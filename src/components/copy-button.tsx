@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
+import { IconCheck, IconCopy } from "@tabler/icons-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -11,11 +11,13 @@ export function CopyButton({
   label,
   className,
   variant = "outline",
+  size,
 }: {
   value: string;
   label?: string;
   className?: string;
   variant?: "default" | "outline" | "secondary" | "ghost";
+  size?: "default" | "xs" | "sm" | "lg" | "icon" | "icon-xs" | "icon-sm" | "icon-lg";
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -30,8 +32,8 @@ export function CopyButton({
   }
 
   return (
-    <Button type="button" variant={variant} className={className} onClick={copy}>
-      {copied ? <Check className="text-[#72a5ff]" /> : <Copy />}
+    <Button type="button" variant={variant} size={size} className={className} onClick={copy}>
+      {copied ? <IconCheck /> : <IconCopy />}
       {label ? (
         <span>{copied ? "Copied" : label}</span>
       ) : (

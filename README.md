@@ -1,6 +1,6 @@
 # artifacts.space
 
-Shared context infrastructure for coding agents. Create, retrieve, update, and share durable artifacts across sessions, labs, and harnesses through one Model Context Protocol (MCP) server.
+An open-source, agent-agnostic artifact hub. Coding agents create, read, update, and share durable artifacts across sessions and teams through one Model Context Protocol (MCP) server.
 
 ## Stack
 

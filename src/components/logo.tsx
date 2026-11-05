@@ -3,6 +3,24 @@ import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * The artifacts.space mark, a 27 by 20 pixel-art grid with fixed brand colors.
+ * It is the same in light and dark mode. It renders at one CSS pixel per grid
+ * unit so every edge lands on whole device pixels.
+ */
+function LogoMark({ className }: { className?: string }) {
+  return (
+    <Image
+      src="/artifacts-space-mark.svg"
+      alt=""
+      width={27}
+      height={20}
+      priority
+      className={cn("h-5 w-[27px] shrink-0", className)}
+    />
+  );
+}
+
 export function Logo({
   href = "/",
   compact = false,
@@ -13,15 +31,9 @@ export function Logo({
   className?: string;
 }) {
   return (
-    <Link href={href} className={cn("group inline-flex items-center gap-2.5", className)}>
-      <span className="overflow-hidden rounded-[5px] ring-1 ring-white/15 transition-transform duration-200 group-hover:-rotate-3">
-        <Image src="/logo.svg" alt="" width={28} height={28} priority />
-      </span>
-      {!compact && (
-        <span className="text-[17px] font-semibold tracking-[-0.035em]">
-          artifacts<span className="text-[#72a5ff]">.space</span>
-        </span>
-      )}
+    <Link href={href} className={cn("inline-flex items-center gap-2.5", className)} aria-label="artifacts.space home">
+      <LogoMark />
+      {!compact && <span className="text-[15px] font-medium tracking-[-0.01em]">artifacts.space</span>}
     </Link>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Plus } from "lucide-react";
+import { IconLoader2 } from "@tabler/icons-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { kinds } from "@/lib/artifact-kinds";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 
 export function CreateArtifactDialog({
@@ -68,46 +69,45 @@ export function CreateArtifactDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto overscroll-contain border-white/10 bg-[#17181d] p-0 sm:max-w-2xl">
-        <form onSubmit={submit}>
-          <DialogHeader className="border-b border-white/10 p-6">
-            <div className="mb-1 font-mono text-[9px] tracking-[0.14em] text-[#72a5ff]">NEW ARTIFACT</div>
-            <DialogTitle className="text-xl tracking-[-0.025em]">Keep something worth coming back to.</DialogTitle>
-            <DialogDescription className="text-white/40">
-              Capture a decision, plan, code snippet, or research note for your next session.
+      <DialogContent className="max-h-[92vh] overflow-y-auto overscroll-contain p-0 sm:max-w-2xl">
+        <form onSubmit={submit} noValidate>
+          <DialogHeader className="border-b p-6">
+            <DialogTitle className="text-lg">New artifact</DialogTitle>
+            <DialogDescription>
+              Agents find artifacts by title, summary, and project. Content can be markdown, code, text, or JSON.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5 p-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="artifact-title">Title</Label>
-                <Input id="artifact-title" name="title" required maxLength={160} autoFocus placeholder="Authentication architecture decision" className="h-10 border-white/10 bg-white/[0.03]" />
+                <Input id="artifact-title" name="title" required maxLength={160} autoFocus placeholder="Authentication architecture decision" className="h-9" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="artifact-project">Project</Label>
-                <Input id="artifact-project" name="project" maxLength={120} placeholder="artifacts-space" className="h-10 border-white/10 bg-white/[0.03]" />
+                <Input id="artifact-project" name="project" maxLength={120} placeholder="artifacts-space" className="h-9" />
               </div>
               <div className="space-y-2">
                 <Label>Format</Label>
                 <Select value={kind} onValueChange={(value) => setKind(value as ArtifactKind)}>
-                  <SelectTrigger className="h-10 w-full border-white/10 bg-white/[0.03]">
+                  <SelectTrigger className="h-9 w-full">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="border-white/10 bg-[#1b1c22]">
-                    {["markdown", "code", "text", "json"].map((value) => (
-                      <SelectItem key={value} value={value} className="capitalize">{value}</SelectItem>
+                  <SelectContent>
+                    {kinds.map((value) => (
+                      <SelectItem key={value} value={value}>{value}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="artifact-summary">Summary <span className="font-normal text-white/25">(optional)</span></Label>
-                <Input id="artifact-summary" name="summary" maxLength={600} placeholder="The short version, for search and agent retrieval" className="h-10 border-white/10 bg-white/[0.03]" />
+                <Label htmlFor="artifact-summary">Summary <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                <Input id="artifact-summary" name="summary" maxLength={600} placeholder="One line, used for search and agent retrieval" className="h-9" />
               </div>
               {kind === "code" && (
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="artifact-language">Language</Label>
-                  <Input id="artifact-language" name="language" maxLength={60} placeholder="typescript" className="h-10 border-white/10 bg-white/[0.03]" />
+                  <Input id="artifact-language" name="language" maxLength={60} placeholder="typescript" className="h-9" />
                 </div>
               )}
               <div className="space-y-2 sm:col-span-2">
@@ -116,16 +116,16 @@ export function CreateArtifactDialog({
                   id="artifact-content"
                   name="content"
                   required
-                  placeholder="## Decision\n\nWhat did you learn, decide, or build?"
-                  className="min-h-56 resize-y border-white/10 bg-[#101115] p-4 font-mono text-xs leading-6"
+                  placeholder="## Decision"
+                  className="min-h-56 resize-y p-4 font-mono text-xs leading-6"
                 />
               </div>
             </div>
           </div>
-          <DialogFooter className="m-0 rounded-none border-white/10 bg-white/[0.015] p-4 px-6">
+          <DialogFooter className="m-0 rounded-none border-t bg-muted/40 px-6 py-4">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={pending} className="bg-[#1768ff] text-white hover:bg-[#2f76ff]">
-              {pending ? <Loader2 className="animate-spin" /> : <Plus />}
+            <Button type="submit" disabled={pending}>
+              {pending && <IconLoader2 className="animate-spin" />}
               {pending ? "Creating…" : "Create artifact"}
             </Button>
           </DialogFooter>

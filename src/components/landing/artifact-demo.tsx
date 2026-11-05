@@ -1,193 +1,240 @@
 "use client";
 
-import {
-  Bot,
-  Braces,
-  Check,
-  ChevronDown,
-  Circle,
-  FileCode2,
-  FileText,
-  Folder,
-  MoreHorizontal,
-  Search,
-  Sparkles,
-} from "lucide-react";
+import { IconLink, IconSearch } from "@tabler/icons-react";
 import { useState } from "react";
 
+import { kindColors, kindIcons } from "@/lib/artifact-kinds";
+import type { ArtifactKind } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
-const examples = [
-  {
-    id: "auth",
-    title: "Auth architecture decision",
-    project: "artifacts-space",
-    kind: "markdown",
-    icon: FileText,
-    updated: "2m",
-    content: `# Auth architecture decision
+const workspace = "Lumen Coffee Roasters";
 
-## Decision
-Use Better Auth with Neon-backed sessions. Agents authenticate with scoped, revocable bearer tokens.
+type Example = {
+  id: string;
+  title: string;
+  project: string;
+  kind: ArtifactKind;
+  updated: string;
+  summary: string;
+  body: React.ReactNode;
+};
 
-## Why
-• Web sessions and MCP access share one identity
-• Token hashes are never readable after creation
-• Every artifact remains scoped to its owner
+const tiers = [
+  ["Café", "10 to 49 kg", "$28.50", "+3%"],
+  ["Regional", "50 to 199 kg", "$26.00", "+2%"],
+  ["National", "200 kg and above", "$23.75", "No change"],
+];
 
-## Next
-Add token rotation before the public beta.`,
-  },
-  {
-    id: "schema",
-    title: "artifact.schema.ts",
-    project: "artifacts-space",
-    kind: "code",
-    icon: FileCode2,
-    updated: "18m",
-    content: `export const artifact = pgTable("artifact", {
-  id: text("id").primaryKey(),
-  title: text("title").notNull(),
-  content: text("content").notNull(),
-  project: text("project"),
-  sessionId: text("session_id"),
-  source: text("source"),
-  updatedAt: timestamp("updated_at"),
-});`,
-  },
-  {
-    id: "research",
-    title: "MCP client compatibility",
-    project: "protocol-research",
-    kind: "json",
-    icon: Braces,
-    updated: "1h",
-    content: `{
-  "transport": "streamable-http",
-  "clients": ["Claude Code", "Cursor", "OpenCode"],
-  "capabilities": {
-    "create": true,
-    "search": true,
-    "update": true
+const nextSteps: [boolean, string][] = [
+  [true, "Update the price list in the B2B store"],
+  [false, "Email the 42 wholesale accounts before 17 April"],
+  [false, "Add the tier rule to the invoicing script"],
+];
+
+const stockistTypes = `/** One café or retailer that stocks Lumen coffee. */
+export interface Stockist {
+  id: string;
+  name: string;
+  tier: "cafe" | "regional" | "national";
+  coordinates: [number, number];
+  openNow: boolean;
+}
+
+export interface StockistResponse {
+  results: Stockist[];
+  nextCursor: string | null;
+}`;
+
+const churnReport = `{
+  "period": "2026-03",
+  "accounts": 184,
+  "churned": 7,
+  "churnRate": 0.038,
+  "topReason": "switched to a local roaster",
+  "atRisk": ["Fern & Co", "Northside Deli", "Harbor Books Café"]
+}`;
+
+const tokenPattern = /(\/\*[\s\S]*?\*\/|\/\/[^\n]*)|("[^"\n]*")(?=\s*:)|("[^"\n]*")|(\b(?:export|interface|type|const|string|number|boolean|null|true|false)\b)|(\b\d+(?:\.\d+)?\b)/g;
+
+/** Minimal token coloring for the demo. Real artifacts render through the editor. */
+function highlight(code: string) {
+  const nodes: React.ReactNode[] = [];
+  let last = 0;
+  for (const match of code.matchAll(tokenPattern)) {
+    const index = match.index ?? 0;
+    if (index > last) nodes.push(code.slice(last, index));
+    const [text, comment, property, string, keyword] = match;
+    const className = comment
+      ? "text-syntax-comment"
+      : property
+        ? "text-syntax-property"
+        : string
+          ? "text-syntax-string"
+          : keyword
+            ? "text-syntax-keyword"
+            : "text-syntax-number";
+    nodes.push(<span key={index} className={className}>{text}</span>);
+    last = index + text.length;
   }
-}`,
+  if (last < code.length) nodes.push(code.slice(last));
+  return nodes;
+}
+
+function Code({ code }: { code: string }) {
+  return (
+    <pre className="overflow-x-auto font-mono text-[12.5px] leading-7">
+      <code>{highlight(code)}</code>
+    </pre>
+  );
+}
+
+const examples: Example[] = [
+  {
+    id: "pricing",
+    title: "Wholesale pricing update, Q2 2026",
+    project: "lumen-wholesale",
+    kind: "markdown",
+    updated: "2 min ago",
+    summary: "Raise the Café and Regional tiers on 1 May. Hold National. Notify every account two weeks ahead.",
+    body: (
+      <div className="demo-doc">
+        <h2>Decision</h2>
+        <p>
+          Raise Café and Regional tier prices on 1 May 2026 and hold the National tier until the annual contracts renew in Q4. Every wholesale account gets written notice at least two weeks before the change.
+        </p>
+        <h2>New tiers</h2>
+        <table>
+          <thead>
+            <tr><th>Tier</th><th>Monthly volume</th><th>Price per kg</th><th>Change</th></tr>
+          </thead>
+          <tbody>
+            {tiers.map(([tier, volume, price, change]) => (
+              <tr key={tier}><td>{tier}</td><td>{volume}</td><td>{price}</td><td>{change}</td></tr>
+            ))}
+          </tbody>
+        </table>
+        <h2>Why</h2>
+        <ul>
+          <li>Green coffee costs rose 11% since the last review in October.</li>
+          <li>Café accounts carry the highest support cost per kilogram.</li>
+          <li>National accounts are on annual contracts until Q4.</li>
+        </ul>
+        <h2>Next steps</h2>
+        <ul className="demo-checklist">
+          {nextSteps.map(([done, step]) => (
+            <li key={step} data-done={done || undefined}>{step}</li>
+          ))}
+        </ul>
+      </div>
+    ),
   },
+  {
+    id: "types",
+    title: "Store locator response types",
+    project: "lumen-web",
+    kind: "code",
+    updated: "41 min ago",
+    summary: "Shared TypeScript types for the stockist map on lumen.coffee.",
+    body: <Code code={stockistTypes} />,
+  },
+  {
+    id: "churn",
+    title: "Wholesale churn, March 2026",
+    project: "lumen-wholesale",
+    kind: "json",
+    updated: "Yesterday",
+    summary: "Monthly churn snapshot pulled from the billing export.",
+    body: <Code code={churnReport} />,
+  },
+];
+
+const activity = [
+  ["Claude Code", "created the decision record", "09:41"],
+  ["Cursor", "updated the tiers table", "09:52"],
+  ["OpenCode", "read it for the invoicing task", "10:07"],
+  ["Maya R.", "opened the share link", "10:30"],
 ];
 
 export function ArtifactDemo() {
   const [selectedId, setSelectedId] = useState(examples[0].id);
   const selected = examples.find((example) => example.id === selectedId) ?? examples[0];
+  const SelectedIcon = kindIcons[selected.kind];
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/15 bg-[#101115] shadow-[0_35px_100px_-35px_rgba(0,0,0,0.9),0_0_0_6px_rgba(255,255,255,0.018)]">
-      <div className="flex h-11 items-center justify-between border-b border-white/10 px-4">
-        <div className="flex items-center gap-3">
-          <div className="flex gap-1.5" aria-hidden="true">
-            <span className="size-2 rounded-full bg-white/15" />
-            <span className="size-2 rounded-full bg-white/15" />
-            <span className="size-2 rounded-full bg-white/15" />
-          </div>
-          <span className="font-mono text-[11px] text-white/45">workspace / artifacts</span>
-        </div>
-        <div className="flex items-center gap-2 font-mono text-[10px] text-white/40">
-          <span className="size-1.5 animate-signal rounded-full bg-[#4d8dff]" />
-          MCP CONNECTED
-        </div>
+    <div className="overflow-hidden rounded-lg border bg-card shadow-[0_30px_80px_-20px_rgba(0,0,0,0.55),0_0_0_1px_rgba(0,0,0,0.08)]">
+      <div className="flex h-11 items-center justify-between border-b px-4 text-xs text-muted-foreground">
+        <span><span className="text-foreground">{workspace}</span> / Artifacts</span>
+        <span>{examples.length} artifacts</span>
       </div>
 
-      <div className="grid min-h-[440px] grid-cols-[210px_minmax(0,1fr)] max-md:grid-cols-1 lg:grid-cols-[230px_minmax(0,1fr)_210px]">
-        <aside className="border-r border-white/10 bg-white/[0.015] max-md:border-r-0 max-md:border-b">
+      <div className="grid min-h-[520px] grid-cols-[240px_minmax(0,1fr)] max-md:grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_240px]">
+        <aside className="border-r bg-background/60 max-md:border-r-0 max-md:border-b">
           <div className="p-3">
-            <div className="flex h-8 items-center gap-2 rounded-md border border-white/10 bg-black/20 px-2.5 text-white/35">
-              <Search className="size-3.5" />
-              <span className="font-mono text-[10px]">Search artifacts…</span>
-              <kbd className="ml-auto text-[9px]">⌘K</kbd>
+            <div className="flex h-8 items-center gap-2 rounded-sm border bg-card px-2.5 text-xs text-muted-foreground">
+              <IconSearch className="size-3.5" />
+              Search
             </div>
           </div>
-          <div className="flex items-center gap-1.5 px-4 pb-2 text-[11px] text-white/45">
-            <ChevronDown className="size-3" />
-            <Folder className="size-3.5" />
-            All artifacts
-            <span className="ml-auto font-mono text-[9px]">24</span>
-          </div>
-          <div className="space-y-1 px-2 pb-3 max-md:grid max-md:grid-cols-3 max-md:gap-1 max-md:space-y-0">
-            {examples.map((example) => (
-              <button
-                key={example.id}
-                type="button"
-                onClick={() => setSelectedId(example.id)}
-                className={cn(
-                  "flex w-full items-start gap-2.5 rounded-md px-2.5 py-2.5 text-left transition-colors",
-                  selectedId === example.id
-                    ? "bg-[#1768ff]/15 text-white ring-1 ring-[#3980ff]/25"
-                    : "text-white/55 hover:bg-white/[0.04] hover:text-white/80",
-                )}
-              >
-                <example.icon className={cn("mt-0.5 size-3.5 shrink-0", selectedId === example.id && "text-[#72a5ff]")} />
-                <span className="min-w-0">
-                  <span className="block truncate text-[11px] font-medium">{example.title}</span>
-                  <span className="mt-1 block truncate font-mono text-[9px] text-white/30">
-                    {example.project} · {example.updated}
+          <div className="px-2 pb-3 max-md:grid max-md:grid-cols-3 max-md:gap-1">
+            {examples.map((example) => {
+              const Icon = kindIcons[example.kind];
+              return (
+                <button
+                  key={example.id}
+                  type="button"
+                  onClick={() => setSelectedId(example.id)}
+                  aria-pressed={selectedId === example.id}
+                  className={cn(
+                    "flex w-full items-start gap-2.5 rounded-sm px-2.5 py-2 text-left transition-colors",
+                    selectedId === example.id ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60",
+                  )}
+                >
+                  <Icon className={cn("mt-0.5 size-4 shrink-0", kindColors[example.kind])} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-medium">{example.title}</span>
+                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                      {example.project} · {example.updated}
+                    </span>
                   </span>
-                </span>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </aside>
 
-        <main className="min-w-0">
-          <div className="flex h-12 items-center justify-between border-b border-white/10 px-5">
-            <div className="flex items-center gap-2 text-[11px] text-white/65">
-              <selected.icon className="size-3.5 text-[#72a5ff]" />
-              {selected.title}
-            </div>
-            <MoreHorizontal className="size-4 text-white/35" />
-          </div>
-          <div className="p-6 sm:p-8">
-            <div className="mb-5 flex items-center gap-2 font-mono text-[9px] tracking-[0.14em] text-[#72a5ff]">
-              <span className="rounded-sm bg-[#1768ff]/10 px-1.5 py-1 ring-1 ring-[#3980ff]/20">
-                {selected.kind.toUpperCase()}
+        <div className="min-w-0">
+          <div className="border-b px-6 pt-6 pb-5">
+            <h3 className="text-xl font-medium tracking-[-0.02em]">{selected.title}</h3>
+            <p className="mt-1.5 text-[13px] leading-6 text-muted-foreground">{selected.summary}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+              <span className={cn("inline-flex items-center gap-1.5 font-medium", kindColors[selected.kind])}>
+                <SelectedIcon className="size-3.5" />
+                {selected.kind}
               </span>
-              <span className="text-white/25">ARTIFACT_{selected.id.toUpperCase()}</span>
+              <span>{selected.project}</span>
+              <span className="inline-flex items-center gap-1"><IconLink className="size-3.5" /> Link enabled</span>
+              <span>Updated {selected.updated}</span>
             </div>
-            <pre className="max-w-[62ch] font-mono text-[11px] leading-[1.9] whitespace-pre-wrap text-white/60 max-sm:text-[10px]">
-              {selected.content}
-            </pre>
           </div>
-        </main>
+          <div className="p-6">{selected.body}</div>
+        </div>
 
-        <aside className="border-l border-white/10 bg-white/[0.015] p-4 max-lg:hidden">
-          <div className="mb-5 flex items-center gap-2 text-[10px] font-medium text-white/45">
-            <Sparkles className="size-3.5 text-[#72a5ff]" />
-            SESSION CONTEXT
-          </div>
-          <div className="space-y-4">
-            {[
-              ["Claude Code", "Created artifact", "09:41"],
-              ["Cursor", "Added decision", "09:43"],
-              ["OpenCode", "Retrieved context", "09:44"],
-            ].map(([agent, action, time], index) => (
-              <div key={agent} className="relative flex gap-2.5">
-                {index < 2 && <span className="absolute top-5 left-[5px] h-8 w-px bg-white/10" />}
-                {index === 2 ? (
-                  <Circle className="mt-1 size-[11px] shrink-0 fill-[#1768ff] text-[#1768ff]" />
-                ) : (
-                  <Check className="mt-0.5 size-3 shrink-0 text-[#72a5ff]" />
-                )}
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-[10px] text-white/70">
-                    <Bot className="size-3 text-white/35" /> {agent}
-                  </div>
-                  <p className="mt-1 text-[10px] text-white/35">{action}</p>
-                  <p className="mt-1 font-mono text-[8px] text-white/20">{time}</p>
+        <aside className="border-l bg-background/60 p-4 max-lg:hidden">
+          <div className="text-xs font-medium">Activity</div>
+          <ol className="mt-4 space-y-4">
+            {activity.map(([who, action, time]) => (
+              <li key={who} className="text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{who}</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">{time}</span>
                 </div>
-              </div>
+                <p className="mt-0.5 text-muted-foreground">{action}</p>
+              </li>
             ))}
-          </div>
-          <div className="mt-8 rounded-md border border-[#3980ff]/15 bg-[#1768ff]/[0.06] p-3">
-            <p className="font-mono text-[9px] leading-5 text-white/40">
-              One source of truth.<br />Three agents.<br />Zero repeated context.
-            </p>
+          </ol>
+          <div className="mt-6 border-t pt-4 text-xs">
+            <div className="font-medium">Access</div>
+            <p className="mt-1.5 text-muted-foreground">Workspace members and anyone with the link.</p>
           </div>
         </aside>
       </div>

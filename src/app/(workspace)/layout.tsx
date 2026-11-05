@@ -10,7 +10,7 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
   if (!session) redirect("/sign-in");
 
   return (
-    <div className="min-h-screen bg-[#111216]">
+    <div className="min-h-screen">
       <AppHeader user={session.user} />
       {children}
     </div>

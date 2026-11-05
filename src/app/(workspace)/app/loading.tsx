@@ -1,11 +1,11 @@
 export default function Loading() {
   return (
-    <div className="animate-pulse p-6">
-      <div className="h-4 w-28 rounded bg-white/[0.06]" />
-      <div className="mt-4 h-8 w-64 rounded bg-white/[0.06]" />
-      <div className="mt-8 grid gap-5 lg:grid-cols-[280px_1fr]">
-        <div className="h-[540px] rounded-lg border border-white/[0.06] bg-white/[0.02]" />
-        <div className="h-[540px] rounded-lg border border-white/[0.06] bg-white/[0.02]" />
+    <div className="mx-auto w-full max-w-none animate-pulse p-6">
+      <div className="h-6 w-28 rounded-sm bg-muted" />
+      <div className="mt-2 h-4 w-44 rounded-sm bg-muted" />
+      <div className="mt-6 grid gap-0 overflow-hidden rounded-md border lg:grid-cols-[280px_1fr]">
+        <div className="h-[560px] border-b bg-muted/40 lg:border-r lg:border-b-0" />
+        <div className="h-[560px] bg-card" />
       </div>
     </div>
   );

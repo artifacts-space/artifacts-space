@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { IconLoader2 } from "@tabler/icons-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,18 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isSignUp && !name.trim()) {
+      setError("Enter your name.");
+      return;
+    }
+    if (!email.trim()) {
+      setError("Enter your email address.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Use a password of at least 8 characters.");
+      return;
+    }
     setPending(true);
     setError("");
 
@@ -29,7 +41,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       : await authClient.signIn.email({ email, password, callbackURL: "/app" });
 
     if (result.error) {
-      setError(result.error.message ?? "Something went wrong. Please try again.");
+      setError(result.error.message ?? "Something went wrong. Try again.");
       setPending(false);
       return;
     }
@@ -39,90 +51,77 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   }
 
   return (
-    <div className="w-full max-w-[390px]">
+    <div className="w-full max-w-[360px]">
       <div className="mb-8">
-        <div className="mb-4 font-mono text-[10px] tracking-[0.16em] text-[#72a5ff]">
-          {isSignUp ? "CREATE YOUR WORKSPACE" : "WELCOME BACK"}
-        </div>
-        <h1 className="text-3xl font-medium tracking-[-0.04em]">
-          {isSignUp ? "Give your agents a memory." : "Continue the work."}
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-white/45">
-          {isSignUp
-            ? "One place for the context every coding session should keep."
-            : "Your artifacts are right where you left them."}
+        <h1 className="text-2xl font-medium tracking-[-0.015em]">{isSignUp ? "Create your account" : "Sign in"}</h1>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          {isSignUp ? "A workspace for your artifacts and the agents that use them." : "Continue to your workspace."}
         </p>
       </div>
 
-      <form onSubmit={submit} className="space-y-5">
+      <form onSubmit={submit} noValidate className="space-y-4">
         {isSignUp && (
           <div className="space-y-2">
-            <Label htmlFor="name" className="text-xs text-white/60">Name</Label>
+            <Label htmlFor="name">Name</Label>
             <Input
               id="name"
               name="name"
               autoComplete="name"
-              placeholder="Ada Lovelace"
               required
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="h-11 border-white/10 bg-white/[0.035] px-3.5 text-sm placeholder:text-white/20"
+              className="h-10"
             />
           </div>
         )}
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-xs text-white/60">Email</Label>
+          <Label htmlFor="email">Email</Label>
           <Input
             id="email"
             name="email"
             type="email"
             autoComplete="email"
-            placeholder="you@company.com"
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="h-11 border-white/10 bg-white/[0.035] px-3.5 text-sm placeholder:text-white/20"
+            className="h-10"
           />
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password" className="text-xs text-white/60">Password</Label>
-            {!isSignUp && <span className="font-mono text-[9px] text-white/25">8+ CHARACTERS</span>}
+            <Label htmlFor="password">Password</Label>
+            {isSignUp && <span className="text-xs text-muted-foreground">At least 8 characters</span>}
           </div>
           <Input
             id="password"
             name="password"
             type="password"
             autoComplete={isSignUp ? "new-password" : "current-password"}
-            placeholder="••••••••••••"
             minLength={8}
             required
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="h-11 border-white/10 bg-white/[0.035] px-3.5 text-sm placeholder:text-white/20"
+            className="h-10"
           />
         </div>
 
         {error && (
-          <p role="alert" className="rounded-md border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-xs leading-5 text-red-200">
+          <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">
             {error}
           </p>
         )}
 
-        <Button type="submit" disabled={pending} className="h-11 w-full bg-[#ecece9] text-black hover:bg-white">
-          {pending ? <Loader2 className="animate-spin" /> : <ArrowRight />}
-          {pending ? "Opening workspace…" : isSignUp ? "Create workspace" : "Sign in"}
+        <Button type="submit" disabled={pending} className="h-10 w-full text-sm">
+          {pending && <IconLoader2 className="animate-spin" />}
+          {pending ? "One moment…" : isSignUp ? "Create account" : "Sign in"}
         </Button>
       </form>
 
-      <p className="mt-7 text-center text-[13px] text-white/35">
-        {isSignUp ? "Already have an account?" : "New to artifacts.space?"}{" "}
-        <Link href={isSignUp ? "/sign-in" : "/sign-up"} className="text-white/70 underline decoration-white/20 underline-offset-4 hover:text-white">
-          {isSignUp ? "Sign in" : "Create an account"}
+      <p className="mt-6 text-[13px] text-muted-foreground">
+        {isSignUp ? "Already have an account?" : "No account yet?"}{" "}
+        <Link href={isSignUp ? "/sign-in" : "/sign-up"} className="text-foreground underline underline-offset-4 decoration-border hover:decoration-foreground">
+          {isSignUp ? "Sign in" : "Create one"}
         </Link>
-      </p>
-      <p className="mt-10 text-center font-mono text-[9px] leading-5 tracking-[0.06em] text-white/20">
-        PRIVATE BY DEFAULT · REVOCABLE AGENT ACCESS
       </p>
     </div>
   );
