@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth/client";
+import { isDevSignInEnabled } from "@/lib/auth/dev-user";
 
 type AuthMode = "sign-in" | "sign-up";
 type Pending = "github" | "email" | null;
@@ -56,6 +57,19 @@ function CheckEmail({ email, onBack }: { email: string; onBack: () => void }) {
         Use a different email
       </button>
     </div>
+  );
+}
+
+/** Development only: one click signs in as the stub dev user. */
+function DevSignIn() {
+  if (!isDevSignInEnabled) return null;
+  return (
+    <a
+      href="/api/dev/sign-in"
+      className="mt-3 flex h-10 w-full items-center justify-center rounded-md border border-dashed border-border text-sm text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+    >
+      Continue as dev user
+    </a>
   );
 }
 
@@ -125,6 +139,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         {pending === "github" ? <IconLoader2 className="animate-spin" /> : <IconBrandGithub />}
         Continue with GitHub
       </Button>
+      <DevSignIn />
 
       <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
         <span className="h-px flex-1 bg-border" />

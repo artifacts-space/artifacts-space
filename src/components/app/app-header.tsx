@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -75,10 +76,13 @@ export function AppHeader({ name, email }: { name: string; email: string }) {
               <IconChevronDown className="size-3 text-muted-foreground" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel className="px-2 py-2">
-                <span className="block truncate text-xs font-medium">{name}</span>
-                <span className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground">{email}</span>
-              </DropdownMenuLabel>
+              {/* Base UI requires a group label to sit inside a group. */}
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="px-2 py-2">
+                  <span className="block truncate text-xs font-medium">{name}</span>
+                  <span className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground">{email}</span>
+                </DropdownMenuLabel>
+              </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => { router.push("/app/connections"); }} className="px-2 py-2 text-xs">
                 <IconKey /> Access tokens

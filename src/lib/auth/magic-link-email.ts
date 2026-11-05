@@ -28,6 +28,17 @@ function renderHtml(url: string) {
 </html>`;
 }
 
+/** Links "sent" in development without Sendir, so the dev sign-in route can follow them. */
+const devOutbox = new Map<string, string>();
+
+/** Returns and forgets the last development magic link for an email address. */
+export function takeDevMagicLink(email: string) {
+  const key = email.toLowerCase();
+  const url = devOutbox.get(key);
+  devOutbox.delete(key);
+  return url;
+}
+
 /** One key per magic-link token, so a retry never sends the same link twice. */
 function idempotencyKey(token: string) {
   return `magic-link:${createHash("sha256").update(token).digest("hex")}`;
@@ -40,6 +51,7 @@ function idempotencyKey(token: string) {
 export async function sendMagicLinkEmail({ email, url, token }: MagicLinkEmail) {
   if (!isSendirConfigured()) {
     if (process.env.NODE_ENV === "production") throw new Error("Sendir is not configured, so sign-in links cannot be sent.");
+    devOutbox.set(email.toLowerCase(), url);
     console.info(`[auth] Magic link for ${email}: ${url}`);
     return;
   }
