@@ -60,7 +60,7 @@ export function Connections({
     2,
   );
 
-  async function create(event: React.FormEvent<HTMLFormElement>) {
+  async function create(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim()) return;
     setCreating(true);
@@ -135,10 +135,10 @@ export function Connections({
             <h2 className="text-sm font-medium">Access tokens</h2>
             <p className="mt-1 text-[13px] text-muted-foreground">Use one token per client or device so you can revoke them separately.</p>
           </div>
-          <form onSubmit={create} noValidate className="border-b p-5">
+          <form onSubmit={(event) => void create(event)} noValidate className="border-b p-5">
             <Label htmlFor="token-name" className="text-xs">Token name</Label>
             <div className="mt-2 flex gap-2">
-              <Input id="token-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} placeholder="Claude Code on laptop" className="h-9 min-w-0 text-[13px]" />
+              <Input id="token-name" value={name} onChange={(event) => { setName(event.target.value); }} maxLength={80} placeholder="Claude Code on laptop" className="h-9 min-w-0 text-[13px]" />
               <Button type="submit" disabled={creating || !name.trim()} size="lg" className="px-3" aria-label="Create token">
                 {creating ? <IconLoader2 className="animate-spin" /> : <IconPlus />}
               </Button>
@@ -162,7 +162,7 @@ export function Connections({
                         {token.lastUsedAt ? `Last used ${dateFormat.format(new Date(token.lastUsedAt))}` : "Never used"}
                       </p>
                     </div>
-                    <Button variant="ghost" size="icon-sm" onClick={() => setRevokeId(token.id)} aria-label={`Revoke ${token.name}`} className="text-muted-foreground hover:text-destructive">
+                    <Button variant="ghost" size="icon-sm" onClick={() => { setRevokeId(token.id); }} aria-label={`Revoke ${token.name}`} className="text-muted-foreground hover:text-destructive">
                       <IconTrash />
                     </Button>
                   </li>
@@ -177,13 +177,13 @@ export function Connections({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Token created</DialogTitle>
-            <DialogDescription className="leading-6">IconCopy it now. It will not be shown again.</DialogDescription>
+            <DialogDescription className="leading-6">Copy it now. It will not be shown again.</DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-2 rounded-md border bg-background/60 p-1.5 pl-3">
             <code className="min-w-0 flex-1 truncate font-mono text-xs">{newToken}</code>
             <CopyButton value={newToken} label="Copy" variant="secondary" size="sm" />
           </div>
-          <DialogFooter><Button onClick={() => setNewToken("")}>Done</Button></DialogFooter>
+          <DialogFooter><Button onClick={() => { setNewToken(""); }}>Done</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -194,8 +194,8 @@ export function Connections({
             <DialogDescription className="leading-6">Any client using it loses access immediately. You can create a new token at any time.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setRevokeId("")}>Cancel</Button>
-            <Button variant="destructive" onClick={revoke} disabled={revoking}>{revoking && <IconLoader2 className="animate-spin" />} Revoke</Button>
+            <Button variant="ghost" onClick={() => { setRevokeId(""); }}>Cancel</Button>
+            <Button variant="destructive" onClick={() => void revoke()} disabled={revoking}>{revoking && <IconLoader2 className="animate-spin" />} Revoke</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

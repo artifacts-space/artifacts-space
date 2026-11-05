@@ -27,6 +27,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { kinds } from "@/lib/artifact-kinds";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 
+/** Reads a text field from form data. File inputs and missing fields read as empty. */
+function formText(formData: FormData, name: string) {
+  const value = formData.get(name);
+  return typeof value === "string" ? value : "";
+}
+
 export function CreateArtifactDialog({
   open,
   onOpenChange,
@@ -39,38 +45,40 @@ export function CreateArtifactDialog({
   const [pending, setPending] = useState(false);
   const [kind, setKind] = useState<ArtifactKind>("markdown");
 
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
     setPending(true);
-
-    const result = await createArtifactAction({
-      title: String(formData.get("title") ?? ""),
-      summary: String(formData.get("summary") ?? ""),
-      project: String(formData.get("project") ?? ""),
-      language: String(formData.get("language") ?? ""),
-      content: String(formData.get("content") ?? ""),
-      kind,
-    });
-
-    setPending(false);
-    if (!result.success) {
-      toast.error(result.error);
-      return;
+    try {
+      const result = await createArtifactAction({
+        title: formText(formData, "title"),
+        summary: formText(formData, "summary"),
+        project: formText(formData, "project"),
+        language: formText(formData, "language"),
+        content: formText(formData, "content"),
+        kind,
+      });
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      onCreated(result.data);
+      onOpenChange(false);
+      form.reset();
+      setKind("markdown");
+      toast.success("Artifact created.");
+    } catch {
+      toast.error("Something went wrong. Check your connection and try again.");
+    } finally {
+      setPending(false);
     }
-
-    onCreated(result.data);
-    onOpenChange(false);
-    form.reset();
-    setKind("markdown");
-    toast.success("Artifact created.");
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto overscroll-contain p-0 sm:max-w-2xl">
-        <form onSubmit={submit} noValidate>
+        <form onSubmit={(event) => void submit(event)} noValidate>
           <DialogHeader className="border-b p-6">
             <DialogTitle className="text-lg">New artifact</DialogTitle>
             <DialogDescription>
@@ -89,7 +97,7 @@ export function CreateArtifactDialog({
               </div>
               <div className="space-y-2">
                 <Label>Format</Label>
-                <Select value={kind} onValueChange={(value) => setKind(value as ArtifactKind)}>
+                <Select value={kind} onValueChange={(value) => { if (value) setKind(value); }}>
                   <SelectTrigger className="h-9 w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -123,7 +131,7 @@ export function CreateArtifactDialog({
             </div>
           </div>
           <DialogFooter className="m-0 rounded-none border-t bg-muted/40 px-6 py-4">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="button" variant="ghost" onClick={() => { onOpenChange(false); }}>Cancel</Button>
             <Button type="submit" disabled={pending}>
               {pending && <IconLoader2 className="animate-spin" />}
               {pending ? "Creating…" : "Create artifact"}

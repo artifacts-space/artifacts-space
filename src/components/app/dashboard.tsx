@@ -3,7 +3,7 @@
 import { IconPlus, IconSearch } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 
-import { ArtifactEditor } from "@/components/app/artifact-editor";
+import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
 import { CreateArtifactDialog } from "@/components/app/create-artifact-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,7 +78,7 @@ export function Dashboard({
             {artifacts.length} {artifacts.length === 1 ? "artifact" : "artifacts"} across {projects.size} {projects.size === 1 ? "project" : "projects"}
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="px-3">
+        <Button onClick={() => { setCreateOpen(true); }} className="px-3">
           <IconPlus /> New artifact
         </Button>
       </div>
@@ -90,13 +90,13 @@ export function Dashboard({
               <IconSearch className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => { setQuery(event.target.value); }}
                 placeholder="Search"
                 aria-label="Search artifacts"
                 className="h-8 bg-card pl-8 text-[13px]"
               />
             </div>
-            <Select value={kind} onValueChange={(value) => setKind(value ?? "all")}>
+            <Select value={kind} onValueChange={(value) => { setKind(value ?? "all"); }}>
               <SelectTrigger size="sm" className="h-7 w-full border-0 bg-transparent px-1 text-xs text-muted-foreground shadow-none" aria-label="Filter by format">
                 <SelectValue />
               </SelectTrigger>
@@ -123,7 +123,7 @@ export function Dashboard({
                     <li key={artifact.id}>
                       <button
                         type="button"
-                        onClick={() => setSelectedId(artifact.id)}
+                        onClick={() => { setSelectedId(artifact.id); }}
                         aria-current={active ? "true" : undefined}
                         className={cn(
                           "w-full rounded-sm px-3 py-2.5 text-left transition-colors",
@@ -165,7 +165,7 @@ export function Dashboard({
               <p className="mt-2 text-[13px] leading-6 text-muted-foreground">
                 Create one here, or connect an agent and let it create artifacts through MCP.
               </p>
-              <Button onClick={() => setCreateOpen(true)} className="mt-5"><IconPlus /> New artifact</Button>
+              <Button onClick={() => { setCreateOpen(true); }} className="mt-5"><IconPlus /> New artifact</Button>
             </div>
           </div>
         )}

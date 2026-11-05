@@ -11,7 +11,7 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen">
-      <AppHeader user={session.user} />
+      <AppHeader name={session.user.name} email={session.user.email} />
       {children}
     </div>
   );

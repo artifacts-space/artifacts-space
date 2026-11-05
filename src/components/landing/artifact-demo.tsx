@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 const workspace = "Lumen Coffee Roasters";
 
-type Example = {
+interface Example {
   id: string;
   title: string;
   project: string;
@@ -17,7 +17,7 @@ type Example = {
   updated: string;
   summary: string;
   body: React.ReactNode;
-};
+}
 
 const tiers = [
   ["Café", "10 to 49 kg", "$28.50", "+3%"],
@@ -61,7 +61,7 @@ function highlight(code: string) {
   const nodes: React.ReactNode[] = [];
   let last = 0;
   for (const match of code.matchAll(tokenPattern)) {
-    const index = match.index ?? 0;
+    const index = match.index;
     if (index > last) nodes.push(code.slice(last, index));
     const [text, comment, property, string, keyword] = match;
     const className = comment
@@ -88,7 +88,7 @@ function Code({ code }: { code: string }) {
   );
 }
 
-const examples: Example[] = [
+const examples: [Example, ...Example[]] = [
   {
     id: "pricing",
     title: "Wholesale pricing update, Q2 2026",
@@ -182,7 +182,7 @@ export function ArtifactDemo() {
                 <button
                   key={example.id}
                   type="button"
-                  onClick={() => setSelectedId(example.id)}
+                  onClick={() => { setSelectedId(example.id); }}
                   aria-pressed={selectedId === example.id}
                   className={cn(
                     "flex w-full items-start gap-2.5 rounded-sm px-2.5 py-2 text-left transition-colors",

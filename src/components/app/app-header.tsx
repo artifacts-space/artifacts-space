@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -23,15 +23,11 @@ const navigation = [
   { href: "/app/connections", label: "Connections", exact: false },
 ];
 
-export function AppHeader({
-  user,
-}: {
-  user: { name: string; email: string; image?: string | null };
-}) {
+export function AppHeader({ name, email }: { name: string; email: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
-  const initials = user.name
+  const initials = name
     .split(" ")
     .map((part) => part[0])
     .join("")
@@ -80,18 +76,18 @@ export function AppHeader({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="px-2 py-2">
-                <span className="block truncate text-xs font-medium">{user.name}</span>
-                <span className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground">{user.email}</span>
+                <span className="block truncate text-xs font-medium">{name}</span>
+                <span className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground">{email}</span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push("/app/connections")} className="px-2 py-2 text-xs">
+              <DropdownMenuItem onClick={() => { router.push("/app/connections"); }} className="px-2 py-2 text-xs">
                 <IconKey /> Access tokens
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/")} className="px-2 py-2 text-xs">
+              <DropdownMenuItem onClick={() => { router.push("/"); }} className="px-2 py-2 text-xs">
                 <IconExternalLink /> Public site
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={signOut} className="px-2 py-2 text-xs">
+              <DropdownMenuItem onClick={() => void signOut()} className="px-2 py-2 text-xs">
                 <IconLogout /> {signingOut ? "Signing out…" : "Sign out"}
               </DropdownMenuItem>
             </DropdownMenuContent>

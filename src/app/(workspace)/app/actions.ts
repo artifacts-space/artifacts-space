@@ -9,6 +9,7 @@ import {
   createArtifact,
   deleteArtifact,
   updateArtifact,
+  type ArtifactUpdateInput,
 } from "@/lib/artifacts";
 import type {
   ActionResult,
@@ -43,7 +44,7 @@ export async function createArtifactAction(
 
 export async function updateArtifactAction(
   id: string,
-  input: Partial<ArtifactInput>,
+  input: ArtifactUpdateInput,
 ): Promise<ActionResult<ArtifactDto>> {
   try {
     const userId = await requireUserId();

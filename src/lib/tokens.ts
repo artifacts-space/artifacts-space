@@ -25,6 +25,7 @@ export async function createApiToken(userId: string, name: string) {
     })
     .returning();
 
+  if (!record) throw new Error("The access token could not be created.");
   return {
     token: secret,
     record: {

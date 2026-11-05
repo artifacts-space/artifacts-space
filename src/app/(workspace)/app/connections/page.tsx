@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { Connections } from "@/components/app/connections";
 import { getRequestOrigin } from "@/lib/origin";
@@ -9,8 +10,9 @@ export const metadata: Metadata = { title: "Connections" };
 
 export default async function ConnectionsPage() {
   const session = await getSession();
+  if (!session) redirect("/sign-in");
   const [tokens, origin] = await Promise.all([
-    listApiTokens(session!.user.id),
+    listApiTokens(session.user.id),
     getRequestOrigin(),
   ]);
   return <Connections initialTokens={tokens} origin={origin} />;

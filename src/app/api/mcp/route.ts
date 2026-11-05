@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 
-import { getAuth } from "@/lib/auth";
+import { getSession } from "@/lib/session";
 import {
   createArtifact,
   deleteArtifact,
@@ -21,7 +21,7 @@ async function authenticateRequest(request: Request) {
     return authenticateApiToken(authorization.slice(7).trim());
   }
 
-  const session = await getAuth().api.getSession({ headers: request.headers });
+  const session = await getSession();
   return session?.user.id ?? null;
 }
 
@@ -59,7 +59,7 @@ function createMcpServer(userId: string) {
     {
       title: "Get artifact",
       description: "Retrieve a complete artifact by its ID.",
-      inputSchema: { id: z.string().uuid().describe("Artifact ID") },
+      inputSchema: { id: z.uuid().describe("Artifact ID") },
     },
     async ({ id }) => {
       const artifact = await getArtifact(userId, id);
@@ -95,7 +95,7 @@ function createMcpServer(userId: string) {
       title: "Update artifact",
       description: "Update one or more fields of an existing artifact. Only supplied fields are changed.",
       inputSchema: {
-        id: z.string().uuid(),
+        id: z.uuid(),
         title: z.string().min(1).max(160).optional(),
         content: z.string().min(1).max(1_000_000).optional(),
         summary: z.string().max(600).optional(),
@@ -120,7 +120,7 @@ function createMcpServer(userId: string) {
     {
       title: "Delete artifact",
       description: "Permanently delete an artifact by ID.",
-      inputSchema: { id: z.string().uuid() },
+      inputSchema: { id: z.uuid() },
     },
     async ({ id }) => {
       const deleted = await deleteArtifact(userId, id);
@@ -142,8 +142,8 @@ export async function POST(request: Request) {
   }
 
   const server = createMcpServer(userId);
+  // No sessionIdGenerator: the transport runs stateless, one request per server.
   const transport = new WebStandardStreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
     enableJsonResponse: true,
   });
 
@@ -155,14 +155,14 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export function GET() {
   return Response.json(
     { error: "Use POST for MCP requests. Standalone event streams are not enabled." },
     { status: 405, headers: { Allow: "POST, OPTIONS" } },
   );
 }
 
-export async function OPTIONS() {
+export function OPTIONS() {
   return new Response(null, {
     status: 204,
     headers: {

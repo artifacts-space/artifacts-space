@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/session";
-import { createApiToken, listApiTokens, revokeApiToken } from "@/lib/tokens";
+import { createApiToken, type listApiTokens, revokeApiToken } from "@/lib/tokens";
 import type { ActionResult } from "@/lib/artifact-types";
 
 export type ApiTokenDto = Awaited<ReturnType<typeof listApiTokens>>[number];

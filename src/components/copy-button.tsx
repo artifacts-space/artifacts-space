@@ -25,14 +25,14 @@ export function CopyButton({
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
+      window.setTimeout(() => { setCopied(false); }, 1800);
     } catch {
       toast.error("Could not access the clipboard.");
     }
   }
 
   return (
-    <Button type="button" variant={variant} size={size} className={className} onClick={copy}>
+    <Button type="button" variant={variant} size={size} className={className} onClick={() => void copy()}>
       {copied ? <IconCheck /> : <IconCopy />}
       {label ? (
         <span>{copied ? "Copied" : label}</span>

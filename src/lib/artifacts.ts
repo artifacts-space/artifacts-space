@@ -24,6 +24,9 @@ const artifactUpdateSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+/** Fields an update may change. Every field is optional. */
+export type ArtifactUpdateInput = z.input<typeof artifactUpdateSchema>;
+
 export const artifactInputSchema = artifactUpdateSchema
   .required({ title: true, content: true })
   .extend({
@@ -58,7 +61,7 @@ export function toArtifactDto(record: ArtifactRecord): ArtifactDto {
 
 export async function listArtifacts(
   userId: string,
-  options: { query?: string; project?: string; limit?: number } = {},
+  options: { query?: string | undefined; project?: string | undefined; limit?: number | undefined } = {},
 ) {
   const conditions: SQL[] = [eq(artifact.userId, userId)];
   const query = options.query?.trim();
@@ -120,13 +123,14 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
     })
     .returning();
 
+  if (!record) throw new Error("The artifact could not be created.");
   return toArtifactDto(record);
 }
 
 export async function updateArtifact(
   userId: string,
   id: string,
-  input: Partial<ArtifactInput>,
+  input: ArtifactUpdateInput,
 ) {
   const parsed = artifactUpdateSchema.parse(input);
   const [record] = await getDb()

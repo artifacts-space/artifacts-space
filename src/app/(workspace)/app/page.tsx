@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { Dashboard } from "@/components/app/dashboard";
 import { listArtifacts } from "@/lib/artifacts";
@@ -9,8 +10,9 @@ export const metadata: Metadata = { title: "Artifacts" };
 
 export default async function AppPage() {
   const session = await getSession();
+  if (!session) redirect("/sign-in");
   const [artifacts, origin] = await Promise.all([
-    listArtifacts(session!.user.id),
+    listArtifacts(session.user.id),
     getRequestOrigin(),
   ]);
 

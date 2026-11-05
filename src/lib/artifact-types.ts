@@ -2,7 +2,7 @@ export const artifactKinds = ["markdown", "code", "text", "json"] as const;
 export type ArtifactKind = (typeof artifactKinds)[number];
 export type ArtifactVisibility = "private" | "unlisted";
 
-export type ArtifactDto = {
+export interface ArtifactDto {
   id: string;
   title: string;
   summary: string;
@@ -17,20 +17,20 @@ export type ArtifactDto = {
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
-};
+}
 
-export type ArtifactInput = {
+export interface ArtifactInput {
   title: string;
-  summary?: string;
+  summary?: string | undefined;
   content: string;
-  kind?: ArtifactKind;
-  language?: string;
-  project?: string;
-  sessionId?: string;
-  source?: string;
-  visibility?: ArtifactVisibility;
-  metadata?: Record<string, unknown>;
-};
+  kind?: ArtifactKind | undefined;
+  language?: string | undefined;
+  project?: string | undefined;
+  sessionId?: string | undefined;
+  source?: string | undefined;
+  visibility?: ArtifactVisibility | undefined;
+  metadata?: Record<string, unknown> | undefined;
+}
 
 export type ActionResult<T> =
   | { success: true; data: T }
