@@ -11,6 +11,7 @@ import {
   updateArtifact,
 } from "@/lib/artifacts";
 import { artifactKinds } from "@/lib/artifact-types";
+import { kindFieldDescription, registerFormatTools } from "@/lib/mcp/format-tools";
 import { authenticateApiToken } from "@/lib/tokens";
 
 export const maxDuration = 30;
@@ -77,7 +78,7 @@ function createMcpServer(userId: string) {
         title: z.string().min(1).max(160),
         content: z.string().min(1).max(1_000_000),
         summary: z.string().max(600).optional(),
-        kind: z.enum(artifactKinds).optional(),
+        kind: z.enum(artifactKinds).optional().describe(kindFieldDescription),
         language: z.string().max(60).optional(),
         project: z.string().max(120).optional(),
         sessionId: z.string().max(200).optional(),
@@ -99,7 +100,7 @@ function createMcpServer(userId: string) {
         title: z.string().min(1).max(160).optional(),
         content: z.string().min(1).max(1_000_000).optional(),
         summary: z.string().max(600).optional(),
-        kind: z.enum(artifactKinds).optional(),
+        kind: z.enum(artifactKinds).optional().describe(kindFieldDescription),
         language: z.string().max(60).optional(),
         project: z.string().max(120).optional(),
         sessionId: z.string().max(200).optional(),
@@ -129,6 +130,7 @@ function createMcpServer(userId: string) {
     },
   );
 
+  registerFormatTools(server);
   return server;
 }
 

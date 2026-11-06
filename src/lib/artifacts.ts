@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { artifact, type ArtifactRecord } from "@/db/schema";
+import { assertValidArtifactContent, assertValidArtifactUpdate } from "@/lib/artifact-content";
 import {
   artifactKinds,
   type ArtifactDto,
@@ -113,6 +114,7 @@ export async function getSharedArtifact(shareId: string) {
 
 export async function createArtifact(userId: string, input: ArtifactInput) {
   const parsed = artifactInputSchema.parse(input);
+  assertValidArtifactContent(parsed.kind, parsed.content);
   const [record] = await getDb()
     .insert(artifact)
     .values({
@@ -133,6 +135,7 @@ export async function updateArtifact(
   input: ArtifactUpdateInput,
 ) {
   const parsed = artifactUpdateSchema.parse(input);
+  await assertValidArtifactUpdate(parsed, () => getArtifact(userId, id));
   const [record] = await getDb()
     .update(artifact)
     .set({ ...parsed, updatedAt: new Date() })
