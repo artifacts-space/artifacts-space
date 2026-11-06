@@ -1,87 +1,210 @@
 # artifacts.space
 
-An open-source, agent-agnostic artifact hub. Coding agents create, read, update, and share durable artifacts across sessions and teams through one Model Context Protocol (MCP) server.
+The human context layer for coding agents.
 
-## Stack
+Coding agents lose what they learned when a session ends. artifacts.space gives
+them one place to keep it: plans, decisions, research, code, and files, saved as
+artifacts through a Model Context Protocol (MCP) server. People read the same
+artifacts in the web app, comment on them, and share them with their team. Any
+MCP client can connect.
 
-- Next.js 16.4.2, React 19, TypeScript
-- Tailwind CSS 4 and shadcn/ui with Base UI
-- Better Auth (self-hosted) with GitHub and magic-link sign-in. There are no passwords.
-- Neon Postgres and Drizzle ORM
-- MCP Streamable HTTP with bearer-token authentication
+Full documentation: https://artifacts.space/docs
 
-## Local setup
+![The artifacts.space landing page, with a sample workspace](docs/images/hero.webp)
 
-```bash
-pnpm install
-cp .env.example .env.local
-```
+## Features
 
-Set these in `.env.local`. Vercel's Neon integration provides the database URLs, and `vercel env pull` can write them.
+- **One MCP server for every agent.** Claude Code, Cursor, and other MCP
+  clients create, read, update, and list artifacts at `/api/mcp`.
+- **Formats people can read.** Markdown, code, plain text, JSON, CSV tables,
+  SVG, Mermaid diagrams, Interface artifacts (dashboards, reports, and
+  checklists built from a fixed component set), and uploaded files. Agent
+  content never runs as code on the page.
+- **Version history.** Each save becomes a version: the latest 100, for up to
+  a year. Editors can compare versions and restore an earlier one.
+- **Teams and sharing.** Artifacts are private by default. Share them with a
+  team, by link, or in public. Each team sets whether sharing needs an owner's
+  or admin's approval. Agents can ask to share, but never approve.
+- **Agent teammates.** Team owners and admins add agents with their own handle
+  and tokens. An agent's work reads "@reviewer for Dana", so you always know
+  who sent it.
+- **Comments, mentions, and an inbox.** People and agents @mention each other
+  in comment threads. Loop limits, rate limits, and mutes keep agents from
+  talking over people.
+- **Files.** Uploads go straight to Cloudflare R2 through short-lived signed
+  URLs. Downloads go through the same access check as everything else.
+- **Safe connections.** Connect with OAuth in the browser, or with an access
+  token for CI. Tokens are stored only as hashes, and a read-only connection
+  never sees write tools.
 
-- `DATABASE_URL` and `DATABASE_URL_UNPOOLED`: the Neon connection strings. Migrations use the unpooled one.
-- `BETTER_AUTH_SECRET`: at least 32 characters, for example from `openssl rand -base64 32`.
-- `BETTER_AUTH_URL`: this site's origin. Use `http://localhost:3000` locally and `https://artifacts.space` in production.
-- `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`: from a GitHub OAuth app.
-- `SENDIR_API_KEY` and `SENDIR_IDENTITY_ID`: Sendir sends the magic sign-in links from that identity's own address. Use a key scoped to the identity. In development without them, the link prints to the dev server log.
+![The workspace with a migration plan open, last edited by an agent teammate](docs/images/workspace.webp)
 
-The GitHub OAuth app's authorization callback URL is `https://artifacts.space/api/auth/callback/github`. A GitHub OAuth app allows one callback URL, so GitHub sign-in stays off locally while `GITHUB_CLIENT_ID` is empty. Use a magic link to sign in locally.
+![An Interface artifact: a cost dashboard with metrics, tabs, tables, and a chart](docs/images/dashboard.webp)
 
-Users, sessions, accounts, and magic-link tokens live in the app's own `public` schema, managed by the same Drizzle migrations as everything else.
+![A comment thread where a person mentions an agent and a teammate, and both reply](docs/images/comments.webp)
 
-```bash
-pnpm db:migrate
-pnpm dev
-```
-
-Open http://localhost:3000. Local `localhost` and `127.0.0.1` database URLs use the PostgreSQL TCP driver; remote Neon URLs use Neon Serverless automatically.
+![Version history showing the line an agent changed](docs/images/history.webp)
 
 ## Connect an agent
 
-1. Create an account and open **Connections** in the workspace.
-2. Create an access token and copy it immediately; only its hash is stored.
-3. Add this configuration to your MCP client, replacing the URL and token for your environment:
+### Claude Code (OAuth)
+
+```bash
+claude mcp add --transport http artifacts https://artifacts.space/api/mcp
+```
+
+Claude Code finds the sign-in server from the endpoint and asks you to approve
+the connection in your browser. Other clients that support OAuth, such as
+Cursor, need only the URL:
+
+```json
+{
+  "mcpServers": {
+    "artifacts": { "url": "https://artifacts.space/api/mcp" }
+  }
+}
+```
+
+### CI and headless agents (access token)
+
+Where nobody can approve in a browser, use an access token:
+
+1. Sign in and open **Connections** at `/app/connections`.
+2. Create an access token and copy it. It is shown once.
+3. Store it as a secret, for example `ARTIFACTS_SPACE_TOKEN`, and send it as a
+   bearer token:
+
+```bash
+claude mcp add --transport http artifacts https://artifacts.space/api/mcp \
+  --header "Authorization: Bearer $ARTIFACTS_SPACE_TOKEN"
+```
 
 ```json
 {
   "mcpServers": {
     "artifacts": {
-      "url": "http://localhost:3000/api/mcp",
-      "headers": {
-        "Authorization": "Bearer YOUR_TOKEN"
-      }
+      "url": "https://artifacts.space/api/mcp",
+      "headers": { "Authorization": "Bearer YOUR_TOKEN" }
     }
   }
 }
 ```
 
-The server exposes `artifacts_create`, `artifacts_get`, `artifacts_list`, `artifacts_update`, `artifacts_delete`, and `teams_list`. Artifacts are identified by their 22-character public id, the same one as in `/artifact/<id>`. Reads go through the same access check as the web app. Agents can request sharing (`visibility` with a `team` slug), and the team's rule decides whether it applies now or waits for an owner or admin; agents can never approve.
+For a self-hosted instance, replace `https://artifacts.space` with your origin.
 
-### Agent teammates
+### Tools
 
-Team owners and admins add agents on the team page. Each agent has its own handle (it shares the username namespace, for example `@reviewer`), a display name, the person who added it, exactly one team, and its own tokens. An agent's token acts as the agent: it sees what its team can see, its work reads "@reviewer for <owner>", and it can ask to share but never approve. Agents cannot sign in to the web app. Personal tokens keep acting as the person.
+| Area | Tools |
+| --- | --- |
+| Artifacts | `artifacts_list`, `artifacts_get`, `artifacts_create`, `artifacts_update`, `artifacts_delete`, `teams_list` |
+| Versions | `artifacts_versions`, `artifacts_restore_version` |
+| Formats | `artifacts_formats_guide`, `artifacts_validate` |
+| Files | `files_request_upload`, `files_finalize`, `files_create_artifact`, `files_attach`, `files_get_download_url`, `files_delete` |
+| Comments and inbox | `inbox_list`, `inbox_mark_read`, `comments_list`, `comment_create`, `comment_update`, `comment_delete` |
 
-Comment threads, mentions, and the inbox use four more tools: `inbox_list`, `inbox_mark_read`, `comments_list`, and `comment_create`. Comment text in their results is labelled as untrusted content. A mention lands only for the artifact's author or the writer's teammates who can view the artifact. Guardrails live in `src/lib/comments/config.ts`, with comment rate limits in `src/lib/abuse/limits.ts`: after 6 agent comments in a row in a thread, agents can no longer be mentioned there until a person posts; agents may post 6 comments a minute and 60 an hour (people 20 and 300); and people can mute an agent in a thread, or team admins across the team.
+Artifacts are identified by their 22-character public id, the same one as in
+`/artifact/<id>`. Comment text in tool results is labelled as untrusted
+content. Comment guardrails live in `src/lib/comments/config.ts`, and rate
+limits in `src/lib/abuse/limits.ts`.
 
-## Commands
+## Self-hosting
+
+You need Node.js 20.12 or later, pnpm 10, a Postgres database (Neon works out of
+the box), a GitHub OAuth app, a Cloudflare R2 bucket, and a
+[Sendir](https://sendir.ai) identity for sign-in emails.
 
 ```bash
-pnpm dev          # Development server
-pnpm build        # Production build
-pnpm start        # Production server
-pnpm check        # Lint, typecheck, and file-length check (runs before every commit)
-pnpm lint         # ESLint, strict type-checked rules, zero warnings
-pnpm typecheck    # Generate Next route types, then strict TypeScript
-pnpm check:lines  # Every file stays within 500 lines
-pnpm db:generate  # Generate a migration from schema changes
-pnpm db:migrate   # Apply migrations
-pnpm db:studio    # Inspect the database
+pnpm install
+cp .env.example .env.local   # then fill it in
+pnpm db:migrate
+pnpm dev
 ```
 
-## Code limits
+Open http://localhost:3000. Without Sendir keys in development, sign-in links
+print to the dev server log, and `/api/dev/sign-in` signs you in as a local
+dev user.
 
-- TypeScript runs with `strict` plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, and the other flags in `tsconfig.json`.
-- ESLint uses typescript-eslint's strict and stylistic type-checked rules and fails on any warning.
-- Cyclomatic complexity is capped at 10 per function.
-- Every file is capped at 500 lines. `AGENTS.md`, `CLAUDE.md`, `src/app/globals.css`, and generated files are exempt.
-- A Husky pre-commit hook runs `pnpm check`. `pnpm install` sets the hook up.
+### Environment variables
+
+| Variable | Required | What it is |
+| --- | --- | --- |
+| `DATABASE_URL` | Yes | Postgres connection string. Vercel's Neon integration sets it. |
+| `DATABASE_URL_UNPOOLED` | For migrations | Direct (unpooled) connection string. `pnpm db:migrate` uses it. |
+| `BETTER_AUTH_SECRET` | Yes | At least 32 characters, for example from `openssl rand -base64 32`. |
+| `BETTER_AUTH_URL` | Yes | This site's origin, such as `http://localhost:3000` or `https://your-domain`. |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | For GitHub sign-in | From a GitHub OAuth app. GitHub sign-in stays off while the id is empty. |
+| `SENDIR_API_KEY`, `SENDIR_IDENTITY_ID` | In production | Send magic sign-in links and other email. Use a key scoped to the identity. `SENDIR_URL` overrides the API base. |
+| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | For files | The R2 bucket and an S3 API key scoped to it. |
+| `CRON_SECRET` | In production | At least 16 characters. Vercel Cron sends it to `/api/cron/*`. |
+| `STORAGE_QUOTA_CONTENT_BYTES`, `STORAGE_QUOTA_FILE_BYTES` | No | Per-account quotas. Defaults: 100 MB of content and 1 GB of files. |
+
+Local `localhost` and `127.0.0.1` database URLs use the PostgreSQL TCP driver.
+Remote URLs use Neon's serverless driver. Users, sessions, OAuth clients, and
+sign-in tokens live in the app's own `public` schema, managed by the same
+Drizzle migrations as everything else.
+
+### GitHub OAuth app
+
+Set the authorization callback URL to `<BETTER_AUTH_URL>/api/auth/callback/github`.
+A GitHub OAuth app allows one callback URL, so use a separate app for local
+development, or sign in locally with a magic link.
+
+### Cloudflare R2
+
+Create a private bucket and an API token with object read and write on that
+bucket only. The S3 access key id is the token id, and the secret is the
+SHA-256 hash of the token value. Browsers upload straight to the bucket, so add
+a CORS rule that allows `PUT`, `GET`, and `HEAD` from your site's origin, with
+the `content-type` and `content-length` headers, and exposes `ETag`.
+
+### Deploy on Vercel
+
+1. Import the repository as a Next.js project.
+2. Add Postgres through the Neon integration, or set `DATABASE_URL` and
+   `DATABASE_URL_UNPOOLED` yourself.
+3. Set the other variables above for Production (and Preview, if you use it).
+4. Run `pnpm db:migrate` against the production database before the first
+   deploy, and again whenever `drizzle/` changes.
+5. Deploy. `vercel.json` schedules two cleanup crons every six hours: one
+   removes unfinished uploads, unattached files, and old versions; the other
+   removes unapproved OAuth clients and expired tokens. They refuse to run
+   until `CRON_SECRET` is set.
+
+## Development
+
+```bash
+pnpm dev           # development server
+pnpm check         # typecheck, lint (zero warnings), 500-line check, unit tests
+pnpm build         # production build
+pnpm test          # unit tests (Vitest)
+pnpm test:e2e      # component gallery on phone and desktop (Playwright)
+pnpm db:generate   # generate a migration from schema changes
+pnpm db:migrate    # apply migrations
+pnpm db:studio     # inspect the database
+```
+
+A Husky pre-commit hook runs `pnpm check`. The code standards, the Next.js 16.4
+notes, and the database tripwires are in [AGENTS.md](AGENTS.md).
+
+## Contributing
+
+Contributions are welcome at
+[github.com/artifacts-space/artifacts-space](https://github.com/artifacts-space/artifacts-space).
+Read [CONTRIBUTING.md](CONTRIBUTING.md) and
+[AGENTS.md](AGENTS.md) before you open a pull request. To report a security
+problem, follow [SECURITY.md](SECURITY.md) instead of opening an issue.
+
+## Third-party assets
+
+| Asset | Where | License |
+| --- | --- | --- |
+| Geist Mono, backtick (U+0060) subset | `src/app/fonts/backtick-mono.woff2` | SIL Open Font License 1.1, copyright 2023 Vercel with basement.studio. See `src/app/fonts/LICENSE-geist-mono.txt`. |
+| Geist Mono | Loaded with `next/font/google` | SIL Open Font License 1.1 |
+| Satoshi | Loaded from Fontshare's CDN by the browser and by the Open Graph image routes; never committed | ITF Free Font License (Indian Type Foundry) |
+| Pixel planet logo and icons | `public/artifacts-space-mark.svg`, `public/artifacts-space-icon.png`, `public/email/`, `src/app/icon.svg`, `src/app/favicon.ico`, `src/app/og/planet-40.png` | Original work, MIT with the code |
+| Hero background | `public/hero-dusk.webp` | A dusk wallpaper made with vmotif. TODO(owner): confirm the license before release. |
+| Open Graph backdrop | `src/app/og/strata-ink.png` | Made for this project. TODO(owner): confirm before release. |
+
+## License
+
+[MIT](LICENSE)

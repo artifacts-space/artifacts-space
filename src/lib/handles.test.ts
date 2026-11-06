@@ -49,7 +49,7 @@ describe("cleanHandleInput", () => {
 
 describe("toHandle", () => {
   it("should map any text to the handle shape", () => {
-    expect(toHandle("Charles.Howard+test")).toBe("charles-howard-test");
+    expect(toHandle("Jane.Doe+test")).toBe("jane-doe-test");
     expect(toHandle("--Octo__Cat--")).toBe("octo-cat");
     expect(toHandle("ünïcode")).toBe("n-code");
   });
@@ -70,7 +70,7 @@ describe("suggestHandle", () => {
   });
 
   it("should use the email local part when suggesting from an email", () => {
-    expect(suggestHandleFromEmail("charles@webrenew.io")).toBe("charles");
+    expect(suggestHandleFromEmail("jane@example.com")).toBe("jane");
     expect(suggestHandleFromEmail("first.last@example.com")).toBe("first-last");
   });
 

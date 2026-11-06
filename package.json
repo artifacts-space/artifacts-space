@@ -2,6 +2,13 @@
   "name": "artifacts-space",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "homepage": "https://artifacts.space",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/artifacts-space/artifacts-space.git"
+  },
+  "bugs": "https://github.com/artifacts-space/artifacts-space/issues",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
