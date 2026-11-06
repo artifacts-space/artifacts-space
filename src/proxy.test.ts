@@ -5,11 +5,16 @@ const mocks = vi.hoisted(() => ({
   canReadArtifact: vi.fn(),
   getSession: vi.fn(),
   getTeamForMember: vi.fn(),
+  hitRateLimits: vi.fn(),
 }));
 
 vi.mock("@/lib/access", () => ({ canReadArtifact: mocks.canReadArtifact }));
 vi.mock("@/lib/auth/server", () => ({ getAuth: () => ({ api: { getSession: mocks.getSession } }) }));
 vi.mock("@/lib/teams/queries", () => ({ getTeamForMember: mocks.getTeamForMember }));
+vi.mock("@/lib/abuse/rate-limit", () => ({
+  hitRateLimits: mocks.hitRateLimits,
+  rateLimitMessage: () => "Your network has opened a lot of artifact pages in the last hour. Try again in about 5 minutes.",
+}));
 
 const { config, proxy } = await import("./proxy");
 
@@ -28,6 +33,7 @@ function location(response: Response) {
 describe("proxy", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.hitRateLimits.mockResolvedValue(null);
   });
 
   it("should redirect to sign-in with a return path when a workspace page is loaded signed out", async () => {
@@ -72,6 +78,32 @@ describe("proxy", () => {
     const response = await proxy(request("/artifact/abc"));
     expect(response.status).toBe(200);
     expect(location(response)).toBeNull();
+  });
+
+  it("should answer 429 with Retry-After when a network opens too many artifact pages", async () => {
+    mocks.hitRateLimits.mockResolvedValue({ name: "artifactPageByNetwork", retryAfterSeconds: 300 });
+    const response = await proxy(request("/artifact/abc"));
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("300");
+    await expect(response.text()).resolves.toContain("Try again");
+    expect(mocks.canReadArtifact).not.toHaveBeenCalled();
+  });
+
+  it("should count artifact page views per network and leave other pages uncounted", async () => {
+    mocks.canReadArtifact.mockResolvedValue(true);
+    await proxy(request("/artifact/abc"));
+    expect(mocks.hitRateLimits).toHaveBeenCalledWith([{ name: "artifactPageByNetwork", subject: expect.stringMatching(/^[a-f0-9]{32}$/) as unknown }]);
+    mocks.hitRateLimits.mockClear();
+    await proxy(request("/app", { cookie: sessionCookie }));
+    expect(mocks.hitRateLimits).not.toHaveBeenCalled();
+  });
+
+  it("should still serve the page when the rate limit check fails", async () => {
+    mocks.hitRateLimits.mockRejectedValue(new Error("down"));
+    mocks.canReadArtifact.mockResolvedValue(true);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = await proxy(request("/artifact/abc"));
+    expect(response.status).toBe(200);
   });
 
   it("should pass server actions through when the request is a POST", async () => {

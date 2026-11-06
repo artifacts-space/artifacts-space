@@ -1,3 +1,6 @@
+import { networkKey } from "@/lib/abuse/network-key";
+import { hitRateLimits } from "@/lib/abuse/rate-limit";
+import { tooManyRequests } from "@/lib/abuse/responses";
 import { findReadableFile, signedFileUrl } from "@/lib/files/download";
 import { getSession } from "@/lib/session";
 
@@ -20,12 +23,24 @@ async function viewerId() {
   }
 }
 
+/** The per-network limit on file views. Fails open, so a counter outage never hides files. */
+async function overLimit(request: Request) {
+  try {
+    return await hitRateLimits([{ name: "fileDownloadByNetwork", subject: networkKey(request.headers) }]);
+  } catch (error) {
+    console.error("[files] Rate limit check failed", error instanceof Error ? error.name : "unknown error");
+    return null;
+  }
+}
+
 /**
- * Shows or downloads a file. Access goes through the file's artifact: whoever
+ * Shows or downloads a file. Views are limited per network address (429 with Retry-After). Access goes through the file's artifact: whoever
  * can view the artifact gets a 302 to a short-lived R2 link; everyone else,
  * and every unknown id, gets the same 404. `?download=1` forces a download.
  */
 export async function GET(request: Request, context: RouteContext<"/api/files/[id]">) {
+  const refusal = await overLimit(request);
+  if (refusal) return tooManyRequests(refusal, baseHeaders);
   try {
     const { id } = await context.params;
     const file = await findReadableFile(id, await viewerId());

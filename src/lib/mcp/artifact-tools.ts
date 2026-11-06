@@ -200,7 +200,7 @@ function registerWriteTools(server: ToolServer, userId: string) {
     {
       title: "Update artifact",
       description:
-        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). Only the author can set visibility, which requests sharing through the team's rule. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved.",
+        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). Only the author can set visibility, which requests sharing through the team's rule. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved. Edits are limited per hour (generously); a limit error says when to try again.",
       inputSchema: {
         id: publicIdField,
         ...editableFields,

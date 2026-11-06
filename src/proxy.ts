@@ -1,6 +1,9 @@
 import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { networkKey } from "@/lib/abuse/network-key";
+import { hitRateLimits } from "@/lib/abuse/rate-limit";
+import { tooManyRequests } from "@/lib/abuse/responses";
 import { canReadArtifact } from "@/lib/access";
 import { getAuth } from "@/lib/auth/server";
 import { routeCheckFor, signInPath, type RouteCheck } from "@/lib/route-status";
@@ -52,10 +55,27 @@ async function checkRecord(request: NextRequest, check: NonNullable<RouteCheck>)
   return (await canReadArtifact(check.publicId, () => viewerId(request))) ? NextResponse.next() : notFound(request);
 }
 
+/**
+ * Artifact pages are open to anyone with the link, so they are limited per
+ * network address. Returns a 429 to send, or null. Fails open.
+ */
+async function refuseArtifactPageFlood(request: NextRequest, check: NonNullable<RouteCheck>) {
+  if (check.kind !== "artifact") return null;
+  try {
+    const refusal = await hitRateLimits([{ name: "artifactPageByNetwork", subject: networkKey(request.headers) }]);
+    return refusal ? tooManyRequests(refusal) : null;
+  } catch (error) {
+    console.error("[proxy] Rate limit check failed", error instanceof Error ? error.name : "unknown error");
+    return null;
+  }
+}
+
 export async function proxy(request: NextRequest) {
   const check = routeCheckFor(request.method, request.nextUrl.pathname);
   if (!check) return NextResponse.next();
   if (needsSignIn(request, check)) return toSignIn(request);
+  const refusal = await refuseArtifactPageFlood(request, check);
+  if (refusal) return refusal;
   try {
     return await checkRecord(request, check);
   } catch (error) {

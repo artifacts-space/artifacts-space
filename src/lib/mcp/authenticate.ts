@@ -9,6 +9,12 @@ export interface McpPrincipal {
   userId: string;
   access: McpAccess;
   via: "oauth" | "api-token";
+  /**
+   * Identifies the connection for per-token rate limits: the API token's id,
+   * or the OAuth app and person (OAuth access tokens rotate every hour, the
+   * app's approval does not).
+   */
+  tokenKey: string;
 }
 
 /** The bearer token from an Authorization header, or null. */
@@ -31,9 +37,9 @@ export async function authenticateMcpRequest(request: Request): Promise<McpPrinc
 
   if (oauthAccessTokenSecret(token)) {
     const grant = await authenticateOAuthAccessToken(token, mcpResource());
-    if (grant) return { ...grant, via: "oauth" };
+    if (grant) return { userId: grant.userId, access: grant.access, via: "oauth", tokenKey: `oauth:${grant.clientId}:${grant.userId}` };
   }
 
-  const userId = await authenticateApiToken(token);
-  return userId ? { userId, access: "full", via: "api-token" } : null;
+  const apiToken = await authenticateApiToken(token);
+  return apiToken ? { userId: apiToken.userId, access: "full", via: "api-token", tokenKey: `api:${apiToken.tokenId}` } : null;
 }

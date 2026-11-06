@@ -1,10 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
+import { hitRateLimits, rateLimitMessage } from "@/lib/abuse/rate-limit";
 import { registerArtifactTools } from "@/lib/mcp/artifact-tools";
 import { authenticateMcpRequest, bearerToken, type McpPrincipal } from "@/lib/mcp/authenticate";
 import { registerFileTools } from "@/lib/mcp/file-tools";
 import { registerFormatTools } from "@/lib/mcp/format-tools";
+import { jsonRpcId, mcpLimitChecks, mcpRateLimitedResponse, mcpToolCalls } from "@/lib/mcp/rate-limits";
 import { registerTeamTools } from "@/lib/mcp/team-tools";
 import { registerVersionTools } from "@/lib/mcp/version-tools";
 import { READ_ONLY_INSTRUCTIONS } from "@/lib/mcp/tool-access";
@@ -46,6 +48,23 @@ function unauthorized(request: Request) {
   );
 }
 
+/**
+ * Applies the per-token and per-user read and edit limits for the tools this
+ * request calls. Returns a 429 to send instead, or null to go on. Fails open:
+ * a counter outage must not take MCP down with it.
+ */
+async function refuseOverLimit(request: Request, principal: McpPrincipal): Promise<Response | null> {
+  try {
+    const body: unknown = await request.clone().json().catch(() => null);
+    const refusal = await hitRateLimits(mcpLimitChecks(principal, mcpToolCalls(body)));
+    if (!refusal) return null;
+    return mcpRateLimitedResponse(refusal, rateLimitMessage(refusal.name, refusal.retryAfterSeconds), jsonRpcId(body));
+  } catch (error) {
+    console.error("[mcp] Rate limit check failed", error instanceof Error ? error.name : "unknown error");
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   let principal: McpPrincipal | null;
   try {
@@ -55,6 +74,8 @@ export async function POST(request: Request) {
     return Response.json({ jsonrpc: "2.0", error: { code: -32603, message: "Could not check the access token. Try again." }, id: null }, { status: 503 });
   }
   if (!principal) return unauthorized(request);
+  const refusal = await refuseOverLimit(request, principal);
+  if (refusal) return refusal;
 
   const server = createMcpServer(principal);
   // No sessionIdGenerator: the transport runs stateless, one request per server.
@@ -85,7 +106,7 @@ export function OPTIONS() {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization, Mcp-Protocol-Version",
-      "Access-Control-Expose-Headers": "WWW-Authenticate",
+      "Access-Control-Expose-Headers": "WWW-Authenticate, Retry-After",
       "Access-Control-Max-Age": "86400",
     },
   });

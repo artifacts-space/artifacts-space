@@ -32,8 +32,8 @@ const hasConsent = (clientId: typeof oauthClient.clientId) =>
   getDb().select({ one: sql`1` }).from(oauthConsent).where(eq(oauthConsent.clientId, clientId));
 
 /**
- * Checks an OAuth access token for the MCP resource. Returns who it acts as
- * and with what access, or null. Revoked apps fail at once, because revoking
+ * Checks an OAuth access token for the MCP resource. Returns who it acts as,
+ * with what access, and through which app, or null. Revoked apps fail at once, because revoking
  * deletes the person's approval and every token.
  */
 export async function authenticateOAuthAccessToken(token: string, resource: string, now = new Date()) {
@@ -41,6 +41,7 @@ export async function authenticateOAuthAccessToken(token: string, resource: stri
   if (!secret) return null;
   const [row] = await getDb()
     .select({
+      clientId: oauthAccessToken.clientId,
       userId: oauthAccessToken.userId,
       scopes: oauthAccessToken.scopes,
       resources: oauthAccessToken.resources,
@@ -56,7 +57,8 @@ export async function authenticateOAuthAccessToken(token: string, resource: stri
     .where(eq(oauthAccessToken.token, hashOAuthToken(secret)))
     .limit(1);
   if (!row) return null;
-  return oauthTokenGrant({ ...row, approved: row.consentId !== null }, resource, now);
+  const grant = oauthTokenGrant({ ...row, approved: row.consentId !== null }, resource, now);
+  return grant ? { ...grant, clientId: row.clientId } : null;
 }
 
 /** An app's details for the consent page, or null when no such app is registered. */

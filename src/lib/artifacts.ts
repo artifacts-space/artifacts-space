@@ -263,9 +263,14 @@ interface SaveContext {
   restoredFromId?: string | null;
 }
 
-/** Writes checked changes, files the version, and returns the DTO. */
+/**
+ * Writes checked changes, files the version, and returns the DTO. Saves are
+ * limited per editor per hour (web and MCP together), because each one can
+ * file a version.
+ */
 async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, context: SaveContext) {
   const { editorId, before } = context;
+  await enforceRateLimit("artifactUpdate", editorId);
   await assertValidArtifactUpdate(changes, () => Promise.resolve(before));
   await attachUpdatedContentFiles(editorId, before, changes);
   const [record] = await getDb()

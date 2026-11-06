@@ -63,14 +63,22 @@ export async function revokeApiToken(userId: string, id: string) {
     .where(and(eq(apiToken.userId, userId), eq(apiToken.id, id)));
 }
 
+/** lastUsedAt is written at most this often per token, so busy agents do not write on every call. */
+export const LAST_USED_WRITE_INTERVAL_MS = 5 * 60_000;
+
+/** Whether a token's lastUsedAt is old enough to write again. */
+export function lastUsedIsStale(lastUsedAt: Date | null, now: Date): boolean {
+  return lastUsedAt === null || now.getTime() - lastUsedAt.getTime() >= LAST_USED_WRITE_INTERVAL_MS;
+}
+
 /**
- * The user id a bearer token acts as, or null. A person's token acts as the
- * person. An agent's token acts as the agent, and only while the agent still
- * belongs to its team.
+ * The user a bearer token acts as, and the token's id, or null. A person's
+ * token acts as the person. An agent's token acts as the agent, and only
+ * while the agent still belongs to its team.
  */
 export async function authenticateApiToken(token: string) {
   const [record] = await getDb()
-    .select({ userId: apiToken.userId, id: apiToken.id, agentTeamId: agent.teamId, agentMemberId: teamMember.id })
+    .select({ userId: apiToken.userId, id: apiToken.id, lastUsedAt: apiToken.lastUsedAt, agentTeamId: agent.teamId, agentMemberId: teamMember.id })
     .from(apiToken)
     .leftJoin(agent, eq(agent.userId, apiToken.userId))
     .leftJoin(teamMember, and(eq(teamMember.userId, apiToken.userId), eq(teamMember.teamId, agent.teamId)))
@@ -79,10 +87,9 @@ export async function authenticateApiToken(token: string) {
 
   if (!record || !tokenUserIsActive(record)) return null;
 
-  await getDb()
-    .update(apiToken)
-    .set({ lastUsedAt: new Date() })
-    .where(eq(apiToken.id, record.id));
-
-  return record.userId;
+  const now = new Date();
+  if (lastUsedIsStale(record.lastUsedAt, now)) {
+    await getDb().update(apiToken).set({ lastUsedAt: now }).where(eq(apiToken.id, record.id));
+  }
+  return { userId: record.userId, tokenId: record.id };
 }

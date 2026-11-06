@@ -5,6 +5,7 @@ import { getDb } from "@/db";
 import { artifact } from "@/db/schema";
 import { canEditRecord } from "@/lib/access";
 import type { SharingActor } from "@/lib/sharing/rules";
+import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { recordArtifactChange } from "@/lib/versions/service";
 
@@ -46,10 +47,11 @@ export async function assertUsableFiles(authorId: string, artifactId: string | n
  * Attaches the editor's files to an artifact they may edit, and files a
  * version. For a link or public artifact the change goes through edit review
  * (recordArtifactChange), so readers outside the team see new files only
- * once they are approved.
+ * once they are approved. Counts against the per-editor edit limit.
  */
 export async function attachFiles(editorId: string, artifactId: string, fileIds: readonly string[], actor: SharingActor): Promise<void> {
   await assertUsableFiles(editorId, artifactId, fileIds);
+  await enforceRateLimit("artifactUpdate", editorId);
   const attached = await attachFileRows(editorId, artifactId, fileIds);
   if (attached > 0) await recordArtifactChange({ artifactId, editorId, actor });
 }
