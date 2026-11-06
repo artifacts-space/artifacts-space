@@ -24,6 +24,7 @@
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@neondatabase/serverless": "^1.2.0",
     "@tabler/icons-react": "^3.50.0",
+    "aws4fetch": "1.0.20",
     "better-auth": "^1.7.18",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
