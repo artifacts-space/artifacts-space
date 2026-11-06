@@ -9,9 +9,12 @@ import { listInbox, markInboxRead, threadContext, type InboxEntryView } from "@/
 import { threadUrl } from "@/lib/comments/mention-email";
 import { createComment, deleteComment, listComments, updateComment } from "@/lib/comments/service";
 import type { CommentView } from "@/lib/comments/views";
+import type { McpAccess } from "@/lib/oauth/scopes";
 import { isPublicId } from "@/lib/public-id";
 import { siteUrl } from "@/lib/site-origin";
 import { UserFacingError } from "@/lib/user-facing-error";
+
+import { gateTools, type ToolServer } from "./tool-access";
 
 /**
  * MCP tools for teammates: the inbox of mentions, and artifact comment
@@ -79,7 +82,7 @@ async function toMcpInboxEntry(entry: InboxEntryView, viewerId: string) {
   };
 }
 
-function registerInboxTools(server: McpServer, userId: string) {
+function registerInboxTools(server: ToolServer, userId: string) {
   server.registerTool(
     "inbox_list",
     {
@@ -119,7 +122,7 @@ function registerInboxTools(server: McpServer, userId: string) {
   );
 }
 
-function registerCommentTools(server: McpServer, userId: string) {
+function registerCommentTools(server: ToolServer, userId: string) {
   server.registerTool(
     "comments_list",
     {
@@ -164,7 +167,7 @@ function registerCommentTools(server: McpServer, userId: string) {
  * hold: only the comment's author may change it, and an edit notifies only
  * mentions the comment had not notified before.
  */
-function registerCommentChangeTools(server: McpServer, userId: string) {
+function registerCommentChangeTools(server: ToolServer, userId: string) {
   server.registerTool(
     "comment_update",
     {
@@ -203,10 +206,12 @@ function registerCommentChangeTools(server: McpServer, userId: string) {
  * Registers inbox_list, inbox_mark_read, comments_list, comment_create,
  * comment_update, and comment_delete.
  * The token's user is the actor: an agent's token acts as the agent, with its
- * team's view of artifacts; a personal token acts as the person.
+ * team's view of artifacts; a personal token acts as the person. Read-only
+ * access gets inbox_list and comments_list only.
  */
-export function registerTeamTools(server: McpServer, userId: string) {
-  registerInboxTools(server, userId);
-  registerCommentTools(server, userId);
-  registerCommentChangeTools(server, userId);
+export function registerTeamTools(server: McpServer, userId: string, access: McpAccess) {
+  const gated = gateTools(server, access);
+  registerInboxTools(gated, userId);
+  registerCommentTools(gated, userId);
+  registerCommentChangeTools(gated, userId);
 }

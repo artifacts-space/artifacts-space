@@ -4,9 +4,11 @@ import { nextCookies } from "better-auth/next-js";
 import { magicLink } from "better-auth/plugins";
 
 import { getDb } from "@/db";
+import * as oauthSchema from "@/db/oauth-schema";
 import * as schema from "@/db/schema";
 import { sessionHooks } from "@/lib/auth/agent-guards";
 import { sendMagicLinkEmail } from "@/lib/auth/magic-link-email";
+import { oauthPlugins } from "@/lib/auth/oauth-plugins";
 import { teamDepartureHook } from "@/lib/auth/team-departure";
 import { teamsPlugin } from "@/lib/auth/teams-plugin";
 import { userHooks } from "@/lib/auth/user-hooks";
@@ -22,6 +24,14 @@ const authSchema = {
   organization: schema.team,
   member: schema.teamMember,
   invitation: schema.teamInvitation,
+  // OAuth server for MCP clients (@better-auth/oauth-provider).
+  oauthClient: oauthSchema.oauthClient,
+  oauthResource: oauthSchema.oauthResource,
+  oauthClientResource: oauthSchema.oauthClientResource,
+  oauthRefreshToken: oauthSchema.oauthRefreshToken,
+  oauthAccessToken: oauthSchema.oauthAccessToken,
+  oauthConsent: oauthSchema.oauthConsent,
+  oauthClientAssertion: oauthSchema.oauthClientAssertion,
 };
 
 function githubProvider() {
@@ -62,6 +72,7 @@ function createAuth() {
         sendMagicLink: ({ email, url, token }) => sendMagicLinkEmail({ email, url, token }),
       }),
       teamsPlugin(),
+      ...oauthPlugins(),
       // Must stay last so server actions can set auth cookies.
       nextCookies(),
     ],

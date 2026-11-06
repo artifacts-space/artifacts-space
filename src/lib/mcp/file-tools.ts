@@ -7,12 +7,14 @@ import { assertUsableFiles, attachFiles, deleteOwnFile } from "@/lib/files/attac
 import { findReadableFile, signedFileUrl } from "@/lib/files/download";
 import { finalizeUpload, requestUpload } from "@/lib/files/uploads";
 import type { ArtifactRecord } from "@/db/schema";
+import type { McpAccess } from "@/lib/oauth/scopes";
 import { isPublicId } from "@/lib/public-id";
 import { siteUrl } from "@/lib/site-origin";
 import { listTeamsForUser } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { toMcpArtifact } from "./artifact-view";
+import { gateTools, type ToolServer } from "./tool-access";
 
 const fileIdField = z.uuid().describe("File id from files_request_upload");
 const fileIdsField = z.array(z.uuid()).min(1).max(fileLimits.maxFilesPerArtifact).describe("Ids of finished uploads (files_finalize)");
@@ -44,7 +46,7 @@ async function ownArtifact(userId: string, publicId: string) {
   return record;
 }
 
-function registerUploadTools(server: McpServer, userId: string) {
+function registerUploadTools(server: ToolServer, userId: string) {
   server.registerTool(
     "files_request_upload",
     {
@@ -79,7 +81,7 @@ function registerUploadTools(server: McpServer, userId: string) {
   );
 }
 
-function registerArtifactFileTools(server: McpServer, userId: string) {
+function registerArtifactFileTools(server: ToolServer, userId: string) {
   server.registerTool(
     "files_create_artifact",
     {
@@ -117,7 +119,7 @@ function registerArtifactFileTools(server: McpServer, userId: string) {
   );
 }
 
-function registerAccessTools(server: McpServer, userId: string) {
+function registerAccessTools(server: ToolServer, userId: string) {
   server.registerTool(
     "files_get_download_url",
     {
@@ -150,10 +152,11 @@ function registerAccessTools(server: McpServer, userId: string) {
 /**
  * Registers the file tools: request an upload URL, finalize it, put files in
  * an artifact, get a download URL, and delete. Reads go through the artifact
- * access check; writes are the author's only.
+ * access check; writes are the author's only, and are left out for read-only access.
  */
-export function registerFileTools(server: McpServer, userId: string) {
-  registerUploadTools(server, userId);
-  registerArtifactFileTools(server, userId);
-  registerAccessTools(server, userId);
+export function registerFileTools(server: McpServer, userId: string, access: McpAccess) {
+  const gated = gateTools(server, access);
+  registerUploadTools(gated, userId);
+  registerArtifactFileTools(gated, userId);
+  registerAccessTools(gated, userId);
 }

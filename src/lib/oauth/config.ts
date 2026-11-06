@@ -1,0 +1,43 @@
+import { createHash } from "node:crypto";
+
+import type { OAuthOptions } from "@better-auth/oauth-provider";
+
+import { mcpEndpoint } from "@/lib/setup/mcp-config";
+import { siteOrigin } from "@/lib/site-origin";
+
+/** Prefixes on tokens the OAuth server issues, so they read differently from API tokens. Not stored. */
+export const oauthTokenPrefixes = {
+  opaqueAccessToken: "artifacts_oat_",
+  refreshToken: "artifacts_ort_",
+} as const satisfies OAuthOptions["prefix"];
+
+/** Lifetimes and limits for the OAuth server. */
+export const oauthLimits = {
+  /** Access tokens last an hour; clients refresh them. */
+  accessTokenSeconds: 60 * 60,
+  /** A refresh token lasts 30 days and rotates on every use. */
+  refreshTokenSeconds: 30 * 24 * 60 * 60,
+  /** A retried refresh within this many seconds gets the same answer instead of failing. */
+  refreshReuseSeconds: 30,
+  /** Registered apps nobody approved are deleted after this long. */
+  unapprovedClientHours: 24,
+  /** Most unapproved apps stored at once. Registration pauses above this. */
+  maxUnapprovedClients: 500,
+} as const;
+
+/**
+ * The protected resource every OAuth token is bound to: the MCP endpoint on
+ * this site's origin, such as https://artifacts.space/api/mcp.
+ */
+export function mcpResource(env: NodeJS.ProcessEnv = process.env): string {
+  return mcpEndpoint(siteOrigin(env));
+}
+
+/**
+ * How the OAuth server stores tokens and authorization codes: a SHA-256 hex
+ * digest, so a database leak does not leak working tokens. The MCP route
+ * looks tokens up with the same function.
+ */
+export function hashOAuthToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}

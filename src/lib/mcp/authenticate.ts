@@ -1,0 +1,39 @@
+import { authenticateOAuthAccessToken } from "@/lib/oauth/clients";
+import { mcpResource } from "@/lib/oauth/config";
+import { oauthAccessTokenSecret } from "@/lib/oauth/token-rules";
+import type { McpAccess } from "@/lib/oauth/scopes";
+import { authenticateApiToken } from "@/lib/tokens";
+
+/** Who an MCP request acts as, and what it may do. */
+export interface McpPrincipal {
+  userId: string;
+  access: McpAccess;
+  via: "oauth" | "api-token";
+}
+
+/** The bearer token from an Authorization header, or null. */
+export function bearerToken(authorization: string | null): string | null {
+  const match = /^Bearer\s+(.+)$/i.exec(authorization ?? "");
+  const token = match?.[1]?.trim();
+  return token ? token : null;
+}
+
+/**
+ * Authenticates an MCP request by its bearer token. OAuth access tokens act
+ * as the person who approved the app, with the access they granted, and only
+ * for this site's MCP resource. Personal and agent API tokens keep full access.
+ * There is no session-cookie fallback: nothing in the app calls /api/mcp from
+ * the browser, and every client gets the same 401 discovery path.
+ */
+export async function authenticateMcpRequest(request: Request): Promise<McpPrincipal | null> {
+  const token = bearerToken(request.headers.get("authorization"));
+  if (!token) return null;
+
+  if (oauthAccessTokenSecret(token)) {
+    const grant = await authenticateOAuthAccessToken(token, mcpResource());
+    if (grant) return { ...grant, via: "oauth" };
+  }
+
+  const userId = await authenticateApiToken(token);
+  return userId ? { userId, access: "full", via: "api-token" } : null;
+}

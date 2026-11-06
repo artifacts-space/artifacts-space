@@ -4,7 +4,10 @@ import { z } from "zod";
 import { validateArtifactContent } from "@/lib/artifact-content";
 import { formatInfo, type FormatKind } from "@/lib/artifact-formats";
 import { artifactKinds } from "@/lib/artifact-types";
+import type { McpAccess } from "@/lib/oauth/scopes";
 import { buildUiGuide } from "@/lib/ui/guide";
+
+import { gateTools } from "./tool-access";
 
 /** Describes the `kind` field for agents on create and update. Lists only formats the server accepts. */
 export const kindFieldDescription = [
@@ -38,8 +41,9 @@ export function validationReport(kind: FormatKind, content: string): string {
  * - artifacts_formats_guide: what each format is, and the full ui component guide.
  * - artifacts_validate: checks content against a format without saving it.
  */
-export function registerFormatTools(server: McpServer) {
-  server.registerTool(
+export function registerFormatTools(server: McpServer, access: McpAccess) {
+  const gated = gateTools(server, access);
+  gated.registerTool(
     "artifacts_formats_guide",
     {
       title: "Artifact formats guide",
@@ -49,7 +53,7 @@ export function registerFormatTools(server: McpServer) {
     ({ kind }) => text(formatGuide(kind)),
   );
 
-  server.registerTool(
+  gated.registerTool(
     "artifacts_validate",
     {
       title: "Validate artifact content",

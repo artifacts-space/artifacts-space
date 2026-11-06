@@ -62,7 +62,7 @@ function registeredTools(userId: string) {
       tools.set(name, { inputSchema: config.inputSchema, handler });
     },
   };
-  registerTeamTools(server as unknown as McpServer, userId);
+  registerTeamTools(server as unknown as McpServer, userId, "full");
   return tools;
 }
 

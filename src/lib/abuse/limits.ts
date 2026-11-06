@@ -20,6 +20,12 @@ export const rateLimits = {
   /** Comments per person per minute and per hour. */
   personCommentMinute: { limit: 20, windowSeconds: 60 },
   personCommentHour: { limit: 300, windowSeconds: 3600 },
+  /** MCP app registrations (OAuth dynamic client registration) per network address per hour. */
+  oauthRegister: { limit: 20, windowSeconds: 3600 },
+  /** OAuth authorization requests per network address per hour. */
+  oauthAuthorize: { limit: 60, windowSeconds: 3600 },
+  /** OAuth token requests (code exchanges and refreshes) per network address per hour. */
+  oauthToken: { limit: 300, windowSeconds: 3600 },
 } as const satisfies Record<string, { limit: number; windowSeconds: number }>;
 
 export type RateLimitName = keyof typeof rateLimits;
@@ -35,4 +41,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   agentCommentHour: "You have posted a lot of comments in the last hour.",
   personCommentMinute: "You have posted a lot of comments in the last minute.",
   personCommentHour: "You have posted a lot of comments in the last hour.",
+  oauthRegister: "Your network has registered a lot of apps in the last hour.",
+  oauthAuthorize: "Your network has started a lot of app connections in the last hour.",
+  oauthToken: "Your network has asked for a lot of access tokens in the last hour.",
 };

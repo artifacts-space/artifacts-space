@@ -18,9 +18,11 @@ import { isPublicId } from "@/lib/public-id";
 import { requestArtifactSharing } from "@/lib/sharing/service";
 import { siteUrl } from "@/lib/site-origin";
 import { listTeamsForUser, type TeamMembership } from "@/lib/teams/queries";
+import type { McpAccess } from "@/lib/oauth/scopes";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { toMcpArtifact, type McpViewContext } from "./artifact-view";
+import { gateTools, type ToolServer } from "./tool-access";
 
 const publicIdField = z.string().refine(isPublicId, "Use the artifact's 22-character id.").describe("Artifact id (22 characters)");
 const visibilityField = z
@@ -108,7 +110,7 @@ async function ownByPublicId(userId: string, publicId: string) {
   return record;
 }
 
-function registerReadTools(server: McpServer, userId: string) {
+function registerReadTools(server: ToolServer, userId: string) {
   server.registerTool(
     "artifacts_list",
     {
@@ -160,7 +162,7 @@ function registerReadTools(server: McpServer, userId: string) {
   );
 }
 
-function registerWriteTools(server: McpServer, userId: string) {
+function registerWriteTools(server: ToolServer, userId: string) {
   server.registerTool(
     "artifacts_create",
     {
@@ -222,9 +224,10 @@ function registerWriteTools(server: McpServer, userId: string) {
  * Registers the artifact and team tools. Every read goes through the access
  * check (getViewableArtifact or listArtifacts). Writes are author-only, and
  * sharing goes through requestArtifactSharing as an agent, so it can wait for
- * approval but never approve.
+ * approval but never approve. Write tools are left out for read-only access.
  */
-export function registerArtifactTools(server: McpServer, userId: string) {
-  registerReadTools(server, userId);
-  registerWriteTools(server, userId);
+export function registerArtifactTools(server: McpServer, userId: string, access: McpAccess) {
+  const gated = gateTools(server, access);
+  registerReadTools(gated, userId);
+  registerWriteTools(gated, userId);
 }
