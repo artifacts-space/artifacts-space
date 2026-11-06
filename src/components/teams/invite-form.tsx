@@ -38,11 +38,12 @@ export function InviteForm({ teamId }: { teamId: string }) {
   return (
     <form onSubmit={(event) => void submit(event)} noValidate className="space-y-3 p-5">
       <div className="flex flex-wrap items-end gap-2">
-        <div className="min-w-56 flex-1 space-y-2">
+        <div className="flex min-w-56 flex-1 flex-col gap-2">
           <Label htmlFor="invite-email" className="text-xs">Email</Label>
           <Input id="invite-email" type="email" value={email} onChange={(event) => { setEmail(event.target.value); setError(""); }} placeholder="teammate@example.com" className="h-9 text-[13px]" />
         </div>
-        <div className="space-y-2">
+        {/* gap, not space-y: Select renders a hidden input after its trigger, and space-y would add margin under the trigger. */}
+        <div className="flex flex-col gap-2">
           <Label className="text-xs">Role</Label>
           <Select value={role} onValueChange={(value) => { if (value) setRole(value); }}>
             <SelectTrigger className="h-9 w-28 text-[13px]" aria-label="Role for the invited person"><SelectValue /></SelectTrigger>

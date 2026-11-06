@@ -12,7 +12,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "check:lines": "node scripts/check-file-lines.mts",
-    "check": "pnpm lint && pnpm typecheck && pnpm check:lines && pnpm test",
+    "check": "pnpm typecheck && pnpm lint && pnpm check:lines && pnpm test",
     "prepare": "husky",
     "test": "vitest run"
   },
