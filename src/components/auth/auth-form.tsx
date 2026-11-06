@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth/client";
 import { isDevSignInEnabled } from "@/lib/auth/dev-user";
+import { safeNextPath } from "@/lib/safe-next";
 
 type AuthMode = "sign-in" | "sign-up";
 type Pending = "github" | "email" | null;
@@ -42,7 +43,8 @@ export function validateEmail(email: string): string | null {
 
 /** Where to land after sign-in, as an absolute URL on this site. */
 function workspaceUrl() {
-  return new URL("/app", window.location.origin).href;
+  const next = safeNextPath(new URLSearchParams(window.location.search).get("next"));
+  return new URL(next ?? "/app", window.location.origin).href;
 }
 
 function CheckEmail({ email, onBack }: { email: string; onBack: () => void }) {

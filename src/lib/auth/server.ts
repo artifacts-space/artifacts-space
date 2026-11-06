@@ -6,14 +6,34 @@ import { magicLink } from "better-auth/plugins";
 import { getDb } from "@/db";
 import * as schema from "@/db/schema";
 import { sendMagicLinkEmail } from "@/lib/auth/magic-link-email";
+import { teamsPlugin } from "@/lib/auth/teams-plugin";
+import { userHooks } from "@/lib/auth/user-hooks";
 
 const tenMinutes = 60 * 10;
+
+/** Better Auth model names mapped to the app's tables. */
+const authSchema = {
+  user: schema.user,
+  session: schema.session,
+  account: schema.account,
+  verification: schema.verification,
+  organization: schema.team,
+  member: schema.teamMember,
+  invitation: schema.teamInvitation,
+};
 
 function githubProvider() {
   const clientId = process.env.GITHUB_CLIENT_ID;
   const clientSecret = process.env.GITHUB_CLIENT_SECRET;
   if (!clientId || !clientSecret) return {};
-  return { github: { clientId, clientSecret } };
+  return {
+    github: {
+      clientId,
+      clientSecret,
+      // The GitHub login is the preferred username. The create hook checks it.
+      mapProfileToUser: (profile: { login: string }) => ({ username: profile.login }),
+    },
+  };
 }
 
 function createAuth() {
@@ -21,15 +41,24 @@ function createAuth() {
     appName: "artifacts.space",
     // Better Auth falls back to the request origin when this is unset.
     ...(process.env.BETTER_AUTH_URL ? { baseURL: process.env.BETTER_AUTH_URL } : {}),
-    database: drizzleAdapter(getDb(), { provider: "pg", schema }),
+    database: drizzleAdapter(getDb(), { provider: "pg", schema: authSchema }),
     // Sign-in is GitHub or an emailed link. There are no passwords.
     emailAndPassword: { enabled: false },
     socialProviders: githubProvider(),
+    user: {
+      additionalFields: {
+        // Settable on create only (the GitHub mapping). The update hook drops it.
+        username: { type: "string", required: false, unique: true },
+        usernameConfirmed: { type: "boolean", required: false, defaultValue: false, input: false },
+      },
+    },
+    databaseHooks: { user: userHooks },
     plugins: [
       magicLink({
         expiresIn: tenMinutes,
         sendMagicLink: ({ email, url, token }) => sendMagicLinkEmail({ email, url, token }),
       }),
+      teamsPlugin(),
       // Must stay last so server actions can set auth cookies.
       nextCookies(),
     ],

@@ -7,6 +7,8 @@ import { getSession } from "@/lib/session";
 import { listApiTokens } from "@/lib/tokens";
 
 export const metadata: Metadata = { title: "Connections" };
+// Reads the signed-in session, so it renders per request.
+export const instant = false;
 
 export default async function ConnectionsPage() {
   const session = await getSession();

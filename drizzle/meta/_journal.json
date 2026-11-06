@@ -15,6 +15,20 @@
       "when": 1793917004736,
       "tag": "0001_yielding_nemesis",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793920448328,
+      "tag": "0002_teams_and_usernames",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793920457998,
+      "tag": "0003_backfill_usernames_and_personal_teams",
+      "breakpoints": true
     }
   ]
 }
