@@ -8,6 +8,7 @@ import type { Gap } from "@/lib/ui/props/shared";
 import { cn } from "@/lib/utils";
 
 import type { ViewProps } from "./stout";
+import { TabStrip } from "./tab-strip";
 
 const gapClass: Record<Gap, string> = { none: "gap-0", sm: "gap-2", md: "gap-4", lg: "gap-6" };
 
@@ -82,15 +83,16 @@ export function TabsView({ props, children }: ViewProps<"Tabs">) {
   const defaultIndex = Math.min(props.defaultIndex ?? 0, props.tabs.length - 1);
   return (
     <Tabs defaultValue={defaultIndex} className="min-w-0">
-      <div className="-mx-1 overflow-x-auto px-1 pb-1">
+      <TabStrip className="-mx-1 px-1 pb-1">
+        {/* Each tab is as wide as its label (flex-none), so no label is ever cut off; the strip scrolls when they do not fit. */}
         <TabsList variant="line" className="w-max">
           {props.tabs.map((tab, index) => (
-            <TabsTrigger key={`${tab.label}-${String(index)}`} value={index} className="max-w-[16rem] truncate">
+            <TabsTrigger key={`${tab.label}-${String(index)}`} value={index} className="flex-none">
               {tab.label}
             </TabsTrigger>
           ))}
         </TabsList>
-      </div>
+      </TabStrip>
       {props.tabs.map((tab, index) => (
         <TabsContent key={`${tab.label}-${String(index)}`} value={index} className="min-w-0 pt-3">
           {panels[index] ?? <Empty what="content in this tab" />}
