@@ -1,8 +1,9 @@
 "use client";
 
 import { IconCalendarEvent, IconUser } from "@tabler/icons-react";
-import { useId } from "react";
+import { useId, type CSSProperties } from "react";
 
+import { boardLayoutVars } from "@/lib/ui/board-layout";
 import { formatShortDate, parseIsoDate } from "@/lib/ui/calendar-dates";
 import type { UiProps } from "@/lib/ui/catalog";
 import type { Tone } from "@/lib/ui/props/shared";
@@ -73,7 +74,7 @@ function Card({ card }: { card: BoardCard }) {
 function BoardColumn({ column, headingId }: { column: Column; headingId: string }) {
   const count = column.count ?? column.cards.length;
   return (
-    <section aria-labelledby={headingId} className="flex max-w-sm min-w-56 flex-1 basis-0 snap-start flex-col gap-2 rounded-lg border bg-muted/40 p-2">
+    <section aria-labelledby={headingId} className="flex w-(--board-column) shrink-0 snap-start flex-col gap-2 rounded-lg border bg-muted/40 p-2">
       <h3 id={headingId} className="flex min-w-0 items-center gap-2 px-1 pt-0.5 text-[13px] font-medium">
         {column.tone ? <span aria-hidden className={cn("size-2 shrink-0 rounded-full", toneDot[column.tone])} /> : null}
         <span className="min-w-0 break-words">{column.title}</span>
@@ -95,13 +96,16 @@ function BoardColumn({ column, headingId }: { column: Column; headingId: string 
 }
 
 /**
- * A read-only status board. Columns sit side by side and scroll sideways
- * inside the board when they do not fit, so the page itself never scrolls
- * sideways and each column keeps a readable width on phones.
+ * A read-only status board. Columns share the board's width when they fit
+ * at a readable minimum; otherwise they keep a readable width and scroll
+ * sideways inside the board, with the next column peeking in under a fade,
+ * so the page itself never scrolls sideways. See board-layout.ts.
  */
 export function BoardView({ props }: ViewProps<"Board">) {
   const id = useId();
   const name = props.title ?? "Board";
+  // Custom properties are not in CSSProperties, so the record needs a cast.
+  const layout = boardLayoutVars(props.columns.length) as CSSProperties;
   return (
     <figure className="min-w-0 space-y-2">
       {props.title ? <figcaption className="text-sm font-medium break-words">{props.title}</figcaption> : null}
@@ -109,11 +113,14 @@ export function BoardView({ props }: ViewProps<"Board">) {
         role="region"
         aria-label={name}
         tabIndex={0}
-        className="relative flex min-w-0 snap-x snap-proximity items-start gap-3 overflow-x-auto overscroll-x-contain rounded-lg pb-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        style={layout}
+        className="@container relative flex min-w-0 snap-x snap-proximity items-start gap-(--board-gap) overflow-x-auto overscroll-x-contain rounded-lg pb-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         {props.columns.map((column, index) => (
           <BoardColumn key={`${String(index)}-${column.title}`} column={column} headingId={`${id}-column-${String(index)}`} />
         ))}
+        {/* Pinned to the scroll edge while columns are hidden past it; zero wide when every column fits. At the end of the scroll it sits in its own gutter, past the last column. */}
+        <div aria-hidden className="pointer-events-none sticky right-0 -ml-(--board-gap) w-(--board-fade) shrink-0 self-stretch bg-linear-to-r from-transparent to-background" />
       </div>
     </figure>
   );
