@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseMentions } from "./mentions";
+import { parseMentions, splitMentions } from "./mentions";
 
 describe("parseMentions", () => {
   it("should find a handle at the start and in the middle of text", () => {
@@ -55,5 +55,34 @@ describe("parseMentions", () => {
 
   it("should return nothing for text without mentions", () => {
     expect(parseMentions("No one here. @ alone and @@double")).toEqual([]);
+  });
+});
+
+describe("splitMentions", () => {
+  const resolved = new Map([["charles", "person" as const], ["claude-code", "agent" as const]]);
+
+  it("should mark resolved handles and keep the text around them", () => {
+    expect(splitMentions("Hi @charles and @Claude-Code.", resolved)).toEqual([
+      { type: "text", value: "Hi " },
+      { type: "mention", value: "@charles", handle: "charles", kind: "person" },
+      { type: "text", value: " and " },
+      { type: "mention", value: "@Claude-Code", handle: "claude-code", kind: "agent" },
+      { type: "text", value: "." },
+    ]);
+  });
+
+  it("should leave unresolved handles and emails as plain text", () => {
+    expect(splitMentions("Ask @nobody or mail charles@example.com", resolved)).toEqual([{ type: "text", value: "Ask @nobody or mail charles@example.com" }]);
+  });
+
+  it("should keep markup-like text as plain text", () => {
+    const text = "<img src=x onerror=alert(1)> @charles";
+    const segments = splitMentions(text, resolved);
+    expect(segments[0]).toEqual({ type: "text", value: "<img src=x onerror=alert(1)> " });
+    expect(segments.map((segment) => segment.value).join("")).toBe(text);
+  });
+
+  it("should return nothing for empty text", () => {
+    expect(splitMentions("", resolved)).toEqual([]);
   });
 });

@@ -37,32 +37,44 @@ function sharesTeam(a: ReadonlySet<string>, b: ReadonlySet<string>) {
   return false;
 }
 
+function unknownHandle(handle: string): MentionCandidate {
+  return { handle, userId: null, kind: "person", canView: false, isArtifactAuthor: false, sharesTeamWithWriter: false, muted: false };
+}
+
 /**
- * The facts the mention rule needs for each handle. Visibility uses the same
- * read rule as every other path (canViewArtifact), with each user's own team
- * memberships.
+ * The facts the mention rule needs for known users: people with a handle, and
+ * agents still in their team. Visibility uses the same read rule as every
+ * other path (canViewArtifact), with each user's own team memberships.
  */
-async function mentionCandidates(handles: string[], artifact: ArtifactRecord, writerId: string, threadMutes: ReadonlySet<string>): Promise<MentionCandidate[]> {
-  const users = await getDb().select({ id: user.id, username: user.username }).from(user).where(inArray(user.username, handles));
-  const ids = users.map((row) => row.id);
+export async function mentionFacts(userIds: string[], artifact: ArtifactRecord, writerId: string, threadMutes: ReadonlySet<string>): Promise<MentionCandidate[]> {
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return [];
   const [actors, teams] = await Promise.all([loadActors(ids), teamsByUser([...ids, writerId])]);
   const writerTeams = teams.get(writerId) ?? new Set<string>();
-  const idByHandle = new Map(users.map((row) => [row.username ?? "", row.id]));
-  return handles.map((handle) => {
-    const actor = actors.get(idByHandle.get(handle) ?? "");
-    if (!actor) return { handle, userId: null, kind: "person", canView: false, isArtifactAuthor: false, sharesTeamWithWriter: false, muted: false };
+  const facts: MentionCandidate[] = [];
+  for (const actor of actors.values()) {
+    if (!actor.handle) continue;
     const memberOf = teams.get(actor.userId) ?? new Set<string>();
     const isTeamMember = artifact.teamId !== null && memberOf.has(artifact.teamId);
-    return {
-      handle,
+    facts.push({
+      handle: actor.handle,
       userId: actor.userId,
       kind: actor.kind,
       canView: canViewArtifact(artifact, { userId: actor.userId, isTeamMember }),
       isArtifactAuthor: artifact.userId === actor.userId,
       sharesTeamWithWriter: sharesTeam(memberOf, writerTeams),
       muted: actor.kind === "agent" && (actor.teamMuted || threadMutes.has(actor.userId)),
-    };
-  });
+    });
+  }
+  return facts;
+}
+
+/** The mention facts for each handle in a comment. Unknown handles get facts that refuse them. */
+async function mentionCandidates(handles: string[], artifact: ArtifactRecord, writerId: string, threadMutes: ReadonlySet<string>): Promise<MentionCandidate[]> {
+  const users = await getDb().select({ id: user.id }).from(user).where(inArray(user.username, handles));
+  const facts = await mentionFacts(users.map((row) => row.id), artifact, writerId, threadMutes);
+  const byHandle = new Map(facts.map((fact) => [fact.handle, fact]));
+  return handles.map((handle) => byHandle.get(handle) ?? unknownHandle(handle));
 }
 
 /** People who already had an unread mention on this artifact. They get no second email. */

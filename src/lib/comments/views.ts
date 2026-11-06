@@ -1,6 +1,7 @@
 import type { CommentRecord } from "@/db/schema";
 import { attribution, type Actor } from "@/lib/agents/identity";
 
+import type { ResolvedMention } from "./mentions";
 import { canChangeComment, type AuthorKind } from "./rules";
 
 /** Who wrote a comment, as the thread shows it. */
@@ -25,6 +26,8 @@ export interface CommentView {
   edited: boolean;
   /** Null when the author's account is gone. */
   author: CommentAuthorView | null;
+  /** Handles in the body that reached a real person or agent. Empty when deleted. */
+  mentions: ResolvedMention[];
   /** The viewer wrote it and may edit or delete it. */
   canChange: boolean;
   createdAt: string;
@@ -44,8 +47,11 @@ export function toAuthorView(actor: Actor): CommentAuthorView {
   };
 }
 
-/** Maps a comment row for a viewer. `authors` holds the actors by user id. */
-export function toCommentView(record: CommentRecord, authors: ReadonlyMap<string, Actor>, viewerId: string): CommentView {
+/**
+ * Maps a comment row for a viewer. `authors` holds the actors by user id, and
+ * `mentions` the mentions this comment delivered (for highlighting).
+ */
+export function toCommentView(record: CommentRecord, authors: ReadonlyMap<string, Actor>, viewerId: string, mentions: readonly ResolvedMention[] = []): CommentView {
   const actor = record.authorId ? authors.get(record.authorId) : undefined;
   const deleted = record.deletedAt !== null;
   return {
@@ -56,6 +62,7 @@ export function toCommentView(record: CommentRecord, authors: ReadonlyMap<string
     // Both times come from the database clock: equal at insert, later after an edit.
     edited: !deleted && record.updatedAt.getTime() > record.createdAt.getTime(),
     author: actor ? toAuthorView(actor) : null,
+    mentions: deleted ? [] : [...mentions],
     canChange: canChangeComment(record, viewerId),
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),

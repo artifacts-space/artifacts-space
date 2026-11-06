@@ -11,6 +11,7 @@ const view: CommentView = {
   deleted: false,
   edited: false,
   author: { userId: "a1", handle: "claude-code", name: "Claude Code", kind: "agent", ownerName: "Charles", label: "@claude-code for Charles" },
+  mentions: [],
   canChange: false,
   createdAt: "2026-11-05T00:00:00.000Z",
   updatedAt: "2026-11-05T00:00:00.000Z",

@@ -84,7 +84,11 @@ export function refusalMessage(handle: string, reason: MentionRefusal): string {
   return `${who} You can mention the artifact's author and your teammates who can see this artifact.`;
 }
 
-function refusalFor(candidate: MentionCandidate, loopLimited: boolean): MentionRefusal | null {
+/**
+ * Why a mention would not land, or null when it would. The composer's
+ * suggestions use this too, so they list only people and agents a mention reaches.
+ */
+export function mentionRefusal(candidate: MentionCandidate, loopLimited: boolean): MentionRefusal | null {
   const reachable = candidate.isArtifactAuthor || candidate.sharesTeamWithWriter;
   if (!candidate.userId || !candidate.canView || !reachable) return "not_visible";
   if (candidate.kind === "agent" && candidate.muted) return "muted";
@@ -108,7 +112,7 @@ export function decideMentions(input: {
   const decision: MentionDecision = { deliver: [], refused: [] };
   const others = input.candidates.filter((candidate) => candidate.userId !== input.writerId);
   for (const [index, candidate] of others.entries()) {
-    const reason = index >= max ? "too_many" : refusalFor(candidate, input.loopLimited);
+    const reason = index >= max ? "too_many" : mentionRefusal(candidate, input.loopLimited);
     if (reason) {
       decision.refused.push({ handle: candidate.handle, reason, message: refusalMessage(candidate.handle, reason) });
     } else if (candidate.userId) {

@@ -35,3 +35,35 @@ export function parseMentions(body: string): string[] {
   }
   return [...found];
 }
+
+/** Who a mention points at. */
+export type MentionKind = "person" | "agent";
+
+/** A handle in a comment that reached a real person or agent. */
+export interface ResolvedMention {
+  handle: string;
+  kind: MentionKind;
+}
+
+/** A piece of comment text: plain text, or a mention that resolved. */
+export type MentionSegment = { type: "text"; value: string } | { type: "mention"; value: string; handle: string; kind: MentionKind };
+
+/**
+ * Splits plain text into text and resolved-mention segments, for highlighting.
+ * Uses the same handle rules as parseMentions. Handles not in `resolved` stay
+ * text. The output only labels slices of the input; it never adds markup.
+ */
+export function splitMentions(text: string, resolved: ReadonlyMap<string, MentionKind>): MentionSegment[] {
+  const segments: MentionSegment[] = [];
+  let cursor = 0;
+  for (const match of text.matchAll(mentionPattern)) {
+    const handle = match[1]?.toLowerCase() ?? "";
+    const kind = resolved.get(handle);
+    if (!kind || !isHandleShape(handle)) continue;
+    if (match.index > cursor) segments.push({ type: "text", value: text.slice(cursor, match.index) });
+    segments.push({ type: "mention", value: match[0], handle, kind });
+    cursor = match.index + match[0].length;
+  }
+  if (cursor < text.length) segments.push({ type: "text", value: text.slice(cursor) });
+  return segments;
+}

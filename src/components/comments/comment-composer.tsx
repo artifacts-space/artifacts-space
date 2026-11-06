@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { COMMENT_MAX_LENGTH } from "@/lib/comments/config";
 
+import { useMentionAutocomplete } from "./mention-suggestions";
 import type { WriteOutcome } from "./use-comment-thread";
 
 interface CommentComposerProps {
@@ -25,6 +26,10 @@ export function CommentComposer({ label, placeholder, submitLabel, initialBody =
   const [body, setBody] = useState(initialBody);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const mentions = useMentionAutocomplete({
+    body,
+    setBody: (next) => { setBody(next); setError(""); },
+  });
 
   async function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,15 +54,19 @@ export function CommentComposer({ label, placeholder, submitLabel, initialBody =
 
   return (
     <form onSubmit={(event) => void submit(event)} noValidate className="space-y-2">
-      <Textarea
-        value={body}
-        onChange={(event) => { setBody(event.target.value); setError(""); }}
-        placeholder={placeholder}
-        aria-label={label}
-        autoFocus={autoFocus}
-        rows={3}
-        className="min-h-20 bg-card text-[13px] leading-6"
-      />
+      <div className="relative">
+        <Textarea
+          {...mentions.textareaProps}
+          value={body}
+          onChange={(event) => { setBody(event.target.value); setError(""); mentions.syncCaret(event); }}
+          placeholder={placeholder}
+          aria-label={label}
+          autoFocus={autoFocus}
+          rows={3}
+          className="min-h-20 bg-card text-[13px] leading-6"
+        />
+        {mentions.suggestions}
+      </div>
       <FormError message={error} />
       <div className="flex items-center justify-end gap-2">
         <span className="mr-auto text-[11px] text-muted-foreground">Markdown. Type @handle to mention a teammate or agent.</span>

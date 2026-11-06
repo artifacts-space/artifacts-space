@@ -10,6 +10,7 @@ import { UserFacingError } from "@/lib/user-facing-error";
 
 import { COMMENT_MAX_LENGTH } from "./config";
 import { notifiedHandles, processMentions, type MentionOutcome } from "./delivery";
+import { resolvedMentions } from "./mentionables";
 import { canChangeComment, isLoopLimited } from "./rules";
 import { agentStreakBefore, assertNotMuted, assertWithinRateLimit, requireThread, threadMutedAgentIds, type Thread } from "./thread";
 import { toCommentView, type CommentView } from "./views";
@@ -40,8 +41,11 @@ const MAX_THREAD_COMMENTS = 500;
 export async function listComments(viewerId: string, publicId: string): Promise<{ thread: Thread; comments: CommentView[] }> {
   const thread = await requireThread(viewerId, publicId);
   const rows = await getDb().select().from(comment).where(eq(comment.artifactId, thread.artifact.id)).orderBy(asc(comment.createdAt)).limit(MAX_THREAD_COMMENTS);
-  const authors = await loadActors(rows.flatMap((row) => (row.authorId ? [row.authorId] : [])));
-  return { thread, comments: rows.map((row) => toCommentView(row, authors, viewerId)) };
+  const [authors, mentions] = await Promise.all([
+    loadActors(rows.flatMap((row) => (row.authorId ? [row.authorId] : []))),
+    resolvedMentions(rows.map((row) => row.id)),
+  ]);
+  return { thread, comments: rows.map((row) => toCommentView(row, authors, viewerId, mentions.get(row.id))) };
 }
 
 /** Replies always attach to the top-level comment, so threads stay one level deep. */
@@ -57,8 +61,8 @@ async function rootParentId(artifactId: string, parentId: string | undefined) {
 }
 
 async function viewOf(record: CommentRecord, viewerId: string) {
-  const authors = await loadActors(record.authorId ? [record.authorId] : []);
-  return toCommentView(record, authors, viewerId);
+  const [authors, mentions] = await Promise.all([loadActors(record.authorId ? [record.authorId] : []), resolvedMentions([record.id])]);
+  return toCommentView(record, authors, viewerId, mentions.get(record.id));
 }
 
 /**

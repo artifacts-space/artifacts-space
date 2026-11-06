@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 import { CommentComposer } from "./comment-composer";
 import { CommentItem, type CommentHandlers } from "./comment-item";
+import { MentionablesProvider } from "./mentionables-context";
 import { useCommentThread, type WriteOutcome } from "./use-comment-thread";
 
 /** Top-level comments, each with its replies. */
@@ -139,7 +140,11 @@ export function CommentThread({ publicId, className }: { publicId: string; class
       </h2>
       {state.status === "loading" ? <p className="flex items-center gap-2 text-xs text-muted-foreground"><IconLoader2 className="size-3.5 animate-spin" /> Loading comments</p> : null}
       {state.status === "error" ? <p className="text-[13px] text-muted-foreground">{state.error}</p> : null}
-      {state.status === "ready" ? <ThreadBody data={state.data} handlers={handlers} post={post} onNotices={showNotices} /> : null}
+      {state.status === "ready" ? (
+        <MentionablesProvider publicId={publicId}>
+          <ThreadBody data={state.data} handlers={handlers} post={post} onNotices={showNotices} />
+        </MentionablesProvider>
+      ) : null}
       <MentionNotices outcome={notices} />
     </section>
   );

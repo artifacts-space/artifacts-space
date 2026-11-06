@@ -1,7 +1,7 @@
 "use client";
 
 import { IconCornerDownRight, IconPencil, IconRobot, IconTrash, IconVolumeOff } from "@tabler/icons-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { MarkdownView } from "@/components/artifact-view/markdown-view";
 import { Badge } from "@/components/ui/badge";
@@ -77,6 +77,7 @@ function CommentActions({ comment, agent, handlers, onEditing }: { comment: Comm
 /** One comment: author, markdown body, and the viewer's actions. */
 export function CommentItem({ comment, agent, handlers, reply = false }: { comment: CommentView; agent: ThreadAgentView | undefined; handlers: CommentHandlers; reply?: boolean }) {
   const [editing, setEditing] = useState(false);
+  const mentions = useMemo(() => new Map(comment.mentions.map((item) => [item.handle, item.kind])), [comment.mentions]);
   return (
     <article id={`comment-${comment.id}`} className={cn("scroll-mt-20 space-y-1.5 py-3", reply && "border-l pl-4")}>
       <AuthorLine comment={comment} agent={agent} />
@@ -96,7 +97,7 @@ export function CommentItem({ comment, agent, handlers, reply = false }: { comme
           }}
         />
       ) : null}
-      {!comment.deleted && !editing ? <MarkdownView content={comment.body} className="text-[13px] leading-6" /> : null}
+      {!comment.deleted && !editing ? <MarkdownView content={comment.body} mentions={mentions} className="text-[13px] leading-6" /> : null}
       {!comment.deleted && !editing ? <CommentActions comment={comment} agent={agent} handlers={handlers} onEditing={() => { setEditing(true); }} /> : null}
     </article>
   );

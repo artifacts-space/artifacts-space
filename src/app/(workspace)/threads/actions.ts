@@ -5,6 +5,8 @@ import { z } from "zod";
 import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult } from "@/lib/artifact-types";
 import { markArtifactMentionsRead } from "@/lib/comments/inbox";
+import type { Mentionable } from "@/lib/comments/mention-autocomplete";
+import { listMentionables } from "@/lib/comments/mentionables";
 import { listThreadAgents, setThreadMute, type ThreadAgentView } from "@/lib/comments/mutes";
 import { createComment, deleteComment, listComments, updateComment, type CommentWriteResult } from "@/lib/comments/service";
 import { requireThread } from "@/lib/comments/thread";
@@ -43,6 +45,21 @@ export async function loadThreadAction(publicId: string): Promise<ActionResult<T
     return { success: true, data: { comments, agents, viewerId: userId } };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The comments could not be loaded. Please try again.") };
+  }
+}
+
+/**
+ * The people and agents the viewer can mention on this artifact, for the
+ * composer's suggestions. Loaded once per thread, never per keystroke.
+ */
+export async function loadMentionablesAction(publicId: string): Promise<ActionResult<Mentionable[]>> {
+  try {
+    const userId = await viewerId();
+    if (!userId) return { success: false, error: signInMessage };
+    const thread = await requireThread(userId, idSchema.parse(publicId));
+    return { success: true, data: await listMentionables(thread) };
+  } catch (error) {
+    return { success: false, error: actionErrorMessage(error, "Suggestions could not be loaded.") };
   }
 }
 
