@@ -6,6 +6,7 @@ import { useSyncExternalStore, type ReactNode } from "react";
 
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ArtifactFilesProvider } from "@/components/artifact-view/files-context";
+import { AvatarGallery } from "@/components/dev/avatar-gallery";
 import { UiView } from "@/components/artifact-view/ui-view";
 import { Button } from "@/components/ui/button";
 import { uiComponentNames } from "@/lib/ui/catalog";
@@ -88,6 +89,7 @@ export function ComponentGallery() {
         {uiComponentNames.map((name) => <a key={name} href={`#${name}`} className="hover:text-foreground">{name}</a>)}
         <a href="#specs" className="hover:text-foreground">Specs</a>
         <a href="#formats" className="hover:text-foreground">Formats</a>
+        <a href="#avatars" className="hover:text-foreground">Avatars</a>
       </nav>
       <div className="space-y-12">
         {uiComponentNames.map((name) => (
@@ -116,6 +118,9 @@ export function ComponentGallery() {
               </ArtifactFilesProvider>
             </Specimen>
           ))}
+        </Group>
+        <Group id="avatars" title="Pixel avatars">
+          <AvatarGallery />
         </Group>
       </div>
     </div>

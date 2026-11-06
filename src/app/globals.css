@@ -25,6 +25,8 @@
   --color-mention-foreground: var(--mention-foreground);
   --color-mention-agent: var(--mention-agent);
   --color-mention-agent-foreground: var(--mention-agent-foreground);
+  --color-avatar-tint-base: var(--avatar-tint-base);
+  --color-avatar-ink: var(--avatar-ink);
   --color-tone-info: var(--tone-info);
   --color-tone-success: var(--tone-success);
   --color-tone-warning: var(--tone-warning);
@@ -120,6 +122,16 @@
   --mention-foreground: oklch(0.42 0.13 262);
   --mention-agent: oklch(0.95 0.025 300);
   --mention-agent-foreground: oklch(0.42 0.13 300);
+  /*
+   * Pixel avatars (src/lib/avatar). Each avatar's hue is data; these tokens
+   * adapt it to the theme. The background is the hue mixed into the tint base;
+   * the pattern is the hue nudged toward the ink, darker on light and lighter
+   * on dark, so it keeps 3:1 against its own tint on both.
+   */
+  --avatar-tint-base: oklch(1 0 0);
+  --avatar-tint-strength: 30%;
+  --avatar-ink: oklch(0.2 0.006 60);
+  --avatar-ink-strength: 22%;
   /* Status tones for Callout, Badge, Metric changes. Reserved: never chart series. */
   --tone-info: oklch(0.52 0.15 255);
   --tone-success: oklch(0.52 0.13 150);
@@ -196,6 +208,10 @@
   --mention-foreground: oklch(0.86 0.08 262);
   --mention-agent: oklch(0.3 0.045 300);
   --mention-agent-foreground: oklch(0.86 0.08 300);
+  --avatar-tint-base: oklch(0.22 0.005 60);
+  --avatar-tint-strength: 32%;
+  --avatar-ink: oklch(0.95 0.004 80);
+  --avatar-ink-strength: 24%;
   --tone-info: oklch(0.74 0.12 255);
   --tone-success: oklch(0.75 0.13 150);
   --tone-warning: oklch(0.8 0.13 75);
