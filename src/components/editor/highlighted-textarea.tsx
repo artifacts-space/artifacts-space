@@ -41,6 +41,17 @@ function tokenClass(token: HighlightToken) {
   return cn(token.styles.map((style) => styleClasses[style]), token.mention ? mentionClasses[token.mention] : null);
 }
 
+/** Longer drafts skip highlighting so typing stays fast; the text still shows, unstyled. */
+export const HIGHLIGHT_MAX_LENGTH = 60_000;
+
+const noMentions: ReadonlyMap<string, MentionKind> = new Map();
+
+/** Markdown tokens for the layer, or one plain token when highlighting is off or the draft is long. */
+function layerTokens(value: string, resolved: ReadonlyMap<string, MentionKind>, markdown: boolean): HighlightToken[] {
+  if (!markdown || value.length > HIGHLIGHT_MAX_LENGTH) return value ? [{ text: value, styles: [] }] : [];
+  return highlightDraft(value, resolved);
+}
+
 /** Tokens with their start offsets, which make stable keys. */
 function keyed(tokens: HighlightToken[]) {
   let offset = 0;
@@ -53,8 +64,10 @@ function keyed(tokens: HighlightToken[]) {
 
 interface HighlightedTextareaProps extends Omit<React.ComponentProps<"textarea">, "value" | "ref"> {
   value: string;
-  /** Handles that show as mention chips. */
-  resolved: ReadonlyMap<string, MentionKind>;
+  /** Handles that show as mention chips. None by default. */
+  resolved?: ReadonlyMap<string, MentionKind>;
+  /** False for plain text: the same textarea without Markdown styles. */
+  markdown?: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 }
 
@@ -63,10 +76,11 @@ interface HighlightedTextareaProps extends Omit<React.ComponentProps<"textarea">
  * you type. The textarea's own text is transparent; a layer under it draws the
  * same text with styles. Typing, selection, IME, undo, spellcheck, and mobile
  * keyboards all stay native, because the textarea is still what you type in.
+ * Comments and the artifact editor share it; `className` sets the size.
  */
-export function HighlightedTextarea({ value, resolved, textareaRef, className, onScroll, ...props }: HighlightedTextareaProps) {
+export function HighlightedTextarea({ value, resolved = noMentions, markdown = true, textareaRef, className, onScroll, ...props }: HighlightedTextareaProps) {
   const layerRef = useRef<HTMLDivElement>(null);
-  const tokens = useMemo(() => keyed(highlightDraft(value, resolved)), [value, resolved]);
+  const tokens = useMemo(() => keyed(layerTokens(value, resolved, markdown)), [value, resolved, markdown]);
 
   // Keeps the layer scrolled with the textarea after each change, as well as on scroll.
   useLayoutEffect(() => {

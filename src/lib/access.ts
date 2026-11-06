@@ -51,6 +51,8 @@ export interface ServedArtifactView {
   metadata: Record<string, unknown>;
   /** When this version was saved. */
   updatedAt: Date;
+  /** Who saved this version: the last editor, or whoever saved the approved version. Null when unknown. */
+  editedBy: string | null;
 }
 
 /** An artifact the viewer may read, with what else they may do. */
@@ -109,7 +111,7 @@ export async function getEditableArtifact(editorId: string, key: { id: string } 
 
 function latestView(record: ArtifactRecord): ServedArtifactView {
   const { title, summary, content, kind, language, project, source, metadata, updatedAt } = record;
-  return { title, summary, content, kind, language, project, source, metadata, updatedAt };
+  return { title, summary, content, kind, language, project, source, metadata, updatedAt, editedBy: record.updatedBy ?? record.userId };
 }
 
 async function hasPendingEdit(artifactId: string) {
@@ -124,9 +126,9 @@ async function hasPendingEdit(artifactId: string) {
 async function approvedView(versionId: string): Promise<ServedArtifactView | null> {
   const [row] = await getDb().select().from(artifactVersion).where(eq(artifactVersion.id, versionId)).limit(1);
   if (!row) return null;
-  const { title, summary, content, kind, language, project, source, metadata, savedAt } = row;
+  const { title, summary, content, kind, language, project, source, metadata, savedAt, createdBy } = row;
   // savedAt, not createdAt: files attached up to the version's last save belong to it.
-  return { title, summary, content, kind, language, project, source, metadata, updatedAt: savedAt };
+  return { title, summary, content, kind, language, project, source, metadata, updatedAt: savedAt, editedBy: createdBy };
 }
 
 /**

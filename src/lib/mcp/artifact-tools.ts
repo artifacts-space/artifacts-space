@@ -8,6 +8,7 @@ import {
   createArtifact,
   deleteArtifact,
   getOwnArtifactByPublicId,
+  lastEditorsFor,
   listArtifacts,
   toArtifactDtos,
   updateArtifact,
@@ -148,9 +149,17 @@ function registerReadTools(server: ToolServer, userId: string) {
     ({ id }) => respond(async () => {
       const viewable = await getViewableArtifact(id, userId);
       if (!viewable) throw new UserFacingError("Artifact not found.");
-      const [[dto], { view }, files] = await Promise.all([toArtifactDtos([viewable.record]), loadContext(userId), filesForViewer(viewable)]);
+      const { editedBy, ...shown } = viewable.view;
+      const [[dto], { view }, files, editors] = await Promise.all([
+        toArtifactDtos([viewable.record]),
+        loadContext(userId),
+        filesForViewer(viewable),
+        lastEditorsFor([{ updatedBy: editedBy }]),
+      ]);
       if (!dto) throw new UserFacingError("Artifact not found.");
-      const served = { ...dto, ...viewable.view, files, updatedAt: viewable.view.updatedAt.toISOString() };
+      // Who saved the version this caller reads: the approved one may be older than the last edit.
+      const updatedBy = editedBy ? editors.get(editedBy) ?? null : null;
+      const served = { ...dto, ...shown, files, updatedBy, updatedAt: shown.updatedAt.toISOString() };
       return { ...toMcpArtifact(served, view), version: viewable.version.source, editPending: viewable.editPending };
     }),
   );

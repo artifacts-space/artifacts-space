@@ -5,13 +5,13 @@ import { useState } from "react";
 
 import { ExternalLink } from "@/components/artifact-view/external-link";
 import { MarkdownView } from "@/components/artifact-view/markdown-view";
+import { HighlightedTextarea } from "@/components/editor/highlighted-textarea";
 import { FormError } from "@/components/teams/form-error";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { COMMENT_MAX_LENGTH } from "@/lib/comments/config";
 import type { MentionKind } from "@/lib/comments/mentions";
 
-import { HighlightedTextarea } from "./highlighted-textarea";
 import { useMentionAutocomplete } from "./mention-suggestions";
 import { useMentionables } from "./mentionables-context";
 import type { WriteOutcome } from "./use-comment-thread";
