@@ -22,6 +22,18 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
       // `||` stays allowed on strings: an empty string should fall back too.
       "@typescript-eslint/prefer-nullish-coalescing": ["error", { ignorePrimitives: { string: true } }],
+      // Font sizes come from the type scale in globals.css: text-xs, text-sm, text-md, text-base.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value=/(^|[\\s:])text-\\[[0-9.]+(px|rem|em)\\]/]",
+          message: "Use a type scale step (text-xs, text-sm, text-md, text-base) instead of an arbitrary font size.",
+        },
+        {
+          selector: "TemplateElement[value.raw=/(^|[\\s:])text-\\[[0-9.]+(px|rem|em)\\]/]",
+          message: "Use a type scale step (text-xs, text-sm, text-md, text-base) instead of an arbitrary font size.",
+        },
+      ],
     },
   },
   {
