@@ -24,7 +24,7 @@ const rules = [
   "`repeat` renders an element's children once per item of a state array: { \"repeat\": { \"statePath\": \"/items\", \"key\": \"id\" } }. Inside, read fields with { \"$item\": \"name\" }. A repeat cannot sit inside another repeat.",
   "Tabs and Accordion: one child per entry in `tabs` / `items`, in the same order.",
   "Links allow only absolute http, https, and mailto URLs. Markdown renders without raw HTML.",
-  "Image and File components are not available yet.",
+  "Image and File show uploaded files only, by id: upload with files_request_upload, PUT the bytes, then files_finalize, and put the returned id in `file`. URLs are refused. Saving attaches the files to the artifact; each file belongs to one artifact.",
   `Limits: ${uiLimits.maxSpecBytes.toLocaleString("en-US")} bytes, ${uiLimits.maxElements} elements, nesting depth ${uiLimits.maxDepth}, ${uiLimits.maxRepeatItems} items per repeat. Use Table (up to 500 rows) or List for long data.`,
   "Unsupported: `watch`, named `slots`, and keys or paths that use __proto__, constructor, or prototype.",
   "Call artifacts_validate before saving to see every problem at once. Each issue names the element key and says how to fix it.",

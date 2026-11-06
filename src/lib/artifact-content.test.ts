@@ -17,6 +17,13 @@ describe("validateArtifactContent", () => {
     expect(result.message).toContain("not valid JSON");
   });
 
+  it("should refuse empty content except for file artifacts", () => {
+    expect(validateArtifactContent("markdown", "").valid).toBe(false);
+    expect(validateArtifactContent("markdown", "").message).toContain("Only file artifacts");
+    expect(validateArtifactContent("file", "").valid).toBe(true);
+    expect(validateArtifactContent("file", "Some *notes*").valid).toBe(true);
+  });
+
   it("should check csv, svg, and mermaid when those kinds are used", () => {
     expect(validateArtifactContent("csv", "a,b\n1,2").valid).toBe(true);
     expect(validateArtifactContent("csv", "").valid).toBe(false);

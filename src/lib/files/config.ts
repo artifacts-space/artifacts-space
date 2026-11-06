@@ -4,6 +4,10 @@
  * limits the server enforces.
  */
 
+/** pending: waiting for the upload to be checked. ready: checked and usable. */
+export const fileStatuses = ["pending", "ready"] as const;
+export type FileStatus = (typeof fileStatuses)[number];
+
 /** Every upload and download limit, in one place. */
 export const fileLimits = {
   /** Largest file, in bytes (25 MB). */

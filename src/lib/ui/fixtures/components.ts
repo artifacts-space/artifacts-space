@@ -167,8 +167,30 @@ const input: Pick<Record<UiComponentName, ComponentFixture[]>, "Checklist" | "Ch
   ],
 };
 
+/** Files the media fixtures point at. The gallery shows them from local stand-ins; nothing is uploaded. */
+export const fixtureFiles = [
+  { id: "00000000-0000-4000-8000-000000000001", filename: "architecture.png", contentType: "image/png", size: 48_213, createdAt: "2026-11-05T00:00:00.000Z" },
+  { id: "00000000-0000-4000-8000-000000000002", filename: "quarterly-report-final-v3.pdf", contentType: "application/pdf", size: 2_481_934, createdAt: "2026-11-05T00:00:00.000Z" },
+  { id: "00000000-0000-4000-8000-000000000003", filename: `${unbroken(110)}.docx`, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size: 26_214_400, createdAt: "2026-11-05T00:00:00.000Z" },
+] as const;
+
+const [imageFile, pdfFile, longFile] = fixtureFiles;
+
+const media: Pick<Record<UiComponentName, ComponentFixture[]>, "Image" | "File"> = {
+  Image: [
+    { name: "Normal", props: { file: imageFile.id, alt: "Architecture diagram", caption: "How agents reach the API." } },
+    { name: "Long caption", props: { file: imageFile.id, alt: longText(300), caption: longText(300) } },
+  ],
+  File: [
+    { name: "PDF", props: { file: pdfFile.id } },
+    { name: "Label", props: { file: pdfFile.id, label: "Board deck" } },
+    { name: "Long name", props: { file: longFile.id } },
+    { name: "Unknown file", props: { file: "00000000-0000-4000-8000-0000000000ff" } },
+  ],
+};
+
 /** Normal and extreme fixtures for every component, for the gallery and tests. */
-export const componentFixtures: Record<UiComponentName, ComponentFixture[]> = { ...layout, ...content, ...data, ...input };
+export const componentFixtures: Record<UiComponentName, ComponentFixture[]> = { ...layout, ...content, ...data, ...input, ...media };
 
 /** Builds a raw ui spec that renders one fixture: the component as root, its children below. */
 export function fixtureSpec(type: string, fixture: ComponentFixture): Record<string, unknown> {

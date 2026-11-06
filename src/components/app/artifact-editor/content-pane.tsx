@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { validateArtifactContent } from "@/lib/artifact-content";
 import { formatInfo } from "@/lib/artifact-formats";
 import type { ArtifactKind } from "@/lib/artifact-types";
+import type { FileDto } from "@/lib/files/types";
 
 import type { ArtifactDraft } from "./use-artifact-draft";
 
@@ -54,11 +55,12 @@ interface ContentPaneProps {
   content: string;
   language: string;
   title: string;
+  files: readonly FileDto[];
   update: UpdateDraft;
 }
 
 /** The content textarea in edit mode, or the rendered artifact in preview mode. */
-export function ContentPane({ mode, kind, content, language, title, update }: ContentPaneProps) {
+export function ContentPane({ mode, kind, content, language, title, files, update }: ContentPaneProps) {
   if (mode === "edit") {
     return (
       <div className="flex flex-1 flex-col">
@@ -75,7 +77,7 @@ export function ContentPane({ mode, kind, content, language, title, update }: Co
   }
   return (
     <div className="min-h-[460px] min-w-0 flex-1 bg-card p-5 sm:p-8">
-      <ArtifactView kind={kind} content={content} language={language} title={title} />
+      <ArtifactView kind={kind} content={content} language={language} title={title} files={files} />
     </div>
   );
 }

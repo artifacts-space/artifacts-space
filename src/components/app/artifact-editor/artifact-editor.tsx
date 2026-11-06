@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ShareControl } from "@/components/app/share-control";
+import { AttachedFiles } from "@/components/files/attached-files";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
 import { ContentPane } from "./content-pane";
@@ -49,7 +50,8 @@ export function ArtifactEditor({ artifact, origin, onUpdated, onDeleted }: Artif
       {shared ? <ShareBanner shareUrl={shareUrl} /> : null}
       <TitleFields title={draft.title} summary={draft.summary} update={update} />
       <ModeBar mode={mode} onMode={setMode} length={draft.content.length} updatedAt={artifact.updatedAt} />
-      <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} update={update} />
+      <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} files={artifact.files} update={update} />
+      {draft.kind === "file" || draft.kind === "ui" || artifact.files.length > 0 ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
       <MetaFields draft={draft} update={update} />
       <DeleteDialog
         open={deleteOpen}

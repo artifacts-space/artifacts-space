@@ -68,9 +68,21 @@ describe("validateUiSpec on broken specs", () => {
     expect(result.renderable).toBe(true);
   });
 
-  it("should explain that Image is planned when an agent uses it", () => {
-    const spec = { version: 1, root: "i", elements: { i: { type: "Image", props: { src: "https://example.com/a.png" } } } };
-    expect(codes(spec)).toContain("planned_component");
+  it("should refuse an Image that points at a URL instead of a file id", () => {
+    const spec = { version: 1, root: "i", elements: { i: { type: "Image", props: { file: "https://example.com/a.png", alt: "A" } } } };
+    const result = validateUiSpec(spec);
+    expect(result.valid).toBe(false);
+    expect(result.issues.map((issue) => issue.message).join("\n")).toContain("URLs are not allowed");
+  });
+
+  it("should refuse a File whose id comes from state", () => {
+    const spec = { version: 1, root: "f", state: { id: "x" }, elements: { f: { type: "File", props: { file: { $state: "/id" } } } } };
+    expect(validateUiSpec(spec).issues.map((issue) => issue.message).join("\n")).toContain("must be a file id written in the spec");
+  });
+
+  it("should accept Image and File when they use file ids", () => {
+    const spec = { version: 1, root: "s", elements: { s: { type: "Stack", props: {}, children: ["i", "f"] }, i: { type: "Image", props: { file: "7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a", alt: "Chart" } }, f: { type: "File", props: { file: "7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4b" } } } };
+    expect(validateUiSpec(spec).valid).toBe(true);
   });
 
   it("should name the element and prop when props are invalid", () => {

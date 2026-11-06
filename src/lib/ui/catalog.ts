@@ -6,20 +6,19 @@ import { contentProps } from "./props/content";
 import { dataChecks, dataProps, type PropCheck } from "./props/data";
 import { inputChecks, inputEvents, inputProps } from "./props/input";
 import { layoutProps } from "./props/layout";
+import { mediaChecks, mediaProps } from "./props/media";
 
 /**
  * The stout component set: zod-only and server-safe. The React registry in
  * src/components/artifact-view/ui implements every component listed here.
- *
- * Extension point: media components (Image, File) arrive with R2 file storage.
- * Add them as a `mediaProps` group whose props accept only R2 asset ids, never
- * URLs, then add descriptions below and implementations in the registry.
+ * Media components (Image, File) accept only uploaded file ids, never URLs.
  */
 export const componentProps = {
   ...layoutProps,
   ...contentProps,
   ...dataProps,
   ...inputProps,
+  ...mediaProps,
 };
 
 export type UiComponentName = keyof typeof componentProps;
@@ -39,13 +38,10 @@ export const containerComponents: ReadonlySet<UiComponentName> = new Set([
 ]);
 
 /** Cross-field prop rules, checked after the zod schema passes. */
-export const componentChecks: Partial<Record<UiComponentName, PropCheck>> = { ...dataChecks, ...inputChecks };
+export const componentChecks: Partial<Record<UiComponentName, PropCheck>> = { ...dataChecks, ...inputChecks, ...mediaChecks };
 
 /** Events a component can emit for `on` bindings. */
 export const componentEvents: Partial<Record<UiComponentName, readonly string[]>> = inputEvents;
-
-/** Components planned for a later wave, named in validation messages. */
-export const plannedComponents = ["Image", "File"] as const;
 
 const descriptions: Record<UiComponentName, string> = {
   Section: "A titled region of the page. Use it to group related content. Children stack vertically.",
@@ -76,6 +72,8 @@ const descriptions: Record<UiComponentName, string> = {
   Switch: "An on/off switch. Bind `checked` with { \"$bindState\": \"/path\" }.",
   Slider: "A numeric slider between `min` (default 0) and `max` (default 100). Bind `value` with { \"$bindState\": \"/path\" }.",
   Button: "A button. Its `press` event can run setState, pushState, or removeState through `on`. It cannot load or send data.",
+  Image: "An uploaded image (PNG, JPEG, GIF, WebP, or AVIF), shown at up to its natural size. `file` is the id from files_finalize; `alt` describes it for screen readers.",
+  File: "A download card for an uploaded file: name, type, and size. `file` is the id from files_finalize; `label` replaces the shown name.",
 };
 
 function componentDefinition(name: UiComponentName) {

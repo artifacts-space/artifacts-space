@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
 import { registerArtifactTools } from "@/lib/mcp/artifact-tools";
+import { registerFileTools } from "@/lib/mcp/file-tools";
 import { registerFormatTools } from "@/lib/mcp/format-tools";
 import { getSession } from "@/lib/session";
 import { authenticateApiToken } from "@/lib/tokens";
@@ -29,6 +30,7 @@ function createMcpServer(userId: string) {
 
   registerArtifactTools(server, userId);
   registerFormatTools(server);
+  registerFileTools(server, userId);
   return server;
 }
 

@@ -16,6 +16,9 @@ import {
   type PendingSharingDto,
 } from "@/lib/artifact-types";
 import { artifactSizeProblem } from "@/lib/artifact-limits";
+import { checkContentFiles } from "@/lib/files/attach";
+import { attachFileRows, deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
+import type { FileDto } from "@/lib/files/types";
 import { generatePublicId } from "@/lib/public-id";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -29,7 +32,8 @@ import { recordArtifactEdit } from "@/lib/versions/service";
 const artifactUpdateSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
   summary: z.string().trim().max(600).optional(),
-  content: z.string().min(1).max(1_000_000).optional(),
+  // Empty only for file artifacts, whose content is optional notes; validateArtifactContent checks.
+  content: z.string().max(1_000_000).optional(),
   kind: z.enum(artifactKinds).optional(),
   language: z.string().trim().max(60).optional(),
   project: z.string().trim().max(120).optional(),
@@ -60,7 +64,7 @@ function assertArtifactSize(input: { content?: string | undefined; metadata?: Re
 }
 
 /** Maps a row to the workspace's DTO. */
-export function toArtifactDto(record: ArtifactRecord, pendingSharing: PendingSharingDto | null = null, pendingEdit: PendingEditDto | null = null): ArtifactDto {
+export function toArtifactDto(record: ArtifactRecord, pendingSharing: PendingSharingDto | null = null, pendingEdit: PendingEditDto | null = null, files: FileDto[] = []): ArtifactDto {
   return {
     id: record.id,
     publicId: record.publicId,
@@ -78,6 +82,7 @@ export function toArtifactDto(record: ArtifactRecord, pendingSharing: PendingSha
     originalAuthorId: record.originalAuthorId,
     pendingSharing,
     pendingEdit,
+    files,
     metadata: record.metadata,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
@@ -103,8 +108,9 @@ export async function pendingRequestsFor(artifactIds: string[]) {
 
 /** Maps rows to DTOs with their open sharing and edit requests. */
 export async function toArtifactDtos(records: ArtifactRecord[]): Promise<ArtifactDto[]> {
-  const pending = await pendingRequestsFor(records.map((record) => record.id));
-  return records.map((record) => toArtifactDto(record, pending.sharing.get(record.id) ?? null, pending.edits.get(record.id) ?? null));
+  const ids = records.map((record) => record.id);
+  const [pending, files] = await Promise.all([pendingRequestsFor(ids), listFilesForArtifacts(ids)]);
+  return records.map((record) => toArtifactDto(record, pending.sharing.get(record.id) ?? null, pending.edits.get(record.id) ?? null, files.get(record.id) ?? []));
 }
 
 /** Which artifacts a list shows: the viewer's own, or those shared with one of their teams. */
@@ -180,6 +186,7 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
   const parsed = artifactInputSchema.parse(input);
   assertArtifactSize(parsed);
   assertValidArtifactContent(parsed.kind, parsed.content);
+  const fileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
   await enforceRateLimit("artifactCreate", userId);
   const [record] = await getDb()
     .insert(artifact)
@@ -194,7 +201,10 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
     .returning();
 
   if (!record) throw new Error("The artifact could not be created.");
-  return toArtifactDto(record);
+  if (fileIds.length === 0) return toArtifactDto(record);
+  await attachFileRows(userId, record.id, fileIds);
+  const [dto] = await toArtifactDtos([record]);
+  return dto ?? toArtifactDto(record);
 }
 
 /**
@@ -209,6 +219,7 @@ export async function updateArtifact(userId: string, id: string, input: Artifact
   const before = await getOwnArtifact(userId, id);
   if (!before) return null;
   await assertValidArtifactUpdate(parsed, () => Promise.resolve(before));
+  await attachUpdatedContentFiles(userId, before, parsed);
   const [record] = await getDb()
     .update(artifact)
     .set({ ...parsed, updatedAt: new Date() })
@@ -221,8 +232,24 @@ export async function updateArtifact(userId: string, id: string, input: Artifact
   return dto ?? null;
 }
 
-/** Deletes the author's own artifact. */
+/**
+ * Checks and attaches the files an update's content points at, before the
+ * row changes, so a version saved with the edit already includes them.
+ */
+async function attachUpdatedContentFiles(userId: string, current: ArtifactRecord, update: { kind?: string | undefined; content?: string | undefined }) {
+  if (update.kind === undefined && update.content === undefined) return;
+  const fileIds = await checkContentFiles(userId, current.id, update.kind ?? current.kind, update.content ?? current.content);
+  await attachFileRows(userId, current.id, fileIds);
+}
+
+/** Deletes the author's own artifact and its files. */
 export async function deleteArtifact(userId: string, id: string) {
+  const own = await getOwnArtifact(userId, id);
+  if (!own) return false;
+  await deleteArtifactFiles(own.id).catch((error: unknown) => {
+    // The rows lose their artifact when it goes; the cleanup job removes them.
+    console.error("[files] Files of a deleted artifact were left for cleanup", error instanceof Error ? error.name : "unknown error");
+  });
   const [record] = await getDb()
     .delete(artifact)
     .where(and(eq(artifact.userId, userId), eq(artifact.id, id)))

@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { componentFixtures, fixtureSpec } from "@/lib/ui/fixtures/components";
+import type { FileDto } from "@/lib/files/types";
+import { componentFixtures, fixtureFiles, fixtureSpec } from "@/lib/ui/fixtures/components";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
 import { invalidPropsSpec, unknownTypeSpec } from "@/lib/ui/fixtures/specs";
 import { uiComponentNames } from "@/lib/ui/catalog";
@@ -86,5 +87,41 @@ describe("ArtifactView for ui", () => {
 describe("ArtifactView for empty content", () => {
   it("should say the artifact is empty when content is blank", () => {
     expect(render("markdown", "  ")).toContain("This artifact is empty.");
+  });
+});
+
+describe("ArtifactView for files", () => {
+  const [image, pdf, docx] = fixtureFiles;
+  const renderFiles = (content: string, files: FileDto[] = [...fixtureFiles]) => renderToStaticMarkup(<ArtifactView kind="file" content={content} title="Files" files={files} />);
+
+  it("should show images inline, pdfs in a frame, and others as download cards", () => {
+    const html = renderFiles("Read **this** first.");
+    expect(html).toContain("<strong>this</strong>");
+    expect(html).toContain(`<img src="/api/files/${image.id}"`);
+    expect(html).toContain(`<iframe src="/api/files/${pdf.id}"`);
+    expect(html).toContain(`href="/api/files/${docx.id}?download=1"`);
+    expect(html).toContain("Word document · 25 MB");
+  });
+
+  it("should play video and audio in native players", () => {
+    const media = [
+      { id: "00000000-0000-4000-8000-00000000000a", filename: "demo.mp4", contentType: "video/mp4", size: 10, createdAt: "2026-11-05T00:00:00.000Z" },
+      { id: "00000000-0000-4000-8000-00000000000b", filename: "note.mp3", contentType: "audio/mpeg", size: 10, createdAt: "2026-11-05T00:00:00.000Z" },
+    ];
+    const html = renderFiles("", media);
+    expect(html).toContain("<video");
+    expect(html).toContain("<audio");
+  });
+
+  it("should say so when a file artifact has no files yet", () => {
+    expect(renderFiles("", [])).toContain("No files yet.");
+  });
+
+  it("should show an uploaded image by id and refuse ids the artifact does not hold", () => {
+    const spec = { version: 1, root: "s", elements: { s: { type: "Stack", props: {}, children: ["i", "x"] }, i: { type: "Image", props: { file: image.id, alt: "Diagram" } }, x: { type: "File", props: { file: "00000000-0000-4000-8000-0000000000ff" } } } };
+    const html = renderToStaticMarkup(<ArtifactView kind="ui" content={JSON.stringify(spec)} files={[...fixtureFiles]} />);
+    expect(html).toContain(`src="/api/files/${image.id}"`);
+    expect(html).toContain('alt="Diagram"');
+    expect(html).toContain("Its file is not attached to this artifact.");
   });
 });

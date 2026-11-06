@@ -6,7 +6,6 @@ import {
   componentProps,
   containerComponents,
   isUiComponentName,
-  plannedComponents,
   uiComponentNames,
   type UiComponentName,
 } from "./catalog";
@@ -26,9 +25,6 @@ const unsupportedFields = {
 } as const;
 
 function typeIssue(key: string, type: string): UiSpecIssue {
-  if ((plannedComponents as readonly string[]).includes(type)) {
-    return specError("planned_component", `Element "${key}": ${type} is not available yet. Images and files arrive with file storage. Remove this element for now.`, key);
-  }
   return specError("unknown_component", `Element "${key}": unknown component "${type}". Use one of: ${uiComponentNames.join(", ")}.`, key);
 }
 

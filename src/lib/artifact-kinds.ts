@@ -4,6 +4,7 @@ import {
   IconCode,
   IconFileText,
   IconLayoutDashboard,
+  IconPaperclip,
   IconSitemap,
   IconTable,
   IconVectorBezier2,
@@ -24,6 +25,7 @@ export const kindIcons: Record<FormatKind, typeof IconFileText> = {
   svg: IconVectorBezier2,
   mermaid: IconSitemap,
   ui: IconLayoutDashboard,
+  file: IconPaperclip,
 };
 
 /** Text color class per format. The colors are tokens in globals.css. */
@@ -36,4 +38,5 @@ export const kindColors: Record<FormatKind, string> = {
   svg: "text-kind-svg",
   mermaid: "text-kind-mermaid",
   ui: "text-kind-ui",
+  file: "text-kind-file",
 };

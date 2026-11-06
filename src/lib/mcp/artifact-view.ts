@@ -20,6 +20,8 @@ export interface McpArtifact {
   /** When the author's latest edit waits for approval, shown only to the author. */
   pendingEdit: { requestedAt: string } | null;
   isAuthor: boolean;
+  /** Attached files. Get a download link with files_get_download_url. */
+  files: { id: string; filename: string; contentType: string; size: number }[];
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -56,6 +58,7 @@ export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext, include
     pendingSharing: pending,
     pendingEdit: isAuthor && dto.pendingEdit ? { requestedAt: dto.pendingEdit.requestedAt } : null,
     isAuthor,
+    files: dto.files.map(({ id, filename, contentType, size }) => ({ id, filename, contentType, size })),
     metadata: dto.metadata,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,

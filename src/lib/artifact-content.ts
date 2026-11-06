@@ -57,12 +57,14 @@ const checks: Record<string, (content: string) => UiSpecIssue[]> = {
 };
 
 /**
- * Checks that `content` fits its format. Markdown, code, and text accept any
+ * Checks that `content` fits its format. Only file artifacts, whose content
+ * is optional notes, may be empty. Markdown, code, and text accept any
  * text. JSON must parse, CSV must have a header and closed quotes, SVG must
  * have an <svg> root, Mermaid must name a diagram type, and ui must pass
  * `validateUiSpec`.
  */
 export function validateArtifactContent(kind: string, content: string): ArtifactContentResult {
+  if (content === "" && kind !== "file") return result([error("empty_content", "Add content. Only file artifacts may be saved without it.")]);
   const check = checks[kind];
   return result(check ? check(content) : []);
 }

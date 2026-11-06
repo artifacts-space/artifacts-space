@@ -15,6 +15,7 @@ const dto: ArtifactDto = {
   project: "",
   sessionId: "",
   source: "",
+  files: [],
   visibility: "team",
   teamId: "team-1",
   authorId: "author",

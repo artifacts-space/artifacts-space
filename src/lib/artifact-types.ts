@@ -1,4 +1,6 @@
-export const artifactKinds = ["markdown", "code", "text", "json", "csv", "svg", "mermaid", "ui"] as const;
+import type { FileDto } from "./files/types";
+
+export const artifactKinds = ["markdown", "code", "text", "json", "csv", "svg", "mermaid", "ui", "file"] as const;
 export type ArtifactKind = (typeof artifactKinds)[number];
 /** Who can read an artifact. Private is the default, even inside a team. */
 export const artifactVisibilities = ["private", "team", "link", "public"] as const;
@@ -53,6 +55,8 @@ export interface ArtifactDto {
   pendingSharing: PendingSharingDto | null;
   /** Set when the latest edit waits for approval; readers outside the team still see the approved version. */
   pendingEdit: PendingEditDto | null;
+  /** Ready files attached to the artifact, in the order they were added. */
+  files: FileDto[];
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;

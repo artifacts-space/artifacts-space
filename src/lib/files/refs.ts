@@ -1,0 +1,33 @@
+import { isPlainObject } from "@/lib/ui/json-walk";
+
+/** ui components that point at an uploaded file through their `file` prop. */
+export const fileComponentTypes: ReadonlySet<string> = new Set(["Image", "File"]);
+
+/** Most distinct files one artifact's content may point at. */
+export const maxFileRefs = 50;
+
+function refsInElements(elements: unknown): string[] {
+  if (!isPlainObject(elements)) return [];
+  const ids: string[] = [];
+  for (const element of Object.values(elements)) {
+    if (!isPlainObject(element) || typeof element.type !== "string" || !fileComponentTypes.has(element.type)) continue;
+    const props = element.props;
+    if (isPlainObject(props) && typeof props.file === "string") ids.push(props.file.trim().toLowerCase());
+  }
+  return ids;
+}
+
+/**
+ * The distinct file ids a piece of content points at: the `file` prop of
+ * every Image and File element in a ui spec. Other formats point at none.
+ * Content that does not parse points at none; validation reports it.
+ */
+export function fileRefsInContent(kind: string, content: string): string[] {
+  if (kind !== "ui") return [];
+  try {
+    const spec: unknown = JSON.parse(content);
+    return isPlainObject(spec) ? [...new Set(refsInElements(spec.elements))] : [];
+  } catch {
+    return [];
+  }
+}

@@ -9,7 +9,7 @@ export interface FormatInfo {
 }
 
 /** Every artifact format, in picker order. Server-safe: no React, no icons. */
-export const formatKinds = ["markdown", "code", "text", "json", "csv", "svg", "mermaid", "ui"] as const;
+export const formatKinds = ["markdown", "code", "text", "json", "csv", "svg", "mermaid", "ui", "file"] as const;
 export type FormatKind = (typeof formatKinds)[number];
 
 export const formatInfo: Record<FormatKind, FormatInfo> = {
@@ -52,5 +52,10 @@ export const formatInfo: Record<FormatKind, FormatInfo> = {
     label: "Interface",
     helper: "A rich page, such as a dashboard or report, built from our components.",
     agent: "A json-render spec on the artifacts.space component set: dashboards, reports, checklists. Read artifacts_formats_guide with kind \"ui\" before writing one.",
+  },
+  file: {
+    label: "Files",
+    helper: "Images, PDFs, documents, video, and audio, with optional notes.",
+    agent: "Uploaded files with optional Markdown notes as content. Create one with files_create_artifact after uploading (files_request_upload, PUT, files_finalize).",
   },
 };

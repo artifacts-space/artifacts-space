@@ -36,7 +36,7 @@ export function useArtifactActions({ artifact, draft, onUpdated, onDeleted }: Op
   }
 
   async function save() {
-    if (!draft.title.trim() || !draft.content.trim()) {
+    if (!draft.title.trim() || (draft.kind !== "file" && !draft.content.trim())) {
       toast.error("Title and content are required.");
       return;
     }

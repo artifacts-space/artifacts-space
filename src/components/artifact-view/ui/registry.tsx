@@ -11,14 +11,12 @@ import { BadgeView, CalloutView, CodeView, HeadingView, LinkView, ListView, Mark
 import { DiagramView, MetricView, ProgressView, TableView, TimelineView } from "./data";
 import { ButtonView, CheckboxView, ChecklistView, SelectView, SliderView, SwitchView } from "./inputs";
 import { AccordionView, CardView, GridView, SectionView, SeparatorView, StackView, TabsView } from "./layout";
+import { FileView, ImageView } from "./media";
 import { renderStout, type ViewProps } from "./stout";
 
 type Views = { [K in UiComponentName]: ComponentType<ViewProps<K>> };
 
-/**
- * One view per catalog component. Extension point: Image and File views join
- * here when the catalog adds media components backed by R2 file storage.
- */
+/** One view per catalog component. */
 const views: Views = {
   Section: SectionView,
   Stack: StackView,
@@ -48,6 +46,8 @@ const views: Views = {
   Switch: SwitchView,
   Slider: SliderView,
   Button: ButtonView,
+  Image: ImageView,
+  File: FileView,
 };
 
 function stoutComponent(type: UiComponentName) {

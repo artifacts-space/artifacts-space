@@ -30,4 +30,6 @@ export const formatFixtures: FormatFixture[] = [
   { name: "Interface", kind: "ui", content: JSON.stringify(exampleUiSpec) },
   { name: "Interface, invalid JSON", kind: "ui", content: '{"version":1,"root":' },
   { name: "Empty", kind: "markdown", content: "   " },
+  { name: "Files", kind: "file", content: "Notes for the **2.4** release: the diagram, the report, and the spec." },
+  { name: "Files, no notes", kind: "file", content: "" },
 ];

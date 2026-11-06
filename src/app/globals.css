@@ -20,6 +20,7 @@
   --color-kind-svg: var(--kind-svg);
   --color-kind-mermaid: var(--kind-mermaid);
   --color-kind-ui: var(--kind-ui);
+  --color-kind-file: var(--kind-file);
   --color-tone-info: var(--tone-info);
   --color-tone-success: var(--tone-success);
   --color-tone-warning: var(--tone-warning);
@@ -107,6 +108,7 @@
   --kind-svg: oklch(0.58 0.17 350);
   --kind-mermaid: oklch(0.6 0.15 45);
   --kind-ui: oklch(0.55 0.13 225);
+  --kind-file: oklch(0.52 0.06 260);
   /* Status tones for Callout, Badge, Metric changes. Reserved: never chart series. */
   --tone-info: oklch(0.52 0.15 255);
   --tone-success: oklch(0.52 0.13 150);
@@ -176,6 +178,7 @@
   --kind-svg: oklch(0.76 0.13 350);
   --kind-mermaid: oklch(0.78 0.13 50);
   --kind-ui: oklch(0.76 0.11 225);
+  --kind-file: oklch(0.76 0.05 260);
   --tone-info: oklch(0.74 0.12 255);
   --tone-success: oklch(0.75 0.13 150);
   --tone-warning: oklch(0.8 0.13 75);

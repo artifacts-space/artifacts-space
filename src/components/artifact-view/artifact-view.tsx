@@ -13,6 +13,9 @@
  * - `title`    (string, optional): the artifact title. Used as the alt text of
  *              SVG images. Defaults to "Artifact image".
  * - `language` (string, optional): the code language label for `code`.
+ * - `files`    (FileDto[], optional): the artifact's ready files. Required to
+ *              show a `file` artifact's files; Image and File elements in a
+ *              ui artifact use it for names and sizes.
  * - `className` (string, optional): extra classes on the outer wrapper.
  *
  * It has no "use client" directive, so it renders on the server when used in
@@ -23,8 +26,11 @@
  * HTML, and links allow only http, https, and mailto.
  */
 import type { FormatKind } from "@/lib/artifact-formats";
+import type { FileDto } from "@/lib/files/types";
 import { cn } from "@/lib/utils";
 
+import { FileArtifactView } from "./file-artifact-view";
+import { ArtifactFilesProvider } from "./files-context";
 import { MarkdownView } from "./markdown-view";
 import { MermaidView } from "./mermaid-view";
 import { CodeView, CsvView, JsonView, SvgView, TextView } from "./source-views";
@@ -36,6 +42,7 @@ export interface ArtifactViewProps {
   content: string;
   title?: string | undefined;
   language?: string | undefined;
+  files?: readonly FileDto[] | undefined;
   className?: string | undefined;
 }
 
@@ -55,6 +62,8 @@ function FormatBody({ kind, content, title, language }: ArtifactViewProps) {
       return <MermaidView code={content} />;
     case "ui":
       return <UiView content={content} />;
+    case "file":
+      return <FileArtifactView notes={content} />;
     default:
       return <TextView content={content} />;
   }
@@ -62,9 +71,10 @@ function FormatBody({ kind, content, title, language }: ArtifactViewProps) {
 
 /** Renders artifact content by its format. See the props documented at the top of this file. */
 export function ArtifactView(props: ArtifactViewProps) {
+  const body = props.content.trim() === "" && props.kind !== "file" ? <ViewNotice title="This artifact is empty." /> : <FormatBody {...props} />;
   return (
     <div className={cn("min-w-0", props.className)} data-artifact-kind={props.kind}>
-      {props.content.trim() === "" ? <ViewNotice title="This artifact is empty." /> : <FormatBody {...props} />}
+      {props.files ? <ArtifactFilesProvider files={props.files}>{body}</ArtifactFilesProvider> : body}
     </div>
   );
 }

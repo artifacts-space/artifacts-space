@@ -5,10 +5,11 @@ import { useTheme } from "next-themes";
 import { useSyncExternalStore, type ReactNode } from "react";
 
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { ArtifactFilesProvider } from "@/components/artifact-view/files-context";
 import { UiView } from "@/components/artifact-view/ui-view";
 import { Button } from "@/components/ui/button";
 import { uiComponentNames } from "@/lib/ui/catalog";
-import { componentFixtures, fixtureSpec } from "@/lib/ui/fixtures/components";
+import { componentFixtures, fixtureFiles, fixtureSpec } from "@/lib/ui/fixtures/components";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
 import { formatFixtures } from "@/lib/ui/fixtures/formats";
 import { deepSpec, invalidPropsSpec, javascriptLinkSpec, manyElementsSpec, repeatSpec, unknownTypeSpec } from "@/lib/ui/fixtures/specs";
@@ -22,6 +23,9 @@ const specFixtures: { name: string; spec: unknown }[] = [
   { name: "Too many elements (501)", spec: manyElementsSpec(500) },
   { name: "Too deep (21)", spec: deepSpec(21) },
 ];
+
+/** Gallery files are not uploaded: every one shows a local stand-in image instead. */
+const standInUrl = () => "/artifacts-space-mark.svg";
 
 const themes = [
   { value: "light", label: "Light", Icon: IconSun },
@@ -90,7 +94,9 @@ export function ComponentGallery() {
           <Group key={name} id={name} title={name}>
             {componentFixtures[name].map((fixture) => (
               <Specimen key={fixture.name} name={fixture.name}>
-                <UiView content={JSON.stringify(fixtureSpec(name, fixture))} />
+                <ArtifactFilesProvider files={fixtureFiles} urlFor={standInUrl}>
+                  <UiView content={JSON.stringify(fixtureSpec(name, fixture))} />
+                </ArtifactFilesProvider>
               </Specimen>
             ))}
           </Group>
@@ -105,7 +111,9 @@ export function ComponentGallery() {
         <Group id="formats" title="Format viewers">
           {formatFixtures.map((fixture) => (
             <Specimen key={fixture.name} name={`${fixture.kind} · ${fixture.name}`}>
-              <ArtifactView kind={fixture.kind} content={fixture.content} language={fixture.language} title={fixture.name} />
+              <ArtifactFilesProvider files={fixtureFiles} urlFor={standInUrl}>
+                <ArtifactView kind={fixture.kind} content={fixture.content} language={fixture.language} title={fixture.name} />
+              </ArtifactFilesProvider>
             </Specimen>
           ))}
         </Group>
