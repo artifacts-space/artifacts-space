@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { emailLink, html, renderEmail } from "@/lib/email/layout";
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
 import { siteUrl } from "@/lib/site-origin";
 
@@ -14,27 +15,26 @@ interface ReportEmail {
   reasonLabel: string;
 }
 
-function escapeHtml(value: string) {
-  return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+interface ReportEmailContent {
+  teamName: string;
+  artifactTitle: string;
+  reasonLabel: string;
+  teamUrl: string;
+  artifactUrl: string;
 }
 
-function renderHtml(input: ReportEmail, teamUrl: string, artifactUrl: string) {
-  const team = escapeHtml(input.teamName);
-  const title = escapeHtml(input.artifactTitle);
-  const reason = escapeHtml(input.reasonLabel);
-  return `<!doctype html>
-<html>
-  <body style="margin:0;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#18181b;background:#ffffff">
-    <div style="max-width:440px;margin:0 auto">
-      <p style="margin:0 0 24px;font-size:14px;font-weight:600">artifacts.space</p>
-      <h1 style="margin:0 0 12px;font-size:20px;font-weight:500">A reader reported an artifact in ${team}</h1>
-      <p style="margin:0 0 8px;font-size:14px;line-height:22px;color:#52525b">Artifact: <a href="${escapeHtml(artifactUrl)}" style="color:#18181b">${title}</a></p>
-      <p style="margin:0 0 24px;font-size:14px;line-height:22px;color:#52525b">Reason: ${reason}</p>
-      <a href="${escapeHtml(teamUrl)}" style="display:inline-block;padding:10px 16px;border-radius:6px;background:#18181b;color:#ffffff;font-size:14px;text-decoration:none">Review the report</a>
-      <p style="margin:32px 0 0;font-size:12px;line-height:18px;color:#71717a">You get this email because you own the team. On the team page you can withdraw sharing or dismiss the report.</p>
-    </div>
-  </body>
-</html>`;
+/** The report email in the shared layout. Team name, artifact title, and reason are escaped. */
+export function renderReportEmail({ teamName, artifactTitle, reasonLabel, teamUrl, artifactUrl }: ReportEmailContent) {
+  return renderEmail({
+    title: `A reader reported an artifact in ${teamName}`,
+    preview: `Reason: ${reasonLabel}`,
+    heading: html`A reader reported an artifact in ${teamName}`,
+    paragraphs: [html`Artifact: ${emailLink(artifactUrl, artifactTitle)}`, html`Reason: ${reasonLabel}`],
+    action: { label: "Review the report", url: teamUrl },
+    note: html`On the team page you can withdraw sharing or dismiss the report.`,
+    reason: "You get this email because you own the team.",
+    text: `A reader reported an artifact in ${teamName}.\n\nArtifact: ${artifactTitle}\n${artifactUrl}\n\nReason: ${reasonLabel}\n\nReview the report: ${teamUrl}`,
+  });
 }
 
 /**
@@ -55,8 +55,7 @@ export async function sendReportEmail(input: ReportEmail) {
       to: input.ownerEmail,
       fromName: "artifacts.space",
       subject: `Report on “${input.artifactTitle}” in ${input.teamName}`,
-      html: renderHtml(input, teamUrl, artifactUrl),
-      text: `A reader reported an artifact in ${input.teamName}.\n\nArtifact: ${input.artifactTitle}\n${artifactUrl}\n\nReason: ${input.reasonLabel}\n\nReview the report: ${teamUrl}`,
+      ...renderReportEmail({ ...input, teamUrl, artifactUrl }),
     },
     { idempotencyKey: `artifact-report:${createHash("sha256").update(`${input.reportId}:${input.ownerId}`).digest("hex")}` },
   );

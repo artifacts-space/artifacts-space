@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { html, renderEmail } from "@/lib/email/layout";
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
 import { siteUrl } from "@/lib/site-origin";
 
@@ -14,10 +15,6 @@ interface MentionEmail {
 
 const TITLE_MAX = 120;
 
-function escapeHtml(value: string) {
-  return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}
-
 function shortTitle(title: string) {
   const flat = title.replace(/\s+/g, " ").trim();
   return flat.length > TITLE_MAX ? `${flat.slice(0, TITLE_MAX - 1)}…` : flat || "an artifact";
@@ -29,20 +26,17 @@ export function threadUrl(publicId: string, commentId?: string) {
   return siteUrl(`/threads/${encodeURIComponent(publicId)}${hash}`);
 }
 
-function renderHtml(url: string, author: string, title: string) {
-  const href = escapeHtml(url);
-  return `<!doctype html>
-<html>
-  <body style="margin:0;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#18181b;background:#ffffff">
-    <div style="max-width:440px;margin:0 auto">
-      <p style="margin:0 0 24px;font-size:14px;font-weight:600">artifacts.space</p>
-      <h1 style="margin:0 0 12px;font-size:20px;font-weight:500">${escapeHtml(author)} mentioned you</h1>
-      <p style="margin:0 0 24px;font-size:14px;line-height:22px;color:#52525b">They mentioned you in a comment on “${escapeHtml(title)}”. Open the thread to read it and reply.</p>
-      <a href="${href}" style="display:inline-block;padding:10px 16px;border-radius:6px;background:#18181b;color:#ffffff;font-size:14px;text-decoration:none">Open thread</a>
-      <p style="margin:32px 0 0;font-size:12px;line-height:18px;color:#71717a">You get this email for the first unread mention on an artifact. Your inbox in artifacts.space lists them all.</p>
-    </div>
-  </body>
-</html>`;
+/** The mention email in the shared layout. The author label and title are escaped; the comment text is never included. */
+export function renderMentionEmail(url: string, author: string, title: string) {
+  return renderEmail({
+    title: `${author} mentioned you`,
+    preview: `They mentioned you in a comment on “${title}”.`,
+    heading: html`${author} mentioned you`,
+    paragraphs: [html`They mentioned you in a comment on “${title}”. Open the thread to read it and reply.`],
+    action: { label: "Open thread", url },
+    reason: "You get this email for the first unread mention on an artifact. Your inbox in artifacts.space lists them all.",
+    text: `${author} mentioned you in a comment on "${title}".\n\nOpen the thread: ${url}`,
+  });
 }
 
 /**
@@ -67,8 +61,7 @@ export async function sendMentionEmail(input: MentionEmail) {
       to: input.email,
       fromName: "artifacts.space",
       subject: `${input.authorLabel} mentioned you on artifacts.space`,
-      html: renderHtml(url, input.authorLabel, title),
-      text: `${input.authorLabel} mentioned you in a comment on "${title}".\n\nOpen the thread: ${url}`,
+      ...renderMentionEmail(url, input.authorLabel, title),
     },
     { idempotencyKey: `mention:${createHash("sha256").update(input.mentionId).digest("hex")}` },
   );
