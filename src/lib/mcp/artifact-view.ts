@@ -1,4 +1,4 @@
-import type { ArtifactDto, ArtifactVisibility, SharingLevel } from "@/lib/artifact-types";
+import type { ArtifactDto, ArtifactListItemDto, ArtifactVisibility, SharingLevel } from "@/lib/artifact-types";
 
 /** How an artifact looks to an agent. Ids are public ids; internal ids never leave the server. */
 export interface McpArtifact {
@@ -6,7 +6,10 @@ export interface McpArtifact {
   url: string;
   title: string;
   summary: string;
+  /** The full content. Only artifacts_get and writes return it. */
   content?: string;
+  /** In lists: the first characters of text formats, "" for structured ones. Call artifacts_get for the content. */
+  preview?: string;
   kind: string;
   language: string;
   project: string;
@@ -37,8 +40,8 @@ export interface McpViewContext {
   urlFor: (publicId: string) => string;
 }
 
-/** Maps a DTO to the agent-facing shape. `includeContent` is false for compact lists. */
-export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext, includeContent = true): McpArtifact {
+/** Maps an artifact, with or without its content, to the agent-facing shape. */
+function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext): McpArtifact {
   const isAuthor = dto.authorId === context.viewerId;
   const slug = (teamId: string | null) => (teamId ? context.teamSlugs.get(teamId) ?? null : null);
   const pending = isAuthor && dto.pendingSharing
@@ -49,7 +52,6 @@ export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext, include
     url: context.urlFor(dto.publicId),
     title: dto.title,
     summary: dto.summary,
-    ...(includeContent ? { content: dto.content } : {}),
     kind: dto.kind,
     language: dto.language,
     project: dto.project,
@@ -66,4 +68,14 @@ export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext, include
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
   };
+}
+
+/** Maps a full DTO to the agent-facing shape, with its content. */
+export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext): McpArtifact {
+  return { ...toMcpShape(dto, context), content: dto.content };
+}
+
+/** Maps a list item to the compact agent-facing shape: a preview, never the content. */
+export function toMcpListItem(item: ArtifactListItemDto, context: McpViewContext): McpArtifact {
+  return { ...toMcpShape(item, context), preview: item.preview };
 }

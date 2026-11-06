@@ -21,6 +21,7 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
   const scopeTeam = slug ? teams.find((team) => team.slug === slug && !team.personal) ?? null : null;
   if (slug && !scopeTeam) notFound();
 
+  // Previews only: content loads when an artifact is opened (loadArtifactAction).
   const artifacts = await listArtifacts(session.user.id, { scope: scopeTeam ? { kind: "team", teamId: scopeTeam.id } : { kind: "mine" } });
 
   return (

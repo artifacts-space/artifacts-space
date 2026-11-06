@@ -112,6 +112,12 @@ export interface VersionDetailDto extends VersionSummaryDto {
   metadata: Record<string, unknown>;
 }
 
+/**
+ * An artifact in a list: everything but its content, plus a short preview
+ * (see artifact-preview.ts). Load the full artifact to read or edit it.
+ */
+export type ArtifactListItemDto = Omit<ArtifactDto, "content"> & { preview: string };
+
 export interface ArtifactInput {
   title: string;
   summary?: string | undefined;

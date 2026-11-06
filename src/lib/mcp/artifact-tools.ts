@@ -1,16 +1,14 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z, ZodError } from "zod";
 
-import { getEditableArtifact, getViewableArtifact } from "@/lib/access";
-import { filesForViewer } from "@/lib/files/download";
+import { getEditableArtifact } from "@/lib/access";
+import { loadArtifactForViewer } from "@/lib/artifact-read";
 import { artifactKinds, artifactVisibilities, type ArtifactDto, type ArtifactVisibility } from "@/lib/artifact-types";
 import {
   createArtifact,
   deleteArtifact,
   getOwnArtifactByPublicId,
-  lastEditorsFor,
   listArtifacts,
-  toArtifactDtos,
   updateArtifact,
   type ArtifactScope,
 } from "@/lib/artifacts";
@@ -22,7 +20,7 @@ import { listTeamsForUser, type TeamMembership } from "@/lib/teams/queries";
 import type { McpAccess } from "@/lib/oauth/scopes";
 import { UserFacingError } from "@/lib/user-facing-error";
 
-import { toMcpArtifact, type McpViewContext } from "./artifact-view";
+import { toMcpArtifact, toMcpListItem, type McpViewContext } from "./artifact-view";
 import { gateTools, type ToolServer } from "./tool-access";
 
 const publicIdField = z.string().refine(isPublicId, "Use the artifact's 22-character id.").describe("Artifact id (22 characters)");
@@ -123,7 +121,8 @@ function registerReadTools(server: ToolServer, userId: string) {
     "artifacts_list",
     {
       title: "List artifacts",
-      description: "List and search artifacts by title, summary, content, or project. scope \"mine\" (default) lists yours; a team slug lists what is shared with that team.",
+      description:
+        "List and search artifacts by title, summary, content, or project. scope \"mine\" (default) lists yours; a team slug lists what is shared with that team. Items have no content: text formats carry a short `preview` (the first 280 characters), others none. Call artifacts_get with an id to read the full content.",
       inputSchema: {
         query: z.string().max(300).optional().describe("Text to find in artifacts"),
         project: z.string().max(120).optional().describe("Exact project name"),
@@ -134,7 +133,7 @@ function registerReadTools(server: ToolServer, userId: string) {
     ({ query, project, scope, limit }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
       const artifacts = await listArtifacts(userId, { scope: scopeFor(teams, scope), query, project, limit });
-      return artifacts.map((item) => toMcpArtifact(item, view));
+      return artifacts.map((item) => toMcpListItem(item, view));
     }),
   );
 
@@ -147,20 +146,9 @@ function registerReadTools(server: ToolServer, userId: string) {
       inputSchema: { id: publicIdField },
     },
     ({ id }) => respond(async () => {
-      const viewable = await getViewableArtifact(id, userId);
-      if (!viewable) throw new UserFacingError("Artifact not found.");
-      const { editedBy, ...shown } = viewable.view;
-      const [[dto], { view }, files, editors] = await Promise.all([
-        toArtifactDtos([viewable.record]),
-        loadContext(userId),
-        filesForViewer(viewable),
-        lastEditorsFor([{ updatedBy: editedBy }]),
-      ]);
-      if (!dto) throw new UserFacingError("Artifact not found.");
-      // Who saved the version this caller reads: the approved one may be older than the last edit.
-      const updatedBy = editedBy ? editors.get(editedBy) ?? null : null;
-      const served = { ...dto, ...shown, files, updatedBy, updatedAt: shown.updatedAt.toISOString() };
-      return { ...toMcpArtifact(served, view), version: viewable.version.source, editPending: viewable.editPending };
+      const [loaded, { view }] = await Promise.all([loadArtifactForViewer(id, userId), loadContext(userId)]);
+      if (!loaded) throw new UserFacingError("Artifact not found.");
+      return { ...toMcpArtifact(loaded.dto, view), version: loaded.viewable.version.source, editPending: loaded.viewable.editPending };
     }),
   );
 

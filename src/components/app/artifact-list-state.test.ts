@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { artifactListState } from "./artifact-list-state";
+import { artifactListState, filterArtifactList } from "./artifact-list-state";
 
 describe("artifactListState", () => {
   it("should be empty when there are no artifacts at all", () => {
@@ -13,5 +13,29 @@ describe("artifactListState", () => {
 
   it("should show items when at least one artifact matches", () => {
     expect(artifactListState({ total: 3, shown: 1 })).toBe("items");
+  });
+});
+
+describe("filterArtifactList", () => {
+  const item = (id: string, overrides: Partial<{ kind: string; title: string; preview: string }> = {}) => ({
+    id, kind: "markdown", title: `Title ${id}`, summary: "", preview: "", project: "", source: "", ...overrides,
+  });
+  const items = [item("a", { preview: "deploy notes" }), item("b", { kind: "ui" }), item("c")];
+
+  it("should keep everything when there is no search and every format is shown", () => {
+    expect(filterArtifactList(items, { query: "", kind: "all" }, null)).toEqual(items);
+  });
+
+  it("should match the preview locally when the search is in an artifact's opening text", () => {
+    expect(filterArtifactList(items, { query: "DEPLOY", kind: "all" }, null).map((x) => x.id)).toEqual(["a"]);
+  });
+
+  it("should add server matches after local ones when content further down matches", () => {
+    const server = [item("c"), item("z")];
+    expect(filterArtifactList(items, { query: "deploy", kind: "all" }, server).map((x) => x.id)).toEqual(["a", "c", "z"]);
+  });
+
+  it("should apply the format filter to server matches too", () => {
+    expect(filterArtifactList(items, { query: "x", kind: "ui" }, [item("b", { kind: "ui" }), item("c")]).map((x) => x.id)).toEqual(["b"]);
   });
 });

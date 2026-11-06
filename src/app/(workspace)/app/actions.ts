@@ -4,11 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { loadArtifactForViewer } from "@/lib/artifact-read";
 import { getSession } from "@/lib/session";
 import {
   createArtifact,
   deleteArtifact,
+  listArtifacts,
   updateArtifact,
   type ArtifactUpdateInput,
   type SaveOptions,
@@ -17,7 +20,12 @@ import type {
   ActionResult,
   ArtifactDto,
   ArtifactInput,
+  ArtifactListItemDto,
 } from "@/lib/artifact-types";
+import { isPublicId } from "@/lib/public-id";
+
+const publicIdSchema = z.string().refine(isPublicId, "Artifact not found.");
+const searchSchema = z.object({ query: z.string().trim().min(1).max(300), teamId: z.string().trim().min(1).max(200).nullable() });
 
 const expectedSchema = z.iso.datetime({ offset: true }).optional();
 
@@ -74,5 +82,40 @@ export async function deleteArtifactAction(id: string): Promise<ActionResult<str
     return { success: true, data: id };
   } catch {
     return { success: false, error: "The artifact could not be deleted." };
+  }
+}
+
+/**
+ * One artifact in full, for the workspace when a list item is opened. Lists
+ * carry previews only. Same access check as every read; counts against the
+ * per-user read limit.
+ */
+export async function loadArtifactAction(publicId: string): Promise<ActionResult<ArtifactDto>> {
+  try {
+    const userId = await requireUserId();
+    const id = publicIdSchema.parse(publicId);
+    await enforceRateLimit("readByUser", userId);
+    const loaded = await loadArtifactForViewer(id, userId);
+    if (!loaded) return { success: false, error: "Artifact not found." };
+    return { success: true, data: loaded.dto };
+  } catch (error) {
+    return { success: false, error: actionErrorMessage(error, "The artifact could not be loaded. Please try again.") };
+  }
+}
+
+/**
+ * Searches titles, summaries, content, and projects on the server, in the
+ * viewer's own artifacts or one team's (membership is checked in the query).
+ * The workspace list only holds previews, so content search happens here.
+ */
+export async function searchArtifactsAction(input: z.input<typeof searchSchema>): Promise<ActionResult<ArtifactListItemDto[]>> {
+  try {
+    const userId = await requireUserId();
+    const { query, teamId } = searchSchema.parse(input);
+    await enforceRateLimit("readByUser", userId);
+    const items = await listArtifacts(userId, { query, scope: teamId ? { kind: "team", teamId } : { kind: "mine" } });
+    return { success: true, data: items };
+  } catch (error) {
+    return { success: false, error: actionErrorMessage(error, "Search did not work. Please try again.") };
   }
 }

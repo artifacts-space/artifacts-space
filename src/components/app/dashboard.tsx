@@ -1,15 +1,17 @@
 "use client";
 
-import { IconPlus, IconSearch } from "@tabler/icons-react";
+import { IconLoader2, IconPlus, IconSearch } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
-import { artifactListState, type ArtifactListState } from "@/components/app/artifact-list-state";
+import { artifactListState, filterArtifactList, type ArtifactListState } from "@/components/app/artifact-list-state";
 import { CreateArtifactDialog } from "@/components/app/create-artifact-dialog";
 import { ScopeTabs } from "@/components/app/scope-tabs";
 import { visibilityLabel } from "@/components/app/share-options";
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
 import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
+import { useFullArtifact } from "@/components/app/use-full-artifact";
+import { useServerSearch } from "@/components/app/use-server-search";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,18 +22,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { kindColors, kindIcons, kinds } from "@/lib/artifact-kinds";
-import type { ArtifactDto } from "@/lib/artifact-types";
+import { toArtifactListItem } from "@/lib/artifact-preview";
+import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 /** What a list item says about sharing, or "" for a private artifact with nothing waiting. */
-function sharingNote(artifact: ArtifactDto) {
+function sharingNote(artifact: ArtifactListItemDto) {
   if (artifact.pendingSharing) return " · Waiting for approval";
   return artifact.visibility === "private" ? "" : ` · ${visibilityLabel(artifact.visibility)}`;
 }
 
-function ArtifactListItem({ artifact, active, onSelect }: { artifact: ArtifactDto; active: boolean; onSelect: (id: string) => void }) {
+function ArtifactListItem({ artifact, active, onSelect }: { artifact: ArtifactListItemDto; active: boolean; onSelect: (id: string) => void }) {
   const Icon = kindIcons[artifact.kind];
   return (
     <li>
@@ -51,7 +54,7 @@ function ArtifactListItem({ artifact, active, onSelect }: { artifact: ArtifactDt
               <h2 className="truncate text-md font-medium">{artifact.title}</h2>
               <span className="shrink-0 text-xs text-muted-foreground">{dateFormat.format(new Date(artifact.updatedAt))}</span>
             </div>
-            <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{artifact.summary || artifact.content}</p>
+            <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{artifact.summary || artifact.preview}</p>
             <p className="mt-1 truncate text-xs text-muted-foreground">
               {artifact.project || "No project"}
               {sharingNote(artifact)}
@@ -65,7 +68,7 @@ function ArtifactListItem({ artifact, active, onSelect }: { artifact: ArtifactDt
 
 interface ArtifactListProps {
   state: ArtifactListState;
-  artifacts: ArtifactDto[];
+  artifacts: ArtifactListItemDto[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onClearFilters: () => void;
@@ -96,7 +99,7 @@ function ArtifactList({ state, artifacts, selectedId, onSelect, onClearFilters }
 }
 
 interface DetailPaneProps {
-  selected: ArtifactDto | null;
+  selected: ArtifactListItemDto | null;
   viewerId: string;
   origin: string;
   onUpdated: (artifact: ArtifactDto) => void;
@@ -104,12 +107,34 @@ interface DetailPaneProps {
   onCreate: () => void;
 }
 
+/** Shown while the selected artifact's content loads, or when it could not. */
+function LoadingPane({ failure, onRetry }: { failure: string | null; onRetry: () => void }) {
+  return (
+    <div className="flex flex-1 items-center justify-center p-8 text-md text-muted-foreground" role="status">
+      {failure ? (
+        <div className="max-w-sm text-center">
+          <p>{failure}</p>
+          <Button variant="outline" size="sm" className="mt-4" onClick={onRetry}>Try again</Button>
+        </div>
+      ) : (
+        <span className="flex items-center gap-2"><IconLoader2 className="size-4 animate-spin" /> Opening the artifact</span>
+      )}
+    </div>
+  );
+}
+
 /** The editor for the viewer's own artifact, a read-only view for a teammate's, or the empty state. */
 function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate }: DetailPaneProps) {
-  if (selected?.authorId === viewerId) {
-    return <ArtifactEditor key={selected.id} artifact={selected} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} />;
+  const { full, failure, remember, retry } = useFullArtifact(selected);
+  const handleUpdated = (artifact: ArtifactDto) => {
+    remember(artifact);
+    onUpdated(artifact);
+  };
+  if (selected && !full) return <LoadingPane failure={failure} onRetry={retry} />;
+  if (full?.authorId === viewerId) {
+    return <ArtifactEditor key={full.id} artifact={full} origin={origin} onUpdated={handleUpdated} onDeleted={onDeleted} />;
   }
-  if (selected) return <SharedArtifactPanel key={selected.id} artifact={selected} viewerId={viewerId} onUpdated={onUpdated} onWithdrawn={onDeleted} />;
+  if (full) return <SharedArtifactPanel key={full.id} artifact={full} viewerId={viewerId} onUpdated={handleUpdated} onWithdrawn={onDeleted} />;
   return (
     <div className="flex flex-1 items-center justify-center p-8">
       <div className="max-w-sm text-center">
@@ -124,7 +149,7 @@ function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate
 }
 
 /** Title, counts, and the create button. Team scopes list others' work, so they have no create button. */
-function DashboardHeading({ artifacts, scopeTeam, onCreate }: { artifacts: ArtifactDto[]; scopeTeam: ShareTeam | null; onCreate: () => void }) {
+function DashboardHeading({ artifacts, scopeTeam, onCreate }: { artifacts: ArtifactListItemDto[]; scopeTeam: ShareTeam | null; onCreate: () => void }) {
   const projects = new Set(artifacts.map((artifact) => artifact.project).filter(Boolean));
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
@@ -143,8 +168,14 @@ function DashboardHeading({ artifacts, scopeTeam, onCreate }: { artifacts: Artif
   );
 }
 
+/** The selected item, from the list or from server search results; else the first shown. */
+function pickSelected(artifacts: ArtifactListItemDto[], filtered: ArtifactListItemDto[], selectedId: string) {
+  return artifacts.find((artifact) => artifact.id === selectedId) ?? filtered.find((artifact) => artifact.id === selectedId) ?? filtered[0] ?? null;
+}
+
 interface DashboardProps {
-  initialArtifacts: ArtifactDto[];
+  /** List items: previews, not content. The selected artifact loads in full. */
+  initialArtifacts: ArtifactListItemDto[];
   origin: string;
   viewerId: string;
   teams: ShareTeam[];
@@ -159,31 +190,20 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
   const [kind, setKind] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
 
-  const filtered = useMemo(() => {
-    const search = query.trim().toLowerCase();
-    return artifacts.filter((artifact) => {
-      const matchesKind = kind === "all" || artifact.kind === kind;
-      const matchesQuery =
-        !search ||
-        [artifact.title, artifact.summary, artifact.content, artifact.project, artifact.source]
-          .join(" ")
-          .toLowerCase()
-          .includes(search);
-      return matchesKind && matchesQuery;
-    });
-  }, [artifacts, kind, query]);
+  const serverMatches = useServerSearch(query, scopeTeam?.id ?? null);
+  const filtered = useMemo(() => filterArtifactList(artifacts, { query, kind }, serverMatches), [artifacts, kind, query, serverMatches]);
 
-  const selected = artifacts.find((artifact) => artifact.id === selectedId) ?? filtered[0] ?? null;
+  const selected = pickSelected(artifacts, filtered, selectedId);
 
   function created(artifact: ArtifactDto) {
-    setArtifacts((current) => [artifact, ...current]);
+    setArtifacts((current) => [toArtifactListItem(artifact), ...current]);
     setSelectedId(artifact.id);
     setQuery("");
     setKind("all");
   }
 
   function updated(artifact: ArtifactDto) {
-    setArtifacts((current) => current.map((item) => (item.id === artifact.id ? artifact : item)));
+    setArtifacts((current) => current.map((item) => (item.id === artifact.id ? toArtifactListItem(artifact) : item)));
   }
 
   function deleted(id: string) {

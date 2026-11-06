@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
@@ -14,10 +14,12 @@ import {
   type ArtifactDto,
   type ArtifactEditorDto,
   type ArtifactInput,
+  type ArtifactListItemDto,
   type PendingEditDto,
   type PendingSharingDto,
 } from "@/lib/artifact-types";
 import { artifactSizeProblem } from "@/lib/artifact-limits";
+import { PREVIEW_CHARS, previewKinds } from "@/lib/artifact-preview";
 import { checkContentFiles } from "@/lib/files/attach";
 import { attachFileRows, deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
 import type { FileDto } from "@/lib/files/types";
@@ -68,20 +70,32 @@ function assertArtifactSize(input: { content?: string | undefined; metadata?: Re
   if (problem) throw new UserFacingError(problem);
 }
 
-/** Maps a row to the workspace's DTO. */
-export function toArtifactDto(
-  record: ArtifactRecord,
-  pendingSharing: PendingSharingDto | null = null,
-  pendingEdit: PendingEditDto | null = null,
-  files: FileDto[] = [],
-  updatedBy: ArtifactEditorDto | null = null,
-): ArtifactDto {
+/** An artifact row without its content, as lists and access checks load it. */
+export type ArtifactMetaRecord = Omit<ArtifactRecord, "content">;
+
+const { content: contentColumn, ...metaColumns } = getTableColumns(artifact);
+
+/** The content column alone, for queries that load content on purpose. */
+export const artifactContentColumn = contentColumn;
+
+/** Every artifact column except content, for queries that must not move content around. */
+export function artifactMetaColumns() {
+  return metaColumns;
+}
+
+/** Maps a row without content to the shared DTO fields. */
+function toArtifactMeta(
+  record: ArtifactMetaRecord,
+  pendingSharing: PendingSharingDto | null,
+  pendingEdit: PendingEditDto | null,
+  files: FileDto[],
+  updatedBy: ArtifactEditorDto | null,
+): Omit<ArtifactDto, "content"> {
   return {
     id: record.id,
     publicId: record.publicId,
     title: record.title,
     summary: record.summary,
-    content: record.content,
     kind: record.kind,
     language: record.language,
     project: record.project,
@@ -99,6 +113,17 @@ export function toArtifactDto(
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };
+}
+
+/** Maps a row to the workspace's DTO. */
+export function toArtifactDto(
+  record: ArtifactRecord,
+  pendingSharing: PendingSharingDto | null = null,
+  pendingEdit: PendingEditDto | null = null,
+  files: FileDto[] = [],
+  updatedBy: ArtifactEditorDto | null = null,
+): ArtifactDto {
+  return { ...toArtifactMeta(record, pendingSharing, pendingEdit, files, updatedBy), content: record.content };
 }
 
 /** Open sharing and edit requests for these artifacts, each by artifact id. */
@@ -140,6 +165,25 @@ export async function toArtifactDtos(records: ArtifactRecord[]): Promise<Artifac
   );
 }
 
+/** Maps list rows (no content, with a preview) to list DTOs with their open requests and files. */
+async function toArtifactListItems(rows: (ArtifactMetaRecord & { preview: string })[]): Promise<ArtifactListItemDto[]> {
+  const ids = rows.map((row) => row.id);
+  const [pending, files, editors] = await Promise.all([pendingRequestsFor(ids), listFilesForArtifacts(ids), lastEditorsFor(rows)]);
+  return rows.map((row) => ({
+    ...toArtifactMeta(
+      row,
+      pending.sharing.get(row.id) ?? null,
+      pending.edits.get(row.id) ?? null,
+      files.get(row.id) ?? [],
+      row.updatedBy ? editors.get(row.updatedBy) ?? null : null,
+    ),
+    preview: row.preview,
+  }));
+}
+
+/** The preview column: the first characters of readable formats, computed in Postgres so content never leaves it. */
+const previewColumn = sql<string>`case when ${artifact.kind} in (${sql.join(previewKinds.map((kind) => sql`${kind}`), sql`, `)}) then left(${artifact.content}, ${PREVIEW_CHARS}) else '' end`;
+
 /** Which artifacts a list shows: the viewer's own, or those shared with one of their teams. */
 export type ArtifactScope = { kind: "mine" } | { kind: "team"; teamId: string };
 
@@ -165,21 +209,22 @@ function scopeCondition(viewerId: string, scope: ArtifactScope) {
 /**
  * Lists artifacts the viewer may read in one scope, newest first. The team
  * scope checks membership in the query itself, so a non-member gets nothing.
+ * Items carry a short preview, never content: load one artifact to read it.
  */
-export async function listArtifacts(viewerId: string, options: ListOptions = {}): Promise<ArtifactDto[]> {
+export async function listArtifacts(viewerId: string, options: ListOptions = {}): Promise<ArtifactListItemDto[]> {
   const conditions: SQL[] = [scopeCondition(viewerId, options.scope ?? { kind: "mine" })];
   const search = searchCondition(options.query);
   if (search) conditions.push(search);
   if (options.project?.trim()) conditions.push(eq(artifact.project, options.project.trim()));
 
-  const records = await getDb()
-    .select()
+  const rows = await getDb()
+    .select({ ...artifactMetaColumns(), preview: previewColumn })
     .from(artifact)
     .where(and(...conditions))
     .orderBy(desc(artifact.updatedAt))
     .limit(Math.min(Math.max(options.limit ?? 100, 1), 100));
 
-  return toArtifactDtos(records);
+  return toArtifactListItems(rows);
 }
 
 /** The author's own artifact by internal id, or null. */

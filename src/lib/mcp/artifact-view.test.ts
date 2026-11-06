@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ArtifactDto } from "@/lib/artifact-types";
 
-import { toMcpArtifact } from "./artifact-view";
+import { toMcpArtifact, toMcpListItem } from "./artifact-view";
 
 const dto: ArtifactDto = {
   id: "internal-uuid",
@@ -52,8 +52,11 @@ describe("toMcpArtifact", () => {
     expect(toMcpArtifact(dto, context("outsider", [])).team).toBeNull();
   });
 
-  it("should leave out content when a compact view is asked for", () => {
-    expect(toMcpArtifact(dto, context("author"), false).content).toBeUndefined();
+  it("should give a preview and no content when the artifact is listed", () => {
+    // Even when a full artifact is passed by mistake, its content is never copied.
+    const item = toMcpListItem({ ...dto, preview: "# Pl" }, context("author"));
+    expect(item.content).toBeUndefined();
+    expect(item.preview).toBe("# Pl");
   });
 
   it("should name who saved it last by handle", () => {
