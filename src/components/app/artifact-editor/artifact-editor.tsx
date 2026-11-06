@@ -24,12 +24,16 @@ import { useArtifactDraft } from "./use-artifact-draft";
 interface ArtifactEditorProps {
   artifact: ArtifactDto;
   origin: string;
+  /** False for a teammate editing an artifact shared through their team: no sharing or delete. */
+  isAuthor: boolean;
+  /** A team owner or admin editing a teammate's artifact can make it private again. */
+  onWithdraw: (() => void) | null;
   onUpdated: (artifact: ArtifactDto) => void;
   onDeleted: (id: string) => void;
 }
 
-/** Edit, share, and delete one artifact. */
-export function ArtifactEditor({ artifact, origin, onUpdated, onDeleted }: ArtifactEditorProps) {
+/** Edit one artifact and read its history. The author also shares and deletes it. */
+export function ArtifactEditor({ artifact, origin, isAuthor, onWithdraw, onUpdated, onDeleted }: ArtifactEditorProps) {
   const { draft, update, dirty, reset } = useArtifactDraft(artifact);
   const { pending, save, remove } = useArtifactActions({ artifact, draft, onUpdated, onDeleted });
   const [mode, setMode] = useState<EditorMode>("preview");
@@ -43,7 +47,7 @@ export function ArtifactEditor({ artifact, origin, onUpdated, onDeleted }: Artif
         id={artifact.id}
         kind={draft.kind}
         content={artifact.content}
-        shareControl={<ShareControl artifact={artifact} shareUrl={shareUrl} onUpdated={onUpdated} />}
+        shareControl={isAuthor ? <ShareControl artifact={artifact} shareUrl={shareUrl} onUpdated={onUpdated} /> : null}
         history={
           <VersionHistory
             publicId={artifact.publicId}
@@ -58,7 +62,8 @@ export function ArtifactEditor({ artifact, origin, onUpdated, onDeleted }: Artif
         dirty={dirty}
         pending={pending}
         onSave={() => void save()}
-        onRequestDelete={() => { if (pending !== "delete") confirmDelete.request(remove); }}
+        onRequestDelete={isAuthor ? () => { if (pending !== "delete") confirmDelete.request(remove); } : null}
+        onWithdraw={onWithdraw}
       />
       {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
       <TitleFields title={draft.title} summary={draft.summary} update={update} />

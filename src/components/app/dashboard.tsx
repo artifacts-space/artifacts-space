@@ -10,6 +10,7 @@ import { ScopeTabs } from "@/components/app/scope-tabs";
 import { visibilityLabel } from "@/components/app/share-options";
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
 import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
+import { useEditAccess, useWithdrawSharing } from "@/components/app/use-edit-access";
 import { useFullArtifact } from "@/components/app/use-full-artifact";
 import { useServerSearch } from "@/components/app/use-server-search";
 import { Button } from "@/components/ui/button";
@@ -123,16 +124,19 @@ function LoadingPane({ failure, onRetry }: { failure: string | null; onRetry: ()
   );
 }
 
-/** The editor for the viewer's own artifact, a read-only view for a teammate's, or the empty state. */
+/** The editor for an artifact the viewer may edit, a read-only view for a teammate's, or the empty state. */
 function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate }: DetailPaneProps) {
   const { full, failure, remember, retry } = useFullArtifact(selected);
+  const access = useEditAccess(full, viewerId);
+  const withdrawal = useWithdrawSharing(full?.id ?? "", onDeleted);
   const handleUpdated = (artifact: ArtifactDto) => {
     remember(artifact);
     onUpdated(artifact);
   };
   if (selected && !full) return <LoadingPane failure={failure} onRetry={retry} />;
-  if (full?.authorId === viewerId) {
-    return <ArtifactEditor key={full.id} artifact={full} origin={origin} onUpdated={handleUpdated} onDeleted={onDeleted} />;
+  if (full && (access.isAuthor || access.canEdit)) {
+    const onWithdraw = access.canWithdraw ? () => void withdrawal.withdraw() : null;
+    return <ArtifactEditor key={full.id} artifact={full} origin={origin} isAuthor={access.isAuthor} onWithdraw={onWithdraw} onUpdated={handleUpdated} onDeleted={onDeleted} />;
   }
   if (full) return <SharedArtifactPanel key={full.id} artifact={full} viewerId={viewerId} onUpdated={handleUpdated} onWithdrawn={onDeleted} />;
   return (

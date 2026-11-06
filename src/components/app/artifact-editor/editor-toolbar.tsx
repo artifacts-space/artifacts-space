@@ -1,6 +1,6 @@
 "use client";
 
-import { IconDots, IconLoader2, IconTrash } from "@tabler/icons-react";
+import { IconDots, IconLoader2, IconLock, IconTrash } from "@tabler/icons-react";
 
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
@@ -21,16 +21,25 @@ function saveLabel(saving: boolean, dirty: boolean) {
   return dirty ? "Save" : "Saved";
 }
 
-function MoreMenu({ onRequestDelete }: { onRequestDelete: () => void }) {
+/** Delete for the author; Withdraw sharing for a team owner or admin editing a teammate's artifact. */
+function MoreMenu({ onRequestDelete, onWithdraw }: { onRequestDelete: (() => void) | null; onWithdraw: (() => void) | null }) {
+  if (!onRequestDelete && !onWithdraw) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="More actions" />}>
         <IconDots />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuItem variant="destructive" onClick={onRequestDelete} className="py-2">
-          <IconTrash /> Delete artifact
-        </DropdownMenuItem>
+        {onWithdraw ? (
+          <DropdownMenuItem onClick={onWithdraw} className="py-2">
+            <IconLock /> Withdraw sharing
+          </DropdownMenuItem>
+        ) : null}
+        {onRequestDelete ? (
+          <DropdownMenuItem variant="destructive" onClick={onRequestDelete} className="py-2">
+            <IconTrash /> Delete artifact
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -49,18 +58,21 @@ interface EditorToolbarProps {
   id: string;
   kind: ArtifactKind;
   content: string;
-  /** The share button and dialog (ShareControl). */
+  /** The share button and dialog (ShareControl). Null for teammates: only the author shares. */
   shareControl: React.ReactNode;
   /** The History button and dialog (VersionHistory). */
   history: React.ReactNode;
   dirty: boolean;
   pending: PendingAction;
   onSave: () => void;
-  onRequestDelete: () => void;
+  /** Null for teammates: only the author deletes. */
+  onRequestDelete: (() => void) | null;
+  /** Set for a team owner or admin editing a teammate's artifact. */
+  onWithdraw: (() => void) | null;
 }
 
 /** The editor's top bar: format icon, short id, copy, history, share, more actions, and save. */
-export function EditorToolbar({ id, kind, content, shareControl, history, dirty, pending, onSave, onRequestDelete }: EditorToolbarProps) {
+export function EditorToolbar({ id, kind, content, shareControl, history, dirty, pending, onSave, onRequestDelete, onWithdraw }: EditorToolbarProps) {
   const KindIcon = kindIcons[kind];
   return (
     <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 sm:px-5">
@@ -70,7 +82,7 @@ export function EditorToolbar({ id, kind, content, shareControl, history, dirty,
         <CopyButton value={content} variant="ghost" size="icon" />
         {history}
         {shareControl}
-        <MoreMenu onRequestDelete={onRequestDelete} />
+        <MoreMenu onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
         <SaveButton saving={pending === "save"} dirty={dirty} onSave={onSave} />
       </div>
     </div>

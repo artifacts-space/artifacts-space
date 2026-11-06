@@ -2,37 +2,21 @@
 
 import { IconExternalLink, IconLoader2, IconLock } from "@tabler/icons-react";
 import Link from "next/link";
-import { useState } from "react";
-import { toast } from "sonner";
-
-import { withdrawSharingAction } from "@/app/(workspace)/app/sharing-actions";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { CopyButton } from "@/components/copy-button";
 import { LastEdited } from "@/components/history/last-edited";
 import { VersionHistory } from "@/components/history/version-history";
 import { Button } from "@/components/ui/button";
-import { canEditArtifact } from "@/lib/access-rules";
 import type { ArtifactDto } from "@/lib/artifact-types";
-import { canManageTeam } from "@/lib/teams/roles";
 
 import { visibilityLabel } from "./share-options";
-import { useShareTeams } from "./share-teams-context";
+import { useEditAccess, useWithdrawSharing } from "./use-edit-access";
 
 /** "Link · Platform · Read only · Changes waiting for approval", leaving out what does not apply. */
 function statusLine(artifact: ArtifactDto, teamName: string | null, canEdit: boolean) {
   const parts = [visibilityLabel(artifact.visibility), teamName, canEdit ? null : "Read only", artifact.pendingEdit ? "Changes waiting for approval" : null];
   return parts.filter(Boolean).join(" · ");
-}
-
-/** The viewer's team for this artifact, and whether they may edit it or withdraw its sharing. */
-function useSharedAccess(artifact: ArtifactDto, viewerId: string) {
-  const team = useShareTeams().find((item) => item.id === artifact.teamId);
-  const canEdit = canEditArtifact(
-    { userId: artifact.authorId, visibility: artifact.visibility, teamId: artifact.teamId, teamPersonal: team?.personal ?? null },
-    { userId: viewerId, isTeamMember: team !== undefined },
-  );
-  return { team, canEdit, canWithdraw: team ? canManageTeam(team.role) : false };
 }
 
 interface SharedArtifactPanelProps {
@@ -48,25 +32,8 @@ interface SharedArtifactPanelProps {
  * admins of that team can make it private again.
  */
 export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn }: SharedArtifactPanelProps) {
-  const { team, canEdit, canWithdraw } = useSharedAccess(artifact, viewerId);
-  const [withdrawing, setWithdrawing] = useState(false);
-
-  async function withdraw() {
-    setWithdrawing(true);
-    try {
-      const result = await withdrawSharingAction(artifact.id);
-      if (!result.success) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success("Sharing withdrawn. Only the author can read it now.");
-      onWithdrawn(artifact.id);
-    } catch {
-      toast.error("Something went wrong. Check your connection and try again.");
-    } finally {
-      setWithdrawing(false);
-    }
-  }
+  const { team, canEdit, canWithdraw } = useEditAccess(artifact, viewerId);
+  const { withdrawing, withdraw } = useWithdrawSharing(artifact.id, onWithdrawn);
 
   return (
     <section className="flex min-w-0 flex-1 flex-col" aria-label={artifact.title}>
