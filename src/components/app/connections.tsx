@@ -11,6 +11,7 @@ import {
 } from "@/app/(workspace)/app/connections/actions";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { CopyButton } from "@/components/copy-button";
+import { CopyableValue } from "@/components/copyable-value";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -192,10 +193,7 @@ export function Connections({
             <DialogTitle>Token created</DialogTitle>
             <DialogDescription className="leading-6">Copy it now. It will not be shown again.</DialogDescription>
           </DialogHeader>
-          <div className="flex items-center gap-2 rounded-md border bg-background/60 p-1.5 pl-3">
-            <code className="min-w-0 flex-1 truncate font-mono text-xs">{newToken}</code>
-            <CopyButton value={newToken} label="Copy" variant="secondary" size="sm" />
-          </div>
+          <CopyableValue value={newToken} />
           <DialogFooter><Button onClick={() => { setNewToken(""); }}>Done</Button></DialogFooter>
         </DialogContent>
       </Dialog>

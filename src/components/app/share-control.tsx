@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { shareArtifactAction } from "@/app/(workspace)/app/sharing-actions";
-import { CopyButton } from "@/components/copy-button";
+import { CopyableValue } from "@/components/copyable-value";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -155,10 +155,7 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
             <TeamPicker visibility={visibility} teams={teams} value={teamId} onChange={setTeamId} />
             <p className="text-xs leading-5 text-muted-foreground">{outcomeText(visibility, teams.find((team) => team.id === teamId))}</p>
             {live ? (
-              <div className="flex items-center gap-2 rounded-md border bg-background/60 p-1.5 pl-3">
-                <code className="min-w-0 flex-1 truncate font-mono text-xs">{shareUrl}</code>
-                <CopyButton value={shareUrl} label="Copy link" variant="secondary" size="sm" />
-              </div>
+              <CopyableValue value={shareUrl} copyLabel="Copy link" />
             ) : null}
           </div>
           <DialogFooter>
