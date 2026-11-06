@@ -71,6 +71,13 @@
       "when": 1793929329857,
       "tag": "0009_artifact_files",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793929660223,
+      "tag": "0010_agents_comments_mentions",
+      "breakpoints": true
     }
   ]
 }
