@@ -31,7 +31,7 @@ function FieldChanges({ before, after }: { before: ReviewedFields; after: Review
   const metadataChanged = JSON.stringify(before.metadata) !== JSON.stringify(after.metadata);
   if (changed.length === 0 && !metadataChanged) return null;
   return (
-    <dl className="grid gap-1.5 text-xs">
+    <dl className="grid gap-1.5 text-sm">
       {changed.map(({ key, label }) => (
         <div key={key} className="grid gap-1 sm:grid-cols-[6rem_1fr]">
           <dt className="text-muted-foreground">{label}</dt>
@@ -59,14 +59,14 @@ function lineNumber(value: number | null) {
 function ContentDiff({ before, after }: { before: string; after: string }) {
   const lines = diffLines(before, after);
   const stats = diffStats(lines);
-  if (stats.added === 0 && stats.removed === 0) return <p className="text-xs text-muted-foreground">The content did not change.</p>;
+  if (stats.added === 0 && stats.removed === 0) return <p className="text-sm text-muted-foreground">The content did not change.</p>;
   const { hunks, hidden } = capHunks(diffHunks(lines), MAX_SHOWN_LINES);
   return (
     <div className="space-y-2">
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         <span className="text-diff-added-foreground">+{stats.added}</span> <span className="text-diff-removed-foreground">-{stats.removed}</span> lines
       </p>
-      <div className="overflow-x-auto rounded-md border font-mono text-[12px] leading-5">
+      <div className="overflow-x-auto rounded-md border font-mono text-sm leading-5">
         {hunks.map((hunk, index) => (
           <div key={`${String(index)}-${String(hunk.lines[0]?.oldNumber ?? hunk.lines[0]?.newNumber ?? 0)}`} className="border-b py-1 last:border-b-0">
             {hunk.lines.map((line, lineIndex) => (
@@ -80,7 +80,7 @@ function ContentDiff({ before, after }: { before: string; after: string }) {
           </div>
         ))}
       </div>
-      {hidden > 0 ? <p className="text-xs text-muted-foreground">{hidden} more diff lines are not shown. Open the artifact to read the latest version.</p> : null}
+      {hidden > 0 ? <p className="text-sm text-muted-foreground">{hidden} more diff lines are not shown. Open the artifact to read the latest version.</p> : null}
     </div>
   );
 }
@@ -93,7 +93,7 @@ export function EditDiff({ before, after }: { before: ReviewedFields | null; aft
   if (!before) {
     return (
       <div className="space-y-2">
-        <p className="text-xs text-muted-foreground">There is no approved version yet, so all of it is new.</p>
+        <p className="text-sm text-muted-foreground">There is no approved version yet, so all of it is new.</p>
         <ContentDiff before="" after={after.content} />
       </div>
     );

@@ -31,7 +31,7 @@ function percent(fraction: number): string {
 
 function SliceList({ slices, active, format, onHover }: { slices: PieSlice[]; active: number | null; format: Formatter; onHover: (index: number | null) => void }) {
   return (
-    <ul className="w-full min-w-0 space-y-0.5 text-xs leading-4 @xl:max-w-80" onMouseLeave={() => { onHover(null); }}>
+    <ul className="w-full min-w-0 space-y-0.5 text-xs @xl:max-w-80" onMouseLeave={() => { onHover(null); }}>
       {slices.map((slice, index) => (
         <li
           key={`${slice.label}-${String(slice.index)}`}
@@ -52,9 +52,9 @@ function SliceList({ slices, active, format, onHover }: { slices: PieSlice[]; ac
 function DonutCenter({ slice, total, format }: { slice: PieSlice | undefined; total: number; format: Formatter }) {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-[22%] flex flex-col items-center justify-center text-center">
-      <span className="max-w-full truncate text-[11px] text-muted-foreground">{slice ? slice.label : "Total"}</span>
+      <span className="max-w-full truncate text-xs text-muted-foreground">{slice ? slice.label : "Total"}</span>
       <span className="max-w-full truncate text-sm font-medium tabular-nums">{format(slice ? slice.value : total)}</span>
-      {slice ? <span className="text-[11px] text-muted-foreground tabular-nums">{percent(slice.fraction)}</span> : null}
+      {slice ? <span className="text-xs text-muted-foreground tabular-nums">{percent(slice.fraction)}</span> : null}
     </div>
   );
 }

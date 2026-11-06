@@ -16,13 +16,13 @@ export function CalendarView({ props }: ViewProps<"Calendar">) {
   const timed = entries.some((entry) => !entry.allDay);
   return (
     <figure className="min-w-0 space-y-3">
-      {props.title ? <figcaption className="text-sm font-medium break-words">{props.title}</figcaption> : null}
+      {props.title ? <figcaption className="text-md font-medium break-words">{props.title}</figcaption> : null}
       {props.view === "month" ? (
         <MonthCalendar entries={entries} month={props.month} weekStart={props.weekStart === "monday" ? 1 : 0} />
       ) : (
         <AgendaList days={agendaDays(entries)} empty="No events yet." />
       )}
-      {props.timeZone && timed ? <p className="text-[11px] text-muted-foreground">Times in {props.timeZone.replaceAll("_", " ")}.</p> : null}
+      {props.timeZone && timed ? <p className="text-xs text-muted-foreground">Times in {props.timeZone.replaceAll("_", " ")}.</p> : null}
     </figure>
   );
 }

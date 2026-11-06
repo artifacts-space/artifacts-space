@@ -24,7 +24,7 @@ export default async function InvitationPage({ params }: PageProps<"/invitations
         {invitation ? (
           <>
             <h1 className="text-2xl font-medium tracking-[-0.015em]">Join {invitation.teamName}</h1>
-            <p className="mt-2 mb-8 text-sm leading-6 text-muted-foreground">
+            <p className="mt-2 mb-8 text-md leading-6 text-muted-foreground">
               <PixelAvatar seed={invitation.inviterId} size={20} className="mr-1.5 -mt-0.5" />
               {invitation.inviterName} invited you as {roleLabel(invitation.role).toLowerCase()}. You will see the artifacts the team shares.
             </p>
@@ -33,10 +33,10 @@ export default async function InvitationPage({ params }: PageProps<"/invitations
         ) : (
           <>
             <h1 className="text-2xl font-medium tracking-[-0.015em]">This invitation is not open</h1>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            <p className="mt-2 text-md leading-6 text-muted-foreground">
               It may have expired, been used, or been sent to another email address. You are signed in as {session.user.email}.
             </p>
-            <Link href="/teams" className="mt-6 inline-block text-[13px] underline underline-offset-4">Go to your teams</Link>
+            <Link href="/teams" className="mt-6 inline-block text-sm underline underline-offset-4">Go to your teams</Link>
           </>
         )}
       </div>

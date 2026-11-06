@@ -48,11 +48,11 @@ function ArtifactListItem({ artifact, active, onSelect }: { artifact: ArtifactDt
           <Icon className={cn("mt-0.5 size-3.5 shrink-0", kindColors[artifact.kind])} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="truncate text-[13px] font-medium">{artifact.title}</h2>
-              <span className="shrink-0 text-[11px] text-muted-foreground">{dateFormat.format(new Date(artifact.updatedAt))}</span>
+              <h2 className="truncate text-md font-medium">{artifact.title}</h2>
+              <span className="shrink-0 text-xs text-muted-foreground">{dateFormat.format(new Date(artifact.updatedAt))}</span>
             </div>
-            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{artifact.summary || artifact.content}</p>
-            <p className="mt-1 truncate text-[11px] text-muted-foreground">
+            <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{artifact.summary || artifact.content}</p>
+            <p className="mt-1 truncate text-xs text-muted-foreground">
               {artifact.project || "No project"}
               {sharingNote(artifact)}
             </p>
@@ -74,11 +74,11 @@ interface ArtifactListProps {
 /** The sidebar list. With no artifacts at all it stays quiet, because the main pane already offers to create one. */
 function ArtifactList({ state, artifacts, selectedId, onSelect, onClearFilters }: ArtifactListProps) {
   if (state === "empty") {
-    return <p className="px-4 py-10 text-center text-[13px] text-muted-foreground">Nothing here yet.</p>;
+    return <p className="px-4 py-10 text-center text-md text-muted-foreground">Nothing here yet.</p>;
   }
   if (state === "no-match") {
     return (
-      <div className="px-4 py-10 text-center text-[13px] text-muted-foreground">
+      <div className="px-4 py-10 text-center text-md text-muted-foreground">
         <p>No artifacts match.</p>
         <button type="button" onClick={onClearFilters} className="mt-2 underline underline-offset-4 hover:text-foreground">
           Clear filters
@@ -114,7 +114,7 @@ function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate
     <div className="flex flex-1 items-center justify-center p-8">
       <div className="max-w-sm text-center">
         <h2 className="text-lg font-medium">No artifacts yet</h2>
-        <p className="mt-2 text-[13px] leading-6 text-muted-foreground">
+        <p className="mt-2 text-md leading-6 text-muted-foreground">
           Create one here, or connect an agent and let it create artifacts through MCP.
         </p>
         <Button onClick={onCreate} className="mt-5"><IconPlus /> New artifact</Button>
@@ -130,7 +130,7 @@ function DashboardHeading({ artifacts, scopeTeam, onCreate }: { artifacts: Artif
     <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
       <div>
         <h1 className="text-xl font-medium tracking-[-0.01em]">{scopeTeam ? `Shared with ${scopeTeam.name}` : "Artifacts"}</h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">
+        <p className="mt-1 text-md text-muted-foreground">
           {artifacts.length} {artifacts.length === 1 ? "artifact" : "artifacts"} across {projects.size} {projects.size === 1 ? "project" : "projects"}
         </p>
       </div>
@@ -210,16 +210,16 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
                   onChange={(event) => { setQuery(event.target.value); }}
                   placeholder="Search"
                   aria-label="Search artifacts"
-                  className="h-8 bg-card pl-8 text-[13px]"
+                  className="h-8 bg-card pl-8"
                 />
               </div>
               <Select value={kind} onValueChange={(value) => { setKind(value ?? "all"); }}>
-                <SelectTrigger size="sm" className="h-7 w-full border-0 bg-transparent px-1 text-xs text-muted-foreground shadow-none" aria-label="Filter by format">
+                <SelectTrigger size="sm" className="h-7 w-full border-0 bg-transparent px-1 text-sm text-muted-foreground shadow-none" aria-label="Filter by format">
                   <SelectValue>{(value: string) => (value === "all" ? "All formats" : value)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-xs">All formats</SelectItem>
-                  {kinds.map((value) => <SelectItem key={value} value={value} className="text-xs">{value}</SelectItem>)}
+                  <SelectItem value="all">All formats</SelectItem>
+                  {kinds.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -232,7 +232,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
                 onClearFilters={() => { setQuery(""); setKind("all"); }}
               />
             </div>
-            <div className="border-t px-4 py-2.5 text-[11px] text-muted-foreground">
+            <div className="border-t px-4 py-2.5 text-xs text-muted-foreground">
               {filtered.length} shown
             </div>
           </aside>

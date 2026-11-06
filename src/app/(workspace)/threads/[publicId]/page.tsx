@@ -25,18 +25,18 @@ export default async function ThreadPage({ params }: PageProps<"/threads/[public
 
   return (
     <main className="mx-auto w-full max-w-3xl space-y-6 p-4 py-8 sm:p-6 sm:py-10">
-      <Button variant="ghost" size="sm" className="-ml-2 text-xs text-muted-foreground" nativeButton={false} render={<Link href="/inbox" />}>
+      <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" nativeButton={false} render={<Link href="/inbox" />}>
         <IconArrowLeft /> Inbox
       </Button>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-xl font-medium tracking-[-0.01em] break-words">{viewable.view.title}</h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">
+          <p className="mt-1 text-md text-muted-foreground">
             By {byline.avatar ? <PixelAvatar seed={byline.avatar.seed} kind={byline.avatar.kind} size={16} className="mr-1 -mt-px" /> : null}
             {byline.author}{byline.teamName ? ` · ${byline.teamName}` : ""}
           </p>
         </div>
-        <Button variant="outline" size="sm" className="text-xs" nativeButton={false} render={<Link href={`/artifact/${viewable.record.publicId}`} />}>
+        <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/artifact/${viewable.record.publicId}`} />}>
           <IconExternalLink /> Open artifact
         </Button>
       </div>

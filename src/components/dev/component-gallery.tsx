@@ -58,7 +58,7 @@ function ThemeToggle() {
 function Specimen({ name, children }: { name: string; children: ReactNode }) {
   return (
     <div className="min-w-0 space-y-2" data-specimen={name}>
-      <p className="font-mono text-[11px] tracking-wide text-muted-foreground uppercase">{name}</p>
+      <p className="font-mono text-xs tracking-wide text-muted-foreground uppercase">{name}</p>
       <div className="min-w-0 rounded-lg border border-dashed bg-background p-3 sm:p-5">{children}</div>
     </div>
   );
@@ -85,7 +85,7 @@ export function ComponentGallery() {
         <span className="text-xs text-muted-foreground">{uiComponentNames.length} components · development only</span>
         <div className="ml-auto"><ThemeToggle /></div>
       </header>
-      <nav aria-label="Components" className="flex flex-wrap gap-x-3 gap-y-1 py-6 text-[13px] text-muted-foreground">
+      <nav aria-label="Components" className="flex flex-wrap gap-x-3 gap-y-1 py-6 text-sm text-muted-foreground">
         {uiComponentNames.map((name) => <a key={name} href={`#${name}`} className="hover:text-foreground">{name}</a>)}
         <a href="#specs" className="hover:text-foreground">Specs</a>
         <a href="#formats" className="hover:text-foreground">Formats</a>

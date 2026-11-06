@@ -18,15 +18,15 @@ function person(name: string, username: string | null) {
  * before/after view and approve or deny. Owners and admins only.
  */
 export function EditReviewList({ edits }: { edits: PendingEditView[] }) {
-  if (edits.length === 0) return <p className="px-5 py-6 text-[13px] text-muted-foreground">No edits are waiting for approval.</p>;
+  if (edits.length === 0) return <p className="px-5 py-6 text-md text-muted-foreground">No edits are waiting for approval.</p>;
   return (
     <ul>
       {edits.map((edit) => (
         <li key={edit.requestId} className="space-y-3 border-b px-5 py-4 last:border-b-0">
           <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0 flex-1">
-              <Link href={`/artifact/${edit.publicId}`} className="block truncate text-[13px] font-medium hover:underline">{edit.after.title}</Link>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <Link href={`/artifact/${edit.publicId}`} className="block truncate text-md font-medium hover:underline">{edit.after.title}</Link>
+              <p className="mt-0.5 text-sm text-muted-foreground">
                 <PixelAvatar seed={edit.requesterId} kind={edit.requesterKind} size={16} className="mr-1 -mt-px" />
                 {person(edit.requesterName, edit.requesterUsername)} changed a {visibilityLabel(edit.visibility).toLowerCase()} artifact · {dateFormat.format(new Date(edit.requestedAt))} UTC
               </p>

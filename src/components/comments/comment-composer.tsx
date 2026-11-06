@@ -63,13 +63,13 @@ export function CommentComposer({ label, placeholder, submitLabel, initialBody =
           aria-label={label}
           autoFocus={autoFocus}
           rows={3}
-          className="min-h-20 bg-card text-[13px] leading-6"
+          className="min-h-20 bg-card text-base leading-6 md:text-md"
         />
         {mentions.suggestions}
       </div>
       <FormError message={error} />
       <div className="flex items-center justify-end gap-2">
-        <span className="mr-auto text-[11px] text-muted-foreground">Markdown. Type @handle to mention a teammate or agent.</span>
+        <span className="mr-auto text-xs text-muted-foreground">Markdown. Type @handle to mention a teammate or agent.</span>
         {onCancel ? <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</Button> : null}
         <Button type="submit" size="sm" disabled={pending}>
           {pending ? <IconLoader2 className="animate-spin" /> : <IconSend />} {submitLabel}

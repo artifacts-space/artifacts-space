@@ -16,17 +16,17 @@ const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZ
 /** Open reports from readers. Withdraw makes the artifact private; dismiss closes the report. */
 export function ReportsList({ reports }: { reports: OpenReportView[] }) {
   const { pending, run } = useTeamAction();
-  if (reports.length === 0) return <p className="px-5 py-6 text-[13px] text-muted-foreground">No open reports.</p>;
+  if (reports.length === 0) return <p className="px-5 py-6 text-md text-muted-foreground">No open reports.</p>;
   return (
     <ul>
       {reports.map((report) => (
         <li key={report.reportId} className="flex flex-wrap items-start gap-3 border-b px-5 py-3 last:border-b-0">
           <div className="min-w-0 flex-1">
-            <Link href={`/artifact/${report.publicId}`} className="block truncate text-[13px] font-medium hover:underline">{report.title}</Link>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <Link href={`/artifact/${report.publicId}`} className="block truncate text-md font-medium hover:underline">{report.title}</Link>
+            <p className="mt-0.5 text-sm text-muted-foreground">
               {reportReasonLabels[report.reason]} · {visibilityLabel(report.visibility)} · {dateFormat.format(new Date(report.reportedAt))}
             </p>
-            {report.details ? <p className="mt-1.5 whitespace-pre-wrap break-words text-xs leading-5">{report.details}</p> : null}
+            {report.details ? <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-5">{report.details}</p> : null}
           </div>
           {report.visibility === "private" ? null : (
             <Button size="sm" variant="outline" className="text-xs" disabled={pending !== null} onClick={() => void run(`${report.reportId}-withdraw`, () => withdrawReportedAction(report.reportId), "Sharing withdrawn. Only the author can read it now.")}>

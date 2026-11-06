@@ -41,8 +41,8 @@ function LevelPicker({ value, onChange }: { value: ArtifactVisibility; onChange:
           >
             <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
             <span>
-              <span className="block text-[13px] font-medium">{option.title}</span>
-              <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{option.detail}</span>
+              <span className="block text-md font-medium">{option.title}</span>
+              <span className="mt-0.5 block text-sm leading-5 text-muted-foreground">{option.detail}</span>
             </span>
           </button>
         );
@@ -55,14 +55,14 @@ function TeamPicker({ visibility, teams, value, onChange }: { visibility: Artifa
   const options = teamsFor(visibility, teams);
   if (visibility === "private" || options.length === 0) return null;
   return (
-    <label className="flex flex-col gap-2 text-xs text-muted-foreground">
+    <label className="flex flex-col gap-2 text-sm text-muted-foreground">
       {visibility === "team" ? "Share with" : "Approved by"}
       <Select value={value ?? ""} onValueChange={(id) => { if (id) onChange(id); }}>
-        <SelectTrigger className="h-9 w-full text-[13px] text-foreground">
+        <SelectTrigger className="h-9 w-full text-sm text-foreground">
           <SelectValue>{(id: string) => selectedTeamLabel(id, options)}</SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {options.map((team) => <SelectItem key={team.id} value={team.id} className="text-xs">{teamLabel(team)}</SelectItem>)}
+          {options.map((team) => <SelectItem key={team.id} value={team.id}>{teamLabel(team)}</SelectItem>)}
         </SelectContent>
       </Select>
     </label>
@@ -73,7 +73,7 @@ function TeamPicker({ visibility, teams, value, onChange }: { visibility: Artifa
 function PendingEditNotice({ artifact }: { artifact: ArtifactDto }) {
   if (!artifact.pendingEdit) return null;
   return (
-    <p className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs leading-5 text-muted-foreground">
+    <p className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-sm leading-5 text-muted-foreground">
       <IconClock className="size-3.5 shrink-0" />
       Changes waiting for approval. Readers outside the team see the last approved version.
     </p>
@@ -85,7 +85,7 @@ function PendingNotice({ artifact, teams }: { artifact: ArtifactDto; teams: read
   if (!pending) return null;
   const team = teams.find((item) => item.id === pending.teamId);
   return (
-    <p className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs leading-5 text-muted-foreground">
+    <p className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-sm leading-5 text-muted-foreground">
       <IconClock className="size-3.5 shrink-0" />
       Waiting for approval: {visibilityLabel(pending.level).toLowerCase()}{team ? ` in ${team.name}` : ""}.
     </p>
@@ -137,7 +137,7 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => { setOpen(true); }} className="gap-1.5 text-xs" aria-label="Share settings">
+      <Button variant="ghost" size="sm" onClick={() => { setOpen(true); }} className="gap-1.5" aria-label="Share settings">
         <Icon /> {waiting ? "Pending" : visibilityLabel(artifact.visibility)}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -151,7 +151,7 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
             <PendingEditNotice artifact={artifact} />
             <LevelPicker value={visibility} onChange={changeLevel} />
             <TeamPicker visibility={visibility} teams={teams} value={teamId} onChange={setTeamId} />
-            <p className="text-xs leading-5 text-muted-foreground">{outcomeText(visibility, teams.find((team) => team.id === teamId))}</p>
+            <p className="text-sm leading-5 text-muted-foreground">{outcomeText(visibility, teams.find((team) => team.id === teamId))}</p>
             {live ? (
               <ValueField value={shareUrl} copyLabel="Copy link" />
             ) : null}

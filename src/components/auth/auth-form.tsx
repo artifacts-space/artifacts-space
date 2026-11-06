@@ -52,10 +52,10 @@ function CheckEmail({ email, onBack }: { email: string; onBack: () => void }) {
     <div className="space-y-3">
       <IconMailCheck className="size-6 text-muted-foreground" />
       <h2 className="text-lg font-medium">Check your email</h2>
-      <p className="text-sm leading-6 text-muted-foreground">
+      <p className="text-md leading-6 text-muted-foreground">
         We sent a sign-in link to <span className="text-foreground">{email}</span>. Open it on this device to continue.
       </p>
-      <button type="button" onClick={onBack} className="text-[13px] text-muted-foreground underline underline-offset-4 hover:text-foreground">
+      <button type="button" onClick={onBack} className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
         Use a different email
       </button>
     </div>
@@ -78,7 +78,7 @@ function DevSignIn() {
 function ErrorMessage({ message }: { message: string }) {
   if (!message) return null;
   return (
-    <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">
+    <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive">
       {message}
     </p>
   );
@@ -134,7 +134,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     <div className="w-full max-w-[360px]">
       <div className="mb-8">
         <h1 className="text-2xl font-medium tracking-[-0.015em]">{text.title}</h1>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">{text.description}</p>
+        <p className="mt-2 text-md leading-6 text-muted-foreground">{text.description}</p>
       </div>
 
       <Button type="button" variant="outline" onClick={() => void continueWithGitHub()} disabled={pending !== null} className="h-10 w-full text-sm">
@@ -161,7 +161,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         </Button>
       </form>
 
-      <p className="mt-6 text-[13px] text-muted-foreground">
+      <p className="mt-6 text-sm text-muted-foreground">
         {text.switchPrompt}{" "}
         <Link href={text.switchHref} className="text-foreground underline underline-offset-4 decoration-border hover:decoration-foreground">
           {text.switchLabel}

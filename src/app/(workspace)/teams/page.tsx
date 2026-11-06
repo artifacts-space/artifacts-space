@@ -27,7 +27,7 @@ export default async function TeamsPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-xl font-medium tracking-[-0.01em]">Teams</h1>
-          <p className="mt-1 text-[13px] leading-6 text-muted-foreground">Share artifacts with a team. Your personal team is only you.</p>
+          <p className="mt-1 text-md leading-6 text-muted-foreground">Share artifacts with a team. Your personal team is only you.</p>
         </div>
         <Button nativeButton={false} render={<Link href="/teams/new" />} className="px-3"><IconPlus /> Create a team</Button>
       </div>
@@ -38,8 +38,8 @@ export default async function TeamsPage() {
             {invitations.map((invitation) => (
               <li key={invitation.id} className="flex flex-wrap items-center gap-3 border-b px-5 py-3 last:border-b-0">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium">{invitation.teamName}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground"><PixelAvatar seed={invitation.inviterId} size={16} className="mr-1 -mt-px" />{invitation.inviterName} invited you as {roleLabel(invitation.role).toLowerCase()}.</p>
+                  <p className="truncate text-md font-medium">{invitation.teamName}</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground"><PixelAvatar seed={invitation.inviterId} size={16} className="mr-1 -mt-px" />{invitation.inviterName} invited you as {roleLabel(invitation.role).toLowerCase()}.</p>
                 </div>
                 <InvitationButtons invitationId={invitation.id} />
               </li>
@@ -55,11 +55,11 @@ export default async function TeamsPage() {
             return (
               <li key={team.id} className="border-b last:border-b-0">
                 <Link href={`/teams/${team.slug}`} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/60">
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{team.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-md font-medium">{team.name}</span>
                   {team.personal ? <Badge variant="secondary">Personal</Badge> : null}
-                  <span className="w-20 text-right text-xs text-muted-foreground">{roleLabel(team.role)}</span>
-                  <span className="w-24 text-right text-xs text-muted-foreground">{peopleCountLabel(headcount.people)}</span>
-                  <span className="hidden w-20 text-right text-xs text-muted-foreground sm:block">{agentCountLabel(headcount.agents)}</span>
+                  <span className="w-20 text-right text-sm text-muted-foreground">{roleLabel(team.role)}</span>
+                  <span className="w-24 text-right text-sm text-muted-foreground">{peopleCountLabel(headcount.people)}</span>
+                  <span className="hidden w-20 text-right text-sm text-muted-foreground sm:block">{agentCountLabel(headcount.agents)}</span>
                 </Link>
               </li>
             );

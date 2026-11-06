@@ -30,7 +30,7 @@ function TeamHeader({ team }: { team: TeamMembership }) {
           <h1 className="text-xl font-medium tracking-[-0.01em]">{team.name}</h1>
           {team.personal ? <Badge variant="secondary">Personal</Badge> : null}
         </div>
-        <p className="mt-1 text-[13px] text-muted-foreground">
+        <p className="mt-1 text-md text-muted-foreground">
           <span className="font-mono">/teams/{team.slug}</span> · You are {roleLabel(team.role).toLowerCase()}
         </p>
       </div>

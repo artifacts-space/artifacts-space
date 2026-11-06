@@ -82,7 +82,7 @@ function highlight(code: string) {
 
 function Code({ code }: { code: string }) {
   return (
-    <pre className="overflow-x-auto font-mono text-[12.5px] leading-7">
+    <pre className="overflow-x-auto font-mono text-sm leading-7">
       <code>{highlight(code)}</code>
     </pre>
   );
@@ -192,7 +192,7 @@ export function ArtifactDemo() {
                   <Icon className={cn("mt-0.5 size-4 shrink-0", kindColors[example.kind])} />
                   <span className="min-w-0">
                     <span className="block truncate text-xs font-medium">{example.title}</span>
-                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                       {example.project} · {example.updated}
                     </span>
                   </span>
@@ -205,8 +205,8 @@ export function ArtifactDemo() {
         <div className="min-w-0">
           <div className="border-b px-6 pt-6 pb-5">
             <h3 className="text-xl font-medium tracking-[-0.02em]">{selected.title}</h3>
-            <p className="mt-1.5 text-[13px] leading-6 text-muted-foreground">{selected.summary}</p>
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+            <p className="mt-1.5 text-md leading-6 text-muted-foreground">{selected.summary}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <span className={cn("inline-flex items-center gap-1.5 font-medium", kindColors[selected.kind])}>
                 <SelectedIcon className="size-3.5" />
                 {selected.kind}
@@ -226,7 +226,7 @@ export function ArtifactDemo() {
               <li key={who} className="text-xs">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">{who}</span>
-                  <span className="font-mono text-[11px] text-muted-foreground">{time}</span>
+                  <span className="font-mono text-xs text-muted-foreground">{time}</span>
                 </div>
                 <p className="mt-0.5 text-muted-foreground">{action}</p>
               </li>

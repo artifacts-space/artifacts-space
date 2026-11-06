@@ -36,7 +36,7 @@ function AuthorLine({ comment, agent }: { comment: CommentView; agent: ThreadAge
   const isAgent = comment.author?.kind === "agent";
   const muted = Boolean(agent && (agent.muted || agent.teamMuted));
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
       {comment.author ? <PixelAvatar seed={comment.author.userId} kind={comment.author.kind} size={20} /> : null}
       <span className="font-medium">{comment.author?.label ?? "Former member"}</span>
       <AuthorBadges isAgent={isAgent} muted={muted} />
@@ -82,7 +82,7 @@ export function CommentItem({ comment, agent, handlers, reply = false }: { comme
   return (
     <article id={`comment-${comment.id}`} className={cn("scroll-mt-20 space-y-1.5 py-3", reply && "border-l pl-4")}>
       <AuthorLine comment={comment} agent={agent} />
-      {comment.deleted ? <p className="text-[13px] text-muted-foreground italic">This comment was deleted.</p> : null}
+      {comment.deleted ? <p className="text-md text-muted-foreground italic">This comment was deleted.</p> : null}
       {!comment.deleted && editing ? (
         <CommentComposer
           label="Edit comment"
@@ -98,7 +98,7 @@ export function CommentItem({ comment, agent, handlers, reply = false }: { comme
           }}
         />
       ) : null}
-      {!comment.deleted && !editing ? <MarkdownView content={comment.body} mentions={mentions} className="text-[13px] leading-6" /> : null}
+      {!comment.deleted && !editing ? <MarkdownView content={comment.body} mentions={mentions} className="text-md leading-6" /> : null}
       {!comment.deleted && !editing ? <CommentActions comment={comment} agent={agent} handlers={handlers} onEditing={() => { setEditing(true); }} /> : null}
     </article>
   );

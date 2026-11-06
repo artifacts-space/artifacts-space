@@ -58,11 +58,11 @@ export function SharedArtifactPanel({ artifact, onWithdrawn }: SharedArtifactPan
         </span>
         <div className="ml-auto flex items-center gap-1">
           <CopyButton value={artifact.content} variant="ghost" size="icon" />
-          <Button variant="ghost" size="sm" className="text-xs" nativeButton={false} render={<Link href={`/artifact/${artifact.publicId}`} />}>
+          <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/artifact/${artifact.publicId}`} />}>
             <IconExternalLink /> Open page
           </Button>
           {canWithdraw ? (
-            <Button variant="outline" size="sm" className="text-xs" disabled={withdrawing} onClick={() => void withdraw()}>
+            <Button variant="outline" size="sm" disabled={withdrawing} onClick={() => void withdraw()}>
               {withdrawing ? <IconLoader2 className="animate-spin" /> : <IconLock />} Withdraw sharing
             </Button>
           ) : null}
@@ -70,7 +70,7 @@ export function SharedArtifactPanel({ artifact, onWithdrawn }: SharedArtifactPan
       </div>
       <div className="border-b px-5 py-5 sm:px-7">
         <h2 className="text-2xl font-medium tracking-[-0.015em]">{artifact.title}</h2>
-        {artifact.summary ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{artifact.summary}</p> : null}
+        {artifact.summary ? <p className="mt-2 text-md leading-6 text-muted-foreground">{artifact.summary}</p> : null}
         <p className="mt-2 text-xs text-muted-foreground">Updated {dateFormat.format(new Date(artifact.updatedAt))}</p>
       </div>
       <div className="min-h-[460px] flex-1 bg-card p-6 sm:p-8">

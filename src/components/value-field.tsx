@@ -43,11 +43,11 @@ export function ValueField({
 
   return (
     <div className="grid min-w-0 gap-1.5">
-      {label ? <p id={labelId} className="font-mono text-[11px] text-muted-foreground">{label}</p> : null}
+      {label ? <p id={labelId} className="font-mono text-xs text-muted-foreground">{label}</p> : null}
       <div role="group" {...groupName} className="flex h-10 min-w-0 items-center rounded-md border bg-background/60">
         <code
           className={cn(
-            "min-w-0 flex-1 overflow-x-auto py-2 pl-3 font-mono text-xs leading-5 whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            "min-w-0 flex-1 overflow-x-auto py-2 pl-3 font-mono text-sm leading-5 whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
             masked ? "select-none" : "select-all",
           )}
         >

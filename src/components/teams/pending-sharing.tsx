@@ -20,14 +20,14 @@ function person(name: string, username: string | null) {
 /** Open sharing requests, each with approve and deny. Owners and admins only. */
 export function PendingSharingList({ requests }: { requests: PendingSharingView[] }) {
   const { pending, run } = useTeamAction();
-  if (requests.length === 0) return <p className="px-5 py-6 text-[13px] text-muted-foreground">Nothing is waiting for approval.</p>;
+  if (requests.length === 0) return <p className="px-5 py-6 text-md text-muted-foreground">Nothing is waiting for approval.</p>;
   return (
     <ul>
       {requests.map((request) => (
         <li key={request.requestId} className="flex flex-wrap items-center gap-3 border-b px-5 py-3 last:border-b-0">
           <div className="min-w-0 flex-1">
-            <Link href={`/artifact/${request.publicId}`} className="block truncate text-[13px] font-medium hover:underline">{request.title}</Link>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <Link href={`/artifact/${request.publicId}`} className="block truncate text-md font-medium hover:underline">{request.title}</Link>
+            <p className="mt-0.5 text-sm text-muted-foreground">
               <PixelAvatar seed={request.requesterId} kind={request.requesterKind} size={16} className="mr-1 -mt-px" />
               {person(request.requesterName, request.requesterUsername)} asks for {visibilityLabel(request.level).toLowerCase()} sharing · {dateFormat.format(new Date(request.requestedAt))}
             </p>
@@ -47,14 +47,14 @@ export function PendingSharingList({ requests }: { requests: PendingSharingView[
 /** Artifacts shared through the team. Owners and admins can make any of them private again. */
 export function TeamSharedList({ artifacts, canWithdraw }: { artifacts: TeamSharedView[]; canWithdraw: boolean }) {
   const { pending, run } = useTeamAction();
-  if (artifacts.length === 0) return <p className="px-5 py-6 text-[13px] text-muted-foreground">No artifacts are shared through this team yet.</p>;
+  if (artifacts.length === 0) return <p className="px-5 py-6 text-md text-muted-foreground">No artifacts are shared through this team yet.</p>;
   return (
     <ul>
       {artifacts.map((item) => (
         <li key={item.artifactId} className="flex flex-wrap items-center gap-3 border-b px-5 py-3 last:border-b-0">
           <div className="min-w-0 flex-1">
-            <Link href={`/artifact/${item.publicId}`} className="block truncate text-[13px] font-medium hover:underline">{item.title}</Link>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <Link href={`/artifact/${item.publicId}`} className="block truncate text-md font-medium hover:underline">{item.title}</Link>
+            <p className="mt-0.5 text-sm text-muted-foreground">
               <PixelAvatar seed={item.authorId} kind={item.authorKind} size={16} className="mr-1 -mt-px" />
               {person(item.authorName, item.authorUsername)} · {visibilityLabel(item.visibility)}
             </p>

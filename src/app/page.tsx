@@ -46,7 +46,7 @@ export default function Home() {
     <div className="min-h-screen">
       <header className="mx-auto flex h-14 w-full max-w-[1440px] items-center justify-between px-6">
         <Logo />
-        <nav className="flex items-center gap-6 text-[13px] text-muted-foreground" aria-label="Main navigation">
+        <nav className="flex items-center gap-6 text-sm text-muted-foreground" aria-label="Main navigation">
           <a href="#how" className="hidden transition-colors hover:text-foreground sm:inline">How it works</a>
           <a href="#tools" className="hidden transition-colors hover:text-foreground sm:inline">Tools</a>
           <Link href="/sign-in" className="transition-colors hover:text-foreground">Sign in</Link>
@@ -61,7 +61,7 @@ export default function Home() {
           <h1 className="animate-enter max-w-[920px] text-balance text-[clamp(2.5rem,5.5vw,4.75rem)] font-medium leading-[1.02] tracking-[-0.035em]">
             A shared artifact hub for coding agents.
           </h1>
-          <p className="animate-enter mt-6 max-w-[640px] text-[17px] leading-7 text-muted-foreground" style={{ animationDelay: "60ms" }}>
+          <p className="animate-enter mt-6 max-w-[640px] text-lg leading-8 text-muted-foreground" style={{ animationDelay: "60ms" }}>
             artifacts.space is an open-source place to keep the work an agent produces: decisions, plans, code, and research. Any MCP client can create, read, and update the same artifacts, and people can share them across a team.
           </p>
           <div className="animate-enter mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: "120ms" }}>
@@ -70,7 +70,7 @@ export default function Home() {
             </Button>
             <CopyButton value={mcpConfig} label="Copy MCP config" variant="outline" className="h-10 px-4 text-sm" />
           </div>
-          <p className="animate-enter mt-5 text-[13px] text-muted-foreground" style={{ animationDelay: "160ms" }}>
+          <p className="animate-enter mt-5 text-sm text-muted-foreground" style={{ animationDelay: "160ms" }}>
             Works with Claude Code, Cursor, OpenCode, and any MCP client.
           </p>
         </section>
@@ -99,8 +99,8 @@ export default function Home() {
             {steps.map((step, index) => (
               <li key={step.title}>
                 <div className="font-mono text-xs text-muted-foreground">{index + 1}</div>
-                <h3 className="mt-3 text-[15px] font-medium">{step.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">{step.body}</p>
+                <h3 className="mt-3 text-base font-medium">{step.title}</h3>
+                <p className="mt-2 text-md leading-6 text-muted-foreground">{step.body}</p>
               </li>
             ))}
           </ol>
@@ -110,14 +110,14 @@ export default function Home() {
           <div className="grid gap-12 lg:grid-cols-2">
             <div>
               <h2 className="text-3xl font-medium tracking-[-0.025em] sm:text-4xl">Five tools, one endpoint</h2>
-              <p className="mt-4 max-w-md text-sm leading-6 text-muted-foreground">
+              <p className="mt-4 max-w-md text-md leading-6 text-muted-foreground">
                 Add the server once. Every call is scoped to the authenticated user, so an agent only sees the artifacts it is allowed to see.
               </p>
               <table className="mt-8 w-full border-collapse text-sm">
                 <tbody>
                   {tools.map(([name, description]) => (
                     <tr key={name} className="border-t last:border-b">
-                      <td className="py-3 pr-6 align-top font-mono text-[13px] whitespace-nowrap">{name}</td>
+                      <td className="py-3 pr-6 align-top font-mono text-sm whitespace-nowrap">{name}</td>
                       <td className="py-3 align-top leading-6 text-muted-foreground">{description}</td>
                     </tr>
                   ))}
@@ -126,7 +126,7 @@ export default function Home() {
             </div>
             <div>
               <CodeBlock title="mcp.json" value={mcpConfig} className="bg-card" preClassName="p-5" />
-              <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
+              <p className="mt-3 text-md leading-6 text-muted-foreground">
                 Replace <code className="font-mono">{TOKEN_PLACEHOLDER}</code> with an access token from Connections. Tokens are shown once and stored as hashes.
               </p>
             </div>
@@ -137,8 +137,8 @@ export default function Home() {
           <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
             {facts.map(([title, body]) => (
               <div key={title}>
-                <h3 className="text-[15px] font-medium">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
+                <h3 className="text-base font-medium">{title}</h3>
+                <p className="mt-2 text-md leading-6 text-muted-foreground">{body}</p>
               </div>
             ))}
           </div>
@@ -146,7 +146,7 @@ export default function Home() {
       </main>
 
       <footer className="border-t">
-        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-6 py-8 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <Logo />
           <div className="flex items-center gap-5">
             <Link href="/sign-in" className="transition-colors hover:text-foreground">Sign in</Link>

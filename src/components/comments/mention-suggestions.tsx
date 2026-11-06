@@ -137,12 +137,12 @@ function MentionSuggestionList({ id, options, activeIndex, optionId, onPick, onH
           onPointerDown={(event) => { event.preventDefault(); }}
           onPointerMove={() => { onHover(index); }}
           onClick={() => { onPick(option); }}
-          className={cn("flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-[13px]", index === activeIndex && "bg-accent text-accent-foreground")}
+          className={cn("flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm", index === activeIndex && "bg-accent text-accent-foreground")}
         >
           <PixelAvatar seed={option.userId} kind={option.kind} size={20} />
           <span className="font-mono">@{option.handle}</span>
           {option.name && option.name !== option.handle ? <span className="truncate text-xs text-muted-foreground">{option.name}</span> : null}
-          {option.kind === "agent" ? <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">Agent</span> : null}
+          {option.kind === "agent" ? <span className="ml-auto shrink-0 text-xs text-muted-foreground">Agent</span> : null}
         </li>
       ))}
     </ul>

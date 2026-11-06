@@ -22,9 +22,9 @@ export function CodeBlock({
     <div className={cn("min-w-0 overflow-hidden rounded-md border bg-background/60", className)}>
       <div className="flex h-10 items-center justify-between border-b px-4">
         <span className="font-mono text-xs text-muted-foreground">{title}</span>
-        <CopyButton value={value} label="Copy" variant="ghost" size="sm" className="text-xs" />
+        <CopyButton value={value} label="Copy" variant="ghost" size="sm" />
       </div>
-      <pre className={cn("overflow-x-auto p-4 font-mono text-[12.5px] leading-6", preClassName)}><code>{value}</code></pre>
+      <pre className={cn("overflow-x-auto p-4 font-mono text-sm leading-6", preClassName)}><code>{value}</code></pre>
     </div>
   );
 }
@@ -36,7 +36,7 @@ export function CodeBlock({
 export function CommandBlock({ command, copyLabel = "Copy command" }: { command: string; copyLabel?: string }) {
   return (
     <div className="flex min-w-0 items-center rounded-md border bg-background/60">
-      <pre className="min-w-0 flex-1 overflow-x-auto py-2.5 pl-3 font-mono text-xs leading-5">
+      <pre className="min-w-0 flex-1 overflow-x-auto py-2.5 pl-3 font-mono text-sm leading-5">
         <code><span aria-hidden="true" className="text-muted-foreground select-none">$ </span>{command}</code>
       </pre>
       <div className="flex shrink-0 items-center px-1">

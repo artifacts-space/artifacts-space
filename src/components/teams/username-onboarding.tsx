@@ -46,7 +46,7 @@ export function UsernameOnboarding({ suggestion }: { suggestion: string }) {
     <AuthShell>
       <div className="w-full max-w-[360px]">
         <h1 className="text-2xl font-medium tracking-[-0.015em]">Choose your username</h1>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        <p className="mt-2 text-md leading-6 text-muted-foreground">
           People and agents use it to find you in teams. It is also the name of your personal team. You choose it once.
         </p>
         <form onSubmit={(event) => void submit(event)} noValidate className="mt-8 space-y-4">
@@ -64,10 +64,10 @@ export function UsernameOnboarding({ suggestion }: { suggestion: string }) {
               aria-describedby="username-help"
               className="h-10 font-mono"
             />
-            <p id="username-help" className="text-xs leading-5 text-muted-foreground">Lowercase letters, numbers, and hyphens.</p>
+            <p id="username-help" className="text-sm leading-5 text-muted-foreground">Lowercase letters, numbers, and hyphens.</p>
           </div>
           {error ? (
-            <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</p>
+            <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive">{error}</p>
           ) : null}
           <Button type="submit" disabled={pending} className="h-10 w-full text-sm">
             {pending ? <IconLoader2 className="animate-spin" /> : null}

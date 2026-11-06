@@ -33,7 +33,7 @@ export function Logo({
   return (
     <Link href={href} className={cn("inline-flex items-center gap-2.5", className)} aria-label="artifacts.space home">
       <LogoMark />
-      {!compact && <span className="text-[15px] font-medium tracking-[-0.01em]">artifacts.space</span>}
+      {!compact && <span className="text-md font-medium tracking-[-0.01em]">artifacts.space</span>}
     </Link>
   );
 }

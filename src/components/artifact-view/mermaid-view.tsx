@@ -16,7 +16,7 @@ function SourceFallback({ code, title, reason }: { code: string; title: string; 
   return (
     <div className="space-y-3">
       <ViewNotice tone="warning" title={title}>{reason}</ViewNotice>
-      <pre className="max-h-80 overflow-auto rounded-md border bg-muted/50 p-4 font-mono text-[12px] leading-6 whitespace-pre-wrap break-words">{code}</pre>
+      <pre className="max-h-80 overflow-auto rounded-md border bg-muted/50 p-4 font-mono text-sm leading-6 whitespace-pre-wrap break-words">{code}</pre>
     </div>
   );
 }
@@ -49,7 +49,7 @@ export function MermaidView({ code, title, className }: { code: string; title?: 
   if (current && "error" in current) return <SourceFallback code={code} title="This diagram could not be drawn." reason={current.error.slice(0, 300)} />;
   return (
     <figure className={cn("min-w-0", className)}>
-      {title ? <figcaption className="mb-3 text-sm font-medium">{title}</figcaption> : null}
+      {title ? <figcaption className="mb-3 text-md font-medium">{title}</figcaption> : null}
       <div className="flex min-h-24 justify-center overflow-x-auto rounded-md border bg-card p-4">
         {current ? (
           // eslint-disable-next-line @next/next/no-img-element -- a data URI image, which next/image cannot optimize

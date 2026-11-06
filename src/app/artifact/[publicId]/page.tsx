@@ -48,7 +48,7 @@ export async function generateMetadata({ params }: PageProps<"/artifact/[publicI
 function UserContentNotice({ author, avatar, teamName }: { author: string; avatar: { seed: string; kind: AvatarKind } | null; teamName: string | null }) {
   return (
     <div role="note" className="border-b bg-muted/50">
-      <p className="mx-auto w-full max-w-[960px] px-6 py-2 text-xs leading-5 text-muted-foreground">
+      <p className="mx-auto w-full max-w-[960px] px-6 py-2 text-sm leading-5 text-muted-foreground">
         Shared by {avatar ? <PixelAvatar seed={avatar.seed} kind={avatar.kind} size={16} className="mr-1 -mt-px" /> : null}
         <span className="font-medium text-foreground">{author}</span>
         {teamName ? <> in <span className="font-medium text-foreground">{teamName}</span></> : null}. This is user-shared content; artifacts.space does not review it.
@@ -61,7 +61,7 @@ function UserContentNotice({ author, avatar, teamName }: { author: string; avata
 function PendingEditNotice({ viewable }: { viewable: ViewableArtifact }) {
   if (!viewable.editPending) return null;
   return (
-    <p role="status" className="mt-6 flex items-start gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs leading-5 text-muted-foreground">
+    <p role="status" className="mt-6 flex items-start gap-2 rounded-md border bg-muted/50 px-3 py-2 text-sm leading-5 text-muted-foreground">
       <IconClock className="mt-0.5 size-3.5 shrink-0" />
       <span>
         <span className="font-medium text-foreground">Changes waiting for approval.</span> You see the latest version. Readers outside the team see the last approved version until a team owner or admin approves the changes.
@@ -87,7 +87,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
     <div className="min-h-screen">
       <header className="mx-auto flex h-14 w-full max-w-[960px] items-center justify-between px-6">
         <Logo />
-        <CopyButton value={view.content} label="Copy" variant="outline" size="sm" className="text-xs" />
+        <CopyButton value={view.content} label="Copy" variant="outline" size="sm" />
       </header>
       <UserContentNotice author={byline.author} avatar={byline.avatar} teamName={byline.teamName} />
       <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
@@ -95,13 +95,13 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
           <Icon className={`size-3.5 ${kindColors[view.kind]}`} /> Shared artifact · {view.kind}
         </div>
         <h1 className="mt-4 text-balance text-4xl font-medium leading-[1.08] tracking-[-0.03em] sm:text-5xl">{view.title}</h1>
-        {view.summary ? <p className="mt-4 max-w-2xl text-[15px] leading-7 text-muted-foreground">{view.summary}</p> : null}
-        <p className="mt-4 text-[13px] text-muted-foreground">{meta.join(" · ")}</p>
+        {view.summary ? <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{view.summary}</p> : null}
+        <p className="mt-4 text-sm text-muted-foreground">{meta.join(" · ")}</p>
         <PendingEditNotice viewable={viewable} />
         <article className="mt-10">
           <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} />
         </article>
-        <div className="mt-10 flex flex-wrap items-baseline justify-between gap-4 text-[13px] leading-6 text-muted-foreground">
+        <div className="mt-10 flex flex-wrap items-baseline justify-between gap-4 text-sm leading-6 text-muted-foreground">
           <p>
             Shared from artifacts.space, a shared artifact hub for coding agents.{" "}
             <Link href="/sign-up" className="text-foreground underline underline-offset-4 decoration-border hover:decoration-foreground">Create your own workspace</Link>

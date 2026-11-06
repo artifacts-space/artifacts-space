@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 export function ViewNotice({ tone = "info", title, children, className }: { tone?: "info" | "warning"; title: string; children?: ReactNode; className?: string }) {
   const Icon = tone === "warning" ? IconAlertTriangle : IconInfoCircle;
   return (
-    <div role="note" className={cn("flex gap-2.5 rounded-md border bg-muted/50 px-3.5 py-2.5 text-[13px] leading-6", className)}>
+    <div role="note" className={cn("flex gap-2.5 rounded-md border bg-muted/50 px-3.5 py-2.5 text-sm leading-6", className)}>
       <Icon aria-hidden className={cn("mt-1 size-4 shrink-0", tone === "warning" ? "text-tone-warning" : "text-muted-foreground")} />
       <div className="min-w-0">
         <p className="font-medium">{title}</p>
@@ -28,7 +28,7 @@ export function IssueList({ issues }: { issues: readonly UiSpecIssue[] }) {
     <ul className="mt-1.5 space-y-1 break-words">
       {shown.map((issue, index) => (
         <li key={`${issue.code}-${String(index)}`} className="flex gap-2">
-          <span className={cn("shrink-0 font-mono text-[11px] leading-6 uppercase", issue.severity === "error" ? "text-tone-danger" : "text-tone-warning")}>
+          <span className={cn("shrink-0 font-mono text-xs leading-6 uppercase", issue.severity === "error" ? "text-tone-danger" : "text-tone-warning")}>
             {issue.severity === "error" ? "Error" : "Warn"}
           </span>
           <span>{issue.message}</span>

@@ -39,16 +39,16 @@ export function InviteForm({ teamId }: { teamId: string }) {
     <form onSubmit={(event) => void submit(event)} noValidate className="space-y-3 p-5">
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex min-w-56 flex-1 flex-col gap-2">
-          <Label htmlFor="invite-email" className="text-xs">Email</Label>
-          <Input id="invite-email" type="email" value={email} onChange={(event) => { setEmail(event.target.value); setError(""); }} placeholder="teammate@example.com" className="h-9 text-[13px]" />
+          <Label htmlFor="invite-email">Email</Label>
+          <Input id="invite-email" type="email" value={email} onChange={(event) => { setEmail(event.target.value); setError(""); }} placeholder="teammate@example.com" className="h-9" />
         </div>
         {/* gap, not space-y: Select renders a hidden input after its trigger, and space-y would add margin under the trigger. */}
         <div className="flex flex-col gap-2">
-          <Label className="text-xs">Role</Label>
+          <Label>Role</Label>
           <Select value={role} onValueChange={(value) => { if (value) setRole(value); }}>
-            <SelectTrigger className="h-9 w-28 text-[13px]" aria-label="Role for the invited person"><SelectValue>{(value: AssignableRole) => roleLabel(value)}</SelectValue></SelectTrigger>
+            <SelectTrigger className="h-9 w-28 text-sm" aria-label="Role for the invited person"><SelectValue>{(value: AssignableRole) => roleLabel(value)}</SelectValue></SelectTrigger>
             <SelectContent>
-              {assignableRoles.map((value) => <SelectItem key={value} value={value} className="text-xs">{roleLabel(value)}</SelectItem>)}
+              {assignableRoles.map((value) => <SelectItem key={value} value={value}>{roleLabel(value)}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -68,7 +68,7 @@ export function PendingInvitations({ teamId, invitations }: { teamId: string; in
   return (
     <ul className="border-t">
       {invitations.map((invitation) => (
-        <li key={invitation.id} className="flex flex-wrap items-center gap-3 border-b px-5 py-2.5 text-[13px] last:border-b-0">
+        <li key={invitation.id} className="flex flex-wrap items-center gap-3 border-b px-5 py-2.5 text-md last:border-b-0">
           <span className="min-w-0 flex-1 truncate">{invitation.email}</span>
           <span className="text-xs text-muted-foreground">{roleLabel(invitation.role)}</span>
           <span className="text-xs text-muted-foreground">Expires {dateFormat.format(new Date(invitation.expiresAt))}</span>

@@ -15,8 +15,8 @@ export function EntryRow({ entry }: { entry: CalendarEntry }) {
         <time dateTime={isoWallText({ day: entry.startDay, minute: entry.startMinute })}>{entryTimeLabel(entry)}</time>
       </span>
       <div className="min-w-0 pl-4 @sm:pl-0">
-        <p className="text-[13px] leading-5 font-medium wrap-anywhere">{entry.title}</p>
-        {entry.note ? <p className="text-xs leading-5 whitespace-pre-line text-muted-foreground wrap-anywhere">{entry.note}</p> : null}
+        <p className="text-md leading-6 font-medium wrap-anywhere">{entry.title}</p>
+        {entry.note ? <p className="text-sm leading-5 whitespace-pre-line text-muted-foreground wrap-anywhere">{entry.note}</p> : null}
       </div>
     </li>
   );
@@ -27,7 +27,7 @@ export function DayEntries({ day, entries, level = 3 }: { day: number; entries: 
   const Heading = level === 3 ? "h3" : "h4";
   return (
     <>
-      <Heading className="pt-2 text-xs font-medium text-muted-foreground">
+      <Heading className="pt-2 text-sm font-medium text-muted-foreground">
         <time dateTime={isoWallText({ day, minute: null })}>{formatLongDay(day)}</time>
       </Heading>
       <ul className="min-w-0 divide-y divide-border/60">
@@ -39,7 +39,7 @@ export function DayEntries({ day, entries, level = 3 }: { day: number; entries: 
 
 /** The agenda: a list of days, each with its events. */
 export function AgendaList({ days, empty, level = 3 }: { days: readonly AgendaDay[]; empty: string; level?: 3 | 4 }) {
-  if (days.length === 0) return <p className="text-xs text-muted-foreground">{empty}</p>;
+  if (days.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
   return (
     <ol aria-label="Events by day" className="@container min-w-0 divide-y border-y">
       {days.map((group) => (

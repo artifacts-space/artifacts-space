@@ -20,7 +20,7 @@ export interface ViewProps<K extends UiComponentName> {
 /** A small inline notice in place of one element that could not be shown. */
 export function ElementNotice({ type, detail }: { type: string; detail?: string }) {
   return (
-    <div role="note" className="flex min-w-0 items-start gap-2 rounded-md border border-dashed px-3 py-2 text-xs leading-5 text-muted-foreground">
+    <div role="note" className="flex min-w-0 items-start gap-2 rounded-md border border-dashed px-3 py-2 text-sm leading-5 text-muted-foreground">
       <IconAlertTriangle aria-hidden className="mt-0.5 size-3.5 shrink-0 text-tone-warning" />
       <span className="min-w-0 break-words">
         This {type} could not be shown.{detail ? ` ${detail}` : ""}

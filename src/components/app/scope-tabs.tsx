@@ -20,7 +20,7 @@ export function ScopeTabs({ teams, activeSlug }: { teams: readonly ShareTeam[]; 
           href={tab.href}
           aria-current={tab.active ? "page" : undefined}
           className={cn(
-            "rounded-sm px-2.5 py-1 text-xs transition-colors",
+            "rounded-sm px-2.5 py-1 text-sm transition-colors",
             tab.active ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
           )}
         >

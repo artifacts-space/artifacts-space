@@ -19,7 +19,7 @@ export default async function InboxPage() {
     <main className="mx-auto w-full max-w-3xl space-y-6 p-4 py-8 sm:p-6 sm:py-10">
       <div>
         <h1 className="text-xl font-medium tracking-[-0.01em]">Inbox</h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">Comments where a teammate or an agent mentioned you.</p>
+        <p className="mt-1 text-md text-muted-foreground">Comments where a teammate or an agent mentioned you.</p>
       </div>
       <InboxList entries={sorted} />
     </main>

@@ -33,14 +33,14 @@ function InboxLink({ count, active }: { count: number; active: boolean }) {
       href="/inbox"
       aria-label={label}
       className={cn(
-        "relative flex h-full items-center gap-1.5 px-2 text-[13px] transition-colors sm:px-3",
+        "relative flex h-full items-center gap-1.5 px-2 text-sm transition-colors sm:px-3",
         active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
       )}
     >
       <IconInbox className="size-4 sm:hidden" aria-hidden />
       <span className="hidden sm:inline">Inbox</span>
       {count > 0 ? (
-        <span className="min-w-4 rounded-full bg-foreground px-1 text-center text-[10px] leading-4 font-medium text-background">{count > 49 ? "50+" : count}</span>
+        <span className="min-w-4.5 rounded-full bg-foreground px-1 text-center text-xs leading-4.5 font-medium text-background">{count > 49 ? "50+" : count}</span>
       ) : null}
       {active && <span className="absolute inset-x-2 bottom-0 h-px bg-foreground sm:inset-x-3" />}
     </Link>
@@ -52,7 +52,7 @@ function ResetConfirmationsItem() {
   const { skipped, reset } = useConfirmations();
   if (skipped.size === 0) return null;
   return (
-    <DropdownMenuItem onClick={() => void reset()} className="px-2 py-2 text-xs">
+    <DropdownMenuItem onClick={() => void reset()} className="px-2 py-2">
       <IconRestore /> Reset confirmations
     </DropdownMenuItem>
   );
@@ -63,7 +63,7 @@ function NavLink({ href, label, active, className }: { href: string; label: stri
     <Link
       href={href}
       className={cn(
-        "relative flex h-full items-center px-2 text-[13px] transition-colors sm:px-3",
+        "relative flex h-full items-center px-2 text-sm transition-colors sm:px-3",
         active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
         className,
       )}
@@ -120,21 +120,21 @@ export function AppHeader({ userId, name, email, username, teams, unreadMentions
               {/* Base UI requires a group label to sit inside a group. */}
               <DropdownMenuGroup>
                 <DropdownMenuLabel className="px-2 py-2">
-                  <span className="block truncate text-xs font-medium">{name}</span>
-                  <span className="mt-0.5 block truncate font-mono text-[11px] font-normal text-muted-foreground">@{username}</span>
-                  <span className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground">{email}</span>
+                  <span className="block truncate text-sm font-medium">{name}</span>
+                  <span className="mt-0.5 block truncate font-mono text-xs font-normal text-muted-foreground">@{username}</span>
+                  <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">{email}</span>
                 </DropdownMenuLabel>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => { router.push("/app/connections"); }} className="px-2 py-2 text-xs">
+              <DropdownMenuItem onClick={() => { router.push("/app/connections"); }} className="px-2 py-2">
                 <IconKey /> Access tokens
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { router.push("/"); }} className="px-2 py-2 text-xs">
+              <DropdownMenuItem onClick={() => { router.push("/"); }} className="px-2 py-2">
                 <IconExternalLink /> Public site
               </DropdownMenuItem>
               <ResetConfirmationsItem />
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => void signOut()} className="px-2 py-2 text-xs">
+              <DropdownMenuItem onClick={() => void signOut()} className="px-2 py-2">
                 <IconLogout /> {signingOut ? "Signing out…" : "Sign out"}
               </DropdownMenuItem>
             </DropdownMenuContent>

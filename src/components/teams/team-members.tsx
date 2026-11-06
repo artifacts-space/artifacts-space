@@ -37,9 +37,9 @@ function RoleCell({ member, teamId, editable, viewerRole }: { member: TeamMember
       }}
       disabled={pending !== null}
     >
-      <SelectTrigger size="sm" className="h-7 w-28 text-xs" aria-label={`Role for ${member.name}`}><SelectValue>{(value: TeamRole) => roleLabel(value)}</SelectValue></SelectTrigger>
+      <SelectTrigger size="sm" className="h-7 w-28 text-sm" aria-label={`Role for ${member.name}`}><SelectValue>{(value: TeamRole) => roleLabel(value)}</SelectValue></SelectTrigger>
       <SelectContent>
-        {rolesFor(viewerRole).map((role) => <SelectItem key={role} value={role} className="text-xs">{roleLabel(role)}</SelectItem>)}
+        {rolesFor(viewerRole).map((role) => <SelectItem key={role} value={role}>{roleLabel(role)}</SelectItem>)}
       </SelectContent>
     </Select>
   );
@@ -77,7 +77,7 @@ export function TeamMembers({ teamId, members, viewerId, viewerRole, canManage }
   return (
     // relative: the role picker's hidden input is absolutely placed and must stay inside this scroller.
     <div className="relative overflow-x-auto">
-      <table className="w-full border-collapse text-[13px]">
+      <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="text-left text-xs text-muted-foreground">
             <th className="px-5 py-2 font-normal">Name</th>
@@ -99,7 +99,7 @@ export function TeamMembers({ teamId, members, viewerId, viewerRole, canManage }
                     <span>{member.name || "Unnamed"}{isViewer ? <span className="ml-1.5 text-xs font-normal text-muted-foreground">(you)</span> : null}</span>
                   </span>
                 </td>
-                <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{member.username ? `@${member.username}` : ""}</td>
+                <td className="px-3 py-2.5 font-mono text-sm text-muted-foreground">{member.username ? `@${member.username}` : ""}</td>
                 <td className="px-3 py-2.5 text-muted-foreground">{member.email}</td>
                 <td className="px-3 py-2.5"><RoleCell member={member} teamId={teamId} editable={editable} viewerRole={viewerRole} /></td>
                 <td className="px-5 py-2.5 text-right">{editable ? <RemoveButton member={member} teamId={teamId} /> : null}</td>

@@ -136,7 +136,7 @@ export function CreateArtifactDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <p id="artifact-format-help" className="text-xs leading-5 text-muted-foreground">{formatInfo[kind].helper}</p>
+                <p id="artifact-format-help" className="text-sm leading-5 text-muted-foreground">{formatInfo[kind].helper}</p>
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="artifact-summary">Summary <span className="font-normal text-muted-foreground">(optional)</span></Label>
@@ -160,7 +160,7 @@ export function CreateArtifactDialog({
                   id="artifact-content"
                   name="content"
                   placeholder={placeholders[kind]}
-                  className={isFiles ? "min-h-24 resize-y p-4 text-sm leading-6" : "min-h-56 resize-y p-4 font-mono text-xs leading-6"}
+                  className={isFiles ? "min-h-24 resize-y p-4 leading-6 md:text-md" : "min-h-56 resize-y p-4 font-mono leading-6"}
                 />
               </div>
             </div>

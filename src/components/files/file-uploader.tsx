@@ -81,7 +81,7 @@ export function FileUploader({ items, onFiles, onRemove, disabled = false, class
         <Button type="button" variant="outline" size="sm" disabled={disabled} aria-describedby={hintId} onClick={() => inputRef.current?.click()}>
           Choose files
         </Button>
-        <p id={hintId} className="max-w-md text-xs leading-5 text-muted-foreground">
+        <p id={hintId} className="max-w-md text-sm leading-5 text-muted-foreground">
           Up to {formatBytes(fileLimits.maxBytes)} each, {String(fileLimits.maxFilesPerArtifact)} per artifact. {allowedTypesHint}.
         </p>
         <input

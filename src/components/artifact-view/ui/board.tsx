@@ -38,7 +38,7 @@ function DueDate({ due }: { due: string }) {
 function CardMeta({ card }: { card: BoardCard }) {
   if (!card.owner && !card.due) return null;
   return (
-    <p className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+    <p className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       {card.owner ? (
         <span className="inline-flex min-w-0 items-center gap-1">
           <IconUser aria-hidden className="size-3.5 shrink-0" />
@@ -55,12 +55,12 @@ function Card({ card }: { card: BoardCard }) {
   const badges = card.badges ?? [];
   return (
     <li className={cn("min-w-0 space-y-1.5 rounded-md border bg-background px-3 py-2.5 shadow-xs", card.tone && card.tone !== "neutral" && cn("border-l-2", cardEdge[card.tone]))}>
-      <p className="text-[13px] leading-5 font-medium wrap-anywhere">{card.title}</p>
-      {card.body ? <p className="text-xs leading-5 whitespace-pre-line text-muted-foreground wrap-anywhere">{card.body}</p> : null}
+      <p className="text-sm leading-5 font-medium wrap-anywhere">{card.title}</p>
+      {card.body ? <p className="text-sm leading-5 whitespace-pre-line text-muted-foreground wrap-anywhere">{card.body}</p> : null}
       {badges.length > 0 ? (
         <ul aria-label="Labels" className="flex min-w-0 flex-wrap gap-1">
           {badges.map((badge, index) => (
-            <li key={`${String(index)}-${badge.label}`} className={cn("inline-flex h-5 max-w-full items-center truncate rounded-full border px-2 text-[11px] font-medium", badgeTone[badge.tone ?? "neutral"])}>
+            <li key={`${String(index)}-${badge.label}`} className={cn("inline-flex h-5 max-w-full items-center truncate rounded-full border px-2 text-xs font-medium", badgeTone[badge.tone ?? "neutral"])}>
               {badge.label}
             </li>
           ))}
@@ -75,10 +75,10 @@ function BoardColumn({ column, headingId }: { column: Column; headingId: string 
   const count = column.count ?? column.cards.length;
   return (
     <section aria-labelledby={headingId} className="flex w-(--board-column) shrink-0 snap-start flex-col gap-2 rounded-lg border bg-muted/40 p-2">
-      <h3 id={headingId} className="flex min-w-0 items-center gap-2 px-1 pt-0.5 text-[13px] font-medium">
+      <h3 id={headingId} className="flex min-w-0 items-center gap-2 px-1 pt-0.5 text-sm font-medium">
         {column.tone ? <span aria-hidden className={cn("size-2 shrink-0 rounded-full", toneDot[column.tone])} /> : null}
         <span className="min-w-0 break-words">{column.title}</span>
-        <span className="ml-auto shrink-0 rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground tabular-nums">
+        <span className="ml-auto shrink-0 rounded-full bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">
           <span className="sr-only">, </span>
           {count.toLocaleString("en-US")}
           <span className="sr-only"> {count === 1 ? "card" : "cards"}</span>
@@ -108,7 +108,7 @@ export function BoardView({ props }: ViewProps<"Board">) {
   const layout = boardLayoutVars(props.columns.length) as CSSProperties;
   return (
     <figure className="min-w-0 space-y-2">
-      {props.title ? <figcaption className="text-sm font-medium break-words">{props.title}</figcaption> : null}
+      {props.title ? <figcaption className="text-md font-medium break-words">{props.title}</figcaption> : null}
       <div
         role="region"
         aria-label={name}

@@ -34,8 +34,8 @@ export function SharingRulePicker({
               selected ? "border-foreground bg-muted" : "hover:bg-muted/60",
             )}
           >
-            <span className="block text-[13px] font-medium">{option.title}</span>
-            <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{option.detail}</span>
+            <span className="block text-md font-medium">{option.title}</span>
+            <span className="mt-0.5 block text-sm leading-5 text-muted-foreground">{option.detail}</span>
           </button>
         );
       })}

@@ -27,7 +27,7 @@ export function SharingRuleSetting({ teamId, needsApproval, canEdit }: { teamId:
   return (
     <div className="space-y-3 p-5">
       <SharingRulePicker value={value} onChange={(next) => void change(next)} disabled={!canEdit || pending !== null} />
-      <p className="text-xs leading-5 text-muted-foreground">
+      <p className="text-sm leading-5 text-muted-foreground">
         Link and public sharing always need an admin&apos;s approval in this team.
         {canEdit ? "" : " Only owners can change this rule."}
       </p>

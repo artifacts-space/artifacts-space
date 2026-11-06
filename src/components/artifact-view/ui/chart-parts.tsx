@@ -32,8 +32,8 @@ export function Legend({ names }: { names: string[] }) {
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
       {names.map((name, index) => (
-        <li key={name + String(index)} className="flex min-w-0 items-start gap-1.5 leading-4">
-          <span aria-hidden className={cn("mt-[3px] size-2.5 shrink-0 rounded-[3px]", swatch(index))} />
+        <li key={name + String(index)} className="flex min-w-0 items-start gap-1.5 leading-4.5">
+          <span aria-hidden className={cn("mt-1 size-2.5 shrink-0 rounded-[3px]", swatch(index))} />
           {/* Names wrap to two lines; only a name longer than that clamps, with the full name on hover. */}
           <span className="line-clamp-2 max-w-[32ch] min-w-0 break-words" title={name}>{name}</span>
         </li>
@@ -47,7 +47,7 @@ export function YAxis({ scale, format, heightClass }: { scale: ChartScale; forma
   const labels = scale.ticks.map((tick) => ({ tick, text: format(tick) }));
   const longest = labels.reduce((width, label) => Math.max(width, label.text.length), 1);
   return (
-    <div aria-hidden className={cn("relative shrink-0 self-start text-right text-[11px] text-muted-foreground tabular-nums", heightClass)} style={{ width: `${String(Math.min(longest, 10) + 1.5)}ch` }}>
+    <div aria-hidden className={cn("relative shrink-0 self-start text-right text-xs text-muted-foreground tabular-nums", heightClass)} style={{ width: `${String(Math.min(longest, 10) + 1.5)}ch` }}>
       {labels.map(({ tick, text }) => (
         <span key={tick} className="absolute right-2 block max-w-full -translate-y-1/2 truncate" style={{ top: `${String((1 - scalePosition(tick, scale)) * 100)}%` }}>
           {text}
@@ -118,7 +118,7 @@ interface TableProps {
 export function ChartTable({ head, rows, visible, textColumns = 1 }: TableProps) {
   return (
     <div className={visible ? "max-h-72 overflow-auto rounded-md border" : "sr-only"}>
-      <table className="w-full text-xs">
+      <table className="w-full text-sm">
         <thead className="sticky top-0 bg-card">
           <tr>
             {head.map((name, index) => <th key={name + String(index)} scope="col" className={cn("border-b px-3 py-1.5 font-medium text-muted-foreground", index < textColumns ? "text-left" : "text-right")}>{name}</th>)}
@@ -155,12 +155,12 @@ export function ChartFrame({ title, legend, empty, heightClass, table, children 
   return (
     <figure className="min-w-0 space-y-3" aria-labelledby={title ? titleId : undefined}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        {title ? <figcaption id={titleId} className="min-w-0 text-sm font-medium break-words">{title}</figcaption> : null}
+        {title ? <figcaption id={titleId} className="min-w-0 text-md font-medium break-words">{title}</figcaption> : null}
         {legend}
         {empty ? null : <Button variant="ghost" size="xs" className="ml-auto text-xs" aria-pressed={showTable} onClick={() => { setShowTable((value) => !value); }}>{showTable ? "Chart" : "Table"}</Button>}
       </div>
       {empty ? (
-        <div className={cn("flex items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground", heightClass)}>No data to chart yet.</div>
+        <div className={cn("flex items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground", heightClass)}>No data to chart yet.</div>
       ) : (
         <>
           {showTable ? null : children}
@@ -174,7 +174,7 @@ export function ChartFrame({ title, legend, empty, heightClass, table, children 
 /** A short axis name, shown above the value axis or below the x-axis. */
 export function AxisTitle({ text, className }: { text: string | undefined; className?: string }) {
   if (!text) return null;
-  return <p className={cn("truncate text-[11px] text-muted-foreground", className)}>{text}</p>;
+  return <p className={cn("truncate text-xs text-muted-foreground", className)}>{text}</p>;
 }
 
 /** X-axis labels at `positions` (0 to 1). Each label gets a width that cannot overlap its neighbors. */
@@ -199,7 +199,7 @@ type TickSet = Parameters<typeof TickLabels>[0];
  */
 export function XAxisLabels({ wide, narrow, className }: { wide: TickSet; narrow: TickSet; className?: string }) {
   return (
-    <div aria-hidden className={cn("@container relative mt-1.5 h-4 text-[11px] text-muted-foreground", className)}>
+    <div aria-hidden className={cn("@container relative mt-1.5 h-4.5 text-xs text-muted-foreground", className)}>
       <div className="absolute inset-0 hidden @sm:block"><TickLabels {...wide} /></div>
       <div className="absolute inset-0 @sm:hidden"><TickLabels {...narrow} /></div>
     </div>

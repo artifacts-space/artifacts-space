@@ -90,7 +90,7 @@ export function ConfirmDialog({ state, title, description, confirmLabel, pending
         </DialogHeader>
         <DialogFooter className="sm:items-center">
           {state.canSkip ? (
-            <label className="flex items-center gap-2 py-1 text-xs text-muted-foreground max-sm:order-last sm:mr-auto">
+            <label className="flex items-center gap-2 py-1 text-sm text-muted-foreground max-sm:order-last sm:mr-auto">
               <Checkbox checked={state.dontAskAgain} onCheckedChange={(checked) => { state.onDontAskAgainChange(checked); }} />
               Don&apos;t ask again
             </label>

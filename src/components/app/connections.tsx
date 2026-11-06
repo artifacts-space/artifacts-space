@@ -87,7 +87,7 @@ export function Connections({
     <main className="mx-auto w-full max-w-[1440px] p-4 py-8 sm:p-6 sm:py-10">
       <div className="mb-6">
         <h1 className="text-xl font-medium tracking-[-0.01em]">Connections</h1>
-        <p className="mt-1 max-w-xl text-[13px] leading-6 text-muted-foreground">
+        <p className="mt-1 max-w-xl text-md leading-6 text-muted-foreground">
           One MCP endpoint for every client. Tokens are shown once and stored as hashes.
         </p>
       </div>
@@ -95,22 +95,22 @@ export function Connections({
       <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
         <section className="overflow-hidden rounded-md border bg-card">
           <div className="border-b px-5 py-4">
-            <h2 className="text-sm font-medium">Connect a client</h2>
-            <p className="mt-1 text-[13px] text-muted-foreground">Add this configuration to any MCP client, then replace the token.</p>
+            <h2 className="text-md font-medium">Connect a client</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Add this configuration to any MCP client, then replace the token.</p>
           </div>
           <div className="p-5">
             <CodeBlock title="mcp.json" value={config} />
-            <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
               Replace <code className="font-mono">{TOKEN_PLACEHOLDER}</code> with a token from this page. Keep it out of source control.
             </p>
           </div>
           <div className="border-t px-5 py-4">
-            <h3 className="text-sm font-medium">Tools</h3>
-            <table className="mt-3 w-full border-collapse text-[13px]">
+            <h3 className="text-md font-medium">Tools</h3>
+            <table className="mt-3 w-full border-collapse text-sm">
               <tbody>
                 {tools.map(([tool, description]) => (
                   <tr key={tool} className="border-t">
-                    <td className="py-2 pr-6 align-top font-mono text-xs whitespace-nowrap">{tool}</td>
+                    <td className="py-2 pr-6 align-top font-mono text-sm whitespace-nowrap">{tool}</td>
                     <td className="py-2 align-top leading-5 text-muted-foreground">{description}</td>
                   </tr>
                 ))}
@@ -121,13 +121,13 @@ export function Connections({
 
         <section className="h-fit overflow-hidden rounded-md border bg-card">
           <div className="border-b px-5 py-4">
-            <h2 className="text-sm font-medium">Access tokens</h2>
-            <p className="mt-1 text-[13px] text-muted-foreground">Use one token per client or device so you can revoke them separately.</p>
+            <h2 className="text-md font-medium">Access tokens</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Use one token per client or device so you can revoke them separately.</p>
           </div>
           <form onSubmit={(event) => void create(event)} noValidate className="border-b p-5">
-            <Label htmlFor="token-name" className="text-xs">Token name</Label>
+            <Label htmlFor="token-name">Token name</Label>
             <div className="mt-2 flex gap-2">
-              <Input id="token-name" value={name} onChange={(event) => { setName(event.target.value); }} maxLength={80} placeholder="Claude Code on laptop" className="h-9 min-w-0 text-[13px]" />
+              <Input id="token-name" value={name} onChange={(event) => { setName(event.target.value); }} maxLength={80} placeholder="Claude Code on laptop" className="h-9 min-w-0" />
               <Button type="submit" disabled={creating || !name.trim()} size="lg" className="px-3" aria-label="Create token">
                 {creating ? <IconLoader2 className="animate-spin" /> : <IconPlus />}
               </Button>
@@ -135,9 +135,9 @@ export function Connections({
           </form>
           <div className="p-2">
             {tokens.length === 0 ? (
-              <div className="px-4 py-10 text-center text-[13px] text-muted-foreground">
+              <div className="px-4 py-10 text-center text-md text-muted-foreground">
                 <p>No tokens yet.</p>
-                <p className="mt-1 text-xs">Create one to connect your first client.</p>
+                <p className="mt-1 text-sm">Create one to connect your first client.</p>
               </div>
             ) : (
               <ul>
@@ -145,9 +145,9 @@ export function Connections({
                   <li key={token.id} className="flex items-center gap-3 rounded-sm px-3 py-2.5 hover:bg-muted/60">
                     <IconKey className="size-3.5 shrink-0 text-muted-foreground" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-medium">{token.name}</p>
-                      <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{token.prefix}</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      <p className="truncate text-md font-medium">{token.name}</p>
+                      <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{token.prefix}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
                         {token.lastUsedAt ? `Last used ${dateFormat.format(new Date(token.lastUsedAt))}` : "Never used"}
                       </p>
                     </div>

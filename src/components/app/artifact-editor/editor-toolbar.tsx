@@ -28,7 +28,7 @@ function MoreMenu({ onRequestDelete }: { onRequestDelete: () => void }) {
         <IconDots />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuItem variant="destructive" onClick={onRequestDelete} className="py-2 text-xs">
+        <DropdownMenuItem variant="destructive" onClick={onRequestDelete} className="py-2">
           <IconTrash /> Delete artifact
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -70,7 +70,7 @@ export function AttachedFiles({ artifact, onUpdated }: { artifact: ArtifactDto; 
   return (
     <section aria-label="Files" className="flex flex-col gap-3 border-t bg-background/60 px-5 py-4 sm:px-7">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-medium">Files</h2>
+        <h2 className="text-md font-medium">Files</h2>
         <span className="text-xs text-muted-foreground">{artifact.files.length === 0 ? "None yet" : `${String(artifact.files.length)} attached`}</span>
       </div>
       {artifact.files.length > 0 ? (

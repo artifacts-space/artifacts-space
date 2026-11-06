@@ -17,7 +17,7 @@ const cellLimit = 3;
 function EventPill({ entry }: { entry: CalendarEntry }) {
   const time = entry.allDay || entry.startMinute === null ? null : formatClock(entry.startMinute);
   return (
-    <li title={entry.title} className={cn("truncate rounded-sm border px-1 text-[11px] leading-4", badgeTone[entry.tone ?? "neutral"])}>
+    <li title={entry.title} className={cn("truncate rounded-sm border px-1 text-xs leading-4", badgeTone[entry.tone ?? "neutral"])}>
       {time ? <span className="mr-1 opacity-75 tabular-nums">{time}</span> : null}
       {entry.title}
     </li>
@@ -38,7 +38,7 @@ function DayCell({ day, inMonth, entries, selected, panelId, onSelect }: CellPro
   const hidden = entries.length - shown.length;
   return (
     <td className={cn("h-24 min-w-0 border p-1 align-top", !inMonth && "bg-muted/40 text-muted-foreground")}>
-      <div className="mb-0.5 text-[11px] tabular-nums">
+      <div className="mb-0.5 text-xs tabular-nums">
         <span aria-hidden>{dayParts(day).date}</span>
         <span className="sr-only">{formatLongDay(day)}</span>
       </div>
@@ -49,7 +49,7 @@ function DayCell({ day, inMonth, entries, selected, panelId, onSelect }: CellPro
           aria-expanded={selected}
           aria-controls={panelId}
           onClick={() => { onSelect(day); }}
-          className="mt-0.5 rounded-sm px-1 text-[11px] font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          className="mt-0.5 rounded-sm px-1 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
         >
           +{hidden} more
         </button>
@@ -83,7 +83,7 @@ function MonthGrid({ month, weekStart, entries, selected, panelId, onSelect }: G
         <caption className="sr-only">{formatMonth(month)}</caption>
         <thead>
           <tr>
-            {weekdayOrder(weekStart).map((name) => <th key={name} scope="col" abbr={name} className="pb-1 text-left text-[11px] font-medium text-muted-foreground">{name.slice(0, 3)}</th>)}
+            {weekdayOrder(weekStart).map((name) => <th key={name} scope="col" abbr={name} className="pb-1 text-left text-xs font-medium text-muted-foreground">{name.slice(0, 3)}</th>)}
           </tr>
         </thead>
         <tbody>
@@ -117,13 +117,13 @@ export function MonthCalendar({ entries, month, weekStart }: { entries: readonly
   const [shown, setShown] = useState(range?.initial ?? 0);
   const [selected, setSelected] = useState<number | null>(null);
   const panelId = useId();
-  if (!range) return <p className="text-xs text-muted-foreground">No events yet.</p>;
+  if (!range) return <p className="text-sm text-muted-foreground">No events yet.</p>;
   const current = Math.min(Math.max(shown, range.first), range.last);
   const go = (step: number) => { setShown(current + step); setSelected(null); };
   return (
     <div className="@container min-w-0 space-y-2">
       <div className="flex items-center gap-2">
-        <h3 aria-live="polite" className="text-sm font-medium">{formatMonth(current)}</h3>
+        <h3 aria-live="polite" className="text-md font-medium">{formatMonth(current)}</h3>
         <div className="ml-auto flex gap-1">
           <Button variant="outline" size="icon-xs" aria-label="Previous month" disabled={current <= range.first} onClick={() => { go(-1); }}><IconChevronLeft /></Button>
           <Button variant="outline" size="icon-xs" aria-label="Next month" disabled={current >= range.last} onClick={() => { go(1); }}><IconChevronRight /></Button>

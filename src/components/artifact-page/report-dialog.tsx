@@ -23,7 +23,7 @@ function ReasonPicker({ value, onChange }: { value: ReportReason | null; onChang
           role="radio"
           aria-checked={value === reason}
           onClick={() => { onChange(reason); }}
-          className={cn("rounded-md border px-3 py-2 text-left text-[13px] transition-colors", value === reason ? "border-foreground bg-muted" : "hover:bg-muted/60")}
+          className={cn("rounded-md border px-3 py-2 text-left text-sm transition-colors", value === reason ? "border-foreground bg-muted" : "hover:bg-muted/60")}
         >
           {reportReasonLabels[reason]}
         </button>
@@ -68,8 +68,8 @@ function ReportForm({ publicId, onSent }: { publicId: string; onSent: () => void
     <form onSubmit={(event) => void submit(event)} noValidate className="space-y-4">
       <ReasonPicker value={reason} onChange={(next) => { setReason(next); setError(""); }} />
       <div className="flex flex-col gap-2">
-        <Label htmlFor="report-details" className="text-xs">Details (optional)</Label>
-        <Textarea id="report-details" value={details} onChange={(event) => { setDetails(event.target.value); setError(""); }} placeholder="What is wrong with this artifact?" className="min-h-20 text-[13px]" />
+        <Label htmlFor="report-details">Details (optional)</Label>
+        <Textarea id="report-details" value={details} onChange={(event) => { setDetails(event.target.value); setError(""); }} placeholder="What is wrong with this artifact?" className="min-h-20" />
       </div>
       <FormError message={error} />
       <DialogFooter>

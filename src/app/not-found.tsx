@@ -15,10 +15,10 @@ export default function NotFound() {
       <main className="mx-auto w-full max-w-[960px] px-6 py-24">
         <p className="text-xs text-muted-foreground">404</p>
         <h1 className="mt-3 text-3xl font-medium tracking-[-0.02em]">This page is not here</h1>
-        <p className="mt-3 max-w-lg text-[15px] leading-7 text-muted-foreground">
+        <p className="mt-3 max-w-lg text-md leading-7 text-muted-foreground">
           The link may be wrong, or the artifact or team is private. Ask the person who shared it to check who can read it.
         </p>
-        <Link href="/" className="mt-8 inline-block text-[13px] underline decoration-border underline-offset-4 hover:decoration-foreground">
+        <Link href="/" className="mt-8 inline-block text-sm underline decoration-border underline-offset-4 hover:decoration-foreground">
           Go to artifacts.space
         </Link>
       </main>

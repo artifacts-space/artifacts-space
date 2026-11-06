@@ -34,7 +34,7 @@ function groupThread(comments: CommentView[]) {
 function MentionNotices({ outcome }: { outcome: MentionOutcome | null }) {
   if (!outcome || (outcome.refused.length === 0 && outcome.notified.length === 0)) return null;
   return (
-    <div role="status" className="space-y-1 rounded-md border bg-muted/50 px-3 py-2 text-xs leading-5">
+    <div role="status" className="space-y-1 rounded-md border bg-muted/50 px-3 py-2 text-sm leading-5">
       {outcome.notified.length > 0 ? <p>Notified {outcome.notified.map((item) => `@${item.handle}`).join(", ")}.</p> : null}
       {outcome.refused.map((item) => <p key={item.handle} className="text-destructive">{item.message}</p>)}
     </div>
@@ -83,7 +83,7 @@ function ThreadBody({ data, handlers, post, onNotices }: ThreadBodyProps) {
   return (
     <>
       <MutedAgents agents={data.agents} onMute={handlers.onMute} />
-      {groups.length === 0 ? <p className="text-[13px] text-muted-foreground">No comments yet. Start the thread, and @mention a teammate or agent to bring them in.</p> : null}
+      {groups.length === 0 ? <p className="text-md text-muted-foreground">No comments yet. Start the thread, and @mention a teammate or agent to bring them in.</p> : null}
       <div className="divide-y">
         {groups.map(({ root, replies }) => (
           <div key={root.id}>
@@ -136,12 +136,12 @@ export function CommentThread({ publicId, className }: { publicId: string; class
 
   return (
     <section aria-label="Comments" className={cn("space-y-3", className)}>
-      <h2 className="flex items-center gap-2 text-sm font-medium">
+      <h2 className="flex items-center gap-2 text-md font-medium">
         <IconMessage className="size-4 text-muted-foreground" aria-hidden /> Comments
         {state.status === "ready" ? <span className="text-xs font-normal text-muted-foreground">{state.data.comments.filter((item) => !item.deleted).length}</span> : null}
       </h2>
       {state.status === "loading" ? <p className="flex items-center gap-2 text-xs text-muted-foreground"><IconLoader2 className="size-3.5 animate-spin" /> Loading comments</p> : null}
-      {state.status === "error" ? <p className="text-[13px] text-muted-foreground">{state.error}</p> : null}
+      {state.status === "error" ? <p className="text-sm text-muted-foreground">{state.error}</p> : null}
       {state.status === "ready" ? (
         <MentionablesProvider publicId={publicId}>
           <ThreadBody data={state.data} handlers={handlers} post={post} onNotices={showNotices} />

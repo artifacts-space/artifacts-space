@@ -30,7 +30,7 @@ function ContentStatus({ kind, content }: { kind: ArtifactKind; content: string 
   const label = formatInfo[kind].label;
   const firstError = result.issues.find((issue) => issue.severity === "error");
   return (
-    <div role="status" className="flex items-start gap-2 border-t bg-background/60 px-5 py-2 text-xs text-muted-foreground sm:px-7">
+    <div role="status" className="flex items-start gap-2 border-t bg-background/60 px-5 py-2 text-sm text-muted-foreground sm:px-7">
       {firstError ? (
         <>
           <IconAlertTriangle aria-hidden className="mt-0.5 size-3.5 shrink-0 text-tone-warning" />
@@ -69,7 +69,7 @@ export function ContentPane({ mode, kind, content, language, title, files, updat
           onChange={(event) => { update("content", event.target.value); }}
           aria-label="Artifact content"
           spellCheck={isProse(kind)}
-          className="min-h-[460px] flex-1 resize-y rounded-none border-0 bg-card p-6 font-mono text-[12.5px] leading-7 shadow-none outline-none focus-visible:ring-0 sm:p-8"
+          className="min-h-[460px] flex-1 resize-y rounded-none border-0 bg-card p-6 font-mono text-base leading-7 md:text-sm shadow-none outline-none focus-visible:ring-0 sm:p-8"
         />
         <ContentStatus kind={kind} content={content} />
       </div>

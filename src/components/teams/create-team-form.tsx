@@ -68,22 +68,22 @@ export function CreateTeamForm() {
       <div className="space-y-2">
         <Label htmlFor="team-slug">Team URL</Label>
         <div className="flex items-center rounded-md border bg-background pl-3 focus-within:ring-2 focus-within:ring-ring/50">
-          <span className="shrink-0 font-mono text-xs text-muted-foreground">/teams/</span>
+          <span className="shrink-0 font-mono text-sm text-muted-foreground">/teams/</span>
           <input
             id="team-slug"
             value={slug}
             onChange={(event) => { setSlug(event.target.value); setSlugEdited(true); setError(""); }}
             autoCapitalize="none"
             spellCheck={false}
-            className="h-9 min-w-0 flex-1 bg-transparent pr-3 font-mono text-[13px] outline-none"
+            className="h-9 min-w-0 flex-1 bg-transparent pr-3 font-mono text-base outline-none md:text-sm"
           />
         </div>
-        <p className="text-xs leading-5 text-muted-foreground">Lowercase letters, numbers, and hyphens. It cannot change later.</p>
+        <p className="text-sm leading-5 text-muted-foreground">Lowercase letters, numbers, and hyphens. It cannot change later.</p>
       </div>
       <fieldset className="space-y-2">
-        <legend className="mb-2 text-sm font-medium">Sharing with the team</legend>
+        <legend className="mb-2 text-md font-medium">Sharing with the team</legend>
         <SharingRulePicker value={needsApproval} onChange={setNeedsApproval} />
-        <p className="text-xs leading-5 text-muted-foreground">
+        <p className="text-sm leading-5 text-muted-foreground">
           Link and public sharing always need an admin&apos;s approval in a team. Owners can change this rule later.
         </p>
       </fieldset>

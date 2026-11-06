@@ -4,11 +4,11 @@ import { cn } from "@/lib/utils";
 
 import { ViewNotice } from "./view-notice";
 
-const sourceClass = "overflow-x-auto font-mono text-[12.5px] leading-7 whitespace-pre-wrap break-words";
+const sourceClass = "overflow-x-auto font-mono text-sm leading-7 whitespace-pre-wrap break-words";
 
 /** Plain text, shown as written. */
 export function TextView({ content }: { content: string }) {
-  return <p className="max-w-[72ch] text-[15px] leading-7 whitespace-pre-wrap break-words">{content}</p>;
+  return <p className="max-w-[72ch] text-md leading-7 whitespace-pre-wrap break-words">{content}</p>;
 }
 
 /** Source code in monospace, with its language label. */
@@ -58,7 +58,7 @@ export function CsvView({ content }: { content: string }) {
   return (
     <div className="min-w-0 space-y-3">
       <div tabIndex={0} role="region" aria-label="CSV table" className="max-h-[70vh] overflow-auto rounded-md border focus-visible:outline-2 focus-visible:outline-ring">
-        <table className="w-full border-collapse text-[13px]">
+        <table className="w-full border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-card">
             <tr>
               <th scope="col" className="w-10 border-b px-3 py-2 text-right font-normal text-muted-foreground/70">#</th>
@@ -79,8 +79,8 @@ export function CsvView({ content }: { content: string }) {
           </tbody>
         </table>
       </div>
-      {parsed.rows.length === 0 ? <p className="text-xs text-muted-foreground">Only a header row so far.</p> : null}
-      {notes.length > 0 ? <p className="text-xs text-muted-foreground">{notes.join(" ")}</p> : null}
+      {parsed.rows.length === 0 ? <p className="text-sm text-muted-foreground">Only a header row so far.</p> : null}
+      {notes.length > 0 ? <p className="text-sm text-muted-foreground">{notes.join(" ")}</p> : null}
     </div>
   );
 }

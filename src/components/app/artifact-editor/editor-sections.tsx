@@ -30,8 +30,8 @@ export function ShareBanner({ shareUrl, isPublic }: { shareUrl: string; isPublic
   return (
     <div className="flex flex-wrap items-center gap-3 border-b bg-muted/50 px-5 py-2">
       <IconLink className="size-3.5 text-muted-foreground" />
-      <span className="text-[13px] text-muted-foreground">{isPublic ? "Anyone can find and read this artifact." : "Anyone with the link can read this artifact."}</span>
-      <CopyButton value={shareUrl} label="Copy link" variant="ghost" size="sm" className="ml-auto text-xs" />
+      <span className="text-sm text-muted-foreground">{isPublic ? "Anyone can find and read this artifact." : "Anyone with the link can read this artifact."}</span>
+      <CopyButton value={shareUrl} label="Copy link" variant="ghost" size="sm" className="ml-auto" />
     </div>
   );
 }
@@ -51,7 +51,7 @@ export function TitleFields({ title, summary, update }: { title: string; summary
         value={summary}
         onChange={(event) => { update("summary", event.target.value); }}
         aria-label="Artifact summary"
-        className="mt-2 w-full bg-transparent text-sm leading-6 text-muted-foreground outline-none placeholder:text-muted-foreground/60"
+        className="mt-2 w-full bg-transparent text-base leading-6 md:text-md text-muted-foreground outline-none placeholder:text-muted-foreground/60"
         placeholder="Add a one-line summary for search and agent retrieval"
       />
     </div>
@@ -71,7 +71,7 @@ export function ModeBar({ mode, onMode, length, updatedAt }: { mode: EditorMode;
             aria-selected={mode === value}
             onClick={() => { onMode(value); }}
             className={cn(
-              "rounded-[3px] px-2.5 py-0.5 text-xs capitalize transition-colors",
+              "rounded-[3px] px-2.5 py-0.5 text-sm capitalize transition-colors",
               mode === value ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
             )}
           >
@@ -89,22 +89,22 @@ export function ModeBar({ mode, onMode, length, updatedAt }: { mode: EditorMode;
 export function MetaFields({ draft, update }: { draft: ArtifactDraft; update: UpdateDraft }) {
   return (
     <div className="grid gap-3 border-t bg-background/60 p-4 sm:grid-cols-3 sm:px-5">
-      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+      <label className="flex items-center gap-2 text-sm text-muted-foreground">
         <span className="w-16 shrink-0">Project</span>
-        <Input value={draft.project} onChange={(event) => { update("project", event.target.value); }} placeholder="None" className="h-8 bg-card text-[13px]" />
+        <Input value={draft.project} onChange={(event) => { update("project", event.target.value); }} placeholder="None" className="h-8 bg-card" />
       </label>
-      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+      <label className="flex items-center gap-2 text-sm text-muted-foreground">
         <span className="w-16 shrink-0">Format</span>
         <Select value={draft.kind} onValueChange={(value) => { if (value) update("kind", value); }}>
-          <SelectTrigger className="h-8 w-full bg-card text-[13px]"><SelectValue>{(value: ArtifactDraft["kind"]) => formatInfo[value].label}</SelectValue></SelectTrigger>
+          <SelectTrigger className="h-8 w-full bg-card text-sm"><SelectValue>{(value: ArtifactDraft["kind"]) => formatInfo[value].label}</SelectValue></SelectTrigger>
           <SelectContent>
-            {kinds.map((value) => <SelectItem key={value} value={value} className="text-xs">{formatInfo[value].label}</SelectItem>)}
+            {kinds.map((value) => <SelectItem key={value} value={value}>{formatInfo[value].label}</SelectItem>)}
           </SelectContent>
         </Select>
       </label>
-      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+      <label className="flex items-center gap-2 text-sm text-muted-foreground">
         <span className="w-16 shrink-0">Language</span>
-        <Input value={draft.language} onChange={(event) => { update("language", event.target.value); }} placeholder="Optional" className="h-8 bg-card text-[13px]" />
+        <Input value={draft.language} onChange={(event) => { update("language", event.target.value); }} placeholder="Optional" className="h-8 bg-card" />
       </label>
     </div>
   );

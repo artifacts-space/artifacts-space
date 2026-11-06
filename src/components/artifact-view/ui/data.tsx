@@ -28,9 +28,9 @@ export function TableView({ props }: ViewProps<"Table">) {
   const currency = props.currency ?? "USD";
   return (
     <figure className="min-w-0 space-y-2">
-      {props.caption ? <figcaption className="text-[13px] font-medium break-words">{props.caption}</figcaption> : null}
+      {props.caption ? <figcaption className="text-md font-medium break-words">{props.caption}</figcaption> : null}
       <div tabIndex={0} role="region" aria-label={props.caption ?? "Table"} className="max-h-[32rem] overflow-auto rounded-md border focus-visible:outline-2 focus-visible:outline-ring">
-        <table className="w-full border-collapse text-[13px]">
+        <table className="w-full border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-card">
             <tr>
               {props.columns.map((column) => (
@@ -84,7 +84,7 @@ function MetricChange({ props }: ViewProps<"Metric">) {
   const format = props.changeFormat ?? props.format ?? "number";
   const unit = props.unit && format !== "percent" ? ` ${props.unit}` : "";
   return (
-    <p className={cn("flex min-w-0 items-center gap-1 text-xs tabular-nums", changeTone(change, props.goodDirection))}>
+    <p className={cn("flex min-w-0 items-center gap-1 text-sm tabular-nums", changeTone(change, props.goodDirection))}>
       <ChangeGlyph change={change} />
       <span className="truncate">
         {change > 0 ? "+" : ""}{formatNumber(change, format, props.currency ?? "USD")}{unit}
@@ -104,7 +104,7 @@ export function MetricView({ props, emit }: ViewProps<"Metric">) {
   const value = typeof props.value === "number" ? formatNumber(props.value, props.format ?? "number", props.currency ?? "USD") : props.value;
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-lg border bg-card p-4">
-      <p className="truncate text-[13px] text-muted-foreground" title={props.label}>{props.label}</p>
+      <p className="truncate text-sm text-muted-foreground" title={props.label}>{props.label}</p>
       <p className="flex min-w-0 items-baseline gap-1.5">
         <span className="min-w-0 text-2xl font-medium tracking-[-0.02em] break-all tabular-nums">{value}</span>
         {props.unit ? <span className="shrink-0 text-sm text-muted-foreground">{props.unit}</span> : null}
@@ -121,7 +121,7 @@ export function ProgressView({ props }: ViewProps<"Progress">) {
   const text = props.format === "fraction" ? `${formatNumber(props.value)} of ${formatNumber(max)}` : `${formatNumber(Math.round(ratio * 1000) / 10)}%`;
   return (
     <div className="min-w-0 space-y-1.5">
-      <div className="flex items-baseline justify-between gap-3 text-[13px]">
+      <div className="flex items-baseline justify-between gap-3 text-sm">
         <span className="min-w-0 truncate font-medium">{props.label ?? "Progress"}</span>
         <span className="shrink-0 tabular-nums text-muted-foreground">{text}</span>
       </div>
@@ -139,7 +139,7 @@ const statusDot = {
 } as const;
 
 export function TimelineView({ props }: ViewProps<"Timeline">) {
-  if (props.items.length === 0) return <p className="text-xs text-muted-foreground">No events yet.</p>;
+  if (props.items.length === 0) return <p className="text-sm text-muted-foreground">No events yet.</p>;
   return (
     <ol className="min-w-0">
       {props.items.map((item, index) => {
@@ -151,12 +151,12 @@ export function TimelineView({ props }: ViewProps<"Timeline">) {
               {status === "done" ? <IconCheck className="size-2.5" stroke={3} /> : null}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+              <p className="flex flex-wrap items-baseline gap-x-2 text-md">
                 <span className={cn("font-medium break-words", status === "upcoming" && "text-muted-foreground")}>{item.title}</span>
                 {item.time ? <span className="text-xs text-muted-foreground break-words">{item.time}</span> : null}
                 <span className="sr-only">({status})</span>
               </p>
-              {item.description ? <p className="mt-1 text-[13px] leading-6 text-muted-foreground whitespace-pre-line break-words">{item.description}</p> : null}
+              {item.description ? <p className="mt-1 text-sm leading-6 text-muted-foreground whitespace-pre-line break-words">{item.description}</p> : null}
             </div>
           </li>
         );
