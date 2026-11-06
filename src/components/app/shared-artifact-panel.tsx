@@ -9,29 +9,47 @@ import { withdrawSharingAction } from "@/app/(workspace)/app/sharing-actions";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { CopyButton } from "@/components/copy-button";
+import { LastEdited } from "@/components/history/last-edited";
+import { VersionHistory } from "@/components/history/version-history";
 import { Button } from "@/components/ui/button";
+import { canEditArtifact } from "@/lib/access-rules";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { canManageTeam } from "@/lib/teams/roles";
 
 import { visibilityLabel } from "./share-options";
 import { useShareTeams } from "./share-teams-context";
 
-const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });
+/** "Link · Platform · Read only · Changes waiting for approval", leaving out what does not apply. */
+function statusLine(artifact: ArtifactDto, teamName: string | null, canEdit: boolean) {
+  const parts = [visibilityLabel(artifact.visibility), teamName, canEdit ? null : "Read only", artifact.pendingEdit ? "Changes waiting for approval" : null];
+  return parts.filter(Boolean).join(" · ");
+}
+
+/** The viewer's team for this artifact, and whether they may edit it or withdraw its sharing. */
+function useSharedAccess(artifact: ArtifactDto, viewerId: string) {
+  const team = useShareTeams().find((item) => item.id === artifact.teamId);
+  const canEdit = canEditArtifact(
+    { userId: artifact.authorId, visibility: artifact.visibility, teamId: artifact.teamId, teamPersonal: team?.personal ?? null },
+    { userId: viewerId, isTeamMember: team !== undefined },
+  );
+  return { team, canEdit, canWithdraw: team ? canManageTeam(team.role) : false };
+}
 
 interface SharedArtifactPanelProps {
   artifact: ArtifactDto;
+  viewerId: string;
+  onUpdated: (artifact: ArtifactDto) => void;
   onWithdrawn: (id: string) => void;
 }
 
 /**
- * Read-only view of an artifact someone else shared with the viewer's team.
- * Owners and admins of that team can make it private again.
+ * View of an artifact someone else shared with the viewer's team. Members
+ * who may edit it see its history and can restore a version. Owners and
+ * admins of that team can make it private again.
  */
-export function SharedArtifactPanel({ artifact, onWithdrawn }: SharedArtifactPanelProps) {
-  const teams = useShareTeams();
+export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn }: SharedArtifactPanelProps) {
+  const { team, canEdit, canWithdraw } = useSharedAccess(artifact, viewerId);
   const [withdrawing, setWithdrawing] = useState(false);
-  const team = teams.find((item) => item.id === artifact.teamId);
-  const canWithdraw = team ? canManageTeam(team.role) : false;
 
   async function withdraw() {
     setWithdrawing(true);
@@ -54,10 +72,20 @@ export function SharedArtifactPanel({ artifact, onWithdrawn }: SharedArtifactPan
     <section className="flex min-w-0 flex-1 flex-col" aria-label={artifact.title}>
       <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 sm:px-5">
         <span className="text-xs text-muted-foreground">
-          {visibilityLabel(artifact.visibility)}{team ? ` · ${team.name}` : ""} · Read only{artifact.pendingEdit ? " · Changes waiting for approval" : ""}
+          {statusLine(artifact, team?.name ?? null, canEdit)}
         </span>
         <div className="ml-auto flex items-center gap-1">
           <CopyButton value={artifact.content} variant="ghost" size="icon" />
+          {canEdit ? (
+            <VersionHistory
+              publicId={artifact.publicId}
+              title={artifact.title}
+              updatedAt={artifact.updatedAt}
+              reviewed={artifact.visibility === "link" || artifact.visibility === "public"}
+              files={artifact.files}
+              onRestored={onUpdated}
+            />
+          ) : null}
           <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/artifact/${artifact.publicId}`} />}>
             <IconExternalLink /> Open page
           </Button>
@@ -71,7 +99,7 @@ export function SharedArtifactPanel({ artifact, onWithdrawn }: SharedArtifactPan
       <div className="border-b px-5 py-5 sm:px-7">
         <h2 className="text-2xl font-medium tracking-[-0.015em]">{artifact.title}</h2>
         {artifact.summary ? <p className="mt-2 text-md leading-6 text-muted-foreground">{artifact.summary}</p> : null}
-        <p className="mt-2 text-xs text-muted-foreground">Updated {dateFormat.format(new Date(artifact.updatedAt))}</p>
+        <LastEdited editor={artifact.updatedBy} at={artifact.updatedAt} className="mt-2" />
       </div>
       <div className="min-h-[460px] flex-1 bg-card p-6 sm:p-8">
         <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />

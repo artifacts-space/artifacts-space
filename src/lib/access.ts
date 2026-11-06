@@ -2,7 +2,7 @@ import { and, eq, exists, ne } from "drizzle-orm";
 import { cache } from "react";
 
 import { getDb } from "@/db";
-import { artifact, artifactVersion, sharingRequest, teamMember, type ArtifactRecord } from "@/db/schema";
+import { artifact, artifactVersion, sharingRequest, team, teamMember, type ArtifactRecord } from "@/db/schema";
 import { canEditArtifact, canViewArtifact } from "@/lib/access-rules";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { isPublicId } from "@/lib/public-id";
@@ -63,6 +63,7 @@ export interface ViewableArtifact {
   version: { source: "latest" | "approved"; versionId: string | null };
   /** Whether newer changes wait for approval. Null when the viewer is not told (outside the team). */
   editPending: boolean | null;
+  /** Whether the viewer may edit it and read its history: the author, or a member of the team it is shared through. */
   canEdit: boolean;
   /** Whether the viewer belongs to the artifact's team. Pages show the team's name only then. */
   isTeamMember: boolean;
@@ -71,6 +72,39 @@ export interface ViewableArtifact {
 async function viewerIsMember(viewerId: string | null, teamId: string | null) {
   if (!viewerId || !teamId) return false;
   return isTeamMember(viewerId, teamId);
+}
+
+/** Whether the viewer belongs to the team, and whether it is a personal team. */
+async function teamContext(viewerId: string | null, teamId: string | null) {
+  if (!viewerId || !teamId) return { isTeamMember: false, teamPersonal: null };
+  const [row] = await getDb()
+    .select({ personal: team.personal })
+    .from(teamMember)
+    .innerJoin(team, eq(team.id, teamMember.teamId))
+    .where(and(eq(teamMember.userId, viewerId), eq(teamMember.teamId, teamId)))
+    .limit(1);
+  return { isTeamMember: Boolean(row), teamPersonal: row?.personal ?? null };
+}
+
+/** Whether `editorId` may save changes to this artifact. See canEditArtifact. */
+export async function canEditRecord(editorId: string, record: ArtifactRecord): Promise<boolean> {
+  if (record.userId === editorId) return true;
+  if (record.visibility === "private") return false;
+  const context = await teamContext(editorId, record.teamId);
+  return canEditArtifact({ ...record, teamPersonal: context.teamPersonal }, { userId: editorId, isTeamMember: context.isTeamMember });
+}
+
+/**
+ * The artifact by internal or public id when `editorId` may edit it: its
+ * author, or a member of the team it is shared through. Null otherwise, so
+ * callers answer "not found" either way. Every write path uses this.
+ */
+export async function getEditableArtifact(editorId: string, key: { id: string } | { publicId: string }): Promise<ArtifactRecord | null> {
+  if ("publicId" in key && !isPublicId(key.publicId)) return null;
+  const where = "id" in key ? eq(artifact.id, key.id) : eq(artifact.publicId, key.publicId);
+  const [record] = await getDb().select().from(artifact).where(where).limit(1);
+  if (!record) return null;
+  return (await canEditRecord(editorId, record)) ? record : null;
 }
 
 function latestView(record: ArtifactRecord): ServedArtifactView {
@@ -90,8 +124,9 @@ async function hasPendingEdit(artifactId: string) {
 async function approvedView(versionId: string): Promise<ServedArtifactView | null> {
   const [row] = await getDb().select().from(artifactVersion).where(eq(artifactVersion.id, versionId)).limit(1);
   if (!row) return null;
-  const { title, summary, content, kind, language, project, source, metadata, createdAt } = row;
-  return { title, summary, content, kind, language, project, source, metadata, updatedAt: createdAt };
+  const { title, summary, content, kind, language, project, source, metadata, savedAt } = row;
+  // savedAt, not createdAt: files attached up to the version's last save belong to it.
+  return { title, summary, content, kind, language, project, source, metadata, updatedAt: savedAt };
 }
 
 /**
@@ -104,11 +139,13 @@ export const getViewableArtifact = cache(async (publicId: string, viewerId: stri
   if (!isPublicId(publicId)) return null;
   const [record] = await getDb().select().from(artifact).where(eq(artifact.publicId, publicId)).limit(1);
   if (!record) return null;
-  const member = record.visibility === "private" ? false : await viewerIsMember(viewerId, record.teamId);
-  if (!canViewArtifact(record, viewerId ? { userId: viewerId, isTeamMember: member } : null)) return null;
+  const context = record.visibility === "private" ? { isTeamMember: false, teamPersonal: null } : await teamContext(viewerId, record.teamId);
+  const member = context.isTeamMember;
+  const viewer = viewerId ? { userId: viewerId, isTeamMember: member } : null;
+  if (!canViewArtifact(record, viewer)) return null;
   const isAuthor = viewerId === record.userId;
   const served = versionToServe({ visibility: record.visibility, approvedVersionId: record.approvedVersionId, isAuthor, isTeamMember: member });
-  const base = { record, canEdit: canEditArtifact(record, viewerId), isTeamMember: member };
+  const base = { record, canEdit: canEditArtifact({ ...record, teamPersonal: context.teamPersonal }, viewer), isTeamMember: member };
   if (served.source === "approved") {
     const view = await approvedView(served.versionId);
     if (view) return { ...base, view, version: { source: "approved", versionId: served.versionId }, editPending: null };

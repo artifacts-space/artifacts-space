@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 
 import { actionErrorMessage } from "@/lib/action-errors";
 import { getSession } from "@/lib/session";
@@ -10,12 +11,15 @@ import {
   deleteArtifact,
   updateArtifact,
   type ArtifactUpdateInput,
+  type SaveOptions,
 } from "@/lib/artifacts";
 import type {
   ActionResult,
   ArtifactDto,
   ArtifactInput,
 } from "@/lib/artifact-types";
+
+const expectedSchema = z.iso.datetime({ offset: true }).optional();
 
 async function requireUserId() {
   const session = await getSession();
@@ -40,15 +44,21 @@ export async function createArtifactAction(
   }
 }
 
+/**
+ * Saves changes to an artifact the person may edit. `options.expectedUpdatedAt`
+ * refuses the save when someone else saved since the editor opened it.
+ */
 export async function updateArtifactAction(
   id: string,
   input: ArtifactUpdateInput,
+  options: SaveOptions = {},
 ): Promise<ActionResult<ArtifactDto>> {
   try {
     const userId = await requireUserId();
-    const updated = await updateArtifact(userId, id, input);
+    const updated = await updateArtifact(userId, id, input, "person", { expectedUpdatedAt: expectedSchema.parse(options.expectedUpdatedAt) });
     if (!updated) return { success: false, error: "Artifact not found." };
     revalidatePath("/app");
+    revalidatePath(`/artifact/${updated.publicId}`);
     return { success: true, data: updated };
   } catch (error) {
     return { success: false, error: errorMessage(error) };

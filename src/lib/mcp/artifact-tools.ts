@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z, ZodError } from "zod";
 
-import { getViewableArtifact } from "@/lib/access";
+import { getEditableArtifact, getViewableArtifact } from "@/lib/access";
 import { filesForViewer } from "@/lib/files/download";
 import { artifactKinds, artifactVisibilities, type ArtifactDto, type ArtifactVisibility } from "@/lib/artifact-types";
 import {
@@ -110,6 +110,13 @@ async function ownByPublicId(userId: string, publicId: string) {
   return record;
 }
 
+/** An artifact the caller may edit: their own, or one shared through their team. */
+async function editableByPublicId(userId: string, publicId: string) {
+  const record = await getEditableArtifact(userId, { publicId });
+  if (!record) throw new UserFacingError("Artifact not found, or you cannot edit it. You can edit your own artifacts and those shared through your team.");
+  return record;
+}
+
 function registerReadTools(server: ToolServer, userId: string) {
   server.registerTool(
     "artifacts_list",
@@ -184,7 +191,7 @@ function registerWriteTools(server: ToolServer, userId: string) {
     {
       title: "Update artifact",
       description:
-        "Update your own artifact. Only supplied fields change. Setting visibility requests sharing through the team's rule. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved.",
+        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). Only the author can set visibility, which requests sharing through the team's rule. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved.",
       inputSchema: {
         id: publicIdField,
         ...editableFields,
@@ -196,10 +203,10 @@ function registerWriteTools(server: ToolServer, userId: string) {
     },
     ({ id, visibility, team, ...input }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
-      const record = await ownByPublicId(userId, id);
+      const record = await editableByPublicId(userId, id);
       if (team) teamBySlug(teams, team);
       const updated = await updateArtifact(userId, record.id, input, "agent");
-      if (!updated) throw new UserFacingError("Artifact not found, or you are not its author.");
+      if (!updated) throw new UserFacingError("Artifact not found, or you cannot edit it.");
       const result = await shareAfterSave(userId, updated, teams, visibility, team);
       return { artifact: toMcpArtifact(result.artifact, view), edit: updated.pendingEdit ? "pending" : "applied", sharing: result.sharing };
     }),
@@ -222,7 +229,8 @@ function registerWriteTools(server: ToolServer, userId: string) {
 
 /**
  * Registers the artifact and team tools. Every read goes through the access
- * check (getViewableArtifact or listArtifacts). Writes are author-only, and
+ * check (getViewableArtifact or listArtifacts). Updates go through the edit
+ * check (getEditableArtifact); deleting and sharing are author-only, and
  * sharing goes through requestArtifactSharing as an agent, so it can wait for
  * approval but never approve. Write tools are left out for read-only access.
  */

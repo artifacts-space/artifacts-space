@@ -3,6 +3,7 @@
 import { IconLink } from "@tabler/icons-react";
 
 import { CopyButton } from "@/components/copy-button";
+import { LastEdited } from "@/components/history/last-edited";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -12,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatInfo } from "@/lib/artifact-formats";
+import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { kinds } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +25,6 @@ export type { EditorMode } from "./content-pane";
 type UpdateDraft = <K extends keyof ArtifactDraft>(key: K, value: ArtifactDraft[K]) => void;
 
 const modes: EditorMode[] = ["edit", "preview"];
-const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 /** Notice shown while the artifact is shared by link or publicly. */
 export function ShareBanner({ shareUrl, isPublic }: { shareUrl: string; isPublic: boolean }) {
@@ -58,8 +59,16 @@ export function TitleFields({ title, summary, update }: { title: string; summary
   );
 }
 
-/** Edit and preview tabs, character count, and last update date. */
-export function ModeBar({ mode, onMode, length, updatedAt }: { mode: EditorMode; onMode: (mode: EditorMode) => void; length: number; updatedAt: string }) {
+interface ModeBarProps {
+  mode: EditorMode;
+  onMode: (mode: EditorMode) => void;
+  length: number;
+  updatedAt: string;
+  updatedBy: ArtifactEditorDto | null;
+}
+
+/** Edit and preview tabs, character count, and who saved it last. */
+export function ModeBar({ mode, onMode, length, updatedAt, updatedBy }: ModeBarProps) {
   return (
     <div className="flex flex-wrap items-center gap-3 border-b bg-background/60 px-5 py-2 sm:px-7">
       <div className="flex rounded-sm border bg-muted p-0.5" role="tablist" aria-label="Editor mode">
@@ -80,7 +89,7 @@ export function ModeBar({ mode, onMode, length, updatedAt }: { mode: EditorMode;
         ))}
       </div>
       <span className="text-xs text-muted-foreground">{length.toLocaleString()} characters</span>
-      <span className="ml-auto text-xs text-muted-foreground">Updated {dateFormat.format(new Date(updatedAt))}</span>
+      <LastEdited editor={updatedBy} at={updatedAt} className="ml-auto" />
     </div>
   );
 }

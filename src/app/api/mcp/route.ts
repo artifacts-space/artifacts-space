@@ -6,13 +6,14 @@ import { authenticateMcpRequest, bearerToken, type McpPrincipal } from "@/lib/mc
 import { registerFileTools } from "@/lib/mcp/file-tools";
 import { registerFormatTools } from "@/lib/mcp/format-tools";
 import { registerTeamTools } from "@/lib/mcp/team-tools";
+import { registerVersionTools } from "@/lib/mcp/version-tools";
 import { READ_ONLY_INSTRUCTIONS } from "@/lib/mcp/tool-access";
 import { bearerChallenge } from "@/lib/oauth/metadata";
 
 export const maxDuration = 30;
 
 const INSTRUCTIONS =
-  "Use artifacts to preserve useful context across coding sessions. Save decisions, plans, research, code, and outputs. Search before creating duplicates, and include project and session identifiers when available. Artifacts are private by default; teams_list shows the teams you can share with. Sharing and edits to shared artifacts may need a team owner's or admin's approval, and agents never approve.";
+  "Use artifacts to preserve useful context across coding sessions. Save decisions, plans, research, code, and outputs. Search before creating duplicates, and include project and session identifiers when available. Artifacts are private by default; teams_list shows the teams you can share with. You can edit artifacts shared through your team, and every save is kept in the history (artifacts_versions). Sharing and edits to shared artifacts may need a team owner's or admin's approval, and agents never approve.";
 
 function createMcpServer({ userId, access }: McpPrincipal) {
   const server = new McpServer(
@@ -24,6 +25,7 @@ function createMcpServer({ userId, access }: McpPrincipal) {
   registerFormatTools(server, access);
   registerFileTools(server, userId, access);
   registerTeamTools(server, userId, access);
+  registerVersionTools(server, userId, access);
   return server;
 }
 

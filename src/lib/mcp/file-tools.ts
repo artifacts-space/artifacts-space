@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z, ZodError } from "zod";
 
+import { getEditableArtifact } from "@/lib/access";
 import { createArtifact, getOwnArtifactByPublicId, toArtifactDtos } from "@/lib/artifacts";
 import { allowedTypesHint, fileLimits, formatBytes } from "@/lib/files/config";
 import { assertUsableFiles, attachFiles, deleteOwnFile } from "@/lib/files/attach";
@@ -18,7 +19,7 @@ import { gateTools, type ToolServer } from "./tool-access";
 
 const fileIdField = z.uuid().describe("File id from files_request_upload");
 const fileIdsField = z.array(z.uuid()).min(1).max(fileLimits.maxFilesPerArtifact).describe("Ids of finished uploads (files_finalize)");
-const artifactIdField = z.string().refine(isPublicId, "Use the artifact's 22-character id.").describe("Your artifact's id (22 characters)");
+const artifactIdField = z.string().refine(isPublicId, "Use the artifact's 22-character id.").describe("The id (22 characters) of an artifact you can edit");
 
 const flow = `Upload flow: 1) files_request_upload with the filename, type, and exact byte size. 2) PUT the bytes to upload.url with exactly upload.headers, for example: curl -X PUT -H "Content-Type: <type>" --data-binary @<path> "<url>" (curl sets Content-Length). The URL works for ${String(fileLimits.uploadUrlSeconds / 60)} minutes. 3) files_finalize with the file id. 4) files_create_artifact or files_attach, within a day, or the upload is deleted.`;
 
@@ -43,6 +44,12 @@ async function artifactResult(userId: string, record: ArtifactRecord) {
 async function ownArtifact(userId: string, publicId: string) {
   const record = await getOwnArtifactByPublicId(userId, publicId);
   if (!record) throw new UserFacingError("Artifact not found, or you are not its author.");
+  return record;
+}
+
+async function editableArtifact(userId: string, publicId: string) {
+  const record = await getEditableArtifact(userId, { publicId });
+  if (!record) throw new UserFacingError("Artifact not found, or you cannot edit it.");
   return record;
 }
 
@@ -108,11 +115,11 @@ function registerArtifactFileTools(server: ToolServer, userId: string) {
     "files_attach",
     {
       title: "Attach files to an artifact",
-      description: "Adds finished uploads to your own artifact. A file belongs to one artifact. In a ui artifact, Image and File elements can then show them.",
+      description: "Adds your finished uploads to an artifact you can edit: your own, or one shared through your team. A file belongs to one artifact. In a ui artifact, Image and File elements can then show them.",
       inputSchema: { artifact: artifactIdField, files: fileIdsField },
     },
     ({ artifact, files }) => respond(async () => {
-      const record = await ownArtifact(userId, artifact);
+      const record = await editableArtifact(userId, artifact);
       await attachFiles(userId, record.id, files, "agent");
       return artifactResult(userId, record);
     }),
@@ -139,7 +146,7 @@ function registerAccessTools(server: ToolServer, userId: string) {
     "files_delete",
     {
       title: "Delete a file",
-      description: "Permanently deletes your own unattached upload, or a file from an artifact you wrote.",
+      description: "Permanently deletes your own unattached upload, or a file from an artifact you can edit.",
       inputSchema: { fileId: fileIdField },
     },
     ({ fileId }) => respond(async () => {
@@ -152,7 +159,8 @@ function registerAccessTools(server: ToolServer, userId: string) {
 /**
  * Registers the file tools: request an upload URL, finalize it, put files in
  * an artifact, get a download URL, and delete. Reads go through the artifact
- * access check; writes are the author's only, and are left out for read-only access.
+ * access check; writes need the edit check (the author, or a member of the
+ * team the artifact is shared through), and are left out for read-only access.
  */
 export function registerFileTools(server: McpServer, userId: string, access: McpAccess) {
   const gated = gateTools(server, access);

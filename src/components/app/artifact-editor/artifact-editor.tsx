@@ -6,6 +6,7 @@ import { ShareControl } from "@/components/app/share-control";
 import { AttachedFiles } from "@/components/files/attached-files";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
+import { VersionHistory } from "@/components/history/version-history";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
 import { ContentPane } from "./content-pane";
@@ -29,7 +30,7 @@ interface ArtifactEditorProps {
 
 /** Edit, share, and delete one artifact. */
 export function ArtifactEditor({ artifact, origin, onUpdated, onDeleted }: ArtifactEditorProps) {
-  const { draft, update, dirty } = useArtifactDraft(artifact);
+  const { draft, update, dirty, reset } = useArtifactDraft(artifact);
   const { pending, save, remove } = useArtifactActions({ artifact, draft, onUpdated, onDeleted });
   const [mode, setMode] = useState<EditorMode>("preview");
   const confirmDelete = useConfirm("deleteArtifact");
@@ -43,6 +44,17 @@ export function ArtifactEditor({ artifact, origin, onUpdated, onDeleted }: Artif
         kind={draft.kind}
         content={artifact.content}
         shareControl={<ShareControl artifact={artifact} shareUrl={shareUrl} onUpdated={onUpdated} />}
+        history={
+          <VersionHistory
+            publicId={artifact.publicId}
+            title={artifact.title}
+            updatedAt={artifact.updatedAt}
+            reviewed={shared}
+            files={artifact.files}
+            hasUnsavedChanges={dirty}
+            onRestored={(restored) => { reset(restored); onUpdated(restored); }}
+          />
+        }
         dirty={dirty}
         pending={pending}
         onSave={() => void save()}
@@ -50,7 +62,7 @@ export function ArtifactEditor({ artifact, origin, onUpdated, onDeleted }: Artif
       />
       {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
       <TitleFields title={draft.title} summary={draft.summary} update={update} />
-      <ModeBar mode={mode} onMode={setMode} length={draft.content.length} updatedAt={artifact.updatedAt} />
+      <ModeBar mode={mode} onMode={setMode} length={draft.content.length} updatedAt={artifact.updatedAt} updatedBy={artifact.updatedBy} />
       <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} files={artifact.files} update={update} />
       {draft.kind === "file" || draft.kind === "ui" || artifact.files.length > 0 ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
       <MetaFields draft={draft} update={update} />

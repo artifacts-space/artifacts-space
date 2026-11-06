@@ -16,6 +16,9 @@ export const toolAccess = {
   artifacts_create: "write",
   artifacts_update: "write",
   artifacts_delete: "write",
+  // Version history: editors only.
+  artifacts_versions: "read",
+  artifacts_restore_version: "write",
   // Formats: guidance and dry-run validation, nothing is saved.
   artifacts_formats_guide: "read",
   artifacts_validate: "read",

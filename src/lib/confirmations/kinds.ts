@@ -13,6 +13,7 @@ export const confirmationActions = [
   "leaveTeam",
   "removeAgent",
   "removeMember",
+  "restoreVersion",
 ] as const;
 
 export const confirmationActionSchema = z.enum(confirmationActions, { error: "Unknown confirmation." });

@@ -42,7 +42,8 @@ export function useArtifactActions({ artifact, draft, onUpdated, onDeleted }: Op
       toast.error("Title and content are required.");
       return;
     }
-    await run("save", () => updateArtifactAction(artifact.id, draft), (data) => {
+    // Refused when someone else saved since this editor opened, so their work is never overwritten.
+    await run("save", () => updateArtifactAction(artifact.id, draft, { expectedUpdatedAt: artifact.updatedAt }), (data) => {
       onUpdated(data);
       toast.success(data.pendingEdit ? "Saved. Waiting for approval." : "Saved.");
     });

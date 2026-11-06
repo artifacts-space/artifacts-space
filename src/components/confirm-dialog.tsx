@@ -76,10 +76,12 @@ interface ConfirmDialogProps {
   confirmLabel: string;
   /** Extra pending state from the caller, such as a shared action hook. */
   pending?: boolean;
+  /** Destructive by default. Use "default" for an action that loses nothing, such as a restore. */
+  confirmVariant?: "destructive" | "default";
 }
 
 /** The one confirmation dialog for destructive actions, with "Don't ask again". */
-export function ConfirmDialog({ state, title, description, confirmLabel, pending = false }: ConfirmDialogProps) {
+export function ConfirmDialog({ state, title, description, confirmLabel, pending = false, confirmVariant = "destructive" }: ConfirmDialogProps) {
   const busy = pending || state.pending;
   return (
     <Dialog open={state.open} onOpenChange={(open) => { if (!open) state.onCancel(); }}>
@@ -96,7 +98,7 @@ export function ConfirmDialog({ state, title, description, confirmLabel, pending
             </label>
           ) : null}
           <Button variant="ghost" onClick={state.onCancel}>Cancel</Button>
-          <Button variant="destructive" onClick={state.onConfirm} disabled={busy}>
+          <Button variant={confirmVariant} onClick={state.onConfirm} disabled={busy}>
             {busy ? <IconLoader2 className="animate-spin" /> : null} {confirmLabel}
           </Button>
         </DialogFooter>

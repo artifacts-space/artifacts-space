@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { artifact } from "@/db/schema";
+import { canEditRecord } from "@/lib/access";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { recordArtifactChange } from "@/lib/versions/service";
@@ -13,9 +14,11 @@ import { fileRefsInContent, maxFileRefs } from "./refs";
 import { attachFileRows, countArtifactFiles, getFileRow, getFileRows, removeFiles } from "./store";
 
 /**
- * Putting files into artifacts. A file belongs to one artifact. An author
- * may use their own finished, unattached uploads, and files already in the
+ * Putting files into artifacts. A file belongs to one artifact. An editor
+ * (the author, or a member of the team the artifact is shared through) may
+ * use their own finished, unattached uploads, and files already in the
  * artifact; nothing else, so no one can pull another person's file into view.
+ * Callers check that the editor may edit the artifact (getEditableArtifact).
  */
 
 /** Throws a UserFacingError, naming the ids, unless every file is usable in this artifact. */
@@ -40,14 +43,15 @@ export async function assertUsableFiles(authorId: string, artifactId: string | n
 }
 
 /**
- * Attaches files to the author's artifact. For a link or public artifact the
- * change goes through edit review (recordArtifactChange), so readers outside
- * the team see new files only once they are approved.
+ * Attaches the editor's files to an artifact they may edit, and files a
+ * version. For a link or public artifact the change goes through edit review
+ * (recordArtifactChange), so readers outside the team see new files only
+ * once they are approved.
  */
-export async function attachFiles(authorId: string, artifactId: string, fileIds: readonly string[], actor: SharingActor): Promise<void> {
-  await assertUsableFiles(authorId, artifactId, fileIds);
-  const attached = await attachFileRows(authorId, artifactId, fileIds);
-  if (attached > 0) await recordArtifactChange({ artifactId, editorId: authorId, actor });
+export async function attachFiles(editorId: string, artifactId: string, fileIds: readonly string[], actor: SharingActor): Promise<void> {
+  await assertUsableFiles(editorId, artifactId, fileIds);
+  const attached = await attachFileRows(editorId, artifactId, fileIds);
+  if (attached > 0) await recordArtifactChange({ artifactId, editorId, actor });
 }
 
 /**
@@ -60,19 +64,19 @@ export async function checkContentFiles(authorId: string, artifactId: string | n
   return ids;
 }
 
-async function artifactAuthor(artifactId: string) {
-  const [row] = await getDb().select({ userId: artifact.userId }).from(artifact).where(eq(artifact.id, artifactId)).limit(1);
-  return row?.userId ?? null;
+async function mayEditArtifact(userId: string, artifactId: string) {
+  const [record] = await getDb().select().from(artifact).where(eq(artifact.id, artifactId)).limit(1);
+  return record ? canEditRecord(userId, record) : false;
 }
 
 /**
  * Deletes a file from R2 and the database. Allowed for the uploader while it
- * is not attached, and for the author of the artifact it belongs to. Returns
- * the artifact id it belonged to, or null.
+ * is not attached, and for anyone who may edit the artifact it belongs to.
+ * Returns the artifact id it belonged to, or null.
  */
 export async function deleteOwnFile(userId: string, fileId: string, actor: SharingActor): Promise<string | null> {
   const row = z.uuid().safeParse(fileId).success ? await getFileRow(fileId.toLowerCase()) : null;
-  const allowed = row !== null && (row.artifactId === null ? row.uploaderId === userId : (await artifactAuthor(row.artifactId)) === userId);
+  const allowed = row !== null && (row.artifactId === null ? row.uploaderId === userId : await mayEditArtifact(userId, row.artifactId));
   if (!row || !allowed) throw new UserFacingError("File not found.");
   const removed = await removeFiles([row]);
   if (removed.length === 0) throw new UserFacingError("The file could not be deleted. Try again.");

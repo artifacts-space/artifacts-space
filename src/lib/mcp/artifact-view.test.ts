@@ -16,6 +16,7 @@ const dto: ArtifactDto = {
   sessionId: "",
   source: "",
   files: [],
+  updatedBy: { id: "member", kind: "person", handle: "ann", name: "Ann" },
   visibility: "team",
   teamId: "team-1",
   authorId: "author",
@@ -53,5 +54,10 @@ describe("toMcpArtifact", () => {
 
   it("should leave out content when a compact view is asked for", () => {
     expect(toMcpArtifact(dto, context("author"), false).content).toBeUndefined();
+  });
+
+  it("should name who saved it last by handle", () => {
+    expect(toMcpArtifact(dto, context("member")).updatedBy).toBe("@ann");
+    expect(toMcpArtifact({ ...dto, updatedBy: null }, context("member")).updatedBy).toBeNull();
   });
 });

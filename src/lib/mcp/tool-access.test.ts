@@ -11,6 +11,7 @@ import { registerFileTools } from "./file-tools";
 import { registerFormatTools } from "./format-tools";
 import { registerTeamTools } from "./team-tools";
 import { gateTools, toolAccess, toolAllowed } from "./tool-access";
+import { registerVersionTools } from "./version-tools";
 
 /** The read-only tool set, spelled out so a reclassification shows up in review. */
 const readOnlyTools = [
@@ -18,6 +19,7 @@ const readOnlyTools = [
   "artifacts_get",
   "artifacts_list",
   "artifacts_validate",
+  "artifacts_versions",
   "comments_list",
   "files_get_download_url",
   "inbox_list",
@@ -33,6 +35,7 @@ async function connect(access: McpAccess) {
   registerFormatTools(server, access);
   registerFileTools(server, "user-1", access);
   registerTeamTools(server, "user-1", access);
+  registerVersionTools(server, "user-1", access);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "1.0.0" });
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
@@ -64,6 +67,7 @@ describe("toolAccess", () => {
     expect(writes).toEqual([
       "artifacts_create",
       "artifacts_delete",
+      "artifacts_restore_version",
       "artifacts_update",
       "comment_create",
       "comment_delete",

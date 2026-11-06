@@ -5,7 +5,8 @@ import { z } from "zod";
 
 import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult, ArtifactDto, ArtifactInput } from "@/lib/artifact-types";
-import { createArtifact, getOwnArtifact, toArtifactDtos } from "@/lib/artifacts";
+import { getEditableArtifact } from "@/lib/access";
+import { createArtifact, toArtifactDtos } from "@/lib/artifacts";
 import { assertUsableFiles, attachFiles, deleteOwnFile } from "@/lib/files/attach";
 import type { FileDto } from "@/lib/files/types";
 import { finalizeUpload, requestUpload, type UploadRequest } from "@/lib/files/uploads";
@@ -34,8 +35,8 @@ async function run<T>(fallback: string, action: (userId: string) => Promise<T>):
   }
 }
 
-async function ownArtifactDto(userId: string, artifactId: string): Promise<ArtifactDto> {
-  const record = await getOwnArtifact(userId, artifactId);
+async function editableArtifactDto(userId: string, artifactId: string): Promise<ArtifactDto> {
+  const record = await getEditableArtifact(userId, { id: artifactId });
   if (!record) throw new UserFacingError("Artifact not found.");
   const [dto] = await toArtifactDtos([record]);
   if (!dto) throw new UserFacingError("Artifact not found.");
@@ -55,25 +56,25 @@ export async function finalizeUploadAction(fileId: string): Promise<ActionResult
   return run("The upload could not be checked. Try again.", (userId) => finalizeUpload(userId, fileId));
 }
 
-/** Deletes one of the person's own uploads, or a file from their artifact. */
+/** Deletes one of the person's own uploads, or a file from an artifact they may edit. */
 export async function deleteFileAction(fileId: string): Promise<ActionResult<ArtifactDto | null>> {
   return run("The file could not be removed. Try again.", async (userId) => {
     const artifactId = await deleteOwnFile(userId, fileId, "person");
     if (!artifactId) return null;
     revalidatePath("/app");
-    return ownArtifactDto(userId, artifactId);
+    return editableArtifactDto(userId, artifactId);
   });
 }
 
-/** Adds finished uploads to the person's own artifact. */
+/** Adds finished uploads to an artifact the person may edit. */
 export async function attachFilesAction(artifactId: string, fileIds: string[]): Promise<ActionResult<ArtifactDto>> {
   return run("The files could not be added. Try again.", async (userId) => {
     const ids = fileIdsSchema.parse(fileIds);
-    const record = await getOwnArtifact(userId, artifactId);
+    const record = await getEditableArtifact(userId, { id: artifactId });
     if (!record) throw new UserFacingError("Artifact not found.");
     await attachFiles(userId, record.id, ids, "person");
     revalidatePath("/app");
-    return ownArtifactDto(userId, record.id);
+    return editableArtifactDto(userId, record.id);
   });
 }
 
@@ -85,6 +86,6 @@ export async function createArtifactWithFilesAction(input: ArtifactInput, fileId
     const created = await createArtifact(userId, { ...input, source: input.source || "web" });
     if (ids.length > 0) await attachFiles(userId, created.id, ids, "person");
     revalidatePath("/app");
-    return ownArtifactDto(userId, created.id);
+    return editableArtifactDto(userId, created.id);
   });
 }

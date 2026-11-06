@@ -35,5 +35,8 @@ export function useArtifactDraft(artifact: ArtifactDto) {
 
   const dirty = draftKeys.some((key) => draft[key] !== artifact[key]);
 
-  return { draft, update, dirty };
+  /** Replaces the draft with a saved artifact, such as a restored version. */
+  const reset = useCallback((saved: ArtifactDto) => { setDraft(draftFrom(saved)); }, []);
+
+  return { draft, update, dirty, reset };
 }

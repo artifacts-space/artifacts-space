@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ArtifactVisibility } from "@/lib/artifact-types";
 
-import { canEditArtifact, canViewArtifact, isIndexable, type AccessViewer } from "./access-rules";
+import { canDeleteArtifact, canEditArtifact, canViewArtifact, isIndexable, type AccessViewer } from "./access-rules";
 
 const author = "author";
 const subject = (visibility: ArtifactVisibility, teamId: string | null = "team-1") => ({ userId: author, visibility, teamId });
@@ -40,11 +40,40 @@ describe("canViewArtifact", () => {
   });
 });
 
+/** Expected edit access in a shared (not personal) team. */
+const editMatrix: Record<ArtifactVisibility, Record<keyof typeof viewers, boolean>> = {
+  private: { signedOut: false, author: true, member: false, outsider: false },
+  team: { signedOut: false, author: true, member: true, outsider: false },
+  link: { signedOut: false, author: true, member: true, outsider: false },
+  public: { signedOut: false, author: true, member: true, outsider: false },
+};
+
 describe("canEditArtifact", () => {
-  it("should allow only the author", () => {
-    expect(canEditArtifact({ userId: author }, author)).toBe(true);
-    expect(canEditArtifact({ userId: author }, "member")).toBe(false);
-    expect(canEditArtifact({ userId: author }, null)).toBe(false);
+  for (const [visibility, row] of Object.entries(editMatrix)) {
+    for (const [viewerName, expected] of Object.entries(row)) {
+      it(`should ${expected ? "allow" : "deny"} ${viewerName} edits when the artifact is ${visibility} in a shared team`, () => {
+        const shared = { ...subject(visibility as ArtifactVisibility), teamPersonal: false };
+        expect(canEditArtifact(shared, viewers[viewerName] ?? null)).toBe(expected);
+      });
+    }
+  }
+
+  it("should keep link artifacts of a personal team author-only", () => {
+    const personal = { ...subject("link"), teamPersonal: true };
+    expect(canEditArtifact(personal, viewers.member ?? null)).toBe(false);
+    expect(canEditArtifact(personal, viewers.author ?? null)).toBe(true);
+  });
+
+  it("should deny members when a shared artifact has lost its team", () => {
+    expect(canEditArtifact({ ...subject("team", null), teamPersonal: null }, viewers.member ?? null)).toBe(false);
+  });
+});
+
+describe("canDeleteArtifact", () => {
+  it("should allow only the author when anyone else asks", () => {
+    expect(canDeleteArtifact({ userId: author }, author)).toBe(true);
+    expect(canDeleteArtifact({ userId: author }, "member")).toBe(false);
+    expect(canDeleteArtifact({ userId: author }, null)).toBe(false);
   });
 });
 

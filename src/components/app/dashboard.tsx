@@ -109,7 +109,7 @@ function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate
   if (selected?.authorId === viewerId) {
     return <ArtifactEditor key={selected.id} artifact={selected} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} />;
   }
-  if (selected) return <SharedArtifactPanel key={selected.id} artifact={selected} onWithdrawn={onDeleted} />;
+  if (selected) return <SharedArtifactPanel key={selected.id} artifact={selected} viewerId={viewerId} onUpdated={onUpdated} onWithdrawn={onDeleted} />;
   return (
     <div className="flex flex-1 items-center justify-center p-8">
       <div className="max-w-sm text-center">

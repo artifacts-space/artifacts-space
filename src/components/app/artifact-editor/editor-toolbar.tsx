@@ -51,14 +51,16 @@ interface EditorToolbarProps {
   content: string;
   /** The share button and dialog (ShareControl). */
   shareControl: React.ReactNode;
+  /** The History button and dialog (VersionHistory). */
+  history: React.ReactNode;
   dirty: boolean;
   pending: PendingAction;
   onSave: () => void;
   onRequestDelete: () => void;
 }
 
-/** The editor's top bar: format icon, short id, copy, share, more actions, and save. */
-export function EditorToolbar({ id, kind, content, shareControl, dirty, pending, onSave, onRequestDelete }: EditorToolbarProps) {
+/** The editor's top bar: format icon, short id, copy, history, share, more actions, and save. */
+export function EditorToolbar({ id, kind, content, shareControl, history, dirty, pending, onSave, onRequestDelete }: EditorToolbarProps) {
   const KindIcon = kindIcons[kind];
   return (
     <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 sm:px-5">
@@ -66,6 +68,7 @@ export function EditorToolbar({ id, kind, content, shareControl, dirty, pending,
       <span className="font-mono text-xs text-muted-foreground">{id.slice(0, 8)}</span>
       <div className="ml-auto flex items-center gap-1">
         <CopyButton value={content} variant="ghost" size="icon" />
+        {history}
         {shareControl}
         <MoreMenu onRequestDelete={onRequestDelete} />
         <SaveButton saving={pending === "save"} dirty={dirty} onSave={onSave} />

@@ -1,16 +1,18 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
 import { artifact, sharingRequest, type ArtifactRecord } from "@/db/schema";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
-import { viewableInTeamCondition } from "@/lib/access";
+import { getEditableArtifact, viewableInTeamCondition } from "@/lib/access";
+import { loadActors } from "@/lib/agents/queries";
 import { assertValidArtifactContent, assertValidArtifactUpdate } from "@/lib/artifact-content";
 import {
   artifactKinds,
   type ArtifactDto,
+  type ArtifactEditorDto,
   type ArtifactInput,
   type PendingEditDto,
   type PendingSharingDto,
@@ -22,11 +24,14 @@ import type { FileDto } from "@/lib/files/types";
 import { generatePublicId } from "@/lib/public-id";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { UserFacingError } from "@/lib/user-facing-error";
-import { recordArtifactEdit } from "@/lib/versions/service";
+import { getVersionOf } from "@/lib/versions/history";
+import { recordArtifactSave } from "@/lib/versions/service";
 
 /**
- * Artifact storage. Writes here are author-only. Visibility never changes
- * here: sharing goes through requestArtifactSharing in src/lib/sharing.
+ * Artifact storage. The author and members of the team an artifact is shared
+ * through edit it (getEditableArtifact); only the author deletes it. Every
+ * save files a version. Visibility never changes here: sharing goes through
+ * requestArtifactSharing in src/lib/sharing.
  */
 
 const artifactUpdateSchema = z.object({
@@ -64,7 +69,13 @@ function assertArtifactSize(input: { content?: string | undefined; metadata?: Re
 }
 
 /** Maps a row to the workspace's DTO. */
-export function toArtifactDto(record: ArtifactRecord, pendingSharing: PendingSharingDto | null = null, pendingEdit: PendingEditDto | null = null, files: FileDto[] = []): ArtifactDto {
+export function toArtifactDto(
+  record: ArtifactRecord,
+  pendingSharing: PendingSharingDto | null = null,
+  pendingEdit: PendingEditDto | null = null,
+  files: FileDto[] = [],
+  updatedBy: ArtifactEditorDto | null = null,
+): ArtifactDto {
   return {
     id: record.id,
     publicId: record.publicId,
@@ -83,6 +94,7 @@ export function toArtifactDto(record: ArtifactRecord, pendingSharing: PendingSha
     pendingSharing,
     pendingEdit,
     files,
+    updatedBy,
     metadata: record.metadata,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
@@ -106,11 +118,26 @@ export async function pendingRequestsFor(artifactIds: string[]) {
   return { sharing, edits };
 }
 
-/** Maps rows to DTOs with their open sharing and edit requests. */
+/** Who saved each artifact last, by user id. People and agents who are gone are left out. */
+export async function lastEditorsFor(records: Pick<ArtifactRecord, "updatedBy">[]): Promise<Map<string, ArtifactEditorDto>> {
+  const ids = records.flatMap((record) => (record.updatedBy ? [record.updatedBy] : []));
+  const actors = await loadActors(ids);
+  return new Map([...actors].map(([id, actor]) => [id, { id, kind: actor.kind, handle: actor.handle, name: actor.name }]));
+}
+
+/** Maps rows to DTOs with their open sharing and edit requests, files, and last editor. */
 export async function toArtifactDtos(records: ArtifactRecord[]): Promise<ArtifactDto[]> {
   const ids = records.map((record) => record.id);
-  const [pending, files] = await Promise.all([pendingRequestsFor(ids), listFilesForArtifacts(ids)]);
-  return records.map((record) => toArtifactDto(record, pending.sharing.get(record.id) ?? null, pending.edits.get(record.id) ?? null, files.get(record.id) ?? []));
+  const [pending, files, editors] = await Promise.all([pendingRequestsFor(ids), listFilesForArtifacts(ids), lastEditorsFor(records)]);
+  return records.map((record) =>
+    toArtifactDto(
+      record,
+      pending.sharing.get(record.id) ?? null,
+      pending.edits.get(record.id) ?? null,
+      files.get(record.id) ?? [],
+      record.updatedBy ? editors.get(record.updatedBy) ?? null : null,
+    ),
+  );
 }
 
 /** Which artifacts a list shows: the viewer's own, or those shared with one of their teams. */
@@ -197,39 +224,96 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
       publicId: generatePublicId(),
       visibility: "private",
       userId,
+      updatedBy: userId,
     })
     .returning();
 
   if (!record) throw new Error("The artifact could not be created.");
-  if (fileIds.length === 0) return toArtifactDto(record);
   await attachFileRows(userId, record.id, fileIds);
+  await recordArtifactSave({ before: null, after: record, editorId: userId, actor: "person", saveKind: "create" });
   const [dto] = await toArtifactDtos([record]);
   return dto ?? toArtifactDto(record);
 }
 
-/**
- * Changes the author's own artifact. Returns null when it is not theirs.
- * Edits to link and public artifacts go through the approval rule: the DTO's
- * `pendingEdit` is set when readers outside the team still see the approved
- * version. `actor` is "agent" for MCP calls, which never approve.
- */
-export async function updateArtifact(userId: string, id: string, input: ArtifactUpdateInput, actor: SharingActor = "person") {
-  const parsed = artifactUpdateSchema.parse(input);
-  assertArtifactSize(parsed);
-  const before = await getOwnArtifact(userId, id);
-  if (!before) return null;
-  await assertValidArtifactUpdate(parsed, () => Promise.resolve(before));
-  await attachUpdatedContentFiles(userId, before, parsed);
+/** Options for one save. */
+export interface SaveOptions {
+  /**
+   * The artifact's `updatedAt` when the editor opened it (ISO). When someone
+   * saved since, the save is refused instead of overwriting their work.
+   */
+  expectedUpdatedAt?: string | undefined;
+}
+
+/** The message when a save would overwrite someone else's newer save. */
+export const STALE_SAVE_MESSAGE = "Someone saved a newer version while you were editing. Copy your changes, reload, and save again.";
+
+function unchangedSince(expectedUpdatedAt: string | undefined) {
+  if (!expectedUpdatedAt) return undefined;
+  const expected = new Date(expectedUpdatedAt);
+  if (Number.isNaN(expected.getTime())) throw new UserFacingError(STALE_SAVE_MESSAGE);
+  // Postgres keeps microseconds; the browser saw milliseconds.
+  return sql`date_trunc('milliseconds', ${artifact.updatedAt}) = ${expected.toISOString()}::timestamptz`;
+}
+
+interface SaveContext {
+  editorId: string;
+  before: ArtifactRecord;
+  actor: SharingActor;
+  options: SaveOptions;
+  restoredFromId?: string | null;
+}
+
+/** Writes checked changes, files the version, and returns the DTO. */
+async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, context: SaveContext) {
+  const { editorId, before } = context;
+  await assertValidArtifactUpdate(changes, () => Promise.resolve(before));
+  await attachUpdatedContentFiles(editorId, before, changes);
   const [record] = await getDb()
     .update(artifact)
-    .set({ ...parsed, updatedAt: new Date() })
-    .where(and(eq(artifact.userId, userId), eq(artifact.id, id)))
+    .set({ ...changes, updatedBy: editorId, updatedAt: new Date() })
+    .where(and(eq(artifact.id, before.id), unchangedSince(context.options.expectedUpdatedAt)))
     .returning();
 
-  if (!record) return null;
-  await recordArtifactEdit({ before, after: record, editorId: userId, actor });
+  if (!record) {
+    if (context.options.expectedUpdatedAt) throw new UserFacingError(STALE_SAVE_MESSAGE);
+    return null;
+  }
+  const saveKind = context.restoredFromId ? "restore" : "edit";
+  await recordArtifactSave({ before, after: record, editorId, actor: context.actor, saveKind, restoredFromId: context.restoredFromId ?? null });
   const [dto] = await toArtifactDtos([record]);
   return dto ?? null;
+}
+
+/**
+ * Changes an artifact the user may edit: their own, or one shared through a
+ * team they belong to. Returns null when they may not. Every save files a
+ * version. Edits to link and public artifacts go through the approval rule:
+ * the DTO's `pendingEdit` is set when readers outside the team still see the
+ * approved version. `actor` is "agent" for MCP calls, which never approve.
+ */
+export async function updateArtifact(userId: string, id: string, input: ArtifactUpdateInput, actor: SharingActor = "person", options: SaveOptions = {}) {
+  const parsed = artifactUpdateSchema.parse(input);
+  assertArtifactSize(parsed);
+  const before = await getEditableArtifact(userId, { id });
+  if (!before) return null;
+  return saveChanges(parsed, { editorId: userId, before, actor, options });
+}
+
+/**
+ * Brings back an older version as a new save. History is never rewritten:
+ * the restore is filed as its own version, and for a link or public artifact
+ * it waits for approval like any edit. Returns null when the user may not
+ * edit the artifact; throws when the version is not the artifact's.
+ */
+export async function restoreArtifactVersion(userId: string, id: string, versionId: string, actor: SharingActor = "person", options: SaveOptions = {}) {
+  const before = await getEditableArtifact(userId, { id });
+  if (!before) return null;
+  const version = await getVersionOf(before.id, versionId);
+  if (!version) throw new UserFacingError("That version is no longer in the history.");
+  const { title, summary, content, kind, language, project, source, metadata } = version;
+  const changes = artifactUpdateSchema.parse({ title, summary, content, kind, language, project, source, metadata });
+  assertArtifactSize(changes);
+  return saveChanges(changes, { editorId: userId, before, actor, options, restoredFromId: version.id });
 }
 
 /**
