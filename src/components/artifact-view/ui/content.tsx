@@ -91,6 +91,15 @@ export const badgeTone: Record<Tone, string> = {
   danger: "border-tone-danger/30 bg-tone-danger/10 text-tone-danger",
 };
 
+/** Small status-dot colors per tone (Board columns, Calendar events). */
+export const toneDot: Record<Tone, string> = {
+  neutral: "bg-muted-foreground/50",
+  info: "bg-tone-info",
+  success: "bg-tone-success",
+  warning: "bg-tone-warning",
+  danger: "bg-tone-danger",
+};
+
 export function BadgeView({ props }: ViewProps<"Badge">) {
   return (
     <span className={cn("inline-flex h-5 w-fit max-w-full items-center truncate rounded-full border px-2 text-xs font-medium", badgeTone[props.tone ?? "neutral"])}>

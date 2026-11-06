@@ -1,6 +1,7 @@
 import type { UiComponentName } from "../catalog";
 import { chartFixtures } from "./charts";
 import { keyValueFixtures, stepsFixtures } from "./details";
+import { boardFixtures, calendarFixtures } from "./planning";
 
 /** A child element used inside a container fixture. */
 export interface FixtureChild {
@@ -106,7 +107,7 @@ const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Te
   ],
 };
 
-const data: Pick<Record<UiComponentName, ComponentFixture[]>, "Table" | "Metric" | "Chart" | "KeyValue" | "Progress" | "Timeline" | "Diagram"> = {
+const data: Pick<Record<UiComponentName, ComponentFixture[]>, "Table" | "Metric" | "Chart" | "KeyValue" | "Progress" | "Timeline" | "Board" | "Calendar" | "Diagram"> = {
   Table: [
     { name: "Normal", props: { caption: "Monthly spend", currency: "USD", columns: [{ key: "team", label: "Team" }, { key: "spend", label: "Spend", align: "right", format: "currency" }, { key: "change", label: "Change", align: "right", format: "percent" }], rows: [{ team: "Platform", spend: 12840, change: 4.2 }, { team: "Web", spend: 5300, change: -1.5 }, { team: "Data" }] } },
     { name: "Empty rows", props: { columns: [{ key: "a", label: "A" }], rows: [] } },
@@ -136,6 +137,8 @@ const data: Pick<Record<UiComponentName, ComponentFixture[]>, "Table" | "Metric"
     { name: "Empty", props: { items: [] } },
     { name: "Long", props: { items: [{ title: longText(160), time: longText(60), description: longText(1000) }] } },
   ],
+  Board: boardFixtures,
+  Calendar: calendarFixtures,
   Diagram: [
     { name: "Flowchart", props: { title: "Request flow", code: "flowchart LR\n  Agent -->|MCP| API --> DB[(Neon)]\n  API --> Page" } },
     { name: "Sequence", props: { code: "sequenceDiagram\n  Agent->>Server: artifacts_create\n  Server-->>Agent: id" } },

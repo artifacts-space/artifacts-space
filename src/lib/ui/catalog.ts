@@ -8,6 +8,7 @@ import { dataChecks, dataProps, type PropCheck } from "./props/data";
 import { inputChecks, inputEvents, inputProps } from "./props/input";
 import { layoutProps } from "./props/layout";
 import { mediaChecks, mediaProps } from "./props/media";
+import { planningChecks, planningDescriptions, planningProps } from "./props/planning";
 
 /**
  * The stout component set: zod-only and server-safe. The React registry in
@@ -18,6 +19,7 @@ export const componentProps = {
   ...layoutProps,
   ...contentProps,
   ...dataProps,
+  ...planningProps,
   ...inputProps,
   ...mediaProps,
 };
@@ -39,7 +41,7 @@ export const containerComponents: ReadonlySet<UiComponentName> = new Set([
 ]);
 
 /** Cross-field prop rules, checked after the zod schema passes. */
-export const componentChecks: Partial<Record<UiComponentName, PropCheck>> = { ...dataChecks, ...inputChecks, ...mediaChecks };
+export const componentChecks: Partial<Record<UiComponentName, PropCheck>> = { ...dataChecks, ...planningChecks, ...inputChecks, ...mediaChecks };
 
 /** Events a component can emit for `on` bindings. */
 export const componentEvents: Partial<Record<UiComponentName, readonly string[]>> = inputEvents;
@@ -68,6 +70,8 @@ const descriptions: Record<UiComponentName, string> = {
   KeyValue: "Label and value pairs for specs, settings, and summaries. Each item's `format` styles a number like a Table column; `tone` shows the value as a status badge; `mono` shows it in monospace (ids, paths). `columns`: 1 or 2 on wide screens.",
   Progress: "A progress bar. `value` out of `max` (default 100).",
   Timeline: "A vertical list of dated events with done, current, or upcoming status.",
+  Board: planningDescriptions.Board,
+  Calendar: planningDescriptions.Calendar,
   Diagram: "A Mermaid diagram (flowchart, sequence, class, state, ER, gantt, and more). Put the Mermaid source in `code`.",
   Checklist: "A list of items a reader can tick off. Ticks stay on the page only.",
   Checkbox: "One checkbox. Bind `checked` with { \"$bindState\": \"/path\" } to share it with other elements.",

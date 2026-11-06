@@ -6,6 +6,8 @@ import type { ComponentType, ReactNode } from "react";
 import type { UiComponentName } from "@/lib/ui/catalog";
 import { uiCatalog } from "@/lib/ui/catalog";
 
+import { BoardView } from "./board";
+import { CalendarView } from "./calendar";
 import { ChartView } from "./chart";
 import { BadgeView, CalloutView, CodeView, HeadingView, LinkView, ListView, MarkdownBlockView, QuoteView, TextView } from "./content";
 import { DiagramView, MetricView, ProgressView, TableView, TimelineView } from "./data";
@@ -43,6 +45,8 @@ const views: Views = {
   KeyValue: KeyValueView,
   Progress: ProgressView,
   Timeline: TimelineView,
+  Board: BoardView,
+  Calendar: CalendarView,
   Diagram: DiagramView,
   Checklist: ChecklistView,
   Checkbox: CheckboxView,
