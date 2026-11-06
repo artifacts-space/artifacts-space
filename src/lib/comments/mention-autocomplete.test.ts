@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { activeMentionQuery, insertMention, matchMentionables, type Mentionable } from "./mention-autocomplete";
+import { activeMentionQuery, composerMentionMap, insertMention, matchMentionables, type Mentionable } from "./mention-autocomplete";
 
 const people: Mentionable[] = [
   { userId: "user-charles", handle: "charles", name: "Charles Smith", kind: "person" },
@@ -65,5 +65,23 @@ describe("insertMention", () => {
 
   it("should not add a space before punctuation that follows", () => {
     expect(insertMention("@c, thanks", { start: 0, query: "c" }, 2, "charles")).toEqual({ text: "@charles, thanks", caret: 8 });
+  });
+});
+
+describe("composerMentionMap", () => {
+  it("should resolve every reachable candidate with its kind", () => {
+    const map = composerMentionMap({ candidates: people, self: null });
+    expect(map.get("charles")).toBe("person");
+    expect(map.get("claude-code")).toBe("agent");
+    expect(map.has("handle")).toBe(false);
+  });
+
+  it("should resolve the writer's own handle when the writer has one", () => {
+    const self: Mentionable = { userId: "user-dev", handle: "dev", name: "Dev", kind: "person" };
+    expect(composerMentionMap({ candidates: [], self }).get("dev")).toBe("person");
+  });
+
+  it("should resolve nothing when nobody is reachable and the writer has no handle", () => {
+    expect(composerMentionMap({ candidates: [], self: null }).size).toBe(0);
   });
 });

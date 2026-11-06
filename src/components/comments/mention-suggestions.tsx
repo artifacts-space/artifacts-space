@@ -22,10 +22,11 @@ interface ActiveOption {
 /**
  * @mention suggestions for a textarea. Tracks the caret, lists matching
  * teammates while an "@handle" is being typed, and handles arrow keys,
- * Enter or Tab to pick, and Escape to close.
+ * Enter or Tab to pick, and Escape to close. When nothing matches, a short
+ * hint says why instead.
  */
 export function useMentionAutocomplete({ body, setBody }: AutocompleteInput) {
-  const candidates = useMentionables();
+  const { candidates, self } = useMentionables();
   const listId = useId();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingCaret = useRef<number | null>(null);
@@ -33,11 +34,7 @@ export function useMentionAutocomplete({ body, setBody }: AutocompleteInput) {
   const [dismissed, setDismissed] = useState<number | null>(null);
   const [active, setActive] = useState<ActiveOption>({ key: "", index: 0 });
 
-  const query = activeMentionQuery(body, caret);
-  const matches = query && candidates.length > 0 ? matchMentionables(candidates, query.query) : [];
-  const open = query !== null && matches.length > 0 && dismissed !== query.start;
-  const key = query ? `${String(query.start)}:${query.query}` : "";
-  const activeIndex = active.key === key ? Math.min(active.index, matches.length - 1) : 0;
+  const { query, typed, matches, showing, open, key, activeIndex } = suggestionState({ body, caret, candidates, dismissed, active });
 
   useLayoutEffect(() => {
     const target = pendingCaret.current;
@@ -65,16 +62,9 @@ export function useMentionAutocomplete({ body, setBody }: AutocompleteInput) {
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (!open || event.nativeEvent.isComposing) return;
+    if (!showing || !query || event.nativeEvent.isComposing) return;
     const start = query.start;
-    const actions = new Map<string, () => void>([
-      ["ArrowDown", () => { move(1); }],
-      ["ArrowUp", () => { move(-1); }],
-      ["Enter", pickActive],
-      ["Tab", pickActive],
-      ["Escape", () => { setDismissed(start); }],
-    ]);
-    const action = actions.get(event.key);
+    const action = keyActions(open, { move, pickActive, dismiss: () => { setDismissed(start); } }).get(event.key);
     if (!action) return;
     event.preventDefault();
     event.stopPropagation();
@@ -107,7 +97,51 @@ export function useMentionAutocomplete({ body, setBody }: AutocompleteInput) {
         onHover={(index) => { setActive({ key, index }); }}
       />
     ) : null,
+    hint: showing && !open ? <MentionHint query={typed} self={self} hasCandidates={candidates.length > 0} /> : null,
   };
+}
+
+/** What the suggestions show for the text and caret: the "@" query, its matches, and the highlighted option. */
+function suggestionState(input: { body: string; caret: number; candidates: readonly Mentionable[]; dismissed: number | null; active: ActiveOption }) {
+  const query = activeMentionQuery(input.body, input.caret);
+  const matches = query && input.candidates.length > 0 ? matchMentionables(input.candidates, query.query) : [];
+  const showing = query !== null && input.dismissed !== query.start;
+  const key = query ? `${String(query.start)}:${query.query}` : "";
+  const activeIndex = input.active.key === key ? Math.min(input.active.index, matches.length - 1) : 0;
+  return { query, typed: query?.query ?? "", matches, showing, open: showing && matches.length > 0, key, activeIndex };
+}
+
+interface KeyHandlers {
+  move: (step: number) => void;
+  pickActive: () => void;
+  dismiss: () => void;
+}
+
+/** The keys the composer takes while an "@" is typed: list keys when suggestions show, else only Escape to close the hint. */
+function keyActions(open: boolean, { move, pickActive, dismiss }: KeyHandlers) {
+  if (!open) return new Map<string, () => void>([["Escape", dismiss]]);
+  return new Map<string, () => void>([
+    ["ArrowDown", () => { move(1); }],
+    ["ArrowUp", () => { move(-1); }],
+    ["Enter", pickActive],
+    ["Tab", pickActive],
+    ["Escape", dismiss],
+  ]);
+}
+
+/** Why no suggestion shows for the "@" being typed, so the writer is never left guessing. */
+function MentionHint({ query, self, hasCandidates }: { query: string; self: Mentionable | null; hasCandidates: boolean }) {
+  const isSelf = self !== null && query.length > 0 && self.handle.startsWith(query);
+  const message = isSelf
+    ? "That is you. Mentioning yourself notifies no one."
+    : hasCandidates
+      ? "No match. You can mention this artifact's author and your teammates."
+      : "No one to mention here yet. You can mention this artifact's author and your teammates.";
+  return (
+    <p role="status" className="absolute top-full left-0 z-50 mt-1 w-full max-w-80 rounded-md border bg-popover px-3 py-2 text-sm text-muted-foreground shadow-md">
+      {message}
+    </p>
+  );
 }
 
 interface ListProps {

@@ -67,3 +67,21 @@ export function insertMention(text: string, mention: MentionQuery, caret: number
   const nextCaret = /^\s/.test(after) ? inserted.length + 1 : inserted.length;
   return { text: inserted + after, caret: nextCaret };
 }
+
+/** Who the viewer can mention on an artifact, and the viewer themself. */
+export interface MentionDirectory {
+  candidates: Mentionable[];
+  /** The viewer, when they have a handle. Never suggested, but highlighted. */
+  self: Mentionable | null;
+}
+
+/**
+ * The handles the composer highlights as mentions: everyone a mention would
+ * reach, plus the writer's own handle. A self-mention notifies no one, but it
+ * names a real member, so it shows as a chip like the posted comment does.
+ */
+export function composerMentionMap(directory: MentionDirectory): Map<string, MentionKind> {
+  const map = new Map(directory.candidates.map((candidate) => [candidate.handle, candidate.kind]));
+  if (directory.self) map.set(directory.self.handle, directory.self.kind);
+  return map;
+}

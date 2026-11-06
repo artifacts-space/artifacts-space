@@ -5,7 +5,7 @@ import { agent, mention, teamMember, user } from "@/db/schema";
 import { listTeamIdsForUser } from "@/lib/teams/queries";
 
 import { mentionFacts } from "./delivery";
-import type { Mentionable } from "./mention-autocomplete";
+import type { Mentionable, MentionDirectory } from "./mention-autocomplete";
 import type { ResolvedMention } from "./mentions";
 import { mentionRefusal } from "./rules";
 import { threadMutedAgentIds, type Thread } from "./thread";
@@ -43,6 +43,17 @@ export async function listMentionables(thread: Thread): Promise<Mentionable[]> {
   return reachable
     .flatMap((fact) => (fact.userId ? [{ userId: fact.userId, handle: fact.handle, name: names.get(fact.userId) ?? "", kind: fact.kind }] : []))
     .sort((a, b) => a.handle.localeCompare(b.handle));
+}
+
+/** The actor as a mentionable entry, for highlighting their own handle. Null without a handle. */
+function selfMentionable(thread: Thread): Mentionable | null {
+  const { actor } = thread;
+  return actor.handle ? { userId: actor.userId, handle: actor.handle, name: actor.name, kind: actor.kind } : null;
+}
+
+/** What the composer needs to suggest and highlight mentions: reachable people and agents, and the actor. */
+export async function mentionDirectory(thread: Thread): Promise<MentionDirectory> {
+  return { candidates: await listMentionables(thread), self: selfMentionable(thread) };
 }
 
 /**
