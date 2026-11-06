@@ -500,7 +500,11 @@
     border-radius: 4px;
     background: var(--muted);
     font-family: var(--font-mono);
-    font-size: 0.86em;
+    /* Never under the 13px floor, even inside small text such as a comment body. */
+    font-size: max(0.86em, var(--text-xs));
+  }
+  .artifact-prose :where(sup, sub, small) {
+    font-size: max(0.75em, var(--text-xs));
   }
   .artifact-prose pre {
     overflow-x: auto;

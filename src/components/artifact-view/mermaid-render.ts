@@ -1,8 +1,11 @@
-/** A rendered diagram: SVG text plus the size its viewBox asks for. */
+import { smallestFontSize } from "@/lib/svg-text-size";
+
+/** A rendered diagram: SVG text, the size its viewBox asks for, and its smallest font size in user units. */
 export interface RenderedDiagram {
   svg: string;
   width: number;
   height: number;
+  smallestFont: number;
 }
 
 let queue: Promise<unknown> = Promise.resolve();
@@ -28,7 +31,7 @@ async function renderNow(code: string, dark: boolean): Promise<RenderedDiagram> 
   });
   counter += 1;
   const { svg } = await mermaid.render(`artifact-mermaid-${String(counter)}`, code);
-  return { svg, ...viewBoxSize(svg) };
+  return { svg, ...viewBoxSize(svg), smallestFont: smallestFontSize(svg) };
 }
 
 /**

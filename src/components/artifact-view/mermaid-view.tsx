@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { checkMermaidSource } from "@/lib/mermaid-source";
 import { svgDataUri } from "@/lib/svg";
+import { minReadableWidth } from "@/lib/svg-text-size";
 import { cn } from "@/lib/utils";
 
 import { renderMermaid, type RenderedDiagram } from "./mermaid-render";
@@ -24,7 +25,9 @@ function SourceFallback({ code, title, reason }: { code: string; title: string; 
 /**
  * A Mermaid diagram, rendered in the browser with securityLevel "strict" and
  * shown as an <img>, so nothing in the diagram can run. Mermaid loads only
- * when a diagram is on screen. The theme follows light and dark mode.
+ * when a diagram is on screen. The theme follows light and dark mode. The
+ * image shrinks to fit only while its text stays at 13px or larger; past
+ * that, the frame scrolls sideways.
  */
 export function MermaidView({ code, title, className }: { code: string; title?: string; className?: string }) {
   const { resolvedTheme } = useTheme();
@@ -50,7 +53,8 @@ export function MermaidView({ code, title, className }: { code: string; title?: 
   return (
     <figure className={cn("min-w-0", className)}>
       {title ? <figcaption className="mb-3 text-md font-medium">{title}</figcaption> : null}
-      <div className="flex min-h-24 justify-center overflow-x-auto rounded-md border bg-card p-4">
+      {/* justify-center-safe: when the diagram is wider than the frame, it starts at the left edge so all of it can be scrolled to. */}
+      <div className="flex min-h-24 justify-center-safe overflow-x-auto rounded-md border bg-card p-4">
         {current ? (
           // eslint-disable-next-line @next/next/no-img-element -- a data URI image, which next/image cannot optimize
           <img
@@ -58,7 +62,8 @@ export function MermaidView({ code, title, className }: { code: string; title?: 
             width={current.diagram.width}
             height={current.diagram.height}
             alt={title ?? "Diagram"}
-            className="h-auto max-w-full"
+            className="h-auto max-w-full shrink-0"
+            style={{ minWidth: `${String(minReadableWidth(current.diagram.width, current.diagram.smallestFont))}px` }}
           />
         ) : (
           <div role="status" className="h-24 w-full max-w-md animate-pulse rounded-sm bg-muted motion-reduce:animate-none">
