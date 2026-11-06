@@ -1,11 +1,12 @@
 "use client";
 
 import { IconCheck, IconCopy } from "@tabler/icons-react";
-import { useState } from "react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 
+import { useCopyToClipboard } from "./use-copy-to-clipboard";
+
+/** A button that copies `value`, with an optional text label that turns into "Copied". */
 export function CopyButton({
   value,
   label,
@@ -19,20 +20,10 @@ export function CopyButton({
   variant?: "default" | "outline" | "secondary" | "ghost";
   size?: "default" | "xs" | "sm" | "lg" | "icon" | "icon-xs" | "icon-sm" | "icon-lg";
 }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      window.setTimeout(() => { setCopied(false); }, 1800);
-    } catch {
-      toast.error("Could not access the clipboard.");
-    }
-  }
+  const { copied, copy } = useCopyToClipboard();
 
   return (
-    <Button type="button" variant={variant} size={size} className={className} onClick={() => void copy()}>
+    <Button type="button" variant={variant} size={size} className={className} onClick={() => void copy(value)}>
       {copied ? <IconCheck /> : <IconCopy />}
       {label ? (
         <span>{copied ? "Copied" : label}</span>

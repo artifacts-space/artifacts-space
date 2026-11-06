@@ -5,9 +5,8 @@ import { useState } from "react";
 
 import { createAgentTokenAction, revokeAgentTokenAction } from "@/app/(workspace)/teams/agent-actions";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
-import { CopyableValue } from "@/components/copyable-value";
+import { TokenRevealDialog } from "@/components/tokens/token-reveal-dialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { TeamAgentView } from "@/lib/agents/queries";
 
@@ -16,26 +15,8 @@ import { useTeamAction } from "./use-team-action";
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });
 
-/** The secret, shown once right after it is created. */
-function NewTokenDialog({ token, handle, onClose }: { token: string; handle: string; onClose: () => void }) {
-  return (
-    <Dialog open={Boolean(token)} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Token for @{handle}</DialogTitle>
-          <DialogDescription className="leading-6">
-            Copy it now. It will not be shown again. The agent acts as @{handle} with it and sees only what the team can see.
-          </DialogDescription>
-        </DialogHeader>
-        <CopyableValue value={token} />
-        <DialogFooter><Button onClick={onClose}>Done</Button></DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 /** An agent's tokens: create one (shown once), or revoke one. Owners and admins only. */
-export function AgentTokens({ agent }: { agent: TeamAgentView }) {
+export function AgentTokens({ agent, origin }: { agent: TeamAgentView; origin: string }) {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [secret, setSecret] = useState("");
@@ -112,7 +93,13 @@ export function AgentTokens({ agent }: { agent: TeamAgentView }) {
         confirmLabel="Revoke"
         pending={pending !== null}
       />
-      <NewTokenDialog token={secret} handle={agent.handle} onClose={() => { setSecret(""); }} />
+      <TokenRevealDialog
+        token={secret}
+        origin={origin}
+        title={`Save the token for @${agent.handle}`}
+        description={`Copy and store it now. You will not see it again. The agent acts as @${agent.handle} and sees only what the team can see.`}
+        onClose={() => { setSecret(""); }}
+      />
     </div>
   );
 }

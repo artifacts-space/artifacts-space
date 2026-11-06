@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { listTeamAgents } from "@/lib/agents/queries";
 import { listOpenReports } from "@/lib/reports/service";
 import { getSession } from "@/lib/session";
+import { siteOrigin } from "@/lib/site-origin";
 import { listPendingSharing, listTeamSharedArtifacts } from "@/lib/sharing/queries";
 import { getTeamForMember, listPendingInvitations, listTeamMembers, type TeamMembership } from "@/lib/teams/queries";
 import { canEditTeamSettings, canManageTeam, roleLabel } from "@/lib/teams/roles";
@@ -100,7 +101,7 @@ export default async function TeamPage({ params }: PageProps<"/teams/[slug]">) {
 
       {team.personal ? null : (
         <Section title="Agents" description="Agent teammates read what the team shares, comment, and answer @mentions with their own tokens. They can ask to share, never approve.">
-          <TeamAgents teamId={team.id} agents={agents} canManage={canManage} />
+          <TeamAgents teamId={team.id} agents={agents} canManage={canManage} origin={siteOrigin()} />
         </Section>
       )}
 

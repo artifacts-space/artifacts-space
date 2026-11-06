@@ -2,21 +2,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { IconArrowRight } from "@tabler/icons-react";
 
+import { CodeBlock } from "@/components/code-block";
 import { CopyButton } from "@/components/copy-button";
 import { ArtifactDemo } from "@/components/landing/artifact-demo";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { mcpConfigJson, TOKEN_PLACEHOLDER } from "@/lib/setup/mcp-config";
 
-const mcpConfig = `{
-  "mcpServers": {
-    "artifacts": {
-      "url": "https://artifacts.space/api/mcp",
-      "headers": {
-        "Authorization": "Bearer YOUR_TOKEN"
-      }
-    }
-  }
-}`;
+const mcpConfig = mcpConfigJson("https://artifacts.space");
 
 const steps = [
   {
@@ -132,17 +125,9 @@ export default function Home() {
               </table>
             </div>
             <div>
-              <div className="overflow-hidden rounded-md border bg-card">
-                <div className="flex h-10 items-center justify-between border-b px-4">
-                  <span className="font-mono text-xs text-muted-foreground">mcp.json</span>
-                  <CopyButton value={mcpConfig} label="Copy" variant="ghost" size="sm" className="text-xs" />
-                </div>
-                <pre className="overflow-x-auto p-5 font-mono text-[12.5px] leading-6">
-                  <code>{mcpConfig}</code>
-                </pre>
-              </div>
+              <CodeBlock title="mcp.json" value={mcpConfig} className="bg-card" preClassName="p-5" />
               <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
-                Replace <code className="font-mono">YOUR_TOKEN</code> with an access token from Connections. Tokens are shown once and stored as hashes.
+                Replace <code className="font-mono">{TOKEN_PLACEHOLDER}</code> with an access token from Connections. Tokens are shown once and stored as hashes.
               </p>
             </div>
           </div>

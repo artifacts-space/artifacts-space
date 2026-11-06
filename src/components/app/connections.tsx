@@ -10,19 +10,12 @@ import {
   type ApiTokenDto,
 } from "@/app/(workspace)/app/connections/actions";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
-import { CopyButton } from "@/components/copy-button";
-import { CopyableValue } from "@/components/copyable-value";
+import { CodeBlock } from "@/components/code-block";
+import { TokenRevealDialog } from "@/components/tokens/token-reveal-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { mcpConfigJson, TOKEN_PLACEHOLDER } from "@/lib/setup/mcp-config";
 
 const tools = [
   ["artifacts_create", "Create an artifact with a title, format, project, and content."],
@@ -53,19 +46,7 @@ export function Connections({
   const [revoking, setRevoking] = useState<string | null>(null);
   const confirmRevoke = useConfirm("revokeToken");
 
-  const endpoint = `${origin}/api/mcp`;
-  const config = JSON.stringify(
-    {
-      mcpServers: {
-        artifacts: {
-          url: endpoint,
-          headers: { Authorization: "Bearer YOUR_TOKEN" },
-        },
-      },
-    },
-    null,
-    2,
-  );
+  const config = mcpConfigJson(origin);
 
   async function create(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -118,15 +99,9 @@ export function Connections({
             <p className="mt-1 text-[13px] text-muted-foreground">Add this configuration to any MCP client, then replace the token.</p>
           </div>
           <div className="p-5">
-            <div className="overflow-hidden rounded-md border bg-background/60">
-              <div className="flex h-10 items-center justify-between border-b px-4">
-                <span className="font-mono text-xs text-muted-foreground">mcp.json</span>
-                <CopyButton value={config} label="Copy" variant="ghost" size="sm" className="text-xs" />
-              </div>
-              <pre className="overflow-x-auto p-4 font-mono text-[12.5px] leading-6"><code>{config}</code></pre>
-            </div>
+            <CodeBlock title="mcp.json" value={config} />
             <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
-              Replace <code className="font-mono">YOUR_TOKEN</code> with a token from this page. Keep it out of source control.
+              Replace <code className="font-mono">{TOKEN_PLACEHOLDER}</code> with a token from this page. Keep it out of source control.
             </p>
           </div>
           <div className="border-t px-5 py-4">
@@ -187,16 +162,7 @@ export function Connections({
         </section>
       </div>
 
-      <Dialog open={Boolean(newToken)} onOpenChange={(open) => { if (!open) setNewToken(""); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Token created</DialogTitle>
-            <DialogDescription className="leading-6">Copy it now. It will not be shown again.</DialogDescription>
-          </DialogHeader>
-          <CopyableValue value={newToken} />
-          <DialogFooter><Button onClick={() => { setNewToken(""); }}>Done</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TokenRevealDialog token={newToken} origin={origin} onClose={() => { setNewToken(""); }} />
 
       <ConfirmDialog
         state={confirmRevoke.dialog}

@@ -56,7 +56,7 @@ function AddAgentForm({ teamId }: { teamId: string }) {
   );
 }
 
-function AgentRow({ agent, canManage }: { agent: TeamAgentView; canManage: boolean }) {
+function AgentRow({ agent, canManage, origin }: { agent: TeamAgentView; canManage: boolean; origin: string }) {
   const { pending, run } = useTeamAction();
   const confirmRemove = useConfirm("removeAgent");
   const muteLabel = agent.muted ? "Unmute" : "Mute";
@@ -85,7 +85,7 @@ function AgentRow({ agent, canManage }: { agent: TeamAgentView; canManage: boole
           </div>
         ) : null}
       </div>
-      {canManage ? <AgentTokens agent={agent} /> : null}
+      {canManage ? <AgentTokens agent={agent} origin={origin} /> : null}
       <ConfirmDialog
         state={confirmRemove.dialog}
         title={`Remove @${agent.handle}?`}
@@ -99,9 +99,10 @@ function AgentRow({ agent, canManage }: { agent: TeamAgentView; canManage: boole
 
 /**
  * The team's agent teammates. Everyone sees them; owners and admins add,
- * mute, and remove agents and manage their tokens.
+ * mute, and remove agents and manage their tokens. `origin` fills in the
+ * MCP setup shown with a new token.
  */
-export function TeamAgents({ teamId, agents, canManage }: { teamId: string; agents: TeamAgentView[]; canManage: boolean }) {
+export function TeamAgents({ teamId, agents, canManage, origin }: { teamId: string; agents: TeamAgentView[]; canManage: boolean; origin: string }) {
   return (
     <div>
       {agents.length === 0 ? (
@@ -109,7 +110,7 @@ export function TeamAgents({ teamId, agents, canManage }: { teamId: string; agen
           No agents yet.{canManage ? " Add one so it can read what the team shares, comment, and answer mentions." : ""}
         </p>
       ) : (
-        <ul>{agents.map((agent) => <AgentRow key={agent.userId} agent={agent} canManage={canManage} />)}</ul>
+        <ul>{agents.map((agent) => <AgentRow key={agent.userId} agent={agent} canManage={canManage} origin={origin} />)}</ul>
       )}
       {canManage ? <AddAgentForm teamId={teamId} /> : null}
     </div>

@@ -5,7 +5,6 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { shareArtifactAction } from "@/app/(workspace)/app/sharing-actions";
-import { CopyableValue } from "@/components/copyable-value";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ValueField } from "@/components/value-field";
 import type { ArtifactDto, ArtifactVisibility } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
@@ -153,7 +153,7 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
             <TeamPicker visibility={visibility} teams={teams} value={teamId} onChange={setTeamId} />
             <p className="text-xs leading-5 text-muted-foreground">{outcomeText(visibility, teams.find((team) => team.id === teamId))}</p>
             {live ? (
-              <CopyableValue value={shareUrl} copyLabel="Copy link" />
+              <ValueField value={shareUrl} copyLabel="Copy link" />
             ) : null}
           </div>
           <DialogFooter>
