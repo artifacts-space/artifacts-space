@@ -12,6 +12,8 @@ interface OgFrameProps {
   children: ReactNode;
   /** Anything drawn over the backdrop outside the text column. */
   aside?: ReactNode;
+  /** Width of the text column in px. */
+  textWidth?: number;
 }
 
 /**
@@ -19,7 +21,7 @@ interface OgFrameProps {
  * planet logo and wordmark above `children`. Satori only lays out flexbox, so
  * every element with more than one child sets `display: flex`.
  */
-export function OgFrame({ background, icon, wordmark, children, aside }: OgFrameProps) {
+export function OgFrame({ background, icon, wordmark, children, aside, textWidth = OG_TEXT_BOX.width }: OgFrameProps) {
   return (
     <div style={{ position: "relative", display: "flex", width: OG_SIZE.width, height: OG_SIZE.height }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- Satori draws plain <img> only */}
@@ -31,7 +33,7 @@ export function OgFrame({ background, icon, wordmark, children, aside }: OgFrame
           left: OG_TEXT_BOX.left,
           top: 0,
           bottom: 0,
-          width: OG_TEXT_BOX.width,
+          width: textWidth,
           paddingBottom: OG_TEXT_BOX.paddingBottom,
           display: "flex",
           flexDirection: "column",

@@ -16,3 +16,13 @@ export const strataInkBackground = pngDataUrl(readFileSync(join(process.cwd(), "
 
 /** The planet logo, pre-scaled to 40×40 with hard pixel edges so nothing resamples it. */
 export const planetIcon40 = pngDataUrl(readFileSync(join(process.cwd(), "src/app/og/planet-40.png")));
+
+/** Strata Ink without the three pixel cards, for artifact previews that draw their own card. */
+export const strataInkPlainBackground = pngDataUrl(readFileSync(join(process.cwd(), "src/app/og/strata-ink-plain.png")));
+
+function arrayBufferOf(bytes: Buffer): ArrayBuffer {
+  return Uint8Array.from(bytes).buffer;
+}
+
+/** Geist Mono Regular (SIL OFL 1.1, license beside the file) for code in artifact previews. */
+export const geistMonoRegular = arrayBufferOf(readFileSync(join(process.cwd(), "src/app/og/fonts/GeistMono-Regular.ttf")));

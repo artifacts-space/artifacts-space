@@ -21,6 +21,7 @@ import { loadArtifactByline } from "@/lib/artifact-byline";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { lastEditorsFor } from "@/lib/artifacts";
+import { artifactOgMetadata } from "@/lib/og/artifact-og";
 import { isReportable } from "@/lib/reports/rules";
 import { getSession } from "@/lib/session";
 import { visibilityCopy, type VisibilityCopy } from "@/lib/visibility-copy";
@@ -45,6 +46,7 @@ export async function generateMetadata({ params }: PageProps<"/artifact/[publicI
   if (!viewable) return notFoundMetadata;
   const { record, view } = viewable;
   return {
+    ...(await artifactOgMetadata(record.publicId)),
     title: view.title,
     ...(view.summary ? { description: view.summary } : {}),
     robots: isIndexable(record.visibility) ? { index: true, follow: false } : { index: false, follow: false },

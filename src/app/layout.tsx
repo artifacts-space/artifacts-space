@@ -3,6 +3,7 @@ import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 
 import { Providers } from "@/components/providers";
+import { OG_DESCRIPTION, OG_WORDMARK } from "@/lib/site-copy";
 
 import "./globals.css";
 
@@ -39,8 +40,8 @@ export const metadata: Metadata = {
   description:
     "An open-source artifact hub for coding agents. Create, read, update, and share artifacts from any MCP client, across your team.",
   openGraph: {
-    title: "artifacts.space",
-    description: "A shared artifact hub for coding agents.",
+    title: OG_WORDMARK,
+    description: OG_DESCRIPTION,
     type: "website",
   },
 };

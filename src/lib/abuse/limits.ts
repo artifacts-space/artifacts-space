@@ -22,6 +22,8 @@ export const rateLimits = {
   fileDownloadByNetwork: { limit: 3600, windowSeconds: hour },
   /** Artifact page views (/artifact/<id>) per network address per hour. */
   artifactPageByNetwork: { limit: 1800, windowSeconds: hour },
+  /** Artifact preview images rendered per network address per hour. Only CDN misses count; crawlers share addresses and retry, so it is generous. */
+  ogImageByNetwork: { limit: 3600, windowSeconds: hour },
   /** Sharing changes per user per hour (making an artifact private is never limited). */
   sharingRequest: { limit: 30, windowSeconds: hour },
   /** Reports per signed-in user per hour. */
@@ -66,6 +68,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   readByToken: "This connection has read a lot in the last hour.",
   fileDownloadByNetwork: "Your network has opened a lot of files in the last hour.",
   artifactPageByNetwork: "Your network has opened a lot of artifact pages in the last hour.",
+  ogImageByNetwork: "Your network has loaded a lot of artifact preview images in the last hour.",
   sharingRequest: "You have changed sharing a lot in the last hour.",
   reportByUser: "You have sent a lot of reports in the last hour.",
   reportByNetwork: "We have received a lot of reports from your network in the last hour.",

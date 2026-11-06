@@ -24,3 +24,36 @@ export const OG_HEADLINE_TYPE = {
   lineHeight: 1.04,
   letterSpacingEm: -0.035,
 } as const;
+
+/** Muted text on the ink backdrop: the kind label above an artifact title. */
+export const OG_TEXT_MUTED = "#5ccafc";
+
+/** Artifact titles: a narrower column than the site headline, to leave room for the card. */
+export const OG_ARTIFACT_TEXT_WIDTH = 520;
+export const OG_TITLE_TYPE = {
+  sizes: [56, 48, 42, 36] as const,
+  maxHeight: 180,
+  lineHeight: 1.06,
+  letterSpacingEm: -0.03,
+} as const;
+
+/** The synopsis card, styled like the Strata pixel cards: paper fill, ink outline, hard shadow. */
+export const OG_CARD = {
+  left: 652,
+  top: 140,
+  width: 476,
+  height: 300,
+  border: 6,
+  shadow: 7,
+  padding: 26,
+  paper: "#f7f6f4",
+  page: "#ffffff",
+  ink: "#0a1118",
+  shadowColor: "#242a36",
+  muted: "#5b6270",
+  rule: "#dfe3ea",
+  blue: "#0156f6",
+  blueMid: "#016af7",
+  blueLight: "#5ccafc",
+  blueWash: "#e6efff",
+} as const;

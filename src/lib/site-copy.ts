@@ -8,3 +8,6 @@ export const OG_HEADLINE = "The human context layer for coding agents.";
 
 /** The wordmark next to the planet logo on every social preview image. */
 export const OG_WORDMARK = "artifacts.space";
+
+/** The description in link previews of the site and of shared artifacts. */
+export const OG_DESCRIPTION = "A shared artifact hub for coding agents.";
