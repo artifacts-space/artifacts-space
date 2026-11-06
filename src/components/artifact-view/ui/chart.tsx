@@ -1,134 +1,68 @@
 "use client";
 
-import { useId, useState, type KeyboardEvent } from "react";
-
-import { Button } from "@/components/ui/button";
-import { niceScale, scalePosition, visibleLabelIndexes, type ChartScale } from "@/lib/ui/chart-scale";
-import { formatNumber, missingValue } from "@/lib/ui/number-format";
-import type { NumberFormat } from "@/lib/ui/props/shared";
+import { niceScale, visibleLabelIndexes, type ChartScale } from "@/lib/ui/chart-scale";
+import { stackSeries, type StackLayout } from "@/lib/ui/chart-stack";
+import type { UiProps } from "@/lib/ui/catalog";
 import { cn } from "@/lib/utils";
 
-import { Bars, Lines, plotSize, seriesBg, type Series } from "./chart-marks";
+import { Bars, Lines, plotSize, StackedAreas, StackedBars, type Series } from "./chart-marks";
+import { AxisTitle, ChartFrame, ChartTable, chartHeights, Gridlines, Legend, makeFormatter, XAxisLabels, TooltipBox, TooltipRow, usePointer, YAxis, type Formatter } from "./chart-parts";
+import { PieChart } from "./chart-pie";
+import { ScatterChart } from "./chart-scatter";
 import type { ViewProps } from "./stout";
 
-const heights = { sm: "h-40", md: "h-60", lg: "h-80" } as const;
+type ChartProps = UiProps<"Chart">;
+type Mark = "bar" | "line" | "area";
 
-type Formatter = (value: number | null | undefined) => string;
-
-function makeFormatter(format: NumberFormat, currency: string): Formatter {
-  return (value) => (value === null || value === undefined ? missingValue : formatNumber(value, format, currency));
-}
-
-function Legend({ series }: { series: Series[] }) {
-  if (series.length < 2) return null;
-  return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-      {series.map((item, index) => (
-        <li key={item.name + String(index)} className="flex min-w-0 items-center gap-1.5">
-          <span aria-hidden className={cn("size-2.5 shrink-0 rounded-[3px]", seriesBg[index % seriesBg.length])} />
-          <span className="max-w-[20ch] truncate">{item.name}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function YAxis({ scale, format, heightClass }: { scale: ChartScale; format: Formatter; heightClass: string }) {
-  const labels = scale.ticks.map((tick) => ({ tick, text: format(tick) }));
-  const longest = labels.reduce((width, label) => Math.max(width, label.text.length), 1);
-  return (
-    <div aria-hidden className={cn("relative shrink-0 self-start text-right text-[11px] text-muted-foreground tabular-nums", heightClass)} style={{ width: `${String(Math.min(longest, 10) + 1.5)}ch` }}>
-      {labels.map(({ tick, text }) => (
-        <span key={tick} className="absolute right-2 block max-w-full -translate-y-1/2 truncate" style={{ top: `${String((1 - scalePosition(tick, scale)) * 100)}%` }}>
-          {text}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function Gridlines({ scale }: { scale: ChartScale }) {
-  return scale.ticks.map((tick) => (
-    <div
-      key={tick}
-      aria-hidden
-      className={cn("absolute inset-x-0 border-t", tick === 0 ? "border-foreground/25" : "border-border/70 border-dashed")}
-      style={{ top: `${String((1 - scalePosition(tick, scale)) * 100)}%` }}
-    />
-  ));
-}
-
-function Tooltip({ label, series, index, count, format }: { label: string; series: Series[]; index: number; count: number; format: Formatter }) {
-  const left = ((index + 0.5) / count) * 100;
-  return (
-    <div
-      role="status"
-      className="pointer-events-none absolute top-1 z-10 w-max max-w-[14rem] rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-sm"
-      style={left > 60 ? { right: `${String(100 - left)}%`, marginRight: 8 } : { left: `${String(left)}%`, marginLeft: 8 }}
-    >
-      <p className="truncate font-medium">{label}</p>
-      {series.map((item, seriesIndex) => (
-        <p key={item.name + String(seriesIndex)} className="flex items-center gap-1.5 tabular-nums">
-          <span aria-hidden className={cn("size-2 shrink-0 rounded-[2px]", seriesBg[seriesIndex % seriesBg.length])} />
-          <span className="min-w-0 truncate text-muted-foreground">{item.name}</span>
-          <span className="ml-auto pl-2">{format(item.values[index])}</span>
-        </p>
-      ))}
-    </div>
-  );
-}
-
-function DataTable({ labels, series, format, visible }: { labels: string[]; series: Series[]; format: Formatter; visible: boolean }) {
-  return (
-    <div className={visible ? "max-h-72 overflow-auto rounded-md border" : "sr-only"}>
-      <table className="w-full text-xs">
-        <thead className="sticky top-0 bg-card">
-          <tr>
-            <th scope="col" className="border-b px-3 py-1.5 text-left font-medium text-muted-foreground">Label</th>
-            {series.map((item, index) => <th key={item.name + String(index)} scope="col" className="border-b px-3 py-1.5 text-right font-medium text-muted-foreground">{item.name}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {labels.map((label, index) => (
-            <tr key={`${label}-${String(index)}`} className="border-b last:border-b-0">
-              <th scope="row" className="px-3 py-1 text-left font-normal">{label}</th>
-              {series.map((item, seriesIndex) => <td key={item.name + String(seriesIndex)} className="px-3 py-1 text-right tabular-nums">{format(item.values[index])}</td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function usePointer(count: number) {
-  const [active, setActive] = useState<number | null>(null);
-  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (count === 0) return;
-    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (step === 0) return;
-    event.preventDefault();
-    setActive((current) => Math.min(count - 1, Math.max(0, (current ?? (step > 0 ? -1 : count)) + step)));
-  }
-  return { active, setActive, onKeyDown };
-}
-
-interface PlotProps {
-  type: "bar" | "line" | "area";
+interface PlotData {
+  mark: Mark;
   labels: string[];
   series: Series[];
+  /** Present when series are stacked. */
+  stack: StackLayout | null;
   scale: ChartScale;
-  format: Formatter;
-  heightClass: string;
-  summary: string;
 }
 
-function Plot({ type, labels, series, scale, format, heightClass, summary }: PlotProps) {
+function Marks({ data }: { data: PlotData }) {
+  const count = data.labels.length;
+  if (data.stack) {
+    return data.mark === "bar"
+      ? <StackedBars segments={data.stack.segments} count={count} scale={data.scale} />
+      : <StackedAreas segments={data.stack.segments} count={count} scale={data.scale} />;
+  }
+  if (data.mark === "bar") return <Bars series={data.series} count={count} scale={data.scale} />;
+  return <Lines series={data.series} count={count} scale={data.scale} area={data.mark === "area"} />;
+}
+
+function Tooltip({ data, index, format }: { data: PlotData; index: number; format: Formatter }) {
+  const total = data.stack?.totals[index];
+  return (
+    <TooltipBox left={((index + 0.5) / data.labels.length) * 100}>
+      <p className="truncate font-medium">{data.labels[index] ?? ""}</p>
+      {data.series.map((item, seriesIndex) => <TooltipRow key={item.name + String(seriesIndex)} colorIndex={seriesIndex} name={item.name} value={format(item.values[index])} />)}
+      {total === undefined ? null : <TooltipRow colorIndex={null} name="Total" value={format(total)} />}
+    </TooltipBox>
+  );
+}
+
+function labelSet(labels: string[], limit: number) {
   const count = labels.length;
-  const pointer = usePointer(count);
+  const shown = visibleLabelIndexes(count, limit);
+  return {
+    anchor: shown.length === count ? ("center" as const) : ("spread" as const),
+    items: shown.map((index) => ({ key: index, position: (index + 0.5) / count, text: labels[index] ?? "" })),
+  };
+}
+
+function XAxis({ labels }: { labels: string[] }) {
+  return <XAxisLabels wide={labelSet(labels, 8)} narrow={labelSet(labels, 4)} />;
+}
+
+function Plot({ data, format, heightClass, summary }: { data: PlotData; format: Formatter; heightClass: string; summary: string }) {
+  const pointer = usePointer(data.labels.length);
   return (
     <div className="flex min-w-0">
-      <YAxis scale={scale} format={format} heightClass={heightClass} />
+      <YAxis scale={data.scale} format={format} heightClass={heightClass} />
       <div className="min-w-0 flex-1">
         <div
           tabIndex={0}
@@ -139,86 +73,75 @@ function Plot({ type, labels, series, scale, format, heightClass, summary }: Plo
           onBlur={() => { pointer.setActive(null); }}
           className={cn("relative rounded-xs focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring", heightClass)}
         >
-          <Gridlines scale={scale} />
+          <Gridlines scale={data.scale} />
           <svg viewBox={`0 0 ${String(plotSize)} ${String(plotSize)}`} preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible" aria-hidden>
-            {type === "bar" ? <Bars series={series} count={count} scale={scale} /> : <Lines series={series} count={count} scale={scale} area={type === "area"} />}
+            <Marks data={data} />
           </svg>
           <div className="absolute inset-0 flex" aria-hidden>
-            {labels.map((label, index) => (
+            {data.labels.map((label, index) => (
               <div key={`${label}-${String(index)}`} className={cn("h-full flex-1", pointer.active === index && "bg-foreground/5")} onMouseEnter={() => { pointer.setActive(index); }} />
             ))}
           </div>
-          {pointer.active !== null ? <Tooltip label={labels[pointer.active] ?? ""} series={series} index={pointer.active} count={count} format={format} /> : null}
+          {pointer.active !== null ? <Tooltip data={data} index={pointer.active} format={format} /> : null}
         </div>
-        <XAxis labels={labels} />
+        <XAxis labels={data.labels} />
       </div>
     </div>
   );
 }
 
-function XAxis({ labels }: { labels: string[] }) {
-  const count = labels.length;
-  return (
-    <div aria-hidden className="relative mt-1.5 h-4 text-[11px] text-muted-foreground">
-      {visibleLabelIndexes(count, 8).map((index) => (
-        <span key={index} className="absolute max-w-20 -translate-x-1/2 truncate" style={{ left: `${String(((index + 0.5) / count) * 100)}%` }}>
-          {labels[index]}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function chartSummary(type: string, title: string | undefined, seriesCount: number, labelCount: number) {
-  const about = title ? ` of ${title}` : "";
-  return `${type} chart${about}: ${String(seriesCount)} series over ${String(labelCount)} labels. Use the left and right arrow keys to read values.`;
-}
-
-function ChartHeader({ title, titleId, series, empty, showTable, onToggle }: { title: string | undefined; titleId: string; series: Series[]; empty: boolean; showTable: boolean; onToggle: () => void }) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      {title ? <figcaption id={titleId} className="min-w-0 text-sm font-medium break-words">{title}</figcaption> : null}
-      <Legend series={series} />
-      {empty ? null : <Button variant="ghost" size="xs" className="ml-auto text-xs" aria-pressed={showTable} onClick={onToggle}>{showTable ? "Chart" : "Table"}</Button>}
-    </div>
-  );
+function chartSummary(type: string, props: ChartProps, seriesCount: number, labelCount: number) {
+  const about = props.title ? ` of ${props.title}` : "";
+  const stacked = props.stacked ? "Stacked " : "";
+  return `${stacked}${type} chart${about}: ${String(seriesCount)} series over ${String(labelCount)} labels. Use the left and right arrow keys to read values.`;
 }
 
 function hasData(labels: string[], series: Series[]) {
   return labels.length > 0 && series.some((item) => item.values.some((value) => value !== null));
 }
 
-export function ChartView({ props }: ViewProps<"Chart">) {
-  const titleId = useId();
-  const [showTable, setShowTable] = useState(false);
-  const series: Series[] = props.series.map((item) => ({ name: item.name, values: props.labels.map((_, index) => item.values[index] ?? null) }));
+function plotData(props: ChartProps, mark: Mark): PlotData {
+  const labels = props.labels ?? [];
+  const series: Series[] = props.series.map((item) => ({ name: item.name, values: labels.map((_, index) => item.values?.[index] ?? null) }));
+  // One label cannot draw a band, so a single stacked area shows as a stacked bar.
+  const drawn: Mark = mark === "area" && props.stacked === true && labels.length < 2 ? "bar" : mark;
+  const stack = props.stacked === true && mark !== "line" ? stackSeries(series.map((item) => item.values), labels.length) : null;
+  const scale = niceScale(stack ? stack.extent : series.flatMap((item) => item.values));
+  return { mark: drawn, labels, series, stack, scale };
+}
+
+function tableRows(data: PlotData, format: Formatter) {
+  return data.labels.map((label, index) => ({
+    key: `${label}-${String(index)}`,
+    cells: [label, ...data.series.map((item) => format(item.values[index])), ...(data.stack ? [format(data.stack.totals[index])] : [])],
+  }));
+}
+
+function CartesianChart({ props, mark }: { props: ChartProps; mark: Mark }) {
+  const data = plotData(props, mark);
   const format = makeFormatter(props.format ?? "number", props.currency ?? "USD");
-  const heightClass = heights[props.height ?? "md"];
-  const empty = !hasData(props.labels, series);
-  const header = <ChartHeader title={props.title} titleId={titleId} series={series} empty={empty} showTable={showTable} onToggle={() => { setShowTable((value) => !value); }} />;
-  if (empty) {
-    return (
-      <figure className="min-w-0 space-y-3" aria-labelledby={props.title ? titleId : undefined}>
-        {header}
-        <div className={cn("flex items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground", heightClass)}>No data to chart yet.</div>
-      </figure>
-    );
-  }
+  const heightClass = chartHeights[props.height ?? "md"];
+  const head = [props.xLabel ?? "Label", ...data.series.map((item) => item.name), ...(data.stack ? ["Total"] : [])];
   return (
-    <figure className="min-w-0 space-y-3" aria-labelledby={props.title ? titleId : undefined}>
-      {header}
-      {showTable ? null : (
-        <Plot
-          type={props.type}
-          labels={props.labels}
-          series={series}
-          scale={niceScale(series.flatMap((item) => item.values))}
-          format={format}
-          heightClass={heightClass}
-          summary={chartSummary(props.type, props.title, series.length, props.labels.length)}
-        />
-      )}
-      <DataTable labels={props.labels} series={series} format={format} visible={showTable} />
-    </figure>
+    <ChartFrame
+      title={props.title}
+      legend={<Legend names={data.series.map((item) => item.name)} />}
+      empty={!hasData(data.labels, data.series)}
+      heightClass={heightClass}
+      table={(visible) => <ChartTable head={head} rows={tableRows(data, format)} visible={visible} />}
+    >
+      <div className="min-w-0 space-y-1">
+        <AxisTitle text={props.yLabel} />
+        <Plot data={data} format={format} heightClass={heightClass} summary={chartSummary(mark, props, data.series.length, data.labels.length)} />
+        <AxisTitle text={props.xLabel} className="text-center" />
+      </div>
+    </ChartFrame>
   );
+}
+
+/** Chart: bar, line, area (optionally stacked), pie, donut, or scatter. */
+export function ChartView({ props }: ViewProps<"Chart">) {
+  if (props.type === "pie" || props.type === "donut") return <PieChart props={props} donut={props.type === "donut"} />;
+  if (props.type === "scatter") return <ScatterChart props={props} />;
+  return <CartesianChart props={props} mark={props.type} />;
 }

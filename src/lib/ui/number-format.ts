@@ -1,4 +1,4 @@
-import type { NumberFormat } from "./props/shared";
+import type { CellFormat, CellValue, NumberFormat } from "./props/shared";
 
 /** Shown in place of a missing or unusable number. */
 export const missingValue = "—";
@@ -55,4 +55,15 @@ export function formatNumber(value: number, format: NumberFormat = "number", cur
     default:
       return plain(value);
   }
+}
+
+/**
+ * Formats a table cell or key-value value: empty shows a dash, yes/no for
+ * booleans, numbers by `format` ("text" shows them as written), text as is.
+ */
+export function formatCellValue(value: CellValue | undefined, format: CellFormat, currencyCode: string): string {
+  if (value === null || value === undefined || value === "") return missingValue;
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return format === "text" ? String(value) : formatNumber(value, format, currencyCode);
+  return value;
 }

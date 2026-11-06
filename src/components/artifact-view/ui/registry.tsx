@@ -11,7 +11,9 @@ import { BadgeView, CalloutView, CodeView, HeadingView, LinkView, ListView, Mark
 import { DiagramView, MetricView, ProgressView, TableView, TimelineView } from "./data";
 import { ButtonView, CheckboxView, ChecklistView, SelectView, SliderView, SwitchView } from "./inputs";
 import { AccordionView, CardView, GridView, SectionView, SeparatorView, StackView, TabsView } from "./layout";
+import { KeyValueView } from "./key-value";
 import { FileView, ImageView } from "./media";
+import { StepsView } from "./steps";
 import { renderStout, type ViewProps } from "./stout";
 
 type Views = { [K in UiComponentName]: ComponentType<ViewProps<K>> };
@@ -32,11 +34,13 @@ const views: Views = {
   Callout: CalloutView,
   Badge: BadgeView,
   List: ListView,
+  Steps: StepsView,
   Link: LinkView,
   Quote: QuoteView,
   Table: TableView,
   Metric: MetricView,
   Chart: ChartView,
+  KeyValue: KeyValueView,
   Progress: ProgressView,
   Timeline: TimelineView,
   Diagram: DiagramView,

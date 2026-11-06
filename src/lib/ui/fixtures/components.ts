@@ -1,4 +1,6 @@
 import type { UiComponentName } from "../catalog";
+import { chartFixtures } from "./charts";
+import { keyValueFixtures, stepsFixtures } from "./details";
 
 /** A child element used inside a container fixture. */
 export interface FixtureChild {
@@ -21,7 +23,6 @@ export const unbroken = (length: number) => "x".repeat(length);
 
 const text = (value: string): FixtureChild => ({ type: "Text", props: { text: value } });
 const manyRows = Array.from({ length: 500 }, (_, index) => ({ id: index + 1, name: `Row ${index + 1}`, amount: (index * 7919) % 100_000, ok: index % 3 === 0 }));
-const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const layout: Pick<Record<UiComponentName, ComponentFixture[]>, "Section" | "Stack" | "Grid" | "Card" | "Tabs" | "Accordion" | "Separator"> = {
   Section: [
@@ -55,7 +56,7 @@ const layout: Pick<Record<UiComponentName, ComponentFixture[]>, "Section" | "Sta
   ],
 };
 
-const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Text" | "Markdown" | "Code" | "Callout" | "Badge" | "List" | "Link" | "Quote"> = {
+const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Text" | "Markdown" | "Code" | "Callout" | "Badge" | "List" | "Steps" | "Link" | "Quote"> = {
   Heading: [
     { name: "Levels", props: { text: "Level one heading", level: 1 } },
     { name: "Level four", props: { text: "Level four heading", level: 4 } },
@@ -93,6 +94,7 @@ const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Te
     { name: "Empty", props: { items: [] } },
     { name: "Many", props: { items: Array.from({ length: 200 }, (_, index) => `Item ${index + 1}`), ordered: true } },
   ],
+  Steps: stepsFixtures,
   Link: [
     { name: "Normal", props: { label: "Base UI docs", href: "https://base-ui.com" } },
     { name: "Mailto", props: { label: "Email the team", href: "mailto:team@example.com" } },
@@ -104,7 +106,7 @@ const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Te
   ],
 };
 
-const data: Pick<Record<UiComponentName, ComponentFixture[]>, "Table" | "Metric" | "Chart" | "Progress" | "Timeline" | "Diagram"> = {
+const data: Pick<Record<UiComponentName, ComponentFixture[]>, "Table" | "Metric" | "Chart" | "KeyValue" | "Progress" | "Timeline" | "Diagram"> = {
   Table: [
     { name: "Normal", props: { caption: "Monthly spend", currency: "USD", columns: [{ key: "team", label: "Team" }, { key: "spend", label: "Spend", align: "right", format: "currency" }, { key: "change", label: "Change", align: "right", format: "percent" }], rows: [{ team: "Platform", spend: 12840, change: 4.2 }, { team: "Web", spend: 5300, change: -1.5 }, { team: "Data" }] } },
     { name: "Empty rows", props: { columns: [{ key: "a", label: "A" }], rows: [] } },
@@ -116,15 +118,13 @@ const data: Pick<Record<UiComponentName, ComponentFixture[]>, "Table" | "Metric"
     { name: "Bad change", props: { label: "Errors", value: 42, change: 8, goodDirection: "down" } },
     { name: "Text value", props: { label: "Status", value: "Healthy" } },
     { name: "Huge", props: { label: longText(80), value: 1e300, unit: "ops", change: -1e20, format: "compact" } },
+    { name: "Sparkline", props: { label: "Weekly active", value: 18_420, format: "compact", change: 6.1, changeFormat: "percent", goodDirection: "up", sparkline: [12_100, 12_900, 13_400, 13_100, 14_800, 15_900, 15_200, 16_700, 17_300, 18_420] } },
+    { name: "Sparkline, gaps and huge", props: { label: "Volatile", value: -3, sparkline: [1e300, null, -1e300, 0, null, 5, 5, -3] } },
+    { name: "Sparkline, flat and one point", props: { label: "Flat", value: 5, sparkline: [5, 5, 5] } },
+    { name: "Sparkline, 200 points", props: { label: "Requests", value: 200, sparkline: Array.from({ length: 200 }, (_, index) => Math.round(Math.sin(index / 9) * 50 + index)) } },
   ],
-  Chart: [
-    { name: "Bar", props: { type: "bar", title: "Deploys per month", labels: months.slice(0, 6), series: [{ name: "Deploys", values: [12, 19, 8, 22, 17, 25] }] } },
-    { name: "Line, two series", props: { type: "line", labels: months, series: [{ name: "Signups", values: [5, 9, 14, 20, null, 31, 35, 40, 38, 45, 52, 60] }, { name: "Churn", values: [1, 2, 2, 3, 3, 4, 4, 5, 6, 6, 7, 7] }] } },
-    { name: "Area, negatives", props: { type: "area", labels: ["Q1", "Q2", "Q3", "Q4"], series: [{ name: "Margin", values: [-20, -5, 10, 35] }], format: "percent" } },
-    { name: "Empty", props: { type: "bar", labels: [], series: [{ name: "Nothing", values: [] }] } },
-    { name: "All null", props: { type: "line", labels: ["a", "b"], series: [{ name: "Gaps", values: [null, null] }] } },
-    { name: "Huge values, 200 points", props: { type: "bar", labels: Array.from({ length: 200 }, (_, index) => `P${index}`), series: [{ name: "Huge", values: Array.from({ length: 200 }, (_, index) => (index % 2 ? 1e300 : -1e299)) }], format: "compact" } },
-  ],
+  Chart: chartFixtures,
+  KeyValue: keyValueFixtures,
   Progress: [
     { name: "Normal", props: { label: "Migration", value: 64 } },
     { name: "Fraction", props: { label: "Tasks", value: 7, max: 12, format: "fraction" } },

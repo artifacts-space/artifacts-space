@@ -4,6 +4,13 @@ import { isSafeHref, maxHrefLength } from "@/lib/link-policy";
 
 import { label, prose, tone } from "./shared";
 
+const stepItem = z.object({
+  title: label(160),
+  body: prose(5000).optional(),
+  code: prose(10_000).optional(),
+  language: label(40).optional(),
+});
+
 /** Props for text and content components. */
 export const contentProps = {
   Heading: z.object({
@@ -35,6 +42,10 @@ export const contentProps = {
   List: z.object({
     items: z.array(prose(1000)).max(200),
     ordered: z.boolean().optional(),
+  }),
+  Steps: z.object({
+    items: z.array(stepItem).max(50),
+    title: label(160).optional(),
   }),
   Link: z.object({
     label: label(200),

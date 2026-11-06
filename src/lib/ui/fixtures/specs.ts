@@ -22,7 +22,7 @@ export const invalidPropsSpec = {
   elements: {
     page: { type: "Stack", props: {}, children: ["ok", "broken-chart", "broken-metric", "ok-2"] },
     ok: { type: "Text", props: { text: "Elements around the broken ones render normally." } },
-    "broken-chart": { type: "Chart", props: { type: "pie", labels: ["a"], series: [{ name: "x", values: ["one"] }] } },
+    "broken-chart": { type: "Chart", props: { type: "radar", labels: ["a"], series: [{ name: "x", values: ["one"] }] } },
     "broken-metric": { type: "Metric", props: { label: "Missing value" } },
     "ok-2": { type: "Badge", props: { label: "still here", tone: "success" } },
   },

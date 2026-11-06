@@ -5,25 +5,18 @@ import { useState } from "react";
 
 import { MermaidView } from "@/components/artifact-view/mermaid-view";
 import { Button } from "@/components/ui/button";
-import { formatNumber, missingValue } from "@/lib/ui/number-format";
-import type { CellValue, NumberFormat } from "@/lib/ui/props/shared";
+import { formatCellValue, formatNumber, missingValue } from "@/lib/ui/number-format";
+import type { CellFormat } from "@/lib/ui/props/shared";
+import type { UiProps } from "@/lib/ui/catalog";
 import { cn } from "@/lib/utils";
 
+import { Sparkline } from "./sparkline";
 import type { ViewProps } from "./stout";
 
 /** Rows shown before "Show all". */
 const initialRows = 100;
 
-type ColumnFormat = NumberFormat | "text";
-
-function formatCell(value: CellValue | undefined, format: ColumnFormat, currency: string): string {
-  if (value === null || value === undefined || value === "") return missingValue;
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (typeof value === "number") return format === "text" ? String(value) : formatNumber(value, format, currency);
-  return value;
-}
-
-function isNumeric(format: ColumnFormat | undefined) {
+function isNumeric(format: CellFormat | undefined) {
   return format !== undefined && format !== "text";
 }
 
@@ -53,7 +46,7 @@ export function TableView({ props }: ViewProps<"Table">) {
             ) : rows.map((row, index) => (
               <tr key={index} className="border-b last:border-b-0 even:bg-muted/30">
                 {props.columns.map((column) => {
-                  const text = formatCell(row[column.key], column.format ?? "text", currency);
+                  const text = formatCellValue(row[column.key], column.format ?? "text", currency);
                   return (
                     <td key={column.key} className={cn("max-w-[40ch] px-3 py-1.5 align-top", alignClass[column.align ?? (isNumeric(column.format) ? "right" : "left")], isNumeric(column.format) ? "whitespace-nowrap tabular-nums" : "wrap-anywhere", text === missingValue && "text-muted-foreground")}>
                       {text}
@@ -101,6 +94,12 @@ function MetricChange({ props }: ViewProps<"Metric">) {
   );
 }
 
+function sparklineSummary(props: UiProps<"Metric">): string {
+  const numbers = (props.sparkline ?? []).filter((value): value is number => value !== null);
+  const format = (value: number | undefined) => (value === undefined ? missingValue : formatNumber(value, props.format ?? "number", props.currency ?? "USD"));
+  return `Trend over ${String(numbers.length)} points, from ${format(numbers[0])} to ${format(numbers.at(-1))}.`;
+}
+
 export function MetricView({ props, emit }: ViewProps<"Metric">) {
   const value = typeof props.value === "number" ? formatNumber(props.value, props.format ?? "number", props.currency ?? "USD") : props.value;
   return (
@@ -111,6 +110,7 @@ export function MetricView({ props, emit }: ViewProps<"Metric">) {
         {props.unit ? <span className="shrink-0 text-sm text-muted-foreground">{props.unit}</span> : null}
       </p>
       <MetricChange props={props} emit={emit} />
+      {props.sparkline ? <Sparkline values={props.sparkline} summary={sparklineSummary(props)} /> : null}
     </div>
   );
 }

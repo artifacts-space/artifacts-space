@@ -21,6 +21,10 @@ export const currencyCode = () => z.string().regex(/^[A-Za-z]{3}$/, "Use a three
 export const numberFormat = z.enum(["number", "compact", "percent", "currency"]);
 export type NumberFormat = z.infer<typeof numberFormat>;
 
+/** How a table cell or key-value value is shown: as written, or as a formatted number. */
+export const cellFormat = z.enum(["text", "number", "compact", "percent", "currency"]);
+export type CellFormat = z.infer<typeof cellFormat>;
+
 /** Color tone shared by Callout, Badge, and status-like components. */
 export const tone = z.enum(["neutral", "info", "success", "warning", "danger"]);
 export type Tone = z.infer<typeof tone>;

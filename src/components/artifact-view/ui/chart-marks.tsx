@@ -1,9 +1,10 @@
 import { scalePosition, type ChartScale } from "@/lib/ui/chart-scale";
+import type { StackSegment } from "@/lib/ui/chart-stack";
 
 /** Series color classes in fixed order. Tailwind needs the full class names written out. */
-export const seriesFill = ["fill-series-1", "fill-series-2", "fill-series-3", "fill-series-4", "fill-series-5", "fill-series-6"] as const;
-export const seriesStroke = ["stroke-series-1", "stroke-series-2", "stroke-series-3", "stroke-series-4", "stroke-series-5", "stroke-series-6"] as const;
-export const seriesBg = ["bg-series-1", "bg-series-2", "bg-series-3", "bg-series-4", "bg-series-5", "bg-series-6"] as const;
+export const seriesFill = ["fill-series-1", "fill-series-2", "fill-series-3", "fill-series-4", "fill-series-5", "fill-series-6", "fill-series-7", "fill-series-8"] as const;
+export const seriesStroke = ["stroke-series-1", "stroke-series-2", "stroke-series-3", "stroke-series-4", "stroke-series-5", "stroke-series-6", "stroke-series-7", "stroke-series-8"] as const;
+export const seriesBg = ["bg-series-1", "bg-series-2", "bg-series-3", "bg-series-4", "bg-series-5", "bg-series-6", "bg-series-7", "bg-series-8"] as const;
 
 /** The plot is drawn in a 1000 × 1000 box stretched to fit; text stays outside the SVG. */
 export const plotSize = 1000;
@@ -83,6 +84,42 @@ export function Lines({ series, count, scale, area }: { series: Series[]; count:
             </g>
           );
         })}
+      </g>
+    );
+  });
+}
+
+/** Stacked bars: one full-width bar per label, a segment per series, split by a thin surface gap. */
+export function StackedBars({ segments, count, scale }: { segments: StackSegment[][]; count: number; scale: ChartScale }) {
+  const slot = plotSize / Math.max(count, 1);
+  const width = slot * 0.72;
+  return segments.map((series, seriesIndex) => (
+    <g key={seriesIndex} className={seriesFill[seriesIndex % seriesFill.length]}>
+      {series.map((segment, index) => {
+        if (segment.start === segment.end) return null;
+        const top = plotY(Math.max(segment.start, segment.end), scale);
+        const bottom = plotY(Math.min(segment.start, segment.end), scale);
+        return <rect key={index} x={index * slot + (slot - width) / 2} width={Math.max(width, 0.5)} y={top} height={Math.max(bottom - top, 1)} className="stroke-background" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />;
+      })}
+    </g>
+  ));
+}
+
+function bandPoints(series: StackSegment[], count: number, scale: ChartScale): string {
+  const top = series.map((segment, index): [number, number] => [plotX(index, count), plotY(segment.end, scale)]);
+  const bottom = series.map((segment, index): [number, number] => [plotX(index, count), plotY(segment.start, scale)]).reverse();
+  return pointsText([...top, ...bottom]);
+}
+
+/** Stacked areas: each series fills the band between its stack offsets, with a line on its top edge. */
+export function StackedAreas({ segments, count, scale }: { segments: StackSegment[][]; count: number; scale: ChartScale }) {
+  return segments.map((series, seriesIndex) => {
+    const color = seriesIndex % seriesFill.length;
+    const top = series.map((segment, index): [number, number] => [plotX(index, count), plotY(segment.end, scale)]);
+    return (
+      <g key={seriesIndex}>
+        <polygon className={seriesFill[color]} fillOpacity={0.3} points={bandPoints(series, count, scale)} />
+        <polyline className={seriesStroke[color]} points={pointsText(top)} fill="none" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
       </g>
     );
   });

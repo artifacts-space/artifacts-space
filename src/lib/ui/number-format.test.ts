@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatNumber, missingValue } from "./number-format";
+import { formatCellValue, formatNumber, missingValue } from "./number-format";
 
 describe("formatNumber", () => {
   it("should group digits and keep two decimals when the format is number", () => {
@@ -33,5 +33,21 @@ describe("formatNumber", () => {
   it("should show a dash when the value is not finite", () => {
     expect(formatNumber(Number.NaN)).toBe(missingValue);
     expect(formatNumber(Number.POSITIVE_INFINITY, "percent")).toBe(missingValue);
+  });
+});
+
+describe("formatCellValue", () => {
+  it("should show a dash when the value is empty", () => {
+    expect(formatCellValue(null, "number", "USD")).toBe(missingValue);
+    expect(formatCellValue("", "text", "USD")).toBe(missingValue);
+  });
+
+  it("should show yes or no when the value is a boolean", () => {
+    expect(formatCellValue(true, "text", "USD")).toBe("Yes");
+  });
+
+  it("should format numbers unless the format is text", () => {
+    expect(formatCellValue(1234.5, "currency", "USD")).toBe("$1,235");
+    expect(formatCellValue(1234.5, "text", "USD")).toBe("1234.5");
   });
 });

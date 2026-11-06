@@ -35,6 +35,8 @@
   --color-series-4: var(--series-4);
   --color-series-5: var(--series-5);
   --color-series-6: var(--series-6);
+  --color-series-7: var(--series-7);
+  --color-series-8: var(--series-8);
   --color-syntax-keyword: var(--syntax-keyword);
   --color-syntax-string: var(--syntax-string);
   --color-syntax-property: var(--syntax-property);
@@ -123,13 +125,15 @@
   --tone-success: oklch(0.52 0.13 150);
   --tone-warning: oklch(0.6 0.14 70);
   --tone-danger: oklch(0.55 0.2 27);
-  /* Categorical chart series, fixed order (validated reference palette). */
+  /* Categorical chart series, fixed order (validated reference palette). 7-8 pass adjacent checks with gaps and labels as secondary encoding. */
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --series-4: #eda100;
   --series-5: #e87ba4;
   --series-6: #6250d6;
+  --series-7: #008300;
+  --series-8: #e34948;
   --syntax-keyword: oklch(0.55 0.18 300);
   --syntax-string: oklch(0.5 0.13 150);
   --syntax-property: oklch(0.5 0.15 255);
@@ -202,6 +206,8 @@
   --series-4: #c98500;
   --series-5: #d55181;
   --series-6: #9085e9;
+  --series-7: #008300;
+  --series-8: #e66767;
   --syntax-keyword: oklch(0.76 0.13 300);
   --syntax-string: oklch(0.76 0.13 150);
   --syntax-property: oklch(0.76 0.12 255);

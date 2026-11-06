@@ -3,6 +3,7 @@ import { schema } from "@json-render/react/schema";
 import type { z } from "zod";
 
 import { contentProps } from "./props/content";
+import { chartDescription } from "./props/chart";
 import { dataChecks, dataProps, type PropCheck } from "./props/data";
 import { inputChecks, inputEvents, inputProps } from "./props/input";
 import { layoutProps } from "./props/layout";
@@ -58,11 +59,13 @@ const descriptions: Record<UiComponentName, string> = {
   Callout: "A highlighted note. `tone`: neutral, info, success, warning, or danger.",
   Badge: "A small status label with a tone.",
   List: "A bulleted or numbered list of plain-text items.",
+  Steps: "A numbered how-to or runbook. Each item has a `title`, an optional `body` in Markdown, and optional `code` (with `language`) to copy and run.",
   Link: "A link that opens in a new tab. Only absolute http, https, and mailto URLs are allowed.",
   Quote: "A block quote with an optional citation.",
   Table: "A data table. `rows` are objects keyed by each column's `key`. Missing cells show a dash. Up to 500 rows.",
-  Metric: "A key number with a label, an optional unit, and an optional change. `change` uses `changeFormat` (default: the value's `format`), so a revenue metric usually sets changeFormat \"percent\". `goodDirection` says whether up or down is good.",
-  Chart: "A bar, line, or area chart. `labels` are the x-axis; each series has one value per label (null for a gap).",
+  Metric: "A key number with a label, an optional unit, and an optional change. `change` uses `changeFormat` (default: the value's `format`), so a revenue metric usually sets changeFormat \"percent\". `goodDirection` says whether up or down is good. `sparkline` (2-200 numbers, oldest first) draws a small trend line under the value.",
+  Chart: chartDescription,
+  KeyValue: "Label and value pairs for specs, settings, and summaries. Each item's `format` styles a number like a Table column; `tone` shows the value as a status badge; `mono` shows it in monospace (ids, paths). `columns`: 1 or 2 on wide screens.",
   Progress: "A progress bar. `value` out of `max` (default 100).",
   Timeline: "A vertical list of dated events with done, current, or upcoming status.",
   Diagram: "A Mermaid diagram (flowchart, sequence, class, state, ER, gantt, and more). Put the Mermaid source in `code`.",

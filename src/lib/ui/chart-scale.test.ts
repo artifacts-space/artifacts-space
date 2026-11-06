@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { niceScale, scalePosition, visibleLabelIndexes } from "./chart-scale";
+import { niceScale, scalePosition, tickLabelWidth, visibleLabelIndexes } from "./chart-scale";
 
 describe("niceScale", () => {
   it("should round bounds outward and include zero when values are positive", () => {
@@ -65,5 +65,42 @@ describe("visibleLabelIndexes", () => {
 
   it("should return nothing when there are no labels", () => {
     expect(visibleLabelIndexes(0, 8)).toEqual([]);
+  });
+});
+
+describe("niceScale without zero", () => {
+  it("should hug the data when includeZero is false", () => {
+    const scale = niceScale([1990, 2020], 4, { includeZero: false });
+    expect(scale.min).toBeGreaterThanOrEqual(1980);
+    expect(scale.max).toBeLessThanOrEqual(2030);
+  });
+
+  it("should pad around a single value when includeZero is false", () => {
+    const scale = niceScale([50], 4, { includeZero: false });
+    expect(scale.min).toBeLessThan(50);
+    expect(scale.max).toBeGreaterThan(50);
+  });
+
+  it("should never repeat a tick when the span is tiny next to the values", () => {
+    const scale = niceScale([1e15, 1e15 + 0.001], 4, { includeZero: false });
+    expect(new Set(scale.ticks).size).toBe(scale.ticks.length);
+  });
+
+  it("should give a unit axis when data is empty and includeZero is false", () => {
+    expect(niceScale([], 4, { includeZero: false })).toMatchObject({ min: 0, max: 1 });
+  });
+});
+
+describe("tickLabelWidth", () => {
+  it("should allow the full gap when labels are centered", () => {
+    expect(tickLabelWidth([0.125, 0.375, 0.625, 0.875], "center")).toBeCloseTo(0.25);
+  });
+
+  it("should shrink to the smallest gap when the last label sits close", () => {
+    expect(tickLabelWidth([0, 0.4, 0.8, 0.9], "spread")).toBeCloseTo(0.1 / 1.1);
+  });
+
+  it("should allow the whole axis when there is one label", () => {
+    expect(tickLabelWidth([0.5], "spread")).toBe(1);
   });
 });

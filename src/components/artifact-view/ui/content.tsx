@@ -1,6 +1,7 @@
 "use client";
 
 import { IconAlertTriangle, IconCircleCheck, IconInfoCircle, IconNote, IconOctagon } from "@tabler/icons-react";
+import type { ReactNode } from "react";
 
 import { ExternalLink } from "@/components/artifact-view/external-link";
 import { MarkdownView } from "@/components/artifact-view/markdown-view";
@@ -38,20 +39,26 @@ export function MarkdownBlockView({ props }: ViewProps<"Markdown">) {
   return <MarkdownView content={props.content} />;
 }
 
-export function CodeView({ props }: ViewProps<"Code">) {
+/** A code block with an optional title and language label. `actions` sit at the right of the header. */
+export function CodeBlock({ code, language, title, actions }: { code: string; language?: string | undefined; title?: string | undefined; actions?: ReactNode }) {
   return (
     <figure className="min-w-0 overflow-hidden rounded-md border bg-muted/40">
-      {props.title || props.language ? (
-        <figcaption className="flex items-center gap-2 border-b px-3.5 py-2 text-xs text-muted-foreground">
-          {props.title ? <span className="min-w-0 truncate font-medium text-foreground">{props.title}</span> : null}
-          {props.language ? <span className="ml-auto shrink-0 font-mono">{props.language}</span> : null}
+      {title || language || actions ? (
+        <figcaption className="flex min-h-9 items-center gap-2 border-b px-3.5 py-1.5 text-xs text-muted-foreground">
+          {title ? <span className="min-w-0 truncate font-medium text-foreground">{title}</span> : null}
+          {language ? <span className="ml-auto min-w-0 truncate font-mono">{language}</span> : null}
+          {actions ? <span className={cn("shrink-0", !language && "ml-auto")}>{actions}</span> : null}
         </figcaption>
       ) : null}
       <pre tabIndex={0} className="max-h-[32rem] overflow-auto p-3.5 font-mono text-[12.5px] leading-6 focus-visible:outline-2 focus-visible:outline-ring">
-        <code>{props.code || " "}</code>
+        <code>{code || " "}</code>
       </pre>
     </figure>
   );
+}
+
+export function CodeView({ props }: ViewProps<"Code">) {
+  return <CodeBlock code={props.code} language={props.language} title={props.title} />;
 }
 
 const toneStyles: Record<Tone, { box: string; icon: string; Icon: typeof IconInfoCircle }> = {
@@ -75,7 +82,8 @@ export function CalloutView({ props }: ViewProps<"Callout">) {
   );
 }
 
-const badgeTone: Record<Tone, string> = {
+/** Badge colors per tone. */
+export const badgeTone: Record<Tone, string> = {
   neutral: "border-border bg-muted text-foreground",
   info: "border-tone-info/30 bg-tone-info/10 text-tone-info",
   success: "border-tone-success/30 bg-tone-success/10 text-tone-success",
