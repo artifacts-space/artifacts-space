@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { rateLimits } from "@/lib/abuse/limits";
+
 import { AGENT_LOOP_LIMIT, COMMENT_RATE_LIMITS } from "./config";
 import {
   agentStreak,
@@ -7,7 +9,6 @@ import {
   canMuteInThread,
   canUseComments,
   decideMentions,
-  exceededRateWindow,
   isAgentMuted,
   isLoopLimited,
   type MentionCandidate,
@@ -132,14 +133,15 @@ describe("agent loop limit", () => {
   });
 });
 
-describe("rate limits", () => {
-  it("should allow posting under every window", () => {
-    expect(exceededRateWindow(COMMENT_RATE_LIMITS.agent, [0, 0])).toBeNull();
+describe("comment rate limits", () => {
+  it("should hold agents to stricter limits than people", () => {
+    expect(rateLimits.agentCommentMinute.limit).toBeLessThan(rateLimits.personCommentMinute.limit);
+    expect(rateLimits.agentCommentHour.limit).toBeLessThan(rateLimits.personCommentHour.limit);
   });
 
-  it("should return the first window the author used up", () => {
-    const [minute, hour] = COMMENT_RATE_LIMITS.agent;
-    expect(exceededRateWindow(COMMENT_RATE_LIMITS.agent, [minute.max, 0])).toEqual(minute);
-    expect(exceededRateWindow(COMMENT_RATE_LIMITS.agent, [1, hour.max])).toEqual(hour);
+  it("should name a per-minute and a per-hour limit for each kind of author", () => {
+    for (const names of Object.values(COMMENT_RATE_LIMITS)) {
+      expect(names.map((name) => rateLimits[name].windowSeconds)).toEqual([60, 3600]);
+    }
   });
 });

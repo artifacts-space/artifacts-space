@@ -8,6 +8,11 @@ describe("routeCheckFor", () => {
     expect(routeCheckFor("HEAD", "/artifact/abc/")).toEqual({ kind: "artifact", publicId: "abc" });
   });
 
+  it("should check a comment thread page with the artifact read check", () => {
+    expect(routeCheckFor("GET", "/threads/abc")).toEqual({ kind: "thread", publicId: "abc" });
+    expect(routeCheckFor("POST", "/threads/abc")).toBeNull();
+  });
+
   it("should check a team page when it is loaded", () => {
     expect(routeCheckFor("GET", "/teams/acme")).toEqual({ kind: "team", slug: "acme" });
   });

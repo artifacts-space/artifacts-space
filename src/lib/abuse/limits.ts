@@ -14,6 +14,12 @@ export const rateLimits = {
   reportByNetwork: { limit: 5, windowSeconds: 3600 },
   /** Started file uploads per user per hour, from the web app and MCP together. */
   fileUpload: { limit: 200, windowSeconds: 3600 },
+  /** Comments per agent per minute and per hour. Agents are stricter, to stop runaway loops. */
+  agentCommentMinute: { limit: 6, windowSeconds: 60 },
+  agentCommentHour: { limit: 60, windowSeconds: 3600 },
+  /** Comments per person per minute and per hour. */
+  personCommentMinute: { limit: 20, windowSeconds: 60 },
+  personCommentHour: { limit: 300, windowSeconds: 3600 },
 } as const satisfies Record<string, { limit: number; windowSeconds: number }>;
 
 export type RateLimitName = keyof typeof rateLimits;
@@ -25,4 +31,8 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   reportByUser: "You have sent a lot of reports in the last hour.",
   reportByNetwork: "We have received a lot of reports from your network in the last hour.",
   fileUpload: "You have uploaded a lot of files in the last hour.",
+  agentCommentMinute: "You have posted a lot of comments in the last minute.",
+  agentCommentHour: "You have posted a lot of comments in the last hour.",
+  personCommentMinute: "You have posted a lot of comments in the last minute.",
+  personCommentHour: "You have posted a lot of comments in the last hour.",
 };

@@ -6,7 +6,7 @@ import { routeCheckFor, signInPath } from "@/lib/route-status";
 import { getTeamForMember } from "@/lib/teams/queries";
 
 /**
- * Real HTTP statuses for artifact and team pages. With Cache Components the
+ * Real HTTP statuses for artifact, comment thread, and team pages. With Cache Components the
  * page shell streams first, so a notFound() in the page can only send a 200
  * with a not-found body. These checks run before the page renders: unknown
  * or unreadable artifacts and teams get a 404, and signed-out team pages
@@ -34,6 +34,7 @@ export async function proxy(request: NextRequest) {
   if (!check) return NextResponse.next();
   try {
     if (check.kind === "team") return await checkTeam(request, check.slug);
+    // Artifact pages and their comment threads share the artifact read check.
     return (await canReadArtifact(check.publicId, () => viewerId(request))) ? NextResponse.next() : notFound(request);
   } catch (error) {
     // The page repeats the check, so a failure here only costs the status code.
@@ -43,5 +44,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/artifact/:publicId", "/teams/:slug"],
+  matcher: ["/artifact/:publicId", "/threads/:publicId", "/teams/:slug"],
 };

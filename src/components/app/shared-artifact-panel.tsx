@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { withdrawSharingAction } from "@/app/(workspace)/app/sharing-actions";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { CommentThread } from "@/components/comments/comment-thread";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import type { ArtifactDto } from "@/lib/artifact-types";
@@ -75,6 +76,7 @@ export function SharedArtifactPanel({ artifact, onWithdrawn }: SharedArtifactPan
       <div className="min-h-[460px] flex-1 bg-card p-6 sm:p-8">
         <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
       </div>
+      <CommentThread publicId={artifact.publicId} className="border-t px-5 py-5 sm:px-7" />
     </section>
   );
 }

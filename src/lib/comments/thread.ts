@@ -1,14 +1,15 @@
-import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { agent, comment, threadMute, type ArtifactRecord } from "@/db/schema";
+import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { getViewableArtifact } from "@/lib/access";
 import type { Actor } from "@/lib/agents/identity";
 import { loadActor } from "@/lib/agents/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { AGENT_LOOP_LIMIT, COMMENT_RATE_LIMITS } from "./config";
-import { agentStreak, canUseComments, exceededRateWindow, isAgentMuted, rateLimitMessage, type AuthorKind } from "./rules";
+import { agentStreak, canUseComments, isAgentMuted, type AuthorKind } from "./rules";
 
 /**
  * Thread facts the comment service needs: the access check, mutes, the agent
@@ -53,21 +54,11 @@ export async function assertNotMuted(thread: Thread) {
   }
 }
 
-/** Refuses a post when the author used up a rate window. Deleted comments still count. */
+/** Refuses a post when the author used up a rate window (the shared Postgres rate limiter). */
 export async function assertWithinRateLimit(actor: Actor) {
-  const windows = COMMENT_RATE_LIMITS[actor.kind];
-  const now = Date.now();
-  const counts = await Promise.all(
-    windows.map(async (window) => {
-      const [row] = await getDb()
-        .select({ count: sql<number>`count(*)::int` })
-        .from(comment)
-        .where(and(eq(comment.authorId, actor.userId), gte(comment.createdAt, new Date(now - window.seconds * 1000))));
-      return row?.count ?? 0;
-    }),
-  );
-  const exceeded = exceededRateWindow(windows, counts);
-  if (exceeded) throw new UserFacingError(rateLimitMessage(exceeded));
+  for (const name of COMMENT_RATE_LIMITS[actor.kind]) {
+    await enforceRateLimit(name, actor.userId);
+  }
 }
 
 /**

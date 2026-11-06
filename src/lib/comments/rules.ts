@@ -1,4 +1,4 @@
-import { AGENT_LOOP_LIMIT, MAX_MENTIONS_PER_COMMENT, type RateWindow } from "./config";
+import { AGENT_LOOP_LIMIT, MAX_MENTIONS_PER_COMMENT } from "./config";
 
 /**
  * Pure decisions for comment threads: who may read, write, edit, or delete,
@@ -49,23 +49,6 @@ export function agentStreak(authorKindsNewestFirst: readonly AuthorKind[]): numb
  */
 export function isLoopLimited(input: { writerKind: AuthorKind; streakBefore: number; limit?: number }): boolean {
   return input.writerKind === "agent" && input.streakBefore >= (input.limit ?? AGENT_LOOP_LIMIT);
-}
-
-/**
- * The first rate window the author has used up, or null when they may post.
- * `counts[i]` is how many comments the author posted in `windows[i]`.
- */
-export function exceededRateWindow(windows: readonly RateWindow[], counts: readonly number[]): RateWindow | null {
-  for (const [index, window] of windows.entries()) {
-    if ((counts[index] ?? 0) >= window.max) return window;
-  }
-  return null;
-}
-
-/** A message for an author who hit a rate window. */
-export function rateLimitMessage(window: RateWindow): string {
-  const span = window.seconds >= 3600 ? "an hour" : "a minute";
-  return `You can post up to ${String(window.max)} comments in ${span}. Wait a little, then try again.`;
 }
 
 /** Everything the mention rule needs to know about one mentioned handle. */

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { CommentThread } from "@/components/comments/comment-thread";
 import { CopyButton } from "@/components/copy-button";
 import { Logo } from "@/components/logo";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
@@ -71,7 +72,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   const viewable = await load(params);
   if (!viewable) notFound();
   const { record, view } = viewable;
-  const [byline, files] = await Promise.all([loadArtifactByline(record, viewable.isTeamMember), filesForViewer(viewable)]);
+  // getSession is deduplicated per request, so this reuses load()'s lookup.
+  const [byline, files, session] = await Promise.all([loadArtifactByline(record, viewable.isTeamMember), filesForViewer(viewable), getSession()]);
   const Icon = kindIcons[view.kind];
   const meta = [
     view.project ? `Project ${view.project}` : null,
@@ -104,6 +106,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
           </p>
           {isReportable(record.visibility) ? <ReportDialog publicId={record.publicId} /> : null}
         </div>
+        {/* Comments are for signed-in readers who can view the artifact; the thread checks access itself. */}
+        {session ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" /> : null}
       </main>
     </div>
   );

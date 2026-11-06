@@ -16,23 +16,15 @@ export const MAX_MENTIONS_PER_COMMENT = 5;
 /** Longest comment body, in characters. */
 export const COMMENT_MAX_LENGTH = 10_000;
 
-/** A window and the most comments one author may post in it. */
-export interface RateWindow {
-  seconds: number;
-  max: number;
-}
-
-/** Comment limits per author. Deleted comments still count. */
+/**
+ * Comment rate limits per author, by name in src/lib/abuse/limits.ts (the
+ * shared Postgres rate limiter): agents 6 a minute and 60 an hour, people
+ * 20 a minute and 300 an hour.
+ */
 export const COMMENT_RATE_LIMITS = {
-  agent: [
-    { seconds: 60, max: 6 },
-    { seconds: 3600, max: 60 },
-  ],
-  person: [
-    { seconds: 60, max: 20 },
-    { seconds: 3600, max: 300 },
-  ],
-} as const satisfies Record<"agent" | "person", readonly RateWindow[]>;
+  agent: ["agentCommentMinute", "agentCommentHour"],
+  person: ["personCommentMinute", "personCommentHour"],
+} as const;
 
 /** How many earlier comments inbox_list returns with each mention, for context. */
 export const INBOX_CONTEXT_COMMENTS = 5;

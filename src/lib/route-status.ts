@@ -4,9 +4,10 @@
  * streams, its status is fixed at 200).
  */
 
-export type RouteCheck = { kind: "artifact"; publicId: string } | { kind: "team"; slug: string } | null;
+export type RouteCheck = { kind: "artifact"; publicId: string } | { kind: "thread"; publicId: string } | { kind: "team"; slug: string } | null;
 
 const artifactPath = /^\/artifact\/([^/]+)\/?$/;
+const threadPath = /^\/threads\/([^/]+)\/?$/;
 const teamPath = /^\/teams\/([^/]+)\/?$/;
 /** Static routes under /teams that are not team slugs. */
 const reservedTeamPaths = new Set(["new"]);
@@ -16,6 +17,8 @@ export function routeCheckFor(method: string, pathname: string): RouteCheck {
   if (method !== "GET" && method !== "HEAD") return null;
   const artifact = artifactPath.exec(pathname)?.[1];
   if (artifact) return { kind: "artifact", publicId: decodeURIComponent(artifact) };
+  const thread = threadPath.exec(pathname)?.[1];
+  if (thread) return { kind: "thread", publicId: decodeURIComponent(thread) };
   const team = teamPath.exec(pathname)?.[1];
   if (team && !reservedTeamPaths.has(team)) return { kind: "team", slug: decodeURIComponent(team) };
   return null;
