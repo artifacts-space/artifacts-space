@@ -36,10 +36,10 @@ function row(visibility: "private" | "team" | "link" | "public", member: boolean
       title: "Latest title", summary: "", kind: "markdown", language: "", project: "", sessionId: "", source: "", metadata: {},
       createdAt: savedAt, updatedAt: savedAt, updatedBy: null,
     },
-    member,
+    memberId: member ? "member-1" : null,
     teamPersonal: false,
     approvedTitle: "Approved title",
-    approvedSavedAt: savedAt.toISOString(),
+    approvedSavedAt: savedAt,
     approvedBy: author,
   };
 }

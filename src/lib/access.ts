@@ -128,8 +128,31 @@ async function hasPendingEdit(artifactId: string) {
   return Boolean(row);
 }
 
-const approvedField = <T>(column: typeof artifactVersion.title | typeof artifactVersion.savedAt | typeof artifactVersion.createdBy) =>
-  sql<T>`(select ${column} from ${artifactVersion} where ${artifactVersion.id} = ${artifact.approvedVersionId})`;
+/**
+ * The query behind loadSubject. Joins, not correlated subqueries: drizzle
+ * leaves column names unqualified in a single-table select, so a subquery
+ * such as `team_member.team_id = artifact.team_id` would compare team_id with
+ * itself and match every team the viewer belongs to. team_member is unique
+ * on (team_id, user_id), so the joins add at most one row.
+ */
+export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publicId: string, viewerId: string | null) {
+  const memberOn = viewerId ? and(eq(teamMember.teamId, artifact.teamId), eq(teamMember.userId, viewerId)) : sql`false`;
+  return db
+    .select({
+      record: artifactMetaColumns(),
+      memberId: teamMember.id,
+      teamPersonal: team.personal,
+      approvedTitle: artifactVersion.title,
+      approvedSavedAt: artifactVersion.savedAt,
+      approvedBy: artifactVersion.createdBy,
+    })
+    .from(artifact)
+    .leftJoin(team, eq(team.id, artifact.teamId))
+    .leftJoin(teamMember, memberOn)
+    .leftJoin(artifactVersion, eq(artifactVersion.id, artifact.approvedVersionId))
+    .where(eq(artifact.publicId, publicId))
+    .limit(1);
+}
 
 /**
  * Everything the read decision needs, in one query and without content: the
@@ -137,22 +160,10 @@ const approvedField = <T>(column: typeof artifactVersion.title | typeof artifact
  * the approved version's title, save time, and saver.
  */
 async function loadSubject(publicId: string, viewerId: string | null) {
-  const member = viewerId
-    ? sql<boolean>`exists (select 1 from ${teamMember} where ${teamMember.teamId} = ${artifact.teamId} and ${teamMember.userId} = ${viewerId})`
-    : sql<boolean>`false`;
-  const [row] = await getDb()
-    .select({
-      record: artifactMetaColumns(),
-      member,
-      teamPersonal: sql<boolean | null>`(select ${team.personal} from ${team} where ${team.id} = ${artifact.teamId})`,
-      approvedTitle: approvedField<string | null>(artifactVersion.title),
-      approvedSavedAt: approvedField<string | null>(artifactVersion.savedAt),
-      approvedBy: approvedField<string | null>(artifactVersion.createdBy),
-    })
-    .from(artifact)
-    .where(eq(artifact.publicId, publicId))
-    .limit(1);
-  return row ?? null;
+  const [row] = await subjectQuery(getDb(), publicId, viewerId);
+  if (!row) return null;
+  const { memberId, ...rest } = row;
+  return { ...rest, member: memberId !== null };
 }
 
 type Subject = NonNullable<Awaited<ReturnType<typeof loadSubject>>>;
@@ -160,7 +171,7 @@ type Subject = NonNullable<Awaited<ReturnType<typeof loadSubject>>>;
 /** The approved version a reader outside the team gets, or null for the latest. */
 function approvedVersionFor(subject: Subject, versionId: string) {
   if (subject.approvedTitle === null || subject.approvedSavedAt === null) return null;
-  return { versionId, served: { title: subject.approvedTitle, updatedAt: new Date(subject.approvedSavedAt), editedBy: subject.approvedBy } };
+  return { versionId, served: { title: subject.approvedTitle, updatedAt: subject.approvedSavedAt, editedBy: subject.approvedBy } };
 }
 
 function latestServed(record: ArtifactMetaRecord) {
