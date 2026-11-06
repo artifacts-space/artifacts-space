@@ -131,7 +131,8 @@ function CartesianChart({ props, mark }: { props: ChartProps; mark: Mark }) {
       table={(visible) => <ChartTable head={head} rows={tableRows(data, format)} visible={visible} />}
     >
       <div className="min-w-0 space-y-1">
-        <AxisTitle text={props.yLabel} />
+        {/* Room for the top tick label, which centers on the plot edge. */}
+        <AxisTitle text={props.yLabel} className="pb-1.5" />
         <Plot data={data} format={format} heightClass={heightClass} summary={chartSummary(mark, props, data.series.length, data.labels.length)} />
         <AxisTitle text={props.xLabel} className="text-center" />
       </div>

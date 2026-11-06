@@ -138,7 +138,8 @@ export function ScatterChart({ props }: { props: ChartProps }) {
       table={(visible) => <ChartTable head={["Series", "Label", props.xLabel ?? "x", props.yLabel ?? "y"]} rows={rows} visible={visible} textColumns={2} />}
     >
       <div className="min-w-0 space-y-1">
-        <AxisTitle text={props.yLabel} />
+        {/* Room for the top tick label, which centers on the plot edge. */}
+        <AxisTitle text={props.yLabel} className="pb-1.5" />
         <Plot data={data} props={props} formats={formats} heightClass={heightClass} />
         <AxisTitle text={props.xLabel} className="text-center" />
       </div>
