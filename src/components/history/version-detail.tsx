@@ -91,8 +91,8 @@ export function VersionDetail({ version, versions, details, error, view, onView,
         <Tabs value={view} onValueChange={(value: VersionView) => { onView(value); }}>
           <TabsList aria-label="Show this version">
             <TabsTrigger value="preview" className="px-2.5">Preview</TabsTrigger>
-            <TabsTrigger value="current" className="px-2.5">Compare with current</TabsTrigger>
-            <TabsTrigger value="previous" className="px-2.5">Changes made</TabsTrigger>
+            <TabsTrigger value="current" className="px-2.5"><span className="sm:hidden">Vs current</span><span className="hidden sm:inline">Compare with current</span></TabsTrigger>
+            <TabsTrigger value="previous" className="px-2.5"><span className="sm:hidden">Changes</span><span className="hidden sm:inline">Changes made</span></TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
