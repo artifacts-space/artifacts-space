@@ -24,10 +24,10 @@ function ThemePanel({ title, dark = false }: { title: string; dark?: boolean }) 
       <p className="text-xs text-muted-foreground">{title}</p>
       {kinds.map(({ kind, label }) => (
         <div key={kind} className="space-y-3">
-          <p className="text-[13px] font-medium">{label}</p>
+          <p className="text-sm font-medium">{label}</p>
           {sizes.map((size) => (
             <div key={size} className="space-y-1.5">
-              <p className="font-mono text-[11px] text-muted-foreground">{size}px</p>
+              <p className="font-mono text-xs text-muted-foreground">{size}px</p>
               <AvatarRow size={size} kind={kind} />
             </div>
           ))}
@@ -44,7 +44,7 @@ function GridComparison() {
       <p className="text-xs text-muted-foreground">5×5 (in use) and 7×7, at 20px and 32px</p>
       {[5, 7].map((gridSize) => (
         <div key={gridSize} className="space-y-1.5">
-          <p className="font-mono text-[11px] text-muted-foreground">{gridSize}×{gridSize}</p>
+          <p className="font-mono text-xs text-muted-foreground">{gridSize}×{gridSize}</p>
           <AvatarRow size={20} kind="person" gridSize={gridSize} />
           <AvatarRow size={32} kind="person" gridSize={gridSize} />
         </div>
@@ -60,7 +60,7 @@ function GridComparison() {
  */
 function InContext() {
   return (
-    <div className="space-y-3 rounded-lg border bg-background p-4 text-[13px] sm:p-5" data-avatar-panel="context">
+    <div className="space-y-3 rounded-lg border bg-background p-4 text-md sm:p-5" data-avatar-panel="context">
       <p className="flex items-center gap-2 text-xs">
         <PixelAvatar seed="gallery-user-03" size={20} />
         <span className="font-medium">@charles</span>
