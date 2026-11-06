@@ -17,8 +17,12 @@ type Pane = "write" | "preview";
 /** Formats edited as prose in the highlighting textarea. File artifacts hold Markdown notes. */
 const proseKinds: ReadonlySet<ArtifactKind> = new Set(["markdown", "text", "file"]);
 
-/** The edit surface's size, shared by both kinds of textarea. */
-const surface = "min-h-[50dvh] max-h-none resize-y rounded-none border-transparent bg-transparent shadow-none focus-visible:border-transparent focus-visible:ring-0 sm:px-5 sm:py-4";
+/**
+ * The edit surface, shared by both kinds of textarea: a fixed height that
+ * scrolls inside, so the format check and the preview stay in view.
+ */
+const surface =
+  "h-[60dvh] min-h-80 max-h-none overflow-y-auto field-sizing-fixed resize-none rounded-none border-transparent bg-transparent shadow-none focus-visible:border-transparent focus-visible:ring-0 sm:px-5 sm:py-4";
 
 interface ContentEditorProps {
   kind: ArtifactKind;
@@ -87,7 +91,7 @@ export function ContentEditor({ kind, value, onChange, title, language, files, l
         </div>
         <section aria-label="Preview" className={cn("min-w-0 bg-background/40", pane === "preview" ? "block" : "hidden lg:block")}>
           <p className="hidden border-b px-5 py-2 text-xs text-muted-foreground lg:block">Preview</p>
-          <div className="max-h-[75dvh] overflow-y-auto overscroll-contain p-4 sm:p-5">
+          <div className="h-[60dvh] min-h-80 overflow-y-auto overscroll-contain p-4 sm:p-5">
             <ArtifactView kind={kind} content={preview} title={title} language={language} files={files} />
           </div>
         </section>

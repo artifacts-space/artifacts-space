@@ -4,10 +4,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ApprovedArticle } from "@/components/artifact-page/approved-article";
+import { EditorIsland } from "@/components/artifact-page/editor-island";
 import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { CopyButton } from "@/components/copy-button";
+import { LastEdited } from "@/components/history/last-edited";
 import { Logo } from "@/components/logo";
 import { PixelAvatar, type AvatarKind } from "@/components/pixel-avatar";
 import { ThemeSwitcher } from "@/components/theme-switcher";
@@ -17,6 +19,8 @@ import type { FileDto } from "@/lib/files/types";
 import { isIndexable } from "@/lib/access-rules";
 import { loadArtifactByline } from "@/lib/artifact-byline";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
+import type { ArtifactEditorDto } from "@/lib/artifact-types";
+import { lastEditorsFor } from "@/lib/artifacts";
 import { isReportable } from "@/lib/reports/rules";
 import { getSession } from "@/lib/session";
 import { visibilityCopy, type VisibilityCopy } from "@/lib/visibility-copy";
@@ -24,7 +28,6 @@ import { visibilityCopy, type VisibilityCopy } from "@/lib/visibility-copy";
 export const instant = false;
 
 const notFoundMetadata: Metadata = { title: "Artifact not found", robots: { index: false, follow: false } };
-const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });
 
 async function load(params: Promise<{ publicId: string }>) {
   const [{ publicId }, session] = await Promise.all([params, getSession()]);
@@ -93,20 +96,46 @@ function ArtifactBody({ viewable, files }: { viewable: ViewableArtifact; files: 
   return <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} />;
 }
 
+/** Who saved the version this reader sees, or null when they are gone. */
+async function lastEditor(userId: string | null): Promise<ArtifactEditorDto | null> {
+  if (!userId) return null;
+  return (await lastEditorsFor([{ updatedBy: userId }])).get(userId) ?? null;
+}
+
+/** Format, title, summary, who saved it last, and whether changes wait for approval. */
+function ArtifactHeading({ viewable, editor }: { viewable: ViewableArtifact; editor: ArtifactEditorDto | null }) {
+  const { view, record } = viewable;
+  const Icon = kindIcons[view.kind];
+  const meta = [view.project ? `Project ${view.project}` : null, view.source ? `Source ${view.source}` : null].filter(Boolean);
+  return (
+    <>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Icon className={`size-3.5 ${kindColors[view.kind]}`} /> {visibilityCopy(record.visibility).kicker} · {view.kind}
+      </div>
+      <h1 className="mt-4 text-balance text-4xl font-medium leading-[1.08] tracking-[-0.03em] sm:text-5xl">{view.title}</h1>
+      {view.summary ? <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{view.summary}</p> : null}
+      <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+        <LastEdited editor={editor} at={view.updatedAt.toISOString()} className="text-sm" />
+        {meta.length > 0 ? <span>· {meta.join(" · ")}</span> : null}
+      </div>
+      <PendingEditNotice viewable={viewable} />
+    </>
+  );
+}
+
 export default async function ArtifactPage({ params }: PageProps<"/artifact/[publicId]">) {
   const viewable = await load(params);
   if (!viewable) notFound();
   const { record, view } = viewable;
   // getSession is deduplicated per request, so this reuses load()'s lookup.
-  const [byline, files, session] = await Promise.all([loadArtifactByline(record, viewable.isTeamMember), filesForViewer(viewable), getSession()]);
-  const Icon = kindIcons[view.kind];
+  const [byline, files, session, editor] = await Promise.all([
+    loadArtifactByline(record, viewable.isTeamMember),
+    filesForViewer(viewable),
+    getSession(),
+    lastEditor(view.editedBy),
+  ]);
   const copy = visibilityCopy(record.visibility);
   const reportable = isReportable(record.visibility);
-  const meta = [
-    view.project ? `Project ${view.project}` : null,
-    `Updated ${dateFormat.format(view.updatedAt)}`,
-    view.source ? `Source ${view.source}` : null,
-  ].filter(Boolean);
 
   return (
     <div className="min-h-screen">
@@ -116,16 +145,12 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
       </header>
       <VisibilityNotice copy={copy} author={byline.author} avatar={byline.avatar} teamName={byline.teamName} />
       <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Icon className={`size-3.5 ${kindColors[view.kind]}`} /> {copy.kicker} · {view.kind}
-        </div>
-        <h1 className="mt-4 text-balance text-4xl font-medium leading-[1.08] tracking-[-0.03em] sm:text-5xl">{view.title}</h1>
-        {view.summary ? <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{view.summary}</p> : null}
-        <p className="mt-4 text-sm text-muted-foreground">{meta.join(" · ")}</p>
-        <PendingEditNotice viewable={viewable} />
-        <article className="mt-10">
-          <ArtifactBody viewable={viewable} files={files} />
-        </article>
+        <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
+          <ArtifactHeading viewable={viewable} editor={editor} />
+          <article className="mt-10">
+            <ArtifactBody viewable={viewable} files={files} />
+          </article>
+        </EditorIsland>
         {copy.showSignUp || reportable ? (
           <div className="mt-10 flex flex-wrap items-baseline justify-between gap-4 text-sm leading-6 text-muted-foreground">
             {copy.showSignUp ? (
