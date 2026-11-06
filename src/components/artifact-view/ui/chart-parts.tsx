@@ -4,7 +4,7 @@ import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { scalePosition, tickLabelWidth, type ChartScale } from "@/lib/ui/chart-scale";
-import { formatNumber, missingValue } from "@/lib/ui/number-format";
+import { formatNumber, missingValue, sharedFractionDigits } from "@/lib/ui/number-format";
 import type { NumberFormat } from "@/lib/ui/props/shared";
 import { cn } from "@/lib/utils";
 
@@ -16,9 +16,14 @@ export type ChartHeight = keyof typeof chartHeights;
 
 export type Formatter = (value: number | null | undefined) => string;
 
-/** Formats chart values; missing values show a dash. */
-export function makeFormatter(format: NumberFormat, currency: string): Formatter {
-  return (value) => (value === null || value === undefined ? missingValue : formatNumber(value, format, currency));
+/**
+ * Formats chart values; missing values show a dash. Given the set the values
+ * are read with (a chart's values, an axis's ticks), they share one decimal
+ * count, so $10.00 sits beside $28.50 rather than $10.
+ */
+export function makeFormatter(format: NumberFormat, currency: string, values: Iterable<number | null | undefined> = []): Formatter {
+  const shared = sharedFractionDigits(values, format, currency);
+  return (value) => (value === null || value === undefined ? missingValue : formatNumber(value, format, currency, shared));
 }
 
 /** The background class for color slot `index`. */

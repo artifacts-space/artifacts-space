@@ -58,11 +58,19 @@ function XAxis({ labels }: { labels: string[] }) {
   return <XAxisLabels wide={labelSet(labels, 8)} narrow={labelSet(labels, 4)} />;
 }
 
-function Plot({ data, format, heightClass, summary }: { data: PlotData; format: Formatter; heightClass: string; summary: string }) {
+interface Formats {
+  /** Values in tooltips and the table, sharing one decimal count. */
+  value: Formatter;
+  /** Axis ticks, sharing their own decimal count. */
+  tick: Formatter;
+}
+
+function Plot({ data, formats, heightClass, summary }: { data: PlotData; formats: Formats; heightClass: string; summary: string }) {
   const pointer = usePointer(data.labels.length);
+  const format = formats.value;
   return (
     <div className="flex min-w-0">
-      <YAxis scale={data.scale} format={format} heightClass={heightClass} />
+      <YAxis scale={data.scale} format={formats.tick} heightClass={heightClass} />
       <div className="min-w-0 flex-1">
         <div
           tabIndex={0}
@@ -119,7 +127,10 @@ function tableRows(data: PlotData, format: Formatter) {
 
 function CartesianChart({ props, mark }: { props: ChartProps; mark: Mark }) {
   const data = plotData(props, mark);
-  const format = makeFormatter(props.format ?? "number", props.currency ?? "USD");
+  const numberFormat = props.format ?? "number";
+  const currency = props.currency ?? "USD";
+  const format = makeFormatter(numberFormat, currency, [...data.series.flatMap((item) => item.values), ...(data.stack?.totals ?? [])]);
+  const formats: Formats = { value: format, tick: makeFormatter(numberFormat, currency, data.scale.ticks) };
   const heightClass = chartHeights[props.height ?? "md"];
   const head = [props.xLabel ?? "Label", ...data.series.map((item) => item.name), ...(data.stack ? ["Total"] : [])];
   return (
@@ -133,7 +144,7 @@ function CartesianChart({ props, mark }: { props: ChartProps; mark: Mark }) {
       <div className="min-w-0 space-y-1">
         {/* Room for the top tick label, which centers on the plot edge. */}
         <AxisTitle text={props.yLabel} className="pb-1.5" />
-        <Plot data={data} format={format} heightClass={heightClass} summary={chartSummary(mark, props, data.series.length, data.labels.length)} />
+        <Plot data={data} formats={formats} heightClass={heightClass} summary={chartSummary(mark, props, data.series.length, data.labels.length)} />
         <AxisTitle text={props.xLabel} className="text-center" />
       </div>
     </ChartFrame>

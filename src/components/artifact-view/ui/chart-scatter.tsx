@@ -53,8 +53,12 @@ function VerticalGridlines({ scale }: { scale: ChartScale }) {
 }
 
 interface Formats {
+  /** Point values in tooltips and the table. */
   x: Formatter;
   y: Formatter;
+  /** Axis ticks, each axis sharing its own decimal count. */
+  xTick: Formatter;
+  yTick: Formatter;
 }
 
 function PointTooltip({ data, index, props, formats }: { data: ScatterData; index: number; props: ChartProps; formats: Formats }) {
@@ -86,7 +90,7 @@ function Plot({ data, props, formats, heightClass }: { data: ScatterData; props:
   const pointer = usePointer(data.points.length);
   return (
     <div className="flex min-w-0">
-      <YAxis scale={data.y} format={formats.y} heightClass={heightClass} />
+      <YAxis scale={data.y} format={formats.yTick} heightClass={heightClass} />
       <div className="min-w-0 flex-1">
         <div
           tabIndex={0}
@@ -105,7 +109,7 @@ function Plot({ data, props, formats, heightClass }: { data: ScatterData; props:
           </svg>
           {pointer.active !== null ? <PointTooltip data={data} index={pointer.active} props={props} formats={formats} /> : null}
         </div>
-        <XTicks scale={data.x} format={formats.x} />
+        <XTicks scale={data.x} format={formats.xTick} />
       </div>
     </div>
   );
@@ -126,7 +130,14 @@ function scatterData(props: ChartProps): ScatterData {
 export function ScatterChart({ props }: { props: ChartProps }) {
   const data = scatterData(props);
   const currency = props.currency ?? "USD";
-  const formats: Formats = { x: makeFormatter(props.xFormat ?? "number", currency), y: makeFormatter(props.format ?? "number", currency) };
+  const xFormat = props.xFormat ?? "number";
+  const yFormat = props.format ?? "number";
+  const formats: Formats = {
+    x: makeFormatter(xFormat, currency, data.points.map((point) => point.x)),
+    y: makeFormatter(yFormat, currency, data.points.map((point) => point.y)),
+    xTick: makeFormatter(xFormat, currency, data.x.ticks),
+    yTick: makeFormatter(yFormat, currency, data.y.ticks),
+  };
   const heightClass = chartHeights[props.height ?? "md"];
   const rows = data.points.map((point, index) => ({ key: String(index), cells: [data.names[point.series] ?? "", point.label ?? "", formats.x(point.x), formats.y(point.y)] }));
   return (

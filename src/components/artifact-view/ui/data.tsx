@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { MermaidView } from "@/components/artifact-view/mermaid-view";
 import { Button } from "@/components/ui/button";
-import { formatCellValue, formatNumber, missingValue } from "@/lib/ui/number-format";
+import { formatCellValue, formatNumber, missingValue, sharedFractionDigits } from "@/lib/ui/number-format";
 import type { CellFormat } from "@/lib/ui/props/shared";
 import type { UiProps } from "@/lib/ui/catalog";
 import { cn } from "@/lib/utils";
@@ -22,10 +22,25 @@ function isNumeric(format: CellFormat | undefined) {
 
 const alignClass = { left: "text-left", center: "text-center", right: "text-right" } as const;
 
+type TableProps = UiProps<"Table">;
+
+/** Each numeric column's shared decimal count, from every row (shown or not), so the numbers line up and do not shift on "Show all". */
+function columnDigits(props: TableProps, currency: string): Map<string, number> {
+  const digits = new Map<string, number>();
+  for (const column of props.columns) {
+    const format = column.format;
+    if (format === undefined || format === "text") continue;
+    const values = props.rows.map((row) => row[column.key]).filter((value): value is number => typeof value === "number");
+    digits.set(column.key, sharedFractionDigits(values, format, currency));
+  }
+  return digits;
+}
+
 export function TableView({ props }: ViewProps<"Table">) {
   const [expanded, setExpanded] = useState(false);
   const rows = expanded ? props.rows : props.rows.slice(0, initialRows);
   const currency = props.currency ?? "USD";
+  const digits = columnDigits(props, currency);
   return (
     <figure className="min-w-0 space-y-2">
       {props.caption ? <figcaption className="text-md font-medium break-words">{props.caption}</figcaption> : null}
@@ -46,7 +61,7 @@ export function TableView({ props }: ViewProps<"Table">) {
             ) : rows.map((row, index) => (
               <tr key={index} className="border-b last:border-b-0 even:bg-muted/30">
                 {props.columns.map((column) => {
-                  const text = formatCellValue(row[column.key], column.format ?? "text", currency);
+                  const text = formatCellValue(row[column.key], column.format ?? "text", currency, digits.get(column.key) ?? 0);
                   return (
                     <td key={column.key} className={cn("max-w-[40ch] px-3 py-1.5 align-top", alignClass[column.align ?? (isNumeric(column.format) ? "right" : "left")], isNumeric(column.format) ? "whitespace-nowrap tabular-nums" : "wrap-anywhere", text === missingValue && "text-muted-foreground")}>
                       {text}

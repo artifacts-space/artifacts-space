@@ -95,7 +95,8 @@ export function PieChart({ props, donut }: { props: UiProps<"Chart">; donut: boo
   const slices = pieSlices(foldPieEntries(labels, values));
   const allSlices = pieSlices(foldPieEntries(labels, values, Infinity));
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
-  const format = makeFormatter(props.format ?? "number", props.currency ?? "USD");
+  // Slice values, the table, and the donut's total share one decimal count.
+  const format = makeFormatter(props.format ?? "number", props.currency ?? "USD", [...allSlices.map((slice) => slice.value), total]);
   const pointer = usePointer(slices.length);
   const activeSlice = pointer.active === null ? undefined : slices[pointer.active];
   const height = props.height ?? "md";
