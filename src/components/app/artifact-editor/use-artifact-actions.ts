@@ -25,11 +25,13 @@ export function useArtifactActions({ artifact, draft, onUpdated, onDeleted }: Op
       const result = await action();
       if (!result.success) {
         toast.error(result.error);
-        return;
+        return false;
       }
       onSuccess(result.data);
+      return true;
     } catch {
       toast.error("Something went wrong. Check your connection and try again.");
+      return false;
     } finally {
       setPending(null);
     }
@@ -46,9 +48,9 @@ export function useArtifactActions({ artifact, draft, onUpdated, onDeleted }: Op
     });
   }
 
-  async function remove(onDone: () => void) {
-    await run("delete", () => deleteArtifactAction(artifact.id), () => {
-      onDone();
+  /** Deletes the artifact. Resolves true once it is gone. */
+  function remove() {
+    return run("delete", () => deleteArtifactAction(artifact.id), () => {
       onDeleted(artifact.id);
       toast.success("Artifact deleted.");
     });

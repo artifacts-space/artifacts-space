@@ -1,0 +1,19 @@
+import { z } from "zod";
+
+/**
+ * Destructive actions whose confirmation dialog a person can turn off with
+ * "Don't ask again". Adding a value is safe; removing one leaves old rows
+ * that `listSkippedConfirmations` ignores.
+ */
+export const confirmationActions = [
+  "deleteArtifact",
+  "revokeToken",
+  "revokeAgentToken",
+  "leaveTeam",
+  "removeAgent",
+  "removeMember",
+] as const;
+
+export const confirmationActionSchema = z.enum(confirmationActions, { error: "Unknown confirmation." });
+
+export type ConfirmationAction = z.infer<typeof confirmationActionSchema>;

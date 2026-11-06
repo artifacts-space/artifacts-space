@@ -1,17 +1,8 @@
 "use client";
 
-import { IconLink, IconLoader2 } from "@tabler/icons-react";
+import { IconLink } from "@tabler/icons-react";
 
 import { CopyButton } from "@/components/copy-button";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -116,39 +107,5 @@ export function MetaFields({ draft, update }: { draft: ArtifactDraft; update: Up
         <Input value={draft.language} onChange={(event) => { update("language", event.target.value); }} placeholder="Optional" className="h-8 bg-card text-[13px]" />
       </label>
     </div>
-  );
-}
-
-/** Confirmation before deleting an artifact. */
-export function DeleteDialog({
-  open,
-  onOpenChange,
-  title,
-  deleting,
-  onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  deleting: boolean;
-  onConfirm: () => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Delete this artifact?</DialogTitle>
-          <DialogDescription className="leading-6">
-            “{title}” will be removed for you and for every agent that reads it. This cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => { onOpenChange(false); }}>Cancel</Button>
-          <Button variant="destructive" onClick={onConfirm} disabled={deleting}>
-            {deleting ? <IconLoader2 className="animate-spin" /> : null} Delete
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

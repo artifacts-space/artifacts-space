@@ -4,6 +4,7 @@ import { IconKey, IconLoader2, IconPlus, IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 
 import { createAgentTokenAction, revokeAgentTokenAction } from "@/app/(workspace)/teams/agent-actions";
+import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -43,6 +44,7 @@ export function AgentTokens({ agent }: { agent: TeamAgentView }) {
   const [secret, setSecret] = useState("");
   const [creating, setCreating] = useState(false);
   const { pending, run } = useTeamAction();
+  const confirmRevoke = useConfirm("revokeAgentToken");
 
   async function create(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -85,7 +87,7 @@ export function AgentTokens({ agent }: { agent: TeamAgentView }) {
               aria-label={`Revoke ${token.name}`}
               disabled={pending !== null}
               className="text-muted-foreground hover:text-destructive"
-              onClick={() => void run(token.id, () => revokeAgentTokenAction(agent.userId, token.id), "Token revoked.")}
+              onClick={() => { confirmRevoke.request(() => run(token.id, () => revokeAgentTokenAction(agent.userId, token.id), "Token revoked.")); }}
             >
               {pending === token.id ? <IconLoader2 className="animate-spin" /> : <IconTrash />}
             </Button>
@@ -106,6 +108,13 @@ export function AgentTokens({ agent }: { agent: TeamAgentView }) {
         </Button>
       </form>
       <FormError message={error} />
+      <ConfirmDialog
+        state={confirmRevoke.dialog}
+        title="Revoke this token?"
+        description={`Any client using it as @${agent.handle} loses access immediately. You can create a new token at any time.`}
+        confirmLabel="Revoke"
+        pending={pending !== null}
+      />
       <NewTokenDialog token={secret} handle={agent.handle} onClose={() => { setSecret(""); }} />
     </div>
   );

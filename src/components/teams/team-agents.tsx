@@ -4,9 +4,9 @@ import { IconLoader2, IconPlus, IconRobot, IconTrash, IconVolume, IconVolumeOff 
 import { useState } from "react";
 
 import { createAgentAction, removeAgentAction, setAgentMuteAction } from "@/app/(workspace)/teams/agent-actions";
+import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { TeamAgentView } from "@/lib/agents/queries";
@@ -56,36 +56,9 @@ function AddAgentForm({ teamId }: { teamId: string }) {
   );
 }
 
-/** Confirms removing an agent. Its tokens stop working at once. */
-function RemoveAgentDialog({ agent, open, onOpenChange }: { agent: TeamAgentView; open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { pending, run } = useTeamAction();
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Remove @{agent.handle}?</DialogTitle>
-          <DialogDescription className="leading-6">
-            Its tokens stop working at once and its handle becomes free. What it shared with the team stays with the team; its comments stay in their threads.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => { onOpenChange(false); }}>Cancel</Button>
-          <Button
-            variant="destructive"
-            disabled={pending !== null}
-            onClick={() => void run("remove", () => removeAgentAction(agent.userId), `@${agent.handle} removed.`).then((done) => { if (done) onOpenChange(false); })}
-          >
-            {pending ? <IconLoader2 className="animate-spin" /> : null} Remove
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function AgentRow({ agent, canManage }: { agent: TeamAgentView; canManage: boolean }) {
-  const [removeOpen, setRemoveOpen] = useState(false);
   const { pending, run } = useTeamAction();
+  const confirmRemove = useConfirm("removeAgent");
   const muteLabel = agent.muted ? "Unmute" : "Mute";
   return (
     <li className="space-y-3 border-t px-5 py-3 first:border-t-0">
@@ -104,16 +77,22 @@ function AgentRow({ agent, canManage }: { agent: TeamAgentView; canManage: boole
               disabled={pending !== null}
               onClick={() => void run("mute", () => setAgentMuteAction(agent.userId, !agent.muted), agent.muted ? `@${agent.handle} can post again.` : `@${agent.handle} is muted across the team.`)}
             >
-              {pending ? <IconLoader2 className="animate-spin" /> : agent.muted ? <IconVolume /> : <IconVolumeOff />} {muteLabel}
+              {pending === "mute" ? <IconLoader2 className="animate-spin" /> : agent.muted ? <IconVolume /> : <IconVolumeOff />} {muteLabel}
             </Button>
-            <Button variant="ghost" size="icon-sm" aria-label={`Remove @${agent.handle}`} className="text-muted-foreground hover:text-destructive" onClick={() => { setRemoveOpen(true); }}>
-              <IconTrash />
+            <Button variant="ghost" size="icon-sm" aria-label={`Remove @${agent.handle}`} className="text-muted-foreground hover:text-destructive" disabled={pending !== null} onClick={() => { confirmRemove.request(() => run("remove", () => removeAgentAction(agent.userId), `@${agent.handle} removed.`)); }}>
+              {pending === "remove" ? <IconLoader2 className="animate-spin" /> : <IconTrash />}
             </Button>
           </div>
         ) : null}
       </div>
       {canManage ? <AgentTokens agent={agent} /> : null}
-      {canManage ? <RemoveAgentDialog agent={agent} open={removeOpen} onOpenChange={setRemoveOpen} /> : null}
+      <ConfirmDialog
+        state={confirmRemove.dialog}
+        title={`Remove @${agent.handle}?`}
+        description="Its tokens stop working at once and its handle becomes free. What it shared with the team stays with the team; its comments stay in their threads."
+        confirmLabel="Remove"
+        pending={pending === "remove"}
+      />
     </li>
   );
 }

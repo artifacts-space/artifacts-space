@@ -9,6 +9,7 @@ import {
   revokeTokenAction,
   type ApiTokenDto,
 } from "@/app/(workspace)/app/connections/actions";
+import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,8 +49,8 @@ export function Connections({
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
   const [newToken, setNewToken] = useState("");
-  const [revokeId, setRevokeId] = useState("");
-  const [revoking, setRevoking] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
+  const confirmRevoke = useConfirm("revokeToken");
 
   const endpoint = `${origin}/api/mcp`;
   const config = JSON.stringify(
@@ -80,17 +81,24 @@ export function Connections({
     setName("");
   }
 
-  async function revoke() {
-    setRevoking(true);
-    const result = await revokeTokenAction(revokeId);
-    setRevoking(false);
-    if (!result.success) {
-      toast.error(result.error);
-      return;
+  /** Revokes one token. Resolves true once it no longer works. */
+  async function revoke(id: string) {
+    setRevoking(id);
+    try {
+      const result = await revokeTokenAction(id);
+      if (!result.success) {
+        toast.error(result.error);
+        return false;
+      }
+      setTokens((current) => current.filter((token) => token.id !== id));
+      toast.success("Token revoked.");
+      return true;
+    } catch {
+      toast.error("Something went wrong. Check your connection and try again.");
+      return false;
+    } finally {
+      setRevoking(null);
     }
-    setTokens((current) => current.filter((token) => token.id !== revokeId));
-    setRevokeId("");
-    toast.success("Token revoked.");
   }
 
   return (
@@ -167,8 +175,8 @@ export function Connections({
                         {token.lastUsedAt ? `Last used ${dateFormat.format(new Date(token.lastUsedAt))}` : "Never used"}
                       </p>
                     </div>
-                    <Button variant="ghost" size="icon-sm" onClick={() => { setRevokeId(token.id); }} aria-label={`Revoke ${token.name}`} className="text-muted-foreground hover:text-destructive">
-                      <IconTrash />
+                    <Button variant="ghost" size="icon-sm" disabled={revoking !== null} onClick={() => { confirmRevoke.request(() => revoke(token.id)); }} aria-label={`Revoke ${token.name}`} className="text-muted-foreground hover:text-destructive">
+                      {revoking === token.id ? <IconLoader2 className="animate-spin" /> : <IconTrash />}
                     </Button>
                   </li>
                 ))}
@@ -192,18 +200,12 @@ export function Connections({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(revokeId)} onOpenChange={(open) => { if (!open) setRevokeId(""); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Revoke this token?</DialogTitle>
-            <DialogDescription className="leading-6">Any client using it loses access immediately. You can create a new token at any time.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => { setRevokeId(""); }}>Cancel</Button>
-            <Button variant="destructive" onClick={() => void revoke()} disabled={revoking}>{revoking && <IconLoader2 className="animate-spin" />} Revoke</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        state={confirmRevoke.dialog}
+        title="Revoke this token?"
+        description="Any client using it loses access immediately. You can create a new token at any time."
+        confirmLabel="Revoke"
+      />
     </main>
   );
 }

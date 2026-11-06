@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { IconChevronDown, IconExternalLink, IconInbox, IconKey, IconLogout, IconUser } from "@tabler/icons-react";
+import { IconChevronDown, IconExternalLink, IconInbox, IconKey, IconLogout, IconRestore, IconUser } from "@tabler/icons-react";
 import { useState } from "react";
 
+import { useConfirmations } from "@/components/confirmations-provider";
 import { Logo } from "@/components/logo";
 import { TeamSwitcher, type HeaderTeam } from "@/components/teams/team-switcher";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,17 @@ function InboxLink({ count, active }: { count: number; active: boolean }) {
       ) : null}
       {active && <span className="absolute inset-x-2 bottom-0 h-px bg-foreground sm:inset-x-3" />}
     </Link>
+  );
+}
+
+/** Brings back every confirmation the person turned off. Hidden when none are off. */
+function ResetConfirmationsItem() {
+  const { skipped, reset } = useConfirmations();
+  if (skipped.size === 0) return null;
+  return (
+    <DropdownMenuItem onClick={() => void reset()} className="px-2 py-2 text-xs">
+      <IconRestore /> Reset confirmations
+    </DropdownMenuItem>
   );
 }
 
@@ -125,6 +137,7 @@ export function AppHeader({ name, email, username, teams, unreadMentions }: AppH
               <DropdownMenuItem onClick={() => { router.push("/"); }} className="px-2 py-2 text-xs">
                 <IconExternalLink /> Public site
               </DropdownMenuItem>
+              <ResetConfirmationsItem />
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => void signOut()} className="px-2 py-2 text-xs">
                 <IconLogout /> {signingOut ? "Signing out…" : "Sign out"}

@@ -3,6 +3,7 @@
 import { IconLoader2, IconTrash } from "@tabler/icons-react";
 
 import { removeMemberAction, updateMemberRoleAction } from "@/app/(workspace)/teams/actions";
+import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { TeamMemberView } from "@/lib/teams/queries";
@@ -45,17 +46,28 @@ function RoleCell({ member, teamId, editable, viewerRole }: { member: TeamMember
 
 function RemoveButton({ member, teamId }: { member: TeamMemberView; teamId: string }) {
   const { pending, run } = useTeamAction();
+  const confirmRemove = useConfirm("removeMember");
+  const name = member.name || "this member";
   return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      disabled={pending !== null}
-      aria-label={`Remove ${member.name}`}
-      className="text-muted-foreground hover:text-destructive"
-      onClick={() => void run("remove", () => removeMemberAction(teamId, member.memberId), `${member.name || "Member"} removed.`)}
-    >
-      {pending ? <IconLoader2 className="animate-spin" /> : <IconTrash />}
-    </Button>
+    <>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        disabled={pending !== null}
+        aria-label={`Remove ${member.name}`}
+        className="text-muted-foreground hover:text-destructive"
+        onClick={() => { confirmRemove.request(() => run("remove", () => removeMemberAction(teamId, member.memberId), `${member.name || "Member"} removed.`)); }}
+      >
+        {pending ? <IconLoader2 className="animate-spin" /> : <IconTrash />}
+      </Button>
+      <ConfirmDialog
+        state={confirmRemove.dialog}
+        title={`Remove ${name}?`}
+        description="They lose access to this team at once. Artifacts they shared with the team stay with the team, and its owners take them over."
+        confirmLabel="Remove"
+        pending={pending !== null}
+      />
+    </>
   );
 }
 
