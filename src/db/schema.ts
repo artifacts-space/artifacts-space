@@ -22,6 +22,7 @@ import {
   sharingLevels,
   sharingRequestKinds,
   sharingRequestStatuses,
+  versionSaveKinds,
 } from "../lib/artifact-types";
 import { artifactSizeLimits } from "../lib/artifact-limits";
 import { fileLimits, fileStatuses } from "../lib/files/config";
@@ -195,6 +196,8 @@ export const artifact = pgTable(
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     // Link and public artifacts: the version readers outside the team see. Edits wait for approval.
     approvedVersionId: text("approved_version_id").references((): AnyPgColumn => artifactVersion.id, { onDelete: "set null" }),
+    // Who saved the content or metadata last: the author, a teammate, or an agent.
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -210,7 +213,9 @@ export const artifact = pgTable(
   ],
 );
 
-// A saved copy of what readers see, taken when a link or public artifact changes.
+// A saved copy of an artifact: one per save, so the history covers every
+// visibility. Quick saves by the same editor merge into the latest version.
+// Link and public artifacts also point at one as their approved version.
 export const artifactVersion = pgTable(
   "artifact_version",
   {
@@ -228,8 +233,18 @@ export const artifactVersion = pgTable(
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // The last save merged into this version. Equals created_at until a quick follow-up save merges in.
+    savedAt: timestamp("saved_at", { withTimezone: true }).notNull().defaultNow(),
+    saveKind: text("save_kind", { enum: versionSaveKinds }).notNull().default("edit"),
+    // For a restore: the version it brought back.
+    restoredFromId: text("restored_from_id").references((): AnyPgColumn => artifactVersion.id, { onDelete: "set null" }),
+    // Content plus metadata size, for the storage quota.
+    bytes: integer("bytes").notNull().default(0),
   },
-  (table) => [index("artifact_version_artifact_created_idx").on(table.artifactId, table.createdAt)],
+  (table) => [
+    index("artifact_version_artifact_created_idx").on(table.artifactId, table.createdAt),
+    index("artifact_version_saved_idx").on(table.savedAt),
+  ],
 );
 
 // A request to share an artifact that waits for a team owner's or admin's decision.

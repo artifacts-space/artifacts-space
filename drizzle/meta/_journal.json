@@ -92,6 +92,20 @@
       "when": 1794000552261,
       "tag": "0012_oauth_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794004830124,
+      "tag": "0013_edit_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794004835275,
+      "tag": "0014_backfill_edit_history",
+      "breakpoints": true
     }
   ]
 }

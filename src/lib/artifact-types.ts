@@ -13,6 +13,14 @@ export type SharingRequestStatus = (typeof sharingRequestStatuses)[number];
 /** sharing: who can read it. edit: new content for a link or public artifact. */
 export const sharingRequestKinds = ["sharing", "edit"] as const;
 export type SharingRequestKind = (typeof sharingRequestKinds)[number];
+/**
+ * Why a version was saved. create: the first content. edit: a content or
+ * metadata save. files: files were added or removed. restore: an older
+ * version was brought back. snapshot: what an artifact showed before history
+ * began, or when it was shared.
+ */
+export const versionSaveKinds = ["create", "edit", "files", "restore", "snapshot"] as const;
+export type VersionSaveKind = (typeof versionSaveKinds)[number];
 /** Why a reader reports an artifact. */
 export const reportReasons = ["spam", "phishing", "malware", "harassment", "illegal", "private_info", "copyright", "other"] as const;
 export type ReportReason = (typeof reportReasons)[number];
@@ -31,6 +39,14 @@ export interface PendingSharingDto {
 export interface PendingEditDto {
   requestId: string;
   requestedAt: string;
+}
+
+/** A person or agent who saved an artifact or one of its versions. `id` seeds their pixel avatar. */
+export interface ArtifactEditorDto {
+  id: string;
+  kind: "person" | "agent";
+  handle: string | null;
+  name: string;
 }
 
 export interface ArtifactDto {
@@ -57,9 +73,43 @@ export interface ArtifactDto {
   pendingEdit: PendingEditDto | null;
   /** Ready files attached to the artifact, in the order they were added. */
   files: FileDto[];
+  /** Who saved it last. Null when they are gone. */
+  updatedBy: ArtifactEditorDto | null;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+}
+
+/** One entry in an artifact's history, without its content. */
+export interface VersionSummaryDto {
+  id: string;
+  createdAt: string;
+  /** The last save merged into it. Equals createdAt for a single save. */
+  savedAt: string;
+  saveKind: VersionSaveKind;
+  restoredFromId: string | null;
+  /** Content plus metadata size. */
+  bytes: number;
+  kind: ArtifactKind;
+  title: string;
+  /** Who saved it. Null when they are gone. */
+  editor: ArtifactEditorDto | null;
+  /** Readers outside the team see this version (link and public artifacts). */
+  approved: boolean;
+  /** This version waits for a team owner or admin. */
+  pending: boolean;
+  /** The newest version: what the artifact shows now. */
+  latest: boolean;
+}
+
+/** One version with everything it saved. */
+export interface VersionDetailDto extends VersionSummaryDto {
+  summary: string;
+  content: string;
+  language: string;
+  project: string;
+  source: string;
+  metadata: Record<string, unknown>;
 }
 
 export interface ArtifactInput {
