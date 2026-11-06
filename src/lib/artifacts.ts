@@ -1,16 +1,24 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
-import { artifact, type ArtifactRecord } from "@/db/schema";
+import { artifact, sharingRequest, type ArtifactRecord } from "@/db/schema";
+import { viewableInTeamCondition } from "@/lib/access";
 import { assertValidArtifactContent, assertValidArtifactUpdate } from "@/lib/artifact-content";
 import {
   artifactKinds,
   type ArtifactDto,
   type ArtifactInput,
+  type PendingSharingDto,
 } from "@/lib/artifact-types";
+import { generatePublicId } from "@/lib/public-id";
+
+/**
+ * Artifact storage. Writes here are author-only. Visibility never changes
+ * here: sharing goes through requestArtifactSharing in src/lib/sharing.
+ */
 
 const artifactUpdateSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
@@ -21,7 +29,6 @@ const artifactUpdateSchema = z.object({
   project: z.string().trim().max(120).optional(),
   sessionId: z.string().trim().max(200).optional(),
   source: z.string().trim().max(120).optional(),
-  visibility: z.enum(["private", "unlisted"]).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -37,13 +44,14 @@ export const artifactInputSchema = artifactUpdateSchema
     project: artifactUpdateSchema.shape.project.default(""),
     sessionId: artifactUpdateSchema.shape.sessionId.default(""),
     source: artifactUpdateSchema.shape.source.default(""),
-    visibility: artifactUpdateSchema.shape.visibility.default("private"),
     metadata: artifactUpdateSchema.shape.metadata.default({}),
   });
 
-export function toArtifactDto(record: ArtifactRecord): ArtifactDto {
+/** Maps a row to the workspace's DTO. */
+export function toArtifactDto(record: ArtifactRecord, pendingSharing: PendingSharingDto | null = null): ArtifactDto {
   return {
     id: record.id,
+    publicId: record.publicId,
     title: record.title,
     summary: record.summary,
     content: record.content,
@@ -53,34 +61,68 @@ export function toArtifactDto(record: ArtifactRecord): ArtifactDto {
     sessionId: record.sessionId,
     source: record.source,
     visibility: record.visibility,
-    shareId: record.shareId,
+    teamId: record.teamId,
+    authorId: record.userId,
+    originalAuthorId: record.originalAuthorId,
+    pendingSharing,
     metadata: record.metadata,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };
 }
 
-export async function listArtifacts(
-  userId: string,
-  options: { query?: string | undefined; project?: string | undefined; limit?: number | undefined } = {},
-) {
-  const conditions: SQL[] = [eq(artifact.userId, userId)];
-  const query = options.query?.trim();
+/** Open sharing requests for these artifacts, by artifact id. */
+export async function pendingSharingFor(artifactIds: string[]): Promise<Map<string, PendingSharingDto>> {
+  if (artifactIds.length === 0) return new Map();
+  const rows = await getDb()
+    .select()
+    .from(sharingRequest)
+    .where(and(inArray(sharingRequest.artifactId, artifactIds), eq(sharingRequest.status, "pending")));
+  return new Map(
+    rows.map((row) => [
+      row.artifactId,
+      { requestId: row.id, level: row.visibility, teamId: row.teamId, requestedAt: row.createdAt.toISOString() },
+    ]),
+  );
+}
 
-  if (query) {
-    const pattern = `%${query}%`;
-    const search = or(
-      ilike(artifact.title, pattern),
-      ilike(artifact.summary, pattern),
-      ilike(artifact.content, pattern),
-      ilike(artifact.project, pattern),
-    );
-    if (search) conditions.push(search);
-  }
+/** Maps rows to DTOs with their open sharing requests. */
+export async function toArtifactDtos(records: ArtifactRecord[]): Promise<ArtifactDto[]> {
+  const pending = await pendingSharingFor(records.map((record) => record.id));
+  return records.map((record) => toArtifactDto(record, pending.get(record.id) ?? null));
+}
 
-  if (options.project?.trim()) {
-    conditions.push(eq(artifact.project, options.project.trim()));
-  }
+/** Which artifacts a list shows: the viewer's own, or those shared with one of their teams. */
+export type ArtifactScope = { kind: "mine" } | { kind: "team"; teamId: string };
+
+export interface ListOptions {
+  scope?: ArtifactScope | undefined;
+  query?: string | undefined;
+  project?: string | undefined;
+  limit?: number | undefined;
+}
+
+function searchCondition(query: string | undefined) {
+  const text = query?.trim();
+  if (!text) return undefined;
+  const pattern = `%${text}%`;
+  return or(ilike(artifact.title, pattern), ilike(artifact.summary, pattern), ilike(artifact.content, pattern), ilike(artifact.project, pattern));
+}
+
+function scopeCondition(viewerId: string, scope: ArtifactScope) {
+  if (scope.kind === "mine") return eq(artifact.userId, viewerId);
+  return viewableInTeamCondition(viewerId, scope.teamId);
+}
+
+/**
+ * Lists artifacts the viewer may read in one scope, newest first. The team
+ * scope checks membership in the query itself, so a non-member gets nothing.
+ */
+export async function listArtifacts(viewerId: string, options: ListOptions = {}): Promise<ArtifactDto[]> {
+  const conditions: SQL[] = [scopeCondition(viewerId, options.scope ?? { kind: "mine" })];
+  const search = searchCondition(options.query);
+  if (search) conditions.push(search);
+  if (options.project?.trim()) conditions.push(eq(artifact.project, options.project.trim()));
 
   const records = await getDb()
     .select()
@@ -89,29 +131,36 @@ export async function listArtifacts(
     .orderBy(desc(artifact.updatedAt))
     .limit(Math.min(Math.max(options.limit ?? 100, 1), 100));
 
-  return records.map(toArtifactDto);
+  return toArtifactDtos(records);
 }
 
-export async function getArtifact(userId: string, id: string) {
+/** The author's own artifact by internal id, or null. */
+export async function getOwnArtifact(userId: string, id: string) {
   const [record] = await getDb()
     .select()
     .from(artifact)
     .where(and(eq(artifact.userId, userId), eq(artifact.id, id)))
     .limit(1);
-
-  return record ? toArtifactDto(record) : null;
+  return record ?? null;
 }
 
-export async function getSharedArtifact(shareId: string) {
+/** The author's own artifact by public id, or null. */
+export async function getOwnArtifactByPublicId(userId: string, publicId: string) {
   const [record] = await getDb()
     .select()
     .from(artifact)
-    .where(and(eq(artifact.shareId, shareId), eq(artifact.visibility, "unlisted")))
+    .where(and(eq(artifact.userId, userId), eq(artifact.publicId, publicId)))
     .limit(1);
-
-  return record ? toArtifactDto(record) : null;
+  return record ?? null;
 }
 
+/** The public id behind a legacy /share/<shareId> link, or null. */
+export async function findPublicIdByShareId(shareId: string) {
+  const [record] = await getDb().select({ publicId: artifact.publicId }).from(artifact).where(eq(artifact.shareId, shareId)).limit(1);
+  return record?.publicId ?? null;
+}
+
+/** Creates a private artifact for its author. */
 export async function createArtifact(userId: string, input: ArtifactInput) {
   const parsed = artifactInputSchema.parse(input);
   assertValidArtifactContent(parsed.kind, parsed.content);
@@ -121,6 +170,8 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
       ...parsed,
       id: randomUUID(),
       shareId: randomUUID().replaceAll("-", ""),
+      publicId: generatePublicId(),
+      visibility: "private",
       userId,
     })
     .returning();
@@ -129,22 +180,22 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
   return toArtifactDto(record);
 }
 
-export async function updateArtifact(
-  userId: string,
-  id: string,
-  input: ArtifactUpdateInput,
-) {
+/** Changes the author's own artifact. Returns null when it is not theirs. */
+export async function updateArtifact(userId: string, id: string, input: ArtifactUpdateInput) {
   const parsed = artifactUpdateSchema.parse(input);
-  await assertValidArtifactUpdate(parsed, () => getArtifact(userId, id));
+  await assertValidArtifactUpdate(parsed, () => getOwnArtifact(userId, id));
   const [record] = await getDb()
     .update(artifact)
     .set({ ...parsed, updatedAt: new Date() })
     .where(and(eq(artifact.userId, userId), eq(artifact.id, id)))
     .returning();
 
-  return record ? toArtifactDto(record) : null;
+  if (!record) return null;
+  const [dto] = await toArtifactDtos([record]);
+  return dto ?? null;
 }
 
+/** Deletes the author's own artifact. */
 export async function deleteArtifact(userId: string, id: string) {
   const [record] = await getDb()
     .delete(artifact)

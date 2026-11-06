@@ -6,6 +6,7 @@ import { magicLink } from "better-auth/plugins";
 import { getDb } from "@/db";
 import * as schema from "@/db/schema";
 import { sendMagicLinkEmail } from "@/lib/auth/magic-link-email";
+import { teamDepartureHook } from "@/lib/auth/team-departure";
 import { teamsPlugin } from "@/lib/auth/teams-plugin";
 import { userHooks } from "@/lib/auth/user-hooks";
 
@@ -53,6 +54,7 @@ function createAuth() {
       },
     },
     databaseHooks: { user: userHooks },
+    hooks: { after: teamDepartureHook },
     plugins: [
       magicLink({
         expiresIn: tenMinutes,

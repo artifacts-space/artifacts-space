@@ -1,24 +1,22 @@
 import { createHash } from "node:crypto";
 
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
+import { siteUrl } from "@/lib/site-origin";
 
 interface TeamInvitationEmail {
   invitationId: string;
   email: string;
   teamName: string;
   inviterName: string;
-  /** The request that created the invitation, used for the link's origin when BETTER_AUTH_URL is unset. */
-  request?: Request | undefined;
 }
 
 function escapeHtml(value: string) {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
-/** The page where the invited person accepts or declines. */
-export function invitationUrl(invitationId: string, request?: Request) {
-  const origin = process.env.BETTER_AUTH_URL ?? (request ? new URL(request.url).origin : "https://artifacts.space");
-  return new URL(`/invitations/${encodeURIComponent(invitationId)}`, origin).href;
+/** The page where the invited person accepts or declines. Never built from the request. */
+export function invitationUrl(invitationId: string) {
+  return siteUrl(`/invitations/${encodeURIComponent(invitationId)}`);
 }
 
 function renderHtml(url: string, teamName: string, inviterName: string) {
@@ -44,7 +42,7 @@ function renderHtml(url: string, teamName: string, inviterName: string) {
  * keys, it prints the link to the server log instead.
  */
 export async function sendTeamInvitationEmail(input: TeamInvitationEmail) {
-  const url = invitationUrl(input.invitationId, input.request);
+  const url = invitationUrl(input.invitationId);
   if (!isSendirConfigured()) {
     if (process.env.NODE_ENV === "production") throw new Error("Sendir is not configured, so invitations cannot be sent.");
     console.info(`[teams] Invitation to ${input.teamName} for ${input.email}: ${url}`);

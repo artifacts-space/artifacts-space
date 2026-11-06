@@ -15,7 +15,6 @@ import type {
   ActionResult,
   ArtifactDto,
   ArtifactInput,
-  ArtifactVisibility,
 } from "@/lib/artifact-types";
 
 async function requireUserId() {
@@ -67,11 +66,4 @@ export async function deleteArtifactAction(id: string): Promise<ActionResult<str
   } catch {
     return { success: false, error: "The artifact could not be deleted." };
   }
-}
-
-export async function setArtifactVisibilityAction(
-  id: string,
-  visibility: ArtifactVisibility,
-): Promise<ActionResult<ArtifactDto>> {
-  return updateArtifactAction(id, { visibility });
 }

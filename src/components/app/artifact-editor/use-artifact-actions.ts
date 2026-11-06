@@ -1,16 +1,12 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
-import {
-  deleteArtifactAction,
-  setArtifactVisibilityAction,
-  updateArtifactAction,
-} from "@/app/(workspace)/app/actions";
+import { deleteArtifactAction, updateArtifactAction } from "@/app/(workspace)/app/actions";
 import type { ActionResult, ArtifactDto } from "@/lib/artifact-types";
 
 import type { ArtifactDraft } from "./use-artifact-draft";
 
-export type PendingAction = "save" | "share" | "delete" | null;
+export type PendingAction = "save" | "delete" | null;
 
 interface Options {
   artifact: ArtifactDto;
@@ -19,10 +15,9 @@ interface Options {
   onDeleted: (id: string) => void;
 }
 
-/** Save, share, and delete for one artifact, with a single pending state. */
+/** Save and delete for one artifact, with a single pending state. Sharing lives in ShareControl. */
 export function useArtifactActions({ artifact, draft, onUpdated, onDeleted }: Options) {
   const [pending, setPending] = useState<PendingAction>(null);
-  const shared = artifact.visibility === "unlisted";
 
   async function run<T>(name: Exclude<PendingAction, null>, action: () => Promise<ActionResult<T>>, onSuccess: (data: T) => void) {
     setPending(name);
@@ -51,14 +46,6 @@ export function useArtifactActions({ artifact, draft, onUpdated, onDeleted }: Op
     });
   }
 
-  async function toggleSharing() {
-    const next = shared ? "private" : "unlisted";
-    await run("share", () => setArtifactVisibilityAction(artifact.id, next), (data) => {
-      onUpdated(data);
-      toast.success(next === "unlisted" ? "Share link enabled." : "Share link disabled.");
-    });
-  }
-
   async function remove(onDone: () => void) {
     await run("delete", () => deleteArtifactAction(artifact.id), () => {
       onDone();
@@ -67,5 +54,5 @@ export function useArtifactActions({ artifact, draft, onUpdated, onDeleted }: Op
     });
   }
 
-  return { pending, shared, save, toggleSharing, remove };
+  return { pending, save, remove };
 }

@@ -28,6 +28,7 @@ const tools = [
   ["artifacts_list", "List and search artifacts by text or project."],
   ["artifacts_update", "Change an artifact in place."],
   ["artifacts_delete", "Remove an artifact."],
+  ["teams_list", "List your teams, for sharing and team scopes."],
 ];
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });

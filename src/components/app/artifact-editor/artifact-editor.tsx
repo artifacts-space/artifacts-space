@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { ShareControl } from "@/components/app/share-control";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
 import {
@@ -27,10 +28,11 @@ interface ArtifactEditorProps {
 /** Edit, share, and delete one artifact. */
 export function ArtifactEditor({ artifact, origin, onUpdated, onDeleted }: ArtifactEditorProps) {
   const { draft, update, dirty } = useArtifactDraft(artifact);
-  const { pending, shared, save, toggleSharing, remove } = useArtifactActions({ artifact, draft, onUpdated, onDeleted });
+  const { pending, save, remove } = useArtifactActions({ artifact, draft, onUpdated, onDeleted });
   const [mode, setMode] = useState<EditorMode>("edit");
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const shareUrl = `${origin}/share/${artifact.shareId}`;
+  const shareUrl = `${origin}/artifact/${artifact.publicId}`;
+  const shared = artifact.visibility === "link" || artifact.visibility === "public";
 
   return (
     <section className="flex min-w-0 flex-1 flex-col" aria-label={`Edit ${artifact.title}`}>
@@ -38,12 +40,10 @@ export function ArtifactEditor({ artifact, origin, onUpdated, onDeleted }: Artif
         id={artifact.id}
         kind={draft.kind}
         content={artifact.content}
-        shared={shared}
-        shareUrl={shareUrl}
+        shareControl={<ShareControl artifact={artifact} shareUrl={shareUrl} onUpdated={onUpdated} />}
         dirty={dirty}
         pending={pending}
         onSave={() => void save()}
-        onToggleShare={() => void toggleSharing()}
         onRequestDelete={() => { setDeleteOpen(true); }}
       />
       {shared ? <ShareBanner shareUrl={shareUrl} /> : null}

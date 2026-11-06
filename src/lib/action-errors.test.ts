@@ -2,6 +2,8 @@ import { APIError } from "better-auth/api";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { UserFacingError } from "@/lib/user-facing-error";
+
 import { actionErrorMessage, teamWording } from "./action-errors";
 
 describe("teamWording", () => {
@@ -23,5 +25,11 @@ describe("actionErrorMessage", () => {
 
   it("should hide unknown errors behind the fallback", () => {
     expect(actionErrorMessage(new Error("connection string leaked"), "Try again.")).toBe("Try again.");
+  });
+});
+
+describe("actionErrorMessage with UserFacingError", () => {
+  it("should show the message of an error written for the user", () => {
+    expect(actionErrorMessage(new UserFacingError("Choose a team."), "fallback")).toBe("Choose a team.");
   });
 });

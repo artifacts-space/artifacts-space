@@ -1,5 +1,6 @@
 import { organization } from "better-auth/plugins";
 
+import { reconcileAfterDeparture } from "@/lib/auth/team-departure";
 import { assertInvitableRole, assertNotPersonal, assertTeamUpdateAllowed, prepareNewTeam } from "@/lib/teams/guards";
 import { sendTeamInvitationEmail } from "@/lib/teams/invitation-email";
 
@@ -20,13 +21,12 @@ export function teamsPlugin() {
     invitationExpiresIn: sevenDays,
     cancelPendingInvitationsOnReInvite: true,
     requireEmailVerificationOnInvitation: true,
-    sendInvitationEmail: async (data, request) => {
+    sendInvitationEmail: async (data) => {
       await sendTeamInvitationEmail({
         invitationId: data.id,
         email: data.email,
         teamName: data.organization.name,
         inviterName: data.inviter.user.name || data.inviter.user.email,
-        request,
       });
     },
     schema: {
@@ -57,6 +57,7 @@ export function teamsPlugin() {
         assertInvitableRole(invitation.role);
         return Promise.resolve();
       },
+      afterRemoveMember: ({ organization: team }) => reconcileAfterDeparture(team.id),
       beforeUpdateMemberRole: ({ organization: team }) => {
         assertNotPersonal(team, "change roles");
         return Promise.resolve();

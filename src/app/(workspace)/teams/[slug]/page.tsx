@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { InviteForm, PendingInvitations } from "@/components/teams/invite-form";
+import { PendingSharingList, TeamSharedList } from "@/components/teams/pending-sharing";
 import { Section } from "@/components/teams/section";
 import { TeamMembers } from "@/components/teams/team-members";
 import { LeaveTeamButton, SharingRuleSetting } from "@/components/teams/team-settings";
 import { Badge } from "@/components/ui/badge";
 import { getSession } from "@/lib/session";
+import { listPendingSharing, listTeamSharedArtifacts } from "@/lib/sharing/queries";
 import { getTeamForMember, listPendingInvitations, listTeamMembers, type TeamMembership } from "@/lib/teams/queries";
 import { canEditTeamSettings, canManageTeam, roleLabel } from "@/lib/teams/roles";
 
@@ -27,6 +29,28 @@ function TeamHeader({ team }: { team: TeamMembership }) {
       </div>
       {team.personal ? null : <LeaveTeamButton teamId={team.id} teamName={team.name} />}
     </div>
+  );
+}
+
+/** Pending requests (owners and admins of shared teams) and what the team shares. */
+async function SharingSections({ team }: { team: TeamMembership }) {
+  const manager = canManageTeam(team.role);
+  const reviews = manager && !team.personal;
+  const [requests, shared] = await Promise.all([
+    reviews ? listPendingSharing(team.id) : Promise.resolve([]),
+    listTeamSharedArtifacts(team.id),
+  ]);
+  return (
+    <>
+      {reviews ? (
+        <Section title="Pending sharing" description="Approve or deny requests to share with the team, by link, or in public.">
+          <PendingSharingList requests={requests} />
+        </Section>
+      ) : null}
+      <Section title="Shared through this team" description={manager ? "Withdraw makes an artifact private to its author again." : undefined}>
+        <TeamSharedList artifacts={shared} canWithdraw={manager} />
+      </Section>
+    </>
   );
 }
 
@@ -51,6 +75,8 @@ export default async function TeamPage({ params }: PageProps<"/teams/[slug]">) {
       <Section title="Members" description={team.personal ? "Your personal team is only you. Create a team to share with others." : undefined}>
         <TeamMembers teamId={team.id} members={members} viewerId={session.user.id} viewerRole={team.role} canManage={canManage} />
       </Section>
+
+      <SharingSections team={team} />
 
       {canManage ? (
         <Section title="Invite people" description="They join when they accept the emailed invitation.">

@@ -1,6 +1,8 @@
 import { isAPIError } from "better-auth/api";
 import { ZodError } from "zod";
 
+import { UserFacingError } from "@/lib/user-facing-error";
+
 const organizationWord = /organization/gi;
 
 /** Better Auth says "organization"; the product says "team". */
@@ -14,6 +16,7 @@ export function teamWording(message: string) {
  */
 export function actionErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ZodError) return error.issues[0]?.message ?? fallback;
+  if (error instanceof UserFacingError) return error.message;
   if (isAPIError(error) && error.message) return teamWording(error.message);
   return fallback;
 }

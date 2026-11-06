@@ -55,7 +55,7 @@ Open http://localhost:3000. Local `localhost` and `127.0.0.1` database URLs use 
 }
 ```
 
-The server exposes `artifacts_create`, `artifacts_get`, `artifacts_list`, `artifacts_update`, and `artifacts_delete`. Every operation is scoped to the authenticated user.
+The server exposes `artifacts_create`, `artifacts_get`, `artifacts_list`, `artifacts_update`, `artifacts_delete`, and `teams_list`. Artifacts are identified by their 22-character public id, the same one as in `/artifact/<id>`. Reads go through the same access check as the web app. Agents can request sharing (`visibility` with a `team` slug), and the team's rule decides whether it applies now or waits for an owner or admin; agents can never approve.
 
 ## Commands
 
