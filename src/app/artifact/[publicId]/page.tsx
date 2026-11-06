@@ -16,6 +16,7 @@ import { loadArtifactByline } from "@/lib/artifact-byline";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import { isReportable } from "@/lib/reports/rules";
 import { getSession } from "@/lib/session";
+import { visibilityCopy, type VisibilityCopy } from "@/lib/visibility-copy";
 
 export const instant = false;
 
@@ -44,14 +45,26 @@ export async function generateMetadata({ params }: PageProps<"/artifact/[publicI
   };
 }
 
-/** The label above every shared artifact, so readers know who wrote it. */
-function UserContentNotice({ author, avatar, teamName }: { author: string; avatar: { seed: string; kind: AvatarKind } | null; teamName: string | null }) {
+interface NoticeProps {
+  copy: VisibilityCopy;
+  author: string;
+  avatar: { seed: string; kind: AvatarKind } | null;
+  teamName: string | null;
+}
+
+/** The note above every artifact: who can see it, and who shared it when that is not the reader. */
+function VisibilityNotice({ copy, author, avatar, teamName }: NoticeProps) {
   return (
     <div role="note" className="border-b bg-muted/50">
       <p className="mx-auto w-full max-w-[960px] px-6 py-2 text-sm leading-5 text-muted-foreground">
-        Shared by {avatar ? <PixelAvatar seed={avatar.seed} kind={avatar.kind} size={16} className="mr-1 -mt-px" /> : null}
-        <span className="font-medium text-foreground">{author}</span>
-        {teamName ? <> in <span className="font-medium text-foreground">{teamName}</span></> : null}. This is user-shared content; artifacts.space does not review it.
+        {copy.showAuthor ? (
+          <>
+            Shared by {avatar ? <PixelAvatar seed={avatar.seed} kind={avatar.kind} size={16} className="mr-1 -mt-px" /> : null}
+            <span className="font-medium text-foreground">{author}</span>
+            {teamName ? <> in <span className="font-medium text-foreground">{teamName}</span></> : null}.{" "}
+          </>
+        ) : null}
+        {copy.note}
       </p>
     </div>
   );
@@ -77,6 +90,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   // getSession is deduplicated per request, so this reuses load()'s lookup.
   const [byline, files, session] = await Promise.all([loadArtifactByline(record, viewable.isTeamMember), filesForViewer(viewable), getSession()]);
   const Icon = kindIcons[view.kind];
+  const copy = visibilityCopy(record.visibility);
+  const reportable = isReportable(record.visibility);
   const meta = [
     view.project ? `Project ${view.project}` : null,
     `Updated ${dateFormat.format(view.updatedAt)}`,
@@ -89,10 +104,10 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
         <Logo />
         <CopyButton value={view.content} label="Copy" variant="outline" size="sm" />
       </header>
-      <UserContentNotice author={byline.author} avatar={byline.avatar} teamName={byline.teamName} />
+      <VisibilityNotice copy={copy} author={byline.author} avatar={byline.avatar} teamName={byline.teamName} />
       <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Icon className={`size-3.5 ${kindColors[view.kind]}`} /> Shared artifact · {view.kind}
+          <Icon className={`size-3.5 ${kindColors[view.kind]}`} /> {copy.kicker} · {view.kind}
         </div>
         <h1 className="mt-4 text-balance text-4xl font-medium leading-[1.08] tracking-[-0.03em] sm:text-5xl">{view.title}</h1>
         {view.summary ? <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{view.summary}</p> : null}
@@ -101,13 +116,17 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
         <article className="mt-10">
           <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} />
         </article>
-        <div className="mt-10 flex flex-wrap items-baseline justify-between gap-4 text-sm leading-6 text-muted-foreground">
-          <p>
-            Shared from artifacts.space, a shared artifact hub for coding agents.{" "}
-            <Link href="/sign-up" className="text-foreground underline underline-offset-4 decoration-border hover:decoration-foreground">Create your own workspace</Link>
-          </p>
-          {isReportable(record.visibility) ? <ReportDialog publicId={record.publicId} /> : null}
-        </div>
+        {copy.showSignUp || reportable ? (
+          <div className="mt-10 flex flex-wrap items-baseline justify-between gap-4 text-sm leading-6 text-muted-foreground">
+            {copy.showSignUp ? (
+              <p>
+                Shared from artifacts.space, a shared artifact hub for coding agents.{" "}
+                <Link href="/sign-up" className="text-foreground underline underline-offset-4 decoration-border hover:decoration-foreground">Create your own workspace</Link>
+              </p>
+            ) : null}
+            {reportable ? <ReportDialog publicId={record.publicId} /> : null}
+          </div>
+        ) : null}
         {/* Comments are for signed-in readers who can view the artifact; the thread checks access itself. */}
         {session ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" /> : null}
       </main>
