@@ -4,6 +4,26 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Type scale. Four steps for everything that is not a heading. Use these
+ * classes only; never an arbitrary `text-md`.
+ *   text-xs   13/18  smallest: badges, timestamps, labels, fine print, axis ticks
+ *   text-sm   14/20  secondary: meta lines, controls, menus, tables, code
+ *   text-md   15/24  body: descriptions, list titles, comments, empty states
+ *   text-base 16/24  inputs on phones (iOS zooms below 16px), lead copy
+ * Headings use text-lg and up (Tailwind defaults).
+ */
+@theme {
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-md: 0.9375rem;
+  --text-md--line-height: 1.5rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -294,12 +314,12 @@
 /* Rendered-document styles for the landing demo. */
 .demo-doc {
   max-width: 64ch;
-  font-size: 14px;
+  font-size: var(--text-md);
   line-height: 1.65;
 }
 .demo-doc h2 {
   margin-top: 1.5rem;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--muted-foreground);
 }
@@ -321,7 +341,7 @@
 .demo-doc table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .demo-doc th,
 .demo-doc td {
@@ -392,116 +412,135 @@
 
 /*
  * Rendered Markdown in artifacts. Sized for reading; every color is a token.
+ * It sits in the components layer so a utility class on the element (for
+ * example `text-md` on a comment body) can still set a smaller size.
  */
-.artifact-prose {
-  max-width: 72ch;
-  font-size: 15px;
-  line-height: 1.7;
-  overflow-wrap: anywhere;
+@layer components {
+  .artifact-prose {
+    max-width: 72ch;
+    font-size: var(--text-base);
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+  .artifact-prose > :first-child {
+    margin-top: 0;
+  }
+  .artifact-prose :where(h1, h2, h3, h4, h5, h6) {
+    margin-top: 1.8em;
+    margin-bottom: 0.5em;
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+  .artifact-prose h1 {
+    font-size: 1.75em;
+    letter-spacing: -0.02em;
+  }
+  .artifact-prose h2 {
+    font-size: 1.35em;
+  }
+  .artifact-prose h3 {
+    font-size: 1.12em;
+  }
+  .artifact-prose :where(h4, h5, h6) {
+    font-size: 1em;
+    color: var(--muted-foreground);
+  }
+  .artifact-prose :where(p, ul, ol, blockquote, pre, table, hr) {
+    margin-top: 0.9em;
+  }
+  .artifact-prose :where(ul, ol) {
+    padding-left: 1.4em;
+  }
+  .artifact-prose ul {
+    list-style: disc;
+  }
+  .artifact-prose ol {
+    list-style: decimal;
+  }
+  .artifact-prose li + li {
+    margin-top: 0.3em;
+  }
+  .artifact-prose li::marker {
+    color: var(--muted-foreground);
+  }
+  .artifact-prose .contains-task-list {
+    padding-left: 0.2em;
+    list-style: none;
+  }
+  .artifact-prose .task-list-item input {
+    margin-right: 0.5em;
+    accent-color: var(--foreground);
+    vertical-align: -0.1em;
+  }
+  .artifact-prose a {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--border);
+  }
+  .artifact-prose a:hover {
+    text-decoration-color: var(--foreground);
+  }
+  .artifact-prose strong {
+    font-weight: 600;
+  }
+  .artifact-prose blockquote {
+    border-left: 2px solid var(--border);
+    padding-left: 1em;
+    color: var(--muted-foreground);
+  }
+  .artifact-prose hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 2em 0;
+  }
+  .artifact-prose :not(pre) > code {
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+    background: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+  }
+  .artifact-prose pre {
+    overflow-x: auto;
+    padding: 1em 1.2em;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: 1.65;
+  }
+  .artifact-prose table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: var(--text-md);
+  }
+  .artifact-prose :where(th, td) {
+    padding: 0.45em 0.9em 0.45em 0;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+  .artifact-prose th {
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
 }
-.artifact-prose > :first-child {
-  margin-top: 0;
+
+/*
+ * Toasts. Sonner injects its own unlayered styles with a 13px system font;
+ * these selectors are more specific, so toasts use the app font and scale.
+ */
+[data-sonner-toaster] {
+  font-family: inherit;
 }
-.artifact-prose :where(h1, h2, h3, h4, h5, h6) {
-  margin-top: 1.8em;
-  margin-bottom: 0.5em;
-  font-weight: 500;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
 }
-.artifact-prose h1 {
-  font-size: 1.75em;
-  letter-spacing: -0.02em;
-}
-.artifact-prose h2 {
-  font-size: 1.35em;
-}
-.artifact-prose h3 {
-  font-size: 1.12em;
-}
-.artifact-prose :where(h4, h5, h6) {
-  font-size: 1em;
-  color: var(--muted-foreground);
-}
-.artifact-prose :where(p, ul, ol, blockquote, pre, table, hr) {
-  margin-top: 0.9em;
-}
-.artifact-prose :where(ul, ol) {
-  padding-left: 1.4em;
-}
-.artifact-prose ul {
-  list-style: disc;
-}
-.artifact-prose ol {
-  list-style: decimal;
-}
-.artifact-prose li + li {
-  margin-top: 0.3em;
-}
-.artifact-prose li::marker {
-  color: var(--muted-foreground);
-}
-.artifact-prose .contains-task-list {
-  padding-left: 0.2em;
-  list-style: none;
-}
-.artifact-prose .task-list-item input {
-  margin-right: 0.5em;
-  accent-color: var(--foreground);
-  vertical-align: -0.1em;
-}
-.artifact-prose a {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-color: var(--border);
-}
-.artifact-prose a:hover {
-  text-decoration-color: var(--foreground);
-}
-.artifact-prose strong {
-  font-weight: 600;
-}
-.artifact-prose blockquote {
-  border-left: 2px solid var(--border);
-  padding-left: 1em;
-  color: var(--muted-foreground);
-}
-.artifact-prose hr {
-  border: 0;
-  border-top: 1px solid var(--border);
-  margin: 2em 0;
-}
-.artifact-prose :not(pre) > code {
-  padding: 0.1em 0.35em;
-  border-radius: 4px;
-  background: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 0.86em;
-}
-.artifact-prose pre {
-  overflow-x: auto;
-  padding: 1em 1.2em;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  line-height: 1.65;
-}
-.artifact-prose table {
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-  border-collapse: collapse;
-  font-size: 13.5px;
-}
-.artifact-prose :where(th, td) {
-  padding: 0.45em 0.9em 0.45em 0;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-  vertical-align: top;
-}
-.artifact-prose th {
-  font-weight: 500;
-  color: var(--muted-foreground);
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-button] {
+  font-size: var(--text-xs);
 }
