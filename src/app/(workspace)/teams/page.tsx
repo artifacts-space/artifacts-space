@@ -8,6 +8,7 @@ import { Section } from "@/components/teams/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/session";
+import { agentCountLabel, headcountFor, peopleCountLabel } from "@/lib/teams/member-counts";
 import { countMembers, listInvitationsForEmail, listTeamsForUser } from "@/lib/teams/queries";
 import { roleLabel } from "@/lib/teams/roles";
 
@@ -48,16 +49,20 @@ export default async function TeamsPage() {
 
       <Section title="Your teams">
         <ul>
-          {teams.map((team) => (
-            <li key={team.id} className="border-b last:border-b-0">
-              <Link href={`/teams/${team.slug}`} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/60">
-                <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{team.name}</span>
-                {team.personal ? <Badge variant="secondary">Personal</Badge> : null}
-                <span className="w-20 text-right text-xs text-muted-foreground">{roleLabel(team.role)}</span>
-                <span className="w-24 text-right text-xs text-muted-foreground">{counts.get(team.id) ?? 0} {counts.get(team.id) === 1 ? "member" : "members"}</span>
-              </Link>
-            </li>
-          ))}
+          {teams.map((team) => {
+            const headcount = headcountFor(counts, team.id);
+            return (
+              <li key={team.id} className="border-b last:border-b-0">
+                <Link href={`/teams/${team.slug}`} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/60">
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{team.name}</span>
+                  {team.personal ? <Badge variant="secondary">Personal</Badge> : null}
+                  <span className="w-20 text-right text-xs text-muted-foreground">{roleLabel(team.role)}</span>
+                  <span className="w-24 text-right text-xs text-muted-foreground">{peopleCountLabel(headcount.people)}</span>
+                  <span className="hidden w-20 text-right text-xs text-muted-foreground sm:block">{agentCountLabel(headcount.agents)}</span>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </Section>
     </main>

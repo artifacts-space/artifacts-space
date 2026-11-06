@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gt, inArray, notExists, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { agent, team, teamInvitation, teamMember, user } from "@/db/schema";
 
+import type { TeamHeadcount } from "./member-counts";
 import { parseTeamRole, type TeamRole } from "./roles";
 
 /** A team as one member sees it. */
@@ -193,13 +194,21 @@ export async function getInvitationForEmail(id: string, email: string): Promise<
   return row ? toInviteeView(row) : null;
 }
 
-/** How many members each of these teams has. */
-export async function countMembers(teamIds: string[]): Promise<Map<string, number>> {
+/**
+ * How many people and agents each of these teams has. Agents hold team
+ * member rows too, so they are split out here and never counted as people.
+ */
+export async function countMembers(teamIds: string[]): Promise<Map<string, TeamHeadcount>> {
   if (teamIds.length === 0) return new Map();
   const rows = await getDb()
-    .select({ teamId: teamMember.teamId, count: sql<number>`count(*)::int` })
+    .select({
+      teamId: teamMember.teamId,
+      people: sql<number>`(count(*) filter (where ${agent.userId} is null))::int`,
+      agents: sql<number>`count(${agent.userId})::int`,
+    })
     .from(teamMember)
+    .leftJoin(agent, eq(agent.userId, teamMember.userId))
     .where(inArray(teamMember.teamId, teamIds))
     .groupBy(teamMember.teamId);
-  return new Map(rows.map((row) => [row.teamId, row.count]));
+  return new Map(rows.map((row) => [row.teamId, { people: row.people, agents: row.agents }]));
 }
