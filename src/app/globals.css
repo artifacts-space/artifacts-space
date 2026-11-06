@@ -27,9 +27,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Satoshi", ui-sans-serif, system-ui, sans-serif;
+  /* --font-backtick covers only U+0060; see layout.tsx. */
+  --font-sans: var(--font-backtick), "Satoshi", ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
-  --font-heading: "Satoshi", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-backtick), "Satoshi", ui-sans-serif, system-ui, sans-serif;
   --color-brand: var(--brand);
   --color-hero-backdrop: var(--hero-backdrop);
   --color-kind-markdown: var(--kind-markdown);

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 
 import { Providers } from "@/components/providers";
 
@@ -8,6 +9,23 @@ import "./globals.css";
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+/*
+ * Satoshi draws the backtick (U+0060) as a raised accent with almost no width,
+ * so it floats over the next letter. This face holds only Geist Mono's
+ * backtick (subset from the OFL-licensed geist@1.8.2 variable font, under 1 KB)
+ * and sits first in the sans stack; unicode-range makes the browser use it for
+ * that one character and download it only when a backtick is on the page.
+ */
+const backtick = localFont({
+  src: "./fonts/backtick-mono.woff2",
+  variable: "--font-backtick",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+  adjustFontFallback: false,
+  declarations: [{ prop: "unicode-range", value: "U+0060" }],
 });
 
 export const metadata: Metadata = {
@@ -38,7 +56,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistMono.variable} h-full antialiased`}
+      className={`${geistMono.variable} ${backtick.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
