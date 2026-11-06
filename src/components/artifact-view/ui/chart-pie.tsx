@@ -31,15 +31,16 @@ function percent(fraction: number): string {
 
 function SliceList({ slices, active, format, onHover }: { slices: PieSlice[]; active: number | null; format: Formatter; onHover: (index: number | null) => void }) {
   return (
-    <ul className="w-full min-w-0 space-y-0.5 text-xs sm:max-w-80" onMouseLeave={() => { onHover(null); }}>
+    <ul className="w-full min-w-0 space-y-0.5 text-xs leading-4 @xl:max-w-80" onMouseLeave={() => { onHover(null); }}>
       {slices.map((slice, index) => (
         <li
           key={`${slice.label}-${String(slice.index)}`}
-          className={cn("flex min-w-0 items-center gap-2 rounded-sm px-1.5 py-1", active === index && "bg-muted")}
+          className={cn("flex min-w-0 items-start gap-2 rounded-sm px-1.5 py-1", active === index && "bg-muted")}
           onMouseEnter={() => { onHover(index); }}
         >
-          <span aria-hidden className={cn("size-2.5 shrink-0 rounded-[3px]", sliceSwatch(slice, index))} />
-          <span className="min-w-0 flex-1 truncate" title={slice.label}>{slice.label}</span>
+          <span aria-hidden className={cn("mt-[3px] size-2.5 shrink-0 rounded-[3px]", sliceSwatch(slice, index))} />
+          {/* The name takes the free width and wraps to two lines; values keep their own columns. */}
+          <span className="line-clamp-2 min-w-0 flex-1 break-words" title={slice.label}>{slice.label}</span>
           <span className="shrink-0 tabular-nums text-muted-foreground">{format(slice.value)}</span>
           <span className="w-12 shrink-0 text-right tabular-nums">{percent(slice.fraction)}</span>
         </li>
@@ -83,7 +84,11 @@ function summaryText(props: UiProps<"Chart">, slices: PieSlice[], format: Format
   return `${props.type} chart${about}: ${parts}. Use the arrow keys to read each slice.`;
 }
 
-/** Pie and donut charts: one series, one slice per label, a legend with values and shares. */
+/**
+ * Pie and donut charts: one series, one slice per label, a legend with values
+ * and shares. The legend sits beside the pie only when the chart is at least
+ * 36rem wide; narrower charts (phones, half-width grid columns) stack it below.
+ */
 export function PieChart({ props, donut }: { props: UiProps<"Chart">; donut: boolean }) {
   const labels = props.labels ?? [];
   const values = props.series[0]?.values ?? [];
@@ -103,7 +108,7 @@ export function PieChart({ props, donut }: { props: UiProps<"Chart">; donut: boo
       table={(visible) => <ChartTable head={[props.xLabel ?? "Label", props.series[0]?.name ?? "Value", "Share"]} rows={allSlices.map((slice) => ({ key: `${slice.label}-${String(slice.index)}`, cells: [slice.label, format(slice.value), percent(slice.fraction)] }))} visible={visible} />}
     >
       <div className="@container min-w-0">
-        <div className="flex min-w-0 flex-col items-center gap-x-8 gap-y-4 @md:flex-row">
+        <div className="flex min-w-0 flex-col items-center gap-x-8 gap-y-4 @xl:flex-row">
           <div
             tabIndex={0}
             role="img"

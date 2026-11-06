@@ -26,15 +26,16 @@ export function swatch(index: number): string {
   return seriesBg[index % seriesBg.length] ?? "bg-series-1";
 }
 
-/** Series names with color swatches. Hidden for a single series: the title names it. */
+/** Series names with color swatches, wrapping to two lines. Hidden for a single series: the title names it. */
 export function Legend({ names }: { names: string[] }) {
   if (names.length < 2) return null;
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
       {names.map((name, index) => (
-        <li key={name + String(index)} className="flex min-w-0 items-center gap-1.5">
-          <span aria-hidden className={cn("size-2.5 shrink-0 rounded-[3px]", swatch(index))} />
-          <span className="max-w-[20ch] truncate">{name}</span>
+        <li key={name + String(index)} className="flex min-w-0 items-start gap-1.5 leading-4">
+          <span aria-hidden className={cn("mt-[3px] size-2.5 shrink-0 rounded-[3px]", swatch(index))} />
+          {/* Names wrap to two lines; only a name longer than that clamps, with the full name on hover. */}
+          <span className="line-clamp-2 max-w-[32ch] min-w-0 break-words" title={name}>{name}</span>
         </li>
       ))}
     </ul>
