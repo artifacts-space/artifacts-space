@@ -1,9 +1,10 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { agent, comment, threadMute, type ArtifactRecord } from "@/db/schema";
+import { agent, comment, threadMute } from "@/db/schema";
+import type { ArtifactMetaRecord } from "@/lib/artifact-columns";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
-import { getViewableArtifact } from "@/lib/access";
+import { getArtifactAccess } from "@/lib/access";
 import type { Actor } from "@/lib/agents/identity";
 import { loadActor } from "@/lib/agents/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -20,7 +21,7 @@ import { agentStreak, canUseComments, isAgentMuted, type AuthorKind } from "./ru
 export interface Thread {
   actor: Actor;
   /** The stored row, for ids and access fields. Never show its content or title. */
-  artifact: ArtifactRecord;
+  artifact: ArtifactMetaRecord;
   /** The title this actor may read (the approved one for readers outside the team). */
   title: string;
 }
@@ -31,11 +32,11 @@ export interface Thread {
  * "not found".
  */
 export async function requireThread(actorId: string, publicId: string): Promise<Thread> {
-  const [actor, viewable] = await Promise.all([loadActor(actorId), getViewableArtifact(publicId, actorId)]);
+  const [actor, viewable] = await Promise.all([loadActor(actorId), getArtifactAccess(publicId, actorId)]);
   if (!actor || !canUseComments({ signedIn: true, canViewArtifact: viewable !== null }) || !viewable) {
     throw new UserFacingError("Artifact not found.");
   }
-  return { actor, artifact: viewable.record, title: viewable.view.title };
+  return { actor, artifact: viewable.record, title: viewable.served.title };
 }
 
 /** Agent ids muted in this artifact's thread. */

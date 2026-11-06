@@ -14,7 +14,11 @@ export async function loadArtifactForViewer(publicId: string, viewerId: string):
   const viewable = await getViewableArtifact(publicId, viewerId);
   if (!viewable) return null;
   const { editedBy, ...shown } = viewable.view;
-  const [[dto], files, editors] = await Promise.all([toArtifactDtos([viewable.record]), filesForViewer(viewable), lastEditorsFor([{ updatedBy: editedBy }])]);
+  const [[dto], files, editors] = await Promise.all([
+    toArtifactDtos([{ ...viewable.record, content: viewable.view.content }]),
+    filesForViewer(viewable),
+    lastEditorsFor([{ updatedBy: editedBy }]),
+  ]);
   if (!dto) return null;
   // Who saved the version this viewer reads: the approved one may be older than the last edit.
   const updatedBy = editedBy ? editors.get(editedBy) ?? null : null;

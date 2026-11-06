@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, getTableColumns, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
@@ -18,6 +18,7 @@ import {
   type PendingEditDto,
   type PendingSharingDto,
 } from "@/lib/artifact-types";
+import { artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
 import { artifactSizeProblem } from "@/lib/artifact-limits";
 import { PREVIEW_CHARS, previewKinds } from "@/lib/artifact-preview";
 import { checkContentFiles } from "@/lib/files/attach";
@@ -27,6 +28,7 @@ import { generatePublicId } from "@/lib/public-id";
 import { assertContentFits } from "@/lib/quota/usage";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { UserFacingError } from "@/lib/user-facing-error";
+import { forgetArtifactCache } from "@/lib/versions/cache";
 import { getVersionOf } from "@/lib/versions/history";
 import { recordArtifactSave } from "@/lib/versions/service";
 
@@ -71,18 +73,6 @@ function assertArtifactSize(input: { content?: string | undefined; metadata?: Re
   if (problem) throw new UserFacingError(problem);
 }
 
-/** An artifact row without its content, as lists and access checks load it. */
-export type ArtifactMetaRecord = Omit<ArtifactRecord, "content">;
-
-const { content: contentColumn, ...metaColumns } = getTableColumns(artifact);
-
-/** The content column alone, for queries that load content on purpose. */
-export const artifactContentColumn = contentColumn;
-
-/** Every artifact column except content, for queries that must not move content around. */
-export function artifactMetaColumns() {
-  return metaColumns;
-}
 
 /** Maps a row without content to the shared DTO fields. */
 function toArtifactMeta(
@@ -393,5 +383,6 @@ export async function deleteArtifact(userId: string, id: string) {
     .where(and(eq(artifact.userId, userId), eq(artifact.id, id)))
     .returning();
 
+  forgetArtifactCache(own.id);
   return Boolean(record);
 }

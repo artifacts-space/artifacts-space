@@ -5,7 +5,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { artifact, artifactReport, team, teamMember, user } from "@/db/schema";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
-import { getViewableArtifact } from "@/lib/access";
+import { getArtifactAccess } from "@/lib/access";
 import type { ArtifactVisibility, ReportReason } from "@/lib/artifact-types";
 import { findPersonalTeam, getTeamMembershipById } from "@/lib/teams/queries";
 import { canManageTeam, parseTeamRole } from "@/lib/teams/roles";
@@ -67,13 +67,13 @@ async function notifyOwners(input: { reportId: string; teamId: string; title: st
 export async function submitReport(input: { publicId: string; viewerId: string | null; networkKey: string; report: unknown }) {
   const parsed = parseReportInput(input.report);
   if (!parsed.ok) throw new UserFacingError(parsed.error);
-  const viewable = await getViewableArtifact(input.publicId, input.viewerId);
+  const viewable = await getArtifactAccess(input.publicId, input.viewerId);
   if (!viewable || !isReportable(viewable.record.visibility)) throw new UserFacingError(notFound);
 
   await enforceRateLimit("reportByNetwork", input.networkKey);
   if (input.viewerId) await enforceRateLimit("reportByUser", input.viewerId);
 
-  const { record, view } = viewable;
+  const { record, served } = viewable;
   const teamId = await reportTeamId(record);
   const id = randomUUID();
   await getDb().insert(artifactReport).values({
@@ -85,7 +85,7 @@ export async function submitReport(input: { publicId: string; viewerId: string |
     reporterId: input.viewerId,
     reporterKey: input.networkKey,
   });
-  if (teamId) await notifyOwners({ reportId: id, teamId, title: view.title, publicId: record.publicId, reason: parsed.data.reason });
+  if (teamId) await notifyOwners({ reportId: id, teamId, title: served.title, publicId: record.publicId, reason: parsed.data.reason });
   return { id };
 }
 

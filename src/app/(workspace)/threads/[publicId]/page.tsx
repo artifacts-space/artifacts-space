@@ -7,7 +7,7 @@ import { CommentThread } from "@/components/comments/comment-thread";
 import { MarkThreadRead } from "@/components/comments/mark-thread-read";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
-import { getViewableArtifact } from "@/lib/access";
+import { getArtifactAccess } from "@/lib/access";
 import { loadArtifactByline } from "@/lib/artifact-byline";
 import { getSession } from "@/lib/session";
 
@@ -19,7 +19,7 @@ export default async function ThreadPage({ params }: PageProps<"/threads/[public
   const session = await getSession();
   if (!session) redirect("/sign-in");
   const { publicId } = await params;
-  const viewable = await getViewableArtifact(publicId, session.user.id);
+  const viewable = await getArtifactAccess(publicId, session.user.id);
   if (!viewable) notFound();
   const byline = await loadArtifactByline(viewable.record, viewable.isTeamMember);
 
@@ -30,7 +30,7 @@ export default async function ThreadPage({ params }: PageProps<"/threads/[public
       </Button>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-xl font-medium tracking-[-0.01em] break-words">{viewable.view.title}</h1>
+          <h1 className="text-xl font-medium tracking-[-0.01em] break-words">{viewable.served.title}</h1>
           <p className="mt-1 text-md text-muted-foreground">
             By {byline.avatar ? <PixelAvatar seed={byline.avatar.seed} kind={byline.avatar.kind} size={16} className="mr-1 -mt-px" /> : null}
             {byline.author}{byline.teamName ? ` · ${byline.teamName}` : ""}

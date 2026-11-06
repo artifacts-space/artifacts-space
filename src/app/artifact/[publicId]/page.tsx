@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ApprovedArticle } from "@/components/artifact-page/approved-article";
 import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CommentThread } from "@/components/comments/comment-thread";
@@ -11,6 +12,7 @@ import { Logo } from "@/components/logo";
 import { PixelAvatar, type AvatarKind } from "@/components/pixel-avatar";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
 import { filesForViewer } from "@/lib/files/download";
+import type { FileDto } from "@/lib/files/types";
 import { isIndexable } from "@/lib/access-rules";
 import { loadArtifactByline } from "@/lib/artifact-byline";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
@@ -83,6 +85,13 @@ function PendingEditNotice({ viewable }: { viewable: ViewableArtifact }) {
   );
 }
 
+/** The artifact itself: the shared cached render for an approved version, or a fresh render of the latest. */
+function ArtifactBody({ viewable, files }: { viewable: ViewableArtifact; files: FileDto[] }) {
+  const { view, version } = viewable;
+  if (version.versionId) return <ApprovedArticle versionId={version.versionId} savedAt={viewable.served.updatedAt.toISOString()} files={files} />;
+  return <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} />;
+}
+
 export default async function ArtifactPage({ params }: PageProps<"/artifact/[publicId]">) {
   const viewable = await load(params);
   if (!viewable) notFound();
@@ -114,7 +123,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
         <p className="mt-4 text-sm text-muted-foreground">{meta.join(" · ")}</p>
         <PendingEditNotice viewable={viewable} />
         <article className="mt-10">
-          <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} />
+          <ArtifactBody viewable={viewable} files={files} />
         </article>
         {copy.showSignUp || reportable ? (
           <div className="mt-10 flex flex-wrap items-baseline justify-between gap-4 text-sm leading-6 text-muted-foreground">

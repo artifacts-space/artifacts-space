@@ -7,10 +7,10 @@ const view = { title: "t", summary: "", content: "", kind: "file" as const, lang
 
 describe("servedVersionTime", () => {
   it("should give the approved version's time when the viewer reads that version", () => {
-    expect(servedVersionTime({ version: { source: "approved", versionId: "v1" }, view })).toEqual(savedAt);
+    expect(servedVersionTime({ version: { source: "approved", versionId: "v1" }, served: view })).toEqual(savedAt);
   });
 
   it("should give null when the viewer reads the latest version", () => {
-    expect(servedVersionTime({ version: { source: "latest", versionId: null }, view })).toBeNull();
+    expect(servedVersionTime({ version: { source: "latest", versionId: null }, served: view })).toBeNull();
   });
 });

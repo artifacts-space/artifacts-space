@@ -1,8 +1,9 @@
 import { and, desc, eq, inArray, isNull, lte } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { artifact, comment, mention, type ArtifactRecord } from "@/db/schema";
-import { getViewableArtifact } from "@/lib/access";
+import { artifact, comment, mention } from "@/db/schema";
+import type { ArtifactMetaRecord } from "@/lib/artifact-columns";
+import { getArtifactAccess } from "@/lib/access";
 import { canViewArtifact } from "@/lib/access-rules";
 import { loadActors } from "@/lib/agents/queries";
 import { listTeamIdsForUser } from "@/lib/teams/queries";
@@ -27,7 +28,7 @@ export interface InboxEntryView {
 
 const INBOX_MAX = 50;
 
-type VisibilityFields = Pick<ArtifactRecord, "userId" | "visibility" | "teamId">;
+type VisibilityFields = Pick<ArtifactMetaRecord, "userId" | "visibility" | "teamId">;
 
 function visibleTo(userId: string, teams: ReadonlySet<string>) {
   return (subject: VisibilityFields) => canViewArtifact(subject, { userId, isTeamMember: subject.teamId !== null && teams.has(subject.teamId) });
@@ -51,10 +52,10 @@ export async function listInbox(userId: string, options: { unreadOnly?: boolean;
   const limit = Math.min(Math.max(options.limit ?? INBOX_MAX, 1), INBOX_MAX);
   const rows = await inboxRows(userId, options.unreadOnly ?? true, limit);
   const publicIds = [...new Set(rows.map((row) => row.artifact.publicId))];
-  const viewable = await Promise.all(publicIds.map((publicId) => getViewableArtifact(publicId, userId)));
+  const viewable = await Promise.all(publicIds.map((publicId) => getArtifactAccess(publicId, userId)));
   const titles = new Map(publicIds.flatMap((publicId, index) => {
     const view = viewable[index];
-    return view ? [[publicId, view.view.title] as const] : [];
+    return view ? [[publicId, view.served.title] as const] : [];
   }));
   const visible = rows.filter((row) => titles.has(row.artifact.publicId));
   const authors = await loadActors(visible.flatMap((row) => (row.record.authorId ? [row.record.authorId] : [])));

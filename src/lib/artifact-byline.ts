@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { team, type ArtifactRecord } from "@/db/schema";
+
+type BylineSubject = Pick<ArtifactRecord, "userId" | "teamId">;
 import { attribution } from "@/lib/agents/identity";
 import { loadActors } from "@/lib/agents/queries";
 
@@ -11,7 +13,7 @@ import { loadActors } from "@/lib/agents/queries";
  * everyone else sees the author alone. `avatar` seeds the author's pixel
  * avatar.
  */
-export async function loadArtifactByline(record: ArtifactRecord, viewerIsTeamMember: boolean) {
+export async function loadArtifactByline(record: BylineSubject, viewerIsTeamMember: boolean) {
   const [actors, sharedIn] = await Promise.all([
     loadActors([record.userId]),
     viewerIsTeamMember && record.teamId

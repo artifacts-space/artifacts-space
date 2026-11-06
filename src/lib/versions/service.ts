@@ -11,6 +11,7 @@ import type { SharingActor } from "@/lib/sharing/rules";
 import { getTeamMembershipById } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 
+import { forgetArtifactCache } from "./cache";
 import { ensureHistoryStart, fileVersion, pruneArtifactVersions, versionMatching } from "./history";
 import { decideEdit, editNeedsAuditRow, isReviewedLevel, sameReviewedFields } from "./rules";
 
@@ -39,6 +40,7 @@ async function cancelPendingEdits(artifactId: string, byUserId: string | null) {
 
 async function setApprovedVersion(artifactId: string, versionId: string | null) {
   await getDb().update(artifact).set({ approvedVersionId: versionId }).where(eq(artifact.id, artifactId));
+  forgetArtifactCache(artifactId);
 }
 
 /**
@@ -187,6 +189,7 @@ export async function recordArtifactChange(input: { artifactId: string; editorId
  * the versions stay in the history.
  */
 export async function syncApprovedVersion(artifactId: string, byUserId: string) {
+  forgetArtifactCache(artifactId);
   const [record] = await getDb().select().from(artifact).where(eq(artifact.id, artifactId)).limit(1);
   if (!record) return;
   if (isReviewedLevel(record.visibility)) {
@@ -230,4 +233,5 @@ export async function decideEditRequest(request: SharingRequestRecord, deciderId
     from decided
     where ${artifact.id} = decided.artifact_id and ${artifact.visibility} in ('link', 'public') and decided.version_id is not null
   `);
+  forgetArtifactCache(request.artifactId);
 }

@@ -3,8 +3,9 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { mention, teamMember, user, type ArtifactRecord } from "@/db/schema";
-import { getViewableArtifact } from "@/lib/access";
+import { mention, teamMember, user } from "@/db/schema";
+import type { ArtifactMetaRecord } from "@/lib/artifact-columns";
+import { getArtifactAccess } from "@/lib/access";
 import { canViewArtifact } from "@/lib/access-rules";
 import type { Actor } from "@/lib/agents/identity";
 import { loadActors } from "@/lib/agents/queries";
@@ -46,7 +47,7 @@ function unknownHandle(handle: string): MentionCandidate {
  * agents still in their team. Visibility uses the same read rule as every
  * other path (canViewArtifact), with each user's own team memberships.
  */
-export async function mentionFacts(userIds: string[], artifact: ArtifactRecord, writerId: string, threadMutes: ReadonlySet<string>): Promise<MentionCandidate[]> {
+export async function mentionFacts(userIds: string[], artifact: ArtifactMetaRecord, writerId: string, threadMutes: ReadonlySet<string>): Promise<MentionCandidate[]> {
   const ids = [...new Set(userIds)];
   if (ids.length === 0) return [];
   const [actors, teams] = await Promise.all([loadActors(ids), teamsByUser([...ids, writerId])]);
@@ -70,7 +71,7 @@ export async function mentionFacts(userIds: string[], artifact: ArtifactRecord, 
 }
 
 /** The mention facts for each handle in a comment. Unknown handles get facts that refuse them. */
-async function mentionCandidates(handles: string[], artifact: ArtifactRecord, writerId: string, threadMutes: ReadonlySet<string>): Promise<MentionCandidate[]> {
+async function mentionCandidates(handles: string[], artifact: ArtifactMetaRecord, writerId: string, threadMutes: ReadonlySet<string>): Promise<MentionCandidate[]> {
   const users = await getDb().select({ id: user.id }).from(user).where(inArray(user.username, handles));
   const facts = await mentionFacts(users.map((row) => row.id), artifact, writerId, threadMutes);
   const byHandle = new Map(facts.map((fact) => [fact.handle, fact]));
@@ -87,7 +88,7 @@ async function alreadyNotified(artifactId: string, recipientIds: string[]) {
   return new Set(rows.map((row) => row.recipientId));
 }
 
-async function emailPeople(input: { people: { id: string; mentionId: string }[]; artifact: ArtifactRecord; commentId: string; writer: Actor }) {
+async function emailPeople(input: { people: { id: string; mentionId: string }[]; artifact: ArtifactMetaRecord; commentId: string; writer: Actor }) {
   if (input.people.length === 0) return;
   const rows = await getDb().select({ id: user.id, email: user.email }).from(user).where(inArray(user.id, input.people.map((person) => person.id)));
   const emails = new Map(rows.map((row) => [row.id, row.email]));
@@ -95,13 +96,13 @@ async function emailPeople(input: { people: { id: string; mentionId: string }[];
   const results = await Promise.allSettled(
     input.people.map(async (person) => {
       // The title this person may read: readers outside the team see the approved version's.
-      const viewable = await getViewableArtifact(input.artifact.publicId, person.id);
+      const viewable = await getArtifactAccess(input.artifact.publicId, person.id);
       if (!viewable) return;
       await sendMentionEmail({
         mentionId: person.mentionId,
         email: emails.get(person.id) ?? "",
         authorLabel,
-        artifactTitle: viewable.view.title,
+        artifactTitle: viewable.served.title,
         publicId: input.artifact.publicId,
         commentId: input.commentId,
       });
@@ -111,7 +112,7 @@ async function emailPeople(input: { people: { id: string; mentionId: string }[];
 }
 
 /** Stores inbox entries for the mentions that landed, and emails the people among them. */
-async function deliver(decision: MentionDecision, input: { artifact: ArtifactRecord; commentId: string; writer: Actor }) {
+async function deliver(decision: MentionDecision, input: { artifact: ArtifactMetaRecord; commentId: string; writer: Actor }) {
   if (decision.deliver.length === 0) return;
   const people = decision.deliver.filter((item) => item.kind === "person").map((item) => item.userId);
   const quiet = await alreadyNotified(input.artifact.id, people);
@@ -128,7 +129,7 @@ async function deliver(decision: MentionDecision, input: { artifact: ArtifactRec
  */
 export async function processMentions(input: {
   body: string;
-  artifact: ArtifactRecord;
+  artifact: ArtifactMetaRecord;
   commentId: string;
   writer: Actor;
   loopLimited: boolean;

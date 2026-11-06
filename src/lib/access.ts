@@ -1,18 +1,22 @@
-import { and, eq, exists, ne } from "drizzle-orm";
+import { and, eq, exists, ne, sql } from "drizzle-orm";
 import { cache } from "react";
 
 import { getDb } from "@/db";
 import { artifact, artifactVersion, sharingRequest, team, teamMember, type ArtifactRecord } from "@/db/schema";
 import { canEditArtifact, canViewArtifact } from "@/lib/access-rules";
+import { artifactContentColumn, artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { isPublicId } from "@/lib/public-id";
+import { cachedVersionView } from "@/lib/versions/cache";
 import { isReviewedLevel, versionToServe } from "@/lib/versions/rules";
 
 /**
  * The one access check for reading artifacts. Every read path (the public
  * page, the workspace, MCP tools, and APIs) goes through getViewableArtifact
- * for one artifact, or listArtifacts (which uses viewableInTeamCondition) for
- * lists. The rule itself lives in access-rules.ts.
+ * (with content) or getArtifactAccess (without) for one artifact, or
+ * listArtifacts (which uses viewableInTeamCondition) for lists. The rule
+ * itself lives in access-rules.ts. The decision is never cached across
+ * requests; only approved version content is (src/lib/versions/cache.ts).
  */
 
 /** True when the user is a member of the team. */
@@ -55,20 +59,26 @@ export interface ServedArtifactView {
   editedBy: string | null;
 }
 
-/** An artifact the viewer may read, with what else they may do. */
-export interface ViewableArtifact {
-  /** The stored row. Its content is the latest version; show `view` instead. */
-  record: ArtifactRecord;
-  /** What this viewer may read. Never show `record`'s content in its place. */
-  view: ServedArtifactView;
-  /** Which version `view` is. Readers outside the team get the approved version. */
+/** May this viewer read the artifact, and which version: everything but the content. */
+export interface ArtifactAccess {
+  /** The stored row, without content. Its fields are the latest version; show `served` or `view` instead. */
+  record: ArtifactMetaRecord;
+  /** Which version the viewer reads. Readers outside the team get the approved version. */
   version: { source: "latest" | "approved"; versionId: string | null };
-  /** Whether newer changes wait for approval. Null when the viewer is not told (outside the team). */
-  editPending: boolean | null;
+  /** The title, save time, and saver of the version this viewer reads. */
+  served: { title: string; updatedAt: Date; editedBy: string | null };
   /** Whether the viewer may edit it and read its history: the author, or a member of the team it is shared through. */
   canEdit: boolean;
   /** Whether the viewer belongs to the artifact's team. Pages show the team's name only then. */
   isTeamMember: boolean;
+}
+
+/** An artifact the viewer may read, with its content. */
+export interface ViewableArtifact extends ArtifactAccess {
+  /** What this viewer may read. */
+  view: ServedArtifactView;
+  /** Whether newer changes wait for approval. Null when the viewer is not told (outside the team). */
+  editPending: boolean | null;
 }
 
 async function viewerIsMember(viewerId: string | null, teamId: string | null) {
@@ -109,11 +119,6 @@ export async function getEditableArtifact(editorId: string, key: { id: string } 
   return (await canEditRecord(editorId, record)) ? record : null;
 }
 
-function latestView(record: ArtifactRecord): ServedArtifactView {
-  const { title, summary, content, kind, language, project, source, metadata, updatedAt } = record;
-  return { title, summary, content, kind, language, project, source, metadata, updatedAt, editedBy: record.updatedBy ?? record.userId };
-}
-
 async function hasPendingEdit(artifactId: string) {
   const [row] = await getDb()
     .select({ id: sharingRequest.id })
@@ -123,37 +128,96 @@ async function hasPendingEdit(artifactId: string) {
   return Boolean(row);
 }
 
-async function approvedView(versionId: string): Promise<ServedArtifactView | null> {
-  const [row] = await getDb().select().from(artifactVersion).where(eq(artifactVersion.id, versionId)).limit(1);
-  if (!row) return null;
-  const { title, summary, content, kind, language, project, source, metadata, savedAt, createdBy } = row;
-  // savedAt, not createdAt: files attached up to the version's last save belong to it.
-  return { title, summary, content, kind, language, project, source, metadata, updatedAt: savedAt, editedBy: createdBy };
+const approvedField = <T>(column: typeof artifactVersion.title | typeof artifactVersion.savedAt | typeof artifactVersion.createdBy) =>
+  sql<T>`(select ${column} from ${artifactVersion} where ${artifactVersion.id} = ${artifact.approvedVersionId})`;
+
+/**
+ * Everything the read decision needs, in one query and without content: the
+ * row, whether the viewer is in its team, whether that team is personal, and
+ * the approved version's title, save time, and saver.
+ */
+async function loadSubject(publicId: string, viewerId: string | null) {
+  const member = viewerId
+    ? sql<boolean>`exists (select 1 from ${teamMember} where ${teamMember.teamId} = ${artifact.teamId} and ${teamMember.userId} = ${viewerId})`
+    : sql<boolean>`false`;
+  const [row] = await getDb()
+    .select({
+      record: artifactMetaColumns(),
+      member,
+      teamPersonal: sql<boolean | null>`(select ${team.personal} from ${team} where ${team.id} = ${artifact.teamId})`,
+      approvedTitle: approvedField<string | null>(artifactVersion.title),
+      approvedSavedAt: approvedField<string | null>(artifactVersion.savedAt),
+      approvedBy: approvedField<string | null>(artifactVersion.createdBy),
+    })
+    .from(artifact)
+    .where(eq(artifact.publicId, publicId))
+    .limit(1);
+  return row ?? null;
+}
+
+type Subject = NonNullable<Awaited<ReturnType<typeof loadSubject>>>;
+
+/** The approved version a reader outside the team gets, or null for the latest. */
+function approvedVersionFor(subject: Subject, versionId: string) {
+  if (subject.approvedTitle === null || subject.approvedSavedAt === null) return null;
+  return { versionId, served: { title: subject.approvedTitle, updatedAt: new Date(subject.approvedSavedAt), editedBy: subject.approvedBy } };
+}
+
+function latestServed(record: ArtifactMetaRecord) {
+  return { title: record.title, updatedAt: record.updatedAt, editedBy: record.updatedBy ?? record.userId };
 }
 
 /**
- * Loads an artifact by public id for a viewer (null when signed out). Returns
- * null when it does not exist or the viewer may not read it, so callers show
- * the same "not found" either way. Readers outside the artifact's team get
- * its approved version. Deduplicated per request.
+ * The one read decision, deduplicated per request and never cached across
+ * requests: null when the artifact does not exist or the viewer may not read
+ * it. Loads no content.
  */
-export const getViewableArtifact = cache(async (publicId: string, viewerId: string | null): Promise<ViewableArtifact | null> => {
+export const getArtifactAccess = cache(async (publicId: string, viewerId: string | null): Promise<ArtifactAccess | null> => {
   if (!isPublicId(publicId)) return null;
-  const [record] = await getDb().select().from(artifact).where(eq(artifact.publicId, publicId)).limit(1);
-  if (!record) return null;
-  const context = record.visibility === "private" ? { isTeamMember: false, teamPersonal: null } : await teamContext(viewerId, record.teamId);
-  const member = context.isTeamMember;
+  const subject = await loadSubject(publicId, viewerId);
+  if (!subject) return null;
+  const { record } = subject;
+  const member = record.visibility === "private" ? false : subject.member;
   const viewer = viewerId ? { userId: viewerId, isTeamMember: member } : null;
   if (!canViewArtifact(record, viewer)) return null;
-  const isAuthor = viewerId === record.userId;
-  const served = versionToServe({ visibility: record.visibility, approvedVersionId: record.approvedVersionId, isAuthor, isTeamMember: member });
-  const base = { record, canEdit: canEditArtifact({ ...record, teamPersonal: context.teamPersonal }, viewer), isTeamMember: member };
-  if (served.source === "approved") {
-    const view = await approvedView(served.versionId);
-    if (view) return { ...base, view, version: { source: "approved", versionId: served.versionId }, editPending: null };
+  const decided = versionToServe({ visibility: record.visibility, approvedVersionId: record.approvedVersionId, isAuthor: viewerId === record.userId, isTeamMember: member });
+  const base = { record, canEdit: canEditArtifact({ ...record, teamPersonal: subject.teamPersonal }, viewer), isTeamMember: member };
+  const approved = decided.source === "approved" ? approvedVersionFor(subject, decided.versionId) : null;
+  if (approved) return { ...base, version: { source: "approved", versionId: approved.versionId }, served: approved.served };
+  return { ...base, version: { source: "latest", versionId: null }, served: latestServed(record) };
+});
+
+async function latestContent(artifactId: string): Promise<string | null> {
+  const [row] = await getDb().select({ content: artifactContentColumn }).from(artifact).where(eq(artifact.id, artifactId)).limit(1);
+  return row?.content ?? null;
+}
+
+async function latestViewable(access: ArtifactAccess): Promise<ViewableArtifact | null> {
+  const { record } = access;
+  const [content, editPending] = await Promise.all([latestContent(record.id), isReviewedLevel(record.visibility) ? hasPendingEdit(record.id) : false]);
+  if (content === null) return null;
+  const { title, summary, kind, language, project, source, metadata } = record;
+  const served = latestServed(record);
+  const view = { title, summary, content, kind, language, project, source, metadata, updatedAt: served.updatedAt, editedBy: served.editedBy };
+  return { ...access, version: { source: "latest", versionId: null }, served, view, editPending };
+}
+
+/**
+ * Loads an artifact by public id for a viewer (null when signed out), with
+ * the content they may read. Returns null when it does not exist or the
+ * viewer may not read it, so callers show the same "not found" either way.
+ * Readers outside the artifact's team get its approved version, from the
+ * version cache keyed by version id and save time; everyone else reads the
+ * row. Deduplicated per request.
+ */
+export const getViewableArtifact = cache(async (publicId: string, viewerId: string | null): Promise<ViewableArtifact | null> => {
+  const access = await getArtifactAccess(publicId, viewerId);
+  if (!access) return null;
+  if (access.version.versionId) {
+    const cached = await cachedVersionView(access.version.versionId, access.served.updatedAt.toISOString());
+    if (cached) return { ...access, view: { ...cached, editedBy: access.served.editedBy }, editPending: null };
   }
-  const editPending = isReviewedLevel(record.visibility) ? await hasPendingEdit(record.id) : false;
-  return { ...base, view: latestView(record), version: { source: "latest", versionId: null }, editPending };
+  return latestViewable(access);
 });
 
 /**

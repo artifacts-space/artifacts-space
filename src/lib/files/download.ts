@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { artifact, artifactFile, type ArtifactFileRecord } from "@/db/schema";
-import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
+import { getArtifactAccess, type ArtifactAccess } from "@/lib/access";
 
 import { canReadFile, type FileArtifactAccess } from "./access-rules";
 import { fileLimits, isInlineType } from "./config";
@@ -14,7 +14,7 @@ import type { FileDto } from "./types";
 
 /**
  * Downloads. Access to a file always goes through its artifact's access
- * check (getViewableArtifact), so whoever can view the artifact can view its
+ * check (getArtifactAccess, which loads no content), so whoever can view the artifact can view its
  * files and nobody else can. Unattached files are their uploader's only.
  */
 
@@ -29,18 +29,18 @@ async function loadWithArtifact(fileId: string) {
 }
 
 /** When the viewer reads an approved version, the time it was saved; otherwise null (they read the latest). */
-export function servedVersionTime(viewable: Pick<ViewableArtifact, "version" | "view">): Date | null {
-  return viewable.version.source === "approved" ? viewable.view.updatedAt : null;
+export function servedVersionTime(viewable: Pick<ArtifactAccess, "version" | "served">): Date | null {
+  return viewable.version.source === "approved" ? viewable.served.updatedAt : null;
 }
 
 /** The files this viewer may see with the version they are served. */
-export async function filesForViewer(viewable: Pick<ViewableArtifact, "record" | "version" | "view">): Promise<FileDto[]> {
+export async function filesForViewer(viewable: Pick<ArtifactAccess, "record" | "version" | "served">): Promise<FileDto[]> {
   return listArtifactFiles(viewable.record.id, { attachedBy: servedVersionTime(viewable) });
 }
 
 async function artifactAccess(publicId: string | null, viewerId: string | null): Promise<FileArtifactAccess | null> {
   if (!publicId) return null;
-  const viewable = await getViewableArtifact(publicId, viewerId);
+  const viewable = await getArtifactAccess(publicId, viewerId);
   return viewable ? { viewable: true, servedVersionAt: servedVersionTime(viewable) } : { viewable: false, servedVersionAt: null };
 }
 
