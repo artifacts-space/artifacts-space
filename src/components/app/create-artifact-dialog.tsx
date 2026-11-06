@@ -108,7 +108,7 @@ export function CreateArtifactDialog({
                 <Label htmlFor="artifact-project">Project</Label>
                 <Input id="artifact-project" name="project" maxLength={120} placeholder="artifacts-space" className="h-9" />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label id="artifact-format-label">Format</Label>
                 <Select value={kind} onValueChange={(value) => { if (value) setKind(value); }}>
                   <SelectTrigger aria-labelledby="artifact-format-label" aria-describedby="artifact-format-help" className="h-9 w-full">
