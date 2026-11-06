@@ -1,7 +1,8 @@
 import { networkKey } from "@/lib/abuse/network-key";
-import { hitRateLimit } from "@/lib/abuse/rate-limit";
+import { hitRateLimit, hitRateLimits, rateLimitMessage } from "@/lib/abuse/rate-limit";
 import { rateLimitMessages } from "@/lib/abuse/limits";
 import { describeWait } from "@/lib/abuse/rate-limit-window";
+import { isMagicLinkRequest, magicLinkChecks, magicLinkEmail } from "@/lib/auth/magic-link-limits";
 import { getAuth } from "@/lib/auth/server";
 import { countUnapprovedClients } from "@/lib/oauth/clients";
 import { oauthLimits } from "@/lib/oauth/config";
@@ -27,12 +28,33 @@ async function refuseAbuse(request: Request, endpoint: PublicOAuthEndpoint): Pro
 }
 
 /**
+ * Limits sign-in link emails per network and per address, in Postgres.
+ * Returns a 429 to send instead, or null to go on. Fails open, so sign-in
+ * keeps working when the counters are unavailable.
+ */
+async function refuseMagicLinkFlood(request: Request): Promise<Response | null> {
+  try {
+    const body: unknown = await request.clone().json().catch(() => null);
+    const refusal = await hitRateLimits(magicLinkChecks(networkKey(request.headers), magicLinkEmail(body)));
+    if (!refusal) return null;
+    return Response.json(
+      { code: "RATE_LIMITED", message: rateLimitMessage(refusal.name, refusal.retryAfterSeconds) },
+      { status: 429, headers: { "Retry-After": String(refusal.retryAfterSeconds), "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    console.error("[auth] Sign-in link limit check failed", error instanceof Error ? error.name : "unknown error");
+    return null;
+  }
+}
+
+/**
  * Applies the abuse limits, then rewrites an authorization request's scope to
  * this server's policy (no scope means full access, and offline_access is
  * always added so clients get refresh tokens).
  */
 async function prepare(request: Request): Promise<Request | Response> {
   const url = new URL(request.url);
+  if (isMagicLinkRequest(request.method, url.pathname)) return (await refuseMagicLinkFlood(request)) ?? request;
   const endpoint = publicOAuthEndpoint(request.method, url.pathname);
   if (!endpoint) return request;
   try {

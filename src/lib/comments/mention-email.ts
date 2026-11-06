@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { reserveBudgetedEmail } from "@/lib/email/budget";
 import { html, renderEmail } from "@/lib/email/layout";
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
 import { siteUrl } from "@/lib/site-origin";
@@ -44,10 +45,16 @@ export function renderMentionEmail(url: string, author: string, title: string) {
  * the email; the person reads it in the app. In local development without
  * Sendir keys, it prints the link to the server log instead. Failures are
  * logged, never thrown: the comment and the inbox entry are already saved.
+ * Over the shared daily email budget the email is skipped (and logged).
  */
 export async function sendMentionEmail(input: MentionEmail) {
   const url = threadUrl(input.publicId, input.commentId);
   const title = shortTitle(input.artifactTitle);
+  const reserved = await reserveBudgetedEmail("mention").catch((error: unknown) => {
+    console.error("[comments] The email budget could not be checked", error instanceof Error ? error.name : "unknown error");
+    return false;
+  });
+  if (!reserved) return;
   if (!isSendirConfigured()) {
     if (process.env.NODE_ENV === "production") {
       console.error("[comments] Sendir is not configured, so a mention email was not sent.");

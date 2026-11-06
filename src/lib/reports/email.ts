@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { reserveBudgetedEmail } from "@/lib/email/budget";
 import { emailLink, html, renderEmail } from "@/lib/email/layout";
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
 import { siteUrl } from "@/lib/site-origin";
@@ -40,11 +41,14 @@ export function renderReportEmail({ teamName, artifactTitle, reasonLabel, teamUr
 /**
  * Tells one team owner about a new report, with Sendir. In local development
  * without Sendir keys, it prints the links to the server log instead. Links
- * are absolute and built from siteUrl, never from the request.
+ * are absolute and built from siteUrl, never from the request. Over the
+ * shared daily email budget the email is skipped (and logged); the report
+ * still waits on the team page.
  */
 export async function sendReportEmail(input: ReportEmail) {
   const teamUrl = siteUrl(`/teams/${encodeURIComponent(input.teamSlug)}`);
   const artifactUrl = siteUrl(`/artifact/${encodeURIComponent(input.publicId)}`);
+  if (!(await reserveBudgetedEmail("report"))) return;
   if (!isSendirConfigured()) {
     if (process.env.NODE_ENV === "production") throw new Error("Sendir is not configured, so report emails cannot be sent.");
     console.info(`[reports] Report on ${artifactUrl} (${input.reasonLabel}) for ${input.ownerEmail}: ${teamUrl}`);

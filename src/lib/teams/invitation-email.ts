@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
 
+import { APIError } from "better-auth/api";
+
+import { reserveBudgetedEmail } from "@/lib/email/budget";
+import { INVITATION_BUDGET_MESSAGE } from "@/lib/email/budget-rules";
 import { html, renderEmail } from "@/lib/email/layout";
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
 import { siteUrl } from "@/lib/site-origin";
@@ -32,10 +36,13 @@ export function renderTeamInvitationEmail(url: string, teamName: string, inviter
 
 /**
  * Sends a team invitation with Sendir. In local development without Sendir
- * keys, it prints the link to the server log instead.
+ * keys, it prints the link to the server log instead. Each send uses one
+ * email of the shared daily budget, so invitations can never use up the
+ * quota sign-in links need; over budget it refuses with a message to show.
  */
 export async function sendTeamInvitationEmail(input: TeamInvitationEmail) {
   const url = invitationUrl(input.invitationId);
+  if (!(await reserveBudgetedEmail("team-invitation"))) throw new APIError("TOO_MANY_REQUESTS", { message: INVITATION_BUDGET_MESSAGE });
   if (!isSendirConfigured()) {
     if (process.env.NODE_ENV === "production") throw new Error("Sendir is not configured, so invitations cannot be sent.");
     console.info(`[teams] Invitation to ${input.teamName} for ${input.email}: ${url}`);

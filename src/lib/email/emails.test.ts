@@ -14,6 +14,9 @@ vi.mock("@/lib/sendir", () => ({
   sendEmail: vi.fn(() => Promise.resolve({ data: { id: "sent" }, error: null })),
 }));
 
+// The daily email budget always has room here; budget.test.ts covers refusals.
+vi.mock("@/lib/email/budget", () => ({ reserveBudgetedEmail: () => Promise.resolve(true) }));
+
 const LOGO = '<img src="https://artifacts.space/email/artifacts-space-icon.png"';
 const HOSTILE = `<script>alert("x")</script>`;
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
