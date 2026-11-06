@@ -22,6 +22,17 @@ export function teamsFor(visibility: ArtifactVisibility, teams: readonly ShareTe
   return [...teams];
 }
 
+/** How a team reads in the picker: a personal team says so. */
+export function teamLabel(team: ShareTeam) {
+  return team.personal ? `${team.name} (personal)` : team.name;
+}
+
+/** The closed picker's label for the chosen team id, so it never shows the raw id. */
+export function selectedTeamLabel(id: string | null, teams: readonly ShareTeam[]) {
+  const team = teams.find((item) => item.id === id);
+  return team ? teamLabel(team) : "Choose a team";
+}
+
 /** The team picked by default: the artifact's current team when it fits, else the first that does. */
 export function defaultTeamId(visibility: ArtifactVisibility, teams: readonly ShareTeam[], currentTeamId: string | null) {
   const options = teamsFor(visibility, teams);

@@ -19,14 +19,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { ArtifactDto, ArtifactVisibility } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
-import { defaultTeamId, outcomeText, teamsFor, visibilityLabel, visibilityOptions } from "./share-options";
+import { defaultTeamId, outcomeText, selectedTeamLabel, teamLabel, teamsFor, visibilityLabel, visibilityOptions } from "./share-options";
 import { useShareTeams, type ShareTeam } from "./share-teams-context";
 
 const icons: Record<ArtifactVisibility, typeof IconLock> = { private: IconLock, team: IconUsersGroup, link: IconLink, public: IconWorld };
-
-function teamLabel(team: ShareTeam) {
-  return team.personal ? `${team.name} (personal)` : team.name;
-}
 
 function LevelPicker({ value, onChange }: { value: ArtifactVisibility; onChange: (value: ArtifactVisibility) => void }) {
   return (
@@ -62,7 +58,9 @@ function TeamPicker({ visibility, teams, value, onChange }: { visibility: Artifa
     <label className="flex flex-col gap-2 text-xs text-muted-foreground">
       {visibility === "team" ? "Share with" : "Approved by"}
       <Select value={value ?? ""} onValueChange={(id) => { if (id) onChange(id); }}>
-        <SelectTrigger className="h-9 w-full text-[13px] text-foreground"><SelectValue /></SelectTrigger>
+        <SelectTrigger className="h-9 w-full text-[13px] text-foreground">
+          <SelectValue>{(id: string) => selectedTeamLabel(id, options)}</SelectValue>
+        </SelectTrigger>
         <SelectContent>
           {options.map((team) => <SelectItem key={team.id} value={team.id} className="text-xs">{teamLabel(team)}</SelectItem>)}
         </SelectContent>

@@ -46,7 +46,7 @@ export function InviteForm({ teamId }: { teamId: string }) {
         <div className="flex flex-col gap-2">
           <Label className="text-xs">Role</Label>
           <Select value={role} onValueChange={(value) => { if (value) setRole(value); }}>
-            <SelectTrigger className="h-9 w-28 text-[13px]" aria-label="Role for the invited person"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9 w-28 text-[13px]" aria-label="Role for the invited person"><SelectValue>{(value: AssignableRole) => roleLabel(value)}</SelectValue></SelectTrigger>
             <SelectContent>
               {assignableRoles.map((value) => <SelectItem key={value} value={value} className="text-xs">{roleLabel(value)}</SelectItem>)}
             </SelectContent>

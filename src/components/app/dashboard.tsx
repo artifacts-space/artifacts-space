@@ -215,7 +215,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
               </div>
               <Select value={kind} onValueChange={(value) => { setKind(value ?? "all"); }}>
                 <SelectTrigger size="sm" className="h-7 w-full border-0 bg-transparent px-1 text-xs text-muted-foreground shadow-none" aria-label="Filter by format">
-                  <SelectValue />
+                  <SelectValue>{(value: string) => (value === "all" ? "All formats" : value)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all" className="text-xs">All formats</SelectItem>

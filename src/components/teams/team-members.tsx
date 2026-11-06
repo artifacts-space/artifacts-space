@@ -36,7 +36,7 @@ function RoleCell({ member, teamId, editable, viewerRole }: { member: TeamMember
       }}
       disabled={pending !== null}
     >
-      <SelectTrigger size="sm" className="h-7 w-28 text-xs" aria-label={`Role for ${member.name}`}><SelectValue /></SelectTrigger>
+      <SelectTrigger size="sm" className="h-7 w-28 text-xs" aria-label={`Role for ${member.name}`}><SelectValue>{(value: TeamRole) => roleLabel(value)}</SelectValue></SelectTrigger>
       <SelectContent>
         {rolesFor(viewerRole).map((role) => <SelectItem key={role} value={role} className="text-xs">{roleLabel(role)}</SelectItem>)}
       </SelectContent>

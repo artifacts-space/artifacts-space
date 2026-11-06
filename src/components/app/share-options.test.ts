@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultTeamId, outcomeText, teamsFor } from "./share-options";
+import { defaultTeamId, outcomeText, selectedTeamLabel, teamsFor } from "./share-options";
 import type { ShareTeam } from "./share-teams-context";
 
 const personal: ShareTeam = { id: "p", slug: "me", name: "Me", personal: true, role: "owner", teamSharingNeedsApproval: false };
@@ -35,5 +35,20 @@ describe("outcomeText", () => {
 
   it("should say an admin approves first when a member shares in a strict team", () => {
     expect(outcomeText("team", strict)).toMatch(/approves it first/);
+  });
+});
+
+describe("selectedTeamLabel", () => {
+  it("should show the personal team's name, marked personal, when its id is chosen", () => {
+    expect(selectedTeamLabel("p", teams)).toBe("Me (personal)");
+  });
+
+  it("should show a shared team's name when its id is chosen", () => {
+    expect(selectedTeamLabel("s", teams)).toBe("Strict");
+  });
+
+  it("should ask for a team when no known team is chosen", () => {
+    expect(selectedTeamLabel("", teams)).toBe("Choose a team");
+    expect(selectedTeamLabel(null, teams)).toBe("Choose a team");
   });
 });
