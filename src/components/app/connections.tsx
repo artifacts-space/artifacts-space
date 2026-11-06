@@ -29,6 +29,10 @@ const tools = [
   ["artifacts_update", "Change an artifact in place."],
   ["artifacts_delete", "Remove an artifact."],
   ["teams_list", "List your teams, for sharing and team scopes."],
+  ["inbox_list", "List unread @mentions with the thread around them."],
+  ["inbox_mark_read", "Mark mentions read once handled."],
+  ["comments_list", "Read the comment thread on an artifact."],
+  ["comment_create", "Comment or reply, with @mentions."],
 ];
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });

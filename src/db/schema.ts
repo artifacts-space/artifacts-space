@@ -351,6 +351,97 @@ export const artifactFile = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// Agents as teammates: agent members, comment threads, mentions, and mutes.
+// ---------------------------------------------------------------------------
+
+// An agent is a `user` row with this companion row. It has a handle (the
+// user's username), a reserved unroutable email, no sign-in method, exactly one
+// team, and the person who added it. Its API tokens are ordinary `api_token`
+// rows for the agent's user id.
+export const agent = pgTable(
+  "agent",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => team.id, { onDelete: "cascade" }),
+    // The person who added the agent. Work is shown as "by @agent for <owner>".
+    ownerId: text("owner_id").references(() => user.id, { onDelete: "set null" }),
+    // Set when a team owner or admin mutes the agent across the team.
+    mutedAt: timestamp("muted_at", { withTimezone: true }),
+    mutedBy: text("muted_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("agent_team_idx").on(table.teamId)],
+);
+
+// A comment on an artifact. All comments on one artifact form its thread;
+// `parentId` points at the top-level comment a reply answers.
+export const comment = pgTable(
+  "comment",
+  {
+    id: text("id").primaryKey(),
+    artifactId: text("artifact_id")
+      .notNull()
+      .references(() => artifact.id, { onDelete: "cascade" }),
+    // Null once the author's account is gone. The comment stays in the thread.
+    authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
+    parentId: text("parent_id").references((): AnyPgColumn => comment.id, { onDelete: "set null" }),
+    // Markdown. Rendered without raw HTML and with the artifact link policy.
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    // Soft delete keeps replies in place and rate limits honest.
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("comment_artifact_created_idx").on(table.artifactId, table.createdAt),
+    index("comment_author_created_idx").on(table.authorId, table.createdAt),
+  ],
+);
+
+// An inbox entry: a mention that landed. Refused mentions are never stored.
+export const mention = pgTable(
+  "mention",
+  {
+    id: text("id").primaryKey(),
+    commentId: text("comment_id")
+      .notNull()
+      .references(() => comment.id, { onDelete: "cascade" }),
+    artifactId: text("artifact_id")
+      .notNull()
+      .references(() => artifact.id, { onDelete: "cascade" }),
+    recipientId: text("recipient_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("mention_comment_recipient_idx").on(table.commentId, table.recipientId),
+    index("mention_recipient_created_idx").on(table.recipientId, table.createdAt),
+  ],
+);
+
+// A person muted an agent in one artifact's thread.
+export const threadMute = pgTable(
+  "thread_mute",
+  {
+    artifactId: text("artifact_id")
+      .notNull()
+      .references(() => artifact.id, { onDelete: "cascade" }),
+    agentId: text("agent_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mutedBy: text("muted_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.artifactId, table.agentId] })],
+);
+
 export type ArtifactRecord = typeof artifact.$inferSelect;
 export type TeamRecord = typeof team.$inferSelect;
 export type SharingRequestRecord = typeof sharingRequest.$inferSelect;
@@ -358,3 +449,6 @@ export type ApiTokenRecord = typeof apiToken.$inferSelect;
 export type ArtifactVersionRecord = typeof artifactVersion.$inferSelect;
 export type ArtifactReportRecord = typeof artifactReport.$inferSelect;
 export type ArtifactFileRecord = typeof artifactFile.$inferSelect;
+export type AgentRecord = typeof agent.$inferSelect;
+export type CommentRecord = typeof comment.$inferSelect;
+export type MentionRecord = typeof mention.$inferSelect;

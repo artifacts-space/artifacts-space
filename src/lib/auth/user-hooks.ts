@@ -1,3 +1,4 @@
+import { assertNotAgentEmail } from "@/lib/auth/agent-guards";
 import { ensureUserSetup, pickUsername } from "@/lib/teams/setup";
 
 interface NewUser {
@@ -16,6 +17,7 @@ interface NewUser {
 export const userHooks = {
   create: {
     before: async (data: { email: string; username?: unknown }) => {
+      assertNotAgentEmail(data.email);
       const preferred = typeof data.username === "string" ? data.username : null;
       const { username, confirmed } = await pickUsername({ preferred, email: data.email });
       return { data: { ...data, username, usernameConfirmed: confirmed } };

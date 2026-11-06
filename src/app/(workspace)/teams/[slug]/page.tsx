@@ -6,9 +6,11 @@ import { InviteForm, PendingInvitations } from "@/components/teams/invite-form";
 import { PendingSharingList, TeamSharedList } from "@/components/teams/pending-sharing";
 import { ReportsList } from "@/components/teams/reports-list";
 import { Section } from "@/components/teams/section";
+import { TeamAgents } from "@/components/teams/team-agents";
 import { TeamMembers } from "@/components/teams/team-members";
 import { LeaveTeamButton, SharingRuleSetting } from "@/components/teams/team-settings";
 import { Badge } from "@/components/ui/badge";
+import { listTeamAgents } from "@/lib/agents/queries";
 import { listOpenReports } from "@/lib/reports/service";
 import { getSession } from "@/lib/session";
 import { listPendingSharing, listTeamSharedArtifacts } from "@/lib/sharing/queries";
@@ -82,9 +84,10 @@ export default async function TeamPage({ params }: PageProps<"/teams/[slug]">) {
 
   // Personal teams have one member and nothing to manage.
   const canManage = canManageTeam(team.role) && !team.personal;
-  const [members, invitations] = await Promise.all([
+  const [members, invitations, agents] = await Promise.all([
     listTeamMembers(team.id),
     canManage ? listPendingInvitations(team.id) : Promise.resolve([]),
+    team.personal ? Promise.resolve([]) : listTeamAgents(team.id, canManage),
   ]);
 
   return (
@@ -94,6 +97,12 @@ export default async function TeamPage({ params }: PageProps<"/teams/[slug]">) {
       <Section title="Members" description={team.personal ? "Your personal team is only you. Create a team to share with others." : undefined}>
         <TeamMembers teamId={team.id} members={members} viewerId={session.user.id} viewerRole={team.role} canManage={canManage} />
       </Section>
+
+      {team.personal ? null : (
+        <Section title="Agents" description="Agent teammates read what the team shares, comment, and answer @mentions with their own tokens. They can ask to share, never approve.">
+          <TeamAgents teamId={team.id} agents={agents} canManage={canManage} />
+        </Section>
+      )}
 
       <SharingSections team={team} />
 

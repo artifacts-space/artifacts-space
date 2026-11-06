@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { ShareControl } from "@/components/app/share-control";
 import { AttachedFiles } from "@/components/files/attached-files";
+import { CommentThread } from "@/components/comments/comment-thread";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
 import { ContentPane } from "./content-pane";
@@ -53,6 +54,7 @@ export function ArtifactEditor({ artifact, origin, onUpdated, onDeleted }: Artif
       <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} files={artifact.files} update={update} />
       {draft.kind === "file" || draft.kind === "ui" || artifact.files.length > 0 ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
       <MetaFields draft={draft} update={update} />
+      <CommentThread publicId={artifact.publicId} className="border-t px-5 py-5 sm:px-7" />
       <DeleteDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}

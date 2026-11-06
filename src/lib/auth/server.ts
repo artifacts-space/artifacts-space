@@ -5,6 +5,7 @@ import { magicLink } from "better-auth/plugins";
 
 import { getDb } from "@/db";
 import * as schema from "@/db/schema";
+import { sessionHooks } from "@/lib/auth/agent-guards";
 import { sendMagicLinkEmail } from "@/lib/auth/magic-link-email";
 import { teamDepartureHook } from "@/lib/auth/team-departure";
 import { teamsPlugin } from "@/lib/auth/teams-plugin";
@@ -53,7 +54,7 @@ function createAuth() {
         usernameConfirmed: { type: "boolean", required: false, defaultValue: false, input: false },
       },
     },
-    databaseHooks: { user: userHooks },
+    databaseHooks: { user: userHooks, session: sessionHooks },
     hooks: { after: teamDepartureHook },
     plugins: [
       magicLink({

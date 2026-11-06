@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { IconChevronDown, IconExternalLink, IconKey, IconLogout, IconUser } from "@tabler/icons-react";
+import { IconChevronDown, IconExternalLink, IconInbox, IconKey, IconLogout, IconUser } from "@tabler/icons-react";
 import { useState } from "react";
 
 import { Logo } from "@/components/logo";
@@ -23,13 +23,36 @@ import { cn } from "@/lib/utils";
 const artifactsLink = { href: "/app", label: "Artifacts" };
 const connectionsLink = { href: "/app/connections", label: "Connections" };
 
-function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
+/** The inbox link, with the number of unread mentions. */
+function InboxLink({ count, active }: { count: number; active: boolean }) {
+  const label = count > 0 ? `Inbox, ${String(count)} unread` : "Inbox";
+  return (
+    <Link
+      href="/inbox"
+      aria-label={label}
+      className={cn(
+        "relative flex h-full items-center gap-1.5 px-2 text-[13px] transition-colors sm:px-3",
+        active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      <IconInbox className="size-4 sm:hidden" aria-hidden />
+      <span className="hidden sm:inline">Inbox</span>
+      {count > 0 ? (
+        <span className="min-w-4 rounded-full bg-foreground px-1 text-center text-[10px] leading-4 font-medium text-background">{count > 49 ? "50+" : count}</span>
+      ) : null}
+      {active && <span className="absolute inset-x-2 bottom-0 h-px bg-foreground sm:inset-x-3" />}
+    </Link>
+  );
+}
+
+function NavLink({ href, label, active, className }: { href: string; label: string; active: boolean; className?: string }) {
   return (
     <Link
       href={href}
       className={cn(
         "relative flex h-full items-center px-2 text-[13px] transition-colors sm:px-3",
         active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+        className,
       )}
     >
       {label}
@@ -43,9 +66,10 @@ interface AppHeaderProps {
   email: string;
   username: string;
   teams: HeaderTeam[];
+  unreadMentions: number;
 }
 
-export function AppHeader({ name, email, username, teams }: AppHeaderProps) {
+export function AppHeader({ name, email, username, teams, unreadMentions }: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -71,7 +95,9 @@ export function AppHeader({ name, email, username, teams }: AppHeaderProps) {
         <nav className="flex h-full items-center gap-1" aria-label="Workspace navigation">
           <NavLink {...artifactsLink} active={pathname === artifactsLink.href} />
           <TeamSwitcher teams={teams} active={pathname.startsWith("/teams")} />
-          <NavLink {...connectionsLink} active={pathname.startsWith(connectionsLink.href)} />
+          <InboxLink count={unreadMentions} active={pathname.startsWith("/inbox") || pathname.startsWith("/threads")} />
+          {/* On phones, Connections lives in the account menu ("Access tokens"). */}
+          <NavLink {...connectionsLink} active={pathname.startsWith(connectionsLink.href)} className="max-sm:hidden" />
         </nav>
         <div className="ml-auto flex items-center">
           <DropdownMenu>

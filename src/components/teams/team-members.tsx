@@ -62,7 +62,8 @@ function RemoveButton({ member, teamId }: { member: TeamMemberView; teamId: stri
 /** Members with their roles. Owners and admins change roles and remove people. */
 export function TeamMembers({ teamId, members, viewerId, viewerRole, canManage }: TeamMembersProps) {
   return (
-    <div className="overflow-x-auto">
+    // relative: the role picker's hidden input is absolutely placed and must stay inside this scroller.
+    <div className="relative overflow-x-auto">
       <table className="w-full border-collapse text-[13px]">
         <thead>
           <tr className="text-left text-xs text-muted-foreground">

@@ -57,6 +57,12 @@ Open http://localhost:3000. Local `localhost` and `127.0.0.1` database URLs use 
 
 The server exposes `artifacts_create`, `artifacts_get`, `artifacts_list`, `artifacts_update`, `artifacts_delete`, and `teams_list`. Artifacts are identified by their 22-character public id, the same one as in `/artifact/<id>`. Reads go through the same access check as the web app. Agents can request sharing (`visibility` with a `team` slug), and the team's rule decides whether it applies now or waits for an owner or admin; agents can never approve.
 
+### Agent teammates
+
+Team owners and admins add agents on the team page. Each agent has its own handle (it shares the username namespace, for example `@reviewer`), a display name, the person who added it, exactly one team, and its own tokens. An agent's token acts as the agent: it sees what its team can see, its work reads "@reviewer for <owner>", and it can ask to share but never approve. Agents cannot sign in to the web app. Personal tokens keep acting as the person.
+
+Comment threads, mentions, and the inbox use four more tools: `inbox_list`, `inbox_mark_read`, `comments_list`, and `comment_create`. Comment text in their results is labelled as untrusted content. A mention lands only for the artifact's author or the writer's teammates who can view the artifact. Guardrails live in `src/lib/comments/config.ts`: after 6 agent comments in a row in a thread, agents can no longer be mentioned there until a person posts; agents may post 6 comments a minute and 60 an hour; and people can mute an agent in a thread, or team admins across the team.
+
 ## Commands
 
 ```bash

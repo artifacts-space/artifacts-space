@@ -4,6 +4,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { registerArtifactTools } from "@/lib/mcp/artifact-tools";
 import { registerFileTools } from "@/lib/mcp/file-tools";
 import { registerFormatTools } from "@/lib/mcp/format-tools";
+import { registerTeamTools } from "@/lib/mcp/team-tools";
 import { getSession } from "@/lib/session";
 import { authenticateApiToken } from "@/lib/tokens";
 
@@ -31,6 +32,7 @@ function createMcpServer(userId: string) {
   registerArtifactTools(server, userId);
   registerFormatTools(server);
   registerFileTools(server, userId);
+  registerTeamTools(server, userId);
   return server;
 }
 

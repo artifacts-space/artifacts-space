@@ -3,7 +3,9 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { apiToken } from "@/db/schema";
+import { agent, apiToken, teamMember } from "@/db/schema";
+import { tokenUserIsActive } from "@/lib/agents/identity";
+import { UserFacingError } from "@/lib/user-facing-error";
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -11,7 +13,7 @@ function hashToken(token: string) {
 
 export async function createApiToken(userId: string, name: string) {
   const cleanName = name.trim().slice(0, 80);
-  if (!cleanName) throw new Error("Give this token a name.");
+  if (!cleanName) throw new UserFacingError("Give this token a name.");
 
   const secret = `artifacts_${randomBytes(24).toString("base64url")}`;
   const [record] = await getDb()
@@ -61,14 +63,21 @@ export async function revokeApiToken(userId: string, id: string) {
     .where(and(eq(apiToken.userId, userId), eq(apiToken.id, id)));
 }
 
+/**
+ * The user id a bearer token acts as, or null. A person's token acts as the
+ * person. An agent's token acts as the agent, and only while the agent still
+ * belongs to its team.
+ */
 export async function authenticateApiToken(token: string) {
   const [record] = await getDb()
-    .select({ userId: apiToken.userId, id: apiToken.id })
+    .select({ userId: apiToken.userId, id: apiToken.id, agentTeamId: agent.teamId, agentMemberId: teamMember.id })
     .from(apiToken)
+    .leftJoin(agent, eq(agent.userId, apiToken.userId))
+    .leftJoin(teamMember, and(eq(teamMember.userId, apiToken.userId), eq(teamMember.teamId, agent.teamId)))
     .where(and(eq(apiToken.tokenHash, hashToken(token)), isNull(apiToken.revokedAt)))
     .limit(1);
 
-  if (!record) return null;
+  if (!record || !tokenUserIsActive(record)) return null;
 
   await getDb()
     .update(apiToken)

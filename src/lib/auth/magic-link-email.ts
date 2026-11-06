@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { isAgentEmail } from "@/lib/agents/identity";
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
 
 interface MagicLinkEmail {
@@ -49,6 +50,8 @@ function idempotencyKey(token: string) {
  * Sendir keys, it prints the link to the server log so sign-in still works.
  */
 export async function sendMagicLinkEmail({ email, url, token }: MagicLinkEmail) {
+  // Agents never sign in, and their addresses cannot receive mail. Answer as usual so nothing is revealed.
+  if (isAgentEmail(email)) return;
   if (!isSendirConfigured()) {
     if (process.env.NODE_ENV === "production") throw new Error("Sendir is not configured, so sign-in links cannot be sent.");
     devOutbox.set(email.toLowerCase(), url);

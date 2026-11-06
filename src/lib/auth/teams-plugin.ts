@@ -1,5 +1,6 @@
 import { organization } from "better-auth/plugins";
 
+import { assertMemberIsNotAgent } from "@/lib/auth/agent-guards";
 import { reconcileAfterDeparture } from "@/lib/auth/team-departure";
 import { assertInvitableRole, assertNotPersonal, assertTeamUpdateAllowed, prepareNewTeam } from "@/lib/teams/guards";
 import { sendTeamInvitationEmail } from "@/lib/teams/invitation-email";
@@ -48,9 +49,9 @@ export function teamsPlugin() {
       beforeUpdateOrganization: async ({ organization: update, member }) => {
         await assertTeamUpdateAllowed(update, member);
       },
-      beforeAddMember: ({ organization: team }) => {
+      beforeAddMember: async ({ organization: team, member }) => {
         assertNotPersonal(team, "add members");
-        return Promise.resolve();
+        await assertMemberIsNotAgent(member.userId, "join another team");
       },
       beforeCreateInvitation: ({ invitation, organization: team }) => {
         assertNotPersonal(team, "invite people");
@@ -58,9 +59,9 @@ export function teamsPlugin() {
         return Promise.resolve();
       },
       afterRemoveMember: ({ organization: team }) => reconcileAfterDeparture(team.id),
-      beforeUpdateMemberRole: ({ organization: team }) => {
+      beforeUpdateMemberRole: async ({ organization: team, member }) => {
         assertNotPersonal(team, "change roles");
-        return Promise.resolve();
+        await assertMemberIsNotAgent(member.userId, "change roles");
       },
     },
   });

@@ -1,7 +1,7 @@
-import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, notExists, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { team, teamInvitation, teamMember, user } from "@/db/schema";
+import { agent, team, teamInvitation, teamMember, user } from "@/db/schema";
 
 import { parseTeamRole, type TeamRole } from "./roles";
 
@@ -101,7 +101,7 @@ export interface TeamMemberView {
   joinedAt: string;
 }
 
-/** Members of a team. Callers must check the viewer's membership first. */
+/** People in a team (agents are listed separately). Callers must check the viewer's membership first. */
 export async function listTeamMembers(teamId: string): Promise<TeamMemberView[]> {
   const rows = await getDb()
     .select({
@@ -115,7 +115,7 @@ export async function listTeamMembers(teamId: string): Promise<TeamMemberView[]>
     })
     .from(teamMember)
     .innerJoin(user, eq(user.id, teamMember.userId))
-    .where(eq(teamMember.teamId, teamId))
+    .where(and(eq(teamMember.teamId, teamId), notExists(getDb().select({ id: agent.userId }).from(agent).where(eq(agent.userId, teamMember.userId)))))
     .orderBy(asc(teamMember.createdAt));
   return rows.map((row) => ({ ...row, role: parseTeamRole(row.role), joinedAt: row.joinedAt.toISOString() }));
 }
