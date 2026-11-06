@@ -9,6 +9,7 @@ import { useConfirmations } from "@/components/confirmations-provider";
 import { Logo } from "@/components/logo";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { TeamSwitcher, type HeaderTeam } from "@/components/teams/team-switcher";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -125,6 +126,12 @@ export function AppHeader({ userId, name, email, username, teams, unreadMentions
                   <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">{email}</span>
                 </DropdownMenuLabel>
               </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              {/* Not a menu item: the switcher is its own radio group, so choosing keeps the menu open. */}
+              <div className="flex items-center justify-between gap-3 px-2 py-1.5 text-sm">
+                <span aria-hidden="true">Theme</span>
+                <ThemeSwitcher />
+              </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => { router.push("/app/connections"); }} className="px-2 py-2">
                 <IconKey /> Access tokens

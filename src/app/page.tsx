@@ -6,6 +6,7 @@ import { CodeBlock, CommandBlock } from "@/components/code-block";
 import { CopyButton } from "@/components/copy-button";
 import { ArtifactDemo } from "@/components/landing/artifact-demo";
 import { Logo } from "@/components/logo";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Button } from "@/components/ui/button";
 import { claudeMcpAddOAuthCommand, mcpOAuthConfigJson } from "@/lib/setup/mcp-config";
 
@@ -152,10 +153,11 @@ export default function Home() {
       <footer className="border-t">
         <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <Logo />
-          <div className="flex items-center gap-5">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-4">
             <Link href="/sign-in" className="transition-colors hover:text-foreground">Sign in</Link>
             <Link href="/sign-up" className="transition-colors hover:text-foreground">Create account</Link>
             <span>© 2026</span>
+            <ThemeSwitcher />
           </div>
         </div>
       </footer>

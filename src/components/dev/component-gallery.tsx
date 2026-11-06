@@ -1,14 +1,12 @@
 "use client";
 
-import { IconDeviceDesktop, IconMoon, IconSun } from "@tabler/icons-react";
-import { useTheme } from "next-themes";
-import { useSyncExternalStore, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ArtifactFilesProvider } from "@/components/artifact-view/files-context";
 import { AvatarGallery } from "@/components/dev/avatar-gallery";
 import { UiView } from "@/components/artifact-view/ui-view";
-import { Button } from "@/components/ui/button";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 import { uiComponentNames } from "@/lib/ui/catalog";
 import { componentFixtures, fixtureFiles, fixtureSpec } from "@/lib/ui/fixtures/components";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
@@ -27,33 +25,6 @@ const specFixtures: { name: string; spec: unknown }[] = [
 
 /** Gallery files are not uploaded: every one shows a local stand-in image instead. */
 const standInUrl = () => "/artifacts-space-mark.svg";
-
-const themes = [
-  { value: "light", label: "Light", Icon: IconSun },
-  { value: "dark", label: "Dark", Icon: IconMoon },
-  { value: "system", label: "System", Icon: IconDeviceDesktop },
-] as const;
-
-const noSubscribe = () => () => undefined;
-
-/** False during server render and hydration, true after, so theme-dependent UI cannot mismatch. */
-function useMounted() {
-  return useSyncExternalStore(noSubscribe, () => true, () => false);
-}
-
-function ThemeToggle() {
-  const { theme: storedTheme, setTheme } = useTheme();
-  const theme = useMounted() ? storedTheme : undefined;
-  return (
-    <div role="group" aria-label="Theme" className="flex rounded-md border p-0.5">
-      {themes.map(({ value, label, Icon }) => (
-        <Button key={value} variant={theme === value ? "secondary" : "ghost"} size="xs" aria-pressed={theme === value} onClick={() => { setTheme(value); }} data-theme-option={value}>
-          <Icon /> {label}
-        </Button>
-      ))}
-    </div>
-  );
-}
 
 function Specimen({ name, children }: { name: string; children: ReactNode }) {
   return (
@@ -83,7 +54,7 @@ export function ComponentGallery() {
       <header className="sticky top-0 z-20 -mx-4 flex flex-wrap items-center gap-3 border-b bg-background/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
         <h1 className="text-base font-medium">Component gallery</h1>
         <span className="text-xs text-muted-foreground">{uiComponentNames.length} components · development only</span>
-        <div className="ml-auto"><ThemeToggle /></div>
+        <div className="ml-auto"><ThemeSwitcher /></div>
       </header>
       <nav aria-label="Components" className="flex flex-wrap gap-x-3 gap-y-1 py-6 text-sm text-muted-foreground">
         {uiComponentNames.map((name) => <a key={name} href={`#${name}`} className="hover:text-foreground">{name}</a>)}
