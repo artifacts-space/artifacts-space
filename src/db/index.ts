@@ -3,7 +3,10 @@ import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import { drizzle as drizzlePostgres } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-import * as schema from "./schema";
+import * as oauthSchema from "./oauth-schema";
+import * as appSchema from "./schema";
+
+const schema = { ...appSchema, ...oauthSchema };
 
 let database: ReturnType<typeof createDatabase> | undefined;
 

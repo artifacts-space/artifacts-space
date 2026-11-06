@@ -7,7 +7,8 @@ if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 
 export default defineConfig({
   dialect: "postgresql",
-  schema: "./src/db/schema.ts",
+  // OAuth tables live in their own file to keep schema.ts under the 500-line limit.
+  schema: ["./src/db/schema.ts", "./src/db/oauth-schema.ts"],
   out: "./drizzle",
   // Only manage this app's tables. Ignore the unused neon_auth schema.
   schemaFilter: ["public"],
