@@ -4,6 +4,7 @@ import { IconPlus, IconSearch } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
+import { artifactListState, type ArtifactListState } from "@/components/app/artifact-list-state";
 import { CreateArtifactDialog } from "@/components/app/create-artifact-dialog";
 import { ScopeTabs } from "@/components/app/scope-tabs";
 import { visibilityLabel } from "@/components/app/share-options";
@@ -59,6 +60,38 @@ function ArtifactListItem({ artifact, active, onSelect }: { artifact: ArtifactDt
         </div>
       </button>
     </li>
+  );
+}
+
+interface ArtifactListProps {
+  state: ArtifactListState;
+  artifacts: ArtifactDto[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onClearFilters: () => void;
+}
+
+/** The sidebar list. With no artifacts at all it stays quiet, because the main pane already offers to create one. */
+function ArtifactList({ state, artifacts, selectedId, onSelect, onClearFilters }: ArtifactListProps) {
+  if (state === "empty") {
+    return <p className="px-4 py-10 text-center text-[13px] text-muted-foreground">Nothing here yet.</p>;
+  }
+  if (state === "no-match") {
+    return (
+      <div className="px-4 py-10 text-center text-[13px] text-muted-foreground">
+        <p>No artifacts match.</p>
+        <button type="button" onClick={onClearFilters} className="mt-2 underline underline-offset-4 hover:text-foreground">
+          Clear filters
+        </button>
+      </div>
+    );
+  }
+  return (
+    <ul className="space-y-0.5">
+      {artifacts.map((artifact) => (
+        <ArtifactListItem key={artifact.id} artifact={artifact} active={selectedId === artifact.id} onSelect={onSelect} />
+      ))}
+    </ul>
   );
 }
 
@@ -191,20 +224,13 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
               </Select>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
-              {filtered.length === 0 ? (
-                <div className="px-4 py-10 text-center text-[13px] text-muted-foreground">
-                  <p>No artifacts match.</p>
-                  <button type="button" onClick={() => { setQuery(""); setKind("all"); }} className="mt-2 underline underline-offset-4 hover:text-foreground">
-                    Clear filters
-                  </button>
-                </div>
-              ) : (
-                <ul className="space-y-0.5">
-                  {filtered.map((artifact) => (
-                    <ArtifactListItem key={artifact.id} artifact={artifact} active={selected?.id === artifact.id} onSelect={setSelectedId} />
-                  ))}
-                </ul>
-              )}
+              <ArtifactList
+                state={artifactListState({ total: artifacts.length, shown: filtered.length })}
+                artifacts={filtered}
+                selectedId={selected?.id ?? null}
+                onSelect={setSelectedId}
+                onClearFilters={() => { setQuery(""); setKind("all"); }}
+              />
             </div>
             <div className="border-t px-4 py-2.5 text-[11px] text-muted-foreground">
               {filtered.length} shown
