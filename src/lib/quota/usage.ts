@@ -2,12 +2,12 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
-import { agent, artifact, artifactFile } from "@/db/schema";
+import { agent, artifact, artifactFile, artifactVersion } from "@/db/schema";
 import { fileLimits } from "@/lib/files/config";
 import { byteLength } from "@/lib/artifact-limits";
 import { UserFacingError } from "@/lib/user-facing-error";
 
-import { contentQuotaProblem, fileQuotaProblem, quotaLimits } from "./rules";
+import { contentBytesAdded, contentQuotaProblem, fileQuotaProblem, quotaLimits } from "./rules";
 
 /**
  * Storage use per account (a person plus the agents they own), summed on
@@ -36,9 +36,20 @@ async function sumBytes(query: ReturnType<typeof sql>): Promise<number> {
   return usageSchema.parse(result.rows[0] ?? { bytes: 0 }).bytes;
 }
 
-/** Bytes of artifact content in the account. */
+/**
+ * Bytes of artifact content in the account: the current content of every
+ * artifact it authored, plus their saved versions (each version's `bytes`).
+ */
 export function contentBytesUsed(userId: string): Promise<number> {
-  return sumBytes(sql`select coalesce(sum(octet_length(${artifact.content})), 0) as bytes from ${artifact} where ${artifact.userId} in ${accountUserIds(userId)}`);
+  return sumBytes(sql`
+    select
+      coalesce((select sum(octet_length(${artifact.content})) from ${artifact} where ${artifact.userId} in ${accountUserIds(userId)}), 0)
+      + coalesce((
+        select sum(${artifactVersion.bytes}) from ${artifactVersion}
+        join ${artifact} on ${artifact.id} = ${artifactVersion.artifactId}
+        where ${artifact.userId} in ${accountUserIds(userId)}
+      ), 0) as bytes
+  `);
 }
 
 /** Bytes of files in the account: finished uploads, plus uploads started within the last hour (older pending ones are abandoned). */
@@ -57,7 +68,7 @@ export function fileBytesUsed(userId: string, now = new Date()): Promise<number>
  * its content quota. Shrinking content is always allowed.
  */
 export async function assertContentFits(userId: string, newContent: string, previousContent = ""): Promise<void> {
-  const adding = byteLength(newContent) - byteLength(previousContent);
+  const adding = contentBytesAdded(byteLength(newContent), byteLength(previousContent));
   if (adding <= 0) return;
   const problem = contentQuotaProblem({ used: await contentBytesUsed(userId), adding, limit: currentLimits().contentBytes });
   if (problem) throw new UserFacingError(problem);

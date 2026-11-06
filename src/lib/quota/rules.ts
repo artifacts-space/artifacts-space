@@ -31,10 +31,21 @@ export function fitsQuota({ used, adding, limit }: QuotaInput): boolean {
   return adding <= 0 || used + adding <= limit;
 }
 
+/**
+ * Bytes a content save adds to the account. Every save also files a version
+ * (src/lib/versions), so a save that grows the content adds the growth plus
+ * the new version. A save that does not grow it adds nothing, so people can
+ * always shrink or fix an artifact; version pruning keeps history bounded.
+ */
+export function contentBytesAdded(newBytes: number, previousBytes: number): number {
+  const growth = newBytes - previousBytes;
+  return growth <= 0 ? 0 : growth + newBytes;
+}
+
 /** The refusal for artifact content over quota, or null when it fits. */
 export function contentQuotaProblem(input: QuotaInput): string | null {
   if (fitsQuota(input)) return null;
-  return `Artifacts in your account use ${formatBytes(input.used)} of ${formatBytes(input.limit)}, and this needs ${formatBytes(input.adding)} more. Delete or shorten artifacts you no longer need, then try again.`;
+  return `Artifacts and their saved versions in your account use ${formatBytes(input.used)} of ${formatBytes(input.limit)}, and this needs ${formatBytes(input.adding)} more. Delete or shorten artifacts you no longer need, then try again.`;
 }
 
 /** The refusal for a file upload over quota, or null when it fits. */

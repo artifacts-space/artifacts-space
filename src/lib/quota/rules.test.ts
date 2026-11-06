@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contentQuotaProblem, fileQuotaProblem, fitsQuota, quotaLimits, storageQuota } from "./rules";
+import { contentBytesAdded, contentQuotaProblem, fileQuotaProblem, fitsQuota, quotaLimits, storageQuota } from "./rules";
 
 const mb = 1024 * 1024;
 
@@ -23,7 +23,7 @@ describe("fitsQuota", () => {
 describe("quota messages", () => {
   it("should say what is used, the limit, and what to do when content is over quota", () => {
     expect(contentQuotaProblem({ used: 99.5 * mb, adding: 2 * mb, limit: storageQuota.contentBytes })).toBe(
-      "Artifacts in your account use 100 MB of 100 MB, and this needs 2.0 MB more. Delete or shorten artifacts you no longer need, then try again.",
+      "Artifacts and their saved versions in your account use 100 MB of 100 MB, and this needs 2.0 MB more. Delete or shorten artifacts you no longer need, then try again.",
     );
   });
 
@@ -47,5 +47,20 @@ describe("quotaLimits", () => {
   it("should use positive whole-number overrides and ignore anything else", () => {
     expect(quotaLimits({ STORAGE_QUOTA_CONTENT_BYTES: "5000", STORAGE_QUOTA_FILE_BYTES: "-1" })).toEqual({ contentBytes: 5000, fileBytes: storageQuota.fileBytes });
     expect(quotaLimits({ STORAGE_QUOTA_CONTENT_BYTES: "lots" }).contentBytes).toBe(storageQuota.contentBytes);
+  });
+});
+
+describe("contentBytesAdded", () => {
+  it("should count the growth plus the new version when a save grows the content", () => {
+    expect(contentBytesAdded(3000, 1000)).toBe(2000 + 3000);
+  });
+
+  it("should add nothing when a save keeps or shrinks the content", () => {
+    expect(contentBytesAdded(1000, 1000)).toBe(0);
+    expect(contentBytesAdded(500, 1000)).toBe(0);
+  });
+
+  it("should count the content twice when an artifact is created, once for its first version", () => {
+    expect(contentBytesAdded(1200, 0)).toBe(2400);
   });
 });

@@ -166,13 +166,3 @@ export async function getVersionOf(artifactId: string, versionId: string): Promi
     .limit(1);
   return row ?? null;
 }
-
-/** Bytes the versions of every artifact a user authored take, for the storage quota. */
-export async function versionBytesForAuthor(userId: string): Promise<number> {
-  const [row] = await getDb()
-    .select({ total: sql<string>`coalesce(sum(${artifactVersion.bytes}), 0)::bigint` })
-    .from(artifactVersion)
-    .innerJoin(artifact, eq(artifact.id, artifactVersion.artifactId))
-    .where(eq(artifact.userId, userId));
-  return Number(row?.total ?? 0);
-}
