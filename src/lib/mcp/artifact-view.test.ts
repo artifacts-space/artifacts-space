@@ -20,6 +20,7 @@ const dto: ArtifactDto = {
   authorId: "author",
   originalAuthorId: null,
   pendingSharing: { requestId: "r1", level: "public", teamId: "team-1", requestedAt: "2026-11-05T00:00:00.000Z" },
+  pendingEdit: null,
   metadata: {},
   createdAt: "2026-11-05T00:00:00.000Z",
   updatedAt: "2026-11-05T00:00:00.000Z",

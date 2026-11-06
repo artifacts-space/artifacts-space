@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { ZodError } from "zod";
 
+import { actionErrorMessage } from "@/lib/action-errors";
 import { getSession } from "@/lib/session";
 import {
   createArtifact,
@@ -24,8 +24,7 @@ async function requireUserId() {
 }
 
 function errorMessage(error: unknown) {
-  if (error instanceof ZodError) return error.issues[0]?.message ?? "Invalid artifact.";
-  return "The artifact could not be saved. Please try again.";
+  return actionErrorMessage(error, "The artifact could not be saved. Please try again.");
 }
 
 export async function createArtifactAction(

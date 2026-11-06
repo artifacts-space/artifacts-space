@@ -11,9 +11,12 @@ import {
   artifactKinds,
   type ArtifactDto,
   type ArtifactInput,
+  type PendingEditDto,
   type PendingSharingDto,
 } from "@/lib/artifact-types";
+import { artifactSizeProblem } from "@/lib/artifact-limits";
 import { generatePublicId } from "@/lib/public-id";
+import { UserFacingError } from "@/lib/user-facing-error";
 
 /**
  * Artifact storage. Writes here are author-only. Visibility never changes
@@ -47,8 +50,14 @@ export const artifactInputSchema = artifactUpdateSchema
     metadata: artifactUpdateSchema.shape.metadata.default({}),
   });
 
+/** Throws a UserFacingError when content or metadata is over the per-artifact size cap. */
+function assertArtifactSize(input: { content?: string | undefined; metadata?: Record<string, unknown> | undefined }) {
+  const problem = artifactSizeProblem(input);
+  if (problem) throw new UserFacingError(problem);
+}
+
 /** Maps a row to the workspace's DTO. */
-export function toArtifactDto(record: ArtifactRecord, pendingSharing: PendingSharingDto | null = null): ArtifactDto {
+export function toArtifactDto(record: ArtifactRecord, pendingSharing: PendingSharingDto | null = null, pendingEdit: PendingEditDto | null = null): ArtifactDto {
   return {
     id: record.id,
     publicId: record.publicId,
@@ -65,31 +74,34 @@ export function toArtifactDto(record: ArtifactRecord, pendingSharing: PendingSha
     authorId: record.userId,
     originalAuthorId: record.originalAuthorId,
     pendingSharing,
+    pendingEdit,
     metadata: record.metadata,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };
 }
 
-/** Open sharing requests for these artifacts, by artifact id. */
-export async function pendingSharingFor(artifactIds: string[]): Promise<Map<string, PendingSharingDto>> {
-  if (artifactIds.length === 0) return new Map();
+/** Open sharing and edit requests for these artifacts, each by artifact id. */
+export async function pendingRequestsFor(artifactIds: string[]) {
+  const sharing = new Map<string, PendingSharingDto>();
+  const edits = new Map<string, PendingEditDto>();
+  if (artifactIds.length === 0) return { sharing, edits };
   const rows = await getDb()
     .select()
     .from(sharingRequest)
     .where(and(inArray(sharingRequest.artifactId, artifactIds), eq(sharingRequest.status, "pending")));
-  return new Map(
-    rows.map((row) => [
-      row.artifactId,
-      { requestId: row.id, level: row.visibility, teamId: row.teamId, requestedAt: row.createdAt.toISOString() },
-    ]),
-  );
+  for (const row of rows) {
+    const requestedAt = row.createdAt.toISOString();
+    if (row.kind === "edit") edits.set(row.artifactId, { requestId: row.id, requestedAt });
+    else sharing.set(row.artifactId, { requestId: row.id, level: row.visibility, teamId: row.teamId, requestedAt });
+  }
+  return { sharing, edits };
 }
 
-/** Maps rows to DTOs with their open sharing requests. */
+/** Maps rows to DTOs with their open sharing and edit requests. */
 export async function toArtifactDtos(records: ArtifactRecord[]): Promise<ArtifactDto[]> {
-  const pending = await pendingSharingFor(records.map((record) => record.id));
-  return records.map((record) => toArtifactDto(record, pending.get(record.id) ?? null));
+  const pending = await pendingRequestsFor(records.map((record) => record.id));
+  return records.map((record) => toArtifactDto(record, pending.sharing.get(record.id) ?? null, pending.edits.get(record.id) ?? null));
 }
 
 /** Which artifacts a list shows: the viewer's own, or those shared with one of their teams. */
@@ -163,6 +175,7 @@ export async function findPublicIdByShareId(shareId: string) {
 /** Creates a private artifact for its author. */
 export async function createArtifact(userId: string, input: ArtifactInput) {
   const parsed = artifactInputSchema.parse(input);
+  assertArtifactSize(parsed);
   assertValidArtifactContent(parsed.kind, parsed.content);
   const [record] = await getDb()
     .insert(artifact)
@@ -183,6 +196,7 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
 /** Changes the author's own artifact. Returns null when it is not theirs. */
 export async function updateArtifact(userId: string, id: string, input: ArtifactUpdateInput) {
   const parsed = artifactUpdateSchema.parse(input);
+  assertArtifactSize(parsed);
   await assertValidArtifactUpdate(parsed, () => getOwnArtifact(userId, id));
   const [record] = await getDb()
     .update(artifact)

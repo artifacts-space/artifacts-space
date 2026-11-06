@@ -1,16 +1,29 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   index,
+  integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 // Relative import: drizzle-kit loads this file without the "@/" alias.
-import { artifactKinds, artifactVisibilities, sharingRequestStatuses, sharingLevels } from "../lib/artifact-types";
+import {
+  artifactKinds,
+  artifactVisibilities,
+  reportReasons,
+  reportStatuses,
+  sharingLevels,
+  sharingRequestKinds,
+  sharingRequestStatuses,
+} from "../lib/artifact-types";
+import { artifactSizeLimits } from "../lib/artifact-limits";
 
 // Better Auth tables. Column names follow Better Auth's core schema.
 
@@ -179,6 +192,8 @@ export const artifact = pgTable(
     // Set when the author left the team and a team owner took the artifact over.
     originalAuthorId: text("original_author_id").references(() => user.id, { onDelete: "set null" }),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    // Link and public artifacts: the version readers outside the team see. Edits wait for approval.
+    approvedVersionId: text("approved_version_id").references((): AnyPgColumn => artifactVersion.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -188,7 +203,32 @@ export const artifact = pgTable(
     index("artifact_user_updated_idx").on(table.userId, table.updatedAt),
     index("artifact_user_project_idx").on(table.userId, table.project),
     index("artifact_team_updated_idx").on(table.teamId, table.updatedAt),
+    check("artifact_content_size_check", sql`octet_length(${table.content}) <= ${sql.raw(String(artifactSizeLimits.maxContentBytes))}`),
+    // jsonb prints with extra spaces, so the backstop allows twice the app's limit.
+    check("artifact_metadata_size_check", sql`octet_length(${table.metadata}::text) <= ${sql.raw(String(artifactSizeLimits.maxMetadataBytes * 2))}`),
   ],
+);
+
+// A saved copy of what readers see, taken when a link or public artifact changes.
+export const artifactVersion = pgTable(
+  "artifact_version",
+  {
+    id: text("id").primaryKey(),
+    artifactId: text("artifact_id")
+      .notNull()
+      .references((): AnyPgColumn => artifact.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    summary: text("summary").notNull().default(""),
+    content: text("content").notNull(),
+    kind: text("kind", { enum: artifactKinds }).notNull(),
+    language: text("language").notNull().default(""),
+    project: text("project").notNull().default(""),
+    source: text("source").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("artifact_version_artifact_created_idx").on(table.artifactId, table.createdAt)],
 );
 
 // A request to share an artifact that waits for a team owner's or admin's decision.
@@ -205,16 +245,20 @@ export const sharingRequest = pgTable(
     requestedBy: text("requested_by")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    // The requested level: team, link, or public.
+    // sharing: a change of who can read it. edit: changed content of a link or public artifact.
+    kind: text("kind", { enum: sharingRequestKinds }).notNull().default("sharing"),
+    // The requested level: team, link, or public. For an edit, the level it is shared at.
     visibility: text("visibility", { enum: sharingLevels }).notNull(),
+    // For an edit: the version waiting for approval.
+    versionId: text("version_id").references(() => artifactVersion.id, { onDelete: "cascade" }),
     status: text("status", { enum: sharingRequestStatuses }).notNull().default("pending"),
     decidedBy: text("decided_by").references(() => user.id, { onDelete: "set null" }),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    // At most one open request per artifact.
-    uniqueIndex("sharing_request_pending_artifact_idx").on(table.artifactId).where(sql`${table.status} = 'pending'`),
+    // At most one open request of each kind per artifact.
+    uniqueIndex("sharing_request_pending_artifact_kind_idx").on(table.artifactId, table.kind).where(sql`${table.status} = 'pending'`),
     index("sharing_request_team_status_idx").on(table.teamId, table.status),
   ],
 );
@@ -239,7 +283,46 @@ export const apiToken = pgTable(
   ],
 );
 
+// Fixed-window counters for rate limits. Old windows are deleted as they expire.
+export const rateLimitBucket = pgTable(
+  "rate_limit_bucket",
+  {
+    key: text("key").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.key, table.windowStart] }), index("rate_limit_bucket_window_idx").on(table.windowStart)],
+);
+
+// A reader's report about a link or public artifact, for the owning team's owners and admins.
+export const artifactReport = pgTable(
+  "artifact_report",
+  {
+    id: text("id").primaryKey(),
+    artifactId: text("artifact_id")
+      .notNull()
+      .references(() => artifact.id, { onDelete: "cascade" }),
+    // The team that approved the sharing when the report arrived.
+    teamId: text("team_id").references(() => team.id, { onDelete: "set null" }),
+    reason: text("reason", { enum: reportReasons }).notNull(),
+    details: text("details").notNull().default(""),
+    // Signed-in reporters only. Signed-out reports keep a hashed network key instead.
+    reporterId: text("reporter_id").references(() => user.id, { onDelete: "set null" }),
+    reporterKey: text("reporter_key").notNull(),
+    status: text("status", { enum: reportStatuses }).notNull().default("open"),
+    resolvedBy: text("resolved_by").references(() => user.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("artifact_report_team_status_idx").on(table.teamId, table.status),
+    index("artifact_report_artifact_idx").on(table.artifactId),
+  ],
+);
+
 export type ArtifactRecord = typeof artifact.$inferSelect;
 export type TeamRecord = typeof team.$inferSelect;
 export type SharingRequestRecord = typeof sharingRequest.$inferSelect;
 export type ApiTokenRecord = typeof apiToken.$inferSelect;
+export type ArtifactVersionRecord = typeof artifactVersion.$inferSelect;
+export type ArtifactReportRecord = typeof artifactReport.$inferSelect;

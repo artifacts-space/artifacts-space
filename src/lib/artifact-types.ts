@@ -8,12 +8,26 @@ export const sharingLevels = ["team", "link", "public"] as const;
 export type SharingLevel = (typeof sharingLevels)[number];
 export const sharingRequestStatuses = ["pending", "approved", "denied", "canceled"] as const;
 export type SharingRequestStatus = (typeof sharingRequestStatuses)[number];
+/** sharing: who can read it. edit: new content for a link or public artifact. */
+export const sharingRequestKinds = ["sharing", "edit"] as const;
+export type SharingRequestKind = (typeof sharingRequestKinds)[number];
+/** Why a reader reports an artifact. */
+export const reportReasons = ["spam", "phishing", "malware", "harassment", "illegal", "private_info", "copyright", "other"] as const;
+export type ReportReason = (typeof reportReasons)[number];
+export const reportStatuses = ["open", "resolved"] as const;
+export type ReportStatus = (typeof reportStatuses)[number];
 
 /** An open request to share an artifact, waiting for a team owner or admin. */
 export interface PendingSharingDto {
   requestId: string;
   level: SharingLevel;
   teamId: string;
+  requestedAt: string;
+}
+
+/** Changed content of a link or public artifact, waiting for a team owner or admin. */
+export interface PendingEditDto {
+  requestId: string;
   requestedAt: string;
 }
 
@@ -37,6 +51,8 @@ export interface ArtifactDto {
   /** Set when a team owner took the artifact over from a member who left. */
   originalAuthorId: string | null;
   pendingSharing: PendingSharingDto | null;
+  /** Set when the latest edit waits for approval; readers outside the team still see the approved version. */
+  pendingEdit: PendingEditDto | null;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
