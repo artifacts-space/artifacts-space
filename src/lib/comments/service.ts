@@ -103,7 +103,7 @@ async function ownComment(actorId: string, commentId: string) {
     .innerJoin(artifact, eq(artifact.id, comment.artifactId))
     .where(eq(comment.id, idSchema.parse(commentId)))
     .limit(1);
-  if (!row || !canChangeComment(row.record, actorId)) throw new UserFacingError("Comment not found, or you are not its author.");
+  if (!row || !canChangeComment(row.record, actorId)) throw new UserFacingError("Comment not found, already deleted, or written by someone else. You can only change your own comments.");
   // The author must still be able to view the artifact.
   const thread = await requireThread(actorId, row.publicId);
   return { record: row.record, thread };
