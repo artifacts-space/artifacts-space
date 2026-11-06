@@ -4,7 +4,7 @@ import { assertMemberIsNotAgent } from "@/lib/auth/agent-guards";
 import { reconcileAfterDeparture } from "@/lib/auth/team-departure";
 import { assertInvitableRole, assertNotPersonal, assertTeamUpdateAllowed, prepareNewTeam } from "@/lib/teams/guards";
 import { sendTeamInvitationEmail } from "@/lib/teams/invitation-email";
-import { assertCanInvite } from "@/lib/teams/invitation-limits";
+import { assertCanCreateTeam, assertCanInvite } from "@/lib/teams/invitation-limits";
 
 const sevenDays = 60 * 60 * 24 * 7;
 
@@ -44,9 +44,11 @@ export function teamsPlugin() {
       session: { fields: { activeOrganizationId: "activeTeamId" } },
     },
     organizationHooks: {
-      beforeCreateOrganization: async ({ organization: data, user }) => ({
-        data: { ...data, ...(await prepareNewTeam(data, user.id)) },
-      }),
+      beforeCreateOrganization: async ({ organization: data, user }) => {
+        const prepared = await prepareNewTeam(data, user.id);
+        await assertCanCreateTeam(user.id);
+        return { data: { ...data, ...prepared } };
+      },
       beforeUpdateOrganization: async ({ organization: update, member }) => {
         await assertTeamUpdateAllowed(update, member);
       },

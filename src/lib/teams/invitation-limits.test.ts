@@ -9,7 +9,7 @@ vi.mock("@/lib/abuse/rate-limit", () => ({
   rateLimitMessage: (name: string, seconds: number) => `${name} ${String(seconds)}`,
 }));
 
-const { assertCanInvite, invitationLimitChecks } = await import("./invitation-limits");
+const { assertCanCreateTeam, assertCanInvite, invitationLimitChecks } = await import("./invitation-limits");
 
 describe("assertCanInvite", () => {
   beforeEach(() => {
@@ -46,5 +46,22 @@ describe("invitationLimitChecks", () => {
       { name: "teamInviteByUserDay", subject: "u1" },
       { name: "teamInviteByTeamDay", subject: "t1" },
     ]);
+  });
+});
+
+describe("assertCanCreateTeam", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("should allow a new team when the person is under the hourly limit", async () => {
+    mocks.hit.mockResolvedValue({ allowed: true, retryAfterSeconds: 0 });
+    await expect(assertCanCreateTeam("u1")).resolves.toBeUndefined();
+    expect(mocks.hit).toHaveBeenCalledWith("teamCreate", "u1");
+  });
+
+  it("should refuse with a message when the person created many teams", async () => {
+    mocks.hit.mockResolvedValue({ allowed: false, retryAfterSeconds: 60 });
+    await expect(assertCanCreateTeam("u1")).rejects.toThrow("teamCreate 60");
   });
 });

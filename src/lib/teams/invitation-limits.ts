@@ -5,6 +5,12 @@ import type { RateLimitName } from "@/lib/abuse/limits";
 import { emailBudgetHasRoom } from "@/lib/email/budget";
 import { INVITATION_BUDGET_MESSAGE } from "@/lib/email/budget-rules";
 
+/** Refuses a new team (from our action or Better Auth's endpoint) when the person created many in the last hour. */
+export async function assertCanCreateTeam(userId: string): Promise<void> {
+  const decision = await hitRateLimit("teamCreate", userId);
+  if (!decision.allowed) throw new APIError("TOO_MANY_REQUESTS", { message: rateLimitMessage("teamCreate", decision.retryAfterSeconds) });
+}
+
 /** The invitation limits, in the order they are checked. */
 export function invitationLimitChecks(inviterId: string, teamId: string): { name: RateLimitName; subject: string }[] {
   return [

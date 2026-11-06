@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { agent, teamMember, user } from "@/db/schema";
+import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { cleanHandleInput, validateHandle } from "@/lib/handles";
 import { reconcileTeamArtifacts } from "@/lib/sharing/transfer";
@@ -71,6 +72,8 @@ async function insertAgentUser(id: string, handle: string, name: string) {
  */
 export async function createAgent(input: { actorId: string; teamId: string; handle: string; name: string }): Promise<{ userId: string; handle: string }> {
   await requireManager(input.actorId, input.teamId);
+  // Each agent gets its own rate limits, so adding agents is limited too.
+  await enforceRateLimit("agentCreate", input.actorId);
   const name = cleanAgentName(input.name);
   const handle = await cleanAgentHandle(input.handle);
   const id = randomUUID();
@@ -111,6 +114,7 @@ export async function setAgentTeamMute(input: { actorId: string; agentId: string
 /** Creates a token for an agent. The secret is returned once; only its hash is stored. */
 export async function createAgentToken(input: { actorId: string; agentId: string; name: string }) {
   const { record } = await requireManagedAgent(input.actorId, input.agentId);
+  await enforceRateLimit("tokenCreate", input.actorId);
   return createApiToken(record.userId, input.name);
 }
 
