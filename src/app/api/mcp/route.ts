@@ -23,7 +23,7 @@ function createMcpServer(userId: string) {
     { name: "artifacts.space", version: "1.0.0" },
     {
       instructions:
-        "Use artifacts to preserve useful context across coding sessions. Save decisions, plans, research, code, and outputs. Search before creating duplicates, and include project and session identifiers when available. Artifacts are private by default; teams_list shows the teams you can share with.",
+        "Use artifacts to preserve useful context across coding sessions. Save decisions, plans, research, code, and outputs. Search before creating duplicates, and include project and session identifiers when available. Artifacts are private by default; teams_list shows the teams you can share with. Sharing and edits to shared artifacts may need a team owner's or admin's approval, and agents never approve.",
     },
   );
 

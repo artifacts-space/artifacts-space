@@ -1,16 +1,20 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
+import { EditReviewList } from "@/components/teams/edit-reviews";
 import { InviteForm, PendingInvitations } from "@/components/teams/invite-form";
 import { PendingSharingList, TeamSharedList } from "@/components/teams/pending-sharing";
+import { ReportsList } from "@/components/teams/reports-list";
 import { Section } from "@/components/teams/section";
 import { TeamMembers } from "@/components/teams/team-members";
 import { LeaveTeamButton, SharingRuleSetting } from "@/components/teams/team-settings";
 import { Badge } from "@/components/ui/badge";
+import { listOpenReports } from "@/lib/reports/service";
 import { getSession } from "@/lib/session";
 import { listPendingSharing, listTeamSharedArtifacts } from "@/lib/sharing/queries";
 import { getTeamForMember, listPendingInvitations, listTeamMembers, type TeamMembership } from "@/lib/teams/queries";
 import { canEditTeamSettings, canManageTeam, roleLabel } from "@/lib/teams/roles";
+import { listPendingEdits } from "@/lib/versions/queries";
 
 export const metadata: Metadata = { title: "Team" };
 export const instant = false;
@@ -32,19 +36,34 @@ function TeamHeader({ team }: { team: TeamMembership }) {
   );
 }
 
-/** Pending requests (owners and admins of shared teams) and what the team shares. */
+/**
+ * Pending sharing and edits (owners and admins of shared teams), reader
+ * reports (owners and admins of any team), and what the team shares.
+ */
 async function SharingSections({ team }: { team: TeamMembership }) {
   const manager = canManageTeam(team.role);
   const reviews = manager && !team.personal;
-  const [requests, shared] = await Promise.all([
+  const [requests, edits, reports, shared] = await Promise.all([
     reviews ? listPendingSharing(team.id) : Promise.resolve([]),
+    reviews ? listPendingEdits(team.id) : Promise.resolve([]),
+    manager ? listOpenReports(team.id) : Promise.resolve([]),
     listTeamSharedArtifacts(team.id),
   ]);
   return (
     <>
+      {manager && reports.length > 0 ? (
+        <Section title="Reports" description="Readers reported these link or public artifacts. Withdraw sharing to take one down.">
+          <ReportsList reports={reports} />
+        </Section>
+      ) : null}
       {reviews ? (
         <Section title="Pending sharing" description="Approve or deny requests to share with the team, by link, or in public.">
           <PendingSharingList requests={requests} />
+        </Section>
+      ) : null}
+      {reviews ? (
+        <Section title="Pending edits" description="Readers outside the team see the last approved version until you approve an edit.">
+          <EditReviewList edits={edits} />
         </Section>
       ) : null}
       <Section title="Shared through this team" description={manager ? "Withdraw makes an artifact private to its author again." : undefined}>

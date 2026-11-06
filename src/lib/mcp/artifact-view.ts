@@ -17,6 +17,8 @@ export interface McpArtifact {
   team: string | null;
   /** An open sharing request, shown only to the author. */
   pendingSharing: { visibility: SharingLevel; team: string | null; requestedAt: string } | null;
+  /** When the author's latest edit waits for approval, shown only to the author. */
+  pendingEdit: { requestedAt: string } | null;
   isAuthor: boolean;
   metadata: Record<string, unknown>;
   createdAt: string;
@@ -52,6 +54,7 @@ export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext, include
     visibility: dto.visibility,
     team: slug(dto.teamId),
     pendingSharing: pending,
+    pendingEdit: isAuthor && dto.pendingEdit ? { requestedAt: dto.pendingEdit.requestedAt } : null,
     isAuthor,
     metadata: dto.metadata,
     createdAt: dto.createdAt,

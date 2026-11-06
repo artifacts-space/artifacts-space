@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
+import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { artifact, sharingRequest, type ArtifactRecord } from "@/db/schema";
 import { isTeamMember } from "@/lib/access";
 import type { ArtifactDto, ArtifactVisibility, SharingLevel } from "@/lib/artifact-types";
@@ -10,6 +11,7 @@ import { getOwnArtifact, toArtifactDtos } from "@/lib/artifacts";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { findPersonalTeam, getTeamMembershipById, type TeamMembership } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
+import { decideEditRequest, syncApprovedVersion } from "@/lib/versions/service";
 
 import {
   canDecideRequest,
@@ -50,15 +52,24 @@ async function dtoFor(artifactId: string) {
   return dto;
 }
 
+/** Cancels the open sharing request. Edit requests follow syncApprovedVersion instead. */
 async function cancelPending(artifactId: string, byUserId: string) {
   await getDb()
     .update(sharingRequest)
     .set({ status: "canceled", decidedBy: byUserId, decidedAt: new Date() })
-    .where(and(eq(sharingRequest.artifactId, artifactId), eq(sharingRequest.status, "pending")));
+    .where(and(eq(sharingRequest.artifactId, artifactId), eq(sharingRequest.kind, "sharing"), eq(sharingRequest.status, "pending")));
 }
 
-async function setVisibility(artifactId: string, visibility: ArtifactVisibility, teamId: string | null) {
+async function setVisibility(artifactId: string, visibility: ArtifactVisibility, teamId: string | null, byUserId: string) {
   await getDb().update(artifact).set({ visibility, teamId }).where(eq(artifact.id, artifactId));
+  // An open edit request follows the artifact to its new approving team.
+  if (teamId) {
+    await getDb()
+      .update(sharingRequest)
+      .set({ teamId })
+      .where(and(eq(sharingRequest.artifactId, artifactId), eq(sharingRequest.kind, "edit"), eq(sharingRequest.status, "pending")));
+  }
+  await syncApprovedVersion(artifactId, byUserId);
 }
 
 async function resolveTeam(requesterId: string, level: SharingLevel, teamId: string | null | undefined): Promise<TeamMembership> {
@@ -106,10 +117,11 @@ export async function requestArtifactSharing(input: SharingRequestInput): Promis
 
   if (input.visibility === "private") {
     await cancelPending(record.id, input.requesterId);
-    await setVisibility(record.id, "private", null);
+    await setVisibility(record.id, "private", null, input.requesterId);
     return { status: "applied", artifact: await dtoFor(record.id) };
   }
 
+  await enforceRateLimit("sharingRequest", input.requesterId);
   const level = input.visibility;
   const team = await resolveTeam(input.requesterId, level, input.teamId);
   await cancelPending(record.id, input.requesterId);
@@ -119,7 +131,7 @@ export async function requestArtifactSharing(input: SharingRequestInput): Promis
     return { status: "pending", artifact: await dtoFor(record.id) };
   }
 
-  await setVisibility(record.id, level, team.id);
+  await setVisibility(record.id, level, team.id, input.requesterId);
   // Keep an audit row when an owner or admin approved their own change.
   if (sharingNeedsApproval(level, team)) await recordDecision(record, team, level, input.requesterId);
   return { status: "applied", artifact: await dtoFor(record.id) };
@@ -153,14 +165,22 @@ async function approve(request: typeof sharingRequest.$inferSelect, deciderId: s
     from decided
     where ${artifact.id} = decided.artifact_id and ${artifact.userId} = decided.requested_by
   `);
+  await syncApprovedVersion(request.artifactId, deciderId);
 }
 
-/** Approves or denies an open request. Only owners and admins of the request's team, in the web app. */
+/**
+ * Approves or denies an open sharing or edit request. Only owners and admins
+ * of the request's team, in the web app.
+ */
 export async function decideSharingRequest(input: { deciderId: string; requestId: string; approve: boolean }) {
   const request = await openRequest(input.requestId);
   const membership = await getTeamMembershipById(input.deciderId, request.teamId);
   if (!canDecideRequest({ viewerRole: membership?.role ?? null, actor: "person" })) {
     throw new UserFacingError("Only team owners and admins can approve sharing.");
+  }
+  if (request.kind === "edit") {
+    await decideEditRequest(request, input.deciderId, input.approve);
+    return;
   }
   if (input.approve) {
     await approve(request, input.deciderId);
@@ -181,5 +201,5 @@ export async function withdrawArtifactSharing(input: { viewerId: string; artifac
     throw new UserFacingError("Artifact not found.");
   }
   await cancelPending(record.id, input.viewerId);
-  await setVisibility(record.id, "private", null);
+  await setVisibility(record.id, "private", null, input.viewerId);
 }

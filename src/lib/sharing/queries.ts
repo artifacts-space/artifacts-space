@@ -34,7 +34,7 @@ export async function listPendingSharing(teamId: string): Promise<PendingSharing
     .from(sharingRequest)
     .innerJoin(artifact, eq(artifact.id, sharingRequest.artifactId))
     .innerJoin(user, eq(user.id, sharingRequest.requestedBy))
-    .where(and(eq(sharingRequest.teamId, teamId), eq(sharingRequest.status, "pending")))
+    .where(and(eq(sharingRequest.teamId, teamId), eq(sharingRequest.kind, "sharing"), eq(sharingRequest.status, "pending")))
     .orderBy(desc(sharingRequest.createdAt));
   return rows.map((row) => ({ ...row, requestedAt: row.requestedAt.toISOString() }));
 }

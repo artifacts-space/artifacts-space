@@ -71,6 +71,17 @@ function TeamPicker({ visibility, teams, value, onChange }: { visibility: Artifa
   );
 }
 
+/** Readers outside the team keep the approved version while an edit waits. */
+function PendingEditNotice({ artifact }: { artifact: ArtifactDto }) {
+  if (!artifact.pendingEdit) return null;
+  return (
+    <p className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs leading-5 text-muted-foreground">
+      <IconClock className="size-3.5 shrink-0" />
+      Changes waiting for approval. Readers outside the team see the last approved version.
+    </p>
+  );
+}
+
 function PendingNotice({ artifact, teams }: { artifact: ArtifactDto; teams: readonly ShareTeam[] }) {
   const pending = artifact.pendingSharing;
   if (!pending) return null;
@@ -99,7 +110,8 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
   const [visibility, setVisibility] = useState<ArtifactVisibility>(artifact.visibility);
   const [teamId, setTeamId] = useState(() => defaultTeamId(artifact.visibility, teams, artifact.teamId));
   const [saving, setSaving] = useState(false);
-  const Icon = artifact.pendingSharing ? IconClock : icons[artifact.visibility];
+  const waiting = artifact.pendingSharing !== null || artifact.pendingEdit !== null;
+  const Icon = waiting ? IconClock : icons[artifact.visibility];
   const live = artifact.visibility === "link" || artifact.visibility === "public";
 
   function changeLevel(next: ArtifactVisibility) {
@@ -128,7 +140,7 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
   return (
     <>
       <Button variant="ghost" size="sm" onClick={() => { setOpen(true); }} className="gap-1.5 text-xs" aria-label="Share settings">
-        <Icon /> {artifact.pendingSharing ? "Pending" : visibilityLabel(artifact.visibility)}
+        <Icon /> {waiting ? "Pending" : visibilityLabel(artifact.visibility)}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -138,6 +150,7 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
           </DialogHeader>
           <div className="space-y-4">
             <PendingNotice artifact={artifact} teams={teams} />
+            <PendingEditNotice artifact={artifact} />
             <LevelPicker value={visibility} onChange={changeLevel} />
             <TeamPicker visibility={visibility} teams={teams} value={teamId} onChange={setTeamId} />
             <p className="text-xs leading-5 text-muted-foreground">{outcomeText(visibility, teams.find((team) => team.id === teamId))}</p>

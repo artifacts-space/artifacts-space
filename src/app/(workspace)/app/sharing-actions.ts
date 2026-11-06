@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { actionErrorMessage } from "@/lib/action-errors";
 import { artifactVisibilities, type ActionResult } from "@/lib/artifact-types";
+import { getManagedReport, resolveReports } from "@/lib/reports/service";
 import { getSession } from "@/lib/session";
 import { decideSharingRequest, requestArtifactSharing, withdrawArtifactSharing, type SharingResult } from "@/lib/sharing/service";
 
@@ -55,6 +56,34 @@ export async function withdrawSharingAction(artifactId: string): Promise<ActionR
   try {
     const viewerId = await requireUserId();
     await withdrawArtifactSharing({ viewerId, artifactId: idSchema.parse(artifactId) });
+    revalidatePath("/teams", "layout");
+    revalidatePath("/app");
+    return { success: true, data: null };
+  } catch (error) {
+    return { success: false, error: actionErrorMessage(error, "Sharing could not be withdrawn. Please try again.") };
+  }
+}
+
+/** Dismisses an open report and any others on the same artifact. Team owners and admins only. */
+export async function dismissReportAction(reportId: string): Promise<ActionResult<null>> {
+  try {
+    const viewerId = await requireUserId();
+    const { report, team } = await getManagedReport(idSchema.parse(reportId), viewerId);
+    await resolveReports({ artifactId: report.artifactId, teamId: team.id, viewerId });
+    revalidatePath("/teams", "layout");
+    return { success: true, data: null };
+  } catch (error) {
+    return { success: false, error: actionErrorMessage(error, "The report could not be dismissed. Please try again.") };
+  }
+}
+
+/** Makes a reported artifact private and resolves its reports. Team owners and admins only. */
+export async function withdrawReportedAction(reportId: string): Promise<ActionResult<null>> {
+  try {
+    const viewerId = await requireUserId();
+    const { report, team } = await getManagedReport(idSchema.parse(reportId), viewerId);
+    await withdrawArtifactSharing({ viewerId, artifactId: report.artifactId });
+    await resolveReports({ artifactId: report.artifactId, teamId: team.id, viewerId });
     revalidatePath("/teams", "layout");
     revalidatePath("/app");
     return { success: true, data: null };

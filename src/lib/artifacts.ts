@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { artifact, sharingRequest, type ArtifactRecord } from "@/db/schema";
+import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { viewableInTeamCondition } from "@/lib/access";
 import { assertValidArtifactContent, assertValidArtifactUpdate } from "@/lib/artifact-content";
 import {
@@ -16,7 +17,9 @@ import {
 } from "@/lib/artifact-types";
 import { artifactSizeProblem } from "@/lib/artifact-limits";
 import { generatePublicId } from "@/lib/public-id";
+import type { SharingActor } from "@/lib/sharing/rules";
 import { UserFacingError } from "@/lib/user-facing-error";
+import { recordArtifactEdit } from "@/lib/versions/service";
 
 /**
  * Artifact storage. Writes here are author-only. Visibility never changes
@@ -172,11 +175,12 @@ export async function findPublicIdByShareId(shareId: string) {
   return record?.publicId ?? null;
 }
 
-/** Creates a private artifact for its author. */
+/** Creates a private artifact for its author, within the hourly creation limit. */
 export async function createArtifact(userId: string, input: ArtifactInput) {
   const parsed = artifactInputSchema.parse(input);
   assertArtifactSize(parsed);
   assertValidArtifactContent(parsed.kind, parsed.content);
+  await enforceRateLimit("artifactCreate", userId);
   const [record] = await getDb()
     .insert(artifact)
     .values({
@@ -193,11 +197,18 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
   return toArtifactDto(record);
 }
 
-/** Changes the author's own artifact. Returns null when it is not theirs. */
-export async function updateArtifact(userId: string, id: string, input: ArtifactUpdateInput) {
+/**
+ * Changes the author's own artifact. Returns null when it is not theirs.
+ * Edits to link and public artifacts go through the approval rule: the DTO's
+ * `pendingEdit` is set when readers outside the team still see the approved
+ * version. `actor` is "agent" for MCP calls, which never approve.
+ */
+export async function updateArtifact(userId: string, id: string, input: ArtifactUpdateInput, actor: SharingActor = "person") {
   const parsed = artifactUpdateSchema.parse(input);
   assertArtifactSize(parsed);
-  await assertValidArtifactUpdate(parsed, () => getOwnArtifact(userId, id));
+  const before = await getOwnArtifact(userId, id);
+  if (!before) return null;
+  await assertValidArtifactUpdate(parsed, () => Promise.resolve(before));
   const [record] = await getDb()
     .update(artifact)
     .set({ ...parsed, updatedAt: new Date() })
@@ -205,6 +216,7 @@ export async function updateArtifact(userId: string, id: string, input: Artifact
     .returning();
 
   if (!record) return null;
+  await recordArtifactEdit({ before, after: record, editorId: userId, actor });
   const [dto] = await toArtifactDtos([record]);
   return dto ?? null;
 }

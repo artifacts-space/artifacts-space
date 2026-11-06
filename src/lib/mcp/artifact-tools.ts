@@ -131,7 +131,8 @@ function registerReadTools(server: McpServer, userId: string) {
     "artifacts_get",
     {
       title: "Get artifact",
-      description: "Retrieve a complete artifact you can read, by its id.",
+      description:
+        "Retrieve a complete artifact you can read, by its id. `version` says whether you got the latest version or the approved version that readers outside the team see; `editPending` says whether newer changes wait for approval.",
       inputSchema: { id: publicIdField },
     },
     ({ id }) => respond(async () => {
@@ -139,7 +140,8 @@ function registerReadTools(server: McpServer, userId: string) {
       if (!viewable) throw new UserFacingError("Artifact not found.");
       const [[dto], { view }] = await Promise.all([toArtifactDtos([viewable.record]), loadContext(userId)]);
       if (!dto) throw new UserFacingError("Artifact not found.");
-      return toMcpArtifact(dto, view);
+      const served = { ...dto, ...viewable.view, updatedAt: viewable.view.updatedAt.toISOString() };
+      return { ...toMcpArtifact(served, view), version: viewable.version.source, editPending: viewable.editPending };
     }),
   );
 
@@ -162,7 +164,7 @@ function registerWriteTools(server: McpServer, userId: string) {
     "artifacts_create",
     {
       title: "Create artifact",
-      description: "Create an artifact to share context with future coding sessions and other agents. It is private unless you set visibility.",
+      description: "Create an artifact to share context with future coding sessions and other agents. It is private unless you set visibility. Creation is limited per hour; a limit error says when to try again.",
       inputSchema: { ...editableFields, visibility: visibilityField, team: teamField },
     },
     ({ visibility, team, ...input }) => respond(async () => {
@@ -178,7 +180,8 @@ function registerWriteTools(server: McpServer, userId: string) {
     "artifacts_update",
     {
       title: "Update artifact",
-      description: "Update your own artifact. Only supplied fields change. Setting visibility requests sharing through the team's rule.",
+      description:
+        "Update your own artifact. Only supplied fields change. Setting visibility requests sharing through the team's rule. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved.",
       inputSchema: {
         id: publicIdField,
         ...editableFields,
@@ -192,10 +195,10 @@ function registerWriteTools(server: McpServer, userId: string) {
       const { teams, view } = await loadContext(userId);
       const record = await ownByPublicId(userId, id);
       if (team) teamBySlug(teams, team);
-      const updated = await updateArtifact(userId, record.id, input);
+      const updated = await updateArtifact(userId, record.id, input, "agent");
       if (!updated) throw new UserFacingError("Artifact not found, or you are not its author.");
       const result = await shareAfterSave(userId, updated, teams, visibility, team);
-      return { artifact: toMcpArtifact(result.artifact, view), sharing: result.sharing };
+      return { artifact: toMcpArtifact(result.artifact, view), edit: updated.pendingEdit ? "pending" : "applied", sharing: result.sharing };
     }),
   );
 
