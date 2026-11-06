@@ -1,12 +1,13 @@
 "use client";
 
-import { IconCheck, IconChecks, IconLoader2, IconRobot } from "@tabler/icons-react";
+import { IconCheck, IconChecks, IconLoader2 } from "@tabler/icons-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { markInboxReadAction } from "@/app/(workspace)/inbox/actions";
+import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
 import type { InboxEntryView } from "@/lib/comments/inbox";
 import { cn } from "@/lib/utils";
@@ -27,7 +28,7 @@ function EntryRow({ entry, pending, onRead }: { entry: InboxEntryView; pending: 
       <span aria-hidden className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", unread ? "bg-foreground" : "bg-transparent")} />
       <div className="min-w-0 flex-1 space-y-1">
         <p className="flex flex-wrap items-center gap-x-1.5 text-[13px]">
-          {author?.kind === "agent" ? <IconRobot className="size-3.5 text-muted-foreground" aria-hidden /> : null}
+          {author ? <PixelAvatar seed={author.userId} kind={author.kind} size={20} /> : null}
           <span className="font-medium">{author?.label ?? "Former member"}</span>
           <span className="text-muted-foreground">mentioned you on</span>
           <Link href={`/threads/${entry.artifact.publicId}#comment-${entry.comment.id}`} className="truncate font-medium underline decoration-border underline-offset-[3px] hover:decoration-foreground">

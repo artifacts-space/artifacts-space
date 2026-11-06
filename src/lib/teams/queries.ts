@@ -144,6 +144,8 @@ export interface InvitationForInvitee {
   id: string;
   teamName: string;
   teamSlug: string;
+  /** Seeds the inviter's pixel avatar. Only people invite. */
+  inviterId: string;
   inviterName: string;
   role: TeamRole;
   expiresAt: string;
@@ -153,6 +155,7 @@ const inviteeColumns = {
   id: teamInvitation.id,
   teamName: team.name,
   teamSlug: team.slug,
+  inviterId: user.id,
   inviterName: user.name,
   role: teamInvitation.role,
   expiresAt: teamInvitation.expiresAt,
@@ -166,7 +169,7 @@ function inviteeCondition(email: string) {
   );
 }
 
-function toInviteeView(row: { id: string; teamName: string; teamSlug: string; inviterName: string; role: string | null; expiresAt: Date }) {
+function toInviteeView(row: { id: string; teamName: string; teamSlug: string; inviterId: string; inviterName: string; role: string | null; expiresAt: Date }) {
   return { ...row, role: parseTeamRole(row.role), expiresAt: row.expiresAt.toISOString() };
 }
 

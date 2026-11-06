@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { CommentThread } from "@/components/comments/comment-thread";
 import { MarkThreadRead } from "@/components/comments/mark-thread-read";
+import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
 import { getViewableArtifact } from "@/lib/access";
 import { loadArtifactByline } from "@/lib/artifact-byline";
@@ -31,7 +32,8 @@ export default async function ThreadPage({ params }: PageProps<"/threads/[public
         <div className="min-w-0">
           <h1 className="text-xl font-medium tracking-[-0.01em] break-words">{viewable.view.title}</h1>
           <p className="mt-1 text-[13px] text-muted-foreground">
-            By {byline.author}{byline.teamName ? ` · ${byline.teamName}` : ""}
+            By {byline.avatar ? <PixelAvatar seed={byline.avatar.seed} kind={byline.avatar.kind} size={16} className="mr-1 -mt-px" /> : null}
+            {byline.author}{byline.teamName ? ` · ${byline.teamName}` : ""}
           </p>
         </div>
         <Button variant="outline" size="sm" className="text-xs" nativeButton={false} render={<Link href={`/artifact/${viewable.record.publicId}`} />}>

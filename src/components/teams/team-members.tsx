@@ -4,6 +4,7 @@ import { IconLoader2, IconTrash } from "@tabler/icons-react";
 
 import { removeMemberAction, updateMemberRoleAction } from "@/app/(workspace)/teams/actions";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
+import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { TeamMemberView } from "@/lib/teams/queries";
@@ -92,7 +93,12 @@ export function TeamMembers({ teamId, members, viewerId, viewerRole, canManage }
             const editable = canManage && !isViewer && (viewerRole === "owner" || member.role !== "owner");
             return (
               <tr key={member.memberId} className="border-t">
-                <td className="px-5 py-2.5 font-medium">{member.name || "Unnamed"}{isViewer ? <span className="ml-1.5 text-xs font-normal text-muted-foreground">(you)</span> : null}</td>
+                <td className="px-5 py-2.5 font-medium">
+                  <span className="flex items-center gap-2">
+                    <PixelAvatar seed={member.userId} size={20} />
+                    <span>{member.name || "Unnamed"}{isViewer ? <span className="ml-1.5 text-xs font-normal text-muted-foreground">(you)</span> : null}</span>
+                  </span>
+                </td>
                 <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{member.username ? `@${member.username}` : ""}</td>
                 <td className="px-3 py-2.5 text-muted-foreground">{member.email}</td>
                 <td className="px-3 py-2.5"><RoleCell member={member} teamId={teamId} editable={editable} viewerRole={viewerRole} /></td>

@@ -25,7 +25,7 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
   return (
     <ConfirmationsProvider initial={skippedConfirmations}>
       <div className="min-h-screen">
-        <AppHeader name={session.user.name} email={session.user.email} username={viewer.username} teams={teams} unreadMentions={unreadMentions} />
+        <AppHeader userId={session.user.id} name={session.user.name} email={session.user.email} username={viewer.username} teams={teams} unreadMentions={unreadMentions} />
         {children}
       </div>
     </ConfirmationsProvider>

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { PixelAvatar } from "@/components/pixel-avatar";
 import { InvitationButtons } from "@/components/teams/invitation-buttons";
 import { Section } from "@/components/teams/section";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +39,7 @@ export default async function TeamsPage() {
               <li key={invitation.id} className="flex flex-wrap items-center gap-3 border-b px-5 py-3 last:border-b-0">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-medium">{invitation.teamName}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{invitation.inviterName} invited you as {roleLabel(invitation.role).toLowerCase()}.</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground"><PixelAvatar seed={invitation.inviterId} size={16} className="mr-1 -mt-px" />{invitation.inviterName} invited you as {roleLabel(invitation.role).toLowerCase()}.</p>
                 </div>
                 <InvitationButtons invitationId={invitation.id} />
               </li>

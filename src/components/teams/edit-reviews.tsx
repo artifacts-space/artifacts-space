@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { visibilityLabel } from "@/components/app/share-options";
+import { PixelAvatar } from "@/components/pixel-avatar";
 import type { PendingEditView } from "@/lib/versions/queries";
 
 import { EditDecisionButtons } from "./edit-decision-buttons";
@@ -26,6 +27,7 @@ export function EditReviewList({ edits }: { edits: PendingEditView[] }) {
             <div className="min-w-0 flex-1">
               <Link href={`/artifact/${edit.publicId}`} className="block truncate text-[13px] font-medium hover:underline">{edit.after.title}</Link>
               <p className="mt-0.5 text-xs text-muted-foreground">
+                <PixelAvatar seed={edit.requesterId} kind={edit.requesterKind} size={16} className="mr-1 -mt-px" />
                 {person(edit.requesterName, edit.requesterUsername)} changed a {visibilityLabel(edit.visibility).toLowerCase()} artifact · {dateFormat.format(new Date(edit.requestedAt))} UTC
               </p>
             </div>

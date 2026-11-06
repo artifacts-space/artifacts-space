@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import { activeMentionQuery, insertMention, matchMentionables, type Mentionable } from "./mention-autocomplete";
 
 const people: Mentionable[] = [
-  { handle: "charles", name: "Charles Smith", kind: "person" },
-  { handle: "claude-code", name: "Claude Code", kind: "agent" },
-  { handle: "dana", name: "Dana Charleston", kind: "person" },
-  { handle: "reviewer-bot", name: "Review Bot", kind: "agent" },
+  { userId: "user-charles", handle: "charles", name: "Charles Smith", kind: "person" },
+  { userId: "user-claude-code", handle: "claude-code", name: "Claude Code", kind: "agent" },
+  { userId: "user-dana", handle: "dana", name: "Dana Charleston", kind: "person" },
+  { userId: "user-reviewer-bot", handle: "reviewer-bot", name: "Review Bot", kind: "agent" },
 ];
 
 describe("activeMentionQuery", () => {

@@ -4,6 +4,7 @@ import { IconLoader2, IconMessage } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 
 import type { ThreadData } from "@/app/(workspace)/threads/actions";
+import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
 import type { MentionOutcome } from "@/lib/comments/delivery";
 import type { ThreadAgentView } from "@/lib/comments/mutes";
@@ -48,6 +49,7 @@ function MutedAgents({ agents, onMute }: { agents: ThreadAgentView[]; onMute: Co
       <span>Muted here:</span>
       {muted.map((agent) => (
         <span key={agent.userId} className="flex items-center gap-1">
+          <PixelAvatar seed={agent.userId} kind="agent" size={16} />
           <span className="font-mono">@{agent.handle}</span>
           {agent.canMute ? <Button variant="ghost" size="xs" onClick={() => void onMute(agent.handle, false)}>Unmute</Button> : null}
         </span>

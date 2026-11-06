@@ -8,6 +8,7 @@ import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { CopyButton } from "@/components/copy-button";
 import { Logo } from "@/components/logo";
+import { PixelAvatar, type AvatarKind } from "@/components/pixel-avatar";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
 import { filesForViewer } from "@/lib/files/download";
 import { isIndexable } from "@/lib/access-rules";
@@ -44,11 +45,12 @@ export async function generateMetadata({ params }: PageProps<"/artifact/[publicI
 }
 
 /** The label above every shared artifact, so readers know who wrote it. */
-function UserContentNotice({ author, teamName }: { author: string; teamName: string | null }) {
+function UserContentNotice({ author, avatar, teamName }: { author: string; avatar: { seed: string; kind: AvatarKind } | null; teamName: string | null }) {
   return (
     <div role="note" className="border-b bg-muted/50">
       <p className="mx-auto w-full max-w-[960px] px-6 py-2 text-xs leading-5 text-muted-foreground">
-        Shared by <span className="font-medium text-foreground">{author}</span>
+        Shared by {avatar ? <PixelAvatar seed={avatar.seed} kind={avatar.kind} size={16} className="mr-1 -mt-px" /> : null}
+        <span className="font-medium text-foreground">{author}</span>
         {teamName ? <> in <span className="font-medium text-foreground">{teamName}</span></> : null}. This is user-shared content; artifacts.space does not review it.
       </p>
     </div>
@@ -87,7 +89,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
         <Logo />
         <CopyButton value={view.content} label="Copy" variant="outline" size="sm" className="text-xs" />
       </header>
-      <UserContentNotice author={byline.author} teamName={byline.teamName} />
+      <UserContentNotice author={byline.author} avatar={byline.avatar} teamName={byline.teamName} />
       <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Icon className={`size-3.5 ${kindColors[view.kind]}`} /> Shared artifact · {view.kind}

@@ -1,10 +1,11 @@
 "use client";
 
-import { IconLoader2, IconPlus, IconRobot, IconTrash, IconVolume, IconVolumeOff } from "@tabler/icons-react";
+import { IconLoader2, IconPlus, IconTrash, IconVolume, IconVolumeOff } from "@tabler/icons-react";
 import { useState } from "react";
 
 import { createAgentAction, removeAgentAction, setAgentMuteAction } from "@/app/(workspace)/teams/agent-actions";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
+import { PixelAvatar } from "@/components/pixel-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,7 +64,7 @@ function AgentRow({ agent, canManage, origin }: { agent: TeamAgentView; canManag
   return (
     <li className="space-y-3 border-t px-5 py-3 first:border-t-0">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
-        <IconRobot className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <PixelAvatar seed={agent.userId} kind="agent" size={20} />
         <span className="font-mono text-xs">@{agent.handle}</span>
         <span className="font-medium">{agent.name}</span>
         {agent.muted ? <Badge variant="secondary">Muted</Badge> : null}

@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { decideSharingAction, withdrawSharingAction } from "@/app/(workspace)/app/sharing-actions";
 import { visibilityLabel } from "@/components/app/share-options";
+import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
 import type { PendingSharingView, TeamSharedView } from "@/lib/sharing/queries";
 
@@ -27,6 +28,7 @@ export function PendingSharingList({ requests }: { requests: PendingSharingView[
           <div className="min-w-0 flex-1">
             <Link href={`/artifact/${request.publicId}`} className="block truncate text-[13px] font-medium hover:underline">{request.title}</Link>
             <p className="mt-0.5 text-xs text-muted-foreground">
+              <PixelAvatar seed={request.requesterId} kind={request.requesterKind} size={16} className="mr-1 -mt-px" />
               {person(request.requesterName, request.requesterUsername)} asks for {visibilityLabel(request.level).toLowerCase()} sharing · {dateFormat.format(new Date(request.requestedAt))}
             </p>
           </div>
@@ -52,7 +54,10 @@ export function TeamSharedList({ artifacts, canWithdraw }: { artifacts: TeamShar
         <li key={item.artifactId} className="flex flex-wrap items-center gap-3 border-b px-5 py-3 last:border-b-0">
           <div className="min-w-0 flex-1">
             <Link href={`/artifact/${item.publicId}`} className="block truncate text-[13px] font-medium hover:underline">{item.title}</Link>
-            <p className="mt-0.5 text-xs text-muted-foreground">{person(item.authorName, item.authorUsername)} · {visibilityLabel(item.visibility)}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              <PixelAvatar seed={item.authorId} kind={item.authorKind} size={16} className="mr-1 -mt-px" />
+              {person(item.authorName, item.authorUsername)} · {visibilityLabel(item.visibility)}
+            </p>
           </div>
           {canWithdraw ? (
             <Button size="sm" variant="outline" className="text-xs" disabled={pending !== null} onClick={() => void run(item.artifactId, () => withdrawSharingAction(item.artifactId), "Sharing withdrawn.")}>

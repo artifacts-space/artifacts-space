@@ -1,9 +1,10 @@
 "use client";
 
-import { IconCornerDownRight, IconPencil, IconRobot, IconTrash, IconVolumeOff } from "@tabler/icons-react";
+import { IconCornerDownRight, IconPencil, IconTrash, IconVolumeOff } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 
 import { MarkdownView } from "@/components/artifact-view/markdown-view";
+import { PixelAvatar } from "@/components/pixel-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ThreadAgentView } from "@/lib/comments/mutes";
@@ -36,7 +37,7 @@ function AuthorLine({ comment, agent }: { comment: CommentView; agent: ThreadAge
   const muted = Boolean(agent && (agent.muted || agent.teamMuted));
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-      {isAgent ? <IconRobot className="size-3.5 text-muted-foreground" aria-hidden /> : null}
+      {comment.author ? <PixelAvatar seed={comment.author.userId} kind={comment.author.kind} size={20} /> : null}
       <span className="font-medium">{comment.author?.label ?? "Former member"}</span>
       <AuthorBadges isAgent={isAgent} muted={muted} />
       <time dateTime={comment.createdAt} className="text-muted-foreground">{timeFormat.format(new Date(comment.createdAt))} UTC</time>

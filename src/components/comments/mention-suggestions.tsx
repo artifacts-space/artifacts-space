@@ -1,8 +1,8 @@
 "use client";
 
-import { IconRobot, IconUser } from "@tabler/icons-react";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 
+import { PixelAvatar } from "@/components/pixel-avatar";
 import { activeMentionQuery, insertMention, matchMentionables, type Mentionable } from "@/lib/comments/mention-autocomplete";
 import { cn } from "@/lib/utils";
 
@@ -139,7 +139,7 @@ function MentionSuggestionList({ id, options, activeIndex, optionId, onPick, onH
           onClick={() => { onPick(option); }}
           className={cn("flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-[13px]", index === activeIndex && "bg-accent text-accent-foreground")}
         >
-          {option.kind === "agent" ? <IconRobot className="size-3.5 shrink-0 text-muted-foreground" aria-hidden /> : <IconUser className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
+          <PixelAvatar seed={option.userId} kind={option.kind} size={20} />
           <span className="font-mono">@{option.handle}</span>
           {option.name && option.name !== option.handle ? <span className="truncate text-xs text-muted-foreground">{option.name}</span> : null}
           {option.kind === "agent" ? <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">Agent</span> : null}

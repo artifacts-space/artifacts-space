@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { IconChevronDown, IconExternalLink, IconInbox, IconKey, IconLogout, IconRestore, IconUser } from "@tabler/icons-react";
+import { IconChevronDown, IconExternalLink, IconInbox, IconKey, IconLogout, IconRestore } from "@tabler/icons-react";
 import { useState } from "react";
 
 import { useConfirmations } from "@/components/confirmations-provider";
 import { Logo } from "@/components/logo";
+import { PixelAvatar } from "@/components/pixel-avatar";
 import { TeamSwitcher, type HeaderTeam } from "@/components/teams/team-switcher";
 import { Button } from "@/components/ui/button";
 import {
@@ -74,6 +75,8 @@ function NavLink({ href, label, active, className }: { href: string; label: stri
 }
 
 interface AppHeaderProps {
+  /** Seeds the account chip's pixel avatar. */
+  userId: string;
   name: string;
   email: string;
   username: string;
@@ -81,16 +84,10 @@ interface AppHeaderProps {
   unreadMentions: number;
 }
 
-export function AppHeader({ name, email, username, teams, unreadMentions }: AppHeaderProps) {
+export function AppHeader({ userId, name, email, username, teams, unreadMentions }: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
-  const initials = name
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 
   async function signOut() {
     setSigningOut(true);
@@ -114,11 +111,9 @@ export function AppHeader({ name, email, username, teams, unreadMentions }: AppH
         <div className="ml-auto flex items-center">
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={<Button variant="ghost" className="h-9 gap-2 px-1.5" disabled={signingOut} />}
+              render={<Button variant="ghost" className="h-9 gap-2 px-1.5" disabled={signingOut} aria-label="Account menu" />}
             >
-              <span className="flex size-7 items-center justify-center rounded-sm border bg-card text-[11px] font-medium">
-                {initials || <IconUser className="size-3.5" />}
-              </span>
+              <PixelAvatar seed={userId} size={28} />
               <IconChevronDown className="size-3 text-muted-foreground" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">

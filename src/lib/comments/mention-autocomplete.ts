@@ -4,6 +4,8 @@ import type { MentionKind } from "./mentions";
 
 /** Someone the writer can mention on this artifact, as the composer lists them. */
 export interface Mentionable {
+  /** Seeds the suggestion's pixel avatar. */
+  userId: string;
   handle: string;
   name: string;
   kind: MentionKind;

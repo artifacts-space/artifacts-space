@@ -41,7 +41,7 @@ export async function listMentionables(thread: Thread): Promise<Mentionable[]> {
   // Names only for teammates: a reader outside the author's teams sees the author's handle, never their name.
   const names = await namesById(reachable.flatMap((fact) => (fact.sharesTeamWithWriter && fact.userId ? [fact.userId] : [])));
   return reachable
-    .map((fact) => ({ handle: fact.handle, name: names.get(fact.userId ?? "") ?? "", kind: fact.kind }))
+    .flatMap((fact) => (fact.userId ? [{ userId: fact.userId, handle: fact.handle, name: names.get(fact.userId) ?? "", kind: fact.kind }] : []))
     .sort((a, b) => a.handle.localeCompare(b.handle));
 }
 

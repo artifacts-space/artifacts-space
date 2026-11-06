@@ -1,7 +1,7 @@
 import { and, desc, eq, ne } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { artifact, sharingRequest, user } from "@/db/schema";
+import { agent, artifact, sharingRequest, user } from "@/db/schema";
 import type { ArtifactVisibility, SharingLevel } from "@/lib/artifact-types";
 
 /** An open request as the team page lists it. */
@@ -12,6 +12,9 @@ export interface PendingSharingView {
   title: string;
   level: SharingLevel;
   currentVisibility: ArtifactVisibility;
+  /** Seeds the requester's pixel avatar. */
+  requesterId: string;
+  requesterKind: "person" | "agent";
   requesterName: string;
   requesterUsername: string | null;
   requestedAt: string;
@@ -27,6 +30,8 @@ export async function listPendingSharing(teamId: string): Promise<PendingSharing
       title: artifact.title,
       level: sharingRequest.visibility,
       currentVisibility: artifact.visibility,
+      requesterId: user.id,
+      requesterAgentId: agent.userId,
       requesterName: user.name,
       requesterUsername: user.username,
       requestedAt: sharingRequest.createdAt,
@@ -34,9 +39,10 @@ export async function listPendingSharing(teamId: string): Promise<PendingSharing
     .from(sharingRequest)
     .innerJoin(artifact, eq(artifact.id, sharingRequest.artifactId))
     .innerJoin(user, eq(user.id, sharingRequest.requestedBy))
+    .leftJoin(agent, eq(agent.userId, user.id))
     .where(and(eq(sharingRequest.teamId, teamId), eq(sharingRequest.kind, "sharing"), eq(sharingRequest.status, "pending")))
     .orderBy(desc(sharingRequest.createdAt));
-  return rows.map((row) => ({ ...row, requestedAt: row.requestedAt.toISOString() }));
+  return rows.map(({ requesterAgentId, ...row }) => ({ ...row, requesterKind: requesterAgentId ? "agent" : "person", requestedAt: row.requestedAt.toISOString() }));
 }
 
 /** An artifact shared through a team, as the team page lists it. */
@@ -45,6 +51,9 @@ export interface TeamSharedView {
   publicId: string;
   title: string;
   visibility: ArtifactVisibility;
+  /** Seeds the author's pixel avatar. */
+  authorId: string;
+  authorKind: "person" | "agent";
   authorName: string;
   authorUsername: string | null;
   updatedAt: string;
@@ -58,14 +67,17 @@ export async function listTeamSharedArtifacts(teamId: string, limit = 100): Prom
       publicId: artifact.publicId,
       title: artifact.title,
       visibility: artifact.visibility,
+      authorId: user.id,
+      authorAgentId: agent.userId,
       authorName: user.name,
       authorUsername: user.username,
       updatedAt: artifact.updatedAt,
     })
     .from(artifact)
     .innerJoin(user, eq(user.id, artifact.userId))
+    .leftJoin(agent, eq(agent.userId, user.id))
     .where(and(eq(artifact.teamId, teamId), ne(artifact.visibility, "private")))
     .orderBy(desc(artifact.updatedAt))
     .limit(limit);
-  return rows.map((row) => ({ ...row, updatedAt: row.updatedAt.toISOString() }));
+  return rows.map(({ authorAgentId, ...row }) => ({ ...row, authorKind: authorAgentId ? "agent" : "person", updatedAt: row.updatedAt.toISOString() }));
 }
