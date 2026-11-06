@@ -3,7 +3,9 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { artifact } from "@/db/schema";
+import type { SharingActor } from "@/lib/sharing/rules";
 import { UserFacingError } from "@/lib/user-facing-error";
+import { recordArtifactChange } from "@/lib/versions/service";
 
 import { canUseFileInArtifact } from "./access-rules";
 import { fileLimits } from "./config";
@@ -37,10 +39,15 @@ export async function assertUsableFiles(authorId: string, artifactId: string | n
   }
 }
 
-/** Attaches checked files to the author's artifact. Call assertUsableFiles first. */
-export async function attachFiles(authorId: string, artifactId: string, fileIds: readonly string[]): Promise<void> {
+/**
+ * Attaches files to the author's artifact. For a link or public artifact the
+ * change goes through edit review (recordArtifactChange), so readers outside
+ * the team see new files only once they are approved.
+ */
+export async function attachFiles(authorId: string, artifactId: string, fileIds: readonly string[], actor: SharingActor): Promise<void> {
   await assertUsableFiles(authorId, artifactId, fileIds);
-  await attachFileRows(authorId, artifactId, fileIds);
+  const attached = await attachFileRows(authorId, artifactId, fileIds);
+  if (attached > 0) await recordArtifactChange({ artifactId, editorId: authorId, actor });
 }
 
 /**
@@ -63,11 +70,12 @@ async function artifactAuthor(artifactId: string) {
  * is not attached, and for the author of the artifact it belongs to. Returns
  * the artifact id it belonged to, or null.
  */
-export async function deleteOwnFile(userId: string, fileId: string): Promise<string | null> {
+export async function deleteOwnFile(userId: string, fileId: string, actor: SharingActor): Promise<string | null> {
   const row = z.uuid().safeParse(fileId).success ? await getFileRow(fileId.toLowerCase()) : null;
   const allowed = row !== null && (row.artifactId === null ? row.uploaderId === userId : (await artifactAuthor(row.artifactId)) === userId);
   if (!row || !allowed) throw new UserFacingError("File not found.");
   const removed = await removeFiles([row]);
   if (removed.length === 0) throw new UserFacingError("The file could not be deleted. Try again.");
+  if (row.artifactId) await recordArtifactChange({ artifactId: row.artifactId, editorId: userId, actor });
   return row.artifactId;
 }

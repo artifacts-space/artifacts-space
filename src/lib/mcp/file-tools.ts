@@ -97,7 +97,7 @@ function registerArtifactFileTools(server: McpServer, userId: string) {
     ({ files, notes, ...input }) => respond(async () => {
       await assertUsableFiles(userId, null, files);
       const created = await createArtifact(userId, { ...input, kind: "file", content: notes ?? "" });
-      await attachFiles(userId, created.id, files);
+      await attachFiles(userId, created.id, files, "agent");
       return artifactResult(userId, await ownArtifact(userId, created.publicId));
     }),
   );
@@ -111,7 +111,7 @@ function registerArtifactFileTools(server: McpServer, userId: string) {
     },
     ({ artifact, files }) => respond(async () => {
       const record = await ownArtifact(userId, artifact);
-      await attachFiles(userId, record.id, files);
+      await attachFiles(userId, record.id, files, "agent");
       return artifactResult(userId, record);
     }),
   );
@@ -141,7 +141,7 @@ function registerAccessTools(server: McpServer, userId: string) {
       inputSchema: { fileId: fileIdField },
     },
     ({ fileId }) => respond(async () => {
-      await deleteOwnFile(userId, fileId);
+      await deleteOwnFile(userId, fileId, "agent");
       return { deleted: true, fileId };
     }),
   );

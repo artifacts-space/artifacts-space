@@ -34,12 +34,12 @@ type UpdateDraft = <K extends keyof ArtifactDraft>(key: K, value: ArtifactDraft[
 const modes: EditorMode[] = ["edit", "preview"];
 const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
-/** Notice shown while the artifact has a public share link. */
-export function ShareBanner({ shareUrl }: { shareUrl: string }) {
+/** Notice shown while the artifact is shared by link or publicly. */
+export function ShareBanner({ shareUrl, isPublic }: { shareUrl: string; isPublic: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-3 border-b bg-muted/50 px-5 py-2">
       <IconLink className="size-3.5 text-muted-foreground" />
-      <span className="text-[13px] text-muted-foreground">Anyone with the link can read this artifact.</span>
+      <span className="text-[13px] text-muted-foreground">{isPublic ? "Anyone can find and read this artifact." : "Anyone with the link can read this artifact."}</span>
       <CopyButton value={shareUrl} label="Copy link" variant="ghost" size="sm" className="ml-auto text-xs" />
     </div>
   );

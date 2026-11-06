@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { artifactFile, type ArtifactFileRecord } from "@/db/schema";
+import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { checkUpload, fileLimits, isAllowedFileType } from "./config";
@@ -37,16 +38,17 @@ export interface StartedUpload {
 
 /**
  * Starts an upload for `uploaderId`. Refuses files over the size cap, types
- * that are not allowed, and more than 20 unfinished uploads at once.
+ * that are not allowed, more than 20 unfinished uploads at once, and more
+ * than the hourly upload limit.
  */
 export async function requestUpload(uploaderId: string, input: UploadRequest): Promise<StartedUpload> {
   const parsed = uploadRequestSchema.parse(input);
   const check = checkUpload(parsed);
   if (!check.ok) throw new UserFacingError(check.error);
-  // TODO(files): add a per-user upload rate limit through src/lib/abuse/rate-limit once it is on main.
   if ((await countPendingUploads(uploaderId)) >= fileLimits.maxPendingPerUser) {
     throw new UserFacingError("You have many unfinished uploads. Finish or remove them, then try again.");
   }
+  await enforceRateLimit("fileUpload", uploaderId);
   const id = randomUUID();
   const filename = sanitizeFilename(parsed.filename);
   const key = fileObjectKey(id, filename);

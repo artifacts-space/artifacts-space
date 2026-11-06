@@ -12,6 +12,8 @@ export const rateLimits = {
   reportByUser: { limit: 10, windowSeconds: 3600 },
   /** Reports per network address per hour, signed in or not. */
   reportByNetwork: { limit: 5, windowSeconds: 3600 },
+  /** Started file uploads per user per hour, from the web app and MCP together. */
+  fileUpload: { limit: 200, windowSeconds: 3600 },
 } as const satisfies Record<string, { limit: number; windowSeconds: number }>;
 
 export type RateLimitName = keyof typeof rateLimits;
@@ -22,4 +24,5 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   sharingRequest: "You have changed sharing a lot in the last hour.",
   reportByUser: "You have sent a lot of reports in the last hour.",
   reportByNetwork: "We have received a lot of reports from your network in the last hour.",
+  fileUpload: "You have uploaded a lot of files in the last hour.",
 };

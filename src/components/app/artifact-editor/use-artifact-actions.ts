@@ -42,7 +42,7 @@ export function useArtifactActions({ artifact, draft, onUpdated, onDeleted }: Op
     }
     await run("save", () => updateArtifactAction(artifact.id, draft), (data) => {
       onUpdated(data);
-      toast.success("Saved.");
+      toast.success(data.pendingEdit ? "Saved. Waiting for approval." : "Saved.");
     });
   }
 

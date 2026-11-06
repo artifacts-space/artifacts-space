@@ -8,6 +8,7 @@ import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CopyButton } from "@/components/copy-button";
 import { Logo } from "@/components/logo";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
+import { filesForViewer } from "@/lib/files/download";
 import { isIndexable } from "@/lib/access-rules";
 import { loadArtifactByline } from "@/lib/artifact-byline";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
@@ -70,7 +71,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   const viewable = await load(params);
   if (!viewable) notFound();
   const { record, view } = viewable;
-  const byline = await loadArtifactByline(record, viewable.isTeamMember);
+  const [byline, files] = await Promise.all([loadArtifactByline(record, viewable.isTeamMember), filesForViewer(viewable)]);
   const Icon = kindIcons[view.kind];
   const meta = [
     view.project ? `Project ${view.project}` : null,
@@ -94,7 +95,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
         <p className="mt-4 text-[13px] text-muted-foreground">{meta.join(" · ")}</p>
         <PendingEditNotice viewable={viewable} />
         <article className="mt-10">
-          <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} />
+          <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} />
         </article>
         <div className="mt-10 flex flex-wrap items-baseline justify-between gap-4 text-[13px] leading-6 text-muted-foreground">
           <p>

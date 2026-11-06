@@ -73,7 +73,7 @@ export function SharedArtifactPanel({ artifact, onWithdrawn }: SharedArtifactPan
         <p className="mt-2 text-xs text-muted-foreground">Updated {dateFormat.format(new Date(artifact.updatedAt))}</p>
       </div>
       <div className="min-h-[460px] flex-1 bg-card p-6 sm:p-8">
-        <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} />
+        <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
       </div>
     </section>
   );

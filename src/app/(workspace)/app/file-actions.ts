@@ -58,7 +58,7 @@ export async function finalizeUploadAction(fileId: string): Promise<ActionResult
 /** Deletes one of the person's own uploads, or a file from their artifact. */
 export async function deleteFileAction(fileId: string): Promise<ActionResult<ArtifactDto | null>> {
   return run("The file could not be removed. Try again.", async (userId) => {
-    const artifactId = await deleteOwnFile(userId, fileId);
+    const artifactId = await deleteOwnFile(userId, fileId, "person");
     if (!artifactId) return null;
     revalidatePath("/app");
     return ownArtifactDto(userId, artifactId);
@@ -71,7 +71,7 @@ export async function attachFilesAction(artifactId: string, fileIds: string[]): 
     const ids = fileIdsSchema.parse(fileIds);
     const record = await getOwnArtifact(userId, artifactId);
     if (!record) throw new UserFacingError("Artifact not found.");
-    await attachFiles(userId, record.id, ids);
+    await attachFiles(userId, record.id, ids, "person");
     revalidatePath("/app");
     return ownArtifactDto(userId, record.id);
   });
@@ -83,7 +83,7 @@ export async function createArtifactWithFilesAction(input: ArtifactInput, fileId
     const ids = fileIdsSchema.parse(fileIds);
     await assertUsableFiles(userId, null, ids);
     const created = await createArtifact(userId, { ...input, source: input.source || "web" });
-    if (ids.length > 0) await attachFiles(userId, created.id, ids);
+    if (ids.length > 0) await attachFiles(userId, created.id, ids, "person");
     revalidatePath("/app");
     return ownArtifactDto(userId, created.id);
   });

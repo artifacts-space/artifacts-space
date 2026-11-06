@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z, ZodError } from "zod";
 
 import { getViewableArtifact } from "@/lib/access";
+import { filesForViewer } from "@/lib/files/download";
 import { artifactKinds, artifactVisibilities, type ArtifactDto, type ArtifactVisibility } from "@/lib/artifact-types";
 import {
   createArtifact,
@@ -138,9 +139,9 @@ function registerReadTools(server: McpServer, userId: string) {
     ({ id }) => respond(async () => {
       const viewable = await getViewableArtifact(id, userId);
       if (!viewable) throw new UserFacingError("Artifact not found.");
-      const [[dto], { view }] = await Promise.all([toArtifactDtos([viewable.record]), loadContext(userId)]);
+      const [[dto], { view }, files] = await Promise.all([toArtifactDtos([viewable.record]), loadContext(userId), filesForViewer(viewable)]);
       if (!dto) throw new UserFacingError("Artifact not found.");
-      const served = { ...dto, ...viewable.view, updatedAt: viewable.view.updatedAt.toISOString() };
+      const served = { ...dto, ...viewable.view, files, updatedAt: viewable.view.updatedAt.toISOString() };
       return { ...toMcpArtifact(served, view), version: viewable.version.source, editPending: viewable.editPending };
     }),
   );

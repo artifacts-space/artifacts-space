@@ -3,12 +3,14 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { artifact, artifactFile, type ArtifactFileRecord } from "@/db/schema";
-import { getViewableArtifact } from "@/lib/access";
+import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
 
 import { canReadFile, type FileArtifactAccess } from "./access-rules";
 import { fileLimits, isInlineType } from "./config";
 import { contentDisposition } from "./names";
 import { presignDownload, r2ConfigFromEnv } from "./r2";
+import { listArtifactFiles } from "./store";
+import type { FileDto } from "./types";
 
 /**
  * Downloads. Access to a file always goes through its artifact's access
@@ -26,10 +28,20 @@ async function loadWithArtifact(fileId: string) {
   return row ?? null;
 }
 
+/** When the viewer reads an approved version, the time it was saved; otherwise null (they read the latest). */
+export function servedVersionTime(viewable: Pick<ViewableArtifact, "version" | "view">): Date | null {
+  return viewable.version.source === "approved" ? viewable.view.updatedAt : null;
+}
+
+/** The files this viewer may see with the version they are served. */
+export async function filesForViewer(viewable: Pick<ViewableArtifact, "record" | "version" | "view">): Promise<FileDto[]> {
+  return listArtifactFiles(viewable.record.id, { attachedBy: servedVersionTime(viewable) });
+}
+
 async function artifactAccess(publicId: string | null, viewerId: string | null): Promise<FileArtifactAccess | null> {
   if (!publicId) return null;
   const viewable = await getViewableArtifact(publicId, viewerId);
-  return { viewable: viewable !== null, servedVersionAt: null };
+  return viewable ? { viewable: true, servedVersionAt: servedVersionTime(viewable) } : { viewable: false, servedVersionAt: null };
 }
 
 /**

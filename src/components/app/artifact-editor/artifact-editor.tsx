@@ -47,7 +47,7 @@ export function ArtifactEditor({ artifact, origin, onUpdated, onDeleted }: Artif
         onSave={() => void save()}
         onRequestDelete={() => { setDeleteOpen(true); }}
       />
-      {shared ? <ShareBanner shareUrl={shareUrl} /> : null}
+      {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
       <TitleFields title={draft.title} summary={draft.summary} update={update} />
       <ModeBar mode={mode} onMode={setMode} length={draft.content.length} updatedAt={artifact.updatedAt} />
       <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} files={artifact.files} update={update} />
