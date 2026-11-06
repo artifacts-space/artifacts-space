@@ -36,6 +36,7 @@ export const dataProps = {
     format: numberFormat.optional(),
     currency: currencyCode().optional(),
     change: finiteNumber().optional(),
+    changeFormat: numberFormat.optional(),
     changeLabel: label(60).optional(),
     goodDirection: z.enum(["up", "down"]).optional(),
   }),

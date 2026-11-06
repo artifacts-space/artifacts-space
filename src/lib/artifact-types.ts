@@ -1,4 +1,4 @@
-export const artifactKinds = ["markdown", "code", "text", "json"] as const;
+export const artifactKinds = ["markdown", "code", "text", "json", "csv", "svg", "mermaid", "ui"] as const;
 export type ArtifactKind = (typeof artifactKinds)[number];
 /** Who can read an artifact. Private is the default, even inside a team. */
 export const artifactVisibilities = ["private", "team", "link", "public"] as const;

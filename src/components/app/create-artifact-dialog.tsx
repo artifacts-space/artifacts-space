@@ -24,8 +24,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { formatInfo } from "@/lib/artifact-formats";
 import { kinds } from "@/lib/artifact-kinds";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
+
+/** A short starting point shown in the empty content box, per format. */
+const placeholders: Record<string, string> = {
+  markdown: "## Decision",
+  code: "export function main() {}",
+  text: "Notes",
+  json: '{ "key": "value" }',
+  csv: "name,value\nAda,1",
+  svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">…</svg>',
+  mermaid: "flowchart TD\n  A --> B",
+  ui: '{ "version": 1, "root": "page", "elements": { … } }',
+};
 
 /** Reads a text field from form data. File inputs and missing fields read as empty. */
 function formText(formData: FormData, name: string) {
@@ -82,7 +95,7 @@ export function CreateArtifactDialog({
           <DialogHeader className="border-b p-6">
             <DialogTitle className="text-lg">New artifact</DialogTitle>
             <DialogDescription>
-              Agents find artifacts by title, summary, and project. Content can be markdown, code, text, or JSON.
+              Agents find artifacts by title, summary, and project. Pick the format that shows your content best.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5 p-6">
@@ -96,17 +109,18 @@ export function CreateArtifactDialog({
                 <Input id="artifact-project" name="project" maxLength={120} placeholder="artifacts-space" className="h-9" />
               </div>
               <div className="space-y-2">
-                <Label>Format</Label>
+                <Label id="artifact-format-label">Format</Label>
                 <Select value={kind} onValueChange={(value) => { if (value) setKind(value); }}>
-                  <SelectTrigger className="h-9 w-full">
-                    <SelectValue />
+                  <SelectTrigger aria-labelledby="artifact-format-label" aria-describedby="artifact-format-help" className="h-9 w-full">
+                    <SelectValue>{(value: ArtifactKind) => formatInfo[value].label}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {kinds.map((value) => (
-                      <SelectItem key={value} value={value}>{value}</SelectItem>
+                      <SelectItem key={value} value={value}>{formatInfo[value].label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p id="artifact-format-help" className="text-xs leading-5 text-muted-foreground">{formatInfo[kind].helper}</p>
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="artifact-summary">Summary <span className="font-normal text-muted-foreground">(optional)</span></Label>
@@ -124,7 +138,7 @@ export function CreateArtifactDialog({
                   id="artifact-content"
                   name="content"
                   required
-                  placeholder="## Decision"
+                  placeholder={placeholders[kind]}
                   className="min-h-56 resize-y p-4 font-mono text-xs leading-6"
                 />
               </div>

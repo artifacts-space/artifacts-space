@@ -65,7 +65,7 @@ const descriptions: Record<UiComponentName, string> = {
   Link: "A link that opens in a new tab. Only absolute http, https, and mailto URLs are allowed.",
   Quote: "A block quote with an optional citation.",
   Table: "A data table. `rows` are objects keyed by each column's `key`. Missing cells show a dash. Up to 500 rows.",
-  Metric: "A key number with a label, an optional unit, and an optional change. `goodDirection` says whether up or down is good.",
+  Metric: "A key number with a label, an optional unit, and an optional change. `change` uses `changeFormat` (default: the value's `format`), so a revenue metric usually sets changeFormat \"percent\". `goodDirection` says whether up or down is good.",
   Chart: "A bar, line, or area chart. `labels` are the x-axis; each series has one value per label (null for a gap).",
   Progress: "A progress bar. `value` out of `max` (default 100).",
   Timeline: "A vertical list of dated events with done, current, or upcoming status.",

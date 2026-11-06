@@ -1,20 +1,39 @@
-import { IconAlignLeft, IconBraces, IconCode, IconFileText } from "@tabler/icons-react";
+import {
+  IconAlignLeft,
+  IconBraces,
+  IconCode,
+  IconFileText,
+  IconLayoutDashboard,
+  IconSitemap,
+  IconTable,
+  IconVectorBezier2,
+} from "@tabler/icons-react";
 
-import type { ArtifactKind } from "@/lib/artifact-types";
+import type { FormatKind } from "@/lib/artifact-formats";
+import { artifactKinds, type ArtifactKind } from "@/lib/artifact-types";
 
-export const kinds: ArtifactKind[] = ["markdown", "code", "text", "json"];
+/** Formats people can pick, in picker order. Follows `artifactKinds`. */
+export const kinds: ArtifactKind[] = [...artifactKinds];
 
-export const kindIcons: Record<ArtifactKind, typeof IconFileText> = {
+export const kindIcons: Record<FormatKind, typeof IconFileText> = {
   markdown: IconFileText,
   code: IconCode,
   text: IconAlignLeft,
   json: IconBraces,
+  csv: IconTable,
+  svg: IconVectorBezier2,
+  mermaid: IconSitemap,
+  ui: IconLayoutDashboard,
 };
 
 /** Text color class per format. The colors are tokens in globals.css. */
-export const kindColors: Record<ArtifactKind, string> = {
+export const kindColors: Record<FormatKind, string> = {
   markdown: "text-kind-markdown",
   code: "text-kind-code",
   text: "text-kind-text",
   json: "text-kind-json",
+  csv: "text-kind-csv",
+  svg: "text-kind-svg",
+  mermaid: "text-kind-mermaid",
+  ui: "text-kind-ui",
 };

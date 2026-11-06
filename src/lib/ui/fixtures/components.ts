@@ -112,7 +112,7 @@ const data: Pick<Record<UiComponentName, ComponentFixture[]>, "Table" | "Metric"
     { name: "Huge and long", props: { columns: [{ key: "v", label: "Value", format: "number", align: "right" }, { key: "t", label: longText(80) }], rows: [{ v: 1e300, t: unbroken(500) }, { v: -9_007_199_254_740_991, t: longText(2000) }, { v: null, t: null }] } },
   ],
   Metric: [
-    { name: "Currency", props: { label: "Revenue", value: 1_284_000, format: "currency", currency: "USD", change: 12.4, changeLabel: "vs last month", goodDirection: "up" } },
+    { name: "Currency", props: { label: "Revenue", value: 1_284_000, format: "currency", currency: "USD", change: 12.4, changeFormat: "percent", changeLabel: "vs last month", goodDirection: "up" } },
     { name: "Bad change", props: { label: "Errors", value: 42, change: 8, goodDirection: "down" } },
     { name: "Text value", props: { label: "Status", value: "Healthy" } },
     { name: "Huge", props: { label: longText(80), value: 1e300, unit: "ops", change: -1e20, format: "compact" } },

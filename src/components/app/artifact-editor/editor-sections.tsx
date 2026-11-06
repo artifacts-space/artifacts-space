@@ -20,14 +20,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { formatInfo } from "@/lib/artifact-formats";
 import { kinds } from "@/lib/artifact-kinds";
-import type { ArtifactKind } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
 import type { ArtifactDraft } from "./use-artifact-draft";
 
-export type EditorMode = "edit" | "preview";
+import type { EditorMode } from "./content-pane";
+
+export type { EditorMode } from "./content-pane";
 type UpdateDraft = <K extends keyof ArtifactDraft>(key: K, value: ArtifactDraft[K]) => void;
 
 const modes: EditorMode[] = ["edit", "preview"];
@@ -93,32 +94,6 @@ export function ModeBar({ mode, onMode, length, updatedAt }: { mode: EditorMode;
   );
 }
 
-function isProse(kind: ArtifactKind) {
-  return kind === "markdown" || kind === "text";
-}
-
-/** The content textarea in edit mode, or a read-only rendering in preview mode. */
-export function ContentPane({ mode, kind, content, update }: { mode: EditorMode; kind: ArtifactKind; content: string; update: UpdateDraft }) {
-  if (mode === "edit") {
-    return (
-      <Textarea
-        value={content}
-        onChange={(event) => { update("content", event.target.value); }}
-        aria-label="Artifact content"
-        spellCheck={isProse(kind)}
-        className="min-h-[460px] flex-1 resize-y rounded-none border-0 bg-card p-6 font-mono text-[12.5px] leading-7 shadow-none outline-none focus-visible:ring-0 sm:p-8"
-      />
-    );
-  }
-  return (
-    <div className="min-h-[460px] flex-1 bg-card p-6 sm:p-8">
-      <pre className={cn("max-w-[80ch] whitespace-pre-wrap break-words leading-7", isProse(kind) ? "font-sans text-[14px]" : "font-mono text-[12.5px]")}>
-        {content}
-      </pre>
-    </div>
-  );
-}
-
 /** Project, format, and language fields below the content. */
 export function MetaFields({ draft, update }: { draft: ArtifactDraft; update: UpdateDraft }) {
   return (
@@ -130,9 +105,9 @@ export function MetaFields({ draft, update }: { draft: ArtifactDraft; update: Up
       <label className="flex items-center gap-2 text-xs text-muted-foreground">
         <span className="w-16 shrink-0">Format</span>
         <Select value={draft.kind} onValueChange={(value) => { if (value) update("kind", value); }}>
-          <SelectTrigger className="h-8 w-full bg-card text-[13px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-8 w-full bg-card text-[13px]"><SelectValue>{(value: ArtifactDraft["kind"]) => formatInfo[value].label}</SelectValue></SelectTrigger>
           <SelectContent>
-            {kinds.map((value) => <SelectItem key={value} value={value} className="text-xs">{value}</SelectItem>)}
+            {kinds.map((value) => <SelectItem key={value} value={value} className="text-xs">{formatInfo[value].label}</SelectItem>)}
           </SelectContent>
         </Select>
       </label>

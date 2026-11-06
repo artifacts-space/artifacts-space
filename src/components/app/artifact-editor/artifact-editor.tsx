@@ -5,8 +5,8 @@ import { useState } from "react";
 import { ShareControl } from "@/components/app/share-control";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
+import { ContentPane } from "./content-pane";
 import {
-  ContentPane,
   DeleteDialog,
   MetaFields,
   ModeBar,
@@ -29,7 +29,7 @@ interface ArtifactEditorProps {
 export function ArtifactEditor({ artifact, origin, onUpdated, onDeleted }: ArtifactEditorProps) {
   const { draft, update, dirty } = useArtifactDraft(artifact);
   const { pending, save, remove } = useArtifactActions({ artifact, draft, onUpdated, onDeleted });
-  const [mode, setMode] = useState<EditorMode>("edit");
+  const [mode, setMode] = useState<EditorMode>("preview");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const shareUrl = `${origin}/artifact/${artifact.publicId}`;
   const shared = artifact.visibility === "link" || artifact.visibility === "public";
@@ -49,7 +49,7 @@ export function ArtifactEditor({ artifact, origin, onUpdated, onDeleted }: Artif
       {shared ? <ShareBanner shareUrl={shareUrl} /> : null}
       <TitleFields title={draft.title} summary={draft.summary} update={update} />
       <ModeBar mode={mode} onMode={setMode} length={draft.content.length} updatedAt={artifact.updatedAt} />
-      <ContentPane mode={mode} kind={draft.kind} content={draft.content} update={update} />
+      <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} update={update} />
       <MetaFields draft={draft} update={update} />
       <DeleteDialog
         open={deleteOpen}
