@@ -70,12 +70,12 @@ export function ConsentForm({ oauthQuery, clientName, clientUri, identityNote, r
   return (
     <div className="w-full max-w-[420px]">
       <AppHeading name={clientName} uri={clientUri} />
-      <p className="text-sm leading-6 text-muted-foreground">
+      <p className="text-md leading-6 text-muted-foreground">
         {clientName} wants to use your artifacts as <span className="text-foreground">{email}</span>. It can:
       </p>
       <ul className="mt-3 space-y-2">
         {abilities.map((ability) => (
-          <li key={ability} className="flex gap-2 text-sm leading-6">
+          <li key={ability} className="flex gap-2 text-md leading-6">
             <IconCheck className="mt-1 size-4 shrink-0 text-muted-foreground" />
             {ability}
           </li>
@@ -85,20 +85,20 @@ export function ConsentForm({ oauthQuery, clientName, clientUri, identityNote, r
       {canWrite ? (
         <div className="mt-5 flex items-start justify-between gap-4 rounded-md border bg-card px-4 py-3">
           <label htmlFor={switchId} className="min-w-0">
-            <span className="block text-sm font-medium">Read-only access</span>
-            <span className="mt-0.5 block text-[13px] leading-5 text-muted-foreground">Let it read and search, but not change anything.</span>
+            <span className="block text-md font-medium">Read-only access</span>
+            <span className="mt-0.5 block text-sm leading-5 text-muted-foreground">Let it read and search, but not change anything.</span>
           </label>
           <Switch id={switchId} checked={readOnly} onCheckedChange={setReadOnly} disabled={pending !== null} className="mt-1" />
         </div>
       ) : null}
 
-      <p className="mt-5 flex gap-2 rounded-md border border-dashed px-3 py-2.5 text-[13px] leading-5 text-muted-foreground">
+      <p className="mt-5 flex gap-2 rounded-md border border-dashed px-3 py-2.5 text-sm leading-5 text-muted-foreground">
         <IconAlertTriangle className="mt-0.5 size-4 shrink-0" />
         {identityNote}
       </p>
 
       {error ? (
-        <p role="alert" className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">
+        <p role="alert" className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive">
           {error}
         </p>
       ) : null}
@@ -111,7 +111,7 @@ export function ConsentForm({ oauthQuery, clientName, clientUri, identityNote, r
           {pending === "deny" ? <IconLoader2 className="animate-spin" /> : null} Deny
         </Button>
       </div>
-      <p className="mt-4 text-xs leading-5 text-muted-foreground">
+      <p className="mt-4 text-sm leading-5 text-muted-foreground">
         {returnTo ? `You go back to ${returnTo} after you choose. ` : ""}You can disconnect it at any time in Connections.
       </p>
     </div>

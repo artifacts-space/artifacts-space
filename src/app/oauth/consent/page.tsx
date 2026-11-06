@@ -19,8 +19,8 @@ function Problem({ title, body }: { title: string; body: string }) {
   return (
     <div className="w-full max-w-[420px]">
       <h1 className="text-2xl font-medium tracking-[-0.015em]">{title}</h1>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
-      <Link href="/app/connections" className="mt-6 inline-block text-[13px] underline underline-offset-4">Go to Connections</Link>
+      <p className="mt-2 text-md leading-6 text-muted-foreground">{body}</p>
+      <Link href="/app/connections" className="mt-6 inline-block text-sm underline underline-offset-4">Go to Connections</Link>
     </div>
   );
 }

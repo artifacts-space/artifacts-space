@@ -16,7 +16,8 @@ export function mcpEndpoint(origin: string): string {
 }
 
 /**
- * The `mcp.json` server entry for any MCP client, pretty-printed. Pass a
+ * The `mcp.json` server entry with a token header, pretty-printed: the path
+ * for CI and headless use, where nobody can approve in a browser. Pass a
  * token to get a snippet that is ready to paste; leave it out for a
  * placeholder.
  */
@@ -32,7 +33,20 @@ export function mcpConfigJson(origin: string, token: string = TOKEN_PLACEHOLDER)
   return JSON.stringify(config, null, 2);
 }
 
-/** The Claude Code one-liner that adds the same server as `mcpConfigJson`. */
+/** The Claude Code one-liner that adds the same token-based server as `mcpConfigJson`. */
 export function claudeMcpAddCommand(origin: string, token: string = TOKEN_PLACEHOLDER): string {
   return `claude mcp add --transport http ${MCP_SERVER_NAME} ${mcpEndpoint(origin)} --header "Authorization: Bearer ${token}"`;
+}
+
+/**
+ * The Claude Code one-liner for local use. There is no token: Claude Code
+ * finds the OAuth server from the endpoint and asks you to approve in the browser.
+ */
+export function claudeMcpAddOAuthCommand(origin: string): string {
+  return `claude mcp add --transport http ${MCP_SERVER_NAME} ${mcpEndpoint(origin)}`;
+}
+
+/** The `mcp.json` entry for clients that support OAuth (Cursor and others): the URL only, no headers. */
+export function mcpOAuthConfigJson(origin: string): string {
+  return JSON.stringify({ mcpServers: { [MCP_SERVER_NAME]: { url: mcpEndpoint(origin) } } }, null, 2);
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { claudeMcpAddCommand, mcpConfigJson, mcpEndpoint, TOKEN_PLACEHOLDER } from "./mcp-config";
+import { claudeMcpAddCommand, claudeMcpAddOAuthCommand, mcpConfigJson, mcpEndpoint, mcpOAuthConfigJson, TOKEN_PLACEHOLDER } from "./mcp-config";
 
 describe("mcpEndpoint", () => {
   it("should append the MCP path when given a bare origin", () => {
@@ -35,5 +35,18 @@ describe("claudeMcpAddCommand", () => {
     expect(claudeMcpAddCommand("https://artifacts.space", "artifacts_abc")).toBe(
       'claude mcp add --transport http artifacts https://artifacts.space/api/mcp --header "Authorization: Bearer artifacts_abc"',
     );
+  });
+});
+
+describe("claudeMcpAddOAuthCommand", () => {
+  it("should add an HTTP server with no token header when used for OAuth", () => {
+    expect(claudeMcpAddOAuthCommand("https://artifacts.space")).toBe("claude mcp add --transport http artifacts https://artifacts.space/api/mcp");
+  });
+});
+
+describe("mcpOAuthConfigJson", () => {
+  it("should hold only the endpoint URL when the client signs in with OAuth", () => {
+    const config: unknown = JSON.parse(mcpOAuthConfigJson("http://localhost:3104/"));
+    expect(config).toEqual({ mcpServers: { artifacts: { url: "http://localhost:3104/api/mcp" } } });
   });
 });

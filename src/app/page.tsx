@@ -2,19 +2,21 @@ import Image from "next/image";
 import Link from "next/link";
 import { IconArrowRight } from "@tabler/icons-react";
 
-import { CodeBlock } from "@/components/code-block";
+import { CodeBlock, CommandBlock } from "@/components/code-block";
 import { CopyButton } from "@/components/copy-button";
 import { ArtifactDemo } from "@/components/landing/artifact-demo";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
-import { mcpConfigJson, TOKEN_PLACEHOLDER } from "@/lib/setup/mcp-config";
+import { claudeMcpAddOAuthCommand, mcpOAuthConfigJson } from "@/lib/setup/mcp-config";
 
-const mcpConfig = mcpConfigJson("https://artifacts.space");
+const siteOrigin = "https://artifacts.space";
+const mcpCommand = claudeMcpAddOAuthCommand(siteOrigin);
+const mcpConfig = mcpOAuthConfigJson(siteOrigin);
 
 const steps = [
   {
     title: "Connect",
-    body: "Create an access token in the workspace and add one MCP server to Claude Code, Cursor, OpenCode, or any other MCP client.",
+    body: "Add one MCP server to Claude Code, Cursor, OpenCode, or any other MCP client, then approve it in your browser. No token to paste.",
   },
   {
     title: "Capture",
@@ -68,7 +70,7 @@ export default function Home() {
             <Button render={<Link href="/sign-up" />} nativeButton={false} className="h-10 px-4 text-sm">
               Get started <IconArrowRight data-icon="inline-end" />
             </Button>
-            <CopyButton value={mcpConfig} label="Copy MCP config" variant="outline" className="h-10 px-4 text-sm" />
+            <CopyButton value={mcpCommand} label="Copy Claude Code command" variant="outline" className="h-10 px-4 text-sm" />
           </div>
           <p className="animate-enter mt-5 text-sm text-muted-foreground" style={{ animationDelay: "160ms" }}>
             Works with Claude Code, Cursor, OpenCode, and any MCP client.
@@ -124,10 +126,12 @@ export default function Home() {
                 </tbody>
               </table>
             </div>
-            <div>
+            <div className="grid min-w-0 content-start gap-3">
+              <CommandBlock command={mcpCommand} />
+              <p className="text-md leading-6 text-muted-foreground">Claude Code opens your browser, and you approve the connection. For Cursor and other clients, add the URL:</p>
               <CodeBlock title="mcp.json" value={mcpConfig} className="bg-card" preClassName="p-5" />
-              <p className="mt-3 text-md leading-6 text-muted-foreground">
-                Replace <code className="font-mono">{TOKEN_PLACEHOLDER}</code> with an access token from Connections. Tokens are shown once and stored as hashes.
+              <p className="text-md leading-6 text-muted-foreground">
+                For CI and headless agents, send an access token from Connections instead. Tokens are shown once and stored as hashes.
               </p>
             </div>
           </div>

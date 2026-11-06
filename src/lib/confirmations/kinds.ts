@@ -9,6 +9,7 @@ export const confirmationActions = [
   "deleteArtifact",
   "revokeToken",
   "revokeAgentToken",
+  "revokeConnectedApp",
   "leaveTeam",
   "removeAgent",
   "removeMember",

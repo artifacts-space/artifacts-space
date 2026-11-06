@@ -9,13 +9,15 @@ import {
   revokeTokenAction,
   type ApiTokenDto,
 } from "@/app/(workspace)/app/connections/actions";
+import { ConnectedApps } from "@/components/app/connected-apps";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
-import { CodeBlock } from "@/components/code-block";
+import { CodeBlock, CommandBlock } from "@/components/code-block";
 import { TokenRevealDialog } from "@/components/tokens/token-reveal-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { mcpConfigJson, TOKEN_PLACEHOLDER } from "@/lib/setup/mcp-config";
+import type { ConnectedApp } from "@/lib/oauth/clients";
+import { claudeMcpAddOAuthCommand, mcpConfigJson, mcpOAuthConfigJson, TOKEN_PLACEHOLDER } from "@/lib/setup/mcp-config";
 
 const tools = [
   ["artifacts_create", "Create an artifact with a title, format, project, and content."],
@@ -34,9 +36,11 @@ const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZ
 
 export function Connections({
   initialTokens,
+  initialApps,
   origin,
 }: {
   initialTokens: ApiTokenDto[];
+  initialApps: ConnectedApp[];
   origin: string;
 }) {
   const [tokens, setTokens] = useState(initialTokens);
@@ -88,7 +92,7 @@ export function Connections({
       <div className="mb-6">
         <h1 className="text-xl font-medium tracking-[-0.01em]">Connections</h1>
         <p className="mt-1 max-w-xl text-md leading-6 text-muted-foreground">
-          One MCP endpoint for every client. Tokens are shown once and stored as hashes.
+          One MCP endpoint for every client. Approve apps in the browser, or use a token where nobody can.
         </p>
       </div>
 
@@ -96,13 +100,19 @@ export function Connections({
         <section className="overflow-hidden rounded-md border bg-card">
           <div className="border-b px-5 py-4">
             <h2 className="text-md font-medium">Connect a client</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Add this configuration to any MCP client, then replace the token.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Run this, then approve the app in your browser. No token to copy.</p>
           </div>
-          <div className="p-5">
-            <CodeBlock title="mcp.json" value={config} />
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Replace <code className="font-mono">{TOKEN_PLACEHOLDER}</code> with a token from this page. Keep it out of source control.
+          <div className="grid gap-3 p-5">
+            <CommandBlock command={claudeMcpAddOAuthCommand(origin)} />
+            <p className="text-sm leading-6 text-muted-foreground">For Cursor and other clients that support OAuth, add this to mcp.json.</p>
+            <CodeBlock title="mcp.json" value={mcpOAuthConfigJson(origin)} />
+          </div>
+          <div className="border-t px-5 py-4">
+            <h3 className="text-md font-medium">CI and headless use</h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Where nobody can approve in a browser, send a token instead. Replace <code className="font-mono">{TOKEN_PLACEHOLDER}</code> with a token from this page, and keep it out of source control.
             </p>
+            <CodeBlock title="mcp.json" value={config} className="mt-3" />
           </div>
           <div className="border-t px-5 py-4">
             <h3 className="text-md font-medium">Tools</h3>
@@ -119,10 +129,12 @@ export function Connections({
           </div>
         </section>
 
+        <div className="grid h-fit gap-6">
+        <ConnectedApps initialApps={initialApps} />
         <section className="h-fit overflow-hidden rounded-md border bg-card">
           <div className="border-b px-5 py-4">
             <h2 className="text-md font-medium">Access tokens</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Use one token per client or device so you can revoke them separately.</p>
+            <p className="mt-1 text-sm text-muted-foreground">For CI and headless clients. Use one token per client or device so you can revoke them separately.</p>
           </div>
           <form onSubmit={(event) => void create(event)} noValidate className="border-b p-5">
             <Label htmlFor="token-name">Token name</Label>
@@ -160,6 +172,7 @@ export function Connections({
             )}
           </div>
         </section>
+        </div>
       </div>
 
       <TokenRevealDialog token={newToken} origin={origin} onClose={() => { setNewToken(""); }} />
