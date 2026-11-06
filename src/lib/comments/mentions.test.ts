@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseMentions, splitMentions } from "./mentions";
+import { parseMentions, postedMentionMap, splitMentions } from "./mentions";
 
 describe("parseMentions", () => {
   it("should find a handle at the start and in the middle of text", () => {
@@ -84,5 +84,21 @@ describe("splitMentions", () => {
 
   it("should return nothing for empty text", () => {
     expect(splitMentions("", resolved)).toEqual([]);
+  });
+});
+
+describe("postedMentionMap", () => {
+  it("should keep the delivered mentions with their kinds", () => {
+    const map = postedMentionMap([{ handle: "claude-code", kind: "agent" }], null);
+    expect([...map]).toEqual([["claude-code", "agent"]]);
+  });
+
+  it("should add the author's own handle when the author mentions themself", () => {
+    const map = postedMentionMap([], { handle: "dev", kind: "person" });
+    expect(map.get("dev")).toBe("person");
+  });
+
+  it("should add nothing for an author without a handle", () => {
+    expect(postedMentionMap([], { handle: null, kind: "person" }).size).toBe(0);
   });
 });

@@ -8,6 +8,7 @@ import { PixelAvatar } from "@/components/pixel-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ThreadAgentView } from "@/lib/comments/mutes";
+import { postedMentionMap } from "@/lib/comments/mentions";
 import type { CommentView } from "@/lib/comments/views";
 import { cn } from "@/lib/utils";
 
@@ -78,7 +79,7 @@ function CommentActions({ comment, agent, handlers, onEditing }: { comment: Comm
 /** One comment: author, markdown body, and the viewer's actions. */
 export function CommentItem({ comment, agent, handlers, reply = false }: { comment: CommentView; agent: ThreadAgentView | undefined; handlers: CommentHandlers; reply?: boolean }) {
   const [editing, setEditing] = useState(false);
-  const mentions = useMemo(() => new Map(comment.mentions.map((item) => [item.handle, item.kind])), [comment.mentions]);
+  const mentions = useMemo(() => postedMentionMap(comment.mentions, comment.author), [comment.mentions, comment.author]);
   return (
     <article id={`comment-${comment.id}`} className={cn("scroll-mt-20 space-y-1.5 py-3", reply && "border-l pl-4")}>
       <AuthorLine comment={comment} agent={agent} />

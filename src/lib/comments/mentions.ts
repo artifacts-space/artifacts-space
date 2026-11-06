@@ -67,3 +67,15 @@ export function splitMentions(text: string, resolved: ReadonlyMap<string, Mentio
   if (cursor < text.length) segments.push({ type: "text", value: text.slice(cursor) });
   return segments;
 }
+
+/**
+ * The handles a posted comment highlights: the mentions it delivered, plus
+ * the author's own handle. Mentioning yourself notifies no one, so no mention
+ * is stored, but the handle names a real member and shows as a chip. Unknown
+ * or refused handles stay plain text.
+ */
+export function postedMentionMap(delivered: readonly ResolvedMention[], author: { handle: string | null; kind: MentionKind } | null): Map<string, MentionKind> {
+  const map = new Map(delivered.map((item) => [item.handle, item.kind]));
+  if (author?.handle && !map.has(author.handle)) map.set(author.handle, author.kind);
+  return map;
+}
