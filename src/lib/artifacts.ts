@@ -24,6 +24,7 @@ import { checkContentFiles } from "@/lib/files/attach";
 import { attachFileRows, deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
 import type { FileDto } from "@/lib/files/types";
 import { generatePublicId } from "@/lib/public-id";
+import { assertContentFits } from "@/lib/quota/usage";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { getVersionOf } from "@/lib/versions/history";
@@ -253,13 +254,14 @@ export async function findPublicIdByShareId(shareId: string) {
   return record?.publicId ?? null;
 }
 
-/** Creates a private artifact for its author, within the hourly creation limit. */
+/** Creates a private artifact for its author, within the hourly creation limit and the account's storage quota. */
 export async function createArtifact(userId: string, input: ArtifactInput) {
   const parsed = artifactInputSchema.parse(input);
   assertArtifactSize(parsed);
   assertValidArtifactContent(parsed.kind, parsed.content);
   const fileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
   await enforceRateLimit("artifactCreate", userId);
+  await assertContentFits(userId, parsed.content);
   const [record] = await getDb()
     .insert(artifact)
     .values({
@@ -316,6 +318,8 @@ interface SaveContext {
 async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, context: SaveContext) {
   const { editorId, before } = context;
   await enforceRateLimit("artifactUpdate", editorId);
+  // Content counts toward the author's account, whoever edits it.
+  if (changes.content !== undefined) await assertContentFits(before.userId, changes.content, before.content);
   await assertValidArtifactUpdate(changes, () => Promise.resolve(before));
   await attachUpdatedContentFiles(editorId, before, changes);
   const [record] = await getDb()
