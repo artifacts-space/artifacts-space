@@ -66,6 +66,8 @@ export async function generateMetadata({ params }: PageProps<"/artifact/[publicI
     ...(await artifactOgMetadata(record.publicId)),
     title: `${iconTitlePrefix(view.icon)}${view.title}`,
     ...(view.summary ? { description: view.summary } : {}),
+    // Agents that read HTML find the Markdown version here (src/lib/markdown).
+    alternates: { types: { "text/markdown": `/artifact/${record.publicId}.md` } },
     robots: (await indexable(record)) ? { index: true, follow: false } : { index: false, follow: false },
   };
 }

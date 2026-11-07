@@ -6,6 +6,7 @@ import { hitRateLimits } from "@/lib/abuse/rate-limit";
 import { tooManyRequests } from "@/lib/abuse/responses";
 import { canReadArtifact } from "@/lib/access";
 import { getAuth } from "@/lib/auth/server";
+import { markdownRequestFor, markdownRoutePath } from "@/lib/markdown/negotiation";
 import { routeCheckFor, signInPath, type RouteCheck } from "@/lib/route-status";
 import { getTeamForMember } from "@/lib/teams/queries";
 
@@ -15,6 +16,10 @@ import { getTeamForMember } from "@/lib/teams/queries";
  * the page can only send a 200. These checks run before the page renders:
  * signed-out workspace pages redirect to sign-in, and unknown or unreadable
  * artifacts and teams get a 404. The pages still run their own checks.
+ *
+ * Artifact pages also have a Markdown version for agents: /artifact/<id>.md,
+ * or /artifact/<id> with Accept: text/markdown, is rewritten to the Markdown
+ * route handler, which runs the access check and rate limits itself.
  */
 
 async function viewerId(request: NextRequest) {
@@ -70,7 +75,14 @@ async function refuseArtifactPageFlood(request: NextRequest, check: NonNullable<
   }
 }
 
+/** Sends a Markdown request to the Markdown route handler, keeping the query (such as ?comments=1). */
+function toMarkdown(request: NextRequest, publicId: string) {
+  return NextResponse.rewrite(new URL(`${markdownRoutePath(publicId)}${request.nextUrl.search}`, request.url));
+}
+
 export async function proxy(request: NextRequest) {
+  const markdown = markdownRequestFor(request.method, request.nextUrl.pathname, request.headers.get("accept"));
+  if (markdown) return toMarkdown(request, markdown.publicId);
   const check = routeCheckFor(request.method, request.nextUrl.pathname);
   if (!check) return NextResponse.next();
   if (needsSignIn(request, check)) return toSignIn(request);

@@ -2,7 +2,7 @@ import { networkKey } from "@/lib/abuse/network-key";
 import { hitRateLimits } from "@/lib/abuse/rate-limit";
 import { tooManyRequests } from "@/lib/abuse/responses";
 import { findReadableFile, signedFileUrl } from "@/lib/files/download";
-import { getSession } from "@/lib/session";
+import { resolveRequestViewer, viewerUserId } from "@/lib/request-viewer";
 
 /** Headers on every answer from this route. R2 serves the bytes; these cover what we send. */
 const baseHeaders = {
@@ -15,9 +15,10 @@ function notFound() {
   return new Response("Not found", { status: 404, headers: { ...baseHeaders, "Content-Type": "text/plain; charset=utf-8" } });
 }
 
-async function viewerId() {
+/** The session's user, or the bearer token's (as MCP checks it), so agents can follow file links from the Markdown version. */
+async function viewerId(request: Request) {
   try {
-    return (await getSession())?.user.id ?? null;
+    return viewerUserId(await resolveRequestViewer(request));
   } catch {
     return null;
   }
@@ -35,7 +36,7 @@ async function overLimit(request: Request) {
 
 /**
  * Shows or downloads a file. Views are limited per network address (429 with Retry-After). Access goes through the file's artifact: whoever
- * can view the artifact gets a 302 to a short-lived R2 link; everyone else,
+ * can view the artifact (signed in, or with an access token) gets a 302 to a short-lived R2 link; everyone else,
  * and every unknown id, gets the same 404. `?download=1` forces a download.
  */
 export async function GET(request: Request, context: RouteContext<"/api/files/[id]">) {
@@ -43,7 +44,7 @@ export async function GET(request: Request, context: RouteContext<"/api/files/[i
   if (refusal) return tooManyRequests(refusal, baseHeaders);
   try {
     const { id } = await context.params;
-    const file = await findReadableFile(id, await viewerId());
+    const file = await findReadableFile(id, await viewerId(request));
     if (!file) return notFound();
     const download = new URL(request.url).searchParams.get("download") === "1";
     const { url } = await signedFileUrl(file, { download });

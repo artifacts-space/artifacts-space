@@ -21,8 +21,8 @@ const { config, proxy } = await import("./proxy");
 const origin = "https://artifacts.space";
 const sessionCookie = "better-auth.session_token=token.signature";
 
-function request(path: string, options: { cookie?: string; method?: string } = {}) {
-  const headers = new Headers(options.cookie ? { cookie: options.cookie } : {});
+function request(path: string, options: { cookie?: string; method?: string; accept?: string } = {}) {
+  const headers = new Headers({ ...(options.cookie ? { cookie: options.cookie } : {}), ...(options.accept ? { accept: options.accept } : {}) });
   return new NextRequest(new URL(path, origin), { method: options.method ?? "GET", headers });
 }
 
@@ -104,6 +104,26 @@ describe("proxy", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const response = await proxy(request("/artifact/abc"));
     expect(response.status).toBe(200);
+  });
+
+  it("should rewrite to the Markdown handler without its own checks when the path ends in .md", async () => {
+    const response = await proxy(request("/artifact/abc.md?comments=1"));
+    expect(response.headers.get("x-middleware-rewrite")).toBe(`${origin}/artifact/abc/markdown?comments=1`);
+    // The handler runs the access check and rate limits, with bearer tokens too.
+    expect(mocks.canReadArtifact).not.toHaveBeenCalled();
+    expect(mocks.hitRateLimits).not.toHaveBeenCalled();
+  });
+
+  it("should rewrite to the Markdown handler when the Accept header asks for Markdown", async () => {
+    const response = await proxy(request("/artifact/abc", { accept: "text/markdown" }));
+    expect(response.headers.get("x-middleware-rewrite")).toBe(`${origin}/artifact/abc/markdown`);
+  });
+
+  it("should serve the normal page when a browser loads the artifact", async () => {
+    mocks.canReadArtifact.mockResolvedValue(true);
+    const response = await proxy(request("/artifact/abc", { accept: "text/html,application/xhtml+xml,*/*;q=0.8" }));
+    expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+    expect(mocks.canReadArtifact).toHaveBeenCalled();
   });
 
   it("should pass server actions through when the request is a POST", async () => {
