@@ -1,13 +1,14 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
 import { getDb } from "@/db";
-import { agent, artifact, artifactFile, artifactVersion } from "@/db/schema";
+import { agent, artifact, artifactFile, artifactVersion, user } from "@/db/schema";
 import { fileLimits } from "@/lib/files/config";
 import { byteLength } from "@/lib/artifact-limits";
 import { UserFacingError } from "@/lib/user-facing-error";
 
-import { contentBytesAdded, contentQuotaProblem, fileQuotaProblem, quotaLimits } from "./rules";
+import { contentBytesAdded, contentQuotaProblem, fileQuotaProblem, quotaLimits, type QuotaOwner } from "./rules";
 
 /**
  * Storage use per account (a person plus the agents they own), summed on
@@ -62,15 +63,48 @@ export function fileBytesUsed(userId: string, now = new Date()): Promise<number>
   `);
 }
 
+const accountOwnerUser = alias(user, "account_owner");
+
+/**
+ * The person whose account a user belongs to: themselves, or an agent's
+ * owner. Joins with an alias, so every column is qualified.
+ */
+export function accountOwnerQuery(db: Pick<ReturnType<typeof getDb>, "select">, userId: string) {
+  return db
+    .select({
+      id: sql<string>`coalesce(${accountOwnerUser.id}, ${user.id})`,
+      handle: sql<string | null>`coalesce(${accountOwnerUser.username}, ${user.username})`,
+      name: sql<string>`coalesce(${accountOwnerUser.name}, ${user.name})`,
+    })
+    .from(user)
+    .leftJoin(agent, eq(agent.userId, user.id))
+    .leftJoin(accountOwnerUser, eq(accountOwnerUser.id, agent.ownerId))
+    .where(eq(user.id, userId))
+    .limit(1);
+}
+
+/** Whose quota a save counts against, from the editor's point of view. */
+async function quotaOwnerFor(authorId: string, editorId: string): Promise<QuotaOwner> {
+  if (authorId === editorId) return { self: true };
+  const [[author], [editor]] = await Promise.all([accountOwnerQuery(getDb(), authorId), accountOwnerQuery(getDb(), editorId)]);
+  if (!author || author.id === editor?.id) return { self: true };
+  return { self: false, label: author.handle ? `@${author.handle}` : author.name || "the author" };
+}
+
 /**
  * Throws a UserFacingError when saving `newContent` in place of
  * `previousContent` (empty for a new artifact) would put the account over
- * its content quota. Shrinking content is always allowed.
+ * its content quota. Content counts toward the author's account
+ * (`userId`); when `editorId` is someone else, the refusal says whose quota
+ * is full. Shrinking content is always allowed.
  */
-export async function assertContentFits(userId: string, newContent: string, previousContent = ""): Promise<void> {
+export async function assertContentFits(userId: string, newContent: string, previousContent = "", editorId: string = userId): Promise<void> {
   const adding = contentBytesAdded(byteLength(newContent), byteLength(previousContent));
   if (adding <= 0) return;
-  const problem = contentQuotaProblem({ used: await contentBytesUsed(userId), adding, limit: currentLimits().contentBytes });
+  const usage = { used: await contentBytesUsed(userId), adding, limit: currentLimits().contentBytes };
+  if (!contentQuotaProblem(usage)) return;
+  // Only a refusal needs to know whose account it is.
+  const problem = contentQuotaProblem(usage, await quotaOwnerFor(userId, editorId));
   if (problem) throw new UserFacingError(problem);
 }
 

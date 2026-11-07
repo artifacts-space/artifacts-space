@@ -27,6 +27,13 @@ describe("quota messages", () => {
     );
   });
 
+  it("should name the author's account when a teammate's edit is over the author's quota", () => {
+    const message = contentQuotaProblem({ used: 99.5 * mb, adding: 2 * mb, limit: storageQuota.contentBytes }, { self: false, label: "@dana" });
+    expect(message).toContain("@dana's account");
+    expect(message).toContain("not yours");
+    expect(message).not.toContain("your account");
+  });
+
   it("should name the file size and the limit when a file does not fit", () => {
     expect(fileQuotaProblem({ used: 1000 * mb, adding: 25 * mb, limit: storageQuota.fileBytes })).toBe(
       "Files in your account use 1000 MB of 1.0 GB, so this 25 MB file does not fit. Delete files you no longer need, then try again.",

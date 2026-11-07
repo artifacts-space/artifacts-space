@@ -307,7 +307,7 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
   const { editorId, before } = context;
   await enforceRateLimit("artifactUpdate", editorId);
   // Content counts toward the author's account, whoever edits it.
-  if (changes.content !== undefined) await assertContentFits(before.userId, changes.content, before.content);
+  if (changes.content !== undefined) await assertContentFits(before.userId, changes.content, before.content, editorId);
   await assertValidArtifactUpdate(changes, () => Promise.resolve(before));
   await attachUpdatedContentFiles(editorId, before, changes);
   const [record] = await getDb()

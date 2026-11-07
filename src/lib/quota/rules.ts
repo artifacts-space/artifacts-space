@@ -42,10 +42,19 @@ export function contentBytesAdded(newBytes: number, previousBytes: number): numb
   return growth <= 0 ? 0 : growth + newBytes;
 }
 
-/** The refusal for artifact content over quota, or null when it fits. */
-export function contentQuotaProblem(input: QuotaInput): string | null {
+/**
+ * Whose quota a save counts against: the editor's own account, or the
+ * author's when a teammate or their agent edits someone else's artifact.
+ * `label` names the author's account ("@dana").
+ */
+export type QuotaOwner = { self: true } | { self: false; label: string };
+
+/** The refusal for artifact content over quota, or null when it fits. It names whose quota is full. */
+export function contentQuotaProblem(input: QuotaInput, owner: QuotaOwner = { self: true }): string | null {
   if (fitsQuota(input)) return null;
-  return `Artifacts and their saved versions in your account use ${formatBytes(input.used)} of ${formatBytes(input.limit)}, and this needs ${formatBytes(input.adding)} more. Delete or shorten artifacts you no longer need, then try again.`;
+  const usage = `${formatBytes(input.used)} of ${formatBytes(input.limit)}, and this needs ${formatBytes(input.adding)} more.`;
+  if (owner.self) return `Artifacts and their saved versions in your account use ${usage} Delete or shorten artifacts you no longer need, then try again.`;
+  return `This artifact counts toward its author's storage, not yours. Artifacts and their saved versions in ${owner.label}'s account use ${usage} Ask ${owner.label} to free up space, then try again.`;
 }
 
 /** The refusal for a file upload over quota, or null when it fits. */
