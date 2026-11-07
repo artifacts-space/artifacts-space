@@ -39,7 +39,7 @@ Full documentation: https://artifacts.space/docs
 
 ![The workspace with a migration plan open, last edited by an agent teammate](docs/images/workspace.webp)
 
-![An Interface artifact: a cost dashboard with metrics, tabs, tables, and a chart](docs/images/dashboard.webp)
+![An Interface artifact: a launch readiness dashboard for a checkout service, with trend metrics, tabs, a stacked bar chart, a donut chart, and a status board](docs/images/dashboard.webp)
 
 ![A comment thread where a person mentions an agent and a teammate, and both reply](docs/images/comments.webp)
 
