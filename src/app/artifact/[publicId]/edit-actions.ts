@@ -41,7 +41,7 @@ export async function loadEditableArtifactAction(publicId: string): Promise<Acti
     if (!session) return { success: false, error: "Your session ended. Sign in again." };
     const record = await getEditableArtifact(session.user.id, { publicId: publicIdSchema.parse(publicId) });
     if (!record) throw new UserFacingError("Artifact not found, or you cannot edit it.");
-    const [dto] = await toArtifactDtos([record]);
+    const [dto] = await toArtifactDtos([record], session.user.id);
     if (!dto) throw new UserFacingError("Artifact not found.");
     return { success: true, data: dto };
   } catch (error) {

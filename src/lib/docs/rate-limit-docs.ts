@@ -25,6 +25,7 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   artifactUpdateByToken: { per: "token", where: "artifacts_update, artifacts_restore_version, files_attach", refusal: "mcp-429", group: "MCP and artifacts" },
   artifactCreate: { per: "user", where: "artifacts_create, files_create_artifact, and the web app", refusal: "tool-error", group: "MCP and artifacts" },
   artifactUpdate: { per: "user", where: "Every artifact edit, from MCP and the web app", refusal: "tool-error", group: "MCP and artifacts" },
+  organize: { per: "user", where: "Project and tag changes, from MCP and the web app", refusal: "tool-error", group: "MCP and artifacts" },
   sharingRequest: { per: "user", where: "Sharing and comments-setting changes (making private is never limited)", refusal: "tool-error", group: "MCP and artifacts" },
   fileUpload: { per: "user", where: "files_request_upload and web uploads", refusal: "tool-error", group: "Files and pages" },
   fileDownloadByNetwork: { per: "network", where: "/api/files views and downloads", refusal: "http-429", group: "Files and pages" },

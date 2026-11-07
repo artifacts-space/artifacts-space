@@ -18,7 +18,8 @@ const artifactShape = `{
   "url": "https://artifacts.space/artifact/Vq3kJ0pXw2mZ8rT5yN1aBc",
   "title": "…", "icon": "🚀" | "tabler:rocket" | "file:<file id>" | null, "summary": "…", "content": "…",
   "theme": "paper" | { "version": 1, "light": { … }, "dark": { … }, … } | null,
-  "kind": "markdown", "language": "", "project": "…", "sessionId": "…", "source": "claude-code",
+  "kind": "markdown", "language": "", "project": "Billing" | "",   // "" when none, or when you are outside the team
+  "sessionId": "…", "source": "claude-code",
   "visibility": "private" | "team" | "link" | "public",
   "team": "acme" | null,                 // slug, only when you are a member
   "comments": "off" | "team" | "signed_in",
@@ -52,13 +53,17 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     summary: "Your teams with their slugs. Use a slug as `scope` in artifacts_list, or as `team` when you share.",
     shape: `[ { "slug": "acme", "name": "Acme", "role": "owner" | "admin" | "member", "personal": false, "teamSharingNeedsApproval": true } ]`,
   },
+  projects_list: {
+    summary: "The projects in a scope, by name, with how many artifacts each holds. Use a name as `project` in artifacts_create, artifacts_update, or artifacts_list.",
+    shape: `[ { "name": "Billing", "icon": "🧾" | "tabler:rocket" | null, "count": 12 } ]`,
+  },
   artifacts_create: {
     summary: "The saved artifact and, when you set `visibility` or `comments`, what happened to each request. The artifact is saved even if sharing or the comments change fails.",
     shape: `{ "artifact": { … }, ${sharingShape} }`,
   },
   artifacts_update: {
-    summary: "The artifact after the save. `edit` is \"pending\" when the change waits for approval (link or public artifacts shared through a team); readers outside the team keep the last approved version.",
-    shape: `{ "artifact": { … }, "edit": "applied" | "pending", ${sharingShape} }`,
+    summary: "The artifact after the save. `edit` is \"pending\" when the change waits for approval (link or public artifacts shared through a team); readers outside the team keep the last approved version. `edit` is \"unchanged\" when you sent no content or fields (only `project`, sharing, or comments): nothing was saved to the history.",
+    shape: `{ "artifact": { … }, "edit": "applied" | "pending" | "unchanged", ${sharingShape} }`,
   },
   artifacts_delete: { summary: "Confirms the delete. Only the author can delete.", shape: `{ "deleted": true, "id": "…" }` },
   artifacts_versions: {

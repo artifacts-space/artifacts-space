@@ -16,11 +16,11 @@ import { forgetArtifactCache } from "@/lib/versions/cache";
  * open comments to anyone signed in.
  */
 
-/** The workspace DTO for an artifact after a change. */
-export async function dtoFor(artifactId: string): Promise<ArtifactDto> {
+/** The workspace DTO for an artifact after a change, as `viewerId` (who made the change) may see it. */
+export async function dtoFor(artifactId: string, viewerId: string): Promise<ArtifactDto> {
   const [record] = await getDb().select().from(artifact).where(eq(artifact.id, artifactId)).limit(1);
   if (!record) throw new UserFacingError("Artifact not found.");
-  const [dto] = await toArtifactDtos([record]);
+  const [dto] = await toArtifactDtos([record], viewerId);
   if (!dto) throw new UserFacingError("Artifact not found.");
   return dto;
 }

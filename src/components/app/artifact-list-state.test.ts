@@ -18,7 +18,7 @@ describe("artifactListState", () => {
 
 describe("filterArtifactList", () => {
   const item = (id: string, overrides: Partial<{ kind: string; title: string; preview: string }> = {}) => ({
-    id, kind: "markdown", title: `Title ${id}`, summary: "", preview: "", project: "", source: "", ...overrides,
+    id, kind: "markdown", title: `Title ${id}`, summary: "", preview: "", project: null, source: "", ...overrides,
   });
   const items = [item("a", { preview: "deploy notes" }), item("b", { kind: "ui" }), item("c")];
 

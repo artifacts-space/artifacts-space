@@ -10,6 +10,7 @@ import type { ArtifactDto, ArtifactVisibility, CommentSetting, SharingLevel } fr
 import { getOwnArtifact } from "@/lib/artifacts";
 import { commentsAfterSharing, decideCommentSetting, defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { isUniqueViolation } from "@/lib/db-errors";
+import { rehomeArtifactProject } from "@/lib/projects/store";
 import { findPersonalTeam, getTeamMembershipById, type TeamMembership } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { decideEditRequest, syncApprovedVersion } from "@/lib/versions/service";
@@ -64,11 +65,23 @@ async function cancelPending(artifactId: string, byUserId: string) {
     .where(and(eq(sharingRequest.artifactId, artifactId), eq(sharingRequest.kind, "sharing"), eq(sharingRequest.status, "pending")));
 }
 
+/**
+ * Moves the artifact's project to its new home scope (src/lib/projects).
+ * The sharing change already happened; a failure here never undoes it, and
+ * a stale link is never shown (projectsForViewer checks the scope).
+ */
+async function rehomeProjectQuietly(artifactId: string, byUserId: string) {
+  await rehomeArtifactProject(artifactId, byUserId).catch((error: unknown) => {
+    console.error("[projects] Project did not follow a sharing change", error instanceof Error ? error.name : "unknown error");
+  });
+}
+
 async function setVisibility(artifactId: string, visibility: ArtifactVisibility, teamId: string | null, byUserId: string, comments?: CommentSetting) {
   await getDb()
     .update(artifact)
     .set({ visibility, teamId, ...(comments ? { comments } : {}) })
     .where(eq(artifact.id, artifactId));
+  await rehomeProjectQuietly(artifactId, byUserId);
   // An open edit request follows the artifact to its new approving team.
   if (teamId) {
     await getDb()
@@ -128,7 +141,7 @@ export async function requestArtifactSharing(input: SharingRequestInput): Promis
     // Private artifacts are only the author's, so any setting applies without approval.
     const comments = commentsAfterSharing({ current: record.comments, requested: input.comments, sameTeam: true, next: { visibility: "private", teamPersonal: null } });
     await setVisibility(record.id, "private", null, input.requesterId, comments);
-    return { status: "applied", comments: "applied", artifact: await dtoFor(record.id) };
+    return { status: "applied", comments: "applied", artifact: await dtoFor(record.id, input.requesterId) };
   }
 
   await enforceRateLimit("sharingRequest", input.requesterId);
@@ -141,7 +154,7 @@ export async function requestArtifactSharing(input: SharingRequestInput): Promis
   if (outcome === "pending") {
     // The comments setting waits with the request; the approver approves both.
     await storeRequest(record, team, level, input.requesterId, comments);
-    return { status: "pending", comments: "pending", artifact: await dtoFor(record.id) };
+    return { status: "pending", comments: "pending", artifact: await dtoFor(record.id, input.requesterId) };
   }
   return applySharing({ record, team, level, comments, sameTeam, requesterId: input.requesterId, actor: input.actor });
 }
@@ -161,7 +174,7 @@ async function applySharing(input: { record: ArtifactRecord; team: TeamMembershi
   // Keep an audit row when an owner or admin approved their own change.
   if (sharingNeedsApproval(level, team)) await recordDecision(record, team, level, requesterId);
   const status = commentsOutcome === "pending" ? "pending" : "applied";
-  return { status, comments: status, artifact: await dtoFor(record.id) };
+  return { status, comments: status, artifact: await dtoFor(record.id, input.requesterId) };
 }
 
 async function openRequest(requestId: string) {

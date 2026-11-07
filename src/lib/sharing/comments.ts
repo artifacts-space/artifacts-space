@@ -63,10 +63,10 @@ export async function setArtifactComments(input: { actorId: string; artifactId: 
   const level = record.visibility === "private" ? null : record.visibility;
   if (outcome === "pending" && record.teamId && level) {
     await storeCommentsRequest({ artifactId: record.id, teamId: record.teamId, level, requesterId: input.actorId, comments: next });
-    return { status: "pending", artifact: await dtoFor(record.id) };
+    return { status: "pending", artifact: await dtoFor(record.id, input.actorId) };
   }
   await applyComments(record.id, next);
-  return { status: "applied", artifact: await dtoFor(record.id) };
+  return { status: "applied", artifact: await dtoFor(record.id, input.actorId) };
 }
 
 /**

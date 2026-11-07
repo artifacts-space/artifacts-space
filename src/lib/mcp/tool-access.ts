@@ -13,6 +13,7 @@ export const toolAccess = {
   artifacts_list: "read",
   artifacts_get: "read",
   teams_list: "read",
+  projects_list: "read",
   artifacts_create: "write",
   artifacts_update: "write",
   artifacts_delete: "write",

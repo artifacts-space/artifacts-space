@@ -25,7 +25,12 @@ import type {
 import { isPublicId } from "@/lib/public-id";
 
 const publicIdSchema = z.string().refine(isPublicId, "Artifact not found.");
-const searchSchema = z.object({ query: z.string().trim().min(1).max(300), teamId: z.string().trim().min(1).max(200).nullable() });
+const projectFilterSchema = z.union([z.object({ key: z.string().trim().min(1).max(240) }), z.object({ none: z.literal(true) })]);
+const searchSchema = z.object({
+  query: z.string().trim().min(1).max(300),
+  teamId: z.string().trim().min(1).max(200).nullable(),
+  project: projectFilterSchema.nullable().optional(),
+});
 
 const expectedSchema = z.iso.datetime({ offset: true }).optional();
 
@@ -104,16 +109,17 @@ export async function loadArtifactAction(publicId: string): Promise<ActionResult
 }
 
 /**
- * Searches titles, summaries, content, and projects on the server, in the
- * viewer's own artifacts or one team's (membership is checked in the query).
+ * Searches titles, summaries, content, and project names on the server, in
+ * the viewer's own artifacts or one team's (membership is checked in the
+ * query), within the project filter when one is set.
  * The workspace list only holds previews, so content search happens here.
  */
 export async function searchArtifactsAction(input: z.input<typeof searchSchema>): Promise<ActionResult<ArtifactListItemDto[]>> {
   try {
     const userId = await requireUserId();
-    const { query, teamId } = searchSchema.parse(input);
+    const { query, teamId, project } = searchSchema.parse(input);
     await enforceRateLimit("readByUser", userId);
-    const items = await listArtifacts(userId, { query, scope: teamId ? { kind: "team", teamId } : { kind: "mine" } });
+    const items = await listArtifacts(userId, { query, project: project ?? undefined, scope: teamId ? { kind: "team", teamId } : { kind: "mine" } });
     return { success: true, data: items };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "Search did not work. Please try again.") };

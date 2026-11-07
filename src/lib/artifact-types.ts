@@ -67,6 +67,14 @@ export interface ArtifactEditorDto {
   name: string;
 }
 
+/** An artifact's project, as the artifact's author and team see it. Never shown to readers outside the team. */
+export interface ArtifactProjectDto {
+  id: string;
+  name: string;
+  /** One emoji or "tabler:<name>". Null when none. */
+  icon: string | null;
+}
+
 export interface ArtifactDto {
   /** Internal id, used by the workspace's own actions. Never shown in URLs. */
   id: string;
@@ -81,7 +89,8 @@ export interface ArtifactDto {
   content: string;
   kind: ArtifactKind;
   language: string;
-  project: string;
+  /** Its project, for the author and team members only. Null for "No project" and for everyone else. */
+  project: ArtifactProjectDto | null;
   sessionId: string;
   source: string;
   visibility: ArtifactVisibility;
@@ -156,7 +165,8 @@ export interface ArtifactInput {
   content: string;
   kind?: ArtifactKind | undefined;
   language?: string | undefined;
-  project?: string | undefined;
+  /** A project name, found or created among the author's projects. "" or null for none. */
+  project?: string | null | undefined;
   sessionId?: string | undefined;
   source?: string | undefined;
   metadata?: Record<string, unknown> | undefined;
