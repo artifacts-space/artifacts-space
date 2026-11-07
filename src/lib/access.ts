@@ -46,6 +46,7 @@ export function viewableInTeamCondition(viewerId: string, teamId: string) {
 /** What a viewer reads: the latest version, or the approved one of a link or public artifact. */
 export interface ServedArtifactView {
   title: string;
+  icon: string | null;
   summary: string;
   content: string;
   kind: ArtifactKind;
@@ -65,8 +66,8 @@ export interface ArtifactAccess {
   record: ArtifactMetaRecord;
   /** Which version the viewer reads. Readers outside the team get the approved version. */
   version: { source: "latest" | "approved"; versionId: string | null };
-  /** The title, save time, and saver of the version this viewer reads. */
-  served: { title: string; updatedAt: Date; editedBy: string | null };
+  /** The title, icon, save time, and saver of the version this viewer reads. */
+  served: { title: string; icon: string | null; updatedAt: Date; editedBy: string | null };
   /** Whether the viewer may edit it and read its history: the author, or a member of the team it is shared through. */
   canEdit: boolean;
   /** Whether the viewer belongs to the artifact's team. Pages show the team's name only then. */
@@ -143,6 +144,7 @@ export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publi
       memberId: teamMember.id,
       teamPersonal: team.personal,
       approvedTitle: artifactVersion.title,
+      approvedIcon: artifactVersion.icon,
       approvedSavedAt: artifactVersion.savedAt,
       approvedBy: artifactVersion.createdBy,
     })
@@ -171,11 +173,11 @@ type Subject = NonNullable<Awaited<ReturnType<typeof loadSubject>>>;
 /** The approved version a reader outside the team gets, or null for the latest. */
 function approvedVersionFor(subject: Subject, versionId: string) {
   if (subject.approvedTitle === null || subject.approvedSavedAt === null) return null;
-  return { versionId, served: { title: subject.approvedTitle, updatedAt: subject.approvedSavedAt, editedBy: subject.approvedBy } };
+  return { versionId, served: { title: subject.approvedTitle, icon: subject.approvedIcon, updatedAt: subject.approvedSavedAt, editedBy: subject.approvedBy } };
 }
 
 function latestServed(record: ArtifactMetaRecord) {
-  return { title: record.title, updatedAt: record.updatedAt, editedBy: record.updatedBy ?? record.userId };
+  return { title: record.title, icon: record.icon, updatedAt: record.updatedAt, editedBy: record.updatedBy ?? record.userId };
 }
 
 /**
@@ -207,9 +209,9 @@ async function latestViewable(access: ArtifactAccess): Promise<ViewableArtifact 
   const { record } = access;
   const [content, editPending] = await Promise.all([latestContent(record.id), isReviewedLevel(record.visibility) ? hasPendingEdit(record.id) : false]);
   if (content === null) return null;
-  const { title, summary, kind, language, project, source, metadata } = record;
+  const { title, icon, summary, kind, language, project, source, metadata } = record;
   const served = latestServed(record);
-  const view = { title, summary, content, kind, language, project, source, metadata, updatedAt: served.updatedAt, editedBy: served.editedBy };
+  const view = { title, icon, summary, content, kind, language, project, source, metadata, updatedAt: served.updatedAt, editedBy: served.editedBy };
   return { ...access, version: { source: "latest", versionId: null }, served, view, editPending };
 }
 

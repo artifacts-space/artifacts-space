@@ -21,6 +21,7 @@ const summaryColumns = {
   bytes: artifactVersion.bytes,
   kind: artifactVersion.kind,
   title: artifactVersion.title,
+  icon: artifactVersion.icon,
   createdBy: artifactVersion.createdBy,
 };
 
@@ -52,6 +53,7 @@ function toSummary(row: SummaryRow, context: SummaryContext): VersionSummaryDto 
     bytes: row.bytes,
     kind: row.kind,
     title: row.title,
+    icon: row.icon,
     editor: row.createdBy ? context.editors.get(row.createdBy) ?? null : null,
     approved: row.id === context.record.approvedVersionId,
     pending: row.id === context.pendingId,

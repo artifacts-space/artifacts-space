@@ -72,6 +72,8 @@ export interface ArtifactDto {
   /** The 22-character id in the canonical URL /artifact/<publicId>. */
   publicId: string;
   title: string;
+  /** Page icon beside the title: one emoji or "tabler:<name>". Null when none. */
+  icon: string | null;
   summary: string;
   content: string;
   kind: ArtifactKind;
@@ -113,6 +115,7 @@ export interface VersionSummaryDto {
   bytes: number;
   kind: ArtifactKind;
   title: string;
+  icon: string | null;
   /** Who saved it. Null when they are gone. */
   editor: ArtifactEditorDto | null;
   /** Readers outside the team see this version (link and public artifacts). */
@@ -141,6 +144,8 @@ export type ArtifactListItemDto = Omit<ArtifactDto, "content"> & { preview: stri
 
 export interface ArtifactInput {
   title: string;
+  /** One emoji or "tabler:<name>"; null or "" for none. */
+  icon?: string | null | undefined;
   summary?: string | undefined;
   content: string;
   kind?: ArtifactKind | undefined;

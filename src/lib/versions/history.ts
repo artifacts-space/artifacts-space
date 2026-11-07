@@ -17,8 +17,8 @@ import { sameReviewedFields } from "./rules";
 
 /** The fields a version copies from the artifact. */
 function copiedFields(record: ArtifactRecord) {
-  const { title, summary, content, kind, language, project, source, metadata } = record;
-  return { title, summary, content, kind, language, project, source, metadata, bytes: versionBytes(record) };
+  const { title, icon, summary, content, kind, language, project, source, metadata } = record;
+  return { title, icon, summary, content, kind, language, project, source, metadata, bytes: versionBytes(record) };
 }
 
 /** Inserts a version of `record` and returns its id. `at` back-dates it, for a snapshot of an older save. */
