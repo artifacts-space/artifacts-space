@@ -1,6 +1,7 @@
 import type { HighlighterCore } from "shiki/core";
 
 import type { SyntaxLanguage } from "./languages";
+import { isShellLanguage, shellLines } from "./shell";
 import { syntaxThemeName } from "./theme";
 import { toSyntaxLines, withinHighlightLimits, type SyntaxLine } from "./tokens";
 
@@ -23,13 +24,15 @@ function withoutClock<T>(work: () => T): T {
 
 /**
  * Highlights code with a ready highlighter. Returns null when the code is
- * too large or the grammar fails, so the caller shows plain text.
+ * too large or the grammar fails, so the caller shows plain text. Shell
+ * comes back in one color, with only comments and prompts dimmed.
  */
 export function tokenize(highlighter: HighlighterCore, code: string, language: SyntaxLanguage): SyntaxLine[] | null {
   if (!withinHighlightLimits(code)) return null;
   try {
     const tokens = withoutClock(() => highlighter.codeToTokensBase(code, { lang: language, theme: syntaxThemeName, tokenizeTimeLimit: 0 }));
-    return toSyntaxLines(tokens);
+    const lines = toSyntaxLines(tokens);
+    return isShellLanguage(language) ? shellLines(lines) : lines;
   } catch {
     return null;
   }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { CodeBlock, CommandBlock } from "@/components/code-block";
+import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
 import { DocsH, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { clientGuides } from "@/components/setup/client-guides";
@@ -48,11 +48,11 @@ export default function ClientsPage() {
           Where nobody can approve in a browser, such as CI, a container, or a cloud agent, send an access token. Create one on the <strong>Connections</strong> page and keep it in an environment variable such as <code>{TOKEN_ENV_VAR}</code>, never in source control.
         </p>
       </Prose>
-      <CodeBlock title="mcp.json" value={mcpConfigJson(origin)} className="mt-4" />
+      <CodeSnippet title="mcp.json" language="json" code={mcpConfigJson(origin)} className="mt-4" />
       <Prose><p>Claude Code, reading the token from the environment:</p></Prose>
-      <div className="mt-4"><CommandBlock command={claudeMcpAddCommand(origin, `$${TOKEN_ENV_VAR}`)} /></div>
+      <CommandSnippet command={claudeMcpAddCommand(origin, `$${TOKEN_ENV_VAR}`)} className="mt-4" />
       <Prose><p>Codex, in <code>~/.codex/config.toml</code>:</p></Prose>
-      <CodeBlock title="config.toml" value={codexHeadlessConfigToml(origin)} className="mt-4" />
+      <CodeSnippet title="config.toml" language="toml" code={codexHeadlessConfigToml(origin)} className="mt-4" />
       <Note title="Give team agents their own token">
         An agent that works for a team should be an agent teammate with its own token, so its work shows under its own handle. See <Link href={docsHref("sharing", "agent-tokens")} className="underline underline-offset-2">Agent tokens</Link>.
       </Note>

@@ -1,4 +1,4 @@
-import { CodeBlock } from "@/components/code-block";
+import { CodeSnippet } from "@/components/code/code-snippet";
 import { InlineCodeText } from "@/components/docs/docs-content";
 import { PropsTable } from "@/components/docs/live-example";
 import type { DocsMcpTool } from "@/lib/docs/mcp-tools";
@@ -42,7 +42,7 @@ export function McpToolEntry({ tool, result }: { tool: DocsMcpTool; result: Tool
       <p className="mt-2 text-md leading-7 text-muted-foreground">
         <InlineCodeText text={result.summary} />
       </p>
-      {result.shape ? <CodeBlock title="Result, abridged" value={result.shape} className="mt-3" /> : null}
+      {result.shape ? <CodeSnippet title="Result, abridged" language="json" code={result.shape} className="mt-3" /> : null}
     </article>
   );
 }

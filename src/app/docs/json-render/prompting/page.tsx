@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { CodeBlock } from "@/components/code-block";
+import { CodeSnippet } from "@/components/code/code-snippet";
 import { DocsH, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { docsMetadata } from "@/lib/docs/metadata";
@@ -45,13 +45,13 @@ export default function PromptingPage() {
           The server carries its own manual. <code>artifacts_formats_guide</code> with <code>kind: &quot;ui&quot;</code> returns the rules, every component with its props (generated from the same catalog as the <Link href={docsHref("json-render/components")}>component pages</Link>), and a complete example. An agent that reads it first gets the format right far more often. Ask for it by name:
         </p>
       </Prose>
-      <CodeBlock title="artifacts_formats_guide · first lines" value={guidePreview} className="mt-4" />
+      <CodeSnippet title="artifacts_formats_guide · first lines" language="markdown" code={guidePreview} className="mt-4" />
 
       <DocsH page={page} id="prompt" />
       <Prose><p>Say what the page is for, which data goes where, and ask for validation. A prompt like this one works well:</p></Prose>
-      <CodeBlock title="Prompt" value={prompt} className="mt-4" />
+      <CodeSnippet title="Prompt" code={prompt} className="mt-4" />
       <Prose><p>To make it a habit in a repository, add a few lines to <code>AGENTS.md</code> or <code>CLAUDE.md</code>:</p></Prose>
-      <CodeBlock title="AGENTS.md" value={agentsMd} className="mt-4" />
+      <CodeSnippet title="AGENTS.md" language="markdown" code={agentsMd} className="mt-4" />
 
       <DocsH page={page} id="habits" />
       <Prose>

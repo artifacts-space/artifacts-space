@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { CodeBlock } from "@/components/code-block";
+import { CodeSnippet } from "@/components/code/code-snippet";
 import { DocsH, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { LiveExample } from "@/components/docs/live-example";
@@ -67,21 +67,21 @@ export default function JsonRenderPage() {
           <code>elements</code> is a <strong>flat map</strong> from a key you choose to one element. <code>root</code> names the top element. Each element has a <code>type</code> (a component name), <code>props</code>, and optionally <code>children</code>, <code>visible</code>, <code>repeat</code>, and <code>on</code>. Keys are up to {uiLimits.maxKeyLength} characters; short, readable keys such as <code>kpi-revenue</code> make validation messages easy to follow.
         </p>
       </Prose>
-      <CodeBlock title="One element" value={elementShape} className="mt-4" />
+      <CodeSnippet title="One element" language="json" code={elementShape} className="mt-4" />
       <DocsH page={page} id="children" />
       <Prose>
         <p>
           <code>children</code> lists child keys in order. Nesting comes from keys, not from nested objects, so a deep layout stays a flat, easy-to-edit list. Each element has exactly one parent, and the root has none. Only layout components (Section, Stack, Grid, Card, Tabs, Accordion) show children; a leaf with children gets a warning.
         </p>
       </Prose>
-      <CodeBlock title="children" value={childrenShape} className="mt-4" />
+      <CodeSnippet title="children" language="json" code={childrenShape} className="mt-4" />
       <DocsH page={page} id="state" />
       <Prose>
         <p>
           <code>state</code> is the page&apos;s starting data: any JSON object. Props read it with <code>$state</code>, inputs write it with <code>$bindState</code>, and <code>repeat</code> renders a list from an array in it. State lives in the reader&apos;s browser and resets on reload. See <Link href={docsHref("json-render/dynamic")}>Dynamic props and actions</Link>.
         </p>
       </Prose>
-      <CodeBlock title="state" value={stateShape} className="mt-4" />
+      <CodeSnippet title="state" language="json" code={stateShape} className="mt-4" />
 
       <DocsH page={page} id="minimal" />
       <Prose><p>The smallest useful spec: a Stack with a heading and a paragraph.</p></Prose>

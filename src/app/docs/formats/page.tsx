@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { CodeBlock } from "@/components/code-block";
+import { CodeSnippet } from "@/components/code/code-snippet";
 import { DocsH, FactTable, InlineCodeText, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { formatInfo, formatKinds, type FormatKind } from "@/lib/artifact-formats";
@@ -15,6 +15,19 @@ import { uiLimits } from "@/lib/ui/limits";
 export const metadata = docsMetadata("formats");
 
 const page = "formats" as const;
+
+/** The code block language for each kind's example. Kinds without a grammar show as plain text. */
+const exampleLanguage: Record<FormatKind, string> = {
+  markdown: "markdown",
+  code: "typescript",
+  text: "text",
+  json: "json",
+  csv: "csv",
+  svg: "svg",
+  mermaid: "mermaid",
+  ui: "json",
+  file: "text",
+};
 
 /** Exact bytes, with a short form for people. */
 const size = (bytes: number) => `${bytes.toLocaleString("en-US")} bytes (${formatBytes(bytes)})`;
@@ -43,8 +56,8 @@ function FormatSection({ kind }: { kind: FormatKind }) {
           ["Shows as", doc.renders],
         ]}
       />
-      <CodeBlock title="Example content" value={doc.example} className="mt-4" />
-      {error ? <CodeBlock title="Refused content, and the real message" value={`${doc.broken ?? ""}\n\n→ ${error}`} className="mt-4" /> : null}
+      <CodeSnippet title="Example content" language={exampleLanguage[kind]} code={doc.example} className="mt-4" />
+      {error ? <CodeSnippet title="Refused content, and the real message" code={`${doc.broken ?? ""}\n\n→ ${error}`} wrap className="mt-4" /> : null}
     </>
   );
 }

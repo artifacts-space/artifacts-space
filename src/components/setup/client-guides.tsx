@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { CodeBlock, CommandBlock } from "@/components/code-block";
+import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
 import { Prose } from "@/components/docs/docs-content";
 import { CursorInstallButton } from "@/components/setup/cursor-install-button";
 import {
@@ -56,7 +56,7 @@ export function ClaudeCodeGuide({ origin }: ClientGuideProps) {
   return (
     <>
       <p className="text-md leading-6 text-muted-foreground">Run one command. There is no token to copy.</p>
-      <div className="mt-3"><CommandBlock command={claudeMcpAddOAuthCommand(origin)} /></div>
+      <CommandSnippet command={claudeMcpAddOAuthCommand(origin)} className="mt-3" />
       <ApproveSteps opener={<>Start Claude Code, type <code>/mcp</code>, choose <strong>artifacts</strong>, then <strong>Authenticate</strong>. Your browser opens.</>} />
     </>
   );
@@ -74,7 +74,7 @@ export function CursorGuide({ origin, full = false }: ClientGuideProps) {
       <Prose className="mt-2">
         <p>Add this to <code>.cursor/mcp.json</code> in your project, or to <code>~/.cursor/mcp.json</code> for every project.</p>
       </Prose>
-      <CodeBlock title="mcp.json" value={mcpOAuthConfigJson(origin)} className="mt-3" />
+      <CodeSnippet title="mcp.json" language="json" code={mcpOAuthConfigJson(origin)} className="mt-3" />
       <ApproveSteps opener="Cursor asks you to confirm the server. When it asks you to sign in, your browser opens." />
       {full ? (
         <Prose className="mt-4">
@@ -117,7 +117,7 @@ export function CodexGuide({ origin, full = false }: ClientGuideProps) {
     <>
       <NoOneClick client="Codex" />
       <Label>In the terminal</Label>
-      <div className="mt-2"><CommandBlock command={codexMcpAddCommand(origin)} /></div>
+      <CommandSnippet command={codexMcpAddCommand(origin)} className="mt-2" />
       <Prose className="mt-2"><p>Codex adds the server, sees that it uses sign-in, and opens your browser.</p></Prose>
       <Label>In the ChatGPT desktop app</Label>
       <Prose className="mt-2">
@@ -131,8 +131,8 @@ export function CodexGuide({ origin, full = false }: ClientGuideProps) {
         <>
           <Label>In config.toml</Label>
           <Prose className="mt-2"><p>Or add this to <code>~/.codex/config.toml</code>, then sign in with the command below.</p></Prose>
-          <CodeBlock title="config.toml" value={codexConfigToml(origin)} className="mt-3" />
-          <div className="mt-3"><CommandBlock command={codexMcpLoginCommand()} /></div>
+          <CodeSnippet title="config.toml" language="toml" code={codexConfigToml(origin)} className="mt-3" />
+          <CommandSnippet command={codexMcpLoginCommand()} className="mt-3" />
         </>
       ) : null}
       <ApproveSteps opener="Your browser opens on the sign-in page." />
@@ -175,7 +175,7 @@ export function OtherClientsGuide({ origin, full = false }: ClientGuideProps) {
         <p>Point any client that supports OAuth for remote servers at <code>{mcpEndpoint(origin)}</code> over Streamable HTTP. It needs only the URL.</p>
         <p>OpenCode reads remote servers from <code>opencode.json</code>:</p>
       </Prose>
-      <CodeBlock title="opencode.json" value={opencodeConfigJson(origin)} className="mt-3" />
+      <CodeSnippet title="opencode.json" language="json" code={opencodeConfigJson(origin)} className="mt-3" />
       <ApproveSteps opener="The client opens your browser when it first connects." />
       {full ? (
         <Prose className="mt-4">
