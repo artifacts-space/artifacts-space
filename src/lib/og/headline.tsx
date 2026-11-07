@@ -21,7 +21,7 @@ export function OgHeadline({ text }: { text: string }) {
         width: OG_TEXT_BOX.width,
         margin: 0,
         fontSize,
-        fontWeight: 700,
+        fontWeight: 600,
         lineHeight: OG_HEADLINE_TYPE.lineHeight,
         letterSpacing: OG_HEADLINE_TYPE.letterSpacingEm * fontSize,
         lineClamp: maxLines,

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { emailLink, emailLogoUrl, escapeHtml, html, renderEmail } from "./layout";
+import { EMAIL_FONT_STACK, emailLink, emailLogoUrl, escapeHtml, html, renderEmail } from "./layout";
 
 const content = () => ({
   title: "Title",
@@ -18,6 +18,15 @@ describe("email layout", () => {
   });
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  it("should set Geist first with system fallbacks when rendering text", () => {
+    const rendered = renderEmail(content()).html;
+    expect(EMAIL_FONT_STACK.startsWith("Geist,")).toBe(true);
+    expect(EMAIL_FONT_STACK).toContain("system-ui");
+    expect(EMAIL_FONT_STACK).not.toContain('"');
+    expect(rendered).toContain(`font-family:${EMAIL_FONT_STACK};`);
+    expect(rendered).not.toContain("Satoshi");
   });
 
   it("should escape every interpolated string when building html", () => {
