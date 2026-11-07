@@ -3,16 +3,15 @@ import Link from "next/link";
 import { CodeBlock, CommandBlock } from "@/components/code-block";
 import { DocsH, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
+import { ClientPicker } from "@/components/setup/client-picker";
 import { SkillInstall } from "@/components/setup/skill-install";
 import { docsMetadata } from "@/lib/docs/metadata";
 import { docsHref } from "@/lib/docs/pages";
-import { claudeMcpAddCommand, claudeMcpAddOAuthCommand, mcpConfigJson, mcpEndpoint, mcpOAuthConfigJson, TOKEN_ENV_VAR } from "@/lib/setup/mcp-config";
+import { claudeMcpAddCommand, mcpConfigJson, TOKEN_ENV_VAR } from "@/lib/setup/mcp-config";
 
 export const metadata = docsMetadata("quickstart");
 
 const origin = "https://artifacts.space";
-const endpoint = mcpEndpoint(origin);
-const opencodeConfig = JSON.stringify({ $schema: "https://opencode.ai/config.json", mcp: { artifacts: { type: "remote", url: endpoint } } }, null, 2);
 const headlessCommand = claudeMcpAddCommand(origin, `$${TOKEN_ENV_VAR}`);
 
 const firstPrompt = `We just agreed on the plan for the billing migration.
@@ -46,37 +45,13 @@ export default function QuickstartPage() {
   const page = "quickstart" as const;
   return (
     <RegistryPage slug={page}>
-      <DocsH page={page} id="claude-code" />
-      <Prose>
-        <p>Run one command. There is no token to copy: Claude Code finds the sign-in server from the endpoint.</p>
-      </Prose>
-      <div className="mt-4"><CommandBlock command={claudeMcpAddOAuthCommand(origin)} /></div>
-      <Prose>
-        <ol>
-          <li>Start Claude Code and type <code>/mcp</code>.</li>
-          <li>Choose <strong>artifacts</strong>, then <strong>Authenticate</strong>. Your browser opens.</li>
-          <li>Sign in, then approve the connection. Turn on <strong>Read-only access</strong> if the agent should only read.</li>
-          <li>Back in Claude Code, the server shows as connected, with its tools.</li>
-        </ol>
-        <p>
-          The connection stays signed in: access tokens last one hour, and the client refreshes them. Each refresh token lasts 30 days and is replaced on every use. See and revoke connected apps on the <strong>Connections</strong> page in the app.
-        </p>
-      </Prose>
-
-      <DocsH page={page} id="other-clients" />
-      <Prose>
-        <p>Clients that support OAuth for remote MCP servers need only the URL. For Cursor, add this to <code>.cursor/mcp.json</code> in your project, or <code>~/.cursor/mcp.json</code> for every project:</p>
-      </Prose>
-      <CodeBlock title="mcp.json" value={mcpOAuthConfigJson(origin)} className="mt-4" />
-      <Prose>
-        <p>OpenCode reads remote servers from <code>opencode.json</code>:</p>
-      </Prose>
-      <CodeBlock title="opencode.json" value={opencodeConfig} className="mt-4" />
+      <DocsH page={page} id="connect" />
       <Prose>
         <p>
-          Any other client: point it at <code>{endpoint}</code> over Streamable HTTP. A request without a token gets a <code>401</code> with a <code>WWW-Authenticate</code> header that names the protected-resource metadata, so OAuth-aware clients can find the sign-in server by themselves. If your client cannot do OAuth, use a token.
+          Pick your agent. Most need only the URL: they open your browser, you sign in and approve, and there is no token to copy. Every client, with more options, is in <Link href={docsHref("clients")}>Client setup</Link>.
         </p>
       </Prose>
+      <ClientPicker origin={origin} />
 
       <DocsH page={page} id="tokens" />
       <Prose>
@@ -126,7 +101,7 @@ export default function QuickstartPage() {
       <DocsH page={page} id="troubleshooting" />
       <Prose>
         <ul>
-          <li><strong>401 or &quot;Authentication required&quot;</strong>: the client has no token, or its token expired or was revoked. In Claude Code, run <code>/mcp</code> and authenticate again.</li>
+          <li><strong>401 or &quot;Authentication required&quot;</strong>: the client has no token, or its token expired or was revoked. Sign in again from your client: in Claude Code, run <code>/mcp</code> and authenticate; in Codex, run <code>codex mcp login artifacts</code>.</li>
           <li><strong>Write tools are missing</strong>: the connection is read-only. Remove it and connect again without <strong>Read-only access</strong>.</li>
           <li><strong>HTTP 429 with JSON-RPC error -32029</strong>: a rate limit. The message and the <code>Retry-After</code> header say when to try again. See <Link href={docsHref("limits")}>Limits</Link>.</li>
           <li><strong>&quot;Use POST for MCP requests&quot;</strong>: the client opened a GET event stream. This server answers POST only; pick Streamable HTTP, not SSE.</li>
