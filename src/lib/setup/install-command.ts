@@ -12,9 +12,8 @@ export const SKILL_INSTALL_COMMAND = `npx skills add ${SKILLS_REPO}`;
 export type SkillInstallStatus = "coming-soon" | "published";
 
 /**
- * "coming-soon" while the skills repository is private; the UI marks the
- * command that way and points people to the MCP setup instead.
- *
- * TODO: flip when artifacts-space/skills is public: set this to "published".
+ * "published" since artifacts-space/skills went public. Set it back to
+ * "coming-soon" only if the repository goes private again; the UI then marks
+ * the command that way and points people to the MCP setup instead.
  */
-export const SKILL_INSTALL_STATUS: SkillInstallStatus = "coming-soon";
+export const SKILL_INSTALL_STATUS: SkillInstallStatus = "published";
