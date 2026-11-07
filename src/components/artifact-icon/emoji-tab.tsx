@@ -5,14 +5,13 @@ import { Component, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
+import { EMOJI_LOCALE, EMOJIBASE_URL } from "./emoji-data";
+
 /**
  * The Emoji tab of the icon picker, on frimousse. It is its own chunk,
- * loaded with next/dynamic only when the picker opens. Emoji data comes from
- * a pinned Emojibase release on jsDelivr and is cached by the browser.
+ * loaded with next/dynamic only when the picker opens. Emoji data is the
+ * vendored Emojibase release served from this site (see emoji-data.ts).
  */
-
-/** Pinned so the data never changes under us. frimousse reads `${url}/${locale}/data.json`. */
-const EMOJIBASE_URL = "https://cdn.jsdelivr.net/npm/emojibase-data@17.0.0";
 
 function CategoryHeader({ category, className, ...props }: EmojiPickerListCategoryHeaderProps) {
   return (
@@ -70,6 +69,7 @@ export default function EmojiTab({ onSelect }: EmojiTabProps) {
         className="isolate flex h-80 w-full flex-col"
         columns={9}
         emojibaseUrl={EMOJIBASE_URL}
+        locale={EMOJI_LOCALE}
         onEmojiSelect={({ emoji }) => { onSelect(emoji); }}
       >
         <div className="flex items-center gap-1.5 px-2 pt-2 pb-1">
