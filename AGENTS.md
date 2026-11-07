@@ -35,12 +35,12 @@ server; people read, comment on, and share them in the web app.
 ```bash
 pnpm install       # also installs the Husky git hooks
 pnpm dev           # development server on http://localhost:3000
-pnpm check         # typecheck + lint (0 warnings) + 500-line check + vitest
+pnpm check         # typecheck + lint (0 warnings) + 500-line + migration checks + vitest
 pnpm build         # production build; must pass before you push
 pnpm test          # vitest only
 pnpm test:e2e      # Playwright against the /dev/components gallery
 pnpm db:generate   # generate a migration from schema changes
-pnpm db:migrate    # apply migrations (uses DATABASE_URL_UNPOOLED)
+pnpm db:migrate    # apply migrations to a local or throwaway database only
 pnpm db:studio     # inspect the database
 ```
 
@@ -163,9 +163,22 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
 
 - The schema is in `src/db/schema.ts` and `src/db/oauth-schema.ts`. Change
   it, then run `pnpm db:generate` and commit the migration in `drizzle/`.
-- Migrations must be additive and safe for existing rows. Backfill data in a
-  SQL migration (`pnpm drizzle-kit generate --custom`). Never run destructive
-  SQL against user data.
+- Migrations apply automatically when a production deploy builds:
+  `pnpm build` runs `scripts/migrate-on-deploy.mts` before `next build`, under
+  an advisory lock. A failed migration fails the build, and the old deployment
+  keeps serving. Preview, CI, and local builds skip it. Never run
+  `pnpm db:migrate` against the shared or production database; use it only on
+  a local or throwaway one.
+- The old code keeps serving while the new schema goes live, so migrations
+  must be additive and backward compatible: add a column or table, backfill,
+  then switch the code. Backfill data in a SQL migration
+  (`pnpm drizzle-kit generate --custom`). Never run destructive SQL against
+  user data.
+- `pnpm check:migrations` (part of `pnpm check` and CI) rejects drops,
+  truncates, unfiltered deletes, column type changes, `SET NOT NULL`, renames,
+  and `NOT NULL` columns without a default, and checks that every file in
+  `drizzle/` has a journal entry. A migration that is safe anyway starts with
+  `-- migration-guard: allow <reason>`. Never edit an applied migration.
 - Keep test rows' emails under `@example.com` and delete them afterwards.
 
 ### Tripwire: no correlated subqueries in single-table selects

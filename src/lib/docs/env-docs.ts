@@ -10,7 +10,7 @@ export interface EnvDoc {
 
 export const envDocs: readonly EnvDoc[] = [
   { name: "DATABASE_URL", need: "required", what: "Postgres connection string. Neon's pooled URL in production; a localhost URL uses a plain pg pool." },
-  { name: "DATABASE_URL_UNPOOLED", need: "optional", what: "Direct (unpooled) connection for migrations. Falls back to DATABASE_URL." },
+  { name: "DATABASE_URL_UNPOOLED", need: "optional", what: "Direct (unpooled) connection for migrations. Vercel production builds need it to apply migrations; pnpm db:migrate falls back to DATABASE_URL." },
   { name: "BETTER_AUTH_SECRET", need: "required", what: "Signs sessions. At least 32 characters: openssl rand -base64 32." },
   { name: "BETTER_AUTH_URL", need: "required", what: "This site's origin, such as https://artifacts.example.com. Every absolute link, the OAuth issuer, and the MCP resource come from it." },
   { name: "GITHUB_CLIENT_ID", need: "optional", what: "GitHub OAuth app. Without both GitHub values, GitHub sign-in is off and email links remain." },

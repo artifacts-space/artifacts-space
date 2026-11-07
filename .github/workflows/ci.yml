@@ -39,6 +39,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm check:lines
+      - run: pnpm check:migrations
 
   test:
     name: Unit tests
@@ -57,7 +58,8 @@ jobs:
       - run: pnpm test
 
   # The build reads no secrets: the database, auth, email, and R2 clients are
-  # created on first request, never at build time. Keep it that way.
+  # created on first request, never at build time. Keep it that way. Outside a
+  # Vercel production deploy, `pnpm build` skips its migration step.
   build:
     name: Build
     runs-on: ubuntu-latest

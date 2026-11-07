@@ -17,7 +17,8 @@ and `/api/dev/sign-in` signs you in as a dev user.
 2. Keep each pull request to one change.
 3. Add or update Vitest tests next to the code you change. Name them
    "should X when Y".
-4. Run `pnpm check` and `pnpm build`. Both must pass. The git hooks lint
+4. Run `pnpm check` and `pnpm build`. Both must pass. A local build never
+   touches a database. The git hooks lint
    staged files on commit and run `pnpm check` on push; do not skip them.
 5. Use conventional commit messages: `feat:`, `fix:`, `chore:`, `refactor:`,
    `test:`, `docs:`. The pull request title becomes the commit on `main`, so it
@@ -27,8 +28,12 @@ and `/api/dev/sign-in` signs you in as a dev user.
 ## Database changes
 
 Edit `src/db/schema.ts`, run `pnpm db:generate`, and commit the migration in
-`drizzle/`. Migrations must be additive and safe for existing rows. Read the
-subquery tripwire in [AGENTS.md](AGENTS.md) before you write an access query.
+`drizzle/`. Production applies migrations by itself when the merged change
+deploys, while the old code is still serving, so they must be additive and
+backward compatible: no drops, renames, type changes, or new `NOT NULL`
+columns without a default. `pnpm check` runs a guard that rejects these. Run
+`pnpm db:migrate` only against your local database. Read the subquery
+tripwire in [AGENTS.md](AGENTS.md) before you write an access query.
 
 ## Security
 

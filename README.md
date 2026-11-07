@@ -143,7 +143,7 @@ dev user.
 | Variable | Required | What it is |
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Postgres connection string. Vercel's Neon integration sets it. |
-| `DATABASE_URL_UNPOOLED` | For migrations | Direct (unpooled) connection string. `pnpm db:migrate` uses it. |
+| `DATABASE_URL_UNPOOLED` | For migrations | Direct (unpooled) connection string. Vercel production builds and `pnpm db:migrate` use it. |
 | `BETTER_AUTH_SECRET` | Yes | At least 32 characters, for example from `openssl rand -base64 32`. |
 | `BETTER_AUTH_URL` | Yes | This site's origin, such as `http://localhost:3000` or `https://your-domain`. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | For GitHub sign-in | From a GitHub OAuth app. GitHub sign-in stays off while the id is empty. |
@@ -177,8 +177,9 @@ the `content-type` and `content-length` headers, and exposes `ETag`.
 2. Add Postgres through the Neon integration, or set `DATABASE_URL` and
    `DATABASE_URL_UNPOOLED` yourself.
 3. Set the other variables above for Production (and Preview, if you use it).
-4. Run `pnpm db:migrate` against the production database before the first
-   deploy, and again whenever `drizzle/` changes.
+4. Set `DATABASE_URL_UNPOOLED` for Production. Each production build applies
+   pending migrations before the new code goes live; if one fails, the build
+   fails and the old deployment keeps serving. Preview builds never migrate.
 5. Deploy. `vercel.json` schedules two cleanup crons every six hours: one
    removes unfinished uploads, unattached files, and old versions; the other
    removes unapproved OAuth clients and expired tokens. They refuse to run
@@ -193,7 +194,7 @@ pnpm build         # production build
 pnpm test          # unit tests (Vitest)
 pnpm test:e2e      # component gallery on phone and desktop (Playwright)
 pnpm db:generate   # generate a migration from schema changes
-pnpm db:migrate    # apply migrations
+pnpm db:migrate    # apply migrations to a local database
 pnpm db:studio     # inspect the database
 ```
 
