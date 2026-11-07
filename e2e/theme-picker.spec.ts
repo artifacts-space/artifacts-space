@@ -12,7 +12,7 @@ test("should apply a preset picked with the keyboard when an editor opens the pi
   await expect(scope).toHaveAttribute("data-picker-scope", "default");
 
   await specimen.getByRole("button", { name: /Theme: Default/ }).click();
-  const group = page.getByRole("radiogroup", { name: "Theme" });
+  const group = page.getByRole("radiogroup", { name: "Artifact theme" });
   await expect(group).toBeVisible();
   const defaultOption = group.getByRole("radio", { name: /^Default:/ });
   await expect(defaultOption).toHaveAttribute("aria-checked", "true");

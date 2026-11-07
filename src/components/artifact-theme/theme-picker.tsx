@@ -48,7 +48,7 @@ function SwatchGrid({ selected, onSelect }: SwatchGridProps) {
   }
 
   return (
-    <div role="radiogroup" aria-label="Theme" className="grid grid-cols-2 gap-2 p-2">
+    <div role="radiogroup" aria-label="Artifact theme" className="grid grid-cols-2 gap-2 p-2">
       {presets.map((preset, index) => {
         const theme = presetTheme(preset.id);
         if (!theme) return null;

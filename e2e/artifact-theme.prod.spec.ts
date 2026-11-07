@@ -28,27 +28,27 @@ test.afterAll(async () => {
   await cleanUp(seeded.publicIds, seeded.userIds);
 });
 
-async function themeFacesOn(page: Page, publicId: string): Promise<string[]> {
+async function themeFacesOn(page: Page, publicId: string, title: string): Promise<string[]> {
   const urls: string[] = [];
   page.on("request", (request) => {
     if (themeFontPath.test(request.url())) urls.push(request.url());
   });
   await page.goto(`/artifact/${publicId}`);
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   return [...new Set(urls.flatMap((url) => themeFontPath.exec(url)?.[1] ?? []))].sort();
 }
 
 test("should request no theme font files when the artifact has no theme", async ({ page }) => {
-  expect(await themeFacesOn(page, seeded.plain)).toEqual([]);
+  expect(await themeFacesOn(page, seeded.plain, "Plain plan")).toEqual([]);
   await expect(page.locator("[data-artifact-theme]")).toHaveAttribute("data-artifact-theme", "default");
 });
 
 test("should request only the theme's own fonts and render in them when the artifact uses Classic", async ({ page }) => {
-  expect(await themeFacesOn(page, seeded.classic)).toEqual(["jetbrains-mono", "roboto"]);
+  expect(await themeFacesOn(page, seeded.classic, "Classic plan")).toEqual(["jetbrains-mono", "roboto"]);
   const scope = page.locator("[data-artifact-theme]");
   await expect(scope).toHaveAttribute("data-artifact-theme", "classic");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveCSS("font-family", /^Roboto/);
+  await expect(page.getByRole("heading", { level: 1, name: "Classic plan" })).toHaveCSS("font-family", /^Roboto/);
   await expect(scope.locator("[data-code-block] pre").first()).toHaveCSS("font-family", /^"JetBrains Mono"/);
 });

@@ -30,7 +30,7 @@ test("should save and render the theme an editor picks on the artifact page", as
   await page.getByRole("radio", { name: /^Editorial:/ }).click();
 
   await expect(scope).toHaveAttribute("data-artifact-theme", "editorial");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveCSS("font-family", /^"Instrument Serif"/);
+  await expect(page.getByRole("heading", { level: 1, name: `Theme e2e ${testInfo.project.name}` })).toHaveCSS("font-family", /^"Instrument Serif"/);
   await expect(page.getByRole("button", { name: /Theme: Editorial/ })).toBeVisible();
   const stored = await storedThemes(publicId);
   expect(stored.artifact).toBe("editorial");
