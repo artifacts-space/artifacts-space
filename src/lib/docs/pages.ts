@@ -99,6 +99,7 @@ export const docsPages = [
       h2("errors", "Errors"),
       h3("rate-limits", "Rate limits"),
       h2("untrusted", "Untrusted content"),
+      h2("markdown", "Read artifacts without MCP"),
     ],
   },
   {

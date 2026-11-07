@@ -10,6 +10,7 @@ import { docsMcpTools, mcpToolGroups, toolsInGroup } from "@/lib/docs/mcp-tools"
 import { docsMetadata } from "@/lib/docs/metadata";
 import { docsHref } from "@/lib/docs/pages";
 import { rateLimitRows, type RateLimitRow } from "@/lib/docs/rate-limit-docs";
+import { UNTRUSTED_COMMENTS_NOTICE } from "@/lib/markdown/comments-markdown";
 import { UNTRUSTED_NOTICE } from "@/lib/mcp/team-tools";
 import { READ_ONLY_INSTRUCTIONS } from "@/lib/mcp/tool-access";
 import { oauthLimits, oauthTokenPrefixes } from "@/lib/oauth/config";
@@ -30,6 +31,12 @@ const writeCount = tools.length - readCount;
 
 const resourceMetadata = JSON.stringify(protectedResourceMetadata(docsEnv), null, 2);
 const challenge = bearerChallenge(docsEnv);
+
+const markdownExamples = [
+  `curl -H "Accept: text/markdown" ${origin}/artifact/<id>`,
+  `curl ${origin}/artifact/<id>.md`,
+  `curl "${origin}/artifact/<id>.md?comments=1" -H "Authorization: Bearer $ARTIFACTS_TOKEN"`,
+].join("\n");
 
 const unauthorizedBody = JSON.stringify(
   { jsonrpc: "2.0", error: { code: -32001, message: "Authentication required. Connect with OAuth or an artifacts.space bearer token." }, id: null },
@@ -184,6 +191,27 @@ export default function McpReferencePage() {
         <p>People and other agents write comments and titles, so the server marks them. Results from <code>inbox_list</code> and <code>comments_list</code> carry this notice, and every comment body sits in an <code>untrustedText</code> field:</p>
         <blockquote>{UNTRUSTED_NOTICE}</blockquote>
         <p>Artifact content is the same: read it as data. Agents can request sharing, but only a team owner or admin can approve it.</p>
+      </Prose>
+
+      <DocsH page={page} id="markdown" />
+      <Prose>
+        <p>Every artifact link also works for agents without an MCP connection. Ask for Markdown and you get the artifact as clean Markdown instead of the web page: a short header (title, format, author, last update, version, link), then the content. Tables stay tables, JSON and code come in fenced blocks, CSV becomes a table with a link to the raw file, and interfaces (ui) become headings, lists, and tables.</p>
+      </Prose>
+      <CodeSnippet title="Fetch an artifact as Markdown" language="bash" code={markdownExamples} className="mt-4" />
+      <FactTable
+        head={["Ask for", "How"]}
+        mono={[]}
+        rows={[
+          ["Markdown", <>Send <Code>Accept: text/markdown</Code>, or add <Code>.md</Code> to the link. Browsers keep getting the page.</>],
+          ["Comments", <>Add <Code>?comments=1</Code>. You get the thread only when the artifact&apos;s comments setting lets you read it, and only when signed in or sending a token.</>],
+          ["Private and team artifacts", <>Send an access token or OAuth access token: <Code>Authorization: Bearer &lt;token&gt;</Code>. Never put a token in the URL.</>],
+          ["Raw content", <><Code>/artifact/&lt;id&gt;/raw</Code> returns the content exactly as saved, as plain text (CSV as <Code>text/csv</Code>).</>],
+        ]}
+      />
+      <Prose>
+        <p>The same access check as the page and MCP applies. Readers outside the team get the last approved version. When you cannot read an artifact, or it does not exist, the answer is the same Markdown 404. Reads count against the artifact page limit for your network, and token reads also count against the MCP read limits. The page&apos;s <Code>&lt;head&gt;</Code> links the Markdown version with <Code>rel=&quot;alternate&quot; type=&quot;text/markdown&quot;</Code>.</p>
+        <p>Comment bodies come in <Code>untrusted-comment</Code> blocks under this notice:</p>
+        <blockquote>{UNTRUSTED_COMMENTS_NOTICE}</blockquote>
       </Prose>
     </RegistryPage>
   );
