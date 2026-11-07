@@ -84,7 +84,7 @@ function Comment({ seed, kind, author, children }: { seed: string; kind: "person
 export function DemoComments({ className, heading = true }: { className?: string; heading?: boolean }) {
   const { agent, reviewer } = demoPeople;
   return (
-    <div className={cn("flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-4 text-card-foreground", className)} style={beat(T.notified)}>
+    <div className={cn("card-nested flex min-w-0 flex-col gap-3 bg-card p-4 text-card-foreground", className)} style={beat(T.notified)}>
       {heading ? <p className="text-sm font-medium">Comments <span className="text-muted-foreground">2</span></p> : null}
       <Comment seed={agent.seed} kind="agent" author={`@${agent.handle}`}>
         <Mention handle={reviewer.handle} /> {agentAsk}

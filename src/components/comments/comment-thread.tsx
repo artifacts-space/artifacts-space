@@ -58,15 +58,47 @@ function MutedAgents({ agents, onMute }: { agents: ThreadAgentView[]; onMute: Co
   );
 }
 
+interface ThreadComposerProps {
+  replyTo: CommentView | null;
+  onCancelReply: () => void;
+  onSubmit: (body: string) => Promise<WriteOutcome>;
+  raised: boolean;
+}
+
+/** The composer under the thread: a new comment, or a reply to the picked comment. */
+function ThreadComposer({ replyTo, onCancelReply, onSubmit, raised }: ThreadComposerProps) {
+  return (
+    <>
+      {replyTo ? (
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          Replying to {replyTo.author?.label ?? "a former member"}
+          <Button variant="ghost" size="xs" onClick={onCancelReply}>Cancel reply</Button>
+        </p>
+      ) : null}
+      <div className={cn(raised && "card-surface p-3 sm:p-4")}>
+        <CommentComposer
+          key={replyTo?.id ?? "new"}
+          label={replyTo ? "Write a reply" : "Write a comment"}
+          placeholder={replyTo ? "Write a reply" : "Write a comment"}
+          submitLabel={replyTo ? "Reply" : "Comment"}
+          autoFocus={replyTo !== null}
+          onSubmit={onSubmit}
+        />
+      </div>
+    </>
+  );
+}
+
 interface ThreadBodyProps {
   data: ThreadData;
   handlers: CommentHandlers;
   post: (body: string, parentId: string | null) => Promise<WriteOutcome>;
   onNotices: (outcome: WriteOutcome) => void;
+  raised: boolean;
 }
 
 /** The loaded thread: muted agents, comments with replies, the composer, and mention notices. */
-function ThreadBody({ data, handlers, post, onNotices }: ThreadBodyProps) {
+function ThreadBody({ data, handlers, post, onNotices, raised }: ThreadBodyProps) {
   const [replyTo, setReplyTo] = useState<CommentView | null>(null);
   const groups = useMemo(() => groupThread(data.comments), [data.comments]);
   const agents = useMemo(() => new Map(data.agents.map((agent) => [agent.userId, agent])), [data.agents]);
@@ -84,7 +116,7 @@ function ThreadBody({ data, handlers, post, onNotices }: ThreadBodyProps) {
     <>
       <MutedAgents agents={data.agents} onMute={handlers.onMute} />
       {groups.length === 0 ? <p className="text-md text-muted-foreground">No comments yet. Start the thread, and @mention a teammate or agent to bring them in.</p> : null}
-      <div className="divide-y">
+      <div className={cn("divide-y", raised && groups.length > 0 && "card-surface px-4 sm:px-5")}>
         {groups.map(({ root, replies }) => (
           <div key={root.id}>
             <CommentItem comment={root} agent={agentFor(root)} handlers={withReply} />
@@ -92,20 +124,7 @@ function ThreadBody({ data, handlers, post, onNotices }: ThreadBodyProps) {
           </div>
         ))}
       </div>
-      {replyTo ? (
-        <p className="flex items-center gap-2 text-xs text-muted-foreground">
-          Replying to {replyTo.author?.label ?? "a former member"}
-          <Button variant="ghost" size="xs" onClick={() => { setReplyTo(null); }}>Cancel reply</Button>
-        </p>
-      ) : null}
-      <CommentComposer
-        key={replyTo?.id ?? "new"}
-        label={replyTo ? "Write a reply" : "Write a comment"}
-        placeholder={replyTo ? "Write a reply" : "Write a comment"}
-        submitLabel={replyTo ? "Reply" : "Comment"}
-        autoFocus={replyTo !== null}
-        onSubmit={submit}
-      />
+      <ThreadComposer replyTo={replyTo} onCancelReply={() => { setReplyTo(null); }} onSubmit={submit} raised={raised} />
     </>
   );
 }
@@ -113,9 +132,11 @@ function ThreadBody({ data, handlers, post, onNotices }: ThreadBodyProps) {
 /**
  * The comment thread for one artifact. Self-contained: give it the artifact's
  * public id and place it on any page. Signed-out readers and anyone who cannot
- * view the artifact see a short notice instead of comments.
+ * view the artifact see a short notice instead of comments. Set `raised` when
+ * the thread sits directly on the page, so the comments and the composer show
+ * as cards; leave it off inside a card, which must not nest card shadows.
  */
-export function CommentThread({ publicId, className }: { publicId: string; className?: string }) {
+export function CommentThread({ publicId, className, raised = false }: { publicId: string; className?: string; raised?: boolean }) {
   const { state, post, edit, remove, setMute } = useCommentThread(publicId);
   const [notices, setNotices] = useState<MentionOutcome | null>(null);
 
@@ -144,7 +165,7 @@ export function CommentThread({ publicId, className }: { publicId: string; class
       {state.status === "error" ? <p className="text-sm text-muted-foreground">{state.error}</p> : null}
       {state.status === "ready" ? (
         <MentionablesProvider publicId={publicId}>
-          <ThreadBody data={state.data} handlers={handlers} post={post} onNotices={showNotices} />
+          <ThreadBody data={state.data} handlers={handlers} post={post} onNotices={showNotices} raised={raised} />
         </MentionablesProvider>
       ) : null}
       <MentionNotices outcome={notices} />

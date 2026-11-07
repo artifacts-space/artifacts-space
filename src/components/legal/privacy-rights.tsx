@@ -28,7 +28,7 @@ export function PrivacyRights() {
       <Prose>
         <p>We use a small set of service providers to run artifacts.space. Each one processes personal data only to provide its service to us, under its own data protection terms.</p>
       </Prose>
-      <dl className="mt-6 divide-y rounded-lg border text-md leading-6">
+      <dl className="card-surface mt-6 divide-y text-md leading-6">
         {providers.map((provider) => (
           <div key={provider.name} className="grid gap-1 px-4 py-3 sm:grid-cols-[9rem_1fr] sm:gap-4">
             <dt className="font-medium">{provider.name}</dt>

@@ -39,7 +39,7 @@ async function sendDecision(accept: boolean, scope: string, oauthQuery: string):
 function AppHeading({ name, uri }: { name: string; uri: string | null }) {
   return (
     <div className="mb-6">
-      <span className="mb-4 flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground">
+      <span className="card-surface mb-4 flex size-10 items-center justify-center text-muted-foreground">
         <IconPlugConnected className="size-5" />
       </span>
       <h1 className="text-2xl font-medium tracking-[-0.015em] text-balance">Connect {name}</h1>
@@ -83,7 +83,7 @@ export function ConsentForm({ oauthQuery, clientName, clientUri, identityNote, r
       </ul>
 
       {canWrite ? (
-        <div className="mt-5 flex items-start justify-between gap-4 rounded-md border bg-card px-4 py-3">
+        <div className="card-surface mt-5 flex items-start justify-between gap-4 px-4 py-3">
           <label htmlFor={switchId} className="min-w-0">
             <span className="block text-md font-medium">Read-only access</span>
             <span className="mt-0.5 block text-sm leading-5 text-muted-foreground">Let it read and search, but not change anything.</span>

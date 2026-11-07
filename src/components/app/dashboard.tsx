@@ -236,7 +236,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
         <ScopeTabs teams={teams} activeSlug={scopeTeam?.slug ?? null} />
         <DashboardHeading artifacts={artifacts} scopeTeam={scopeTeam} onCreate={() => { setCreateOpen(true); }} />
 
-        <div className="grid min-h-[640px] flex-1 overflow-hidden rounded-md border bg-card lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="card-surface grid min-h-[640px] flex-1 overflow-hidden lg:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="flex min-h-0 flex-col border-b bg-background/60 max-lg:max-h-[360px] lg:border-r lg:border-b-0">
             <div className="space-y-2 border-b p-3">
               <div className="relative">

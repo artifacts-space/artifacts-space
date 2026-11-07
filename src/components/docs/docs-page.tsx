@@ -13,7 +13,7 @@ function NeighborLink({ link, direction }: { link: DocsLink; direction: "previou
   return (
     <Link
       href={link.href}
-      className={cn("group flex min-w-0 flex-1 flex-col gap-1 rounded-lg border px-4 py-3 transition-colors hover:bg-muted/50", next && "items-end text-right")}
+      className={cn("card-surface card-hover group flex min-w-0 flex-1 flex-col gap-1 px-4 py-3", next && "items-end text-right")}
     >
       <span className="flex items-center gap-1 text-xs text-muted-foreground">
         {next ? null : <IconArrowLeft aria-hidden className="size-3.5" />}

@@ -86,7 +86,7 @@ export function Connections({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
-        <section className="overflow-hidden rounded-md border bg-card">
+        <section className="card-surface overflow-hidden">
           <div className="border-b px-5 py-4">
             <h2 className="text-md font-medium">Connect a client</h2>
             <p className="mt-1 text-sm text-muted-foreground">Run this, then approve the app in your browser. No token to copy.</p>
@@ -118,7 +118,7 @@ export function Connections({
 
         <div className="grid h-fit gap-6">
         <ConnectedApps initialApps={initialApps} />
-        <section className="h-fit overflow-hidden rounded-md border bg-card">
+        <section className="card-surface h-fit overflow-hidden">
           <div className="border-b px-5 py-4">
             <h2 className="text-md font-medium">Access tokens</h2>
             <p className="mt-1 text-sm text-muted-foreground">For CI and headless clients. Use one token per client or device so you can revoke them separately.</p>

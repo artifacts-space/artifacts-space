@@ -25,7 +25,7 @@ export function AccessBadge({ access }: { access: "read" | "write" }) {
  */
 export function McpToolEntry({ tool, result }: { tool: DocsMcpTool; result: ToolResultDoc }) {
   return (
-    <article id={tool.name} className="mt-8 scroll-mt-20 rounded-lg border bg-card px-4 py-5 sm:px-6" aria-labelledby={`${tool.name}-name`}>
+    <article id={tool.name} className="card-surface mt-8 scroll-mt-20 px-4 py-5 sm:px-6" aria-labelledby={`${tool.name}-name`}>
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h4 id={`${tool.name}-name`} className="font-mono text-lg font-medium break-all">
           <a href={`#${tool.name}`} className="hover:underline hover:underline-offset-4">{tool.name}</a>

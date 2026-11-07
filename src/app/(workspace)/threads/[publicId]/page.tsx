@@ -44,7 +44,7 @@ export default async function ThreadPage({ params }: PageProps<"/threads/[public
           <IconExternalLink /> Open artifact
         </Button>
       </div>
-      <div className="rounded-md border bg-card p-5">
+      <div className="card-surface p-5">
         <CommentThread publicId={viewable.record.publicId} />
       </div>
       <MarkThreadRead publicId={viewable.record.publicId} />

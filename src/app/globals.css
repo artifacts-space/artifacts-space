@@ -119,6 +119,7 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-card-edge: var(--card-edge);
   --shadow-xs: var(--elevation-xs);
   --shadow-sm: var(--elevation-sm);
   --shadow-md: var(--elevation-md);
@@ -238,17 +239,18 @@
   --window-dim: oklch(0.12 0.01 60 / 0.2);
   --window-edge: oklch(1 0 0 / 0.14);
   /*
-   * Elevation: lift you feel more than see. Each step pairs a tight contact
-   * shadow with a soft ambient one, tinted with the warm ink. Use them through
-   * shadow-xs (inputs, frames), shadow-sm (cards, metrics), shadow-md
-   * (menus, popups, tooltips), and shadow-lg (dialogs). Flat inline elements
-   * (text, badges, separators, lists) get none. Dark mode swaps the tint for
-   * deeper black and adds a faint top highlight, since shadows barely show
-   * on a dark page.
+   * Elevation: soft minimalism. A card is felt, never outlined: a hairline
+   * edge (--card-edge) plus a wide, low-opacity shadow with a negative spread,
+   * tinted with the warm ink. The ladder: page, then card (shadow-sm, the
+   * card-surface utility), then a hovered or raised card and menus
+   * (shadow-md), then dialogs (shadow-lg). Wells and inputs get shadow-xs or
+   * none; flat inline elements (text, badges, separators, rows) get none.
+   * Dark mode swaps the tint for deeper black and adds a faint top highlight,
+   * since shadows barely show on a dark page; the lighter --card does the rest.
    */
-  --shadow-contact: oklch(0.2 0.01 60 / 0.06);
-  --shadow-ambient: oklch(0.2 0.01 60 / 0.04);
-  --shadow-ambient-strong: oklch(0.2 0.01 60 / 0.08);
+  --shadow-contact: oklch(0.2 0.01 60 / 0.05);
+  --shadow-ambient: oklch(0.2 0.01 60 / 0.11);
+  --shadow-ambient-strong: oklch(0.2 0.01 60 / 0.14);
   --shadow-highlight: oklch(1 0 0 / 0);
   color-scheme: light;
 }
@@ -340,17 +342,48 @@
 }
 
 /*
- * Composite shadows, declared on every scope so they pick up that scope's
- * shadow colors (a custom property resolves its var()s where it is declared).
+ * Composite shadows and the card edge, declared on every scope so they pick up
+ * that scope's colors (a custom property resolves its var()s where it is
+ * declared).
  */
 :root,
 .light,
 .dark,
 .theme-invert {
+  --card-edge: color-mix(in oklch, var(--foreground) 9%, transparent);
   --elevation-xs: 0 1px 2px 0 var(--shadow-contact);
-  --elevation-sm: 0 1px 2px 0 var(--shadow-contact), 0 2px 8px -2px var(--shadow-ambient), inset 0 1px 0 0 var(--shadow-highlight);
-  --elevation-md: 0 1px 3px 0 var(--shadow-contact), 0 8px 20px -6px var(--shadow-ambient-strong), inset 0 1px 0 0 var(--shadow-highlight);
-  --elevation-lg: 0 2px 4px 0 var(--shadow-contact), 0 20px 44px -12px var(--shadow-ambient-strong), inset 0 1px 0 0 var(--shadow-highlight);
+  --elevation-sm: 0 1px 2px 0 var(--shadow-contact), 0 10px 30px -12px var(--shadow-ambient), inset 0 1px 0 0 var(--shadow-highlight);
+  --elevation-md: 0 2px 4px 0 var(--shadow-contact), 0 16px 40px -12px var(--shadow-ambient-strong), inset 0 1px 0 0 var(--shadow-highlight);
+  --elevation-lg: 0 4px 8px 0 var(--shadow-contact), 0 28px 64px -16px var(--shadow-ambient-strong), inset 0 1px 0 0 var(--shadow-highlight);
+}
+
+/*
+ * The card primitive. Every surface that sits on the page (a panel, a settings
+ * section, a docs note, a form card) uses `card-surface`; never hand-write
+ * `rounded-md border bg-card`. Add `card-hover` when the whole card is a link
+ * or button. Items nested inside a card never get their own shadow: give them
+ * `card-nested` (the hairline edge only) or a divider.
+ */
+@utility card-surface {
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-xl);
+  background-color: var(--card);
+  color: var(--card-foreground);
+  box-shadow: var(--elevation-sm);
+}
+
+@utility card-hover {
+  transition-property: box-shadow, background-color;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  &:hover {
+    box-shadow: var(--elevation-md);
+  }
+}
+
+@utility card-nested {
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-lg);
 }
 
 @layer base {

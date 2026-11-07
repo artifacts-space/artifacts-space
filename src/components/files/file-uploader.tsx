@@ -26,7 +26,7 @@ function StatusIcon({ status }: { status: UploadItem["status"] }) {
 /** One picked file: name, progress or error, and a remove button. */
 function UploadRow({ item, onRemove }: { item: UploadItem; onRemove: (key: string) => void }) {
   return (
-    <li className="flex min-w-0 flex-col gap-1.5 rounded-md border bg-card px-3 py-2">
+    <li className="card-nested flex min-w-0 flex-col gap-1.5 bg-card px-3 py-2">
       <div className="flex min-w-0 items-center gap-2">
         <StatusIcon status={item.status} />
         <span className="min-w-0 flex-1 truncate text-sm">{item.name}</span>

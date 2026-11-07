@@ -34,7 +34,7 @@ export function LiveExample({ example, className, jsonOpen = true }: { example: 
 export function PropsTable({ rows, label = "Prop" }: { rows: PropRow[]; label?: string }) {
   if (rows.length === 0) return <p className="mt-4 text-md text-muted-foreground">No arguments.</p>;
   return (
-    <div className="mt-4 overflow-x-auto rounded-lg border">
+    <div className="card-surface mt-4 overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <thead className="bg-muted/50">
           <tr>

@@ -17,7 +17,7 @@ import { useFileUploads } from "./use-file-uploads";
 /** One attached file: name, type and size, and open, copy-id, and remove actions. */
 function AttachedRow({ file, showId, removing, onRemove }: { file: FileDto; showId: boolean; removing: boolean; onRemove: () => void }) {
   return (
-    <li className="flex min-w-0 items-center gap-3 rounded-md border bg-card px-3 py-2">
+    <li className="card-nested flex min-w-0 items-center gap-3 bg-card px-3 py-2">
       <IconFile aria-hidden className="size-4 shrink-0 text-muted-foreground" />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-sm">{file.filename}</span>
