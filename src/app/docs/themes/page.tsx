@@ -135,7 +135,7 @@ export default function ThemesPage() {
 
       <DocsH page={page} id="vendoring" />
       <Prose>
-        <p>Every theme font except Geist is stored in the repository under <code>public/fonts/v1/&lt;id&gt;/</code>: the latin woff2 files, a small <code>font.css</code>, and the font&apos;s license. <code>scripts/vendor-fonts.mjs</code> downloads them once from Google Fonts. Run it only to add or refresh a face, then change the <code>v1</code> folder name and update the file sizes in <code>src/lib/themes/fonts.ts</code>. Readers&apos; browsers never contact another site for a font.</p>
+        <p>Every theme font except Geist is vendored from Google Fonts under the SIL Open Font License and stored in the repository under <code>public/fonts/v1/&lt;id&gt;/</code>: the latin woff2 files, a small <code>font.css</code>, and the font&apos;s license. Readers&apos; browsers never contact another site for a font.</p>
       </Prose>
     </RegistryPage>
   );

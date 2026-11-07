@@ -143,7 +143,7 @@ export const docsPages = [
       h2("validation", "Validation"),
       h2("contrast", "Contrast"),
       h2("example", "A full theme"),
-      h2("vendoring", "How the fonts are vendored"),
+      h2("vendoring", "Where the fonts come from"),
     ],
   },
   {
