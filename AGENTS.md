@@ -38,7 +38,7 @@ pnpm dev           # development server on http://localhost:3000
 pnpm check         # typecheck + lint (0 warnings) + 500-line + migration checks + vitest
 pnpm build         # production build; must pass before you push
 pnpm test          # vitest only
-pnpm test:e2e      # Playwright against the /dev/components gallery
+pnpm test:e2e      # Playwright: the /dev/components gallery, plus production checks
 pnpm db:generate   # generate a migration from schema changes
 pnpm db:migrate    # apply migrations to a local or throwaway database only
 pnpm db:studio     # inspect the database
@@ -218,4 +218,18 @@ catch this, so test the generated SQL with `.toSQL()`, as
   fails when access is wrongly granted, not only one that passes when it is
   correctly granted.
 - `pnpm test:e2e` renders the component gallery at `/dev/components` on a
-  phone and a desktop viewport.
+  phone and a desktop viewport. It also builds and starts production on
+  `PLAYWRIGHT_PORT + 1000` for the `*.prod.spec.ts` checks, which need real
+  production HTML (for example, that theme fonts are never preloaded on pages
+  that do not use them).
+
+### Themes
+
+Artifact themes live in `src/lib/themes` (tokens, validation, contrast,
+presets, fonts) and render through `ThemeScope`
+(`src/components/artifact-view/theme-scope.tsx`). Theme values reach the page
+only as validated custom properties in a wrapper's `style`, never as a
+`<style>` string. Preset colors live in `src/lib/themes/presets.ts`; the
+Default preset must equal the tokens in `globals.css` (a test checks it).
+Theme fonts other than Geist are vendored in `public/fonts/v1/<id>/` and load
+only where a theme uses them; never add one to the root layout.

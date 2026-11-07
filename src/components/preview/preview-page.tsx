@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { UiView } from "@/components/artifact-view/ui-view";
 import type { PreviewComponentItem, PreviewFormatItem, PreviewGroup } from "@/lib/preview/catalog";
+import { builtInPresets } from "@/lib/themes/resolve";
 
+import { PreviewThemeProvider, PreviewThemeSwitcher } from "./preview-theme";
 import { ThemePanel } from "./theme-panel";
 
 /** The same content in a light panel and a dark panel: side by side on wide screens, stacked on phones. */
@@ -106,24 +108,30 @@ function SideNav({ groups }: { groups: readonly PreviewGroup[] }) {
 
 /**
  * Every json-render component and every artifact format viewer, each shown
- * in a light and a dark panel, with static sample data only.
+ * in a light and a dark panel, with static sample data only. The switcher at
+ * the top applies each built-in theme preset to every panel.
  */
 export function PreviewPage({ groups }: { groups: readonly PreviewGroup[] }) {
   const componentCount = groups.reduce((count, group) => count + group.items.filter((item) => item.type === "component").length, 0);
   return (
-    <div className="mx-auto flex w-full max-w-7xl gap-10 px-4 pt-6 pb-24 sm:px-6 sm:pt-10">
-      <SideNav groups={groups} />
-      <main className="min-w-0 flex-1 space-y-10">
-        <header className="space-y-2">
-          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">artifacts.space</Link>
-          <h1 className="text-3xl font-medium tracking-tight">Artifact preview</h1>
-          <p className="max-w-[60ch] text-md text-muted-foreground">
-            See all {componentCount} components and every format in light and dark, side by side. Everything here is sample data.
-          </p>
-        </header>
-        <MobileNav groups={groups} />
-        {groups.map((group) => <Group key={group.id} group={group} />)}
-      </main>
-    </div>
+    <PreviewThemeProvider presets={[...builtInPresets().values()]}>
+      <div className="mx-auto flex w-full max-w-7xl gap-10 px-4 pt-6 pb-24 sm:px-6 sm:pt-10">
+        <SideNav groups={groups} />
+        <main className="min-w-0 flex-1 space-y-10">
+          <header className="space-y-4">
+            <div className="space-y-2">
+              <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">artifacts.space</Link>
+              <h1 className="text-3xl font-medium tracking-tight">Artifact preview</h1>
+              <p className="max-w-[60ch] text-md text-muted-foreground">
+                See all {componentCount} components and every format in light and dark, side by side. Pick a theme to see every panel in it. Everything here is sample data.
+              </p>
+            </div>
+            <PreviewThemeSwitcher />
+          </header>
+          <MobileNav groups={groups} />
+          {groups.map((group) => <Group key={group.id} group={group} />)}
+        </main>
+      </div>
+    </PreviewThemeProvider>
   );
 }

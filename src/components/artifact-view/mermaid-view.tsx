@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 import { embeddedFontFace, readFontFamily, readPalette } from "./mermaid-palette";
 import { renderMermaid, type DiagramStyle, type RenderedDiagram } from "./mermaid-render";
-import { useDarkTheme } from "./theme-scope";
+import { useDarkTheme, useThemeKey } from "./theme-scope-context";
 import { ViewNotice } from "./view-notice";
 
 type Outcome = { key: string; diagram: RenderedDiagram } | { key: string; error: string };
@@ -40,7 +40,8 @@ function SourceFallback({ code, title, reason }: { code: string; title: string; 
  */
 export function MermaidView({ code, title, className }: { code: string; title?: string; className?: string }) {
   const dark = useDarkTheme();
-  const key = `${dark ? "dark" : "light"}:${code}`;
+  const themeKey = useThemeKey();
+  const key = `${dark ? "dark" : "light"}:${themeKey}:${code}`;
   const sourceProblem = checkMermaidSource(code);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const scopeRef = useRef<HTMLDivElement>(null);
@@ -56,7 +57,7 @@ export function MermaidView({ code, title, className }: { code: string; title?: 
         if (!cancelled) setOutcome({ key, error: error instanceof Error ? error.message : "Mermaid could not read this diagram." });
       });
     return () => { cancelled = true; };
-  }, [code, dark, key, sourceProblem]);
+  }, [code, key, sourceProblem]);
 
   const current = outcome?.key === key ? outcome : null;
   const problem = sourceProblem ?? (current && "error" in current ? current.error.slice(0, 300) : null);

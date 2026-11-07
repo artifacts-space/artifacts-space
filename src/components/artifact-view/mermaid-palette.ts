@@ -3,7 +3,8 @@ import type { DiagramPalette } from "./mermaid-theme";
 /**
  * Browser-only helpers that turn the page's design tokens into what a Mermaid
  * <img> needs: opaque hex colors (an image cannot read CSS variables) and the
- * Geist font embedded as a data URI (an image cannot load the page's fonts).
+ * font in scope (Geist, or a theme's body font) embedded as a data URI (an
+ * image cannot load the page's fonts).
  */
 
 let canvasContext: CanvasRenderingContext2D | null = null;
@@ -30,10 +31,35 @@ function toOpaqueHex(color: string, backdrop: string): string {
   return `#${hex(r)}${hex(g)}${hex(b)}`;
 }
 
+/**
+ * A reader for the tokens in scope at `element`. Each token is resolved by
+ * the browser through a hidden probe's `color`, because a token's raw text
+ * can be `light-dark(…)` (a ThemeScope following the reader's mode) or
+ * `color-mix(…)`, which only resolve in context.
+ */
+function tokenReader(element: Element): { token: (name: string) => string; done: () => void } {
+  const probe = document.createElement("span");
+  probe.hidden = true;
+  element.appendChild(probe);
+  const style = getComputedStyle(probe);
+  const token = (name: string) => {
+    probe.style.color = `var(--${name})`;
+    return style.color || getComputedStyle(element).getPropertyValue(`--${name}`).trim();
+  };
+  return { token, done: () => { probe.remove(); } };
+}
+
 /** Reads the diagram palette from the tokens in scope at `element`, so a ThemeScope or `.dark` wrapper applies. */
 export function readPalette(element: Element): DiagramPalette {
-  const style = getComputedStyle(element);
-  const token = (name: string) => style.getPropertyValue(`--${name}`).trim();
+  const { token, done } = tokenReader(element);
+  try {
+    return paletteFrom(token);
+  } finally {
+    done();
+  }
+}
+
+function paletteFrom(token: (name: string) => string): DiagramPalette {
   const surface = toOpaqueHex(token("card"), "#808080");
   const resolve = (name: string) => toOpaqueHex(token(name), surface);
   return {
@@ -67,6 +93,8 @@ function unquote(value: string): string {
 /** The woff2 URL of a @font-face rule for `family` that covers basic latin, or null. */
 function latinWoff2(rule: CSSFontFaceRule, family: string, base: string): string | null {
   if (unquote(rule.style.getPropertyValue("font-family")) !== family) return null;
+  // The diagram draws upright text; an italic face would embed the wrong file.
+  if (rule.style.getPropertyValue("font-style") === "italic") return null;
   const range = rule.style.getPropertyValue("unicode-range");
   if (range !== "" && !basicLatin.test(range)) return null;
   const url = /url\(["']?([^"')]+\.woff2)["']?\)/.exec(rule.style.getPropertyValue("src"))?.[1];
