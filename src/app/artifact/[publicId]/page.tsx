@@ -29,7 +29,7 @@ import { iconTitlePrefix } from "@/lib/artifact-icons";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { lastEditorsFor } from "@/lib/artifacts";
-import { artifactOgMetadata } from "@/lib/og/artifact-og";
+import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
 import { isReportable } from "@/lib/reports/rules";
 import { getSession } from "@/lib/session";
 import { visibilityCopy, type VisibilityCopy } from "@/lib/visibility-copy";
@@ -51,12 +51,15 @@ async function indexable(record: ViewableArtifact["record"]) {
 }
 
 /**
- * Metadata comes from the version this viewer reads, so an unapproved edit
- * never reaches link previews or search results. Public pages may be indexed
- * (links not followed) once the author's account is a few days old; new
- * accounts' public pages, and link, team, and private pages, never are.
- * src/proxy.ts answers 404 before this runs when the viewer cannot read the
- * artifact.
+ * The tab title comes from the version this viewer reads. The description
+ * and link-preview tags come only from what a signed-out reader sees (the
+ * approved version of a link or public artifact, see artifactOgMetadata), so
+ * an unapproved edit, or a private or team artifact, never reaches link
+ * previews or search results; those pages keep the site's description.
+ * Public pages may be indexed (links not followed) once the author's account
+ * is a few days old; new accounts' public pages, and link, team, and private
+ * pages, never are. src/proxy.ts answers 404 before this runs when the viewer
+ * cannot read the artifact.
  */
 export async function generateMetadata({ params }: PageProps<"/artifact/[publicId]">): Promise<Metadata> {
   const viewable = await load(params);
@@ -65,9 +68,8 @@ export async function generateMetadata({ params }: PageProps<"/artifact/[publicI
   return {
     ...(await artifactOgMetadata(record.publicId)),
     title: `${iconTitlePrefix(view.icon)}${view.title}`,
-    ...(view.summary ? { description: view.summary } : {}),
     // Agents that read HTML find the Markdown version here (src/lib/markdown).
-    alternates: { types: { "text/markdown": `/artifact/${record.publicId}.md` } },
+    alternates: { canonical: artifactPagePath(record.publicId), types: { "text/markdown": `/artifact/${record.publicId}.md` } },
     robots: (await indexable(record)) ? { index: true, follow: false } : { index: false, follow: false },
   };
 }
