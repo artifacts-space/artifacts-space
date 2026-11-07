@@ -1,13 +1,11 @@
-import Image from "next/image";
 import Link from "next/link";
 import { IconArrowRight } from "@tabler/icons-react";
 
 import { GitHubLink } from "@/components/github-link";
-import { ArtifactDemo } from "@/components/landing/artifact-demo";
 import { ClosingSection } from "@/components/landing/closing-section";
 import { ConnectSection } from "@/components/landing/connect-section";
 import { ControlSection } from "@/components/landing/control-section";
-import { SessionSection } from "@/components/landing/session-section";
+import { HeroDemo } from "@/components/landing/demo/hero-demo";
 import { Logo } from "@/components/logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Button } from "@/components/ui/button";
@@ -52,25 +50,7 @@ export default function Home() {
           </p>
         </section>
 
-        <section className="animate-enter pb-24" style={{ animationDelay: "220ms" }} aria-label="Workspace preview">
-          <div className="relative isolate overflow-hidden rounded-xl bg-hero-backdrop px-4 py-10 sm:px-10 sm:py-20 lg:py-28">
-            <Image
-              src="/hero-dusk.webp"
-              alt=""
-              fill
-              priority
-              sizes="(min-width: 1440px) 1392px, 100vw"
-              className="-z-10 object-cover"
-            />
-            <div aria-hidden="true" className="hero-tone pointer-events-none absolute inset-0 -z-10" />
-            <div aria-hidden="true" className="hero-grain pointer-events-none absolute inset-0 -z-10" />
-            <div className="mx-auto max-w-[1080px]">
-              <ArtifactDemo />
-            </div>
-          </div>
-        </section>
-
-        <SessionSection />
+        <HeroDemo />
         <ConnectSection />
         <ControlSection />
         <ClosingSection />

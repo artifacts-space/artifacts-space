@@ -1,0 +1,364 @@
+/*
+ * The landing hero demo: a Claude Code terminal beside the artifacts.space
+ * app. Ported from Vmotif's side gate. The markup is the finished session.
+ * Once DemoReplay sets `data-play`, every element with `--d-in` waits that
+ * many seconds and lands; elements with `--d-out` leave again. Without the
+ * script, and with reduced motion, the finished session stays on screen.
+ * Every color is a token in globals.css (--term-* for the terminal).
+ */
+
+.demo-board__frame {
+  display: grid;
+  grid-template-columns: minmax(0, 0.74fr) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--term-line);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 30px 80px -24px oklch(0 0 0 / 0.6);
+}
+
+/* --- The terminal ----------------------------------------------------------- */
+.demo-term {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--term-line);
+  background: var(--term);
+  color: var(--term-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+.demo-term p {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.demo-term b {
+  font-weight: 600;
+  color: var(--term-bright);
+}
+.demo-term__bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding-inline: 14px;
+  border-bottom: 1px solid var(--term-line);
+  background: var(--term-bar);
+}
+.demo-lights {
+  display: inline-flex;
+  gap: 7px;
+}
+.demo-lights i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--term-field);
+}
+.demo-term__title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--term-muted);
+  white-space: nowrap;
+}
+.demo-term__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px clamp(14px, 1.6vw, 22px) 14px;
+}
+.demo-term__body > div {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 8px;
+}
+.demo-welcome {
+  align-items: center;
+  margin-bottom: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--term-accent);
+  border-radius: 6px;
+}
+.demo-welcome p span {
+  display: block;
+  color: var(--term-muted);
+}
+.demo-spark {
+  color: var(--term-accent);
+}
+.demo-user {
+  color: var(--term-muted);
+}
+.demo-user p {
+  color: var(--term-bright);
+}
+.demo-dot {
+  display: block;
+  width: 7px;
+  height: 7px;
+  margin-top: 0.55em;
+  border-radius: 50%;
+  background: var(--term-bright);
+}
+.demo-dot[data-ok] {
+  background: var(--term-ok);
+}
+.demo-args {
+  color: var(--term-muted);
+}
+.demo-term__body > .demo-result {
+  margin-top: -8px;
+  color: var(--term-muted);
+}
+.demo-result > span {
+  padding-left: 4px;
+}
+.demo-term__input {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 8px;
+  margin: 0 clamp(14px, 1.6vw, 22px);
+  padding: 9px 12px;
+  border: 1px solid var(--term-field);
+  border-radius: 6px;
+  color: var(--term-muted);
+}
+.demo-term__input p {
+  display: grid;
+  color: var(--term-bright);
+}
+.demo-term__input p > span {
+  grid-area: 1 / 1;
+}
+.demo-term__sizer {
+  visibility: hidden;
+}
+.demo-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  background: var(--term-text);
+}
+.demo-term__hint {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px clamp(14px, 1.6vw, 22px) 14px;
+  color: var(--term-dim);
+}
+
+/* --- The app ----------------------------------------------------------------- */
+.demo-app__stage {
+  display: grid;
+  grid-template-areas: "scene" "comments";
+  grid-template-rows: auto auto;
+  align-content: start;
+}
+.demo-scene {
+  grid-area: scene;
+  min-width: 0;
+}
+.demo-comments {
+  grid-area: comments;
+}
+.demo-swap {
+  display: inline-grid;
+}
+div.demo-swap {
+  display: grid;
+}
+.demo-swap > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.demo-glow {
+  position: absolute;
+  inset: -4px;
+  z-index: -1;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+}
+.demo-typing {
+  display: inline-flex;
+  gap: 3px;
+}
+.demo-typing i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* --- The finished state --------------------------------------------------------- */
+.demo-board [style*="--d-out"] {
+  visibility: hidden;
+}
+/* The typed prompt was sent: the input box is empty, with the caret at its start. */
+.demo-typed {
+  display: none;
+}
+
+/* --- The replay ----------------------------------------------------------------- */
+@keyframes demo-land {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes demo-leave {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+@keyframes demo-type {
+  from {
+    font-size: 0;
+  }
+  to {
+    font-size: 1em;
+  }
+}
+@keyframes demo-clear {
+  from,
+  to {
+    font-size: 0;
+    visibility: hidden;
+  }
+}
+@keyframes demo-row {
+  from {
+    max-height: 0;
+    padding-block: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: 4rem;
+    opacity: 1;
+  }
+}
+@keyframes demo-wipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes demo-glow {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes demo-blink {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes demo-bounce {
+  0%,
+  60%,
+  100% {
+    transform: none;
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .demo-board[data-play] [style*="--d-in"] {
+    animation: demo-land 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(var(--d-in) * 1s);
+  }
+  .demo-board[data-play] [style*="--d-out"] {
+    visibility: visible;
+    animation:
+      demo-land 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both,
+      demo-leave 0.3s ease forwards;
+    animation-delay: calc(var(--d-in, 0) * 1s), calc(var(--d-out) * 1s);
+  }
+  .demo-board[data-play] .demo-typed {
+    display: inline;
+    animation: demo-clear 0.01s linear forwards;
+    animation-delay: calc(var(--d-out) * 1s);
+  }
+  .demo-board[data-play] .demo-char[style*="--d-in"] {
+    animation: demo-type 1ms step-end both;
+    animation-delay: calc(var(--d-in) * 1s);
+  }
+  .demo-board[data-play] .demo-piece[style*="--d-in"] {
+    animation:
+      demo-land 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both,
+      demo-wipe 0.7s cubic-bezier(0.4, 0, 0.2, 1) both;
+    animation-delay: calc(var(--d-in) * 1s);
+  }
+  .demo-board[data-play] .demo-row-new[style*="--d-in"] {
+    overflow: hidden;
+    animation-name: demo-row;
+  }
+  .demo-board[data-play] .demo-glow[style*="--d-in"] {
+    animation: demo-glow 1.8s ease-out both;
+    animation-delay: calc(var(--d-in) * 1s);
+  }
+  .demo-caret {
+    animation: demo-blink 1.1s steps(2, jump-none) infinite;
+  }
+  .demo-typing i {
+    animation: demo-bounce 1s ease-in-out infinite;
+  }
+  .demo-typing i:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .demo-typing i:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+  /* DemoReplay loops by fading the panes out over the finished session first. */
+  .demo-board [data-demo-pane] {
+    transition: opacity 0.45s ease;
+  }
+  .demo-board[data-rewind] [data-demo-pane] {
+    opacity: 0;
+  }
+}
+
+/* --- Narrow screens: the two surfaces stack ---------------------------------------- */
+@media (max-width: 1023px) {
+  .demo-board__frame {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .demo-term {
+    border-right: 0;
+    border-bottom: 1px solid var(--term-line);
+  }
+}
+@media (max-width: 639px) {
+  .demo-board__frame {
+    border-radius: var(--radius-lg);
+  }
+  .demo-term__title {
+    position: static;
+    transform: none;
+    margin-left: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
