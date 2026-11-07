@@ -91,7 +91,7 @@ export function ContentEditor({ kind, value, onChange, title, language, files, l
         </div>
         <section aria-label="Preview" className={cn("min-w-0 bg-background/40", pane === "preview" ? "block" : "hidden lg:block")}>
           <p className="hidden border-b px-5 py-2 text-xs text-muted-foreground lg:block">Preview</p>
-          <div className="h-[60dvh] min-h-80 overflow-y-auto overscroll-contain p-4 sm:p-5">
+          <div className="relative h-[60dvh] min-h-80 overflow-y-auto overscroll-contain p-4 sm:p-5">
             <ArtifactView kind={kind} content={preview} title={title} language={language} files={files} />
           </div>
         </section>
