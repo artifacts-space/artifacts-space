@@ -1,6 +1,6 @@
-import { csvColumnCap, csvRowCap } from "@/components/artifact-view/source-views";
 import type { FormatKind } from "@/lib/artifact-formats";
 import { validateArtifactContent } from "@/lib/artifact-content";
+import { csvColumnCap, csvRowCap } from "@/lib/csv-limits";
 import { maxMermaidLength } from "@/lib/mermaid-source";
 
 /**
@@ -45,7 +45,7 @@ export const formatDocs: Record<FormatKind, FormatDoc> = {
   },
   csv: {
     checks: "RFC 4180 CSV with a header row. Quotes must close.",
-    renders: `A table with row numbers and a sticky header. Shows up to ${count(csvRowCap)} rows and ${String(csvColumnCap)} columns and says how many it left out.`,
+    renders: `A table with row numbers and a sticky header. Readers sort by clicking a column header and filter from the search box or a column's menu; neither changes the file. Shows up to ${count(csvRowCap)} rows and ${String(csvColumnCap)} columns and says how many it left out. Editors get a spreadsheet-style grid, with a Raw view for the text.`,
     example: "service,p95_ms,errors\nbilling,182,3\nsearch,95,0",
     broken: 'service,note\nbilling,"never closed',
   },
