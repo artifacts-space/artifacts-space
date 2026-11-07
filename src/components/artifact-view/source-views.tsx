@@ -1,3 +1,7 @@
+import { highlightCode } from "#syntax-highlight";
+
+import { CodeBlock } from "@/components/code/code-block";
+import { prettyJson } from "@/lib/pretty-json";
 import { checkSvg, svgDataUri } from "@/lib/svg";
 import { cn } from "@/lib/utils";
 
@@ -5,36 +9,32 @@ import { ViewNotice } from "./view-notice";
 
 const sourceClass = "overflow-x-auto font-mono text-sm leading-7 whitespace-pre-wrap break-words";
 
-/** Plain text, shown as written. */
+/** Plain text, shown as written on a quiet sheet, so it reads as a document. */
 export function TextView({ content }: { content: string }) {
-  return <p className="max-w-[72ch] text-md leading-7 whitespace-pre-wrap break-words">{content}</p>;
-}
-
-/** Source code in monospace, with its language label. */
-export function CodeView({ content, language }: { content: string; language?: string | undefined }) {
   return (
-    <figure className="min-w-0">
-      {language ? <figcaption className="mb-2 font-mono text-xs text-muted-foreground">{language}</figcaption> : null}
-      <pre tabIndex={0} className={cn(sourceClass, "focus-visible:outline-2 focus-visible:outline-ring")}><code>{content}</code></pre>
-    </figure>
+    <article className="card-nested min-w-0 bg-card px-5 py-5 text-card-foreground sm:px-8 sm:py-7">
+      <div className="max-w-[72ch] text-base leading-7 whitespace-pre-wrap break-words">{content}</div>
+    </article>
   );
 }
 
-function prettyJson(content: string): string | null {
-  try {
-    return JSON.stringify(JSON.parse(content), null, 2);
-  } catch {
-    return null;
-  }
+/**
+ * Source code in the shared code block. In a server component it arrives
+ * highlighted, with no highlighter in the page; elsewhere the block
+ * highlights itself.
+ */
+export function CodeView({ content, language }: { content: string; language?: string | undefined }) {
+  return <CodeBlock code={content} language={language} lines={highlightCode(content, language)} />;
 }
 
-/** JSON, pretty-printed. Invalid JSON shows as written, with a notice. */
+/** JSON, pretty-printed and highlighted. Invalid JSON shows as written, with a notice. */
 export function JsonView({ content }: { content: string }) {
   const pretty = prettyJson(content);
+  const code = pretty ?? content;
   return (
     <div className="min-w-0 space-y-3">
       {pretty === null ? <ViewNotice tone="warning" title="This JSON does not parse, so it is shown as written." /> : null}
-      <pre tabIndex={0} className={cn(sourceClass, "focus-visible:outline-2 focus-visible:outline-ring")}><code>{pretty ?? content}</code></pre>
+      <CodeBlock code={code} language="json" lines={pretty === null ? null : highlightCode(code, "json")} />
     </div>
   );
 }

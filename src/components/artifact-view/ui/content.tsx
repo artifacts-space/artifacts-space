@@ -1,9 +1,9 @@
 "use client";
 
 import { IconAlertTriangle, IconCircleCheck, IconInfoCircle, IconNote, IconOctagon } from "@tabler/icons-react";
-import type { ReactNode } from "react";
 
 import { ExternalLink } from "@/components/artifact-view/external-link";
+import { CodeBlock } from "@/components/code/code-block";
 import { MarkdownView } from "@/components/artifact-view/markdown-view";
 import type { Tone } from "@/lib/ui/props/shared";
 import { cn } from "@/lib/utils";
@@ -39,26 +39,8 @@ export function MarkdownBlockView({ props }: ViewProps<"Markdown">) {
   return <MarkdownView content={props.content} />;
 }
 
-/** A code block with an optional title and language label. `actions` sit at the right of the header. */
-export function CodeBlock({ code, language, title, actions }: { code: string; language?: string | undefined; title?: string | undefined; actions?: ReactNode }) {
-  return (
-    <figure className="min-w-0 overflow-hidden rounded-md border bg-muted/40 shadow-xs">
-      {title || language || actions ? (
-        <figcaption className="flex min-h-9 items-center gap-2 border-b px-3.5 py-1.5 text-xs text-muted-foreground">
-          {title ? <span className="min-w-0 truncate font-medium text-foreground">{title}</span> : null}
-          {language ? <span className="ml-auto min-w-0 truncate font-mono">{language}</span> : null}
-          {actions ? <span className={cn("shrink-0", !language && "ml-auto")}>{actions}</span> : null}
-        </figcaption>
-      ) : null}
-      <pre tabIndex={0} className="max-h-[32rem] overflow-auto p-3.5 font-mono text-sm leading-6 focus-visible:outline-2 focus-visible:outline-ring">
-        <code>{code || " "}</code>
-      </pre>
-    </figure>
-  );
-}
-
 export function CodeView({ props }: ViewProps<"Code">) {
-  return <CodeBlock code={props.code} language={props.language} title={props.title} />;
+  return <CodeBlock code={props.code} language={props.language} title={props.title} capHeight />;
 }
 
 const toneStyles: Record<Tone, { box: string; icon: string; Icon: typeof IconInfoCircle }> = {
