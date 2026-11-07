@@ -54,6 +54,53 @@ async function fetchText(url, headers = {}) {
 
 /** @typedef {{ style: string; weight: string; src: string; range: string }} LatinBlock */
 
+/*
+ * Everything downloaded is checked before it is written: font files must
+ * come from fonts.gstatic.com and be real woff2 files under 1 MB, the CSS
+ * values that reach font.css must match strict patterns, and a license must
+ * be the SIL Open Font License. Anything else stops the script.
+ */
+const fontHost = "fonts.gstatic.com";
+const maxFontBytes = 1_000_000;
+const maxLicenseChars = 20_000;
+const woff2Signature = "wOF2";
+const stylePattern = /^(normal|italic)$/;
+const weightPattern = /^\d{3,4}( \d{3,4})?$/;
+const rangePattern = /^[U+0-9A-Fa-f, -]+$/;
+
+/**
+ * Keeps a block only when every value that reaches font.css or a file name is well formed.
+ * @param {LatinBlock} block
+ */
+function checkedBlock(block) {
+  const url = new URL(block.src);
+  if (url.protocol !== "https:" || url.hostname !== fontHost) throw new Error(`Unexpected font host: ${url.hostname}`);
+  if (!stylePattern.test(block.style) || !weightPattern.test(block.weight) || !rangePattern.test(block.range)) throw new Error(`Unexpected @font-face values in ${block.src}`);
+  return { ...block, src: url.href };
+}
+
+/**
+ * Downloads one woff2 file and checks it is one.
+ * @param {string} src
+ */
+async function fetchWoff2(src) {
+  const response = await fetch(src);
+  if (!response.ok) throw new Error(`${src} answered ${String(response.status)}`);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length > maxFontBytes || bytes.subarray(0, 4).toString("latin1") !== woff2Signature) throw new Error(`${src} is not a woff2 file under 1 MB`);
+  return bytes;
+}
+
+/**
+ * Downloads a face's license and checks it is the OFL.
+ * @param {string} licenseDir
+ */
+async function fetchLicense(licenseDir) {
+  const text = await fetchText(`https://raw.githubusercontent.com/google/fonts/main/ofl/${licenseDir}/OFL.txt`);
+  if (text.length > maxLicenseChars || !/SIL OPEN FONT LICENSE/i.test(text)) throw new Error(`The ${licenseDir} license is not the SIL Open Font License`);
+  return text;
+}
+
 /**
  * The latin @font-face blocks of a Google Fonts stylesheet, upright first.
  * @param {string} css
@@ -99,18 +146,16 @@ async function vendorFace(face) {
   if (blocks.length === 0) throw new Error(`No latin files for ${face.family}`);
   const rules = [];
   const files = [];
-  for (const block of blocks) {
+  for (const block of blocks.map(checkedBlock)) {
     const name = `${face.id}-${block.style}-${block.weight.replace(" ", "-")}.woff2`;
-    const response = await fetch(block.src);
-    if (!response.ok) throw new Error(`${block.src} answered ${String(response.status)}`);
-    const bytes = Buffer.from(await response.arrayBuffer());
+    const bytes = await fetchWoff2(block.src);
     writeFileSync(join(out, name), bytes);
     files.push({ file: name, style: block.style, weight: block.weight, bytes: bytes.length });
     rules.push(`@font-face {\n  font-family: "${face.family}";\n  font-style: ${block.style};\n  font-weight: ${block.weight};\n  font-display: swap;\n  src: url("${name}") format("woff2");\n  unicode-range: ${block.range};\n}\n`);
   }
   const header = `/* ${face.family}, latin subset, from Google Fonts. SIL Open Font License 1.1: see OFL.txt. */\n`;
   writeFileSync(join(out, "font.css"), header + rules.join("") + fallbackFace(face));
-  writeFileSync(join(out, "OFL.txt"), await fetchText(`https://raw.githubusercontent.com/google/fonts/main/ofl/${face.licenseDir}/OFL.txt`));
+  writeFileSync(join(out, "OFL.txt"), await fetchLicense(face.licenseDir));
   return { files, cssBytes: statSync(join(out, "font.css")).size, hasFallback: face.fallback !== "mono" };
 }
 
