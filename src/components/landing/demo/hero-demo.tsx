@@ -26,7 +26,7 @@ const focusTimes: Record<string, number> = { "--focus-app": T.appFront, "--focus
 export function HeroDemo() {
   return (
     <section id="how" className="animate-enter scroll-mt-20 pb-24 max-sm:-mx-6" style={{ animationDelay: "220ms" }} aria-label="How it works">
-      <figure className="relative isolate overflow-hidden bg-hero-backdrop px-3 py-5 sm:rounded-xl sm:p-8 xl:p-10">
+      <figure className="relative isolate overflow-hidden bg-hero-backdrop px-4 py-4 sm:rounded-xl sm:p-8 xl:p-10">
         <Image src="/hero-dusk.webp" alt="" fill priority sizes="(min-width: 1440px) 1392px, 100vw" className="-z-10 object-cover" />
         <div aria-hidden="true" className="hero-tone pointer-events-none absolute inset-0 -z-10" />
         <div aria-hidden="true" className="hero-grain pointer-events-none absolute inset-0 -z-10" />

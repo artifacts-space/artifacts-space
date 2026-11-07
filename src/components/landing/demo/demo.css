@@ -119,7 +119,8 @@
   height: 400px;
   overflow: hidden;
   padding: 0 clamp(14px, 1.6vw, 22px) 14px;
-  mask-image: linear-gradient(to bottom, transparent, var(--term) 28px);
+  /* Older lines fade out under the title bar; a line the edge cuts is fully faded. */
+  mask-image: linear-gradient(to bottom, transparent 14px, var(--term) 48px);
 }
 .demo-term__log {
   display: flex;
@@ -297,20 +298,60 @@ div.demo-swap {
   }
 }
 
-/* --- Narrow screens: the windows stack with a small overlap --------------------------- */
-@media (max-width: 1023px) {
+/*
+ * --- Below 1280px: the windows stack like a deck of cards ---------------------------
+ * Both windows take the full width and sit almost on top of each other, so the
+ * whole story fits in about one viewport. The window behind sits back and
+ * shows only its title bar above the one in front (`--peek`). The finished
+ * state has the browser in front; demo-replay.css swaps them as focus moves.
+ */
+@media (max-width: 1279px) {
   .demo-desk {
-    display: flex;
-    flex-direction: column;
+    --deck-h: 600px;
+    --peek: 26px;
+    --back: 0.94;
+    display: block;
+    max-width: 880px;
+    height: var(--deck-h);
+    margin-inline: auto;
+  }
+  .demo-win {
+    position: absolute;
+    inset: 0 0 auto;
+    height: calc(var(--deck-h) - var(--peek));
+    margin: 0;
+    transform-origin: 50% 0;
   }
   .demo-win--term {
-    margin-right: 14px;
+    z-index: 1;
+    transform: scale(var(--back));
+  }
+  .demo-win--term::after {
+    opacity: 1;
   }
   .demo-win--app {
-    margin: -18px 0 0 14px;
+    z-index: 2;
+    transform: translateY(var(--peek));
+  }
+  .demo-win__frame,
+  .demo-win__frame > * {
+    height: 100%;
   }
   .demo-term__body {
-    height: 260px;
+    flex: 1 1 0;
+    height: auto;
+    min-height: 0;
+  }
+  .demo-app__stage {
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+/* Tablets and small laptops: a taller deck, with room for the board under the chart and timeline. */
+@media (min-width: 640px) and (max-width: 1279px) {
+  .demo-desk {
+    --deck-h: 720px;
+    --peek: 30px;
   }
 }
 @media (max-width: 639px) {
@@ -326,5 +367,17 @@ div.demo-swap {
   }
   .demo-term__input {
     margin-bottom: 12px;
+  }
+  /* A shorter chart and a tighter timeline, so both fit in the phone window. */
+  .demo-piece--chart .h-40 {
+    height: 6.5rem;
+  }
+  .demo-piece--timeline li:not(:last-child) {
+    padding-bottom: 12px;
+  }
+  /* The comment sheet fades the page out above it, so no line shows cut in half. */
+  .demo-sheet {
+    padding-top: 40px;
+    background: linear-gradient(to bottom, transparent, var(--background) 32px);
   }
 }

@@ -81,16 +81,16 @@ function Comment({ seed, kind, author, children }: { seed: string; kind: "person
 }
 
 /** The comment thread: the agent asks Dana, Dana types, and her reply lands. */
-export function DemoComments() {
+export function DemoComments({ className, heading = true }: { className?: string; heading?: boolean }) {
   const { agent, reviewer } = demoPeople;
   return (
-    <div className="flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-4 text-card-foreground" style={beat(T.notified)}>
-      <p className="text-sm font-medium">Comments <span className="text-muted-foreground">2</span></p>
+    <div className={cn("flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-4 text-card-foreground", className)} style={beat(T.notified)}>
+      {heading ? <p className="text-sm font-medium">Comments <span className="text-muted-foreground">2</span></p> : null}
       <Comment seed={agent.seed} kind="agent" author={`@${agent.handle}`}>
         <Mention handle={reviewer.handle} /> {agentAsk}
       </Comment>
       <div className="demo-swap">
-        <p className="flex items-center gap-2 text-xs text-muted-foreground" style={beat(T.typing, T.reply)}>
+        <p className="flex items-center gap-2 self-start text-xs text-muted-foreground" style={beat(T.typing, T.reply)}>
           <span className="demo-typing" aria-hidden="true"><i /><i /><i /></span>
           {reviewer.name} is typing
         </p>
@@ -100,6 +100,20 @@ export function DemoComments() {
           </Comment>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The thread on narrow screens, where the page has no room beside it: it
+ * slides up over the bottom of the artifact as the mention lands, shows
+ * Dana's reply, and leaves once the terminal is in front again. It is
+ * hidden in the finished state, where version 2 shows what she asked for.
+ */
+export function DemoCommentSheet() {
+  return (
+    <div className="demo-sheet absolute inset-x-0 bottom-0 z-10 p-2 sm:left-auto sm:w-92 xl:hidden" style={beat(T.notified, T.termFront + 0.8)}>
+      <DemoComments heading={false} className="gap-2.5 p-3.5 shadow-lg" />
     </div>
   );
 }

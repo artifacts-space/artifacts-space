@@ -10,7 +10,7 @@ import { demoListRows, demoPeople, demoTitle, shortId, T } from "@/lib/landing/d
 import { cn } from "@/lib/utils";
 
 import { beat } from "./beat";
-import { DemoComments, DemoShareDialog } from "./demo-review";
+import { DemoCommentSheet, DemoComments, DemoShareDialog } from "./demo-review";
 
 const UiIcon = kindIcons.ui;
 
@@ -27,7 +27,7 @@ function Swap({ at, before, after, className }: { at: number; before: ReactNode;
 /** Browser chrome: traffic lights and the address, which follows the page that is open. */
 function BrowserBar() {
   return (
-    <div className="flex h-10 shrink-0 items-center gap-3 border-b bg-muted px-3.5">
+    <div className="flex h-9 shrink-0 items-center gap-3 border-b bg-muted px-3.5 sm:h-10">
       <span aria-hidden="true" className="flex gap-1.5">
         <i className="size-2.5 rounded-full bg-border" />
         <i className="size-2.5 rounded-full bg-border" />
@@ -49,7 +49,7 @@ function BrowserBar() {
 /** The app header: logo, workspace navigation, and who is looking at the artifact. */
 function AppHeader() {
   return (
-    <div className="flex h-11 shrink-0 items-center gap-4 border-b px-3 sm:px-4">
+    <div className="flex h-10 shrink-0 items-center gap-4 border-b px-3 sm:h-11 sm:px-4">
       <Image src="/artifacts-space-mark.svg" alt="" width={27} height={20} className="h-5 w-[27px] shrink-0" />
       <nav className="flex h-full items-center gap-3 text-sm text-muted-foreground sm:gap-4">
         <span className="relative flex h-full items-center text-foreground">
@@ -122,7 +122,7 @@ function Piece({ piece, at, changes = false, className }: { piece: DemoPiece; at
 /** The artifact page: title, share state, version, the pieces as they build in, and the thread. */
 function ArtifactScene() {
   return (
-    <div className="demo-scene @container flex flex-col gap-5 p-4 sm:p-5" style={beat(T.open)}>
+    <div className="demo-scene @container flex flex-col gap-4 p-4 sm:gap-5 sm:p-5" style={beat(T.open)}>
       <div className="flex flex-col gap-2.5">
         <div className="flex items-start justify-between gap-3">
           <h3 className="min-w-0 text-xl font-medium tracking-[-0.02em]">{demoTitle}</h3>
@@ -138,18 +138,18 @@ function ArtifactScene() {
             after={<Chip><IconUsers aria-hidden className="size-3.5" /> Team · {demoPeople.team.name}</Chip>}
           />
           <Swap at={T.v2} before={<Chip>Version 1</Chip>} after={<Chip>Version 2</Chip>} />
-          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground max-sm:hidden">
             <PixelAvatar seed={demoPeople.agent.seed} kind="agent" size={18} /> @{demoPeople.agent.handle}
           </span>
         </div>
       </div>
       <div className="grid gap-5 @min-[560px]:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-        <Piece piece="chart" at={T.chart} changes />
-        <Piece piece="timeline" at={T.timeline} changes />
+        <Piece piece="chart" at={T.chart} changes className="demo-piece--chart" />
+        <Piece piece="timeline" at={T.timeline} changes className="demo-piece--timeline" />
       </div>
       <div className="grid items-start gap-5 @min-[640px]:grid-cols-[minmax(0,1fr)_14rem]">
         <Piece piece="board" at={T.board} className="max-sm:hidden" />
-        <DemoComments />
+        <DemoComments className="max-xl:hidden" />
       </div>
     </div>
   );
@@ -169,6 +169,7 @@ export function DemoBrowser() {
         <ListScene />
         <ArtifactScene />
         <DemoShareDialog />
+        <DemoCommentSheet />
       </div>
     </div>
   );
