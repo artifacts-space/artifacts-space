@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { IconChevronDown, IconExternalLink, IconInbox, IconKey, IconLogout, IconRestore } from "@tabler/icons-react";
+import { IconBook, IconChevronDown, IconExternalLink, IconInbox, IconKey, IconLogout, IconRestore } from "@tabler/icons-react";
 import { useState } from "react";
 
 import { useConfirmations } from "@/components/confirmations-provider";
@@ -137,6 +137,9 @@ export function AppHeader({ userId, name, email, username, teams, unreadMentions
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => { router.push("/app/connections"); }} className="px-2 py-2">
                 <IconKey /> Access tokens
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { router.push("/docs"); }} className="px-2 py-2">
+                <IconBook /> Docs
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => { router.push("/"); }} className="px-2 py-2">
                 <IconExternalLink /> Public site

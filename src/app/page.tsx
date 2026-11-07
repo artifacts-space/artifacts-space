@@ -53,6 +53,7 @@ export default function Home() {
         <nav className="flex items-center gap-6 text-sm text-muted-foreground" aria-label="Main navigation">
           <a href="#how" className="hidden transition-colors hover:text-foreground sm:inline">How it works</a>
           <a href="#tools" className="hidden transition-colors hover:text-foreground sm:inline">Tools</a>
+          <Link href="/docs" className="hidden transition-colors hover:text-foreground sm:inline">Docs</Link>
           <GitHubLink className="-mx-2" />
           <Link href="/sign-in" className="transition-colors hover:text-foreground">Sign in</Link>
           <Button render={<Link href="/sign-up" />} nativeButton={false} size="sm" className="hidden px-3 sm:inline-flex">
@@ -156,6 +157,7 @@ export default function Home() {
         <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <Logo />
           <div className="flex flex-wrap items-center gap-x-5 gap-y-4">
+            <Link href="/docs" className="transition-colors hover:text-foreground">Docs</Link>
             <Link href="/sign-in" className="transition-colors hover:text-foreground">Sign in</Link>
             <Link href="/sign-up" className="transition-colors hover:text-foreground">Create account</Link>
             <span>© 2026</span>
