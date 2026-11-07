@@ -1,9 +1,8 @@
 "use client";
 
-import { CopyButton } from "@/components/copy-button";
 import { MarkdownView } from "@/components/artifact-view/markdown-view";
+import { CodeBlock } from "@/components/code/code-block";
 
-import { CodeBlock } from "./content";
 import type { ViewProps } from "./stout";
 
 /** A numbered how-to: each step has a title, optional Markdown body, and optional code with a copy button. */
@@ -26,7 +25,7 @@ export function StepsView({ props }: ViewProps<"Steps">) {
               </p>
               {step.body?.trim() ? <MarkdownView content={step.body} className="text-md leading-6 text-foreground/85" /> : null}
               {step.code ? (
-                <CodeBlock code={step.code} language={step.language} actions={<CopyButton value={step.code} variant="ghost" size="icon-xs" />} />
+                <CodeBlock code={step.code} language={step.language} capHeight />
               ) : null}
             </div>
           </li>

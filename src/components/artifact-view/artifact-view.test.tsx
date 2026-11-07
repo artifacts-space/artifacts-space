@@ -51,6 +51,13 @@ describe("ArtifactView for csv and json", () => {
     expect(html).toContain("Filter rows in every column");
   });
 
+  it("should pretty-print json in a code block labelled json when it parses", () => {
+    const html = render("json", '{"service":"billing","p95Ms":182}');
+    expect(html).toContain("data-code-block");
+    expect(html).toContain(">json</span>");
+    expect(html).toContain("{\n  &quot;service&quot;: &quot;billing&quot;,\n  &quot;p95Ms&quot;: 182\n}");
+  });
+
   it("should show invalid json as written with a notice", () => {
     const html = render("json", "{ nope");
     expect(html).toContain("does not parse");
@@ -131,5 +138,28 @@ describe("ArtifactView for files", () => {
     expect(html).toContain(`src="/api/files/${image.id}"`);
     expect(html).toContain('alt="Diagram"');
     expect(html).toContain("Its file is not attached to this artifact.");
+  });
+});
+
+describe("ArtifactView for markdown code and text", () => {
+  it("should render fenced code as the shared code block when markdown has a fence", () => {
+    const html = render("markdown", "Intro\n\n```ts\nconst x = 1;\n```");
+    expect(html).toContain("data-code-block");
+    expect(html).toContain(">ts</span>");
+    expect(html).toContain("const x = 1;");
+  });
+
+  it("should keep every line of a text artifact when it renders", () => {
+    const html = render("text", "Standup notes, 6 Nov\nShipped: docs shell\nNext: MCP reference");
+    expect(html).toContain("<article");
+    expect(html).toContain("Standup notes, 6 Nov\nShipped: docs shell\nNext: MCP reference");
+  });
+
+  it("should render every block of the markdown sample when it renders", () => {
+    const html = render("markdown", "# Billing migration plan\n\n- [x] Dual-write behind `billing.ledger_v2`\n- [ ] Backfill 2025 invoices\n\n| Step | Owner |\n| --- | --- |\n| Backfill | @dana |");
+    expect(html).toContain("<h1>Billing migration plan</h1>");
+    expect(html).toContain("<code>billing.ledger_v2</code>");
+    expect(html).toContain("Backfill 2025 invoices");
+    expect(html).toContain("<td>@dana</td>");
   });
 });
