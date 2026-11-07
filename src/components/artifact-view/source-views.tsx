@@ -12,7 +12,7 @@ const sourceClass = "overflow-x-auto font-mono text-sm leading-7 whitespace-pre-
 /** Plain text, shown as written on a quiet sheet, so it reads as a document. */
 export function TextView({ content }: { content: string }) {
   return (
-    <article className="card-surface min-w-0 px-5 py-5 sm:px-8 sm:py-7">
+    <article className="card-nested min-w-0 bg-card px-5 py-5 text-card-foreground sm:px-8 sm:py-7">
       <div className="max-w-[72ch] text-base leading-7 whitespace-pre-wrap break-words">{content}</div>
     </article>
   );
