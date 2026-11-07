@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { updateArtifactAction } from "@/app/(workspace)/app/actions";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { ContentEditor } from "@/components/editor/content-editor";
+import { DocumentEditor, isDocumentKind } from "@/components/editor/document-editor";
 import { FormError } from "@/components/teams/form-error";
 import { Button } from "@/components/ui/button";
 import { formatInfo } from "@/lib/artifact-formats";
@@ -100,7 +101,7 @@ export function PageEditor({ artifact, onClose }: PageEditorProps) {
         }
       }}
     >
-      <div className="sticky top-0 z-10 -mx-6 flex flex-wrap items-center gap-2 border-b bg-background/95 px-6 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div data-slot="editor-bar" className="sticky top-0 z-10 -mx-6 flex flex-wrap items-center gap-2 border-b bg-background/95 px-6 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <p className="text-sm text-muted-foreground">
           Editing <span className="text-foreground">{formatInfo[artifact.kind].label}</span>
           {dirty ? " · Unsaved changes" : ""}
@@ -132,6 +133,8 @@ export function PageEditor({ artifact, onClose }: PageEditorProps) {
       <div className="mt-6">
         {artifact.kind === "csv" ? (
           <CsvContentEditor value={draft.content} onChange={change("content")} title={draft.title} files={artifact.files} label="Content" />
+        ) : isDocumentKind(artifact.kind) ? (
+          <DocumentEditor kind={artifact.kind} value={draft.content} onChange={change("content")} label="Content" autoFocus />
         ) : (
           <ContentEditor
             kind={artifact.kind}

@@ -1,0 +1,63 @@
+import {
+  IconBlockquote,
+  IconCode,
+  IconH1,
+  IconH2,
+  IconH3,
+  IconList,
+  IconListCheck,
+  IconListNumbers,
+  IconMinus,
+  IconTable,
+  type Icon,
+} from "@tabler/icons-react";
+import type { ChainedCommands, Editor, Range } from "@tiptap/core";
+
+/** One block the slash menu can insert. */
+export interface SlashCommand {
+  id: string;
+  title: string;
+  hint: string;
+  keywords: readonly string[];
+  icon: Icon;
+  apply: (chain: ChainedCommands) => ChainedCommands;
+}
+
+/** Every block the slash menu offers, in menu order. */
+export const slashCommands: readonly SlashCommand[] = [
+  { id: "h1", title: "Heading 1", hint: "#", keywords: ["title", "h1"], icon: IconH1, apply: (chain) => chain.setNode("heading", { level: 1 }) },
+  { id: "h2", title: "Heading 2", hint: "##", keywords: ["subtitle", "h2"], icon: IconH2, apply: (chain) => chain.setNode("heading", { level: 2 }) },
+  { id: "h3", title: "Heading 3", hint: "###", keywords: ["h3"], icon: IconH3, apply: (chain) => chain.setNode("heading", { level: 3 }) },
+  { id: "bullet", title: "Bulleted list", hint: "-", keywords: ["ul", "unordered", "bullet"], icon: IconList, apply: (chain) => chain.toggleBulletList() },
+  { id: "ordered", title: "Numbered list", hint: "1.", keywords: ["ol", "ordered", "number"], icon: IconListNumbers, apply: (chain) => chain.toggleOrderedList() },
+  { id: "task", title: "Task list", hint: "[ ]", keywords: ["todo", "checkbox", "check"], icon: IconListCheck, apply: (chain) => chain.toggleTaskList() },
+  { id: "quote", title: "Quote", hint: ">", keywords: ["blockquote", "citation"], icon: IconBlockquote, apply: (chain) => chain.toggleBlockquote() },
+  { id: "code", title: "Code block", hint: "```", keywords: ["pre", "snippet", "fence"], icon: IconCode, apply: (chain) => chain.toggleCodeBlock() },
+  { id: "table", title: "Table", hint: "3×3", keywords: ["grid", "columns", "rows"], icon: IconTable, apply: (chain) => chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }) },
+  { id: "divider", title: "Divider", hint: "---", keywords: ["hr", "rule", "separator", "line"], icon: IconMinus, apply: (chain) => chain.setHorizontalRule() },
+];
+
+/**
+ * The commands that match what was typed after the slash, by title,
+ * keyword, or Markdown hint. An empty query matches everything.
+ */
+export function filterSlashCommands(query: string, commands: readonly SlashCommand[] = slashCommands): SlashCommand[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [...commands];
+  return commands.filter(
+    (command) =>
+      command.title.toLowerCase().includes(needle) ||
+      command.hint === needle ||
+      command.keywords.some((keyword) => keyword.startsWith(needle)),
+  );
+}
+
+/** Replaces the typed `/query` with the chosen block. */
+export function runSlashCommand(editor: Editor, range: Range, command: SlashCommand): void {
+  command.apply(editor.chain().focus().deleteRange(range)).run();
+}
+
+/** Inserts a block at the cursor, for the touch toolbar's Insert menu. */
+export function insertBlock(editor: Editor, command: SlashCommand): void {
+  command.apply(editor.chain().focus()).run();
+}
