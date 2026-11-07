@@ -11,6 +11,7 @@ import { CommentThread } from "@/components/comments/comment-thread";
 import { CopyButton } from "@/components/copy-button";
 import { GitHubLink } from "@/components/github-link";
 import { LastEdited } from "@/components/history/last-edited";
+import { LegalLinks } from "@/components/legal-links";
 import { Logo } from "@/components/logo";
 import { PixelAvatar, type AvatarKind } from "@/components/pixel-avatar";
 import { ThemeSwitcher } from "@/components/theme-switcher";
@@ -193,8 +194,11 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
         {session && seesComments(viewable, session.user.id) ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" /> : null}
       </main>
       <footer className="border-t">
-        <div className="mx-auto flex w-full max-w-[960px] items-center justify-between gap-4 px-6 py-6 text-sm text-muted-foreground">
-          <Link href="/" className="transition-colors hover:text-foreground">artifacts.space</Link>
+        <div className="mx-auto flex w-full max-w-[960px] flex-wrap items-center justify-between gap-4 px-6 py-6 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <Link href="/" className="transition-colors hover:text-foreground">artifacts.space</Link>
+            <LegalLinks />
+          </div>
           <ThemeSwitcher />
         </div>
       </footer>

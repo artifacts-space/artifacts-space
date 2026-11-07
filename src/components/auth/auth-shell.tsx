@@ -1,3 +1,4 @@
+import { LegalLinks } from "@/components/legal-links";
 import { Logo } from "@/components/logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 
@@ -10,7 +11,10 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
       <main className="flex flex-1 items-center justify-center px-6 py-12">{children}</main>
       <footer className="mx-auto flex w-full max-w-[1440px] flex-col items-start gap-4 px-6 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>Artifacts are private by default. You can revoke any app or token at any time.</p>
-        <ThemeSwitcher />
+        <div className="flex items-center gap-5">
+          <LegalLinks />
+          <ThemeSwitcher />
+        </div>
       </footer>
     </div>
   );

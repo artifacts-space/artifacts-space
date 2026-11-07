@@ -7,10 +7,9 @@ import { ConnectSection } from "@/components/landing/connect-section";
 import { ControlSection } from "@/components/landing/control-section";
 import { HeroDemo } from "@/components/landing/demo/hero-demo";
 import { Logo } from "@/components/logo";
-import { ThemeSwitcher } from "@/components/theme-switcher";
+import { SiteFooter } from "@/components/site-footer";
 import { Button } from "@/components/ui/button";
 import { docsHref } from "@/lib/docs/pages";
-import { REPO_URL } from "@/lib/site-copy";
 
 export default function Home() {
   return (
@@ -56,19 +55,7 @@ export default function Home() {
         <ClosingSection />
       </main>
 
-      <footer className="border-t">
-        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <Logo />
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-4">
-            <Link href="/docs" className="transition-colors hover:text-foreground">Docs</Link>
-            <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-foreground">Source</a>
-            <Link href="/sign-in" className="transition-colors hover:text-foreground">Sign in</Link>
-            <Link href="/sign-up" className="transition-colors hover:text-foreground">Create account</Link>
-            <span>© 2026</span>
-            <ThemeSwitcher />
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
