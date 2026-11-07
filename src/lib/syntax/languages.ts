@@ -24,6 +24,7 @@ const aliases: Readonly<Record<string, SyntaxLanguage>> = {
   zsh: "shellscript",
   shell: "shellscript",
   console: "shellscript",
+  shellsession: "shellscript",
   py: "python",
   yml: "yaml",
   md: "markdown",

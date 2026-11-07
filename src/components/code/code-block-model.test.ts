@@ -27,4 +27,14 @@ describe("codeBlockModel", () => {
     expect(model.copyValue).toBe(code);
     expect(model.display).toBe("line one\n\tline two  ");
   });
+
+  it("should copy shell code without its prompts when lines start with one", () => {
+    const model = codeBlockModel("$ pnpm install\n$ pnpm dev\n", "bash");
+    expect(model.copyValue).toBe("pnpm install\npnpm dev\n");
+    expect(model.display).toBe("$ pnpm install\n$ pnpm dev");
+  });
+
+  it("should copy other languages exactly when a line starts with a dollar sign", () => {
+    expect(codeBlockModel("$ not a prompt", "text").copyValue).toBe("$ not a prompt");
+  });
 });

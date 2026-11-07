@@ -87,7 +87,7 @@ function CodeArea({ display, lines, name, wrap = false, prompt = false, classNam
       {...scrollRegion(scrollable, name)}
       className={cn("font-mono text-sm leading-6", focusClass, wrap && "whitespace-pre-wrap break-words", className)}
     >
-      {prompt ? <span aria-hidden="true" className="text-muted-foreground select-none">$ </span> : null}
+      {prompt ? <span aria-hidden="true" className="text-syntax-comment select-none">$ </span> : null}
       <code className={codeClass(prompt, wrap)}>{lines ? <HighlightedCode lines={lines} /> : display || " "}</code>
     </pre>
   );

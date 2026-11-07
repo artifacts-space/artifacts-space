@@ -47,7 +47,7 @@ describe("CodeBlock as a command", () => {
 
   it("should show a prompt that is hidden from screen readers and never selected when it is a command", () => {
     const html = renderToStaticMarkup(<CodeBlock variant="command" code={command} />);
-    expect(html).toContain('<span aria-hidden="true" class="text-muted-foreground select-none">$ </span>');
+    expect(html).toContain('<span aria-hidden="true" class="text-syntax-comment select-none">$ </span>');
   });
 
   it("should keep the prompt out of the code element when it is a command", () => {
