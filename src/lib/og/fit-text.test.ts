@@ -46,6 +46,6 @@ describe("fitText", () => {
   });
 
   it("should use the smallest size and clamp when nothing fits", () => {
-    expect(fitText("word ".repeat(80), headline)).toEqual({ fontSize: 46, maxLines: 4, clamped: true });
+    expect(fitText("word ".repeat(80), headline)).toEqual({ fontSize: 42, maxLines: 5, clamped: true });
   });
 });

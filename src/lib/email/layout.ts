@@ -13,8 +13,12 @@ export const EMAIL_COLORS = {
   dark: { page: "#100e0d", card: "#151312", border: "#2c2b2a", ink: "#e9e7e5", muted: "#95918d", buttonText: "#100e0d" },
 } as const;
 
-/** The site's sans (Satoshi) first, then system fonts, since most mail apps do not load web fonts. */
-const FONT_STACK = "'Satoshi',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
+/**
+ * The site's sans (Geist) first, for readers who have it installed, then
+ * system fonts, since most mail apps do not load web fonts. Single quotes:
+ * the stack sits inside double-quoted style attributes.
+ */
+export const EMAIL_FONT_STACK = "Geist,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif";
 const SITE_NAME = "artifacts.space";
 /** A 96 px file shown at 48 px, so it stays sharp on high-density screens. */
 export const EMAIL_LOGO_PATH = "/email/artifacts-space-icon.png";
@@ -122,29 +126,29 @@ function renderHeader(): string {
   const logo = `<img src="${escapeHtml(emailLogoUrl())}" width="${String(LOGO_SIZE)}" height="${String(LOGO_SIZE)}" alt="${SITE_NAME}" style="display:block;width:${String(LOGO_SIZE)}px;height:${String(LOGO_SIZE)}px;border:0;outline:none">`;
   return `<table ${TABLE}><tr>
 <td style="vertical-align:middle;padding:0 10px 0 0"><a href="${home}" style="text-decoration:none">${logo}</a></td>
-<td class="em-ink" style="vertical-align:middle;font-family:${FONT_STACK};font-size:17px;line-height:24px;font-weight:500;letter-spacing:-0.01em;color:${LIGHT.ink}">${siteNameLink("ink")}</td>
+<td class="em-ink" style="vertical-align:middle;font-family:${EMAIL_FONT_STACK};font-size:17px;line-height:24px;font-weight:500;letter-spacing:-0.01em;color:${LIGHT.ink}">${siteNameLink("ink")}</td>
 </tr></table>`;
 }
 
 function renderButton({ label, url }: EmailContent["action"]): string {
   return `<table ${TABLE} style="margin:28px 0 0"><tr>
-<td class="em-button" bgcolor="${LIGHT.ink}" style="border-radius:6px;background-color:${LIGHT.ink}"><a class="em-button-text" href="${escapeHtml(url)}" style="display:inline-block;padding:11px 18px;border-radius:6px;font-family:${FONT_STACK};font-size:14px;line-height:20px;font-weight:500;color:${LIGHT.buttonText};text-decoration:none">${escapeHtml(label)}</a></td>
+<td class="em-button" bgcolor="${LIGHT.ink}" style="border-radius:6px;background-color:${LIGHT.ink}"><a class="em-button-text" href="${escapeHtml(url)}" style="display:inline-block;padding:11px 18px;border-radius:6px;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:20px;font-weight:500;color:${LIGHT.buttonText};text-decoration:none">${escapeHtml(label)}</a></td>
 </tr></table>`;
 }
 
 function renderCard(content: EmailContent): string {
-  const heading = `<h1 class="em-ink" style="margin:0 0 12px;font-family:${FONT_STACK};font-size:22px;line-height:30px;font-weight:500;letter-spacing:-0.01em;color:${LIGHT.ink}">${content.heading.safeHtml}</h1>`;
+  const heading = `<h1 class="em-ink" style="margin:0 0 12px;font-family:${EMAIL_FONT_STACK};font-size:22px;line-height:30px;font-weight:500;letter-spacing:-0.01em;color:${LIGHT.ink}">${content.heading.safeHtml}</h1>`;
   const paragraphs = content.paragraphs
-    .map((paragraph) => `<p class="em-muted" style="margin:12px 0 0;font-family:${FONT_STACK};font-size:15px;line-height:24px;color:${LIGHT.muted}">${paragraph.safeHtml}</p>`)
+    .map((paragraph) => `<p class="em-muted" style="margin:12px 0 0;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:${LIGHT.muted}">${paragraph.safeHtml}</p>`)
     .join("\n");
   const note = content.note
-    ? `<p class="em-muted" style="margin:28px 0 0;font-family:${FONT_STACK};font-size:13px;line-height:20px;color:${LIGHT.muted}">${content.note.safeHtml}</p>`
+    ? `<p class="em-muted" style="margin:28px 0 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:${LIGHT.muted}">${content.note.safeHtml}</p>`
     : "";
   return `${heading}\n${paragraphs}\n${renderButton(content.action)}\n${note}`;
 }
 
 function renderFooter(reason: string): string {
-  return `<td class="em-muted" style="padding:20px 4px 0;font-family:${FONT_STACK};font-size:12px;line-height:18px;color:${LIGHT.muted}">${copy(reason, "muted")}<br>${siteNameLink("muted")}</td>`;
+  return `<td class="em-muted" style="padding:20px 4px 0;font-family:${EMAIL_FONT_STACK};font-size:12px;line-height:18px;color:${LIGHT.muted}">${copy(reason, "muted")}<br>${siteNameLink("muted")}</td>`;
 }
 
 /** Hidden text that inbox lists show as the preview line, padded so body text does not follow it. */

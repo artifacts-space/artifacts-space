@@ -39,7 +39,7 @@ export function PrivacyRights() {
         ))}
       </dl>
       <Prose>
-        <p>Fontshare also serves our typeface to your browser, as described under <a href="#cookies">Cookies and local storage</a>. We will update this list before we add a provider that handles personal data.</p>
+        <p>We will update this list before we add a provider that handles personal data.</p>
         <p>We may also disclose personal data when the law requires it, to protect the rights, safety, or property of our users, the public, or Webrenew, or as part of a merger, acquisition, or sale of assets, in which case this policy keeps applying to your data. We tell you about legal requests for your data unless the law or a court forbids it.</p>
       </Prose>
 

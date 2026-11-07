@@ -214,9 +214,7 @@ problem, follow [SECURITY.md](SECURITY.md) instead of opening an issue.
 
 | Asset | Where | License |
 | --- | --- | --- |
-| Geist Mono, backtick (U+0060) subset | `src/app/fonts/backtick-mono.woff2` | SIL Open Font License 1.1, copyright 2023 Vercel with basement.studio. See `src/app/fonts/LICENSE-geist-mono.txt`. |
-| Geist Mono | Loaded with `next/font/google`; `src/app/og/fonts/GeistMono-Regular.ttf` for Open Graph images | SIL Open Font License 1.1. See `src/app/og/fonts/LICENSE-geist-mono.txt`. |
-| Satoshi | Loaded from Fontshare's CDN by the browser and by the Open Graph image routes; never committed | ITF Free Font License (Indian Type Foundry) |
+| Geist and Geist Mono | Loaded with `next/font/google`; `src/app/og/fonts/Geist-Medium.ttf`, `Geist-SemiBold.ttf`, and `GeistMono-Regular.ttf` (from the geist@1.8.2 npm package) for Open Graph images | SIL Open Font License 1.1, copyright 2023 Vercel with basement.studio. See `src/app/og/fonts/LICENSE-geist.txt`. |
 | Pixel planet logo and icons | `public/artifacts-space-mark.svg`, `public/artifacts-space-icon.png`, `public/email/`, `src/app/icon.svg`, `src/app/favicon.ico`, `src/app/og/planet-40.png` | Original work, MIT with the code |
 | Hero background | `public/hero-dusk.webp` | A dusk wallpaper made with vmotif. TODO(owner): confirm the license before release. |
 | Open Graph backdrops | `src/app/og/strata-ink.png`, `src/app/og/strata-ink-plain.png` | Made for this project. TODO(owner): confirm before release. |

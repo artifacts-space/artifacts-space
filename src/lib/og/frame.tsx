@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { OG_SANS_FAMILY } from "@/lib/og/fonts";
 import { OG_SIZE, OG_TEXT, OG_TEXT_BOX, OG_WORDMARK_TYPE } from "@/lib/og/theme";
 
 interface OgFrameProps {
@@ -40,7 +41,7 @@ export function OgFrame({ background, icon, wordmark, children, aside, textWidth
           justifyContent: "center",
           gap: OG_TEXT_BOX.gap,
           color: OG_TEXT,
-          fontFamily: "Satoshi",
+          fontFamily: OG_SANS_FAMILY,
         }}
       >
         <div

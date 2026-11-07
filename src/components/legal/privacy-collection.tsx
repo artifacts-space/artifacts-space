@@ -83,7 +83,7 @@ export function PrivacyCollection() {
           Your browser also stores your theme choice (system, light, or dark) in local storage. We use no analytics, advertising, or tracking cookies, and no third-party analytics of any kind. That is why there is no cookie banner. Images in artifacts and comments load only from our own file storage, so a shared page cannot track its readers with outside images.
         </p>
         <p>
-          One outside service loads in your browser: our Satoshi typeface comes from Fontshare (api.fontshare.com), which receives your IP address and browser details when it serves the font. Our other fonts are served from artifacts.space itself.
+          No outside service loads in your browser. Our fonts, Geist and Geist Mono, are served from artifacts.space itself.
         </p>
       </Prose>
 

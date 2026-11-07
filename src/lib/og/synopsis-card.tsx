@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { OG_MONO_FAMILY, OG_SANS_FAMILY } from "./fonts";
 import { Glyph, SketchView } from "./synopsis-glyphs";
 import type { Synopsis, SynopsisMetric } from "./synopsis-types";
 import { OG_CARD } from "./theme";
@@ -18,7 +19,7 @@ function Metrics({ metrics, sketchHeight }: { metrics: SynopsisMetric[]; sketchH
       {metrics.map((metric) => (
         <div key={metric.label} style={{ ...column, flex: 1, minWidth: 0, gap: 4 }}>
           <div style={{ display: "flex", fontSize: 16, fontWeight: 500, color: OG_CARD.muted, whiteSpace: "nowrap", overflow: "hidden" }}>{metric.label}</div>
-          <div style={{ display: "flex", fontSize: valueSize, fontWeight: 700, color: OG_CARD.ink, letterSpacing: -0.02 * valueSize, whiteSpace: "nowrap" }}>{metric.value}</div>
+          <div style={{ display: "flex", fontSize: valueSize, fontWeight: 600, color: OG_CARD.ink, letterSpacing: -0.02 * valueSize, whiteSpace: "nowrap" }}>{metric.value}</div>
         </div>
       ))}
     </div>
@@ -27,7 +28,7 @@ function Metrics({ metrics, sketchHeight }: { metrics: SynopsisMetric[]; sketchH
 
 function TableView({ header, rows }: { header: string[]; rows: string[][] }) {
   const cell = (text: string, index: number, bold: boolean) => (
-    <div key={index} style={{ display: "flex", flex: 1, minWidth: 0, padding: "0 10px", fontSize: 17, fontWeight: bold ? 700 : 500, color: bold ? OG_CARD.ink : OG_CARD.muted, whiteSpace: "nowrap", overflow: "hidden" }}>
+    <div key={index} style={{ display: "flex", flex: 1, minWidth: 0, padding: "0 10px", fontSize: 17, fontWeight: bold ? 600 : 500, color: bold ? OG_CARD.ink : OG_CARD.muted, whiteSpace: "nowrap", overflow: "hidden" }}>
       {text}
     </div>
   );
@@ -49,7 +50,7 @@ function Chips({ names }: { names: string[] }) {
       <div style={{ display: "flex", fontSize: 17, fontWeight: 500, color: OG_CARD.muted }}>Built from</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, width: innerWidth }}>
         {names.map((name) => (
-          <div key={name} style={{ display: "flex", padding: "6px 14px", fontSize: 20, fontWeight: 700, color: OG_CARD.ink, background: OG_CARD.blueWash, border: `4px solid ${OG_CARD.ink}` }}>
+          <div key={name} style={{ display: "flex", padding: "6px 14px", fontSize: 20, fontWeight: 600, color: OG_CARD.ink, background: OG_CARD.blueWash, border: `4px solid ${OG_CARD.ink}` }}>
             {name}
           </div>
         ))}
@@ -61,7 +62,7 @@ function Chips({ names }: { names: string[] }) {
 function Prose({ heading, body }: { heading: string | null; body: string }) {
   return (
     <div style={{ ...column, gap: 12, width: innerWidth }}>
-      {heading ? <div style={{ display: "block", fontSize: 27, fontWeight: 700, lineHeight: 1.15, color: OG_CARD.ink, letterSpacing: -0.5, lineClamp: 2 }}>{heading}</div> : null}
+      {heading ? <div style={{ display: "block", fontSize: 27, fontWeight: 600, lineHeight: 1.15, color: OG_CARD.ink, letterSpacing: -0.5, lineClamp: 2 }}>{heading}</div> : null}
       <div style={{ display: "block", fontSize: 20, fontWeight: 500, lineHeight: 1.4, color: OG_CARD.muted, lineClamp: heading ? 6 : 8 }}>{body}</div>
     </div>
   );
@@ -70,8 +71,8 @@ function Prose({ heading, body }: { heading: string | null; body: string }) {
 function Code({ language, lines }: { language: string; lines: string[] }) {
   return (
     <div style={{ ...column, gap: 10, width: innerWidth }}>
-      <div style={{ display: "flex", fontSize: 15, fontWeight: 700, color: OG_CARD.blue, letterSpacing: 1.2, textTransform: "uppercase" }}>{language}</div>
-      <div style={{ ...column, fontFamily: "Geist Mono", fontSize: 17, lineHeight: 1.42, color: OG_CARD.ink }}>
+      <div style={{ display: "flex", fontSize: 15, fontWeight: 600, color: OG_CARD.blue, letterSpacing: 1.2, textTransform: "uppercase" }}>{language}</div>
+      <div style={{ ...column, fontFamily: OG_MONO_FAMILY, fontSize: 17, lineHeight: 1.42, color: OG_CARD.ink }}>
         {lines.map((line, index) => (
           <div key={index} style={{ display: "flex", whiteSpace: "pre", height: 24 }}>{line || " "}</div>
         ))}
@@ -85,7 +86,7 @@ function GlyphCard({ synopsis }: { synopsis: Extract<Synopsis, { type: "glyph" }
     <div style={{ ...column, alignItems: "center", justifyContent: "center", gap: 18, width: innerWidth, height: innerHeight }}>
       <Glyph glyph={synopsis.glyph} />
       <div style={{ ...column, alignItems: "center", gap: 4 }}>
-        <div style={{ display: "flex", fontSize: 26, fontWeight: 700, color: OG_CARD.ink, whiteSpace: "nowrap" }}>{synopsis.label}</div>
+        <div style={{ display: "flex", fontSize: 26, fontWeight: 600, color: OG_CARD.ink, whiteSpace: "nowrap" }}>{synopsis.label}</div>
         {synopsis.detail ? <div style={{ display: "flex", fontSize: 18, fontWeight: 500, color: OG_CARD.muted }}>{synopsis.detail}</div> : null}
       </div>
     </div>
@@ -106,7 +107,7 @@ function ChartCard({ synopsis }: { synopsis: Extract<Synopsis, { type: "chart" }
   const titleHeight = synopsis.title ? 34 : 0;
   return (
     <div style={{ ...column, justifyContent: "space-between", width: innerWidth, height: innerHeight }}>
-      {synopsis.title ? <div style={{ display: "flex", height: titleHeight, fontSize: 22, fontWeight: 700, color: OG_CARD.ink, whiteSpace: "nowrap", overflow: "hidden" }}>{synopsis.title}</div> : null}
+      {synopsis.title ? <div style={{ display: "flex", height: titleHeight, fontSize: 22, fontWeight: 600, color: OG_CARD.ink, whiteSpace: "nowrap", overflow: "hidden" }}>{synopsis.title}</div> : null}
       <SketchView sketch={synopsis.sketch} width={innerWidth} height={innerHeight - titleHeight - 12} />
     </div>
   );
@@ -147,7 +148,7 @@ export function SynopsisCard({ synopsis }: { synopsis: Synopsis }) {
         background: OG_CARD.paper,
         border: `${String(OG_CARD.border)}px solid ${OG_CARD.ink}`,
         boxShadow: `${String(OG_CARD.shadow)}px ${String(OG_CARD.shadow)}px 0 0 ${OG_CARD.shadowColor}`,
-        fontFamily: "Satoshi",
+        fontFamily: OG_SANS_FAMILY,
       }}
     >
       {cardBody(synopsis)}

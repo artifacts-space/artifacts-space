@@ -16,10 +16,10 @@ export const OG_WORDMARK_TYPE = { fontSize: 32, letterSpacingEm: -0.01, iconSize
 
 /**
  * Headline type. `maxHeight` holds three lines at 64px (or four at 52px and
- * below), which keeps the block clear of the pixel band at the bottom.
+ * below), or five at 42px, which keeps the block clear of the pixel band at the bottom.
  */
 export const OG_HEADLINE_TYPE = {
-  sizes: [64, 56, 52, 46] as const,
+  sizes: [64, 56, 52, 46, 42] as const,
   maxHeight: 220,
   lineHeight: 1.04,
   letterSpacingEm: -0.035,

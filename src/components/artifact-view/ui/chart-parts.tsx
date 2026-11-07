@@ -79,7 +79,7 @@ export function TooltipBox({ left, children }: { left: number; children: ReactNo
   return (
     <div
       role="status"
-      className="pointer-events-none absolute top-1 z-10 w-max max-w-[14rem] rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-sm"
+      className="pointer-events-none absolute top-1 z-10 w-max max-w-[14rem] rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
       style={left > 60 ? { right: `${String(100 - left)}%`, marginRight: 8 } : { left: `${String(left)}%`, marginLeft: 8 }}
     >
       {children}

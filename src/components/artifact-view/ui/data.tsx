@@ -44,7 +44,7 @@ export function TableView({ props }: ViewProps<"Table">) {
   return (
     <figure className="min-w-0 space-y-2">
       {props.caption ? <figcaption className="text-md font-medium break-words">{props.caption}</figcaption> : null}
-      <div tabIndex={0} role="region" aria-label={props.caption ?? "Table"} className="max-h-[32rem] overflow-auto rounded-md border focus-visible:outline-2 focus-visible:outline-ring">
+      <div tabIndex={0} role="region" aria-label={props.caption ?? "Table"} className="max-h-[32rem] overflow-auto rounded-md border bg-card shadow-xs focus-visible:outline-2 focus-visible:outline-ring">
         <table className="w-full border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-card">
             <tr>
@@ -118,7 +118,7 @@ function sparklineSummary(props: UiProps<"Metric">): string {
 export function MetricView({ props, emit }: ViewProps<"Metric">) {
   const value = typeof props.value === "number" ? formatNumber(props.value, props.format ?? "number", props.currency ?? "USD") : props.value;
   return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-lg border bg-card p-4">
+    <div className="flex min-w-0 flex-col gap-1 rounded-lg border bg-card p-4 shadow-sm">
       <p className="truncate text-sm text-muted-foreground" title={props.label}>{props.label}</p>
       <p className="flex min-w-0 items-baseline gap-1.5">
         <span className="min-w-0 text-2xl font-medium tracking-[-0.02em] break-all tabular-nums">{value}</span>

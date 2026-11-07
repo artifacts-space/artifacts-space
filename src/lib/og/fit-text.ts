@@ -5,16 +5,23 @@
  * The estimates lean wide, so a real line is never longer than predicted.
  */
 
-const NARROW = "iljtfrI.,:;'!|()[]’ ";
-const WIDE = "mwMW@%&";
+/*
+ * Tiers from Geist SemiBold's advance widths (the weight preview text uses),
+ * each rounded up: narrow glyphs are 0.20-0.31 em, mid 0.38-0.43, most
+ * lowercase 0.55-0.63, capitals up to 0.76, and the widest up to 0.99.
+ */
+const NARROW = "ijlI.,:;'!|’ ";
+const MID = "ftr()[]1";
+const WIDE = "mwMW@%";
 
 /** Rough advance width of one character in em, letter spacing excluded. */
 function charWidthEm(char: string): number {
-  if (NARROW.includes(char)) return 0.3;
-  if (WIDE.includes(char)) return 0.9;
-  if (char >= "A" && char <= "Z") return 0.68;
-  if (char >= "0" && char <= "9") return 0.6;
-  return 0.58;
+  if (NARROW.includes(char)) return 0.31;
+  if (MID.includes(char)) return 0.45;
+  if (WIDE.includes(char)) return 1;
+  if (char >= "A" && char <= "Z") return 0.76;
+  if (char >= "0" && char <= "9") return 0.68;
+  return 0.63;
 }
 
 /** Estimated width of `text` in px at `fontSize` with letter spacing in em. */

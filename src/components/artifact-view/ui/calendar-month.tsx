@@ -79,22 +79,25 @@ function MonthGrid({ month, weekStart, entries, selected, panelId, onSelect }: G
   const selectedEntries = selected === null ? [] : (byDay.get(selected) ?? []);
   return (
     <div className="space-y-3">
-      <table className="w-full table-fixed border-collapse">
-        <caption className="sr-only">{formatMonth(month)}</caption>
-        <thead>
-          <tr>
-            {weekdayOrder(weekStart).map((name) => <th key={name} scope="col" abbr={name} className="pb-1 text-left text-xs font-medium text-muted-foreground">{name.slice(0, 3)}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {weeks.map((week) => (
-            <tr key={week[0]}>
-              {week.map((day) => <DayCell key={day} day={day} inMonth={monthOfDay(day) === month} entries={byDay.get(day) ?? []} selected={selected === day} panelId={panelId} onSelect={onSelect} />)}
+      {/* The frame draws the outer edge; border-hidden drops the cells' own outer borders. */}
+      <div className="overflow-hidden rounded-md border bg-card shadow-xs">
+        <table className="w-full table-fixed border-collapse border-hidden">
+          <caption className="sr-only">{formatMonth(month)}</caption>
+          <thead>
+            <tr>
+              {weekdayOrder(weekStart).map((name) => <th key={name} scope="col" abbr={name} className="px-1 py-1.5 text-left text-xs font-medium text-muted-foreground">{name.slice(0, 3)}</th>)}
             </tr>
-          ))}
-        </tbody>
-      </table>
-      <section id={panelId} aria-label={selected === null ? "Selected day" : `Events on ${formatLongDay(selected)}`} hidden={selected === null} className="min-w-0 rounded-md border px-3 pb-1">
+          </thead>
+          <tbody>
+            {weeks.map((week) => (
+              <tr key={week[0]}>
+                {week.map((day) => <DayCell key={day} day={day} inMonth={monthOfDay(day) === month} entries={byDay.get(day) ?? []} selected={selected === day} panelId={panelId} onSelect={onSelect} />)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <section id={panelId} aria-label={selected === null ? "Selected day" : `Events on ${formatLongDay(selected)}`} hidden={selected === null} className="min-w-0 rounded-md border bg-card px-3 pb-1 shadow-xs">
         {selected === null ? null : (
           <div className="@container relative">
             <Button variant="ghost" size="icon-xs" aria-label="Close day" className="absolute top-1.5 right-0" onClick={() => { onSelect(null); }}>

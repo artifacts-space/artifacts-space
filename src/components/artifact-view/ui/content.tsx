@@ -42,7 +42,7 @@ export function MarkdownBlockView({ props }: ViewProps<"Markdown">) {
 /** A code block with an optional title and language label. `actions` sit at the right of the header. */
 export function CodeBlock({ code, language, title, actions }: { code: string; language?: string | undefined; title?: string | undefined; actions?: ReactNode }) {
   return (
-    <figure className="min-w-0 overflow-hidden rounded-md border bg-muted/40">
+    <figure className="min-w-0 overflow-hidden rounded-md border bg-muted/40 shadow-xs">
       {title || language || actions ? (
         <figcaption className="flex min-h-9 items-center gap-2 border-b px-3.5 py-1.5 text-xs text-muted-foreground">
           {title ? <span className="min-w-0 truncate font-medium text-foreground">{title}</span> : null}
@@ -72,7 +72,7 @@ const toneStyles: Record<Tone, { box: string; icon: string; Icon: typeof IconInf
 export function CalloutView({ props }: ViewProps<"Callout">) {
   const style = toneStyles[props.tone ?? "info"];
   return (
-    <div role="note" className={cn("flex min-w-0 gap-3 rounded-md border px-4 py-3", style.box)}>
+    <div role="note" className={cn("flex min-w-0 gap-3 rounded-md border px-4 py-3 shadow-xs", style.box)}>
       <style.Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", style.icon)} />
       <div className="min-w-0 space-y-0.5 text-md leading-6">
         {props.title ? <p className="font-medium break-words">{props.title}</p> : null}

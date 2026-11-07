@@ -14,7 +14,7 @@ export function ImageView({ props }: ViewProps<"Image">) {
   return (
     <figure className="flex min-w-0 flex-col items-start gap-2">
       {/* eslint-disable-next-line @next/next/no-img-element -- an access-checked redirect to R2, which next/image cannot optimize */}
-      <img src={url} alt={props.alt} loading="lazy" decoding="async" className="h-auto max-h-[70vh] max-w-full rounded-md border bg-muted object-contain" />
+      <img src={url} alt={props.alt} loading="lazy" decoding="async" className="h-auto max-h-[70vh] max-w-full rounded-md border bg-muted object-contain shadow-xs" />
       {props.caption ? <figcaption className="text-sm leading-5 text-muted-foreground">{props.caption}</figcaption> : null}
     </figure>
   );

@@ -1,0 +1,30 @@
+import { expect, test } from "@playwright/test";
+
+const themes = ["light", "dark"] as const;
+
+for (const theme of themes) {
+  test(`should show every component in both panels without errors when the site theme is ${theme}`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text().slice(0, 500));
+    });
+    await page.addInitScript((value) => { window.localStorage.setItem("theme", value); }, theme);
+
+    await page.goto("/preview");
+    await expect(page.getByRole("heading", { name: "Artifact preview", level: 1 })).toBeVisible();
+    await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${theme}\\b`));
+    await expect(page.getByRole("status").filter({ hasText: "Drawing diagram" })).toHaveCount(0, { timeout: 60_000 });
+
+    // Each panel keeps its own theme whatever the site theme is.
+    const light = page.locator('[data-preview-theme="light"]').first();
+    const dark = page.locator('[data-preview-theme="dark"]').first();
+    await expect(light).toHaveCSS("color-scheme", "light");
+    await expect(dark).toHaveCSS("color-scheme", "dark");
+    expect(await page.locator("[data-preview-theme]").count()).toBeGreaterThan(80);
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
+    expect(errors).toEqual([]);
+  });
+}
