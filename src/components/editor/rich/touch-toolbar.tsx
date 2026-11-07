@@ -62,7 +62,7 @@ export function TouchToolbar({ editor, linkOpen, onLinkOpenChange }: TouchToolba
     selector: ({ editor: current }) => ({ undo: current.can().undo(), redo: current.can().redo() }),
   });
   return (
-    <div ref={ref} role="toolbar" aria-label="Format" style={{ top }} className="sticky z-[5] -mx-1 mb-3 flex items-center gap-0.5 overflow-x-auto rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <div ref={ref} role="toolbar" aria-label="Format" style={{ top: `calc(var(--artifact-chrome-height, 0px) + ${String(top)}px)` }} className="sticky z-[5] -mx-1 mb-3 flex items-center gap-0.5 overflow-x-auto rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       {linkOpen ? (
         <LinkEditor editor={editor} onDone={() => { onLinkOpenChange(false); }} />
       ) : (
