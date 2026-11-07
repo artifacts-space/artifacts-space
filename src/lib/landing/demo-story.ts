@@ -16,22 +16,34 @@ export const T = {
   send: 2.5,
   create: 3.0,
   created: 3.6,
-  open: 4.2,
-  chart: 4.5,
-  timeline: 4.9,
-  board: 5.3,
-  share: 6.0,
-  sharePick: 6.5,
-  shared: 7.1,
-  mention: 7.7,
-  notified: 8.2,
-  typing: 8.8,
-  reply: 9.7,
-  inbox: 10.2,
-  read: 10.7,
-  update: 11.3,
-  updated: 11.8,
-  wrap: 12.5,
+  /** The artifact card flies from the terminal to the browser. */
+  handoff: 3.6,
+  /** The browser comes forward; the terminal recedes. */
+  appFront: 3.9,
+  listRow: 4.3,
+  open: 4.9,
+  chart: 5.2,
+  timeline: 5.6,
+  board: 6.0,
+  share: 6.7,
+  sharePick: 7.2,
+  shared: 7.8,
+  mention: 8.4,
+  notified: 8.9,
+  typing: 9.4,
+  reply: 10.2,
+  /** Dana's reply flies from the browser back to the terminal. */
+  handback: 10.6,
+  /** The terminal comes forward again. */
+  termFront: 10.9,
+  inbox: 11.1,
+  read: 11.6,
+  update: 12.0,
+  updated: 12.5,
+  /** The browser comes forward to show version 2. */
+  appFront2: 12.5,
+  v2: 12.8,
+  wrap: 13.2,
 } as const;
 
 /** Seconds between typed characters in the prompt. */
@@ -50,7 +62,7 @@ export const demoPeople = {
 
 export const demoTitle = "Checkout v2 rollout";
 export const demoSummary = "Move checkout v2 to all traffic in one week.";
-const shortId = "q7Rk2V…";
+export const shortId = "q7Rk2V…";
 
 export const demoPrompt = "Save the checkout v2 rollout plan as an artifact and ask @dana to check the risks.";
 export const agentAsk = "Can you check the risks before we pass 5%?";

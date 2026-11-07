@@ -82,6 +82,9 @@
   --color-term-dim: var(--term-dim);
   --color-term-accent: var(--term-accent);
   --color-term-ok: var(--term-ok);
+  --color-window-shadow: var(--window-shadow);
+  --color-window-dim: var(--window-dim);
+  --color-window-edge: var(--window-edge);
   --color-syntax-keyword: var(--syntax-keyword);
   --color-syntax-string: var(--syntax-string);
   --color-syntax-property: var(--syntax-property);
@@ -222,6 +225,10 @@
   --term-dim: oklch(0.6 0.008 70);
   --term-accent: oklch(0.58 0.15 40);
   --term-ok: oklch(0.55 0.13 150);
+  /* Desktop windows in the landing demo, on the dusk backdrop in both themes. */
+  --window-shadow: oklch(0.08 0.01 60 / 0.6);
+  --window-dim: oklch(0.12 0.01 60 / 0.2);
+  --window-edge: oklch(1 0 0 / 0.14);
   color-scheme: light;
 }
 

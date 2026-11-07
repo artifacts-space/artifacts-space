@@ -66,16 +66,16 @@ function Mention({ handle, agent = false }: { handle: string; agent?: boolean })
   );
 }
 
-function Comment({ seed, kind, author, clamp = false, children }: { seed: string; kind: "person" | "agent"; author: string; clamp?: boolean; children: ReactNode }) {
+function Comment({ seed, kind, author, children }: { seed: string; kind: "person" | "agent"; author: string; children: ReactNode }) {
   return (
     <div className="grid gap-1">
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         <PixelAvatar seed={seed} kind={kind} size={20} />
         <span className="font-medium">{author}</span>
         {kind === "agent" ? <span className="rounded-full bg-secondary px-2 text-xs font-medium text-secondary-foreground">Agent</span> : null}
         <span className="text-xs text-muted-foreground">now</span>
       </div>
-      <p className={cn("text-sm leading-6", clamp && "lg:line-clamp-1")}>{children}</p>
+      <p className="text-sm leading-6">{children}</p>
     </div>
   );
 }
@@ -84,9 +84,9 @@ function Comment({ seed, kind, author, clamp = false, children }: { seed: string
 export function DemoComments() {
   const { agent, reviewer } = demoPeople;
   return (
-    <div className="demo-comments z-10 flex flex-col gap-3 border-t bg-card p-4 text-card-foreground lg:absolute lg:right-4 lg:bottom-4 lg:w-80 lg:rounded-lg lg:border lg:shadow-lg" style={beat(T.notified)}>
+    <div className="flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-4 text-card-foreground" style={beat(T.notified)}>
       <p className="text-sm font-medium">Comments <span className="text-muted-foreground">2</span></p>
-      <Comment seed={agent.seed} kind="agent" author={`@${agent.handle}`} clamp>
+      <Comment seed={agent.seed} kind="agent" author={`@${agent.handle}`}>
         <Mention handle={reviewer.handle} /> {agentAsk}
       </Comment>
       <div className="demo-swap">

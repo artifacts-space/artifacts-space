@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { agentWrap, demoCalls, demoPeople, demoPrompt, T, typedAt, type DemoCall } from "@/lib/landing/demo-story";
 import { toolRows } from "@/lib/mcp/tool-summaries";
@@ -8,7 +8,7 @@ import { beat } from "./beat";
 const toolCount = toolRows().length;
 
 /** A line of the transcript: a marker column, then the text. */
-function Line({ marker, className, style, children }: { marker: ReactNode; className: string; style?: React.CSSProperties; children: ReactNode }) {
+function Line({ marker, className, style, children }: { marker: ReactNode; className: string; style?: CSSProperties; children: ReactNode }) {
   return (
     <div className={className} style={style}>
       <span aria-hidden="true">{marker}</span>
@@ -46,9 +46,11 @@ function TypedPrompt() {
 }
 
 /**
- * A Claude Code session, drawn the way Claude Code draws it: the welcome box,
- * the `>` prompt, `⏺` tool calls with compact arguments, `⎿` results, and the
- * input box at the bottom. It follows the page theme.
+ * A Claude Code session in its own window, drawn the way Claude Code draws
+ * it: the welcome box, the `>` prompt, `⏺` tool calls with compact
+ * arguments, `⎿` results, and the input box at the bottom. The transcript
+ * keeps the newest lines in view, so older ones scroll off the top as calls
+ * arrive. It follows the page theme.
  */
 export function DemoTerminal() {
   return (
@@ -58,13 +60,15 @@ export function DemoTerminal() {
         <span className="demo-term__title">claude — ~/{demoPeople.project}</span>
       </div>
       <div className="demo-term__body" data-demo-pane="">
-        <Line marker={<span className="demo-spark">✻</span>} className="demo-welcome">
-          <b>Claude Code</b>
-          <span>~/{demoPeople.project} · artifacts connected</span>
-        </Line>
-        <Line marker="&gt;" className="demo-user" style={beat(T.send)}>{demoPrompt}</Line>
-        {demoCalls.map((call) => <Call key={`${call.tool}-${String(call.at)}`} call={call} />)}
-        <Line marker={<span className="demo-dot" />} className="demo-say" style={beat(T.wrap)}>{agentWrap}</Line>
+        <div className="demo-term__log">
+          <div className="demo-welcome">
+            <b>Claude Code</b>
+            <span>~/{demoPeople.project} · artifacts connected</span>
+          </div>
+          <Line marker="&gt;" className="demo-user" style={beat(T.send)}>{demoPrompt}</Line>
+          {demoCalls.map((call) => <Call key={`${call.tool}-${String(call.at)}`} call={call} />)}
+          <Line marker={<span className="demo-dot" />} className="demo-say" style={beat(T.wrap)}>{agentWrap}</Line>
+        </div>
       </div>
       <div className="demo-term__input" data-demo-pane="">
         <span aria-hidden="true">&gt;</span>

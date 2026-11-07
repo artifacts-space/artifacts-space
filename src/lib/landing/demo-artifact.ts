@@ -64,8 +64,11 @@ const board: Element = {
   props: {
     title: "Risks",
     columns: [
-      { title: "To check", tone: "warning", cards: [{ title: "Card declines go up", badges: [{ label: "Payments", tone: "warning" }], owner: "Dana" }] },
-      { title: "Watching", tone: "info", cards: [{ title: "Tax totals round differently", badges: [{ label: "Billing" }] }] },
+      {
+        title: "To check",
+        tone: "warning",
+        cards: [{ title: "Card declines go up", badges: [{ label: "Payments", tone: "warning" }], owner: "Dana" }],
+      },
       { title: "Done", tone: "success", cards: [{ title: "Load test at 2x peak", badges: [{ label: "Passed", tone: "success" }] }] },
     ],
   },
