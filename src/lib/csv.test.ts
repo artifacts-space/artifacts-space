@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detectDelimiter, parseCsv } from "./csv";
+import { csvTextStyle, detectDelimiter, parseCsv, serializeCsv, serializeCsvField } from "./csv";
 
 describe("parseCsv", () => {
   it("should split a header and rows when the input is simple", () => {
@@ -72,5 +72,67 @@ describe("detectDelimiter", () => {
 
   it("should ignore separators inside quotes when counting", () => {
     expect(detectDelimiter('"a;b;c",d\n')).toBe(",");
+  });
+});
+
+describe("serializeCsv", () => {
+  it("should give back the same cells when a parsed file is written and read again", () => {
+    const source = 'name,note,score\nAda,"x, y",10\n"Lin ""LJ""","line 1\nline 2",\n,,\n';
+    const parsed = parseCsv(source);
+    const again = parseCsv(serializeCsv(parsed.header, parsed.rows, csvTextStyle(source)));
+    expect(again.header).toEqual(parsed.header);
+    expect(again.rows).toEqual(parsed.rows);
+  });
+
+  it("should write the same text when the file is already minimally quoted", () => {
+    const source = 'a,b\n1,"x, y"\n2,"say ""hi"""\n';
+    const parsed = parseCsv(source);
+    expect(serializeCsv(parsed.header, parsed.rows, csvTextStyle(source))).toBe(source);
+  });
+
+  it("should quote a field when it holds a comma, a quote, or a line break", () => {
+    expect(serializeCsvField("a,b")).toBe('"a,b"');
+    expect(serializeCsvField('say "hi"')).toBe('"say ""hi"""');
+    expect(serializeCsvField("one\ntwo")).toBe('"one\ntwo"');
+    expect(serializeCsvField("cr\rhere")).toBe('"cr\rhere"');
+    expect(serializeCsvField("plain text")).toBe("plain text");
+  });
+
+  it("should quote by the file's separator when it is not a comma", () => {
+    expect(serializeCsvField("a;b", ";")).toBe('"a;b"');
+    expect(serializeCsvField("a,b", ";")).toBe("a,b");
+    expect(serializeCsv(["a", "b"], [["1,5", "2;3"]], { delimiter: ";", newline: "\n" })).toBe('a;b\n1,5;"2;3"');
+  });
+
+  it("should keep a row when its only field is empty", () => {
+    const text = serializeCsv(["a"], [[""], ["x"]], { newline: "\n" });
+    expect(parseCsv(text).rows).toEqual([[""], ["x"]]);
+  });
+
+  it("should use CRLF between records when no style is given", () => {
+    expect(serializeCsv(["a"], [["1"]])).toBe("a\r\n1");
+  });
+
+  it("should keep ragged rows ragged when writing", () => {
+    expect(serializeCsv(["a", "b", "c"], [["1"], ["1", "2", "3", "4"]], { newline: "\n" })).toBe("a,b,c\n1\n1,2,3,4");
+  });
+});
+
+describe("serializeCsv header", () => {
+  it("should keep the separator detectable when a header name holds another separator", () => {
+    const text = serializeCsv(["a;b;c", "x"], [["1", "2"]], { newline: "\n" });
+    expect(text).toBe('"a;b;c",x\n1,2');
+    expect(parseCsv(text).header).toEqual(["a;b;c", "x"]);
+  });
+
+  it("should write nothing when there is no header and no rows", () => {
+    expect(serializeCsv([], [])).toBe("");
+  });
+});
+
+describe("csvTextStyle", () => {
+  it("should read CRLF, a trailing line break, and the separator when present", () => {
+    expect(csvTextStyle("a;b\r\n1;2\r\n")).toEqual({ delimiter: ";", newline: "\r\n", trailingNewline: true });
+    expect(csvTextStyle("a,b\n1,2")).toEqual({ delimiter: ",", newline: "\n", trailingNewline: false });
   });
 });
