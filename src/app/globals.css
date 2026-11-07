@@ -627,6 +627,119 @@
     color: var(--muted-foreground);
     background: color-mix(in oklch, var(--muted) 60%, transparent);
   }
+
+  /*
+   * The rich Markdown editor. Its document uses .artifact-prose, so it reads
+   * like the rendered artifact; these rules add only what editing needs.
+   */
+  .rich-editor-content {
+    min-height: 50dvh;
+    padding-bottom: 6rem;
+    outline: none;
+    caret-color: var(--foreground);
+  }
+  .rich-editor-content :where(p, h1, h2, h3, h4, h5, h6).is-empty::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    color: var(--muted-foreground);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+  .rich-editor-content .suggestion {
+    border-radius: 4px;
+    background: var(--muted);
+  }
+  .rich-editor-content ul[data-type="taskList"] {
+    padding-left: 0.2em;
+    list-style: none;
+  }
+  .rich-editor-content ul[data-type="taskList"] li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+  }
+  .rich-editor-content ul[data-type="taskList"] li > label {
+    flex-shrink: 0;
+    margin-top: 0.15em;
+    user-select: none;
+  }
+  .rich-editor-content ul[data-type="taskList"] li > div {
+    flex: 1;
+    min-width: 0;
+  }
+  .rich-editor-content ul[data-type="taskList"] li > div > p {
+    margin-top: 0;
+  }
+  .rich-editor-content ul[data-type="taskList"] li[data-checked="true"] > div {
+    color: var(--muted-foreground);
+    text-decoration: line-through;
+    text-decoration-color: var(--border);
+  }
+  .rich-editor-content ul[data-type="taskList"] input[type="checkbox"] {
+    width: 1em;
+    height: 1em;
+    cursor: pointer;
+    accent-color: var(--foreground);
+  }
+  .rich-editor-content li > p {
+    margin-top: 0;
+  }
+  .rich-editor-content table {
+    display: table;
+  }
+  .rich-editor-content :where(th, td) {
+    position: relative;
+    min-width: 4em;
+  }
+  .rich-editor-content :where(th, td) > p {
+    margin: 0;
+  }
+  .rich-editor-content .selectedCell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .rich-editor-content .tableWrapper {
+    overflow-x: auto;
+  }
+  .rich-editor-content .rich-code-block {
+    margin-top: 0.9em;
+  }
+  /* Same surface as the read-side code block (the --code tokens); plain text while editing. */
+  .rich-editor-content .rich-code-block pre {
+    margin-top: 0;
+    padding-right: 7.5rem;
+    border-color: var(--code-border);
+    border-radius: var(--radius-lg);
+    background: var(--code);
+    color: var(--code-foreground);
+    white-space: pre;
+    tab-size: 2;
+  }
+  .rich-editor-content .rich-raw-block {
+    margin-top: 0.9em;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-md);
+    background: var(--muted);
+  }
+  .rich-editor-content .rich-raw-block[data-selected],
+  .rich-editor-content .ProseMirror-selectednode {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .rich-editor-content hr.ProseMirror-selectednode {
+    outline-offset: 4px;
+  }
+  .rich-editor-content .ProseMirror-gapcursor::after {
+    border-top-color: var(--foreground);
+  }
+  .rich-editor-content a {
+    cursor: text;
+  }
 }
 
 /*
