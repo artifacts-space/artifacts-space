@@ -13,7 +13,7 @@ vi.mock("@/lib/access", () => ({ getArtifactAccess: mocks.getArtifactAccess }));
 vi.mock("@/lib/versions/cache", () => ({ cachedVersionView: mocks.cachedVersionView }));
 vi.mock("@/lib/files/download", () => ({ filesForViewer: mocks.filesForViewer }));
 
-const { artifactImagePath, artifactOgMetadata, loadArtifactOg, shareableVersion } = await import("./artifact-og");
+const { artifactImagePath, artifactOgMetadata, artifactPagePath, loadArtifactOg, shareableVersion } = await import("./artifact-og");
 
 const approvedId = "11111111-1111-4111-8111-111111111111";
 const pendingTitle = "Pending edit title";
@@ -87,10 +87,70 @@ describe("artifactOgMetadata", () => {
     }
   });
 
+  it("should describe the approved version with its summary in every description tag, with og:url, when the artifact is public", async () => {
+    mocks.getArtifactAccess.mockResolvedValue(access("public"));
+    mocks.cachedVersionView.mockResolvedValue({ ...approvedView, summary: "Approved summary." });
+    const tags = await artifactOgMetadata("abc");
+    expect(mocks.cachedVersionView).toHaveBeenCalledWith(approvedId, savedAt.toISOString());
+    expect(tags.description).toBe("Approved summary.");
+    expect(tags.openGraph).toMatchObject({ description: "Approved summary.", url: "/artifact/abc" });
+    expect(tags.twitter).toMatchObject({ description: "Approved summary." });
+  });
+
+  it("should excerpt the approved content when the approved version has no summary", async () => {
+    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.cachedVersionView.mockResolvedValue(approvedView);
+    expect((await artifactOgMetadata("abc")).description).toBe("Approved body.");
+  });
+
+  it("should never describe a pending edit when the latest version differs from the approved one", async () => {
+    const pending = { summary: "Pending summary secret", content: "Pending body secret" };
+    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.cachedVersionView.mockImplementation((versionId: string) => Promise.resolve(versionId === approvedId ? approvedView : { ...approvedView, ...pending }));
+    const serialized = JSON.stringify(await artifactOgMetadata("abc"));
+    expect(serialized).not.toContain("secret");
+    expect(serialized).not.toContain(pendingTitle);
+  });
+
+  it("should put the approved emoji before the title in og:title and twitter:title, as in the tab title", async () => {
+    const withEmoji = access("public");
+    withEmoji.served.icon = "🚀";
+    mocks.getArtifactAccess.mockResolvedValue(withEmoji);
+    const tags = await artifactOgMetadata("abc");
+    expect(tags.openGraph).toMatchObject({ title: "🚀 Approved title" });
+    expect(tags.twitter).toMatchObject({ title: "🚀 Approved title" });
+  });
+
+  it("should list the approved files only when a file artifact has no notes or summary", async () => {
+    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.cachedVersionView.mockResolvedValue({ ...approvedView, kind: "file", content: "" });
+    mocks.filesForViewer.mockResolvedValue([{ id: "f", filename: "deck.pdf", contentType: "application/pdf", size: 1, createdAt: "" }]);
+    expect((await artifactOgMetadata("abc")).description).toBe("1 file: deck.pdf");
+    mocks.filesForViewer.mockClear();
+    mocks.cachedVersionView.mockResolvedValue({ ...approvedView, kind: "file", content: "Signed copies." });
+    expect((await artifactOgMetadata("abc")).description).toBe("Signed copies.");
+    expect(mocks.filesForViewer).not.toHaveBeenCalled();
+  });
+
+  it("should add no description and never read content when the artifact is private, team, missing, or unapproved", async () => {
+    for (const result of [null, access("team"), access("private"), access("link", "latest"), access("public", "latest")]) {
+      mocks.getArtifactAccess.mockResolvedValue(result);
+      expect((await artifactOgMetadata("abc")).description).toBeUndefined();
+    }
+    expect(mocks.cachedVersionView).not.toHaveBeenCalled();
+    expect(mocks.filesForViewer).not.toHaveBeenCalled();
+  });
+
   it("should keep the site tags when the lookup fails", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.getArtifactAccess.mockRejectedValue(new Error("db down"));
     expect(await artifactOgMetadata("abc")).toEqual({});
+  });
+});
+
+describe("artifactPagePath", () => {
+  it("should encode the id into the page path", () => {
+    expect(artifactPagePath("a/b")).toBe("/artifact/a%2Fb");
   });
 });
 

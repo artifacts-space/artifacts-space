@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 
 import { getArtifactAccess, type ArtifactAccess } from "@/lib/access";
+import { iconTitlePrefix } from "@/lib/artifact-icons";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { filesForViewer } from "@/lib/files/download";
 import { cachedVersionView } from "@/lib/versions/cache";
 import { isReviewedLevel } from "@/lib/versions/rules";
 import { OG_DESCRIPTION, OG_WORDMARK } from "@/lib/site-copy";
 
+import { artifactDescription } from "./description";
 import { ogIconFor, type OgIcon } from "./icon";
 import { buildSynopsis, ogKindLabels } from "./synopsis";
 import type { Synopsis } from "./synopsis-types";
@@ -44,23 +46,42 @@ export function artifactImagePath(publicId: string, versionId: string): string {
   return `/artifact/${encodeURIComponent(publicId)}/og/${encodeURIComponent(versionId)}`;
 }
 
+/** The path of an artifact's page, the canonical URL of every way to reach it. */
+export function artifactPagePath(publicId: string): string {
+  return `/artifact/${encodeURIComponent(publicId)}`;
+}
+
+/** The description of the approved version a signed-out reader sees. Files are listed only when a file artifact has no notes. */
+async function shareableDescription(access: ArtifactAccess, shareable: { versionId: string; savedAt: string }): Promise<string | null> {
+  const view = await cachedVersionView(shareable.versionId, shareable.savedAt);
+  if (!view) return null;
+  const needsFiles = view.kind === "file" && !view.summary.trim() && !view.content.trim();
+  const files = needsFiles ? await filesForViewer(access) : [];
+  return artifactDescription({ kind: view.kind, summary: view.summary, content: view.content, language: view.language, files });
+}
+
 /**
- * Open Graph and X card tags for an artifact page, as a signed-out reader
- * would get them: its approved title and the preview of its approved version,
- * whose URL holds the version id so it changes with every approval and can be
- * cached for a year. Empty (the page keeps the site's tags and image) when
- * the artifact may not be previewed or the lookup fails.
+ * The description, Open Graph, and X card tags for an artifact page, as a
+ * signed-out reader would get them: its approved title (with its emoji, as
+ * in the tab title), a description of its approved version (its summary, or
+ * an excerpt of its content), and the preview of that version, whose URL
+ * holds the version id so it changes with every approval and can be cached
+ * for a year. Empty (the page keeps the site's description, tags, and image)
+ * when the artifact may not be previewed or the lookup fails, so private,
+ * team, and unapproved text never reaches these tags.
  */
-export async function artifactOgMetadata(publicId: string): Promise<Pick<Metadata, "openGraph" | "twitter">> {
+export async function artifactOgMetadata(publicId: string): Promise<Pick<Metadata, "description" | "openGraph" | "twitter">> {
   try {
     const access = await publicAccess(publicId);
     const shareable = shareableVersion(access);
     if (!access || !shareable) return {};
-    const title = access.served.title;
-    const image = { url: artifactImagePath(publicId, shareable.versionId), alt: `${title} on ${OG_WORDMARK}`, width: OG_SIZE.width, height: OG_SIZE.height, type: "image/png" };
+    const description = (await shareableDescription(access, shareable)) ?? OG_DESCRIPTION;
+    const title = `${iconTitlePrefix(access.served.icon)}${access.served.title}`;
+    const image = { url: artifactImagePath(publicId, shareable.versionId), alt: `${access.served.title} on ${OG_WORDMARK}`, width: OG_SIZE.width, height: OG_SIZE.height, type: "image/png" };
     return {
-      openGraph: { title, description: OG_DESCRIPTION, type: "article", siteName: OG_WORDMARK, images: [image] },
-      twitter: { card: "summary_large_image", title, description: OG_DESCRIPTION, images: [image] },
+      description,
+      openGraph: { title, description, url: artifactPagePath(publicId), type: "article", siteName: OG_WORDMARK, images: [image] },
+      twitter: { card: "summary_large_image", title, description, images: [image] },
     };
   } catch (error) {
     console.error("[og] Artifact preview tags failed; keeping the site tags", error);
