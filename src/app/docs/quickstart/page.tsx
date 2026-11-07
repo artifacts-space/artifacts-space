@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { CodeBlock, CommandBlock } from "@/components/code-block";
+import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
 import { DocsH, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { ClientPicker } from "@/components/setup/client-picker";
@@ -62,9 +62,9 @@ export default function QuickstartPage() {
           <li>Keep it in a secret store or an environment variable such as <code>{TOKEN_ENV_VAR}</code>, never in source control.</li>
         </ol>
       </Prose>
-      <CodeBlock title="mcp.json" value={mcpConfigJson(origin)} className="mt-4" />
+      <CodeSnippet title="mcp.json" language="json" code={mcpConfigJson(origin)} className="mt-4" />
       <Prose><p>Or with Claude Code, reading the token from the environment:</p></Prose>
-      <div className="mt-4"><CommandBlock command={headlessCommand} /></div>
+      <CommandSnippet command={headlessCommand} className="mt-4" />
       <Note title="Personal tokens and agent tokens">
         A personal token acts as you, with full access. For an agent that works for a team, add it as an agent teammate and give it its own token; then its work shows under its own handle. See <Link href={docsHref("sharing", "agent-tokens")} className="underline underline-offset-2">Agent tokens</Link>.
       </Note>
@@ -80,9 +80,9 @@ export default function QuickstartPage() {
 
       <DocsH page={page} id="first-artifact" />
       <Prose><p>Ask your agent in plain words. It picks the tool and the arguments:</p></Prose>
-      <CodeBlock title="Prompt" value={firstPrompt} className="mt-4" />
+      <CodeSnippet title="Prompt" code={firstPrompt} className="mt-4" />
       <Prose><p>The agent calls <code>artifacts_create</code>:</p></Prose>
-      <CodeBlock title="tools/call" value={firstCall} className="mt-4" />
+      <CodeSnippet title="tools/call" language="json" code={firstCall} className="mt-4" />
       <Prose>
         <p>
           The result holds the artifact&apos;s id and <code>url</code>. Open the URL to read and edit it, or share it from the page. The artifact is private until you share it. Later sessions find it with <code>artifacts_list</code> (search by text or project) and read it with <code>artifacts_get</code>.
@@ -91,7 +91,7 @@ export default function QuickstartPage() {
 
       <DocsH page={page} id="first-ui" />
       <Prose><p>For dashboards and reports, ask for a <code>ui</code> artifact. The agent reads the component guide, writes a spec, and checks it before it saves:</p></Prose>
-      <CodeBlock title="Prompt" value={uiPrompt} className="mt-4" />
+      <CodeSnippet title="Prompt" code={uiPrompt} className="mt-4" />
       <Prose>
         <p>
           Read <Link href={docsHref("json-render")}>JSON Render</Link> to see what a spec looks like, or try one in the <Link href={docsHref("json-render/playground")}>playground</Link>.

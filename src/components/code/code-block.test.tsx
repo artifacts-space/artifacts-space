@@ -41,3 +41,51 @@ describe("CodeBlock with a title", () => {
     expect(copy).toBeGreaterThan(language);
   });
 });
+
+describe("CodeBlock as a command", () => {
+  const command = "claude mcp add --transport http artifacts https://artifacts.space/api/mcp";
+
+  it("should show a prompt that is hidden from screen readers and never selected when it is a command", () => {
+    const html = renderToStaticMarkup(<CodeBlock variant="command" code={command} />);
+    expect(html).toContain('<span aria-hidden="true" class="text-muted-foreground select-none">$ </span>');
+  });
+
+  it("should keep the prompt out of the code element when it is a command", () => {
+    const html = renderToStaticMarkup(<CodeBlock variant="command" code={command} />);
+    const code = /<code[^>]*>(.*?)<\/code>/.exec(html)?.[1] ?? "";
+    expect(code).toBe(command);
+    expect(code).not.toContain("$");
+  });
+
+  it("should drop the header and name the copy button for a command when no label is given", () => {
+    const html = renderToStaticMarkup(<CodeBlock variant="command" code={command} />);
+    expect(html).not.toContain("<figcaption");
+    expect(html).toContain('aria-label="Copy command"');
+    expect(html).toContain('data-variant="command"');
+  });
+
+  it("should use the given copy label when one is set", () => {
+    const html = renderToStaticMarkup(<CodeBlock variant="command" code="npx skills add x" copyLabel="Copy skill command" />);
+    expect(html).toContain('aria-label="Copy skill command"');
+  });
+
+  it("should color the command with syntax token classes when lines come highlighted", () => {
+    const lines = [[{ text: "npx", kind: "function" as const }, { text: " skills", kind: null }]];
+    const html = renderToStaticMarkup(<CodeBlock variant="command" code="npx skills" lines={lines} />);
+    expect(html).toContain('<span class="text-syntax-function">npx</span>');
+  });
+});
+
+describe("CodeBlock wrapping", () => {
+  it("should wrap long lines instead of scrolling sideways when wrap is set", () => {
+    const html = renderToStaticMarkup(<CodeBlock code="a very long report line" wrap />);
+    expect(html).toContain("whitespace-pre-wrap");
+    expect(html).not.toContain("w-max");
+  });
+
+  it("should scroll sideways by default when wrap is not set", () => {
+    const html = renderToStaticMarkup(<CodeBlock code="a very long line" />);
+    expect(html).toContain("w-max");
+    expect(html).not.toContain("whitespace-pre-wrap");
+  });
+});

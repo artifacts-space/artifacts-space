@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { CodeBlock } from "@/components/code-block";
+import { CodeSnippet } from "@/components/code/code-snippet";
 import { DocsH, FactTable, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { LiveExample } from "@/components/docs/live-example";
@@ -100,7 +100,7 @@ export default function DynamicPage() {
         </p>
       </Prose>
       <FactTable head={["Action", "params", "What it does"]} rows={actionRows} mono={[0, 1]} />
-      <CodeBlock title="Two actions on one press" value={bindingShape} className="mt-6" />
+      <CodeSnippet title="Two actions on one press" language="json" code={bindingShape} className="mt-6" />
       <DocsH page={page} id="set-state" />
       <LiveExample example={setStateExample} />
       <DocsH page={page} id="push-remove" />

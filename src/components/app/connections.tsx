@@ -12,7 +12,7 @@ import {
 import { ConnectedApps } from "@/components/app/connected-apps";
 import { McpToolsTable } from "@/components/app/mcp-tools-table";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
-import { CodeBlock, CommandBlock } from "@/components/code-block";
+import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
 import { CursorInstallButton } from "@/components/setup/cursor-install-button";
 import { SkillInstall } from "@/components/setup/skill-install";
 import { TokenRevealDialog } from "@/components/tokens/token-reveal-dialog";
@@ -93,19 +93,19 @@ export function Connections({
             <p className="mt-1 text-sm text-muted-foreground">Run this, then approve the app in your browser. No token to copy.</p>
           </div>
           <div className="grid gap-3 p-5">
-            <CommandBlock command={claudeMcpAddOAuthCommand(origin)} />
+            <CommandSnippet command={claudeMcpAddOAuthCommand(origin)} />
             <div className="flex flex-wrap items-center gap-3">
               <CursorInstallButton origin={origin} />
               <p className="text-sm leading-6 text-muted-foreground">Or, for other clients that support OAuth, add this to mcp.json.</p>
             </div>
-            <CodeBlock title="mcp.json" value={mcpOAuthConfigJson(origin)} />
+            <CodeSnippet title="mcp.json" language="json" code={mcpOAuthConfigJson(origin)} />
           </div>
           <div className="border-t px-5 py-4">
             <h3 className="text-md font-medium">CI and headless use</h3>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
               Where nobody can approve in a browser, send a token instead. Replace <code className="font-mono">{TOKEN_PLACEHOLDER}</code> with a token from this page, and keep it out of source control.
             </p>
-            <CodeBlock title="mcp.json" value={config} className="mt-3" />
+            <CodeSnippet title="mcp.json" language="json" code={config} className="mt-3" />
           </div>
           <div className="border-t px-5 py-4">
             <h3 className="text-md font-medium">Agent skill</h3>

@@ -1,5 +1,3 @@
-"use client";
-
 import { IconArrowRight } from "@tabler/icons-react";
 import Link from "next/link";
 
@@ -11,7 +9,9 @@ import { mcpClients } from "@/lib/setup/client-installs";
 /**
  * Pick your agent, then follow its steps: a one-click button where the
  * client has one, the exact config or steps, and what happens after.
- * Each tab links to the full guide on the clients page.
+ * Each tab links to the full guide on the clients page. A server
+ * component, so the guides' code blocks arrive highlighted with no
+ * highlighter in the page; only the tabs themselves run in the browser.
  */
 export function ClientPicker({ origin }: { origin: string }) {
   return (

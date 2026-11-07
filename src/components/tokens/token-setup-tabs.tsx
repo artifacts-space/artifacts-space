@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 
-import { CodeBlock, CommandBlock } from "@/components/code-block";
+import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
 import { SkillInstall } from "@/components/setup/skill-install";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { claudeMcpAddCommand, claudeMcpAddOAuthCommand, mcpConfigJson } from "@/lib/setup/mcp-config";
@@ -22,12 +22,12 @@ export function TokenSetupTabs({ token, origin }: { token: string; origin: strin
           <p className="text-sm leading-5 text-muted-foreground">
             <span className="font-medium text-foreground">For CI and headless use.</span> Add this server to your MCP client. Your token is already in it.
           </p>
-          <CodeBlock title="mcp.json" value={mcpConfigJson(origin, token)} preClassName="p-3 leading-5" />
+          <CodeSnippet title="mcp.json" language="json" code={mcpConfigJson(origin, token)} />
           <p className="text-sm leading-5 text-muted-foreground">Or add it to Claude Code with one command.</p>
-          <CommandBlock command={claudeMcpAddCommand(origin, token)} />
+          <CommandSnippet command={claudeMcpAddCommand(origin, token)} />
           <p className="text-sm leading-5 text-muted-foreground">Both contain your token. Keep them out of source control.</p>
           <p className="text-sm leading-5 text-muted-foreground">On your own computer, skip the token: run this and approve in the browser.</p>
-          <CommandBlock command={claudeMcpAddOAuthCommand(origin)} copyLabel="Copy OAuth command" />
+          <CommandSnippet command={claudeMcpAddOAuthCommand(origin)} copyLabel="Copy OAuth command" />
         </TabsContent>
         <TabsContent value="skill" className="min-w-0">
           <SkillInstall intro="Add the skill so your agent knows when to save, update, and share artifacts." />

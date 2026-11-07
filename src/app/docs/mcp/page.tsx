@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { CodeBlock } from "@/components/code-block";
+import { CodeSnippet } from "@/components/code/code-snippet";
 import { AnchorHeading, Code, DocsH, FactTable, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { AccessBadge, McpToolEntry } from "@/components/docs/mcp-tool-entry";
@@ -111,9 +111,9 @@ export default function McpReferencePage() {
           <li><strong>API tokens.</strong> Made under Connections in the app, or for an agent teammate on the team page. They start with <code>artifacts_</code>, are shown once, are stored only as a SHA-256 hash, and always have full access.</li>
         </ul>
       </Prose>
-      <CodeBlock title="401 · WWW-Authenticate" value={challenge} className="mt-4" />
-      <CodeBlock title="/.well-known/oauth-protected-resource/api/mcp" value={resourceMetadata} className="mt-4" />
-      <CodeBlock title="401 body" value={unauthorizedBody} className="mt-4" />
+      <CodeSnippet title="401 · WWW-Authenticate" language="http" code={challenge} wrap className="mt-4" />
+      <CodeSnippet title="/.well-known/oauth-protected-resource/api/mcp" language="json" code={resourceMetadata} className="mt-4" />
+      <CodeSnippet title="401 body" language="json" code={unauthorizedBody} className="mt-4" />
       <FactTable
         head={["Scope", "Gives"]}
         rows={[
@@ -163,8 +163,8 @@ export default function McpReferencePage() {
         ]}
         mono={[0, 1]}
       />
-      <CodeBlock title="429 · Retry-After: 754" value={rateLimitedBody} className="mt-4" />
-      <CodeBlock title="200 · a tool error" value={toolErrorBody} className="mt-4" />
+      <CodeSnippet title="429 · Retry-After: 754" language="json" code={rateLimitedBody} className="mt-4" />
+      <CodeSnippet title="200 · a tool error" language="json" code={toolErrorBody} className="mt-4" />
 
       <DocsH page={page} id="rate-limits" />
       <Prose>

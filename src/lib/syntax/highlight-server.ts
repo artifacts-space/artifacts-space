@@ -18,8 +18,10 @@ import python from "shiki/langs/python.mjs";
 import rust from "shiki/langs/rust.mjs";
 import shellscript from "shiki/langs/shellscript.mjs";
 import sql from "shiki/langs/sql.mjs";
+import toml from "shiki/langs/toml.mjs";
 import tsx from "shiki/langs/tsx.mjs";
 import typescript from "shiki/langs/typescript.mjs";
+import xml from "shiki/langs/xml.mjs";
 import yaml from "shiki/langs/yaml.mjs";
 
 import { isCoreLanguage, resolveLanguage } from "./languages";
@@ -32,7 +34,7 @@ let highlighter: HighlighterCore | null = null;
 function getHighlighter(): HighlighterCore {
   highlighter ??= createHighlighterCoreSync({
     themes: [syntaxTheme],
-    langs: [css, diff, go, html, javascript, json, jsx, markdown, python, rust, shellscript, sql, tsx, typescript, yaml],
+    langs: [css, diff, go, html, javascript, json, jsx, markdown, python, rust, shellscript, sql, toml, tsx, typescript, xml, yaml],
     engine: createJavaScriptRegexEngine(),
   });
   return highlighter;

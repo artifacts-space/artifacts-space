@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { CodeBlock, CommandBlock } from "@/components/code-block";
+import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
 import { DocsH, FactTable, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { envDocs } from "@/lib/docs/env-docs";
@@ -59,7 +59,7 @@ export default function SelfHostingPage() {
       <Prose>
         <p>The schema lives in <code>src/db/schema.ts</code> and <code>src/db/oauth-schema.ts</code>; migrations are SQL files in <code>drizzle/</code>, managed by drizzle-kit. Apply them before the first start and after every update:</p>
       </Prose>
-      <CommandBlock command="pnpm db:migrate" />
+      <CommandSnippet command="pnpm db:migrate" />
       <Prose>
         <p>Migrations use <code>DATABASE_URL_UNPOOLED</code> (the direct connection), and the app uses <code>DATABASE_URL</code>. On Neon, the Vercel integration sets both. drizzle-kit reads <code>.env.local</code> itself. Only the <code>public</code> schema is managed.</p>
       </Prose>
@@ -83,7 +83,7 @@ export default function SelfHostingPage() {
           <li>Add a CORS rule for your origin, because the browser PUTs to the bucket directly:</li>
         </ol>
       </Prose>
-      <CodeBlock title="R2 CORS policy" value={corsRule} className="mt-4" />
+      <CodeSnippet title="R2 CORS policy" language="json" code={corsRule} className="mt-4" />
       <Prose>
         <p>Files are capped at {fileLimits.maxBytes / 1024 / 1024} MB. If the R2 variables are missing, file requests fail with a message that names them; everything else keeps working.</p>
       </Prose>
@@ -114,7 +114,7 @@ export default function SelfHostingPage() {
       </Prose>
 
       <DocsH page={page} id="local" />
-      <CodeBlock title="Terminal" value={localSteps} className="mt-4" />
+      <CodeSnippet title="Terminal" language="bash" code={localSteps} className="mt-4" />
       <Prose>
         <p>The app runs on <code>http://localhost:3000</code>. Without Sendir keys, open <code>/api/dev/sign-in</code> to sign in as a development user in one step; it exists only under <code>next dev</code> and is off while Sendir keys are set. Before you push, run <code>pnpm check</code> (typecheck, lint, file length, tests) and <code>pnpm build</code>.</p>
       </Prose>

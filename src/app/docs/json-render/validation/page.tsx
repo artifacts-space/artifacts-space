@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { CodeBlock } from "@/components/code-block";
+import { CodeSnippet } from "@/components/code/code-snippet";
 import { DocsH, FactTable, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { minimalExample } from "@/lib/docs/guide-examples";
@@ -66,8 +66,8 @@ export default function ValidationPage() {
 
       <DocsH page={page} id="validate-tool" />
       <Prose><p>Agents should validate before every save. It costs one read call, reports every problem at once, and each line names the element and says how to fix it.</p></Prose>
-      <CodeBlock title="tools/call" value={callExample} className="mt-4" preClassName="whitespace-pre-wrap break-all" />
-      <CodeBlock title="Result for a valid spec" value={reports.valid} className="mt-4" preClassName="whitespace-pre-wrap break-words" />
+      <CodeSnippet title="tools/call" language="json" code={callExample} wrap className="mt-4" />
+      <CodeSnippet title="Result for a valid spec" code={reports.valid} wrap className="mt-4" />
 
       <DocsH page={page} id="errors-warnings" />
       <Prose>
@@ -80,10 +80,10 @@ export default function ValidationPage() {
 
       <DocsH page={page} id="examples" />
       <Prose><p>Each block below is the exact text <code>artifacts_validate</code> returns, computed from the validator when these docs were built.</p></Prose>
-      <CodeBlock title="A spec with three mistakes" value={brokenJson} className="mt-4" />
-      <CodeBlock title="Report" value={reports.broken} className="mt-4" preClassName="whitespace-pre-wrap break-words" />
-      <CodeBlock title="Warnings only: no version, an unknown prop, a leaf with children, an unreachable element" value={reports.warnings} className="mt-6" preClassName="whitespace-pre-wrap break-words" />
-      <CodeBlock title="Not JSON" value={reports.notJson} className="mt-6" preClassName="whitespace-pre-wrap break-words" />
+      <CodeSnippet title="A spec with three mistakes" language="json" code={brokenJson} className="mt-4" />
+      <CodeSnippet title="Report" code={reports.broken} wrap className="mt-4" />
+      <CodeSnippet title="Warnings only: no version, an unknown prop, a leaf with children, an unreachable element" code={reports.warnings} wrap className="mt-6" />
+      <CodeSnippet title="Not JSON" code={reports.notJson} wrap className="mt-6" />
       <Note title="Fix it yourself">
         The first block is the &quot;Broken: fix me&quot; seed in the <Link href={docsHref("json-render/playground")} className="underline underline-offset-2">playground</Link>. Fix each line and watch the page appear.
       </Note>

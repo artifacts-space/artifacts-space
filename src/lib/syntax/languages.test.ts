@@ -24,4 +24,10 @@ describe("resolveLanguage", () => {
     expect(isCoreLanguage("typescript")).toBe(true);
     expect(isCoreLanguage("cpp")).toBe(false);
   });
+
+  it("should highlight TOML and SVG on the server when the docs show config and SVG examples", () => {
+    expect(isCoreLanguage("toml")).toBe(true);
+    expect(resolveLanguage("svg")).toBe("xml");
+    expect(isCoreLanguage("xml")).toBe(true);
+  });
 });

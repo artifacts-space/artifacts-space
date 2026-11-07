@@ -34,6 +34,17 @@ describe("highlightCode on the server", () => {
     expect(highlightCode("plain words", undefined)).toBeNull();
   });
 
+  it("should highlight TOML config and shell commands when the docs show them", () => {
+    const toml = '[mcp_servers.artifacts]\nurl = "https://artifacts.space/api/mcp"';
+    const tomlLines = highlightCode(toml, "toml");
+    expect(textOf(tomlLines)).toBe(toml);
+    expect(kindsOf(tomlLines).has("string")).toBe(true);
+    const command = "claude mcp add --transport http artifacts https://artifacts.space/api/mcp";
+    const commandLines = highlightCode(command, "bash");
+    expect(textOf(commandLines)).toBe(command);
+    expect(kindsOf(commandLines).size).toBeGreaterThan(1);
+  });
+
   it("should leave extra languages to the browser when they are outside the core set", () => {
     expect(highlightCode("int main() { return 0; }", "cpp")).toBeNull();
   });

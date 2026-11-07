@@ -3,9 +3,9 @@
  * without loading anything at request time; the browser lazy-loads any
  * language here on demand. Anything else shows as plain text.
  */
-export const coreLanguages = ["typescript", "tsx", "javascript", "jsx", "json", "shellscript", "python", "sql", "css", "html", "yaml", "markdown", "diff", "go", "rust"] as const;
+export const coreLanguages = ["typescript", "tsx", "javascript", "jsx", "json", "shellscript", "python", "sql", "css", "html", "yaml", "markdown", "diff", "go", "rust", "toml", "xml"] as const;
 
-export const extraLanguages = ["jsonc", "java", "kotlin", "swift", "ruby", "php", "c", "cpp", "csharp", "scss", "toml", "xml", "graphql", "dockerfile"] as const;
+export const extraLanguages = ["jsonc", "java", "kotlin", "swift", "ruby", "php", "c", "cpp", "csharp", "scss", "graphql", "dockerfile"] as const;
 
 export type SyntaxLanguage = (typeof coreLanguages)[number] | (typeof extraLanguages)[number];
 
