@@ -98,7 +98,7 @@ export default function JsonRenderPage() {
       <Prose><p>The stout set has {uiComponentNames.length} components in six groups. Each page shows live examples and a props table generated from the schema the server checks against.</p></Prose>
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
         {componentGroups.map((group) => (
-          <div key={group.name} className="rounded-lg border px-4 py-3">
+          <div key={group.name} className="card-surface px-4 py-3">
             <p className="text-md font-medium">{group.name}</p>
             <p className="mt-0.5 text-sm text-muted-foreground">{group.summary}</p>
             <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">

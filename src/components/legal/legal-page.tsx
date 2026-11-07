@@ -51,7 +51,7 @@ function LegalHeader() {
 /** "In plain terms": the short summary at the top of each document. It explains; the sections below govern. */
 function PlainTerms({ points }: { points: readonly ReactNode[] }) {
   return (
-    <section aria-labelledby="plain-terms" className="mt-8 rounded-lg border bg-card px-5 py-5 sm:px-6">
+    <section aria-labelledby="plain-terms" className="card-surface mt-8 px-5 py-5 sm:px-6">
       <h2 id="plain-terms" className="text-lg font-medium tracking-[-0.01em]">In plain terms</h2>
       <ul className="mt-3 space-y-2 text-md leading-6 text-muted-foreground">
         {points.map((point, index) => (

@@ -65,7 +65,7 @@ export function ConnectedApps({ initialApps }: { initialApps: ConnectedApp[] }) 
   }
 
   return (
-    <section className="h-fit overflow-hidden rounded-md border bg-card">
+    <section className="card-surface h-fit overflow-hidden">
       <div className="border-b px-5 py-4">
         <h2 className="text-md font-medium">Connected apps</h2>
         <p className="mt-1 text-sm text-muted-foreground">Apps you approved in the browser. Each one acts as you.</p>

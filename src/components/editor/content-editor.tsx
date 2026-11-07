@@ -75,7 +75,7 @@ export function ContentEditor({ kind, value, onChange, title, language, files, l
   const [pane, setPane] = useState<Pane>("write");
   const preview = useDeferredValue(value);
   return (
-    <div className="overflow-hidden rounded-lg border bg-card">
+    <div className="card-surface overflow-hidden">
       <div className="border-b px-2 py-1.5 lg:hidden">
         <Tabs value={pane} onValueChange={(next: Pane) => { setPane(next); }}>
           <TabsList aria-label={`${label}: write or preview`}>

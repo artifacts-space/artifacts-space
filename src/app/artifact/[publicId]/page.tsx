@@ -191,7 +191,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
           </div>
         ) : null}
         {/* Comments are for signed-in readers the comments setting lets in; the thread checks access itself too. */}
-        {session && seesComments(viewable, session.user.id) ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" /> : null}
+        {session && seesComments(viewable, session.user.id) ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" raised /> : null}
       </main>
       <footer className="border-t">
         <div className="mx-auto flex w-full max-w-[960px] flex-wrap items-center justify-between gap-4 px-6 py-6 text-sm text-muted-foreground">

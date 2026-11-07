@@ -141,6 +141,24 @@ lint. Nothing renders under the 13px floor.
 - Copy is plain, short, and benefit-first, in sentences with verbs. The UI
   says "Team", never "Organization".
 
+### Aesthetic: soft minimalism
+
+Surfaces that sit on the page are cards: a hairline edge (`--card-edge`, 9%
+foreground) plus a wide, soft shadow that is felt, never seen as an outline.
+
+- Use the `card-surface` utility (`globals.css`) for every card: panels,
+  settings sections, docs notes and tables, form cards. Never hand-write
+  `rounded-md border bg-card`; `src/lib/card-surface-rules.test.ts` fails on it.
+- Elevation ladder: page, then card (`shadow-sm`, built into `card-surface`),
+  then a hovered card or menu (`shadow-md`; add `card-hover` to a card that is
+  a link), then dialogs (`shadow-lg`). Wells, frames, and inputs get
+  `shadow-xs` or none.
+- Radii: cards `rounded-xl` (in `card-surface`), controls `rounded-lg`.
+- Never put a card shadow inside a card. Nested items use `card-nested` (the
+  edge only) or a divider. Text, badges, separators, and rows stay flat.
+- No glow or colored shadows. In dark mode the lighter `--card` and a faint top
+  highlight do the lifting. Tune the look only through the `--shadow-*` tokens.
+
 ## Database
 
 - The schema is in `src/db/schema.ts` and `src/db/oauth-schema.ts`. Change

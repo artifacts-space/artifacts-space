@@ -117,7 +117,7 @@ export function Playground({ seeds }: { seeds: PlaygroundSeed[] }) {
         files={noFiles}
         label="ui spec JSON"
       />
-      <section aria-label="Validation" className="rounded-lg border bg-card px-4 py-4 sm:px-5">
+      <section aria-label="Validation" className="card-surface px-4 py-4 sm:px-5">
         <IssuePanel issues={result.issues} parsed={result.spec !== null} />
       </section>
     </div>

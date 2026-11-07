@@ -70,7 +70,7 @@ export function InboxList({ entries }: { entries: InboxEntryView[] }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-md border bg-card">
+    <section className="card-surface overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3">
         <p className="text-sm text-muted-foreground">{unread === 0 ? "You are all caught up." : `${String(unread)} unread`}</p>
         {unread > 0 ? (

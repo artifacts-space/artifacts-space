@@ -100,7 +100,7 @@ export default function DocsIntroduction() {
       <DocsH page={page} id="next" />
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
         {nextSteps.map((step) => (
-          <Link key={step.href} href={step.href} className="rounded-lg border px-4 py-3 transition-colors hover:bg-muted/50">
+          <Link key={step.href} href={step.href} className="card-surface card-hover px-4 py-3">
             <span className="block text-md font-medium">{step.title}</span>
             <span className="mt-1 block text-sm text-muted-foreground">{step.body}</span>
           </Link>

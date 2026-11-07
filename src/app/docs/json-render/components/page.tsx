@@ -26,7 +26,7 @@ export default function ComponentsIndexPage() {
             <ul className="mt-4 grid gap-3 sm:grid-cols-2">
               {group.components.map((name) => (
                 <li key={name}>
-                  <Link href={componentHref(name)} className="block h-full rounded-lg border px-4 py-3 transition-colors hover:bg-muted/50">
+                  <Link href={componentHref(name)} className="card-surface card-hover block h-full px-4 py-3">
                     <span className="block font-mono text-sm font-medium">{name}</span>
                     <span className="mt-1 block text-sm leading-6 text-muted-foreground"><InlineCodeText text={firstSentence(componentDescription(name))} /></span>
                   </Link>

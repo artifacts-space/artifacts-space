@@ -66,7 +66,7 @@ export function GridView({ props, children }: ViewProps<"Grid">) {
 
 export function CardView({ props, children }: ViewProps<"Card">) {
   return (
-    <div className="flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-4 text-card-foreground shadow-sm sm:p-5">
+    <div className="card-surface flex min-w-0 flex-col gap-3 p-4 sm:p-5">
       {props.title || props.description ? (
         <div className="space-y-1">
           {props.title ? <h3 className="text-base font-medium break-words">{props.title}</h3> : null}

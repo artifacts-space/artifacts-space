@@ -11,7 +11,7 @@ export function Section({
   action?: React.ReactNode | undefined;
 }) {
   return (
-    <section className="overflow-hidden rounded-md border bg-card">
+    <section className="card-surface overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
         <div>
           <h2 className="text-md font-medium">{title}</h2>

@@ -118,7 +118,7 @@ function sparklineSummary(props: UiProps<"Metric">): string {
 export function MetricView({ props, emit }: ViewProps<"Metric">) {
   const value = typeof props.value === "number" ? formatNumber(props.value, props.format ?? "number", props.currency ?? "USD") : props.value;
   return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-lg border bg-card p-4 shadow-sm">
+    <div className="card-surface flex min-w-0 flex-col gap-1 p-4">
       <p className="truncate text-sm text-muted-foreground" title={props.label}>{props.label}</p>
       <p className="flex min-w-0 items-baseline gap-1.5">
         <span className="min-w-0 text-2xl font-medium tracking-[-0.02em] break-all tabular-nums">{value}</span>

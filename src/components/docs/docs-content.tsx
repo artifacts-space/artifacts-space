@@ -50,7 +50,7 @@ const noteTones = {
 export function Note({ tone = "info", title, children }: { tone?: keyof typeof noteTones; title?: string; children: ReactNode }) {
   const { Icon, className } = noteTones[tone];
   return (
-    <div role="note" className="mt-6 flex gap-3 rounded-lg border bg-card px-4 py-3 text-md leading-6">
+    <div role="note" className="card-surface mt-6 flex gap-3 px-4 py-3 text-md leading-6">
       <Icon aria-hidden className={cn("mt-1 size-4 shrink-0", className)} />
       <div className="min-w-0 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-sm">
         {title ? <p className="font-medium">{title}</p> : null}
@@ -68,7 +68,7 @@ export function Code({ children }: { children: ReactNode }) {
 /** A simple table for facts, outside Prose. Rows are cells in order. All-empty `head` cells leave out the header row. */
 export function FactTable({ head, rows, mono = [0] }: { head: string[]; rows: ReactNode[][]; mono?: number[] }) {
   return (
-    <div className="mt-6 overflow-x-auto rounded-lg border">
+    <div className="card-surface mt-6 overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         {head.some(Boolean) ? (
           <thead className="bg-muted/50">
