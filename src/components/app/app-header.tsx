@@ -6,6 +6,7 @@ import { IconChevronDown, IconExternalLink, IconInbox, IconKey, IconLogout, Icon
 import { useState } from "react";
 
 import { useConfirmations } from "@/components/confirmations-provider";
+import { GitHubLink } from "@/components/github-link";
 import { Logo } from "@/components/logo";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { TeamSwitcher, type HeaderTeam } from "@/components/teams/team-switcher";
@@ -109,7 +110,8 @@ export function AppHeader({ userId, name, email, username, teams, unreadMentions
           {/* On phones, Connections lives in the account menu ("Access tokens"). */}
           <NavLink {...connectionsLink} active={pathname.startsWith(connectionsLink.href)} className="max-sm:hidden" />
         </nav>
-        <div className="ml-auto flex items-center">
+        <div className="ml-auto flex items-center gap-1">
+          <GitHubLink className="max-sm:hidden" />
           <DropdownMenu>
             <DropdownMenuTrigger
               render={<Button variant="ghost" className="h-9 gap-2 px-1.5" disabled={signingOut} aria-label="Account menu" />}

@@ -9,6 +9,7 @@ import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { CopyButton } from "@/components/copy-button";
+import { GitHubLink } from "@/components/github-link";
 import { LastEdited } from "@/components/history/last-edited";
 import { Logo } from "@/components/logo";
 import { PixelAvatar, type AvatarKind } from "@/components/pixel-avatar";
@@ -164,7 +165,10 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
     <div className="min-h-screen">
       <header className="mx-auto flex h-14 w-full max-w-[960px] items-center justify-between px-6">
         <Logo />
-        <CopyButton value={view.content} label="Copy" variant="outline" size="sm" />
+        <div className="flex items-center gap-2">
+          <GitHubLink />
+          <CopyButton value={view.content} label="Copy" variant="outline" size="sm" />
+        </div>
       </header>
       <VisibilityNotice copy={copy} author={byline.author} avatar={byline.avatar} teamName={byline.teamName} />
       <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">

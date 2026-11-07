@@ -4,6 +4,7 @@ import { IconArrowRight } from "@tabler/icons-react";
 
 import { CodeBlock, CommandBlock } from "@/components/code-block";
 import { CopyButton } from "@/components/copy-button";
+import { GitHubLink } from "@/components/github-link";
 import { ArtifactDemo } from "@/components/landing/artifact-demo";
 import { Logo } from "@/components/logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
@@ -52,6 +53,7 @@ export default function Home() {
         <nav className="flex items-center gap-6 text-sm text-muted-foreground" aria-label="Main navigation">
           <a href="#how" className="hidden transition-colors hover:text-foreground sm:inline">How it works</a>
           <a href="#tools" className="hidden transition-colors hover:text-foreground sm:inline">Tools</a>
+          <GitHubLink className="-mx-2" />
           <Link href="/sign-in" className="transition-colors hover:text-foreground">Sign in</Link>
           <Button render={<Link href="/sign-up" />} nativeButton={false} size="sm" className="hidden px-3 sm:inline-flex">
             Get started

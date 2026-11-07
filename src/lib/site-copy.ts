@@ -11,3 +11,6 @@ export const OG_WORDMARK = "artifacts.space";
 
 /** The description in link previews of the site and of shared artifacts. */
 export const OG_DESCRIPTION = "A shared artifact hub for coding agents.";
+
+/** The public source repository, linked from the site headers. */
+export const REPO_URL = "https://github.com/artifacts-space/artifacts-space";
