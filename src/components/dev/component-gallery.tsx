@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ArtifactFilesProvider } from "@/components/artifact-view/files-context";
+import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
 import { AvatarGallery } from "@/components/dev/avatar-gallery";
 import { UiView } from "@/components/artifact-view/ui-view";
 import { ThemeSwitcher } from "@/components/theme-switcher";
@@ -12,6 +13,7 @@ import { componentFixtures, fixtureFiles, fixtureSpec } from "@/lib/ui/fixtures/
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
 import { formatFixtures } from "@/lib/ui/fixtures/formats";
 import { deepSpec, invalidPropsSpec, javascriptLinkSpec, manyElementsSpec, repeatSpec, unknownTypeSpec } from "@/lib/ui/fixtures/specs";
+import { presetTheme } from "@/lib/themes/resolve";
 
 const specFixtures: { name: string; spec: unknown }[] = [
   { name: "Example", spec: exampleUiSpec },
@@ -44,6 +46,25 @@ function Group({ id, title, children }: { id: string; title: string; children: R
   );
 }
 
+/** Presets shown in a scope that follows the site's light or dark mode, as an artifact page will. */
+const themeFixtureIds = ["ocean", "editorial"] as const;
+const themedFormats = new Set(["Markdown", "Code", "Mermaid", "CSV"]);
+
+function ThemedSpecimen({ id }: { id: string }) {
+  const theme = presetTheme(id) ?? null;
+  return (
+    <Specimen name={`theme · ${id}`}>
+      <ThemeBackdrop theme={theme} className="rounded-md p-3 sm:p-5" data-theme-backdrop={id}>
+        <ThemeScope theme={theme} className="space-y-6 text-foreground" data-theme-scope={id}>
+          {formatFixtures.filter((fixture) => themedFormats.has(fixture.name)).map((fixture) => (
+            <ArtifactView key={fixture.name} kind={fixture.kind} content={fixture.content} language={fixture.language} title={fixture.name} />
+          ))}
+        </ThemeScope>
+      </ThemeBackdrop>
+    </Specimen>
+  );
+}
+
 /**
  * Every ui component with normal and extreme fixtures, whole-spec edge cases,
  * and every format viewer. Development only: the route returns 404 elsewhere.
@@ -60,6 +81,7 @@ export function ComponentGallery() {
         {uiComponentNames.map((name) => <a key={name} href={`#${name}`} className="hover:text-foreground">{name}</a>)}
         <a href="#specs" className="hover:text-foreground">Specs</a>
         <a href="#formats" className="hover:text-foreground">Formats</a>
+        <a href="#themes" className="hover:text-foreground">Themes</a>
         <a href="#avatars" className="hover:text-foreground">Avatars</a>
       </nav>
       <div className="space-y-12">
@@ -89,6 +111,9 @@ export function ComponentGallery() {
               </ArtifactFilesProvider>
             </Specimen>
           ))}
+        </Group>
+        <Group id="themes" title="Themes">
+          {themeFixtureIds.map((id) => <ThemedSpecimen key={id} id={id} />)}
         </Group>
         <Group id="avatars" title="Pixel avatars">
           <AvatarGallery />

@@ -41,9 +41,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-heading: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* A ThemeScope may set --theme-font-*; everywhere else these resolve to Geist. */
+  --font-sans: var(--theme-font-body, var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif);
+  --font-mono: var(--theme-font-mono, var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace);
+  --font-heading: var(--theme-font-heading, var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif);
   --color-brand: var(--brand);
   --color-hero-backdrop: var(--hero-backdrop);
   --color-kind-markdown: var(--kind-markdown);
@@ -496,6 +497,31 @@
     radial-gradient(ellipse at center, transparent 45%, var(--hero-vignette) 100%),
     var(--hero-tint);
   mix-blend-mode: multiply;
+}
+
+/*
+ * Artifact themes (src/lib/themes, ThemeScope). A ThemeScope wrapper carries a
+ * theme's colors as the tokens above, set through its style attribute (each
+ * color a light-dark() pair, resolved from the inherited color-scheme), and
+ * its fonts as --theme-font-body, --theme-font-heading, and --theme-font-mono.
+ * The font tokens are declared again here so they resolve inside the scope
+ * (a custom property resolves its var()s where it is declared). In the
+ * components layer, so a utility class on an element still wins.
+ * .theme-backdrop paints a theme's background behind the content only.
+ */
+@layer components {
+  .artifact-theme {
+    --font-sans: var(--theme-font-body, var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif);
+    --font-mono: var(--theme-font-mono, var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace);
+    --font-heading: var(--theme-font-heading, var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif);
+    font-family: var(--font-sans);
+  }
+  .artifact-theme :where(h1, h2, h3, h4, h5, h6) {
+    font-family: var(--font-heading);
+  }
+  .theme-backdrop {
+    background-color: var(--theme-backdrop, var(--background));
+  }
 }
 
 /*
