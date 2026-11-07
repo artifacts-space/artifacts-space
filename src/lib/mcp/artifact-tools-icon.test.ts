@@ -119,6 +119,19 @@ describe("artifacts_update with icon", () => {
     expect((JSON.parse(result.text) as { edit: string }).edit).toBe("pending");
   });
 
+  it("should pass an uploaded image id to the data layer, which checks the file, when it is a uuid", async () => {
+    data.updateArtifact.mockResolvedValue(dto("file:0f8fad5b-d9cb-469f-a165-70867728950e"));
+    const result = await call("artifacts_update", { id: publicId, icon: "file:0f8fad5b-d9cb-469f-a165-70867728950e" });
+    expect(result.isError).toBe(false);
+    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { icon: "file:0f8fad5b-d9cb-469f-a165-70867728950e" }, "agent");
+  });
+
+  it("should refuse a file icon that is not a uuid before anything is saved", async () => {
+    const result = await call("artifacts_update", { id: publicId, icon: "file:../secret" });
+    expect(result.isError).toBe(true);
+    expect(data.updateArtifact).not.toHaveBeenCalled();
+  });
+
   it("should refuse text when it is not an emoji", async () => {
     const result = await call("artifacts_update", { id: publicId, icon: "launch" });
     expect(result.isError).toBe(true);
@@ -133,5 +146,7 @@ describe("tools/list", () => {
     const icon = (update?.inputSchema.properties as Record<string, { description?: string }> | undefined)?.icon;
     expect(icon?.description).toMatch(/tabler:<name>/);
     expect(icon?.description).toMatch(/null or "" removes/);
+    expect(icon?.description).toMatch(/file:<file id>/);
+    expect(icon?.description).toMatch(/SVG is not accepted/);
   });
 });

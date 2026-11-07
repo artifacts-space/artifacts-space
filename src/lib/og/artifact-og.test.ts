@@ -114,6 +114,14 @@ describe("loadArtifactOg", () => {
     expect(JSON.stringify(og)).not.toContain(pendingTitle);
   });
 
+  it("should draw the approved version's icon, never a pending one, when the preview renders", async () => {
+    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.cachedVersionView.mockResolvedValue({ ...approvedView, icon: "tabler:gavel" });
+    expect((await loadArtifactOg("abc", approvedId))?.icon).toEqual({ type: "tabler", name: "gavel" });
+    mocks.cachedVersionView.mockResolvedValue({ ...approvedView, icon: null });
+    expect((await loadArtifactOg("abc", approvedId))?.icon).toBeNull();
+  });
+
   it("should return null when the requested version is no longer the approved one", async () => {
     mocks.getArtifactAccess.mockResolvedValue(access("public"));
     expect(await loadArtifactOg("abc", "22222222-2222-4222-8222-222222222222")).toBeNull();

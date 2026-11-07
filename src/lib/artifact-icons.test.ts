@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ICON_FIELD_DESCRIPTION,
   artifactIconInputSchema,
+  iconFileId,
   iconLabel,
   iconTitlePrefix,
   normalizeEmoji,
@@ -18,6 +19,10 @@ describe("artifactIconInputSchema", () => {
 
   it("should accept an allowed Tabler id when the name is in the list", () => {
     expect(artifactIconInputSchema.parse("tabler:rocket")).toBe("tabler:rocket");
+  });
+
+  it("should accept an uploaded file id in lowercase when it is a uuid", () => {
+    expect(artifactIconInputSchema.parse("file:0F8FAD5B-D9CB-469F-A165-70867728950E")).toBe("file:0f8fad5b-d9cb-469f-a165-70867728950e");
   });
 
   it("should store a bare symbol fully qualified when it lacks the emoji selector", () => {
@@ -52,6 +57,9 @@ describe("artifactIconInputSchema", () => {
     ["an empty Tabler name", "tabler:"],
     ["a Tabler id in caps", "TABLER:rocket"],
     ["another prefix", "lucide:rocket"],
+    ["a file id that is not a uuid", "file:../../etc/passwd"],
+    ["an empty file id", "file:"],
+    ["a file id with markup", "file:<img>"],
     ["a URL", "https://example.com/icon.png"],
     ["an over-long string", "🚀".repeat(40)],
   ])("should refuse %s", (_label, value) => {
@@ -78,6 +86,12 @@ describe("normalizeEmoji", () => {
 describe("parseArtifactIcon", () => {
   it("should parse a stored Tabler id when it is allowed", () => {
     expect(parseArtifactIcon("tabler:bug")).toEqual({ type: "tabler", name: "bug" });
+  });
+
+  it("should name the file when the icon is an uploaded image", () => {
+    expect(iconFileId("file:0f8fad5b-d9cb-469f-a165-70867728950e")).toBe("0f8fad5b-d9cb-469f-a165-70867728950e");
+    expect(iconFileId("🚀")).toBeNull();
+    expect(iconTitlePrefix("file:0f8fad5b-d9cb-469f-a165-70867728950e")).toBe("");
   });
 
   it("should return null when a stored value is no longer allowed", () => {

@@ -14,7 +14,7 @@ const exemptFiles = new Set(["AGENTS.md", "CLAUDE.md", "src/app/globals.css"]);
 /** Generated files nobody edits by hand. */
 const generatedPatterns = [/^pnpm-lock\.yaml$/, /^drizzle\/meta\//];
 
-const binaryExtensions = /\.(png|jpe?g|gif|webp|avif|ico|woff2?|ttf|otf|pdf|zip)$/i;
+const binaryExtensions = /\.(png|jpe?g|gif|webp|avif|ico|woff2?|ttf|otf|pdf|zip|gz)$/i;
 
 function listFiles(): string[] {
   const output = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { encoding: "utf8" });

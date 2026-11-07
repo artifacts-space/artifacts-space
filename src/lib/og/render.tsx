@@ -8,6 +8,7 @@ import { fitText } from "./fit-text";
 import { ogMonoFont, ogSansFonts } from "./fonts";
 import { OgFrame } from "./frame";
 import { OgHeadline } from "./headline";
+import { OgIconMark } from "./icon";
 import { SynopsisCard } from "./synopsis-card";
 import { OG_ARTIFACT_TEXT_WIDTH, OG_SIZE, OG_TEXT_MUTED, OG_TITLE_TYPE } from "./theme";
 
@@ -54,6 +55,7 @@ export function artifactImageResponse(og: ArtifactOg, headers: Record<string, st
     (
       <OgFrame background={strataInkPlainBackground} icon={planetIcon40} wordmark={OG_WORDMARK} textWidth={OG_ARTIFACT_TEXT_WIDTH} aside={<SynopsisCard synopsis={og.synopsis} />}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {og.icon ? <OgIconMark icon={og.icon} /> : null}
           <div style={{ display: "flex", fontSize: 20, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: OG_TEXT_MUTED }}>{og.kindLabel}</div>
           <ArtifactTitle title={og.title} />
         </div>

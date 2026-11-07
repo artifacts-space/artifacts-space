@@ -20,11 +20,13 @@ import {
   type PendingSharingDto,
 } from "@/lib/artifact-types";
 import { artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
-import { artifactIconInputSchema } from "@/lib/artifact-icons";
+import { artifactIconInputSchema, iconFileId } from "@/lib/artifact-icons";
 import { artifactSizeProblem } from "@/lib/artifact-limits";
 import { defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { PREVIEW_CHARS, previewKinds } from "@/lib/artifact-preview";
 import { checkContentFiles } from "@/lib/files/attach";
+import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
+import { checkIconFile, restorableIcon } from "@/lib/files/icon-file";
 import { attachFileRows, deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
 import type { FileDto } from "@/lib/files/types";
 import { generatePublicId } from "@/lib/public-id";
@@ -249,7 +251,8 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
   const parsed = artifactInputSchema.parse(input);
   assertArtifactSize(parsed);
   assertValidArtifactContent(parsed.kind, parsed.content);
-  const fileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
+  const contentFileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
+  const fileIds = [...new Set([...contentFileIds, ...(await checkIconFile(userId, null, parsed.icon))])];
   await enforceRateLimit("artifactCreate", userId);
   await assertContentFits(userId, parsed.content);
   const [record] = await getDb()
@@ -326,6 +329,8 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
   }
   const saveKind = context.restoredFromId ? "restore" : "edit";
   await recordArtifactSave({ before, after: record, editorId, actor: context.actor, saveKind, restoredFromId: context.restoredFromId ?? null });
+  // A replaced or removed image icon goes with this save, unless something still shows it (see icon-cleanup.ts).
+  if (iconFileId(before.icon) && record.icon !== before.icon) await pruneUnusedIconFilesQuietly(record.id, [before.icon]);
   const [dto] = await toArtifactDtos([record]);
   return dto ?? null;
 }
@@ -356,20 +361,22 @@ export async function restoreArtifactVersion(userId: string, id: string, version
   if (!before) return null;
   const version = await getVersionOf(before.id, versionId);
   if (!version) throw new UserFacingError("That version is no longer in the history.");
-  const { title, icon, summary, content, kind, language, project, source, metadata } = version;
+  const { title, summary, content, kind, language, project, source, metadata } = version;
+  const icon = await restorableIcon(userId, before.id, version.icon);
   const changes = artifactUpdateSchema.parse({ title, icon, summary, content, kind, language, project, source, metadata });
   assertArtifactSize(changes);
   return saveChanges(changes, { editorId: userId, before, actor, options, restoredFromId: version.id });
 }
 
 /**
- * Checks and attaches the files an update's content points at, before the
+ * Checks and attaches the files an update's content and icon point at, before the
  * row changes, so a version saved with the edit already includes them.
  */
-async function attachUpdatedContentFiles(userId: string, current: ArtifactRecord, update: { kind?: string | undefined; content?: string | undefined }) {
-  if (update.kind === undefined && update.content === undefined) return;
-  const fileIds = await checkContentFiles(userId, current.id, update.kind ?? current.kind, update.content ?? current.content);
-  await attachFileRows(userId, current.id, fileIds);
+async function attachUpdatedContentFiles(userId: string, current: ArtifactRecord, update: { kind?: string | undefined; content?: string | undefined; icon?: string | null | undefined }) {
+  const iconFileIds = await checkIconFile(userId, current.id, update.icon);
+  const contentChanged = update.kind !== undefined || update.content !== undefined;
+  const contentFileIds = contentChanged ? await checkContentFiles(userId, current.id, update.kind ?? current.kind, update.content ?? current.content) : [];
+  await attachFileRows(userId, current.id, [...new Set([...contentFileIds, ...iconFileIds])]);
 }
 
 /** Deletes the author's own artifact and its files. */

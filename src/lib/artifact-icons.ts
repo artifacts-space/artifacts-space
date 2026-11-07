@@ -6,13 +6,21 @@ import { artifactIconLimits } from "./artifact-icon-limits";
  * Page icons beside an artifact's title, like Notion's. An icon is stored as
  * text and is exactly one of:
  * - one emoji (a single grapheme that is an RGI emoji), stored as the emoji itself;
- * - `tabler:<name>`, where <name> is in the curated list below.
+ * - `tabler:<name>`, where <name> is in the curated list below;
+ * - `file:<uuid>`, an uploaded image attached to the same artifact. Its
+ *   rules (finished, image type, size, same artifact) need the database and
+ *   live in src/lib/files/icon-file.ts; here only the shape is checked.
  * Everything else is refused at every boundary (server actions, MCP). Icons
  * render as text or as a Tabler component, never as HTML.
  */
 
 /** The prefix of a Tabler icon id. */
 export const TABLER_PREFIX = "tabler:";
+
+/** The prefix of an uploaded image icon id. */
+export const FILE_PREFIX = "file:";
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** Groups of the Icons tab, in display order. */
 export const tablerIconGroups = ["Documents", "Planning", "Research", "Code", "Data", "Time", "Security", "People", "Status", "Things"] as const;
@@ -157,7 +165,7 @@ export function isTablerIconName(name: string): name is TablerIconName {
 }
 
 /** A parsed icon, ready to render. */
-export type ParsedArtifactIcon = { type: "emoji"; emoji: string } | { type: "tabler"; name: TablerIconName };
+export type ParsedArtifactIcon = { type: "emoji"; emoji: string } | { type: "tabler"; name: TablerIconName } | { type: "file"; fileId: string };
 
 const graphemes = new Intl.Segmenter("en", { granularity: "grapheme" });
 
@@ -197,6 +205,10 @@ export function normalizeEmoji(value: string): string | null {
 /** Parses a stored or submitted icon. Null when it is neither one emoji nor an allowed Tabler id. */
 export function parseArtifactIcon(value: string | null | undefined): ParsedArtifactIcon | null {
   if (!value) return null;
+  if (value.startsWith(FILE_PREFIX)) {
+    const fileId = value.slice(FILE_PREFIX.length).toLowerCase();
+    return uuidPattern.test(fileId) ? { type: "file", fileId } : null;
+  }
   if (value.startsWith(TABLER_PREFIX)) {
     const name = value.slice(TABLER_PREFIX.length);
     return isTablerIconName(name) ? { type: "tabler", name } : null;
@@ -207,6 +219,7 @@ export function parseArtifactIcon(value: string | null | undefined): ParsedArtif
 
 /** The stored form of a parsed icon. */
 export function storedIcon(icon: ParsedArtifactIcon): string {
+  if (icon.type === "file") return `${FILE_PREFIX}${icon.fileId}`;
   return icon.type === "emoji" ? icon.emoji : `${TABLER_PREFIX}${icon.name}`;
 }
 
@@ -223,7 +236,13 @@ export function normalizeIconInput(value: string | null): string | null | undefi
 }
 
 /** The error an invalid icon gets, written for the person or agent who sent it. */
-export const ICON_RULE_MESSAGE = 'Use one emoji (such as "🚀") or "tabler:<name>" from the allowed list, such as "tabler:rocket". Send null or "" to remove the icon.';
+export const ICON_RULE_MESSAGE = 'Use one emoji (such as "🚀"), "tabler:<name>" from the allowed list (such as "tabler:rocket"), or "file:<file id>" for an uploaded image. Send null or "" to remove the icon.';
+
+/** The uploaded file an icon points at, or null for emoji, Tabler, and no icon. */
+export function iconFileId(icon: string | null | undefined): string | null {
+  const parsed = parseArtifactIcon(icon);
+  return parsed?.type === "file" ? parsed.fileId : null;
+}
 
 /**
  * Validates and normalizes an icon at a boundary. Accepts one emoji, an
@@ -254,6 +273,7 @@ export function iconLabel(icon: string | null | undefined): string {
   const parsed = parseArtifactIcon(icon);
   if (!parsed) return "No icon";
   if (parsed.type === "emoji") return parsed.emoji;
+  if (parsed.type === "file") return "Custom image";
   return tablerIconEntries.find((item) => item.name === parsed.name)?.label ?? parsed.name;
 }
 
@@ -268,4 +288,4 @@ export function searchTablerIcons(query: string): readonly CuratedTablerIcon[] {
 }
 
 /** The field description agents read on artifacts_create and artifacts_update. */
-export const ICON_FIELD_DESCRIPTION = `Optional page icon shown beside the title. One emoji (such as "🚀" or "🧪"), or "tabler:<name>" with one of: ${tablerIconEntries.map((item) => item.name).join(", ")}. On update, null or "" removes the icon; leave it out to keep it. Icon changes follow the same approval rule as title changes.`;
+export const ICON_FIELD_DESCRIPTION = `Optional page icon shown beside the title. One emoji (such as "🚀" or "🧪"), or "tabler:<name>" with one of: ${tablerIconEntries.map((item) => item.name).join(", ")}. Or "file:<file id>" for your own image: upload a PNG, JPEG, GIF, WebP, or AVIF of at most 1 MB (files_request_upload, PUT, files_finalize) and pass its id; it is attached to this artifact on save, and a file already attached to another artifact is refused. SVG is not accepted. On update, null or "" removes the icon; leave it out to keep it. Icon changes follow the same approval rule as title changes.`;

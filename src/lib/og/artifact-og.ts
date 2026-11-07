@@ -7,6 +7,7 @@ import { cachedVersionView } from "@/lib/versions/cache";
 import { isReviewedLevel } from "@/lib/versions/rules";
 import { OG_DESCRIPTION, OG_WORDMARK } from "@/lib/site-copy";
 
+import { ogIconFor, type OgIcon } from "./icon";
 import { buildSynopsis, ogKindLabels } from "./synopsis";
 import type { Synopsis } from "./synopsis-types";
 import { truncate } from "./text-utils";
@@ -70,6 +71,8 @@ export async function artifactOgMetadata(publicId: string): Promise<Pick<Metadat
 /** What an artifact preview draws. */
 export interface ArtifactOg {
   title: string;
+  /** The approved version's page icon, when the preview can draw it. */
+  icon: OgIcon | null;
   kind: ArtifactKind;
   kindLabel: string;
   synopsis: Synopsis;
@@ -90,6 +93,7 @@ export async function loadArtifactOg(publicId: string, versionId: string): Promi
   const files = view.kind === "file" ? await filesForViewer(access) : [];
   return {
     title: view.title,
+    icon: ogIconFor(view.icon),
     kind: view.kind,
     kindLabel: view.kind === "code" && view.language ? `${ogKindLabels.code} · ${truncate(view.language, 16)}` : ogKindLabels[view.kind],
     synopsis: buildSynopsis({ kind: view.kind, content: view.content, language: view.language, files }),
