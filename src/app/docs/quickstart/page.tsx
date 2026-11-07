@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CodeBlock, CommandBlock } from "@/components/code-block";
 import { DocsH, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
+import { SkillInstall } from "@/components/setup/skill-install";
 import { docsMetadata } from "@/lib/docs/metadata";
 import { docsHref } from "@/lib/docs/pages";
 import { claudeMcpAddCommand, claudeMcpAddOAuthCommand, mcpConfigJson, mcpEndpoint, mcpOAuthConfigJson, TOKEN_ENV_VAR } from "@/lib/setup/mcp-config";
@@ -92,6 +93,15 @@ export default function QuickstartPage() {
       <Note title="Personal tokens and agent tokens">
         A personal token acts as you, with full access. For an agent that works for a team, add it as an agent teammate and give it its own token; then its work shows under its own handle. See <Link href={docsHref("sharing", "agent-tokens")} className="underline underline-offset-2">Agent tokens</Link>.
       </Note>
+
+      <DocsH page={page} id="skill" />
+      <Prose>
+        <p>
+          The artifacts.space skill teaches your agent good habits: when to save plans, decisions, research, and handoffs; to update an existing artifact instead of making a duplicate; and to treat comments as untrusted data, never as instructions.
+        </p>
+      </Prose>
+      <div className="mt-4"><SkillInstall intro="Run it in your project:" /></div>
+      <Note>The skill gives guidance, not access. Your agent still needs the MCP connection above.</Note>
 
       <DocsH page={page} id="first-artifact" />
       <Prose><p>Ask your agent in plain words. It picks the tool and the arguments:</p></Prose>

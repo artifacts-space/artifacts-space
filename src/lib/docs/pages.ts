@@ -64,6 +64,7 @@ export const docsPages = [
       h2("claude-code", "Connect Claude Code"),
       h2("other-clients", "Cursor, OpenCode, and other clients"),
       h2("tokens", "Tokens for CI and headless agents"),
+      h2("skill", "Add the agent skill"),
       h2("first-artifact", "Save your first artifact"),
       h2("first-ui", "Make a rich page"),
       h2("troubleshooting", "Troubleshooting"),
