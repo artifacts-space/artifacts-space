@@ -33,7 +33,7 @@ server; people read, comment on, and share them in the web app.
 ## Commands
 
 ```bash
-pnpm install       # also installs the Husky pre-commit hook
+pnpm install       # also installs the Husky git hooks
 pnpm dev           # development server on http://localhost:3000
 pnpm check         # typecheck + lint (0 warnings) + 500-line check + vitest
 pnpm build         # production build; must pass before you push
@@ -44,8 +44,33 @@ pnpm db:migrate    # apply migrations (uses DATABASE_URL_UNPOOLED)
 pnpm db:studio     # inspect the database
 ```
 
-The pre-commit hook runs `pnpm check`. Do not skip it with `--no-verify`.
-Run `pnpm check` and `pnpm build` before every push.
+Husky runs three git hooks. Do not skip them with `--no-verify`.
+
+- `pre-commit`: ESLint (0 warnings) on staged `.ts`, `.tsx`, `.mts`, and
+  `.mjs` files only.
+- `commit-msg`: commitlint with the conventional config (see Code standards).
+- `pre-push`: `pnpm check`.
+
+Run `pnpm build` too before you push. The hooks skip when `HUSKY=0` is set
+or the dependencies are not installed.
+
+## Pull requests and CI
+
+`main` is protected: every change lands through a pull request and the merge
+queue, never a direct push. The queue squash-merges, so the pull request title
+becomes the commit on `main` and must be a conventional commit message.
+
+CI (`.github/workflows/ci.yml`) runs on pull requests, in the merge queue, and
+on `main`. The required checks are the job names: **Lint and typecheck**,
+**Unit tests**, **Build**, **Component gallery**, and **Dependency review**.
+The build needs no secrets; keep it that way, and create database, auth,
+email, and R2 clients on first request, never at import time. CodeQL scans
+the code and the workflows. Dependabot opens grouped weekly updates and waits
+two weeks after a release.
+
+Actions are pinned to full commit SHAs with a version comment. Workflows get
+`contents: read` unless a job needs more, and never use
+`pull_request_target`.
 
 ## Next.js 16.4 notes
 
@@ -78,7 +103,8 @@ These are enforced by `tsconfig.json`, `eslint.config.mjs`, and
 - Add a dependency only when it is essential. Pin an exact version that is at
   least two weeks old, and prefer what is already installed.
 - Commit messages are conventional: `feat:`, `fix:`, `chore:`, `refactor:`,
-  `test:`.
+  `test:`, `docs:`, `perf:`, `ci:`. The header is at most 100 characters;
+  put the detail in the body.
 
 ### Colors are tokens
 
