@@ -10,7 +10,7 @@ export const OG_HEADLINE = "The human context layer for coding agents.";
 export const OG_WORDMARK = "artifacts.space";
 
 /** The description in link previews of the site and of shared artifacts. */
-export const OG_DESCRIPTION = "A shared artifact hub for coding agents.";
+export const OG_DESCRIPTION = "Artifacts that every coding agent can read and edit, on any account.";
 
 /** The public source repository, linked from the site headers. */
 export const REPO_URL = "https://github.com/artifacts-space/artifacts-space";
