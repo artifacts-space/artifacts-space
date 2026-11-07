@@ -65,21 +65,23 @@ export function Code({ children }: { children: ReactNode }) {
   return <code className="rounded bg-muted px-1 py-0.5 font-mono text-sm">{children}</code>;
 }
 
-/** A simple table for facts, outside Prose. Rows are cells in order. */
+/** A simple table for facts, outside Prose. Rows are cells in order. All-empty `head` cells leave out the header row. */
 export function FactTable({ head, rows, mono = [0] }: { head: string[]; rows: ReactNode[][]; mono?: number[] }) {
   return (
     <div className="mt-6 overflow-x-auto rounded-lg border">
       <table className="w-full border-collapse text-sm">
-        <thead className="bg-muted/50">
-          <tr>
-            {head.map((cell) => <th key={cell} scope="col" className="px-3 py-2 text-left font-medium whitespace-nowrap text-muted-foreground">{cell}</th>)}
-          </tr>
-        </thead>
+        {head.some(Boolean) ? (
+          <thead className="bg-muted/50">
+            <tr>
+              {head.map((cell, index) => <th key={`${cell}-${String(index)}`} scope="col" className="px-3 py-2 text-left font-medium whitespace-nowrap text-muted-foreground">{cell}</th>)}
+            </tr>
+          </thead>
+        ) : null}
         <tbody>
           {rows.map((row, rowIndex) => (
-            <tr key={rowIndex} className="border-t align-top">
+            <tr key={rowIndex} className="border-t align-top first:border-t-0">
               {row.map((cell, cellIndex) => (
-                <td key={cellIndex} className={cn("px-3 py-2 leading-6", mono.includes(cellIndex) ? "font-mono text-sm whitespace-nowrap" : "text-muted-foreground")}>{cell}</td>
+                <td key={cellIndex} className={cn("px-3 py-2 leading-6", mono.includes(cellIndex) ? "font-mono text-sm whitespace-nowrap" : "min-w-40 text-muted-foreground")}>{cell}</td>
               ))}
             </tr>
           ))}

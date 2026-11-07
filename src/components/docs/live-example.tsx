@@ -3,6 +3,7 @@ import { specJson, type DocExample } from "@/lib/docs/spec-builders";
 import type { PropRow } from "@/lib/docs/prop-rows";
 import { cn } from "@/lib/utils";
 
+import { InlineCodeText } from "./docs-content";
 import { ExamplePreview } from "./example-preview";
 
 /**
@@ -49,7 +50,7 @@ export function PropsTable({ rows, label = "Prop" }: { rows: PropRow[]; label?: 
               </td>
               <td className="max-w-[22rem] px-3 py-2 font-mono text-muted-foreground break-words">{row.type}</td>
               <td className="min-w-[12rem] px-3 py-2 text-muted-foreground">
-                {[...row.constraints, row.description].filter(Boolean).join(". ") || "—"}
+                <InlineCodeText text={[...row.constraints, row.description].filter(Boolean).join(". ") || "—"} />
               </td>
             </tr>
           ))}
