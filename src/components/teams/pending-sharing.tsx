@@ -4,6 +4,7 @@ import { IconCheck, IconLoader2, IconLock, IconX } from "@tabler/icons-react";
 import Link from "next/link";
 
 import { decideSharingAction, withdrawSharingAction } from "@/app/(workspace)/app/sharing-actions";
+import { commentLabel } from "@/components/app/comment-options";
 import { visibilityLabel } from "@/components/app/share-options";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,14 @@ function person(name: string, username: string | null) {
   return username ? `@${username}` : name || "A member";
 }
 
-/** Open sharing requests, each with approve and deny. Owners and admins only. */
+/** What the request asks for: a sharing level with who may comment, or opening comments. */
+function askedFor(request: PendingSharingView) {
+  if (request.kind === "comments") return "asks to open comments to anyone signed in";
+  const comments = request.comments ? `, comments: ${commentLabel(request.comments).toLowerCase()}` : "";
+  return `asks for ${visibilityLabel(request.level).toLowerCase()} sharing${comments}`;
+}
+
+/** Open sharing and comments requests, each with approve and deny. Owners and admins only. */
 export function PendingSharingList({ requests }: { requests: PendingSharingView[] }) {
   const { pending, run } = useTeamAction();
   if (requests.length === 0) return <p className="px-5 py-6 text-md text-muted-foreground">Nothing is waiting for approval.</p>;
@@ -29,7 +37,7 @@ export function PendingSharingList({ requests }: { requests: PendingSharingView[
             <Link href={`/artifact/${request.publicId}`} className="block truncate text-md font-medium hover:underline">{request.title}</Link>
             <p className="mt-0.5 text-sm text-muted-foreground">
               <PixelAvatar seed={request.requesterId} kind={request.requesterKind} size={16} className="mr-1 -mt-px" />
-              {person(request.requesterName, request.requesterUsername)} asks for {visibilityLabel(request.level).toLowerCase()} sharing · {dateFormat.format(new Date(request.requestedAt))}
+              {person(request.requesterName, request.requesterUsername)} {askedFor(request)} · {dateFormat.format(new Date(request.requestedAt))}
             </p>
           </div>
           <Button size="sm" className="text-xs" disabled={pending !== null} onClick={() => void run(request.requestId, () => decideSharingAction(request.requestId, true), "Sharing approved.")}>

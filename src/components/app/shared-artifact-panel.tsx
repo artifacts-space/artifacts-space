@@ -4,6 +4,7 @@ import { IconExternalLink, IconLoader2, IconLock } from "@tabler/icons-react";
 import Link from "next/link";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CommentThread } from "@/components/comments/comment-thread";
+import { CommentsControl } from "@/components/app/comments-picker";
 import { CopyButton } from "@/components/copy-button";
 import { LastEdited } from "@/components/history/last-edited";
 import { VersionHistory } from "@/components/history/version-history";
@@ -32,7 +33,7 @@ interface SharedArtifactPanelProps {
  * admins of that team can make it private again.
  */
 export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn }: SharedArtifactPanelProps) {
-  const { team, canEdit, canWithdraw } = useEditAccess(artifact, viewerId);
+  const { team, canEdit, canWithdraw, seesComments } = useEditAccess(artifact, viewerId);
   const { withdrawing, withdraw } = useWithdrawSharing(artifact.id, onWithdrawn);
 
   return (
@@ -56,6 +57,7 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
           <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/artifact/${artifact.publicId}`} />}>
             <IconExternalLink /> Open page
           </Button>
+          {canWithdraw ? <CommentsControl artifact={artifact} team={team} onUpdated={onUpdated} /> : null}
           {canWithdraw ? (
             <Button variant="outline" size="sm" disabled={withdrawing} onClick={() => void withdraw()}>
               {withdrawing ? <IconLoader2 className="animate-spin" /> : <IconLock />} Withdraw sharing
@@ -71,7 +73,7 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
       <div className="min-h-[460px] flex-1 bg-card p-6 sm:p-8">
         <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
       </div>
-      <CommentThread publicId={artifact.publicId} className="border-t px-5 py-5 sm:px-7" />
+      {seesComments ? <CommentThread publicId={artifact.publicId} className="border-t px-5 py-5 sm:px-7" /> : null}
     </section>
   );
 }

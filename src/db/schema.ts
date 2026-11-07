@@ -17,6 +17,7 @@ import {
 import {
   artifactKinds,
   artifactVisibilities,
+  commentSettings,
   reportReasons,
   reportStatuses,
   sharingLevels,
@@ -185,6 +186,11 @@ export const artifact = pgTable(
     visibility: text("visibility", { enum: artifactVisibilities })
       .notNull()
       .default("private"),
+    // Who can read and write its comments: off, team (the author and the team), or signed_in
+    // (anyone signed in who can read it). The app always sets it on insert. The database
+    // default is today's behavior before this setting existed, so rows written by older code
+    // keep working the old way.
+    comments: text("comments", { enum: commentSettings }).notNull().default("signed_in"),
     // Legacy /share/<shareId> links redirect to /artifact/<publicId>.
     shareId: text("share_id").notNull(),
     // 22-character random base58 id. The canonical URL is /artifact/<publicId>.
@@ -207,6 +213,7 @@ export const artifact = pgTable(
     index("artifact_user_updated_idx").on(table.userId, table.updatedAt),
     index("artifact_user_project_idx").on(table.userId, table.project),
     index("artifact_team_updated_idx").on(table.teamId, table.updatedAt),
+    check("artifact_comments_check", sql`${table.comments} in ('off', 'team', 'signed_in')`),
     check("artifact_content_size_check", sql`octet_length(${table.content}) <= ${sql.raw(String(artifactSizeLimits.maxContentBytes))}`),
     // jsonb prints with extra spaces, so the backstop allows twice the app's limit.
     check("artifact_metadata_size_check", sql`octet_length(${table.metadata}::text) <= ${sql.raw(String(artifactSizeLimits.maxMetadataBytes * 2))}`),
@@ -265,6 +272,8 @@ export const sharingRequest = pgTable(
     kind: text("kind", { enum: sharingRequestKinds }).notNull().default("sharing"),
     // The requested level: team, link, or public. For an edit, the level it is shared at.
     visibility: text("visibility", { enum: sharingLevels }).notNull(),
+    // For sharing and comments requests: who may comment once it is approved.
+    comments: text("comments", { enum: commentSettings }),
     // For an edit: the version waiting for approval.
     versionId: text("version_id").references(() => artifactVersion.id, { onDelete: "cascade" }),
     status: text("status", { enum: sharingRequestStatuses }).notNull().default("pending"),
@@ -390,7 +399,8 @@ export const agent = pgTable(
     mutedBy: text("muted_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("agent_team_idx").on(table.teamId)],
+  // agent_owner_idx: the storage quota sums an account (a person and the agents they own) by owner.
+  (table) => [index("agent_team_idx").on(table.teamId), index("agent_owner_idx").on(table.ownerId)],
 );
 
 // A comment on an artifact. All comments on one artifact form its thread;

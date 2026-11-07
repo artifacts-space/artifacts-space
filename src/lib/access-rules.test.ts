@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ArtifactVisibility } from "@/lib/artifact-types";
 
-import { canDeleteArtifact, canEditArtifact, canViewArtifact, isIndexable, type AccessViewer } from "./access-rules";
+import { canDeleteArtifact, canEditArtifact, canViewArtifact, isIndexable, NEW_ACCOUNT_NOINDEX_DAYS, type AccessViewer } from "./access-rules";
 
 const author = "author";
 const subject = (visibility: ArtifactVisibility, teamId: string | null = "team-1") => ({ userId: author, visibility, teamId });
@@ -78,10 +78,27 @@ describe("canDeleteArtifact", () => {
 });
 
 describe("isIndexable", () => {
-  it("should let search engines index public artifacts only", () => {
-    expect(isIndexable("public")).toBe(true);
-    expect(isIndexable("link")).toBe(false);
-    expect(isIndexable("team")).toBe(false);
-    expect(isIndexable("private")).toBe(false);
+  const now = new Date("2026-11-10T12:00:00Z");
+  const established = new Date("2026-10-01T00:00:00Z");
+
+  it("should let search engines index public artifacts only when the account is established", () => {
+    expect(isIndexable("public", established, now)).toBe(true);
+    expect(isIndexable("link", established, now)).toBe(false);
+    expect(isIndexable("team", established, now)).toBe(false);
+    expect(isIndexable("private", established, now)).toBe(false);
+  });
+
+  it("should keep public pages out of search when the account is newer than the limit", () => {
+    const justUnder = new Date(now.getTime() - NEW_ACCOUNT_NOINDEX_DAYS * 86_400_000 + 1000);
+    expect(isIndexable("public", justUnder, now)).toBe(false);
+  });
+
+  it("should index public pages when the account reaches the limit exactly", () => {
+    const atLimit = new Date(now.getTime() - NEW_ACCOUNT_NOINDEX_DAYS * 86_400_000);
+    expect(isIndexable("public", atLimit, now)).toBe(true);
+  });
+
+  it("should treat an unknown account age as new", () => {
+    expect(isIndexable("public", null, now)).toBe(false);
   });
 });

@@ -1,12 +1,16 @@
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { agent, artifact, sharingRequest, user } from "@/db/schema";
-import type { ArtifactVisibility, SharingLevel } from "@/lib/artifact-types";
+import type { ArtifactVisibility, CommentSetting, SharingLevel } from "@/lib/artifact-types";
 
 /** An open request as the team page lists it. */
 export interface PendingSharingView {
   requestId: string;
+  /** sharing: who can read it (with who may comment). comments: open its comments to anyone signed in. */
+  kind: "sharing" | "comments";
+  /** Who may comment once approved. */
+  comments: CommentSetting | null;
   artifactId: string;
   publicId: string;
   title: string;
@@ -20,11 +24,13 @@ export interface PendingSharingView {
   requestedAt: string;
 }
 
-/** Open sharing requests for a team. Callers must check the viewer is an owner or admin. */
+/** Open sharing and comments requests for a team. Callers must check the viewer is an owner or admin. */
 export async function listPendingSharing(teamId: string): Promise<PendingSharingView[]> {
   const rows = await getDb()
     .select({
       requestId: sharingRequest.id,
+      kind: sharingRequest.kind,
+      comments: sharingRequest.comments,
       artifactId: artifact.id,
       publicId: artifact.publicId,
       title: artifact.title,
@@ -40,9 +46,14 @@ export async function listPendingSharing(teamId: string): Promise<PendingSharing
     .innerJoin(artifact, eq(artifact.id, sharingRequest.artifactId))
     .innerJoin(user, eq(user.id, sharingRequest.requestedBy))
     .leftJoin(agent, eq(agent.userId, user.id))
-    .where(and(eq(sharingRequest.teamId, teamId), eq(sharingRequest.kind, "sharing"), eq(sharingRequest.status, "pending")))
+    .where(and(eq(sharingRequest.teamId, teamId), inArray(sharingRequest.kind, ["sharing", "comments"]), eq(sharingRequest.status, "pending")))
     .orderBy(desc(sharingRequest.createdAt));
-  return rows.map(({ requesterAgentId, ...row }) => ({ ...row, requesterKind: requesterAgentId ? "agent" : "person", requestedAt: row.requestedAt.toISOString() }));
+  return rows.map(({ requesterAgentId, kind, ...row }) => ({
+    ...row,
+    kind: kind === "comments" ? "comments" : "sharing",
+    requesterKind: requesterAgentId ? "agent" : "person",
+    requestedAt: row.requestedAt.toISOString(),
+  }));
 }
 
 /** An artifact shared through a team, as the team page lists it. */

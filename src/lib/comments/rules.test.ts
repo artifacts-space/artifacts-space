@@ -26,13 +26,25 @@ const teammate: MentionCandidate = {
 const reviewer: MentionCandidate = { ...teammate, handle: "reviewer", userId: "u-reviewer", kind: "agent" };
 
 describe("comment permissions", () => {
-  it("should let signed-in viewers who can view the artifact use comments", () => {
-    expect(canUseComments({ signedIn: true, canViewArtifact: true })).toBe(true);
+  const reader = { canViewArtifact: true, isAuthor: false, isTeamMember: false };
+
+  it("should let signed-in viewers who can view the artifact use comments when they are open to anyone signed in", () => {
+    expect(canUseComments({ ...reader, signedIn: true, setting: "signed_in" })).toBe(true);
   });
 
   it("should refuse comments when the viewer is signed out or cannot view the artifact", () => {
-    expect(canUseComments({ signedIn: false, canViewArtifact: true })).toBe(false);
-    expect(canUseComments({ signedIn: true, canViewArtifact: false })).toBe(false);
+    expect(canUseComments({ ...reader, signedIn: false, setting: "signed_in" })).toBe(false);
+    expect(canUseComments({ ...reader, signedIn: true, setting: "signed_in", canViewArtifact: false })).toBe(false);
+  });
+
+  it("should refuse comments to everyone when comments are off", () => {
+    expect(canUseComments({ signedIn: true, setting: "off", canViewArtifact: true, isAuthor: true, isTeamMember: true })).toBe(false);
+  });
+
+  it("should keep team-only comments to the author and team members", () => {
+    expect(canUseComments({ ...reader, signedIn: true, setting: "team" })).toBe(false);
+    expect(canUseComments({ ...reader, signedIn: true, setting: "team", isTeamMember: true })).toBe(true);
+    expect(canUseComments({ ...reader, signedIn: true, setting: "team", isAuthor: true })).toBe(true);
   });
 
   it("should let only the author edit or delete a comment", () => {

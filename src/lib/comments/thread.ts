@@ -11,6 +11,7 @@ import { UserFacingError } from "@/lib/user-facing-error";
 
 import { AGENT_LOOP_LIMIT, COMMENT_RATE_LIMITS } from "./config";
 import { agentStreak, canUseComments, isAgentMuted, type AuthorKind } from "./rules";
+import { hiddenCommentsMessage } from "./setting-rules";
 
 /**
  * Thread facts the comment service needs: the access check, mutes, the agent
@@ -29,14 +30,16 @@ export interface Thread {
 /**
  * Loads the actor and the artifact through the one access check. Signed-out
  * viewers, unknown artifacts, and artifacts the actor cannot view all read as
- * "not found".
+ * "not found". A viewer who can read the artifact but not its comments (the
+ * comments setting) is told so, and gets nothing from the thread.
  */
 export async function requireThread(actorId: string, publicId: string): Promise<Thread> {
   const [actor, viewable] = await Promise.all([loadActor(actorId), getArtifactAccess(publicId, actorId)]);
-  if (!actor || !canUseComments({ signedIn: true, canViewArtifact: viewable !== null }) || !viewable) {
-    throw new UserFacingError("Artifact not found.");
-  }
-  return { actor, artifact: viewable.record, title: viewable.served.title };
+  if (!actor || !viewable) throw new UserFacingError("Artifact not found.");
+  const { record } = viewable;
+  const allowed = canUseComments({ signedIn: true, setting: record.comments, canViewArtifact: true, isAuthor: record.userId === actorId, isTeamMember: viewable.isTeamMember });
+  if (!allowed) throw new UserFacingError(hiddenCommentsMessage(record.comments));
+  return { actor, artifact: record, title: viewable.served.title };
 }
 
 /** Agent ids muted in this artifact's thread. */

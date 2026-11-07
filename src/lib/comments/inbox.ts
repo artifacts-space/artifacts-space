@@ -9,12 +9,15 @@ import { loadActors } from "@/lib/agents/queries";
 import { listTeamIdsForUser } from "@/lib/teams/queries";
 
 import { INBOX_CONTEXT_COMMENTS } from "./config";
+import { canSeeComments } from "./setting-rules";
 import { toCommentView, type CommentView } from "./views";
 
 /**
  * The inbox: mentions that landed for a person or an agent. Entries are
- * re-checked against the read rule when listed, so a mention on an artifact
- * that is no longer visible quietly drops out.
+ * re-checked against the read rule and the comments setting when listed, so
+ * a mention on an artifact that is no longer visible, or whose comments are
+ * hidden from the recipient, quietly drops out. Hidden entries stay stored and
+ * come back unchanged if the comments come back; they never send anything.
  */
 
 /** One inbox entry. */
@@ -28,10 +31,30 @@ export interface InboxEntryView {
 
 const INBOX_MAX = 50;
 
-type VisibilityFields = Pick<ArtifactMetaRecord, "userId" | "visibility" | "teamId">;
+type VisibilityFields = Pick<ArtifactMetaRecord, "userId" | "visibility" | "teamId" | "comments">;
 
+/** Whether the user can still read the artifact and see its comments, from their team ids. */
 function visibleTo(userId: string, teams: ReadonlySet<string>) {
-  return (subject: VisibilityFields) => canViewArtifact(subject, { userId, isTeamMember: subject.teamId !== null && teams.has(subject.teamId) });
+  return (subject: VisibilityFields) => {
+    const isTeamMember = subject.teamId !== null && teams.has(subject.teamId);
+    const canView = canViewArtifact(subject, { userId, isTeamMember });
+    return canSeeComments(subject.comments, { canViewArtifact: canView, isAuthor: subject.userId === userId, isTeamMember });
+  };
+}
+
+/**
+ * The fields the unread count checks, for a user's unread mentions on live
+ * comments. Joins only, with every column qualified (see subjectQuery in
+ * src/lib/access.ts for why).
+ */
+export function unreadMentionSubjects(db: Pick<ReturnType<typeof getDb>, "select">, userId: string) {
+  return db
+    .select({ userId: artifact.userId, visibility: artifact.visibility, teamId: artifact.teamId, comments: artifact.comments })
+    .from(mention)
+    .innerJoin(comment, eq(comment.id, mention.commentId))
+    .innerJoin(artifact, eq(artifact.id, mention.artifactId))
+    .where(and(eq(mention.recipientId, userId), isNull(mention.readAt), isNull(comment.deletedAt)))
+    .limit(INBOX_MAX);
 }
 
 function inboxRows(userId: string, unreadOnly: boolean, limit: number) {
@@ -55,7 +78,9 @@ export async function listInbox(userId: string, options: { unreadOnly?: boolean;
   const viewable = await Promise.all(publicIds.map((publicId) => getArtifactAccess(publicId, userId)));
   const titles = new Map(publicIds.flatMap((publicId, index) => {
     const view = viewable[index];
-    return view ? [[publicId, view.served.title] as const] : [];
+    if (!view) return [];
+    const seesComments = canSeeComments(view.record.comments, { canViewArtifact: true, isAuthor: view.record.userId === userId, isTeamMember: view.isTeamMember });
+    return seesComments ? [[publicId, view.served.title] as const] : [];
   }));
   const visible = rows.filter((row) => titles.has(row.artifact.publicId));
   const authors = await loadActors(visible.flatMap((row) => (row.record.authorId ? [row.record.authorId] : [])));
@@ -70,16 +95,7 @@ export async function listInbox(userId: string, options: { unreadOnly?: boolean;
 
 /** How many unread mentions a user can still see, up to the inbox limit. */
 export async function countUnreadMentions(userId: string): Promise<number> {
-  const [rows, teams] = await Promise.all([
-    getDb()
-      .select({ userId: artifact.userId, visibility: artifact.visibility, teamId: artifact.teamId })
-      .from(mention)
-      .innerJoin(comment, eq(comment.id, mention.commentId))
-      .innerJoin(artifact, eq(artifact.id, mention.artifactId))
-      .where(and(eq(mention.recipientId, userId), isNull(mention.readAt), isNull(comment.deletedAt)))
-      .limit(INBOX_MAX),
-    listTeamIdsForUser(userId),
-  ]);
+  const [rows, teams] = await Promise.all([unreadMentionSubjects(getDb(), userId), listTeamIdsForUser(userId)]);
   return rows.filter(visibleTo(userId, teams)).length;
 }
 

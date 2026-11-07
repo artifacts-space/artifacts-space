@@ -3,7 +3,7 @@ import { z, ZodError } from "zod";
 
 import { getEditableArtifact } from "@/lib/access";
 import { loadArtifactForViewer } from "@/lib/artifact-read";
-import { artifactKinds, artifactVisibilities, type ArtifactDto, type ArtifactVisibility } from "@/lib/artifact-types";
+import { artifactKinds, artifactVisibilities, commentSettings, type ArtifactDto, type ArtifactVisibility, type CommentSetting } from "@/lib/artifact-types";
 import {
   createArtifact,
   deleteArtifact,
@@ -14,6 +14,7 @@ import {
 } from "@/lib/artifacts";
 import { kindFieldDescription } from "@/lib/mcp/format-tools";
 import { isPublicId } from "@/lib/public-id";
+import { setArtifactComments } from "@/lib/sharing/comments";
 import { requestArtifactSharing } from "@/lib/sharing/service";
 import { siteUrl } from "@/lib/site-origin";
 import { listTeamsForUser, type TeamMembership } from "@/lib/teams/queries";
@@ -35,6 +36,13 @@ const teamField = z
   .max(39)
   .optional()
   .describe("Team slug from teams_list. Required for team sharing. For link or public, the team whose admins approve it; defaults to your personal team.");
+
+const commentsField = z
+  .enum(commentSettings)
+  .optional()
+  .describe(
+    "Who can read and write its comments. off: nobody (existing comments are hidden, not deleted). team: the author and members of its team. signed_in: anyone signed in who can read it. Left out on a sharing change: kept within the same team, else off for link or public in a personal team and team in a shared team. signed_in in a shared team waits for an owner's or admin's approval.",
+  );
 
 const editableFields = {
   title: z.string().min(1).max(160),
@@ -86,21 +94,50 @@ function scopeFor(teams: TeamMembership[], scope: string): ArtifactScope {
   return { kind: "team", teamId: teamBySlug(teams, scope).id };
 }
 
-async function share(userId: string, artifact: ArtifactDto, teams: TeamMembership[], visibility: ArtifactVisibility, team: string | undefined) {
-  const teamId = team ? teamBySlug(teams, team).id : null;
-  return requestArtifactSharing({ requesterId: userId, artifactId: artifact.id, visibility, teamId, actor: "agent" });
+/** Who can read it and who can comment, as a create or update asks for them. */
+interface SharingAsk {
+  visibility: ArtifactVisibility | undefined;
+  team: string | undefined;
+  comments: CommentSetting | undefined;
 }
 
-/** Shares after a create or update. The artifact is already saved, so a sharing failure is reported, not thrown. */
-async function shareAfterSave(userId: string, saved: ArtifactDto, teams: TeamMembership[], visibility: ArtifactVisibility | undefined, team: string | undefined) {
-  if (!visibility) return { artifact: saved, sharing: null };
+type ChangeStatus = { status: "applied" | "pending" } | { status: "failed"; error: string };
+
+function failed(error: unknown, fallback: string): ChangeStatus {
+  return { status: "failed", error: error instanceof UserFacingError ? error.message : fallback };
+}
+
+/** A sharing change that carries the comments setting. Only the author shares. */
+async function shareWithComments(userId: string, saved: ArtifactDto, teams: TeamMembership[], ask: SharingAsk & { visibility: ArtifactVisibility }) {
   try {
-    const result = await share(userId, saved, teams, visibility, team);
-    return { artifact: result.artifact, sharing: { status: result.status } };
+    const teamId = ask.team ? teamBySlug(teams, ask.team).id : null;
+    const result = await requestArtifactSharing({ requesterId: userId, artifactId: saved.id, visibility: ask.visibility, teamId, comments: ask.comments, actor: "agent" });
+    const comments: ChangeStatus | null = ask.comments ? { status: result.comments } : null;
+    return { artifact: result.artifact, sharing: { status: result.status } satisfies ChangeStatus, comments };
   } catch (error) {
-    const message = error instanceof UserFacingError ? error.message : "Sharing could not be changed.";
-    return { artifact: saved, sharing: { status: "failed", error: message } };
+    return { artifact: saved, sharing: failed(error, "Sharing could not be changed."), comments: null };
   }
+}
+
+/** A comments setting change on its own: the author, or an owner or admin of its team. */
+async function changeComments(userId: string, saved: ArtifactDto, comments: CommentSetting) {
+  try {
+    const result = await setArtifactComments({ actorId: userId, artifactId: saved.id, comments, actor: "agent" });
+    return { artifact: result.artifact, sharing: null, comments: { status: result.status } satisfies ChangeStatus };
+  } catch (error) {
+    return { artifact: saved, sharing: null, comments: failed(error, "Comments could not be changed.") };
+  }
+}
+
+/**
+ * Shares and sets comments after a create or update. The artifact is already
+ * saved, so a failure is reported in the result, not thrown.
+ */
+async function shareAfterSave(userId: string, saved: ArtifactDto, teams: TeamMembership[], ask: SharingAsk) {
+  const { visibility } = ask;
+  if (visibility) return shareWithComments(userId, saved, teams, { ...ask, visibility });
+  if (ask.comments) return changeComments(userId, saved, ask.comments);
+  return { artifact: saved, sharing: null, comments: null };
 }
 
 async function ownByPublicId(userId: string, publicId: string) {
@@ -171,15 +208,16 @@ function registerWriteTools(server: ToolServer, userId: string) {
     "artifacts_create",
     {
       title: "Create artifact",
-      description: "Create an artifact to share context with future coding sessions and other agents. It is private unless you set visibility. Creation is limited per hour; a limit error says when to try again.",
-      inputSchema: { ...editableFields, visibility: visibilityField, team: teamField },
+      description:
+        "Create an artifact to share context with future coding sessions and other agents. It is private unless you set visibility, and `comments` sets who can comment. Creation is limited per hour; a limit error says when to try again.",
+      inputSchema: { ...editableFields, visibility: visibilityField, team: teamField, comments: commentsField },
     },
-    ({ visibility, team, ...input }) => respond(async () => {
+    ({ visibility, team, comments, ...input }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
       if (team) teamBySlug(teams, team);
       const created = await createArtifact(userId, input);
-      const result = await shareAfterSave(userId, created, teams, visibility, team);
-      return { artifact: toMcpArtifact(result.artifact, view), sharing: result.sharing };
+      const result = await shareAfterSave(userId, created, teams, { visibility, team, comments });
+      return { artifact: toMcpArtifact(result.artifact, view), sharing: result.sharing, comments: result.comments };
     }),
   );
 
@@ -188,7 +226,7 @@ function registerWriteTools(server: ToolServer, userId: string) {
     {
       title: "Update artifact",
       description:
-        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). Only the author can set visibility, which requests sharing through the team's rule. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved. Edits are limited per hour (generously); a limit error says when to try again.",
+        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). Only the author can set visibility, which requests sharing through the team's rule. The author (and the team's owners and admins) can set `comments`. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved. Edits are limited per hour (generously); a limit error says when to try again.",
       inputSchema: {
         id: publicIdField,
         ...editableFields,
@@ -196,16 +234,17 @@ function registerWriteTools(server: ToolServer, userId: string) {
         content: editableFields.content.optional(),
         visibility: visibilityField,
         team: teamField,
+        comments: commentsField,
       },
     },
-    ({ id, visibility, team, ...input }) => respond(async () => {
+    ({ id, visibility, team, comments, ...input }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
       const record = await editableByPublicId(userId, id);
       if (team) teamBySlug(teams, team);
       const updated = await updateArtifact(userId, record.id, input, "agent");
       if (!updated) throw new UserFacingError("Artifact not found, or you cannot edit it.");
-      const result = await shareAfterSave(userId, updated, teams, visibility, team);
-      return { artifact: toMcpArtifact(result.artifact, view), edit: updated.pendingEdit ? "pending" : "applied", sharing: result.sharing };
+      const result = await shareAfterSave(userId, updated, teams, { visibility, team, comments });
+      return { artifact: toMcpArtifact(result.artifact, view), edit: updated.pendingEdit ? "pending" : "applied", sharing: result.sharing, comments: result.comments };
     }),
   );
 

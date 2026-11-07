@@ -136,7 +136,19 @@ function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate
   if (selected && !full) return <LoadingPane failure={failure} onRetry={retry} />;
   if (full && (access.isAuthor || access.canEdit)) {
     const onWithdraw = access.canWithdraw ? () => void withdrawal.withdraw() : null;
-    return <ArtifactEditor key={full.id} artifact={full} origin={origin} isAuthor={access.isAuthor} onWithdraw={onWithdraw} onUpdated={handleUpdated} onDeleted={onDeleted} />;
+    return (
+      <ArtifactEditor
+        key={full.id}
+        artifact={full}
+        origin={origin}
+        isAuthor={access.isAuthor}
+        team={access.team}
+        seesComments={access.seesComments}
+        onWithdraw={onWithdraw}
+        onUpdated={handleUpdated}
+        onDeleted={onDeleted}
+      />
+    );
   }
   if (full) return <SharedArtifactPanel key={full.id} artifact={full} viewerId={viewerId} onUpdated={handleUpdated} onWithdrawn={onDeleted} />;
   return (

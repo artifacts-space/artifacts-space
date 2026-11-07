@@ -4,7 +4,7 @@ import { IconClock, IconLink, IconLoader2, IconLock, IconUsersGroup, IconWorld }
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { shareArtifactAction } from "@/app/(workspace)/app/sharing-actions";
+import { setCommentsAction, shareArtifactAction } from "@/app/(workspace)/app/sharing-actions";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,11 +16,14 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ValueField } from "@/components/value-field";
-import type { ArtifactDto, ArtifactVisibility } from "@/lib/artifact-types";
+import type { ActionResult, ArtifactDto, ArtifactVisibility, CommentSetting } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
-import { defaultTeamId, outcomeText, selectedTeamLabel, teamLabel, teamsFor, visibilityLabel, visibilityOptions } from "./share-options";
+import { commentLabel, commentsWaitForApproval } from "./comment-options";
+import { CommentsPicker } from "./comments-picker";
+import { outcomeText, selectedTeamLabel, teamLabel, teamsFor, visibilityLabel, visibilityOptions } from "./share-options";
 import { useShareTeams, type ShareTeam } from "./share-teams-context";
+import { useShareChoice } from "./use-share-choice";
 
 const icons: Record<ArtifactVisibility, typeof IconLock> = { private: IconLock, team: IconUsersGroup, link: IconLink, public: IconWorld };
 
@@ -82,14 +85,45 @@ function PendingEditNotice({ artifact }: { artifact: ArtifactDto }) {
 
 function PendingNotice({ artifact, teams }: { artifact: ArtifactDto; teams: readonly ShareTeam[] }) {
   const pending = artifact.pendingSharing;
-  if (!pending) return null;
-  const team = teams.find((item) => item.id === pending.teamId);
+  const comments = artifact.pendingComments;
+  if (!pending && !comments) return null;
+  const team = teams.find((item) => item.id === pending?.teamId);
   return (
     <p className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-sm leading-5 text-muted-foreground">
       <IconClock className="size-3.5 shrink-0" />
-      Waiting for approval: {visibilityLabel(pending.level).toLowerCase()}{team ? ` in ${team.name}` : ""}.
+      <span>
+        Waiting for approval:{" "}
+        {pending ? `${visibilityLabel(pending.level).toLowerCase()}${team ? ` in ${team.name}` : ""}` : null}
+        {pending && comments ? "; " : null}
+        {comments ? `comments from ${commentLabel(comments.comments).toLowerCase()}` : null}.
+      </span>
     </p>
   );
+}
+
+/** The sentence about comments approval, or null when the chosen setting applies at once. */
+function commentsApprovalNote(input: { artifact: ArtifactDto; visibility: ArtifactVisibility; team: ShareTeam | undefined; comments: CommentSetting }) {
+  const wait = commentsWaitForApproval({ current: input.artifact.comments, next: input.comments, currentTeamId: input.artifact.teamId, visibility: input.visibility, team: input.team });
+  return wait ? `Comments from anyone signed in need an owner's or admin's approval in ${input.team?.name ?? "the team"}.` : null;
+}
+
+/** What saving will do: now or after approval, for the level and for comments. */
+function ShareOutcome(props: { artifact: ArtifactDto; visibility: ArtifactVisibility; team: ShareTeam | undefined; comments: CommentSetting }) {
+  const { artifact, visibility, team, comments } = props;
+  const note = commentsApprovalNote(props);
+  const onlyComments = visibility === artifact.visibility && (visibility === "private" || team?.id === artifact.teamId) && comments !== artifact.comments;
+  // Only the comments change: sharing stays as it is, so only the comments rule applies.
+  const commentsText = note ? `${note} Until then, comments stay as they are.` : "It applies as soon as you save.";
+  const text = onlyComments ? commentsText : [outcomeText(visibility, team), note].filter(Boolean).join(" ");
+  return <p className="text-sm leading-5 text-muted-foreground">{text}</p>;
+}
+
+/** Saves the dialog: only the comments setting when the level and team stay, else a sharing change that carries it. */
+function saveChoice(artifact: ArtifactDto, choice: { visibility: ArtifactVisibility; teamId: string | null; comments: CommentSetting }): Promise<ActionResult<{ status: "applied" | "pending"; artifact: ArtifactDto }>> {
+  const teamId = choice.visibility === "private" ? null : choice.teamId;
+  const sameSharing = choice.visibility === artifact.visibility && (choice.visibility === "private" || teamId === artifact.teamId);
+  if (sameSharing && choice.comments !== artifact.comments) return setCommentsAction(artifact.id, choice.comments);
+  return shareArtifactAction(artifact.id, { visibility: choice.visibility, teamId, comments: choice.comments });
 }
 
 interface ShareControlProps {
@@ -105,22 +139,17 @@ interface ShareControlProps {
 export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProps) {
   const teams = useShareTeams();
   const [open, setOpen] = useState(false);
-  const [visibility, setVisibility] = useState<ArtifactVisibility>(artifact.visibility);
-  const [teamId, setTeamId] = useState(() => defaultTeamId(artifact.visibility, teams, artifact.teamId));
+  const choice = useShareChoice(artifact, teams);
+  const { visibility, teamId, team, comments } = choice;
   const [saving, setSaving] = useState(false);
-  const waiting = artifact.pendingSharing !== null || artifact.pendingEdit !== null;
+  const waiting = artifact.pendingSharing !== null || artifact.pendingEdit !== null || artifact.pendingComments !== null;
   const Icon = waiting ? IconClock : icons[artifact.visibility];
   const live = artifact.visibility === "link" || artifact.visibility === "public";
-
-  function changeLevel(next: ArtifactVisibility) {
-    setVisibility(next);
-    setTeamId(defaultTeamId(next, teams, teamId ?? artifact.teamId));
-  }
 
   async function save() {
     setSaving(true);
     try {
-      const result = await shareArtifactAction(artifact.id, { visibility, teamId: visibility === "private" ? null : teamId });
+      const result = await saveChoice(artifact, { visibility, teamId, comments });
       if (!result.success) {
         toast.error(result.error);
         return;
@@ -149,9 +178,10 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
           <div className="space-y-4">
             <PendingNotice artifact={artifact} teams={teams} />
             <PendingEditNotice artifact={artifact} />
-            <LevelPicker value={visibility} onChange={changeLevel} />
-            <TeamPicker visibility={visibility} teams={teams} value={teamId} onChange={setTeamId} />
-            <p className="text-sm leading-5 text-muted-foreground">{outcomeText(visibility, teams.find((team) => team.id === teamId))}</p>
+            <LevelPicker value={visibility} onChange={choice.changeLevel} />
+            <TeamPicker visibility={visibility} teams={teams} value={teamId} onChange={choice.changeTeam} />
+            <CommentsPicker visibility={visibility} team={team} value={comments} onChange={choice.chooseComments} />
+            <ShareOutcome artifact={artifact} visibility={visibility} team={team} comments={comments} />
             {live ? (
               <ValueField value={shareUrl} copyLabel="Copy link" />
             ) : null}

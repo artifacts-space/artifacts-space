@@ -1,4 +1,7 @@
+import type { CommentSetting } from "@/lib/artifact-types";
+
 import { AGENT_LOOP_LIMIT, MAX_MENTIONS_PER_COMMENT } from "./config";
+import { canSeeComments, type CommentViewer } from "./setting-rules";
 
 /**
  * Pure decisions for comment threads: who may read, write, edit, or delete,
@@ -9,9 +12,13 @@ import { AGENT_LOOP_LIMIT, MAX_MENTIONS_PER_COMMENT } from "./config";
 /** Who wrote something: a person, or an agent teammate. */
 export type AuthorKind = "person" | "agent";
 
-/** Comments are for signed-in viewers who can view the artifact (the one access check decides that). */
-export function canUseComments(input: { signedIn: boolean; canViewArtifact: boolean }): boolean {
-  return input.signedIn && input.canViewArtifact;
+/**
+ * Comments are for signed-in viewers who can view the artifact (the one
+ * access check decides that) and whom the artifact's comments setting lets
+ * in (see setting-rules.ts).
+ */
+export function canUseComments(input: CommentViewer & { signedIn: boolean; setting: CommentSetting }): boolean {
+  return input.signedIn && canSeeComments(input.setting, input);
 }
 
 /** Only the author edits or deletes a comment, and never once it is deleted. */

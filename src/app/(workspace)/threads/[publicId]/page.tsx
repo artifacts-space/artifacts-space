@@ -9,6 +9,7 @@ import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
 import { getArtifactAccess } from "@/lib/access";
 import { loadArtifactByline } from "@/lib/artifact-byline";
+import { canSeeComments } from "@/lib/comments/setting-rules";
 import { getSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Thread", robots: { index: false, follow: false } };
@@ -21,6 +22,9 @@ export default async function ThreadPage({ params }: PageProps<"/threads/[public
   const { publicId } = await params;
   const viewable = await getArtifactAccess(publicId, session.user.id);
   if (!viewable) notFound();
+  // Hidden comments (the comments setting) read as a missing thread.
+  const { record } = viewable;
+  if (!canSeeComments(record.comments, { canViewArtifact: true, isAuthor: record.userId === session.user.id, isTeamMember: viewable.isTeamMember })) notFound();
   const byline = await loadArtifactByline(viewable.record, viewable.isTeamMember);
 
   return (

@@ -8,10 +8,18 @@ export type ArtifactVisibility = (typeof artifactVisibilities)[number];
 /** Visibilities that share an artifact with someone besides its author. */
 export const sharingLevels = ["team", "link", "public"] as const;
 export type SharingLevel = (typeof sharingLevels)[number];
+/**
+ * Who can read and write an artifact's comments. Separate from who can read
+ * the artifact. off: nobody; existing comments stay hidden until comments
+ * come back. team: the author and members of the artifact's team. signed_in:
+ * anyone signed in who can read the artifact.
+ */
+export const commentSettings = ["off", "team", "signed_in"] as const;
+export type CommentSetting = (typeof commentSettings)[number];
 export const sharingRequestStatuses = ["pending", "approved", "denied", "canceled"] as const;
 export type SharingRequestStatus = (typeof sharingRequestStatuses)[number];
-/** sharing: who can read it. edit: new content for a link or public artifact. */
-export const sharingRequestKinds = ["sharing", "edit"] as const;
+/** sharing: who can read it. edit: new content for a link or public artifact. comments: open comments to anyone signed in. */
+export const sharingRequestKinds = ["sharing", "edit", "comments"] as const;
 export type SharingRequestKind = (typeof sharingRequestKinds)[number];
 /**
  * Why a version was saved. create: the first content. edit: a content or
@@ -32,6 +40,15 @@ export interface PendingSharingDto {
   requestId: string;
   level: SharingLevel;
   teamId: string;
+  /** Who may comment once it is approved. */
+  comments: CommentSetting | null;
+  requestedAt: string;
+}
+
+/** A request to open an artifact's comments to anyone signed in, waiting for a team owner or admin. */
+export interface PendingCommentsDto {
+  requestId: string;
+  comments: CommentSetting;
   requestedAt: string;
 }
 
@@ -63,6 +80,8 @@ export interface ArtifactDto {
   sessionId: string;
   source: string;
   visibility: ArtifactVisibility;
+  /** Who can read and write its comments. */
+  comments: CommentSetting;
   /** The team it is shared with (team), or whose admins approved it (link, public). */
   teamId: string | null;
   authorId: string;
@@ -71,6 +90,8 @@ export interface ArtifactDto {
   pendingSharing: PendingSharingDto | null;
   /** Set when the latest edit waits for approval; readers outside the team still see the approved version. */
   pendingEdit: PendingEditDto | null;
+  /** Set when opening comments to anyone signed in waits for approval. */
+  pendingComments: PendingCommentsDto | null;
   /** Ready files attached to the artifact, in the order they were added. */
   files: FileDto[];
   /** Who saved it last. Null when they are gone. */

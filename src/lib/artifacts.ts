@@ -15,11 +15,13 @@ import {
   type ArtifactEditorDto,
   type ArtifactInput,
   type ArtifactListItemDto,
+  type PendingCommentsDto,
   type PendingEditDto,
   type PendingSharingDto,
 } from "@/lib/artifact-types";
 import { artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
 import { artifactSizeProblem } from "@/lib/artifact-limits";
+import { defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { PREVIEW_CHARS, previewKinds } from "@/lib/artifact-preview";
 import { checkContentFiles } from "@/lib/files/attach";
 import { attachFileRows, deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
@@ -74,14 +76,17 @@ function assertArtifactSize(input: { content?: string | undefined; metadata?: Re
 }
 
 
+/** Open requests on one artifact. */
+export interface PendingRequests {
+  sharing: PendingSharingDto | null;
+  edit: PendingEditDto | null;
+  comments: PendingCommentsDto | null;
+}
+
+const noPending: PendingRequests = { sharing: null, edit: null, comments: null };
+
 /** Maps a row without content to the shared DTO fields. */
-function toArtifactMeta(
-  record: ArtifactMetaRecord,
-  pendingSharing: PendingSharingDto | null,
-  pendingEdit: PendingEditDto | null,
-  files: FileDto[],
-  updatedBy: ArtifactEditorDto | null,
-): Omit<ArtifactDto, "content"> {
+function toArtifactMeta(record: ArtifactMetaRecord, pending: PendingRequests, files: FileDto[], updatedBy: ArtifactEditorDto | null): Omit<ArtifactDto, "content"> {
   return {
     id: record.id,
     publicId: record.publicId,
@@ -93,11 +98,13 @@ function toArtifactMeta(
     sessionId: record.sessionId,
     source: record.source,
     visibility: record.visibility,
+    comments: record.comments,
     teamId: record.teamId,
     authorId: record.userId,
     originalAuthorId: record.originalAuthorId,
-    pendingSharing,
-    pendingEdit,
+    pendingSharing: pending.sharing,
+    pendingEdit: pending.edit,
+    pendingComments: pending.comments,
     files,
     updatedBy,
     metadata: record.metadata,
@@ -107,31 +114,32 @@ function toArtifactMeta(
 }
 
 /** Maps a row to the workspace's DTO. */
-export function toArtifactDto(
-  record: ArtifactRecord,
-  pendingSharing: PendingSharingDto | null = null,
-  pendingEdit: PendingEditDto | null = null,
-  files: FileDto[] = [],
-  updatedBy: ArtifactEditorDto | null = null,
-): ArtifactDto {
-  return { ...toArtifactMeta(record, pendingSharing, pendingEdit, files, updatedBy), content: record.content };
+export function toArtifactDto(record: ArtifactRecord, pending: PendingRequests = noPending, files: FileDto[] = [], updatedBy: ArtifactEditorDto | null = null): ArtifactDto {
+  return { ...toArtifactMeta(record, pending, files, updatedBy), content: record.content };
 }
 
-/** Open sharing and edit requests for these artifacts, each by artifact id. */
-export async function pendingRequestsFor(artifactIds: string[]) {
-  const sharing = new Map<string, PendingSharingDto>();
-  const edits = new Map<string, PendingEditDto>();
-  if (artifactIds.length === 0) return { sharing, edits };
+function pendingEntry(map: Map<string, PendingRequests>, artifactId: string): PendingRequests {
+  const entry = map.get(artifactId) ?? { ...noPending };
+  map.set(artifactId, entry);
+  return entry;
+}
+
+/** Open sharing, edit, and comments requests for these artifacts, by artifact id. */
+export async function pendingRequestsFor(artifactIds: string[]): Promise<Map<string, PendingRequests>> {
+  const byArtifact = new Map<string, PendingRequests>();
+  if (artifactIds.length === 0) return byArtifact;
   const rows = await getDb()
     .select()
     .from(sharingRequest)
     .where(and(inArray(sharingRequest.artifactId, artifactIds), eq(sharingRequest.status, "pending")));
   for (const row of rows) {
     const requestedAt = row.createdAt.toISOString();
-    if (row.kind === "edit") edits.set(row.artifactId, { requestId: row.id, requestedAt });
-    else sharing.set(row.artifactId, { requestId: row.id, level: row.visibility, teamId: row.teamId, requestedAt });
+    const entry = pendingEntry(byArtifact, row.artifactId);
+    if (row.kind === "edit") entry.edit = { requestId: row.id, requestedAt };
+    else if (row.kind === "comments") entry.comments = { requestId: row.id, comments: row.comments ?? "signed_in", requestedAt };
+    else entry.sharing = { requestId: row.id, level: row.visibility, teamId: row.teamId, comments: row.comments, requestedAt };
   }
-  return { sharing, edits };
+  return byArtifact;
 }
 
 /** Who saved each artifact last, by user id. People and agents who are gone are left out. */
@@ -146,13 +154,7 @@ export async function toArtifactDtos(records: ArtifactRecord[]): Promise<Artifac
   const ids = records.map((record) => record.id);
   const [pending, files, editors] = await Promise.all([pendingRequestsFor(ids), listFilesForArtifacts(ids), lastEditorsFor(records)]);
   return records.map((record) =>
-    toArtifactDto(
-      record,
-      pending.sharing.get(record.id) ?? null,
-      pending.edits.get(record.id) ?? null,
-      files.get(record.id) ?? [],
-      record.updatedBy ? editors.get(record.updatedBy) ?? null : null,
-    ),
+    toArtifactDto(record, pending.get(record.id) ?? noPending, files.get(record.id) ?? [], record.updatedBy ? editors.get(record.updatedBy) ?? null : null),
   );
 }
 
@@ -161,13 +163,7 @@ async function toArtifactListItems(rows: (ArtifactMetaRecord & { preview: string
   const ids = rows.map((row) => row.id);
   const [pending, files, editors] = await Promise.all([pendingRequestsFor(ids), listFilesForArtifacts(ids), lastEditorsFor(rows)]);
   return rows.map((row) => ({
-    ...toArtifactMeta(
-      row,
-      pending.sharing.get(row.id) ?? null,
-      pending.edits.get(row.id) ?? null,
-      files.get(row.id) ?? [],
-      row.updatedBy ? editors.get(row.updatedBy) ?? null : null,
-    ),
+    ...toArtifactMeta(row, pending.get(row.id) ?? noPending, files.get(row.id) ?? [], row.updatedBy ? editors.get(row.updatedBy) ?? null : null),
     preview: row.preview,
   }));
 }
@@ -260,6 +256,8 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
       shareId: randomUUID().replaceAll("-", ""),
       publicId: generatePublicId(),
       visibility: "private",
+      // New artifacts start private, so comments stay with the author until it is shared.
+      comments: defaultCommentSetting({ visibility: "private", teamPersonal: null }),
       userId,
       updatedBy: userId,
     })

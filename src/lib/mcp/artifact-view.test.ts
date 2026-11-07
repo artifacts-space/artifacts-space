@@ -18,11 +18,13 @@ const dto: ArtifactDto = {
   files: [],
   updatedBy: { id: "member", kind: "person", handle: "ann", name: "Ann" },
   visibility: "team",
+  comments: "team",
   teamId: "team-1",
   authorId: "author",
   originalAuthorId: null,
-  pendingSharing: { requestId: "r1", level: "public", teamId: "team-1", requestedAt: "2026-11-05T00:00:00.000Z" },
+  pendingSharing: { requestId: "r1", level: "public", teamId: "team-1", comments: "signed_in", requestedAt: "2026-11-05T00:00:00.000Z" },
   pendingEdit: null,
+  pendingComments: null,
   metadata: {},
   createdAt: "2026-11-05T00:00:00.000Z",
   updatedAt: "2026-11-05T00:00:00.000Z",
@@ -43,7 +45,7 @@ describe("toMcpArtifact", () => {
   });
 
   it("should show the pending request only to the author", () => {
-    expect(toMcpArtifact(dto, context("author")).pendingSharing).toEqual({ visibility: "public", team: "platform", requestedAt: dto.createdAt });
+    expect(toMcpArtifact(dto, context("author")).pendingSharing).toEqual({ visibility: "public", team: "platform", comments: "signed_in", requestedAt: dto.createdAt });
     expect(toMcpArtifact(dto, context("member")).pendingSharing).toBeNull();
   });
 

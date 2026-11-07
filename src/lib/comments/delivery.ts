@@ -13,6 +13,7 @@ import { loadActors } from "@/lib/agents/queries";
 import { sendMentionEmail } from "./mention-email";
 import { parseMentions } from "./mentions";
 import { decideMentions, type MentionCandidate, type MentionDecision } from "./rules";
+import { canSeeComments } from "./setting-rules";
 import { toAuthorView } from "./views";
 
 /** What happened to the mentions in a comment, for the writer. */
@@ -45,7 +46,9 @@ function unknownHandle(handle: string): MentionCandidate {
 /**
  * The facts the mention rule needs for known users: people with a handle, and
  * agents still in their team. Visibility uses the same read rule as every
- * other path (canViewArtifact), with each user's own team memberships.
+ * other path (canViewArtifact), with each user's own team memberships, and
+ * the artifact's comments setting: someone who cannot see the comments is
+ * never notified of one.
  */
 export async function mentionFacts(userIds: string[], artifact: ArtifactMetaRecord, writerId: string, threadMutes: ReadonlySet<string>): Promise<MentionCandidate[]> {
   const ids = [...new Set(userIds)];
@@ -61,7 +64,11 @@ export async function mentionFacts(userIds: string[], artifact: ArtifactMetaReco
       handle: actor.handle,
       userId: actor.userId,
       kind: actor.kind,
-      canView: canViewArtifact(artifact, { userId: actor.userId, isTeamMember }),
+      canView: canSeeComments(artifact.comments, {
+        canViewArtifact: canViewArtifact(artifact, { userId: actor.userId, isTeamMember }),
+        isAuthor: artifact.userId === actor.userId,
+        isTeamMember,
+      }),
       isArtifactAuthor: artifact.userId === actor.userId,
       sharesTeamWithWriter: sharesTeam(memberOf, writerTeams),
       muted: actor.kind === "agent" && (actor.teamMuted || threadMutes.has(actor.userId)),

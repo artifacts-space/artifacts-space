@@ -14,9 +14,11 @@ import { Logo } from "@/components/logo";
 import { PixelAvatar, type AvatarKind } from "@/components/pixel-avatar";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
+import { canSeeComments } from "@/lib/comments/setting-rules";
 import { filesForViewer } from "@/lib/files/download";
 import type { FileDto } from "@/lib/files/types";
 import { isIndexable } from "@/lib/access-rules";
+import { accountCreatedAt } from "@/lib/account-age";
 import { loadArtifactByline } from "@/lib/artifact-byline";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
@@ -35,11 +37,20 @@ async function load(params: Promise<{ publicId: string }>) {
   return getViewableArtifact(publicId, session?.user.id ?? null);
 }
 
+/** Whether search engines may index this page: public, and the author's account is past its first days. */
+async function indexable(record: ViewableArtifact["record"]) {
+  if (record.visibility !== "public") return false;
+  const createdAt = await accountCreatedAt(record.userId).catch(() => null);
+  return isIndexable(record.visibility, createdAt);
+}
+
 /**
  * Metadata comes from the version this viewer reads, so an unapproved edit
  * never reaches link previews or search results. Public pages may be indexed
- * (links not followed); link, team, and private pages never are. src/proxy.ts
- * answers 404 before this runs when the viewer cannot read the artifact.
+ * (links not followed) once the author's account is a few days old; new
+ * accounts' public pages, and link, team, and private pages, never are.
+ * src/proxy.ts answers 404 before this runs when the viewer cannot read the
+ * artifact.
  */
 export async function generateMetadata({ params }: PageProps<"/artifact/[publicId]">): Promise<Metadata> {
   const viewable = await load(params);
@@ -49,7 +60,7 @@ export async function generateMetadata({ params }: PageProps<"/artifact/[publicI
     ...(await artifactOgMetadata(record.publicId)),
     title: view.title,
     ...(view.summary ? { description: view.summary } : {}),
-    robots: isIndexable(record.visibility) ? { index: true, follow: false } : { index: false, follow: false },
+    robots: (await indexable(record)) ? { index: true, follow: false } : { index: false, follow: false },
   };
 }
 
@@ -125,6 +136,16 @@ function ArtifactHeading({ viewable, editor }: { viewable: ViewableArtifact; edi
   );
 }
 
+/**
+ * Whether this signed-in reader gets the comment section. With comments off,
+ * or for readers outside the team when they are team-only, the page has no
+ * comment section at all.
+ */
+function seesComments(viewable: ViewableArtifact, viewerId: string) {
+  const { record } = viewable;
+  return canSeeComments(record.comments, { canViewArtifact: true, isAuthor: record.userId === viewerId, isTeamMember: viewable.isTeamMember });
+}
+
 export default async function ArtifactPage({ params }: PageProps<"/artifact/[publicId]">) {
   const viewable = await load(params);
   if (!viewable) notFound();
@@ -164,8 +185,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
             {reportable ? <ReportDialog publicId={record.publicId} /> : null}
           </div>
         ) : null}
-        {/* Comments are for signed-in readers who can view the artifact; the thread checks access itself. */}
-        {session ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" /> : null}
+        {/* Comments are for signed-in readers the comments setting lets in; the thread checks access itself too. */}
+        {session && seesComments(viewable, session.user.id) ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" /> : null}
       </main>
       <footer className="border-t">
         <div className="mx-auto flex w-full max-w-[960px] items-center justify-between gap-4 px-6 py-6 text-sm text-muted-foreground">

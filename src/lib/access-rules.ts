@@ -50,7 +50,22 @@ export function canDeleteArtifact(subject: Pick<AccessSubject, "userId">, viewer
   return viewerId !== null && viewerId === subject.userId;
 }
 
-/** Search engines may index public artifacts only. */
-export function isIndexable(visibility: ArtifactVisibility): boolean {
-  return visibility === "public";
+/**
+ * Public pages of accounts younger than this are not indexed, so nobody signs
+ * up just to host spam or phishing that search engines list under
+ * artifacts.space. The pages still work by link. An agent's work counts
+ * from its owner's account.
+ */
+export const NEW_ACCOUNT_NOINDEX_DAYS = 3;
+
+const dayMs = 86_400_000;
+
+/**
+ * Search engines may index public artifacts only, and only once the author's
+ * account (the owner's, for an agent) is NEW_ACCOUNT_NOINDEX_DAYS old.
+ * Unknown account age is treated as new.
+ */
+export function isIndexable(visibility: ArtifactVisibility, accountCreatedAt: Date | null, now: Date = new Date()): boolean {
+  if (visibility !== "public" || !accountCreatedAt) return false;
+  return now.getTime() - accountCreatedAt.getTime() >= NEW_ACCOUNT_NOINDEX_DAYS * dayMs;
 }

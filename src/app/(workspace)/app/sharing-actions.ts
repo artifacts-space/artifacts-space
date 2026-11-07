@@ -5,15 +5,17 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { actionErrorMessage } from "@/lib/action-errors";
-import { artifactVisibilities, type ActionResult } from "@/lib/artifact-types";
+import { artifactVisibilities, commentSettings, type ActionResult } from "@/lib/artifact-types";
 import { getManagedReport, resolveReports } from "@/lib/reports/service";
 import { getSession } from "@/lib/session";
+import { setArtifactComments, type CommentsChangeResult } from "@/lib/sharing/comments";
 import { decideSharingRequest, requestArtifactSharing, withdrawArtifactSharing, type SharingResult } from "@/lib/sharing/service";
 
 const idSchema = z.string().trim().min(1).max(200);
 const shareSchema = z.object({
   visibility: z.enum(artifactVisibilities),
   teamId: idSchema.nullable().optional(),
+  comments: z.enum(commentSettings).optional(),
 });
 
 async function requireUserId() {
@@ -29,12 +31,29 @@ async function requireUserId() {
 export async function shareArtifactAction(artifactId: string, input: z.input<typeof shareSchema>): Promise<ActionResult<SharingResult>> {
   try {
     const requesterId = await requireUserId();
-    const { visibility, teamId } = shareSchema.parse(input);
-    const result = await requestArtifactSharing({ requesterId, artifactId: idSchema.parse(artifactId), visibility, teamId, actor: "person" });
+    const { visibility, teamId, comments } = shareSchema.parse(input);
+    const result = await requestArtifactSharing({ requesterId, artifactId: idSchema.parse(artifactId), visibility, teamId, comments, actor: "person" });
     revalidatePath("/app");
     return { success: true, data: result };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "Sharing could not be changed. Please try again.") };
+  }
+}
+
+/**
+ * Changes who can read and write an artifact's comments: its author, or an
+ * owner or admin of its team. Opening comments in a shared team to anyone
+ * signed in may wait for approval; the result says so.
+ */
+export async function setCommentsAction(artifactId: string, comments: string): Promise<ActionResult<CommentsChangeResult>> {
+  try {
+    const actorId = await requireUserId();
+    const result = await setArtifactComments({ actorId, artifactId: idSchema.parse(artifactId), comments: z.enum(commentSettings).parse(comments), actor: "person" });
+    revalidatePath("/app");
+    revalidatePath("/teams", "layout");
+    return { success: true, data: result };
+  } catch (error) {
+    return { success: false, error: actionErrorMessage(error, "Comments could not be changed. Please try again.") };
   }
 }
 

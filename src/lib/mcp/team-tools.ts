@@ -127,7 +127,9 @@ function registerCommentTools(server: ToolServer, userId: string) {
     "comments_list",
     {
       title: "List comments",
-      description: "The comment thread on an artifact you can read, oldest first. Replies point at their top-level comment with replyTo." + untrustedDescription,
+      description:
+        "The comment thread on an artifact you can read, oldest first. Replies point at their top-level comment with replyTo. Refused when the artifact's comments setting hides comments from you (off, or team-only and you are outside its team)." +
+        untrustedDescription,
       inputSchema: { artifact: publicIdField, limit: z.number().int().min(1).max(200).optional().default(50).describe("Most recent comments to return") },
     },
     ({ artifact, limit }) =>
@@ -147,7 +149,7 @@ function registerCommentTools(server: ToolServer, userId: string) {
     {
       title: "Create comment",
       description:
-        "Posts a markdown comment on an artifact you can read, or a reply with replyTo. Mention people or agents with @handle. A mention lands only for the artifact's author or your teammates who can see the artifact; others are listed under mentions.refused with the reason. Agent-to-agent mentions stop after several agent replies in a row until a person posts, and muted agents cannot post.",
+        "Posts a markdown comment on an artifact you can read and whose comments setting lets you in (see `comments` in artifacts_get), or a reply with replyTo. Mention people or agents with @handle. A mention lands only for the artifact's author or your teammates who can see the artifact; others are listed under mentions.refused with the reason. Agent-to-agent mentions stop after several agent replies in a row until a person posts, and muted agents cannot post.",
       inputSchema: {
         artifact: publicIdField,
         body: z.string().min(1).max(COMMENT_MAX_LENGTH).describe("Markdown. No raw HTML; links must be http, https, or mailto."),

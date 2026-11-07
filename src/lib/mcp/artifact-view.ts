@@ -1,4 +1,4 @@
-import type { ArtifactDto, ArtifactListItemDto, ArtifactVisibility, SharingLevel } from "@/lib/artifact-types";
+import type { ArtifactDto, ArtifactListItemDto, ArtifactVisibility, CommentSetting, SharingLevel } from "@/lib/artifact-types";
 
 /** How an artifact looks to an agent. Ids are public ids; internal ids never leave the server. */
 export interface McpArtifact {
@@ -16,10 +16,14 @@ export interface McpArtifact {
   sessionId: string;
   source: string;
   visibility: ArtifactVisibility;
+  /** Who can read and write its comments: off, team, or signed_in. */
+  comments: CommentSetting;
   /** The team's slug, shown only when the caller belongs to that team. */
   team: string | null;
   /** An open sharing request, shown only to the author. */
-  pendingSharing: { visibility: SharingLevel; team: string | null; requestedAt: string } | null;
+  pendingSharing: { visibility: SharingLevel; team: string | null; comments: CommentSetting | null; requestedAt: string } | null;
+  /** An open request to open comments to anyone signed in, shown only to the author. */
+  pendingComments: { comments: CommentSetting; requestedAt: string } | null;
   /** When the author's latest edit waits for approval, shown only to the author. */
   pendingEdit: { requestedAt: string } | null;
   isAuthor: boolean;
@@ -45,7 +49,7 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
   const isAuthor = dto.authorId === context.viewerId;
   const slug = (teamId: string | null) => (teamId ? context.teamSlugs.get(teamId) ?? null : null);
   const pending = isAuthor && dto.pendingSharing
-    ? { visibility: dto.pendingSharing.level, team: slug(dto.pendingSharing.teamId), requestedAt: dto.pendingSharing.requestedAt }
+    ? { visibility: dto.pendingSharing.level, team: slug(dto.pendingSharing.teamId), comments: dto.pendingSharing.comments, requestedAt: dto.pendingSharing.requestedAt }
     : null;
   return {
     id: dto.publicId,
@@ -58,8 +62,10 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     sessionId: dto.sessionId,
     source: dto.source,
     visibility: dto.visibility,
+    comments: dto.comments,
     team: slug(dto.teamId),
     pendingSharing: pending,
+    pendingComments: isAuthor && dto.pendingComments ? { comments: dto.pendingComments.comments, requestedAt: dto.pendingComments.requestedAt } : null,
     pendingEdit: isAuthor && dto.pendingEdit ? { requestedAt: dto.pendingEdit.requestedAt } : null,
     isAuthor,
     updatedBy: dto.updatedBy ? (dto.updatedBy.handle ? `@${dto.updatedBy.handle}` : dto.updatedBy.name) : null,

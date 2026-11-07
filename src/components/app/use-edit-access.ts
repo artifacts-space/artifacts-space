@@ -4,28 +4,31 @@ import { toast } from "sonner";
 import { withdrawSharingAction } from "@/app/(workspace)/app/sharing-actions";
 import { canEditArtifact } from "@/lib/access-rules";
 import type { ArtifactDto } from "@/lib/artifact-types";
+import { canSeeComments } from "@/lib/comments/setting-rules";
 import { canManageTeam } from "@/lib/teams/roles";
 
 import { useShareTeams } from "./share-teams-context";
 
-type AccessFields = Pick<ArtifactDto, "authorId" | "visibility" | "teamId">;
+type AccessFields = Pick<ArtifactDto, "authorId" | "visibility" | "teamId" | "comments">;
 
 /**
  * What the viewer may do with an artifact in the workspace, from the same
  * rule the server enforces (canEditArtifact): edit it (the author, or a
- * member of the team it is shared through), and withdraw its sharing (the
- * team's owners and admins). The server checks every action again.
+ * member of the team it is shared through), withdraw its sharing and change
+ * its comments setting (the team's owners and admins), and see its comments
+ * (the comments setting). The server checks every action again.
  */
 export function useEditAccess(artifact: AccessFields | null, viewerId: string) {
   const teams = useShareTeams();
-  if (!artifact) return { team: undefined, isAuthor: false, canEdit: false, canWithdraw: false };
+  if (!artifact) return { team: undefined, isAuthor: false, canEdit: false, canWithdraw: false, seesComments: false };
   const team = teams.find((item) => item.id === artifact.teamId);
   const isAuthor = artifact.authorId === viewerId;
   const canEdit = canEditArtifact(
     { userId: artifact.authorId, visibility: artifact.visibility, teamId: artifact.teamId, teamPersonal: team?.personal ?? null },
     { userId: viewerId, isTeamMember: team !== undefined },
   );
-  return { team, isAuthor, canEdit, canWithdraw: !isAuthor && team !== undefined && canManageTeam(team.role) };
+  const seesComments = canSeeComments(artifact.comments, { canViewArtifact: true, isAuthor, isTeamMember: team !== undefined });
+  return { team, isAuthor, canEdit, canWithdraw: !isAuthor && team !== undefined && canManageTeam(team.role), seesComments };
 }
 
 /** Makes a teammate's artifact private again, for the team's owners and admins. */
