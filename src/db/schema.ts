@@ -187,10 +187,10 @@ export const artifact = pgTable(
       .notNull()
       .default("private"),
     // Who can read and write its comments: off, team (the author and the team), or signed_in
-    // (anyone signed in who can read it). The app always sets it on insert. The database
-    // default is today's behavior before this setting existed, so rows written by older code
-    // keep working the old way.
-    comments: text("comments", { enum: commentSettings }).notNull().default("signed_in"),
+    // (anyone signed in who can read it). The app always sets it on insert. 0015 added it with
+    // the default signed_in (how comments worked before), and 0017 moved the default to team,
+    // so an insert that forgets it fails narrow.
+    comments: text("comments", { enum: commentSettings }).notNull().default("team"),
     // Legacy /share/<shareId> links redirect to /artifact/<publicId>.
     shareId: text("share_id").notNull(),
     // 22-character random base58 id. The canonical URL is /artifact/<publicId>.

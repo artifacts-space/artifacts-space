@@ -120,6 +120,20 @@
       "when": 1794008832195,
       "tag": "0016_backfill_comments_setting",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794010211857,
+      "tag": "0017_comments_default_team",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794010212323,
+      "tag": "0018_rebackfill_comments_setting",
+      "breakpoints": true
     }
   ]
 }
