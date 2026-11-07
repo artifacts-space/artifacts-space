@@ -7,6 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { markInboxReadAction } from "@/app/(workspace)/inbox/actions";
+import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
 import type { InboxEntryView } from "@/lib/comments/inbox";
@@ -31,6 +32,7 @@ function EntryRow({ entry, pending, onRead }: { entry: InboxEntryView; pending: 
           {author ? <PixelAvatar seed={author.userId} kind={author.kind} size={20} /> : null}
           <span className="font-medium">{author?.label ?? "Former member"}</span>
           <span className="text-muted-foreground">mentioned you on</span>
+          {entry.artifact.icon ? <ArtifactIcon icon={entry.artifact.icon} /> : null}
           <Link href={`/threads/${entry.artifact.publicId}#comment-${entry.comment.id}`} className="truncate font-medium underline decoration-border underline-offset-[3px] hover:decoration-foreground">
             {entry.artifact.title}
           </Link>

@@ -95,6 +95,7 @@ export interface OpenReportView {
   artifactId: string;
   publicId: string;
   title: string;
+  icon: string | null;
   visibility: ArtifactVisibility;
   reason: ReportReason;
   details: string;
@@ -109,6 +110,7 @@ export async function listOpenReports(teamId: string, limit = 50): Promise<OpenR
       artifactId: artifact.id,
       publicId: artifact.publicId,
       title: artifact.title,
+      icon: artifact.icon,
       visibility: artifact.visibility,
       reason: artifactReport.reason,
       details: artifactReport.details,

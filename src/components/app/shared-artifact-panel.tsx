@@ -2,6 +2,7 @@
 
 import { IconExternalLink, IconLoader2, IconLock } from "@tabler/icons-react";
 import Link from "next/link";
+import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { CommentsControl } from "@/components/app/comments-picker";
@@ -66,6 +67,7 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
         </div>
       </div>
       <div className="border-b px-5 py-5 sm:px-7">
+        <ArtifactIcon icon={artifact.icon} size="heading" className="mb-2 block" />
         <h2 className="text-2xl font-medium tracking-[-0.015em]">{artifact.title}</h2>
         {artifact.summary ? <p className="mt-2 text-md leading-6 text-muted-foreground">{artifact.summary}</p> : null}
         <LastEdited editor={artifact.updatedBy} at={artifact.updatedAt} className="mt-2" />

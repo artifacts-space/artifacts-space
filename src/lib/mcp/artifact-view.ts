@@ -5,6 +5,8 @@ export interface McpArtifact {
   id: string;
   url: string;
   title: string;
+  /** Page icon beside the title: one emoji or "tabler:<name>". Null when none. */
+  icon: string | null;
   summary: string;
   /** The full content. Only artifacts_get and writes return it. */
   content?: string;
@@ -55,6 +57,7 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     id: dto.publicId,
     url: context.urlFor(dto.publicId),
     title: dto.title,
+    icon: dto.icon,
     summary: dto.summary,
     kind: dto.kind,
     language: dto.language,

@@ -14,6 +14,7 @@ export interface PendingSharingView {
   artifactId: string;
   publicId: string;
   title: string;
+  icon: string | null;
   level: SharingLevel;
   currentVisibility: ArtifactVisibility;
   /** Seeds the requester's pixel avatar. */
@@ -34,6 +35,7 @@ export async function listPendingSharing(teamId: string): Promise<PendingSharing
       artifactId: artifact.id,
       publicId: artifact.publicId,
       title: artifact.title,
+      icon: artifact.icon,
       level: sharingRequest.visibility,
       currentVisibility: artifact.visibility,
       requesterId: user.id,
@@ -61,6 +63,7 @@ export interface TeamSharedView {
   artifactId: string;
   publicId: string;
   title: string;
+  icon: string | null;
   visibility: ArtifactVisibility;
   /** Seeds the author's pixel avatar. */
   authorId: string;
@@ -77,6 +80,7 @@ export async function listTeamSharedArtifacts(teamId: string, limit = 100): Prom
       artifactId: artifact.id,
       publicId: artifact.publicId,
       title: artifact.title,
+      icon: artifact.icon,
       visibility: artifact.visibility,
       authorId: user.id,
       authorAgentId: agent.userId,

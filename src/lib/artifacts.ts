@@ -20,6 +20,7 @@ import {
   type PendingSharingDto,
 } from "@/lib/artifact-types";
 import { artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
+import { artifactIconInputSchema } from "@/lib/artifact-icons";
 import { artifactSizeProblem } from "@/lib/artifact-limits";
 import { defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { PREVIEW_CHARS, previewKinds } from "@/lib/artifact-preview";
@@ -41,8 +42,10 @@ import { recordArtifactSave } from "@/lib/versions/service";
  * requestArtifactSharing in src/lib/sharing.
  */
 
-const artifactUpdateSchema = z.object({
+export const artifactUpdateSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
+  // One emoji or an allowed "tabler:<name>"; null or "" removes it. Reviewed like the title.
+  icon: artifactIconInputSchema.optional(),
   summary: z.string().trim().max(600).optional(),
   // Empty only for file artifacts, whose content is optional notes; validateArtifactContent checks.
   content: z.string().max(1_000_000).optional(),
@@ -91,6 +94,7 @@ function toArtifactMeta(record: ArtifactMetaRecord, pending: PendingRequests, fi
     id: record.id,
     publicId: record.publicId,
     title: record.title,
+    icon: record.icon,
     summary: record.summary,
     kind: record.kind,
     language: record.language,
@@ -352,8 +356,8 @@ export async function restoreArtifactVersion(userId: string, id: string, version
   if (!before) return null;
   const version = await getVersionOf(before.id, versionId);
   if (!version) throw new UserFacingError("That version is no longer in the history.");
-  const { title, summary, content, kind, language, project, source, metadata } = version;
-  const changes = artifactUpdateSchema.parse({ title, summary, content, kind, language, project, source, metadata });
+  const { title, icon, summary, content, kind, language, project, source, metadata } = version;
+  const changes = artifactUpdateSchema.parse({ title, icon, summary, content, kind, language, project, source, metadata });
   assertArtifactSize(changes);
   return saveChanges(changes, { editorId: userId, before, actor, options, restoredFromId: version.id });
 }

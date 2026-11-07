@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
+import { TitleIcon } from "@/components/artifact-icon/title-icon";
 import { ApprovedArticle } from "@/components/artifact-page/approved-article";
 import { EditorIsland } from "@/components/artifact-page/editor-island";
 import { ReportDialog } from "@/components/artifact-page/report-dialog";
@@ -22,6 +24,7 @@ import type { FileDto } from "@/lib/files/types";
 import { isIndexable } from "@/lib/access-rules";
 import { accountCreatedAt } from "@/lib/account-age";
 import { loadArtifactByline } from "@/lib/artifact-byline";
+import { iconTitlePrefix } from "@/lib/artifact-icons";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { lastEditorsFor } from "@/lib/artifacts";
@@ -60,7 +63,7 @@ export async function generateMetadata({ params }: PageProps<"/artifact/[publicI
   const { record, view } = viewable;
   return {
     ...(await artifactOgMetadata(record.publicId)),
-    title: view.title,
+    title: `${iconTitlePrefix(view.icon)}${view.title}`,
     ...(view.summary ? { description: view.summary } : {}),
     robots: (await indexable(record)) ? { index: true, follow: false } : { index: false, follow: false },
   };
@@ -117,7 +120,15 @@ async function lastEditor(userId: string | null): Promise<ArtifactEditorDto | nu
   return (await lastEditorsFor([{ updatedBy: userId }])).get(userId) ?? null;
 }
 
-/** Format, title, summary, who saved it last, and whether changes wait for approval. */
+/** The page icon above the title: the picker for editors, the icon alone for readers. */
+function HeadingIcon({ viewable }: { viewable: ViewableArtifact }) {
+  const { view, record } = viewable;
+  if (viewable.canEdit) return <TitleIcon key={view.icon ?? ""} publicId={record.publicId} icon={view.icon} />;
+  if (!view.icon) return null;
+  return <div className="mb-2"><ArtifactIcon icon={view.icon} size="page" /></div>;
+}
+
+/** Format, icon, title, summary, who saved it last, and whether changes wait for approval. */
 function ArtifactHeading({ viewable, editor }: { viewable: ViewableArtifact; editor: ArtifactEditorDto | null }) {
   const { view, record } = viewable;
   const Icon = kindIcons[view.kind];
@@ -127,7 +138,10 @@ function ArtifactHeading({ viewable, editor }: { viewable: ViewableArtifact; edi
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Icon className={`size-3.5 ${kindColors[view.kind]}`} /> {visibilityCopy(record.visibility).kicker} · {view.kind}
       </div>
-      <h1 className="mt-4 text-balance text-4xl font-medium leading-[1.08] tracking-[-0.03em] sm:text-5xl">{view.title}</h1>
+      <div className="group/title mt-4">
+        <HeadingIcon viewable={viewable} />
+        <h1 className="text-balance text-4xl font-medium leading-[1.08] tracking-[-0.03em] sm:text-5xl">{view.title}</h1>
+      </div>
       {view.summary ? <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{view.summary}</p> : null}
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
         <LastEdited editor={editor} at={view.updatedAt.toISOString()} className="text-sm" />

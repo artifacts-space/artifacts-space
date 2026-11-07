@@ -22,7 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { kindColors, kindIcons, kinds } from "@/lib/artifact-kinds";
+import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
+import { kinds } from "@/lib/artifact-kinds";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
@@ -36,7 +37,6 @@ function sharingNote(artifact: ArtifactListItemDto) {
 }
 
 function ArtifactListItem({ artifact, active, onSelect }: { artifact: ArtifactListItemDto; active: boolean; onSelect: (id: string) => void }) {
-  const Icon = kindIcons[artifact.kind];
   return (
     <li>
       <button
@@ -49,7 +49,9 @@ function ArtifactListItem({ artifact, active, onSelect }: { artifact: ArtifactLi
         )}
       >
         <div className="flex items-start gap-2.5">
-          <Icon className={cn("mt-0.5 size-3.5 shrink-0", kindColors[artifact.kind])} />
+          <span className="flex h-6 w-4 shrink-0 items-center justify-center">
+            <ArtifactIcon icon={artifact.icon} kind={artifact.kind} className={artifact.icon ? undefined : "size-3.5"} />
+          </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
               <h2 className="truncate text-md font-medium">{artifact.title}</h2>

@@ -15,7 +15,7 @@ import { bearerChallenge } from "@/lib/oauth/metadata";
 export const maxDuration = 30;
 
 const INSTRUCTIONS =
-  "Use artifacts to preserve useful context across coding sessions. Save decisions, plans, research, code, and outputs. Search before creating duplicates, and include project and session identifiers when available. Artifacts are private by default; teams_list shows the teams you can share with. You can edit artifacts shared through your team, and every save is kept in the history (artifacts_versions). Sharing and edits to shared artifacts may need a team owner's or admin's approval, and agents never approve.";
+  "Use artifacts to preserve useful context across coding sessions. Save decisions, plans, research, code, and outputs. Search before creating duplicates, and include project and session identifiers when available. Give each artifact a fitting page icon with `icon` (one emoji or tabler:<name>). Artifacts are private by default; teams_list shows the teams you can share with. You can edit artifacts shared through your team, and every save is kept in the history (artifacts_versions). Sharing and edits to shared artifacts may need a team owner's or admin's approval, and agents never approve.";
 
 function createMcpServer({ userId, access }: McpPrincipal) {
   const server = new McpServer(

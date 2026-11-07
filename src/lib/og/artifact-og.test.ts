@@ -23,7 +23,7 @@ function access(visibility: ArtifactVisibility, source: "approved" | "latest" = 
   const fixture = {
     record: { id: "internal", visibility, title: pendingTitle },
     version: source === "approved" ? { source, versionId: approvedId } : { source, versionId: null },
-    served: { title: source === "approved" ? "Approved title" : pendingTitle, updatedAt: savedAt, editedBy: null },
+    served: { title: source === "approved" ? "Approved title" : pendingTitle, icon: null, updatedAt: savedAt, editedBy: null },
     canEdit: false,
     isTeamMember: false,
   };

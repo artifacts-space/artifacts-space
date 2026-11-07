@@ -2,6 +2,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z, ZodError } from "zod";
 
 import { getEditableArtifact } from "@/lib/access";
+import { ICON_FIELD_DESCRIPTION, isAcceptedIconInput, ICON_RULE_MESSAGE } from "@/lib/artifact-icons";
+import { artifactIconLimits } from "@/lib/artifact-icon-limits";
 import { loadArtifactForViewer } from "@/lib/artifact-read";
 import { artifactKinds, artifactVisibilities, commentSettings, type ArtifactDto, type ArtifactVisibility, type CommentSetting } from "@/lib/artifact-types";
 import {
@@ -44,8 +46,17 @@ const commentsField = z
     "Who can read and write its comments. off: nobody (existing comments are hidden, not deleted). team: the author and members of its team. signed_in: anyone signed in who can read it. Left out on a sharing change: kept within the same team, else off for link or public in a personal team and team in a shared team. signed_in in a shared team waits for an owner's or admin's approval.",
   );
 
+const iconField = z
+  .string()
+  .max(artifactIconLimits.maxInputLength, ICON_RULE_MESSAGE)
+  .nullable()
+  .refine(isAcceptedIconInput, ICON_RULE_MESSAGE)
+  .optional()
+  .describe(ICON_FIELD_DESCRIPTION);
+
 const editableFields = {
   title: z.string().min(1).max(160),
+  icon: iconField,
   content: z.string().min(1).max(1_000_000),
   summary: z.string().max(600).optional(),
   kind: z.enum(artifactKinds).optional().describe(kindFieldDescription),

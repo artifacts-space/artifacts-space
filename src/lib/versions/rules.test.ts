@@ -78,7 +78,7 @@ describe("versionToServe", () => {
 });
 
 describe("sameReviewedFields", () => {
-  const base: ReviewedFields = { title: "T", summary: "", content: "a", kind: "markdown", language: "", project: "", source: "", metadata: { a: 1 } };
+  const base: ReviewedFields = { title: "T", icon: null, summary: "", content: "a", kind: "markdown", language: "", project: "", source: "", metadata: { a: 1 } };
 
   it("should treat versions as the same when every reader-facing field matches", () => {
     expect(sameReviewedFields(base, { ...base, metadata: { a: 1 } })).toBe(true);
@@ -87,5 +87,11 @@ describe("sameReviewedFields", () => {
   it("should see a change when content or metadata differs", () => {
     expect(sameReviewedFields(base, { ...base, content: "b" })).toBe(false);
     expect(sameReviewedFields(base, { ...base, metadata: { a: 2 } })).toBe(false);
+  });
+
+  it("should see a change when only the icon differs, so an icon edit goes through approval", () => {
+    expect(sameReviewedFields(base, { ...base, icon: "🚀" })).toBe(false);
+    expect(sameReviewedFields({ ...base, icon: "tabler:bug" }, { ...base, icon: "tabler:rocket" })).toBe(false);
+    expect(sameReviewedFields({ ...base, icon: "🚀" }, { ...base, icon: "🚀" })).toBe(true);
   });
 });

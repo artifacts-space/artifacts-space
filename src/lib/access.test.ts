@@ -33,18 +33,19 @@ function row(visibility: "private" | "team" | "link" | "public", member: boolean
       id: "art-1", publicId, shareId: "s", userId: author, originalAuthorId: null, teamId: "team-1", visibility,
       // A stale approved version id, as if sharing was just withdrawn: it must never be served.
       approvedVersionId: "version-1",
-      title: "Latest title", summary: "", kind: "markdown", language: "", project: "", sessionId: "", source: "", metadata: {},
+      title: "Latest title", icon: "tabler:bug", summary: "", kind: "markdown", language: "", project: "", sessionId: "", source: "", metadata: {},
       createdAt: savedAt, updatedAt: savedAt, updatedBy: null,
     },
     memberId: member ? "member-1" : null,
     teamPersonal: false,
     approvedTitle: "Approved title",
+    approvedIcon: "🚀",
     approvedSavedAt: savedAt,
     approvedBy: author,
   };
 }
 
-const approved = { title: "Approved title", summary: "", content: "approved", kind: "markdown", language: "", project: "", source: "", metadata: {}, updatedAt: savedAt };
+const approved = { title: "Approved title", icon: "🚀", summary: "", content: "approved", kind: "markdown", language: "", project: "", source: "", metadata: {}, updatedAt: savedAt };
 
 describe("access decision and the version cache", () => {
   beforeEach(() => {
@@ -104,8 +105,22 @@ describe("access decision and the version cache", () => {
     mocks.rows = [[row("public", false)]];
     const access = await getArtifactAccess(publicId, "outsider");
     expect(access?.served.title).toBe("Approved title");
+    expect(access?.served.icon).toBe("🚀");
     expect(access?.version.source).toBe("approved");
     expect(mocks.cachedView).not.toHaveBeenCalled();
+  });
+
+  it("should keep an unapproved icon from a reader outside the team when a link artifact has a pending edit", async () => {
+    mocks.rows = [[row("link", false)]];
+    const viewable = await getViewableArtifact(publicId, "outsider");
+    expect(viewable?.view.icon).toBe("🚀");
+    expect(viewable?.served.icon).toBe("🚀");
+  });
+
+  it("should show the latest icon to the author when a link artifact has a pending edit", async () => {
+    mocks.rows = [[row("link", false)], [{ content: "latest" }], []];
+    const viewable = await getViewableArtifact(publicId, author);
+    expect(viewable?.view.icon).toBe("tabler:bug");
   });
 
   it("should answer not found when the artifact does not exist", async () => {

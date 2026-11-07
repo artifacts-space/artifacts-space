@@ -23,6 +23,7 @@ import type { ArtifactKind } from "@/lib/artifact-types";
 /** What a reader of an approved version sees. */
 export interface CachedVersionView {
   title: string;
+  icon: string | null;
   summary: string;
   content: string;
   kind: ArtifactKind;
@@ -48,9 +49,9 @@ export async function cachedVersionView(versionId: string, savedAt: string): Pro
   const [row] = await getDb().select().from(artifactVersion).where(eq(artifactVersion.id, versionId)).limit(1);
   if (!row) return null;
   cacheTag(artifactCacheTag(row.artifactId), `version:${versionId}:${savedAt}`);
-  const { title, summary, content, kind, language, project, source, metadata } = row;
+  const { title, icon, summary, content, kind, language, project, source, metadata } = row;
   // savedAt, not createdAt: files attached up to the version's last save belong to it.
-  return { title, summary, content, kind, language, project, source, metadata, updatedAt: row.savedAt };
+  return { title, icon, summary, content, kind, language, project, source, metadata, updatedAt: row.savedAt };
 }
 
 /**

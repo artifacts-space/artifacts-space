@@ -29,8 +29,8 @@ const approved = alias(artifactVersion, "approved_version");
 const proposed = alias(artifactVersion, "proposed_version");
 
 function fields(row: typeof artifactVersion.$inferSelect): ReviewedFields {
-  const { title, summary, content, kind, language, project, source, metadata } = row;
-  return { title, summary, content, kind, language, project, source, metadata };
+  const { title, icon, summary, content, kind, language, project, source, metadata } = row;
+  return { title, icon, summary, content, kind, language, project, source, metadata };
 }
 
 /** Open edit requests for a team, newest first. Callers must check the viewer is an owner or admin. */

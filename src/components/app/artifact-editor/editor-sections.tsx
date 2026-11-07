@@ -2,6 +2,8 @@
 
 import { IconLink } from "@tabler/icons-react";
 
+import { IconPicker } from "@/components/artifact-icon/icon-picker";
+import { addIconTrigger, changeIconTrigger } from "@/components/artifact-icon/icon-triggers";
 import { CopyButton } from "@/components/copy-button";
 import { LastEdited } from "@/components/history/last-edited";
 import { Input } from "@/components/ui/input";
@@ -37,10 +39,17 @@ export function ShareBanner({ shareUrl, isPublic }: { shareUrl: string; isPublic
   );
 }
 
-/** Title and one-line summary inputs. */
-export function TitleFields({ title, summary, update }: { title: string; summary: string; update: UpdateDraft }) {
+/** The icon above the title in the editor: part of the draft, saved with Save. */
+function DraftIcon({ icon, update }: { icon: string | null; update: UpdateDraft }) {
+  const trigger = icon ? changeIconTrigger(icon, "heading") : addIconTrigger;
+  return <div className="mb-1"><IconPicker value={icon} onChange={(next) => { update("icon", next); }} trigger={trigger} /></div>;
+}
+
+/** Icon, title, and one-line summary inputs. */
+export function TitleFields({ title, icon, summary, update }: { title: string; icon: string | null; summary: string; update: UpdateDraft }) {
   return (
-    <div className="border-b px-5 py-5 sm:px-7">
+    <div className="group/title border-b px-5 py-5 sm:px-7">
+      <DraftIcon icon={icon} update={update} />
       <input
         value={title}
         onChange={(event) => { update("title", event.target.value); }}
