@@ -312,6 +312,21 @@
   }
 }
 
+/*
+ * The landing terminal: each line fades in as it scrolls into view. Browsers
+ * without scroll-driven animations, and people who ask for less motion, see
+ * every line at once.
+ */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .terminal-reveal > * {
+      animation: enter linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 100%;
+    }
+  }
+}
+
 /* Rendered-document styles for the landing demo. */
 .demo-doc {
   max-width: 64ch;

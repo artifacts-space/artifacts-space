@@ -150,9 +150,9 @@ const examples: [Example, ...Example[]] = [
 
 const activity = [
   ["Claude Code", "created the decision record", "09:41"],
+  ["Maya R.", "commented on the Café tier", "09:48"],
   ["Cursor", "updated the tiers table", "09:52"],
   ["OpenCode", "read it for the invoicing task", "10:07"],
-  ["Maya R.", "opened the share link", "10:30"],
 ];
 
 export function ArtifactDemo() {
@@ -234,7 +234,7 @@ export function ArtifactDemo() {
           </ol>
           <div className="mt-6 border-t pt-4 text-xs">
             <div className="font-medium">Access</div>
-            <p className="mt-1.5 text-muted-foreground">Workspace members and anyone with the link.</p>
+            <p className="mt-1.5 text-muted-foreground">Team members and anyone with the link.</p>
           </div>
         </aside>
       </div>
