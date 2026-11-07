@@ -5,6 +5,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { artifact, artifactVersion, sharingRequest, team, type ArtifactRecord, type ArtifactVersionRecord, type SharingRequestRecord } from "@/db/schema";
 import { canEditRecord } from "@/lib/access";
+import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import type { VersionSaveKind } from "@/lib/artifact-types";
 import { isUniqueViolation } from "@/lib/db-errors";
 import type { SharingActor } from "@/lib/sharing/rules";
@@ -234,4 +235,6 @@ export async function decideEditRequest(request: SharingRequestRecord, deciderId
     where ${artifact.id} = decided.artifact_id and ${artifact.visibility} in ('link', 'public') and decided.version_id is not null
   `);
   forgetArtifactCache(request.artifactId);
+  // The old approved version may have been the last to show an image icon.
+  await pruneUnusedIconFilesQuietly(request.artifactId);
 }

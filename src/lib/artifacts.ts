@@ -20,11 +20,12 @@ import {
   type PendingSharingDto,
 } from "@/lib/artifact-types";
 import { artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
-import { artifactIconInputSchema } from "@/lib/artifact-icons";
+import { artifactIconInputSchema, iconFileId } from "@/lib/artifact-icons";
 import { artifactSizeProblem } from "@/lib/artifact-limits";
 import { defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { PREVIEW_CHARS, previewKinds } from "@/lib/artifact-preview";
 import { checkContentFiles } from "@/lib/files/attach";
+import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { checkIconFile, restorableIcon } from "@/lib/files/icon-file";
 import { attachFileRows, deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
 import type { FileDto } from "@/lib/files/types";
@@ -328,6 +329,8 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
   }
   const saveKind = context.restoredFromId ? "restore" : "edit";
   await recordArtifactSave({ before, after: record, editorId, actor: context.actor, saveKind, restoredFromId: context.restoredFromId ?? null });
+  // A replaced or removed image icon goes with this save, unless something still shows it (see icon-cleanup.ts).
+  if (iconFileId(before.icon) && record.icon !== before.icon) await pruneUnusedIconFilesQuietly(record.id, [before.icon]);
   const [dto] = await toArtifactDtos([record]);
   return dto ?? null;
 }
