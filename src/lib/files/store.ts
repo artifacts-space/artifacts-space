@@ -1,7 +1,8 @@
 import { and, asc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { artifactFile, type ArtifactFileRecord } from "@/db/schema";
+import { artifact, artifactFile, type ArtifactFileRecord } from "@/db/schema";
+import { FILE_PREFIX } from "@/lib/artifact-icons";
 
 import { fileLimits } from "./config";
 import { deleteObject, r2ConfigFromEnv } from "./r2";
@@ -58,6 +59,11 @@ export async function listArtifactFiles(artifactId: string, options: { attachedB
   const rows = await getFileRows(files.map((file) => file.id));
   const allowed = new Set(rows.filter((row) => row.attachedAt !== null && row.attachedAt <= cutoff).map((row) => row.id));
   return files.filter((file) => allowed.has(file.id));
+}
+
+/** Removes an icon that points at a file being deleted from its artifact. Call before the change is recorded. */
+export async function clearIconForFile(artifactId: string, fileId: string): Promise<void> {
+  await getDb().update(artifact).set({ icon: null }).where(and(eq(artifact.id, artifactId), eq(artifact.icon, `${FILE_PREFIX}${fileId}`)));
 }
 
 /** How many files an artifact holds. */

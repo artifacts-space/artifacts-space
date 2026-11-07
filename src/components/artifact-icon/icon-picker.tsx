@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { parseArtifactIcon } from "@/lib/artifact-icons";
 
 import { TablerTab } from "./tabler-tab";
+import { UploadTab } from "./upload-tab";
 
 /** frimousse and its list load only when the picker opens on the Emoji tab. */
 const EmojiTab = dynamic(() => import("./emoji-tab"), {
@@ -21,7 +22,13 @@ const EmojiTab = dynamic(() => import("./emoji-tab"), {
   ),
 });
 
-type PickerTab = "emoji" | "icons";
+type PickerTab = "emoji" | "icons" | "upload";
+
+function initialTab(value: string | null): PickerTab {
+  const type = parseArtifactIcon(value)?.type;
+  if (type === "tabler") return "icons";
+  return type === "file" ? "upload" : "emoji";
+}
 
 interface IconPickerProps {
   /** The stored icon, or null. */
@@ -35,12 +42,12 @@ interface IconPickerProps {
 }
 
 /**
- * A Notion-style icon picker: Emoji and Icons tabs, search in each, and
- * Remove. A popover that spans the screen on phones.
+ * A Notion-style icon picker: Emoji, Icons, and Upload tabs, search where it
+ * helps, and Remove. A popover that spans the screen on phones.
  */
 export function IconPicker({ value, onChange, trigger, disabled = false, align = "start" }: IconPickerProps) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<PickerTab>(() => (parseArtifactIcon(value)?.type === "tabler" ? "icons" : "emoji"));
+  const [tab, setTab] = useState<PickerTab>(() => initialTab(value));
 
   function choose(icon: string | null) {
     setOpen(false);
@@ -57,6 +64,7 @@ export function IconPicker({ value, onChange, trigger, disabled = false, align =
             <TabsList variant="line" className="h-8">
               <TabsTrigger value="emoji">Emoji</TabsTrigger>
               <TabsTrigger value="icons">Icons</TabsTrigger>
+              <TabsTrigger value="upload">Upload</TabsTrigger>
             </TabsList>
             {value ? (
               <Button type="button" variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={() => { choose(null); }}>
@@ -66,6 +74,7 @@ export function IconPicker({ value, onChange, trigger, disabled = false, align =
           </div>
           <TabsContent value="emoji">{open && tab === "emoji" ? <EmojiTab onSelect={choose} /> : null}</TabsContent>
           <TabsContent value="icons">{open && tab === "icons" ? <TablerTab value={value} onSelect={choose} /> : null}</TabsContent>
+          <TabsContent value="upload">{open && tab === "upload" ? <UploadTab onSelect={choose} /> : null}</TabsContent>
         </Tabs>
       </PopoverContent>
     </Popover>

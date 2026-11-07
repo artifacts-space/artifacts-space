@@ -1,10 +1,12 @@
 "use client";
 
-import { IconLoader2 } from "@tabler/icons-react";
+import { IconLoader2, IconMoodSmile } from "@tabler/icons-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { createArtifactWithFilesAction } from "@/app/(workspace)/app/file-actions";
+import { createArtifactWithFilesAction, deleteFileAction } from "@/app/(workspace)/app/file-actions";
+import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
+import { IconPicker } from "@/components/artifact-icon/icon-picker";
 import { FileUploader } from "@/components/files/file-uploader";
 import { useFileUploads } from "@/components/files/use-file-uploads";
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatInfo } from "@/lib/artifact-formats";
+import { iconFileId } from "@/lib/artifact-icons";
 import { kinds } from "@/lib/artifact-kinds";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 
@@ -42,6 +45,16 @@ const placeholders: Record<string, string> = {
   ui: '{ "version": 1, "root": "page", "elements": { … } }',
   file: "What these files are and how to use them",
 };
+
+/** The icon button beside the title: the chosen icon, or a smiley that opens the picker. */
+function NewIconButton({ icon, onChange }: { icon: string | null; onChange: (icon: string | null) => void }) {
+  const trigger = (
+    <Button type="button" variant="outline" size="icon" className="size-9 shrink-0" aria-label={icon ? "Change icon" : "Add icon"} title={icon ? "Change icon" : "Add icon"}>
+      {icon ? <ArtifactIcon icon={icon} /> : <IconMoodSmile className="text-muted-foreground" />}
+    </Button>
+  );
+  return <IconPicker value={icon} onChange={onChange} trigger={trigger} />;
+}
 
 /** Reads a text field from form data. File inputs and missing fields read as empty. */
 function formText(formData: FormData, name: string) {
@@ -60,11 +73,16 @@ export function CreateArtifactDialog({
 }) {
   const [pending, setPending] = useState(false);
   const [kind, setKind] = useState<ArtifactKind>("markdown");
+  const [icon, setIcon] = useState<string | null>(null);
   const uploads = useFileUploads();
   const isFiles = kind === "file";
 
   function close() {
     uploads.reset({ deleteUploads: true });
+    // An image picked as the icon was uploaded but never used; the cleanup job is the backstop.
+    const unusedIconFile = iconFileId(icon);
+    if (unusedIconFile) void deleteFileAction(unusedIconFile).catch(() => undefined);
+    setIcon(null);
     onOpenChange(false);
   }
 
@@ -86,6 +104,7 @@ export function CreateArtifactDialog({
         language: formText(formData, "language"),
         content: formText(formData, "content"),
         kind,
+        icon,
       }, fileIds);
       if (!result.success) {
         toast.error(result.error);
@@ -96,6 +115,7 @@ export function CreateArtifactDialog({
       onOpenChange(false);
       form.reset();
       setKind("markdown");
+      setIcon(null);
       toast.success("Artifact created.");
     } catch {
       toast.error("Something went wrong. Check your connection and try again.");
@@ -118,7 +138,10 @@ export function CreateArtifactDialog({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="artifact-title">Title</Label>
-                <Input id="artifact-title" name="title" required maxLength={160} autoFocus placeholder="Authentication architecture decision" className="h-9" />
+                <div className="flex items-center gap-2">
+                  <NewIconButton icon={icon} onChange={setIcon} />
+                  <Input id="artifact-title" name="title" required maxLength={160} autoFocus placeholder="Authentication architecture decision" className="h-9" />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="artifact-project">Project</Label>

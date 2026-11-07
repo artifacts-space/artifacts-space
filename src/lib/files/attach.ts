@@ -12,7 +12,7 @@ import { recordArtifactChange } from "@/lib/versions/service";
 import { canUseFileInArtifact } from "./access-rules";
 import { fileLimits } from "./config";
 import { fileRefsInContent, maxFileRefs } from "./refs";
-import { attachFileRows, countArtifactFiles, getFileRow, getFileRows, removeFiles } from "./store";
+import { attachFileRows, clearIconForFile, countArtifactFiles, getFileRow, getFileRows, removeFiles } from "./store";
 
 /**
  * Putting files into artifacts. A file belongs to one artifact. An editor
@@ -82,6 +82,10 @@ export async function deleteOwnFile(userId: string, fileId: string, actor: Shari
   if (!row || !allowed) throw new UserFacingError("File not found.");
   const removed = await removeFiles([row]);
   if (removed.length === 0) throw new UserFacingError("The file could not be deleted. Try again.");
-  if (row.artifactId) await recordArtifactChange({ artifactId: row.artifactId, editorId: userId, actor });
+  if (row.artifactId) {
+    // An icon that showed this image goes back to the format icon, and the change is versioned.
+    await clearIconForFile(row.artifactId, row.id);
+    await recordArtifactChange({ artifactId: row.artifactId, editorId: userId, actor });
+  }
   return row.artifactId;
 }
