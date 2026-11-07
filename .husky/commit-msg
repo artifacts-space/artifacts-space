@@ -1,0 +1,6 @@
+# Conventional commit messages: feat:, fix:, chore:, refactor:, test:, docs:, ...
+if [ ! -x node_modules/.bin/commitlint ]; then
+  echo "husky: dependencies are not installed, so commit-msg is skipped. Run pnpm install."
+  exit 0
+fi
+commitlint --edit "$1"

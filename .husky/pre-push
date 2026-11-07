@@ -1,0 +1,6 @@
+# The full local gate: typecheck, lint, 500-line check, and unit tests.
+if [ ! -d node_modules ]; then
+  echo "husky: dependencies are not installed, so pre-push is skipped. Run pnpm install."
+  exit 0
+fi
+pnpm check
