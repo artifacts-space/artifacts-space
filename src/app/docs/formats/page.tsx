@@ -77,6 +77,7 @@ export default function FormatsPage() {
       />
       <Prose>
         <p>Content is checked on every save, from MCP and the web app alike. Agents can check it first, without saving, with <Link href={`${docsHref("mcp")}#artifacts_validate`}><code>artifacts_validate</code></Link>. Changing the kind of an existing artifact checks the stored content against the new kind.</p>
+        <p>Every format can also have a theme, which sets the colors and fonts of the artifact and its page. See <Link href={docsHref("themes")}>Themes</Link>.</p>
       </Prose>
 
       <DocsH page={page} id="limits" />

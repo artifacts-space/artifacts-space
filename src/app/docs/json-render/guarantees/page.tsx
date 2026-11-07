@@ -79,7 +79,7 @@ export default function GuaranteesPage() {
       <DocsH page={page} id="themes" />
       <Prose>
         <p>
-          Every component reads the site&apos;s light and dark tokens, so a page follows the reader&apos;s theme with no work from the agent. Layouts adapt to the screen: Grid drops to one column on phones, horizontal Stacks wrap, wide tables and boards scroll inside themselves, and the month calendar becomes a list. Text uses the site&apos;s type scale, and inputs are real, keyboard-accessible controls. Try the theme switcher in the footer while you read the <Link href={docsHref("json-render/components")}>component pages</Link>.
+          Every component reads the page&apos;s color and font tokens. These come from the site&apos;s light and dark look, or from the artifact&apos;s own <Link href={docsHref("themes")}>theme</Link>. So a page follows the reader&apos;s light or dark choice and the artifact&apos;s theme with no work from the agent. Layouts adapt to the screen: Grid drops to one column on phones, horizontal Stacks wrap, wide tables and boards scroll inside themselves, and the month calendar becomes a list. Text uses the site&apos;s type scale, and inputs are real, keyboard-accessible controls. Try the theme switcher in the footer while you read the <Link href={docsHref("json-render/components")}>component pages</Link>.
         </p>
       </Prose>
     </RegistryPage>

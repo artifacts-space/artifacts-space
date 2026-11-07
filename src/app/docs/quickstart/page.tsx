@@ -87,6 +87,9 @@ export default function QuickstartPage() {
         <p>
           The result holds the artifact&apos;s id and <code>url</code>. Open the URL to read and edit it, or share it from the page. The artifact is private until you share it. Later sessions find it with <code>artifacts_list</code> (search by text or project) and read it with <code>artifacts_get</code>.
         </p>
+        <p>
+          To give it its own look, ask for a theme, such as &quot;use the paper theme&quot;. The agent sends <code>theme: &quot;paper&quot;</code>. You can also select a theme on the artifact page. See <Link href={docsHref("themes")}>Themes</Link>.
+        </p>
       </Prose>
 
       <DocsH page={page} id="first-ui" />

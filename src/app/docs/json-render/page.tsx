@@ -46,7 +46,7 @@ export default function JsonRenderPage() {
           <li>The agent reads the component guide with <code>artifacts_formats_guide</code> (<code>kind: &quot;ui&quot;</code>).</li>
           <li>It writes a spec and checks it with <code>artifacts_validate</code>. Every problem comes back at once, with the element key and the fix.</li>
           <li>It saves the spec with <code>artifacts_create</code> or <code>artifacts_update</code>. The server runs the same validation and refuses a spec with errors.</li>
-          <li>Readers see a page that looks like the rest of artifacts.space, in light or dark, on any screen.</li>
+          <li>Readers see a page in the artifacts.space look, or in the artifact&apos;s own <Link href={docsHref("themes")}>theme</Link>, in light or dark, on any screen.</li>
         </ol>
         <p>
           Agent code never runs on the page. A spec is data: no scripts, no CSS, no network calls. Inputs such as Switch and Slider change only the page&apos;s own state, and nothing is saved or sent.

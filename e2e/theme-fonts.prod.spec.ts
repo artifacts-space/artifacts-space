@@ -77,3 +77,13 @@ test("should send no preload or stylesheet for theme faces in the production HTM
   expect(response.headers().link ?? "").not.toMatch(themeFontPath);
   expect(html).not.toMatch(themeFontPath);
 });
+
+test("should send no theme font preload in the production HTML of the themes docs page", async ({ request }) => {
+  const response = await request.get("/docs/themes");
+  expect(response.ok()).toBe(true);
+  const html = await response.text();
+  // The preset samples mount, and load their fonts, only when a reader scrolls to them.
+  expect(html).toContain("data-theme-preset=");
+  expect(response.headers().link ?? "").not.toMatch(themeFontPath);
+  expect(html).not.toMatch(themeFontPath);
+});

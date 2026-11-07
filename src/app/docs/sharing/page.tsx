@@ -69,7 +69,7 @@ export default function SharingPage() {
 
       <DocsH page={page} id="edits" />
       <Prose>
-        <p>Link and public artifacts in a shared team keep an <strong>approved version</strong>. Readers outside the team see it; members see the latest. An edit by a member or an agent waits for approval and becomes the approved version when an owner or admin accepts it. <code>artifacts_get</code> returns <code>editPending: true</code> while one waits. Team and private artifacts have no approved version, because every reader is inside the team.</p>
+        <p>Link and public artifacts in a shared team keep an <strong>approved version</strong>. Readers outside the team see it; members see the latest. An edit by a member or an agent, to the content, title, icon, or <Link href={docsHref("themes", "history")}>theme</Link>, waits for approval and becomes the approved version when an owner or admin accepts it. <code>artifacts_get</code> returns <code>editPending: true</code> while one waits. Team and private artifacts have no approved version, because every reader is inside the team.</p>
       </Prose>
 
       <DocsH page={page} id="agents" />

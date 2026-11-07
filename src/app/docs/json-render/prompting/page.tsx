@@ -60,6 +60,7 @@ export default function PromptingPage() {
           <li><strong>Pick the component that fits the data.</strong> Table for rows (up to 500), Chart for trends, KeyValue for settings, Steps for runbooks, Board for status, Calendar for dates.</li>
           <li><strong>Use formats, not strings.</strong> Send numbers with <code>format</code> and <code>currency</code> instead of &quot;$1.2M&quot; text, so axes, tables, and the data view stay exact.</li>
           <li><strong>Use short, readable keys</strong> such as <code>kpi-revenue</code>. Validation messages name them.</li>
+          <li><strong>Pick a theme for the reader.</strong> Pass a preset id as <code>theme</code>, such as <code>editorial</code> for a long report or <code>ink</code> for the most contrast. Charts, badges, and tables take the theme&apos;s colors with no change to the spec. See <Link href={docsHref("themes")}>Themes</Link>.</li>
           <li><strong>Validate, then save.</strong> <code>artifacts_validate</code> reports every problem at once; fix them all in one pass.</li>
           <li><strong>Update, do not duplicate.</strong> Save a new version of the same artifact with <code>artifacts_update</code>; its link stays the same and history keeps every version.</li>
           <li><strong>Mind the limits.</strong> Split very large data into several artifacts, or summarize it. See <Link href={docsHref("json-render/validation", "limits")}>Spec limits</Link>.</li>
