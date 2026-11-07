@@ -10,6 +10,7 @@ import {
   type ApiTokenDto,
 } from "@/app/(workspace)/app/connections/actions";
 import { ConnectedApps } from "@/components/app/connected-apps";
+import { McpToolsTable } from "@/components/app/mcp-tools-table";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { CodeBlock, CommandBlock } from "@/components/code-block";
 import { SkillInstall } from "@/components/setup/skill-install";
@@ -19,19 +20,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ConnectedApp } from "@/lib/oauth/clients";
 import { claudeMcpAddOAuthCommand, mcpConfigJson, mcpOAuthConfigJson, TOKEN_PLACEHOLDER } from "@/lib/setup/mcp-config";
-
-const tools = [
-  ["artifacts_create", "Create an artifact with a title, format, project, and content."],
-  ["artifacts_get", "Return one artifact in full."],
-  ["artifacts_list", "List and search artifacts by text or project."],
-  ["artifacts_update", "Change an artifact in place."],
-  ["artifacts_delete", "Remove an artifact."],
-  ["teams_list", "List your teams, for sharing and team scopes."],
-  ["inbox_list", "List unread @mentions with the thread around them."],
-  ["inbox_mark_read", "Mark mentions read once handled."],
-  ["comments_list", "Read the comment thread on an artifact."],
-  ["comment_create", "Comment or reply, with @mentions."],
-];
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });
 
@@ -123,16 +111,8 @@ export function Connections({
           </div>
           <div className="border-t px-5 py-4">
             <h3 className="text-md font-medium">Tools</h3>
-            <table className="mt-3 w-full border-collapse text-sm">
-              <tbody>
-                {tools.map(([tool, description]) => (
-                  <tr key={tool} className="border-t">
-                    <td className="py-2 pr-6 align-top font-mono text-sm whitespace-nowrap">{tool}</td>
-                    <td className="py-2 align-top leading-5 text-muted-foreground">{description}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">What your agent can do once connected.</p>
+            <McpToolsTable />
           </div>
         </section>
 
