@@ -1,6 +1,5 @@
 "use client";
 
-import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
 import { checkMermaidSource } from "@/lib/mermaid-source";
@@ -9,6 +8,7 @@ import { minReadableWidth } from "@/lib/svg-text-size";
 import { cn } from "@/lib/utils";
 
 import { renderMermaid, type RenderedDiagram } from "./mermaid-render";
+import { useDarkTheme } from "./theme-scope";
 import { ViewNotice } from "./view-notice";
 
 type Outcome = { key: string; diagram: RenderedDiagram } | { key: string; error: string };
@@ -25,13 +25,12 @@ function SourceFallback({ code, title, reason }: { code: string; title: string; 
 /**
  * A Mermaid diagram, rendered in the browser with securityLevel "strict" and
  * shown as an <img>, so nothing in the diagram can run. Mermaid loads only
- * when a diagram is on screen. The theme follows light and dark mode. The
+ * when a diagram is on screen. The theme follows light and dark mode, or a ThemeScope. The
  * image shrinks to fit only while its text stays at 13px or larger; past
  * that, the frame scrolls sideways.
  */
 export function MermaidView({ code, title, className }: { code: string; title?: string; className?: string }) {
-  const { resolvedTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
+  const dark = useDarkTheme();
   const key = `${dark ? "dark" : "light"}:${code}`;
   const sourceProblem = checkMermaidSource(code);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -54,7 +53,7 @@ export function MermaidView({ code, title, className }: { code: string; title?: 
     <figure className={cn("min-w-0", className)}>
       {title ? <figcaption className="mb-3 text-md font-medium">{title}</figcaption> : null}
       {/* justify-center-safe: when the diagram is wider than the frame, it starts at the left edge so all of it can be scrolled to. */}
-      <div className="flex min-h-24 justify-center-safe overflow-x-auto rounded-md border bg-card p-4">
+      <div className="flex min-h-24 justify-center-safe overflow-x-auto rounded-md border bg-card p-4 shadow-xs">
         {current ? (
           // eslint-disable-next-line @next/next/no-img-element -- a data URI image, which next/image cannot optimize
           <img
