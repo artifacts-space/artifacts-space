@@ -4,10 +4,12 @@ import { getArtifactAccess, type ArtifactAccess } from "@/lib/access";
 import { iconTitlePrefix } from "@/lib/artifact-icons";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { filesForViewer } from "@/lib/files/download";
+import { resolveTheme } from "@/lib/themes/resolve";
 import { cachedVersionView } from "@/lib/versions/cache";
 import { isReviewedLevel } from "@/lib/versions/rules";
 import { OG_DESCRIPTION, OG_WORDMARK } from "@/lib/site-copy";
 
+import { ogCardPalette, type OgCardPalette } from "./card-palette";
 import { artifactDescription } from "./description";
 import { ogIconFor, type OgIcon } from "./icon";
 import { buildSynopsis, ogKindLabels } from "./synopsis";
@@ -97,6 +99,8 @@ export interface ArtifactOg {
   kind: ArtifactKind;
   kindLabel: string;
   synopsis: Synopsis;
+  /** The synopsis card's colors: the approved version's theme, or the site card. */
+  palette: OgCardPalette;
 }
 
 /**
@@ -118,5 +122,7 @@ export async function loadArtifactOg(publicId: string, versionId: string): Promi
     kind: view.kind,
     kindLabel: view.kind === "code" && view.language ? `${ogKindLabels.code} · ${truncate(view.language, 16)}` : ogKindLabels[view.kind],
     synopsis: buildSynopsis({ kind: view.kind, content: view.content, language: view.language, files }),
+    // The team default arrives with team presets; until then the version's own theme or the site card.
+    palette: ogCardPalette(resolveTheme(view.theme, null).theme),
   };
 }

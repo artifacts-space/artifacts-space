@@ -44,6 +44,11 @@ describe("markdownHeader", () => {
     expect(markdownHeader({ ...base, emoji: null, title: "Line one\n# Injected" })).toMatch(/^# Line one # Injected\n/);
   });
 
+  it("should name the theme only when the artifact has one", () => {
+    expect(markdownHeader({ ...base, theme: "Paper" })).toContain("- Format: markdown\n- Theme: Paper\n");
+    expect(markdownHeader({ ...base, theme: null })).not.toContain("Theme:");
+  });
+
   it("should name the language when the format is code", () => {
     expect(markdownHeader({ ...base, kind: "code", language: "ts" })).toContain("- Format: code (ts)");
   });

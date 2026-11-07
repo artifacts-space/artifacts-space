@@ -22,6 +22,8 @@ export const toolAccess = {
   // Formats: guidance and dry-run validation, nothing is saved.
   artifacts_formats_guide: "read",
   artifacts_validate: "read",
+  // Themes: the built-in presets an artifact's `theme` can name.
+  themes_list: "read",
   // Files
   files_get_download_url: "read",
   files_request_upload: "write",

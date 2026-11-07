@@ -1,12 +1,13 @@
 "use client";
 
-import { IconLoader2, IconMoodSmile } from "@tabler/icons-react";
+import { IconChevronDown, IconLoader2, IconMoodSmile, IconPalette } from "@tabler/icons-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { createArtifactWithFilesAction, deleteFileAction } from "@/app/(workspace)/app/file-actions";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { IconPicker } from "@/components/artifact-icon/icon-picker";
+import { ThemePicker } from "@/components/artifact-theme/theme-picker";
 import { FileUploader } from "@/components/files/file-uploader";
 import { useFileUploads } from "@/components/files/use-file-uploads";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ import { formatInfo } from "@/lib/artifact-formats";
 import { iconFileId } from "@/lib/artifact-icons";
 import { kinds } from "@/lib/artifact-kinds";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
+import { themeLabel } from "@/lib/themes/artifact-theme";
 
 /** A short starting point shown in the empty content box, per format. */
 const placeholders: Record<string, string> = {
@@ -56,6 +58,17 @@ function NewIconButton({ icon, onChange }: { icon: string | null; onChange: (ico
   return <IconPicker value={icon} onChange={onChange} trigger={trigger} />;
 }
 
+/** The theme field: the chosen preset's name, opening the swatch picker. */
+function NewThemeButton({ theme, onChange }: { theme: string | null; onChange: (theme: string | null) => void }) {
+  const trigger = (
+    <Button type="button" variant="outline" id="artifact-theme" aria-labelledby="artifact-theme-label artifact-theme" className="h-9 w-full justify-start font-normal">
+      <IconPalette className="text-muted-foreground" /> {themeLabel(theme)}
+      <IconChevronDown className="ml-auto text-muted-foreground" />
+    </Button>
+  );
+  return <ThemePicker value={theme} onChange={onChange} trigger={trigger} />;
+}
+
 /** Reads a text field from form data. File inputs and missing fields read as empty. */
 function formText(formData: FormData, name: string) {
   const value = formData.get(name);
@@ -74,6 +87,7 @@ export function CreateArtifactDialog({
   const [pending, setPending] = useState(false);
   const [kind, setKind] = useState<ArtifactKind>("markdown");
   const [icon, setIcon] = useState<string | null>(null);
+  const [theme, setTheme] = useState<string | null>(null);
   const uploads = useFileUploads();
   const isFiles = kind === "file";
 
@@ -83,6 +97,7 @@ export function CreateArtifactDialog({
     const unusedIconFile = iconFileId(icon);
     if (unusedIconFile) void deleteFileAction(unusedIconFile).catch(() => undefined);
     setIcon(null);
+    setTheme(null);
     onOpenChange(false);
   }
 
@@ -105,6 +120,7 @@ export function CreateArtifactDialog({
         content: formText(formData, "content"),
         kind,
         icon,
+        theme,
       }, fileIds);
       if (!result.success) {
         toast.error(result.error);
@@ -116,6 +132,7 @@ export function CreateArtifactDialog({
       form.reset();
       setKind("markdown");
       setIcon(null);
+      setTheme(null);
       toast.success("Artifact created.");
     } catch {
       toast.error("Something went wrong. Check your connection and try again.");
@@ -164,6 +181,10 @@ export function CreateArtifactDialog({
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="artifact-summary">Summary <span className="font-normal text-muted-foreground">(optional)</span></Label>
                 <Input id="artifact-summary" name="summary" maxLength={600} placeholder="One line, used for search and agent retrieval" className="h-9" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label id="artifact-theme-label">Theme</Label>
+                <NewThemeButton theme={theme} onChange={setTheme} />
               </div>
               {kind === "code" && (
                 <div className="space-y-2 sm:col-span-2">

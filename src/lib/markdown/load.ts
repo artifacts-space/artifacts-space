@@ -10,6 +10,7 @@ import { listComments } from "@/lib/comments/service";
 import { filesForViewer } from "@/lib/files/download";
 import { fileUrl } from "@/lib/files/types";
 import { siteUrl } from "@/lib/site-origin";
+import { themeLabel } from "@/lib/themes/artifact-theme";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import type { ArtifactMarkdownInput } from "./artifact-markdown";
@@ -87,6 +88,7 @@ export async function loadMarkdownInput(viewable: ViewableArtifact, userId: stri
   return {
     title: view.title,
     emoji: emojiOf(view.icon),
+    theme: view.theme === null ? null : themeLabel(view.theme),
     summary: view.summary,
     kind: view.kind,
     language: view.language,

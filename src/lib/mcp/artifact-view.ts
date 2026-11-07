@@ -1,4 +1,5 @@
 import type { ArtifactDto, ArtifactListItemDto, ArtifactVisibility, CommentSetting, SharingLevel } from "@/lib/artifact-types";
+import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
 
 /** How an artifact looks to an agent. Ids are public ids; internal ids never leave the server. */
 export interface McpArtifact {
@@ -7,6 +8,8 @@ export interface McpArtifact {
   title: string;
   /** Page icon beside the title: one emoji or "tabler:<name>". Null when none. */
   icon: string | null;
+  /** The artifact's own theme: a preset id or theme JSON. Null when it uses the default look. */
+  theme: StoredArtifactTheme | null;
   summary: string;
   /** The full content. Only artifacts_get and writes return it. */
   content?: string;
@@ -58,6 +61,7 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     url: context.urlFor(dto.publicId),
     title: dto.title,
     icon: dto.icon,
+    theme: dto.theme,
     summary: dto.summary,
     kind: dto.kind,
     language: dto.language,

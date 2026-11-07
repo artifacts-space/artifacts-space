@@ -125,11 +125,15 @@ export const docsPages = [
   {
     slug: "themes",
     title: "Themes",
-    description: "Theme tokens, the built-in presets, fonts, and the validation and contrast rules every theme passes.",
+    description: "Give an artifact its own colors and fonts from the web app or over MCP: presets, theme tokens, fonts, and the validation and contrast rules every theme passes.",
     section: "Reference",
     source: app("themes/"),
     headings: [
       h2("overview", "How themes work"),
+      h2("artifact", "Set an artifact's theme"),
+      h3("web", "In the web app"),
+      h3("mcp", "Over MCP"),
+      h3("history", "History and approval"),
       h2("tokens", "Tokens"),
       h3("colors", "Colors"),
       h3("radius", "Radius"),
@@ -139,6 +143,7 @@ export const docsPages = [
       h2("validation", "Validation"),
       h2("contrast", "Contrast"),
       h2("example", "A full theme"),
+      h2("vendoring", "Where the fonts come from"),
     ],
   },
   {

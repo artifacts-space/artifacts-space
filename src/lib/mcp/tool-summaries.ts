@@ -17,6 +17,7 @@ export const toolSummaries = {
   artifacts_restore_version: "Bring back an older version as a new save.",
   artifacts_formats_guide: "Explain each format, with the component guide for rich pages.",
   artifacts_validate: "Check content against a format without saving it.",
+  themes_list: "List the theme presets an artifact can use, with their fonts.",
   files_get_download_url: "Get a short-lived link to download a file.",
   files_request_upload: "Start a file upload and get a link to send it to.",
   files_finalize: "Check an uploaded file and make it usable.",

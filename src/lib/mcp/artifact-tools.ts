@@ -20,6 +20,7 @@ import { setArtifactComments } from "@/lib/sharing/comments";
 import { requestArtifactSharing } from "@/lib/sharing/service";
 import { siteUrl } from "@/lib/site-origin";
 import { listTeamsForUser, type TeamMembership } from "@/lib/teams/queries";
+import { artifactThemeRawSchema, parseArtifactThemeInput, THEME_FIELD_DESCRIPTION } from "@/lib/themes/artifact-theme";
 import type { McpAccess } from "@/lib/oauth/scopes";
 import { UserFacingError } from "@/lib/user-facing-error";
 
@@ -54,9 +55,19 @@ const iconField = z
   .optional()
   .describe(ICON_FIELD_DESCRIPTION);
 
+const themeField = artifactThemeRawSchema.optional().describe(THEME_FIELD_DESCRIPTION);
+
+/** Checks `theme` before anything is saved, so an agent gets every problem and the nearest passing colors in one clear message. */
+function assertTheme(theme: unknown) {
+  if (theme === undefined) return;
+  const result = parseArtifactThemeInput(theme);
+  if (!result.ok) throw new UserFacingError(result.message);
+}
+
 const editableFields = {
   title: z.string().min(1).max(160),
   icon: iconField,
+  theme: themeField,
   content: z.string().min(1).max(1_000_000),
   summary: z.string().max(600).optional(),
   kind: z.enum(artifactKinds).optional().describe(kindFieldDescription),
@@ -226,6 +237,7 @@ function registerWriteTools(server: ToolServer, userId: string) {
     ({ visibility, team, comments, ...input }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
       if (team) teamBySlug(teams, team);
+      assertTheme(input.theme);
       const created = await createArtifact(userId, input);
       const result = await shareAfterSave(userId, created, teams, { visibility, team, comments });
       return { artifact: toMcpArtifact(result.artifact, view), sharing: result.sharing, comments: result.comments };
@@ -252,6 +264,7 @@ function registerWriteTools(server: ToolServer, userId: string) {
       const { teams, view } = await loadContext(userId);
       const record = await editableByPublicId(userId, id);
       if (team) teamBySlug(teams, team);
+      assertTheme(input.theme);
       const updated = await updateArtifact(userId, record.id, input, "agent");
       if (!updated) throw new UserFacingError("Artifact not found, or you cannot edit it.");
       const result = await shareAfterSave(userId, updated, teams, { visibility, team, comments });

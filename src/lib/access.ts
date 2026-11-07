@@ -7,6 +7,7 @@ import { canEditArtifact, canViewArtifact } from "@/lib/access-rules";
 import { artifactContentColumn, artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { isPublicId } from "@/lib/public-id";
+import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
 import { cachedVersionView } from "@/lib/versions/cache";
 import { isReviewedLevel, versionToServe } from "@/lib/versions/rules";
 
@@ -47,6 +48,7 @@ export function viewableInTeamCondition(viewerId: string, teamId: string) {
 export interface ServedArtifactView {
   title: string;
   icon: string | null;
+  theme: StoredArtifactTheme | null;
   summary: string;
   content: string;
   kind: ArtifactKind;
@@ -66,8 +68,8 @@ export interface ArtifactAccess {
   record: ArtifactMetaRecord;
   /** Which version the viewer reads. Readers outside the team get the approved version. */
   version: { source: "latest" | "approved"; versionId: string | null };
-  /** The title, icon, save time, and saver of the version this viewer reads. */
-  served: { title: string; icon: string | null; updatedAt: Date; editedBy: string | null };
+  /** The title, icon, theme, save time, and saver of the version this viewer reads. */
+  served: { title: string; icon: string | null; theme: StoredArtifactTheme | null; updatedAt: Date; editedBy: string | null };
   /** Whether the viewer may edit it and read its history: the author, or a member of the team it is shared through. */
   canEdit: boolean;
   /** Whether the viewer belongs to the artifact's team. Pages show the team's name only then. */
@@ -145,6 +147,7 @@ export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publi
       teamPersonal: team.personal,
       approvedTitle: artifactVersion.title,
       approvedIcon: artifactVersion.icon,
+      approvedTheme: artifactVersion.theme,
       approvedSavedAt: artifactVersion.savedAt,
       approvedBy: artifactVersion.createdBy,
     })
@@ -173,11 +176,11 @@ type Subject = NonNullable<Awaited<ReturnType<typeof loadSubject>>>;
 /** The approved version a reader outside the team gets, or null for the latest. */
 function approvedVersionFor(subject: Subject, versionId: string) {
   if (subject.approvedTitle === null || subject.approvedSavedAt === null) return null;
-  return { versionId, served: { title: subject.approvedTitle, icon: subject.approvedIcon, updatedAt: subject.approvedSavedAt, editedBy: subject.approvedBy } };
+  return { versionId, served: { title: subject.approvedTitle, icon: subject.approvedIcon, theme: subject.approvedTheme, updatedAt: subject.approvedSavedAt, editedBy: subject.approvedBy } };
 }
 
 function latestServed(record: ArtifactMetaRecord) {
-  return { title: record.title, icon: record.icon, updatedAt: record.updatedAt, editedBy: record.updatedBy ?? record.userId };
+  return { title: record.title, icon: record.icon, theme: record.theme, updatedAt: record.updatedAt, editedBy: record.updatedBy ?? record.userId };
 }
 
 /**
@@ -209,9 +212,9 @@ async function latestViewable(access: ArtifactAccess): Promise<ViewableArtifact 
   const { record } = access;
   const [content, editPending] = await Promise.all([latestContent(record.id), isReviewedLevel(record.visibility) ? hasPendingEdit(record.id) : false]);
   if (content === null) return null;
-  const { title, icon, summary, kind, language, project, source, metadata } = record;
+  const { title, icon, theme, summary, kind, language, project, source, metadata } = record;
   const served = latestServed(record);
-  const view = { title, icon, summary, content, kind, language, project, source, metadata, updatedAt: served.updatedAt, editedBy: served.editedBy };
+  const view = { title, icon, theme, summary, content, kind, language, project, source, metadata, updatedAt: served.updatedAt, editedBy: served.editedBy };
   return { ...access, version: { source: "latest", versionId: null }, served, view, editPending };
 }
 

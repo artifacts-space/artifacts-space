@@ -26,6 +26,8 @@ import {
   versionSaveKinds,
 } from "../lib/artifact-types";
 import { artifactIconLimits } from "../lib/artifact-icon-limits";
+import type { StoredArtifactTheme } from "../lib/themes/artifact-theme";
+import { artifactThemeLimits } from "../lib/themes/artifact-theme-limits";
 import { artifactSizeLimits } from "../lib/artifact-limits";
 import { fileLimits, fileStatuses } from "../lib/files/config";
 
@@ -170,25 +172,21 @@ export const artifact = pgTable(
   "artifact",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     // Optional page icon beside the title: one emoji, or "tabler:<name>" from src/lib/artifact-icons.ts.
     icon: text("icon"),
+    // Optional theme: a preset id (a JSON string) or theme JSON normalised by src/lib/themes. Null uses the default look.
+    theme: jsonb("theme").$type<StoredArtifactTheme>(),
     summary: text("summary").notNull().default(""),
     content: text("content").notNull(),
-    kind: text("kind", { enum: artifactKinds })
-      .notNull()
-      .default("markdown"),
+    kind: text("kind", { enum: artifactKinds }).notNull().default("markdown"),
     language: text("language").notNull().default(""),
     project: text("project").notNull().default(""),
     sessionId: text("session_id").notNull().default(""),
     source: text("source").notNull().default(""),
     // private: author only. team: members of `teamId`. link: anyone with the URL. public: anyone.
-    visibility: text("visibility", { enum: artifactVisibilities })
-      .notNull()
-      .default("private"),
+    visibility: text("visibility", { enum: artifactVisibilities }).notNull().default("private"),
     // Who can read and write its comments: off, team (the author and the team), or signed_in
     // (anyone signed in who can read it). The app always sets it on insert. 0015 added it with
     // the default signed_in (how comments worked before), and 0017 moved the default to team,
@@ -218,6 +216,7 @@ export const artifact = pgTable(
     index("artifact_team_updated_idx").on(table.teamId, table.updatedAt),
     check("artifact_comments_check", sql`${table.comments} in ('off', 'team', 'signed_in')`),
     check("artifact_icon_length_check", sql`char_length(${table.icon}) <= ${sql.raw(String(artifactIconLimits.maxStoredChars))}`),
+    check("artifact_theme_size_check", sql`octet_length(${table.theme}::text) <= ${sql.raw(String(artifactThemeLimits.maxStoredBytes))}`),
     check("artifact_content_size_check", sql`octet_length(${table.content}) <= ${sql.raw(String(artifactSizeLimits.maxContentBytes))}`),
     // jsonb prints with extra spaces, so the backstop allows twice the app's limit.
     check("artifact_metadata_size_check", sql`octet_length(${table.metadata}::text) <= ${sql.raw(String(artifactSizeLimits.maxMetadataBytes * 2))}`),
@@ -237,6 +236,8 @@ export const artifactVersion = pgTable(
     title: text("title").notNull(),
     // The page icon this version showed, versioned with the title.
     icon: text("icon"),
+    // The theme this version showed, versioned with the title and icon.
+    theme: jsonb("theme").$type<StoredArtifactTheme>(),
     summary: text("summary").notNull().default(""),
     content: text("content").notNull(),
     kind: text("kind", { enum: artifactKinds }).notNull(),

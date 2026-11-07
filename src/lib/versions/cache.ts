@@ -4,6 +4,7 @@ import { cacheLife, cacheTag, revalidateTag } from "next/cache";
 import { getDb } from "@/db";
 import { artifactVersion } from "@/db/schema";
 import type { ArtifactKind } from "@/lib/artifact-types";
+import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
 
 /**
  * Cached reads of approved versions, keyed by version id and save time.
@@ -24,6 +25,7 @@ import type { ArtifactKind } from "@/lib/artifact-types";
 export interface CachedVersionView {
   title: string;
   icon: string | null;
+  theme: StoredArtifactTheme | null;
   summary: string;
   content: string;
   kind: ArtifactKind;
@@ -49,9 +51,9 @@ export async function cachedVersionView(versionId: string, savedAt: string): Pro
   const [row] = await getDb().select().from(artifactVersion).where(eq(artifactVersion.id, versionId)).limit(1);
   if (!row) return null;
   cacheTag(artifactCacheTag(row.artifactId), `version:${versionId}:${savedAt}`);
-  const { title, icon, summary, content, kind, language, project, source, metadata } = row;
+  const { title, icon, theme, summary, content, kind, language, project, source, metadata } = row;
   // savedAt, not createdAt: files attached up to the version's last save belong to it.
-  return { title, icon, summary, content, kind, language, project, source, metadata, updatedAt: row.savedAt };
+  return { title, icon, theme, summary, content, kind, language, project, source, metadata, updatedAt: row.savedAt };
 }
 
 /**

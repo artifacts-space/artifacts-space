@@ -9,14 +9,23 @@ import type { ActionResult, ArtifactDto } from "@/lib/artifact-types";
 import { artifactIconInputSchema } from "@/lib/artifact-icons";
 import { toArtifactDtos, updateArtifact } from "@/lib/artifacts";
 import { isPublicId } from "@/lib/public-id";
+import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
 import { getSession } from "@/lib/session";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 const publicIdSchema = z.string().refine(isPublicId, "Artifact not found.");
+/** The web picker sends a preset id or null; updateArtifact checks the id is a real preset. */
+const presetIdSchema = z.string().max(64).nullable();
 
 /** What setting the icon did: live for every reader, or waiting for approval (link and public artifacts). */
 export interface IconSaveResult {
   icon: string | null;
+  pending: boolean;
+}
+
+/** What setting the theme did: live for every reader, or waiting for approval (link and public artifacts). */
+export interface ThemeSaveResult {
+  theme: StoredArtifactTheme | null;
   pending: boolean;
 }
 
@@ -61,5 +70,29 @@ export async function setArtifactIconAction(publicId: string, icon: string | nul
     return { success: true, data: { icon: saved.icon, pending: saved.pendingEdit !== null } };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The icon could not be saved. Try again.") };
+  }
+}
+
+/**
+ * Sets or removes the artifact's theme from its title area: a built-in
+ * preset id, or null for the default look. The same edit check and save path
+ * as a title or icon change (updateArtifact as a person), so it files a
+ * version and, for link and public artifacts, waits for approval.
+ */
+export async function setArtifactThemeAction(publicId: string, theme: string | null): Promise<ActionResult<ThemeSaveResult>> {
+  try {
+    const session = await getSession();
+    if (!session) return { success: false, error: "Your session ended. Sign in again." };
+    const id = publicIdSchema.parse(publicId);
+    const nextTheme = presetIdSchema.parse(theme);
+    const record = await getEditableArtifact(session.user.id, { publicId: id });
+    if (!record) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+    const saved = await updateArtifact(session.user.id, record.id, { theme: nextTheme }, "person");
+    if (!saved) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+    revalidatePath("/app");
+    revalidatePath(`/artifact/${saved.publicId}`);
+    return { success: true, data: { theme: saved.theme, pending: saved.pendingEdit !== null } };
+  } catch (error) {
+    return { success: false, error: actionErrorMessage(error, "The theme could not be saved. Try again.") };
   }
 }

@@ -53,7 +53,7 @@ function ArtifactTitle({ title }: { title: string }) {
 export function artifactImageResponse(og: ArtifactOg, headers: Record<string, string> = {}): ImageResponse {
   return new ImageResponse(
     (
-      <OgFrame background={strataInkPlainBackground} icon={planetIcon40} wordmark={OG_WORDMARK} textWidth={OG_ARTIFACT_TEXT_WIDTH} aside={<SynopsisCard synopsis={og.synopsis} />}>
+      <OgFrame background={strataInkPlainBackground} icon={planetIcon40} wordmark={OG_WORDMARK} textWidth={OG_ARTIFACT_TEXT_WIDTH} aside={<SynopsisCard synopsis={og.synopsis} palette={og.palette} />}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {og.icon ? <OgIconMark icon={og.icon} /> : null}
           <div style={{ display: "flex", fontSize: 20, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: OG_TEXT_MUTED }}>{og.kindLabel}</div>
