@@ -12,6 +12,7 @@ import {
 import { ConnectedApps } from "@/components/app/connected-apps";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { CodeBlock, CommandBlock } from "@/components/code-block";
+import { SkillInstall } from "@/components/setup/skill-install";
 import { TokenRevealDialog } from "@/components/tokens/token-reveal-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -113,6 +114,12 @@ export function Connections({
               Where nobody can approve in a browser, send a token instead. Replace <code className="font-mono">{TOKEN_PLACEHOLDER}</code> with a token from this page, and keep it out of source control.
             </p>
             <CodeBlock title="mcp.json" value={config} className="mt-3" />
+          </div>
+          <div className="border-t px-5 py-4">
+            <h3 className="text-md font-medium">Agent skill</h3>
+            <div className="mt-2">
+              <SkillInstall intro="Teach your agent when to save, update, and share artifacts." />
+            </div>
           </div>
           <div className="border-t px-5 py-4">
             <h3 className="text-md font-medium">Tools</h3>

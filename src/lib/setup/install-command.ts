@@ -1,16 +1,20 @@
+/** The public GitHub repository that holds the artifacts.space agent skill. */
+export const SKILLS_REPO = "artifacts-space/skills";
+
 /**
- * The one command that sets up a coding agent for artifacts.space: it adds
- * the MCP server and asks for the access token.
- *
- * TODO: the `artifacts-space` CLI and its agent skill are not published to
- * npm yet, so this command does not work. When the package ships, keep the
- * command here in sync with it and set `SETUP_COMMAND_STATUS` to "published" so
- * the token dialog stops showing "Coming soon".
+ * The command that adds the artifacts.space agent skill to a project with the
+ * skills.sh CLI. The skill teaches an agent when to save, update, and share
+ * artifacts; the MCP server (see `mcp-config.ts`) is what gives it access.
  */
-export const SETUP_COMMAND = "npx artifacts-space@latest setup";
+export const SKILL_INSTALL_COMMAND = `npx skills add ${SKILLS_REPO}`;
 
-/** Whether people can run `SETUP_COMMAND` yet. */
-export type SetupCommandStatus = "coming-soon" | "published";
+/** Whether people can run `SKILL_INSTALL_COMMAND` yet. */
+export type SkillInstallStatus = "coming-soon" | "published";
 
-/** "coming-soon" until the setup CLI is on npm; the UI marks the command that way. */
-export const SETUP_COMMAND_STATUS: SetupCommandStatus = "coming-soon";
+/**
+ * "coming-soon" while the skills repository is private; the UI marks the
+ * command that way and points people to the MCP setup instead.
+ *
+ * TODO: flip when artifacts-space/skills is public: set this to "published".
+ */
+export const SKILL_INSTALL_STATUS: SkillInstallStatus = "coming-soon";
