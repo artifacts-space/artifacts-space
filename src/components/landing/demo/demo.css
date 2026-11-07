@@ -1,0 +1,383 @@
+/*
+ * The landing hero demo: a Claude Code window and the artifacts.space app in
+ * a browser window, overlapping on the dusk backdrop. The terminal look is
+ * ported from Vmotif's side gate. The markup is the finished session. Once
+ * DemoReplay sets `data-play`, every element with `--d-in` waits that many
+ * seconds and lands; elements with `--d-out` leave again; focus moves between
+ * the windows at `--focus-*`. Without the script, and with reduced motion,
+ * the finished session stays on screen with both windows still.
+ * Motion uses transform and opacity. Colors are tokens in globals.css.
+ */
+
+/* --- The desktop ---------------------------------------------------------------- */
+.demo-desk {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40.5% 5.5% minmax(0, 1fr);
+  container-type: inline-size;
+}
+.demo-win {
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  transform-origin: 50% 40%;
+}
+.demo-win--term {
+  grid-area: 1 / 1 / 2 / 3;
+  align-self: start;
+  z-index: 1;
+}
+.demo-win--app {
+  grid-area: 1 / 2 / 2 / 4;
+  margin-top: 48px;
+  z-index: 2;
+}
+.demo-win__frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  box-shadow:
+    0 0 0 1px var(--window-edge),
+    0 10px 30px -14px var(--window-shadow);
+}
+/* The lift: a deeper shadow under the window in front. */
+.demo-win::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--radius-2xl);
+  box-shadow: 0 44px 90px -28px var(--window-shadow);
+  opacity: 0.35;
+}
+.demo-win--app::before {
+  opacity: 1;
+}
+/* The dim: a veil over the window behind. */
+.demo-win::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: var(--radius-2xl);
+  background: var(--window-dim);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* --- The terminal ----------------------------------------------------------------- */
+.demo-term {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--term);
+  color: var(--term-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+.demo-term p {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.demo-term b {
+  font-weight: 600;
+  color: var(--term-bright);
+}
+.demo-term__bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding-inline: 14px;
+  border-bottom: 1px solid var(--term-line);
+  background: var(--term-bar);
+}
+.demo-lights {
+  display: inline-flex;
+  gap: 7px;
+}
+.demo-lights i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--term-field);
+}
+.demo-term__title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--term-muted);
+  white-space: nowrap;
+}
+/* The transcript keeps its newest lines in view: older lines leave at the top. */
+.demo-term__body {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 400px;
+  overflow: hidden;
+  padding: 0 clamp(14px, 1.6vw, 22px) 14px;
+  /* Older lines fade out under the title bar; a line the edge cuts is fully faded. */
+  mask-image: linear-gradient(to bottom, transparent 14px, var(--term) 48px);
+}
+.demo-term__log {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 10px;
+  min-height: 100%;
+  padding-top: 18px;
+}
+.demo-term__log > div {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 8px;
+}
+.demo-term__log > .demo-welcome {
+  display: block;
+  margin-bottom: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--term-accent);
+  border-radius: 6px;
+}
+.demo-welcome span {
+  display: block;
+  color: var(--term-muted);
+}
+.demo-user {
+  color: var(--term-muted);
+}
+.demo-user p {
+  color: var(--term-bright);
+}
+.demo-dot {
+  display: block;
+  width: 7px;
+  height: 7px;
+  margin-top: 0.55em;
+  border-radius: 50%;
+  background: var(--term-bright);
+}
+.demo-dot[data-ok] {
+  background: var(--term-ok);
+}
+.demo-args {
+  color: var(--term-muted);
+}
+.demo-term__log > .demo-result {
+  --line-pull: -8px;
+  margin-top: var(--line-pull);
+  color: var(--term-muted);
+}
+.demo-result > span {
+  padding-left: 4px;
+}
+.demo-term__input {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 8px;
+  margin: 0 clamp(14px, 1.6vw, 22px);
+  padding: 9px 12px;
+  border: 1px solid var(--term-field);
+  border-radius: 6px;
+  color: var(--term-muted);
+}
+.demo-term__input p {
+  display: grid;
+  color: var(--term-bright);
+}
+.demo-term__input p > span {
+  grid-area: 1 / 1;
+}
+.demo-term__sizer {
+  visibility: hidden;
+}
+.demo-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  background: var(--term-text);
+}
+.demo-term__hint {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px clamp(14px, 1.6vw, 22px) 14px;
+  color: var(--term-dim);
+}
+
+/* --- The app ----------------------------------------------------------------------- */
+.demo-app__stage {
+  display: grid;
+  align-content: start;
+}
+.demo-scene {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.demo-swap {
+  display: inline-grid;
+}
+div.demo-swap {
+  display: grid;
+}
+.demo-swap > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.demo-glow {
+  position: absolute;
+  inset: -4px;
+  z-index: -1;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+}
+.demo-typing {
+  display: inline-flex;
+  gap: 3px;
+}
+.demo-typing i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.demo-packet {
+  position: absolute;
+  z-index: 5;
+  display: none;
+  align-items: center;
+  gap: 10px;
+  width: 15rem;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow: 0 18px 40px -16px var(--window-shadow);
+  opacity: 0;
+  pointer-events: none;
+}
+/* From the newest terminal line to the top row of the list. */
+.demo-packet--out {
+  top: 372px;
+  left: 36px;
+  --fly-x: calc(40.5cqw - 20px);
+  --fly-y: -162px;
+}
+/* From Dana's reply in the thread to the newest terminal line. */
+.demo-packet--back {
+  top: 640px;
+  left: calc(100cqw - 15rem - 36px);
+  --fly-x: calc(-100cqw + 15rem + 72px);
+  --fly-y: -256px;
+}
+
+/* --- The finished state ------------------------------------------------------------ */
+.demo-board [style*="--d-out"] {
+  visibility: hidden;
+}
+/* The typed prompt was sent: the input box is empty, with the caret at its start. */
+.demo-typed {
+  display: none;
+}
+
+/* The flights need both windows side by side, at full layout. */
+@media (min-width: 1280px) {
+  .demo-packet {
+    display: flex;
+    visibility: hidden;
+  }
+  .demo-board[data-play] .demo-packet {
+    visibility: visible;
+  }
+}
+
+/*
+ * --- Below 1280px: the windows stack like a deck of cards ---------------------------
+ * Both windows take the full width and sit almost on top of each other, so the
+ * whole story fits in about one viewport. The window behind sits back and
+ * shows only its title bar above the one in front (`--peek`). The finished
+ * state has the browser in front; demo-replay.css swaps them as focus moves.
+ */
+@media (max-width: 1279px) {
+  .demo-desk {
+    --deck-h: 600px;
+    --peek: 26px;
+    --back: 0.94;
+    display: block;
+    max-width: 880px;
+    height: var(--deck-h);
+    margin-inline: auto;
+  }
+  .demo-win {
+    position: absolute;
+    inset: 0 0 auto;
+    height: calc(var(--deck-h) - var(--peek));
+    margin: 0;
+    transform-origin: 50% 0;
+  }
+  .demo-win--term {
+    z-index: 1;
+    transform: scale(var(--back));
+  }
+  .demo-win--term::after {
+    opacity: 1;
+  }
+  .demo-win--app {
+    z-index: 2;
+    transform: translateY(var(--peek));
+  }
+  .demo-win__frame,
+  .demo-win__frame > * {
+    height: 100%;
+  }
+  .demo-term__body {
+    flex: 1 1 0;
+    height: auto;
+    min-height: 0;
+  }
+  .demo-app__stage {
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+/* Tablets and small laptops: a taller deck, with room for the board under the chart and timeline. */
+@media (min-width: 640px) and (max-width: 1279px) {
+  .demo-desk {
+    --deck-h: 720px;
+    --peek: 30px;
+  }
+}
+@media (max-width: 639px) {
+  .demo-term__title {
+    position: static;
+    transform: none;
+    margin-left: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .demo-term__hint {
+    display: none;
+  }
+  .demo-term__input {
+    margin-bottom: 12px;
+  }
+  /* A shorter chart and a tighter timeline, so both fit in the phone window. */
+  .demo-piece--chart .h-40 {
+    height: 6.5rem;
+  }
+  .demo-piece--timeline li:not(:last-child) {
+    padding-bottom: 12px;
+  }
+  /* The comment sheet fades the page out above it, so no line shows cut in half. */
+  .demo-sheet {
+    padding-top: 40px;
+    background: linear-gradient(to bottom, transparent, var(--background) 32px);
+  }
+}

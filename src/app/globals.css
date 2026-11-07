@@ -2,7 +2,19 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/*
+ * Dark mode follows the `dark` class on <html>. A `.theme-invert` element
+ * takes the opposite theme of the page (the landing demo's app surface), so
+ * the dark variant flips inside it too, in step with its tokens below.
+ */
+@custom-variant dark {
+  &:is(.dark *):not(.dark .theme-invert, .dark .theme-invert *) {
+    @slot;
+  }
+  &:is(:root:not(.dark) .theme-invert, :root:not(.dark) .theme-invert *) {
+    @slot;
+  }
+}
 
 /*
  * Type scale. Four steps for everything that is not a heading. Use these
@@ -60,6 +72,19 @@
   --color-series-6: var(--series-6);
   --color-series-7: var(--series-7);
   --color-series-8: var(--series-8);
+  --color-term: var(--term);
+  --color-term-bar: var(--term-bar);
+  --color-term-line: var(--term-line);
+  --color-term-field: var(--term-field);
+  --color-term-text: var(--term-text);
+  --color-term-bright: var(--term-bright);
+  --color-term-muted: var(--term-muted);
+  --color-term-dim: var(--term-dim);
+  --color-term-accent: var(--term-accent);
+  --color-term-ok: var(--term-ok);
+  --color-window-shadow: var(--window-shadow);
+  --color-window-dim: var(--window-dim);
+  --color-window-edge: var(--window-edge);
   --color-syntax-keyword: var(--syntax-keyword);
   --color-syntax-string: var(--syntax-string);
   --color-syntax-property: var(--syntax-property);
@@ -104,8 +129,12 @@
  * Two neutral palettes. Light is a warm paper; dark is a warm near-black.
  * The only chromatic token is --brand, taken from the logo mark, and it is
  * reserved for focus rings and text selection.
+ *
+ * `.theme-invert` takes the other palette: light inside a dark page, dark
+ * inside a light page. Each palette is still written once.
  */
-:root {
+:root,
+.dark .theme-invert {
   --background: oklch(0.985 0.003 85);
   --foreground: oklch(0.2 0.006 60);
   --card: oklch(1 0 0);
@@ -185,10 +214,26 @@
   --sidebar-accent-foreground: oklch(0.2 0.006 60);
   --sidebar-border: oklch(0.905 0.005 80);
   --sidebar-ring: oklch(0.5 0.22 262);
+  /* The landing demo's Claude Code terminal, in its light theme. */
+  --term: oklch(0.985 0.004 90);
+  --term-bar: oklch(0.955 0.006 90);
+  --term-line: oklch(0.9 0.008 85);
+  --term-field: oklch(0.8 0.01 85);
+  --term-text: oklch(0.32 0.006 70);
+  --term-bright: oklch(0.18 0.004 70);
+  --term-muted: oklch(0.5 0.008 70);
+  --term-dim: oklch(0.6 0.008 70);
+  --term-accent: oklch(0.58 0.15 40);
+  --term-ok: oklch(0.55 0.13 150);
+  /* Desktop windows in the landing demo, on the dusk backdrop in both themes. */
+  --window-shadow: oklch(0.08 0.01 60 / 0.6);
+  --window-dim: oklch(0.12 0.01 60 / 0.2);
+  --window-edge: oklch(1 0 0 / 0.14);
   color-scheme: light;
 }
 
-.dark {
+.dark,
+:root:not(.dark) .theme-invert {
   --background: oklch(0.165 0.004 60);
   --foreground: oklch(0.93 0.004 80);
   --card: oklch(0.19 0.004 60);
@@ -255,6 +300,17 @@
   --diff-added-foreground: oklch(0.85 0.1 150);
   --diff-removed: oklch(0.3 0.06 25);
   --diff-removed-foreground: oklch(0.85 0.09 25);
+  /* The landing demo's Claude Code terminal, in its dark theme. */
+  --term: oklch(0.2 0.003 100);
+  --term-bar: oklch(0.225 0.003 100);
+  --term-line: oklch(0.29 0.004 100);
+  --term-field: oklch(0.36 0.004 100);
+  --term-text: oklch(0.88 0.008 95);
+  --term-bright: oklch(0.96 0.003 100);
+  --term-muted: oklch(0.64 0.008 95);
+  --term-dim: oklch(0.54 0.007 95);
+  --term-accent: oklch(0.68 0.13 40);
+  --term-ok: oklch(0.72 0.13 150);
   color-scheme: dark;
 }
 
@@ -310,85 +366,6 @@
   .animate-enter {
     animation: none;
   }
-}
-
-/* Rendered-document styles for the landing demo. */
-.demo-doc {
-  max-width: 64ch;
-  font-size: var(--text-md);
-  line-height: 1.65;
-}
-.demo-doc h2 {
-  margin-top: 1.5rem;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--muted-foreground);
-}
-.demo-doc h2:first-child {
-  margin-top: 0;
-}
-.demo-doc p,
-.demo-doc ul,
-.demo-doc table {
-  margin-top: 0.5rem;
-}
-.demo-doc ul {
-  padding-left: 1.1rem;
-  list-style: disc;
-}
-.demo-doc li + li {
-  margin-top: 0.25rem;
-}
-.demo-doc table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--text-sm);
-}
-.demo-doc th,
-.demo-doc td {
-  padding: 0.45rem 0.75rem 0.45rem 0;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-}
-.demo-doc th {
-  font-weight: 500;
-  color: var(--muted-foreground);
-}
-.demo-doc .demo-checklist {
-  padding-left: 0;
-  list-style: none;
-}
-.demo-doc .demo-checklist li {
-  position: relative;
-  padding-left: 1.5rem;
-}
-.demo-doc .demo-checklist li::before {
-  content: "";
-  position: absolute;
-  top: 0.3rem;
-  left: 0;
-  width: 0.9rem;
-  height: 0.9rem;
-  border: 1px solid var(--input);
-  border-radius: 3px;
-}
-.demo-doc .demo-checklist li[data-done]::before {
-  background: var(--foreground);
-  border-color: var(--foreground);
-}
-.demo-doc .demo-checklist li[data-done]::after {
-  content: "";
-  position: absolute;
-  top: 0.42rem;
-  left: 0.32rem;
-  width: 0.3rem;
-  height: 0.5rem;
-  border: solid var(--background);
-  border-width: 0 1.5px 1.5px 0;
-  transform: rotate(45deg);
-}
-.demo-doc .demo-checklist li[data-done] {
-  color: var(--muted-foreground);
 }
 
 /*
