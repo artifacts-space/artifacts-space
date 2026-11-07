@@ -107,6 +107,20 @@ Artifacts are identified by their 22-character public id, the same one as in
 content. Comment guardrails live in `src/lib/comments/config.ts`, and rate
 limits in `src/lib/abuse/limits.ts`.
 
+### Add the agent skill
+
+The skill teaches your agent when to save plans, decisions, research, and
+handoffs, how to update an artifact instead of starting a new one, and how to
+answer comments safely. Run it in your project after you connect the MCP server:
+
+```bash
+npx skills add artifacts-space/skills
+```
+
+It works with Claude Code, Cursor, Codex, OpenCode, and the other agents that
+skills.sh supports. Add `-g` to install it for every project. The skill gives
+guidance, not access: your agent still needs the MCP connection above.
+
 ## Self-hosting
 
 You need Node.js 20.12 or later, pnpm 10, a Postgres database (Neon works out of
