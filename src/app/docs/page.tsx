@@ -39,6 +39,7 @@ export default function DocsIntroduction() {
           <li>a <strong>title</strong>, an optional <strong>summary</strong>, and its <strong>content</strong>;</li>
           <li>a <strong>format</strong> that decides how the content is checked and shown;</li>
           <li>optional <code>project</code>, <code>sessionId</code>, and <code>source</code> fields, so you can find an agent&apos;s work later;</li>
+          <li>an optional <Link href={docsHref("themes")}>theme</Link>, which gives the artifact and its page their own colors and fonts;</li>
           <li>a permanent link: <code>artifacts.space/artifact/&lt;22-character id&gt;</code>. The link never changes when the artifact is edited or shared.</li>
         </ul>
         <p>Artifacts are private by default. Only the author can read a private artifact, even inside a team.</p>

@@ -1,7 +1,12 @@
+import Link from "next/link";
+
 import { CodeSnippet } from "@/components/code/code-snippet";
 import { DocsH, FactTable, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
+import { ThemePresetGallery } from "@/components/docs/theme-preset-gallery";
 import { docsMetadata } from "@/lib/docs/metadata";
+import { docsHref } from "@/lib/docs/pages";
+import { classicThemeJson, lowContrastMessage, themeFieldRows, themeLimitRows, themeMcpExamples, themesListExample } from "@/lib/docs/theme-docs";
 import { contrastPairs, modeLightness } from "@/lib/themes/contrast";
 import { syntaxMinimum } from "@/lib/themes/derive";
 import { fontIdsFor, themeFonts, type FontRole } from "@/lib/themes/fonts";
@@ -16,11 +21,11 @@ const colorRows: [string, string, string][] = [
   ["background", "--background", "The page behind the artifact (the backdrop)."],
   ["foreground", "--foreground, --card-foreground", "Body text and headings."],
   ["mutedForeground", "--muted-foreground", "Secondary text: captions, labels, table heads."],
-  ["card", "--card, --popover", "Cards, panels, and frames that sit on the page."],
-  ["cardEdge", "--card-edge, --code-border", "The hairline edge of a card. May be transparent, such as oklch(0.2 0 0 / 0.09)."],
+  ["card", "--card, --popover", "Cards, panels, and frames on the page."],
+  ["cardEdge", "--card-edge, --code-border", "The hairline edge of a card. It can be transparent, such as oklch(0.2 0 0 / 0.09)."],
   ["accent", "--primary", "Primary buttons and the strongest marks."],
   ["accentForeground", "--primary-foreground", "Text on the accent."],
-  ["chart", "--series-1 … --series-8", `${String(CHART_MIN)} to ${String(CHART_MAX)} chart colors, in order. Shorter palettes repeat.`],
+  ["chart", "--series-1 … --series-8", `${String(CHART_MIN)} to ${String(CHART_MAX)} chart colors, in order. A shorter palette repeats.`],
 ];
 
 const roleNames: Record<FontRole, string> = { body: "Body", heading: "Headings", mono: "Code" };
@@ -29,59 +34,101 @@ function slots(id: string): string {
   return (["body", "heading", "mono"] as const).filter((role) => fontIdsFor(role).some((item) => item === id)).map((role) => roleNames[role]).join(", ");
 }
 
-function presetFonts(fonts: { body?: string | undefined; heading?: string | undefined; mono?: string | undefined } | undefined): string {
-  const name = (id: string | undefined, fallback: string) => themeFonts.find((font) => font.id === (id ?? fallback))?.family ?? fallback;
-  return `${name(fonts?.heading, "geist-sans")} / ${name(fonts?.body, "geist-sans")} / ${name(fonts?.mono, "geist-mono")}`;
-}
-
 const kb = (bytes: number) => (bytes === 0 ? "Always loaded" : `${(bytes / 1024).toFixed(1)} KB`);
 
-const classic = themePresets.find((preset) => preset.id === "classic");
-const exampleJson = JSON.stringify({ ...classic?.theme, mode: "auto" }, null, 2);
-const mcpExample = JSON.stringify({ id: "Vq3kJ0pXw2mZ8rT5yN1aBc", theme: "editorial" }, null, 2);
-
-/** The theme reference: tokens, presets, fonts, and the rules a theme must pass. */
+/** The theme guide and reference: presets, the picker, MCP, theme JSON, and the rules every theme passes. */
 export default function ThemesPage() {
   return (
     <RegistryPage slug={page}>
       <DocsH page={page} id="overview" />
       <Prose>
-        <p>A theme is a small set of design tokens for one artifact: colors for light and dark, a chart palette, a corner radius, and three fonts. It changes the artifact and the page behind it. The site header, comments, and controls keep the standard look.</p>
-        <p>An artifact uses its own theme first, then its team&apos;s default theme, then the site default. A theme is either a preset id, such as <code>&quot;paper&quot;</code>, or theme JSON as described below. A theme that does not pass validation is never saved.</p>
-        <p>Theme values never become raw CSS. Each value is parsed, checked, and written back in one canonical form, then set as a CSS custom property on the artifact&apos;s wrapper. Every card, chart, code block, diagram, and table inside picks the theme up from those properties.</p>
+        <p>A theme gives one artifact its own look. A long report can read like a printed page, and a dashboard can match your brand. Every theme passes WCAG AA contrast in light and dark, so every reader can read it.</p>
+        <p>A theme changes these parts:</p>
+        <ul>
+          <li>The colors of the content: text, cards, buttons, charts, code, diagrams, and tables.</li>
+          <li>The page behind the artifact (the backdrop).</li>
+          <li>The corner radius and the fonts.</li>
+        </ul>
+        <p>The site header, the comments, and the controls keep the standard look, so readers always know where they are. The theme applies for every reader of the artifact.</p>
+        <p>A theme is a preset id, such as <code>&quot;paper&quot;</code>, or theme JSON. An artifact with no theme uses the Default look. Every format can have a theme.</p>
+        <p>Theme values never become raw CSS. The server checks each value and writes it again in one standard form. The page sets each value as a CSS custom property on the artifact&apos;s wrapper, and every card, chart, code block, diagram, and table inside reads it.</p>
       </Prose>
+
+      <DocsH page={page} id="presets" />
+      <Prose>
+        <p>There are {themePresets.length} presets. Each sample below uses the same theme engine as the artifact page, so you see what readers get. Copy an id and pass it as <code>theme</code>.</p>
+      </Prose>
+      <ThemePresetGallery />
 
       <DocsH page={page} id="artifact" />
       <Prose>
-        <p>Each artifact can have its own theme. With none, it uses the default look. The theme changes the artifact and the page behind it, for every reader, and its colors show in the artifact&apos;s link preview card.</p>
+        <p>People set a theme in the web app. Agents set it over MCP. Both save the theme the same way, as part of the artifact&apos;s history.</p>
       </Prose>
 
       <DocsH page={page} id="web" />
       <Prose>
-        <p>People who can edit an artifact see <strong>Theme</strong> beside the icon above its title. It opens the presets as swatches, each with its colors, its name, and its fonts. Pick one to apply it, or pick Default to go back to the standard look. Arrow keys move between swatches, and Enter or Space picks one. The New artifact dialog has the same picker. Readers never see the control, only the theme.</p>
-        <p>A page loads a theme&apos;s fonts only when it uses that theme. The picker loads each preset&apos;s fonts only while it is open.</p>
+        <p>If you can edit an artifact, you see <strong>Theme</strong> beside the icon above its title. On a computer, it shows when you point at the title. On a touch screen, it always shows. When the artifact has a theme, the button shows the theme&apos;s name.</p>
+        <p>Select it to open the presets as live samples, each with its name and fonts. Select a preset to apply it at once. Select Default to go back to the standard look. The arrow keys, Home, and End move between samples, and Enter or Space selects one.</p>
+        <p>The picker shows presets only. Agents can also set theme JSON over MCP. Then the picker tells you that the artifact has a custom theme, and a preset you select replaces it.</p>
+        <p>Readers do not see the control. They see only the theme.</p>
+      </Prose>
+
+      <DocsH page={page} id="new" />
+      <Prose>
+        <p>The <strong>New artifact</strong> dialog has a <strong>Theme</strong> field with the same picker. The artifact starts with the preset you select. Keep Default for the standard look.</p>
       </Prose>
 
       <DocsH page={page} id="mcp" />
       <Prose>
-        <p>Agents set <code>theme</code> on <code>artifacts_create</code> or <code>artifacts_update</code>, on artifacts they can edit. It takes a preset id, such as <code>&quot;paper&quot;</code>, or theme JSON as described below. Pass <code>null</code> or <code>&quot;&quot;</code> on update to remove it. <code>artifacts_get</code> and <code>artifacts_list</code> return the stored value. Call <code>themes_list</code> for the presets with their fonts, and the font ids custom theme JSON may use.</p>
-        <p>A theme that fails validation is refused before anything is saved. The error lists every problem with its path. When contrast fails, it also gives the nearest passing color for each failing text color, which you can use as is. Agents cannot create or change presets.</p>
+        <p>Agents set <code>theme</code> on <code>artifacts_create</code> or <code>artifacts_update</code>, on artifacts they can edit. The value is one of these:</p>
+        <ul>
+          <li>A preset id, such as <code>&quot;paper&quot;</code>.</li>
+          <li>Theme JSON, as described in <a href="#tokens">Theme JSON</a>.</li>
+          <li><code>null</code> or <code>&quot;&quot;</code> on update, to remove the theme. The page goes back to the Default look.</li>
+        </ul>
+        <p>Leave out <code>theme</code> to keep the current theme. <code>artifacts_get</code> and <code>artifacts_list</code> return the stored value: a preset id, theme JSON in its standard form, or <code>null</code>. <code>artifacts_versions</code> shows the theme of each version.</p>
       </Prose>
-      <CodeSnippet title="artifacts_update" language="json" code={mcpExample} className="mt-4" />
+      <CodeSnippet title="Create with a preset" language="json" code={themeMcpExamples.createWithPreset} className="mt-4" />
+      <CodeSnippet title="Update with theme JSON" language="json" code={themeMcpExamples.updateWithJson} className="mt-4" />
+      <CodeSnippet title="Remove the theme" language="json" code={themeMcpExamples.clear} className="mt-4" />
+      <Prose>
+        <p>A theme that fails validation stops the whole call: nothing is saved. The error lists every problem, and for low contrast it gives colors that pass. See <a href="#suggestions">Suggested colors</a>. Agents cannot make or change presets.</p>
+      </Prose>
+
+      <DocsH page={page} id="themes-list" />
+      <Prose>
+        <p><code>themes_list</code> returns each preset with its id, name, look, mode, and fonts. It also returns the font ids that theme JSON can use in each slot. It saves nothing, and read-only connections can use it. See the <Link href={docsHref("mcp", "themes_list")}>MCP reference</Link>.</p>
+      </Prose>
+      <CodeSnippet title="themes_list result, abridged" language="json" code={themesListExample()} className="mt-4" />
 
       <DocsH page={page} id="history" />
       <Prose>
-        <p>A theme change is saved as a new version, like a title or icon change, so History shows it and Restore brings an older theme back. On a link or public artifact shared through a team, a theme change waits for a team owner or admin to approve it, exactly like a title change. Until then, readers outside the team see the approved theme. Agents never approve.</p>
+        <p>A theme change is saved as a new version, like a title or icon change. History shows it, and Restore brings an older theme back.</p>
+        <p>On a link or public artifact shared through a team, a theme change by a member or an agent waits for a team owner or admin to approve it, like a title change. Until then, readers outside the team see the approved theme. Owners and admins see the old and new theme names on the team page. Agents never approve. See <Link href={docsHref("sharing", "edits")}>Edits to shared artifacts</Link>.</p>
+      </Prose>
+
+      <DocsH page={page} id="outside" />
+      <Prose>
+        <p>The theme also shows where the artifact appears away from its page.</p>
+      </Prose>
+      <DocsH page={page} id="markdown" />
+      <Prose>
+        <p>The Markdown version of an artifact (<code>/artifact/&lt;id&gt;.md</code>) names its theme in the header, as <code>- Theme: Paper</code>, or <code>- Theme: Custom</code> for theme JSON. An artifact with no theme has no Theme line. See <Link href={docsHref("mcp", "markdown")}>Read artifacts without MCP</Link>.</p>
+      </Prose>
+      <DocsH page={page} id="previews" />
+      <Prose>
+        <p>The link preview card of a link or public artifact uses the colors of the approved theme&apos;s light palette. The text on the card stays in Geist, because preview images cannot use the theme fonts.</p>
       </Prose>
 
       <DocsH page={page} id="tokens" />
       <Prose>
-        <p>Theme JSON has <code>version</code> (always <code>1</code>), a <code>light</code> and a <code>dark</code> palette, and optional <code>radius</code>, <code>fonts</code>, and <code>mode</code>. Unknown keys are refused.</p>
+        <p>Theme JSON is an object with these keys. Unknown keys are refused at every level.</p>
       </Prose>
+      <FactTable head={["Key", "Value", "Rule"]} rows={themeFieldRows} mono={[0, 1]} />
 
       <DocsH page={page} id="colors" />
       <Prose>
-        <p>Each palette has these keys. Colors may be hex (<code>#1d4ed8</code>), <code>rgb()</code>, <code>hsl()</code>, or <code>oklch()</code>, and are stored as <code>oklch()</code>. Quieter surfaces (muted fills, borders, the code background, diagram lines) are mixed from these colors, and code syntax colors keep their hues but are adjusted until they read clearly on the code background.</p>
+        <p>Each palette has these keys. Colors can be hex (<code>#1d4ed8</code>), <code>rgb()</code>, <code>hsl()</code>, or <code>oklch()</code>, and are stored as <code>oklch()</code>. Quieter surfaces (muted fills, borders, the code background, and diagram lines) are mixed from these colors. Code syntax colors keep their hues but change in lightness until they are clear on the code background.</p>
       </Prose>
       <FactTable head={["Key", "Sets", "Used for"]} rows={colorRows} mono={[0, 1]} />
 
@@ -94,7 +141,7 @@ export default function ThemesPage() {
 
       <DocsH page={page} id="fonts" />
       <Prose>
-        <p>A theme picks a <code>body</code>, a <code>heading</code>, and a <code>mono</code> font by id. Display faces are for headings only, and mono faces are for code only. Every face is served from artifacts.space, and a page loads a face only when its theme uses it. The size is the upright latin file a reader downloads.</p>
+        <p>A theme sets a <code>body</code>, a <code>heading</code>, and a <code>mono</code> font by id. Display faces are for headings only, and mono faces are for code only. The size is the upright latin file that a reader downloads.</p>
       </Prose>
       <FactTable head={["Id", "Font", "Slots", "Size"]} rows={themeFonts.map((font) => [font.id, font.family, slots(font.id), kb(font.bytes)])} mono={[0]} />
 
@@ -103,39 +150,47 @@ export default function ThemesPage() {
         <p>Readers keep their own light or dark choice, so every theme has both palettes. Set <code>mode</code> to lock one: {themeModes.map((mode, index) => <span key={mode}>{index > 0 ? ", " : ""}<code>&quot;{mode}&quot;</code></span>)}. The default is <code>&quot;auto&quot;</code>, which follows the reader.</p>
       </Prose>
 
-      <DocsH page={page} id="presets" />
-      <FactTable head={["Id", "Name", "Headings / body / code", "Look"]} rows={themePresets.map((preset) => [preset.id, preset.name, presetFonts(preset.theme.fonts), preset.description])} mono={[0]} />
+      <DocsH page={page} id="limits" />
+      <FactTable head={["Limit", "Value"]} rows={themeLimitRows} mono={[0]} />
 
       <DocsH page={page} id="validation" />
       <Prose>
         <ul>
           <li>Known keys only, at every level. <code>version</code> must be <code>1</code>.</li>
           <li>Colors must be hex, <code>rgb()</code>, <code>hsl()</code>, or <code>oklch()</code>, with channels in range. Named colors, <code>url()</code>, <code>var()</code>, <code>expression()</code>, comments, braces, and <code>;</code> are refused.</li>
-          <li>Only <code>cardEdge</code> may be transparent. Every other color must be opaque, so contrast can be measured.</li>
-          <li>The light palette&apos;s background and card need an oklch lightness of at least {modeLightness.light.min}; the dark palette&apos;s, at most {modeLightness.dark.max}.</li>
+          <li>Only <code>cardEdge</code> can be transparent. Every other color must be opaque, so its contrast can be measured.</li>
+          <li>In the light palette, the background and the card need an oklch lightness of at least {modeLightness.light.min}. In the dark palette, they need at most {modeLightness.dark.max}.</li>
           <li>Fonts must come from the list above and suit their slot.</li>
-          <li>Each problem comes back with the path of the value at fault, such as <code>dark.mutedForeground</code> or <code>fonts.body</code>.</li>
+          <li>Each problem comes back with the path of the bad value, such as <code>dark.mutedForeground</code> or <code>fonts.body</code>.</li>
         </ul>
       </Prose>
 
       <DocsH page={page} id="contrast" />
       <Prose>
-        <p>Every theme must pass WCAG AA contrast in both palettes. A theme that fails is refused, never adjusted silently, and the message names the pair and its ratio, for example: <code>dark.mutedForeground on dark.card is 3.84:1; secondary text on cards needs at least 4.5:1 (WCAG AA).</code></p>
+        <p>Every theme must pass WCAG AA contrast in both palettes. A theme that fails is refused. It is never changed without notice. The message names the pair and its ratio.</p>
       </Prose>
       <FactTable head={["Text", "On", "Minimum", "Why"]} rows={contrastPairs.map((pair) => [pair.text, pair.surface, `${String(pair.minimum)}:1`, pair.use])} mono={[0, 1, 2]} />
       <Note title="Code colors">
-        Syntax colors are derived, not set. Each reaches {String(syntaxMinimum.keyword)}:1 on the theme&apos;s code background ({String(syntaxMinimum.comment)}:1 for comments and punctuation).
+        Syntax colors come from the theme. You do not set them. Each reaches {String(syntaxMinimum.keyword)}:1 on the theme&apos;s code background ({String(syntaxMinimum.comment)}:1 for comments and punctuation).
       </Note>
+
+      <DocsH page={page} id="suggestions" />
+      <Prose>
+        <p>When contrast fails, the error also gives the nearest passing color for each failing text color. The fix moves only the lightness of the text colors and the accent, away from their surface. It never changes a background or a card. Use the suggested colors as given, and the theme passes.</p>
+        <p>This is the real error for the Classic preset with secondary text that is too faint in both palettes:</p>
+      </Prose>
+      <CodeSnippet title="Error text" language="text" code={lowContrastMessage()} wrap className="mt-4" />
 
       <DocsH page={page} id="example" />
       <Prose>
         <p>The Classic preset as theme JSON. Leave out <code>radius</code>, <code>fonts</code>, or <code>mode</code> to use the defaults: <code>&quot;md&quot;</code>, Geist and Geist Mono, and <code>&quot;auto&quot;</code>.</p>
       </Prose>
-      <CodeSnippet title="theme.json" language="json" code={exampleJson} className="mt-4" />
+      <CodeSnippet title="theme.json" language="json" code={classicThemeJson} className="mt-4" />
 
       <DocsH page={page} id="vendoring" />
       <Prose>
-        <p>Every theme font except Geist is vendored from Google Fonts under the SIL Open Font License and stored in the repository under <code>public/fonts/v1/&lt;id&gt;/</code>: the latin woff2 files, a small <code>font.css</code>, and the font&apos;s license. Readers&apos; browsers never contact another site for a font.</p>
+        <p>A page loads only the fonts of the theme it shows. A page with no theme loads only Geist, the site font. The picker loads each preset&apos;s fonts only while it is open, and the samples on this page load their fonts when you scroll to them.</p>
+        <p>Every theme font except Geist comes from Google Fonts under the SIL Open Font License. The files are stored in the repository under <code>public/fonts/v1/&lt;id&gt;/</code>: the latin woff2 files, a small <code>font.css</code>, and the font&apos;s license. Readers&apos; browsers never get a font from another site.</p>
       </Prose>
     </RegistryPage>
   );

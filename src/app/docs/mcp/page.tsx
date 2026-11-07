@@ -195,7 +195,7 @@ export default function McpReferencePage() {
 
       <DocsH page={page} id="markdown" />
       <Prose>
-        <p>Every artifact link also works for agents without an MCP connection. Ask for Markdown and you get the artifact as clean Markdown instead of the web page: a short header (title, format, author, last update, version, link), then the content. Tables stay tables, JSON and code come in fenced blocks, CSV becomes a table with a link to the raw file, and interfaces (ui) become headings, lists, and tables.</p>
+        <p>Every artifact link also works for agents without an MCP connection. Ask for Markdown and you get the artifact as clean Markdown instead of the web page: a short header (title, format, theme, author, last update, version, link), then the content. Tables stay tables, JSON and code come in fenced blocks, CSV becomes a table with a link to the raw file, and interfaces (ui) become headings, lists, and tables.</p>
       </Prose>
       <CodeSnippet title="Fetch an artifact as Markdown" language="bash" code={markdownExamples} className="mt-4" />
       <FactTable
