@@ -15,6 +15,10 @@ export const kindFieldDescription = [
   ...artifactKinds.map((kind) => `${kind}: ${formatInfo[kind].agent}`),
 ].join("\n");
 
+/** How agents set an artifact's page icon, in any format. */
+export const ICON_GUIDE =
+  'Any format can carry a page icon beside its title: set `icon` on artifacts_create or artifacts_update to one emoji (such as "🧪") or "tabler:<name>" (such as "tabler:rocket"; the field description lists every allowed name). Pass null or "" on update to remove it.';
+
 function text(value: string) {
   return { content: [{ type: "text" as const, text: value }] };
 }
@@ -25,7 +29,7 @@ export function formatGuide(kind?: FormatKind): string {
   if (kind) return `${formatInfo[kind].label} (${kind}): ${formatInfo[kind].agent}`;
   const lines = artifactKinds.map((item) => `- ${item}: ${formatInfo[item].agent}`);
   const uiHint = (artifactKinds as readonly string[]).includes("ui") ? ['', 'For rich pages, call artifacts_formats_guide with kind "ui" to get the component reference and an example.'] : [];
-  return ["Artifact formats:", ...lines, ...uiHint].join("\n");
+  return ["Artifact formats:", ...lines, ...uiHint, "", ICON_GUIDE].join("\n");
 }
 
 /** Validation feedback for agents, in plain text. */

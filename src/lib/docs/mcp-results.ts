@@ -16,7 +16,7 @@ export interface ToolResultDoc {
 const artifactShape = `{
   "id": "Vq3kJ0pXw2mZ8rT5yN1aBc",   // 22-character public id
   "url": "https://artifacts.space/artifact/Vq3kJ0pXw2mZ8rT5yN1aBc",
-  "title": "…", "summary": "…", "content": "…",
+  "title": "…", "icon": "🚀" | "tabler:rocket" | null, "summary": "…", "content": "…",
   "kind": "markdown", "language": "", "project": "…", "sessionId": "…", "source": "claude-code",
   "visibility": "private" | "team" | "link" | "public",
   "team": "acme" | null,                 // slug, only when you are a member
@@ -63,7 +63,7 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   artifacts_versions: {
     summary: "Without `version`: the saved versions, newest first. With `version`: that one version with its content, summary, and language.",
     shape: `[ { "id", "createdAt", "savedAt", "saveKind": "create" | "edit" | "files" | "restore" | "snapshot",
-    "restoredFromId", "bytes", "kind", "title", "approved", "pending", "latest",
+    "restoredFromId", "bytes", "kind", "title", "icon", "approved", "pending", "latest",
     "savedBy": { "handle", "kind": "person" | "agent" } | null } ]`,
   },
   artifacts_restore_version: {

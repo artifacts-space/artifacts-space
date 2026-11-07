@@ -11,6 +11,10 @@ describe("formatGuide", () => {
     for (const kind of artifactKinds) expect(guide).toContain(`- ${kind}:`);
   });
 
+  it("should explain page icons when no kind is given", () => {
+    expect(formatGuide()).toContain("tabler:rocket");
+  });
+
   it("should include rules, the generated component list, and the example when the kind is ui", () => {
     const guide = formatGuide("ui");
     expect(guide).toContain("## Rules");

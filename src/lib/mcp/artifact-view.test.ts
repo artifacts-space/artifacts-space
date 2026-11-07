@@ -8,6 +8,7 @@ const dto: ArtifactDto = {
   id: "internal-uuid",
   publicId: "4fXkP9qR2sT7vW1yZ3aB5c",
   title: "Plan",
+  icon: "🧭",
   summary: "",
   content: "# Plan",
   kind: "markdown",
@@ -59,6 +60,11 @@ describe("toMcpArtifact", () => {
     const item = toMcpListItem({ ...dto, preview: "# Pl" }, context("author"));
     expect(item.content).toBeUndefined();
     expect(item.preview).toBe("# Pl");
+  });
+
+  it("should return the icon when the artifact is read or listed", () => {
+    expect(toMcpArtifact(dto, context("author")).icon).toBe("🧭");
+    expect(toMcpListItem({ ...dto, icon: null, preview: "" }, context("author")).icon).toBeNull();
   });
 
   it("should name who saved it last by handle", () => {
