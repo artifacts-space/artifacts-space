@@ -83,15 +83,32 @@ export interface FormatSample {
   language?: string;
 }
 
+/** A service report big enough to show sorting and filtering: text, numbers, dates, blanks, and a quoted comma. */
+const serviceReportCsv = [
+  "service,owner,region,p95_ms,error_rate,requests,last_deploy,status",
+  "billing,dana,eu-west-1,182,0.4%,\"1,204,330\",2026-11-06,healthy",
+  "search,lin,us-east-1,95,0.1%,\"3,880,120\",2026-11-05,healthy",
+  "checkout,ada,eu-west-1,412,2.3%,\"902,450\",2026-11-07,degraded",
+  "auth,grace,us-west-2,61,0.0%,\"5,120,004\",2026-10-30,healthy",
+  "notifications,alan,eu-central-1,240,1.1%,\"640,980\",2026-11-02,healthy",
+  "media,dana,us-east-1,1310,4.8%,\"220,415\",2026-11-07,incident",
+  "reports,lin,ap-south-1,,,\"12,300\",2026-09-18,paused",
+  "inventory,ada,eu-west-1,156,0.3%,\"1,010,872\",2026-11-04,healthy",
+  "recommendations,grace,us-west-2,388,0.9%,\"2,450,600\",2026-11-01,healthy",
+  "ledger,alan,eu-central-1,97,0.0%,\"780,019\",2026-11-06,healthy",
+  "\"exports, nightly\",dana,us-east-1,2040,3.2%,\"8,912\",2026-10-28,degraded",
+  "gateway,lin,global,44,0.2%,\"9,402,775\",2026-11-07,healthy",
+].join("\n");
+
 const checkoutNotes = "Screenshots and the metrics export from the **Checkout v2** review on Nov 6.";
 
-/** Content for each format viewer. Reuses the Formats docs examples, except ui and file. */
+/** Content for each format viewer. Reuses the Formats docs examples, except csv, ui, and file. */
 export const formatSamples: Record<FormatKind, FormatSample> = {
   markdown: { format: "markdown", content: formatDocs.markdown.example },
   code: { format: "code", content: formatDocs.code.example, language: "typescript" },
   text: { format: "text", content: formatDocs.text.example },
   json: { format: "json", content: formatDocs.json.example },
-  csv: { format: "csv", content: formatDocs.csv.example },
+  csv: { format: "csv", content: serviceReportCsv },
   svg: { format: "svg", content: formatDocs.svg.example },
   mermaid: { format: "mermaid", content: formatDocs.mermaid.example },
   ui: { format: "ui", content: JSON.stringify(checkoutRolloutSpec) },

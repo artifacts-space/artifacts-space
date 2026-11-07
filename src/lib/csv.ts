@@ -156,3 +156,53 @@ export function parseCsv(text: string, options: CsvParseOptions = {}): CsvParseR
     errors,
   };
 }
+
+/** How a CSV file writes records, so a save keeps the file's own style. */
+export interface CsvTextStyle {
+  delimiter: CsvDelimiter;
+  /** The line break between records. */
+  newline: "\n" | "\r\n";
+  /** True when the last record ends with a line break. */
+  trailingNewline: boolean;
+}
+
+/** Reads the separator, line break, and final line break that `text` uses. */
+export function csvTextStyle(text: string): CsvTextStyle {
+  return {
+    delimiter: detectDelimiter(text),
+    newline: text.includes("\r\n") ? "\r\n" : "\n",
+    trailingNewline: text.endsWith("\n") || text.endsWith("\r"),
+  };
+}
+
+const quoteTrigger = /["\r\n]/;
+
+/** One field, quoted when it holds the separator, a quote, or a line break. Quotes inside are doubled. */
+export function serializeCsvField(field: string, delimiter: CsvDelimiter = ","): string {
+  if (!field.includes(delimiter) && !quoteTrigger.test(field)) return field;
+  return `"${field.replaceAll('"', '""')}"`;
+}
+
+/** Any separator the parser might detect. Header fields holding one are quoted, so detection stays right. */
+const anySeparator = /[,;\t]/;
+
+function serializeRecord(record: readonly string[], delimiter: CsvDelimiter, isHeader: boolean): string {
+  // A lone empty field would read back as a blank line, which is not a record.
+  if (record.length === 0 || (record.length === 1 && record[0] === "")) return '""';
+  const field = (value: string) => (isHeader && anySeparator.test(value) ? `"${value.replaceAll('"', '""')}"` : serializeCsvField(value, delimiter));
+  return record.map(field).join(delimiter);
+}
+
+/**
+ * Writes a header and rows as RFC 4180 CSV. Fields are quoted only when they
+ * must be, so `parseCsv(serializeCsv(header, rows))` gives back the same
+ * header and rows. Ragged rows stay ragged. Header names that hold any
+ * separator are quoted too, so the file's separator is still detected.
+ */
+export function serializeCsv(header: readonly string[], rows: readonly (readonly string[])[], style: Partial<CsvTextStyle> = {}): string {
+  const delimiter = style.delimiter ?? ",";
+  const newline = style.newline ?? "\r\n";
+  if (header.length === 0 && rows.length === 0) return "";
+  const text = [header, ...rows].map((record, index) => serializeRecord(record, delimiter, index === 0)).join(newline);
+  return style.trailingNewline ? text + newline : text;
+}

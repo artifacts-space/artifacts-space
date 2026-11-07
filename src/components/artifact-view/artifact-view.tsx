@@ -33,7 +33,8 @@ import { FileArtifactView } from "./file-artifact-view";
 import { ArtifactFilesProvider } from "./files-context";
 import { MarkdownView } from "./markdown-view";
 import { MermaidView } from "./mermaid-view";
-import { CodeView, CsvView, JsonView, SvgView, TextView } from "./source-views";
+import { CsvView } from "./csv-view";
+import { CodeView, JsonView, SvgView, TextView } from "./source-views";
 import { UiView } from "./ui-view";
 import { ViewNotice } from "./view-notice";
 

@@ -43,6 +43,14 @@ describe("ArtifactView for csv and json", () => {
     expect(render("csv", content)).toContain("Showing the first 1,000 of 1,200 rows.");
   });
 
+  it("should render a csv as a grid with sortable headers and a row count", () => {
+    const html = render("csv", "name,score\nAda,10\nLin,9\n");
+    expect(html).toContain('role="grid"');
+    expect(html).toContain('aria-sort="none"');
+    expect(html).toContain("Showing 2 of 2 rows");
+    expect(html).toContain("Filter rows in every column");
+  });
+
   it("should show invalid json as written with a notice", () => {
     const html = render("json", "{ nope");
     expect(html).toContain("does not parse");

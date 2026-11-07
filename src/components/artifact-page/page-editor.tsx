@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { formatInfo } from "@/lib/artifact-formats";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
+import { CsvContentEditor } from "./csv-content-editor";
 import { useLeaveGuard } from "./use-leave-guard";
 
 interface PageDraft {
@@ -129,16 +130,20 @@ export function PageEditor({ artifact, onClose }: PageEditorProps) {
         />
       </div>
       <div className="mt-6">
-        <ContentEditor
-          kind={artifact.kind}
-          value={draft.content}
-          onChange={change("content")}
-          title={draft.title}
-          language={artifact.language}
-          files={artifact.files}
-          label="Content"
-          autoFocus
-        />
+        {artifact.kind === "csv" ? (
+          <CsvContentEditor value={draft.content} onChange={change("content")} title={draft.title} files={artifact.files} label="Content" />
+        ) : (
+          <ContentEditor
+            kind={artifact.kind}
+            value={draft.content}
+            onChange={change("content")}
+            title={draft.title}
+            language={artifact.language}
+            files={artifact.files}
+            label="Content"
+            autoFocus
+          />
+        )}
       </div>
       <p className="mt-2 text-xs text-muted-foreground">Save with ⌘S or Ctrl+S. Every save is kept in the history.</p>
       <ConfirmDialog
