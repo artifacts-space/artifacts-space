@@ -15,7 +15,7 @@ import { mcpClients } from "@/lib/setup/client-installs";
  */
 export function ClientPicker({ origin }: { origin: string }) {
   return (
-    <Tabs defaultValue="claude-code" className="mt-6 min-w-0 gap-0 overflow-hidden rounded-lg border bg-card">
+    <Tabs defaultValue="claude-code" className="card-surface mt-6 min-w-0 gap-0 overflow-hidden">
       <div className="overflow-x-auto border-b">
         <TabsList variant="line" aria-label="Choose your agent" className="h-11 w-max min-w-full justify-start gap-5 px-4">
           {mcpClients.map((client) => (
