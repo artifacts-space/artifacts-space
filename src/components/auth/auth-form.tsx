@@ -4,6 +4,7 @@ import Link from "next/link";
 import { IconBrandGithub, IconLoader2, IconMailCheck } from "@tabler/icons-react";
 import { useState } from "react";
 
+import { ConsentNotice } from "@/components/legal-links";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -160,6 +161,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           Email me a sign-in link
         </Button>
       </form>
+      <ConsentNotice className="mt-4" />
 
       <p className="mt-6 text-sm text-muted-foreground">
         {text.switchPrompt}{" "}

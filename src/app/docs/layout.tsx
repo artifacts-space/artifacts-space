@@ -5,7 +5,7 @@ import { DocsMobileNav } from "@/components/docs/docs-mobile-nav";
 import { DocsSearch } from "@/components/docs/docs-search";
 import { DocsSidebar } from "@/components/docs/docs-sidebar";
 import { Logo } from "@/components/logo";
-import { ThemeSwitcher } from "@/components/theme-switcher";
+import { SiteFooter } from "@/components/site-footer";
 import { docsNavTree, docsSearchIndex } from "@/lib/docs/navigation";
 
 /** Every docs page is static: no request data, rendered once at build time. */
@@ -36,22 +36,6 @@ function DocsHeader() {
   );
 }
 
-function DocsFooter() {
-  return (
-    <footer className="border-t">
-      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <Logo />
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-4">
-          <Link href="/" className="transition-colors hover:text-foreground">Home</Link>
-          <Link href="/docs" className="transition-colors hover:text-foreground">Docs</Link>
-          <Link href="/sign-in" className="transition-colors hover:text-foreground">Sign in</Link>
-          <ThemeSwitcher />
-        </div>
-      </div>
-    </footer>
-  );
-}
-
 /** The docs shell: header with search, sidebar on wide screens (a sheet on phones), the page, and the footer. */
 export default function DocsLayout({ children }: LayoutProps<"/docs">) {
   return (
@@ -65,7 +49,7 @@ export default function DocsLayout({ children }: LayoutProps<"/docs">) {
         </aside>
         <main className="min-w-0 flex-1 lg:border-l lg:pl-10" id="docs-main">{children}</main>
       </div>
-      <DocsFooter />
+      <SiteFooter className="px-4 sm:px-6" />
     </div>
   );
 }
