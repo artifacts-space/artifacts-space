@@ -72,7 +72,7 @@ function Diagram({ title, diagram }: { title?: string | undefined; diagram: Rend
     <figure className="min-w-0">
       {title ? <figcaption className="mb-3 text-md font-medium">{title}</figcaption> : null}
       {/* justify-center-safe: when the diagram is wider than the frame, it starts at the left edge so all of it can be scrolled to. */}
-      <div className="flex min-h-24 justify-center-safe overflow-x-auto rounded-lg border bg-card px-4 py-6 sm:px-6">
+      <div className="flex min-h-24 justify-center-safe overflow-x-auto card-nested bg-card px-4 py-6 sm:px-6">
         {diagram ? (
           // eslint-disable-next-line @next/next/no-img-element -- a data URI image, which next/image cannot optimize
           <img
