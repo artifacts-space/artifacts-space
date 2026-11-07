@@ -57,11 +57,12 @@ export default function SelfHostingPage() {
 
       <DocsH page={page} id="database" />
       <Prose>
-        <p>The schema lives in <code>src/db/schema.ts</code> and <code>src/db/oauth-schema.ts</code>; migrations are SQL files in <code>drizzle/</code>, managed by drizzle-kit. Apply them before the first start and after every update:</p>
+        <p>The schema lives in <code>src/db/schema.ts</code> and <code>src/db/oauth-schema.ts</code>; migrations are SQL files in <code>drizzle/</code>, managed by drizzle-kit. On Vercel, every production build applies pending migrations before the new code goes live (see <Link href={docsHref(page, "vercel")}>Deploy on Vercel</Link>). Anywhere else, apply them before the first start and after every update:</p>
       </Prose>
       <CommandSnippet command="pnpm db:migrate" />
       <Prose>
         <p>Migrations use <code>DATABASE_URL_UNPOOLED</code> (the direct connection), and the app uses <code>DATABASE_URL</code>. On Neon, the Vercel integration sets both. drizzle-kit reads <code>.env.local</code> itself. Only the <code>public</code> schema is managed.</p>
+        <p>The old code keeps serving while a deploy migrates, so migrations stay additive: add columns and tables, backfill, then switch the code. <code>pnpm check</code> rejects drops, renames, type changes, and new required columns without a default.</p>
       </Prose>
 
       <DocsH page={page} id="auth" />
@@ -99,7 +100,7 @@ export default function SelfHostingPage() {
         <ol>
           <li>Import the repository into Vercel. It detects Next.js and pnpm.</li>
           <li>Add Neon from the Vercel Marketplace, which sets the database variables, and add the rest from the table above.</li>
-          <li>Run <code>pnpm db:migrate</code> against the production database, then deploy.</li>
+          <li>Deploy. The production build runs <code>scripts/migrate-on-deploy.mts</code> first: it applies pending migrations over <code>DATABASE_URL_UNPOOLED</code>, one build at a time. If a migration fails, the build fails and the previous deployment keeps serving. Preview and local builds skip this step, so an unmerged migration never reaches your database.</li>
           <li>Point your domain at the project and set <code>BETTER_AUTH_URL</code> to it.</li>
         </ol>
         <p><code>vercel.json</code> schedules two cleanup jobs. Vercel sends <code>CRON_SECRET</code> as a bearer token; requests without it are refused.</p>
