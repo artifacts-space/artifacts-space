@@ -17,10 +17,12 @@ and `/api/dev/sign-in` signs you in as a dev user.
 2. Keep each pull request to one change.
 3. Add or update Vitest tests next to the code you change. Name them
    "should X when Y".
-4. Run `pnpm check` and `pnpm build`. Both must pass. The pre-commit hook runs
-   `pnpm check`; do not skip it.
+4. Run `pnpm check` and `pnpm build`. Both must pass. The git hooks lint
+   staged files on commit and run `pnpm check` on push; do not skip them.
 5. Use conventional commit messages: `feat:`, `fix:`, `chore:`, `refactor:`,
-   `test:`.
+   `test:`, `docs:`. The pull request title becomes the commit on `main`, so it
+   follows the same format.
+6. CI must pass before the pull request enters the merge queue.
 
 ## Database changes
 

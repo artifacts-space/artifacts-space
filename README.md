@@ -197,8 +197,10 @@ pnpm db:migrate    # apply migrations
 pnpm db:studio     # inspect the database
 ```
 
-A Husky pre-commit hook runs `pnpm check`. The code standards, the Next.js 16.4
-notes, and the database tripwires are in [AGENTS.md](AGENTS.md).
+Husky git hooks lint staged files on commit, check commit messages, and run
+`pnpm check` on push. CI runs the same checks plus the build on every pull
+request. The code standards, the Next.js 16.4 notes, and the database
+tripwires are in [AGENTS.md](AGENTS.md).
 
 ## Contributing
 

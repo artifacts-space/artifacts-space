@@ -1,3 +1,7 @@
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+overrides:
+  # drizzle-kit's @esbuild-kit loader pins esbuild ~0.18, which has
+  # GHSA-67mh-4wv8-2f99. 0.25.12 is the version drizzle-kit itself uses.
+  "@esbuild-kit/core-utils>esbuild": 0.25.12
