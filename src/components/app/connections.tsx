@@ -13,6 +13,7 @@ import { ConnectedApps } from "@/components/app/connected-apps";
 import { McpToolsTable } from "@/components/app/mcp-tools-table";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { CodeBlock, CommandBlock } from "@/components/code-block";
+import { CursorInstallButton } from "@/components/setup/cursor-install-button";
 import { SkillInstall } from "@/components/setup/skill-install";
 import { TokenRevealDialog } from "@/components/tokens/token-reveal-dialog";
 import { Button } from "@/components/ui/button";
@@ -93,7 +94,10 @@ export function Connections({
           </div>
           <div className="grid gap-3 p-5">
             <CommandBlock command={claudeMcpAddOAuthCommand(origin)} />
-            <p className="text-sm leading-6 text-muted-foreground">For Cursor and other clients that support OAuth, add this to mcp.json.</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <CursorInstallButton origin={origin} />
+              <p className="text-sm leading-6 text-muted-foreground">Or, for other clients that support OAuth, add this to mcp.json.</p>
+            </div>
             <CodeBlock title="mcp.json" value={mcpOAuthConfigJson(origin)} />
           </div>
           <div className="border-t px-5 py-4">
