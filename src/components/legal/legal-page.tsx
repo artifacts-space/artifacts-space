@@ -38,7 +38,7 @@ function LegalHeader() {
     <header className="border-b">
       <div className="mx-auto flex h-14 w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6">
         <Logo />
-        <nav aria-label="Legal" className="flex items-center gap-5 text-sm text-muted-foreground">
+        <nav aria-label="Legal" className="flex items-center gap-5 text-sm font-medium text-muted-foreground">
           <Link href={legalPaths.privacy} className="transition-colors hover:text-foreground">Privacy</Link>
           <Link href={legalPaths.terms} className="transition-colors hover:text-foreground">Terms</Link>
           <Link href="/docs" className="hidden transition-colors hover:text-foreground sm:inline">Docs</Link>

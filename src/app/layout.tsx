@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     template: "%s · artifacts.space",
   },
   description:
-    "An open-source artifact hub for coding agents. Create, read, update, and share artifacts from any MCP client, across your team.",
+    "Keep your artifacts when you switch agents or accounts. Claude, Codex, Cursor, Devin, and any MCP client read and edit the same artifacts. Open source.",
   openGraph: {
     title: OG_WORDMARK,
     description: OG_DESCRIPTION,

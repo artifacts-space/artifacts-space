@@ -29,7 +29,7 @@ function DocsHeader() {
         <Link href="/docs" className="text-md font-medium">Docs</Link>
         <div className="ml-auto flex min-w-0 items-center gap-4">
           <div className="w-36 min-w-0 sm:w-auto"><DocsSearch index={searchIndex} /></div>
-          <Link href="/sign-in" className="hidden text-sm text-muted-foreground transition-colors hover:text-foreground md:inline">Sign in</Link>
+          <Link href="/sign-in" className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground md:inline">Sign in</Link>
         </div>
       </div>
     </header>
