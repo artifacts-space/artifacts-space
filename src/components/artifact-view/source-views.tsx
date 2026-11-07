@@ -57,7 +57,7 @@ export function CsvView({ content }: { content: string }) {
   ].filter((note): note is string => note !== null);
   return (
     <div className="min-w-0 space-y-3">
-      <div tabIndex={0} role="region" aria-label="CSV table" className="max-h-[70vh] overflow-auto rounded-md border focus-visible:outline-2 focus-visible:outline-ring">
+      <div tabIndex={0} role="region" aria-label="CSV table" className="max-h-[70vh] overflow-auto rounded-md border bg-card shadow-xs focus-visible:outline-2 focus-visible:outline-ring">
         <table className="w-full border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-card">
             <tr>
@@ -97,7 +97,7 @@ export function SvgView({ content, title }: { content: string; title: string }) 
     );
   }
   return (
-    <div className="flex min-w-0 justify-center rounded-md border bg-[repeating-conic-gradient(var(--muted)_0_25%,transparent_0_50%)] bg-size-[16px_16px] p-4">
+    <div className="flex min-w-0 justify-center rounded-md border bg-[repeating-conic-gradient(var(--muted)_0_25%,transparent_0_50%)] bg-size-[16px_16px] p-4 shadow-xs">
       {/* eslint-disable-next-line @next/next/no-img-element -- a data URI image, which next/image cannot optimize */}
       <img src={svgDataUri(content)} alt={title} className="h-auto max-h-[70vh] max-w-full" />
     </div>

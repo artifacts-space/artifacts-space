@@ -8,7 +8,7 @@ import { useArtifactFile, useArtifactFiles } from "./files-context";
 import { MarkdownView } from "./markdown-view";
 import { ViewNotice } from "./view-notice";
 
-const mediaClass = "w-full max-h-[70vh] rounded-md border bg-muted";
+const mediaClass = "w-full max-h-[70vh] rounded-md border bg-muted shadow-xs";
 
 /** How one file shows: in the page for images, PDFs, video, and audio, and always with a download card. */
 function FilePreview({ file }: { file: FileDto }) {
@@ -19,7 +19,7 @@ function FilePreview({ file }: { file: FileDto }) {
     return (
       <figure className="flex min-w-0 flex-col gap-2">
         {/* eslint-disable-next-line @next/next/no-img-element -- an access-checked redirect to R2, which next/image cannot optimize */}
-        <img src={url} alt={file.filename} loading="lazy" decoding="async" className="h-auto max-h-[70vh] max-w-full self-start rounded-md border bg-muted object-contain" />
+        <img src={url} alt={file.filename} loading="lazy" decoding="async" className="h-auto max-h-[70vh] max-w-full self-start rounded-md border bg-muted object-contain shadow-xs" />
         {card}
       </figure>
     );

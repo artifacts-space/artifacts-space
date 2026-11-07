@@ -66,7 +66,7 @@ export function GridView({ props, children }: ViewProps<"Grid">) {
 
 export function CardView({ props, children }: ViewProps<"Card">) {
   return (
-    <div className="flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-4 text-card-foreground sm:p-5">
+    <div className="flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-4 text-card-foreground shadow-sm sm:p-5">
       {props.title || props.description ? (
         <div className="space-y-1">
           {props.title ? <h3 className="text-base font-medium break-words">{props.title}</h3> : null}
@@ -105,7 +105,7 @@ export function TabsView({ props, children }: ViewProps<"Tabs">) {
 export function AccordionView({ props, children }: ViewProps<"Accordion">) {
   const panels = Children.toArray(children);
   return (
-    <Accordion defaultValue={props.openFirst ? [0] : []} multiple className="min-w-0 rounded-lg border px-4">
+    <Accordion defaultValue={props.openFirst ? [0] : []} multiple className="min-w-0 rounded-lg border bg-card px-4 shadow-xs">
       {props.items.map((item, index) => (
         <AccordionItem key={`${item.title}-${String(index)}`} value={index}>
           <AccordionTrigger className="min-w-0 break-words">{item.title}</AccordionTrigger>

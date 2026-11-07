@@ -5,10 +5,12 @@
 /*
  * Dark mode follows the `dark` class on <html>. A `.theme-invert` element
  * takes the opposite theme of the page (the landing demo's app surface), so
- * the dark variant flips inside it too, in step with its tokens below.
+ * the dark variant flips inside it too, in step with its tokens below. A
+ * `.light` element inside a dark page (the /preview page's light panels) turns
+ * the dark variant off below it; :where() keeps that from adding specificity.
  */
 @custom-variant dark {
-  &:is(.dark *):not(.dark .theme-invert, .dark .theme-invert *) {
+  &:is(.dark *):not(.dark .theme-invert, .dark .theme-invert *, :where(.dark .light *)) {
     @slot;
   }
   &:is(:root:not(.dark) .theme-invert, :root:not(.dark) .theme-invert *) {
@@ -39,10 +41,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* --font-backtick covers only U+0060; see layout.tsx. */
-  --font-sans: var(--font-backtick), "Satoshi", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-backtick), "Satoshi", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --color-brand: var(--brand);
   --color-hero-backdrop: var(--hero-backdrop);
   --color-kind-markdown: var(--kind-markdown);
@@ -118,6 +119,10 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --shadow-xs: var(--elevation-xs);
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+  --shadow-lg: var(--elevation-lg);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -131,9 +136,12 @@
  * reserved for focus rings and text selection.
  *
  * `.theme-invert` takes the other palette: light inside a dark page, dark
- * inside a light page. Each palette is still written once.
+ * inside a light page. Each palette is still written once. A `.light` or
+ * `.dark` class on any element re-scopes every token below it, whatever the
+ * page theme (the /preview page's panels).
  */
 :root,
+.light,
 .dark .theme-invert {
   --background: oklch(0.985 0.003 85);
   --foreground: oklch(0.2 0.006 60);
@@ -229,6 +237,19 @@
   --window-shadow: oklch(0.08 0.01 60 / 0.6);
   --window-dim: oklch(0.12 0.01 60 / 0.2);
   --window-edge: oklch(1 0 0 / 0.14);
+  /*
+   * Elevation: lift you feel more than see. Each step pairs a tight contact
+   * shadow with a soft ambient one, tinted with the warm ink. Use them through
+   * shadow-xs (inputs, frames), shadow-sm (cards, metrics), shadow-md
+   * (menus, popups, tooltips), and shadow-lg (dialogs). Flat inline elements
+   * (text, badges, separators, lists) get none. Dark mode swaps the tint for
+   * deeper black and adds a faint top highlight, since shadows barely show
+   * on a dark page.
+   */
+  --shadow-contact: oklch(0.2 0.01 60 / 0.06);
+  --shadow-ambient: oklch(0.2 0.01 60 / 0.04);
+  --shadow-ambient-strong: oklch(0.2 0.01 60 / 0.08);
+  --shadow-highlight: oklch(1 0 0 / 0);
   color-scheme: light;
 }
 
@@ -311,7 +332,25 @@
   --term-dim: oklch(0.54 0.007 95);
   --term-accent: oklch(0.68 0.13 40);
   --term-ok: oklch(0.72 0.13 150);
+  --shadow-contact: oklch(0 0 0 / 0.3);
+  --shadow-ambient: oklch(0 0 0 / 0.22);
+  --shadow-ambient-strong: oklch(0 0 0 / 0.4);
+  --shadow-highlight: oklch(1 0 0 / 0.045);
   color-scheme: dark;
+}
+
+/*
+ * Composite shadows, declared on every scope so they pick up that scope's
+ * shadow colors (a custom property resolves its var()s where it is declared).
+ */
+:root,
+.light,
+.dark,
+.theme-invert {
+  --elevation-xs: 0 1px 2px 0 var(--shadow-contact);
+  --elevation-sm: 0 1px 2px 0 var(--shadow-contact), 0 2px 8px -2px var(--shadow-ambient), inset 0 1px 0 0 var(--shadow-highlight);
+  --elevation-md: 0 1px 3px 0 var(--shadow-contact), 0 8px 20px -6px var(--shadow-ambient-strong), inset 0 1px 0 0 var(--shadow-highlight);
+  --elevation-lg: 0 2px 4px 0 var(--shadow-contact), 0 20px 44px -12px var(--shadow-ambient-strong), inset 0 1px 0 0 var(--shadow-highlight);
 }
 
 @layer base {

@@ -54,7 +54,7 @@ function CardMeta({ card }: { card: BoardCard }) {
 function Card({ card }: { card: BoardCard }) {
   const badges = card.badges ?? [];
   return (
-    <li className={cn("min-w-0 space-y-1.5 rounded-md border bg-background px-3 py-2.5 shadow-xs", card.tone && card.tone !== "neutral" && cn("border-l-2", cardEdge[card.tone]))}>
+    <li className={cn("min-w-0 space-y-1.5 rounded-md border bg-card px-3 py-2.5 shadow-sm", card.tone && card.tone !== "neutral" && cn("border-l-2", cardEdge[card.tone]))}>
       <p className="text-sm leading-5 font-medium wrap-anywhere">{card.title}</p>
       {card.body ? <p className="text-sm leading-5 whitespace-pre-line text-muted-foreground wrap-anywhere">{card.body}</p> : null}
       {badges.length > 0 ? (
@@ -74,7 +74,7 @@ function Card({ card }: { card: BoardCard }) {
 function BoardColumn({ column, headingId }: { column: Column; headingId: string }) {
   const count = column.count ?? column.cards.length;
   return (
-    <section aria-labelledby={headingId} className="flex w-(--board-column) shrink-0 snap-start flex-col gap-2 rounded-lg border bg-muted/40 p-2">
+    <section aria-labelledby={headingId} className="flex w-(--board-column) shrink-0 snap-start flex-col gap-2 rounded-lg border bg-muted/40 p-2 shadow-xs">
       <h3 id={headingId} className="flex min-w-0 items-center gap-2 px-1 pt-0.5 text-sm font-medium">
         {column.tone ? <span aria-hidden className={cn("size-2 shrink-0 rounded-full", toneDot[column.tone])} /> : null}
         <span className="min-w-0 break-words">{column.title}</span>
