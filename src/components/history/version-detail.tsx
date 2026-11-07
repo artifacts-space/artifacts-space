@@ -3,11 +3,13 @@
 import { IconArrowBackUp, IconLoader2 } from "@tabler/icons-react";
 
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { ThemeScope } from "@/components/artifact-view/theme-scope";
 import { EditDiff } from "@/components/teams/edit-diff";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { VersionDetailDto, VersionSummaryDto } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
+import { resolveTheme } from "@/lib/themes/resolve";
 import { diffableContent } from "@/lib/versions/diff-text";
 
 import { SavedAt } from "./last-edited";
@@ -41,7 +43,14 @@ interface BodyProps {
 }
 
 function VersionBody({ view, selected, compareWith, compareId, files }: BodyProps) {
-  if (view === "preview") return <ArtifactView kind={selected.kind} content={selected.content} title={selected.title} language={selected.language} files={files} />;
+  if (view === "preview") {
+    // The preview shows the version in the theme it was saved with.
+    return (
+      <ThemeScope theme={resolveTheme(selected.theme, null).theme} className="text-foreground">
+        <ArtifactView kind={selected.kind} content={selected.content} title={selected.title} language={selected.language} files={files} />
+      </ThemeScope>
+    );
+  }
   if (compareId === null) return <p className="text-sm text-muted-foreground">This is the first saved version, so there is nothing before it.</p>;
   if (compareId === selected.id) return <p className="text-sm text-muted-foreground">This is the current version.</p>;
   if (!compareWith) return <Loading />;

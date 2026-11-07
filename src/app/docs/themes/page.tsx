@@ -38,6 +38,7 @@ const kb = (bytes: number) => (bytes === 0 ? "Always loaded" : `${(bytes / 1024)
 
 const classic = themePresets.find((preset) => preset.id === "classic");
 const exampleJson = JSON.stringify({ ...classic?.theme, mode: "auto" }, null, 2);
+const mcpExample = JSON.stringify({ id: "Vq3kJ0pXw2mZ8rT5yN1aBc", theme: "editorial" }, null, 2);
 
 /** The theme reference: tokens, presets, fonts, and the rules a theme must pass. */
 export default function ThemesPage() {
@@ -48,6 +49,29 @@ export default function ThemesPage() {
         <p>A theme is a small set of design tokens for one artifact: colors for light and dark, a chart palette, a corner radius, and three fonts. It changes the artifact and the page behind it. The site header, comments, and controls keep the standard look.</p>
         <p>An artifact uses its own theme first, then its team&apos;s default theme, then the site default. A theme is either a preset id, such as <code>&quot;paper&quot;</code>, or theme JSON as described below. A theme that does not pass validation is never saved.</p>
         <p>Theme values never become raw CSS. Each value is parsed, checked, and written back in one canonical form, then set as a CSS custom property on the artifact&apos;s wrapper. Every card, chart, code block, diagram, and table inside picks the theme up from those properties.</p>
+      </Prose>
+
+      <DocsH page={page} id="artifact" />
+      <Prose>
+        <p>Each artifact can have its own theme. With none, it uses the default look. The theme changes the artifact and the page behind it, for every reader, and its colors show in the artifact&apos;s link preview card.</p>
+      </Prose>
+
+      <DocsH page={page} id="web" />
+      <Prose>
+        <p>People who can edit an artifact see <strong>Theme</strong> beside the icon above its title. It opens the presets as swatches, each with its colors, its name, and its fonts. Pick one to apply it, or pick Default to go back to the standard look. Arrow keys move between swatches, and Enter or Space picks one. The New artifact dialog has the same picker. Readers never see the control, only the theme.</p>
+        <p>A page loads a theme&apos;s fonts only when it uses that theme. The picker loads each preset&apos;s fonts only while it is open.</p>
+      </Prose>
+
+      <DocsH page={page} id="mcp" />
+      <Prose>
+        <p>Agents set <code>theme</code> on <code>artifacts_create</code> or <code>artifacts_update</code>, on artifacts they can edit. It takes a preset id, such as <code>&quot;paper&quot;</code>, or theme JSON as described below. Pass <code>null</code> or <code>&quot;&quot;</code> on update to remove it. <code>artifacts_get</code> and <code>artifacts_list</code> return the stored value. Call <code>themes_list</code> for the presets with their fonts, and the font ids custom theme JSON may use.</p>
+        <p>A theme that fails validation is refused before anything is saved. The error lists every problem with its path. When contrast fails, it also gives the nearest passing color for each failing text color, which you can use as is. Agents cannot create or change presets.</p>
+      </Prose>
+      <CodeSnippet title="artifacts_update" language="json" code={mcpExample} className="mt-4" />
+
+      <DocsH page={page} id="history" />
+      <Prose>
+        <p>A theme change is saved as a new version, like a title or icon change, so History shows it and Restore brings an older theme back. On a link or public artifact shared through a team, a theme change waits for a team owner or admin to approve it, exactly like a title change. Until then, readers outside the team see the approved theme. Agents never approve.</p>
       </Prose>
 
       <DocsH page={page} id="tokens" />
@@ -108,6 +132,11 @@ export default function ThemesPage() {
         <p>The Classic preset as theme JSON. Leave out <code>radius</code>, <code>fonts</code>, or <code>mode</code> to use the defaults: <code>&quot;md&quot;</code>, Geist and Geist Mono, and <code>&quot;auto&quot;</code>.</p>
       </Prose>
       <CodeSnippet title="theme.json" language="json" code={exampleJson} className="mt-4" />
+
+      <DocsH page={page} id="vendoring" />
+      <Prose>
+        <p>Every theme font except Geist is stored in the repository under <code>public/fonts/v1/&lt;id&gt;/</code>: the latin woff2 files, a small <code>font.css</code>, and the font&apos;s license. <code>scripts/vendor-fonts.mjs</code> downloads them once from Google Fonts. Run it only to add or refresh a face, then change the <code>v1</code> folder name and update the file sizes in <code>src/lib/themes/fonts.ts</code>. Readers&apos; browsers never contact another site for a font.</p>
+      </Prose>
     </RegistryPage>
   );
 }

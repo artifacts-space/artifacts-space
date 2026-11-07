@@ -28,6 +28,8 @@ export interface ArtifactMarkdownInput {
   title: string;
   /** An emoji, "tabler:<name>", "file:<id>", or null. Only emoji show in Markdown. */
   emoji: string | null;
+  /** The artifact's own theme by name ("Paper", or "Custom"), or null for the default look. Optional. */
+  theme?: string | null;
   summary: string;
   kind: ArtifactKind;
   language: string;
@@ -53,6 +55,7 @@ function headerLines(input: ArtifactMarkdownInput): string[] {
   const version = input.version === null ? null : `- Version: ${String(input.version)}${input.approvedVersion ? " (the last approved version)" : ""}`;
   return [
     `- Format: ${format}`,
+    input.theme ? `- Theme: ${inlineText(input.theme)}` : null,
     input.author ? `- Author: ${inlineText(input.author)}` : null,
     input.updatedBy ? `- Last edited by: ${inlineText(input.updatedBy)}` : null,
     `- Last updated: ${input.updatedAt.toISOString()}`,

@@ -14,6 +14,7 @@ vi.mock("@/lib/versions/cache", () => ({ cachedVersionView: mocks.cachedVersionV
 vi.mock("@/lib/files/download", () => ({ filesForViewer: mocks.filesForViewer }));
 
 const { artifactImagePath, artifactOgMetadata, artifactPagePath, loadArtifactOg, shareableVersion } = await import("./artifact-og");
+const { siteCardPalette } = await import("./card-palette");
 
 const approvedId = "11111111-1111-4111-8111-111111111111";
 const pendingTitle = "Pending edit title";
@@ -180,6 +181,16 @@ describe("loadArtifactOg", () => {
     expect((await loadArtifactOg("abc", approvedId))?.icon).toEqual({ type: "tabler", name: "gavel" });
     mocks.cachedVersionView.mockResolvedValue({ ...approvedView, icon: null });
     expect((await loadArtifactOg("abc", approvedId))?.icon).toBeNull();
+  });
+
+  it("should draw the card in the approved version's theme, and the site card without one", async () => {
+    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.cachedVersionView.mockResolvedValue({ ...approvedView, theme: "paper" });
+    const themed = await loadArtifactOg("abc", approvedId);
+    expect(themed?.palette).not.toEqual(siteCardPalette);
+    expect(themed?.palette.paper).toMatch(/^#[0-9a-f]{6}$/);
+    mocks.cachedVersionView.mockResolvedValue({ ...approvedView, theme: null });
+    expect((await loadArtifactOg("abc", approvedId))?.palette).toEqual(siteCardPalette);
   });
 
   it("should return null when the requested version is no longer the approved one", async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { parseArtifactThemeInput } from "./artifact-theme";
 import { presetTheme, resolveTheme, siteDefaultTheme } from "./resolve";
 import type { Theme } from "./schema";
 
@@ -33,6 +34,14 @@ describe("resolveTheme", () => {
     const bad = { ...preset("forest"), light: { ...preset("forest").light, foreground: "url(x)" } };
     expect(resolveTheme(bad, "ocean").source).toBe("team");
     expect(resolveTheme("no-such-preset", null).source).toBe("site");
+  });
+
+  it("should render a stored artifact theme when there is no team default yet", () => {
+    const stored = parseArtifactThemeInput({ version: 1, light: preset("ocean").light, dark: preset("ocean").dark });
+    if (!stored.ok || stored.theme === null) throw new Error("ocean JSON should validate");
+    expect(resolveTheme(stored.theme, null)).toMatchObject({ presetId: null, source: "artifact", theme: { light: preset("ocean").light } });
+    expect(resolveTheme("graphite", null)).toMatchObject({ presetId: "graphite", source: "artifact" });
+    expect(resolveTheme(null, null)).toMatchObject({ presetId: "default", source: "site" });
   });
 
   it("should find extra presets by id when the caller passes team presets", () => {

@@ -5,11 +5,13 @@ import { notFound } from "next/navigation";
 
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { TitleIcon } from "@/components/artifact-icon/title-icon";
+import { TitleTheme } from "@/components/artifact-theme/title-theme";
 import { ApprovedArticle } from "@/components/artifact-page/approved-article";
 import { EditorIsland } from "@/components/artifact-page/editor-island";
 import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { CopyButton } from "@/components/copy-button";
 import { GitHubLink } from "@/components/github-link";
@@ -32,6 +34,9 @@ import { lastEditorsFor } from "@/lib/artifacts";
 import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
 import { isReportable } from "@/lib/reports/rules";
 import { getSession } from "@/lib/session";
+import { resolveTheme } from "@/lib/themes/resolve";
+import { lockedMode } from "@/lib/themes/style";
+import { cn } from "@/lib/utils";
 import { visibilityCopy, type VisibilityCopy } from "@/lib/visibility-copy";
 
 export const instant = false;
@@ -125,10 +130,19 @@ async function lastEditor(userId: string | null): Promise<ArtifactEditorDto | nu
   return (await lastEditorsFor([{ updatedBy: userId }])).get(userId) ?? null;
 }
 
-/** The page icon above the title: the picker for editors, the icon alone for readers. */
+/** The page icon above the title: the icon and theme pickers for editors, the icon alone for readers. */
 function HeadingIcon({ viewable }: { viewable: ViewableArtifact }) {
   const { view, record } = viewable;
-  if (viewable.canEdit) return <TitleIcon key={view.icon ?? ""} publicId={record.publicId} icon={view.icon} />;
+  if (viewable.canEdit) {
+    return (
+      <div className="flex flex-wrap items-end gap-1">
+        <TitleIcon key={view.icon ?? ""} publicId={record.publicId} icon={view.icon} />
+        <div className={view.icon ? "mb-2" : "mb-1"}>
+          <TitleTheme key={JSON.stringify(view.theme)} publicId={record.publicId} theme={view.theme} />
+        </div>
+      </div>
+    );
+  }
   if (!view.icon) return null;
   return <div className="mb-2"><ArtifactIcon icon={view.icon} size="page" /></div>;
 }
@@ -167,6 +181,23 @@ function seesComments(viewable: ViewableArtifact, viewerId: string) {
   return canSeeComments(record.comments, { canViewArtifact: true, isAuthor: record.userId === viewerId, isTeamMember: viewable.isTeamMember });
 }
 
+/** Under the artifact: the sign-up line for readers outside the workspace, and Report for link and public artifacts. */
+function SignUpAndReport({ copy, publicId, visibility }: { copy: VisibilityCopy; publicId: string; visibility: ViewableArtifact["record"]["visibility"] }) {
+  const reportable = isReportable(visibility);
+  if (!copy.showSignUp && !reportable) return null;
+  return (
+    <div className="mt-10 flex flex-wrap items-baseline justify-between gap-4 text-sm leading-6 text-muted-foreground">
+      {copy.showSignUp ? (
+        <p>
+          Shared from artifacts.space, a shared artifact hub for coding agents.{" "}
+          <Link href="/sign-up" className="text-foreground underline underline-offset-4 decoration-border hover:decoration-foreground">Create your own workspace</Link>
+        </p>
+      ) : null}
+      {reportable ? <ReportDialog publicId={publicId} /> : null}
+    </div>
+  );
+}
+
 export default async function ArtifactPage({ params }: PageProps<"/artifact/[publicId]">) {
   const viewable = await load(params);
   if (!viewable) notFound();
@@ -179,7 +210,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
     lastEditor(view.editedBy),
   ]);
   const copy = visibilityCopy(record.visibility);
-  const reportable = isReportable(record.visibility);
+  // The team default arrives with team presets; until then an artifact's own theme or the site default.
+  const { theme, presetId } = resolveTheme(view.theme, null);
 
   return (
     <div className="min-h-screen">
@@ -193,27 +225,22 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
         </header>
         <VisibilityNotice copy={copy} author={byline.author} avatar={byline.avatar} teamName={byline.teamName} />
       </StickyChrome>
-      <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
-        <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
-          <ArtifactHeading viewable={viewable} editor={editor} />
-          <article className="mt-10">
-            <ArtifactBody viewable={viewable} files={files} />
-          </article>
-        </EditorIsland>
-        {copy.showSignUp || reportable ? (
-          <div className="mt-10 flex flex-wrap items-baseline justify-between gap-4 text-sm leading-6 text-muted-foreground">
-            {copy.showSignUp ? (
-              <p>
-                Shared from artifacts.space, a shared artifact hub for coding agents.{" "}
-                <Link href="/sign-up" className="text-foreground underline underline-offset-4 decoration-border hover:decoration-foreground">Create your own workspace</Link>
-              </p>
-            ) : null}
-            {reportable ? <ReportDialog publicId={record.publicId} /> : null}
-          </div>
-        ) : null}
-        {/* Comments are for signed-in readers the comments setting lets in; the thread checks access itself too. */}
-        {session && seesComments(viewable, session.user.id) ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" raised /> : null}
-      </main>
+      {/* A theme that locks light or dark sets that mode on the backdrop too, so comments and controls on it stay readable. */}
+      <ThemeBackdrop theme={theme} className={cn("text-foreground", lockedMode(theme))}>
+        <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
+          <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
+            <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={presetId ?? "custom"}>
+              <ArtifactHeading viewable={viewable} editor={editor} />
+              <article className="mt-10">
+                <ArtifactBody viewable={viewable} files={files} />
+              </article>
+            </ThemeScope>
+          </EditorIsland>
+          <SignUpAndReport copy={copy} publicId={record.publicId} visibility={record.visibility} />
+          {/* Comments are for signed-in readers the comments setting lets in; the thread checks access itself too. */}
+          {session && seesComments(viewable, session.user.id) ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" raised /> : null}
+        </main>
+      </ThemeBackdrop>
       <footer className="border-t">
         <div className="mx-auto flex w-full max-w-[960px] flex-wrap items-center justify-between gap-4 px-6 py-6 text-sm text-muted-foreground">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
