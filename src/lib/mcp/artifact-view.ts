@@ -17,6 +17,7 @@ export interface McpArtifact {
   preview?: string;
   kind: string;
   language: string;
+  /** The project's name; "" for none. Only the author and members of the team it is shared through see it. */
   project: string;
   sessionId: string;
   source: string;
@@ -49,6 +50,11 @@ export interface McpViewContext {
   urlFor: (publicId: string) => string;
 }
 
+/** The project's name for agents, or "" for none (and for callers outside the team, whose DTO has none). */
+function projectName(project: ArtifactDto["project"]): string {
+  return project ? project.name : "";
+}
+
 /** Maps an artifact, with or without its content, to the agent-facing shape. */
 function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext): McpArtifact {
   const isAuthor = dto.authorId === context.viewerId;
@@ -65,7 +71,7 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     summary: dto.summary,
     kind: dto.kind,
     language: dto.language,
-    project: dto.project,
+    project: projectName(dto.project),
     sessionId: dto.sessionId,
     source: dto.source,
     visibility: dto.visibility,

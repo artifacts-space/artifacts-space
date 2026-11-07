@@ -80,7 +80,12 @@ describe("versionToServe", () => {
 });
 
 describe("sameReviewedFields", () => {
-  const base: ReviewedFields = { title: "T", icon: null, theme: null, summary: "", content: "a", kind: "markdown", language: "", project: "", source: "", metadata: { a: 1 } };
+  const base: ReviewedFields = { title: "T", icon: null, theme: null, summary: "", content: "a", kind: "markdown", language: "", source: "", metadata: { a: 1 } };
+
+  it("should treat versions as the same when only the deprecated project label differs, since projects are never reviewed", () => {
+    const withLabel = { ...base, project: "Old label" };
+    expect(sameReviewedFields(base, withLabel)).toBe(true);
+  });
 
   it("should treat versions as the same when every reader-facing field matches", () => {
     expect(sameReviewedFields(base, { ...base, metadata: { a: 1 } })).toBe(true);

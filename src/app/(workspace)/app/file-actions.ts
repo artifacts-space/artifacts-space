@@ -38,7 +38,7 @@ async function run<T>(fallback: string, action: (userId: string) => Promise<T>):
 async function editableArtifactDto(userId: string, artifactId: string): Promise<ArtifactDto> {
   const record = await getEditableArtifact(userId, { id: artifactId });
   if (!record) throw new UserFacingError("Artifact not found.");
-  const [dto] = await toArtifactDtos([record]);
+  const [dto] = await toArtifactDtos([record], userId);
   if (!dto) throw new UserFacingError("Artifact not found.");
   return dto;
 }

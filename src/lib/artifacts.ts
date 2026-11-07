@@ -15,6 +15,7 @@ import {
   type ArtifactEditorDto,
   type ArtifactInput,
   type ArtifactListItemDto,
+  type ArtifactProjectDto,
   type PendingCommentsDto,
   type PendingEditDto,
   type PendingSharingDto,
@@ -25,6 +26,9 @@ import { artifactThemeInputSchema } from "@/lib/themes/artifact-theme";
 import { artifactSizeProblem } from "@/lib/artifact-limits";
 import { defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { PREVIEW_CHARS, previewKinds } from "@/lib/artifact-preview";
+import { loadProjectFacets, projectFilterCondition, projectSearchCondition, projectsForViewer, type ProjectFacets, type ProjectFilter } from "@/lib/projects/queries";
+import { projectChoiceSchema } from "@/lib/projects/rules";
+import { findOrCreateProject } from "@/lib/projects/store";
 import { checkContentFiles } from "@/lib/files/attach";
 import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { checkIconFile, restorableIcon } from "@/lib/files/icon-file";
@@ -56,7 +60,6 @@ export const artifactUpdateSchema = z.object({
   content: z.string().max(1_000_000).optional(),
   kind: z.enum(artifactKinds).optional(),
   language: z.string().trim().max(60).optional(),
-  project: z.string().trim().max(120).optional(),
   sessionId: z.string().trim().max(200).optional(),
   source: z.string().trim().max(120).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -71,7 +74,8 @@ export const artifactInputSchema = artifactUpdateSchema
     summary: artifactUpdateSchema.shape.summary.default(""),
     kind: artifactUpdateSchema.shape.kind.default("markdown"),
     language: artifactUpdateSchema.shape.language.default(""),
-    project: artifactUpdateSchema.shape.project.default(""),
+    // A project name, found or created among the author's projects; "" or null for none. Not part of updates: see src/lib/projects.
+    project: projectChoiceSchema.optional().default(null),
     sessionId: artifactUpdateSchema.shape.sessionId.default(""),
     source: artifactUpdateSchema.shape.source.default(""),
     metadata: artifactUpdateSchema.shape.metadata.default({}),
@@ -93,8 +97,18 @@ export interface PendingRequests {
 
 const noPending: PendingRequests = { sharing: null, edit: null, comments: null };
 
+/** What a DTO carries beyond the row: open requests, files, the last editor, and the project the viewer may see. */
+interface DtoExtras {
+  pending: PendingRequests;
+  files: FileDto[];
+  updatedBy: ArtifactEditorDto | null;
+  project: ArtifactProjectDto | null;
+}
+
+const noExtras: DtoExtras = { pending: noPending, files: [], updatedBy: null, project: null };
+
 /** Maps a row without content to the shared DTO fields. */
-function toArtifactMeta(record: ArtifactMetaRecord, pending: PendingRequests, files: FileDto[], updatedBy: ArtifactEditorDto | null): Omit<ArtifactDto, "content"> {
+function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy, project }: DtoExtras): Omit<ArtifactDto, "content"> {
   return {
     id: record.id,
     publicId: record.publicId,
@@ -104,7 +118,7 @@ function toArtifactMeta(record: ArtifactMetaRecord, pending: PendingRequests, fi
     summary: record.summary,
     kind: record.kind,
     language: record.language,
-    project: record.project,
+    project,
     sessionId: record.sessionId,
     source: record.source,
     visibility: record.visibility,
@@ -123,9 +137,9 @@ function toArtifactMeta(record: ArtifactMetaRecord, pending: PendingRequests, fi
   };
 }
 
-/** Maps a row to the workspace's DTO. */
-export function toArtifactDto(record: ArtifactRecord, pending: PendingRequests = noPending, files: FileDto[] = [], updatedBy: ArtifactEditorDto | null = null): ArtifactDto {
-  return { ...toArtifactMeta(record, pending, files, updatedBy), content: record.content };
+/** Maps a row to the workspace's DTO. Without extras it shows no project. */
+export function toArtifactDto(record: ArtifactRecord, extras: DtoExtras = noExtras): ArtifactDto {
+  return { ...toArtifactMeta(record, extras), content: record.content };
 }
 
 function pendingEntry(map: Map<string, PendingRequests>, artifactId: string): PendingRequests {
@@ -159,23 +173,32 @@ export async function lastEditorsFor(records: Pick<ArtifactRecord, "updatedBy">[
   return new Map([...actors].map(([id, actor]) => [id, { id, kind: actor.kind, handle: actor.handle, name: actor.name }]));
 }
 
-/** Maps rows to DTOs with their open sharing and edit requests, files, and last editor. */
-export async function toArtifactDtos(records: ArtifactRecord[]): Promise<ArtifactDto[]> {
-  const ids = records.map((record) => record.id);
-  const [pending, files, editors] = await Promise.all([pendingRequestsFor(ids), listFilesForArtifacts(ids), lastEditorsFor(records)]);
-  return records.map((record) =>
-    toArtifactDto(record, pending.get(record.id) ?? noPending, files.get(record.id) ?? [], record.updatedBy ? editors.get(record.updatedBy) ?? null : null),
-  );
+/** Each row's extras, loaded together. `viewerId` decides whose projects show (src/lib/projects/queries.ts). */
+async function loadExtras(rows: ArtifactMetaRecord[], viewerId: string): Promise<(row: ArtifactMetaRecord) => DtoExtras> {
+  const ids = rows.map((row) => row.id);
+  const [pending, files, editors, projects] = await Promise.all([pendingRequestsFor(ids), listFilesForArtifacts(ids), lastEditorsFor(rows), projectsForViewer(rows, viewerId)]);
+  return (row) => ({
+    pending: pending.get(row.id) ?? noPending,
+    files: files.get(row.id) ?? [],
+    updatedBy: row.updatedBy ? editors.get(row.updatedBy) ?? null : null,
+    project: projects.get(row.id) ?? null,
+  });
 }
 
-/** Maps list rows (no content, with a preview) to list DTOs with their open requests and files. */
-async function toArtifactListItems(rows: (ArtifactMetaRecord & { preview: string })[]): Promise<ArtifactListItemDto[]> {
-  const ids = rows.map((row) => row.id);
-  const [pending, files, editors] = await Promise.all([pendingRequestsFor(ids), listFilesForArtifacts(ids), lastEditorsFor(rows)]);
-  return rows.map((row) => ({
-    ...toArtifactMeta(row, pending.get(row.id) ?? noPending, files.get(row.id) ?? [], row.updatedBy ? editors.get(row.updatedBy) ?? null : null),
-    preview: row.preview,
-  }));
+/**
+ * Maps rows to DTOs for one viewer, with their open sharing and edit
+ * requests, files, last editor, and the project when the viewer may see it
+ * (the author and members of the team it is shared through).
+ */
+export async function toArtifactDtos(records: ArtifactRecord[], viewerId: string): Promise<ArtifactDto[]> {
+  const extras = await loadExtras(records, viewerId);
+  return records.map((record) => toArtifactDto(record, extras(record)));
+}
+
+/** Maps list rows (no content, with a preview) to list DTOs for one viewer. */
+async function toArtifactListItems(rows: (ArtifactMetaRecord & { preview: string })[], viewerId: string): Promise<ArtifactListItemDto[]> {
+  const extras = await loadExtras(rows, viewerId);
+  return rows.map((row) => ({ ...toArtifactMeta(row, extras(row)), preview: row.preview }));
 }
 
 /** The preview column: the first characters of readable formats, computed in Postgres so content never leaves it. */
@@ -187,20 +210,28 @@ export type ArtifactScope = { kind: "mine" } | { kind: "team"; teamId: string };
 export interface ListOptions {
   scope?: ArtifactScope | undefined;
   query?: string | undefined;
-  project?: string | undefined;
+  /** Only artifacts in a project with this name key, or with no project. */
+  project?: ProjectFilter | undefined;
   limit?: number | undefined;
 }
 
-function searchCondition(query: string | undefined) {
+/** Search in the title, summary, content, and the project's name. */
+async function searchCondition(viewerId: string, scope: ArtifactScope, query: string | undefined) {
   const text = query?.trim();
   if (!text) return undefined;
   const pattern = `%${text}%`;
-  return or(ilike(artifact.title, pattern), ilike(artifact.summary, pattern), ilike(artifact.content, pattern), ilike(artifact.project, pattern));
+  const inProject = await projectSearchCondition(viewerId, scope, pattern);
+  return or(ilike(artifact.title, pattern), ilike(artifact.summary, pattern), ilike(artifact.content, pattern), inProject);
 }
 
 function scopeCondition(viewerId: string, scope: ArtifactScope) {
   if (scope.kind === "mine") return eq(artifact.userId, viewerId);
   return viewableInTeamCondition(viewerId, scope.teamId);
+}
+
+/** The project filter's entries and counts for a list scope (every artifact, not only the first page). */
+export async function listProjectFacets(viewerId: string, scope: ArtifactScope): Promise<ProjectFacets> {
+  return loadProjectFacets(viewerId, scope, scopeCondition(viewerId, scope));
 }
 
 /**
@@ -209,10 +240,11 @@ function scopeCondition(viewerId: string, scope: ArtifactScope) {
  * Items carry a short preview, never content: load one artifact to read it.
  */
 export async function listArtifacts(viewerId: string, options: ListOptions = {}): Promise<ArtifactListItemDto[]> {
-  const conditions: SQL[] = [scopeCondition(viewerId, options.scope ?? { kind: "mine" })];
-  const search = searchCondition(options.query);
+  const scope = options.scope ?? { kind: "mine" };
+  const conditions: SQL[] = [scopeCondition(viewerId, scope)];
+  const search = await searchCondition(viewerId, scope, options.query);
   if (search) conditions.push(search);
-  if (options.project?.trim()) conditions.push(eq(artifact.project, options.project.trim()));
+  if (options.project) conditions.push(await projectFilterCondition(viewerId, scope, options.project));
 
   const rows = await getDb()
     .select({ ...artifactMetaColumns(), preview: previewColumn })
@@ -221,7 +253,15 @@ export async function listArtifacts(viewerId: string, options: ListOptions = {})
     .orderBy(desc(artifact.updatedAt))
     .limit(Math.min(Math.max(options.limit ?? 100, 1), 100));
 
-  return toArtifactListItems(rows);
+  return toArtifactListItems(rows, viewerId);
+}
+
+/** The DTO of an artifact the editor may edit, as they see it, or null when they may not. */
+export async function getEditableArtifactDto(editorId: string, id: string): Promise<ArtifactDto | null> {
+  const record = await getEditableArtifact(editorId, { id });
+  if (!record) return null;
+  const [dto] = await toArtifactDtos([record], editorId);
+  return dto ?? null;
 }
 
 /** The author's own artifact by internal id, or null. */
@@ -252,17 +292,20 @@ export async function findPublicIdByShareId(shareId: string) {
 
 /** Creates a private artifact for its author, within the hourly creation limit and the account's storage quota. */
 export async function createArtifact(userId: string, input: ArtifactInput) {
-  const parsed = artifactInputSchema.parse(input);
+  const { project: projectName, ...parsed } = artifactInputSchema.parse(input);
   assertArtifactSize(parsed);
   assertValidArtifactContent(parsed.kind, parsed.content);
   const contentFileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
   const fileIds = [...new Set([...contentFileIds, ...(await checkIconFile(userId, null, parsed.icon))])];
   await enforceRateLimit("artifactCreate", userId);
   await assertContentFits(userId, parsed.content);
+  // New artifacts are private, so their project is among the author's own.
+  const chosen = projectName ? await findOrCreateProject({ kind: "user", userId }, projectName, userId) : null;
   const [record] = await getDb()
     .insert(artifact)
     .values({
       ...parsed,
+      projectId: chosen?.id ?? null,
       id: randomUUID(),
       shareId: randomUUID().replaceAll("-", ""),
       publicId: generatePublicId(),
@@ -277,7 +320,7 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
   if (!record) throw new Error("The artifact could not be created.");
   await attachFileRows(userId, record.id, fileIds);
   await recordArtifactSave({ before: null, after: record, editorId: userId, actor: "person", saveKind: "create" });
-  const [dto] = await toArtifactDtos([record]);
+  const [dto] = await toArtifactDtos([record], userId);
   return dto ?? toArtifactDto(record);
 }
 
@@ -335,7 +378,7 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
   await recordArtifactSave({ before, after: record, editorId, actor: context.actor, saveKind, restoredFromId: context.restoredFromId ?? null });
   // A replaced or removed image icon goes with this save, unless something still shows it (see icon-cleanup.ts).
   if (iconFileId(before.icon) && record.icon !== before.icon) await pruneUnusedIconFilesQuietly(record.id, [before.icon]);
-  const [dto] = await toArtifactDtos([record]);
+  const [dto] = await toArtifactDtos([record], editorId);
   return dto ?? null;
 }
 
@@ -365,9 +408,10 @@ export async function restoreArtifactVersion(userId: string, id: string, version
   if (!before) return null;
   const version = await getVersionOf(before.id, versionId);
   if (!version) throw new UserFacingError("That version is no longer in the history.");
-  const { title, theme, summary, content, kind, language, project, source, metadata } = version;
+  // The project is not versioned: a restore keeps the artifact in its current project.
+  const { title, theme, summary, content, kind, language, source, metadata } = version;
   const icon = await restorableIcon(userId, before.id, version.icon);
-  const changes = artifactUpdateSchema.parse({ title, icon, theme, summary, content, kind, language, project, source, metadata });
+  const changes = artifactUpdateSchema.parse({ title, icon, theme, summary, content, kind, language, source, metadata });
   assertArtifactSize(changes);
   return saveChanges(changes, { editorId: userId, before, actor, options, restoredFromId: version.id });
 }

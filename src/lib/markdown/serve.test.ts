@@ -106,6 +106,19 @@ describe("artifactMarkdownResponse", () => {
     expect(mocks.getViewableArtifact).toHaveBeenCalledWith(publicId, null);
   });
 
+  it("should never put the project in the Markdown, even when the author reads it with a token", async () => {
+    mocks.authenticateMcpRequest.mockResolvedValue({ userId: "author", access: "read", via: "api-token", tokenKey: "api:t1" });
+    const authored = viewable({ visibility: "private" });
+    Object.assign(authored.record, { projectId: "project-1", project: "Secret project label" });
+    Object.assign(authored, { canEdit: true, isTeamMember: true });
+    Object.assign(authored.view, { project: "Secret project label" });
+    mocks.getViewableArtifact.mockResolvedValue(authored);
+    const body = await (await artifactMarkdownResponse(request(`/artifact/${publicId}.md`, { authorization: "Bearer artifacts_secret" }), publicId)).text();
+    expect(body).toContain("Pending title");
+    expect(body).not.toContain("Secret project label");
+    expect(body).not.toContain("project-1");
+  });
+
   it("should answer with the same Markdown 404 when a private artifact is read without auth as when it does not exist", async () => {
     mocks.getViewableArtifact.mockResolvedValue(null);
     const unauthorized = await artifactMarkdownResponse(request(`/artifact/${publicId}.md`), publicId);

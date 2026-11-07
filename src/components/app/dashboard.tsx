@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
 import { artifactListState, filterArtifactList, type ArtifactListState } from "@/components/app/artifact-list-state";
 import { CreateArtifactDialog } from "@/components/app/create-artifact-dialog";
+import { ProjectFilter } from "@/components/app/project-filter";
 import { ScopeTabs } from "@/components/app/scope-tabs";
 import { visibilityLabel } from "@/components/app/share-options";
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
@@ -23,9 +24,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
+import { ProjectLabel } from "@/components/projects/project-label";
 import { kinds } from "@/lib/artifact-kinds";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
+import type { ProjectFacets } from "@/lib/projects/queries";
+import type { ProjectFilter as ProjectFilterValue } from "@/lib/projects/rules";
 import { cn } from "@/lib/utils";
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
@@ -58,9 +62,9 @@ function ArtifactListItem({ artifact, active, onSelect }: { artifact: ArtifactLi
               <span className="shrink-0 text-xs text-muted-foreground">{dateFormat.format(new Date(artifact.updatedAt))}</span>
             </div>
             <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{artifact.summary || artifact.preview}</p>
-            <p className="mt-1 truncate text-xs text-muted-foreground">
-              {artifact.project || "No project"}
-              {sharingNote(artifact)}
+            <p className="mt-1 flex min-w-0 items-center text-xs text-muted-foreground">
+              {artifact.project ? <ProjectLabel name={artifact.project.name} icon={artifact.project.icon} /> : <span className="shrink-0">No project</span>}
+              <span className="shrink-0 whitespace-pre">{sharingNote(artifact)}</span>
             </p>
           </div>
         </div>
@@ -166,15 +170,16 @@ function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate
   );
 }
 
-/** Title, counts, and the create button. Team scopes list others' work, so they have no create button. */
-function DashboardHeading({ artifacts, scopeTeam, onCreate }: { artifacts: ArtifactListItemDto[]; scopeTeam: ShareTeam | null; onCreate: () => void }) {
-  const projects = new Set(artifacts.map((artifact) => artifact.project).filter(Boolean));
+/** Title, counts (every artifact in scope and the projects they use), and the create button. Team scopes list others' work, so they have no create button. */
+function DashboardHeading({ facets, scopeTeam, onCreate }: { facets: ProjectFacets; scopeTeam: ShareTeam | null; onCreate: () => void }) {
+  const total = facets.total;
+  const projects = facets.projects.length;
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
       <div>
         <h1 className="text-xl font-medium tracking-[-0.01em]">{scopeTeam ? `Shared with ${scopeTeam.name}` : "Artifacts"}</h1>
         <p className="mt-1 text-md text-muted-foreground">
-          {artifacts.length} {artifacts.length === 1 ? "artifact" : "artifacts"} across {projects.size} {projects.size === 1 ? "project" : "projects"}
+          {total} {total === 1 ? "artifact" : "artifacts"} across {projects} {projects === 1 ? "project" : "projects"}
         </p>
       </div>
       {scopeTeam ? null : (
@@ -199,16 +204,20 @@ interface DashboardProps {
   teams: ShareTeam[];
   /** The team whose shared artifacts are shown, or null for the viewer's own. */
   scopeTeam: ShareTeam | null;
+  /** The project filter's entries and counts for the whole scope. */
+  facets: ProjectFacets;
+  /** The project filter in the URL; the list is already filtered by it. */
+  projectFilter: ProjectFilterValue | null;
 }
 
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam }: DashboardProps) {
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectFilter }: DashboardProps) {
   const [artifacts, setArtifacts] = useState(initialArtifacts);
   const [selectedId, setSelectedId] = useState(initialArtifacts[0]?.id ?? "");
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
 
-  const serverMatches = useServerSearch(query, scopeTeam?.id ?? null);
+  const serverMatches = useServerSearch(query, scopeTeam?.id ?? null, projectFilter);
   const filtered = useMemo(() => filterArtifactList(artifacts, { query, kind }, serverMatches), [artifacts, kind, query, serverMatches]);
 
   const selected = pickSelected(artifacts, filtered, selectedId);
@@ -236,7 +245,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
     <ShareTeamsProvider teams={teams}>
       <main className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col p-4 sm:p-6">
         <ScopeTabs teams={teams} activeSlug={scopeTeam?.slug ?? null} />
-        <DashboardHeading artifacts={artifacts} scopeTeam={scopeTeam} onCreate={() => { setCreateOpen(true); }} />
+        <DashboardHeading facets={facets} scopeTeam={scopeTeam} onCreate={() => { setCreateOpen(true); }} />
 
         <div className="card-surface grid min-h-[640px] flex-1 overflow-hidden lg:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="flex min-h-0 flex-col border-b bg-background/60 max-lg:max-h-[360px] lg:border-r lg:border-b-0">
@@ -251,15 +260,18 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
                   className="h-8 bg-card pl-8"
                 />
               </div>
-              <Select value={kind} onValueChange={(value) => { setKind(value ?? "all"); }}>
-                <SelectTrigger size="sm" className="h-7 w-full border-0 bg-transparent px-1 text-sm text-muted-foreground shadow-none" aria-label="Filter by format">
-                  <SelectValue>{(value: string) => (value === "all" ? "All formats" : value)}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All formats</SelectItem>
-                  {kinds.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-2 gap-1">
+                <Select value={kind} onValueChange={(value) => { setKind(value ?? "all"); }}>
+                  <SelectTrigger size="sm" className="h-7 w-full min-w-0 border-0 bg-transparent px-1 text-sm text-muted-foreground shadow-none" aria-label="Filter by format">
+                    <SelectValue>{(value: string) => (value === "all" ? "All formats" : value)}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All formats</SelectItem>
+                    {kinds.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <ProjectFilter facets={facets} filter={projectFilter} scopeTeam={scopeTeam} />
+              </div>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
               <ArtifactList

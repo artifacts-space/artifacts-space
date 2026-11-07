@@ -14,6 +14,8 @@ export const rateLimits = {
   artifactUpdate: { limit: 1200, windowSeconds: hour },
   /** Artifact edits per MCP token per hour, so one runaway agent leaves room for the person's other agents. */
   artifactUpdateByToken: { limit: 600, windowSeconds: hour },
+  /** Project and tag changes (moving artifacts, creating, renaming, merging, deleting projects) per user per hour. */
+  organize: { limit: 1200, windowSeconds: hour },
   /** Reads (MCP read tools and opening artifacts in the workspace) per user per hour. */
   readByUser: { limit: 3600, windowSeconds: hour },
   /** MCP read tool calls per token per hour. */
@@ -64,6 +66,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   artifactCreate: "You have created a lot of artifacts in the last hour.",
   artifactUpdate: "You have changed artifacts a lot in the last hour.",
   artifactUpdateByToken: "This connection has changed artifacts a lot in the last hour.",
+  organize: "You have changed projects and tags a lot in the last hour.",
   readByUser: "You have read a lot of artifacts in the last hour.",
   readByToken: "This connection has read a lot in the last hour.",
   fileDownloadByNetwork: "Your network has opened a lot of files in the last hour.",

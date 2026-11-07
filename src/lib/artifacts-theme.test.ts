@@ -45,7 +45,7 @@ vi.mock("@/lib/agents/queries", () => ({ loadActors: () => Promise.resolve(new M
 
 const baseRecord = {
   id: "artifact-1", publicId: "4fXkP9qR2sT7vW1yZ3aB5c", userId: "user-1", title: "Plan", icon: null, theme: "ocean", summary: "", content: "# Plan",
-  kind: "markdown", language: "", project: "", sessionId: "", source: "", visibility: "private", comments: "team", shareId: "s", teamId: null,
+  kind: "markdown", language: "", project: "", projectId: null, sessionId: "", source: "", visibility: "private", comments: "team", shareId: "s", teamId: null,
   originalAuthorId: null, metadata: {}, approvedVersionId: null, updatedBy: "user-1", createdAt: new Date(), updatedAt: new Date(),
 } satisfies ArtifactRecord;
 

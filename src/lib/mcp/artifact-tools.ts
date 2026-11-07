@@ -9,12 +9,17 @@ import { artifactKinds, artifactVisibilities, commentSettings, type ArtifactDto,
 import {
   createArtifact,
   deleteArtifact,
+  getEditableArtifactDto,
   getOwnArtifactByPublicId,
   listArtifacts,
   updateArtifact,
   type ArtifactScope,
+  type ArtifactUpdateInput,
 } from "@/lib/artifacts";
 import { kindFieldDescription } from "@/lib/mcp/format-tools";
+import { projectLimits } from "@/lib/projects/limits";
+import { projectChoiceSchema, projectNameKey } from "@/lib/projects/rules";
+import { setArtifactProject } from "@/lib/projects/store";
 import { isPublicId } from "@/lib/public-id";
 import { setArtifactComments } from "@/lib/sharing/comments";
 import { requestArtifactSharing } from "@/lib/sharing/service";
@@ -64,6 +69,15 @@ function assertTheme(theme: unknown) {
   if (!result.ok) throw new UserFacingError(result.message);
 }
 
+const projectField = z
+  .string()
+  .max(projectLimits.maxNameChars * 2)
+  .nullable()
+  .optional()
+  .describe(
+    "Project name, matched without regard to case among the artifact's projects (projects_list shows them); a new name creates the project. null or \"\" removes it. Your private artifacts use your projects; artifacts shared through a team use the team's. Moving an artifact between projects never files a version or waits for approval, and readers outside the team never see it.",
+  );
+
 const editableFields = {
   title: z.string().min(1).max(160),
   icon: iconField,
@@ -72,7 +86,7 @@ const editableFields = {
   summary: z.string().max(600).optional(),
   kind: z.enum(artifactKinds).optional().describe(kindFieldDescription),
   language: z.string().max(60).optional(),
-  project: z.string().max(120).optional(),
+  project: projectField,
   sessionId: z.string().max(200).optional(),
   source: z.string().max(120).optional().describe("Agent or harness name"),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -175,23 +189,53 @@ async function editableByPublicId(userId: string, publicId: string) {
   return record;
 }
 
+/** The list filter for a project name, or none. */
+function projectFilterFor(name: string | undefined) {
+  const key = name ? projectNameKey(name) : "";
+  return key ? { key } : undefined;
+}
+
+/** Moves the artifact into the named project, or out of every project for null or "". */
+async function moveToProject(userId: string, artifactId: string, name: string | null) {
+  const choice = projectChoiceSchema.parse(name);
+  const moved = await setArtifactProject(userId, artifactId, choice ? { name: choice } : { none: true });
+  if (moved === undefined) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+  return moved;
+}
+
+/**
+ * Saves the content and fields an update supplied, filing a version. When it
+ * supplied none (only project, sharing, or comments), nothing is saved and
+ * no version is filed.
+ */
+async function saveFields(userId: string, artifactId: string, input: ArtifactUpdateInput): Promise<{ artifact: ArtifactDto; edit: "applied" | "pending" | "unchanged" }> {
+  if (!Object.values(input).some((value) => value !== undefined)) {
+    const current = await getEditableArtifactDto(userId, artifactId);
+    if (!current) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+    return { artifact: current, edit: "unchanged" };
+  }
+  const updated = await updateArtifact(userId, artifactId, input, "agent");
+  if (!updated) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+  return { artifact: updated, edit: updated.pendingEdit ? "pending" : "applied" };
+}
+
 function registerReadTools(server: ToolServer, userId: string) {
   server.registerTool(
     "artifacts_list",
     {
       title: "List artifacts",
       description:
-        "List and search artifacts by title, summary, content, or project. scope \"mine\" (default) lists yours; a team slug lists what is shared with that team. Items have no content: text formats carry a short `preview` (the first 280 characters), others none. Call artifacts_get with an id to read the full content.",
+        "List and search artifacts by title, summary, content, or project name, or only those in one `project`. scope \"mine\" (default) lists yours; a team slug lists what is shared with that team. Items have no content: text formats carry a short `preview` (the first 280 characters), others none. Call artifacts_get with an id to read the full content.",
       inputSchema: {
         query: z.string().max(300).optional().describe("Text to find in artifacts"),
-        project: z.string().max(120).optional().describe("Exact project name"),
+        project: z.string().max(projectLimits.maxNameChars * 2).optional().describe("Only artifacts in this project (name, any case)"),
         scope: z.string().max(39).optional().default("mine").describe("\"mine\" or a team slug from teams_list"),
         limit: z.number().int().min(1).max(100).optional().default(25),
       },
     },
     ({ query, project, scope, limit }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
-      const artifacts = await listArtifacts(userId, { scope: scopeFor(teams, scope), query, project, limit });
+      const artifacts = await listArtifacts(userId, { scope: scopeFor(teams, scope), query, project: projectFilterFor(project), limit });
       return artifacts.map((item) => toMcpListItem(item, view));
     }),
   );
@@ -249,7 +293,7 @@ function registerWriteTools(server: ToolServer, userId: string) {
     {
       title: "Update artifact",
       description:
-        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). Only the author can set visibility, which requests sharing through the team's rule. The author (and the team's owners and admins) can set `comments`. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved. Edits are limited per hour (generously); a limit error says when to try again.",
+        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). `project` applies at once, files no version, and never waits for approval; when you send only `project`, sharing, or comments, `edit` is \"unchanged\". Only the author can set visibility, which requests sharing through the team's rule. The author (and the team's owners and admins) can set `comments`. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved. Edits are limited per hour (generously); a limit error says when to try again.",
       inputSchema: {
         id: publicIdField,
         ...editableFields,
@@ -260,15 +304,16 @@ function registerWriteTools(server: ToolServer, userId: string) {
         comments: commentsField,
       },
     },
-    ({ id, visibility, team, comments, ...input }) => respond(async () => {
+    ({ id, visibility, team, comments, project, ...input }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
       const record = await editableByPublicId(userId, id);
       if (team) teamBySlug(teams, team);
       assertTheme(input.theme);
-      const updated = await updateArtifact(userId, record.id, input, "agent");
-      if (!updated) throw new UserFacingError("Artifact not found, or you cannot edit it.");
-      const result = await shareAfterSave(userId, updated, teams, { visibility, team, comments });
-      return { artifact: toMcpArtifact(result.artifact, view), edit: updated.pendingEdit ? "pending" : "applied", sharing: result.sharing, comments: result.comments };
+      const saved = await saveFields(userId, record.id, input);
+      // The project changes after the save, on its own: no version, no approval, and nothing if the save failed.
+      const artifact = project === undefined ? saved.artifact : { ...saved.artifact, project: await moveToProject(userId, record.id, project) };
+      const result = await shareAfterSave(userId, artifact, teams, { visibility, team, comments });
+      return { artifact: toMcpArtifact(result.artifact, view), edit: saved.edit, sharing: result.sharing, comments: result.comments };
     }),
   );
 

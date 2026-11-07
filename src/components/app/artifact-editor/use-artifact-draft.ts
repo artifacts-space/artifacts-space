@@ -9,12 +9,11 @@ export interface ArtifactDraft {
   icon: string | null;
   summary: string;
   content: string;
-  project: string;
   language: string;
   kind: ArtifactKind;
 }
 
-const draftKeys = ["title", "icon", "summary", "content", "project", "language", "kind"] as const satisfies readonly (keyof ArtifactDraft)[];
+const draftKeys = ["title", "icon", "summary", "content", "language", "kind"] as const satisfies readonly (keyof ArtifactDraft)[];
 
 function draftFrom(artifact: ArtifactDto): ArtifactDraft {
   return {
@@ -22,7 +21,6 @@ function draftFrom(artifact: ArtifactDto): ArtifactDraft {
     icon: artifact.icon,
     summary: artifact.summary,
     content: artifact.content,
-    project: artifact.project,
     language: artifact.language,
     kind: artifact.kind,
   };

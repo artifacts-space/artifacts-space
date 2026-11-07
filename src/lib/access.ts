@@ -53,7 +53,6 @@ export interface ServedArtifactView {
   content: string;
   kind: ArtifactKind;
   language: string;
-  project: string;
   source: string;
   metadata: Record<string, unknown>;
   /** When this version was saved. */
@@ -212,9 +211,10 @@ async function latestViewable(access: ArtifactAccess): Promise<ViewableArtifact 
   const { record } = access;
   const [content, editPending] = await Promise.all([latestContent(record.id), isReviewedLevel(record.visibility) ? hasPendingEdit(record.id) : false]);
   if (content === null) return null;
-  const { title, icon, theme, summary, kind, language, project, source, metadata } = record;
+  // No project or tags: they are for the author and team, and come from src/lib/projects for them.
+  const { title, icon, theme, summary, kind, language, source, metadata } = record;
   const served = latestServed(record);
-  const view = { title, icon, theme, summary, content, kind, language, project, source, metadata, updatedAt: served.updatedAt, editedBy: served.editedBy };
+  const view = { title, icon, theme, summary, content, kind, language, source, metadata, updatedAt: served.updatedAt, editedBy: served.editedBy };
   return { ...access, version: { source: "latest", versionId: null }, served, view, editPending };
 }
 

@@ -52,7 +52,7 @@ function fixtureArtifact(kind: EditorFixtureKind): ArtifactDto {
     content: contentFor[kind](),
     kind,
     language: "",
-    project: "",
+    project: null,
     sessionId: "",
     source: "web",
     visibility: "private",

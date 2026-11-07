@@ -99,6 +99,6 @@ export async function getArtifactVersionDetail(record: Pick<ArtifactRecord, "id"
   if (!row) return null;
   const [pendingId, newest, editors] = await Promise.all([pendingVersionId(record.id), latestId(record.id), lastEditorsFor([{ updatedBy: row.createdBy }])]);
   const summary = toSummary(row, { record, pendingId, latestId: newest, editors });
-  const { summary: text, content, language, project, source, metadata } = row;
-  return { ...summary, summary: text, content, language, project, source, metadata };
+  const { summary: text, content, language, source, metadata } = row;
+  return { ...summary, summary: text, content, language, source, metadata };
 }

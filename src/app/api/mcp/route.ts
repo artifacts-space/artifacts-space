@@ -6,6 +6,7 @@ import { registerArtifactTools } from "@/lib/mcp/artifact-tools";
 import { authenticateMcpRequest, bearerToken, type McpPrincipal } from "@/lib/mcp/authenticate";
 import { registerFileTools } from "@/lib/mcp/file-tools";
 import { registerFormatTools } from "@/lib/mcp/format-tools";
+import { registerProjectTools } from "@/lib/mcp/project-tools";
 import { jsonRpcId, mcpLimitChecks, mcpRateLimitedResponse, mcpToolCalls } from "@/lib/mcp/rate-limits";
 import { registerTeamTools } from "@/lib/mcp/team-tools";
 import { registerThemeTools } from "@/lib/mcp/theme-tools";
@@ -16,7 +17,7 @@ import { bearerChallenge } from "@/lib/oauth/metadata";
 export const maxDuration = 30;
 
 const INSTRUCTIONS =
-  "Use artifacts to preserve useful context across coding sessions. Save decisions, plans, research, code, and outputs. Search before creating duplicates, and include project and session identifiers when available. Give each artifact a fitting page icon with `icon` (one emoji or tabler:<name>), and optionally a `theme` preset from themes_list. Artifacts are private by default; teams_list shows the teams you can share with. You can edit artifacts shared through your team, and every save is kept in the history (artifacts_versions). Sharing and edits to shared artifacts may need a team owner's or admin's approval, and agents never approve.";
+  "Use artifacts to preserve useful context across coding sessions. Save decisions, plans, research, code, and outputs. Search before creating duplicates, and include project and session identifiers when available: set `project` to a project name (projects_list shows the ones that exist; a new name creates one). Give each artifact a fitting page icon with `icon` (one emoji or tabler:<name>), and optionally a `theme` preset from themes_list. Artifacts are private by default; teams_list shows the teams you can share with. You can edit artifacts shared through your team, and every save is kept in the history (artifacts_versions). Sharing and edits to shared artifacts may need a team owner's or admin's approval, and agents never approve.";
 
 function createMcpServer({ userId, access }: McpPrincipal) {
   const server = new McpServer(
@@ -25,6 +26,7 @@ function createMcpServer({ userId, access }: McpPrincipal) {
   );
 
   registerArtifactTools(server, userId, access);
+  registerProjectTools(server, userId, access);
   registerFormatTools(server, access);
   registerThemeTools(server, access);
   registerFileTools(server, userId, access);

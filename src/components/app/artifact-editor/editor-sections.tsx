@@ -103,14 +103,10 @@ export function ModeBar({ mode, onMode, length, updatedAt, updatedBy }: ModeBarP
   );
 }
 
-/** Project, format, and language fields below the content. */
+/** Format and language fields below the content. The project is set beside the summary (src/components/projects). */
 export function MetaFields({ draft, update }: { draft: ArtifactDraft; update: UpdateDraft }) {
   return (
-    <div className="grid gap-3 border-t bg-background/60 p-4 sm:grid-cols-3 sm:px-5">
-      <label className="flex items-center gap-2 text-sm text-muted-foreground">
-        <span className="w-16 shrink-0">Project</span>
-        <Input value={draft.project} onChange={(event) => { update("project", event.target.value); }} placeholder="None" className="h-8 bg-card" />
-      </label>
+    <div className="grid gap-3 border-t bg-background/60 p-4 sm:grid-cols-2 sm:px-5">
       <label className="flex items-center gap-2 text-sm text-muted-foreground">
         <span className="w-16 shrink-0">Format</span>
         <Select value={draft.kind} onValueChange={(value) => { if (value) update("kind", value); }}>

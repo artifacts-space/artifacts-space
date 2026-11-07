@@ -30,6 +30,7 @@ import type { StoredArtifactTheme } from "../lib/themes/artifact-theme";
 import { artifactThemeLimits } from "../lib/themes/artifact-theme-limits";
 import { artifactSizeLimits } from "../lib/artifact-limits";
 import { fileLimits, fileStatuses } from "../lib/files/config";
+import { projectLimits } from "../lib/projects/limits";
 
 // Better Auth tables. Column names follow Better Auth's core schema.
 
@@ -59,9 +60,7 @@ export const session = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     // Better Auth's organization plugin field `activeOrganizationId`.
     activeTeamId: text("active_team_id"),
   },
@@ -74,9 +73,7 @@ export const account = pgTable(
     id: text("id").primaryKey(),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
@@ -131,12 +128,8 @@ export const teamMember = pgTable(
   "team_member",
   {
     id: text("id").primaryKey(),
-    teamId: text("team_id")
-      .notNull()
-      .references(() => team.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    teamId: text("team_id").notNull().references(() => team.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     role: text("role").notNull().default("member"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
@@ -150,17 +143,13 @@ export const teamInvitation = pgTable(
   "team_invitation",
   {
     id: text("id").primaryKey(),
-    teamId: text("team_id")
-      .notNull()
-      .references(() => team.id, { onDelete: "cascade" }),
+    teamId: text("team_id").notNull().references(() => team.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
     role: text("role"),
     status: text("status").notNull().default("pending"),
     expiresAt: timestamp("expires_at").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
-    inviterId: text("inviter_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    inviterId: text("inviter_id").notNull().references(() => user.id, { onDelete: "cascade" }),
   },
   (table) => [
     index("team_invitation_team_idx").on(table.teamId),
@@ -182,7 +171,10 @@ export const artifact = pgTable(
     content: text("content").notNull(),
     kind: text("kind", { enum: artifactKinds }).notNull().default("markdown"),
     language: text("language").notNull().default(""),
+    // Deprecated: the free-text label from before projects were rows. Not read; project_id replaced it.
     project: text("project").notNull().default(""),
+    // The artifact's project, in its home scope (src/lib/projects). Null is "No project". Not versioned.
+    projectId: text("project_id").references((): AnyPgColumn => project.id, { onDelete: "set null" }),
     sessionId: text("session_id").notNull().default(""),
     source: text("source").notNull().default(""),
     // private: author only. team: members of `teamId`. link: anyone with the URL. public: anyone.
@@ -213,6 +205,7 @@ export const artifact = pgTable(
     uniqueIndex("artifact_public_id_idx").on(table.publicId),
     index("artifact_user_updated_idx").on(table.userId, table.updatedAt),
     index("artifact_user_project_idx").on(table.userId, table.project),
+    index("artifact_project_idx").on(table.projectId),
     index("artifact_team_updated_idx").on(table.teamId, table.updatedAt),
     check("artifact_comments_check", sql`${table.comments} in ('off', 'team', 'signed_in')`),
     check("artifact_icon_length_check", sql`char_length(${table.icon}) <= ${sql.raw(String(artifactIconLimits.maxStoredChars))}`),
@@ -261,20 +254,40 @@ export const artifactVersion = pgTable(
   ],
 );
 
+// A named group of artifacts in one scope: a person's own (team_id null) or a
+// shared team's (user_id null). Names are unique per scope by name_key.
+export const project = pgTable(
+  "project",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    teamId: text("team_id").references(() => team.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // The normalized name in lowercase, for case-insensitive matching (src/lib/projects/rules.ts).
+    nameKey: text("name_key").notNull(),
+    // One emoji or "tabler:<name>", like an artifact icon but never an uploaded file.
+    icon: text("icon"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("project_user_key_idx").on(table.userId, table.nameKey).where(sql`${table.userId} is not null`),
+    uniqueIndex("project_team_key_idx").on(table.teamId, table.nameKey).where(sql`${table.teamId} is not null`),
+    check("project_scope_check", sql`(${table.userId} is null) <> (${table.teamId} is null)`),
+    check("project_name_check", sql`char_length(${table.name}) between 1 and ${sql.raw(String(projectLimits.maxNameChars))}`),
+    check("project_icon_length_check", sql`char_length(${table.icon}) <= ${sql.raw(String(artifactIconLimits.maxStoredChars))}`),
+  ],
+);
+
 // A request to share an artifact that waits for a team owner's or admin's decision.
 export const sharingRequest = pgTable(
   "sharing_request",
   {
     id: text("id").primaryKey(),
-    artifactId: text("artifact_id")
-      .notNull()
-      .references(() => artifact.id, { onDelete: "cascade" }),
-    teamId: text("team_id")
-      .notNull()
-      .references(() => team.id, { onDelete: "cascade" }),
-    requestedBy: text("requested_by")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    artifactId: text("artifact_id").notNull().references(() => artifact.id, { onDelete: "cascade" }),
+    teamId: text("team_id").notNull().references(() => team.id, { onDelete: "cascade" }),
+    requestedBy: text("requested_by").notNull().references(() => user.id, { onDelete: "cascade" }),
     // sharing: a change of who can read it. edit: changed content of a link or public artifact.
     kind: text("kind", { enum: sharingRequestKinds }).notNull().default("sharing"),
     // The requested level: team, link, or public. For an edit, the level it is shared at.
@@ -299,9 +312,7 @@ export const apiToken = pgTable(
   "api_token",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     prefix: text("prefix").notNull(),
     tokenHash: text("token_hash").notNull(),
@@ -331,9 +342,7 @@ export const artifactReport = pgTable(
   "artifact_report",
   {
     id: text("id").primaryKey(),
-    artifactId: text("artifact_id")
-      .notNull()
-      .references(() => artifact.id, { onDelete: "cascade" }),
+    artifactId: text("artifact_id").notNull().references(() => artifact.id, { onDelete: "cascade" }),
     // The team that approved the sharing when the report arrived.
     teamId: text("team_id").references(() => team.id, { onDelete: "set null" }),
     reason: text("reason", { enum: reportReasons }).notNull(),
@@ -393,12 +402,8 @@ export const artifactFile = pgTable(
 export const agent = pgTable(
   "agent",
   {
-    userId: text("user_id")
-      .primaryKey()
-      .references(() => user.id, { onDelete: "cascade" }),
-    teamId: text("team_id")
-      .notNull()
-      .references(() => team.id, { onDelete: "cascade" }),
+    userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
+    teamId: text("team_id").notNull().references(() => team.id, { onDelete: "cascade" }),
     // The person who added the agent. Work is shown as "by @agent for <owner>".
     ownerId: text("owner_id").references(() => user.id, { onDelete: "set null" }),
     // Set when a team owner or admin mutes the agent across the team.
@@ -416,9 +421,7 @@ export const comment = pgTable(
   "comment",
   {
     id: text("id").primaryKey(),
-    artifactId: text("artifact_id")
-      .notNull()
-      .references(() => artifact.id, { onDelete: "cascade" }),
+    artifactId: text("artifact_id").notNull().references(() => artifact.id, { onDelete: "cascade" }),
     // Null once the author's account is gone. The comment stays in the thread.
     authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
     parentId: text("parent_id").references((): AnyPgColumn => comment.id, { onDelete: "set null" }),
@@ -440,15 +443,9 @@ export const mention = pgTable(
   "mention",
   {
     id: text("id").primaryKey(),
-    commentId: text("comment_id")
-      .notNull()
-      .references(() => comment.id, { onDelete: "cascade" }),
-    artifactId: text("artifact_id")
-      .notNull()
-      .references(() => artifact.id, { onDelete: "cascade" }),
-    recipientId: text("recipient_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    commentId: text("comment_id").notNull().references(() => comment.id, { onDelete: "cascade" }),
+    artifactId: text("artifact_id").notNull().references(() => artifact.id, { onDelete: "cascade" }),
+    recipientId: text("recipient_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     readAt: timestamp("read_at", { withTimezone: true }),
   },
@@ -462,12 +459,8 @@ export const mention = pgTable(
 export const threadMute = pgTable(
   "thread_mute",
   {
-    artifactId: text("artifact_id")
-      .notNull()
-      .references(() => artifact.id, { onDelete: "cascade" }),
-    agentId: text("agent_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    artifactId: text("artifact_id").notNull().references(() => artifact.id, { onDelete: "cascade" }),
+    agentId: text("agent_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     mutedBy: text("muted_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -479,9 +472,7 @@ export const threadMute = pgTable(
 export const confirmationSkip = pgTable(
   "confirmation_skip",
   {
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     action: text("action").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -489,6 +480,7 @@ export const confirmationSkip = pgTable(
 );
 
 export type ArtifactRecord = typeof artifact.$inferSelect;
+export type ProjectRecord = typeof project.$inferSelect;
 export type TeamRecord = typeof team.$inferSelect;
 export type SharingRequestRecord = typeof sharingRequest.$inferSelect;
 export type ApiTokenRecord = typeof apiToken.$inferSelect;

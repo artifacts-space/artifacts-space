@@ -12,6 +12,7 @@ import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
+import { PageOrganizers } from "@/components/projects/page-organizers";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { CopyButton } from "@/components/copy-button";
 import { GitHubLink } from "@/components/github-link";
@@ -32,6 +33,7 @@ import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { lastEditorsFor } from "@/lib/artifacts";
 import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
+import { pageProjectFor } from "@/lib/projects/page-project";
 import { isReportable } from "@/lib/reports/rules";
 import { getSession } from "@/lib/session";
 import { resolveTheme } from "@/lib/themes/resolve";
@@ -147,11 +149,14 @@ function HeadingIcon({ viewable }: { viewable: ViewableArtifact }) {
   return <div className="mb-2"><ArtifactIcon icon={view.icon} size="page" /></div>;
 }
 
-/** Format, icon, title, summary, who saved it last, and whether changes wait for approval. */
-function ArtifactHeading({ viewable, editor }: { viewable: ViewableArtifact; editor: ArtifactEditorDto | null }) {
+/**
+ * Format, icon, title, summary, the project (for editors only), who saved it
+ * last, and whether changes wait for approval.
+ */
+function ArtifactHeading({ viewable, editor, organizers }: { viewable: ViewableArtifact; editor: ArtifactEditorDto | null; organizers: React.ReactNode }) {
   const { view, record } = viewable;
   const Icon = kindIcons[view.kind];
-  const meta = [view.project ? `Project ${view.project}` : null, view.source ? `Source ${view.source}` : null].filter(Boolean);
+  const meta = [view.source ? `Source ${view.source}` : null].filter(Boolean);
   return (
     <>
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -162,6 +167,7 @@ function ArtifactHeading({ viewable, editor }: { viewable: ViewableArtifact; edi
         <h1 className="text-balance text-4xl font-medium leading-[1.08] tracking-[-0.03em] sm:text-5xl">{view.title}</h1>
       </div>
       {view.summary ? <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{view.summary}</p> : null}
+      {organizers}
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
         <LastEdited editor={editor} at={view.updatedAt.toISOString()} className="text-sm" />
         {meta.length > 0 ? <span>· {meta.join(" · ")}</span> : null}
@@ -169,6 +175,17 @@ function ArtifactHeading({ viewable, editor }: { viewable: ViewableArtifact; edi
       <PendingEditNotice viewable={viewable} />
     </>
   );
+}
+
+/**
+ * The project control, only for those who may edit the artifact: its author
+ * and members of the team it is shared through. Everyone else, including
+ * every reader of a link or public page, never receives the project.
+ */
+async function loadOrganizers(viewable: ViewableArtifact, session: { user: { id: string } } | null) {
+  const project = await pageProjectFor(viewable, session ? session.user.id : null).catch(() => undefined);
+  if (project === undefined) return null;
+  return <PageOrganizers artifactId={viewable.record.id} project={project} />;
 }
 
 /**
@@ -202,12 +219,13 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   const viewable = await load(params);
   if (!viewable) notFound();
   const { record, view } = viewable;
-  // getSession is deduplicated per request, so this reuses load()'s lookup.
-  const [byline, files, session, editor] = await Promise.all([
+  // getSession is deduplicated per request, so these reuse load()'s lookup.
+  const [byline, files, session, editor, organizers] = await Promise.all([
     loadArtifactByline(record, viewable.isTeamMember),
     filesForViewer(viewable),
     getSession(),
     lastEditor(view.editedBy),
+    getSession().then((session) => loadOrganizers(viewable, session)),
   ]);
   const copy = visibilityCopy(record.visibility);
   // The team default arrives with team presets; until then an artifact's own theme or the site default.
@@ -230,7 +248,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
         <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
           <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
             <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={presetId ?? "custom"}>
-              <ArtifactHeading viewable={viewable} editor={editor} />
+              <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} />
               <article className="mt-10">
                 <ArtifactBody viewable={viewable} files={files} />
               </article>

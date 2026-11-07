@@ -30,6 +30,23 @@ function initialTab(value: string | null): PickerTab {
   return type === "file" ? "upload" : "emoji";
 }
 
+/** The tab buttons. Upload shows only where an icon may be an uploaded image. */
+function PickerTabs({ allowUpload }: { allowUpload: boolean }) {
+  return (
+    <TabsList variant="line" className="h-8">
+      <TabsTrigger value="emoji">Emoji</TabsTrigger>
+      <TabsTrigger value="icons">Icons</TabsTrigger>
+      {allowUpload ? <TabsTrigger value="upload">Upload</TabsTrigger> : null}
+    </TabsList>
+  );
+}
+
+/** The Upload tab's panel, when uploads are allowed. Its content mounts only while it is open. */
+function UploadPanel({ shown, active, onSelect }: { shown: boolean; active: boolean; onSelect: (icon: string) => void }) {
+  if (!shown) return null;
+  return <TabsContent value="upload">{active ? <UploadTab onSelect={onSelect} /> : null}</TabsContent>;
+}
+
 interface IconPickerProps {
   /** The stored icon, or null. */
   value: string | null;
@@ -39,13 +56,16 @@ interface IconPickerProps {
   trigger: React.ReactElement;
   disabled?: boolean;
   align?: "start" | "center" | "end";
+  /** False hides the Upload tab, for icons that cannot be an uploaded image (projects). */
+  allowUpload?: boolean;
 }
 
 /**
  * A Notion-style icon picker: Emoji, Icons, and Upload tabs, search where it
  * helps, and Remove. A popover that spans the screen on phones.
  */
-export function IconPicker({ value, onChange, trigger, disabled = false, align = "start" }: IconPickerProps) {
+export function IconPicker({ value, onChange, trigger, disabled = false, align = "start", allowUpload }: IconPickerProps) {
+  const uploads = allowUpload !== false;
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<PickerTab>(() => initialTab(value));
 
@@ -61,11 +81,7 @@ export function IconPicker({ value, onChange, trigger, disabled = false, align =
         <PopoverTitle className="sr-only">Choose an icon</PopoverTitle>
         <Tabs value={tab} onValueChange={(next: PickerTab) => { setTab(next); }} className="gap-0">
           <div className="flex items-center gap-2 border-b px-2 py-1.5">
-            <TabsList variant="line" className="h-8">
-              <TabsTrigger value="emoji">Emoji</TabsTrigger>
-              <TabsTrigger value="icons">Icons</TabsTrigger>
-              <TabsTrigger value="upload">Upload</TabsTrigger>
-            </TabsList>
+            <PickerTabs allowUpload={uploads} />
             {value ? (
               <Button type="button" variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={() => { choose(null); }}>
                 <IconTrash /> Remove
@@ -74,7 +90,7 @@ export function IconPicker({ value, onChange, trigger, disabled = false, align =
           </div>
           <TabsContent value="emoji">{open && tab === "emoji" ? <EmojiTab onSelect={choose} /> : null}</TabsContent>
           <TabsContent value="icons">{open && tab === "icons" ? <TablerTab value={value} onSelect={choose} /> : null}</TabsContent>
-          <TabsContent value="upload">{open && tab === "upload" ? <UploadTab onSelect={choose} /> : null}</TabsContent>
+          <UploadPanel shown={uploads} active={open && tab === "upload"} onSelect={choose} />
         </Tabs>
       </PopoverContent>
     </Popover>

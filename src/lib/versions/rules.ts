@@ -69,12 +69,11 @@ export interface ReviewedFields {
   content: string;
   kind: string;
   language: string;
-  project: string;
   source: string;
   metadata: Record<string, unknown>;
 }
 
-const reviewedKeys = ["title", "icon", "summary", "content", "kind", "language", "project", "source"] as const;
+const reviewedKeys = ["title", "icon", "summary", "content", "kind", "language", "source"] as const;
 
 /** True when two versions show readers the same thing. */
 export function sameReviewedFields(a: ReviewedFields, b: ReviewedFields): boolean {

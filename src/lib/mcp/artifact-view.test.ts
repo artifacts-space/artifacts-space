@@ -14,7 +14,7 @@ const dto: ArtifactDto = {
   content: "# Plan",
   kind: "markdown",
   language: "",
-  project: "",
+  project: null,
   sessionId: "",
   source: "",
   files: [],

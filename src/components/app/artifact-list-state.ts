@@ -24,7 +24,7 @@ interface FilterableItem {
   title: string;
   summary: string;
   preview: string;
-  project: string;
+  project: { name: string } | null;
   source: string;
 }
 
@@ -38,7 +38,7 @@ export function filterArtifactList<T extends FilterableItem>(items: readonly T[]
   const kindMatches = (item: T) => filters.kind === "all" || item.kind === filters.kind;
   const local = items.filter((item) => {
     if (!kindMatches(item)) return false;
-    return !search || [item.title, item.summary, item.preview, item.project, item.source].join(" ").toLowerCase().includes(search);
+    return !search || [item.title, item.summary, item.preview, item.project?.name ?? "", item.source].join(" ").toLowerCase().includes(search);
   });
   if (!search || !serverMatches) return local;
   const shown = new Set(local.map((item) => item.id));
