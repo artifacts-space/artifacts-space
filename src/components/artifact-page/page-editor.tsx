@@ -116,7 +116,7 @@ export function PageEditor({ artifact, onClose }: PageEditorProps) {
       </div>
       {error ? <div className="mt-4"><FormError message={error} /></div> : null}
       <div className="mt-6 space-y-3">
-        {artifact.icon ? <div><ArtifactIcon icon={artifact.icon} size="page" /></div> : null}
+        <ArtifactIcon icon={artifact.icon} size="page" />
         <input
           value={draft.title}
           onChange={(event) => { change("title")(event.target.value); }}
