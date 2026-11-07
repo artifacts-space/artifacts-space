@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { updateArtifactAction } from "@/app/(workspace)/app/actions";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
+import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { ContentEditor } from "@/components/editor/content-editor";
 import { DocumentEditor, isDocumentKind } from "@/components/editor/document-editor";
 import { FormError } from "@/components/teams/form-error";
@@ -115,6 +116,7 @@ export function PageEditor({ artifact, onClose }: PageEditorProps) {
       </div>
       {error ? <div className="mt-4"><FormError message={error} /></div> : null}
       <div className="mt-6 space-y-3">
+        {artifact.icon ? <div><ArtifactIcon icon={artifact.icon} size="page" /></div> : null}
         <input
           value={draft.title}
           onChange={(event) => { change("title")(event.target.value); }}

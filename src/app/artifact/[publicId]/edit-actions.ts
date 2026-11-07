@@ -1,16 +1,24 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getEditableArtifact } from "@/lib/access";
 import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult, ArtifactDto } from "@/lib/artifact-types";
-import { toArtifactDtos } from "@/lib/artifacts";
+import { artifactIconInputSchema } from "@/lib/artifact-icons";
+import { toArtifactDtos, updateArtifact } from "@/lib/artifacts";
 import { isPublicId } from "@/lib/public-id";
 import { getSession } from "@/lib/session";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 const publicIdSchema = z.string().refine(isPublicId, "Artifact not found.");
+
+/** What setting the icon did: live for every reader, or waiting for approval (link and public artifacts). */
+export interface IconSaveResult {
+  icon: string | null;
+  pending: boolean;
+}
 
 /**
  * The latest saved artifact, for the in-place editor on its page. Only the
@@ -29,5 +37,29 @@ export async function loadEditableArtifactAction(publicId: string): Promise<Acti
     return { success: true, data: dto };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The artifact could not load for editing. Try again.") };
+  }
+}
+
+/**
+ * Sets or removes the page icon from the artifact's title area. The same
+ * edit check and save path as any other change (updateArtifact as a
+ * person), so it files a version and, for link and public artifacts, waits
+ * for approval exactly like a title change.
+ */
+export async function setArtifactIconAction(publicId: string, icon: string | null): Promise<ActionResult<IconSaveResult>> {
+  try {
+    const session = await getSession();
+    if (!session) return { success: false, error: "Your session ended. Sign in again." };
+    const id = publicIdSchema.parse(publicId);
+    const nextIcon = artifactIconInputSchema.parse(icon);
+    const record = await getEditableArtifact(session.user.id, { publicId: id });
+    if (!record) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+    const saved = await updateArtifact(session.user.id, record.id, { icon: nextIcon }, "person");
+    if (!saved) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+    revalidatePath("/app");
+    revalidatePath(`/artifact/${saved.publicId}`);
+    return { success: true, data: { icon: saved.icon, pending: saved.pendingEdit !== null } };
+  } catch (error) {
+    return { success: false, error: actionErrorMessage(error, "The icon could not be saved. Try again.") };
   }
 }

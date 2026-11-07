@@ -5,6 +5,8 @@ import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 /** The fields a person can edit in the artifact editor. */
 export interface ArtifactDraft {
   title: string;
+  /** One emoji or "tabler:<name>"; null for none. */
+  icon: string | null;
   summary: string;
   content: string;
   project: string;
@@ -12,11 +14,12 @@ export interface ArtifactDraft {
   kind: ArtifactKind;
 }
 
-const draftKeys = ["title", "summary", "content", "project", "language", "kind"] as const satisfies readonly (keyof ArtifactDraft)[];
+const draftKeys = ["title", "icon", "summary", "content", "project", "language", "kind"] as const satisfies readonly (keyof ArtifactDraft)[];
 
 function draftFrom(artifact: ArtifactDto): ArtifactDraft {
   return {
     title: artifact.title,
+    icon: artifact.icon,
     summary: artifact.summary,
     content: artifact.content,
     project: artifact.project,

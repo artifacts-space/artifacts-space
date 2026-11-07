@@ -1,10 +1,10 @@
 "use client";
 
 import { IconCheck, IconLoader2, IconLock } from "@tabler/icons-react";
-import Link from "next/link";
 
 import { dismissReportAction, withdrawReportedAction } from "@/app/(workspace)/app/sharing-actions";
 import { visibilityLabel } from "@/components/app/share-options";
+import { ArtifactTitleLink } from "@/components/artifact-icon/artifact-title-link";
 import { Button } from "@/components/ui/button";
 import { reportReasonLabels } from "@/lib/reports/rules";
 import type { OpenReportView } from "@/lib/reports/service";
@@ -22,7 +22,7 @@ export function ReportsList({ reports }: { reports: OpenReportView[] }) {
       {reports.map((report) => (
         <li key={report.reportId} className="flex flex-wrap items-start gap-3 border-b px-5 py-3 last:border-b-0">
           <div className="min-w-0 flex-1">
-            <Link href={`/artifact/${report.publicId}`} className="block truncate text-md font-medium hover:underline">{report.title}</Link>
+            <ArtifactTitleLink publicId={report.publicId} title={report.title} icon={report.icon} />
             <p className="mt-0.5 text-sm text-muted-foreground">
               {reportReasonLabels[report.reason]} · {visibilityLabel(report.visibility)} · {dateFormat.format(new Date(report.reportedAt))}
             </p>

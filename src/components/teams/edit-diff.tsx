@@ -1,3 +1,5 @@
+import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
+import { iconLabel } from "@/lib/artifact-icons";
 import { capHunks, diffHunks, diffLines, diffStats, type DiffLine } from "@/lib/diff";
 import { cn } from "@/lib/utils";
 import type { ReviewedFields } from "@/lib/versions/rules";
@@ -5,7 +7,7 @@ import type { ReviewedFields } from "@/lib/versions/rules";
 /** Most diff lines shown for one edit. Longer diffs say how much is hidden. */
 const MAX_SHOWN_LINES = 300;
 
-const fieldLabels: { key: Exclude<keyof ReviewedFields, "content" | "metadata">; label: string }[] = [
+const fieldLabels: { key: Exclude<keyof ReviewedFields, "content" | "metadata" | "icon">; label: string }[] = [
   { key: "title", label: "Title" },
   { key: "summary", label: "Summary" },
   { key: "kind", label: "Format" },
@@ -25,13 +27,38 @@ function empty(value: string) {
   return value === "" ? "(empty)" : value;
 }
 
+/** One icon and its plain name, for the review row. */
+function IconValue({ icon }: { icon: string | null }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 align-middle">
+      <ArtifactIcon icon={icon} />
+      <span>{iconLabel(icon)}</span>
+    </span>
+  );
+}
+
+/** The icon row: old icon struck through, then the new one. */
+function IconChange({ before, after }: { before: string | null; after: string | null }) {
+  return (
+    <div className="grid gap-1 sm:grid-cols-[6rem_1fr]">
+      <dt className="text-muted-foreground">Icon</dt>
+      <dd className="flex min-w-0 flex-wrap items-center gap-2">
+        <span className="bg-diff-removed px-1 text-diff-removed-foreground line-through"><IconValue icon={before} /></span>
+        <span className="bg-diff-added px-1 text-diff-added-foreground"><IconValue icon={after} /></span>
+      </dd>
+    </div>
+  );
+}
+
 /** Changed short fields, one row each: old value, then new value. */
 function FieldChanges({ before, after }: { before: ReviewedFields; after: ReviewedFields }) {
   const changed = fieldLabels.filter(({ key }) => before[key] !== after[key]);
+  const iconChanged = before.icon !== after.icon;
   const metadataChanged = JSON.stringify(before.metadata) !== JSON.stringify(after.metadata);
-  if (changed.length === 0 && !metadataChanged) return null;
+  if (changed.length === 0 && !metadataChanged && !iconChanged) return null;
   return (
     <dl className="grid gap-1.5 text-sm">
+      {iconChanged ? <IconChange before={before.icon} after={after.icon} /> : null}
       {changed.map(({ key, label }) => (
         <div key={key} className="grid gap-1 sm:grid-cols-[6rem_1fr]">
           <dt className="text-muted-foreground">{label}</dt>

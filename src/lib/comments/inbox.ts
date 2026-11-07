@@ -25,7 +25,7 @@ export interface InboxEntryView {
   id: string;
   createdAt: string;
   readAt: string | null;
-  artifact: { publicId: string; title: string };
+  artifact: { publicId: string; title: string; icon: string | null };
   comment: CommentView;
 }
 
@@ -80,7 +80,7 @@ export async function listInbox(userId: string, options: { unreadOnly?: boolean;
     const view = viewable[index];
     if (!view) return [];
     const seesComments = canSeeComments(view.record.comments, { canViewArtifact: true, isAuthor: view.record.userId === userId, isTeamMember: view.isTeamMember });
-    return seesComments ? [[publicId, view.served.title] as const] : [];
+    return seesComments ? [[publicId, { title: view.served.title, icon: view.served.icon }] as const] : [];
   }));
   const visible = rows.filter((row) => titles.has(row.artifact.publicId));
   const authors = await loadActors(visible.flatMap((row) => (row.record.authorId ? [row.record.authorId] : [])));
@@ -88,7 +88,7 @@ export async function listInbox(userId: string, options: { unreadOnly?: boolean;
     id: row.entry.id,
     createdAt: row.entry.createdAt.toISOString(),
     readAt: row.entry.readAt?.toISOString() ?? null,
-    artifact: { publicId: row.artifact.publicId, title: titles.get(row.artifact.publicId) ?? "" },
+    artifact: { publicId: row.artifact.publicId, title: "", icon: null, ...titles.get(row.artifact.publicId) },
     comment: toCommentView(row.record, authors, userId),
   }));
 }

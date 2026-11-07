@@ -1,11 +1,11 @@
 "use client";
 
 import { IconCheck, IconLoader2, IconLock, IconX } from "@tabler/icons-react";
-import Link from "next/link";
 
 import { decideSharingAction, withdrawSharingAction } from "@/app/(workspace)/app/sharing-actions";
 import { commentLabel } from "@/components/app/comment-options";
 import { visibilityLabel } from "@/components/app/share-options";
+import { ArtifactTitleLink } from "@/components/artifact-icon/artifact-title-link";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
 import type { PendingSharingView, TeamSharedView } from "@/lib/sharing/queries";
@@ -34,7 +34,7 @@ export function PendingSharingList({ requests }: { requests: PendingSharingView[
       {requests.map((request) => (
         <li key={request.requestId} className="flex flex-wrap items-center gap-3 border-b px-5 py-3 last:border-b-0">
           <div className="min-w-0 flex-1">
-            <Link href={`/artifact/${request.publicId}`} className="block truncate text-md font-medium hover:underline">{request.title}</Link>
+            <ArtifactTitleLink publicId={request.publicId} title={request.title} icon={request.icon} />
             <p className="mt-0.5 text-sm text-muted-foreground">
               <PixelAvatar seed={request.requesterId} kind={request.requesterKind} size={16} className="mr-1 -mt-px" />
               {person(request.requesterName, request.requesterUsername)} {askedFor(request)} · {dateFormat.format(new Date(request.requestedAt))}
@@ -61,7 +61,7 @@ export function TeamSharedList({ artifacts, canWithdraw }: { artifacts: TeamShar
       {artifacts.map((item) => (
         <li key={item.artifactId} className="flex flex-wrap items-center gap-3 border-b px-5 py-3 last:border-b-0">
           <div className="min-w-0 flex-1">
-            <Link href={`/artifact/${item.publicId}`} className="block truncate text-md font-medium hover:underline">{item.title}</Link>
+            <ArtifactTitleLink publicId={item.publicId} title={item.title} icon={item.icon} />
             <p className="mt-0.5 text-sm text-muted-foreground">
               <PixelAvatar seed={item.authorId} kind={item.authorKind} size={16} className="mr-1 -mt-px" />
               {person(item.authorName, item.authorUsername)} · {visibilityLabel(item.visibility)}

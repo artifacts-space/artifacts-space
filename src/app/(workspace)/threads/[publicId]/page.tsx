@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { MarkThreadRead } from "@/components/comments/mark-thread-read";
 import { PixelAvatar } from "@/components/pixel-avatar";
@@ -34,7 +35,10 @@ export default async function ThreadPage({ params }: PageProps<"/threads/[public
       </Button>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-xl font-medium tracking-[-0.01em] break-words">{viewable.served.title}</h1>
+          <h1 className="flex items-center gap-2 text-xl font-medium tracking-[-0.01em] break-words">
+            {viewable.served.icon ? <ArtifactIcon icon={viewable.served.icon} className="size-5" /> : null}
+            <span className="min-w-0">{viewable.served.title}</span>
+          </h1>
           <p className="mt-1 text-md text-muted-foreground">
             By {byline.avatar ? <PixelAvatar seed={byline.avatar.seed} kind={byline.avatar.kind} size={16} className="mr-1 -mt-px" /> : null}
             {byline.author}{byline.teamName ? ` · ${byline.teamName}` : ""}

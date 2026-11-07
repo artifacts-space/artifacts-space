@@ -98,7 +98,7 @@ export function ArtifactEditor({ artifact, origin, isAuthor, team, seesComments,
         onWithdraw={onWithdraw}
       />
       {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
-      <TitleFields title={draft.title} summary={draft.summary} update={update} />
+      <TitleFields title={draft.title} icon={draft.icon} summary={draft.summary} update={update} />
       <ModeBar mode={mode} onMode={setMode} length={draft.content.length} updatedAt={artifact.updatedAt} updatedBy={artifact.updatedBy} />
       <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} files={artifact.files} update={update} />
       {draft.kind === "file" || draft.kind === "ui" || artifact.files.length > 0 ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}

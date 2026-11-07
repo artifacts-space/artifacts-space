@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { setCommentsAction, shareArtifactAction } from "@/app/(workspace)/app/sharing-actions";
+import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -172,7 +173,10 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Share “{artifact.title}”</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <ArtifactIcon icon={artifact.icon} />
+              <span className="min-w-0">Share “{artifact.title}”</span>
+            </DialogTitle>
             <DialogDescription className="leading-6">Artifacts are private until you share them. Teams decide whether sharing needs approval.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
