@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, isNull, type SQL } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, project, type ArtifactRecord, type ProjectRecord } from "@/db/schema";
@@ -75,11 +75,35 @@ async function resolveChoice(choice: ProjectChoice, scope: ProjectScope, editorI
   return loaded.row;
 }
 
-/** Links an artifact to a project (or none) without touching its content, history, or save time. */
+/**
+ * SQL for "the artifact still has the sharing that was read": a write that
+ * depends on the home scope applies only if no sharing change slipped in.
+ */
+function sharingUnchanged(record: Pick<ArtifactRecord, "id" | "visibility" | "teamId">): SQL {
+  const team = record.teamId === null ? isNull(artifact.teamId) : eq(artifact.teamId, record.teamId);
+  const condition = and(eq(artifact.id, record.id), eq(artifact.visibility, record.visibility), team);
+  if (!condition) throw new Error("The artifact condition could not be built.");
+  return condition;
+}
+
+/**
+ * The link's columns: the project, and the deprecated label cleared, so a
+ * rerun of the label backfill never brings back a project someone changed.
+ */
+function linkColumns(projectId: string | null) {
+  return { projectId, project: "" };
+}
+
+/**
+ * Links an artifact to a project (or none) without touching its content,
+ * history, or save time. Refused when its sharing changed since it was read,
+ * so a link never lands outside the artifact's home scope.
+ */
 export async function linkArtifactProject(record: ArtifactRecord, choice: ProjectChoice, editorId: string): Promise<ArtifactProjectDto | null> {
   const scope = await loadHomeScope(record);
   const chosen = await resolveChoice(choice, scope, editorId);
-  await getDb().update(artifact).set({ projectId: chosen?.id ?? null }).where(eq(artifact.id, record.id));
+  const changed = await getDb().update(artifact).set(linkColumns(chosen?.id ?? null)).where(sharingUnchanged(record)).returning();
+  if (changed.length === 0) throw new UserFacingError("The artifact's sharing changed just now. Try again.");
   return chosen ? toProjectDto(chosen) : null;
 }
 
@@ -104,9 +128,11 @@ function nullWhenFull(error: unknown): null {
  * After a sharing change, moves the artifact's project link to its new home
  * scope: the project with the same name there (created, with the same icon,
  * when missing). When the new scope is full the artifact loses its project
- * rather than its sharing change. `actorId` is who changed the sharing.
+ * rather than its sharing change. A project created in the author's own
+ * scope is recorded as theirs. The write applies only if the sharing and the
+ * link are still what was read; a later change runs its own move.
  */
-export async function rehomeArtifactProject(artifactId: string, actorId: string): Promise<void> {
+export async function rehomeArtifactProject(artifactId: string): Promise<void> {
   const [record] = await getDb()
     .select({ id: artifact.id, userId: artifact.userId, visibility: artifact.visibility, teamId: artifact.teamId, projectId: artifact.projectId })
     .from(artifact)
@@ -115,6 +141,9 @@ export async function rehomeArtifactProject(artifactId: string, actorId: string)
   if (!record?.projectId) return;
   const [current, home] = await Promise.all([loadProject(record.projectId), loadHomeScope(record)]);
   if (current && sameScope(current.scope, home)) return;
-  const target = current ? await findOrCreateProject(home, current.row.name, actorId, current.row.icon).catch(nullWhenFull) : null;
-  await getDb().update(artifact).set({ projectId: target?.id ?? null }).where(eq(artifact.id, artifactId));
+  const target = current ? await findOrCreateProject(home, current.row.name, record.userId, current.row.icon).catch(nullWhenFull) : null;
+  await getDb()
+    .update(artifact)
+    .set(linkColumns(target?.id ?? null))
+    .where(and(sharingUnchanged(record), eq(artifact.projectId, record.projectId)));
 }

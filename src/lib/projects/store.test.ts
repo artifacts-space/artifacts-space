@@ -108,7 +108,20 @@ describe("setArtifactProject", () => {
     expect(tables.get(artifactVersion)).toEqual([]);
     expect(current()).toMatchObject({ updatedAt, updatedBy: "author" });
     const writes = log.filter((entry) => entry.table === artifact);
-    expect(writes).toEqual([{ op: "update", table: artifact, values: { projectId: "p-author" } }]);
+    expect(writes).toEqual([{ op: "update", table: artifact, values: { projectId: "p-author", project: "" } }]);
+  });
+
+  it("should clear the deprecated label when an artifact moves", async () => {
+    Object.assign(current() ?? {}, { project: "Old label" });
+    await setArtifactProject("author", "a1", { none: true });
+    expect(current()?.project).toBe("");
+  });
+
+  it("should refuse the move and change nothing when the sharing changed after the artifact was read", async () => {
+    state.editable = { ...current() };
+    Object.assign(current() ?? {}, { visibility: "team", teamId: "acme" });
+    await expect(setArtifactProject("author", "a1", { name: "Billing" })).rejects.toThrow("sharing changed just now");
+    expect(current()?.projectId).toBeNull();
   });
 
   it("should count the change against the organize limit", async () => {
@@ -128,15 +141,15 @@ describe("findOrCreateProject", () => {
 describe("rehomeArtifactProject", () => {
   it("should move the link to the team's project of the same name when the artifact is shared with a team", async () => {
     Object.assign(current() ?? {}, { projectId: "p-author", visibility: "team", teamId: "acme" });
-    await rehomeArtifactProject("a1", "author");
+    await rehomeArtifactProject("a1");
     const teamProject = tables.get(project)?.find((row) => row.teamId === "acme" && row.nameKey === "billing");
-    expect(teamProject).toBeDefined();
+    expect(teamProject).toMatchObject({ createdBy: "author" });
     expect(current()?.projectId).toBe(teamProject?.id);
   });
 
   it("should move the link back to the author's project when a team artifact turns private", async () => {
     Object.assign(current() ?? {}, { projectId: "p-acme", visibility: "private", teamId: null });
-    await rehomeArtifactProject("a1", "admin");
+    await rehomeArtifactProject("a1");
     const own = tables.get(project)?.find((row) => row.userId === "author" && row.nameKey === "launch");
     expect(own).toBeDefined();
     expect(current()?.projectId).toBe(own?.id);
@@ -144,7 +157,7 @@ describe("rehomeArtifactProject", () => {
 
   it("should keep the link when the home scope did not change", async () => {
     Object.assign(current() ?? {}, { projectId: "p-author", visibility: "link", teamId: "personal" });
-    await rehomeArtifactProject("a1", "author");
+    await rehomeArtifactProject("a1");
     expect(current()?.projectId).toBe("p-author");
     expect(log).toEqual([]);
   });

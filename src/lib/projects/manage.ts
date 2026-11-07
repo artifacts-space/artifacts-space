@@ -1,4 +1,4 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, project, team } from "@/db/schema";
@@ -85,9 +85,10 @@ export async function mergeProjects(viewerId: string, sourceId: string, targetId
   if (!sameScope(source.scope, target.scope)) throw new UserFacingError(NOT_FOUND);
   await enforceRateLimit("organize", viewerId);
   const db = getDb();
-  await db.update(artifact).set({ projectId: target.row.id }).where(eq(artifact.projectId, source.row.id));
+  // The deprecated label is cleared with every link change (see linkColumns in store.ts).
+  await db.update(artifact).set({ projectId: target.row.id, project: "" }).where(eq(artifact.projectId, source.row.id));
   // Anything linked to the source in between loses its project rather than blocking the merge.
-  await db.delete(project).where(and(eq(project.id, source.row.id), ne(project.id, target.row.id)));
+  await db.delete(project).where(eq(project.id, source.row.id));
   return toProjectDto(target.row);
 }
 
@@ -95,6 +96,8 @@ export async function mergeProjects(viewerId: string, sourceId: string, targetId
 export async function deleteProject(viewerId: string, projectId: string): Promise<void> {
   const { row } = await manageable(viewerId, projectId);
   await enforceRateLimit("organize", viewerId);
+  // The artifacts stay; their deprecated label goes too, so a label backfill never brings the project back.
+  await getDb().update(artifact).set({ project: "" }).where(eq(artifact.projectId, row.id));
   await getDb().delete(project).where(eq(project.id, row.id));
 }
 

@@ -144,7 +144,6 @@ export interface VersionDetailDto extends VersionSummaryDto {
   summary: string;
   content: string;
   language: string;
-  project: string;
   source: string;
   metadata: Record<string, unknown>;
 }

@@ -2,7 +2,8 @@
 -- the artifact to it. The project lives in the artifact's home scope
 -- (src/lib/projects/rules.ts): the shared team it is shared through when it
 -- is not private and the team is not personal, else its author. Labels are
--- normalized like normalizeProjectName (NFC, no control characters, spaces
+-- normalized like normalizeProjectName (NFC, no control or format
+-- characters (\p{Cc} and \p{Cf}), spaces
 -- collapsed, trimmed) and matched by lowercase key, so "Billing" and
 -- "billing " become one project; the newest artifact's spelling names it.
 -- The label column stays (deprecated, no longer read). Additive and safe to
@@ -14,7 +15,7 @@ WITH "labelled" AS (
     a."updated_at",
     CASE WHEN a."visibility" <> 'private' AND a."team_id" IS NOT NULL AND t."personal" = false THEN NULL ELSE a."user_id" END AS "scope_user_id",
     CASE WHEN a."visibility" <> 'private' AND a."team_id" IS NOT NULL AND t."personal" = false THEN a."team_id" ELSE NULL END AS "scope_team_id",
-    btrim(regexp_replace(regexp_replace(normalize(a."project", NFC), '[[:cntrl:]]', '', 'g'), '\s+', ' ', 'g')) AS "name"
+    btrim(regexp_replace(regexp_replace(normalize(a."project", NFC), '[[:cntrl:]­؀-؅؜۝܏࢐-࢑࣢᠎​-‏‪-‮⁠-⁤⁦-⁯﻿￹-￻\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]', '', 'g'), '\s+', ' ', 'g')) AS "name"
   FROM "artifact" a
   LEFT JOIN "team" t ON t."id" = a."team_id"
   WHERE a."project_id" IS NULL AND btrim(a."project") <> ''
@@ -36,7 +37,7 @@ WITH "labelled" AS (
     a."id" AS "artifact_id",
     CASE WHEN a."visibility" <> 'private' AND a."team_id" IS NOT NULL AND t."personal" = false THEN NULL ELSE a."user_id" END AS "scope_user_id",
     CASE WHEN a."visibility" <> 'private' AND a."team_id" IS NOT NULL AND t."personal" = false THEN a."team_id" ELSE NULL END AS "scope_team_id",
-    lower(btrim(regexp_replace(regexp_replace(normalize(a."project", NFC), '[[:cntrl:]]', '', 'g'), '\s+', ' ', 'g'))) AS "name_key"
+    lower(btrim(regexp_replace(regexp_replace(normalize(a."project", NFC), '[[:cntrl:]­؀-؅؜۝܏࢐-࢑࣢᠎​-‏‪-‮⁠-⁤⁦-⁯﻿￹-￻\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]', '', 'g'), '\s+', ' ', 'g'))) AS "name_key"
   FROM "artifact" a
   LEFT JOIN "team" t ON t."id" = a."team_id"
   WHERE a."project_id" IS NULL AND btrim(a."project") <> ''

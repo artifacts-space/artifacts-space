@@ -200,6 +200,7 @@ async function moveToProject(userId: string, artifactId: string, name: string | 
   const choice = projectChoiceSchema.parse(name);
   const moved = await setArtifactProject(userId, artifactId, choice ? { name: choice } : { none: true });
   if (moved === undefined) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+  return moved;
 }
 
 /**
@@ -308,10 +309,10 @@ function registerWriteTools(server: ToolServer, userId: string) {
       const record = await editableByPublicId(userId, id);
       if (team) teamBySlug(teams, team);
       assertTheme(input.theme);
-      // The project changes first and on its own: no version, no approval.
-      if (project !== undefined) await moveToProject(userId, record.id, project);
       const saved = await saveFields(userId, record.id, input);
-      const result = await shareAfterSave(userId, saved.artifact, teams, { visibility, team, comments });
+      // The project changes after the save, on its own: no version, no approval, and nothing if the save failed.
+      const artifact = project === undefined ? saved.artifact : { ...saved.artifact, project: await moveToProject(userId, record.id, project) };
+      const result = await shareAfterSave(userId, artifact, teams, { visibility, team, comments });
       return { artifact: toMcpArtifact(result.artifact, view), edit: saved.edit, sharing: result.sharing, comments: result.comments };
     }),
   );

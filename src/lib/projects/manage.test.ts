@@ -111,7 +111,8 @@ describe("deleteProject", () => {
     await deleteProject("author", "billing");
     expect(projects().some((row) => row.id === "billing")).toBe(false);
     expect(tables.get(artifact)).toHaveLength(3);
-    expect(log.filter((entry) => entry.table === artifact)).toEqual([]);
+    // The only artifact write clears the deprecated label, so a label backfill never brings the project back.
+    expect(log.filter((entry) => entry.table === artifact).map((entry) => entry.values)).toEqual([{ project: "" }]);
   });
 });
 

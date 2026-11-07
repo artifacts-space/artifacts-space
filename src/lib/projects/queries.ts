@@ -131,13 +131,23 @@ export interface ProjectFacets {
  * they cover every artifact, not only the first page. `listCondition` is the
  * list's scope condition on artifact (the viewer's own, or a team's).
  */
-export async function loadProjectFacets(viewerId: string, listCondition: SQL): Promise<ProjectFacets> {
+/**
+ * How facet counts join artifacts to projects: only projects the viewer may
+ * use in this list scope. A link that points anywhere else (it never should)
+ * never names a filter entry.
+ */
+export async function facetJoinCondition(viewerId: string, scope: ListScope): Promise<SQL | undefined> {
+  return and(eq(project.id, artifact.projectId), await projectCondition(viewerId, scope));
+}
+
+export async function loadProjectFacets(viewerId: string, scope: ListScope, listCondition: SQL): Promise<ProjectFacets> {
   const db = getDb();
+  const usable = await facetJoinCondition(viewerId, scope);
   const [perProject, totals] = await Promise.all([
     db
       .select({ id: project.id, name: project.name, nameKey: project.nameKey, icon: project.icon, userId: project.userId, count: count(artifact.id) })
       .from(artifact)
-      .innerJoin(project, eq(project.id, artifact.projectId))
+      .innerJoin(project, usable)
       .where(listCondition)
       .groupBy(project.id),
     db

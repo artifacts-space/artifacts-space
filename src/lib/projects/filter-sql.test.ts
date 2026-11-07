@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it, vi } from "vitest";
 
-import { artifact } from "@/db/schema";
+import { artifact, project } from "@/db/schema";
 
 import type * as ScopeModule from "./scope";
 
@@ -23,7 +23,7 @@ vi.mock("./scope", async (importOriginal) => ({
   sharedTeamIdsFor: () => Promise.resolve(teams.ids),
 }));
 
-const { projectFilterCondition, projectSearchCondition } = await import("./queries");
+const { facetJoinCondition, projectFilterCondition, projectSearchCondition } = await import("./queries");
 
 function listSql(condition: Parameters<typeof and>[0]) {
   return db.select({ id: artifact.id }).from(artifact).where(and(eq(artifact.userId, "viewer-1"), condition)).toSQL();
@@ -54,6 +54,23 @@ describe("projectFilterCondition", () => {
   it("should match artifacts without a project when the filter is none", async () => {
     const { sql } = listSql(await projectFilterCondition("viewer-1", { kind: "mine" }, { none: true }));
     expect(sql).toContain('"project_id" is null');
+  });
+});
+
+describe("facetJoinCondition", () => {
+  it("should count only projects in the viewer's usable scopes when the list is the viewer's own", async () => {
+    teams.ids = new Set(["team-a"]);
+    const join = await facetJoinCondition("viewer-1", { kind: "mine" });
+    const { sql, params } = db.select({ id: artifact.id }).from(artifact).innerJoin(project, join).toSQL();
+    expect(sql).toContain('"project"."id" = "artifact"."project_id"');
+    expect(params).toEqual(expect.arrayContaining(["viewer-1", "team-a"]));
+  });
+
+  it("should count only the team's projects when the list is a team's", async () => {
+    const join = await facetJoinCondition("viewer-1", { kind: "team", teamId: "team-b" });
+    const { sql, params } = db.select({ id: artifact.id }).from(artifact).innerJoin(project, join).toSQL();
+    expect(sql).toContain('"team_id" = $');
+    expect(params).toEqual(["team-b"]);
   });
 });
 

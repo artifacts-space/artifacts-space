@@ -70,8 +70,8 @@ async function cancelPending(artifactId: string, byUserId: string) {
  * The sharing change already happened; a failure here never undoes it, and
  * a stale link is never shown (projectsForViewer checks the scope).
  */
-async function rehomeProjectQuietly(artifactId: string, byUserId: string) {
-  await rehomeArtifactProject(artifactId, byUserId).catch((error: unknown) => {
+async function rehomeProjectQuietly(artifactId: string) {
+  await rehomeArtifactProject(artifactId).catch((error: unknown) => {
     console.error("[projects] Project did not follow a sharing change", error instanceof Error ? error.name : "unknown error");
   });
 }
@@ -81,7 +81,7 @@ async function setVisibility(artifactId: string, visibility: ArtifactVisibility,
     .update(artifact)
     .set({ visibility, teamId, ...(comments ? { comments } : {}) })
     .where(eq(artifact.id, artifactId));
-  await rehomeProjectQuietly(artifactId, byUserId);
+  await rehomeProjectQuietly(artifactId);
   // An open edit request follows the artifact to its new approving team.
   if (teamId) {
     await getDb()
@@ -205,6 +205,7 @@ async function approve(request: typeof sharingRequest.$inferSelect, deciderId: s
     from decided
     where ${artifact.id} = decided.artifact_id and ${artifact.userId} = decided.requested_by
   `);
+  await rehomeProjectQuietly(request.artifactId);
   await cancelPendingComments(request.artifactId, deciderId);
   await syncApprovedVersion(request.artifactId, deciderId);
 }

@@ -118,6 +118,19 @@ describe("artifacts_update with project", () => {
     expect(data.setArtifactProject).not.toHaveBeenCalled();
   });
 
+  it("should keep the project as it was when the save fails", async () => {
+    data.updateArtifact.mockRejectedValue(new Error("save failed"));
+    const result = await call("artifacts_update", { id: publicId, title: "New title", project: "Billing" });
+    expect(result.isError).toBe(true);
+    expect(data.setArtifactProject).not.toHaveBeenCalled();
+  });
+
+  it("should return the new project after a save that read the artifact before the move", async () => {
+    data.updateArtifact.mockResolvedValue(dto(null));
+    const result = await call("artifacts_update", { id: publicId, title: "New title", project: "Billing" });
+    expect(JSON.parse(result.text)).toMatchObject({ artifact: { project: "Billing" } });
+  });
+
   it("should leave the project alone when it is not sent", async () => {
     data.updateArtifact.mockResolvedValue(dto(null));
     await call("artifacts_update", { id: publicId, title: "New title" });

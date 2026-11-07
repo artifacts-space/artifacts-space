@@ -2,7 +2,7 @@
 
 import { IconCheck, IconChevronDown, IconFolderPlus, IconLoader2, IconPlus, IconSettings, IconX } from "@tabler/icons-react";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { listArtifactProjectsAction, setArtifactProjectAction } from "@/app/(workspace)/app/project-actions";
@@ -61,14 +61,18 @@ function manageHref(choices: ArtifactProjectChoices | null) {
 function useChoices(artifactId: string) {
   const [choices, setChoices] = useState<ArtifactProjectChoices | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const request = useRef(0);
   const load = () => {
     setFailure(null);
+    // Only the newest load may set the list: an older, slower answer is dropped.
+    const id = ++request.current;
     listArtifactProjectsAction(artifactId)
       .then((result) => {
+        if (id !== request.current) return;
         if (result.success) setChoices(result.data);
         else setFailure(result.error);
       })
-      .catch(() => { setFailure("Projects did not load. Try again."); });
+      .catch(() => { if (id === request.current) setFailure("Projects did not load. Try again."); });
   };
   return { choices, failure, load };
 }

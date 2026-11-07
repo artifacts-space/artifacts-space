@@ -219,14 +219,14 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   const viewable = await load(params);
   if (!viewable) notFound();
   const { record, view } = viewable;
-  // getSession is deduplicated per request, so this reuses load()'s lookup.
-  const [byline, files, session, editor] = await Promise.all([
+  // getSession is deduplicated per request, so these reuse load()'s lookup.
+  const [byline, files, session, editor, organizers] = await Promise.all([
     loadArtifactByline(record, viewable.isTeamMember),
     filesForViewer(viewable),
     getSession(),
     lastEditor(view.editedBy),
+    getSession().then((session) => loadOrganizers(viewable, session)),
   ]);
-  const organizers = await loadOrganizers(viewable, session);
   const copy = visibilityCopy(record.visibility);
   // The team default arrives with team presets; until then an artifact's own theme or the site default.
   const { theme, presetId } = resolveTheme(view.theme, null);

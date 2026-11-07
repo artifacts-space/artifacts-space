@@ -13,7 +13,6 @@ const fieldLabels: { key: Exclude<keyof ReviewedFields, "content" | "metadata" |
   { key: "summary", label: "Summary" },
   { key: "kind", label: "Format" },
   { key: "language", label: "Language" },
-  { key: "project", label: "Project" },
   { key: "source", label: "Source" },
 ];
 

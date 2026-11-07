@@ -231,7 +231,7 @@ function scopeCondition(viewerId: string, scope: ArtifactScope) {
 
 /** The project filter's entries and counts for a list scope (every artifact, not only the first page). */
 export async function listProjectFacets(viewerId: string, scope: ArtifactScope): Promise<ProjectFacets> {
-  return loadProjectFacets(viewerId, scopeCondition(viewerId, scope));
+  return loadProjectFacets(viewerId, scope, scopeCondition(viewerId, scope));
 }
 
 /**
