@@ -5,6 +5,7 @@ import { registerArtifactTools } from "@/lib/mcp/artifact-tools";
 import { registerFileTools } from "@/lib/mcp/file-tools";
 import { registerFormatTools } from "@/lib/mcp/format-tools";
 import { registerTeamTools } from "@/lib/mcp/team-tools";
+import { registerThemeTools } from "@/lib/mcp/theme-tools";
 import { toolAccess, type McpToolName } from "@/lib/mcp/tool-access";
 import { registerVersionTools } from "@/lib/mcp/version-tools";
 
@@ -27,7 +28,7 @@ export interface DocsMcpTool {
   args: PropRow[];
 }
 
-export const mcpToolGroups = ["Artifacts", "Version history", "Formats", "Files", "Inbox and comments"] as const;
+export const mcpToolGroups = ["Artifacts", "Version history", "Formats", "Themes", "Files", "Inbox and comments"] as const;
 export type McpToolGroup = (typeof mcpToolGroups)[number];
 
 interface ToolConfig {
@@ -65,6 +66,7 @@ function recordTools(): DocsMcpTool[] {
   const tools: DocsMcpTool[] = [];
   registerArtifactTools(recordingServer("Artifacts", tools), docsUserId, "full");
   registerFormatTools(recordingServer("Formats", tools), "full");
+  registerThemeTools(recordingServer("Themes", tools), "full");
   registerFileTools(recordingServer("Files", tools), docsUserId, "full");
   registerTeamTools(recordingServer("Inbox and comments", tools), docsUserId, "full");
   registerVersionTools(recordingServer("Version history", tools), docsUserId, "full");

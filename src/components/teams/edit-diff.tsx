@@ -1,5 +1,6 @@
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { iconLabel } from "@/lib/artifact-icons";
+import { sameArtifactTheme, themeLabel } from "@/lib/themes/artifact-theme";
 import { capHunks, diffHunks, diffLines, diffStats, type DiffLine } from "@/lib/diff";
 import { cn } from "@/lib/utils";
 import type { ReviewedFields } from "@/lib/versions/rules";
@@ -7,7 +8,7 @@ import type { ReviewedFields } from "@/lib/versions/rules";
 /** Most diff lines shown for one edit. Longer diffs say how much is hidden. */
 const MAX_SHOWN_LINES = 300;
 
-const fieldLabels: { key: Exclude<keyof ReviewedFields, "content" | "metadata" | "icon">; label: string }[] = [
+const fieldLabels: { key: Exclude<keyof ReviewedFields, "content" | "metadata" | "icon" | "theme">; label: string }[] = [
   { key: "title", label: "Title" },
   { key: "summary", label: "Summary" },
   { key: "kind", label: "Format" },
@@ -50,15 +51,30 @@ function IconChange({ before, after }: { before: string | null; after: string | 
   );
 }
 
+/** One short row: old value struck through, then the new one. */
+function ShortChange({ label, before, after }: { label: string; before: string; after: string }) {
+  return (
+    <div className="grid gap-1 sm:grid-cols-[6rem_1fr]">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 break-words">
+        <span className="bg-diff-removed text-diff-removed-foreground line-through">{before}</span>{" "}
+        <span className="bg-diff-added text-diff-added-foreground">{after}</span>
+      </dd>
+    </div>
+  );
+}
+
 /** Changed short fields, one row each: old value, then new value. */
 function FieldChanges({ before, after }: { before: ReviewedFields; after: ReviewedFields }) {
   const changed = fieldLabels.filter(({ key }) => before[key] !== after[key]);
   const iconChanged = before.icon !== after.icon;
+  const themeChanged = !sameArtifactTheme(before.theme, after.theme);
   const metadataChanged = JSON.stringify(before.metadata) !== JSON.stringify(after.metadata);
-  if (changed.length === 0 && !metadataChanged && !iconChanged) return null;
+  if (changed.length === 0 && !metadataChanged && !iconChanged && !themeChanged) return null;
   return (
     <dl className="grid gap-1.5 text-sm">
       {iconChanged ? <IconChange before={before.icon} after={after.icon} /> : null}
+      {themeChanged ? <ShortChange label="Theme" before={themeLabel(before.theme)} after={themeLabel(after.theme)} /> : null}
       {changed.map(({ key, label }) => (
         <div key={key} className="grid gap-1 sm:grid-cols-[6rem_1fr]">
           <dt className="text-muted-foreground">{label}</dt>

@@ -10,6 +10,7 @@ import { registerArtifactTools } from "./artifact-tools";
 import { registerFileTools } from "./file-tools";
 import { registerFormatTools } from "./format-tools";
 import { registerTeamTools } from "./team-tools";
+import { registerThemeTools } from "./theme-tools";
 import { gateTools, toolAccess, toolAllowed } from "./tool-access";
 import { registerVersionTools } from "./version-tools";
 
@@ -24,6 +25,7 @@ const readOnlyTools = [
   "files_get_download_url",
   "inbox_list",
   "teams_list",
+  "themes_list",
 ];
 
 const closers: (() => Promise<void>)[] = [];
@@ -33,6 +35,7 @@ async function connect(access: McpAccess) {
   const server = new McpServer({ name: "test", version: "1.0.0" });
   registerArtifactTools(server, "user-1", access);
   registerFormatTools(server, access);
+  registerThemeTools(server, access);
   registerFileTools(server, "user-1", access);
   registerTeamTools(server, "user-1", access);
   registerVersionTools(server, "user-1", access);

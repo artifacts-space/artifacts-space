@@ -9,6 +9,7 @@ const dto: ArtifactDto = {
   publicId: "4fXkP9qR2sT7vW1yZ3aB5c",
   title: "Plan",
   icon: "🧭",
+  theme: null,
   summary: "",
   content: "# Plan",
   kind: "markdown",

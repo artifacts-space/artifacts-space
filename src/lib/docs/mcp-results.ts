@@ -17,6 +17,7 @@ const artifactShape = `{
   "id": "Vq3kJ0pXw2mZ8rT5yN1aBc",   // 22-character public id
   "url": "https://artifacts.space/artifact/Vq3kJ0pXw2mZ8rT5yN1aBc",
   "title": "…", "icon": "🚀" | "tabler:rocket" | "file:<file id>" | null, "summary": "…", "content": "…",
+  "theme": "paper" | { "version": 1, "light": { … }, "dark": { … }, … } | null,
   "kind": "markdown", "language": "", "project": "…", "sessionId": "…", "source": "claude-code",
   "visibility": "private" | "team" | "link" | "public",
   "team": "acme" | null,                 // slug, only when you are a member
@@ -63,7 +64,7 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   artifacts_versions: {
     summary: "Without `version`: the saved versions, newest first. With `version`: that one version with its content, summary, and language.",
     shape: `[ { "id", "createdAt", "savedAt", "saveKind": "create" | "edit" | "files" | "restore" | "snapshot",
-    "restoredFromId", "bytes", "kind", "title", "icon", "approved", "pending", "latest",
+    "restoredFromId", "bytes", "kind", "title", "icon", "theme", "approved", "pending", "latest",
     "savedBy": { "handle", "kind": "person" | "agent" } | null } ]`,
   },
   artifacts_restore_version: {
@@ -76,6 +77,12 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   artifacts_validate: {
     summary: "Plain text: \"Valid <kind> content. It is ready to save.\", or a list of every error and warning with the element key and the fix. Nothing is saved.",
     shape: `Invalid ui content. Fix these and validate again:\n- Error: Element "chart" (Chart): Series "Signups" has 3 values but there are 4 labels. …`,
+  },
+  themes_list: {
+    summary: "The built-in theme presets, the font ids custom theme JSON may use in each slot, and a usage note. Nothing is saved.",
+    shape: `{ "presets": [ { "id": "paper", "name": "Paper", "description": "…", "mode": "auto",
+    "fonts": { "body": { "id": "work-sans", "family": "Work Sans" }, "heading": { … }, "mono": { … } } } ],
+  "customFonts": { "body": ["geist-sans", …], "heading": [ … ], "mono": [ … ] }, "usage": "…" }`,
   },
   files_request_upload: {
     summary: "The pending file, a presigned PUT URL with the exact headers to send, a ready-made curl command, and the next step.",

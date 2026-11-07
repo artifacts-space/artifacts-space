@@ -1,4 +1,5 @@
 import type { FileDto } from "./files/types";
+import type { StoredArtifactTheme } from "./themes/artifact-theme";
 
 export const artifactKinds = ["markdown", "code", "text", "json", "csv", "svg", "mermaid", "ui", "file"] as const;
 export type ArtifactKind = (typeof artifactKinds)[number];
@@ -74,6 +75,8 @@ export interface ArtifactDto {
   title: string;
   /** Page icon beside the title: one emoji or "tabler:<name>". Null when none. */
   icon: string | null;
+  /** The artifact's own theme: a preset id or normalised theme JSON. Null uses the default look. */
+  theme: StoredArtifactTheme | null;
   summary: string;
   content: string;
   kind: ArtifactKind;
@@ -116,6 +119,7 @@ export interface VersionSummaryDto {
   kind: ArtifactKind;
   title: string;
   icon: string | null;
+  theme: StoredArtifactTheme | null;
   /** Who saved it. Null when they are gone. */
   editor: ArtifactEditorDto | null;
   /** Readers outside the team see this version (link and public artifacts). */
@@ -146,6 +150,8 @@ export interface ArtifactInput {
   title: string;
   /** One emoji or "tabler:<name>"; null or "" for none. */
   icon?: string | null | undefined;
+  /** A preset id or theme JSON; null or "" for none. Checked by parseArtifactThemeInput. */
+  theme?: StoredArtifactTheme | Record<string, unknown> | null | undefined;
   summary?: string | undefined;
   content: string;
   kind?: ArtifactKind | undefined;

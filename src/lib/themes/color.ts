@@ -245,3 +245,10 @@ export function ensureContrast(color: Oklch, background: Oklch, minimum: number)
   }
   return candidate;
 }
+
+const toGamma = (channel: number) => (channel <= 0.0031308 ? channel * 12.92 : 1.055 * channel ** (1 / 2.4) - 0.055);
+
+/** The color as `#rrggbb` (alpha dropped), clamped to sRGB, for renderers that cannot read oklch() such as social preview images. */
+export function formatHex(color: Oklch): string {
+  return `#${oklchToLinearRgb(color).map((channel) => Math.round(clamp(toGamma(channel), 0, 1) * 255).toString(16).padStart(2, "0")).join("")}`;
+}

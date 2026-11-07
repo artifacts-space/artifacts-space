@@ -1,6 +1,7 @@
 import type { ArtifactVisibility } from "@/lib/artifact-types";
 import { sharingNeedsApproval, type SharingActor, type SharingTeamRule } from "@/lib/sharing/rules";
 import { canManageTeam, type TeamRole } from "@/lib/teams/roles";
+import { sameArtifactTheme, type StoredArtifactTheme } from "@/lib/themes/artifact-theme";
 
 /**
  * Edit re-approval rules. Link and public artifacts keep an approved version
@@ -63,6 +64,7 @@ export function versionToServe(input: {
 export interface ReviewedFields {
   title: string;
   icon: string | null;
+  theme: StoredArtifactTheme | null;
   summary: string;
   content: string;
   kind: string;
@@ -77,5 +79,6 @@ const reviewedKeys = ["title", "icon", "summary", "content", "kind", "language",
 /** True when two versions show readers the same thing. */
 export function sameReviewedFields(a: ReviewedFields, b: ReviewedFields): boolean {
   if (reviewedKeys.some((key) => a[key] !== b[key])) return false;
+  if (!sameArtifactTheme(a.theme, b.theme)) return false;
   return JSON.stringify(a.metadata) === JSON.stringify(b.metadata);
 }

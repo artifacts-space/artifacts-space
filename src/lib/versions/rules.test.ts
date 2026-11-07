@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { presetTheme } from "@/lib/themes/resolve";
+
 import { decideEdit, editNeedsAuditRow, sameReviewedFields, versionToServe, type ReviewedFields } from "./rules";
 
 const sharedTeam = { personal: false, teamSharingNeedsApproval: true };
@@ -78,7 +80,7 @@ describe("versionToServe", () => {
 });
 
 describe("sameReviewedFields", () => {
-  const base: ReviewedFields = { title: "T", icon: null, summary: "", content: "a", kind: "markdown", language: "", project: "", source: "", metadata: { a: 1 } };
+  const base: ReviewedFields = { title: "T", icon: null, theme: null, summary: "", content: "a", kind: "markdown", language: "", project: "", source: "", metadata: { a: 1 } };
 
   it("should treat versions as the same when every reader-facing field matches", () => {
     expect(sameReviewedFields(base, { ...base, metadata: { a: 1 } })).toBe(true);
@@ -93,5 +95,19 @@ describe("sameReviewedFields", () => {
     expect(sameReviewedFields(base, { ...base, icon: "🚀" })).toBe(false);
     expect(sameReviewedFields({ ...base, icon: "tabler:bug" }, { ...base, icon: "tabler:rocket" })).toBe(false);
     expect(sameReviewedFields({ ...base, icon: "🚀" }, { ...base, icon: "🚀" })).toBe(true);
+  });
+
+  it("should see a change when only the theme differs, so a theme edit goes through approval", () => {
+    expect(sameReviewedFields(base, { ...base, theme: "paper" })).toBe(false);
+    expect(sameReviewedFields({ ...base, theme: "paper" }, { ...base, theme: "ocean" })).toBe(false);
+    expect(sameReviewedFields({ ...base, theme: "paper" }, { ...base, theme: null })).toBe(false);
+  });
+
+  it("should treat the same theme as unchanged when its JSON keys come back in another order", () => {
+    const theme = presetTheme("forest");
+    if (!theme) throw new Error("forest preset missing");
+    const reordered = { dark: theme.dark, light: theme.light, fonts: theme.fonts, radius: theme.radius, mode: theme.mode, version: theme.version };
+    expect(sameReviewedFields({ ...base, theme }, { ...base, theme: reordered })).toBe(true);
+    expect(sameReviewedFields({ ...base, theme }, { ...base, theme: { ...theme, radius: "xl" } })).toBe(false);
   });
 });
