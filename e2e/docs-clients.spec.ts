@@ -13,13 +13,17 @@ async function pageScrollsSideways(page: Page): Promise<boolean> {
   return page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
 }
 
+/** Clients shown with their label alone (by the owner's choice), with a spacer that keeps the labels aligned. */
+const withoutMark = new Set(["Devin"]);
+
 test("should show every client with its mark when the clients page opens", async ({ page }) => {
   await page.goto("/docs/clients");
 
   for (const name of clients) {
     const heading = page.getByRole("heading", { level: 2, name: headingName(name) });
     await expect(heading).toBeVisible();
-    await expect(heading.locator("svg[data-client-logo]")).toHaveCount(1);
+    await expect(heading.locator("svg[data-client-logo]")).toHaveCount(withoutMark.has(name) ? 0 : 1);
+    if (withoutMark.has(name)) await expect(heading.locator("[data-client-logo-spacer]")).toHaveCount(1);
   }
   await expect(page.getByText("Product names and logos belong to their owners.")).toBeVisible();
   expect(await pageScrollsSideways(page)).toBe(false);

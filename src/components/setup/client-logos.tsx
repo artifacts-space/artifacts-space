@@ -13,9 +13,10 @@ import { cn } from "@/lib/utils";
  * - Claude Code, Claude, Cursor, OpenCode, Kimi, Model Context Protocol:
  *   Simple Icons v16.37.0 (https://simpleicons.org), path data under CC0 1.0.
  *   The marks stay trademarks of their owners.
- * - Codex and Devin: Simple Icons has no mark for them, and we found no
- *   brand terms that allow the use, so they get a neutral initial in a
- *   hairline circle.
+ * - Codex: Simple Icons has no mark for it, and we found no brand terms
+ *   that allow the use, so it gets a neutral initial in a hairline circle.
+ * - Devin: no mark at all, by the owner's choice; an empty spacer of the
+ *   same size keeps its label in line with the others.
  */
 
 /** Props every mark takes. */
@@ -110,9 +111,9 @@ function CodexLogo({ className }: LogoProps) {
   return <InitialMark initial="C" className={className} />;
 }
 
-/** Devin. Neutral fallback: no licensed mark found. */
+/** Devin. No mark: an empty, hidden spacer the size of a mark, so headings and tab labels stay aligned. */
 function DevinLogo({ className }: LogoProps) {
-  return <InitialMark initial="D" className={className} />;
+  return <span aria-hidden="true" data-client-logo-spacer="" className={cn("inline-block size-4 shrink-0", className)} />;
 }
 
 /** Each client's mark, by id. */
