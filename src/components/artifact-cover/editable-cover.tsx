@@ -20,6 +20,12 @@ interface EditableCoverProps {
   cover: string | null;
 }
 
+/** Moves focus to the reposition slider when it appears, so the arrow keys work at once. A stable function, so React calls it once per mount. */
+function focusOnMount(node: HTMLElement | null) {
+  // After the frame: the button that started repositioning finishes its own pointer handling first.
+  if (node) requestAnimationFrame(() => { node.focus(); });
+}
+
 interface DragStart {
   pointerId: number;
   y: number;
@@ -77,7 +83,6 @@ function useReposition(onSave: (position: number) => Promise<void>) {
  */
 export function EditableCover({ publicId, cover: initial }: EditableCoverProps) {
   const { cover, saving, save } = useCoverSave(publicId, initial);
-  const sliderRef = useRef<HTMLDivElement>(null);
   const reposition = useReposition(async (position) => { await save(withCoverPosition(cover, position)); });
   const parsed = parseArtifactCover(cover);
   if (!parsed) return null;
@@ -87,7 +92,6 @@ export function EditableCover({ publicId, cover: initial }: EditableCoverProps) 
   function startReposition() {
     if (parsed?.type !== "image") return;
     reposition.setDraft(parsed.position);
-    requestAnimationFrame(() => { sliderRef.current?.focus(); });
   }
 
   return (
@@ -96,9 +100,9 @@ export function EditableCover({ publicId, cover: initial }: EditableCoverProps) 
       {repositioning ? (
         <>
           <div
-            ref={sliderRef}
             role="slider"
             tabIndex={0}
+            ref={focusOnMount}
             aria-label="Cover position"
             aria-valuemin={0}
             aria-valuemax={100}

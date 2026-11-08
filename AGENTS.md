@@ -233,3 +233,16 @@ only as validated custom properties in a wrapper's `style`, never as a
 Default preset must equal the tokens in `globals.css` (a test checks it).
 Theme fonts other than Geist are vendored in `public/fonts/v1/<id>/` and load
 only where a theme uses them; never add one to the root layout.
+
+### Covers
+
+Artifact covers live in `src/lib/covers` (gradients, parsing, reposition
+rules) and render through `src/components/artifact-cover`. A cover is stored as
+text: a gradient id, or `file:<uuid>` with an optional `@<0-100>` focal point.
+Gradients are recipes over theme tokens (`color-mix` in OKLab into
+`--background`), never literal colors, so they follow the theme and light or
+dark; link previews redraw the same recipe as hex (`coverGradientHex`). Cover
+images use the icon image rules (no SVG, uploads only) with a 2 MB cap, are
+checked in `src/lib/files/cover-file.ts`, and are pruned with old icon images
+(`icon-cleanup.ts`). Link previews can draw only PNG and JPEG covers; Satori
+draws nothing for WebP.

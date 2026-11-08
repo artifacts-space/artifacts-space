@@ -3,7 +3,9 @@ import Link from "next/link";
 import { CodeSnippet } from "@/components/code/code-snippet";
 import { DocsH, FactTable, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
+import { CoverGradientGallery } from "@/components/docs/cover-gradient-gallery";
 import { ThemePresetGallery } from "@/components/docs/theme-preset-gallery";
+import { coverImageRows, coverMcpExamples } from "@/lib/docs/cover-docs";
 import { docsMetadata } from "@/lib/docs/metadata";
 import { docsHref } from "@/lib/docs/pages";
 import { classicThemeJson, lowContrastMessage, themeFieldRows, themeLimitRows, themeMcpExamples, themesListExample } from "@/lib/docs/theme-docs";
@@ -107,17 +109,63 @@ export default function ThemesPage() {
         <p>On a link or public artifact shared through a team, a theme change by a member or an agent waits for a team owner or admin to approve it, like a title change. Until then, readers outside the team see the approved theme. Owners and admins see the old and new theme names on the team page. Agents never approve. See <Link href={docsHref("sharing", "edits")}>Edits to shared artifacts</Link>.</p>
       </Prose>
 
+      <DocsH page={page} id="covers" />
+      <Prose>
+        <p>A cover is a slim banner across the top of the artifact page, like a book jacket: it makes an artifact easy to know at a glance. It is about 180 px tall on a computer and 120 px on a phone, so the content still starts near the top.</p>
+        <p>A cover is a gradient id, such as <code>&quot;mist&quot;</code>, or an image you upload. Every format can have a cover. An artifact with no cover shows none.</p>
+      </Prose>
+
+      <DocsH page={page} id="cover-gradients" />
+      <Prose>
+        <p>Gradients are soft tints of the artifact&apos;s own theme colors, so a cover always matches the theme, in light and in dark. Each sample shows light and dark in the Default look (top row) and in Ocean (bottom row). Copy an id and pass it as <code>cover</code>.</p>
+      </Prose>
+      <CoverGradientGallery />
+
+      <DocsH page={page} id="cover-web" />
+      <Prose>
+        <p>If you can edit an artifact, you see <strong>Add cover</strong> beside the icon and theme above its title. It adds a gradient at once. Point at the cover (or tap it on a touch screen) to see its controls:</p>
+        <ul>
+          <li><strong>Change cover</strong> opens the gradients and <strong>Upload an image</strong>.</li>
+          <li><strong>Reposition</strong>, for images, lets you drag the image up or down. You can also use the arrow keys (Shift for bigger steps), Home, and End. Enter or <strong>Save position</strong> saves; Escape or <strong>Cancel</strong> stops.</li>
+          <li><strong>Remove</strong> takes the cover away.</li>
+        </ul>
+        <p>The <strong>New artifact</strong> dialog has a <strong>Cover</strong> field with the gradients. Readers see only the cover.</p>
+      </Prose>
+
+      <DocsH page={page} id="cover-mcp" />
+      <Prose>
+        <p>Agents set <code>cover</code> on <code>artifacts_create</code> or <code>artifacts_update</code>, on artifacts they can edit. The value is a gradient id, <code>&quot;file:&lt;file id&gt;&quot;</code> for an uploaded image, or <code>null</code> or <code>&quot;&quot;</code> on update to remove it. <code>coverPosition</code> (0 to 100) sets an image&apos;s focal point; sent alone, it moves the current image cover. Leave both out to keep the cover.</p>
+        <p><code>themes_list</code> lists the gradients. <code>artifacts_get</code>, <code>artifacts_list</code>, and <code>artifacts_versions</code> return <code>cover</code> and <code>coverPosition</code>. A cover that breaks a rule stops the whole call, and nothing is saved.</p>
+      </Prose>
+      <CodeSnippet title="Create with a theme and a gradient cover" language="json" code={coverMcpExamples.createWithGradient} className="mt-4" />
+      <CodeSnippet title="Use an uploaded image, focused near the top" language="json" code={coverMcpExamples.updateWithImage} className="mt-4" />
+      <CodeSnippet title="Move the image's focal point" language="json" code={coverMcpExamples.reposition} className="mt-4" />
+      <CodeSnippet title="Remove the cover" language="json" code={coverMcpExamples.clear} className="mt-4" />
+
+      <DocsH page={page} id="cover-images" />
+      <Prose>
+        <p>Upload the image like any file (<code>files_request_upload</code>, then PUT, then <code>files_finalize</code>), and pass its id. The save attaches it to the artifact. Only people who can read the artifact can load the image.</p>
+      </Prose>
+      <FactTable head={["Rule", "Value"]} rows={coverImageRows} mono={[0]} />
+
+      <DocsH page={page} id="cover-history" />
+      <Prose>
+        <p>A cover change, including a new focal point, is saved as a new version. History shows it, and Restore brings an older cover back. If an older cover image was deleted, Restore leaves the artifact without a cover.</p>
+        <p>On a link or public artifact shared through a team, a cover change by a member or an agent waits for a team owner or admin to approve it. Until then, readers outside the team see the approved cover. Agents never approve.</p>
+      </Prose>
+
       <DocsH page={page} id="outside" />
       <Prose>
         <p>The theme also shows where the artifact appears away from its page.</p>
       </Prose>
       <DocsH page={page} id="markdown" />
       <Prose>
-        <p>The Markdown version of an artifact (<code>/artifact/&lt;id&gt;.md</code>) names its theme in the header, as <code>- Theme: Paper</code>, or <code>- Theme: Custom</code> for theme JSON. An artifact with no theme has no Theme line. See <Link href={docsHref("mcp", "markdown")}>Read artifacts without MCP</Link>.</p>
+        <p>The Markdown version of an artifact (<code>/artifact/&lt;id&gt;.md</code>) names its theme in the header, as <code>- Theme: Paper</code>, or <code>- Theme: Custom</code> for theme JSON. An artifact with no theme has no Theme line. A cover shows as <code>- Cover: Mist</code>, or <code>- Cover: Image</code>, never with a link to the file. See <Link href={docsHref("mcp", "markdown")}>Read artifacts without MCP</Link>.</p>
       </Prose>
       <DocsH page={page} id="previews" />
       <Prose>
         <p>The link preview card of a link or public artifact uses the colors of the approved theme&apos;s light palette. The text on the card stays in Geist, because preview images cannot use the theme fonts.</p>
+        <p>A cover becomes the card&apos;s background. A gradient is drawn in the theme&apos;s light palette, with dark text. A PNG or JPEG image is drawn under a dark shade, with light text. Preview images cannot draw WebP, GIF, or AVIF, so those covers keep the standard background there.</p>
       </Prose>
 
       <DocsH page={page} id="tokens" />

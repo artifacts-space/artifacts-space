@@ -125,7 +125,7 @@ export const docsPages = [
   {
     slug: "themes",
     title: "Themes",
-    description: "Give an artifact its own colors and fonts, in the web app or over MCP. Every theme passes contrast checks, so every reader can read it.",
+    description: "Give an artifact its own colors, fonts, and a slim cover, in the web app or over MCP. Every theme passes contrast checks, so every reader can read it.",
     section: "Reference",
     source: app("themes/"),
     headings: [
@@ -137,6 +137,12 @@ export const docsPages = [
       h3("mcp", "Over MCP"),
       h3("themes-list", "themes_list"),
       h3("history", "History and approval"),
+      h2("covers", "Covers"),
+      h3("cover-gradients", "Gradients"),
+      h3("cover-web", "Add a cover on the page"),
+      h3("cover-mcp", "Covers over MCP"),
+      h3("cover-images", "Cover images"),
+      h3("cover-history", "Cover history and approval"),
       h2("outside", "Outside the page"),
       h3("markdown", "Markdown"),
       h3("previews", "Link previews"),

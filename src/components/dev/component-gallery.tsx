@@ -6,6 +6,7 @@ import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ArtifactFilesProvider } from "@/components/artifact-view/files-context";
 import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
 import { AvatarGallery } from "@/components/dev/avatar-gallery";
+import { CoverSpecimen } from "@/components/dev/cover-specimen";
 import { ThemePickerSpecimen } from "@/components/dev/theme-picker-specimen";
 import { UiView } from "@/components/artifact-view/ui-view";
 import { ThemeSwitcher } from "@/components/theme-switcher";
@@ -117,6 +118,9 @@ export function ComponentGallery() {
           {themeFixtureIds.map((id) => <ThemedSpecimen key={id} id={id} />)}
           <Specimen name="theme picker">
             <ThemePickerSpecimen />
+          </Specimen>
+          <Specimen name="cover picker">
+            <CoverSpecimen />
           </Specimen>
         </Group>
         <Group id="avatars" title="Pixel avatars">

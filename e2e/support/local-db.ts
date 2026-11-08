@@ -42,16 +42,46 @@ export async function devUserId(): Promise<string> {
   return id;
 }
 
-/** Inserts an artifact with an optional theme and returns its public id. */
-export async function createTestArtifact(input: { userId: string; title: string; content: string; visibility: "private" | "public"; theme: string | null }): Promise<string> {
+/** Inserts an artifact with an optional theme and cover and returns its public id. */
+export async function createTestArtifact(input: { userId: string; title: string; content: string; visibility: "private" | "public"; theme: string | null; cover?: string | null }): Promise<string> {
   const result = await db().query<{ public_id: string }>(
-    `insert into artifact (id, user_id, title, content, kind, visibility, comments, share_id, theme, updated_by)
-     values ($1, $2, $3, $4, 'markdown', $5, 'team', $6, $7::jsonb, $2) returning public_id`,
-    [randomUUID(), input.userId, input.title, input.content, input.visibility, randomUUID().replaceAll("-", ""), input.theme === null ? null : JSON.stringify(input.theme)],
+    `insert into artifact (id, user_id, title, content, kind, visibility, comments, share_id, theme, cover, updated_by)
+     values ($1, $2, $3, $4, 'markdown', $5, 'team', $6, $7::jsonb, $8, $2) returning public_id`,
+    [randomUUID(), input.userId, input.title, input.content, input.visibility, randomUUID().replaceAll("-", ""), input.theme === null ? null : JSON.stringify(input.theme), input.cover ?? null],
   );
   const publicId = result.rows[0]?.public_id;
   if (!publicId) throw new Error("The test artifact was not created.");
   return publicId;
+}
+
+/** Files an approved version with this cover (the one readers outside the team see), while the artifact row keeps its own. */
+export async function approveVersionWithCover(publicId: string, cover: string | null): Promise<void> {
+  const versionId = randomUUID();
+  await db().query(
+    `insert into artifact_version (id, artifact_id, title, cover, content, kind, created_by)
+     select $1, id, title, $2, content, kind, user_id from artifact where public_id = $3`,
+    [versionId, cover, publicId],
+  );
+  await db().query(`update artifact set approved_version_id = $1 where public_id = $2`, [versionId, publicId]);
+}
+
+/** Records a finished JPEG already attached to the artifact (no bytes in storage) and returns its id, for cover checks. */
+export async function attachTestImage(publicId: string, userId: string, id: string = randomUUID()): Promise<string> {
+  await db().query(
+    `insert into artifact_file (id, uploader_id, artifact_id, key, filename, content_type, size, status, attached_at)
+     select $1, $2, id, $3, 'cover.jpg', 'image/jpeg', 2048, 'ready', now() from artifact where public_id = $4`,
+    [id, userId, `files/${id}/cover.jpg`, publicId],
+  );
+  return id;
+}
+
+/** The stored cover of an artifact, and the covers of its versions, newest first. */
+export async function storedCovers(publicId: string): Promise<{ artifact: string | null; versions: (string | null)[] }> {
+  const artifact = await db().query<{ id: string; cover: string | null }>(`select id, cover from artifact where public_id = $1`, [publicId]);
+  const row = artifact.rows[0];
+  if (!row) throw new Error("No such artifact.");
+  const versions = await db().query<{ cover: string | null }>(`select cover from artifact_version where artifact_id = $1 order by created_at desc`, [row.id]);
+  return { artifact: row.cover, versions: versions.rows.map((version) => version.cover) };
 }
 
 /** The stored theme of an artifact, and the themes of its versions, newest first. */
