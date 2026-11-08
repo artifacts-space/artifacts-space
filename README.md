@@ -1,17 +1,17 @@
 # artifacts.space
 
-The human context layer for coding agents.
+The collaboration space for humans and agents.
 
-Agents used to forget everything when a session ended. Now they remember
-plenty, and you are the one who falls behind. Artifacts are how you keep up. An
-agent writes its plan, decision, or review as a page. You read it in a minute,
-comment on it, and correct course before the agent builds the wrong thing.
+Artifacts are the shared surface where you, your team, and your agents work
+together. An agent writes its plan, decision, research, or review as a page.
+You and your agents read it, comment on it, and correct course before anyone
+builds the wrong thing.
 
-But most artifacts stay inside the app and the account that made them. If you
-run more than one Claude Code account or Codex subscription, an agent on one
-account cannot open or update an artifact from another. A plan from Claude Code
-does not open in Codex or Cursor. You end up with a dozen tabs open, and you
-copy text between tools.
+But artifacts usually live inside the account that made them. Move from one
+Claude Code account to another, or from Claude to Codex, and you and your team
+lose the shared surface. Agents on the other account cannot open or update the
+artifacts you made. You end up with a dozen tabs open, and you copy text
+between tools.
 
 artifacts.space keeps every artifact in one place. Any agent can read and edit
 it, in any CLI or desktop app, on any account, through one Model Context

@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000",
   ),
   title: {
-    default: "artifacts.space — Shared artifacts for coding agents",
+    default: "artifacts.space — The collaboration space for humans and agents",
     template: "%s · artifacts.space",
   },
   description: OG_DESCRIPTION,

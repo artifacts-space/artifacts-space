@@ -3,28 +3,28 @@ import { expect, test } from "@playwright/test";
 const themes = ["light", "dark"] as const;
 
 const storySections = [
-  "You need the context now.",
+  "One surface for people and agents.",
   "How it works",
-  "But artifacts get stuck.",
+  "But switching accounts cuts you off.",
   "Pricing",
-  "Keep up with your agents.",
+  "Bring your team and your agents into one space.",
 ] as const;
 
 for (const theme of themes) {
-  test(`should tell the context story in order without sideways scroll when the site theme is ${theme}`, async ({ page }) => {
+  test(`should tell the shared-surface story in order without sideways scroll when the site theme is ${theme}`, async ({ page }) => {
     await page.addInitScript((value) => { window.localStorage.setItem("theme", value); }, theme);
     await page.goto("/");
 
-    const hero = page.getByRole("heading", { level: 1, name: "Your agents have the context. Now you do too." });
+    const hero = page.getByRole("heading", { level: 1, name: "The collaboration space for humans and agents." });
     await expect(hero).toBeVisible();
 
-    const context = page.getByRole("region", { name: "You need the context now." });
-    await context.scrollIntoViewIfNeeded();
-    await expect(context.getByText("Read the plan before the code.")).toBeVisible();
-    await expect(context.getByText("Correct course early.")).toBeVisible();
-    await expect(context.getByText("Keep the why.")).toBeVisible();
+    const surface = page.getByRole("region", { name: "One surface for people and agents." });
+    await surface.scrollIntoViewIfNeeded();
+    await expect(surface.getByText("Read the plan before the code.")).toBeVisible();
+    await expect(surface.getByText("Correct course together.")).toBeVisible();
+    await expect(surface.getByText("Keep the why.")).toBeVisible();
 
-    const why = page.getByRole("region", { name: "But artifacts get stuck." });
+    const why = page.getByRole("region", { name: "But switching accounts cuts you off." });
     await why.scrollIntoViewIfNeeded();
     await expect(why.getByRole("heading", { level: 3, name: "One place for every artifact" })).toBeVisible();
     await expect(why.getByText("Switch accounts. Lose nothing.")).toBeVisible();

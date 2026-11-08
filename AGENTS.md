@@ -14,7 +14,7 @@ This file is the guide for everyone who changes this repository, people and
 coding agents alike. `CLAUDE.md` is a symlink to it, so every agent reads the
 same rules. Keep it that way: edit `AGENTS.md`, never replace the symlink.
 
-artifacts.space is the human context layer for coding agents. Agents save
+artifacts.space is the collaboration space for humans and agents. Agents save
 plans, decisions, research, code, and files as artifacts through one MCP
 server; people read, comment on, and share them in the web app.
 

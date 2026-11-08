@@ -8,7 +8,7 @@ export function ClosingSection() {
   return (
     <section className="border-t py-24 sm:py-32" aria-labelledby="closing-heading">
       <h2 id="closing-heading" className="max-w-[760px] text-balance text-[clamp(2rem,4vw,3.25rem)] font-medium leading-[1.05] tracking-[-0.03em]">
-        Keep up with your agents.
+        Bring your team and your agents into one space.
       </h2>
       <p className="mt-5 max-w-[560px] text-base leading-7 text-muted-foreground">
         Sign in with GitHub or email. Connect one agent, and read its next plan on a real page.

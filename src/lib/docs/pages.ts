@@ -39,7 +39,7 @@ export const docsPages = [
   {
     slug: "",
     title: "Introduction",
-    description: "artifacts.space is the human context layer for coding agents. Agents save their work as artifacts; people read, edit, and share them.",
+    description: "artifacts.space is the collaboration space for humans and agents. Agents save their work as artifacts; people read, edit, and share them.",
     section: "Get started",
     source: app(""),
     headings: [
