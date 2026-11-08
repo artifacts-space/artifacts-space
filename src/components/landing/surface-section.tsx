@@ -1,4 +1,4 @@
-import { CornerMarks, SectionEyebrow } from "./section-marks";
+import { SectionEyebrow } from "./section-marks";
 import { SurfaceMock, type SurfaceRegion } from "./surface-mock";
 import "./surface.css";
 
@@ -28,11 +28,11 @@ export function SurfaceSection() {
   return (
     <section id="surface" className="scroll-mt-20 border-t py-20 sm:py-24" aria-labelledby="surface-heading">
       <SectionEyebrow>why it matters</SectionEyebrow>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end">
-        <h2 id="surface-heading" className="max-w-[560px] text-balance text-3xl font-medium tracking-[-0.025em] sm:text-4xl">
+      <div>
+        <h2 id="surface-heading" className="max-w-[640px] text-balance text-3xl font-medium tracking-[-0.025em] sm:text-4xl">
           One surface for people and agents.
         </h2>
-        <div className="max-w-[560px]">
+        <div className="mt-5 max-w-[640px]">
           {surface.map((paragraph) => (
             <p key={paragraph} className="text-base leading-7 text-muted-foreground [&+p]:mt-3">
               {paragraph}
@@ -42,7 +42,6 @@ export function SurfaceSection() {
       </div>
       <div className="surface-explore mt-12 grid gap-10 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-center">
         <div className="dot-grid relative border border-dashed p-3 sm:p-8 lg:p-12">
-          <CornerMarks />
           <SurfaceMock />
         </div>
         <ol className="grid gap-0 sm:grid-cols-3 sm:gap-6 xl:grid-cols-1 xl:gap-0">

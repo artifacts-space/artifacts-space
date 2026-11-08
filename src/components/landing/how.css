@@ -1,9 +1,11 @@
 /*
- * How it works, driven by scroll. The section is a view timeline (--how);
- * each piece plays over its own slice of it: the command types itself, the
- * skill answers, the chat appears, the artifact travels the line, and the
- * preview opens with Dana's cursor moving in. Without scroll timelines, or
- * with reduced motion, every piece shows in its final state.
+ * How it works, driven by scroll. On wide screens the section is taller than
+ * the viewport and its stage pins (sticky) while you scroll through it; the
+ * section is a view timeline (--how), and each piece plays over its own slice
+ * of the pinned stretch: the command types itself, the skill answers, the
+ * chat appears, the artifact travels the line, and the preview opens with
+ * Dana's cursor moving in. On narrow screens, without scroll timelines, or
+ * with reduced motion, nothing pins and every piece shows in its final state.
  */
 
 /* The artifact's resting place: just after the third chapter number. Columns are equal with a 1.5rem gap. */
@@ -12,9 +14,15 @@
 }
 
 @supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
+  @media (prefers-reduced-motion: no-preference) and (min-width: 80rem) {
     .how-pipeline {
+      height: 260vh;
       view-timeline: --how block;
+    }
+
+    .how-stage {
+      position: sticky;
+      top: max(2rem, calc(50vh - 22rem));
     }
 
     .how-type,
@@ -32,38 +40,38 @@
     .how-type {
       animation-name: how-type;
       animation-timing-function: steps(37, end);
-      animation-range: cover 24% cover 38%;
+      animation-range: contain 2% contain 20%;
     }
 
     .how-out {
       animation-name: how-show;
-      animation-range: cover 38% cover 41%;
+      animation-range: contain 22% contain 27%;
     }
 
     .how-token {
       animation-name: how-travel;
       animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
-      animation-range: cover 26% cover 58%;
+      animation-range: contain 14% contain 72%;
     }
 
     .how-ask-1 {
       animation-name: how-show;
-      animation-range: cover 42% cover 45%;
+      animation-range: contain 32% contain 38%;
     }
 
     .how-ask-2 {
       animation-name: how-show;
-      animation-range: cover 47% cover 50%;
+      animation-range: contain 42% contain 48%;
     }
 
     .how-collab {
       animation-name: how-open;
-      animation-range: cover 52% cover 57%;
+      animation-range: contain 64% contain 74%;
     }
 
     .how-cursor {
       animation-name: how-cursor;
-      animation-range: cover 54% cover 64%;
+      animation-range: contain 72% contain 90%;
     }
   }
 }

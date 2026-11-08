@@ -3,7 +3,7 @@ import Image from "next/image";
 import type { PixelIconName } from "@/lib/landing/pixel-icons";
 
 import { PixelIcon } from "./pixel-icon";
-import { CornerMarks, SectionEyebrow } from "./section-marks";
+import { SectionEyebrow } from "./section-marks";
 
 const problem = [
   "Artifacts usually live inside the account that made them. Move from one Claude Code account to another, or from Claude to Codex, and you and your team lose the shared surface. Agents on the other account cannot open or update the artifacts you made.",
@@ -50,7 +50,6 @@ function ProblemPanel() {
 function AnswerCard() {
   return (
     <div className="frame-sharp relative min-w-0 p-6 sm:p-8">
-      <CornerMarks />
       <div className="flex items-center gap-3">
         <Image src="/artifacts-space-mark.svg" alt="" width={54} height={40} className="h-10 w-[54px] shrink-0" />
         <h3 className="text-lg font-medium">One place for every artifact</h3>
