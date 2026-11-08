@@ -18,6 +18,7 @@ import { formatInfo } from "@/lib/artifact-formats";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
 import { CsvContentEditor } from "./csv-content-editor";
+import { FullWidthToggle } from "./full-width-toggle";
 import { useLeaveGuard } from "./use-leave-guard";
 
 interface PageDraft {
@@ -140,6 +141,7 @@ export function PageEditor({ artifact, onClose }: PageEditorProps) {
           {dirty ? " · Unsaved changes" : ""}
         </p>
         <div className="flex shrink-0 items-center gap-2">
+          <FullWidthToggle artifact={artifact} />
           <Button type="button" variant="ghost" onClick={cancel} disabled={saving}>Cancel</Button>
           <Button type="submit" disabled={saving || !dirty}>
             {saving ? <IconLoader2 className="animate-spin" /> : <IconDeviceFloppy />} Save
