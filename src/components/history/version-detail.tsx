@@ -45,9 +45,9 @@ interface BodyProps {
 
 function VersionBody({ view, selected, compareWith, compareId, files }: BodyProps) {
   if (view === "preview") {
-    // The preview shows the version in the theme it was saved with, under its cover.
+    // The preview shows the version in the theme it was saved with (a team preset as it is now, or the team default), under its cover.
     return (
-      <ThemeScope theme={resolveTheme(selected.theme, null).theme} className="text-foreground">
+      <ThemeScope theme={selected.renderTheme ?? resolveTheme(selected.theme, null).theme} className="text-foreground">
         {selected.cover ? <div data-version-cover="" className="relative mb-6 h-20 overflow-hidden rounded-lg"><CoverArt cover={selected.cover} /></div> : null}
         <ArtifactView kind={selected.kind} content={selected.content} title={selected.title} language={selected.language} files={files} />
       </ThemeScope>

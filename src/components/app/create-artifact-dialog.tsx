@@ -1,10 +1,12 @@
 "use client";
 
 import { IconChevronDown, IconLoader2, IconMoodSmile, IconPalette, IconPhoto } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { createArtifactWithFilesAction, deleteFileAction } from "@/app/(workspace)/app/file-actions";
+import { newArtifactThemeChoicesAction } from "@/app/(workspace)/teams/theme-actions";
+import { teamPresetNames } from "@/components/artifact-theme/theme-options";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { IconPicker } from "@/components/artifact-icon/icon-picker";
 import { ThemePicker } from "@/components/artifact-theme/theme-picker";
@@ -35,6 +37,7 @@ import { iconFileId } from "@/lib/artifact-icons";
 import { kinds } from "@/lib/artifact-kinds";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { themeLabel } from "@/lib/themes/artifact-theme";
+import { noThemeChoices, type ThemeChoices } from "@/lib/themes/theme-choice-types";
 import { coverLabel } from "@/lib/covers/cover";
 import { coverGradient, coverGradientCss } from "@/lib/covers/gradients";
 
@@ -61,15 +64,30 @@ function NewIconButton({ icon, onChange }: { icon: string | null; onChange: (ico
   return <IconPicker value={icon} onChange={onChange} trigger={trigger} />;
 }
 
-/** The theme field: the chosen preset's name, opening the swatch picker. */
+/** The team presets the person may use on a new artifact, loaded once when the dialog opens. Built-ins work without them. */
+function useNewArtifactThemeChoices(): ThemeChoices {
+  const [choices, setChoices] = useState<ThemeChoices>(noThemeChoices);
+  useEffect(() => {
+    let current = true;
+    newArtifactThemeChoicesAction()
+      .then((result) => { if (current && result.success) setChoices(result.data); })
+      .catch(() => undefined);
+    return () => { current = false; };
+  }, []);
+  return choices;
+}
+
+/** The theme field: the chosen preset's name, opening the swatch picker with the built-ins and the person's team presets. */
 function NewThemeButton({ theme, onChange }: { theme: string | null; onChange: (theme: string | null) => void }) {
+  const choices = useNewArtifactThemeChoices();
+  const names = useMemo(() => teamPresetNames(choices), [choices]);
   const trigger = (
     <Button type="button" variant="outline" id="artifact-theme" aria-labelledby="artifact-theme-label artifact-theme" className="h-9 w-full justify-start font-normal">
-      <IconPalette className="text-muted-foreground" /> {themeLabel(theme)}
+      <IconPalette className="text-muted-foreground" /> {themeLabel(theme, names)}
       <IconChevronDown className="ml-auto text-muted-foreground" />
     </Button>
   );
-  return <ThemePicker value={theme} onChange={onChange} trigger={trigger} />;
+  return <ThemePicker value={theme} onChange={onChange} trigger={trigger} choices={choices} />;
 }
 
 /** The cover field: a small sample and the gradient's name, opening the gradient picker. */
