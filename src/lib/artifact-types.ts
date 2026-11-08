@@ -101,6 +101,12 @@ export interface ArtifactDto {
   visibility: ArtifactVisibility;
   /** Who can read and write its comments. */
   comments: CommentSetting;
+  /**
+   * "Show in search engines": true only while it is public and its author
+   * turned it on (src/lib/search/search-rules.ts). Changed only by the author
+   * in the web app.
+   */
+  showInSearch: boolean;
   /** The team it is shared with (team), or whose admins approved it (link, public). */
   teamId: string | null;
   authorId: string;

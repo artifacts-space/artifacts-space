@@ -45,7 +45,11 @@ export function artifactsToTransfer(artifacts: TransferArtifact[], teamId: strin
   return artifacts.filter((item) => item.teamId === teamId && item.visibility !== "private" && !memberIds.has(item.userId));
 }
 
-/** The new ownership fields. The first author is kept when an artifact moves again. */
+/**
+ * The new ownership fields. The first author is kept when an artifact moves
+ * again. "Show in search engines" was the old author's decision, so it turns
+ * off until the new owner turns it back on.
+ */
 export function transferredOwnership(item: TransferArtifact, newOwnerId: string) {
-  return { userId: newOwnerId, originalAuthorId: item.originalAuthorId ?? item.userId };
+  return { userId: newOwnerId, originalAuthorId: item.originalAuthorId ?? item.userId, showInSearch: false };
 }

@@ -1,0 +1,2 @@
+ALTER TABLE "artifact" ADD COLUMN "show_in_search" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+CREATE INDEX "artifact_in_search_idx" ON "artifact" USING btree ("public_id") WHERE "artifact"."show_in_search" and "artifact"."visibility" = 'public';

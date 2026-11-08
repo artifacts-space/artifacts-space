@@ -23,12 +23,13 @@ export const securityTxtExpires = new Date("2027-11-01T00:00:00.000Z");
  * Paths crawlers should not visit: the signed-in app, team pages, comment
  * threads, invitations, the API and OAuth endpoints, dev pages, and legacy
  * share redirects. Artifact pages are not listed: each one sets its own
- * robots meta (public artifacts may be indexed, all others are noindex), and
- * a crawler blocked here could not read that tag.
+ * robots meta and X-Robots-Tag (only public artifacts whose author turned on
+ * "Show in search engines" may be indexed, src/lib/search/search-rules.ts),
+ * and a crawler blocked here could not read them.
  */
 export const crawlDisallowed = ["/app", "/inbox", "/teams", "/threads", "/invitations", "/api/", "/oauth/", "/dev/", "/preview", "/share/"] as const;
 
-/** Public pages for the sitemap: the home page, the legal pages, and every docs page. Never artifacts. */
+/** The site's own pages for the sitemap: the home page, the legal pages, and every docs page. */
 export function publicPaths(): string[] {
   return ["/", "/privacy", "/terms", ...docsPages.map((page) => docsHref(page.slug))];
 }
@@ -54,9 +55,13 @@ export function robotsFor(origin: string): MetadataRoute.Robots {
   };
 }
 
-/** The sitemap entries for a site at `origin`. */
-export function sitemapFor(origin: string): MetadataRoute.Sitemap {
-  return publicPaths().map((path) => ({ url: new URL(path, origin).href }));
+/**
+ * The sitemap entries for a site at `origin`: the site's own pages, then the
+ * artifact pages search engines may index (artifactSitemapPaths in
+ * src/lib/search/search-rules.ts decides which).
+ */
+export function sitemapFor(origin: string, artifactPaths: readonly string[] = []): MetadataRoute.Sitemap {
+  return [...publicPaths(), ...artifactPaths].map((path) => ({ url: new URL(path, origin).href }));
 }
 
 /** The /.well-known/security.txt body (RFC 9116) for a site at `origin`. */

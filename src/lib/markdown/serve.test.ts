@@ -98,7 +98,7 @@ describe("artifactMarkdownResponse", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("text/markdown; charset=utf-8");
     expect(response.headers.get("vary")).toContain("Accept");
-    expect(response.headers.get("x-robots-tag")).toBe("noindex");
+    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
     expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
     const body = await response.text();
     expect(body).toContain("# 🧪 Pending title");

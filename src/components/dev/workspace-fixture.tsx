@@ -4,11 +4,15 @@ import { useMemo } from "react";
 
 import { AppHeader } from "@/components/app/app-header";
 import { Dashboard } from "@/components/app/dashboard";
+import type { ShareTeam } from "@/components/app/share-teams-context";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
 import { fixtureArtifact, longCsv, longJson, longMarkdown, longUi } from "./fixture-content";
+
+/** The viewer's personal team, so the Share dialog can offer link and public sharing. It adds no scope tab. */
+const fixtureTeams: ShareTeam[] = [{ id: "fixture-team", slug: "fixture", name: "Fixture", personal: true, role: "owner", teamSharingNeedsApproval: false }];
 
 /** Four long artifacts first, then enough short ones that the list scrolls. */
 function fixtureArtifacts(): ArtifactDto[] {
@@ -41,7 +45,7 @@ export function WorkspaceFixture() {
           initialFull={artifacts}
           origin="http://localhost"
           viewerId="fixture"
-          teams={[]}
+          teams={fixtureTeams}
           scopeTeam={null}
           facets={{ projects: [], none: artifacts.length, total: artifacts.length }}
           projectFilter={null}

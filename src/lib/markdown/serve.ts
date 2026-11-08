@@ -6,6 +6,7 @@ import { tooManyRequests } from "@/lib/abuse/responses";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
 import { bearerToken } from "@/lib/mcp/authenticate";
 import { resolveRequestViewer, viewerUserId, type RequestViewer } from "@/lib/request-viewer";
+import { noindexHeader } from "@/lib/search/search-rules";
 
 import { artifactToMarkdown, notFoundMarkdown } from "./artifact-markdown";
 import { loadMarkdownInput } from "./load";
@@ -27,13 +28,16 @@ function hasCredentials(request: Request): boolean {
   return bearerToken(request.headers.get("authorization")) !== null || getSessionCookie(request.headers) !== null;
 }
 
-/** Headers on every answer: never mixed with the HTML page in a cache, never indexed. */
+/**
+ * Headers on every answer: never mixed with the HTML page in a cache, and
+ * never indexed, even when the page is (it would repeat the page).
+ */
 export function markdownHeaders(credentialed: boolean, contentType = "text/markdown; charset=utf-8"): Record<string, string> {
   return {
     "Content-Type": contentType,
     "Cache-Control": credentialed ? privateCache : publicCache,
     Vary: "Accept, Authorization, Cookie",
-    "X-Robots-Tag": "noindex",
+    "X-Robots-Tag": noindexHeader,
     "X-Content-Type-Options": "nosniff",
   };
 }

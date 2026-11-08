@@ -31,6 +31,8 @@ export interface McpArtifact {
   visibility: ArtifactVisibility;
   /** Who can read and write its comments: off, team, or signed_in. */
   comments: CommentSetting;
+  /** Whether search engines may list it: only public artifacts whose author turned this on in the web app. Read-only for agents. */
+  showInSearch: boolean;
   /** The team's slug, shown only when the caller belongs to that team. */
   team: string | null;
   /** An open sharing request, shown only to the author. */
@@ -85,6 +87,7 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     source: dto.source,
     visibility: dto.visibility,
     comments: dto.comments,
+    showInSearch: dto.showInSearch,
     team: slug(dto.teamId),
     pendingSharing: pending,
     pendingComments: isAuthor && dto.pendingComments ? { comments: dto.pendingComments.comments, requestedAt: dto.pendingComments.requestedAt } : null,

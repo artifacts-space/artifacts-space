@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { actionErrorMessage } from "@/lib/action-errors";
-import { artifactVisibilities, commentSettings, type ActionResult } from "@/lib/artifact-types";
+import { artifactVisibilities, commentSettings, type ActionResult, type ArtifactDto } from "@/lib/artifact-types";
 import { getManagedReport, resolveReports } from "@/lib/reports/service";
+import { setShowInSearch } from "@/lib/search/search-service";
 import { getSession } from "@/lib/session";
 import { setArtifactComments, type CommentsChangeResult } from "@/lib/sharing/comments";
 import { decideSharingRequest, requestArtifactSharing, withdrawArtifactSharing, type SharingResult } from "@/lib/sharing/service";
@@ -54,6 +55,21 @@ export async function setCommentsAction(artifactId: string, comments: string): P
     return { success: true, data: result };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "Comments could not be changed. Please try again.") };
+  }
+}
+
+/**
+ * Turns "Show in search engines" on or off for the viewer's own public
+ * artifact. Only its author, as a person in the web app; agents cannot.
+ */
+export async function setShowInSearchAction(artifactId: string, on: boolean): Promise<ActionResult<ArtifactDto>> {
+  try {
+    const actorId = await requireUserId();
+    const artifact = await setShowInSearch({ actorId, artifactId: idSchema.parse(artifactId), on: z.boolean().parse(on), actor: "person" });
+    revalidatePath("/app");
+    return { success: true, data: artifact };
+  } catch (error) {
+    return { success: false, error: actionErrorMessage(error, "The search engines setting could not be changed. Please try again.") };
   }
 }
 

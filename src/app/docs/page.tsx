@@ -61,7 +61,7 @@ export default function DocsIntroduction() {
           <li><strong>Private</strong>: only the author.</li>
           <li><strong>Team</strong>: the author and signed-in members of one team.</li>
           <li><strong>Link</strong>: anyone with the URL. Search engines are told not to index it.</li>
-          <li><strong>Public</strong>: anyone. Search engines may index it once the author&apos;s account is a few days old.</li>
+          <li><strong>Public</strong>: anyone. Search engines list it only when its author turns on Show in search engines.</li>
         </ul>
         <p>Only the author changes visibility. Making an artifact private again always works at once.</p>
       </Prose>

@@ -22,6 +22,7 @@ const dto: ArtifactDto = {
   updatedBy: { id: "member", kind: "person", handle: "ann", name: "Ann" },
   visibility: "team",
   comments: "team",
+  showInSearch: false,
   teamId: "team-1",
   authorId: "author",
   originalAuthorId: null,

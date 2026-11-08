@@ -8,7 +8,7 @@ const origin = "https://artifacts.space";
 const privatePrefixes = ["/artifact", "/share", "/app", "/api", "/oauth", "/teams", "/inbox", "/threads", "/invitations", "/dev", "/preview"];
 
 describe("sitemapFor", () => {
-  it("should never list artifacts, shares, or app routes when the sitemap is built", () => {
+  it("should never list artifacts, shares, or app routes when no artifact is opted in", () => {
     for (const { url } of sitemapFor(origin)) {
       const { pathname } = new URL(url);
       for (const prefix of privatePrefixes) expect(pathname === prefix || pathname.startsWith(`${prefix}/`)).toBe(false);
@@ -23,6 +23,12 @@ describe("sitemapFor", () => {
     expect(urls).toContain(`${origin}/docs`);
     expect(urls).toContain(`${origin}/docs/quickstart`);
     expect(urls).toHaveLength(3 + docsPages.length);
+  });
+
+  it("should add only the artifact pages it is given after the site's pages when artifacts are opted in", () => {
+    const urls = sitemapFor(origin, ["/artifact/4fXkP9qR2sT7vW1yZ3aB5c"]).map((entry) => entry.url);
+    expect(urls).toHaveLength(publicPaths().length + 1);
+    expect(urls.at(-1)).toBe(`${origin}/artifact/4fXkP9qR2sT7vW1yZ3aB5c`);
   });
 
   it("should use only the given origin when URLs are built", () => {

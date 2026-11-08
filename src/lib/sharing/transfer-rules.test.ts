@@ -50,6 +50,7 @@ describe("transferredOwnership", () => {
     expect(transferredOwnership({ id: "a", userId: "gone", visibility: "team", teamId: "t1", originalAuthorId: null }, "owner")).toEqual({
       userId: "owner",
       originalAuthorId: "gone",
+      showInSearch: false,
     });
   });
 
@@ -57,6 +58,7 @@ describe("transferredOwnership", () => {
     expect(transferredOwnership({ id: "a", userId: "second", visibility: "team", teamId: "t1", originalAuthorId: "first" }, "owner")).toEqual({
       userId: "owner",
       originalAuthorId: "first",
+      showInSearch: false,
     });
   });
 });
