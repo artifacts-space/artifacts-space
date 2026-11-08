@@ -164,6 +164,17 @@ test.describe("desktop and tablet", () => {
     expect(await overlappingSections(page), "edit").toEqual([]);
   });
 
+  test("should leave room under the last section when the artifact scrolls to its end", async ({ page }) => {
+    await openWorkspace(page);
+    const body = slot(page, "detail-body");
+    await scrollToBottom(body);
+    const gap = await body.evaluate((element) => {
+      const last = element.lastElementChild?.getBoundingClientRect();
+      return last ? element.getBoundingClientRect().bottom - last.bottom : 0;
+    });
+    expect(gap, "space between the last section and the pane's bottom edge").toBeGreaterThanOrEqual(32);
+  });
+
   test("should scroll the source inside the pane in Edit mode, with one scroll bar", async ({ page }) => {
     await openWorkspace(page);
     const tops = await controlTops(page);
