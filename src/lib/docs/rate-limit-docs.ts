@@ -47,6 +47,8 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   teamCreate: { per: "user", where: "New teams", refusal: "form", group: "Teams and accounts" },
   agentCreate: { per: "user", where: "New agent teammates", refusal: "form", group: "Teams and accounts" },
   tokenCreate: { per: "user", where: "New access tokens", refusal: "form", group: "Teams and accounts" },
+  pushDevice: { per: "user", where: "Turning on browser notifications in Settings", refusal: "form", group: "Teams and accounts" },
+  pushTest: { per: "user", where: "Send a test notification in Settings", refusal: "form", group: "Teams and accounts" },
   magicLinkByNetwork: { per: "network", where: "Sign-in links", refusal: "http-429", group: "Sign-in and OAuth" },
   magicLinkByNetworkDay: { per: "network", where: "Sign-in links, each day", refusal: "http-429", group: "Sign-in and OAuth" },
   magicLinkByEmail: { per: "email address", where: "Sign-in links", refusal: "http-429", group: "Sign-in and OAuth" },

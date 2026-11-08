@@ -18,6 +18,11 @@ const providers = [
   { name: "Cloudflare R2", role: "stores uploaded files.", data: "files and their names" },
   { name: "Sendir", role: "sends our transactional email.", data: "the recipient's email address and the email itself" },
   { name: "GitHub", role: "signs you in, if you choose GitHub.", data: "the fact that you use GitHub to sign in to artifacts.space" },
+  {
+    name: "Browser push services",
+    role: "(Google for Chrome and Edge, Mozilla for Firefox, Apple for Safari, Microsoft for Windows) deliver browser notifications, only if you turn them on. Each message is encrypted for your browser, so the push service cannot read it.",
+    data: "your browser's push address, and the time and size of each message",
+  },
 ] as const;
 
 /** Privacy Policy: providers, retention, security, transfers, rights, children, changes, and contact. */
