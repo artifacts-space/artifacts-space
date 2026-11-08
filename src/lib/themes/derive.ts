@@ -102,6 +102,8 @@ function codeTokens(mode: PaletteMode, colors: ThemeColors): Record<string, stri
     "--code": formatOklch(code),
     "--code-foreground": colors.foreground,
     "--code-border": colors.cardEdge,
+    // Inline code in running text: the card a step toward the ink, like --accent.
+    "--code-inline": formatOklch(mixOklch(read(colors.card), read(colors.foreground), 0.07)),
     // Declared from --code-foreground in globals.css, which resolves where it is declared, so it is set here too.
     "--syntax-plain": colors.foreground,
     ...syntaxTokens(mode, code),

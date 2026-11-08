@@ -25,6 +25,7 @@ const refusalText: Record<RefusalShape, string> = {
   "tool-error": "Tool error (isError), or in the page",
   "http-429": "HTTP 429 with Retry-After",
   form: "Error in the page",
+  "not-counted": "The view is not counted; the page is unaffected",
 };
 
 const groups = [...new Set(rateLimitRows().map((row) => row.group))];

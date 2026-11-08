@@ -4,7 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, artifactReport, team, teamMember, user } from "@/db/schema";
-import { enforceRateLimit } from "@/lib/abuse/rate-limit";
+import { enforceRateLimits } from "@/lib/abuse/rate-limit";
 import { getArtifactAccess } from "@/lib/access";
 import type { ArtifactVisibility, ReportReason } from "@/lib/artifact-types";
 import { findPersonalTeam, getTeamMembershipById } from "@/lib/teams/queries";
@@ -12,7 +12,7 @@ import { canManageTeam, parseTeamRole } from "@/lib/teams/roles";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { sendReportEmail } from "./email";
-import { isReportable, parseReportInput, reportReasonLabels } from "./rules";
+import { isReportable, parseReportInput, reportLimitChecks, reportReasonLabels } from "./rules";
 
 /**
  * Reader reports about link and public artifacts. A report lands with the
@@ -61,7 +61,7 @@ async function notifyOwners(input: { reportId: string; teamId: string; title: st
 /**
  * Files a report from a reader, signed in (`viewerId`) or not. Checks the
  * input, that the reader can see the artifact and that it is link or public,
- * and the per-network and per-user limits. The owners' email never blocks
+ * and the per-artifact, per-network, and per-user limits (reportLimitChecks). The owners' email never blocks
  * the report.
  */
 export async function submitReport(input: { publicId: string; viewerId: string | null; networkKey: string; report: unknown }) {
@@ -70,10 +70,9 @@ export async function submitReport(input: { publicId: string; viewerId: string |
   const viewable = await getArtifactAccess(input.publicId, input.viewerId);
   if (!viewable || !isReportable(viewable.record.visibility)) throw new UserFacingError(notFound);
 
-  await enforceRateLimit("reportByNetwork", input.networkKey);
-  if (input.viewerId) await enforceRateLimit("reportByUser", input.viewerId);
-
   const { record, served } = viewable;
+  await enforceRateLimits(reportLimitChecks({ networkKey: input.networkKey, artifactId: record.id, viewerId: input.viewerId }));
+
   const teamId = await reportTeamId(record);
   const id = randomUUID();
   await getDb().insert(artifactReport).values({

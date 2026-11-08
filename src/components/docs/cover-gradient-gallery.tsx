@@ -33,7 +33,7 @@ function GradientCard({ gradient }: { gradient: CoverGradient }) {
       </div>
       <div className="flex items-center gap-2 px-4 py-2.5">
         <h3 className="text-md font-medium">{gradient.name}</h3>
-        <code className="rounded bg-muted px-1 py-0.5 font-mono text-sm">{gradient.id}</code>
+        <code className="inline-code">{gradient.id}</code>
         <CopyIconButton value={gradient.id} label={`Copy the ${gradient.name} cover id`} className="ml-auto" />
       </div>
     </li>

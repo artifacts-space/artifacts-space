@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { clientAddress, networkKey } from "./network-key";
+import { clientAddress, MissingNetworkKeySecretError, networkKey, networkKeySecret } from "./network-key";
 
 describe("clientAddress", () => {
   it("should use the first forwarded address when a proxy chain is listed", () => {
@@ -23,5 +23,44 @@ describe("networkKey", () => {
   it("should give different keys when the secret differs", () => {
     const headers = new Headers({ "x-real-ip": "198.51.100.2" });
     expect(networkKey(headers, "a")).not.toBe(networkKey(headers, "b"));
+  });
+});
+
+describe("networkKeySecret", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("should throw when BETTER_AUTH_SECRET is missing", () => {
+    expect(() => networkKeySecret({})).toThrow(MissingNetworkKeySecretError);
+  });
+
+  it("should throw when BETTER_AUTH_SECRET is blank", () => {
+    expect(() => networkKeySecret({ BETTER_AUTH_SECRET: "   " })).toThrow(MissingNetworkKeySecretError);
+  });
+
+  it("should return the secret when it is set", () => {
+    expect(networkKeySecret({ BETTER_AUTH_SECRET: "s3cret" })).toBe("s3cret");
+  });
+
+  it("should refuse to hash with an empty secret when the environment has none", () => {
+    vi.stubEnv("BETTER_AUTH_SECRET", "");
+    expect(() => networkKey(new Headers({ "x-real-ip": "198.51.100.2" }))).toThrow(MissingNetworkKeySecretError);
+    expect(() => networkKey(new Headers({ "x-real-ip": "198.51.100.2" }), "")).toThrow(MissingNetworkKeySecretError);
+  });
+
+  it("should hash with the environment secret when none is passed", () => {
+    vi.stubEnv("BETTER_AUTH_SECRET", "from-env");
+    const headers = new Headers({ "x-real-ip": "198.51.100.2" });
+    expect(networkKey(headers)).toBe(networkKey(headers, "from-env"));
+  });
+});
+
+describe("network-key module", () => {
+  it("should load without a secret so the build needs none", async () => {
+    vi.stubEnv("BETTER_AUTH_SECRET", "");
+    vi.resetModules();
+    await expect(import("./network-key")).resolves.toHaveProperty("networkKey");
+    vi.unstubAllEnvs();
   });
 });

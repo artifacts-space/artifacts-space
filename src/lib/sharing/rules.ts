@@ -48,3 +48,25 @@ export function canWithdrawSharing(input: { viewerId: string; authorId: string; 
 export function canDecideRequest(input: { viewerRole: TeamRole | null; actor: SharingActor }): boolean {
   return input.actor === "person" && input.viewerRole !== null && canManageTeam(input.viewerRole);
 }
+
+/**
+ * Whether an open sharing or comments request may still be approved: the
+ * artifact's author is still in the request's team (artifacts shared through
+ * a team belong to a member, src/lib/sharing/transfer.ts), and the person who
+ * asked is the author or still acts for the agent that wrote it.
+ */
+export function requestStillValid(input: { authorId: string; requestedBy: string; requesterActsForAuthor: boolean; authorInTeam: boolean }): boolean {
+  if (!input.authorInTeam) return false;
+  return input.requestedBy === input.authorId || input.requesterActsForAuthor;
+}
+
+/**
+ * The team a sharing change goes to when the person who added an agent
+ * shares the agent's artifact: the agent's own team, since an artifact shared
+ * through a team must belong to one of its members. Returns the error to show
+ * when the chosen team does not include the agent, or null when it does.
+ */
+export function agentArtifactTeamProblem(input: { authorInTeam: boolean }): string | null {
+  if (input.authorInTeam) return null;
+  return "An agent wrote this artifact, so share it with the agent's team, or by link or public through that team.";
+}

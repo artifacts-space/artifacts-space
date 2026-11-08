@@ -106,8 +106,11 @@ export interface CodeBlockProps {
   /**
    * "command" is one shell command on a single compact row: a `$` prompt that
    * is never copied, the command, and the copy button. It has no header.
+   * "embedded" is the code area alone, on the code surface with no edge or
+   * header, for code inside another frame that has its own copy button (the
+   * docs live examples).
    */
-  variant?: "block" | "command";
+  variant?: "block" | "command" | "embedded";
   /** The copy button's accessible name, so several buttons on a page stay distinct. */
   copyLabel?: string | undefined;
   /** Wraps long lines instead of scrolling sideways, for prose-like output such as error reports. */
@@ -128,6 +131,23 @@ function CommandRow({ code, language, lines, copyLabel = "Copy command", classNa
       <div className="flex shrink-0 items-center px-1.5">
         <CopyIconButton value={model.copyValue} label={copyLabel} />
       </div>
+    </div>
+  );
+}
+
+/** The code area alone, flush inside a frame that carries its own caption and copy button. */
+function EmbeddedCode({ code, language, title, lines, capHeight = false, wrap = false, className }: CodeBlockProps) {
+  const model = codeBlockModel(code, language);
+  const highlighted = useHighlightedLines(model.display, model.language, lines);
+  return (
+    <div data-code-block="" data-variant="embedded" className={cn("min-w-0 bg-code text-code-foreground", className)}>
+      <CodeArea
+        display={model.display}
+        lines={highlighted}
+        name={title ?? model.label}
+        wrap={wrap}
+        className={cn("overflow-auto px-4 py-3.5", capHeight && "max-h-[32rem]")}
+      />
     </div>
   );
 }
@@ -155,8 +175,11 @@ function CodeFigure({ code, language, title, lines, capHeight = false, copyLabel
  * in Markdown and comments, the ui Code and Steps components, the docs, and
  * the setup screens. A raised surface with a hairline edge, a header with the
  * language and a copy button, and colors from the `--syntax-*` tokens. The
- * "command" variant is the same surface on one compact row.
+ * "command" variant is the same surface on one compact row; "embedded" is the
+ * highlighted code alone, for a frame with its own caption.
  */
 export function CodeBlock(props: CodeBlockProps) {
-  return props.variant === "command" ? <CommandRow {...props} /> : <CodeFigure {...props} />;
+  if (props.variant === "command") return <CommandRow {...props} />;
+  if (props.variant === "embedded") return <EmbeddedCode {...props} />;
+  return <CodeFigure {...props} />;
 }

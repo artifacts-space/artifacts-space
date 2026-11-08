@@ -16,7 +16,8 @@ test("should follow the site mode and draw diagrams in theme colors when a scope
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(message.text().slice(0, 500));
     });
-    await page.addInitScript((value) => { window.localStorage.setItem("theme", value); }, theme);
+    // Top frame only: the gallery's file stand-ins are data: frames, which have no storage.
+    await page.addInitScript((value) => { if (window === window.top) window.localStorage.setItem("theme", value); }, theme);
     await page.goto("/dev/components#themes");
     await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${theme}\\b`));
     const scope = page.locator('[data-theme-scope="ocean"]');
