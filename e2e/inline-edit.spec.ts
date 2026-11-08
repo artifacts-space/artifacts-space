@@ -130,7 +130,7 @@ test("should save a heading typed into an interface, keep it after a reload, and
   await page.keyboard.press("End");
   await page.keyboard.type(" for Friday");
   await page.keyboard.type(" and Monday");
-  await expect(page.locator("[data-slot=editor-bar]").getByRole("status")).toHaveText("Saved");
+  await expect(page.locator("[data-slot=editor-bar]").getByRole("status")).toHaveText("Saved", savedWithin);
 
   await page.reload();
   await expect(page.locator("[data-slot=ui-block-editor]").getByRole("textbox", { name: "Heading" })).toHaveText("Launch plan for Friday and Monday");

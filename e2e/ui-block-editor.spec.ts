@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
+/** Autosave sends at most one save every 5 seconds (autosave-rules.ts), so "Saved" can take a little over that. */
+const savedWithin = { timeout: 12_000 };
+
 /**
  * The interface block editor on the artifact page fixture (no database;
  * saves stay in memory): text typed in place, blocks added from "+" and "/",
@@ -39,7 +42,7 @@ test("should save a heading typed in place without any JSON", async ({ page }) =
   await page.keyboard.press("End");
   await page.keyboard.type(" for Friday");
   await expect(heading).toHaveText("Launch plan for Friday");
-  await expect(saveStatus(page)).toHaveText("Saved");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
   const spec = await savedSpec(page);
   expect(spec.elements.title?.props?.text).toBe("Launch plan for Friday");
 });
@@ -54,7 +57,7 @@ test("should add a block from the + button and turn an empty line into a heading
   await page.keyboard.type("/");
   await page.getByRole("combobox", { name: "Search blocks" }).fill("heading 2");
   await page.keyboard.press("Enter");
-  await expect(saveStatus(page)).toHaveText("Saved");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
   expect(await rootChildren(page)).toEqual(["Heading", "Text", "Callout", "Tabs", "Heading"]);
 });
 
@@ -64,14 +67,14 @@ test("should duplicate and delete a block from its handle and keep the spec vali
   await callout.hover();
   await callout.getByRole("button", { name: /Callout block/ }).click();
   await page.getByRole("menuitem", { name: "Duplicate" }).click();
-  await expect(saveStatus(page)).toHaveText("Saved");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
   expect(await rootChildren(page)).toEqual(["Heading", "Text", "Callout", "Callout", "Tabs"]);
 
   const intro = editor(page).locator("[data-block=intro]");
   await intro.hover();
   await intro.getByRole("button", { name: /Text block/ }).click();
   await page.getByRole("menuitem", { name: "Delete" }).click();
-  await expect(saveStatus(page)).toHaveText("Saved");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
   expect(await rootChildren(page)).toEqual(["Heading", "Callout", "Callout", "Tabs"]);
 });
 
@@ -81,6 +84,6 @@ test("should move a block by dragging its handle onto another block", async ({ p
   const tabs = editor(page).locator("[data-block=tabs]");
   await tabs.hover();
   await tabs.getByRole("button", { name: /Tabs block/ }).dragTo(editor(page).locator("[data-block=intro]"), { targetPosition: { x: 20, y: 2 } });
-  await expect(saveStatus(page)).toHaveText("Saved");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
   expect(await rootChildren(page)).toEqual(["Heading", "Tabs", "Text", "Callout"]);
 });
