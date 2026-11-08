@@ -104,9 +104,15 @@ test("should show who can see the artifact in the header row without wrapping or
   expect(fits.oneLine, "everything sits on one line").toBe(true);
   expect(fits.inside, "nothing spills out of the row").toBe(true);
 
-  // Keyboard focus opens the tooltip with the full sentence (hover does too, with a mouse).
-  await badge.focus();
-  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText("Private. Only you can see this.");
+  // Tabbing to it from the logo opens the tooltip with the full sentence (hovering does too, with a mouse).
+  // Retried, so a Tab pressed before the page has hydrated does not count.
+  const tooltip = page.locator('[data-slot="tooltip-content"]');
+  await expect(async () => {
+    await header.getByRole("link", { name: "artifacts.space home" }).focus();
+    await page.keyboard.press("Tab");
+    await expect(badge).toBeFocused({ timeout: 1_000 });
+    await expect(tooltip).toHaveText("Private. Only you can see this.", { timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
 
   const icons = page.locator('[data-specimen="artifact page chrome"] [data-visibility-badges]');
   for (const [visibility, name] of [["private", "Private"], ["team", "Team"], ["link", "Link"], ["public", "Public"]] as const) {
