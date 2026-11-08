@@ -35,7 +35,7 @@ export function SharingRuleSetting({ teamId, needsApproval, canEdit }: { teamId:
   );
 }
 
-/** Leave the team. Artifacts the viewer shared with it stay with the team. */
+/** Leave the team. Artifacts the viewer shared with it stay with the team; agents they added go to a team owner. */
 export function LeaveTeamButton({ teamId, teamName }: { teamId: string; teamName: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -68,7 +68,7 @@ export function LeaveTeamButton({ teamId, teamName }: { teamId: string; teamName
       <ConfirmDialog
         state={confirmLeave.dialog}
         title={`Leave ${teamName}?`}
-        description="Artifacts you shared with this team stay with the team, and its owners take them over. Your private artifacts stay yours."
+        description="Artifacts you shared with this team stay with the team, and its owners take them over. Agents you added go to the team's owner, and their tokens stop working at once. Your private artifacts stay yours."
         confirmLabel="Leave team"
         pending={pending}
       />
