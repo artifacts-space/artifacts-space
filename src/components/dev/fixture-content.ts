@@ -3,7 +3,7 @@ import { specJson, type DocElement } from "@/lib/docs/spec-builders";
 import { checkoutRolloutSpec } from "@/lib/preview/samples";
 
 /** Samples the editor fixture can open: long ones for layout, and a short interface ("blocks") for the block editor. */
-export const editorFixtureKinds = ["ui", "json", "markdown", "blocks"] as const;
+export const editorFixtureKinds = ["ui", "json", "markdown", "blocks", "data"] as const;
 export type EditorFixtureKind = (typeof editorFixtureKinds)[number];
 
 /** The rollout dashboard twelve times over: a long ui with charts, timelines, and tables. */
@@ -31,6 +31,22 @@ export function shortUi(): string {
       title: { type: "Heading", props: { text: "Launch plan", level: 1 } },
       intro: { type: "Text", props: { text: "First line." } },
       note: { type: "Callout", props: { text: "Ship on Friday.", tone: "info" } },
+      tabs: { type: "Tabs", props: { tabs: [{ label: "Risks" }, { label: "Owners" }] }, children: ["risks", "owners"] },
+      risks: { type: "Text", props: { text: "Payments could lag." } },
+      owners: { type: "Text", props: { text: "Ann and Bo." } },
+    },
+  }, null, 2);
+}
+
+/** A short interface of data blocks for the properties form checks: a chart, a table, and tabs. */
+export function dataUi(): string {
+  return JSON.stringify({
+    version: checkoutRolloutSpec.version,
+    root: "page",
+    elements: {
+      page: { type: "Stack", props: {}, children: ["chart", "table", "tabs"] },
+      chart: { type: "Chart", props: { type: "bar", title: "Orders", labels: ["Q1", "Q2", "Q3"], series: [{ name: "Orders", values: [3, 5, 4] }] } },
+      table: { type: "Table", props: { columns: [{ key: "name", label: "Name" }, { key: "orders", label: "Orders", format: "number" }], rows: [{ name: "North", orders: 12 }] } },
       tabs: { type: "Tabs", props: { tabs: [{ label: "Risks" }, { label: "Owners" }] }, children: ["risks", "owners"] },
       risks: { type: "Text", props: { text: "Payments could lag." } },
       owners: { type: "Text", props: { text: "Ann and Bo." } },
