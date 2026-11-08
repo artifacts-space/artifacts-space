@@ -4,17 +4,19 @@ import { IconLoader2, IconPlus, IconSearch } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
-import { artifactListState, filterArtifactList, type ArtifactListState } from "@/components/app/artifact-list-state";
+import { ArtifactList } from "@/components/app/artifact-list";
+import { artifactListState, filterArtifactList } from "@/components/app/artifact-list-state";
 import { CreateArtifactDialog } from "@/components/app/create-artifact-dialog";
 import { ProjectFilter } from "@/components/app/project-filter";
 import { TagFilter } from "@/components/app/tag-filter";
 import { ScopeTabs } from "@/components/app/scope-tabs";
-import { visibilityLabel } from "@/components/app/share-options";
+import { serverProjectsApi, type ProjectsApi } from "@/components/app/projects-api";
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
 import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
 import { useEditAccess, useWithdrawSharing } from "@/components/app/use-edit-access";
 import { useFullArtifact } from "@/components/app/use-full-artifact";
 import { useServerSearch } from "@/components/app/use-server-search";
+import { useDashboardProjects } from "@/components/app/use-dashboard-projects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,103 +26,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { LinkedCommentsProvider } from "@/components/comments/linked-comments";
-import { ProjectLabel } from "@/components/projects/project-label";
+import { SidebarProjects } from "@/components/projects/sidebar-projects";
 import { withoutArtifactLink, type ArtifactLink } from "@/lib/app-link";
 import { kinds } from "@/lib/artifact-kinds";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
 import type { ProjectFacets } from "@/lib/projects/queries";
 import type { ProjectFilter as ProjectFilterValue } from "@/lib/projects/rules";
+import { matchesProjectFilter, type SidebarProjectRow } from "@/lib/projects/sidebar-rules";
 import type { TagFacet } from "@/lib/tags/queries";
-import { rowTags } from "@/lib/tags/rules";
-import { cn } from "@/lib/utils";
-
-const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-
-/** What a list item says about sharing, or "" for a private artifact with nothing waiting. */
-function sharingNote(artifact: ArtifactListItemDto) {
-  if (artifact.pendingSharing) return " · Waiting for approval";
-  return artifact.visibility === "private" ? "" : ` · ${visibilityLabel(artifact.visibility)}`;
-}
-
-function ArtifactListItem({ artifact, active, onSelect }: { artifact: ArtifactListItemDto; active: boolean; onSelect: (id: string) => void }) {
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={() => { onSelect(artifact.id); }}
-        aria-current={active ? "true" : undefined}
-        className={cn(
-          "w-full rounded-sm px-3 py-2.5 text-left transition-colors",
-          active ? "bg-muted" : "hover:bg-muted/60",
-        )}
-      >
-        <div className="flex items-start gap-2.5">
-          <span className="flex h-6 w-4 shrink-0 items-center justify-center">
-            <ArtifactIcon icon={artifact.icon} kind={artifact.kind} className={artifact.icon ? undefined : "size-3.5"} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="truncate text-md font-medium">{artifact.title}</h2>
-              <span className="shrink-0 text-xs text-muted-foreground">{dateFormat.format(new Date(artifact.updatedAt))}</span>
-            </div>
-            <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{artifact.summary || artifact.preview}</p>
-            <p className="mt-1 flex min-w-0 items-center text-xs text-muted-foreground">
-              {artifact.project ? <ProjectLabel name={artifact.project.name} icon={artifact.project.icon} /> : <span className="shrink-0">No project</span>}
-              <span className="shrink-0 whitespace-pre">{sharingNote(artifact)}</span>
-            </p>
-            {artifact.tags.length > 0 ? <RowTags tags={artifact.tags} /> : null}
-          </div>
-        </div>
-      </button>
-    </li>
-  );
-}
-
-/** A row's tags: the first two and how many more. */
-function RowTags({ tags }: { tags: readonly string[] }) {
-  const { visible, more } = rowTags(tags);
-  return (
-    <p className="mt-1 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-      {visible.map((tag) => <span key={tag} className="truncate rounded-sm bg-muted px-1">{tag}</span>)}
-      {more > 0 ? <span className="shrink-0">+{more}</span> : null}
-    </p>
-  );
-}
-
-interface ArtifactListProps {
-  state: ArtifactListState;
-  artifacts: ArtifactListItemDto[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onClearFilters: () => void;
-}
-
-/** The sidebar list. With no artifacts at all it stays quiet, because the main pane already offers to create one. */
-function ArtifactList({ state, artifacts, selectedId, onSelect, onClearFilters }: ArtifactListProps) {
-  if (state === "empty") {
-    return <p className="px-4 py-10 text-center text-md text-muted-foreground">Nothing here yet.</p>;
-  }
-  if (state === "no-match") {
-    return (
-      <div className="px-4 py-10 text-center text-md text-muted-foreground">
-        <p>No artifacts match.</p>
-        <button type="button" onClick={onClearFilters} className="mt-2 underline underline-offset-4 hover:text-foreground">
-          Clear filters
-        </button>
-      </div>
-    );
-  }
-  return (
-    <ul className="space-y-0.5">
-      {artifacts.map((artifact) => (
-        <ArtifactListItem key={artifact.id} artifact={artifact} active={selectedId === artifact.id} onSelect={onSelect} />
-      ))}
-    </ul>
-  );
-}
 
 interface DetailPaneProps {
   selected: ArtifactListItemDto | null;
@@ -148,9 +63,16 @@ function LoadingPane({ failure, onRetry }: { failure: string | null; onRetry: ()
   );
 }
 
+/** The full artifact with the list's project: the list holds the newest one, since the sidebar can move the open artifact. */
+function withListProject(full: ArtifactDto | null, selected: ArtifactListItemDto | null): ArtifactDto | null {
+  if (!full || selected?.id !== full.id) return full;
+  return { ...full, project: selected.project };
+}
+
 /** The editor for an artifact the viewer may edit, a read-only view for a teammate's, or the empty state. */
 function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull }: DetailPaneProps) {
-  const { full, failure, remember, retry } = useFullArtifact(selected, initialFull);
+  const { full: loaded, failure, remember, retry } = useFullArtifact(selected, initialFull);
+  const full = withListProject(loaded, selected);
   const access = useEditAccess(full, viewerId);
   const withdrawal = useWithdrawSharing(full?.id ?? "", onDeleted);
   const handleUpdated = (artifact: ArtifactDto) => {
@@ -225,6 +147,8 @@ interface DashboardProps {
   scopeTeam: ShareTeam | null;
   /** The project filter's entries and counts for the whole scope. */
   facets: ProjectFacets;
+  /** The projects the viewer may use in this list, for the sidebar's Projects group. */
+  projectRows: SidebarProjectRow[];
   /** The project filter in the URL; the list is already filtered by it. */
   projectFilter: ProjectFilterValue | null;
   /** The tag filter's entries and counts for the whole scope. */
@@ -233,18 +157,22 @@ interface DashboardProps {
   tagFilter: string[];
   /** Full artifacts already in hand, so they open without a load (the /dev/workspace fixture). */
   initialFull?: readonly ArtifactDto[];
+  /** Where project changes go: the server actions, or the fixture's stand-in. */
+  projectsApi?: ProjectsApi;
+  /** The list's path, for filter links: /app, or the fixture's page. */
+  listPath?: string;
   /** The artifact the URL asked to open (`?artifact=<id>`), and whether to open its comments. */
   link?: ArtifactLink | null;
 }
 
 /** The artifact to select first: the linked one when it is in the list, else the first. */
-function firstSelection(artifacts: ArtifactListItemDto[], link: ArtifactLink | null) {
+function firstSelection(artifacts: ArtifactListItemDto[], link: ArtifactLink | null | undefined) {
   const linked = link ? artifacts.find((artifact) => artifact.publicId === link.publicId) : undefined;
   return linked?.id ?? artifacts[0]?.id ?? "";
 }
 
 /** Once the link has opened its artifact, drops it from the address bar so a reload or a later pick does not jump back. */
-function useForgetArtifactLink(link: ArtifactLink | null) {
+function useForgetArtifactLink(link: ArtifactLink | null | undefined) {
   useEffect(() => {
     if (!link) return;
     const { pathname, search, hash } = window.location;
@@ -252,16 +180,24 @@ function useForgetArtifactLink(link: ArtifactLink | null) {
   }, [link]);
 }
 
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectFilter, tagFacets, tagFilter, initialFull, link = null }: DashboardProps) {
+/** The artifact whose comments the link asked to open, if any. */
+function linkedCommentsId(link: ArtifactLink | null | undefined): string | null {
+  return link?.comments ? link.publicId : null;
+}
+
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", link }: DashboardProps) {
   const [artifacts, setArtifacts] = useState(initialArtifacts);
   const [selectedId, setSelectedId] = useState(() => firstSelection(initialArtifacts, link));
   useForgetArtifactLink(link);
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
+  const sidebar = useDashboardProjects({ artifacts, setArtifacts, rows: projectRows, facets, api: projectsApi, teams, scopeTeam, tagFilter, listPath, viewerId });
 
   const serverMatches = useServerSearch(query, scopeTeam?.id ?? null, projectFilter, tagFilter);
-  const filtered = useMemo(() => filterArtifactList(artifacts, { query, kind }, serverMatches), [artifacts, kind, query, serverMatches]);
+  // A card moved out of the filtered project leaves the list at once; Undo brings it back.
+  const inFilter = useMemo(() => artifacts.filter((item) => matchesProjectFilter(item.project, projectFilter)), [artifacts, projectFilter]);
+  const filtered = useMemo(() => filterArtifactList(inFilter, { query, kind }, serverMatches), [inFilter, kind, query, serverMatches]);
 
   const selected = pickSelected(artifacts, filtered, selectedId);
 
@@ -286,7 +222,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
 
   return (
     <ShareTeamsProvider teams={teams}>
-      <LinkedCommentsProvider publicId={link?.comments ? link.publicId : null}>
+      <LinkedCommentsProvider publicId={linkedCommentsId(link)}>
       {/* An app shell from md up: the frame is the viewport (workspace-frame), and only the list and the artifact scroll. */}
       <main data-app-shell className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col p-4 sm:p-6 md:min-h-0 md:flex-1">
         <ScopeTabs teams={teams} activeSlug={scopeTeam?.slug ?? null} />
@@ -316,10 +252,20 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
                     {kinds.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <ProjectFilter facets={facets} filter={projectFilter} scopeTeam={scopeTeam} tags={tagFilter} />
+                <ProjectFilter facets={facets} filter={projectFilter} scopeTeam={scopeTeam} tags={tagFilter} listPath={listPath} />
               </div>
-              <TagFilter facets={tagFacets} selected={tagFilter} projectFilter={projectFilter} scopeTeam={scopeTeam} />
+              <TagFilter facets={tagFacets} selected={tagFilter} projectFilter={projectFilter} scopeTeam={scopeTeam} listPath={listPath} />
             </div>
+            <SidebarProjects
+              controls={sidebar.projects}
+              filter={projectFilter}
+              onFilter={sidebar.filterBy}
+              scopeTeam={scopeTeam}
+              teams={sidebar.shared}
+              dragging={sidebar.dragging}
+              blockedKeys={sidebar.blockedKeys}
+              onDropArtifact={sidebar.dropped}
+            />
             <div data-slot="artifact-list" className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
               <ArtifactList
                 state={artifactListState({ total: artifacts.length, shown: filtered.length })}
@@ -327,6 +273,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
                 selectedId={selected?.id ?? null}
                 onSelect={setSelectedId}
                 onClearFilters={() => { setQuery(""); setKind("all"); }}
+                moves={sidebar.moves}
               />
             </div>
             <div className="border-t px-4 py-2.5 text-xs text-muted-foreground">

@@ -10,6 +10,8 @@ import { loadArtifactForViewer } from "@/lib/artifact-read";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
 import { listArtifacts, listProjectFacets, listTagFacets } from "@/lib/artifacts";
 import { parseProjectFilter, parseTagFilter, projectFilterId } from "@/lib/projects/filter-params";
+import { listSidebarProjects } from "@/lib/projects/sidebar-queries";
+import { toSidebarRows } from "@/lib/projects/sidebar-rules";
 import { getSession } from "@/lib/session";
 import { siteOrigin } from "@/lib/site-origin";
 import { listTeamsForUser } from "@/lib/teams/queries";
@@ -54,10 +56,11 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
   const scope = scopeTeam ? { kind: "team" as const, teamId: scopeTeam.id } : { kind: "mine" as const };
   const projectFilter = parseProjectFilter(params);
   const tagFilter = parseTagFilter(params);
-  const [artifacts, facets, tagFacets] = await Promise.all([
+  const [artifacts, facets, tagFacets, projectSources] = await Promise.all([
     listArtifacts(session.user.id, { scope, project: projectFilter ?? undefined, tags: tagFilter }),
     listProjectFacets(session.user.id, scope),
     listTagFacets(session.user.id, scope),
+    listSidebarProjects(session.user.id, scope),
   ]);
   // A link (from a notification, say) opens its artifact even when the list does not hold it: it joins the top.
   const link = parseArtifactLink(params);
@@ -67,6 +70,7 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
     <Dashboard
       key={`${scopeTeam?.id ?? "mine"}:${projectFilterId(projectFilter)}:${tagFilter.join(",")}`}
       facets={facets}
+      projectRows={toSidebarRows(projectSources, teams)}
       projectFilter={projectFilter}
       tagFilter={tagFilter}
       tagFacets={tagFacets}
