@@ -13,6 +13,38 @@ import { draftKeys, type ArtifactDraft } from "./use-artifact-draft";
 /** How long after the last keystroke the editor saves. */
 export const AUTOSAVE_DELAY_MS = 1000;
 
+/** The longest a change waits while typing goes on without a pause: it is saved at least this often. */
+export const AUTOSAVE_MAX_WAIT_MS = 5000;
+
+/**
+ * The shortest time between two autosaves, so an editor sends at most 720
+ * an hour however it types: well under the runaway cap on autosaves
+ * (`artifactAutosave` in src/lib/abuse/limits.ts). Leaving the field, the
+ * tab, or the artifact saves at once.
+ */
+export const AUTOSAVE_MIN_INTERVAL_MS = 5000;
+
+/** When the next autosave may go, as of a change made `now`. Times are ms since the epoch. */
+export interface SaveTiming {
+  now: number;
+  /** When the oldest unsaved change was made. */
+  pendingSince: number;
+  /** When the last autosave was sent; null before the first. */
+  lastSaveAt: number | null;
+}
+
+/**
+ * How long to wait, after a change made now, before saving: a second after
+ * typing stops, but no later than AUTOSAVE_MAX_WAIT_MS after the oldest
+ * unsaved change, and never sooner than AUTOSAVE_MIN_INTERVAL_MS after the
+ * last save.
+ */
+export function nextSaveDelay({ now, pendingSince, lastSaveAt }: SaveTiming): number {
+  const due = Math.min(now + AUTOSAVE_DELAY_MS, pendingSince + AUTOSAVE_MAX_WAIT_MS);
+  const allowed = lastSaveAt === null ? due : Math.max(due, lastSaveAt + AUTOSAVE_MIN_INTERVAL_MS);
+  return Math.max(0, allowed - now);
+}
+
 /** The editor's editing session: open after its first save, until a long pause, leaving, or someone else's save closes it. */
 export interface EditSession {
   open: boolean;
