@@ -24,9 +24,15 @@ export function magicLinkEmail(body: unknown): string | null {
   return parsed.success ? parsed.data.email.toLowerCase() : null;
 }
 
-/** The limits for one sign-in link request: per network, and per address when there is one (hashed, never stored raw). */
+/**
+ * The limits for one sign-in link request: per network (a short window and a
+ * daily ceiling), and per address when there is one (hashed, never stored raw).
+ */
 export function magicLinkChecks(networkKey: string, email: string | null): RateLimitCheck[] {
-  const checks: RateLimitCheck[] = [{ name: "magicLinkByNetwork", subject: networkKey }];
+  const checks: RateLimitCheck[] = [
+    { name: "magicLinkByNetwork", subject: networkKey },
+    { name: "magicLinkByNetworkDay", subject: networkKey },
+  ];
   if (email) checks.push({ name: "magicLinkByEmail", subject: createHash("sha256").update(email).digest("hex").slice(0, 32) });
   return checks;
 }

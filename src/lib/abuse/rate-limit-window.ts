@@ -39,10 +39,11 @@ export function decideRateLimit(input: { previous: number; current: number; nowM
   return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((freeAt - input.nowMs) / 1000)) };
 }
 
-/** "about 12 minutes", "about 1 hour", or "a minute", for error messages. */
+/** "a minute", "about 12 minutes", "about 1 hour", or "about 9 hours", for error messages. */
 export function describeWait(seconds: number): string {
   if (seconds <= 60) return "a minute";
   const minutes = Math.ceil(seconds / 60);
   if (minutes < 60) return `about ${String(minutes)} minutes`;
-  return "about 1 hour";
+  const hours = Math.round(minutes / 60);
+  return hours <= 1 ? "about 1 hour" : `about ${String(hours)} hours`;
 }

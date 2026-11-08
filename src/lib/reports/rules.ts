@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { RateLimitCheck } from "@/lib/abuse/rate-limit";
 import { reportReasons, type ArtifactVisibility, type ReportReason } from "@/lib/artifact-types";
 
 /** Labels for the report form and the team page, in the order the form lists them. */
@@ -39,4 +40,20 @@ export function parseReportInput(input: unknown): { ok: true; data: ReportInput 
 /** Only artifacts readable outside a team (link and public) can be reported. */
 export function isReportable(visibility: ArtifactVisibility): boolean {
   return visibility === "link" || visibility === "public";
+}
+
+/**
+ * The limits one report counts against, checked in this order: reports about
+ * this artifact from this network (each report emails the team's owners),
+ * reports from this network (short window, then daily), and reports from
+ * this signed-in reader.
+ */
+export function reportLimitChecks(input: { networkKey: string; artifactId: string; viewerId: string | null }): RateLimitCheck[] {
+  const checks: RateLimitCheck[] = [
+    { name: "reportByNetworkArtifact", subject: `${input.networkKey}:${input.artifactId}` },
+    { name: "reportByNetwork", subject: input.networkKey },
+    { name: "reportByNetworkDay", subject: input.networkKey },
+  ];
+  if (input.viewerId) checks.push({ name: "reportByUser", subject: input.viewerId });
+  return checks;
 }
