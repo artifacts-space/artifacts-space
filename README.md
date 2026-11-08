@@ -1,5 +1,8 @@
 # artifacts.space
 
+[![CI](https://github.com/artifacts-space/artifacts-space/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/artifacts-space/artifacts-space/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 The collaboration space for humans and agents.
 
 Artifacts are the shared surface where you, your team, and your agents work
@@ -220,7 +223,8 @@ tripwires are in [AGENTS.md](AGENTS.md).
 Contributions are welcome at
 [github.com/artifacts-space/artifacts-space](https://github.com/artifacts-space/artifacts-space).
 Read [CONTRIBUTING.md](CONTRIBUTING.md) and
-[AGENTS.md](AGENTS.md) before you open a pull request. To report a security
+[AGENTS.md](AGENTS.md) before you open a pull request. Everyone who takes part
+follows the [code of conduct](CODE_OF_CONDUCT.md). To report a security
 problem, follow [SECURITY.md](SECURITY.md) instead of opening an issue.
 
 ## Third-party assets

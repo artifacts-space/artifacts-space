@@ -1,0 +1,50 @@
+name: Bug report
+description: Something does not work as it should.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For a security problem, stop here and follow
+        [SECURITY.md](https://github.com/artifacts-space/artifacts-space/blob/main/SECURITY.md)
+        instead. Never paste access tokens, keys, or private artifact content.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected to see instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Web app on artifacts.space
+        - MCP server on artifacts.space
+        - Self-hosted instance
+        - Local development
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Browser or MCP client
+      description: The name and version, for example of your browser or of Claude Code, Codex, or Cursor.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error messages or logs
+      description: Remove tokens, keys, and email addresses first.
+      render: text
