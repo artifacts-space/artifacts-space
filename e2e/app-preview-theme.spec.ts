@@ -3,8 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { readColors } from "./support/colors";
 
 /**
- * The /app preview shows a themed artifact in its theme, as on its page,
- * in Preview and in Edit, while the toolbar keeps the app's look. Checked on
+ * The /app editor shows a themed artifact in its theme, as on its page,
+ * as it reads and in View source, while the toolbar keeps the app's look. Checked on
  * /dev/workspace, the real workspace without a database, where Note 9 uses
  * the Ocean theme and Note 10 has none.
  */
@@ -38,11 +38,12 @@ test("should show a themed artifact in its theme in the preview while the toolba
   expect(themed.toolbar, "the toolbar stays in the app theme").toEqual(plain.toolbar);
 });
 
-test("should keep the artifact's theme when an editor switches the preview to Edit", async ({ page }) => {
+test("should keep the artifact's theme when an editor opens View source", async ({ page }) => {
   const editor = await open(page, "fixtureworkspacenote08", "Note 9");
   const previewSurface = await readColors(editor.locator("[data-content-theme]").getByText(/The preview wears/));
-  await editor.getByRole("tablist", { name: "Editor mode" }).getByRole("tab", { name: "Edit" }).click();
-  const source = editor.getByRole("textbox", { name: "Artifact content" });
+  await editor.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "View source" }).click();
+  const source = editor.getByRole("textbox", { name: "Artifact source" });
   await expect(source).toBeVisible();
   const editSurface = await readColors(source);
   expect(editSurface.background, "the source sits on the same theme color as the preview").toBe(previewSurface.background);

@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
+/** Autosave sends at most one save every 5 seconds (autosave-rules.ts), so "Saved" can take a little over that. */
+const savedWithin = { timeout: 12_000 };
+
 declare global {
   interface Window {
     layoutShifts: number[];
@@ -33,82 +36,64 @@ function layout(page: Page) {
   });
 }
 
-/** Opens Edit and returns where the Edit button was and where the page was scrolled before the click. */
-async function openEditor(page: Page, kind: string) {
+/** Opens the fixture page. Editors get the artifact unlocked in place: no Edit button, no Save button. */
+async function openFixture(page: Page, kind: string) {
   await page.goto(`/dev/editor?kind=${kind}`);
-  const edit = page.getByRole("button", { name: "Edit" });
-  await expect(edit).toBeVisible();
-  const before = await edit.evaluate((button) => ({ top: button.getBoundingClientRect().top, scrollY: window.scrollY }));
-  await edit.click();
-  await expect(page.getByRole("form", { name: /^Edit / })).toBeVisible();
-  return before;
+  await expect(page.locator("[data-slot=editor-bar]")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Save/ })).toHaveCount(0);
+  await expect(page.getByRole("tablist", { name: "Editor mode" })).toHaveCount(0);
 }
 
-/** The editor opens where the Edit button was: the page does not scroll and the bar sits below the pinned header. */
-async function expectOpenedInPlace(page: Page, before: { top: number; scrollY: number }) {
-  const opened = await layout(page);
-  expect(await page.evaluate(() => window.scrollY), "the page keeps its scroll position").toBe(before.scrollY);
-  expect(Math.abs((opened.barTop ?? -1) - before.top), "the editor bar takes the Edit button's place").toBeLessThanOrEqual(2);
-  expect(opened.barTop ?? -1, "the editor bar is below the pinned header").toBeGreaterThanOrEqual(opened.chrome - 1);
-  return opened;
+/** Opens View source from the bar's More menu. */
+async function viewSource(page: Page) {
+  await page.locator("[data-slot=editor-bar]").getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "View source" }).click();
+  const source = page.getByRole("textbox", { name: "Artifact source" });
+  await expect(source).toBeVisible();
+  return source;
 }
 
-/** The title sits under the editor bar, and the source starts on screen at the full width of the editor. */
-async function expectSourceInView(page: Page, opened: { barBottom: number | null; innerHeight: number }) {
-  const title = await page.getByRole("textbox", { name: "Title" }).boundingBox();
-  const source = await page.getByRole("textbox", { name: "Artifact content" }).boundingBox();
-  const form = await page.getByRole("form", { name: /^Edit / }).boundingBox();
-  expect(title?.y ?? -1).toBeGreaterThanOrEqual(opened.barBottom ?? Infinity);
-  expect(source?.y ?? Infinity).toBeLessThan(opened.innerHeight);
-  expect(source?.width ?? 0, "the source uses the full content width").toBeGreaterThan((form?.width ?? Infinity) - 4);
-}
+const saveStatus = (page: Page) => page.locator("[data-slot=editor-bar]").getByRole("status");
 
-const modeTabs = (page: Page) => page.getByRole("tablist", { name: "Editor mode" });
-
-test("should open a long ui artifact in place, as in the workspace editor, with no empty page below the footer", async ({ page }) => {
+test("should show a long ui artifact as itself, with its source one menu away and no empty page below the footer", async ({ page }) => {
   await recordLayoutShifts(page);
-  const before = await openEditor(page, "ui");
-  const source = page.getByRole("textbox", { name: "Artifact content" });
-  await expect(source).toBeVisible();
-
-  // The page does not move, and the document ends at the footer.
-  const opened = await expectOpenedInPlace(page, before);
-  expect(opened.excess, "empty space below the footer").toBeLessThanOrEqual(1);
-
-  // The title and the first lines of the source are in view, in one full-width pane.
-  await expectSourceInView(page, opened);
-  await expect(page.getByRole("region", { name: "Preview" })).toHaveCount(0);
-
-  // Edit and Preview tabs, as in the workspace editor. It opens on Edit.
-  const tabs = modeTabs(page);
-  await expect(tabs.getByRole("tab", { name: /edit/i })).toHaveAttribute("aria-selected", "true");
-  await tabs.getByRole("tab", { name: /preview/i }).click();
-  await expect(source).toHaveCount(0);
+  await openFixture(page, "ui");
   await expect(page.getByText("Checkout v2 rollout").first()).toBeVisible();
-  // Charts and screen-reader text in a long preview are positioned elements; none may reach past the footer.
-  expect((await layout(page)).excess, "empty space below the footer with the preview open").toBeLessThanOrEqual(1);
-  await tabs.getByRole("tab", { name: /edit/i }).click();
-  await expect(source).toBeVisible();
+  // Charts and screen-reader text in a long interface are positioned elements; none may reach past the footer.
+  expect((await layout(page)).excess, "empty space below the footer").toBeLessThanOrEqual(1);
 
-  // Typing, breaking the JSON, and fixing it again never moves the layout.
+  const source = await viewSource(page);
+  const opened = await layout(page);
+  expect(opened.excess, "empty space below the footer with the source open").toBeLessThanOrEqual(1);
+  expect((await source.boundingBox())?.y ?? Infinity, "the source starts on screen").toBeLessThan(opened.innerHeight);
+
+  // Breaking the spec holds the autosave and says why; fixing it again lets it go. The layout never moves.
   await source.click({ position: { x: 40, y: 20 } });
   await page.keyboard.press("Control+Home");
   await page.evaluate(() => { window.layoutShifts = []; });
   await page.keyboard.type("oops ", { delay: 40 });
-  const status = page.getByRole("form", { name: /^Edit / }).getByRole("status");
-  await expect(status).not.toContainText("ready to save");
+  await expect(saveStatus(page)).toContainText("Not saved yet");
   for (let index = 0; index < 5; index++) await page.keyboard.press("Backspace");
-  await expect(status).toHaveText("Valid Interface. It is ready to save.");
+  await expect(saveStatus(page)).not.toContainText("Not saved");
+  await expect(page.getByText("Valid Interface.")).toBeVisible();
   const shift = await page.evaluate(() => window.layoutShifts.reduce((sum, value) => sum + value, 0));
   expect(shift, "layout shift while typing").toBeLessThan(0.1);
   expect((await layout(page)).excess).toBeLessThanOrEqual(1);
 });
 
-test("should open a long Markdown artifact in the rich editor where the reader was", async ({ page }) => {
-  const before = await openEditor(page, "markdown");
-  await expect(page.getByRole("textbox", { name: "Content" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Markdown" })).toBeVisible();
-  await expect(modeTabs(page)).toHaveCount(0);
-  const opened = await expectOpenedInPlace(page, before);
-  expect(opened.excess).toBeLessThanOrEqual(1);
+test("should edit a long Markdown artifact in place and save it on its own", async ({ page }) => {
+  await openFixture(page, "markdown");
+  const content = page.getByRole("textbox", { name: "Artifact content" });
+  await expect(content).toBeVisible();
+  await expect(page.getByRole("button", { name: "Markdown" }), "the source lives behind View source").toHaveCount(0);
+  expect((await layout(page)).excess).toBeLessThanOrEqual(1);
+
+  await page.getByRole("textbox", { name: "Title" }).fill("Renamed fixture");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
+  await content.locator("p").first().click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" Typed in place.");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
+  await expect(content).toContainText("Typed in place.");
 });

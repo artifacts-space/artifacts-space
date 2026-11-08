@@ -43,6 +43,7 @@ import type { FileDto } from "@/lib/files/types";
 import { generatePublicId } from "@/lib/public-id";
 import { assertContentFits } from "@/lib/quota/usage";
 import type { SharingActor } from "@/lib/sharing/rules";
+import { StaleSaveError, unchangedSince, type SaveOptions } from "@/lib/save-guard";
 import { showsInSearch } from "@/lib/search/search-rules";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { forgetArtifactCache } from "@/lib/versions/cache";
@@ -361,26 +362,6 @@ function imageChanged(before: ArtifactRecord, after: ArtifactRecord): boolean {
   return (iconFileId(before.icon) !== null && after.icon !== before.icon) || (coverFileId(before.cover) !== null && after.cover !== before.cover);
 }
 
-/** Options for one save. */
-export interface SaveOptions {
-  /**
-   * The artifact's `updatedAt` when the editor opened it (ISO). When someone
-   * saved since, the save is refused instead of overwriting their work.
-   */
-  expectedUpdatedAt?: string | undefined;
-}
-
-/** The message when a save would overwrite someone else's newer save. */
-export const STALE_SAVE_MESSAGE = "Someone saved a newer version while you were editing. Copy your changes, reload, and save again.";
-
-function unchangedSince(expectedUpdatedAt: string | undefined) {
-  if (!expectedUpdatedAt) return undefined;
-  const expected = new Date(expectedUpdatedAt);
-  if (Number.isNaN(expected.getTime())) throw new UserFacingError(STALE_SAVE_MESSAGE);
-  // Postgres keeps microseconds; the browser saw milliseconds.
-  return sql`date_trunc('milliseconds', ${artifact.updatedAt}) = ${expected.toISOString()}::timestamptz`;
-}
-
 interface SaveContext {
   editorId: string;
   before: ArtifactRecord;
@@ -389,14 +370,29 @@ interface SaveContext {
   restoredFromId?: string | null;
 }
 
+/** How a save is filed: a restore stands alone; an edit may belong to an editing session. */
+function saveKindOf(context: SaveContext) {
+  if (context.restoredFromId) return { saveKind: "restore" as const, restoredFromId: context.restoredFromId };
+  return { saveKind: "edit" as const, restoredFromId: null, session: context.options.session };
+}
+
+/**
+ * The limit a save counts against: an autosave that continues an open
+ * editing session folds into that session's version, so it has its own
+ * runaway cap; every other save can file a version and counts as an edit.
+ */
+function saveLimit(context: SaveContext) {
+  return !context.restoredFromId && context.options.session === "continue" ? "artifactAutosave" : "artifactUpdate";
+}
+
 /**
  * Writes checked changes, files the version, and returns the DTO. Saves are
  * limited per editor per hour (web and MCP together), because each one can
- * file a version.
+ * file a version; see saveLimit.
  */
 async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, context: SaveContext) {
   const { editorId, before } = context;
-  await enforceRateLimit("artifactUpdate", editorId);
+  await enforceRateLimit(saveLimit(context), editorId);
   // Content counts toward the author's account, whoever edits it.
   if (changes.content !== undefined) await assertContentFits(before.userId, changes.content, before.content, editorId);
   await assertValidArtifactUpdate(changes, () => Promise.resolve(before));
@@ -406,15 +402,14 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
   const [record] = await getDb()
     .update(artifact)
     .set({ ...changes, updatedBy: editorId, updatedAt: new Date() })
-    .where(and(eq(artifact.id, before.id), unchangedSince(context.options.expectedUpdatedAt)))
+    .where(and(eq(artifact.id, before.id), unchangedSince(context.options.expectedUpdatedAt, before.publicId)))
     .returning();
 
   if (!record) {
-    if (context.options.expectedUpdatedAt) throw new UserFacingError(STALE_SAVE_MESSAGE);
+    if (context.options.expectedUpdatedAt) throw new StaleSaveError(before.publicId);
     return null;
   }
-  const saveKind = context.restoredFromId ? "restore" : "edit";
-  await recordArtifactSave({ before, after: record, editorId, actor: context.actor, saveKind, restoredFromId: context.restoredFromId ?? null });
+  await recordArtifactSave({ before, after: record, editorId, actor: context.actor, ...saveKindOf(context) });
   // A replaced or removed image icon or cover goes with this save, unless something still shows it (see icon-cleanup.ts).
   if (imageChanged(before, record)) await pruneUnusedIconFilesQuietly(record.id, [before.icon, before.cover]);
   const [dto] = await toArtifactDtos([record], editorId);

@@ -200,3 +200,12 @@ export interface ArtifactInput {
 export type ActionResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
+
+/**
+ * The result of saving an artifact from the web editor. A save refused because
+ * someone saved since the editor's base version carries `latest`, the newest
+ * version the editor may read, so it can merge or offer a reload.
+ */
+export type SaveArtifactResult =
+  | { success: true; data: ArtifactDto }
+  | { success: false; error: string; latest?: ArtifactDto };

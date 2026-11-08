@@ -9,7 +9,7 @@ import type { VersionSaveKind } from "@/lib/artifact-types";
 import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { dropsShownImage } from "@/lib/files/icon-cleanup-rules";
 
-import { selectPrunableVersions, shouldMergeInto, versionBytes, versionRetention } from "./history-rules";
+import { canDropSuperseded, selectPrunableVersions, shouldMergeInto, versionBytes, versionRetention, type EditSessionStep } from "./history-rules";
 import { sameReviewedFields } from "./rules";
 
 /**
@@ -97,11 +97,12 @@ async function mergeInto(versionId: string, record: ArtifactRecord) {
  * changes nothing the latest version shows returns that version. A quick
  * follow-up save by the same editor merges into the latest version, unless
  * that version is protected (see protectedVersions) or the save drops an
- * uploaded icon or cover image the latest version shows.
+ * uploaded icon or cover image the latest version shows. A web editor
+ * autosave passes its editing-session step: see shouldMergeInto.
  */
 export async function fileVersion(
   record: ArtifactRecord,
-  save: { editorId: string; saveKind: VersionSaveKind; restoredFromId?: string | null },
+  save: { editorId: string; saveKind: VersionSaveKind; restoredFromId?: string | null; session?: EditSessionStep | undefined },
 ): Promise<string> {
   const latest = await latestVersion(record.id);
   if (latest && save.saveKind === "edit" && sameReviewedFields(latest, record)) return latest.id;
@@ -112,6 +113,32 @@ export async function fileVersion(
     return latest.id;
   }
   return insertVersion(record, { createdBy: save.editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null });
+}
+
+/**
+ * After a continuing editing session filed a new version because its own
+ * previous one was protected at the time, deletes that previous version when
+ * canDropSuperseded allows it, with the editor's own instant-approval rows
+ * that named it (the new version has its own). Call it after the approval
+ * step. Quietly does nothing when the rule says no.
+ */
+export async function dropSupersededSessionVersion(
+  record: ArtifactRecord,
+  previous: ArtifactVersionRecord | null,
+  save: { editorId: string; saveKind: VersionSaveKind; session?: EditSessionStep | undefined; newVersionId: string },
+): Promise<void> {
+  if (!previous || previous.id === save.newVersionId || save.session !== "continue" || dropsShownImage(previous, record)) return;
+  const [[owner], references] = await Promise.all([
+    getDb().select({ approvedVersionId: artifact.approvedVersionId }).from(artifact).where(eq(artifact.id, record.id)).limit(1),
+    getDb()
+      .select({ status: sharingRequest.status, requestedBy: sharingRequest.requestedBy, decidedBy: sharingRequest.decidedBy })
+      .from(sharingRequest)
+      .where(and(eq(sharingRequest.artifactId, record.id), eq(sharingRequest.versionId, previous.id))),
+  ]);
+  const state = { newVersionId: save.newVersionId, approvedVersionId: owner?.approvedVersionId ?? null, references };
+  if (!owner || !canDropSuperseded(previous, { ...save, now: new Date() }, state)) return;
+  await getDb().delete(sharingRequest).where(and(eq(sharingRequest.artifactId, record.id), eq(sharingRequest.versionId, previous.id), eq(sharingRequest.status, "approved")));
+  await getDb().delete(artifactVersion).where(and(eq(artifactVersion.artifactId, record.id), eq(artifactVersion.id, previous.id)));
 }
 
 /** The icon and cover values of dropped versions, for the image cleanup. */

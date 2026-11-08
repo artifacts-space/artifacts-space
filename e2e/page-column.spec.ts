@@ -7,8 +7,8 @@ import { cleanUp, createTestArtifact, localDatabaseEnabled, localDatabaseSkipRea
 /**
  * The page column in /app and on the artifact's page, with a real artifact:
  * the /app preview holds callouts and diagrams to the same column readers
- * see, Full width widens them in both Edit and Preview, and the in-place
- * editor on the artifact's page has the setting too.
+ * see, Full width widens them and the View source field, and the editor bar
+ * on the artifact's page has the setting too.
  */
 
 test.skip(!localDatabaseEnabled(), localDatabaseSkipReason);
@@ -47,7 +47,7 @@ async function seed(page: Page, title: string, kind: "markdown" | "ui") {
   return publicId;
 }
 
-test("should match the public page's column in the /app preview and widen it with Full width from Edit mode", async ({ page }) => {
+test("should match the public page's column in the /app preview and widen it with Full width from View source", async ({ page }) => {
   const title = "Page column e2e";
   const publicId = await seed(page, title, "ui");
 
@@ -70,8 +70,9 @@ test("should match the public page's column in the /app preview and widen it wit
   await expect(open).toHaveAttribute("href", `/artifact/${publicId}`);
   await expect(open).toHaveAttribute("target", "_blank");
 
-  await page.getByRole("tab", { name: "edit" }).click();
-  const source = page.getByRole("textbox", { name: "Artifact content" });
+  await page.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "View source" }).click();
+  const source = page.getByRole("textbox", { name: "Artifact source" });
   expect(await widthOf(source)).toBeLessThanOrEqual(960);
   await page.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitemcheckbox", { name: "Full width" }).click();
@@ -79,24 +80,25 @@ test("should match the public page's column in the /app preview and widen it wit
   await page.keyboard.press("Escape");
   expect(await widthOf(source), "the source field follows Full width").toBeGreaterThan(1000);
 
-  await page.getByRole("tab", { name: "preview" }).click();
+  await page.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Hide source" }).click();
+  await expect(callout).toBeVisible();
   expect(await widthOf(callout), "callouts widen").toBeGreaterThan(1000);
   expect(await widthOf(diagram), "diagrams widen").toBeGreaterThan(1000);
 });
 
-test("should offer Full width in the in-place editor on the artifact's page and widen the page while it stays open", async ({ page }) => {
+test("should offer Full width in the editor bar on the artifact's page and widen the page while it stays editable", async ({ page }) => {
   const title = "Page editor width e2e";
   const publicId = await seed(page, title, "markdown");
   await page.goto(`/artifact/${publicId}`);
   const main = page.locator("main");
   await expect(main).toHaveAttribute("data-full-width", "false");
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
 
   const toggle = page.getByRole("switch", { name: "Full width" });
   await expect(toggle).not.toBeChecked();
   await toggle.click();
   await expect(main).toHaveAttribute("data-full-width", "true");
   await expect(toggle).toBeChecked();
-  await expect(page.getByRole("form", { name: `Edit ${title}` }), "the editor stays open").toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Title" }), "the page stays editable").toHaveValue(title);
   expect(await widthOf(main)).toBeGreaterThan(960);
 });

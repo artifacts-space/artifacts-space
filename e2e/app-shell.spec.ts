@@ -96,6 +96,13 @@ function scrollBoxStyles(page: Page) {
   );
 }
 
+/** Opens View source from the toolbar's More menu. */
+async function viewSource(page: Page) {
+  await page.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "View source" }).click();
+  await expect(page.getByRole("textbox", { name: "Artifact source" })).toBeVisible();
+}
+
 async function openWorkspace(page: Page, viewport = desktop) {
   await page.setViewportSize(viewport);
   await page.goto("/dev/workspace");
@@ -105,7 +112,7 @@ async function openWorkspace(page: Page, viewport = desktop) {
 
 const controls = (page: Page) => [
   page.getByRole("button", { name: "History" }),
-  page.getByRole("tablist", { name: "Editor mode" }),
+  slot(page, "save-status"),
   page.getByRole("textbox", { name: "Search artifacts" }),
   slot(page, "artifact-list").getByRole("button").first(),
 ];
@@ -165,12 +172,11 @@ test.describe("desktop and tablet", () => {
     expect(styles.find((box) => box.name === "detail-body")).toMatchObject({ overflowY: "auto", overscroll: "contain" });
   });
 
-  test("should stack a long artifact above its files, fields, and comments without overlap in both modes", async ({ page }) => {
+  test("should stack a long artifact above its files, fields, and comments without overlap on the page and in its source", async ({ page }) => {
     await openWorkspace(page);
-    expect(await overlappingSections(page), "preview").toEqual([]);
-    await page.getByRole("tab", { name: "edit" }).click();
-    await expect(page.getByRole("textbox", { name: "Artifact content" })).toBeVisible();
-    expect(await overlappingSections(page), "edit").toEqual([]);
+    expect(await overlappingSections(page), "page").toEqual([]);
+    await viewSource(page);
+    expect(await overlappingSections(page), "source").toEqual([]);
   });
 
   test("should leave room under the last section when the artifact scrolls to its end", async ({ page }) => {
@@ -196,14 +202,13 @@ test.describe("desktop and tablet", () => {
     await expect(dialog).toHaveCount(0);
   });
 
-  test("should scroll the source inside the pane in Edit mode, with one scroll bar", async ({ page }) => {
+  test("should scroll the source inside the pane under View source, with one scroll bar", async ({ page }) => {
     await openWorkspace(page);
     const tops = await controlTops(page);
-    await page.getByRole("tab", { name: "edit" }).click();
-    const source = page.getByRole("textbox", { name: "Artifact content" });
-    await expect(source).toBeVisible();
+    await viewSource(page);
+    const source = page.getByRole("textbox", { name: "Artifact source" });
     await expectPageDoesNotScroll(page);
-    expect(await controlTops(page), "switching modes moves nothing in the header").toEqual(tops);
+    expect(await controlTops(page), "opening the source moves nothing in the header").toEqual(tops);
 
     // The field grows with its text, so only the pane scrolls.
     expect(await source.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeLessThanOrEqual(1);
@@ -213,14 +218,13 @@ test.describe("desktop and tablet", () => {
     expect(await escapedElements(page)).toEqual([]);
   });
 
-  test("should keep the place when switching modes and start a newly picked artifact at the top", async ({ page }) => {
+  test("should keep the place when opening the source and start a newly picked artifact at the top", async ({ page }) => {
     await openWorkspace(page);
     const body = slot(page, "detail-body");
     await body.evaluate((element) => { element.scrollTop = (element.scrollHeight - element.clientHeight) / 2; });
-    await page.getByRole("tab", { name: "edit" }).click();
-    await expect(page.getByRole("textbox", { name: "Artifact content" })).toBeVisible();
+    await viewSource(page);
     const share = await body.evaluate((element) => element.scrollTop / (element.scrollHeight - element.clientHeight));
-    expect(share, "Edit opens about as far down as the preview was").toBeGreaterThan(0.4);
+    expect(share, "the source opens about as far down as the page was").toBeGreaterThan(0.4);
     expect(share).toBeLessThan(0.6);
 
     await slot(page, "artifact-list").getByRole("button", { name: /Long markdown fixture/ }).click();
@@ -228,7 +232,7 @@ test.describe("desktop and tablet", () => {
     expect(await slot(page, "detail-body").evaluate((element) => element.scrollTop), "a new artifact starts at the top").toBe(0);
   });
 
-  test("should scroll the preview from the keyboard and never the page", async ({ page }) => {
+  test("should scroll the rendered artifact from the keyboard and never the page", async ({ page }) => {
     await openWorkspace(page);
     const body = slot(page, "detail-body");
     await body.focus();
@@ -242,7 +246,7 @@ test.describe("desktop and tablet", () => {
   test("should fit the CSV grid inside the pane so only one box scrolls at a time", async ({ page }) => {
     await openWorkspace(page);
     await slot(page, "artifact-list").getByRole("button", { name: /Long csv fixture/ }).click();
-    const grid = page.getByRole("grid", { name: "CSV table" });
+    const grid = page.getByRole("grid", { name: "CSV grid editor" });
     await expect(grid).toBeVisible();
     const sizes = await page.evaluate(() => {
       const body = document.querySelector("[data-slot=detail-body]");
@@ -254,7 +258,7 @@ test.describe("desktop and tablet", () => {
     await expectPageDoesNotScroll(page);
   });
 
-  test("should let the title scroll away on a short viewport while the toolbar and Edit/Preview bar stay", async ({ page }) => {
+  test("should let the title scroll away on a short viewport while the toolbar and save status bar stay", async ({ page }) => {
     await openWorkspace(page, { width: 1280, height: 640 });
     await expectPageDoesNotScroll(page);
     const outer = slot(page, "detail-outer");
@@ -308,8 +312,8 @@ test.describe("open and page column", () => {
     expect(Math.abs(gaps.left - gaps.right), "the column is centered").toBeLessThanOrEqual(2);
     expect(await widthOf(body.getByRole("note").first()), "a callout keeps to the column").toBeLessThanOrEqual(pageContent + 1);
 
-    await page.getByRole("tab", { name: "edit" }).click();
-    expect(await widthOf(page.getByRole("textbox", { name: "Artifact content" })), "the source field keeps to the column").toBeLessThanOrEqual(960);
+    await viewSource(page);
+    expect(await widthOf(page.getByRole("textbox", { name: "Artifact source" })), "the source field keeps to the column").toBeLessThanOrEqual(960);
   });
 });
 
@@ -326,7 +330,7 @@ test.describe("phone", () => {
     await page.evaluate(() => { window.scrollTo(0, document.documentElement.scrollHeight / 2); });
     const history = page.getByRole("button", { name: "History" });
     await expect(history).toBeInViewport();
-    await expect(page.getByRole("button", { name: /^Save/ })).toBeInViewport();
+    await expect(page.getByRole("button", { name: "More actions" })).toBeInViewport();
     const header = await page.getByRole("banner").boundingBox();
     const historyBox = await history.boundingBox();
     expect(historyBox?.y ?? -1, "the actions sit below the app header").toBeGreaterThanOrEqual((header?.y ?? 0) + (header?.height ?? 0) - 1);

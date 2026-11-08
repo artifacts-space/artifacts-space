@@ -13,7 +13,8 @@ import { getTeamMembershipById } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { forgetArtifactCache } from "./cache";
-import { ensureHistoryStart, fileVersion, pruneArtifactVersions, versionMatching } from "./history";
+import { dropSupersededSessionVersion, ensureHistoryStart, fileVersion, latestVersion, pruneArtifactVersions, versionMatching } from "./history";
+import type { EditSessionStep } from "./history-rules";
 import { decideEdit, editNeedsAuditRow, isReviewedLevel, sameReviewedFields } from "./rules";
 
 /**
@@ -136,6 +137,8 @@ export interface ArtifactSave {
   saveKind: VersionSaveKind;
   /** For a restore: the version brought back. */
   restoredFromId?: string | null;
+  /** For a web editor autosave: where it sits in its editing session (one version per session). */
+  session?: EditSessionStep | undefined;
 }
 
 /**
@@ -149,8 +152,14 @@ export async function recordArtifactSave(save: ArtifactSave): Promise<EditStatus
   const { before, after, editorId } = save;
   if (before) await ensureHistoryStart(before);
   const approvedId = before && isReviewedLevel(after.visibility) ? await ensureApprovedBefore(before) : null;
-  const versionId = await fileVersion({ ...after, approvedVersionId: approvedId ?? after.approvedVersionId }, { editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null });
+  // A continuing session that could not merge (its version was approved or waiting) replaces that version once approval moved on.
+  const previous = save.session === "continue" ? await latestVersion(after.id) : null;
+  const versionId = await fileVersion({ ...after, approvedVersionId: approvedId ?? after.approvedVersionId }, { editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null, session: save.session });
   const status = approvedId ? await approvalFor(after, approvedId, versionId, save) : "applied";
+  await dropSupersededSessionVersion(after, previous, { editorId, saveKind: save.saveKind, session: save.session, newVersionId: versionId }).catch((error: unknown) => {
+    // Housekeeping only: an extra version in History is the worst case.
+    console.error("[versions] Dropping a superseded session version failed", error instanceof Error ? error.name : "unknown error");
+  });
   await pruneArtifactVersions(after.id).catch((error: unknown) => {
     // Pruning is housekeeping; the cleanup job retries it.
     console.error("[versions] Pruning after a save failed", error instanceof Error ? error.name : "unknown error");

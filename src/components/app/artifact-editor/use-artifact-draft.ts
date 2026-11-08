@@ -13,9 +13,11 @@ export interface ArtifactDraft {
   kind: ArtifactKind;
 }
 
-const draftKeys = ["title", "icon", "summary", "content", "language", "kind"] as const satisfies readonly (keyof ArtifactDraft)[];
+/** Every editable field, in a fixed order. */
+export const draftKeys = ["title", "icon", "summary", "content", "language", "kind"] as const satisfies readonly (keyof ArtifactDraft)[];
 
-function draftFrom(artifact: ArtifactDto): ArtifactDraft {
+/** The editable fields of a saved artifact. */
+export function draftFrom(artifact: Pick<ArtifactDto, keyof ArtifactDraft>): ArtifactDraft {
   return {
     title: artifact.title,
     icon: artifact.icon,
@@ -26,18 +28,31 @@ function draftFrom(artifact: ArtifactDto): ArtifactDraft {
   };
 }
 
-/** Holds the editable copy of an artifact and reports whether it differs from the saved one. */
+/**
+ * Holds the editable copy of an artifact. `revision` changes whenever the
+ * draft is replaced from outside the content editor (a restore, a reload,
+ * a merge that changed the content), so editors that keep their own state,
+ * such as the rich Markdown editor, remount with the new content.
+ */
 export function useArtifactDraft(artifact: ArtifactDto) {
   const [draft, setDraft] = useState<ArtifactDraft>(() => draftFrom(artifact));
+  const [revision, setRevision] = useState(0);
 
   const update = useCallback(<K extends keyof ArtifactDraft>(key: K, value: ArtifactDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
   }, []);
 
-  const dirty = draftKeys.some((key) => draft[key] !== artifact[key]);
+  /** Replaces the draft. `remount` reloads the content editor, for content that changed outside it. */
+  const replace = useCallback((next: ArtifactDraft, remount: boolean) => {
+    setDraft(next);
+    if (remount) setRevision((count) => count + 1);
+  }, []);
 
   /** Replaces the draft with a saved artifact, such as a restored version. */
-  const reset = useCallback((saved: ArtifactDto) => { setDraft(draftFrom(saved)); }, []);
+  const reset = useCallback((saved: ArtifactDto) => { replace(draftFrom(saved), true); }, [replace]);
 
-  return { draft, update, dirty, reset };
+  /** Reloads the content editor from the draft, such as after editing the source. */
+  const remount = useCallback(() => { setRevision((count) => count + 1); }, []);
+
+  return { draft, update, replace, reset, remount, revision };
 }

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { selectPrunableVersions, shouldMergeInto, VERSION_MERGE_WINDOW_MS, versionBytes, versionRetention, type MergeTarget } from "./history-rules";
+import {
+  canDropSuperseded,
+  EDIT_SESSION_IDLE_MS,
+  selectPrunableVersions,
+  shouldMergeInto,
+  VERSION_MERGE_WINDOW_MS,
+  versionBytes,
+  versionRetention,
+  type MergeTarget,
+} from "./history-rules";
 
 const now = new Date("2026-11-06T12:00:00Z");
 const secondsAgo = (seconds: number) => new Date(now.getTime() - seconds * 1000);
@@ -39,6 +48,60 @@ describe("shouldMergeInto", () => {
   it("should not merge when there is no version yet or the editor is unknown", () => {
     expect(shouldMergeInto(null, { editorId: "ann", saveKind: "edit", now }, none)).toBe(false);
     expect(shouldMergeInto(latest({ createdBy: null }), { editorId: "ann", saveKind: "edit", now }, none)).toBe(false);
+  });
+});
+
+describe("shouldMergeInto for editing sessions", () => {
+  const save = (session: "start" | "continue", editorId = "ann") => ({ editorId, saveKind: "edit" as const, now, session });
+
+  it("should merge every save of one session into one version when the pauses are short", () => {
+    const sessionVersion = latest({ savedAt: secondsAgo(4 * 60) });
+    expect(shouldMergeInto(sessionVersion, save("continue"), none)).toBe(true);
+  });
+
+  it("should file a new version when a session starts, even right after the same editor saved", () => {
+    expect(shouldMergeInto(latest({ savedAt: secondsAgo(5) }), save("start"), none)).toBe(false);
+  });
+
+  it("should file a new version when the session was idle longer than the idle limit", () => {
+    const idle = latest({ savedAt: new Date(now.getTime() - EDIT_SESSION_IDLE_MS - 1) });
+    expect(shouldMergeInto(idle, save("continue"), none)).toBe(false);
+  });
+
+  it("should file a new version when someone else saved in between", () => {
+    expect(shouldMergeInto(latest({ createdBy: "agent-7" }), save("continue"), none)).toBe(false);
+  });
+
+  it("should keep the plain merge window for saves outside a session, such as agents", () => {
+    const threeMinutes = latest({ savedAt: secondsAgo(3 * 60) });
+    expect(shouldMergeInto(threeMinutes, { editorId: "ann", saveKind: "edit", now }, none)).toBe(false);
+  });
+});
+
+describe("canDropSuperseded", () => {
+  const save = { editorId: "ann", saveKind: "edit" as const, now, session: "continue" as const };
+  const state = (references: { status: string; requestedBy: string | null; decidedBy: string | null }[] = [], approvedVersionId: string | null = "v2") => ({ newVersionId: "v2", approvedVersionId, references });
+  const own = latest({ id: "v1", savedAt: secondsAgo(30) });
+
+  it("should replace the session's own earlier version once the approval step moved on to the new one", () => {
+    expect(canDropSuperseded(own, save, state())).toBe(true);
+    expect(canDropSuperseded(own, save, state([{ status: "approved", requestedBy: "ann", decidedBy: "ann" }]))).toBe(true);
+  });
+
+  it("should keep a version someone else approved or denied, so a decision always shows what was decided", () => {
+    expect(canDropSuperseded(own, save, state([{ status: "approved", requestedBy: "ann", decidedBy: "owner" }]))).toBe(false);
+    expect(canDropSuperseded(own, save, state([{ status: "denied", requestedBy: "ann", decidedBy: "owner" }]))).toBe(false);
+  });
+
+  it("should keep a version that still waits for approval or is still the approved one", () => {
+    expect(canDropSuperseded(own, save, state([{ status: "pending", requestedBy: "ann", decidedBy: null }]))).toBe(false);
+    expect(canDropSuperseded(own, save, state([], "v1"))).toBe(false);
+  });
+
+  it("should keep the version when the save starts a session, comes from someone else, or follows a long pause", () => {
+    expect(canDropSuperseded(own, { ...save, session: "start" }, state())).toBe(false);
+    expect(canDropSuperseded(own, { ...save, editorId: "bo" }, state())).toBe(false);
+    expect(canDropSuperseded(latest({ id: "v1", savedAt: new Date(now.getTime() - EDIT_SESSION_IDLE_MS - 1) }), save, state())).toBe(false);
   });
 });
 

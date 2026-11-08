@@ -11,6 +11,22 @@ import type { VersionSaveKind } from "@/lib/artifact-types";
 /** Saves by the same editor this soon after the latest version merge into it. */
 export const VERSION_MERGE_WINDOW_MS = 2 * 60 * 1000;
 
+/**
+ * An editing session in the web editor files one version. It stays open while
+ * saves keep coming at most this far apart; after a longer pause the next save
+ * starts a new version.
+ */
+export const EDIT_SESSION_IDLE_MS = 5 * 60 * 1000;
+
+/**
+ * Where an autosave sits in its editing session. "start": the first save after
+ * the editor opened, after a pause, or after someone else saved; it always
+ * files a new version. "continue": a later save of the same session; it merges
+ * into the version the session filed.
+ */
+export const editSessionSteps = ["start", "continue"] as const;
+export type EditSessionStep = (typeof editSessionSteps)[number];
+
 /** How many versions an artifact keeps, and for how long. */
 export const versionRetention = { keep: 100, maxAgeMs: 365 * 24 * 60 * 60 * 1000 } as const;
 
@@ -32,22 +48,70 @@ const mergingKinds: ReadonlySet<VersionSaveKind> = new Set(["edit", "files"]);
 /** Versions a later save may merge into. A restore stays visible as its own entry. */
 const mergeableKinds: ReadonlySet<VersionSaveKind> = new Set(["create", "edit", "files"]);
 
+/** One save, as the merge rule sees it. `session` is set for web editor autosaves only. */
+export interface MergeCandidate {
+  editorId: string;
+  saveKind: VersionSaveKind;
+  now: Date;
+  session?: EditSessionStep | undefined;
+}
+
+/** How long after `latest` a save may still merge into it. */
+function mergeWindow(session: EditSessionStep | undefined, windowMs: number): number {
+  return session === "continue" ? EDIT_SESSION_IDLE_MS : windowMs;
+}
+
 /**
  * Whether a save merges into `latest` instead of adding a version: the same
  * editor saved it within the merge window, both are ordinary saves, and
  * `latest` is not protected (approved, or part of an approval request).
+ * An autosave that starts an editing session never merges. One that continues
+ * a session merges while the pause since the last save is under
+ * EDIT_SESSION_IDLE_MS. A save by anyone else in between makes `latest`
+ * theirs, so the session's next save files a new version. Protected
+ * versions are never merged into, even by a session: see canDropSuperseded.
  */
 export function shouldMergeInto(
   latest: MergeTarget | null,
-  save: { editorId: string; saveKind: VersionSaveKind; now: Date },
+  save: MergeCandidate,
   protectedIds: ReadonlySet<string>,
   windowMs: number = VERSION_MERGE_WINDOW_MS,
 ): boolean {
+  if (save.session === "start") return false;
   if (latest?.createdBy !== save.editorId) return false;
   if (!mergingKinds.has(save.saveKind) || !mergeableKinds.has(latest.saveKind)) return false;
   if (protectedIds.has(latest.id)) return false;
   const age = save.now.getTime() - latest.savedAt.getTime();
-  return age >= 0 && age <= windowMs;
+  return age >= 0 && age <= mergeWindow(save.session, windowMs);
+}
+
+/** A request that names a version, as the superseded-version rule sees it. */
+export interface VersionReference {
+  status: string;
+  requestedBy: string | null;
+  decidedBy: string | null;
+}
+
+/**
+ * Whether a continuing editing session may delete `previous`, its own
+ * version from moments ago, now that a newer version holds the session's
+ * work. It applies when the save could not merge into `previous` only
+ * because `previous` was protected at the time (approved, or waiting for
+ * approval) and the approval step has since moved on to the new version:
+ * `previous` is no longer the approved version, and no request names it
+ * except the editor's own instant approvals. A version anyone else decided
+ * on, or that still waits, is never touched, and a version is never edited
+ * in place after a request named it. Together with merging, a session files
+ * one version even on link and public artifacts.
+ */
+export function canDropSuperseded(
+  previous: MergeTarget | null,
+  save: MergeCandidate,
+  state: { newVersionId: string; approvedVersionId: string | null; references: readonly VersionReference[] },
+): boolean {
+  if (!previous || previous.id === state.newVersionId || previous.id === state.approvedVersionId) return false;
+  if (save.session !== "continue" || !shouldMergeInto(previous, save, new Set())) return false;
+  return state.references.every((reference) => reference.status === "approved" && reference.requestedBy === save.editorId && reference.decidedBy === save.editorId);
 }
 
 /** A version as pruning sees it. */

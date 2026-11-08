@@ -5,7 +5,6 @@ import { IconLink } from "@tabler/icons-react";
 import { IconPicker } from "@/components/artifact-icon/icon-picker";
 import { addIconTrigger, changeIconTrigger } from "@/components/artifact-icon/icon-triggers";
 import { CopyButton } from "@/components/copy-button";
-import { LastEdited } from "@/components/history/last-edited";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -15,18 +14,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatInfo } from "@/lib/artifact-formats";
-import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { kinds } from "@/lib/artifact-kinds";
-import { cn } from "@/lib/utils";
 
 import type { ArtifactDraft } from "./use-artifact-draft";
 
-import type { EditorMode } from "./content-pane";
-
-export type { EditorMode } from "./content-pane";
 type UpdateDraft = <K extends keyof ArtifactDraft>(key: K, value: ArtifactDraft[K]) => void;
-
-const modes: EditorMode[] = ["edit", "preview"];
 
 /** Notice shown while the artifact is shared by link or publicly. */
 export function ShareBanner({ shareUrl, isPublic }: { shareUrl: string; isPublic: boolean }) {
@@ -39,7 +31,7 @@ export function ShareBanner({ shareUrl, isPublic }: { shareUrl: string; isPublic
   );
 }
 
-/** The icon above the title in the editor: part of the draft, saved with Save. */
+/** The icon above the title in the editor: part of the draft, saved with it. */
 function DraftIcon({ icon, update }: { icon: string | null; update: UpdateDraft }) {
   const trigger = icon ? changeIconTrigger(icon, "heading") : addIconTrigger;
   return <div className="mb-1"><IconPicker value={icon} onChange={(next) => { update("icon", next); }} trigger={trigger} /></div>;
@@ -64,43 +56,6 @@ export function TitleFields({ title, icon, summary, update }: { title: string; i
         className="mt-2 w-full bg-transparent text-base leading-6 md:text-md text-muted-foreground outline-none placeholder:text-muted-foreground/60"
         placeholder="Add a one-line summary for search and agent retrieval"
       />
-    </div>
-  );
-}
-
-interface ModeBarProps {
-  mode: EditorMode;
-  onMode: (mode: EditorMode) => void;
-  length: number;
-  updatedAt: string;
-  updatedBy: ArtifactEditorDto | null;
-  /** Extra classes from the surrounding layout, such as sticking in the /app shell. */
-  className?: string;
-}
-
-/** Edit and preview tabs, character count, and who saved it last. */
-export function ModeBar({ mode, onMode, length, updatedAt, updatedBy, className }: ModeBarProps) {
-  return (
-    <div className={cn("flex flex-wrap items-center gap-3 border-b bg-background/60 px-5 py-2 sm:px-7", className)}>
-      <div className="flex rounded-sm border bg-muted p-0.5" role="tablist" aria-label="Editor mode">
-        {modes.map((value) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={mode === value}
-            onClick={() => { onMode(value); }}
-            className={cn(
-              "rounded-[3px] px-2.5 py-0.5 text-sm capitalize transition-colors",
-              mode === value ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {value}
-          </button>
-        ))}
-      </div>
-      <span className="text-xs text-muted-foreground">{length.toLocaleString()} characters</span>
-      <LastEdited editor={updatedBy} at={updatedAt} className="ml-auto" />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { ArtifactHeader } from "@/components/artifact-page/artifact-header";
 import { ArtifactPageFooter } from "@/components/artifact-page/artifact-page-footer";
 import { ArtifactPageTheme } from "@/components/artifact-page/artifact-page-theme";
 import { EditorIsland } from "@/components/artifact-page/editor-island";
+import { InlineBody, InlineSummary, InlineTitle } from "@/components/artifact-page/inline-fields";
 import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
@@ -136,7 +137,8 @@ function HeadingIcon({ viewable, themeChoices }: { viewable: ViewableArtifact; t
 
 /**
  * Format, icon, title, summary, the project (for editors only), who saved it
- * last, and whether changes wait for approval.
+ * last, and whether changes wait for approval. For editors the title and
+ * summary are fields in the same place (inline-fields.tsx).
  */
 function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewable: ViewableArtifact; editor: ArtifactEditorDto | null; organizers: React.ReactNode; themeChoices: ThemeChoices }) {
   const { view, record } = viewable;
@@ -149,9 +151,9 @@ function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewa
       </div>
       <div className="group/title mt-4">
         <HeadingIcon viewable={viewable} themeChoices={themeChoices} />
-        <h1 className="text-balance text-4xl font-medium leading-[1.08] tracking-[-0.03em] sm:text-5xl">{view.title}</h1>
+        <InlineTitle>{view.title}</InlineTitle>
       </div>
-      {view.summary ? <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{view.summary}</p> : null}
+      <InlineSummary>{view.summary ? <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{view.summary}</p> : null}</InlineSummary>
       {organizers}
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
         <LastEdited editor={editor} at={view.updatedAt.toISOString()} className="text-sm" />
@@ -249,7 +251,9 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
               <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={themeIdForReader(presetId, viewable.canEdit)} data-theme-source={source}>
                 <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
                 <article className="mt-10">
-                  <ArtifactBody viewable={viewable} files={files} />
+                  <InlineBody>
+                    <ArtifactBody viewable={viewable} files={files} />
+                  </InlineBody>
                 </article>
               </ThemeScope>
             </EditorIsland>

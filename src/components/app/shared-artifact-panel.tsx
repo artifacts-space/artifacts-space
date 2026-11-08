@@ -17,7 +17,7 @@ import type { ArtifactDto } from "@/lib/artifact-types";
 import { artifactPageHref } from "@/lib/artifact-page-href";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
-import { PreviewSurface } from "./artifact-editor/content-pane";
+import { PreviewSurface } from "./artifact-editor/preview-surface";
 import { detailBody, detailOuter, detailSection } from "./artifact-editor/detail-scroll";
 import { useEditAccess, useWithdrawSharing } from "./use-edit-access";
 import { useRenderTheme } from "./use-render-theme";

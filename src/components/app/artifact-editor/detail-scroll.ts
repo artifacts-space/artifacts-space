@@ -7,8 +7,8 @@ import { useCallback, useLayoutEffect, useRef } from "react";
  *
  * - `detailSection`: the column. Its toolbar never scrolls.
  * - `detailOuter`: everything under the toolbar. On short viewports it is the
- *   scroll box, so the title block scrolls away and the Edit/Preview bar sticks.
- * - `detailBody`: everything under the Edit/Preview bar. On tall viewports it
+ *   scroll box, so the title block scrolls away and the save status bar sticks.
+ * - `detailBody`: everything under the save status bar. On tall viewports it
  *   is the scroll box. It is a size container, so a CSV grid inside caps its
  *   own height at the pane's instead of running past it (one scroll at a time).
  *
@@ -28,7 +28,7 @@ export const detailBody = [
   "focus-visible:outline-2 focus-visible:-outline-offset-2",
 ].join(" ");
 
-/** The Edit/Preview bar on short viewports: it sticks to the top of the scroll box, opaque, in the colour it has today over the card. */
+/** The save status bar on short viewports: it sticks to the top of the scroll box, opaque, in the colour it has today over the card. */
 export const stickyModeBar = "shell-short:sticky shell-short:top-0 shell-short:z-10 shell-short:bg-[color-mix(in_srgb,var(--background)_60%,var(--card))]";
 
 interface ScrollBox {
@@ -50,7 +50,7 @@ export function scrollTopForShare(share: number, box: Omit<ScrollBox, "scrollTop
 }
 
 /**
- * Keeps the reader's place when the Edit/Preview mode changes: call
+ * Keeps the reader's place when the page and its source switch: call
  * `remember` before the change, and both scroll boxes return to the same
  * share of the way down once the other mode renders.
  */
