@@ -8,6 +8,8 @@ interface ArtifactCoverProps {
   cover: string | null;
   /** Editors get Change, Reposition, and Remove. */
   editable: boolean;
+  /** The artifact's "Full width" setting, so the editors' controls line up with the page column. */
+  fullWidth: boolean;
 }
 
 /**
@@ -15,9 +17,9 @@ interface ArtifactCoverProps {
  * the sticky chrome. Readers see only the picture; editors also get its
  * controls. Render it inside a ThemeScope so gradients take the theme.
  */
-export function ArtifactCover({ publicId, cover, editable }: ArtifactCoverProps) {
+export function ArtifactCover({ publicId, cover, editable, fullWidth }: ArtifactCoverProps) {
   if (!cover) return null;
-  if (editable) return <EditableCover key={cover} publicId={publicId} cover={cover} />;
+  if (editable) return <EditableCover key={cover} publicId={publicId} cover={cover} fullWidth={fullWidth} />;
   return (
     <CoverFrame>
       <CoverArt cover={cover} />

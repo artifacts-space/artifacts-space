@@ -1,0 +1,1 @@
+ALTER TABLE "artifact" ADD COLUMN "full_width" boolean DEFAULT false NOT NULL;
