@@ -3,6 +3,7 @@ import { IconArrowRight } from "@tabler/icons-react";
 
 import { GitHubLink } from "@/components/github-link";
 import { ClosingSection } from "@/components/landing/closing-section";
+import { SurfaceSection } from "@/components/landing/surface-section";
 import { ConnectSection } from "@/components/landing/connect-section";
 import { ControlSection } from "@/components/landing/control-section";
 import { HeroDemo } from "@/components/landing/demo/hero-demo";
@@ -34,10 +35,10 @@ export default function Home() {
       <main className="mx-auto w-full max-w-[1440px] px-6">
         <section className="pb-14 pt-20 sm:pb-16 sm:pt-28">
           <h1 className="animate-enter max-w-[920px] text-balance text-[clamp(2.5rem,5.5vw,4.75rem)] font-medium leading-[1.02] tracking-[-0.035em]">
-            Keep your artifacts when you switch agents or accounts.
+            The collaboration space for humans and agents.
           </h1>
           <p className="animate-enter mt-6 max-w-[640px] text-lg leading-8 text-muted-foreground" style={{ animationDelay: "60ms" }}>
-            Your agents save plans, research, and reviews in one shared place. Claude, Codex, Cursor, and Devin all read and edit the same artifacts. Your team can read them, comment, and share them too.
+            Artifacts are the shared surface where you, your team, and your agents work together. They hold your plans, decisions, research, and reviews. Switch between Claude and Codex, and you keep every artifact.
           </p>
           <div className="animate-enter mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: "120ms" }}>
             <Button render={<Link href="/sign-up" />} nativeButton={false} className="h-10 px-4 text-sm">
@@ -48,10 +49,11 @@ export default function Home() {
             </Button>
           </div>
           <p className="animate-enter mt-5 text-sm text-muted-foreground" style={{ animationDelay: "160ms" }}>
-            Works with Claude Code, Codex, Cursor, Claude Desktop, Devin, and any MCP client.
+            Works with Claude Code, Codex, Cursor, OpenCode, Kimi Code, Claude Desktop, Devin, and any MCP client.
           </p>
         </section>
 
+        <SurfaceSection />
         <HeroDemo />
         <WhySection />
         <ConnectSection />

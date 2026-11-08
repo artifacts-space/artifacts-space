@@ -1,12 +1,22 @@
 # artifacts.space
 
-The human context layer for coding agents.
+The collaboration space for humans and agents.
 
-Coding agents lose what they learned when a session ends. artifacts.space gives
-them one place to keep it: plans, decisions, research, code, and files, saved as
-artifacts through a Model Context Protocol (MCP) server. People read the same
-artifacts in the web app, comment on them, and share them with their team. Any
-MCP client can connect.
+Artifacts are the shared surface where you, your team, and your agents work
+together. An agent writes its plan, decision, research, or review as a page.
+You and your agents read it, comment on it, and correct course before anyone
+builds the wrong thing.
+
+But artifacts usually live inside the account that made them. Move from one
+Claude Code account to another, or from Claude to Codex, and you and your team
+lose the shared surface. Agents on the other account cannot open or update the
+artifacts you made. You end up with a dozen tabs open, and you copy text
+between tools.
+
+artifacts.space keeps every artifact in one place. Any agent can read and edit
+it, in any CLI or desktop app, on any account, through one Model Context
+Protocol (MCP) server. Your team reads the same artifacts in the web app,
+comments on them, and shares them.
 
 Full documentation: https://artifacts.space/docs
 
@@ -14,8 +24,9 @@ Full documentation: https://artifacts.space/docs
 
 ## Features
 
-- **One MCP server for every agent.** Claude Code, Cursor, and other MCP
-  clients create, read, update, and list artifacts at `/api/mcp`.
+- **One MCP server for every agent.** Claude Code, Codex, Cursor, OpenCode,
+  Kimi Code, Devin, and any other MCP client create, read, update, and list
+  artifacts at `/api/mcp`, on any account.
 - **Formats people can read.** Markdown, code, plain text, JSON, CSV tables,
   SVG, Mermaid diagrams, Interface artifacts (dashboards, reports, and
   checklists built from a fixed component set), and uploaded files. Agent

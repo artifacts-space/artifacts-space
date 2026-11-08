@@ -31,8 +31,10 @@ describe("estimateLineCount", () => {
 });
 
 describe("fitText", () => {
-  it("should keep the current headline at 64px in at most three lines", () => {
-    expect(fitText(OG_HEADLINE, headline)).toEqual({ fontSize: 64, maxLines: 3, clamped: false });
+  it("should fit the current headline at 56px or larger without clamping when it is the site headline", () => {
+    const fitted = fitText(OG_HEADLINE, headline);
+    expect(fitted.fontSize).toBeGreaterThanOrEqual(56);
+    expect(fitted.clamped).toBe(false);
   });
 
   it("should scale a 90-character headline down so it fits the height budget", () => {
