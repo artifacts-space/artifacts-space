@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { approveVersionWithCover, attachTestImage, cleanUp, createTestArtifact, devUserId, fileRowExists, localDatabaseEnabled, localDatabaseSkipReason, storedCovers } from "./support/local-db";
+import { approveVersionWithCover, attachTestImage, cleanUp, createTestArtifact, devUserId, fileCurrentAsRecentEdit, fileRowExists, localDatabaseEnabled, localDatabaseSkipReason, storedCovers } from "./support/local-db";
 
 /**
  * Cover images over their life: a large phone photo is resized to a JPEG
@@ -77,13 +77,15 @@ test("should resize a large phone photo to a JPEG under 2 MB before it uploads a
   expect(body[0].size).toBeLessThanOrEqual(2_097_152);
 });
 
-test("should bring a removed image cover back with its file when an editor restores the older version", async ({ page }, testInfo) => {
+test("should bring a removed image cover back with its file when an editor restores the older version, even right after adding it", async ({ page }, testInfo) => {
   await signIn(page);
   const userId = await devUserId();
   const fileId = randomUUID();
   const publicId = await createTestArtifact({ userId, title: `Cover restore ${testInfo.project.name}`, content: "# Notes", visibility: "private", theme: null, cover: `file:${fileId}@30` });
   created.push(publicId);
   await attachTestImage(publicId, userId, fileId);
+  // The image cover was saved moments ago: a quick next save by the same editor would normally merge into that version.
+  await fileCurrentAsRecentEdit(publicId);
   await page.goto(`/artifact/${publicId}`);
 
   const cover = page.locator("[data-artifact-cover]");

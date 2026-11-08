@@ -107,3 +107,12 @@ export async function fileRowExists(id: string): Promise<boolean> {
   const result = await db().query(`select 1 from artifact_file where id = $1`, [id]);
   return result.rowCount === 1;
 }
+
+/** Files the artifact's current state as a fresh edit by its author, as if they had just saved it (a quick next save would merge into it). */
+export async function fileCurrentAsRecentEdit(publicId: string): Promise<void> {
+  await db().query(
+    `insert into artifact_version (id, artifact_id, title, icon, cover, content, kind, created_by, save_kind)
+     select $1, id, title, icon, cover, content, kind, user_id, 'edit' from artifact where public_id = $2`,
+    [randomUUID(), publicId],
+  );
+}
