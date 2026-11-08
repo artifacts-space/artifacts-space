@@ -1,57 +1,59 @@
-import type { PixelIconName } from "@/lib/landing/pixel-icons";
-
-import { PixelTile } from "./pixel-icon";
+import { CornerMarks, SectionEyebrow } from "./section-marks";
+import { SurfaceMock, type SurfaceRegion } from "./surface-mock";
+import "./surface.css";
 
 const surface = [
   "Agents plan, decide, and build fast. Artifacts keep that work in one place where people can see it.",
   "Each plan, decision, and review becomes a page that you and your agents both read and edit.",
 ] as const;
 
-interface Point {
-  icon: PixelIconName;
+interface Callout {
+  region: SurfaceRegion;
   title: string;
   body: string;
 }
 
-const lead: Point = { icon: "plan", title: "Read the plan before the code.", body: "See what the agent will do on one page, not in the scrollback." };
-
-const points: readonly Point[] = [
-  { icon: "comment", title: "Correct course together.", body: "Comment on the artifact. Agents read the thread, reply to @mentions, and save a new version." },
-  { icon: "history", title: "Keep the why.", body: "Decisions and research stay after the session ends. Weeks later, you and your agents can still read the reasons." },
+const callouts: readonly Callout[] = [
+  { region: "plan", title: "Read the plan before the code.", body: "See what the agent will do on one page, not in the scrollback." },
+  { region: "comments", title: "Correct course together.", body: "Comment on the artifact. Agents read the thread, reply to @mentions, and save a new version." },
+  { region: "history", title: "Keep the why.", body: "Decisions and research stay after the session ends. Weeks later, you and your agents can still read the reasons." },
 ];
 
-/** One point as a card: its pixel icon on a tile, then the title and the line under it. */
-function PointCard({ point, wide = false }: { point: Point; wide?: boolean }) {
-  return (
-    <div className={wide ? "card-surface flex min-w-0 flex-col gap-6 p-6 sm:col-span-2 sm:flex-row sm:items-center sm:p-8" : "card-surface flex min-w-0 flex-col gap-6 p-6"}>
-      <PixelTile name={point.icon} large={wide} />
-      <div className="min-w-0">
-        <h3 className={wide ? "text-xl font-medium tracking-[-0.015em]" : "text-lg font-medium"}>{point.title}</h3>
-        <p className="mt-2 max-w-[520px] text-md leading-6 text-muted-foreground">{point.body}</p>
-      </div>
-    </div>
-  );
-}
-
-/** The shared surface: the story on the left, a bento of what it gives you on the right. */
+/**
+ * The shared surface as one large artifact to explore: a realistic window on
+ * a dot grid, with the three benefits pinned to its parts. Hovering a callout
+ * highlights its part of the window, and the other way round (surface.css).
+ */
 export function SurfaceSection() {
   return (
     <section id="surface" className="scroll-mt-20 border-t py-20 sm:py-24" aria-labelledby="surface-heading">
-      <div className="grid gap-12 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
-          <h2 id="surface-heading" className="max-w-[480px] text-balance text-3xl font-medium tracking-[-0.025em] sm:text-4xl">
-            One surface for people and agents.
-          </h2>
+      <SectionEyebrow>why it matters</SectionEyebrow>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end">
+        <h2 id="surface-heading" className="max-w-[560px] text-balance text-3xl font-medium tracking-[-0.025em] sm:text-4xl">
+          One surface for people and agents.
+        </h2>
+        <div className="max-w-[560px]">
           {surface.map((paragraph) => (
-            <p key={paragraph} className="mt-5 max-w-[480px] text-base leading-7 text-muted-foreground">
+            <p key={paragraph} className="text-base leading-7 text-muted-foreground [&+p]:mt-3">
               {paragraph}
             </p>
           ))}
         </div>
-        <div className="grid min-w-0 gap-6 sm:grid-cols-2">
-          <PointCard point={lead} wide />
-          {points.map((point) => <PointCard key={point.title} point={point} />)}
+      </div>
+      <div className="surface-explore mt-12 grid gap-10 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-center">
+        <div className="dot-grid relative border border-dashed p-3 sm:p-8 lg:p-12">
+          <CornerMarks />
+          <SurfaceMock />
         </div>
+        <ol className="grid gap-0 sm:grid-cols-3 sm:gap-6 xl:grid-cols-1 xl:gap-0">
+          {callouts.map((callout, index) => (
+            <li key={callout.region} data-callout={callout.region} className="surface-callout border-t py-5">
+              <span className="surface-callout-number grid size-6 place-items-center rounded-[2px] border font-mono text-xs text-muted-foreground">{index + 1}</span>
+              <h3 className="mt-3 text-base font-medium">{callout.title}</h3>
+              <p className="mt-1.5 text-md leading-6 text-muted-foreground">{callout.body}</p>
+            </li>
+          ))}
+        </ol>
       </div>
     </section>
   );

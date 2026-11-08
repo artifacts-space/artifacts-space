@@ -27,12 +27,3 @@ export function PixelIcon({ name, size = 48, className }: { name: PixelIconName;
     </svg>
   );
 }
-
-/** A pixel icon on its pale tile, the way the landing sections show them. `large` is for a lead card. */
-export function PixelTile({ name, large = false, className }: { name: PixelIconName; large?: boolean; className?: string }) {
-  return (
-    <div className={cn("grid shrink-0 place-items-center rounded-lg bg-pixel-tile", large ? "size-24" : "size-16", className)}>
-      <PixelIcon name={name} size={large ? 64 : 48} />
-    </div>
-  );
-}

@@ -97,7 +97,10 @@
   --color-window-shadow: var(--window-shadow);
   --color-window-dim: var(--window-dim);
   --color-window-edge: var(--window-edge);
-  --color-pixel-tile: var(--pixel-tile);
+  --color-actor-agent: var(--actor-agent);
+  --color-actor-agent-tint: var(--actor-agent-tint);
+  --color-actor-person: var(--actor-person);
+  --color-actor-person-tint: var(--actor-person-tint);
   --color-syntax-keyword: var(--syntax-keyword);
   --color-syntax-string: var(--syntax-string);
   --color-syntax-property: var(--syntax-property);
@@ -280,14 +283,24 @@
   /*
    * Pixel icons on the landing page (src/lib/landing/pixel-icons.ts), in the
    * blues of the brand icon: shade (the drop shadow), base (outlines), mid,
-   * light, and pale (fills). --pixel-tile is the square an icon sits on.
+   * light, and pale (fills).
    */
   --pixel-shade: #0a40c4;
   --pixel-base: #0051f0;
   --pixel-mid: #0868f5;
   --pixel-light: #88c5fb;
   --pixel-pale: #f7faff;
-  --pixel-tile: #dceeff;
+  /*
+   * Actors on the landing page: blue marks what agents do, amber what people
+   * do, so "people and agents" reads in color as well as copy. The tints are
+   * the backgrounds behind each actor's chips and badges. --dot-grid is the
+   * faint dot field behind product mockups.
+   */
+  --actor-agent: oklch(0.52 0.2 262);
+  --actor-agent-tint: oklch(0.95 0.03 262);
+  --actor-person: oklch(0.56 0.14 58);
+  --actor-person-tint: oklch(0.95 0.045 75);
+  --dot-grid: oklch(0.2 0.006 60 / 0.13);
   /*
    * Elevation: soft minimalism. A card is felt, never outlined: a hairline
    * edge (--card-edge) plus a wide, low-opacity shadow with a negative spread,
@@ -404,7 +417,11 @@
   --pixel-mid: #3d8af7;
   --pixel-light: #88c5fb;
   --pixel-pale: oklch(0.26 0.06 262);
-  --pixel-tile: oklch(0.22 0.035 262);
+  --actor-agent: oklch(0.72 0.14 255);
+  --actor-agent-tint: oklch(0.28 0.06 262);
+  --actor-person: oklch(0.8 0.13 75);
+  --actor-person-tint: oklch(0.3 0.05 70);
+  --dot-grid: oklch(1 0 0 / 0.1);
   color-scheme: dark;
 }
 
@@ -437,6 +454,25 @@
   background-color: var(--card);
   color: var(--card-foreground);
   box-shadow: var(--elevation-sm);
+}
+
+/*
+ * The landing page's precise, dev-tool frames: the card's edge, fill, and
+ * shadow on a 2px corner. Use it for product mockups and the panels beside
+ * them, not for app UI, which keeps card-surface.
+ */
+@utility frame-sharp {
+  border: 1px solid var(--card-edge);
+  border-radius: 2px;
+  background-color: var(--card);
+  color: var(--card-foreground);
+  box-shadow: var(--elevation-sm);
+}
+
+/* A faint dot field behind landing-page mockups. */
+@utility dot-grid {
+  background-image: radial-gradient(circle, var(--dot-grid) 1px, transparent 1.5px);
+  background-size: 16px 16px;
 }
 
 @utility card-hover {
