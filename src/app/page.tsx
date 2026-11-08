@@ -53,8 +53,8 @@ export default function Home() {
           </p>
         </section>
 
-        <SurfaceSection />
         <HeroDemo />
+        <SurfaceSection />
         <WhySection />
         <ConnectSection />
         <ControlSection />
