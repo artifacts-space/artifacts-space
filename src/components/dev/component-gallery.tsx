@@ -6,6 +6,7 @@ import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ArtifactFilesProvider } from "@/components/artifact-view/files-context";
 import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
 import { AvatarGallery } from "@/components/dev/avatar-gallery";
+import { ArtifactHeaderSpecimen } from "@/components/dev/artifact-header-specimen";
 import { CoverSpecimen } from "@/components/dev/cover-specimen";
 import { NotificationsSpecimen } from "@/components/dev/notifications-specimen";
 import { ThemePickerSpecimen } from "@/components/dev/theme-picker-specimen";
@@ -131,6 +132,9 @@ export function ComponentGallery() {
           </Specimen>
           <Specimen name="cover picker">
             <CoverSpecimen />
+          </Specimen>
+          <Specimen name="artifact page chrome">
+            <ArtifactHeaderSpecimen />
           </Specimen>
         </Group>
         <Group id="avatars" title="Pixel avatars">
