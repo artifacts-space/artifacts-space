@@ -23,6 +23,7 @@ import {
 import { artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
 import { artifactIconInputSchema, iconFileId } from "@/lib/artifact-icons";
 import { artifactThemeInputSchema } from "@/lib/themes/artifact-theme";
+import { assertTeamPresetUsable } from "@/lib/themes/team-preset-access";
 import { artifactCoverInputSchema, coverFileId } from "@/lib/covers/cover";
 import { artifactSizeProblem } from "@/lib/artifact-limits";
 import { defaultCommentSetting } from "@/lib/comments/setting-rules";
@@ -325,6 +326,8 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
   const contentFileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
   const imageFileIds = [...(await checkIconFile(userId, null, parsed.icon)), ...(await checkCoverFile(userId, null, parsed.cover))];
   const fileIds = [...new Set([...contentFileIds, ...imageFileIds])];
+  // New artifacts are private: a team preset must be one of the author's teams'.
+  await assertTeamPresetUsable(userId, { userId, visibility: "private", teamId: null }, parsed.theme);
   await enforceRateLimit("artifactCreate", userId);
   await assertContentFits(userId, parsed.content);
   // New artifacts are private, so their project is among the author's own.
@@ -398,6 +401,8 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
   // Content counts toward the author's account, whoever edits it.
   if (changes.content !== undefined) await assertContentFits(before.userId, changes.content, before.content, editorId);
   await assertValidArtifactUpdate(changes, () => Promise.resolve(before));
+  // A restore keeps the version's theme as it was; a team preset it may no longer use just falls back.
+  if (!context.restoredFromId && changes.theme !== before.theme) await assertTeamPresetUsable(editorId, before, changes.theme);
   await attachUpdatedContentFiles(editorId, before, changes);
   const [record] = await getDb()
     .update(artifact)

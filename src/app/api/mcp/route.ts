@@ -30,7 +30,7 @@ function createMcpServer({ userId, access }: McpPrincipal) {
   registerProjectTools(server, userId, access);
   registerTagTools(server, userId, access);
   registerFormatTools(server, access);
-  registerThemeTools(server, access);
+  registerThemeTools(server, userId, access);
   registerFileTools(server, userId, access);
   registerTeamTools(server, userId, access);
   registerVersionTools(server, userId, access);

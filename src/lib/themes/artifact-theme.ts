@@ -7,10 +7,12 @@ import { fontIdsFor, themeFont, type ThemeFontId } from "./fonts";
 import { themePresets } from "./presets";
 import { builtInPresets } from "./resolve";
 import { parseTheme, themeColorKeys, type Theme, type ThemeColors, type ThemeIssue } from "./schema";
+import { isTeamPresetRef } from "./team-preset-rules";
 
 /**
  * An artifact's own theme, as stored on the artifact and each version: a
- * built-in preset id, or a validated theme already normalised by parseTheme.
+ * built-in preset id, a team preset id ("team:<slug>", a live reference; see
+ * team-preset-rules.ts), or a validated theme already normalised by parseTheme.
  * No value (null) means the artifact has no theme of its own and renders
  * with the team default, then the site default (resolveTheme).
  */
@@ -34,7 +36,9 @@ function parsePresetId(input: string): ArtifactThemeParse {
   const id = input.trim();
   if (id === "") return { ok: true, theme: null };
   if (builtInPresets().has(id)) return { ok: true, theme: id };
-  return { ok: false, message: `"${id.slice(0, 40)}" is not a theme preset. Use one of: ${presetIdList()} (themes_list describes them), or theme JSON (${THEME_DOCS_PATH}).` };
+  // A team preset id is shaped right here; the data layer checks the artifact may use it (assertTeamPresetUsable).
+  if (isTeamPresetRef(id)) return { ok: true, theme: id };
+  return { ok: false, message: `"${id.slice(0, 40)}" is not a theme preset. Use one of: ${presetIdList()}, a team preset id from themes_list ("team:…"), or theme JSON (${THEME_DOCS_PATH}).` };
 }
 
 /** One palette's colors, normalised, when every key is present and parses; null otherwise. */
@@ -122,10 +126,15 @@ export function sameArtifactTheme(a: StoredArtifactTheme | null | undefined, b: 
   return JSON.stringify(canonical(a ?? null)) === JSON.stringify(canonical(b ?? null));
 }
 
-/** A short name for a stored theme: the preset's name, "Custom", or "Default" when there is none. */
-export function themeLabel(theme: StoredArtifactTheme | null | undefined): string {
+/**
+ * A short name for a stored theme: the preset's name, "Custom", or "Default"
+ * when there is none. Team preset ids take their name from `teamNames` (by
+ * id), else read "Team preset".
+ */
+export function themeLabel(theme: StoredArtifactTheme | null | undefined, teamNames?: ReadonlyMap<string, string>): string {
   if (theme === null || theme === undefined) return "Default";
   if (typeof theme !== "string") return "Custom";
+  if (isTeamPresetRef(theme)) return teamNames?.get(theme) ?? "Team preset";
   return builtInPresets().get(theme)?.name ?? theme;
 }
 
@@ -148,6 +157,11 @@ function fontEntry(id: ThemeFontId) {
   return { id, family: themeFont(id)?.family ?? id };
 }
 
+/** A theme's three font slots with their family names, as themes_list shows them. */
+export function themeFontsSummary(theme: Theme): ThemePresetSummary["fonts"] {
+  return { body: fontEntry(theme.fonts.body), heading: fontEntry(theme.fonts.heading), mono: fontEntry(theme.fonts.mono) };
+}
+
 /** Every built-in preset with its fonts, for the themes_list MCP tool and the pickers. */
 export function themePresetSummaries(): ThemePresetSummary[] {
   return [...builtInPresets().values()].map((preset) => ({
@@ -155,7 +169,7 @@ export function themePresetSummaries(): ThemePresetSummary[] {
     name: preset.name,
     description: preset.description,
     mode: preset.theme.mode,
-    fonts: { body: fontEntry(preset.theme.fonts.body), heading: fontEntry(preset.theme.fonts.heading), mono: fontEntry(preset.theme.fonts.mono) },
+    fonts: themeFontsSummary(preset.theme),
   }));
 }
 
@@ -166,8 +180,8 @@ export function allowedThemeFonts(): Record<"body" | "heading" | "mono", ThemeFo
 
 /** How agents set a theme, for the MCP field description and the formats guide. */
 export const THEME_FIELD_DESCRIPTION = [
-  'Optional theme for the artifact page: a preset id from themes_list (such as "paper"), or theme JSON:',
+  'Optional theme for the artifact page: a preset id from themes_list (a built-in such as "paper", or a team preset such as "team:brand-x7k2p9" of the team the artifact is shared through, or of your teams while it is private), or theme JSON:',
   '{"version":1,"light":{background,foreground,mutedForeground,card,cardEdge,accent,accentForeground,chart:[6-8 colors]},"dark":{…same keys},"fonts"?:{body,heading,mono},"radius"?,"mode"?}.',
   `Colors are hex, rgb(), hsl(), or oklch(). Text must pass WCAG AA contrast in both palettes; a failing theme is refused with each pair, its ratio, and the nearest passing color. Full rules: ${THEME_DOCS_PATH}.`,
-  'Pass null or "" on update to remove it, so the page uses the default look. Theme changes are versioned and reviewed like title changes.',
+  'Pass null or "" on update to remove it, so the page uses the team default (or the site default). Theme changes are versioned and reviewed like title changes.',
 ].join(" ");

@@ -10,7 +10,8 @@ import { listComments } from "@/lib/comments/service";
 import { filesForViewer } from "@/lib/files/download";
 import { fileUrl } from "@/lib/files/types";
 import { siteUrl } from "@/lib/site-origin";
-import { themeLabel } from "@/lib/themes/artifact-theme";
+import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
+import { markdownThemeLabel } from "@/lib/themes/team-preset-rules";
 import { coverLabel } from "@/lib/covers/cover";
 import { UserFacingError } from "@/lib/user-facing-error";
 
@@ -79,17 +80,19 @@ function emojiOf(icon: string | null): string | null {
 /** Loads everything the Markdown version shows. `withComments` adds the thread (?comments=1). */
 export async function loadMarkdownInput(viewable: ViewableArtifact, userId: string | null, withComments: boolean): Promise<ArtifactMarkdownInput> {
   const { record, view } = viewable;
-  const [files, byline, updatedBy, version, comments] = await Promise.all([
+  const [files, byline, updatedBy, version, comments, resolvedTheme] = await Promise.all([
     filesForViewer(viewable),
     loadArtifactByline(record, viewable.isTeamMember),
     editorLabel(view.editedBy),
     versionNumber(viewable),
     withComments ? commentsFor(userId, record.publicId) : Promise.resolve(null),
+    resolveThemeFor(record, view.theme),
   ]);
   return {
     title: view.title,
     emoji: emojiOf(view.icon),
-    theme: view.theme === null ? null : themeLabel(view.theme),
+    // The theme the page shows: its own, or the team default (marked); none for the site default.
+    theme: markdownThemeLabel(resolvedTheme),
     cover: view.cover === null ? null : coverLabel(view.cover),
     summary: view.summary,
     kind: view.kind,

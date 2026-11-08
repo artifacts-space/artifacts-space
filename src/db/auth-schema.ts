@@ -1,5 +1,8 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, check, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+
+// Relative import: drizzle-kit loads this file without the "@/" alias.
+import { teamPresetLimits } from "../lib/themes/team-preset-limits";
 
 /*
  * Accounts and teams: Better Auth's core tables and its organization plugin's
@@ -94,9 +97,16 @@ export const team = pgTable(
     // The team's sharing rule: does sharing with the team need an admin's approval?
     teamSharingNeedsApproval: boolean("team_sharing_needs_approval").notNull().default(true),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    // The team default theme: a built-in preset id or "team:<slug>" of one of its presets
+    // (src/lib/themes/team-preset-rules.ts). Null uses the site default. Set by owners and admins.
+    defaultTheme: text("default_theme"),
+    // Who set the team default last, and when, for an audit trail.
+    defaultThemeSetBy: text("default_theme_set_by").references(() => user.id, { onDelete: "set null" }),
+    defaultThemeSetAt: timestamp("default_theme_set_at", { withTimezone: true }),
   },
   (table) => [
     uniqueIndex("team_personal_owner_idx").on(table.createdBy).where(sql`${table.personal}`),
+    check("team_default_theme_length_check", sql`char_length(${table.defaultTheme}) <= ${sql.raw(String(teamPresetLimits.maxRefChars))}`),
   ],
 );
 
