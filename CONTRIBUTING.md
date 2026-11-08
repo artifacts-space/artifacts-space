@@ -20,8 +20,8 @@ By taking part, you agree to follow the [code of conduct](CODE_OF_CONDUCT.md).
 
 You need:
 
-- Node.js at the version in [`.nvmrc`](.nvmrc). CI uses the same file. With
-  nvm, run `nvm use`.
+- Node.js 22.22.1 or later. CI and production run the version in
+  [`.nvmrc`](.nvmrc), so use that one if you can. With nvm, run `nvm use`.
 - pnpm 10. Run `corepack enable` to get the version pinned in `package.json`.
 - A local Postgres database.
 

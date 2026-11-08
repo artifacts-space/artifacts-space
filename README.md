@@ -138,8 +138,8 @@ guidance, not access: your agent still needs the MCP connection above.
 
 ## Self-hosting
 
-You need Node.js 20.12 or later, pnpm 10, a Postgres database (Neon works out of
-the box), a GitHub OAuth app, a Cloudflare R2 bucket, and a
+You need Node.js 22.22.1 or later (CI and production run Node 26, the version
+in `.nvmrc`), pnpm 10, a Postgres database (Neon works out of the box), a GitHub OAuth app, a Cloudflare R2 bucket, and a
 [Sendir](https://sendir.ai) identity for sign-in emails.
 
 ```bash

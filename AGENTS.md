@@ -20,6 +20,8 @@ server; people read, comment on, and share them in the web app.
 
 ## Stack
 
+- Node.js 22.22.1 or later (`engines` in `package.json`); CI and production run
+  Node 26 from `.nvmrc`. pnpm 10, pinned by `packageManager`.
 - Next.js 16.4 (App Router, `cacheComponents` on), React 19, TypeScript (strict)
 - Tailwind CSS 4 and shadcn/ui on Base UI (`src/components/ui`), Tabler icons
 - Better Auth, self-hosted: GitHub and magic-link sign-in, plus an OAuth 2.1

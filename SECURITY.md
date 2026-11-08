@@ -7,11 +7,11 @@ problem.
 
 Report it privately instead:
 
-- Use GitHub's **Report a vulnerability** button on this repository's
-  **Security** tab, or open a
-  [private security advisory](https://github.com/artifacts-space/artifacts-space/security/advisories/new)
-  directly. Only you and the maintainers can see it, or
-- Email TODO(owner): add a security contact address before release.
+1. Preferred: open a
+   [private security advisory](https://github.com/artifacts-space/artifacts-space/security/advisories/new),
+   or use the **Report a vulnerability** button on this repository's
+   **Security** tab. Only you and the maintainers can see it.
+2. Or email [security@artifacts.space](mailto:security@artifacts.space).
 
 Include what you found, the steps to reproduce it, and the impact you expect.
 We will confirm that we received your report, keep you updated while we fix
