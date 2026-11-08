@@ -14,7 +14,8 @@ for (const theme of themes) {
       errors.push(`Unexpected dialog: ${dialog.message()}`);
       void dialog.dismiss();
     });
-    await page.addInitScript((value) => { window.localStorage.setItem("theme", value); }, theme);
+    // Top frame only: the gallery's file stand-ins are data: frames, which have no storage.
+    await page.addInitScript((value) => { if (window === window.top) window.localStorage.setItem("theme", value); }, theme);
 
     await page.goto("/dev/components");
     await expect(page.getByRole("heading", { name: "Component gallery" })).toBeVisible();
