@@ -8,8 +8,8 @@ import type { ArtifactKind } from "@/lib/artifact-types";
 function EditorLoading() {
   return (
     <div role="status" aria-label="Loading the editor" className="min-h-[50dvh] pt-12">
-      <div className="h-4 w-2/3 max-w-[72ch] animate-pulse rounded-sm bg-muted" />
-      <div className="mt-3 h-4 w-1/2 max-w-[72ch] animate-pulse rounded-sm bg-muted" />
+      <div className="h-4 w-2/3 max-w-[var(--artifact-measure,72ch)] animate-pulse rounded-sm bg-muted" />
+      <div className="mt-3 h-4 w-1/2 max-w-[var(--artifact-measure,72ch)] animate-pulse rounded-sm bg-muted" />
     </div>
   );
 }
@@ -50,7 +50,7 @@ function PlainTextEditor({ value, onChange, label, autoFocus = false }: Omit<Doc
       autoFocus={autoFocus}
       spellCheck
       placeholder="Start writing"
-      className="block min-h-[50dvh] w-full max-w-[72ch] resize-none field-sizing-content bg-transparent text-base leading-7 break-words whitespace-pre-wrap outline-none placeholder:text-muted-foreground/60 md:text-md"
+      className="block min-h-[50dvh] w-full max-w-[var(--artifact-measure,72ch)] resize-none field-sizing-content bg-transparent text-base leading-7 break-words whitespace-pre-wrap outline-none placeholder:text-muted-foreground/60 md:text-md"
     />
   );
 }

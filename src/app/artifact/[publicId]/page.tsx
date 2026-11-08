@@ -37,6 +37,7 @@ import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { lastEditorsFor } from "@/lib/artifacts";
 import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
+import { pageColumnClass, readingMeasureClass } from "@/lib/page-width/rules";
 import { pageOrganizersFor } from "@/lib/projects/page-project";
 import { isReportable } from "@/lib/reports/rules";
 import { getSession } from "@/lib/session";
@@ -90,6 +91,8 @@ export async function generateMetadata({ params }: PageProps<"/artifact/[publicI
 }
 
 interface NoticeProps {
+  /** The page column's classes (pageColumnClass), so the notice lines up with the artifact. */
+  column: string;
   copy: VisibilityCopy;
   author: string;
   avatar: { seed: string; kind: AvatarKind } | null;
@@ -97,10 +100,10 @@ interface NoticeProps {
 }
 
 /** The note above every artifact: who can see it, and who shared it when that is not the reader. */
-function VisibilityNotice({ copy, author, avatar, teamName }: NoticeProps) {
+function VisibilityNotice({ column, copy, author, avatar, teamName }: NoticeProps) {
   return (
     <div role="note" className="border-b bg-muted/50">
-      <p className="mx-auto w-full max-w-[960px] px-6 py-2 text-sm leading-5 text-muted-foreground">
+      <p className={cn("mx-auto w-full py-2 text-sm leading-5 text-muted-foreground", column)}>
         {copy.showAuthor ? (
           <>
             Shared by {avatar ? <PixelAvatar seed={avatar.seed} kind={avatar.kind} size={16} className="mr-1 -mt-px" /> : null}
@@ -251,37 +254,42 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   ]);
   const copy = visibilityCopy(record.visibility);
   const { theme, presetId, source } = resolved;
+  // Full width is a display setting on the row, not part of a version: every reader sees the current choice.
+  const column = pageColumnClass(record.fullWidth);
 
   return (
     <div className="min-h-screen">
       <StickyChrome>
-        <header className="mx-auto flex h-14 w-full max-w-[960px] items-center justify-between px-6">
+        <header className={cn("mx-auto flex h-14 w-full items-center justify-between", column)}>
           <Logo />
           <div className="flex items-center gap-2">
             <GitHubLink />
             <CopyButton value={view.content} label="Copy" variant="outline" size="sm" />
           </div>
         </header>
-        <VisibilityNotice copy={copy} author={byline.author} avatar={byline.avatar} teamName={byline.teamName} />
+        <VisibilityNotice column={column} copy={copy} author={byline.author} avatar={byline.avatar} teamName={byline.teamName} />
       </StickyChrome>
       {/* A theme that locks light or dark sets that mode on the backdrop too, so comments and controls on it stay readable. */}
       <ThemeBackdrop theme={theme} className={cn("text-foreground", lockedMode(theme))}>
         {view.cover ? (
           <ThemeScope theme={theme}>
-            <ArtifactCover publicId={record.publicId} cover={view.cover} editable={viewable.canEdit} />
+            <ArtifactCover publicId={record.publicId} cover={view.cover} editable={viewable.canEdit} fullWidth={record.fullWidth} />
           </ThemeScope>
         ) : null}
-        <main className={cn("mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16", view.cover && "pt-8 sm:pt-10")}>
-          <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
-            <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={themeIdForReader(presetId, viewable.canEdit)} data-theme-source={source}>
-              <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
-              <article className="mt-10">
-                <InlineBody>
-                  <ArtifactBody viewable={viewable} files={files} />
-                </InlineBody>
-              </article>
-            </ThemeScope>
-          </EditorIsland>
+        <main className={cn("mx-auto w-full py-12 sm:py-16", column, view.cover && "pt-8 sm:pt-10")} data-full-width={record.fullWidth}>
+          {/* The reading measure covers the artifact and its in-place editor, not the comments under it. */}
+          <div className={readingMeasureClass(record.fullWidth)}>
+            <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
+              <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={themeIdForReader(presetId, viewable.canEdit)} data-theme-source={source}>
+                <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
+                <article className="mt-10">
+                  <InlineBody>
+                    <ArtifactBody viewable={viewable} files={files} />
+                  </InlineBody>
+                </article>
+              </ThemeScope>
+            </EditorIsland>
+          </div>
           <SignUpAndReport copy={copy} publicId={record.publicId} visibility={record.visibility} />
           {/* Comments are for signed-in readers the comments setting lets in; the thread checks access itself too. */}
           {session && seesComments(viewable, session.user.id) ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" raised /> : null}
@@ -290,7 +298,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
       {/* Cookieless view count for the author; people who can edit are never counted (the server checks too). */}
       {countsViews(record.visibility) && !viewable.canEdit ? <ViewBeacon publicId={record.publicId} /> : null}
       <footer className="border-t">
-        <div className="mx-auto flex w-full max-w-[960px] flex-wrap items-center justify-between gap-4 px-6 py-6 text-sm text-muted-foreground">
+        <div className={cn("mx-auto flex w-full flex-wrap items-center justify-between gap-4 py-6 text-sm text-muted-foreground", column)}>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <Link href="/" className="transition-colors hover:text-foreground">artifacts.space</Link>
             <LegalLinks />

@@ -72,6 +72,7 @@ export function fixtureArtifact({ id, kind, title, content, publicId = "fixture0
     icon: null,
     theme: null,
     cover: null,
+    fullWidth: false,
     summary: "A long artifact for layout tests.",
     content,
     kind,
