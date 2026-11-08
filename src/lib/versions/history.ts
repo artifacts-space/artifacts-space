@@ -4,7 +4,9 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, artifactVersion, sharingRequest, type ArtifactRecord, type ArtifactVersionRecord } from "@/db/schema";
+import { FILE_PREFIX } from "@/lib/artifact-icons";
 import type { VersionSaveKind } from "@/lib/artifact-types";
+import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 
 import { selectPrunableVersions, shouldMergeInto, versionBytes, versionRetention } from "./history-rules";
 import { sameReviewedFields } from "./rules";
@@ -109,13 +111,21 @@ export async function fileVersion(
   return insertVersion(record, { createdBy: save.editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null });
 }
 
-/** Deletes the versions of one artifact that retention lets go. Returns how many went. */
+/** The icon and cover values of dropped versions, for the image cleanup. */
+function droppedImages(rows: readonly { icon: string | null; cover: string | null }[]): string[] {
+  return rows.flatMap((row) => [row.icon, row.cover]).filter((value): value is string => value?.startsWith(FILE_PREFIX) === true);
+}
+
+/**
+ * Deletes the versions of one artifact that retention lets go, then the icon
+ * and cover images only those versions showed. Returns how many versions went.
+ */
 export async function pruneArtifactVersions(artifactId: string, now: Date = new Date()): Promise<number> {
   const [owner] = await getDb().select({ approvedVersionId: artifact.approvedVersionId }).from(artifact).where(eq(artifact.id, artifactId)).limit(1);
   if (!owner) return 0;
   const [versions, { pinned }] = await Promise.all([
     getDb()
-      .select({ id: artifactVersion.id, savedAt: artifactVersion.savedAt })
+      .select({ id: artifactVersion.id, savedAt: artifactVersion.savedAt, icon: artifactVersion.icon, cover: artifactVersion.cover })
       .from(artifactVersion)
       .where(eq(artifactVersion.artifactId, artifactId))
       .orderBy(desc(artifactVersion.createdAt), desc(artifactVersion.id)),
@@ -124,20 +134,34 @@ export async function pruneArtifactVersions(artifactId: string, now: Date = new 
   const prunable = selectPrunableVersions(versions, pinned, now);
   if (prunable.length === 0) return 0;
   await getDb().delete(artifactVersion).where(and(eq(artifactVersion.artifactId, artifactId), inArray(artifactVersion.id, prunable)));
+  const dropped = new Set(prunable);
+  const images = droppedImages(versions.filter((version) => dropped.has(version.id)));
+  if (images.length > 0) await pruneUnusedIconFilesQuietly(artifactId, images);
   return prunable.length;
 }
 
 /** The most versions one cleanup run deletes. The next run continues. */
 export const versionCleanupBatchSize = 1000;
 
+/** Removes the icon and cover images that only the dropped versions showed, one artifact at a time. */
+async function pruneDroppedImages(rows: readonly { artifact_id: string; icon: string | null; cover: string | null }[]): Promise<void> {
+  const byArtifact = new Map<string, { icon: string | null; cover: string | null }[]>();
+  for (const row of rows) byArtifact.set(row.artifact_id, [...(byArtifact.get(row.artifact_id) ?? []), row]);
+  for (const [artifactId, dropped] of byArtifact) {
+    const images = droppedImages(dropped);
+    if (images.length > 0) await pruneUnusedIconFilesQuietly(artifactId, images);
+  }
+}
+
 /**
  * The cleanup job's pass over every artifact, with the same rule as
  * selectPrunableVersions: past the newest 100, or older than a year, but
  * never the newest version, the approved version, or one waiting for approval.
+ * Icon and cover images only the dropped versions showed go with them.
  */
 export async function pruneAllVersions(): Promise<{ removed: number; remaining: boolean }> {
   const maxAgeDays = Math.round(versionRetention.maxAgeMs / 86_400_000);
-  const result = await getDb().execute<{ id: string }>(sql`
+  const result = await getDb().execute<{ id: string; artifact_id: string; icon: string | null; cover: string | null }>(sql`
     delete from ${artifactVersion} where id in (
       select ranked.id from (
         select v.id, v.artifact_id, v.saved_at,
@@ -151,8 +175,9 @@ export async function pruneAllVersions(): Promise<{ removed: number; remaining: 
         and not exists (select 1 from ${sharingRequest} s where s.version_id = ranked.id and s.status = 'pending')
       limit ${versionCleanupBatchSize}
     )
-    returning id
+    returning id, artifact_id, icon, cover
   `);
+  await pruneDroppedImages(result.rows);
   const removed = result.rows.length;
   return { removed, remaining: removed === versionCleanupBatchSize };
 }

@@ -4,7 +4,7 @@ import { canReadFile, canUseFileInArtifact, type FileAccessSubject } from "./acc
 
 const attached: FileAccessSubject = { status: "ready", uploaderId: "author", artifactId: "art", attachedAt: new Date("2026-11-05T10:00:00Z") };
 const unattached: FileAccessSubject = { status: "ready", uploaderId: "author", artifactId: null, attachedAt: null };
-const viewable = { viewable: true, servedVersionAt: null };
+const viewable = { viewable: true, servedVersionAt: null, hiddenImage: false };
 
 describe("canReadFile", () => {
   it("should allow anyone who can view the artifact when the file is attached", () => {
@@ -13,7 +13,7 @@ describe("canReadFile", () => {
   });
 
   it("should refuse when the artifact is not viewable or missing", () => {
-    expect(canReadFile(attached, "author", { viewable: false, servedVersionAt: null })).toBe(false);
+    expect(canReadFile(attached, "author", { viewable: false, servedVersionAt: null, hiddenImage: false })).toBe(false);
     expect(canReadFile(attached, "author", null)).toBe(false);
   });
 
@@ -31,9 +31,19 @@ describe("canReadFile", () => {
 
   it("should hide files attached after the approved version when the viewer reads that version", () => {
     const servedVersionAt = new Date("2026-11-05T11:00:00Z");
-    expect(canReadFile(attached, null, { viewable: true, servedVersionAt })).toBe(true);
-    expect(canReadFile({ ...attached, attachedAt: new Date("2026-11-05T12:00:00Z") }, null, { viewable: true, servedVersionAt })).toBe(false);
-    expect(canReadFile({ ...attached, attachedAt: null }, null, { viewable: true, servedVersionAt })).toBe(false);
+    expect(canReadFile(attached, null, { viewable: true, servedVersionAt, hiddenImage: false })).toBe(true);
+    expect(canReadFile({ ...attached, attachedAt: new Date("2026-11-05T12:00:00Z") }, null, { viewable: true, servedVersionAt, hiddenImage: false })).toBe(false);
+    expect(canReadFile({ ...attached, attachedAt: null }, null, { viewable: true, servedVersionAt, hiddenImage: false })).toBe(false);
+  });
+
+  it("should refuse an old icon or cover image the approved version does not show when the viewer reads that version", () => {
+    const servedVersionAt = new Date("2026-11-05T11:00:00Z");
+    expect(canReadFile(attached, null, { viewable: true, servedVersionAt, hiddenImage: true })).toBe(false);
+    expect(canReadFile(attached, "reader", { viewable: true, servedVersionAt, hiddenImage: true })).toBe(false);
+  });
+
+  it("should allow the team a kept image when they read the latest version", () => {
+    expect(canReadFile(attached, "member", { viewable: true, servedVersionAt: null, hiddenImage: true })).toBe(true);
   });
 });
 
