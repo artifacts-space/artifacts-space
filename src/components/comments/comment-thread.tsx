@@ -1,7 +1,7 @@
 "use client";
 
 import { IconLoader2, IconMessage } from "@tabler/icons-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ThreadData } from "@/app/(workspace)/threads/actions";
 import { PixelAvatar } from "@/components/pixel-avatar";
@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 
 import { CommentComposer } from "./comment-composer";
 import { CommentItem, type CommentHandlers } from "./comment-item";
+import { useLinkedComments } from "./linked-comments";
 import { MentionablesProvider } from "./mentionables-context";
 import { useCommentThread, type WriteOutcome } from "./use-comment-thread";
 
@@ -28,6 +29,22 @@ function groupThread(comments: CommentView[]) {
     replies.set(item.parentId, [...(replies.get(item.parentId) ?? []), item]);
   }
   return roots.map((root) => ({ root, replies: replies.get(root.id) ?? [] }));
+}
+
+/**
+ * When a link asked to open this artifact's comments (/app?artifact=<id>&comments=1),
+ * brings the thread into view and moves focus to it once it has loaded.
+ */
+function useLinkedThreadFocus(publicId: string, loaded: boolean) {
+  const { linked, consume } = useLinkedComments(publicId);
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!linked || !loaded) return;
+    ref.current?.scrollIntoView({ block: "start" });
+    ref.current?.focus({ preventScroll: true });
+    consume();
+  }, [linked, loaded, consume]);
+  return ref;
 }
 
 /** What happened to the mentions in the viewer's last comment. */
@@ -139,6 +156,7 @@ function ThreadBody({ data, handlers, post, onNotices, raised }: ThreadBodyProps
 export function CommentThread({ publicId, className, raised = false }: { publicId: string; className?: string; raised?: boolean }) {
   const { state, post, edit, remove, setMute } = useCommentThread(publicId);
   const [notices, setNotices] = useState<MentionOutcome | null>(null);
+  const sectionRef = useLinkedThreadFocus(publicId, state.status !== "loading");
 
   function showNotices(outcome: WriteOutcome) {
     if (outcome.ok) setNotices(outcome.mentions);
@@ -156,7 +174,7 @@ export function CommentThread({ publicId, className, raised = false }: { publicI
   };
 
   return (
-    <section aria-label="Comments" className={cn("space-y-3", className)}>
+    <section ref={sectionRef} tabIndex={-1} aria-label="Comments" className={cn("space-y-3 outline-none", className)}>
       <h2 className="flex items-center gap-2 text-md font-medium">
         <IconMessage className="size-4 text-muted-foreground" aria-hidden /> Comments
         {state.status === "ready" ? <span className="text-xs font-normal text-muted-foreground">{state.data.comments.filter((item) => !item.deleted).length}</span> : null}

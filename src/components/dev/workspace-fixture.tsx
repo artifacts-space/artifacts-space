@@ -5,12 +5,13 @@ import { useMemo } from "react";
 import { AppHeader } from "@/components/app/app-header";
 import { Dashboard } from "@/components/app/dashboard";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
+import type { ArtifactLink } from "@/lib/app-link";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
 import { fixtureArtifact, longCsv, longJson, longMarkdown, longUi } from "./fixture-content";
 
-/** Four long artifacts first, then enough short ones that the list scrolls. */
+/** Four long artifacts first, then enough short ones that the list scrolls. The first note has comments on. */
 function fixtureArtifacts(): ArtifactDto[] {
   const long = [
     fixtureArtifact({ id: "fixture-ui", kind: "ui", title: "Long ui fixture", content: longUi(), publicId: "fixtureworkspace0000ui" }),
@@ -21,7 +22,9 @@ function fixtureArtifacts(): ArtifactDto[] {
   const short = Array.from({ length: 36 }, (_, index) =>
     fixtureArtifact({ id: `fixture-note-${String(index)}`, kind: "text", title: `Note ${String(index + 1)}`, content: `Note ${String(index + 1)}.`, publicId: `fixtureworkspacenote${String(index).padStart(2, "0")}` }),
   );
-  return [...long, ...short];
+  // The first note keeps comments on for its author, so links can open a thread (e2e/artifact-link.spec.ts).
+  const [first, ...rest] = short;
+  return first ? [...long, { ...first, comments: "team" }, ...rest] : [...long, ...rest];
 }
 
 /**
@@ -29,7 +32,7 @@ function fixtureArtifacts(): ArtifactDto[] {
  * with long artifacts and a long list, and no database. Every artifact is
  * handed in full, so none loads. The app shell e2e test measures it.
  */
-export function WorkspaceFixture() {
+export function WorkspaceFixture({ link = null }: { link?: ArtifactLink | null }) {
   const artifacts = useMemo(() => fixtureArtifacts(), []);
   const items = useMemo(() => artifacts.map(toArtifactListItem), [artifacts]);
   return (
@@ -47,6 +50,7 @@ export function WorkspaceFixture() {
           projectFilter={null}
           tagFacets={[]}
           tagFilter={[]}
+          link={link}
         />
       </div>
     </ConfirmationsProvider>
