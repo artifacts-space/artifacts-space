@@ -290,6 +290,8 @@
   --pixel-mid: #0868f5;
   --pixel-light: #88c5fb;
   --pixel-pale: #f7faff;
+  /* The night sky behind the open-source galaxy (src/components/landing/galaxy.tsx), the same in both themes. */
+  --galaxy-sky: oklch(0.18 0.04 265);
   /*
    * Actors on the landing page: blue marks what agents do, amber what people
    * do, so "people and agents" reads in color as well as copy. The tints are
@@ -417,6 +419,7 @@
   --pixel-mid: #3d8af7;
   --pixel-light: #88c5fb;
   --pixel-pale: oklch(0.26 0.06 262);
+  --galaxy-sky: oklch(0.18 0.04 265);
   --actor-agent: oklch(0.72 0.14 255);
   --actor-agent-tint: oklch(0.28 0.06 262);
   --actor-person: oklch(0.8 0.13 75);

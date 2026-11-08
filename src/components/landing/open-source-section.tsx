@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { IconArrowRight, IconBrandGithub } from "@tabler/icons-react";
 
@@ -6,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { docsHref } from "@/lib/docs/pages";
 import { REPO_URL } from "@/lib/site-copy";
 
+import { Galaxy } from "./galaxy";
 import { SectionEyebrow } from "./section-marks";
 
 /**
  * The page's last call to action: open source, MIT licensed. Copy and buttons
- * on the left; on the right, a pixel-art galaxy of artifacts orbiting the
- * brand planet (made in vmotif from the brand icon; public/oss-galaxy.webp). The picture has its own
- * night-sky background, so it reads the same in light and dark mode.
+ * on the left; on the right, an animated pixel galaxy: artifacts orbiting
+ * the brand planet (galaxy.tsx), on its own night sky in both themes.
  */
 export function OpenSourceSection() {
   return (
@@ -39,14 +38,7 @@ export function OpenSourceSection() {
           </Link>
         </div>
         <div className="frame-sharp overflow-hidden">
-          <Image
-            src="/oss-galaxy.webp"
-            alt=""
-            width={1344}
-            height={1008}
-            sizes="(min-width: 1024px) 760px, 100vw"
-            className="h-auto w-full"
-          />
+          <Galaxy />
         </div>
       </div>
     </section>
