@@ -46,6 +46,7 @@ export function PrivacyCollection() {
           <li><strong>Version history.</strong> A saved copy of each version, with who saved it and when.</li>
           <li><strong>Files.</strong> Files you or your agents upload, with their name, type, and size.</li>
           <li><strong>Comments and mentions.</strong> Comment text, who wrote it, @mentions, and whether you have read each mention.</li>
+          <li><strong>Notifications.</strong> The notifications you get in the app (who did what, on which artifact, and whether you have read it) and the notification settings you choose. A notification stores only references; the app shows a short piece of the comment only while you can still read the artifact.</li>
           <li><strong>Sharing and reviews.</strong> Sharing requests, approvals, declined requests, mutes, and the &quot;Don&apos;t ask again&quot; choices you make in confirmation dialogs.</li>
           <li><strong>Reports.</strong> If you report an artifact, the reason, any details you add, and your account if you are signed in.</li>
         </ul>
@@ -96,7 +97,7 @@ export function PrivacyCollection() {
         <ul>
           <li><strong>Run the service:</strong> sign you in, store and show your artifacts, keep version history, apply your sharing and comment settings, and let your agents work over MCP.</li>
           <li><strong>Show authors their readers:</strong> tell the people who can edit a public artifact how many people read it, per day, and which sites linked to it, as counts only.</li>
-          <li><strong>Send emails you need:</strong> sign-in links, team invitations, a note when someone @mentions you (with the artifact title and a link, never the comment text), and report notices to team owners. We send no marketing email.</li>
+          <li><strong>Send emails you need:</strong> sign-in links, team invitations, a note when someone @mentions you (with the artifact title and a link, never the comment text; you can turn it off in Settings), and report notices to team owners. We send no marketing email.</li>
           <li><strong>Keep the service safe:</strong> enforce rate limits and storage quotas, stop spam and phishing, handle reports, and investigate abuse and security problems.</li>
           <li><strong>Fix and improve it:</strong> find errors and keep the service reliable, using logs and aggregate counts.</li>
           <li><strong>Meet legal duties:</strong> answer valid legal requests and enforce our <Link href={legalPaths.terms}>Terms</Link>.</li>
@@ -111,7 +112,7 @@ export function PrivacyCollection() {
         <p>If you are in the European Economic Area (EEA) or the United Kingdom, we rely on these legal bases:</p>
         <ul>
           <li><strong>Contract:</strong> to provide the service you signed up for, including your account, artifacts, teams, connected apps, and the emails the service needs.</li>
-          <li><strong>Legitimate interests:</strong> to keep the service secure, prevent abuse, enforce limits, keep logs, handle reports, let search engines index public artifacts, and count views of public artifacts for their authors. Our interest is a safe, reliable service; we keep these uses narrow so they do not override your rights.</li>
+          <li><strong>Legitimate interests:</strong> to keep the service secure, prevent abuse, enforce limits, keep logs, handle reports, let search engines index public artifacts whose authors chose that, and count views of public artifacts for their authors. Our interest is a safe, reliable service; we keep these uses narrow so they do not override your rights.</li>
           <li><strong>Legal obligation:</strong> to answer lawful requests and keep records the law requires.</li>
           <li><strong>Consent:</strong> where we ask for it. You can withdraw consent at any time.</li>
         </ul>
@@ -123,7 +124,7 @@ export function PrivacyCollection() {
         <ul>
           <li><strong>Team:</strong> signed-in members of the artifact&apos;s team can read and edit it.</li>
           <li><strong>Link:</strong> anyone with the URL can read it, signed in or not. We tell search engines not to index link pages.</li>
-          <li><strong>Public:</strong> anyone can read it. Search engines may index a public artifact once the author&apos;s account is at least {NEW_ACCOUNT_NOINDEX_DAYS} days old (an agent&apos;s work counts from its owner&apos;s account). We ask search engines not to follow links inside artifacts.</li>
+          <li><strong>Public:</strong> anyone can read it. We tell search engines not to index it unless its author turns on &quot;Show in search engines&quot;, and even then only once the author&apos;s account is at least {NEW_ACCOUNT_NOINDEX_DAYS} days old (an agent&apos;s work counts from its owner&apos;s account). We ask search engines not to follow links inside artifacts.</li>
         </ul>
         <p>
           A link or public page shows the artifact, your name or handle and avatar as its author, and a preview image with its title and a short synopsis when someone shares the link. Readers outside the team see the last approved version. Comments follow the artifact&apos;s comments setting, and signed-out readers never see comments. Your teammates see your name, handle, and email address in the team&apos;s member list, and the work you do in the team.

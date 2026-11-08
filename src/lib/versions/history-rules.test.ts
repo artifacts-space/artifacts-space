@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canDropSuperseded,
   EDIT_SESSION_IDLE_MS,
-  mergeGuard,
   selectPrunableVersions,
   shouldMergeInto,
   VERSION_MERGE_WINDOW_MS,
@@ -78,24 +78,30 @@ describe("shouldMergeInto for editing sessions", () => {
   });
 });
 
-describe("mergeGuard", () => {
-  const versions = { referenced: new Set(["approved", "waiting", "denied"]), decided: new Set(["approved", "denied"]) };
+describe("canDropSuperseded", () => {
+  const save = { editorId: "ann", saveKind: "edit" as const, now, session: "continue" as const };
+  const state = (references: { status: string; requestedBy: string | null; decidedBy: string | null }[] = [], approvedVersionId: string | null = "v2") => ({ newVersionId: "v2", approvedVersionId, references });
+  const own = latest({ id: "v1", savedAt: secondsAgo(30) });
 
-  it("should let a continuing session merge into its own version while it waits for approval", () => {
-    const guard = mergeGuard("continue", versions);
-    expect(guard.has("waiting")).toBe(false);
-    expect(shouldMergeInto(latest({ id: "waiting" }), { editorId: "ann", saveKind: "edit", now, session: "continue" }, guard)).toBe(true);
+  it("should replace the session's own earlier version once the approval step moved on to the new one", () => {
+    expect(canDropSuperseded(own, save, state())).toBe(true);
+    expect(canDropSuperseded(own, save, state([{ status: "approved", requestedBy: "ann", decidedBy: "ann" }]))).toBe(true);
   });
 
-  it("should never let any save merge into the approved version or a decided one", () => {
-    for (const session of ["start", "continue", undefined] as const) {
-      const guard = mergeGuard(session, versions);
-      expect(guard.has("approved") && guard.has("denied")).toBe(true);
-    }
+  it("should keep a version someone else approved or denied, so a decision always shows what was decided", () => {
+    expect(canDropSuperseded(own, save, state([{ status: "approved", requestedBy: "ann", decidedBy: "owner" }]))).toBe(false);
+    expect(canDropSuperseded(own, save, state([{ status: "denied", requestedBy: "ann", decidedBy: "owner" }]))).toBe(false);
   });
 
-  it("should keep ordinary saves off a version waiting for approval", () => {
-    expect(mergeGuard(undefined, versions).has("waiting")).toBe(true);
+  it("should keep a version that still waits for approval or is still the approved one", () => {
+    expect(canDropSuperseded(own, save, state([{ status: "pending", requestedBy: "ann", decidedBy: null }]))).toBe(false);
+    expect(canDropSuperseded(own, save, state([], "v1"))).toBe(false);
+  });
+
+  it("should keep the version when the save starts a session, comes from someone else, or follows a long pause", () => {
+    expect(canDropSuperseded(own, { ...save, session: "start" }, state())).toBe(false);
+    expect(canDropSuperseded(own, { ...save, editorId: "bo" }, state())).toBe(false);
+    expect(canDropSuperseded(latest({ id: "v1", savedAt: new Date(now.getTime() - EDIT_SESSION_IDLE_MS - 1) }), save, state())).toBe(false);
   });
 });
 

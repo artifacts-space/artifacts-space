@@ -29,7 +29,6 @@ import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
 import { canSeeComments } from "@/lib/comments/setting-rules";
 import { filesForViewer } from "@/lib/files/download";
 import type { FileDto } from "@/lib/files/types";
-import { isIndexable } from "@/lib/access-rules";
 import { accountCreatedAt } from "@/lib/account-age";
 import { loadArtifactByline } from "@/lib/artifact-byline";
 import { iconTitlePrefix } from "@/lib/artifact-icons";
@@ -40,6 +39,7 @@ import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
 import { pageColumnClass, readingMeasureClass } from "@/lib/page-width/rules";
 import { pageOrganizersFor } from "@/lib/projects/page-project";
 import { isReportable } from "@/lib/reports/rules";
+import { isSearchIndexable, pageRobots, showsInSearch } from "@/lib/search/search-rules";
 import { getSession } from "@/lib/session";
 import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
 import { themeIdForReader } from "@/lib/themes/theme-privacy";
@@ -59,11 +59,15 @@ async function load(params: Promise<{ publicId: string }>) {
   return getViewableArtifact(publicId, session?.user.id ?? null);
 }
 
-/** Whether search engines may index this page: public, and the author's account is past its first days. */
+/**
+ * Whether search engines may index this page: public, its author turned on
+ * "Show in search engines", and the author's account is past its first days.
+ * A failed account lookup counts as a new account.
+ */
 async function indexable(record: ViewableArtifact["record"]) {
-  if (record.visibility !== "public") return false;
+  if (!showsInSearch(record)) return false;
   const createdAt = await accountCreatedAt(record.userId).catch(() => null);
-  return isIndexable(record.visibility, createdAt);
+  return isSearchIndexable(record, createdAt);
 }
 
 /**
@@ -72,9 +76,9 @@ async function indexable(record: ViewableArtifact["record"]) {
  * approved version of a link or public artifact, see artifactOgMetadata), so
  * an unapproved edit, or a private or team artifact, never reaches link
  * previews or search results; those pages keep the site's description.
- * Public pages may be indexed (links not followed) once the author's account
- * is a few days old; new accounts' public pages, and link, team, and private
- * pages, never are. src/proxy.ts answers 404 before this runs when the viewer
+ * A public page may be indexed (links not followed) only when its author
+ * turned on "Show in search engines" and their account is a few days old;
+ * every other page is noindex (src/lib/search/search-rules.ts). src/proxy.ts answers 404 before this runs when the viewer
  * cannot read the artifact.
  */
 export async function generateMetadata({ params }: PageProps<"/artifact/[publicId]">): Promise<Metadata> {
@@ -86,7 +90,7 @@ export async function generateMetadata({ params }: PageProps<"/artifact/[publicI
     title: `${iconTitlePrefix(view.icon)}${view.title}`,
     // Agents that read HTML find the Markdown version here (src/lib/markdown).
     alternates: { canonical: artifactPagePath(record.publicId), types: { "text/markdown": `/artifact/${record.publicId}.md` } },
-    robots: (await indexable(record)) ? { index: true, follow: false } : { index: false, follow: false },
+    robots: pageRobots(await indexable(record)),
   };
 }
 

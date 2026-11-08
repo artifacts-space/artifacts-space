@@ -11,6 +11,7 @@ import { listThreadAgents, setThreadMute, type ThreadAgentView } from "@/lib/com
 import { createComment, deleteComment, listComments, updateComment, type CommentWriteResult } from "@/lib/comments/service";
 import { requireThread } from "@/lib/comments/thread";
 import type { CommentView } from "@/lib/comments/views";
+import { markArtifactNotificationsRead } from "@/lib/notifications/feed";
 import { getSession } from "@/lib/session";
 
 /**
@@ -27,6 +28,16 @@ async function viewerId() {
   return session?.user.id ?? null;
 }
 
+/**
+ * Reading a thread marks the viewer's mentions and comment notifications on
+ * it read. A failure only leaves them unread; the thread still loads.
+ */
+async function markRead(userId: string, artifactId: string) {
+  await Promise.all([markArtifactMentionsRead(userId, artifactId), markArtifactNotificationsRead(userId, artifactId)]).catch((error: unknown) => {
+    console.error("[notifications] Marking a thread read failed", error instanceof Error ? error.name : "unknown error");
+  });
+}
+
 /** A thread as the panel shows it. */
 export interface ThreadData {
   comments: CommentView[];
@@ -41,7 +52,7 @@ export async function loadThreadAction(publicId: string): Promise<ActionResult<T
     if (!userId) return { success: false, error: signInMessage };
     const { thread, comments } = await listComments(userId, idSchema.parse(publicId));
     const authorIds = comments.flatMap((item) => (item.author?.kind === "agent" ? [item.author.userId] : []));
-    const agents = await listThreadAgents(thread, authorIds);
+    const [agents] = await Promise.all([listThreadAgents(thread, authorIds), markRead(userId, thread.artifact.id)]);
     return { success: true, data: { comments, agents, viewerId: userId } };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The comments could not be loaded. Please try again.") };
@@ -111,13 +122,13 @@ export async function setThreadMuteAction(publicId: string, agentHandle: string,
   }
 }
 
-/** Marks the viewer's unread mentions on this artifact read, when they open its thread. */
+/** Marks the viewer's unread mentions and comment notifications on this artifact read, when they open its thread. */
 export async function markThreadReadAction(publicId: string): Promise<ActionResult<null>> {
   try {
     const userId = await viewerId();
     if (!userId) return { success: false, error: signInMessage };
     const thread = await requireThread(userId, idSchema.parse(publicId));
-    await markArtifactMentionsRead(userId, thread.artifact.id);
+    await markRead(userId, thread.artifact.id);
     return { success: true, data: null };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The mentions could not be marked read.") };

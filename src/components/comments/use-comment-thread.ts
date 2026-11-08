@@ -10,6 +10,7 @@ import {
   updateCommentAction,
   type ThreadData,
 } from "@/app/(workspace)/threads/actions";
+import { announceNotificationsChanged } from "@/components/notifications/notification-events";
 import type { ActionResult } from "@/lib/artifact-types";
 import type { MentionOutcome } from "@/lib/comments/delivery";
 
@@ -30,7 +31,8 @@ async function settle<T>(action: () => Promise<ActionResult<T>>): Promise<Action
 
 /**
  * Loads an artifact's comment thread once, and reloads it after each change
- * the viewer makes. There is no background refresh.
+ * the viewer makes. There is no background refresh. Loading marks the
+ * viewer's notifications on it read, so the bell is told to catch up.
  */
 export function useCommentThread(publicId: string) {
   const [state, setState] = useState<ThreadState>({ status: "loading" });
@@ -45,6 +47,8 @@ export function useCommentThread(publicId: string) {
     void settle(() => loadThreadAction(publicId)).then((result) => {
       if (!active) return;
       setState(result.success ? { status: "ready", data: result.data } : { status: "error", error: result.error });
+      // Loading the thread marked its notifications read; the bell catches up.
+      if (result.success) announceNotificationsChanged();
     });
     return () => {
       active = false;

@@ -8,6 +8,8 @@ import { canReadArtifact } from "@/lib/access";
 import { getAuth } from "@/lib/auth/server";
 import { markdownRequestFor, markdownRoutePath } from "@/lib/markdown/negotiation";
 import { routeCheckFor, signInPath, type RouteCheck } from "@/lib/route-status";
+import { isPageSearchIndexable } from "@/lib/search/search-queries";
+import { noindexHeader, robotsHeaderName } from "@/lib/search/search-rules";
 import { getTeamForMember } from "@/lib/teams/queries";
 
 /**
@@ -16,6 +18,10 @@ import { getTeamForMember } from "@/lib/teams/queries";
  * the page can only send a 200. These checks run before the page renders:
  * signed-out workspace pages redirect to sign-in, and unknown or unreadable
  * artifacts and teams get a 404. The pages still run their own checks.
+ *
+ * Artifact pages, and their 404s, carry X-Robots-Tag: noindex, nofollow unless
+ * search engines may index them (src/lib/search/search-rules.ts); the page's
+ * robots meta tag says the same.
  *
  * Artifact pages also have a Markdown version for agents: /artifact/<id>.md,
  * or /artifact/<id> with Accept: text/markdown, is rewritten to the Markdown
@@ -53,10 +59,34 @@ async function checkTeam(request: NextRequest, slug: string) {
   return (await getTeamForMember(userId, slug)) ? NextResponse.next() : notFound(request);
 }
 
+/** Tells search engines not to index or follow this response. */
+function noindex<T extends Response>(response: T): T {
+  response.headers.set(robotsHeaderName, noindexHeader);
+  return response;
+}
+
+/** Whether search engines may index the page. A failed lookup counts as no. */
+async function pageIndexable(publicId: string) {
+  try {
+    return await isPageSearchIndexable(publicId);
+  } catch (error) {
+    console.error("[proxy] Search visibility check failed", error instanceof Error ? error.name : "unknown error");
+    return false;
+  }
+}
+
+/** The artifact page: 404 when the viewer cannot read it, noindex unless search engines may list it. */
+async function checkArtifact(request: NextRequest, publicId: string) {
+  const [readable, indexable] = await Promise.all([canReadArtifact(publicId, () => viewerId(request)), pageIndexable(publicId)]);
+  if (!readable) return noindex(notFound(request));
+  return indexable ? NextResponse.next() : noindex(NextResponse.next());
+}
+
 async function checkRecord(request: NextRequest, check: NonNullable<RouteCheck>) {
   if (check.kind === "workspace") return NextResponse.next();
   if (check.kind === "team") return checkTeam(request, check.slug);
-  // Artifact pages and their comment threads share the artifact read check.
+  if (check.kind === "artifact") return checkArtifact(request, check.publicId);
+  // Comment threads share the artifact read check.
   return (await canReadArtifact(check.publicId, () => viewerId(request))) ? NextResponse.next() : notFound(request);
 }
 
@@ -91,9 +121,9 @@ export async function proxy(request: NextRequest) {
   try {
     return await checkRecord(request, check);
   } catch (error) {
-    // The page repeats the check, so a failure here only costs the status code.
+    // The page repeats the check, so a failure here only costs the status code. Artifact pages stay noindex.
     console.error("[proxy] Route check failed", error instanceof Error ? error.name : "unknown error");
-    return NextResponse.next();
+    return check.kind === "artifact" ? noindex(NextResponse.next()) : NextResponse.next();
   }
 }
 

@@ -7,12 +7,13 @@ import { artifact, artifactVersion, sharingRequest, team, type ArtifactRecord, t
 import { canEditRecord } from "@/lib/access";
 import type { VersionSaveKind } from "@/lib/artifact-types";
 import { isUniqueViolation } from "@/lib/db-errors";
+import { notifySharingRequest } from "@/lib/notifications/create";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { getTeamMembershipById } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { forgetArtifactCache } from "./cache";
-import { ensureHistoryStart, fileVersion, pruneArtifactVersions, versionMatching } from "./history";
+import { dropSupersededSessionVersion, ensureHistoryStart, fileVersion, latestVersion, pruneArtifactVersions, versionMatching } from "./history";
 import type { EditSessionStep } from "./history-rules";
 import { decideEdit, editNeedsAuditRow, isReviewedLevel, sameReviewedFields } from "./rules";
 
@@ -78,8 +79,11 @@ async function storePendingEdit(record: ArtifactRecord, teamId: string, editorId
     await getDb().update(sharingRequest).set({ versionId, teamId, visibility, requestedBy: editorId, createdAt: new Date() }).where(open);
     return;
   }
+  const id = randomUUID();
   try {
-    await getDb().insert(sharingRequest).values({ id: randomUUID(), kind: "edit", artifactId: record.id, teamId, requestedBy: editorId, visibility, versionId });
+    await getDb().insert(sharingRequest).values({ id, kind: "edit", artifactId: record.id, teamId, requestedBy: editorId, visibility, versionId });
+    // Only a new request notifies; later edits move the open one along quietly.
+    notifySharingRequest(id);
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
     // Another edit filed the request first; point it at this newer version.
@@ -148,8 +152,14 @@ export async function recordArtifactSave(save: ArtifactSave): Promise<EditStatus
   const { before, after, editorId } = save;
   if (before) await ensureHistoryStart(before);
   const approvedId = before && isReviewedLevel(after.visibility) ? await ensureApprovedBefore(before) : null;
+  // A continuing session that could not merge (its version was approved or waiting) replaces that version once approval moved on.
+  const previous = save.session === "continue" ? await latestVersion(after.id) : null;
   const versionId = await fileVersion({ ...after, approvedVersionId: approvedId ?? after.approvedVersionId }, { editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null, session: save.session });
   const status = approvedId ? await approvalFor(after, approvedId, versionId, save) : "applied";
+  await dropSupersededSessionVersion(after, previous, { editorId, saveKind: save.saveKind, session: save.session, newVersionId: versionId }).catch((error: unknown) => {
+    // Housekeeping only: an extra version in History is the worst case.
+    console.error("[versions] Dropping a superseded session version failed", error instanceof Error ? error.name : "unknown error");
+  });
   await pruneArtifactVersions(after.id).catch((error: unknown) => {
     // Pruning is housekeeping; the cleanup job retries it.
     console.error("[versions] Pruning after a save failed", error instanceof Error ? error.name : "unknown error");

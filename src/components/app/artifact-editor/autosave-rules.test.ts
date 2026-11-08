@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { EDIT_SESSION_IDLE_MS } from "@/lib/versions/history-rules";
 
-import { changedFields, closedSession, draftProblem, hasChanges, mergeDrafts, sessionStep } from "./autosave-rules";
+import { changedFields, closedSession, draftProblem, hasChanges, keepMineOver, mergeDrafts, sessionStep } from "./autosave-rules";
 import type { ArtifactDraft } from "./use-artifact-draft";
 
 const base: ArtifactDraft = { title: "Plan", icon: null, summary: "", content: "# Plan\n\nShip it.", language: "", kind: "markdown" };
@@ -71,5 +71,12 @@ describe("mergeDrafts", () => {
   it("should report a conflict and merge nothing when both changed the same field differently", () => {
     const outcome = mergeDrafts(base, edited({ content: "Mine" }), edited({ content: "Theirs", title: "Theirs too" }));
     expect(outcome).toEqual({ kind: "conflict", fields: ["content"] });
+  });
+});
+
+describe("keepMineOver", () => {
+  it("should keep the editor's changes and their changes to other fields when the editor keeps theirs out of a conflict", () => {
+    const kept = keepMineOver(base, edited({ content: "Mine" }), edited({ content: "Theirs", title: "Their title" }));
+    expect(kept).toEqual(edited({ content: "Mine", title: "Their title" }));
   });
 });

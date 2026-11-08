@@ -78,3 +78,16 @@ export function mergeDrafts(base: ArtifactDraft, mine: ArtifactDraft, theirs: Ar
   }
   return { kind: "merged", draft };
 }
+
+/**
+ * "Keep my changes" after a conflict: their newer version, with every field
+ * the editor changed from `base` taken from the editor's draft. Fields only
+ * they changed keep their change.
+ */
+export function keepMineOver(base: ArtifactDraft, mine: ArtifactDraft, theirs: ArtifactDraft): ArtifactDraft {
+  const draft = { ...theirs };
+  for (const key of draftKeys) {
+    if (mine[key] !== base[key]) Object.assign(draft, { [key]: mine[key] });
+  }
+  return draft;
+}

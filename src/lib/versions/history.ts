@@ -9,7 +9,7 @@ import type { VersionSaveKind } from "@/lib/artifact-types";
 import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { dropsShownImage } from "@/lib/files/icon-cleanup-rules";
 
-import { mergeGuard, selectPrunableVersions, shouldMergeInto, versionBytes, versionRetention, type EditSessionStep } from "./history-rules";
+import { canDropSuperseded, selectPrunableVersions, shouldMergeInto, versionBytes, versionRetention, type EditSessionStep } from "./history-rules";
 import { sameReviewedFields } from "./rules";
 
 /**
@@ -52,9 +52,7 @@ export async function latestVersion(artifactId: string): Promise<ArtifactVersion
  * Versions readers or reviewers rely on. `pinned`: the approved version and
  * versions waiting for approval, which are never pruned. `referenced`: also
  * versions any request ever named, which are never merged into, so an
- * approval or denial always shows what was decided. `decided`: the approved
- * version and versions a decided request named; an editing session may still
- * merge into its own version while it only waits for approval.
+ * approval or denial always shows what was decided.
  */
 export async function protectedVersions(artifactId: string, approvedVersionId: string | null) {
   const rows = await getDb()
@@ -63,14 +61,12 @@ export async function protectedVersions(artifactId: string, approvedVersionId: s
     .where(and(eq(sharingRequest.artifactId, artifactId), eq(sharingRequest.kind, "edit")));
   const pinned = new Set<string>(approvedVersionId ? [approvedVersionId] : []);
   const referenced = new Set(pinned);
-  const decided = new Set(pinned);
   for (const row of rows) {
     if (!row.versionId) continue;
     referenced.add(row.versionId);
     if (row.status === "pending") pinned.add(row.versionId);
-    else decided.add(row.versionId);
   }
-  return { pinned, referenced, decided };
+  return { pinned, referenced };
 }
 
 /**
@@ -110,13 +106,39 @@ export async function fileVersion(
 ): Promise<string> {
   const latest = await latestVersion(record.id);
   if (latest && save.saveKind === "edit" && sameReviewedFields(latest, record)) return latest.id;
-  const guarded = mergeGuard(save.session, await protectedVersions(record.id, record.approvedVersionId));
+  const { referenced } = await protectedVersions(record.id, record.approvedVersionId);
   // A save that drops an uploaded icon or cover image files its own version, so the image stays restorable.
-  if (latest && shouldMergeInto(latest, { ...save, now: new Date() }, guarded) && !dropsShownImage(latest, record)) {
+  if (latest && shouldMergeInto(latest, { ...save, now: new Date() }, referenced) && !dropsShownImage(latest, record)) {
     await mergeInto(latest.id, record);
     return latest.id;
   }
   return insertVersion(record, { createdBy: save.editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null });
+}
+
+/**
+ * After a continuing editing session filed a new version because its own
+ * previous one was protected at the time, deletes that previous version when
+ * canDropSuperseded allows it, with the editor's own instant-approval rows
+ * that named it (the new version has its own). Call it after the approval
+ * step. Quietly does nothing when the rule says no.
+ */
+export async function dropSupersededSessionVersion(
+  record: ArtifactRecord,
+  previous: ArtifactVersionRecord | null,
+  save: { editorId: string; saveKind: VersionSaveKind; session?: EditSessionStep | undefined; newVersionId: string },
+): Promise<void> {
+  if (!previous || previous.id === save.newVersionId || save.session !== "continue" || dropsShownImage(previous, record)) return;
+  const [[owner], references] = await Promise.all([
+    getDb().select({ approvedVersionId: artifact.approvedVersionId }).from(artifact).where(eq(artifact.id, record.id)).limit(1),
+    getDb()
+      .select({ status: sharingRequest.status, requestedBy: sharingRequest.requestedBy, decidedBy: sharingRequest.decidedBy })
+      .from(sharingRequest)
+      .where(and(eq(sharingRequest.artifactId, record.id), eq(sharingRequest.versionId, previous.id))),
+  ]);
+  const state = { newVersionId: save.newVersionId, approvedVersionId: owner?.approvedVersionId ?? null, references };
+  if (!owner || !canDropSuperseded(previous, { ...save, now: new Date() }, state)) return;
+  await getDb().delete(sharingRequest).where(and(eq(sharingRequest.artifactId, record.id), eq(sharingRequest.versionId, previous.id), eq(sharingRequest.status, "approved")));
+  await getDb().delete(artifactVersion).where(and(eq(artifactVersion.artifactId, record.id), eq(artifactVersion.id, previous.id)));
 }
 
 /** The icon and cover values of dropped versions, for the image cleanup. */

@@ -42,7 +42,7 @@ export async function devUserId(): Promise<string> {
   return id;
 }
 
-/** Inserts an artifact (Markdown unless `kind` says ui) with an optional theme (a preset id or theme JSON) and cover and returns its public id. */
+/** Inserts an artifact (Markdown unless `kind` says otherwise) with an optional theme (a preset id or theme JSON) and cover and returns its public id. */
 export async function createTestArtifact(input: { userId: string; title: string; content: string; visibility: "private" | "public"; theme: unknown; cover?: string | null; kind?: "markdown" | "ui" }): Promise<string> {
   const result = await db().query<{ public_id: string }>(
     `insert into artifact (id, user_id, title, content, kind, visibility, comments, share_id, theme, cover, updated_by)
