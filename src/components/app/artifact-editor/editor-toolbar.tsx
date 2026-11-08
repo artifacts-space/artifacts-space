@@ -64,6 +64,8 @@ interface EditorToolbarProps {
   history: React.ReactNode;
   /** The Comments button and dialog (CommentsDialog), beside History. */
   comments: React.ReactNode;
+  /** The Views button and dialog (ViewsDialog). */
+  views: React.ReactNode;
   dirty: boolean;
   pending: PendingAction;
   onSave: () => void;
@@ -74,12 +76,12 @@ interface EditorToolbarProps {
 }
 
 /**
- * The editor's top bar: format icon, short id, copy, history, comments, share, more
+ * The editor's top bar: format icon, short id, copy, history, views, comments, share, more
  * actions, and save. On phones the page scrolls, so it sticks under the app
  * header (h-14) to keep Save and History in reach; from md up the /app shell
  * keeps it in place.
  */
-export function EditorToolbar({ id, kind, content, shareControl, history, comments, dirty, pending, onSave, onRequestDelete, onWithdraw }: EditorToolbarProps) {
+export function EditorToolbar({ id, kind, content, shareControl, history, comments, views, dirty, pending, onSave, onRequestDelete, onWithdraw }: EditorToolbarProps) {
   const KindIcon = kindIcons[kind];
   return (
     <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5">
@@ -88,6 +90,7 @@ export function EditorToolbar({ id, kind, content, shareControl, history, commen
       <div className="ml-auto flex items-center gap-1">
         <CopyButton value={content} variant="ghost" size="icon" />
         {history}
+        {views}
         {comments}
         {shareControl}
         <MoreMenu onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
