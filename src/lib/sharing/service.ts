@@ -11,7 +11,7 @@ import { getOwnArtifact } from "@/lib/artifacts";
 import { commentsAfterSharing, decideCommentSetting, defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { rehomeArtifactProject } from "@/lib/projects/store";
-import { findPersonalTeam, getTeamMembershipById, type TeamMembership } from "@/lib/teams/queries";
+import { getTeamMembershipById, listTeamsForUser, type TeamMembership } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { decideEditRequest, syncApprovedVersion } from "@/lib/versions/service";
 
@@ -25,6 +25,7 @@ import {
   sharingNeedsApproval,
   type SharingActor,
 } from "./rules";
+import { chooseSharingTeam, notAMemberError } from "./team-choice-rules";
 
 /**
  * Every sharing change goes through this module. requestArtifactSharing
@@ -38,7 +39,11 @@ export interface SharingRequestInput {
   /** Internal artifact id. Only the author may request sharing. */
   artifactId: string;
   visibility: ArtifactVisibility;
-  /** The team to share with (team), or whose admins approve it (link, public). Defaults to the personal team for link and public. */
+  /**
+   * The team to share with (team), or whose admins approve it (link, public).
+   * Left out: the artifact's current team, then (link and public) the
+   * personal team, then the requester's only team. See team-choice-rules.ts.
+   */
   teamId?: string | null | undefined;
   /**
    * Who may comment afterwards. Left out: the current setting when the
@@ -92,11 +97,13 @@ async function setVisibility(artifactId: string, visibility: ArtifactVisibility,
   await syncApprovedVersion(artifactId, byUserId);
 }
 
-async function resolveTeam(requesterId: string, level: SharingLevel, teamId: string | null | undefined): Promise<TeamMembership> {
-  if (!teamId && level === "team") throw new UserFacingError("Choose a team to share with.");
-  const targetId = teamId ?? (await findPersonalTeam(requesterId))?.id;
-  const membership = targetId ? await getTeamMembershipById(requesterId, targetId) : null;
-  if (!membership) throw new UserFacingError("Team not found. You can share only with teams you belong to.");
+/** The team the change goes through: the one asked for, else the artifact's current team, else a default (team-choice-rules.ts). */
+async function resolveTeam(requesterId: string, level: SharingLevel, teamId: string | null | undefined, currentTeamId: string | null): Promise<TeamMembership> {
+  const memberships = await listTeamsForUser(requesterId);
+  const choice = chooseSharingTeam({ level, requestedTeamId: teamId, currentTeamId, memberships });
+  if (!choice.ok) throw new UserFacingError(choice.error);
+  const membership = memberships.find((item) => item.id === choice.teamId);
+  if (!membership) throw new UserFacingError(notAMemberError);
   if (!isLevelAllowedInTeam(level, membership)) {
     throw new UserFacingError("Your personal team is only you. Choose a shared team, or share by link.");
   }
@@ -146,7 +153,7 @@ export async function requestArtifactSharing(input: SharingRequestInput): Promis
 
   await enforceRateLimit("sharingRequest", input.requesterId);
   const level = input.visibility;
-  const team = await resolveTeam(input.requesterId, level, input.teamId);
+  const team = await resolveTeam(input.requesterId, level, input.teamId, record.teamId);
   const sameTeam = record.teamId === team.id;
   const comments = commentsAfterSharing({ current: record.comments, requested: input.comments, sameTeam, next: { visibility: level, teamPersonal: team.personal } });
   await cancelPending(record.id, input.requesterId);

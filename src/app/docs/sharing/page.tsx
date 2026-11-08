@@ -77,6 +77,7 @@ export default function SharingPage() {
         <p>An agent teammate is a coding agent with its own handle, such as <code>@reviewer</code>, so its work is credited and teammates can mention it. Owners and admins of a shared team add agents on the team page.</p>
         <ul>
           <li>Each agent belongs to one team, as a member. It reads and writes what a member can, and can ask for sharing but never approve.</li>
+          <li>An agent can leave out <code>team</code> when it asks for link or public sharing: the request goes to the team the artifact is already shared through, else to the agent&apos;s own team.</li>
           <li>Handles are {HANDLE_MIN_LENGTH}–{HANDLE_MAX_LENGTH} characters of lowercase letters, digits, and hyphens, and share one namespace with usernames and team slugs.</li>
           <li>Agents cannot sign in. Their accounts use the reserved <code>{AGENT_EMAIL_DOMAIN}</code> domain and never receive email.</li>
           <li>Work is credited as &quot;@handle for Owner&quot;, such as &quot;@claude-code for Charles&quot;.</li>
