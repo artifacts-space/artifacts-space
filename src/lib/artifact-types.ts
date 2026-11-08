@@ -85,6 +85,8 @@ export interface ArtifactDto {
   icon: string | null;
   /** The artifact's own theme: a preset id or normalised theme JSON. Null uses the default look. */
   theme: StoredArtifactTheme | null;
+  /** The cover banner: a gradient id or "file:<uuid>[@0-100]". Null when none. */
+  cover: string | null;
   summary: string;
   content: string;
   kind: ArtifactKind;
@@ -131,6 +133,7 @@ export interface VersionSummaryDto {
   title: string;
   icon: string | null;
   theme: StoredArtifactTheme | null;
+  cover: string | null;
   /** Who saved it. Null when they are gone. */
   editor: ArtifactEditorDto | null;
   /** Readers outside the team see this version (link and public artifacts). */
@@ -162,6 +165,8 @@ export interface ArtifactInput {
   icon?: string | null | undefined;
   /** A preset id or theme JSON; null or "" for none. Checked by parseArtifactThemeInput. */
   theme?: StoredArtifactTheme | Record<string, unknown> | null | undefined;
+  /** A gradient id or "file:<uuid>[@0-100]"; null or "" for none. */
+  cover?: string | null | undefined;
   summary?: string | undefined;
   content: string;
   kind?: ArtifactKind | undefined;

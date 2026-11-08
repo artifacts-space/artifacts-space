@@ -193,6 +193,16 @@ describe("loadArtifactOg", () => {
     expect((await loadArtifactOg("abc", approvedId))?.palette).toEqual(siteCardPalette);
   });
 
+  it("should use the approved version's gradient cover as the backdrop, and none without a cover", async () => {
+    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.cachedVersionView.mockResolvedValue({ ...approvedView, cover: "dusk" });
+    const covered = await loadArtifactOg("abc", approvedId);
+    expect(covered?.cover).toMatchObject({ type: "gradient", from: expect.stringMatching(/^#[0-9a-f]{6}$/) as unknown });
+    expect(covered?.coverDegraded).toBe(false);
+    mocks.cachedVersionView.mockResolvedValue({ ...approvedView, cover: null });
+    expect((await loadArtifactOg("abc", approvedId))?.cover).toBeNull();
+  });
+
   it("should never put the project or tags in the preview or its meta tags, even when the row and version carry them", async () => {
     const withProject = access("public");
     Object.assign(withProject.record, { projectId: "project-1", project: "Secret project label", tags: ["secret-tag-label"] });

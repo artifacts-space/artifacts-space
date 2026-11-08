@@ -1,4 +1,5 @@
 import type { ArtifactDto, ArtifactListItemDto, ArtifactVisibility, CommentSetting, SharingLevel } from "@/lib/artifact-types";
+import { mcpCoverFields } from "@/lib/covers/cover";
 import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
 
 /** How an artifact looks to an agent. Ids are public ids; internal ids never leave the server. */
@@ -10,6 +11,10 @@ export interface McpArtifact {
   icon: string | null;
   /** The artifact's own theme: a preset id or theme JSON. Null when it uses the default look. */
   theme: StoredArtifactTheme | null;
+  /** The cover banner: a gradient id or "file:<file id>". Null when none. */
+  cover: string | null;
+  /** An image cover's vertical focal point, 0 (top) to 100 (bottom). Null for gradients and no cover. */
+  coverPosition: number | null;
   summary: string;
   /** The full content. Only artifacts_get and writes return it. */
   content?: string;
@@ -70,6 +75,7 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     title: dto.title,
     icon: dto.icon,
     theme: dto.theme,
+    ...mcpCoverFields(dto.cover),
     summary: dto.summary,
     kind: dto.kind,
     language: dto.language,

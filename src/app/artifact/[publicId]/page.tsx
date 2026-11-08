@@ -6,6 +6,8 @@ import { notFound } from "next/navigation";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { TitleIcon } from "@/components/artifact-icon/title-icon";
 import { TitleTheme } from "@/components/artifact-theme/title-theme";
+import { AddCoverButton } from "@/components/artifact-cover/add-cover-button";
+import { ArtifactCover } from "@/components/artifact-cover/artifact-cover";
 import { ApprovedArticle } from "@/components/artifact-page/approved-article";
 import { EditorIsland } from "@/components/artifact-page/editor-island";
 import { ReportDialog } from "@/components/artifact-page/report-dialog";
@@ -132,7 +134,7 @@ async function lastEditor(userId: string | null): Promise<ArtifactEditorDto | nu
   return (await lastEditorsFor([{ updatedBy: userId }])).get(userId) ?? null;
 }
 
-/** The page icon above the title: the icon and theme pickers for editors, the icon alone for readers. */
+/** The page icon above the title: the icon, theme, and Add cover controls for editors, the icon alone for readers. */
 function HeadingIcon({ viewable }: { viewable: ViewableArtifact }) {
   const { view, record } = viewable;
   if (viewable.canEdit) {
@@ -142,6 +144,7 @@ function HeadingIcon({ viewable }: { viewable: ViewableArtifact }) {
         <div className={view.icon ? "mb-2" : "mb-1"}>
           <TitleTheme key={JSON.stringify(view.theme)} publicId={record.publicId} theme={view.theme} />
         </div>
+        {view.cover ? null : <div className={view.icon ? "mb-2" : "mb-1"}><AddCoverButton publicId={record.publicId} /></div>}
       </div>
     );
   }
@@ -245,7 +248,12 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
       </StickyChrome>
       {/* A theme that locks light or dark sets that mode on the backdrop too, so comments and controls on it stay readable. */}
       <ThemeBackdrop theme={theme} className={cn("text-foreground", lockedMode(theme))}>
-        <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
+        {view.cover ? (
+          <ThemeScope theme={theme}>
+            <ArtifactCover publicId={record.publicId} cover={view.cover} editable={viewable.canEdit} />
+          </ThemeScope>
+        ) : null}
+        <main className={cn("mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16", view.cover && "pt-8 sm:pt-10")}>
           <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
             <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={presetId ?? "custom"}>
               <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contrastRatio, ensureContrast, formatOklch, mixOklch, normalizeColor, parseColor } from "./color";
+import { contrastRatio, ensureContrast, formatOklch, mixOklab, mixOklch, normalizeColor, parseColor } from "./color";
 
 const parsed = (value: string) => {
   const color = parseColor(value);
@@ -89,5 +89,24 @@ describe("mixOklch", () => {
   it("should land halfway in lightness and keep the chromatic hue when one side is grey", () => {
     const mixed = mixOklch(parsed("oklch(0.4 0.1 250)"), parsed("oklch(1 0 0)"), 0.5);
     expect(formatOklch(mixed)).toBe("oklch(0.7 0.05 250)");
+  });
+});
+
+describe("mixOklab", () => {
+  it("should keep the tint's hue when a little of a color goes into a nearly grey paper", () => {
+    const paper = parseColor("oklch(0.985 0.003 85)");
+    const blue = parseColor("#2a78d6");
+    if (!paper || !blue) throw new Error("colors did not parse");
+    const tint = mixOklab(paper, blue, 0.2);
+    expect(tint.h).toBeGreaterThan(220);
+    expect(tint.h).toBeLessThan(280);
+    expect(tint.l).toBeGreaterThan(0.85);
+  });
+
+  it("should return either end when the amount is 0 or 1", () => {
+    const a = { l: 0.5, c: 0.1, h: 30, alpha: 1 };
+    const b = { l: 0.9, c: 0, h: 0, alpha: 1 };
+    expect(mixOklab(a, b, 0).l).toBeCloseTo(0.5);
+    expect(mixOklab(a, b, 1)).toMatchObject({ l: 0.9, c: 0 });
   });
 });

@@ -26,6 +26,8 @@ import { setArtifactComments } from "@/lib/sharing/comments";
 import { requestArtifactSharing } from "@/lib/sharing/service";
 import { siteUrl } from "@/lib/site-origin";
 import { listTeamsForUser, type TeamMembership } from "@/lib/teams/queries";
+import { COVER_FIELD_DESCRIPTION, COVER_POSITION_DESCRIPTION, COVER_RULE_MESSAGE, resolveCoverChange } from "@/lib/covers/cover";
+import { artifactCoverLimits } from "@/lib/covers/limits";
 import { artifactThemeRawSchema, parseArtifactThemeInput, THEME_FIELD_DESCRIPTION } from "@/lib/themes/artifact-theme";
 import type { McpAccess } from "@/lib/oauth/scopes";
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -71,6 +73,16 @@ function assertTheme(theme: unknown) {
   if (!result.ok) throw new UserFacingError(result.message);
 }
 
+const coverField = z.string().max(artifactCoverLimits.maxInputLength, COVER_RULE_MESSAGE).nullable().optional().describe(COVER_FIELD_DESCRIPTION);
+const coverPositionField = z.number().int().min(0).max(100).optional().describe(COVER_POSITION_DESCRIPTION);
+
+/** The stored cover from an agent's `cover` and `coverPosition`, checked before anything is saved. Undefined keeps the current one. */
+function coverFor(cover: string | null | undefined, position: number | undefined, current: string | null) {
+  const change = resolveCoverChange(cover, position, current);
+  if (!change.ok) throw new UserFacingError(change.message);
+  return change.cover;
+}
+
 const projectField = z
   .string()
   .max(projectLimits.maxNameChars * 2)
@@ -84,6 +96,8 @@ const editableFields = {
   title: z.string().min(1).max(160),
   icon: iconField,
   theme: themeField,
+  cover: coverField,
+  coverPosition: coverPositionField,
   content: z.string().min(1).max(1_000_000),
   summary: z.string().max(600).optional(),
   kind: z.enum(artifactKinds).optional().describe(kindFieldDescription),
@@ -288,11 +302,11 @@ function registerWriteTools(server: ToolServer, userId: string) {
         "Create an artifact to share context with future coding sessions and other agents. It is private unless you set visibility, and `comments` sets who can comment. Creation is limited per hour; a limit error says when to try again.",
       inputSchema: { ...editableFields, visibility: visibilityField, team: teamField, comments: commentsField },
     },
-    ({ visibility, team, comments, ...input }) => respond(async () => {
+    ({ visibility, team, comments, cover, coverPosition, ...input }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
       if (team) teamBySlug(teams, team);
       assertTheme(input.theme);
-      const created = await createArtifact(userId, input);
+      const created = await createArtifact(userId, { ...input, cover: coverFor(cover, coverPosition, null) });
       const result = await shareAfterSave(userId, created, teams, { visibility, team, comments });
       return { artifact: toMcpArtifact(result.artifact, view), sharing: result.sharing, comments: result.comments };
     }),
@@ -315,13 +329,13 @@ function registerWriteTools(server: ToolServer, userId: string) {
         comments: commentsField,
       },
     },
-    ({ id, visibility, team, comments, project, tags, addTags, removeTags, ...input }) => respond(async () => {
+    ({ id, visibility, team, comments, project, tags, addTags, removeTags, cover, coverPosition, ...input }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
       const record = await editableByPublicId(userId, id);
       if (team) teamBySlug(teams, team);
       assertTheme(input.theme);
       const tagChange = tagChangeFor({ tags, addTags, removeTags });
-      const saved = await saveFields(userId, record.id, input);
+      const saved = await saveFields(userId, record.id, { ...input, cover: coverFor(cover, coverPosition, record.cover) });
       // Project and tags change after the save, on their own: no version, no approval, and nothing if the save failed.
       const artifact = await organize(userId, record.id, saved.artifact, project, tagChange);
       const result = await shareAfterSave(userId, artifact, teams, { visibility, team, comments });

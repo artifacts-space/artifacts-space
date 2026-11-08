@@ -48,6 +48,7 @@ function fixtureArtifact(kind: EditorFixtureKind): ArtifactDto {
     title: `Long ${kind} fixture`,
     icon: null,
     theme: null,
+    cover: null,
     summary: "A long artifact for layout tests.",
     content: contentFor[kind](),
     kind,

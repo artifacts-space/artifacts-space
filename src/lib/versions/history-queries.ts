@@ -23,6 +23,7 @@ const summaryColumns = {
   title: artifactVersion.title,
   icon: artifactVersion.icon,
   theme: artifactVersion.theme,
+  cover: artifactVersion.cover,
   createdBy: artifactVersion.createdBy,
 };
 
@@ -56,6 +57,7 @@ function toSummary(row: SummaryRow, context: SummaryContext): VersionSummaryDto 
     title: row.title,
     icon: row.icon,
     theme: row.theme,
+    cover: row.cover,
     editor: row.createdBy ? context.editors.get(row.createdBy) ?? null : null,
     approved: row.id === context.record.approvedVersionId,
     pending: row.id === context.pendingId,

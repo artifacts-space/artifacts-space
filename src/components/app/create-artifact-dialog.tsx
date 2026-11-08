@@ -1,6 +1,6 @@
 "use client";
 
-import { IconChevronDown, IconLoader2, IconMoodSmile, IconPalette } from "@tabler/icons-react";
+import { IconChevronDown, IconLoader2, IconMoodSmile, IconPalette, IconPhoto } from "@tabler/icons-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -8,6 +8,7 @@ import { createArtifactWithFilesAction, deleteFileAction } from "@/app/(workspac
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { IconPicker } from "@/components/artifact-icon/icon-picker";
 import { ThemePicker } from "@/components/artifact-theme/theme-picker";
+import { CoverPicker } from "@/components/artifact-cover/cover-picker";
 import { FileUploader } from "@/components/files/file-uploader";
 import { useFileUploads } from "@/components/files/use-file-uploads";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,8 @@ import { iconFileId } from "@/lib/artifact-icons";
 import { kinds } from "@/lib/artifact-kinds";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { themeLabel } from "@/lib/themes/artifact-theme";
+import { coverLabel } from "@/lib/covers/cover";
+import { coverGradient, coverGradientCss } from "@/lib/covers/gradients";
 
 /** A short starting point shown in the empty content box, per format. */
 const placeholders: Record<string, string> = {
@@ -69,6 +72,19 @@ function NewThemeButton({ theme, onChange }: { theme: string | null; onChange: (
   return <ThemePicker value={theme} onChange={onChange} trigger={trigger} />;
 }
 
+/** The cover field: a small sample and the gradient's name, opening the gradient picker. */
+function NewCoverButton({ cover, onChange }: { cover: string | null; onChange: (cover: string | null) => void }) {
+  const gradient = cover ? coverGradient(cover) : undefined;
+  const trigger = (
+    <Button type="button" variant="outline" id="artifact-cover" aria-labelledby="artifact-cover-label artifact-cover" className="h-9 w-full justify-start font-normal">
+      {gradient ? <span aria-hidden className="size-4 rounded-sm" style={{ backgroundImage: coverGradientCss(gradient) }} /> : <IconPhoto className="text-muted-foreground" />}
+      {cover ? coverLabel(cover) : "No cover"}
+      <IconChevronDown className="ml-auto text-muted-foreground" />
+    </Button>
+  );
+  return <CoverPicker value={cover} onChange={onChange} trigger={trigger} align="start" />;
+}
+
 /** Reads a text field from form data. File inputs and missing fields read as empty. */
 function formText(formData: FormData, name: string) {
   const value = formData.get(name);
@@ -88,6 +104,7 @@ export function CreateArtifactDialog({
   const [kind, setKind] = useState<ArtifactKind>("markdown");
   const [icon, setIcon] = useState<string | null>(null);
   const [theme, setTheme] = useState<string | null>(null);
+  const [cover, setCover] = useState<string | null>(null);
   const uploads = useFileUploads();
   const isFiles = kind === "file";
 
@@ -98,6 +115,7 @@ export function CreateArtifactDialog({
     if (unusedIconFile) void deleteFileAction(unusedIconFile).catch(() => undefined);
     setIcon(null);
     setTheme(null);
+    setCover(null);
     onOpenChange(false);
   }
 
@@ -121,6 +139,7 @@ export function CreateArtifactDialog({
         kind,
         icon,
         theme,
+        cover,
       }, fileIds);
       if (!result.success) {
         toast.error(result.error);
@@ -133,6 +152,7 @@ export function CreateArtifactDialog({
       setKind("markdown");
       setIcon(null);
       setTheme(null);
+      setCover(null);
       toast.success("Artifact created.");
     } catch {
       toast.error("Something went wrong. Check your connection and try again.");
@@ -185,6 +205,10 @@ export function CreateArtifactDialog({
               <div className="flex flex-col gap-2">
                 <Label id="artifact-theme-label">Theme</Label>
                 <NewThemeButton theme={theme} onChange={setTheme} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label id="artifact-cover-label">Cover</Label>
+                <NewCoverButton cover={cover} onChange={setCover} />
               </div>
               {kind === "code" && (
                 <div className="space-y-2 sm:col-span-2">

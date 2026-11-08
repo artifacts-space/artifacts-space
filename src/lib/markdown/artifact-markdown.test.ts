@@ -49,6 +49,12 @@ describe("markdownHeader", () => {
     expect(markdownHeader({ ...base, theme: null })).not.toContain("Theme:");
   });
 
+  it("should name the cover only when the artifact has one, never with a file link", () => {
+    expect(markdownHeader({ ...base, theme: "Paper", cover: "Mist" })).toContain("- Theme: Paper\n- Cover: Mist\n");
+    expect(markdownHeader({ ...base, cover: "Image" })).toContain("- Cover: Image\n");
+    expect(markdownHeader({ ...base, cover: null })).not.toContain("Cover:");
+  });
+
   it("should name the language when the format is code", () => {
     expect(markdownHeader({ ...base, kind: "code", language: "ts" })).toContain("- Format: code (ts)");
   });

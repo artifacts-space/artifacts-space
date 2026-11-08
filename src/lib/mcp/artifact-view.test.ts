@@ -10,6 +10,7 @@ const dto: ArtifactDto = {
   title: "Plan",
   icon: "🧭",
   theme: null,
+  cover: null,
   summary: "",
   content: "# Plan",
   kind: "markdown",

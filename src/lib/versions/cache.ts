@@ -26,6 +26,7 @@ export interface CachedVersionView {
   title: string;
   icon: string | null;
   theme: StoredArtifactTheme | null;
+  cover: string | null;
   summary: string;
   content: string;
   kind: ArtifactKind;
@@ -50,9 +51,9 @@ export async function cachedVersionView(versionId: string, savedAt: string): Pro
   const [row] = await getDb().select().from(artifactVersion).where(eq(artifactVersion.id, versionId)).limit(1);
   if (!row) return null;
   cacheTag(artifactCacheTag(row.artifactId), `version:${versionId}:${savedAt}`);
-  const { title, icon, theme, summary, content, kind, language, source, metadata } = row;
+  const { title, icon, theme, cover, summary, content, kind, language, source, metadata } = row;
   // savedAt, not createdAt: files attached up to the version's last save belong to it. No project: it is not versioned.
-  return { title, icon, theme, summary, content, kind, language, source, metadata, updatedAt: row.savedAt };
+  return { title, icon, theme, cover, summary, content, kind, language, source, metadata, updatedAt: row.savedAt };
 }
 
 /**

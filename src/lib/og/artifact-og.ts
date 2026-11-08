@@ -10,6 +10,7 @@ import { isReviewedLevel } from "@/lib/versions/rules";
 import { OG_DESCRIPTION, OG_WORDMARK } from "@/lib/site-copy";
 
 import { ogCardPalette, type OgCardPalette } from "./card-palette";
+import { loadOgCover, type OgCover } from "./cover";
 import { artifactDescription } from "./description";
 import { ogIconFor, type OgIcon } from "./icon";
 import { buildSynopsis, ogKindLabels } from "./synopsis";
@@ -101,6 +102,10 @@ export interface ArtifactOg {
   synopsis: Synopsis;
   /** The synopsis card's colors: the approved version's theme, or the site card. */
   palette: OgCardPalette;
+  /** The approved version's cover as the backdrop, when the preview can draw it. Null keeps the standard backdrop. */
+  cover: OgCover | null;
+  /** True when an image cover could not be fetched this time: cache the picture briefly so it is tried again. */
+  coverDegraded: boolean;
 }
 
 /**
@@ -115,7 +120,8 @@ export async function loadArtifactOg(publicId: string, versionId: string): Promi
   if (shareable.versionId !== versionId) return null;
   const view = await cachedVersionView(shareable.versionId, shareable.savedAt);
   if (!view) return null;
-  const files = view.kind === "file" ? await filesForViewer(access) : [];
+  const theme = resolveTheme(view.theme, null).theme;
+  const [files, cover] = await Promise.all([view.kind === "file" ? filesForViewer(access) : Promise.resolve([]), loadOgCover(view.cover, theme)]);
   return {
     title: view.title,
     icon: ogIconFor(view.icon),
@@ -123,6 +129,8 @@ export async function loadArtifactOg(publicId: string, versionId: string): Promi
     kindLabel: view.kind === "code" && view.language ? `${ogKindLabels.code} · ${truncate(view.language, 16)}` : ogKindLabels[view.kind],
     synopsis: buildSynopsis({ kind: view.kind, content: view.content, language: view.language, files }),
     // The team default arrives with team presets; until then the version's own theme or the site card.
-    palette: ogCardPalette(resolveTheme(view.theme, null).theme),
+    palette: ogCardPalette(theme),
+    cover: cover.cover,
+    coverDegraded: cover.degraded,
   };
 }

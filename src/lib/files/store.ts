@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, like, lt, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, artifactFile, type ArtifactFileRecord } from "@/db/schema";
@@ -61,9 +61,11 @@ export async function listArtifactFiles(artifactId: string, options: { attachedB
   return files.filter((file) => allowed.has(file.id));
 }
 
-/** Removes an icon that points at a file being deleted from its artifact. Call before the change is recorded. */
+/** Removes an icon or cover that points at a file being deleted from its artifact. Call before the change is recorded. */
 export async function clearIconForFile(artifactId: string, fileId: string): Promise<void> {
-  await getDb().update(artifact).set({ icon: null }).where(and(eq(artifact.id, artifactId), eq(artifact.icon, `${FILE_PREFIX}${fileId}`)));
+  const ref = `${FILE_PREFIX}${fileId}`;
+  await getDb().update(artifact).set({ icon: null }).where(and(eq(artifact.id, artifactId), eq(artifact.icon, ref)));
+  await getDb().update(artifact).set({ cover: null }).where(and(eq(artifact.id, artifactId), or(eq(artifact.cover, ref), like(artifact.cover, `${ref}@%`))));
 }
 
 /** How many files an artifact holds. */

@@ -30,6 +30,8 @@ export interface ArtifactMarkdownInput {
   emoji: string | null;
   /** The artifact's own theme by name ("Paper", or "Custom"), or null for the default look. Optional. */
   theme?: string | null;
+  /** The cover by name ("Mist", or "Image"), or null for none. Never a file URL. Optional. */
+  cover?: string | null;
   summary: string;
   kind: ArtifactKind;
   language: string;
@@ -56,6 +58,7 @@ function headerLines(input: ArtifactMarkdownInput): string[] {
   return [
     `- Format: ${format}`,
     input.theme ? `- Theme: ${inlineText(input.theme)}` : null,
+    input.cover ? `- Cover: ${inlineText(input.cover)}` : null,
     input.author ? `- Author: ${inlineText(input.author)}` : null,
     input.updatedBy ? `- Last edited by: ${inlineText(input.updatedBy)}` : null,
     `- Last updated: ${input.updatedAt.toISOString()}`,

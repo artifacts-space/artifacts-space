@@ -1,6 +1,5 @@
 import { sql } from "drizzle-orm";
 import {
-  boolean,
   check,
   index,
   integer,
@@ -29,134 +28,15 @@ import { artifactIconLimits } from "../lib/artifact-icon-limits";
 import type { StoredArtifactTheme } from "../lib/themes/artifact-theme";
 import { artifactThemeLimits } from "../lib/themes/artifact-theme-limits";
 import { artifactSizeLimits } from "../lib/artifact-limits";
+import { artifactCoverLimits } from "../lib/covers/limits";
 import { fileLimits, fileStatuses } from "../lib/files/config";
 import { projectLimits } from "../lib/projects/limits";
 import { tagLimits } from "../lib/tags/limits";
 
-// Better Auth tables. Column names follow Better Auth's core schema.
+import { team, user } from "./auth-schema";
 
-export const user = pgTable("user", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").notNull().default(false),
-  image: text("image"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  // Lowercase handle, unique across users. It is also the personal team's slug.
-  // Nullable only so that older code paths can never fail a sign-up; the app
-  // assigns one on first use.
-  username: text("username").unique(),
-  // False until the person keeps or picks their username once.
-  usernameConfirmed: boolean("username_confirmed").notNull().default(false),
-});
-
-export const session = pgTable(
-  "session",
-  {
-    id: text("id").primaryKey(),
-    expiresAt: timestamp("expires_at").notNull(),
-    token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-    ipAddress: text("ip_address"),
-    userAgent: text("user_agent"),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-    // Better Auth's organization plugin field `activeOrganizationId`.
-    activeTeamId: text("active_team_id"),
-  },
-  (table) => [index("session_user_idx").on(table.userId)],
-);
-
-export const account = pgTable(
-  "account",
-  {
-    id: text("id").primaryKey(),
-    accountId: text("account_id").notNull(),
-    providerId: text("provider_id").notNull(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-    accessToken: text("access_token"),
-    refreshToken: text("refresh_token"),
-    idToken: text("id_token"),
-    accessTokenExpiresAt: timestamp("access_token_expires_at"),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
-    scope: text("scope"),
-    password: text("password"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  },
-  (table) => [index("account_user_idx").on(table.userId)],
-);
-
-export const verification = pgTable(
-  "verification",
-  {
-    id: text("id").primaryKey(),
-    identifier: text("identifier").notNull(),
-    value: text("value").notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  },
-  (table) => [index("verification_identifier_idx").on(table.identifier)],
-);
-
-// Teams. Better Auth's organization plugin manages these three tables; the app
-// calls them teams everywhere. The adapter maps organization -> team,
-// member -> teamMember, and invitation -> teamInvitation (see src/lib/auth).
-
-export const team = pgTable(
-  "team",
-  {
-    id: text("id").primaryKey(),
-    name: text("name").notNull(),
-    slug: text("slug").notNull().unique(),
-    logo: text("logo"),
-    metadata: text("metadata"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    // Every user owns exactly one personal team. It approves its own sharing.
-    personal: boolean("personal").notNull().default(false),
-    // The team's sharing rule: does sharing with the team need an admin's approval?
-    teamSharingNeedsApproval: boolean("team_sharing_needs_approval").notNull().default(true),
-    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
-  },
-  (table) => [
-    uniqueIndex("team_personal_owner_idx").on(table.createdBy).where(sql`${table.personal}`),
-  ],
-);
-
-export const teamMember = pgTable(
-  "team_member",
-  {
-    id: text("id").primaryKey(),
-    teamId: text("team_id").notNull().references(() => team.id, { onDelete: "cascade" }),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-    role: text("role").notNull().default("member"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-  },
-  (table) => [
-    uniqueIndex("team_member_team_user_idx").on(table.teamId, table.userId),
-    index("team_member_user_idx").on(table.userId),
-  ],
-);
-
-export const teamInvitation = pgTable(
-  "team_invitation",
-  {
-    id: text("id").primaryKey(),
-    teamId: text("team_id").notNull().references(() => team.id, { onDelete: "cascade" }),
-    email: text("email").notNull(),
-    role: text("role"),
-    status: text("status").notNull().default("pending"),
-    expiresAt: timestamp("expires_at").notNull(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    inviterId: text("inviter_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  },
-  (table) => [
-    index("team_invitation_team_idx").on(table.teamId),
-    index("team_invitation_email_idx").on(table.email),
-  ],
-);
+// Accounts and teams live in auth-schema.ts; re-exported so every import keeps working.
+export * from "./auth-schema";
 
 export const artifact = pgTable(
   "artifact",
@@ -168,6 +48,8 @@ export const artifact = pgTable(
     icon: text("icon"),
     // Optional theme: a preset id (a JSON string) or theme JSON normalised by src/lib/themes. Null uses the default look.
     theme: jsonb("theme").$type<StoredArtifactTheme>(),
+    // Optional cover banner: a gradient id, or "file:<uuid>[@0-100]" (src/lib/covers). Null shows none.
+    cover: text("cover"),
     summary: text("summary").notNull().default(""),
     content: text("content").notNull(),
     kind: text("kind", { enum: artifactKinds }).notNull().default("markdown"),
@@ -214,6 +96,7 @@ export const artifact = pgTable(
     check("artifact_tags_count_check", sql`cardinality(${table.tags}) <= ${sql.raw(String(tagLimits.maxPerArtifact))}`),
     check("artifact_comments_check", sql`${table.comments} in ('off', 'team', 'signed_in')`),
     check("artifact_icon_length_check", sql`char_length(${table.icon}) <= ${sql.raw(String(artifactIconLimits.maxStoredChars))}`),
+    check("artifact_cover_length_check", sql`char_length(${table.cover}) <= ${sql.raw(String(artifactCoverLimits.maxStoredChars))}`),
     check("artifact_theme_size_check", sql`octet_length(${table.theme}::text) <= ${sql.raw(String(artifactThemeLimits.maxStoredBytes))}`),
     check("artifact_content_size_check", sql`octet_length(${table.content}) <= ${sql.raw(String(artifactSizeLimits.maxContentBytes))}`),
     // jsonb prints with extra spaces, so the backstop allows twice the app's limit.
@@ -236,6 +119,8 @@ export const artifactVersion = pgTable(
     icon: text("icon"),
     // The theme this version showed, versioned with the title and icon.
     theme: jsonb("theme").$type<StoredArtifactTheme>(),
+    // The cover this version showed, versioned with the title, icon, and theme.
+    cover: text("cover"),
     summary: text("summary").notNull().default(""),
     content: text("content").notNull(),
     kind: text("kind", { enum: artifactKinds }).notNull(),

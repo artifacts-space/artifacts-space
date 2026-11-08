@@ -19,6 +19,10 @@ export const kindFieldDescription = [
 export const ICON_GUIDE =
   'Any format can carry a page icon beside its title: set `icon` on artifacts_create or artifacts_update to one emoji (such as "🧪") or "tabler:<name>" (such as "tabler:rocket"; the field description lists every allowed name). Pass null or "" on update to remove it.';
 
+/** How agents set an artifact's cover, in any format. */
+export const COVER_GUIDE =
+  'Any format can carry a slim cover banner above it: set `cover` on artifacts_create or artifacts_update to a gradient id from themes_list (such as "mist"), or to "file:<file id>" for an uploaded image, with an optional `coverPosition` (0 top to 100 bottom). Pass null or "" on update to remove it.';
+
 /** How agents set an artifact's theme, in any format. */
 export const THEME_GUIDE =
   'Any format can carry a theme (colors, fonts, and corner radius for the artifact and the page behind it): set `theme` on artifacts_create or artifacts_update to a preset id from themes_list (such as "paper"), or to theme JSON (see /docs/themes). Pass null or "" on update to remove it.';
@@ -33,7 +37,7 @@ export function formatGuide(kind?: FormatKind): string {
   if (kind) return `${formatInfo[kind].label} (${kind}): ${formatInfo[kind].agent}`;
   const lines = artifactKinds.map((item) => `- ${item}: ${formatInfo[item].agent}`);
   const uiHint = (artifactKinds as readonly string[]).includes("ui") ? ['', 'For rich pages, call artifacts_formats_guide with kind "ui" to get the component reference and an example.'] : [];
-  return ["Artifact formats:", ...lines, ...uiHint, "", ICON_GUIDE, "", THEME_GUIDE].join("\n");
+  return ["Artifact formats:", ...lines, ...uiHint, "", ICON_GUIDE, "", THEME_GUIDE, "", COVER_GUIDE].join("\n");
 }
 
 /** Validation feedback for agents, in plain text. */

@@ -18,6 +18,7 @@ const artifactShape = `{
   "url": "https://artifacts.space/artifact/Vq3kJ0pXw2mZ8rT5yN1aBc",
   "title": "…", "icon": "🚀" | "tabler:rocket" | "file:<file id>" | null, "summary": "…", "content": "…",
   "theme": "paper" | { "version": 1, "light": { … }, "dark": { … }, … } | null,
+  "cover": "mist" | "file:<file id>" | null, "coverPosition": 40 | null,   // position for image covers only
   "kind": "markdown", "language": "", "project": "Billing" | "",   // "" when none, or when you are outside the team
   "tags": ["needs-review", "q4"],        // [] when none, or when you are outside the team
   "sessionId": "…", "source": "claude-code",
@@ -74,7 +75,7 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   artifacts_versions: {
     summary: "Without `version`: the saved versions, newest first. With `version`: that one version with its content, summary, and language.",
     shape: `[ { "id", "createdAt", "savedAt", "saveKind": "create" | "edit" | "files" | "restore" | "snapshot",
-    "restoredFromId", "bytes", "kind", "title", "icon", "theme", "approved", "pending", "latest",
+    "restoredFromId", "bytes", "kind", "title", "icon", "theme", "cover", "coverPosition", "approved", "pending", "latest",
     "savedBy": { "handle", "kind": "person" | "agent" } | null } ]`,
   },
   artifacts_restore_version: {
@@ -89,10 +90,11 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     shape: `Invalid ui content. Fix these and validate again:\n- Error: Element "chart" (Chart): Series "Signups" has 3 values but there are 4 labels. …`,
   },
   themes_list: {
-    summary: "The built-in theme presets, the font ids custom theme JSON may use in each slot, and a usage note. Nothing is saved.",
+    summary: "The built-in theme presets, the font ids custom theme JSON may use in each slot, the cover gradients, and usage notes. Nothing is saved.",
     shape: `{ "presets": [ { "id": "paper", "name": "Paper", "description": "…", "mode": "auto",
     "fonts": { "body": { "id": "work-sans", "family": "Work Sans" }, "heading": { … }, "mono": { … } } } ],
-  "customFonts": { "body": ["geist-sans", …], "heading": [ … ], "mono": [ … ] }, "usage": "…" }`,
+  "customFonts": { "body": ["geist-sans", …], "heading": [ … ], "mono": [ … ] }, "usage": "…",
+  "covers": { "gradients": [ { "id": "mist", "name": "Mist" }, … ], "usage": "…" } }`,
   },
   files_request_upload: {
     summary: "The pending file, a presigned PUT URL with the exact headers to send, a ready-made curl command, and the next step.",
