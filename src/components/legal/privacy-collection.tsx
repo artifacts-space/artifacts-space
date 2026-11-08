@@ -70,6 +70,7 @@ export function PrivacyCollection() {
           <li>
             <strong>View counts.</strong> When someone opens a public artifact, the page tells our server once that it was viewed, and which site linked to it. We keep, per artifact and per day, the number of views, the number of unique visitors, and the linking site&apos;s domain (never its full address). To count a visitor once a day, we make a keyed, one-way hash of the network address, browser user agent, and artifact, with a key that changes every day. We never store the address or the user agent, and we delete each day&apos;s hashes after that day ends, so nobody can be recognized from one day to the next or from one artifact to another. This uses no cookie and no local storage. Bots, and people who can edit the artifact, are not counted, and link, team, and private artifacts are not counted at all. Only the people and agents who can edit the artifact (its author and the team it is shared through) see the counts.
           </li>
+          <li><strong>Browser notifications.</strong> If you turn them on, we store each browser&apos;s push address and encryption keys, a label such as &quot;Chrome on macOS&quot; (not the full user agent), and when it was added and last notified. Signing out or removing the browser in Settings deletes them.</li>
           <li><strong>Abuse limits.</strong> To count requests for rate limits, we use a keyed, one-way hash of your network address. We do not store the raw address for this. Reports from signed-out readers keep the same hash instead of an account.</li>
           <li><strong>Server logs.</strong> Our host, Vercel, records each request (IP address, time, URL, status, and user agent) and keeps these logs for a limited time. Our own error logs leave out tokens and artifact content.</li>
         </ul>
@@ -87,7 +88,7 @@ export function PrivacyCollection() {
           Your browser also stores your theme choice (system, light, or dark) in local storage. We use no analytics, advertising, or tracking cookies, and no third-party analytics of any kind. That is why there is no cookie banner. Images in artifacts and comments load only from our own file storage, so a shared page cannot track its readers with outside images.
         </p>
         <p>
-          No outside service loads in your browser. Our fonts, Geist and Geist Mono, are served from artifacts.space itself.
+          No outside service loads in your browser. Our fonts, Geist and Geist Mono, are served from artifacts.space itself. If you turn on browser notifications, your browser registers with its own push service, and a small service worker from artifacts.space shows the notifications; it caches nothing.
         </p>
       </Prose>
 
@@ -98,6 +99,7 @@ export function PrivacyCollection() {
           <li><strong>Run the service:</strong> sign you in, store and show your artifacts, keep version history, apply your sharing and comment settings, and let your agents work over MCP.</li>
           <li><strong>Show authors their readers:</strong> tell the people who can edit a public artifact how many people read it, per day, and which sites linked to it, as counts only.</li>
           <li><strong>Send emails you need:</strong> sign-in links, team invitations, a note when someone @mentions you (with the artifact title and a link, never the comment text; you can turn it off in Settings), and report notices to team owners. We send no marketing email.</li>
+          <li><strong>Send the notifications you choose:</strong> in the app, and in your browser if you turn that on. A browser notification says who did what on which artifact, with a link and at most a short excerpt of the comment, and goes only to people who can still read the artifact.</li>
           <li><strong>Keep the service safe:</strong> enforce rate limits and storage quotas, stop spam and phishing, handle reports, and investigate abuse and security problems.</li>
           <li><strong>Fix and improve it:</strong> find errors and keep the service reliable, using logs and aggregate counts.</li>
           <li><strong>Meet legal duties:</strong> answer valid legal requests and enforce our <Link href={legalPaths.terms}>Terms</Link>.</li>
