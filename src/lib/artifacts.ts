@@ -28,7 +28,7 @@ import { defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { PREVIEW_CHARS, previewKinds } from "@/lib/artifact-preview";
 import { loadProjectFacets, projectFilterCondition, projectSearchCondition, projectsForViewer, type ProjectFacets, type ProjectFilter } from "@/lib/projects/queries";
 import { loadTagFacets, tagFilterCondition, tagSearchCondition, tagsForViewer, type TagFacet } from "@/lib/tags/queries";
-import { tagsForNewArtifact } from "@/lib/tags/store";
+import { assertRoomForNewTags, parseNewTags } from "@/lib/tags/store";
 import { projectChoiceSchema } from "@/lib/projects/rules";
 import { findOrCreateProject } from "@/lib/projects/store";
 import { checkContentFiles } from "@/lib/files/attach";
@@ -78,7 +78,7 @@ export const artifactInputSchema = artifactUpdateSchema
     language: artifactUpdateSchema.shape.language.default(""),
     // A project name, found or created among the author's projects; "" or null for none. Not part of updates: see src/lib/projects.
     project: projectChoiceSchema.optional().default(null),
-    // Tags, checked and normalized in tagsForNewArtifact. Not part of updates: see src/lib/tags.
+    // Tags, checked and normalized in parseNewTags. Not part of updates: see src/lib/tags.
     tags: z.array(z.string()).optional(),
     sessionId: artifactUpdateSchema.shape.sessionId.default(""),
     source: artifactUpdateSchema.shape.source.default(""),
@@ -265,7 +265,7 @@ export async function listArtifacts(viewerId: string, options: ListOptions = {})
   const search = await searchCondition(viewerId, scope, options.query);
   if (search) conditions.push(search);
   if (options.project) conditions.push(await projectFilterCondition(viewerId, scope, options.project));
-  if (options.tags && options.tags.length > 0) conditions.push(tagFilterCondition(options.tags));
+  if (options.tags && options.tags.length > 0) conditions.push(await tagFilterCondition(viewerId, options.tags));
 
   const rows = await getDb()
     .select({ ...artifactMetaColumns(), preview: previewColumn })
@@ -314,6 +314,7 @@ export async function findPublicIdByShareId(shareId: string) {
 /** Creates a private artifact for its author, within the hourly creation limit and the account's storage quota. */
 export async function createArtifact(userId: string, input: ArtifactInput) {
   const { project: projectName, tags: tagInput, ...parsed } = artifactInputSchema.parse(input);
+  const tags = parseNewTags(tagInput);
   assertArtifactSize(parsed);
   assertValidArtifactContent(parsed.kind, parsed.content);
   const contentFileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
@@ -321,7 +322,7 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
   await enforceRateLimit("artifactCreate", userId);
   await assertContentFits(userId, parsed.content);
   // New artifacts are private, so their project is among the author's own.
-  const tags = await tagsForNewArtifact(userId, tagInput);
+  await assertRoomForNewTags(userId, tags);
   const chosen = projectName ? await findOrCreateProject({ kind: "user", userId }, projectName, userId) : null;
   const [record] = await getDb()
     .insert(artifact)

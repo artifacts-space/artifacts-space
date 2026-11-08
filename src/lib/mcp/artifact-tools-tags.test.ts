@@ -87,7 +87,7 @@ describe("artifacts_update with tags", () => {
     data.getEditableArtifactDto.mockResolvedValue(dto(null, ["old"]));
     const result = await call("artifacts_update", { id: publicId, tags: ["Launch", "q4"] });
     expect(result.isError).toBe(false);
-    expect(data.setArtifactTags).toHaveBeenCalledWith("agent-1", "internal-1", { set: ["Launch", "q4"] });
+    expect(data.setArtifactTags).toHaveBeenCalledWith("agent-1", "internal-1", { set: ["launch", "q4"] });
     expect(data.updateArtifact).not.toHaveBeenCalled();
     expect(JSON.parse(result.text)).toMatchObject({ edit: "unchanged", artifact: { tags: ["launch", "q4"] } });
   });
@@ -101,6 +101,14 @@ describe("artifacts_update with tags", () => {
   it("should refuse tags together with addTags and change nothing", async () => {
     const result = await call("artifacts_update", { id: publicId, title: "New", tags: ["a"], addTags: ["b"] });
     expect(result.isError).toBe(true);
+    expect(data.updateArtifact).not.toHaveBeenCalled();
+    expect(data.setArtifactTags).not.toHaveBeenCalled();
+  });
+
+  it("should save nothing, content included, when a tag is too long", async () => {
+    const result = await call("artifacts_update", { id: publicId, content: "# New", tags: ["x".repeat(40)] });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain("1 to 32 characters");
     expect(data.updateArtifact).not.toHaveBeenCalled();
     expect(data.setArtifactTags).not.toHaveBeenCalled();
   });

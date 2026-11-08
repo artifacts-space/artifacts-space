@@ -12,16 +12,18 @@ import { tagLimits } from "./limits";
  * module boundary.
  */
 
-const state = vi.hoisted((): { db: unknown; editable: Record<string, unknown> | null } => ({ db: null, editable: null }));
+const state = vi.hoisted((): { db: unknown; editable: Record<string, unknown> | null; reads: Record<string, unknown>[] } => ({ db: null, editable: null, reads: [] }));
 const mocks = vi.hoisted(() => ({ enforceRateLimit: vi.fn(), recordArtifactSave: vi.fn(), scopeTagCount: vi.fn(), tagsInScope: vi.fn() }));
 
 vi.mock("@/db", () => ({ getDb: () => state.db }));
-vi.mock("@/lib/access", () => ({ getEditableArtifact: () => Promise.resolve(state.editable) }));
+// Each read returns the next queued row first (to stage a concurrent change), then the live row.
+vi.mock("@/lib/access", () => ({ getEditableArtifact: () => Promise.resolve(state.reads.shift() ?? state.editable) }));
 vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: mocks.enforceRateLimit }));
 vi.mock("@/lib/versions/service", () => ({ recordArtifactSave: mocks.recordArtifactSave }));
 vi.mock("./queries", () => ({ scopeTagCount: mocks.scopeTagCount, tagsInScope: mocks.tagsInScope, scopeTags: vi.fn() }));
 
-const { setArtifactTags, tagsForNewArtifact } = await import("./store");
+const { assertRoomForNewTags, parseNewTags, setArtifactTags } = await import("./store");
+const { checkTagChange } = await import("./rules");
 
 type Row = Record<string, unknown>;
 let tables: Map<unknown, Row[]>;
@@ -39,6 +41,7 @@ beforeEach(() => {
   state.db = fake.db;
   log = fake.log;
   state.editable = tables.get(artifact)?.[0] ?? null;
+  state.reads = [];
   mocks.scopeTagCount.mockResolvedValue(10);
   mocks.tagsInScope.mockResolvedValue(new Set());
 });
@@ -95,20 +98,46 @@ describe("setArtifactTags", () => {
     await expect(setArtifactTags("author", "a1", { set: ["infra", "launch"] })).resolves.toEqual(["infra", "launch"]);
   });
 
+  it("should keep a tag someone else added in between when tags are added", async () => {
+    const stale = { ...current(), tags: ["infra"] };
+    Object.assign(current() ?? {}, { tags: ["infra", "from-agent"] });
+    state.reads = [stale, stale];
+    await expect(setArtifactTags("author", "a1", { add: ["launch"], remove: [] })).resolves.toEqual(["infra", "from-agent", "launch"]);
+    expect(current()?.tags).toEqual(["infra", "from-agent", "launch"]);
+  });
+
+  it("should refuse and change nothing when other saves keep changing the tags", async () => {
+    const stale = { ...current(), tags: ["old"] };
+    state.reads = [stale, stale, stale, stale];
+    await expect(setArtifactTags("author", "a1", { set: ["launch"] })).rejects.toThrow("The tags changed just now");
+    expect(current()?.tags).toEqual(["infra"]);
+  });
+
   it("should count the change against the organize limit", async () => {
     await setArtifactTags("author", "a1", { set: [] });
     expect(mocks.enforceRateLimit).toHaveBeenCalledWith("organize", "author");
   });
 });
 
-describe("tagsForNewArtifact", () => {
-  it("should give no tags and check nothing when none are sent", async () => {
-    await expect(tagsForNewArtifact("author", undefined)).resolves.toEqual([]);
-    expect(mocks.tagsInScope).not.toHaveBeenCalled();
+describe("new artifact tags", () => {
+  it("should give no tags when none are sent", () => {
+    expect(parseNewTags(undefined)).toEqual([]);
+  });
+
+  it("should normalize tags and refuse too many before anything is saved", () => {
+    expect(parseNewTags(["Launch", "launch"])).toEqual(["launch"]);
+    expect(() => parseNewTags(Array.from({ length: tagLimits.maxPerArtifact + 1 }, (_, index) => `t${String(index)}`))).toThrow(UserFacingError);
   });
 
   it("should check new tags against the author's own space", async () => {
-    await expect(tagsForNewArtifact("author", ["Launch"])).resolves.toEqual(["launch"]);
+    await assertRoomForNewTags("author", ["launch"]);
     expect(mocks.tagsInScope).toHaveBeenCalledWith({ kind: "user", userId: "author" }, ["launch"]);
+  });
+});
+
+describe("checkTagChange", () => {
+  it("should refuse a tag past the length limit in addTags without reading the database", () => {
+    expect(() => checkTagChange({ add: ["x".repeat(tagLimits.maxChars + 1)], remove: [] })).toThrow(UserFacingError);
+    expect(log).toEqual([]);
   });
 });

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult } from "@/lib/artifact-types";
 import { tagLimits } from "@/lib/tags/limits";
@@ -18,6 +19,7 @@ import { UserFacingError } from "@/lib/user-facing-error";
 
 const idSchema = z.string().trim().min(1).max(200);
 const tagsSchema = z.array(z.string().max(tagLimits.maxChars * 4)).max(tagLimits.maxPerArtifact * 4);
+const changeSchema = z.object({ add: tagsSchema, remove: tagsSchema });
 
 const notFound = "Artifact not found, or you cannot edit it.";
 
@@ -31,6 +33,7 @@ async function requireUserId() {
 export async function listArtifactTagSuggestionsAction(artifactId: string): Promise<ActionResult<TagFacet[]>> {
   try {
     const userId = await requireUserId();
+    await enforceRateLimit("readByUser", userId);
     const suggestions = await listArtifactTagSuggestions(userId, idSchema.parse(artifactId));
     if (!suggestions) return { success: false, error: notFound };
     return { success: true, data: suggestions };
@@ -39,11 +42,14 @@ export async function listArtifactTagSuggestionsAction(artifactId: string): Prom
   }
 }
 
-/** Replaces an artifact's tags. Returns them as saved: normalized, without repeats. */
-export async function setArtifactTagsAction(artifactId: string, tags: string[]): Promise<ActionResult<string[]>> {
+/**
+ * Adds and removes some of an artifact's tags, keeping the rest as they are
+ * now (so tags an agent added meanwhile stay). Returns all its tags as saved.
+ */
+export async function changeArtifactTagsAction(artifactId: string, change: { add: string[]; remove: string[] }): Promise<ActionResult<string[]>> {
   try {
     const userId = await requireUserId();
-    const saved = await setArtifactTags(userId, idSchema.parse(artifactId), { set: tagsSchema.parse(tags) });
+    const saved = await setArtifactTags(userId, idSchema.parse(artifactId), changeSchema.parse(change));
     if (saved === undefined) return { success: false, error: notFound };
     revalidatePath("/app");
     return { success: true, data: saved };

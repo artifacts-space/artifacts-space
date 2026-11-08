@@ -1,4 +1,5 @@
 import type { TagFacet } from "@/lib/tags/queries";
+import { tagLimits } from "@/lib/tags/limits";
 import { normalizeTag } from "@/lib/tags/rules";
 
 /** The most suggestions shown under the tag input. */
@@ -18,9 +19,10 @@ export function suggestionsFor(all: readonly TagFacet[], typed: string, current:
   return [...starts, ...rest].slice(0, MAX_SUGGESTIONS).map((facet) => facet.tag);
 }
 
-/** The tags after adding what was typed, or null when it adds nothing (empty, or already there). */
-export function withTyped(current: readonly string[], typed: string): string[] | null {
-  const tag = normalizeTag(typed);
-  if (!tag || current.includes(tag)) return null;
-  return [...current, tag];
+/** What typed or pasted text adds: one tag per comma-separated part, or a message when a part is too long. */
+export function typedTags(current: readonly string[], typed: string): { add: string[] } | { error: string } {
+  const parts = typed.split(",").map(normalizeTag).filter((tag) => tag.length > 0);
+  if (parts.some((tag) => Array.from(tag).length > tagLimits.maxChars)) return { error: `Tags are 1 to ${String(tagLimits.maxChars)} characters.` };
+  const taken = new Set(current);
+  return { add: [...new Set(parts)].filter((tag) => !taken.has(tag)) };
 }

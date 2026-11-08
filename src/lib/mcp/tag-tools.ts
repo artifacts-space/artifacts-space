@@ -5,7 +5,7 @@ import type { McpAccess } from "@/lib/oauth/scopes";
 import { assertScopeAccess } from "@/lib/projects/manage";
 import { tagLimits } from "@/lib/tags/limits";
 import { scopeTags } from "@/lib/tags/queries";
-import { normalizeTag, type TagChange } from "@/lib/tags/rules";
+import { checkTagChange, normalizeTag, type TagChange } from "@/lib/tags/rules";
 import { setArtifactTags } from "@/lib/tags/store";
 import { UserFacingError } from "@/lib/user-facing-error";
 
@@ -44,13 +44,13 @@ export function tagFilterFor(tags: readonly string[] | undefined): string[] | un
   return normalized.length > 0 ? normalized : undefined;
 }
 
-/** The tag change an update asks for, or undefined when it sends no tag field. */
+/** The tag change an update asks for, checked before anything is saved; undefined when it sends no tag field. */
 export function tagChangeFor(input: { tags?: string[] | undefined; addTags?: string[] | undefined; removeTags?: string[] | undefined }): TagChange | undefined {
   const { tags, addTags, removeTags } = input;
   const adjusting = addTags !== undefined || removeTags !== undefined;
   if (tags !== undefined && adjusting) throw new UserFacingError("Send `tags` to replace every tag, or `addTags` and `removeTags` to change some. Not both.");
-  if (tags !== undefined) return { set: tags };
-  if (adjusting) return { add: addTags ?? [], remove: removeTags ?? [] };
+  if (tags !== undefined) return checkTagChange({ set: tags });
+  if (adjusting) return checkTagChange({ add: addTags ?? [], remove: removeTags ?? [] });
   return undefined;
 }
 

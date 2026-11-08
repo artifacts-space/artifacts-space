@@ -1,4 +1,6 @@
-import { z } from "zod";
+import { z, ZodError } from "zod";
+
+import { UserFacingError } from "@/lib/user-facing-error";
 
 import { tagLimits } from "./limits";
 
@@ -87,3 +89,24 @@ export function vocabularyWouldOverflow(size: number, adding: number): boolean {
 export function rowTags(tags: readonly string[], shown = 2): { visible: string[]; more: number } {
   return { visible: tags.slice(0, shown), more: Math.max(0, tags.length - shown) };
 }
+
+/** Runs a tag rule, turning a validation error into a message people and agents can act on. */
+export function parseTags<T>(rule: () => T): T {
+  try {
+    return rule();
+  } catch (error) {
+    if (error instanceof ZodError) throw new UserFacingError(error.issues[0]?.message ?? "Those tags are not valid.");
+    throw error;
+  }
+}
+
+/**
+ * Checks a tag change's own tags (length, count) before anything is saved,
+ * so a bad tag never leaves a half-applied update. Returns the change with
+ * its tags normalized.
+ */
+export function checkTagChange(change: TagChange): TagChange {
+  if ("set" in change) return { set: parseTags(() => applyTagChange([], change)) };
+  return { add: parseTags(() => tagListSchema.parse(change.add)), remove: parseTags(() => tagListSchema.parse(change.remove)) };
+}
+

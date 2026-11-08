@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { suggestionsFor, withTyped } from "./tag-suggestions";
+import { suggestionsFor, typedTags } from "./tag-suggestions";
 
 const scope = [
   { tag: "launch", count: 9 },
@@ -23,13 +23,17 @@ describe("suggestionsFor", () => {
   });
 });
 
-describe("withTyped", () => {
-  it("should add the normalized tag when it is new", () => {
-    expect(withTyped(["infra"], " Q4 Launch ")).toEqual(["infra", "q4-launch"]);
+describe("typedTags", () => {
+  it("should add one tag per comma-separated part when text is pasted", () => {
+    expect(typedTags(["infra"], "a, B c, infra, a")).toEqual({ add: ["a", "b-c"] });
   });
 
-  it("should add nothing when the tag is empty or already there", () => {
-    expect(withTyped(["infra"], " # ")).toBeNull();
-    expect(withTyped(["infra"], "INFRA")).toBeNull();
+  it("should add nothing when the text is empty or every tag is already there", () => {
+    expect(typedTags(["infra"], " # ")).toEqual({ add: [] });
+    expect(typedTags(["infra"], "INFRA")).toEqual({ add: [] });
+  });
+
+  it("should give a message instead when a part is too long", () => {
+    expect(typedTags([], `ok, ${"x".repeat(40)}`)).toEqual({ error: "Tags are 1 to 32 characters." });
   });
 });

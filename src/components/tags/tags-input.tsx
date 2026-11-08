@@ -3,12 +3,12 @@
 import { IconTag, IconX } from "@tabler/icons-react";
 import { useId, useRef, useState, useTransition } from "react";
 
-import { listArtifactTagSuggestionsAction, setArtifactTagsAction } from "@/app/(workspace)/app/tag-actions";
+import { changeArtifactTagsAction, listArtifactTagSuggestionsAction } from "@/app/(workspace)/app/tag-actions";
 import { tagLimits } from "@/lib/tags/limits";
 import type { TagFacet } from "@/lib/tags/queries";
 import { cn } from "@/lib/utils";
 
-import { suggestionsFor, withTyped } from "./tag-suggestions";
+import { suggestionsFor, typedTags } from "./tag-suggestions";
 
 interface TagsInputProps {
   /** The artifact's internal id. */
@@ -17,16 +17,27 @@ interface TagsInputProps {
   onChange: (tags: string[]) => void;
 }
 
-/** The scope's tags for suggestions, loaded once on first focus. Only the newest load may set them. */
+interface TagChange {
+  add: string[];
+  remove: string[];
+}
+
+/** The scope's tags for suggestions, loaded on first focus. Only the newest load may set them; a failed one tries again next time. */
 function useScopeTags(artifactId: string) {
   const [tags, setTags] = useState<TagFacet[]>([]);
   const request = useRef(0);
+  const loaded = useRef(false);
   const load = () => {
-    if (request.current > 0) return;
+    if (loaded.current) return;
+    loaded.current = true;
     const id = ++request.current;
     listArtifactTagSuggestionsAction(artifactId)
-      .then((result) => { if (id === request.current && result.success) setTags(result.data); })
-      .catch(() => undefined);
+      .then((result) => {
+        if (id !== request.current) return;
+        if (result.success) setTags(result.data);
+        else loaded.current = false;
+      })
+      .catch(() => { loaded.current = false; });
   };
   return { tags, load };
 }
@@ -75,17 +86,27 @@ function SuggestionList({ id, options, highlight, onPick }: SuggestionListProps)
   );
 }
 
-/** Saves a new tag set at once, showing it right away and putting the old one back if the save fails. */
+/**
+ * Saves tag changes at once. The change shows right away; the server applies
+ * it to the tags as they are then (keeping any an agent added meanwhile) and
+ * the saved set replaces the shown one. A failed save puts the old set back
+ * and says why.
+ */
 function useTagSave(artifactId: string, value: string[], onChange: (tags: string[]) => void) {
   const [shown, setShown] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  function save(next: string[]) {
+  // Saves run one after another; the shown set waits for the last one, so it never flashes back to an older set.
+  const inFlight = useRef(0);
+  const tags = shown ?? value;
+  function save(change: TagChange) {
     setError(null);
-    setShown(next);
+    setShown([...tags.filter((tag) => !change.remove.includes(tag)), ...change.add]);
+    inFlight.current += 1;
     startTransition(async () => {
-      const result = await setArtifactTagsAction(artifactId, next).catch(() => null);
-      setShown(null);
+      const result = await changeArtifactTagsAction(artifactId, change).catch(() => null);
+      inFlight.current -= 1;
+      if (inFlight.current === 0) setShown(null);
       if (!result?.success) {
         setError(result?.error ?? "The tags did not change. Try again.");
         return;
@@ -93,14 +114,14 @@ function useTagSave(artifactId: string, value: string[], onChange: (tags: string
       onChange(result.data);
     });
   }
-  return { tags: shown ?? value, error, pending, save, clearError: () => { setError(null); } };
+  return { tags, error, pending, save, showError: setError };
 }
 
 /**
- * The tags of an artifact: remove one with its ×, add one by typing and
- * pressing Enter or a comma, or pick one the space already uses. Saves at
- * once, without a version or approval. For the artifact's author and team
- * only.
+ * The tags of an artifact: remove one with its ×, add some by typing (commas
+ * separate tags) and pressing Enter or a comma, or pick one the space already
+ * uses. Saves at once, without a version or approval. For the artifact's
+ * author and team only.
  */
 export function TagsInput({ artifactId, value, onChange }: TagsInputProps) {
   const listId = useId();
@@ -108,51 +129,53 @@ export function TagsInput({ artifactId, value, onChange }: TagsInputProps) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(-1);
   const scope = useScopeTags(artifactId);
-  const { tags, error, pending, save, clearError } = useTagSave(artifactId, value, onChange);
+  const { tags, error, pending, save, showError } = useTagSave(artifactId, value, onChange);
   const options = open ? suggestionsFor(scope.tags, typed, tags) : [];
   const full = tags.length >= tagLimits.maxPerArtifact;
 
   function add(text: string) {
-    const next = withTyped(tags, text);
+    const result = typedTags(tags, text);
+    if ("error" in result) {
+      showError(result.error);
+      return;
+    }
     setTyped("");
     setHighlight(-1);
-    if (next) save(next);
+    if (result.add.length > 0) save({ add: result.add, remove: [] });
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    const handled = handleKey(event.key, { typed, tags, options, highlight, add, save, setHighlight, close: () => { setOpen(false); } });
-    if (handled) event.preventDefault();
+    // Removing waits for the last save, and a held Backspace never clears every tag.
+    if (event.key === "Backspace" && (pending || event.repeat)) return;
+    const context: KeyContext = { typed, tags, options, highlight, add, setHighlight, close: () => { setOpen(false); }, removeLast: (tag) => { save({ add: [], remove: [tag] }); } };
+    if (handleKey(event.key, context)) event.preventDefault();
   }
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1">
       <IconTag aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
       {tags.map((tag) => (
-        <TagChip key={tag} tag={tag} disabled={pending} onRemove={() => { save(tags.filter((item) => item !== tag)); }} />
+        <TagChip key={tag} tag={tag} disabled={pending} onRemove={() => { save({ add: [], remove: [tag] }); }} />
       ))}
-      {full ? (
-        <span className="text-xs text-muted-foreground">{tagLimits.maxPerArtifact} tags is the most an artifact can have.</span>
-      ) : (
-        <div className="relative">
-          <input
-            value={typed}
-            onChange={(event) => { setTyped(event.target.value); setOpen(true); setHighlight(-1); clearError(); }}
-            onFocus={() => { scope.load(); setOpen(true); }}
-            onBlur={() => { setOpen(false); }}
-            onKeyDown={onKeyDown}
-            placeholder={tags.length === 0 ? "Add tags" : "Add tag"}
-            aria-label="Add a tag"
-            role="combobox"
-            aria-expanded={options.length > 0}
-            aria-controls={listId}
-            aria-activedescendant={highlight >= 0 ? `${listId}-${String(highlight)}` : undefined}
-            aria-invalid={error ? true : undefined}
-            maxLength={tagLimits.maxChars * 2}
-            className="h-6 w-28 rounded-md bg-transparent px-1 text-base text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50 sm:text-sm"
-          />
-          {options.length > 0 ? <SuggestionList id={listId} options={options} highlight={highlight} onPick={add} /> : null}
-        </div>
-      )}
+      <div className="relative">
+        <input
+          value={typed}
+          onChange={(event) => { setTyped(event.target.value); setOpen(true); setHighlight(-1); showError(null); }}
+          onFocus={() => { scope.load(); setOpen(true); }}
+          onBlur={() => { setOpen(false); }}
+          onKeyDown={onKeyDown}
+          disabled={full}
+          placeholder={full ? `${String(tagLimits.maxPerArtifact)} tags is the most` : tags.length === 0 ? "Add tags" : "Add tag"}
+          aria-label="Add a tag"
+          role="combobox"
+          aria-expanded={options.length > 0}
+          aria-controls={listId}
+          aria-activedescendant={highlight >= 0 ? `${listId}-${String(highlight)}` : undefined}
+          aria-invalid={error ? true : undefined}
+          className="h-6 w-32 rounded-md bg-transparent px-1 text-base text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed sm:text-sm"
+        />
+        {options.length > 0 ? <SuggestionList id={listId} options={options} highlight={highlight} onPick={add} /> : null}
+      </div>
       {error ? <p role="alert" className="w-full text-xs text-destructive">{error}</p> : null}
     </div>
   );
@@ -164,9 +187,9 @@ interface KeyContext {
   options: string[];
   highlight: number;
   add: (text: string) => void;
-  save: (tags: string[]) => void;
   setHighlight: (index: number) => void;
   close: () => void;
+  removeLast: (tag: string) => void;
 }
 
 const keyHandlers: Record<string, (context: KeyContext) => boolean> = {
@@ -182,13 +205,16 @@ const keyHandlers: Record<string, (context: KeyContext) => boolean> = {
     setHighlight(highlight <= 0 ? options.length - 1 : highlight - 1);
     return true;
   },
-  Escape: ({ close }) => {
+  // Only closes an open list, so Escape still reaches a dialog or sheet around the input.
+  Escape: ({ options, close }) => {
+    if (options.length === 0) return false;
     close();
     return true;
   },
-  Backspace: ({ typed, tags, save }) => {
-    if (typed !== "" || tags.length === 0) return false;
-    save(tags.slice(0, -1));
+  Backspace: ({ typed, tags, removeLast }) => {
+    const last = tags.at(-1);
+    if (typed !== "" || last === undefined) return false;
+    removeLast(last);
     return true;
   },
 };

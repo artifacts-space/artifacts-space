@@ -1,5 +1,4 @@
-import { eq } from "drizzle-orm";
-import { ZodError } from "zod";
+import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact } from "@/db/schema";
@@ -10,7 +9,7 @@ import { loadHomeScope } from "@/lib/projects/scope";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { tagLimits } from "./limits";
-import { applyTagChange, newTags, vocabularyWouldOverflow, type TagChange } from "./rules";
+import { applyTagChange, checkTagChange, newTags, parseTags, vocabularyWouldOverflow, type TagChange } from "./rules";
 import { scopeTagCount, scopeTags, tagsInScope, type TagFacet } from "./queries";
 
 /**
@@ -19,16 +18,6 @@ import { scopeTagCount, scopeTags, tagsInScope, type TagFacet } from "./queries"
  * own, or one shared team's) has a runaway cap on how many different tags
  * it uses.
  */
-
-/** Runs a tag rule, turning a validation error into a message people and agents can act on. */
-function parseTags<T>(rule: () => T): T {
-  try {
-    return rule();
-  } catch (error) {
-    if (error instanceof ZodError) throw new UserFacingError(error.issues[0]?.message ?? "Those tags are not valid.");
-    throw error;
-  }
-}
 
 /** Refuses tags new to the scope when they would take it past its cap. */
 async function assertRoomForTags(scope: ProjectScope, candidates: readonly string[]): Promise<void> {
@@ -41,12 +30,38 @@ async function assertRoomForTags(scope: ProjectScope, candidates: readonly strin
   }
 }
 
-/** Tags for a new, private artifact: normalized, capped, and within the author's tag cap. */
-export async function tagsForNewArtifact(userId: string, tags: readonly string[] | undefined): Promise<string[]> {
+/** A new artifact's tags, normalized and checked, without touching the database. */
+export function parseNewTags(tags: readonly string[] | undefined): string[] {
   if (!tags || tags.length === 0) return [];
-  const next = parseTags(() => applyTagChange([], { set: [...tags] }));
-  await assertRoomForTags({ kind: "user", userId }, next);
-  return next;
+  return parseTags(() => applyTagChange([], { set: [...tags] }));
+}
+
+/** Refuses a new, private artifact's tags when they would take the author past their tag cap. */
+export async function assertRoomForNewTags(userId: string, tags: readonly string[]): Promise<void> {
+  await assertRoomForTags({ kind: "user", userId }, tags);
+}
+
+/** Tries before giving up when other saves keep changing the tags in between. */
+const WRITE_ATTEMPTS = 3;
+
+/**
+ * Applies a change to the tags as they are now. The write lands only if
+ * nobody changed the tags since they were read, so two people (or an agent
+ * and a person) adding tags at once never drop each other's. Returns the
+ * new tags, undefined when the artifact is gone or no longer editable, or
+ * null when other saves kept winning.
+ */
+async function writeTags(editorId: string, artifactId: string, change: TagChange): Promise<string[] | null | undefined> {
+  const record = await getEditableArtifact(editorId, { id: artifactId });
+  if (!record) return undefined;
+  const next = parseTags(() => applyTagChange(record.tags, change));
+  await assertRoomForTags(await loadHomeScope(record), newTags(next, new Set(record.tags)));
+  const written = await getDb()
+    .update(artifact)
+    .set({ tags: next })
+    .where(and(eq(artifact.id, record.id), eq(artifact.tags, record.tags)))
+    .returning();
+  return written.length > 0 ? next : null;
 }
 
 /**
@@ -56,14 +71,14 @@ export async function tagsForNewArtifact(userId: string, tags: readonly string[]
  * version.
  */
 export async function setArtifactTags(editorId: string, artifactId: string, change: TagChange): Promise<string[] | undefined> {
-  const record = await getEditableArtifact(editorId, { id: artifactId });
-  if (!record) return undefined;
+  const checked = checkTagChange(change);
+  if (!(await getEditableArtifact(editorId, { id: artifactId }))) return undefined;
   await enforceRateLimit("organize", editorId);
-  const next = parseTags(() => applyTagChange(record.tags, change));
-  const current = new Set(record.tags);
-  await assertRoomForTags(await loadHomeScope(record), newTags(next, current));
-  await getDb().update(artifact).set({ tags: next }).where(eq(artifact.id, record.id));
-  return next;
+  for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt += 1) {
+    const result = await writeTags(editorId, artifactId, checked);
+    if (result !== null) return result;
+  }
+  throw new UserFacingError("The tags changed just now. Try again.");
 }
 
 /** The tags an artifact's editors can pick from: those its home scope uses. Undefined when they may not edit it. */

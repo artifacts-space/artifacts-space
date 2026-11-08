@@ -47,49 +47,60 @@ export function homeScopeCondition(scope: ProjectScope): SQL {
   return must(and(eq(artifact.userId, scope.userId), or(eq(artifact.visibility, "private"), isNull(artifact.teamId), inArray(artifact.teamId, personalTeams))));
 }
 
-/** SQL for the tag filter: artifacts that carry every one of the tags. */
-export function tagFilterCondition(tags: readonly string[]): SQL {
-  return arrayContains(artifact.tags, [...tags]);
+/** SQL for the tag filter: artifacts that carry every one of the tags, among those whose tags the viewer may see. */
+export async function tagFilterCondition(viewerId: string, tags: readonly string[]): Promise<SQL> {
+  return must(and(arrayContains(artifact.tags, [...tags]), await tagsVisibleCondition(viewerId)));
 }
 
 /** SQL matching artifacts with a tag containing the pattern, among those whose tags the viewer may see. */
 export async function tagSearchCondition(viewerId: string, pattern: string): Promise<SQL> {
-  return must(and(await tagsVisibleCondition(viewerId), sql`array_to_string(${artifact.tags}, ' ') ilike ${pattern}`));
+  return must(and(await tagsVisibleCondition(viewerId), sql`array_to_string(${artifact.tags}, E'\\n') ilike ${pattern}`));
 }
 
-/** Tags with their counts among the artifacts matching `condition`, most used first. */
-async function countTags(condition: SQL, limit: number): Promise<TagFacet[]> {
-  const db = getDb();
-  const tagged = db.select({ tag: sql<string>`unnest(${artifact.tags})`.as("tag") }).from(artifact).where(condition).as("tagged");
+/** Every tag use among the artifacts matching `condition`, one row per artifact and tag. */
+function tagUses(condition: SQL) {
+  return getDb().select({ tag: sql<string>`unnest(${artifact.tags})`.as("tag") }).from(artifact).where(condition).as("tagged");
+}
+
+/** The query for tags with their counts among the artifacts matching `condition`, most used first. Exported for SQL tests. */
+export function tagCountsQuery(condition: SQL, limit: number) {
+  const tagged = tagUses(condition);
   const uses = count();
-  const rows = await db.select({ tag: tagged.tag, count: uses }).from(tagged).groupBy(tagged.tag).orderBy(desc(uses), tagged.tag).limit(limit);
-  return rows.map((row) => ({ tag: row.tag, count: row.count }));
+  return getDb().select({ tag: tagged.tag, count: uses }).from(tagged).groupBy(tagged.tag).orderBy(desc(uses), tagged.tag).limit(limit);
+}
+
+/** The query for how many different tags the artifacts matching `condition` use. Exported for SQL tests. */
+export function distinctTagCountQuery(condition: SQL) {
+  const tagged = tagUses(condition);
+  return getDb().select({ total: sql<number>`count(distinct ${tagged.tag})`.mapWith(Number) }).from(tagged);
+}
+
+/** The query for which of these tags the artifacts matching `condition` already use. Exported for SQL tests. */
+export function knownTagsQuery(condition: SQL, tags: readonly string[]) {
+  const tagged = tagUses(condition);
+  return getDb().selectDistinct({ tag: tagged.tag }).from(tagged).where(inArray(tagged.tag, [...tags]));
 }
 
 /** The tag filter's entries for a list (`listCondition` is its scope condition), counted over every artifact in it. */
 export async function loadTagFacets(viewerId: string, listCondition: SQL): Promise<TagFacet[]> {
-  return countTags(must(and(listCondition, await tagsVisibleCondition(viewerId))), FACET_LIMIT);
+  return tagCountsQuery(must(and(listCondition, await tagsVisibleCondition(viewerId))), FACET_LIMIT);
 }
 
 /** A scope's tags, most used first, for suggestions. The caller checks the viewer may use the scope. */
 export async function scopeTags(scope: ProjectScope): Promise<TagFacet[]> {
-  return countTags(homeScopeCondition(scope), FACET_LIMIT);
+  return tagCountsQuery(homeScopeCondition(scope), FACET_LIMIT);
 }
 
 /** How many different tags a scope's artifacts use, for the runaway cap. */
 export async function scopeTagCount(scope: ProjectScope): Promise<number> {
-  const db = getDb();
-  const tagged = db.select({ tag: sql<string>`unnest(${artifact.tags})`.as("tag") }).from(artifact).where(homeScopeCondition(scope)).as("tagged");
-  const [row] = await db.select({ total: sql<number>`count(distinct ${tagged.tag})`.mapWith(Number) }).from(tagged);
+  const [row] = await distinctTagCountQuery(homeScopeCondition(scope));
   return row?.total ?? 0;
 }
 
-/** Whether a scope already uses each of these tags. */
+/** Which of these tags a scope already uses. */
 export async function tagsInScope(scope: ProjectScope, tags: readonly string[]): Promise<Set<string>> {
   if (tags.length === 0) return new Set();
-  const db = getDb();
-  const tagged = db.select({ tag: sql<string>`unnest(${artifact.tags})`.as("tag") }).from(artifact).where(homeScopeCondition(scope)).as("tagged");
-  const rows = await db.selectDistinct({ tag: tagged.tag }).from(tagged).where(inArray(tagged.tag, [...tags]));
+  const rows = await knownTagsQuery(homeScopeCondition(scope), tags);
   return new Set(rows.map((row) => row.tag));
 }
 

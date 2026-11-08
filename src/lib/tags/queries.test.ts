@@ -21,7 +21,7 @@ vi.mock("@/lib/projects/scope", async (importOriginal) => ({
   sharedTeamIdsFor: () => Promise.resolve(teams.ids),
 }));
 
-const { homeScopeCondition, tagFilterCondition, tagSearchCondition, tagsForViewer, tagsVisibleCondition } = await import("./queries");
+const { distinctTagCountQuery, homeScopeCondition, knownTagsQuery, tagCountsQuery, tagFilterCondition, tagSearchCondition, tagsForViewer, tagsVisibleCondition } = await import("./queries");
 
 function listSql(condition: Parameters<typeof and>[0]) {
   return db.select({ id: artifact.id }).from(artifact).where(and(eq(artifact.userId, "viewer-1"), condition)).toSQL();
@@ -65,9 +65,11 @@ describe("homeScopeCondition", () => {
 });
 
 describe("tagFilterCondition", () => {
-  it("should need every tag when several are chosen", () => {
-    const { sql, params } = listSql(tagFilterCondition(["launch", "q4"]));
+  it("should need every tag and keep to artifacts whose tags the viewer may see when several are chosen", async () => {
+    teams.ids = new Set();
+    const { sql, params } = listSql(await tagFilterCondition("viewer-1", ["launch", "q4"]));
     expect(sql).toContain('"tags" @> $');
+    expect(params.filter((value) => value === "viewer-1")).toHaveLength(2);
     expect(params).toContain('{"launch","q4"}');
   });
 });
@@ -76,8 +78,28 @@ describe("tagSearchCondition", () => {
   it("should search tags only among artifacts whose tags the viewer may see", async () => {
     teams.ids = new Set();
     const { sql, params } = listSql(await tagSearchCondition("viewer-1", "%lau%"));
-    expect(sql).toContain("array_to_string(\"artifact\".\"tags\", ' ') ilike $");
+    expect(sql).toContain("array_to_string(\"artifact\".\"tags\", E'\\n') ilike $");
     expect(params).toEqual(["viewer-1", "viewer-1", "%lau%"]);
+  });
+});
+
+describe("tag count queries", () => {
+  const scope = homeScopeCondition({ kind: "team", teamId: "team-b" });
+
+  it("should count tag uses from the scope's artifacts only, most used first", () => {
+    const { sql, params } = tagCountsQuery(scope, 200).toSQL();
+    expect(sql).toMatch(/from \(select unnest\("tags"\) as "tag" from "artifact" where/);
+    expect(sql).toContain('group by "tag" order by count(*) desc');
+    expect(params).toEqual(expect.arrayContaining(["team-b", "private", 200]));
+    expect(sql).not.toMatch(selfCompare);
+  });
+
+  it("should count distinct tags and look up known ones inside the same scope", () => {
+    expect(distinctTagCountQuery(scope).toSQL().sql).toContain('count(distinct "tag")');
+    const known = knownTagsQuery(scope, ["launch"]).toSQL();
+    expect(known.sql).toMatch(/select distinct "tag" from \(select unnest/);
+    expect(known.params).toEqual(expect.arrayContaining(["team-b", "launch"]));
+    expect(known.sql).not.toMatch(selfCompare);
   });
 });
 
