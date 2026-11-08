@@ -4,6 +4,7 @@
  * runaway-only: generous for real work (about one request a second for a
  * person), and they stop runaway agents and scripted abuse. Never ration.
  */
+const quarterHour = 900;
 const hour = 3600;
 const day = 86_400;
 
@@ -30,8 +31,14 @@ export const rateLimits = {
   sharingRequest: { limit: 30, windowSeconds: hour },
   /** Reports per signed-in user per hour. */
   reportByUser: { limit: 10, windowSeconds: hour },
-  /** Reports per network address per hour, signed in or not. */
-  reportByNetwork: { limit: 5, windowSeconds: hour },
+  /**
+   * Reports per network address, signed in or not. A short window, so readers
+   * behind one shared address (an office, a school, mobile carrier NAT) wait
+   * minutes, not an hour: at most about 40 an hour from one address.
+   */
+  reportByNetwork: { limit: 10, windowSeconds: quarterHour },
+  /** Reports about one artifact per network address per hour. Each report emails the team's owners. */
+  reportByNetworkArtifact: { limit: 3, windowSeconds: hour },
   /** Started file uploads per user per hour, from the web app and MCP together. */
   fileUpload: { limit: 200, windowSeconds: hour },
   /** Comments per agent per minute and per hour. Agents are stricter, to stop runaway loops. */
@@ -44,8 +51,13 @@ export const rateLimits = {
   teamInviteByUserHour: { limit: 20, windowSeconds: hour },
   teamInviteByUserDay: { limit: 50, windowSeconds: day },
   teamInviteByTeamDay: { limit: 100, windowSeconds: day },
-  /** Sign-in links per network address and per email address per hour. Each one sends an email. */
-  magicLinkByNetwork: { limit: 10, windowSeconds: hour },
+  /**
+   * Sign-in links per network address, in a short window so many people
+   * behind one shared address can sign in (at most about 100 an hour), and a
+   * refused network waits minutes, not an hour. Each one sends an email.
+   */
+  magicLinkByNetwork: { limit: 25, windowSeconds: quarterHour },
+  /** Sign-in links per email address per hour, from any network, so nobody can flood one inbox. */
   magicLinkByEmail: { limit: 5, windowSeconds: hour },
   /** New teams, agents, and access tokens per person per hour. Each agent gets its own limits, so agents are capped too. */
   teamCreate: { limit: 10, windowSeconds: hour },
@@ -74,7 +86,8 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   ogImageByNetwork: "Your network has loaded a lot of artifact preview images in the last hour.",
   sharingRequest: "You have changed sharing a lot in the last hour.",
   reportByUser: "You have sent a lot of reports in the last hour.",
-  reportByNetwork: "We have received a lot of reports from your network in the last hour.",
+  reportByNetwork: "We have received a lot of reports from your network in the last few minutes.",
+  reportByNetworkArtifact: "We have received a lot of reports about this artifact from your network in the last hour.",
   fileUpload: "You have uploaded a lot of files in the last hour.",
   agentCommentMinute: "You have posted a lot of comments in the last minute.",
   agentCommentHour: "You have posted a lot of comments in the last hour.",
@@ -83,7 +96,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   teamInviteByUserHour: "You have sent a lot of invitations in the last hour.",
   teamInviteByUserDay: "You have sent a lot of invitations today.",
   teamInviteByTeamDay: "This team has sent a lot of invitations today.",
-  magicLinkByNetwork: "Your network has asked for a lot of sign-in links in the last hour.",
+  magicLinkByNetwork: "Your network has asked for a lot of sign-in links in the last few minutes.",
   magicLinkByEmail: "This email address has asked for a lot of sign-in links in the last hour.",
   teamCreate: "You have created a lot of teams in the last hour.",
   agentCreate: "You have added a lot of agents in the last hour.",

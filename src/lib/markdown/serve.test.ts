@@ -79,6 +79,8 @@ const commentView = { id: "c1", parentId: null, body: "Visible comment body", de
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("BETTER_AUTH_URL", "https://artifacts.space");
+  // Network keys need a secret to hash with (src/lib/abuse/network-key.ts).
+  vi.stubEnv("BETTER_AUTH_SECRET", "test-network-key-secret");
   mocks.hitRateLimits.mockResolvedValue(null);
   mocks.getSession.mockResolvedValue(null);
   mocks.filesForViewer.mockResolvedValue([]);

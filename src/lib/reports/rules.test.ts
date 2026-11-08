@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isReportable, parseReportInput, REPORT_DETAILS_MAX_LENGTH } from "./rules";
+import { isReportable, parseReportInput, REPORT_DETAILS_MAX_LENGTH, reportLimitChecks } from "./rules";
 
 describe("parseReportInput", () => {
   it("should accept a reason without details when details are left out", () => {
@@ -34,5 +34,26 @@ describe("isReportable", () => {
   it("should refuse reports when an artifact is private or team-only", () => {
     expect(isReportable("private")).toBe(false);
     expect(isReportable("team")).toBe(false);
+  });
+});
+
+describe("reportLimitChecks", () => {
+  it("should count the artifact from this network, then the network, then the reader when the reader is signed in", () => {
+    const checks = reportLimitChecks({ networkKey: "net", artifactId: "art-1", viewerId: "user-1" });
+    expect(checks).toEqual([
+      { name: "reportByNetworkArtifact", subject: "net:art-1" },
+      { name: "reportByNetwork", subject: "net" },
+      { name: "reportByUser", subject: "user-1" },
+    ]);
+  });
+
+  it("should still count the network limits when the reader is signed out", () => {
+    expect(reportLimitChecks({ networkKey: "net", artifactId: "art-1", viewerId: null }).map((check) => check.name)).toEqual(["reportByNetworkArtifact", "reportByNetwork"]);
+  });
+
+  it("should key the per-artifact limit on both network and artifact when two artifacts are reported", () => {
+    const [first] = reportLimitChecks({ networkKey: "net", artifactId: "art-1", viewerId: null });
+    const [second] = reportLimitChecks({ networkKey: "net", artifactId: "art-2", viewerId: null });
+    expect(first?.subject).not.toBe(second?.subject);
   });
 });
