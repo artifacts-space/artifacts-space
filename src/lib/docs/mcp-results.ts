@@ -82,6 +82,11 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     summary: "Confirms the restore. The old version comes back as a new save; history is never rewritten.",
     shape: `{ "id": "…", "restoredFrom": "<version id>", "edit": "applied" | "pending", "updatedAt": "…" }`,
   },
+  artifacts_views: {
+    summary: "Views and daily unique visitors over the range, one entry per day (oldest first, zeros included), and the top referring domains. `counting` is false unless the artifact is public.",
+    shape: `{ "id": "…", "days": 30, "counting": true, "totals": { "views": 120, "visitors": 87 },
+  "daily": [ { "day": "2026-11-08", "views": 4, "visitors": 3 }, … ], "referrers": [ { "domain": "news.ycombinator.com", "views": 40 } ] }`,
+  },
   artifacts_formats_guide: {
     summary: "Plain text. Without `kind`, one line per format. With `kind: \"ui\"`, the full JSON Render guide: rules, every component and its props, and an example spec.",
   },

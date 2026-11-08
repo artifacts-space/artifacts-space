@@ -23,6 +23,7 @@ import { LegalLinks } from "@/components/legal-links";
 import { Logo } from "@/components/logo";
 import { PixelAvatar, type AvatarKind } from "@/components/pixel-avatar";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { ViewBeacon } from "@/components/views/view-beacon";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
 import { canSeeComments } from "@/lib/comments/setting-rules";
 import { filesForViewer } from "@/lib/files/download";
@@ -45,6 +46,7 @@ import { noThemeChoices, type ThemeChoices } from "@/lib/themes/theme-choice-typ
 import { artifactThemeChoices } from "@/lib/themes/theme-choices";
 import { lockedMode } from "@/lib/themes/style";
 import { cn } from "@/lib/utils";
+import { countsViews } from "@/lib/views/view-rules";
 import { visibilityCopy, type VisibilityCopy } from "@/lib/visibility-copy";
 
 export const instant = false;
@@ -289,6 +291,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
           {session && seesComments(viewable, session.user.id) ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" raised /> : null}
         </main>
       </ThemeBackdrop>
+      {/* Cookieless view count for the author; people who can edit are never counted (the server checks too). */}
+      {countsViews(record.visibility) && !viewable.canEdit ? <ViewBeacon publicId={record.publicId} /> : null}
       <footer className="border-t">
         <div className={cn("mx-auto flex w-full flex-wrap items-center justify-between gap-4 py-6 text-sm text-muted-foreground", column)}>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">

@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z, ZodError } from "zod";
 
 import { getEditableArtifact } from "@/lib/access";
+import { findDeletableArtifact } from "@/lib/agents/owner-access";
 import { ICON_FIELD_DESCRIPTION, isAcceptedIconInput, ICON_RULE_MESSAGE } from "@/lib/artifact-icons";
 import { artifactIconLimits } from "@/lib/artifact-icon-limits";
 import { loadArtifactForViewer } from "@/lib/artifact-read";
@@ -10,7 +11,6 @@ import {
   createArtifact,
   deleteArtifact,
   getEditableArtifactDto,
-  getOwnArtifactByPublicId,
   listArtifacts,
   updateArtifact,
   type ArtifactScope,
@@ -166,7 +166,7 @@ function failed(error: unknown, fallback: string): ChangeStatus {
   return { status: "failed", error: error instanceof UserFacingError ? error.message : fallback };
 }
 
-/** A sharing change that carries the comments setting. Only the author shares. */
+/** A sharing change that carries the comments setting. Only the author, or the person who added the agent that wrote it, shares. */
 async function shareWithComments(userId: string, saved: ArtifactDto, teams: TeamMembership[], ask: SharingAsk & { visibility: ArtifactVisibility }) {
   try {
     const teamId = ask.team ? teamBySlug(teams, ask.team).id : null;
@@ -197,12 +197,6 @@ async function shareAfterSave(userId: string, saved: ArtifactDto, teams: TeamMem
   if (visibility) return shareWithComments(userId, saved, teams, { ...ask, visibility });
   if (ask.comments) return changeComments(userId, saved, ask.comments);
   return { artifact: saved, sharing: null, comments: null };
-}
-
-async function ownByPublicId(userId: string, publicId: string) {
-  const record = await getOwnArtifactByPublicId(userId, publicId);
-  if (!record) throw new UserFacingError("Artifact not found, or you are not its author.");
-  return record;
 }
 
 /** An artifact the caller may edit: their own, or one shared through their team. */
@@ -262,7 +256,7 @@ function registerReadTools(server: ToolServer, userId: string) {
     {
       title: "List artifacts",
       description:
-        "List and search artifacts by title, summary, content, project name, or tag, or only those in one `project` or with every one of `tags`. scope \"mine\" (default) lists yours; a team slug lists what is shared with that team. Items have no content: text formats carry a short `preview` (the first 280 characters), others none. Call artifacts_get with an id to read the full content.",
+        "List and search artifacts by title, summary, content, project name, or tag, or only those in one `project` or with every one of `tags`. scope \"mine\" (default) lists yours, and those of agents you added; a team slug lists what is shared with that team. Items have no content: text formats carry a short `preview` (the first 280 characters), others none. Call artifacts_get with an id to read the full content.",
       inputSchema: {
         query: z.string().max(300).optional().describe("Text to find in artifacts"),
         project: z.string().max(projectLimits.maxNameChars * 2).optional().describe("Only artifacts in this project (name, any case)"),
@@ -331,7 +325,7 @@ function registerWriteTools(server: ToolServer, userId: string) {
     {
       title: "Update artifact",
       description:
-        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). `project`, tags, and `fullWidth` apply at once, file no version, and never wait for approval; when you send only those, sharing, or comments, `edit` is \"unchanged\". Only the author can set visibility, which requests sharing through the team's rule. The author (and the team's owners and admins) can set `comments`. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved. Edits are limited per hour (generously); a limit error says when to try again.",
+        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). `project`, tags, and `fullWidth` apply at once, file no version, and never wait for approval; when you send only those, sharing, or comments, `edit` is \"unchanged\". Only the author (or the person who added the agent that wrote it) can set visibility, which requests sharing through the team's rule. The author (and the team's owners and admins) can set `comments`. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved. Edits are limited per hour (generously); a limit error says when to try again.",
       inputSchema: {
         id: publicIdField,
         ...editableFields,
@@ -363,11 +357,12 @@ function registerWriteTools(server: ToolServer, userId: string) {
     "artifacts_delete",
     {
       title: "Delete artifact",
-      description: "Permanently delete your own artifact by id.",
+      description: "Permanently delete an artifact by id: your own, or one written by an agent you added.",
       inputSchema: { id: publicIdField },
     },
     ({ id }) => respond(async () => {
-      const record = await ownByPublicId(userId, id);
+      const record = await findDeletableArtifact(userId, { publicId: id });
+      if (!record) throw new UserFacingError("Artifact not found, or you cannot delete it. You can delete your own artifacts and those of agents you added.");
       await deleteArtifact(userId, record.id);
       return { deleted: true, id };
     }),
@@ -377,7 +372,8 @@ function registerWriteTools(server: ToolServer, userId: string) {
 /**
  * Registers the artifact and team tools. Every read goes through the access
  * check (getViewableArtifact or listArtifacts). Updates go through the edit
- * check (getEditableArtifact); deleting and sharing are author-only, and
+ * check (getEditableArtifact); deleting and sharing are for the author or
+ * the person who added the agent that wrote it, and
  * sharing goes through requestArtifactSharing as an agent, so it can wait for
  * approval but never approve. Write tools are left out for read-only access.
  */

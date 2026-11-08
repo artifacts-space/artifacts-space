@@ -1,9 +1,11 @@
 import { and, eq, exists, ne, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { cache } from "react";
 
 import { getDb } from "@/db";
-import { artifact, artifactVersion, sharingRequest, team, teamMember, type ArtifactRecord } from "@/db/schema";
-import { canEditArtifact, canViewArtifact } from "@/lib/access-rules";
+import { agent, artifact, artifactVersion, sharingRequest, team, teamMember, type ArtifactRecord } from "@/db/schema";
+import { canEditArtifact, canViewArtifact, isAuthorOrActsFor } from "@/lib/access-rules";
+import { actsForAuthor } from "@/lib/agents/owner-access";
 import { artifactContentColumn, artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { isPublicId } from "@/lib/public-id";
@@ -74,6 +76,8 @@ export interface ArtifactAccess {
   canEdit: boolean;
   /** Whether the viewer belongs to the artifact's team. Pages show the team's name only then. */
   isTeamMember: boolean;
+  /** Whether the viewer added the agent that wrote it (and is still in its team), so they share it as its author would. */
+  actsForAuthor: boolean;
 }
 
 /** An artifact the viewer may read, with its content. */
@@ -104,9 +108,11 @@ async function teamContext(viewerId: string | null, teamId: string | null) {
 /** Whether `editorId` may save changes to this artifact. See canEditArtifact. */
 export async function canEditRecord(editorId: string, record: ArtifactRecord): Promise<boolean> {
   if (record.userId === editorId) return true;
-  if (record.visibility === "private") return false;
-  const context = await teamContext(editorId, record.teamId);
-  return canEditArtifact({ ...record, teamPersonal: context.teamPersonal }, { userId: editorId, isTeamMember: context.isTeamMember });
+  if (record.visibility !== "private") {
+    const context = await teamContext(editorId, record.teamId);
+    if (canEditArtifact({ ...record, teamPersonal: context.teamPersonal }, { userId: editorId, isTeamMember: context.isTeamMember })) return true;
+  }
+  return actsForAuthor(editorId, record.userId);
 }
 
 /**
@@ -131,19 +137,27 @@ async function hasPendingEdit(artifactId: string) {
   return Boolean(row);
 }
 
+/** The viewer's membership in the author agent's team, joined in subjectQuery. */
+const ownerMember = alias(teamMember, "owner_member");
+
 /**
  * The query behind loadSubject. Joins, not correlated subqueries: drizzle
  * leaves column names unqualified in a single-table select, so a subquery
  * such as `team_member.team_id = artifact.team_id` would compare team_id with
  * itself and match every team the viewer belongs to. team_member is unique
- * on (team_id, user_id), so the joins add at most one row.
+ * on (team_id, user_id), so the joins add at most one row. The agent join
+ * matches only when the author is an agent the viewer added (agent.user_id
+ * is its key), and owner_member only when the viewer is still in its team.
  */
 export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publicId: string, viewerId: string | null) {
   const memberOn = viewerId ? and(eq(teamMember.teamId, artifact.teamId), eq(teamMember.userId, viewerId)) : sql`false`;
+  const ownedAgentOn = viewerId ? and(eq(agent.userId, artifact.userId), eq(agent.ownerId, viewerId)) : sql`false`;
+  const ownerMemberOn = viewerId ? and(eq(ownerMember.teamId, agent.teamId), eq(ownerMember.userId, viewerId)) : sql`false`;
   return db
     .select({
       record: artifactMetaColumns(),
       memberId: teamMember.id,
+      ownerMemberId: ownerMember.id,
       teamPersonal: team.personal,
       approvedTitle: artifactVersion.title,
       approvedIcon: artifactVersion.icon,
@@ -155,6 +169,8 @@ export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publi
     .from(artifact)
     .leftJoin(team, eq(team.id, artifact.teamId))
     .leftJoin(teamMember, memberOn)
+    .leftJoin(agent, ownedAgentOn)
+    .leftJoin(ownerMember, ownerMemberOn)
     .leftJoin(artifactVersion, eq(artifactVersion.id, artifact.approvedVersionId))
     .where(eq(artifact.publicId, publicId))
     .limit(1);
@@ -168,8 +184,8 @@ export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publi
 async function loadSubject(publicId: string, viewerId: string | null) {
   const [row] = await subjectQuery(getDb(), publicId, viewerId);
   if (!row) return null;
-  const { memberId, ...rest } = row;
-  return { ...rest, member: memberId !== null };
+  const { memberId, ownerMemberId, ...rest } = row;
+  return { ...rest, member: memberId !== null, actsForAuthor: viewerId !== null && viewerId !== rest.record.userId && ownerMemberId !== null };
 }
 
 type Subject = NonNullable<Awaited<ReturnType<typeof loadSubject>>>;
@@ -195,10 +211,10 @@ export const getArtifactAccess = cache(async (publicId: string, viewerId: string
   if (!subject) return null;
   const { record } = subject;
   const member = record.visibility === "private" ? false : subject.member;
-  const viewer = viewerId ? { userId: viewerId, isTeamMember: member } : null;
+  const viewer = viewerId ? { userId: viewerId, isTeamMember: member, actsForAuthor: subject.actsForAuthor } : null;
   if (!canViewArtifact(record, viewer)) return null;
-  const decided = versionToServe({ visibility: record.visibility, approvedVersionId: record.approvedVersionId, isAuthor: viewerId === record.userId, isTeamMember: member });
-  const base = { record, canEdit: canEditArtifact({ ...record, teamPersonal: subject.teamPersonal }, viewer), isTeamMember: member };
+  const decided = versionToServe({ visibility: record.visibility, approvedVersionId: record.approvedVersionId, isAuthor: isAuthorOrActsFor(record, viewer), isTeamMember: member });
+  const base = { record, canEdit: canEditArtifact({ ...record, teamPersonal: subject.teamPersonal }, viewer), isTeamMember: member, actsForAuthor: subject.actsForAuthor };
   const approved = decided.source === "approved" ? approvedVersionFor(subject, decided.versionId) : null;
   if (approved) return { ...base, version: { source: "approved", versionId: approved.versionId }, served: approved.served };
   return { ...base, version: { source: "latest", versionId: null }, served: latestServed(record) };
@@ -255,5 +271,6 @@ export async function canReadArtifact(publicId: string, resolveViewer: () => Pro
   const viewerId = await resolveViewer();
   if (!viewerId) return false;
   const member = subject.visibility === "team" ? await viewerIsMember(viewerId, subject.teamId) : false;
-  return canViewArtifact(subject, { userId: viewerId, isTeamMember: member });
+  if (canViewArtifact(subject, { userId: viewerId, isTeamMember: member })) return true;
+  return canViewArtifact(subject, { userId: viewerId, isTeamMember: member, actsForAuthor: await actsForAuthor(viewerId, subject.userId) });
 }

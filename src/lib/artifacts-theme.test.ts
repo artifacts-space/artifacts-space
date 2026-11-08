@@ -42,6 +42,7 @@ vi.mock("@/lib/files/icon-file", () => ({ checkIconFile: () => Promise.resolve([
 vi.mock("@/lib/files/icon-cleanup", () => ({ pruneUnusedIconFilesQuietly: () => Promise.resolve() }));
 vi.mock("@/lib/files/store", () => ({ attachFileRows: () => Promise.resolve(), deleteArtifactFiles: () => Promise.resolve(), listFilesForArtifacts: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/agents/queries", () => ({ loadActors: () => Promise.resolve(new Map()) }));
+vi.mock("@/lib/agents/owner-access", () => ({ ownedAgentIds: () => Promise.resolve(new Set()), authoredByViewerCondition: vi.fn() }));
 
 const baseRecord = {
   id: "artifact-1", publicId: "4fXkP9qR2sT7vW1yZ3aB5c", userId: "user-1", title: "Plan", icon: null, theme: "ocean", cover: null, fullWidth: false, summary: "", content: "# Plan",

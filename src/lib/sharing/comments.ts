@@ -4,7 +4,6 @@ import { z } from "zod";
 import { getDb } from "@/db";
 import { artifact, sharingRequest, team, type ArtifactRecord, type SharingRequestRecord } from "@/db/schema";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
-import { isTeamMember } from "@/lib/access";
 import { commentSettings, type ArtifactDto, type CommentSetting } from "@/lib/artifact-types";
 import { canChangeCommentSetting, decideCommentSetting } from "@/lib/comments/setting-rules";
 import { getTeamMembershipById } from "@/lib/teams/queries";
@@ -12,7 +11,7 @@ import type { TeamRole } from "@/lib/teams/roles";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { forgetArtifactCache } from "@/lib/versions/cache";
 
-import { applyComments, cancelPendingComments, dtoFor, storeCommentsRequest } from "./requests";
+import { applyComments, cancelPendingComments, dtoFor, requestStillHolds, storeCommentsRequest } from "./requests";
 import type { SharingActor, SharingTeamRule } from "./rules";
 
 /**
@@ -76,8 +75,7 @@ export async function setArtifactComments(input: { actorId: string; artifactId: 
  */
 export async function approveCommentsRequest(request: SharingRequestRecord, deciderId: string) {
   const record = await loadArtifact(request.artifactId);
-  const requesterIsAuthor = record?.userId === request.requestedBy;
-  const stillHere = record?.teamId === request.teamId && requesterIsAuthor && (await isTeamMember(request.requestedBy, request.teamId));
+  const stillHere = record !== null && record.teamId === request.teamId && (await requestStillHolds(request, record.userId));
   if (!stillHere) {
     await cancelPendingComments(request.artifactId, deciderId);
     throw new UserFacingError("The artifact moved, turned private, or its author left the team, so the request was canceled.");
