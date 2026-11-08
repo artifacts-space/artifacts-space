@@ -33,11 +33,11 @@ export default function SharingPage() {
           ["private", "Only the author, and for an agent's artifact the person who added the agent.", "Never"],
           ["team", "Members of the artifact's team. Needs a shared team.", "Never"],
           ["link", "Anyone with the link, signed in or not.", "Never"],
-          ["public", "Anyone. The page says it is user-shared content.", `Only when the author turns on Show in search engines, and the account is ${String(NEW_ACCOUNT_NOINDEX_DAYS)} days old`],
+          ["public", "Anyone. The page says it is user-shared content.", `Only when someone who can share it turns on Show in search engines, and the account is ${String(NEW_ACCOUNT_NOINDEX_DAYS)} days old`],
         ]}
       />
       <Prose>
-        <p>Public artifacts stay out of search engines until their author turns on <strong>Show in search engines</strong> in the Share dialog. Only the people who can share the artifact (its author, or the person who added the agent that wrote it) can turn it on, and agents cannot. Making the artifact link, team, or private turns it off again. Only the page itself is listed: its Markdown version, raw content, files, and preview images never are.</p>
+        <p>Public artifacts stay out of search engines until someone who can share them turns on <strong>Show in search engines</strong> in the Share dialog. Only the people who can share the artifact (its author, or the person who added the agent that wrote it) can turn it on, and agents cannot. Making the artifact link, team, or private turns it off again. Only the page itself is listed: its Markdown version, raw content, files, and preview images never are.</p>
       </Prose>
       <Prose>
         <p>Link and public pages carry a <strong>Report</strong> button. Readers pick one of {reasons.length} reasons ({reasons.join(", ").toLowerCase()}), and the team&apos;s owners and admins see the report. The author, or an owner or admin of the artifact&apos;s team, can always make an artifact private again, with no approval and no limit.</p>

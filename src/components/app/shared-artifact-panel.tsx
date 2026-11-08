@@ -3,6 +3,7 @@
 import { IconLoader2, IconLock } from "@tabler/icons-react";
 
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
+import { VisibilityBadge } from "@/components/artifact-page/visibility-badge";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { CommentsControl } from "@/components/app/comments-picker";
@@ -12,18 +13,34 @@ import { VersionHistory } from "@/components/history/version-history";
 import { Button } from "@/components/ui/button";
 import { ViewsDialog } from "@/components/views/views-dialog";
 import { OpenPageButton } from "@/components/page-width/open-page-button";
-import { PageColumn } from "@/components/page-width/page-column";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { artifactPageHref } from "@/lib/artifact-page-href";
+import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
+import { PreviewSurface } from "./artifact-editor/preview-surface";
 import { detailBody, detailOuter, detailSection } from "./artifact-editor/detail-scroll";
-import { visibilityLabel } from "./share-options";
 import { useEditAccess, useWithdrawSharing } from "./use-edit-access";
+import { useRenderTheme } from "./use-render-theme";
 
-/** "Link · Platform · Read only · Changes waiting for approval", leaving out what does not apply. */
+/** "Platform · Read only · Changes waiting for approval", leaving out what does not apply. The visibility badge comes first. */
 function statusLine(artifact: ArtifactDto, teamName: string | null, canEdit: boolean) {
-  const parts = [visibilityLabel(artifact.visibility), teamName, canEdit ? null : "Read only", artifact.pendingEdit ? "Changes waiting for approval" : null];
+  const parts = [teamName, canEdit ? null : "Read only", artifact.pendingEdit ? "Changes waiting for approval" : null];
   return parts.filter(Boolean).join(" · ");
+}
+
+/** Who can see the artifact, as the same badge the artifact page shows, then the status line. */
+function PanelStatus({ artifact, teamName, canEdit }: { artifact: ArtifactDto; teamName: string | null; canEdit: boolean }) {
+  const status = statusLine(artifact, teamName, canEdit);
+  return (
+    <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+      <VisibilityBadge
+        visibility={artifact.visibility}
+        sentence={visibilitySentence(visibilityCopy(artifact.visibility))}
+        className="-ml-1.5 h-7 px-1.5 text-xs [&>svg]:size-3.5"
+      />
+      {status ? <span>· {status}</span> : null}
+    </span>
+  );
 }
 
 interface SharedArtifactPanelProps {
@@ -41,13 +58,12 @@ interface SharedArtifactPanelProps {
 export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn }: SharedArtifactPanelProps) {
   const { team, canEdit, canWithdraw, seesComments } = useEditAccess(artifact, viewerId);
   const { withdrawing, withdraw } = useWithdrawSharing(artifact.id, onWithdrawn);
+  const theme = useRenderTheme(artifact);
 
   return (
     <section className={detailSection} aria-label={artifact.title}>
       <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5">
-        <span className="text-xs text-muted-foreground">
-          {statusLine(artifact, team?.name ?? null, canEdit)}
-        </span>
+        <PanelStatus artifact={artifact} teamName={team?.name ?? null} canEdit={canEdit} />
         <div className="ml-auto flex items-center gap-1">
           <CopyButton value={artifact.content} variant="ghost" size="icon" />
           {canEdit ? (
@@ -84,11 +100,9 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
         </div>
         {/* Read only, so nothing in the pane takes focus first: the pane does, for keyboard scrolling. */}
         <div data-slot="detail-body" role="region" aria-label="Content" tabIndex={0} className={detailBody}>
-          <div className="min-h-[460px] flex-[1_0_auto] bg-card py-6 sm:py-8" data-full-width={artifact.fullWidth}>
-            <PageColumn fullWidth={artifact.fullWidth}>
-              <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
-            </PageColumn>
-          </div>
+          <PreviewSurface theme={theme} fullWidth={artifact.fullWidth} className="py-6 sm:py-8">
+            <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
+          </PreviewSurface>
         </div>
       </div>
     </section>

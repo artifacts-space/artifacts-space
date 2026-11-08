@@ -24,7 +24,7 @@ test("should show totals, a daily chart, and top sites when an editor opens View
   await expect(dialog.locator('[data-stat="Views"]')).toHaveText("1,701");
   await expect(dialog.getByRole("img", { name: /over 90 labels/ })).toBeVisible();
 
-  const width = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
+  const width = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: document.documentElement.clientWidth }));
   expect(width.scroll, "no horizontal page scroll").toBeLessThanOrEqual(width.inner + 1);
 });
 

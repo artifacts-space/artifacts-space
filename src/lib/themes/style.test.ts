@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { presetTheme, siteDefaultTheme } from "./resolve";
 import type { Theme } from "./schema";
-import { themeBackdropStyle, themeFontAssets, themeScopeProps } from "./style";
+import { themeBackdropStyle, themeChromeProps, themeFontAssets, themeScopeProps } from "./style";
 
 function preset(id: string): Theme {
   const theme = presetTheme(id);
@@ -85,5 +85,26 @@ describe("themeBackdropStyle", () => {
     const style = themeBackdropStyle(preset("paper"));
     expect(Object.keys(style)).toEqual(["--theme-backdrop"]);
     expect(style["--theme-backdrop"]).toMatch(/^light-dark\(oklch/);
+  });
+});
+
+describe("themeChromeProps", () => {
+  it("should emit nothing when the theme is the site default", () => {
+    expect(themeChromeProps(siteDefaultTheme())).toEqual({ modeClass: null, style: {} });
+  });
+
+  it("should carry the theme's colors but not its fonts or radius when the theme sets them", () => {
+    const theme = preset("classic");
+    const { style } = themeChromeProps(theme);
+    expect(style["--background"]).toBe(themeScopeProps(theme).style["--background"]);
+    expect(style["--foreground"]).toBe(themeScopeProps(theme).style["--foreground"]);
+    expect(Object.keys(style).some((name) => name.startsWith("--theme-font") || name === "--radius")).toBe(false);
+  });
+
+  it("should pin the mode and use that mode's plain colors when the theme locks one", () => {
+    const theme: Theme = { ...preset("ocean"), mode: "dark" };
+    const props = themeChromeProps(theme);
+    expect(props.modeClass).toBe("dark");
+    expect(props.style["--background"]).toBe(theme.dark.background);
   });
 });

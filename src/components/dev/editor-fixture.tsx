@@ -3,12 +3,14 @@
 import { useCallback, useMemo, useRef } from "react";
 
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
+import { ArtifactHeader } from "@/components/artifact-page/artifact-header";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
 import { InlineBody, InlineSummary, InlineTitle } from "@/components/artifact-page/inline-fields";
 import { PageInlineEditor } from "@/components/artifact-page/page-inline-editor";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
+import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
 import { fixtureArtifact, longJson, longMarkdown, longUi } from "./fixture-content";
 
@@ -27,7 +29,7 @@ function useMemorySave(initial: ArtifactDto): SaveArtifact {
 }
 
 /**
- * Development only: the artifact page's layout (pinned header and notice,
+ * Development only: the artifact page's layout (pinned header,
  * heading, content, footer) around the real in-place page editor, with a
  * long artifact and no database. Saves stay in memory. The layout e2e test
  * edits here.
@@ -39,10 +41,7 @@ export function EditorFixture({ kind }: { kind: EditorFixtureKind }) {
   return (
     <div className="min-h-screen">
       <StickyChrome>
-        <header className="mx-auto flex h-14 w-full max-w-[960px] items-center px-6 text-sm font-medium">Editor fixture</header>
-        <div role="note" className="border-b bg-muted/50">
-          <p className="mx-auto w-full max-w-[960px] px-6 py-2 text-sm leading-5 text-muted-foreground">Only you can see this artifact.</p>
-        </div>
+        <ArtifactHeader visibility="private" sentence={visibilitySentence(visibilityCopy("private"))} content={artifact.content} />
       </StickyChrome>
       <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
         <ConfirmationsProvider initial={[]}>
