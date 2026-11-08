@@ -9,6 +9,7 @@ import { useConfirmations } from "@/components/confirmations-provider";
 import { GitHubLink } from "@/components/github-link";
 import { Logo } from "@/components/logo";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { forgetThisBrowser } from "@/components/notifications/push/forget-this-browser";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { TeamSwitcher, type HeaderTeam } from "@/components/teams/team-switcher";
 import { ThemeSwitcher } from "@/components/theme-switcher";
@@ -94,6 +95,8 @@ export function AppHeader({ userId, name, email, username, teams, unreadNotifica
 
   async function signOut() {
     setSigningOut(true);
+    // A shared computer should not keep showing this account's notifications.
+    await forgetThisBrowser();
     await authClient.signOut();
     router.push("/");
     router.refresh();

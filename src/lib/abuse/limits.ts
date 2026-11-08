@@ -83,6 +83,9 @@ export const rateLimits = {
   teamCreate: { limit: 10, windowSeconds: hour },
   agentCreate: { limit: 20, windowSeconds: hour },
   tokenCreate: { limit: 30, windowSeconds: hour },
+  /** Browsers turned on for notifications, and test notifications, per person per hour. Each test calls the push services. */
+  pushDevice: { limit: 30, windowSeconds: hour },
+  pushTest: { limit: 10, windowSeconds: hour },
   /** MCP app registrations (OAuth dynamic client registration) per network address per hour. */
   oauthRegister: { limit: 20, windowSeconds: hour },
   /** OAuth authorization requests per network address per hour. */
@@ -126,6 +129,8 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   teamCreate: "You have created a lot of teams in the last hour.",
   agentCreate: "You have added a lot of agents in the last hour.",
   tokenCreate: "You have created a lot of access tokens in the last hour.",
+  pushDevice: "You have turned on browser notifications a lot in the last hour.",
+  pushTest: "You have sent a lot of test notifications in the last hour.",
   oauthRegister: "Your network has registered a lot of apps in the last hour.",
   oauthAuthorize: "Your network has started a lot of app connections in the last hour.",
   oauthToken: "Your network has asked for a lot of access tokens in the last hour.",

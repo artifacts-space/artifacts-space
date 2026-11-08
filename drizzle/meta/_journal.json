@@ -225,6 +225,13 @@
       "when": 1794174228810,
       "tag": "0031_artifact_show_in_search",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794175372488,
+      "tag": "0032_push_subscriptions",
+      "breakpoints": true
     }
   ]
 }

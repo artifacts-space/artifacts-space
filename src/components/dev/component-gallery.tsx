@@ -8,6 +8,7 @@ import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scop
 import { AvatarGallery } from "@/components/dev/avatar-gallery";
 import { ArtifactHeaderSpecimen } from "@/components/dev/artifact-header-specimen";
 import { CoverSpecimen } from "@/components/dev/cover-specimen";
+import { NotificationsSpecimen } from "@/components/dev/notifications-specimen";
 import { ThemePickerSpecimen } from "@/components/dev/theme-picker-specimen";
 import { ViewsSpecimen } from "@/components/dev/views-specimen";
 import { UiView } from "@/components/artifact-view/ui-view";
@@ -94,6 +95,7 @@ export function ComponentGallery() {
         <a href="#themes" className="hover:text-foreground">Themes</a>
         <a href="#avatars" className="hover:text-foreground">Avatars</a>
         <a href="#views" className="hover:text-foreground">Views</a>
+        <a href="#notifications" className="hover:text-foreground">Notifications</a>
       </nav>
       <div className="space-y-12">
         {uiComponentNames.map((name) => (
@@ -142,6 +144,9 @@ export function ComponentGallery() {
           <Specimen name="views dialog">
             <ViewsSpecimen />
           </Specimen>
+        </Group>
+        <Group id="notifications" title="Notification settings">
+          <NotificationsSpecimen />
         </Group>
       </div>
     </div>

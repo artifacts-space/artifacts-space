@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { check, index, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 // Relative imports: drizzle-kit loads this file without the "@/" alias.
-import { notificationTypes } from "../lib/notifications/types";
+import { MAX_ENDPOINT_LENGTH, notificationTypes } from "../lib/notifications/types";
 
 import { user } from "./auth-schema";
 import { artifact, comment, sharingRequest } from "./schema";
@@ -45,4 +45,30 @@ export const notificationSetting = pgTable("notification_setting", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// One browser that turned on browser notifications (Web Push). The endpoint is
+// the push service address the browser handed out; p256dh and auth are its
+// public encryption keys. One endpoint belongs to whoever subscribed last on
+// that browser. Removed when the push service says it is gone (404 or 410).
+export const pushSubscription = pgTable(
+  "push_subscription",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    // "Chrome on macOS", from the user agent when it subscribed. The raw user agent is not kept.
+    label: text("label").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("push_subscription_endpoint_idx").on(table.endpoint),
+    index("push_subscription_user_idx").on(table.userId, table.createdAt),
+    check("push_subscription_endpoint_length_check", sql`char_length(${table.endpoint}) <= ${sql.raw(String(MAX_ENDPOINT_LENGTH))}`),
+    check("push_subscription_label_length_check", sql`char_length(${table.label}) <= 100`),
+  ],
+);
+
 export type NotificationRecord = typeof notification.$inferSelect;
+export type PushSubscriptionRecord = typeof pushSubscription.$inferSelect;

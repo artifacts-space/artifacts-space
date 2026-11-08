@@ -41,6 +41,12 @@ const eslintConfig = defineConfig([
     files: ["**/*.mjs", "**/*.cjs"],
     ...tseslint.configs.disableTypeChecked,
   },
+  {
+    // The service worker is plain JavaScript served as is from public/.
+    files: ["public/sw.js"],
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: { ...tseslint.configs.disableTypeChecked.languageOptions, globals: { self: "readonly" } },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

@@ -26,6 +26,9 @@ export type NotificationEvent = (typeof notificationEvents)[number];
 export const notificationChannels = ["inApp", "browser", "email"] as const;
 export type NotificationChannel = (typeof notificationChannels)[number];
 
+/** Longest push address stored, in characters. Real ones are a few hundred. */
+export const MAX_ENDPOINT_LENGTH = 1000;
+
 /** The setting that controls a stored type. */
 export function eventForType(type: NotificationType): NotificationEvent {
   if (type === "share_approved" || type === "share_declined") return "share_decision";
