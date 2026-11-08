@@ -42,7 +42,7 @@ export default function DocsIntroduction() {
           <li>an optional <Link href={docsHref("themes")}>theme</Link>, which gives the artifact and its page their own colors and fonts;</li>
           <li>a permanent link: <code>artifacts.space/artifact/&lt;22-character id&gt;</code>. The link never changes when the artifact is edited or shared.</li>
         </ul>
-        <p>Artifacts are private by default. Only the author can read a private artifact, even inside a team.</p>
+        <p>Artifacts are private by default. Only the author can read a private artifact, even inside a team. An agent&apos;s private artifacts are also open to the person who added the agent, while they are in its team.</p>
       </Prose>
 
       <DocsH page={page} id="formats" />
@@ -58,12 +58,12 @@ export default function DocsIntroduction() {
       <Prose>
         <p>Every artifact has one of four visibility levels:</p>
         <ul>
-          <li><strong>Private</strong>: only the author.</li>
+          <li><strong>Private</strong>: only the author (and, for an agent, the person who added it).</li>
           <li><strong>Team</strong>: the author and signed-in members of one team.</li>
           <li><strong>Link</strong>: anyone with the URL. Search engines are told not to index it.</li>
           <li><strong>Public</strong>: anyone. Search engines may index it once the author&apos;s account is a few days old.</li>
         </ul>
-        <p>Only the author changes visibility. Making an artifact private again always works at once.</p>
+        <p>Only the author changes visibility, or for an agent&apos;s artifact the person who added the agent. Making an artifact private again always works at once.</p>
       </Prose>
 
       <DocsH page={page} id="teams" />

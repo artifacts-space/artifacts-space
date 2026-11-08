@@ -58,7 +58,7 @@ interface EditorToolbarProps {
   id: string;
   kind: ArtifactKind;
   content: string;
-  /** The share button and dialog (ShareControl). Null for teammates: only the author shares. */
+  /** The share button and dialog (ShareControl). Null for teammates: only the author (or the person who added the agent that wrote it) shares. */
   shareControl: React.ReactNode;
   /** The History button and dialog (VersionHistory). */
   history: React.ReactNode;
@@ -67,7 +67,7 @@ interface EditorToolbarProps {
   dirty: boolean;
   pending: PendingAction;
   onSave: () => void;
-  /** Null for teammates: only the author deletes. */
+  /** Null for teammates: only the author (or the person who added the agent that wrote it) deletes. */
   onRequestDelete: (() => void) | null;
   /** Set for a team owner or admin editing a teammate's artifact. */
   onWithdraw: (() => void) | null;
