@@ -108,35 +108,55 @@ test("should pin the How it works stage below the header when the window is desk
   expect(layout.stageTop, "the pinned stage starts below the header").toBeGreaterThanOrEqual(layout.headerBottom);
 });
 
-const ringTransform = (page: Page, scope: "banner" | "contentinfo") =>
-  page.getByRole(scope).locator("[data-logo-ring]").first().evaluate((ring) => {
-    const style = getComputedStyle(ring);
-    return { name: style.animationName, transform: style.transform };
+/** The logo ring's place and transform, and its highlight's animation, in the header or the footer. */
+const logoRing = (page: Page, scope: "banner" | "contentinfo") =>
+  page.getByRole(scope).locator("svg").filter({ has: page.locator("[data-logo-ring]") }).first().evaluate((mark) => {
+    const ring = mark.querySelector("[data-logo-ring]");
+    const sheen = mark.querySelector("[data-logo-ring-sheen]");
+    const ringBox = ring?.querySelector(":scope > path")?.getBoundingClientRect();
+    const markBox = mark.getBoundingClientRect();
+    const sheenStyle = sheen ? getComputedStyle(sheen) : null;
+    return {
+      ringTransform: ring ? getComputedStyle(ring).transform : "missing",
+      ringOffset: ringBox ? [ringBox.left - markBox.left, ringBox.top - markBox.top, ringBox.width, ringBox.height].map((value) => Math.round(value * 100) / 100) : [],
+      sheen: sheenStyle ? { name: sheenStyle.animationName, display: sheenStyle.display, transform: sheenStyle.transform } : null,
+    };
   });
 
-test("should turn the header logo's ring as the page scrolls and keep the footer logo still", async ({ page }) => {
-  await page.goto("/");
-  const atTop = await ringTransform(page, "banner");
-  expect(atTop.name).toBe("logo-ring-spin");
-  expect(["none", "matrix(1, 0, 0, 1, 0, 0)"]).toContain(atTop.transform);
-
+const scrollDown = async (page: Page) => {
   await page.evaluate(() => { window.scrollTo(0, document.documentElement.scrollHeight / 7); });
-  await expect.poll(async () => (await ringTransform(page, "banner")).transform).not.toBe(atTop.transform);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+};
 
-  const footer = await ringTransform(page, "contentinfo");
-  expect(footer.name, "only the landing header's ring turns").toBe("none");
+test("should send a highlight around the header logo's still ring as the page scrolls", async ({ page }) => {
+  await page.goto("/");
+  const atTop = await logoRing(page, "banner");
+  expect(atTop.ringTransform, "the ring itself never turns").toBe("none");
+  expect(atTop.sheen?.name).toBe("logo-ring-sheen");
+  expect(atTop.sheen?.display).not.toBe("none");
+
+  await scrollDown(page);
+  await expect.poll(async () => (await logoRing(page, "banner")).sheen?.transform).not.toBe(atTop.sheen?.transform);
+  const scrolled = await logoRing(page, "banner");
+  expect(scrolled.ringTransform, "the ring stays put").toBe("none");
+  expect(scrolled.ringOffset, "the ring sits where it did at the top").toEqual(atTop.ringOffset);
+
+  const footer = await logoRing(page, "contentinfo");
+  expect(footer.sheen, "only the landing header's logo has the highlight").toBeNull();
 });
 
 test.describe("with reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
-  test("should keep the logo's ring still when the page scrolls", async ({ page }) => {
+  test("should show the still mark with no highlight when the page scrolls", async ({ page }) => {
     await page.goto("/");
-    await page.evaluate(() => { window.scrollTo(0, document.documentElement.scrollHeight / 7); });
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-    const ring = await ringTransform(page, "banner");
-    expect(ring.name).toBe("none");
-    expect(ring.transform).toBe("none");
+    const atTop = await logoRing(page, "banner");
+    await scrollDown(page);
+    const scrolled = await logoRing(page, "banner");
+    expect(scrolled.sheen?.name).toBe("none");
+    expect(scrolled.sheen?.display).toBe("none");
+    expect(scrolled.ringTransform).toBe("none");
+    expect(scrolled.ringOffset).toEqual(atTop.ringOffset);
   });
 });
 

@@ -1,16 +1,15 @@
 import Link from "next/link";
 
+import { RING, RING_TILT, SHEEN_BANDS, sheenWedge } from "@/lib/logo-sheen";
 import { cn } from "@/lib/utils";
 
 import "./logo.css";
 
 /*
  * The mark's artwork in grid cells (one unit per pixel of the 27 by 20 grid),
- * traced from public/artifacts-space-mark.svg. The ring is its own layer so it
- * can turn; the planet is drawn after it, so any part of the ring that turns
- * across the planet passes behind it.
+ * traced from public/artifacts-space-mark.svg. The ring is its own layer so a
+ * highlight can be clipped to it; the planet is drawn after it.
  */
-const RING = "M20 0h5v1h-5zM18 1h8v1h-8zM16 2h4v1h-4zM23 2h4v1h-4zM17 3h1v1h-1zM24 3h3v2h-3zM23 5h3v1h-3zM22 6h4v1h-4zM21 7h4v1h-4zM21 8h3v1h-3zM20 9h3v1h-3zM4 10h2v1h-2zM20 10h2v1h-2zM3 11h2v1h-2zM2 12h2v1h-2zM1 13h2v2h-2zM0 15h2v2h-2zM0 17h3v1h-3zM6 17h4v1h-4zM1 18h8v1h-8zM2 19h4v1h-4z";
 const RING_SPARKS = "M22.25 7.15h.7v.7h-.7zM21.3 8.15h.7v.7h-.7zM20.45 9.15h.7v.7h-.7zM20.05 10.15h.5v.45h-.5z";
 
 const PLANET: readonly { tone: string; d: string }[] = [
@@ -32,12 +31,40 @@ const PLANET: readonly { tone: string; d: string }[] = [
   { tone: "glint", d: "M14.12 9.12h.5v.5h-.5z" },
 ];
 
+/** The clip for the sheen. Only the landing header draws it, once per page, so the id is fixed. */
+const RING_CLIP_ID = "logo-ring-clip";
+
+/**
+ * The travelling highlight: bands drawn face on, turned by logo.css, then
+ * tilted onto the ring's ellipse and clipped to the ring's own cells. The
+ * ring itself never moves; only the light on it does.
+ */
+function RingSheen() {
+  return (
+    <>
+      <clipPath id={RING_CLIP_ID}>
+        <path d={RING} />
+      </clipPath>
+      <g clipPath={`url(#${RING_CLIP_ID})`}>
+        <g transform={RING_TILT}>
+          <g data-logo-ring-sheen="" className="logo-ring-sheen">
+            {SHEEN_BANDS.map(({ tone, from, to }) => (
+              <path key={`${tone}-${String(from)}`} d={sheenWedge(from, to)} style={{ fill: `var(--mark-${tone})` }} />
+            ))}
+          </g>
+        </g>
+      </g>
+    </>
+  );
+}
+
 /**
  * The artifacts.space mark, a 27 by 20 pixel-art grid with fixed brand colors
  * (the `--mark-*` tokens). It is the same in light and dark mode and renders
  * at one CSS pixel per grid unit so every edge lands on whole device pixels.
- * With `spin`, the ring turns around the planet as the page scrolls (see
- * logo.css); otherwise, and with reduced motion, the mark is still.
+ * With `spin`, a highlight travels around the still ring as the page scrolls,
+ * so the ring seems to spin in place (see logo.css); otherwise, and with
+ * reduced motion, the mark is still.
  */
 function LogoMark({ spin }: { spin: boolean }) {
   return (
@@ -48,10 +75,11 @@ function LogoMark({ spin }: { spin: boolean }) {
       aria-hidden="true"
       focusable="false"
       shapeRendering="crispEdges"
-      className="h-5 w-[27px] shrink-0 overflow-visible"
+      className="h-5 w-[27px] shrink-0"
     >
-      <g data-logo-ring="" className={cn("logo-ring", spin && "logo-ring-spin")}>
+      <g data-logo-ring="">
         <path d={RING} style={{ fill: "var(--mark-base)" }} />
+        {spin && <RingSheen />}
         <path d={RING_SPARKS} style={{ fill: "var(--mark-spark)" }} />
       </g>
       {PLANET.map(({ tone, d }) => (
@@ -63,8 +91,8 @@ function LogoMark({ spin }: { spin: boolean }) {
 
 /**
  * The site logo: the mark plus the wordmark, linking home. `compact` drops the
- * wordmark. `spin` turns the ring with the page scroll; only the landing
- * page's header sets it.
+ * wordmark. `spin` sends a highlight around the ring with the page scroll;
+ * only the landing page's header sets it.
  */
 export function Logo({
   href = "/",
