@@ -39,6 +39,7 @@ import { pageOrganizersFor } from "@/lib/projects/page-project";
 import { isReportable } from "@/lib/reports/rules";
 import { getSession } from "@/lib/session";
 import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
+import { themeIdForReader } from "@/lib/themes/theme-privacy";
 import { noThemeChoices, type ThemeChoices } from "@/lib/themes/theme-choice-types";
 import { artifactThemeChoices } from "@/lib/themes/theme-choices";
 import { lockedMode } from "@/lib/themes/style";
@@ -268,7 +269,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
         ) : null}
         <main className={cn("mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16", view.cover && "pt-8 sm:pt-10")}>
           <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
-            <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={presetId ?? "custom"} data-theme-source={source}>
+            <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={themeIdForReader(presetId, viewable.canEdit)} data-theme-source={source}>
               <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
               <article className="mt-10">
                 <ArtifactBody viewable={viewable} files={files} />

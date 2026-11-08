@@ -18,6 +18,7 @@ import type { TeamPresetDto } from "@/lib/themes/team-presets";
 
 import { FormError } from "./form-error";
 import { PresetFormFields } from "./preset-form-fields";
+import { PresetJsonTools } from "./preset-json-tools";
 import { PresetPreview } from "./preset-preview";
 import { usePresetEditor, type PresetEditorStart, type PresetEditorState } from "./use-preset-editor";
 
@@ -29,9 +30,11 @@ export interface PresetSaveInput {
 }
 
 interface PresetEditorDialogProps {
-  /** "new" offers "Start from"; "edit" changes an existing preset. */
-  kind: "new" | "edit";
+  /** "new" offers "Start from"; "edit" changes an existing preset; "save" makes a new preset from a theme already in use (an artifact's custom theme). */
+  kind: "new" | "edit" | "save";
   start: PresetEditorStart;
+  /** The team the preset belongs to, named in the title when saving a custom theme. */
+  teamName?: string;
   /** The team's presets, to start a new one from. */
   teamPresets: readonly TeamPresetDto[];
   onSave: (input: PresetSaveInput) => Promise<ActionResult<TeamPresetDto>>;
@@ -115,6 +118,12 @@ function JsonTab({ editor, disabled }: { editor: PresetEditorState; disabled: bo
   );
 }
 
+function dialogTitle(kind: PresetEditorDialogProps["kind"], start: PresetEditorStart, teamName: string | undefined): string {
+  if (kind === "edit") return `Edit ${start.name}`;
+  if (kind === "save") return teamName ? `Save as a ${teamName} preset` : "Save as team preset";
+  return "New team preset";
+}
+
 /**
  * Creates or edits a team preset: a name, then the theme as a friendly form
  * or raw JSON, beside a live preview drawn with the real theme components.
@@ -122,7 +131,7 @@ function JsonTab({ editor, disabled }: { editor: PresetEditorState; disabled: bo
  * one button to apply them all. Errors show inline; the form never uses
  * browser validation bubbles.
  */
-export function PresetEditorDialog({ kind, start, teamPresets, onSave, onClose }: PresetEditorDialogProps) {
+export function PresetEditorDialog({ kind, start, teamName, teamPresets, onSave, onClose }: PresetEditorDialogProps) {
   const editor = usePresetEditor(start);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -152,13 +161,14 @@ export function PresetEditorDialog({ kind, start, teamPresets, onSave, onClose }
       <DialogContent className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
         <form onSubmit={(event) => void submit(event)} noValidate className="flex min-h-0 flex-1 flex-col">
           <DialogHeader className="border-b px-5 py-4">
-            <DialogTitle>{kind === "new" ? "New team preset" : `Edit ${start.name}`}</DialogTitle>
+            <DialogTitle>{dialogTitle(kind, start, teamName)}</DialogTitle>
             <DialogDescription>Team members can pick it for their artifacts. Changes show on every artifact that uses it, at once.</DialogDescription>
           </DialogHeader>
           <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto overscroll-contain p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
             <div className="min-w-0 space-y-4">
               <NameFields editor={editor} disabled={saving} />
               {kind === "new" ? <StartFrom teamPresets={teamPresets} onPick={editor.startFrom} /> : null}
+              <PresetJsonTools editor={editor} disabled={saving} />
               <ContrastNotice editor={editor} disabled={saving} />
               {general.map((message) => <FormError key={message} message={message} />)}
               <Tabs defaultValue="form">
@@ -182,7 +192,7 @@ export function PresetEditorDialog({ kind, start, teamPresets, onSave, onClose }
             <div className="min-w-0 flex-1"><FormError message={error} /></div>
             <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
             <Button type="submit" disabled={saving}>
-              {saving ? <IconLoader2 className="animate-spin" /> : null} {kind === "new" ? "Create preset" : "Save preset"}
+              {saving ? <IconLoader2 className="animate-spin" /> : null} {kind === "edit" ? "Save preset" : "Create preset"}
             </Button>
           </DialogFooter>
         </form>

@@ -18,7 +18,7 @@ import { siteOrigin } from "@/lib/site-origin";
 import { listPendingSharing, listTeamSharedArtifacts } from "@/lib/sharing/queries";
 import { getTeamForMember, listPendingInvitations, listTeamMembers, type TeamMembership } from "@/lib/teams/queries";
 import { canEditTeamSettings, canManageTeam, roleLabel } from "@/lib/teams/roles";
-import { loadTeamThemeSettings } from "@/lib/themes/team-presets";
+import { listPresetsForTeams, loadTeamThemeSettings } from "@/lib/themes/team-presets";
 import { canManageTeamThemes } from "@/lib/themes/team-preset-rules";
 import { listPendingEdits } from "@/lib/versions/queries";
 
@@ -64,6 +64,18 @@ function SettingsSections({ team }: { team: TeamMembership }) {
   );
 }
 
+/** The team's preset names by id for reviewers, so pending theme changes read "Brand", not "Team preset". A failed lookup keeps the generic label. */
+async function teamPresetNames(teamId: string, reviews: boolean): Promise<Map<string, string>> {
+  if (!reviews) return new Map();
+  try {
+    const presets = (await listPresetsForTeams([teamId])).get(teamId) ?? [];
+    return new Map(presets.map((preset) => [preset.ref, preset.name]));
+  } catch (error) {
+    console.error("[themes] Preset names failed", error instanceof Error ? error.name : "unknown error");
+    return new Map();
+  }
+}
+
 /**
  * Pending sharing and edits (owners and admins of shared teams), reader
  * reports (owners and admins of any team), and what the team shares.
@@ -71,11 +83,12 @@ function SettingsSections({ team }: { team: TeamMembership }) {
 async function SharingSections({ team }: { team: TeamMembership }) {
   const manager = canManageTeam(team.role);
   const reviews = manager && !team.personal;
-  const [requests, edits, reports, shared] = await Promise.all([
+  const [requests, edits, reports, shared, themeNames] = await Promise.all([
     reviews ? listPendingSharing(team.id) : Promise.resolve([]),
     reviews ? listPendingEdits(team.id) : Promise.resolve([]),
     manager ? listOpenReports(team.id) : Promise.resolve([]),
     listTeamSharedArtifacts(team.id),
+    teamPresetNames(team.id, reviews),
   ]);
   return (
     <>
@@ -91,7 +104,7 @@ async function SharingSections({ team }: { team: TeamMembership }) {
       ) : null}
       {reviews ? (
         <Section title="Pending edits" description="Readers outside the team see the last approved version until you approve an edit.">
-          <EditReviewList edits={edits} />
+          <EditReviewList edits={edits} themeNames={themeNames} />
         </Section>
       ) : null}
       <Section title="Shared through this team" description={manager ? "Withdraw makes an artifact private to its author again." : undefined}>

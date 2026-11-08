@@ -245,6 +245,15 @@ reference to another team's preset or a deleted one falls back; never copy a
 preset into an artifact. Only owners and admins change presets and the default
 (`src/app/(workspace)/teams/theme-actions.ts`); agents can only list and use them.
 
+Team preset names and ids (`team:<slug>`, whose slug holds part of the name)
+are team-internal, like projects and tags: only readers who may edit the
+artifact (the author and its team) see them. Every surface an outsider can
+reach goes through `src/lib/themes/theme-privacy.ts` (Markdown `- Theme:`,
+the page's `data-artifact-theme`, `artifacts_get`), which shows "Custom"
+instead and never says "team default". Link preview image URLs carry a short
+hash of the resolved theme (`src/lib/og/theme-key.ts`), never a name, so a
+team default or preset edit gives the card a fresh URL.
+
 ### Covers
 
 Artifact covers live in `src/lib/covers` (gradients, parsing, reposition
@@ -254,11 +263,12 @@ Gradients are recipes over theme tokens (`color-mix` in OKLab into
 `--background`), never literal colors, so they follow the theme and light or
 dark; link previews redraw the same recipe as hex (`coverGradientHex`). Cover
 images use the icon image rules (no SVG, uploads only) with a 2 MB cap and are
-checked in `src/lib/files/cover-file.ts`. The web picker prepares every image
-in the browser first (`prepare-cover-image.ts`: upright, at most 2400 px, JPEG
-unless a transparent PNG already fits, camera data dropped); the server cap and
-type checks stay the authority. Link previews can draw only PNG and JPEG
-covers; Satori draws nothing for WebP.
+checked in `src/lib/files/cover-file.ts`. The web pickers prepare every cover
+and icon image in the browser first (`src/components/images/prepare-image.ts`
+with a profile from `src/lib/images/prepare-rules.ts`: upright, at most 2400 px
+for covers and 512 px for icons, JPEG unless a transparent PNG fits, camera
+data dropped); the server cap and type checks stay the authority. Link
+previews can draw only PNG and JPEG covers; Satori draws nothing for WebP.
 
 Uploaded icon and cover images are kept while the artifact or any version in
 its history shows them, so Remove is undone by Restore. `icon-cleanup.ts`

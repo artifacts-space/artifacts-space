@@ -2,13 +2,14 @@ import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { lastEditorsFor, toArtifactDtos } from "@/lib/artifacts";
 import { filesForViewer } from "@/lib/files/download";
+import { storedThemeForReader } from "@/lib/themes/theme-privacy";
 
 /**
  * One artifact, in full, as this viewer may read it: through the one access
  * check, with the version they are served (readers outside the team get the
  * approved version) and the files that go with it. Null when the viewer may
- * not read it. The project shows only to editors (the author and the team
- * it is shared through). Used where a list item is opened: MCP artifacts_get and the
+ * not read it. The project, tags, and team preset ids show only to editors
+ * (the author and the team it is shared through). Used where a list item is opened: MCP artifacts_get and the
  * workspace.
  */
 export async function loadArtifactForViewer(publicId: string, viewerId: string): Promise<{ dto: ArtifactDto; viewable: ViewableArtifact } | null> {
@@ -26,5 +27,7 @@ export async function loadArtifactForViewer(publicId: string, viewerId: string):
   // Projects and tags are for the author and the team only: readers outside it never get them.
   const project = viewable.canEdit ? dto.project : null;
   const tags = viewable.canEdit ? dto.tags : [];
-  return { viewable, dto: { ...dto, ...shown, project, tags, files, updatedBy, updatedAt: shown.updatedAt.toISOString() } };
+  // A team preset id carries a name the team chose: outsiders read "custom" (theme-privacy.ts).
+  const theme = storedThemeForReader(shown.theme, viewable.canEdit);
+  return { viewable, dto: { ...dto, ...shown, theme, project, tags, files, updatedBy, updatedAt: shown.updatedAt.toISOString() } };
 }

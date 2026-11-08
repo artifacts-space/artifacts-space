@@ -105,7 +105,7 @@ describe("team theme actions", () => {
 
   it("should give no team presets for a new artifact when signed out", async () => {
     mocks.session.mockResolvedValue(null);
-    expect(await actions.newArtifactThemeChoicesAction()).toEqual({ success: true, data: { groups: [], inherited: null } });
+    expect(await actions.newArtifactThemeChoicesAction()).toEqual({ success: true, data: { groups: [], inherited: null, manageable: [] } });
     expect(mocks.newArtifactThemeChoices).not.toHaveBeenCalled();
   });
 });

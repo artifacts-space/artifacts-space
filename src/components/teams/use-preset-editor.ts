@@ -75,6 +75,10 @@ export function usePresetEditor(start: PresetEditorStart) {
     draft,
     setDraft,
     startFrom: (theme: Theme) => { replaceDraft(draftFromTheme(theme)); },
+    /** Replaces the whole draft with imported theme JSON (theme-import.ts); the form and JSON tab follow. */
+    importDraft: (next: ThemeDraft) => { replaceDraft(next); },
+    /** The theme as it would save, or null while it is not valid: what Export writes. */
+    exportable: validation.ok ? validation.theme : null,
     applySuggestions: () => { replaceDraft(applyContrastChanges(draft, suggestions)); },
     jsonText,
     jsonError,

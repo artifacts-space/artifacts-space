@@ -15,7 +15,7 @@ function viewable(canEdit: boolean) {
   return {
     record: { id: "a1", publicId: "pub", userId: "author", visibility: "link", teamId: "acme", projectId: "p1" },
     canEdit,
-    view: { title: "Plan", icon: null, summary: "", content: "Body", kind: "markdown", language: "", source: "", metadata: {}, updatedAt: savedAt, editedBy: null },
+    view: { title: "Plan", icon: null, theme: "team:acme-q3-launch-x7k2p9", summary: "", content: "Body", kind: "markdown", language: "", source: "", metadata: {}, updatedAt: savedAt, editedBy: null },
   };
 }
 
@@ -40,5 +40,14 @@ describe("loadArtifactForViewer", () => {
     const loaded = await loadArtifactForViewer("pub", "stranger");
     expect(loaded?.dto.project).toBeNull();
     expect(loaded?.dto.tags).toEqual([]);
+  });
+
+  it("should hide the team preset id from a reader outside the team and keep it for the team", async () => {
+    mocks.getViewableArtifact.mockResolvedValue(viewable(false));
+    const outsider = await loadArtifactForViewer("pub", "stranger");
+    expect(outsider?.dto.theme).toBe("custom");
+    expect(JSON.stringify(outsider?.dto)).not.toContain("acme-q3-launch");
+    mocks.getViewableArtifact.mockResolvedValue(viewable(true));
+    expect((await loadArtifactForViewer("pub", "author"))?.dto.theme).toBe("team:acme-q3-launch-x7k2p9");
   });
 });

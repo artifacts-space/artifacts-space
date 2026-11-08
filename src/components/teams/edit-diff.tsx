@@ -65,7 +65,7 @@ function ShortChange({ label, before, after }: { label: string; before: string; 
 }
 
 /** Changed short fields, one row each: old value, then new value. */
-function FieldChanges({ before, after }: { before: ReviewedFields; after: ReviewedFields }) {
+function FieldChanges({ before, after, themeNames }: { before: ReviewedFields; after: ReviewedFields; themeNames: ReadonlyMap<string, string> | undefined }) {
   const changed = fieldLabels.filter(({ key }) => before[key] !== after[key]);
   const iconChanged = before.icon !== after.icon;
   const themeChanged = !sameArtifactTheme(before.theme, after.theme);
@@ -75,7 +75,7 @@ function FieldChanges({ before, after }: { before: ReviewedFields; after: Review
   return (
     <dl className="grid gap-1.5 text-sm">
       {iconChanged ? <IconChange before={before.icon} after={after.icon} /> : null}
-      {themeChanged ? <ShortChange label="Theme" before={themeLabel(before.theme)} after={themeLabel(after.theme)} /> : null}
+      {themeChanged ? <ShortChange label="Theme" before={themeLabel(before.theme, themeNames)} after={themeLabel(after.theme, themeNames)} /> : null}
       {coverChanged ? <ShortChange label="Cover" before={coverLabel(before.cover)} after={coverLabel(after.cover)} /> : null}
       {changed.map(({ key, label }) => (
         <div key={key} className="grid gap-1 sm:grid-cols-[6rem_1fr]">
@@ -132,9 +132,11 @@ function ContentDiff({ before, after }: { before: string; after: string }) {
 
 /**
  * What an edit changes: short fields first, then a line diff of the content.
- * Without an approved version, everything shows as new.
+ * Without an approved version, everything shows as new. `themeNames` names
+ * team presets by id (the team's own), so a theme change reads "Brand", not
+ * "Team preset".
  */
-export function EditDiff({ before, after }: { before: ReviewedFields | null; after: ReviewedFields }) {
+export function EditDiff({ before, after, themeNames }: { before: ReviewedFields | null; after: ReviewedFields; themeNames?: ReadonlyMap<string, string> | undefined }) {
   if (!before) {
     return (
       <div className="space-y-2">
@@ -145,7 +147,7 @@ export function EditDiff({ before, after }: { before: ReviewedFields | null; aft
   }
   return (
     <div className="space-y-3">
-      <FieldChanges before={before} after={after} />
+      <FieldChanges before={before} after={after} themeNames={themeNames} />
       <ContentDiff before={before.content} after={after.content} />
     </div>
   );

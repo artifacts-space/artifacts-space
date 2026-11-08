@@ -7,9 +7,9 @@ import type { ThemeChoices } from "@/lib/themes/theme-choice-types";
 
 /** One swatch in the theme picker. */
 export interface ThemeOption {
-  /** Unique within the picker: "inherit", a built-in id, or a team preset id. */
+  /** Unique within the picker: "inherit", "custom", a built-in id, or a team preset id. */
   key: string;
-  /** What choosing it stores: a preset id, or null for no theme of its own. */
+  /** What choosing it stores: a preset id, or null for no theme of its own. Unused for "custom", which keeps the theme as it is. */
   value: string | null;
   name: string;
   /** The line under the name: the fonts, or the inherited preset's name. */
@@ -22,6 +22,8 @@ export interface ThemeOption {
 }
 
 const INHERIT_KEY = "inherit";
+/** The key of the artifact's own theme JSON: shown as "Custom" with its swatch, and choosing it keeps it. */
+export const CUSTOM_KEY = "custom";
 
 function fontsLine(theme: Theme): string {
   const heading = themeFont(theme.fonts.heading)?.family ?? theme.fonts.heading;
@@ -30,14 +32,19 @@ function fontsLine(theme: Theme): string {
 }
 
 /**
- * The picker's options, in order: the team default (when the artifact
- * inherits one), each team's presets, then the built-ins. Without a team
- * default, the built-in Default means "no theme of its own" (null), as
- * before; with one, it is stored as "default" so it overrides the team's.
+ * The picker's options, in order: the artifact's custom theme (when it has
+ * theme JSON of its own, such as one an agent set), the team default (when
+ * the artifact inherits one), each team's presets, then the built-ins.
+ * Without a team default, the built-in Default means "no theme of its own"
+ * (null), as before; with one, it is stored as "default" so it overrides
+ * the team's.
  */
-export function themeOptions(choices: ThemeChoices): ThemeOption[] {
-  const grouped = choices.groups.length > 0 || choices.inherited !== null;
+export function themeOptions(choices: ThemeChoices, custom: Theme | null = null): ThemeOption[] {
+  const grouped = choices.groups.length > 0 || choices.inherited !== null || custom !== null;
   const options: ThemeOption[] = [];
+  if (custom) {
+    options.push({ key: CUSTOM_KEY, value: null, name: "Custom", detail: fontsLine(custom), label: "Custom: this artifact's own theme", theme: custom, group: "This artifact" });
+  }
   if (choices.inherited) {
     const { name, theme } = choices.inherited;
     options.push({ key: INHERIT_KEY, value: null, name: "Team default", detail: name, label: `Team default: ${name}, set by the team`, theme, group: "Team default" });
@@ -60,7 +67,7 @@ export function themeOptions(choices: ThemeChoices): ThemeOption[] {
 /** The key of the option that shows as chosen: "custom" for theme JSON, and "missing" for a team preset not on offer. */
 export function selectedOptionKey(value: StoredArtifactTheme | null, options: readonly ThemeOption[]): string {
   if (value === null) return options.some((option) => option.key === INHERIT_KEY) ? INHERIT_KEY : DEFAULT_THEME_ID;
-  if (typeof value !== "string") return "custom";
+  if (typeof value !== "string") return CUSTOM_KEY;
   return options.some((option) => option.key === value) ? value : "missing";
 }
 

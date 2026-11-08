@@ -6,7 +6,7 @@ import { team, teamMember } from "@/db/schema";
 import { loadArtifactThemeContext, type ThemeSubject } from "./artifact-theme-context";
 import { noThemeChoices, type ThemeChoiceGroup, type ThemeChoices } from "./theme-choice-types";
 import { listPresetsForTeams } from "./team-presets";
-import { resolveArtifactTheme, themeTeamId } from "./team-preset-rules";
+import { manageableTeams, resolveArtifactTheme, themeTeamId } from "./team-preset-rules";
 
 /**
  * What the artifact theme picker offers one viewer: the built-ins (always),
@@ -18,6 +18,7 @@ import { resolveArtifactTheme, themeTeamId } from "./team-preset-rules";
 interface TeamRow {
   id: string;
   name: string;
+  role: string;
 }
 
 /** The viewer's shared teams, or just `onlyTeamId` when given (and they belong to it). */
@@ -25,7 +26,7 @@ async function viewerTeams(viewerId: string, onlyTeamId?: string): Promise<TeamR
   const conditions = [eq(teamMember.userId, viewerId), eq(team.personal, false)];
   if (onlyTeamId) conditions.push(eq(team.id, onlyTeamId));
   return getDb()
-    .select({ id: team.id, name: team.name })
+    .select({ id: team.id, name: team.name, role: teamMember.role })
     .from(teamMember)
     .innerJoin(team, eq(team.id, teamMember.teamId))
     .where(and(...conditions))
@@ -43,7 +44,8 @@ async function groupsFor(teams: readonly TeamRow[]): Promise<ThemeChoiceGroup[]>
 
 /** Choices for a new artifact: it starts private, so the presets of every shared team the viewer belongs to. */
 export async function newArtifactThemeChoices(viewerId: string): Promise<ThemeChoices> {
-  return { groups: await groupsFor(await viewerTeams(viewerId)), inherited: null };
+  const teams = await viewerTeams(viewerId);
+  return { groups: await groupsFor(teams), inherited: null, manageable: manageableTeams(teams) };
 }
 
 async function teamPersonal(teamId: string | null): Promise<boolean | null> {
@@ -56,6 +58,7 @@ async function teamPersonal(teamId: string | null): Promise<boolean | null> {
  * Choices for an artifact the viewer may edit: its theme team's presets (when
  * the viewer belongs to that team) and its team default; or, with no theme
  * team, the presets of the author's shared teams, offered only to the author.
+ * `manageable` lists the same teams where the viewer is an owner or admin.
  */
 export async function artifactThemeChoices(viewerId: string, subject: ThemeSubject): Promise<ThemeChoices> {
   const themeTeam = themeTeamId(subject, await teamPersonal(subject.visibility === "private" ? null : subject.teamId));
@@ -63,8 +66,10 @@ export async function artifactThemeChoices(viewerId: string, subject: ThemeSubje
     if (subject.userId !== viewerId) return noThemeChoices;
     return newArtifactThemeChoices(viewerId);
   }
-  const [groups, context] = await Promise.all([groupsFor(await viewerTeams(viewerId, themeTeam)), loadArtifactThemeContext(subject, [])]);
-  if (context.teamDefault === null) return { groups, inherited: null };
+  const teams = await viewerTeams(viewerId, themeTeam);
+  const [groups, context] = await Promise.all([groupsFor(teams), loadArtifactThemeContext(subject, [])]);
+  const manageable = manageableTeams(teams);
+  if (context.teamDefault === null) return { groups, inherited: null, manageable };
   const inherited = resolveArtifactTheme(null, context);
-  return { groups, inherited: inherited.source === "team" ? { name: inherited.name, theme: inherited.theme } : null };
+  return { groups, inherited: inherited.source === "team" ? { name: inherited.name, theme: inherited.theme } : null, manageable };
 }

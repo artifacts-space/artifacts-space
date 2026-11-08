@@ -1,15 +1,21 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Fragment, useMemo, useRef, useState } from "react";
 
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { iconGridMove } from "@/lib/icon-grid";
 import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
-import { noThemeChoices, type ThemeChoices } from "@/lib/themes/theme-choice-types";
+import { parseThemeForPreview } from "@/lib/themes/schema";
+import { noThemeChoices, type ThemeChoices, type ThemeChoiceTeam } from "@/lib/themes/theme-choice-types";
 import { cn } from "@/lib/utils";
 
-import { selectedOptionKey, themeOptions, type ThemeOption } from "./theme-options";
+import { CustomThemeActions } from "./custom-theme-actions";
+import { CUSTOM_KEY, selectedOptionKey, themeOptions, type ThemeOption } from "./theme-options";
 import { ThemeSwatch } from "./theme-swatch";
+
+// The preset editor loads only when an owner or admin saves a custom theme as a team preset.
+const SaveCustomThemeDialog = dynamic(() => import("./save-custom-theme-dialog").then((module) => module.SaveCustomThemeDialog), { ssr: false });
 
 const COLUMNS = 2;
 
@@ -89,37 +95,52 @@ function SwatchGrid({ options, selected, onSelect }: SwatchGridProps) {
 }
 
 const notes: Record<string, string> = {
-  custom: "This artifact uses a custom theme. Pick a preset to replace it.",
+  custom: "This artifact has its own theme, set by an agent or with theme JSON. Pick a preset to replace it.",
   missing: "This artifact's team preset is not available here, so it shows the team default or the site default. Pick another to replace it.",
 };
 
 /**
- * Picks an artifact's theme: the team default it inherits (when its team has
- * one), the presets of the viewer's team, and the built-ins, as swatches
- * with names and fonts. Swatches, and so their fonts, load only while it is open.
+ * Picks an artifact's theme: its own custom theme (shown as "Custom", with
+ * "Copy theme JSON" and, for team owners and admins, "Save as team preset"),
+ * the team default it inherits (when its team has one), the presets of the
+ * viewer's team, and the built-ins, as swatches with names and fonts. Swatches, and so their fonts, load only while it is open.
  */
 export function ThemePicker({ value, onChange, trigger, choices = noThemeChoices, disabled = false, align = "start" }: ThemePickerProps) {
   const [open, setOpen] = useState(false);
-  const options = useMemo(() => themeOptions(choices), [choices]);
+  const [savingTo, setSavingTo] = useState<ThemeChoiceTeam | null>(null);
+  // Theme JSON of the artifact's own (stored already validated); re-read defensively before drawing it.
+  const custom = useMemo(() => (value !== null && typeof value !== "string" ? parseThemeForPreview(value) : null), [value]);
+  const options = useMemo(() => themeOptions(choices, custom), [choices, custom]);
   const selected = selectedOptionKey(value, options);
   const note = notes[selected];
 
   function choose(option: ThemeOption) {
     setOpen(false);
+    // Custom keeps the theme the artifact already has.
+    if (option.key === CUSTOM_KEY) return;
     if (option.value !== value) onChange(option.value);
   }
 
+  function saveAsPreset(team: ThemeChoiceTeam) {
+    setOpen(false);
+    setSavingTo(team);
+  }
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={trigger} disabled={disabled} />
-      <PopoverContent align={align} sideOffset={8} className="w-[calc(100vw-2rem)] p-0 sm:w-[26rem]">
-        <div className="border-b px-3 py-2.5">
-          <PopoverTitle>Theme</PopoverTitle>
-          <p className="text-xs text-muted-foreground">Colors and fonts for this artifact and the page behind it.</p>
-        </div>
-        {note ? <p role="note" className="border-b px-3 py-2 text-xs text-muted-foreground">{note}</p> : null}
-        {open ? <SwatchGrid options={options} selected={selected} onSelect={choose} /> : null}
-      </PopoverContent>
-    </Popover>
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger render={trigger} disabled={disabled} />
+        <PopoverContent align={align} sideOffset={8} className="w-[calc(100vw-2rem)] p-0 sm:w-[26rem]">
+          <div className="border-b px-3 py-2.5">
+            <PopoverTitle>Theme</PopoverTitle>
+            <p className="text-xs text-muted-foreground">Colors and fonts for this artifact and the page behind it.</p>
+          </div>
+          {note ? <p role="note" className="border-b px-3 py-2 text-xs text-muted-foreground">{note}</p> : null}
+          {custom ? <CustomThemeActions theme={custom} teams={choices.manageable} onSave={saveAsPreset} /> : null}
+          {open ? <SwatchGrid options={options} selected={selected} onSelect={choose} /> : null}
+        </PopoverContent>
+      </Popover>
+      {custom && savingTo ? <SaveCustomThemeDialog theme={custom} team={savingTo} onClose={() => { setSavingTo(null); }} /> : null}
+    </>
   );
 }

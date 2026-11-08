@@ -11,7 +11,7 @@ import { filesForViewer } from "@/lib/files/download";
 import { fileUrl } from "@/lib/files/types";
 import { siteUrl } from "@/lib/site-origin";
 import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
-import { markdownThemeLabel } from "@/lib/themes/team-preset-rules";
+import { markdownThemeLabel } from "@/lib/themes/theme-privacy";
 import { coverLabel } from "@/lib/covers/cover";
 import { UserFacingError } from "@/lib/user-facing-error";
 
@@ -91,8 +91,8 @@ export async function loadMarkdownInput(viewable: ViewableArtifact, userId: stri
   return {
     title: view.title,
     emoji: emojiOf(view.icon),
-    // The theme the page shows: its own, or the team default (marked); none for the site default.
-    theme: markdownThemeLabel(resolvedTheme),
+    // The theme the page shows: its own, or the team default (marked); none for the site default. Team preset names stay with the team.
+    theme: markdownThemeLabel(resolvedTheme, viewable.canEdit),
     cover: view.cover === null ? null : coverLabel(view.cover),
     summary: view.summary,
     kind: view.kind,

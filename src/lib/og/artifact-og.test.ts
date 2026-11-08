@@ -2,19 +2,38 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ArtifactAccess } from "@/lib/access";
 import type { ArtifactVisibility } from "@/lib/artifact-types";
+import { presetTheme as builtInTheme } from "@/lib/themes/resolve";
+import { emptyThemeContext, resolveArtifactTheme, type ArtifactThemeContext } from "@/lib/themes/team-preset-rules";
 
 const mocks = vi.hoisted(() => ({
   getArtifactAccess: vi.fn(),
   cachedVersionView: vi.fn(),
   filesForViewer: vi.fn(),
+  resolveThemeFor: vi.fn(),
 }));
 
 vi.mock("@/lib/access", () => ({ getArtifactAccess: mocks.getArtifactAccess }));
 vi.mock("@/lib/versions/cache", () => ({ cachedVersionView: mocks.cachedVersionView }));
 vi.mock("@/lib/files/download", () => ({ filesForViewer: mocks.filesForViewer }));
+// The team context is the database boundary: each test says what the team default and presets are.
+vi.mock("@/lib/themes/artifact-theme-context", () => ({ resolveThemeFor: mocks.resolveThemeFor }));
 
 const { artifactImagePath, artifactOgMetadata, artifactPagePath, loadArtifactOg, shareableVersion } = await import("./artifact-og");
 const { siteCardPalette } = await import("./card-palette");
+const { ogThemeKey } = await import("./theme-key");
+
+/** Resolves themes against this team context, as resolveThemeFor would after loading it. */
+function useThemeContext(context: ArtifactThemeContext = emptyThemeContext) {
+  mocks.resolveThemeFor.mockImplementation((_subject: unknown, theme: unknown) => Promise.resolve(resolveArtifactTheme(theme, context)));
+}
+
+function presetTheme(id: string) {
+  const theme = builtInTheme(id);
+  if (!theme) throw new Error(`No preset ${id}`);
+  return theme;
+}
+
+const siteKey = ogThemeKey(presetTheme("default"));
 
 const approvedId = "11111111-1111-4111-8111-111111111111";
 const pendingTitle = "Pending edit title";
@@ -64,6 +83,7 @@ describe("shareableVersion", () => {
 describe("artifactOgMetadata", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    useThemeContext();
   });
 
   it("should decide as a signed-out reader when it looks the artifact up", async () => {
@@ -75,7 +95,7 @@ describe("artifactOgMetadata", () => {
   it("should point og:image and twitter:image at the approved version with the approved title when the artifact is link", async () => {
     mocks.getArtifactAccess.mockResolvedValue(access("link"));
     const tags = await artifactOgMetadata("abc");
-    const image = { url: `/artifact/abc/og/${approvedId}`, alt: "Approved title on artifacts.space", width: 1200, height: 630, type: "image/png" };
+    const image = { url: `/artifact/abc/og/${approvedId}.${siteKey}`, alt: "Approved title on artifacts.space", width: 1200, height: 630, type: "image/png" };
     expect(tags.openGraph).toMatchObject({ title: "Approved title", images: [image] });
     expect(tags.twitter).toMatchObject({ card: "summary_large_image", title: "Approved title", images: [image] });
     expect(JSON.stringify(tags)).not.toContain(pendingTitle);
@@ -156,14 +176,95 @@ describe("artifactPagePath", () => {
 });
 
 describe("artifactImagePath", () => {
-  it("should encode both ids into the path", () => {
-    expect(artifactImagePath("a/b", "v 1")).toBe("/artifact/a%2Fb/og/v%201");
+  it("should encode the id, the version, and the theme key into the path", () => {
+    expect(artifactImagePath("a/b", "v 1", "k_-9abcdef")).toBe("/artifact/a%2Fb/og/v%201.k_-9abcdef");
+  });
+});
+
+describe("link preview URLs and theme changes", () => {
+  const brand = { ref: "team:brand-abc123", teamId: "t1", name: "Brand", theme: presetTheme("ocean") };
+  const teamContext = (teamDefault: string | null, theme = brand.theme): ArtifactThemeContext => ({ teamDefault, presets: new Map([["team:brand-abc123", { ...brand, theme }]]) });
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.cachedVersionView.mockResolvedValue(approvedView);
+  });
+
+  async function imageUrl(visibility: ArtifactVisibility = "public"): Promise<unknown> {
+    mocks.getArtifactAccess.mockResolvedValue(access(visibility));
+    const images = (await artifactOgMetadata("abc")).openGraph?.images;
+    return Array.isArray(images) ? (images[0] as { url?: unknown } | undefined)?.url : undefined;
+  }
+
+  it("should give the preview a new URL when the team default changes, with no new version", async () => {
+    useThemeContext(teamContext(null));
+    const before = await imageUrl();
+    useThemeContext(teamContext("paper"));
+    const after = await imageUrl();
+    expect(before).toBe(`/artifact/abc/og/${approvedId}.${siteKey}`);
+    expect(after).toBe(`/artifact/abc/og/${approvedId}.${ogThemeKey(presetTheme("paper"))}`);
+    expect(after).not.toBe(before);
+  });
+
+  it("should give the preview a new URL when the team preset it uses is edited", async () => {
+    useThemeContext(teamContext("team:brand-abc123"));
+    const before = await imageUrl();
+    const edited = { ...brand.theme, light: { ...brand.theme.light, accent: "oklch(0.45 0.2 20)" } };
+    useThemeContext(teamContext("team:brand-abc123", edited));
+    const after = await imageUrl();
+    expect(after).not.toBe(before);
+    expect(after).toBe(`/artifact/abc/og/${approvedId}.${ogThemeKey(edited)}`);
+  });
+
+  it("should keep the same URL when nothing about the theme changed", async () => {
+    useThemeContext(teamContext("paper"));
+    expect(await imageUrl()).toBe(await imageUrl());
+  });
+
+  it("should keep private and team artifacts on the generic site image, whatever the team theme", async () => {
+    useThemeContext(teamContext("paper"));
+    for (const visibility of ["private", "team"] as const) {
+      expect(await imageUrl(visibility)).toBeUndefined();
+      mocks.getArtifactAccess.mockResolvedValue(access(visibility));
+      expect(await loadArtifactOg("abc", `${approvedId}.${ogThemeKey(presetTheme("paper"))}`)).toBeNull();
+    }
+    expect(mocks.resolveThemeFor).not.toHaveBeenCalled();
+  });
+
+  it("should mark the picture current only when the URL names the theme it is drawn with", async () => {
+    useThemeContext(teamContext("paper"));
+    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    const paperKey = ogThemeKey(presetTheme("paper"));
+    expect((await loadArtifactOg("abc", `${approvedId}.${paperKey}`))?.themeCurrent).toBe(true);
+    expect((await loadArtifactOg("abc", `${approvedId}.${siteKey}`))?.themeCurrent).toBe(false);
+    expect((await loadArtifactOg("abc", approvedId))?.themeCurrent).toBe(false);
+  });
+
+  it("should never put a team preset's name or id in the preview or its tags", async () => {
+    const secret = { ref: "team:acme-q3-launch-x7k2p9", teamId: "t1", name: "Acme Q3 launch", theme: presetTheme("ocean") };
+    useThemeContext({ teamDefault: secret.ref, presets: new Map([[secret.ref, secret]]) });
+    mocks.getArtifactAccess.mockResolvedValue(access("public"));
+    const tags = await artifactOgMetadata("abc");
+    const url = (tags.openGraph?.images as { url: string }[] | undefined)?.[0]?.url ?? "";
+    const og = await loadArtifactOg("abc", url.split("/").at(-1) ?? "");
+    const serialized = JSON.stringify([tags, og]);
+    expect(og?.themeCurrent).toBe(true);
+    expect(serialized).not.toContain("Acme Q3 launch");
+    expect(serialized).not.toContain("acme-q3-launch");
+    expect(serialized).not.toContain("team default");
+  });
+
+  it("should stay generic when the theme key is right but the version is not the approved one", async () => {
+    useThemeContext(teamContext("paper"));
+    mocks.getArtifactAccess.mockResolvedValue(access("public"));
+    expect(await loadArtifactOg("abc", `22222222-2222-4222-8222-222222222222.${ogThemeKey(presetTheme("paper"))}`)).toBeNull();
   });
 });
 
 describe("loadArtifactOg", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    useThemeContext();
   });
 
   it("should read only the approved version when an edit is pending", async () => {

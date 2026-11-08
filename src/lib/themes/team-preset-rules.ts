@@ -131,6 +131,15 @@ export function canManageTeamThemes(membership: { role: string; personal: boolea
   return !membership.personal && (membership.role === "owner" || membership.role === "admin");
 }
 
+/**
+ * The shared teams (from the viewer's memberships) where the viewer manages
+ * presets, so the picker offers "Save as team preset" there: owners and
+ * admins only.
+ */
+export function manageableTeams(teams: readonly { id: string; name: string; role: string }[]): { teamId: string; teamName: string }[] {
+  return teams.filter((row) => canManageTeamThemes({ role: row.role, personal: false })).map((row) => ({ teamId: row.id, teamName: row.name }));
+}
+
 /** True when another preset may be added, under the runaway cap. */
 export function hasRoomForPreset(count: number): boolean {
   return count < teamPresetLimits.maxPerTeam;
@@ -227,12 +236,6 @@ export function resolveArtifactTheme(artifactTheme: unknown, context: ArtifactTh
 function resolvedName(presetId: string | null, context: ArtifactThemeContext): string {
   if (presetId === null) return "Custom";
   return builtInPresets().get(presetId)?.name ?? context.presets.get(presetId)?.name ?? presetId;
-}
-
-/** The Markdown "- Theme:" value: the theme's name, marked when it is the team default; null for the site default. */
-export function markdownThemeLabel(resolved: NamedResolvedTheme): string | null {
-  if (resolved.source === "site") return null;
-  return resolved.source === "team" ? `${resolved.name} (team default)` : resolved.name;
 }
 
 /** What the delete confirmation says about a preset in use. Null usage (not loaded) says only what happens. */
