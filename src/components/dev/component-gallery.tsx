@@ -8,6 +8,7 @@ import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scop
 import { AvatarGallery } from "@/components/dev/avatar-gallery";
 import { CoverSpecimen } from "@/components/dev/cover-specimen";
 import { ThemePickerSpecimen } from "@/components/dev/theme-picker-specimen";
+import { ViewsSpecimen } from "@/components/dev/views-specimen";
 import { UiView } from "@/components/artifact-view/ui-view";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { uiComponentNames } from "@/lib/ui/catalog";
@@ -28,7 +29,13 @@ const specFixtures: { name: string; spec: unknown }[] = [
 ];
 
 /** Gallery files are not uploaded: every one shows a local stand-in image instead. */
-const standInUrl = () => "/artifacts-space-mark.svg";
+/**
+ * Every fixture file (image, PDF, video) shows this stand-in. It is an inline
+ * data URL, not a file on this site: the site sends frame-ancestors 'none'
+ * (src/lib/security-header-rules.ts), so a PDF iframe pointed at a site path
+ * would be blocked, while the real viewer frames /api/files, which allows it.
+ */
+const standInUrl = () => "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 3'%3E%3Crect width='4' height='3' fill-opacity='.08'/%3E%3C/svg%3E";
 
 function Specimen({ name, children }: { name: string; children: ReactNode }) {
   return (
@@ -85,6 +92,7 @@ export function ComponentGallery() {
         <a href="#formats" className="hover:text-foreground">Formats</a>
         <a href="#themes" className="hover:text-foreground">Themes</a>
         <a href="#avatars" className="hover:text-foreground">Avatars</a>
+        <a href="#views" className="hover:text-foreground">Views</a>
       </nav>
       <div className="space-y-12">
         {uiComponentNames.map((name) => (
@@ -125,6 +133,11 @@ export function ComponentGallery() {
         </Group>
         <Group id="avatars" title="Pixel avatars">
           <AvatarGallery />
+        </Group>
+        <Group id="views" title="Views">
+          <Specimen name="views dialog">
+            <ViewsSpecimen />
+          </Specimen>
         </Group>
       </div>
     </div>

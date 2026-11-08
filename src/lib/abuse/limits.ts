@@ -1,9 +1,12 @@
+import { SENDIR_DAILY_RECIPIENTS } from "@/lib/email/budget-rules";
+
 /**
  * Every rate limit in one place. Counts are per key (a user, a token, a team,
  * or a hashed network address for signed-out visitors) per window. Limits are
  * runaway-only: generous for real work (about one request a second for a
  * person), and they stop runaway agents and scripted abuse. Never ration.
  */
+const quarterHour = 900;
 const hour = 3600;
 const day = 86_400;
 
@@ -24,14 +27,27 @@ export const rateLimits = {
   fileDownloadByNetwork: { limit: 3600, windowSeconds: hour },
   /** Artifact page views (/artifact/<id>) per network address per hour. */
   artifactPageByNetwork: { limit: 1800, windowSeconds: hour },
+  /** Counted page views (the view beacon) per network address per hour, across all artifacts. Over the limit, views are not counted; the page is unaffected. */
+  viewByNetwork: { limit: 1200, windowSeconds: hour },
+  /** Counted page views of one artifact per network address per hour, so one address cannot inflate a page's views. */
+  viewByNetworkArtifact: { limit: 60, windowSeconds: hour },
   /** Artifact preview images rendered per network address per hour. Only CDN misses count; crawlers share addresses and retry, so it is generous. */
   ogImageByNetwork: { limit: 3600, windowSeconds: hour },
   /** Sharing changes per user per hour (making an artifact private is never limited). */
   sharingRequest: { limit: 30, windowSeconds: hour },
   /** Reports per signed-in user per hour. */
   reportByUser: { limit: 10, windowSeconds: hour },
-  /** Reports per network address per hour, signed in or not. */
-  reportByNetwork: { limit: 5, windowSeconds: hour },
+  /**
+   * Reports per network address, signed in or not: a short window, so a
+   * reader behind a shared address (an office, a school, mobile carrier NAT)
+   * waits minutes, not an hour, plus a daily ceiling. Report emails share the
+   * non-sign-in email budget (src/lib/email/budget-rules.ts) with invitations
+   * and mentions, so one address may file only a few a day.
+   */
+  reportByNetwork: { limit: 5, windowSeconds: quarterHour },
+  reportByNetworkDay: { limit: 10, windowSeconds: day },
+  /** Reports about one artifact per network address per hour. Each report emails the team's owners. */
+  reportByNetworkArtifact: { limit: 3, windowSeconds: hour },
   /** Started file uploads per user per hour, from the web app and MCP together. */
   fileUpload: { limit: 200, windowSeconds: hour },
   /** Comments per agent per minute and per hour. Agents are stricter, to stop runaway loops. */
@@ -44,8 +60,16 @@ export const rateLimits = {
   teamInviteByUserHour: { limit: 20, windowSeconds: hour },
   teamInviteByUserDay: { limit: 50, windowSeconds: day },
   teamInviteByTeamDay: { limit: 100, windowSeconds: day },
-  /** Sign-in links per network address and per email address per hour. Each one sends an email. */
-  magicLinkByNetwork: { limit: 10, windowSeconds: hour },
+  /**
+   * Sign-in links per network address. A short window lets a group behind one
+   * shared address sign in together, and a refused network waits minutes,
+   * not an hour. The daily ceiling keeps one address to a tenth of Sendir's
+   * daily recipient cap, which every sign-in on the site shares: once the cap
+   * is spent, nobody gets a sign-in link until midnight UTC.
+   */
+  magicLinkByNetwork: { limit: 10, windowSeconds: quarterHour },
+  magicLinkByNetworkDay: { limit: Math.floor(SENDIR_DAILY_RECIPIENTS / 10), windowSeconds: day },
+  /** Sign-in links per email address per hour, from any network, so nobody can flood one inbox. */
   magicLinkByEmail: { limit: 5, windowSeconds: hour },
   /** New teams, agents, and access tokens per person per hour. Each agent gets its own limits, so agents are capped too. */
   teamCreate: { limit: 10, windowSeconds: hour },
@@ -71,10 +95,14 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   readByToken: "This connection has read a lot in the last hour.",
   fileDownloadByNetwork: "Your network has opened a lot of files in the last hour.",
   artifactPageByNetwork: "Your network has opened a lot of artifact pages in the last hour.",
+  viewByNetwork: "Your network has opened a lot of artifact pages in the last hour, so further views are not counted.",
+  viewByNetworkArtifact: "Your network has opened this artifact a lot in the last hour, so further views are not counted.",
   ogImageByNetwork: "Your network has loaded a lot of artifact preview images in the last hour.",
   sharingRequest: "You have changed sharing a lot in the last hour.",
   reportByUser: "You have sent a lot of reports in the last hour.",
-  reportByNetwork: "We have received a lot of reports from your network in the last hour.",
+  reportByNetwork: "We have received a lot of reports from your network in the last few minutes.",
+  reportByNetworkDay: "We have received a lot of reports from your network today.",
+  reportByNetworkArtifact: "We have received a lot of reports about this artifact from your network in the last hour.",
   fileUpload: "You have uploaded a lot of files in the last hour.",
   agentCommentMinute: "You have posted a lot of comments in the last minute.",
   agentCommentHour: "You have posted a lot of comments in the last hour.",
@@ -83,7 +111,8 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   teamInviteByUserHour: "You have sent a lot of invitations in the last hour.",
   teamInviteByUserDay: "You have sent a lot of invitations today.",
   teamInviteByTeamDay: "This team has sent a lot of invitations today.",
-  magicLinkByNetwork: "Your network has asked for a lot of sign-in links in the last hour.",
+  magicLinkByNetwork: "Your network has asked for a lot of sign-in links in the last few minutes.",
+  magicLinkByNetworkDay: "Your network has asked for a lot of sign-in links today.",
   magicLinkByEmail: "This email address has asked for a lot of sign-in links in the last hour.",
   teamCreate: "You have created a lot of teams in the last hour.",
   agentCreate: "You have added a lot of agents in the last hour.",

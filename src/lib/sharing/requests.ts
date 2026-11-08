@@ -4,12 +4,16 @@ import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, sharingRequest } from "@/db/schema";
+import { isTeamMember } from "@/lib/access";
+import { actsForAuthor } from "@/lib/agents/owner-access";
 import type { ArtifactDto, CommentSetting, SharingLevel } from "@/lib/artifact-types";
 import { toArtifactDtos } from "@/lib/artifacts";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { notifySharingRequest } from "@/lib/notifications/create";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { forgetArtifactCache } from "@/lib/versions/cache";
+
+import { requestStillValid } from "./rules";
 
 /**
  * Helpers shared by sharing changes (service.ts) and comments setting
@@ -62,4 +66,16 @@ export async function storeCommentsRequest(input: { artifactId: string; teamId: 
 export async function applyComments(artifactId: string, comments: CommentSetting) {
   await getDb().update(artifact).set({ comments }).where(eq(artifact.id, artifactId));
   forgetArtifactCache(artifactId);
+}
+
+/**
+ * Whether a request may still be approved (requestStillValid): the author is
+ * still in its team, and whoever asked still speaks for the author.
+ */
+export async function requestStillHolds(request: { requestedBy: string; teamId: string }, authorId: string): Promise<boolean> {
+  const [authorInTeam, requesterActsForAuthor] = await Promise.all([
+    isTeamMember(authorId, request.teamId),
+    request.requestedBy === authorId ? false : actsForAuthor(request.requestedBy, authorId),
+  ]);
+  return requestStillValid({ authorId, requestedBy: request.requestedBy, requesterActsForAuthor, authorInTeam });
 }

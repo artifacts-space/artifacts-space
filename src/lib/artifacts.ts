@@ -7,6 +7,7 @@ import { getDb } from "@/db";
 import { artifact, sharingRequest, type ArtifactRecord } from "@/db/schema";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { getEditableArtifact, viewableInTeamCondition } from "@/lib/access";
+import { authoredByViewerCondition, findDeletableArtifact, ownedAgentIds } from "@/lib/agents/owner-access";
 import { loadActors } from "@/lib/agents/queries";
 import { assertValidArtifactContent, assertValidArtifactUpdate } from "@/lib/artifact-content";
 import {
@@ -49,7 +50,8 @@ import { recordArtifactSave } from "@/lib/versions/service";
 
 /**
  * Artifact storage. The author and members of the team an artifact is shared
- * through edit it (getEditableArtifact); only the author deletes it. Every
+ * through edit it (getEditableArtifact); only the author, or the person who
+ * added the agent that wrote it, deletes it (findDeletableArtifact). Every
  * save files a version. Visibility never changes here: sharing goes through
  * requestArtifactSharing in src/lib/sharing.
  */
@@ -113,12 +115,13 @@ interface DtoExtras {
   updatedBy: ArtifactEditorDto | null;
   project: ArtifactProjectDto | null;
   tags: string[];
+  actsForAuthor: boolean;
 }
 
-const noExtras: DtoExtras = { pending: noPending, files: [], updatedBy: null, project: null, tags: [] };
+const noExtras: DtoExtras = { pending: noPending, files: [], updatedBy: null, project: null, tags: [], actsForAuthor: false };
 
 /** Maps a row without content to the shared DTO fields. */
-function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy, project, tags }: DtoExtras): Omit<ArtifactDto, "content"> {
+function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy, project, tags, actsForAuthor }: DtoExtras): Omit<ArtifactDto, "content"> {
   return {
     id: record.id,
     publicId: record.publicId,
@@ -137,6 +140,7 @@ function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy,
     comments: record.comments,
     teamId: record.teamId,
     authorId: record.userId,
+    actsForAuthor,
     originalAuthorId: record.originalAuthorId,
     pendingSharing: pending.sharing,
     pendingEdit: pending.edit,
@@ -188,12 +192,13 @@ export async function lastEditorsFor(records: Pick<ArtifactRecord, "updatedBy">[
 /** Each row's extras, loaded together. `viewerId` decides whose projects show (src/lib/projects/queries.ts). */
 async function loadExtras(rows: ArtifactMetaRecord[], viewerId: string): Promise<(row: ArtifactMetaRecord) => DtoExtras> {
   const ids = rows.map((row) => row.id);
-  const [pending, files, editors, projects, tags] = await Promise.all([
+  const [pending, files, editors, projects, tags, agents] = await Promise.all([
     pendingRequestsFor(ids),
     listFilesForArtifacts(ids),
     lastEditorsFor(rows),
     projectsForViewer(rows, viewerId),
     tagsForViewer(rows, viewerId),
+    ownedAgentIds(viewerId),
   ]);
   return (row) => ({
     pending: pending.get(row.id) ?? noPending,
@@ -201,6 +206,7 @@ async function loadExtras(rows: ArtifactMetaRecord[], viewerId: string): Promise
     updatedBy: row.updatedBy ? editors.get(row.updatedBy) ?? null : null,
     project: projects.get(row.id) ?? null,
     tags: tags.get(row.id) ?? [],
+    actsForAuthor: row.userId !== viewerId && agents.has(row.userId),
   });
 }
 
@@ -223,7 +229,7 @@ async function toArtifactListItems(rows: (ArtifactMetaRecord & { preview: string
 /** The preview column: the first characters of readable formats, computed in Postgres so content never leaves it. */
 const previewColumn = sql<string>`case when ${artifact.kind} in (${sql.join(previewKinds.map((kind) => sql`${kind}`), sql`, `)}) then left(${artifact.content}, ${PREVIEW_CHARS}) else '' end`;
 
-/** Which artifacts a list shows: the viewer's own, or those shared with one of their teams. */
+/** Which artifacts a list shows: the viewer's own (with their agents'), or those shared with one of their teams. */
 export type ArtifactScope = { kind: "mine" } | { kind: "team"; teamId: string };
 
 export interface ListOptions {
@@ -246,7 +252,7 @@ async function searchCondition(viewerId: string, scope: ArtifactScope, query: st
 }
 
 function scopeCondition(viewerId: string, scope: ArtifactScope) {
-  if (scope.kind === "mine") return eq(artifact.userId, viewerId);
+  if (scope.kind === "mine") return authoredByViewerCondition(getDb(), viewerId);
   return viewableInTeamCondition(viewerId, scope.teamId);
 }
 
@@ -289,16 +295,6 @@ export async function getEditableArtifactDto(editorId: string, id: string): Prom
   if (!record) return null;
   const [dto] = await toArtifactDtos([record], editorId);
   return dto ?? null;
-}
-
-/** The author's own artifact by internal id, or null. */
-export async function getOwnArtifact(userId: string, id: string) {
-  const [record] = await getDb()
-    .select()
-    .from(artifact)
-    .where(and(eq(artifact.userId, userId), eq(artifact.id, id)))
-    .limit(1);
-  return record ?? null;
 }
 
 /** The author's own artifact by public id, or null. */
@@ -467,9 +463,9 @@ async function attachUpdatedContentFiles(userId: string, current: ArtifactRecord
   await attachFileRows(userId, current.id, [...new Set([...contentFileIds, ...iconFileIds])]);
 }
 
-/** Deletes the author's own artifact and its files. */
+/** Deletes an artifact and its files, for its author or the person who added the agent that wrote it. */
 export async function deleteArtifact(userId: string, id: string) {
-  const own = await getOwnArtifact(userId, id);
+  const own = await findDeletableArtifact(userId, { id });
   if (!own) return false;
   await deleteArtifactFiles(own.id).catch((error: unknown) => {
     // The rows lose their artifact when it goes; the cleanup job removes them.
@@ -477,7 +473,7 @@ export async function deleteArtifact(userId: string, id: string) {
   });
   const [record] = await getDb()
     .delete(artifact)
-    .where(and(eq(artifact.userId, userId), eq(artifact.id, id)))
+    .where(and(eq(artifact.userId, own.userId), eq(artifact.id, id)))
     .returning();
 
   forgetArtifactCache(own.id);

@@ -53,7 +53,7 @@ export function Note({ tone = "info", title, children }: { tone?: keyof typeof n
   return (
     <div role="note" className="card-surface mt-6 flex gap-3 px-4 py-3 text-md leading-6">
       <Icon aria-hidden className={cn("mt-1 size-4 shrink-0", className)} />
-      <div className="min-w-0 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-sm">
+      <div className="min-w-0 [&_code]:inline-code">
         {title ? <p className="font-medium">{title}</p> : null}
         <div className={cn(title && "mt-0.5 text-muted-foreground")}>{children}</div>
       </div>
@@ -63,7 +63,7 @@ export function Note({ tone = "info", title, children }: { tone?: keyof typeof n
 
 /** Inline code outside a Prose block. */
 export function Code({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-muted px-1 py-0.5 font-mono text-sm">{children}</code>;
+  return <code className="inline-code">{children}</code>;
 }
 
 /** A simple table for facts, outside Prose. Rows are cells in order. All-empty `head` cells leave out the header row. */
@@ -95,6 +95,6 @@ export function FactTable({ head, rows, mono = [0] }: { head: string[]; rows: Re
 /** Plain text where `backticked` words show as inline code, as in catalog descriptions. */
 export function InlineCodeText({ text }: { text: string }) {
   return text.split(/(`[^`]+`)/g).map((part, index) =>
-    part.length > 2 && part.startsWith("`") && part.endsWith("`") ? <code key={index} className="rounded bg-muted px-1 py-0.5 font-mono text-sm">{part.slice(1, -1)}</code> : part,
+    part.length > 2 && part.startsWith("`") && part.endsWith("`") ? <code key={index} className="inline-code">{part.slice(1, -1)}</code> : part,
   );
 }

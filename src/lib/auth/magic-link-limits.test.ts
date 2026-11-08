@@ -25,12 +25,12 @@ describe("magicLinkEmail", () => {
 describe("magicLinkChecks", () => {
   it("should limit by network and by a hash of the address when an address is given", () => {
     const checks = magicLinkChecks("net", "ada@example.com");
-    expect(checks.map((check) => check.name)).toEqual(["magicLinkByNetwork", "magicLinkByEmail"]);
-    expect(checks[1]?.subject).toMatch(/^[a-f0-9]{32}$/);
-    expect(checks[1]?.subject).not.toContain("ada");
+    expect(checks.map((check) => check.name)).toEqual(["magicLinkByNetwork", "magicLinkByNetworkDay", "magicLinkByEmail"]);
+    expect(checks[2]?.subject).toMatch(/^[a-f0-9]{32}$/);
+    expect(checks[2]?.subject).not.toContain("ada");
   });
 
   it("should limit by network only when there is no address", () => {
-    expect(magicLinkChecks("net", null).map((check) => check.name)).toEqual(["magicLinkByNetwork"]);
+    expect(magicLinkChecks("net", null).map((check) => check.name)).toEqual(["magicLinkByNetwork", "magicLinkByNetworkDay"]);
   });
 });

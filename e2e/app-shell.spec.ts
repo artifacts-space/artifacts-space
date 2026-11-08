@@ -175,6 +175,18 @@ test.describe("desktop and tablet", () => {
     expect(gap, "space between the last section and the pane's bottom edge").toBeGreaterThanOrEqual(32);
   });
 
+  test("should open the comments in a dialog from the toolbar beside History, not under the content", async ({ page }) => {
+    await openWorkspace(page);
+    await expect(slot(page, "detail-body").getByRole("region", { name: "Comments" })).toHaveCount(0);
+    const toolbarComments = page.getByRole("button", { name: "Comments" });
+    await expect(toolbarComments).toBeInViewport();
+    await toolbarComments.click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: /^Comments on / })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+  });
+
   test("should scroll the source inside the pane in Edit mode, with one scroll bar", async ({ page }) => {
     await openWorkspace(page);
     const tops = await controlTops(page);

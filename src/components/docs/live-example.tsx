@@ -1,3 +1,6 @@
+import { IconChevronRight } from "@tabler/icons-react";
+
+import { CodeSnippet } from "@/components/code/code-snippet";
 import { CopyButton } from "@/components/copy-button";
 import { specJson, type DocExample } from "@/lib/docs/spec-builders";
 import type { PropRow } from "@/lib/docs/prop-rows";
@@ -5,6 +8,24 @@ import { cn } from "@/lib/utils";
 
 import { InlineCodeText } from "./docs-content";
 import { ExamplePreview } from "./example-preview";
+
+/**
+ * The spec under a live example, behind a quiet "Show JSON" toggle. The JSON
+ * is the shared code block's highlighted code, so it matches every other code
+ * block in the docs. Focus shows the standard ring for the keyboard only.
+ */
+export function ExampleSource({ title, json, open }: { title: string; json: string; open: boolean }) {
+  return (
+    <details className="group border-t" open={open}>
+      <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1.5 px-4 text-sm text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
+        <IconChevronRight aria-hidden className="size-4 shrink-0 transition-transform group-open:rotate-90" />
+        <span className="group-open:hidden">Show JSON</span>
+        <span className="hidden group-open:inline">Hide JSON</span>
+      </summary>
+      <CodeSnippet code={json} language="json" title={`${title} JSON`} variant="embedded" capHeight className="border-t border-code-border" />
+    </details>
+  );
+}
 
 /**
  * One live example: the rendered spec on top and its JSON underneath, with a
@@ -22,10 +43,7 @@ export function LiveExample({ example, className, jsonOpen = true }: { example: 
       <div className="min-w-0 bg-background p-4 sm:p-6" data-docs-preview="">
         <ExamplePreview json={json} />
       </div>
-      <details className="group border-t" open={jsonOpen}>
-        <summary className="cursor-pointer px-4 py-2.5 text-sm text-muted-foreground select-none hover:text-foreground">JSON</summary>
-        <pre tabIndex={0} className="max-h-[28rem] overflow-auto border-t bg-muted/30 px-4 py-3 font-mono text-sm leading-6"><code>{json}</code></pre>
-      </details>
+      <ExampleSource title={example.title} json={json} open={jsonOpen} />
     </figure>
   );
 }

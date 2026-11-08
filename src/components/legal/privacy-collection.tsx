@@ -67,6 +67,9 @@ export function PrivacyCollection() {
       <Prose>
         <ul>
           <li><strong>Sessions.</strong> When you sign in, we store your session with the IP address and browser user agent it started from, so you and we can spot sessions that are not yours.</li>
+          <li>
+            <strong>View counts.</strong> When someone opens a public artifact, the page tells our server once that it was viewed, and which site linked to it. We keep, per artifact and per day, the number of views, the number of unique visitors, and the linking site&apos;s domain (never its full address). To count a visitor once a day, we make a keyed, one-way hash of the network address, browser user agent, and artifact, with a key that changes every day. We never store the address or the user agent, and we delete each day&apos;s hashes after that day ends, so nobody can be recognized from one day to the next or from one artifact to another. This uses no cookie and no local storage. Bots, and people who can edit the artifact, are not counted, and link, team, and private artifacts are not counted at all. Only the people and agents who can edit the artifact (its author and the team it is shared through) see the counts.
+          </li>
           <li><strong>Abuse limits.</strong> To count requests for rate limits, we use a keyed, one-way hash of your network address. We do not store the raw address for this. Reports from signed-out readers keep the same hash instead of an account.</li>
           <li><strong>Server logs.</strong> Our host, Vercel, records each request (IP address, time, URL, status, and user agent) and keeps these logs for a limited time. Our own error logs leave out tokens and artifact content.</li>
         </ul>
@@ -93,6 +96,7 @@ export function PrivacyCollection() {
         <p>We use personal data to:</p>
         <ul>
           <li><strong>Run the service:</strong> sign you in, store and show your artifacts, keep version history, apply your sharing and comment settings, and let your agents work over MCP.</li>
+          <li><strong>Show authors their readers:</strong> tell the people who can edit a public artifact how many people read it, per day, and which sites linked to it, as counts only.</li>
           <li><strong>Send emails you need:</strong> sign-in links, team invitations, a note when someone @mentions you (with the artifact title and a link, never the comment text; you can turn it off in Settings), and report notices to team owners. We send no marketing email.</li>
           <li><strong>Keep the service safe:</strong> enforce rate limits and storage quotas, stop spam and phishing, handle reports, and investigate abuse and security problems.</li>
           <li><strong>Fix and improve it:</strong> find errors and keep the service reliable, using logs and aggregate counts.</li>
@@ -108,7 +112,7 @@ export function PrivacyCollection() {
         <p>If you are in the European Economic Area (EEA) or the United Kingdom, we rely on these legal bases:</p>
         <ul>
           <li><strong>Contract:</strong> to provide the service you signed up for, including your account, artifacts, teams, connected apps, and the emails the service needs.</li>
-          <li><strong>Legitimate interests:</strong> to keep the service secure, prevent abuse, enforce limits, keep logs, handle reports, and let search engines index public artifacts. Our interest is a safe, reliable service; we keep these uses narrow so they do not override your rights.</li>
+          <li><strong>Legitimate interests:</strong> to keep the service secure, prevent abuse, enforce limits, keep logs, handle reports, let search engines index public artifacts, and count views of public artifacts for their authors. Our interest is a safe, reliable service; we keep these uses narrow so they do not override your rights.</li>
           <li><strong>Legal obligation:</strong> to answer lawful requests and keep records the law requires.</li>
           <li><strong>Consent:</strong> where we ask for it. You can withdraw consent at any time.</li>
         </ul>

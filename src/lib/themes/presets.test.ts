@@ -60,6 +60,20 @@ describe("theme presets", () => {
     }
   });
 
+  it("should keep inline code readable and set apart from the page on every preset in both modes", () => {
+    for (const [id, preset] of builtInPresets()) {
+      for (const mode of ["light", "dark"] as const) {
+        const tokens = paletteTokens(mode, preset.theme[mode]);
+        const inline = parseColor(tokens["--code-inline"] ?? "");
+        const foreground = parseColor(tokens["--foreground"] ?? "");
+        const background = parseColor(tokens["--background"] ?? "");
+        if (!inline || !foreground || !background) throw new Error(`${id} ${mode}: missing inline code tokens`);
+        expect(contrastRatio(foreground, inline), `${id} ${mode} text on inline code`).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(inline, background), `${id} ${mode} inline code on the page`).toBeGreaterThan(1.05);
+      }
+    }
+  });
+
   it("should show off at least one pairing beyond Geist when listing presets", () => {
     const fonts = themePresets.flatMap((preset) => Object.values(preset.theme.fonts ?? {}));
     expect(fonts).toEqual(expect.arrayContaining(["instrument-serif", "source-serif-4", "roboto"]));
@@ -80,6 +94,9 @@ describe("the Default preset", () => {
       expect(colors.accent).toBe(siteColor(mode, "--primary"));
       expect(colors.accentForeground).toBe(siteColor(mode, "--primary-foreground"));
       expect(colors.chart).toEqual(Array.from({ length: 8 }, (_, index) => siteColor(mode, `--series-${String(index + 1)}`)));
+    }
+    for (const mode of ["light", "dark"] as const) {
+      expect(paletteTokens(mode, preset.theme[mode])["--code-inline"], `${mode} --code-inline`).toBe(siteColor(mode, "--code-inline"));
     }
     expect(preset.theme.fonts).toEqual({ body: "geist-sans", heading: "geist-sans", mono: "geist-mono" });
     expect(preset.theme.radius).toBe("md");

@@ -6,6 +6,7 @@ import { isMagicLinkRequest, magicLinkChecks, magicLinkEmail } from "@/lib/auth/
 import { getAuth } from "@/lib/auth/server";
 import { countUnapprovedClients } from "@/lib/oauth/clients";
 import { oauthLimits } from "@/lib/oauth/config";
+import { corsOAuthEndpoint, corsPreflightResponse, withCorsHeaders, withoutCookies } from "@/lib/oauth/cors-rules";
 import { oauthErrorResponse, oauthRateLimits, publicOAuthEndpoint, withPolicyScope, type PublicOAuthEndpoint } from "@/lib/oauth/request-policy";
 
 /**
@@ -74,11 +75,26 @@ async function handle(request: Request) {
   return getAuth().handler(prepared);
 }
 
+/**
+ * The OAuth token and revoke endpoints answer any origin, without cookies
+ * and never with credentials (src/lib/oauth/cors-rules.ts). Refusals carry
+ * the CORS headers too, so a browser client can read why it was refused.
+ */
+async function handleCors(request: Request) {
+  return withCorsHeaders(await handle(withoutCookies(request)));
+}
+
 /** Better Auth endpoints: GitHub OAuth, magic links, sessions, and the OAuth server for MCP clients. */
 export function GET(request: Request) {
   return handle(request);
 }
 
 export function POST(request: Request) {
-  return handle(request);
+  return corsOAuthEndpoint(new URL(request.url).pathname) ? handleCors(request) : handle(request);
+}
+
+/** Preflight for the CORS-enabled OAuth endpoints. Every other path answers as Next does by default, with no CORS headers. */
+export function OPTIONS(request: Request) {
+  if (corsOAuthEndpoint(new URL(request.url).pathname)) return corsPreflightResponse();
+  return new Response(null, { status: 204, headers: { Allow: "GET, POST, OPTIONS" } });
 }
