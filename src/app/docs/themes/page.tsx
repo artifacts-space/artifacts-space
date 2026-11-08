@@ -52,7 +52,7 @@ export default function ThemesPage() {
           <li>The corner radius and the fonts.</li>
         </ul>
         <p>The site header, the comments, and the controls keep the standard look, so readers always know where they are. The theme applies for every reader of the artifact.</p>
-        <p>A theme is a preset id, such as <code>&quot;paper&quot;</code>, or theme JSON. An artifact with no theme uses the Default look. Every format can have a theme.</p>
+        <p>A theme is a preset id, such as <code>&quot;paper&quot;</code>, a team preset id, or theme JSON. An artifact with no theme of its own uses its team&apos;s default, or else the Default look. See <a href="#team">Team themes</a>. Every format can have a theme.</p>
         <p>Theme values never become raw CSS. The server checks each value and writes it again in one standard form. The page sets each value as a CSS custom property on the artifact&apos;s wrapper, and every card, chart, code block, diagram, and table inside reads it.</p>
       </Prose>
 
@@ -71,13 +71,14 @@ export default function ThemesPage() {
       <Prose>
         <p>If you can edit an artifact, you see <strong>Theme</strong> beside the icon above its title. On a computer, it shows when you point at the title. On a touch screen, it always shows. When the artifact has a theme, the button shows the theme&apos;s name.</p>
         <p>Select it to open the presets as live samples, each with its name and fonts. Select a preset to apply it at once. Select Default to go back to the standard look. The arrow keys, Home, and End move between samples, and Enter or Space selects one.</p>
+        <p>When the artifact is shared with a team, the picker also shows that team&apos;s presets, under the team&apos;s name. When the team has a default, the first sample is <strong>Team default</strong>: it is selected while the artifact has no theme of its own, and selecting it removes the artifact&apos;s own theme. A private artifact offers the presets of every team you belong to.</p>
         <p>The picker shows presets only. Agents can also set theme JSON over MCP. Then the picker tells you that the artifact has a custom theme, and a preset you select replaces it.</p>
         <p>Readers do not see the control. They see only the theme.</p>
       </Prose>
 
       <DocsH page={page} id="new" />
       <Prose>
-        <p>The <strong>New artifact</strong> dialog has a <strong>Theme</strong> field with the same picker. The artifact starts with the preset you select. Keep Default for the standard look.</p>
+        <p>The <strong>New artifact</strong> dialog has a <strong>Theme</strong> field with the same picker, including the presets of your teams. The artifact starts with the preset you select. Keep Default for the standard look.</p>
       </Prose>
 
       <DocsH page={page} id="mcp" />
@@ -85,8 +86,9 @@ export default function ThemesPage() {
         <p>Agents set <code>theme</code> on <code>artifacts_create</code> or <code>artifacts_update</code>, on artifacts they can edit. The value is one of these:</p>
         <ul>
           <li>A preset id, such as <code>&quot;paper&quot;</code>.</li>
+          <li>A team preset id, such as <code>&quot;team:acme-brand-x7k2p9&quot;</code>. See <a href="#team-mcp">Team themes over MCP</a>.</li>
           <li>Theme JSON, as described in <a href="#tokens">Theme JSON</a>.</li>
-          <li><code>null</code> or <code>&quot;&quot;</code> on update, to remove the theme. The page goes back to the Default look.</li>
+          <li><code>null</code> or <code>&quot;&quot;</code> on update, to remove the theme. The page goes back to the team default, or else the Default look.</li>
         </ul>
         <p>Leave out <code>theme</code> to keep the current theme. <code>artifacts_get</code> and <code>artifacts_list</code> return the stored value: a preset id, theme JSON in its standard form, or <code>null</code>. <code>artifacts_versions</code> shows the theme of each version.</p>
       </Prose>
@@ -99,7 +101,7 @@ export default function ThemesPage() {
 
       <DocsH page={page} id="themes-list" />
       <Prose>
-        <p><code>themes_list</code> returns each preset with its id, name, look, mode, and fonts. It also returns the font ids that theme JSON can use in each slot. It saves nothing, and read-only connections can use it. See the <Link href={docsHref("mcp", "themes_list")}>MCP reference</Link>.</p>
+        <p><code>themes_list</code> returns each preset with its id, name, look, mode, and fonts, then, under <code>teams</code>, the presets and default of each team you belong to. It also returns the font ids that theme JSON can use in each slot. It saves nothing, and read-only connections can use it. See the <Link href={docsHref("mcp", "themes_list")}>MCP reference</Link>.</p>
       </Prose>
       <CodeSnippet title="themes_list result, abridged" language="json" code={themesListExample()} className="mt-4" />
 
@@ -107,6 +109,38 @@ export default function ThemesPage() {
       <Prose>
         <p>A theme change is saved as a new version, like a title or icon change. History shows it, and Restore brings an older theme back.</p>
         <p>On a link or public artifact shared through a team, a theme change by a member or an agent waits for a team owner or admin to approve it, like a title change. Until then, readers outside the team see the approved theme. Owners and admins see the old and new theme names on the team page. Agents never approve. See <Link href={docsHref("sharing", "edits")}>Edits to shared artifacts</Link>.</p>
+      </Prose>
+
+      <DocsH page={page} id="team" />
+      <Prose>
+        <p>A team can give its artifacts one look. Team owners and admins keep the team&apos;s own presets and pick a team default on the team page, under <strong>Themes</strong>. Everyone in the team can see them and use the presets. People outside the team never see the list; they see only how an artifact looks.</p>
+      </Prose>
+      <DocsH page={page} id="resolution" />
+      <Prose>
+        <p>The first match wins:</p>
+        <ol>
+          <li>The artifact&apos;s own theme: a preset, a team preset, or theme JSON.</li>
+          <li>The default of the team the artifact is shared through (team, link, or public in a shared team).</li>
+          <li>The Default look.</li>
+        </ol>
+        <p>Private artifacts, and artifacts shared through a personal team, have no team default. Every reader sees the same theme, signed in or not: a public page in a team with a default shows that default to everyone.</p>
+      </Prose>
+      <DocsH page={page} id="team-presets" />
+      <Prose>
+        <p>Owners and admins create, edit, duplicate, and delete presets. The editor has a form for every theme field (colors for light and dark, chart colors, fonts from the allowlist, radius, and mode) and a JSON tab with the same theme JSON agents use. A live preview draws a sample artifact and cover with the real theme, in light or dark. Start a new preset from any built-in or team preset.</p>
+        <p>A preset must pass the same <a href="#validation">validation</a> and <a href="#contrast">contrast</a> checks as any theme. Text that fails contrast is marked at its field with a suggested color that passes, and <strong>Apply suggestions</strong> sets them all.</p>
+        <p>A team preset id looks like <code>team:acme-brand-x7k2p9</code> and never changes, even when the preset is renamed. Artifacts store this id, not a copy, so an edit to the preset shows on every artifact that uses it at once, with no new versions and no approval. Versions store the id too.</p>
+        <p>Before you delete a preset, the team page says how many artifacts use it. They fall back to the team default, then the Default look. If it was the team default, the team goes back to the Default look. An artifact that moves to another team, or that names another team&apos;s preset, falls back the same way.</p>
+        <p>A team can keep up to 50 presets.</p>
+      </Prose>
+      <DocsH page={page} id="team-default" />
+      <Prose>
+        <p>Owners and admins pick a built-in preset or a team preset as the team default, or <strong>Site default</strong> for none. It is a team setting: it files no artifact versions and needs no approval. The team page shows who changed it last and when, and the server logs each change.</p>
+      </Prose>
+      <DocsH page={page} id="team-mcp" />
+      <Prose>
+        <p><code>themes_list</code> returns the presets and default of each team you belong to, never another team&apos;s. Pass a team preset id as <code>theme</code> on an artifact shared through that team, or on a private artifact when you belong to the team. Any other team preset id is refused, and nothing is saved.</p>
+        <p>Agents use team presets but never create, change, or delete them, and never change the team default. Those stay with the team&apos;s owners and admins.</p>
       </Prose>
 
       <DocsH page={page} id="covers" />
@@ -160,11 +194,11 @@ export default function ThemesPage() {
       </Prose>
       <DocsH page={page} id="markdown" />
       <Prose>
-        <p>The Markdown version of an artifact (<code>/artifact/&lt;id&gt;.md</code>) names its theme in the header, as <code>- Theme: Paper</code>, or <code>- Theme: Custom</code> for theme JSON. An artifact with no theme has no Theme line. A cover shows as <code>- Cover: Mist</code>, or <code>- Cover: Image</code>, never with a link to the file. See <Link href={docsHref("mcp", "markdown")}>Read artifacts without MCP</Link>.</p>
+        <p>The Markdown version of an artifact (<code>/artifact/&lt;id&gt;.md</code>) names the theme it shows in the header, as <code>- Theme: Paper</code>, <code>- Theme: Custom</code> for theme JSON, or <code>- Theme: Acme brand (team default)</code> when it shows its team&apos;s default. An artifact that shows the Default look has no Theme line. A cover shows as <code>- Cover: Mist</code>, or <code>- Cover: Image</code>, never with a link to the file. See <Link href={docsHref("mcp", "markdown")}>Read artifacts without MCP</Link>.</p>
       </Prose>
       <DocsH page={page} id="previews" />
       <Prose>
-        <p>The link preview card of a link or public artifact uses the colors of the approved theme&apos;s light palette. The text on the card stays in Geist, because preview images cannot use the theme fonts.</p>
+        <p>The link preview card of a link or public artifact uses the light palette of the theme the approved version shows: its own, or else the team default. The text on the card stays in Geist, because preview images cannot use the theme fonts.</p>
         <p>A cover becomes the card&apos;s background. A gradient is drawn in the theme&apos;s light palette, with dark text. A PNG or JPEG image of at most 2 MB is drawn under a dark shade, with light text. Preview images cannot draw WebP, GIF, or AVIF, so those covers keep the standard background there. Images uploaded in the web app are always JPEG or PNG.</p>
       </Prose>
 

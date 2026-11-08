@@ -234,6 +234,17 @@ Default preset must equal the tokens in `globals.css` (a test checks it).
 Theme fonts other than Geist are vendored in `public/fonts/v1/<id>/` and load
 only where a theme uses them; never add one to the root layout.
 
+Team presets and the team default live in `src/lib/themes/team-preset-rules.ts`
+(pure rules), `team-presets.ts` (storage), and `artifact-theme-context.ts`
+(what an artifact resolves against). Artifacts store a team preset as a live
+reference, `team:<slug>`; the slug is unique across teams and never changes.
+An artifact resolves its own theme, then the default of the shared team it is
+shared through, then the site default, with `resolveThemeFor`; use it on every
+surface that draws an artifact (page, history, link preview, Markdown). A
+reference to another team's preset or a deleted one falls back; never copy a
+preset into an artifact. Only owners and admins change presets and the default
+(`src/app/(workspace)/teams/theme-actions.ts`); agents can only list and use them.
+
 ### Covers
 
 Artifact covers live in `src/lib/covers` (gradients, parsing, reposition
