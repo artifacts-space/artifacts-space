@@ -3,8 +3,9 @@ import { expect, test } from "@playwright/test";
 const themes = ["light", "dark"] as const;
 
 const storySections = [
-  "One surface for people and agents.",
+  // The hero demo stays directly under the hero.
   "How it works",
+  "One surface for people and agents.",
   "But switching accounts cuts you off.",
   "Pricing",
   "Bring your team and your agents into one space.",
