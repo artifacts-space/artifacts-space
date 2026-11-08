@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseProjectFilter, projectFilterId, workspaceQuery } from "./filter-params";
+import { parseProjectFilter, parseTagFilter, projectFilterId, workspaceQuery } from "./filter-params";
 
 describe("parseProjectFilter", () => {
   it("should read a project key in lowercase when the URL names a project", () => {
@@ -38,5 +38,22 @@ describe("workspaceQuery", () => {
 describe("projectFilterId", () => {
   it("should tell all, none, and one project apart", () => {
     expect(new Set([projectFilterId(null), projectFilterId({ none: true }), projectFilterId({ key: "none" })]).size).toBe(3);
+  });
+});
+
+describe("parseTagFilter", () => {
+  it("should normalize repeated tag params and drop repeats and empty ones", () => {
+    expect(parseTagFilter({ tag: ["Launch", "launch", " # ", "Q4 Plan"] })).toEqual(["launch", "q4-plan"]);
+  });
+
+  it("should accept a single tag param and ignore one past the length limit", () => {
+    expect(parseTagFilter({ tag: "infra" })).toEqual(["infra"]);
+    expect(parseTagFilter({ tag: "x".repeat(200) })).toEqual([]);
+  });
+});
+
+describe("workspaceQuery with tags", () => {
+  it("should repeat the tag param after the scope and project", () => {
+    expect(workspaceQuery("acme", { key: "billing" }, ["launch", "q4"])).toBe("?team=acme&project=billing&tag=launch&tag=q4");
   });
 });

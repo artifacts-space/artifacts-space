@@ -3,8 +3,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { Dashboard } from "@/components/app/dashboard";
 import type { ShareTeam } from "@/components/app/share-teams-context";
-import { listArtifacts, listProjectFacets } from "@/lib/artifacts";
-import { parseProjectFilter, projectFilterId } from "@/lib/projects/filter-params";
+import { listArtifacts, listProjectFacets, listTagFacets } from "@/lib/artifacts";
+import { parseProjectFilter, parseTagFilter, projectFilterId } from "@/lib/projects/filter-params";
 import { getSession } from "@/lib/session";
 import { siteOrigin } from "@/lib/site-origin";
 import { listTeamsForUser } from "@/lib/teams/queries";
@@ -32,16 +32,20 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
   // Previews only: content loads when an artifact is opened (loadArtifactAction).
   const scope = scopeTeam ? { kind: "team" as const, teamId: scopeTeam.id } : { kind: "mine" as const };
   const projectFilter = parseProjectFilter(params);
-  const [artifacts, facets] = await Promise.all([
-    listArtifacts(session.user.id, { scope, project: projectFilter ?? undefined }),
+  const tagFilter = parseTagFilter(params);
+  const [artifacts, facets, tagFacets] = await Promise.all([
+    listArtifacts(session.user.id, { scope, project: projectFilter ?? undefined, tags: tagFilter }),
     listProjectFacets(session.user.id, scope),
+    listTagFacets(session.user.id, scope),
   ]);
 
   return (
     <Dashboard
-      key={`${scopeTeam?.id ?? "mine"}:${projectFilterId(projectFilter)}`}
+      key={`${scopeTeam?.id ?? "mine"}:${projectFilterId(projectFilter)}:${tagFilter.join(",")}`}
       facets={facets}
       projectFilter={projectFilter}
+      tagFilter={tagFilter}
+      tagFacets={tagFacets}
       initialArtifacts={artifacts}
       origin={siteOrigin()}
       viewerId={session.user.id}

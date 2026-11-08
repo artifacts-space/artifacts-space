@@ -12,15 +12,17 @@ const SEARCH_DELAY_MS = 300;
  * content. Returns the matches for the current query, or null while there is
  * no query or no answer for it yet.
  */
-export function useServerSearch(query: string, teamId: string | null, project: ProjectFilter | null): ArtifactListItemDto[] | null {
+export function useServerSearch(query: string, teamId: string | null, project: ProjectFilter | null, tags: readonly string[]): ArtifactListItemDto[] | null {
   const [results, setResults] = useState<{ query: string; teamId: string | null; items: ArtifactListItemDto[] } | null>(null);
   const trimmed = query.trim();
+  // A string, so a new array with the same tags does not search again.
+  const tagKey = tags.join("\n");
 
   useEffect(() => {
     if (!trimmed) return;
     let active = true;
     const timer = setTimeout(() => {
-      searchArtifactsAction({ query: trimmed, teamId, project })
+      searchArtifactsAction({ query: trimmed, teamId, project, tags: tagKey ? tagKey.split("\n") : [] })
         .then((result) => {
           if (active && result.success) setResults({ query: trimmed, teamId, items: result.data });
         })
@@ -30,7 +32,7 @@ export function useServerSearch(query: string, teamId: string | null, project: P
       active = false;
       clearTimeout(timer);
     };
-  }, [trimmed, teamId, project]);
+  }, [trimmed, teamId, project, tagKey]);
 
   return results !== null && trimmed !== "" && results.query === trimmed && results.teamId === teamId ? results.items : null;
 }

@@ -91,6 +91,8 @@ export interface ArtifactDto {
   language: string;
   /** Its project, for the author and team members only. Null for "No project" and for everyone else. */
   project: ArtifactProjectDto | null;
+  /** Its tags, for the author and team members only. Empty for everyone else. */
+  tags: string[];
   sessionId: string;
   source: string;
   visibility: ArtifactVisibility;
@@ -166,6 +168,8 @@ export interface ArtifactInput {
   language?: string | undefined;
   /** A project name, found or created among the author's projects. "" or null for none. */
   project?: string | null | undefined;
+  /** Tags, normalized (src/lib/tags/rules.ts). */
+  tags?: string[] | undefined;
   sessionId?: string | undefined;
   source?: string | undefined;
   metadata?: Record<string, unknown> | undefined;

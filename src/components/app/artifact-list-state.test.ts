@@ -17,8 +17,9 @@ describe("artifactListState", () => {
 });
 
 describe("filterArtifactList", () => {
-  const item = (id: string, overrides: Partial<{ kind: string; title: string; preview: string }> = {}) => ({
-    id, kind: "markdown", title: `Title ${id}`, summary: "", preview: "", project: null, source: "", ...overrides,
+  const noTags: string[] = [];
+  const item = (id: string, overrides: Partial<{ kind: string; title: string; preview: string; tags: string[] }> = {}) => ({
+    id, kind: "markdown", title: `Title ${id}`, summary: "", preview: "", project: null, tags: noTags, source: "", ...overrides,
   });
   const items = [item("a", { preview: "deploy notes" }), item("b", { kind: "ui" }), item("c")];
 
@@ -28,6 +29,11 @@ describe("filterArtifactList", () => {
 
   it("should match the preview locally when the search is in an artifact's opening text", () => {
     expect(filterArtifactList(items, { query: "DEPLOY", kind: "all" }, null).map((x) => x.id)).toEqual(["a"]);
+  });
+
+  it("should match a tag locally when the search names one", () => {
+    const tagged = [...items, item("t", { tags: ["needs-review"] })];
+    expect(filterArtifactList(tagged, { query: "needs-rev", kind: "all" }, null).map((x) => x.id)).toEqual(["t"]);
   });
 
   it("should add server matches after local ones when content further down matches", () => {

@@ -19,6 +19,8 @@ export interface McpArtifact {
   language: string;
   /** The project's name; "" for none. Only the author and members of the team it is shared through see it. */
   project: string;
+  /** Its tags; [] for none and for callers outside the team. */
+  tags: string[];
   sessionId: string;
   source: string;
   visibility: ArtifactVisibility;
@@ -72,6 +74,7 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     kind: dto.kind,
     language: dto.language,
     project: projectName(dto.project),
+    tags: dto.tags,
     sessionId: dto.sessionId,
     source: dto.source,
     visibility: dto.visibility,

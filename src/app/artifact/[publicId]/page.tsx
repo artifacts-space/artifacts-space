@@ -33,7 +33,7 @@ import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { lastEditorsFor } from "@/lib/artifacts";
 import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
-import { pageProjectFor } from "@/lib/projects/page-project";
+import { pageOrganizersFor } from "@/lib/projects/page-project";
 import { isReportable } from "@/lib/reports/rules";
 import { getSession } from "@/lib/session";
 import { resolveTheme } from "@/lib/themes/resolve";
@@ -178,14 +178,14 @@ function ArtifactHeading({ viewable, editor, organizers }: { viewable: ViewableA
 }
 
 /**
- * The project control, only for those who may edit the artifact: its author
+ * The project and tag controls, only for those who may edit the artifact: its author
  * and members of the team it is shared through. Everyone else, including
  * every reader of a link or public page, never receives the project.
  */
 async function loadOrganizers(viewable: ViewableArtifact, session: { user: { id: string } } | null) {
-  const project = await pageProjectFor(viewable, session ? session.user.id : null).catch(() => undefined);
-  if (project === undefined) return null;
-  return <PageOrganizers artifactId={viewable.record.id} project={project} />;
+  const values = await pageOrganizersFor(viewable, session ? session.user.id : null).catch(() => undefined);
+  if (values === undefined) return null;
+  return <PageOrganizers artifactId={viewable.record.id} project={values.project} tags={values.tags} />;
 }
 
 /**

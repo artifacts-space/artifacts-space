@@ -193,14 +193,15 @@ describe("loadArtifactOg", () => {
     expect((await loadArtifactOg("abc", approvedId))?.palette).toEqual(siteCardPalette);
   });
 
-  it("should never put the project in the preview or its tags, even when the row and version carry one", async () => {
+  it("should never put the project or tags in the preview or its meta tags, even when the row and version carry them", async () => {
     const withProject = access("public");
-    Object.assign(withProject.record, { projectId: "project-1", project: "Secret project label" });
+    Object.assign(withProject.record, { projectId: "project-1", project: "Secret project label", tags: ["secret-tag-label"] });
     mocks.getArtifactAccess.mockResolvedValue(withProject);
     mocks.cachedVersionView.mockResolvedValue({ ...approvedView, project: "Secret project label" });
     const serialized = JSON.stringify([await loadArtifactOg("abc", approvedId), await artifactOgMetadata("abc")]);
     expect(serialized).not.toContain("Secret project label");
     expect(serialized).not.toContain("project-1");
+    expect(serialized).not.toContain("secret-tag-label");
   });
 
   it("should return null when the requested version is no longer the approved one", async () => {
