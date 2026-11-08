@@ -15,6 +15,14 @@ export const rateLimits = {
   artifactCreate: { limit: 120, windowSeconds: hour },
   /** Artifact edits (content, fields, or attached files) per user per hour, from the web app and MCP together. */
   artifactUpdate: { limit: 1200, windowSeconds: hour },
+  /**
+   * Web editor autosaves that continue an open editing session, per user per
+   * hour. They fold into the session's one version, so they count here
+   * instead of artifactUpdate (the session's first save counts there). The
+   * editor sends at most one every 5 seconds (720 an hour, see
+   * autosave-rules.ts); this is the runaway cap.
+   */
+  artifactAutosave: { limit: 3600, windowSeconds: hour },
   /** Artifact edits per MCP token per hour, so one runaway agent leaves room for the person's other agents. */
   artifactUpdateByToken: { limit: 600, windowSeconds: hour },
   /** Project and tag changes (moving artifacts, creating, renaming, merging, deleting projects) per user per hour. */
@@ -75,6 +83,9 @@ export const rateLimits = {
   teamCreate: { limit: 10, windowSeconds: hour },
   agentCreate: { limit: 20, windowSeconds: hour },
   tokenCreate: { limit: 30, windowSeconds: hour },
+  /** Browsers turned on for notifications, and test notifications, per person per hour. Each test calls the push services. */
+  pushDevice: { limit: 30, windowSeconds: hour },
+  pushTest: { limit: 10, windowSeconds: hour },
   /** MCP app registrations (OAuth dynamic client registration) per network address per hour. */
   oauthRegister: { limit: 20, windowSeconds: hour },
   /** OAuth authorization requests per network address per hour. */
@@ -89,6 +100,7 @@ export type RateLimitName = keyof typeof rateLimits;
 export const rateLimitMessages: Record<RateLimitName, string> = {
   artifactCreate: "You have created a lot of artifacts in the last hour.",
   artifactUpdate: "You have changed artifacts a lot in the last hour.",
+  artifactAutosave: "You have saved changes a lot in the last hour.",
   artifactUpdateByToken: "This connection has changed artifacts a lot in the last hour.",
   organize: "You have changed projects and tags a lot in the last hour.",
   readByUser: "You have read a lot of artifacts in the last hour.",
@@ -117,6 +129,8 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   teamCreate: "You have created a lot of teams in the last hour.",
   agentCreate: "You have added a lot of agents in the last hour.",
   tokenCreate: "You have created a lot of access tokens in the last hour.",
+  pushDevice: "You have turned on browser notifications a lot in the last hour.",
+  pushTest: "You have sent a lot of test notifications in the last hour.",
   oauthRegister: "Your network has registered a lot of apps in the last hour.",
   oauthAuthorize: "Your network has started a lot of app connections in the last hour.",
   oauthToken: "Your network has asked for a lot of access tokens in the last hour.",

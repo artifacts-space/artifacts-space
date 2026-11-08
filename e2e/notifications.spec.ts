@@ -46,6 +46,6 @@ test("should fit the bell in the header on a narrow phone without a sideways scr
   await page.goto("/dev/workspace");
   await expect(page.getByRole("button", { name: /^Notifications/ })).toBeInViewport();
   await expect(page.getByRole("button", { name: "Account menu" })).toBeInViewport();
-  const widths = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
-  expect(widths.scroll).toBeLessThanOrEqual(widths.inner + 1);
+  const widths = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+  expect(widths.scroll).toBeLessThanOrEqual(widths.client + 1);
 });

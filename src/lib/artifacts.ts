@@ -377,13 +377,22 @@ function saveKindOf(context: SaveContext) {
 }
 
 /**
+ * The limit a save counts against: an autosave that continues an open
+ * editing session folds into that session's version, so it has its own
+ * runaway cap; every other save can file a version and counts as an edit.
+ */
+function saveLimit(context: SaveContext) {
+  return !context.restoredFromId && context.options.session === "continue" ? "artifactAutosave" : "artifactUpdate";
+}
+
+/**
  * Writes checked changes, files the version, and returns the DTO. Saves are
  * limited per editor per hour (web and MCP together), because each one can
- * file a version.
+ * file a version; see saveLimit.
  */
 async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, context: SaveContext) {
   const { editorId, before } = context;
-  await enforceRateLimit("artifactUpdate", editorId);
+  await enforceRateLimit(saveLimit(context), editorId);
   // Content counts toward the author's account, whoever edits it.
   if (changes.content !== undefined) await assertContentFits(before.userId, changes.content, before.content, editorId);
   await assertValidArtifactUpdate(changes, () => Promise.resolve(before));

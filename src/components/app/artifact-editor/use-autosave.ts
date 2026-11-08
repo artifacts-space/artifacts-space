@@ -4,7 +4,7 @@ import { updateArtifactAction } from "@/app/(workspace)/app/actions";
 import type { ArtifactDto, SaveArtifactResult } from "@/lib/artifact-types";
 import type { EditSessionStep } from "@/lib/versions/history-rules";
 
-import { AUTOSAVE_DELAY_MS, changedFields, closedSession, draftProblem, hasChanges, keepMineOver, mergeDrafts, sessionStep, type EditSession } from "./autosave-rules";
+import { changedFields, closedSession, draftProblem, hasChanges, keepMineOver, mergeDrafts, nextSaveDelay, sessionStep, type EditSession } from "./autosave-rules";
 import { draftFrom, type ArtifactDraft } from "./use-artifact-draft";
 
 /** What the editor shows about saving, beside the character count. */
@@ -41,7 +41,10 @@ function isNewerOrSame(next: ArtifactDto, current: ArtifactDto) {
 }
 
 /**
- * Saves the draft about a second after typing stops. Every save names the
+ * Saves the draft about a second after typing stops, at least every 5
+ * seconds while typing goes on, and never more than once every 5 seconds
+ * (nextSaveDelay); leaving a field, the tab, or the artifact saves at once.
+ * Every save names the
  * version the draft is based on, so it is refused instead of overwriting a
  * newer save by someone else; then the draft merges with theirs when the two
  * changed different fields, or the editor shows a notice to load their
@@ -59,11 +62,31 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
   const sessionRef = useRef<EditSession>(closedSession);
   const inFlightRef = useRef(false);
   const queuedRef = useRef(false);
+  /** When the oldest unsaved change was made, and when the last save was sent (ms since the epoch). */
+  const pendingSinceRef = useRef<number | null>(null);
+  const lastSaveAtRef = useRef<number | null>(null);
+  const pausedRef = useRef(false);
+  /** The next save resends a merged or kept draft (see SaveTiming.resend). */
+  const resendRef = useRef(false);
   const callbacksRef = useRef({ replaceDraft, onUpdated, save });
 
   useEffect(() => { draftRef.current = draft; }, [draft]);
   useEffect(() => { callbacksRef.current = { replaceDraft, onUpdated, save }; }, [replaceDraft, onUpdated, save]);
   /** Adopts someone else's newer version as the base, merging the draft when that is trivial. */
+  /** Makes `theirs` the base with `next` as the draft, and sends `next` again when it still differs from theirs. */
+  const adopt = useCallback((theirs: ArtifactDto, next: ArtifactDraft, mine: ArtifactDraft) => {
+    baseRef.current = theirs;
+    callbacksRef.current.onUpdated(theirs);
+    callbacksRef.current.replaceDraft(next, next.content !== mine.content);
+    if (!hasChanges(draftFrom(theirs), next)) {
+      setStatus({ kind: "saved", waitingForApproval: Boolean(theirs.pendingEdit) });
+      return;
+    }
+    resendRef.current = true;
+    setStatus({ kind: "saving" });
+    setRetry((count) => count + 1);
+  }, []);
+
   const resolveRefused = useCallback((base: ArtifactDto, theirs: ArtifactDto) => {
     sessionRef.current = closedSession;
     const mine = draftRef.current;
@@ -72,12 +95,8 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
       setStatus({ kind: "conflict", theirs, base });
       return;
     }
-    baseRef.current = theirs;
-    callbacksRef.current.onUpdated(theirs);
-    callbacksRef.current.replaceDraft(outcome.draft, outcome.draft.content !== mine.content);
-    setStatus({ kind: "saving" });
-    setRetry((count) => count + 1);
-  }, []);
+    adopt(theirs, outcome.draft, mine);
+  }, [adopt]);
 
   useEffect(() => {
     const base = baseRef.current;
@@ -112,6 +131,8 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
 
   const saveNowRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const saveNow = useCallback(async () => {
+    // While a conflict notice waits for a choice, nothing saves: the save would be refused again.
+    if (pausedRef.current) return;
     if (inFlightRef.current) {
       queuedRef.current = true;
       return;
@@ -126,9 +147,13 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
       return;
     }
     inFlightRef.current = true;
+    const sentAt = Date.now();
+    resendRef.current = false;
+    pendingSinceRef.current = null;
+    lastSaveAtRef.current = sentAt;
     setStatus({ kind: "saving" });
     try {
-      const session = sessionStep(sessionRef.current, Date.now());
+      const session = sessionStep(sessionRef.current, sentAt);
       applyResult(await callbacksRef.current.save(base.id, changes, { expectedUpdatedAt: base.updatedAt, session }), base);
     } catch {
       setStatus({ kind: "failed", message: offlineMessage });
@@ -145,23 +170,38 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
 
   const dirty = hasChanges(draftFrom(artifact), draft);
   const paused = status.kind === "conflict";
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
 
   useEffect(() => {
-    if (!dirty || paused) return;
-    const timer = window.setTimeout(() => { void saveNow(); }, AUTOSAVE_DELAY_MS);
+    if (!dirty) {
+      pendingSinceRef.current = null;
+      return;
+    }
+    if (paused) return;
+    // Runs on every change: the change was made now.
+    const now = Date.now();
+    pendingSinceRef.current ??= now;
+    const delay = nextSaveDelay({ now, pendingSince: pendingSinceRef.current, lastSaveAt: lastSaveAtRef.current, resend: resendRef.current });
+    const timer = window.setTimeout(() => { void saveNow(); }, delay);
     return () => { window.clearTimeout(timer); };
   }, [draft, dirty, paused, retry, saveNow]);
 
   useEffect(() => {
     const saveWhenHidden = () => { if (document.visibilityState === "hidden") void saveNow(); };
+    // Leaving a field or the window saves at once; saveNow sends nothing when nothing changed.
+    const saveOnBlur = () => { void saveNow(); };
     const saveOnLeave = () => {
       void saveNow();
       sessionRef.current = closedSession;
     };
     document.addEventListener("visibilitychange", saveWhenHidden);
+    document.addEventListener("focusout", saveOnBlur);
+    window.addEventListener("blur", saveOnBlur);
     window.addEventListener("pagehide", saveOnLeave);
     return () => {
       document.removeEventListener("visibilitychange", saveWhenHidden);
+      document.removeEventListener("focusout", saveOnBlur);
+      window.removeEventListener("blur", saveOnBlur);
       window.removeEventListener("pagehide", saveOnLeave);
       // Switching to another artifact unmounts the editor: save what is left.
       void saveNow();
@@ -181,13 +221,8 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
   const keepMine = useCallback(() => {
     if (status.kind !== "conflict") return;
     const mine = draftRef.current;
-    const kept = keepMineOver(draftFrom(status.base), mine, draftFrom(status.theirs));
-    baseRef.current = status.theirs;
-    callbacksRef.current.onUpdated(status.theirs);
-    callbacksRef.current.replaceDraft(kept, kept.content !== mine.content);
-    setStatus({ kind: "saving" });
-    setRetry((count) => count + 1);
-  }, [status]);
+    adopt(status.theirs, keepMineOver(draftFrom(status.base), mine, draftFrom(status.theirs)), mine);
+  }, [status, adopt]);
 
   const retryNow = useCallback(() => { void saveNow(); }, [saveNow]);
 
