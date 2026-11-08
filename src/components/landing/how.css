@@ -20,9 +20,10 @@
       view-timeline: --how block;
     }
 
+    /* Pins below the landing header (3.5rem), centred in the space under it. */
     .how-stage {
       position: sticky;
-      top: max(2rem, calc(50vh - 22rem));
+      top: max(4.5rem, calc(50vh - 22rem + 1.75rem));
     }
 
     .how-type,

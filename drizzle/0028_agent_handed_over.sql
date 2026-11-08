@@ -1,0 +1,1 @@
+ALTER TABLE "agent" ADD COLUMN "handed_over_at" timestamp with time zone;

@@ -1,18 +1,27 @@
 import { createAuthMiddleware } from "better-auth/api";
 import { z } from "zod";
 
+import { reconcileTeamAgents } from "@/lib/agents/handover";
 import { reconcileTeamArtifacts } from "@/lib/sharing/transfer";
 
 /**
- * Moves artifacts a departed member shared with the team to a team owner.
- * Errors are logged, not thrown: the member is already gone, and the next
- * departure (or a rerun) repairs the team, because reconcile is idempotent.
+ * After someone leaves or is removed: hands the agents they added to a team
+ * owner with their tokens revoked (src/lib/agents/handover.ts), and moves the
+ * artifacts they shared with the team to that owner. Errors are logged, not
+ * thrown: the member is already gone, and the next departure (or a rerun)
+ * repairs the team, because both steps are idempotent.
  */
 export async function reconcileAfterDeparture(teamId: string) {
-  try {
-    await reconcileTeamArtifacts(teamId);
-  } catch (error) {
-    console.error("[teams] Artifact transfer after a departure failed", error instanceof Error ? error.message : "unknown error");
+  const steps = [
+    { name: "Agent handover", run: () => reconcileTeamAgents(teamId) },
+    { name: "Artifact transfer", run: () => reconcileTeamArtifacts(teamId) },
+  ];
+  for (const step of steps) {
+    try {
+      await step.run();
+    } catch (error) {
+      console.error(`[teams] ${step.name} after a departure failed`, error instanceof Error ? error.message : "unknown error");
+    }
   }
 }
 

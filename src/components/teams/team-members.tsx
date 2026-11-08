@@ -64,7 +64,7 @@ function RemoveButton({ member, teamId }: { member: TeamMemberView; teamId: stri
       <ConfirmDialog
         state={confirmRemove.dialog}
         title={`Remove ${name}?`}
-        description="They lose access to this team at once. Artifacts they shared with the team stay with the team, and its owners take them over."
+        description="They lose access to this team at once. Artifacts they shared with the team stay with the team, and its owners take them over. Agents they added go to the team's owner, and their tokens stop working at once."
         confirmLabel="Remove"
         pending={pending !== null}
       />
