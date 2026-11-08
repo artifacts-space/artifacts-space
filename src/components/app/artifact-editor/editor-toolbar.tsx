@@ -3,6 +3,7 @@
 import { IconArrowsHorizontal, IconDots, IconLoader2, IconLock, IconTrash } from "@tabler/icons-react";
 
 import { CopyButton } from "@/components/copy-button";
+import { OpenPageButton } from "@/components/page-width/open-page-button";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -67,6 +68,8 @@ function SaveButton({ saving, dirty, onSave }: { saving: boolean; dirty: boolean
 
 interface EditorToolbarProps {
   id: string;
+  /** For Open, beside copy: the artifact's own page in a new tab. */
+  publicId: string;
   kind: ArtifactKind;
   content: string;
   /** The share button and dialog (ShareControl). Null for teammates: only the author (or the person who added the agent that wrote it) shares. */
@@ -94,14 +97,15 @@ interface EditorToolbarProps {
  * header (h-14) to keep Save and History in reach; from md up the /app shell
  * keeps it in place.
  */
-export function EditorToolbar({ id, kind, content, shareControl, history, comments, views, dirty, pending, onSave, onRequestDelete, onWithdraw, fullWidth }: EditorToolbarProps) {
+export function EditorToolbar({ id, publicId, kind, content, shareControl, history, comments, views, dirty, pending, onSave, onRequestDelete, onWithdraw, fullWidth }: EditorToolbarProps) {
   const KindIcon = kindIcons[kind];
   return (
     <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5">
       <KindIcon className={cn("size-4 shrink-0", kindColors[kind])} />
       <span className="font-mono text-xs text-muted-foreground">{id.slice(0, 8)}</span>
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
         <CopyButton value={content} variant="ghost" size="icon" />
+        <OpenPageButton publicId={publicId} />
         {history}
         {views}
         {comments}

@@ -37,6 +37,12 @@ export function mcpResource(env: NodeJS.ProcessEnv = process.env): string {
  * How the OAuth server stores tokens and authorization codes: a SHA-256 hex
  * digest, so a database leak does not leak working tokens. The MCP route
  * looks tokens up with the same function.
+ *
+ * These are never passwords. Better Auth makes each one from 32 random
+ * letters or digits (at least 182 bits), so a fast hash cannot be brute-forced,
+ * and lookups need the same digest every time, which a salted password KDF
+ * (bcrypt, scrypt, Argon2) would not give. CodeQL's
+ * js/insufficient-password-hash alert here is a false positive.
  */
 export function hashOAuthToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");

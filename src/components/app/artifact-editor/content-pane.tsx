@@ -2,10 +2,11 @@
 
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ContentStatus } from "@/components/editor/content-status";
+import { PageColumn } from "@/components/page-width/page-column";
 import { Textarea } from "@/components/ui/textarea";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
-import { readingMeasureClass } from "@/lib/page-width/rules";
+import { editColumnClass } from "@/lib/page-width/rules";
 import { cn } from "@/lib/utils";
 
 import type { ArtifactDraft } from "./use-artifact-draft";
@@ -24,7 +25,7 @@ interface ContentPaneProps {
   language: string;
   title: string;
   files: readonly FileDto[];
-  /** The artifact's "Full width" setting: preview drops the reading measure. The edit textarea is always full width. */
+  /** The artifact's "Full width" setting: both modes keep to the public page's column unless it is on. */
   fullWidth: boolean;
   update: UpdateDraft;
 }
@@ -39,7 +40,7 @@ interface ContentPaneProps {
 export function ContentPane({ mode, kind, content, language, title, files, fullWidth, update }: ContentPaneProps) {
   if (mode === "edit") {
     return (
-      <div className="flex flex-[1_0_auto] flex-col" data-full-width={fullWidth}>
+      <div className={cn("flex flex-[1_0_auto] flex-col", editColumnClass(fullWidth))} data-full-width={fullWidth}>
         <Textarea
           value={content}
           onChange={(event) => { update("content", event.target.value); }}
@@ -52,8 +53,10 @@ export function ContentPane({ mode, kind, content, language, title, files, fullW
     );
   }
   return (
-    <div className={cn("min-h-[460px] min-w-0 flex-[1_0_auto] bg-card p-5 sm:p-8", readingMeasureClass(fullWidth))} data-full-width={fullWidth}>
-      <ArtifactView kind={kind} content={content} language={language} title={title} files={files} />
+    <div className="min-h-[460px] min-w-0 flex-[1_0_auto] bg-card py-5 sm:py-8" data-full-width={fullWidth}>
+      <PageColumn fullWidth={fullWidth}>
+        <ArtifactView kind={kind} content={content} language={language} title={title} files={files} />
+      </PageColumn>
     </div>
   );
 }

@@ -74,6 +74,31 @@ describe("setShowInSearch", () => {
     expect(mocks.set).toHaveBeenCalledWith({ showInSearch: true });
   });
 
+  it("should refuse and write nothing when anyone but the agent's adder asks about an agent's artifact", async () => {
+    // actsForAuthor (src/lib/agents/owner-access.ts) is true only for the person who added the agent while they
+    // are still in its team; owner-access.test.ts checks that join. Here it answers false, as it does for each of these.
+    mocks.row = { userId: "agent-1", visibility: "public" };
+    for (const actorId of ["teammate", "team-admin", "team-owner", "stranger", "departed-adder"]) {
+      await expect(setShowInSearch({ actorId, artifactId: "art-1", on: true, actor: "person" })).rejects.toThrow(/Only the people who can share it/);
+      await expect(setShowInSearch({ actorId, artifactId: "art-1", on: false, actor: "person" })).rejects.toThrow(/Only the people who can share it/);
+      expect(mocks.actsForAuthor).toHaveBeenCalledWith(actorId, "agent-1");
+    }
+    expect(mocks.set).not.toHaveBeenCalled();
+    expect(mocks.enforceRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("should refuse the adder and write nothing when they have left the agent's team", async () => {
+    mocks.row = { userId: "agent-1", visibility: "public" };
+    const stillInTeam = new Set(["adder"]);
+    mocks.actsForAuthor.mockImplementation((viewerId: string, authorId: string) => Promise.resolve(viewerId === "adder" && authorId === "agent-1" && stillInTeam.has(viewerId)));
+    await setShowInSearch({ actorId: "adder", artifactId: "art-1", on: true, actor: "person" });
+    expect(mocks.set).toHaveBeenCalledTimes(1);
+
+    stillInTeam.delete("adder");
+    await expect(setShowInSearch({ actorId: "adder", artifactId: "art-1", on: false, actor: "person" })).rejects.toThrow(/Only the people who can share it/);
+    expect(mocks.set).toHaveBeenCalledTimes(1);
+  });
+
   it("should refuse and write nothing when the agent itself asks for its own artifact", async () => {
     mocks.row = { userId: "agent-1", visibility: "public" };
     await expect(setShowInSearch({ actorId: "agent-1", artifactId: "art-1", on: true, actor: "agent" })).rejects.toThrow(/Only the people who can share it/);
