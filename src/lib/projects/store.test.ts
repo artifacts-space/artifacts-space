@@ -4,6 +4,9 @@ import { artifact, artifactVersion, project, team } from "@/db/schema";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { createFakeDb } from "./fake-db";
+import type { ProjectScope } from "./rules";
+
+import type * as ScopeModule from "./scope";
 
 /*
  * Moving artifacts between projects, against an in-memory database. The
@@ -18,6 +21,12 @@ vi.mock("@/db", () => ({ getDb: () => state.db }));
 vi.mock("@/lib/access", () => ({ getEditableArtifact: () => Promise.resolve(state.editable) }));
 vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: mocks.enforceRateLimit }));
 vi.mock("@/lib/versions/service", () => ({ recordArtifactSave: mocks.recordArtifactSave }));
+// Scope membership: the author uses their own projects; "author" and "teammate" are in acme.
+vi.mock("./scope", async (importOriginal) => ({
+  ...(await importOriginal<typeof ScopeModule>()),
+  canUseScope: (viewerId: string, scope: ProjectScope) =>
+    Promise.resolve(scope.kind === "user" ? scope.userId === viewerId : ["author", "teammate"].includes(viewerId) && scope.teamId === "acme"),
+}));
 
 const { findOrCreateProject, rehomeArtifactProject, setArtifactProject } = await import("./store");
 
@@ -38,9 +47,9 @@ function projectRow(id: string, name: string, scope: { userId?: string; teamId?:
 beforeEach(() => {
   vi.resetAllMocks();
   tables = new Map<unknown, Row[]>([
-    [project, [projectRow("p-author", "Billing", { userId: "author" }), projectRow("p-other-user", "Secret", { userId: "someone-else" }), projectRow("p-acme", "Launch", { teamId: "acme" })]],
+    [project, [projectRow("p-author", "Billing", { userId: "author" }), projectRow("p-other-user", "Secret", { userId: "someone-else" }), projectRow("p-acme", "Launch", { teamId: "acme" }), projectRow("p-globex", "Roadmap", { teamId: "globex" })]],
     [artifact, [artifactRow()]],
-    [team, [{ id: "acme", personal: false }, { id: "personal", personal: true }]],
+    [team, [{ id: "acme", name: "Acme", personal: false }, { id: "globex", name: "Globex", personal: false }, { id: "personal", name: "Personal", personal: true }]],
     [artifactVersion, []],
   ]);
   const fake = createFakeDb(tables);
@@ -65,7 +74,7 @@ describe("setArtifactProject", () => {
     const result = await setArtifactProject("author", "a1", { name: "BILLING" });
     expect(result?.id).toBe("p-author");
     expect(current()?.projectId).toBe("p-author");
-    expect(tables.get(project)).toHaveLength(3);
+    expect(tables.get(project)).toHaveLength(4);
   });
 
   it("should create the project among the author's own when a private artifact gets a new name", async () => {
@@ -86,14 +95,31 @@ describe("setArtifactProject", () => {
     expect(current()?.projectId).toBeNull();
   });
 
-  it("should refuse a team's project when the artifact is private", async () => {
-    await expect(setArtifactProject("author", "a1", { projectId: "p-acme" })).rejects.toThrow("Project not found");
+  it("should refuse a cross-space move, say how to share first, and write nothing when a private artifact goes to a team project", async () => {
+    await expect(setArtifactProject("author", "a1", { projectId: "p-acme" })).rejects.toThrow("Share it with Acme first to put it in Launch.");
     expect(current()?.projectId).toBeNull();
+    expect(log).toEqual([]);
+    expect(tables.get(project)).toHaveLength(4);
   });
 
-  it("should refuse the author's own project when the artifact lives in a team", async () => {
+  it("should refuse the author's own project, say to stop sharing first, and write nothing when the artifact lives in a team", async () => {
     state.editable = Object.assign(current() ?? {}, { visibility: "team", teamId: "acme" });
-    await expect(setArtifactProject("author", "a1", { projectId: "p-author" })).rejects.toThrow("Project not found");
+    await expect(setArtifactProject("author", "a1", { projectId: "p-author" })).rejects.toThrow("Stop sharing it with Acme first to put it in Billing.");
+    expect(current()?.projectId).toBeNull();
+    expect(log).toEqual([]);
+  });
+
+  it("should answer not found without naming the team when the editor is not in the project's team", async () => {
+    const error = await setArtifactProject("author", "a1", { projectId: "p-globex" }).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(UserFacingError);
+    expect(String(error)).toContain("Project not found");
+    expect(String(error)).not.toContain("Globex");
+    expect(log).toEqual([]);
+  });
+
+  it("should never make a look-alike project when a move by id is refused", async () => {
+    await expect(setArtifactProject("author", "a1", { projectId: "p-acme" })).rejects.toBeInstanceOf(UserFacingError);
+    expect(tables.get(project)?.filter((row) => row.nameKey === "launch")).toHaveLength(1);
   });
 
   it("should clear the project when none is chosen", async () => {
