@@ -49,3 +49,20 @@ export function artifactsToTransfer(artifacts: TransferArtifact[], teamId: strin
 export function transferredOwnership(item: TransferArtifact, newOwnerId: string) {
   return { userId: newOwnerId, originalAuthorId: item.originalAuthorId ?? item.userId };
 }
+
+/** An agent in the team, as the departure check sees it. */
+export interface HandoverAgent {
+  userId: string;
+  ownerId: string | null;
+  handedOverAt: Date | null;
+}
+
+/**
+ * Agents to hand to a team owner after a departure: those whose owner is no
+ * longer a member, and those whose owner's account is gone (owner id null)
+ * that were not handed over already. An agent that stays with a former
+ * member keeps working for them after they lost the team, so none may stay.
+ */
+export function agentsToHandOver(agents: readonly HandoverAgent[], memberIds: ReadonlySet<string>): HandoverAgent[] {
+  return agents.filter((item) => (item.ownerId === null ? item.handedOverAt === null : !memberIds.has(item.ownerId)));
+}
