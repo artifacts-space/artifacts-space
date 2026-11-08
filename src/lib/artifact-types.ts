@@ -88,6 +88,8 @@ export interface ArtifactDto {
   theme: StoredArtifactTheme | null;
   /** The cover banner: a gradient id or "file:<uuid>[@0-100]". Null when none. */
   cover: string | null;
+  /** Show the body across the whole width instead of the reading width. A display setting: not versioned. */
+  fullWidth: boolean;
   summary: string;
   content: string;
   kind: ArtifactKind;

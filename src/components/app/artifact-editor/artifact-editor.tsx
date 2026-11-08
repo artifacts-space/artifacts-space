@@ -24,6 +24,7 @@ import {
 import { EditorToolbar } from "./editor-toolbar";
 import { useArtifactActions } from "./use-artifact-actions";
 import { useArtifactDraft } from "./use-artifact-draft";
+import { useFullWidth } from "./use-full-width";
 
 interface ArtifactEditorProps {
   artifact: ArtifactDto;
@@ -61,6 +62,7 @@ export function ArtifactEditor({ artifact, origin, isAuthor, team, seesComments,
   const { draft, update, dirty, reset } = useArtifactDraft(artifact);
   const { pending, save, remove } = useArtifactActions({ artifact, draft, onUpdated, onDeleted });
   const [mode, setMode] = useState<EditorMode>("preview");
+  const fullWidth = useFullWidth(artifact, onUpdated);
   const confirmDelete = useConfirm("deleteArtifact");
   const shareUrl = `${origin}/artifact/${artifact.publicId}`;
   const shared = artifact.visibility === "link" || artifact.visibility === "public";
@@ -101,6 +103,7 @@ export function ArtifactEditor({ artifact, origin, isAuthor, team, seesComments,
         onSave={() => void save()}
         onRequestDelete={isAuthor ? () => { if (pending !== "delete") confirmDelete.request(remove); } : null}
         onWithdraw={onWithdraw}
+        fullWidth={fullWidth}
       />
       <div ref={outerRef} data-slot="detail-outer" className={detailOuter}>
         {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
@@ -116,7 +119,7 @@ export function ArtifactEditor({ artifact, origin, isAuthor, team, seesComments,
           tabIndex={mode === "preview" ? 0 : undefined}
           className={detailBody}
         >
-          <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} files={artifact.files} update={update} />
+          <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} files={artifact.files} fullWidth={artifact.fullWidth} update={update} />
           {draft.kind === "file" || draft.kind === "ui" || artifact.files.length > 0 ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
           <MetaFields draft={draft} update={update} />
         </div>

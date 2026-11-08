@@ -18,6 +18,7 @@ import {
 } from "@/lib/artifacts";
 import { kindFieldDescription } from "@/lib/mcp/format-tools";
 import { projectLimits } from "@/lib/projects/limits";
+import { setArtifactFullWidth } from "@/lib/page-width/store";
 import { projectChoiceSchema, projectNameKey } from "@/lib/projects/rules";
 import { setArtifactProject } from "@/lib/projects/store";
 import type { TagChange } from "@/lib/tags/rules";
@@ -91,6 +92,11 @@ const projectField = z
   .describe(
     "Project name, matched without regard to case among the artifact's projects (projects_list shows them); a new name creates the project. null or \"\" removes it. Your private artifacts use your projects; artifacts shared through a team use the team's. Moving an artifact between projects never files a version or waits for approval, and readers outside the team never see it.",
   );
+
+const fullWidthField = z
+  .boolean()
+  .optional()
+  .describe("Show the page full width (true) or at the reading width (false, the default), like Notion's Full width. A display setting: applies at once, files no version, and never waits for approval.");
 
 const editableFields = {
   title: z.string().min(1).max(160),
@@ -226,9 +232,17 @@ async function organize(userId: string, artifactId: string, saved: ArtifactDto, 
   return tagChange ? { ...moved, tags: await applyTagChangeFor(userId, artifactId, tagChange) } : moved;
 }
 
+/** Applies an update's full width setting after its save. Undefined leaves it as it is. */
+async function applyFullWidth(userId: string, artifactId: string, artifact: ArtifactDto, fullWidth: boolean | undefined): Promise<ArtifactDto> {
+  if (fullWidth === undefined) return artifact;
+  const saved = await setArtifactFullWidth(userId, artifactId, fullWidth);
+  if (!saved) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+  return { ...artifact, fullWidth: saved.fullWidth };
+}
+
 /**
  * Saves the content and fields an update supplied, filing a version. When it
- * supplied none (only project, tags, sharing, or comments), nothing is saved and
+ * supplied none (only project, tags, full width, sharing, or comments), nothing is saved and
  * no version is filed.
  */
 async function saveFields(userId: string, artifactId: string, input: ArtifactUpdateInput): Promise<{ artifact: ArtifactDto; edit: "applied" | "pending" | "unchanged" }> {
@@ -317,27 +331,29 @@ function registerWriteTools(server: ToolServer, userId: string) {
     {
       title: "Update artifact",
       description:
-        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). `project` and tags apply at once, file no version, and never wait for approval; when you send only those, sharing, or comments, `edit` is \"unchanged\". Only the author can set visibility, which requests sharing through the team's rule. The author (and the team's owners and admins) can set `comments`. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved. Edits are limited per hour (generously); a limit error says when to try again.",
+        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). `project`, tags, and `fullWidth` apply at once, file no version, and never wait for approval; when you send only those, sharing, or comments, `edit` is \"unchanged\". Only the author can set visibility, which requests sharing through the team's rule. The author (and the team's owners and admins) can set `comments`. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved. Edits are limited per hour (generously); a limit error says when to try again.",
       inputSchema: {
         id: publicIdField,
         ...editableFields,
         title: editableFields.title.optional(),
         content: editableFields.content.optional(),
         ...tagChangeFields,
+        fullWidth: fullWidthField,
         visibility: visibilityField,
         team: teamField,
         comments: commentsField,
       },
     },
-    ({ id, visibility, team, comments, project, tags, addTags, removeTags, cover, coverPosition, ...input }) => respond(async () => {
+    ({ id, visibility, team, comments, project, tags, addTags, removeTags, fullWidth, cover, coverPosition, ...input }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
       const record = await editableByPublicId(userId, id);
       if (team) teamBySlug(teams, team);
       assertTheme(input.theme);
       const tagChange = tagChangeFor({ tags, addTags, removeTags });
       const saved = await saveFields(userId, record.id, { ...input, cover: coverFor(cover, coverPosition, record.cover) });
-      // Project and tags change after the save, on their own: no version, no approval, and nothing if the save failed.
-      const artifact = await organize(userId, record.id, saved.artifact, project, tagChange);
+      // Project, tags, and full width change after the save, on their own: no version, no approval, and nothing if the save failed.
+      const organized = await organize(userId, record.id, saved.artifact, project, tagChange);
+      const artifact = await applyFullWidth(userId, record.id, organized, fullWidth);
       const result = await shareAfterSave(userId, artifact, teams, { visibility, team, comments });
       return { artifact: toMcpArtifact(result.artifact, view), edit: saved.edit, sharing: result.sharing, comments: result.comments };
     }),

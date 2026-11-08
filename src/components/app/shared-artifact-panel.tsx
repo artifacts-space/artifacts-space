@@ -11,6 +11,8 @@ import { LastEdited } from "@/components/history/last-edited";
 import { VersionHistory } from "@/components/history/version-history";
 import { Button } from "@/components/ui/button";
 import type { ArtifactDto } from "@/lib/artifact-types";
+import { readingMeasureClass } from "@/lib/page-width/rules";
+import { cn } from "@/lib/utils";
 
 import { detailBody, detailOuter, detailSection } from "./artifact-editor/detail-scroll";
 import { visibilityLabel } from "./share-options";
@@ -77,7 +79,7 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
         </div>
         {/* Read only, so nothing in the pane takes focus first: the pane does, for keyboard scrolling. */}
         <div data-slot="detail-body" role="region" aria-label="Content" tabIndex={0} className={detailBody}>
-          <div className="min-h-[460px] flex-[1_0_auto] bg-card p-6 sm:p-8">
+          <div className={cn("min-h-[460px] flex-[1_0_auto] bg-card p-6 sm:p-8", readingMeasureClass(artifact.fullWidth))} data-full-width={artifact.fullWidth}>
             <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
           </div>
         </div>
