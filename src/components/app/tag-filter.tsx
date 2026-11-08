@@ -16,6 +16,8 @@ interface TagFilterProps {
   projectFilter: ProjectFilter | null;
   /** The team whose list this is, or null for the viewer's own. */
   scopeTeam: { slug: string } | null;
+  /** The list's path: /app, or the /dev/workspace fixture. */
+  listPath?: string;
 }
 
 /** The tags after turning one on or off in the filter. */
@@ -28,14 +30,14 @@ function toggled(selected: readonly string[], tag: string): string[] {
  * list shows artifacts that carry every one of them. It lives in the URL, so
  * links keep it. Hidden when the list has no tags at all.
  */
-export function TagFilter({ facets, selected, projectFilter, scopeTeam }: TagFilterProps) {
+export function TagFilter({ facets, selected, projectFilter, scopeTeam, listPath = "/app" }: TagFilterProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   if (facets.length === 0 && selected.length === 0) return null;
   const teamSlug = scopeTeam ? scopeTeam.slug : null;
 
   function go(tags: string[]) {
-    startTransition(() => { router.push(`/app${workspaceQuery(teamSlug, projectFilter, tags)}`); });
+    startTransition(() => { router.push(`${listPath}${workspaceQuery(teamSlug, projectFilter, tags)}`); });
   }
 
   return (
