@@ -6,7 +6,7 @@ import { CommentsControl } from "@/components/app/comments-picker";
 import { ShareControl } from "@/components/app/share-control";
 import type { ShareTeam } from "@/components/app/share-teams-context";
 import { AttachedFiles } from "@/components/files/attached-files";
-import { CommentThread } from "@/components/comments/comment-thread";
+import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { VersionHistory } from "@/components/history/version-history";
 import { ArtifactOrganizers } from "@/components/projects/artifact-organizers";
@@ -56,16 +56,6 @@ function SharingSlot({ artifact, shareUrl, isAuthor, manager, team, onUpdated }:
   return null;
 }
 
-/** The thread, or a note that comments are off. Editors are the author or team members, so only "off" hides it. */
-function CommentsSection({ publicId, seesComments, isAuthor }: { publicId: string; seesComments: boolean; isAuthor: boolean }) {
-  if (seesComments) return <CommentThread publicId={publicId} className="border-t px-5 py-5 sm:px-7" />;
-  return (
-    <p className="border-t px-5 py-4 text-sm text-muted-foreground sm:px-7">
-      Comments are off for this artifact.{isAuthor ? " Change who can comment in Share." : null}
-    </p>
-  );
-}
-
 /** Edit one artifact and read its history. The author also shares and deletes it. */
 export function ArtifactEditor({ artifact, origin, isAuthor, team, seesComments, onWithdraw, onUpdated, onDeleted }: ArtifactEditorProps) {
   const { draft, update, dirty, reset } = useArtifactDraft(artifact);
@@ -98,6 +88,14 @@ export function ArtifactEditor({ artifact, origin, isAuthor, team, seesComments,
             onRestored={(restored) => { reset(restored); onUpdated(restored); }}
           />
         }
+        comments={
+          <CommentsDialog
+            publicId={artifact.publicId}
+            title={artifact.title}
+            seesComments={seesComments}
+            offNotice={`Comments are off for this artifact.${isAuthor ? " Change who can comment in Share." : ""}`}
+          />
+        }
         dirty={dirty}
         pending={pending}
         onSave={() => void save()}
@@ -121,7 +119,6 @@ export function ArtifactEditor({ artifact, origin, isAuthor, team, seesComments,
           <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} files={artifact.files} update={update} />
           {draft.kind === "file" || draft.kind === "ui" || artifact.files.length > 0 ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
           <MetaFields draft={draft} update={update} />
-          <CommentsSection publicId={artifact.publicId} seesComments={seesComments} isAuthor={isAuthor} />
         </div>
       </div>
       <ConfirmDialog
