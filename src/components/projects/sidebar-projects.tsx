@@ -24,6 +24,8 @@ interface SidebarProjectsProps {
   teams: readonly SidebarTeam[];
   /** True while an artifact card is being dragged. */
   dragging: boolean;
+  /** Entries the dragged card may not go into: they live in another space. */
+  blockedKeys: ReadonlySet<string>;
   onDropArtifact: (artifactId: string, target: SidebarProject | null) => void;
 }
 
@@ -66,10 +68,10 @@ function isActive(filter: ProjectFilter | null, key: string) {
   return filter !== null && "key" in filter && filter.key === key;
 }
 
-type EntriesProps = Pick<SidebarProjectsProps, "controls" | "filter" | "onFilter" | "onDropArtifact"> & { namesTeams: boolean };
+type EntriesProps = Pick<SidebarProjectsProps, "controls" | "filter" | "onFilter" | "onDropArtifact" | "blockedKeys"> & { namesTeams: boolean };
 
 /** "No project" and every project entry, with rename in place and delete behind a confirm. */
-function ProjectEntries({ controls, filter, onFilter, onDropArtifact, namesTeams }: EntriesProps) {
+function ProjectEntries({ controls, filter, onFilter, onDropArtifact, blockedKeys, namesTeams }: EntriesProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<{ row: SidebarProjectRow; count: number | null } | null>(null);
   const confirmDelete = useConfirm("deleteProject");
@@ -101,6 +103,7 @@ function ProjectEntries({ controls, filter, onFilter, onDropArtifact, namesTeams
         key={project.key}
         project={project}
         active={active}
+        blocked={blockedKeys.has(project.key)}
         namesTeams={namesTeams}
         onFilter={() => { onFilter(active ? null : { key: project.key }); }}
         onDropArtifact={(id) => { onDropArtifact(id, project); }}
@@ -156,7 +159,7 @@ function GroupHeader({ open, dragging, onToggle, onCreate }: { open: boolean; dr
  * keeps the artifacts; they just leave the project. Open on wide screens,
  * closed at first where the sidebar is short.
  */
-export function SidebarProjects({ controls, filter, onFilter, scopeTeam, teams, dragging, onDropArtifact }: SidebarProjectsProps) {
+export function SidebarProjects({ controls, filter, onFilter, scopeTeam, teams, dragging, blockedKeys, onDropArtifact }: SidebarProjectsProps) {
   const wide = useMediaQuery("(min-width: 64rem)", true);
   const [openChoice, setOpenChoice] = useState<boolean | null>(null);
   const [creating, setCreating] = useState(false);
@@ -168,7 +171,7 @@ export function SidebarProjects({ controls, filter, onFilter, scopeTeam, teams, 
       {open ? (
         <div data-slot="sidebar-projects" className="relative max-h-48 overflow-y-auto overscroll-contain">
           {creating ? <CreateForm controls={controls} scopeTeam={scopeTeam} teams={teams} onDone={() => { setCreating(false); }} /> : null}
-          <ProjectEntries controls={controls} filter={filter} onFilter={onFilter} onDropArtifact={onDropArtifact} namesTeams={scopeTeam === null} />
+          <ProjectEntries controls={controls} filter={filter} onFilter={onFilter} onDropArtifact={onDropArtifact} blockedKeys={blockedKeys} namesTeams={scopeTeam === null} />
           {controls.entries.length === 0 && !creating ? <p className="px-2 pb-1 text-xs text-muted-foreground">Create a project, then move artifacts into it.</p> : null}
         </div>
       ) : null}

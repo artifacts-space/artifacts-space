@@ -94,6 +94,28 @@ test.describe("desktop", () => {
     await expect(entry(page, "Design")).toHaveText(/Design\s*2/);
   });
 
+  test("should refuse a drop on a team project when the artifact is private, and say to share it first", async ({ page }) => {
+    await openWorkspace(page);
+    const note = card(page, "Note 5");
+    const launch = projects(page).locator("li").filter({ has: page.getByRole("button", { name: entryName("Launch") }) });
+    await dragCard(page, note, entry(page, "Launch"), async () => {
+      await expect(launch).toHaveAttribute("data-drop-target", "blocked");
+    });
+    await expect(page.getByText("Share it with Acme first to put it in Launch.")).toBeVisible();
+    await expect(projectLine(note)).toHaveText(/No project/);
+    await expect(entry(page, "Launch")).toHaveText(/Launch\s*0/);
+    await expect(entry(page, "No project")).toHaveText(/No project\s*37/);
+  });
+
+  test("should show a team project as closed in the card menu, with the same hint, when the artifact is private", async ({ page }) => {
+    await openWorkspace(page);
+    await card(page, "Note 6").getByRole("button", { name: "Move to project" }).click();
+    const launch = page.getByRole("menuitem", { name: /Launch/ });
+    await expect(launch).toHaveAttribute("aria-disabled", "true");
+    await expect(launch).toContainText("Share it with Acme first to put it in Launch.");
+    await expect(page.getByRole("menuitem", { name: /Research/ })).not.toHaveAttribute("aria-disabled", "true");
+  });
+
   test("should move an artifact from the card menu with the keyboard only", async ({ page }) => {
     await openWorkspace(page);
     const note = card(page, "Note 3");

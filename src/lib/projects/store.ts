@@ -3,15 +3,16 @@ import { randomUUID } from "node:crypto";
 import { and, count, eq, isNull, type SQL } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { artifact, project, type ArtifactRecord, type ProjectRecord } from "@/db/schema";
+import { artifact, project, team, type ArtifactRecord, type ProjectRecord } from "@/db/schema";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { getEditableArtifact } from "@/lib/access";
 import type { ArtifactProjectDto } from "@/lib/artifact-types";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { projectLimits } from "./limits";
+import { crossSpaceMessage, type MoveSpace } from "./move-rules";
 import { projectNameKey, sameScope, scopeIsFull, scopeOfRow, type ProjectScope } from "./rules";
-import { inScope, loadHomeScope, scopeColumns } from "./scope";
+import { canUseScope, inScope, loadHomeScope, scopeColumns } from "./scope";
 
 /**
  * Linking artifacts to projects. An artifact's project always lives in its
@@ -66,12 +67,32 @@ export async function loadProject(projectId: string): Promise<{ row: ProjectReco
 /** How a project is chosen: by name (found or created in the home scope), by id, or none. */
 export type ProjectChoice = { name: string } | { projectId: string } | { none: true };
 
+const NOT_ITS_PROJECT = "Project not found. Pick one of this artifact's projects.";
+
+/** A scope as a move message names it. */
+async function describeSpace(scope: ProjectScope, viewerId: string): Promise<MoveSpace> {
+  if (scope.kind === "user") return scope.userId === viewerId ? { kind: "own" } : { kind: "other" };
+  const [row] = await getDb().select({ name: team.name }).from(team).where(eq(team.id, scope.teamId)).limit(1);
+  return { kind: "team", name: row?.name ?? "its team" };
+}
+
+/**
+ * Refuses a project outside the artifact's home space. Nothing moves and no
+ * look-alike project is made. The editor hears what to do only when they may
+ * use the project's space; anyone else's projects are "not found".
+ */
+async function refuseOtherSpace(loaded: { row: ProjectRecord; scope: ProjectScope }, home: ProjectScope, editorId: string): Promise<never> {
+  if (!(await canUseScope(editorId, loaded.scope))) throw new UserFacingError(NOT_ITS_PROJECT);
+  const [target, from] = await Promise.all([describeSpace(loaded.scope, editorId), describeSpace(home, editorId)]);
+  throw new UserFacingError(crossSpaceMessage(loaded.row.name, target, from));
+}
+
 async function resolveChoice(choice: ProjectChoice, scope: ProjectScope, editorId: string): Promise<ProjectRecord | null> {
   if ("none" in choice) return null;
   if ("name" in choice) return findOrCreateProject(scope, choice.name, editorId);
   const loaded = await loadProject(choice.projectId);
-  // Projects of another person or team are "not found", whoever owns them.
-  if (!loaded || !sameScope(loaded.scope, scope)) throw new UserFacingError("Project not found. Pick one of this artifact's projects.");
+  if (!loaded) throw new UserFacingError(NOT_ITS_PROJECT);
+  if (!sameScope(loaded.scope, scope)) return refuseOtherSpace(loaded, scope, editorId);
   return loaded.row;
 }
 

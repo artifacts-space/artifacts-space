@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ArtifactListItemDto } from "@/lib/artifact-types";
-import { projectKeyOf, type SidebarProject } from "@/lib/projects/sidebar-rules";
+import { projectKeyOf, type MoveTarget, type SidebarProject } from "@/lib/projects/sidebar-rules";
 import { rowTags } from "@/lib/tags/rules";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +36,24 @@ export interface CardMoves {
   /** False on touch screens: there the card's menu is the way to move. */
   canDrag: boolean;
   onMove: (artifact: ArtifactListItemDto, target: SidebarProject | null) => void;
+  /** The project an artifact would land in for an entry, or why it may not (another space). */
+  targetFor: (artifact: ArtifactListItemDto, target: SidebarProject) => MoveTarget;
   onDragChange: (artifactId: string | null) => void;
+}
+
+/** One project in the card's menu: pick it, or read why this artifact cannot go there. */
+function MoveItem({ artifact, project, current, moves }: { artifact: ArtifactListItemDto; project: SidebarProject; current: boolean; moves: CardMoves }) {
+  const target = moves.targetFor(artifact, project);
+  const refusal = "refusal" in target ? target.refusal : null;
+  return (
+    <DropdownMenuItem disabled={current || refusal !== null} onClick={() => { moves.onMove(artifact, project); }} className={refusal ? "flex-col items-start gap-0.5" : undefined}>
+      <span className="flex w-full min-w-0 items-center gap-1.5">
+        <ProjectLabel name={project.name} icon={project.icon} className="min-w-0 flex-1" />
+        {current ? <IconCheck aria-label="Current project" className="ml-auto" /> : null}
+      </span>
+      {refusal ? <span className="pl-5 text-xs text-muted-foreground">{refusal}</span> : null}
+    </DropdownMenuItem>
+  );
 }
 
 /** The card's menu: move to a project or to no project. The way to move without a mouse. */
@@ -55,12 +72,7 @@ function CardMenu({ artifact, moves, titleId }: { artifact: ArtifactListItemDto;
       <DropdownMenuContent align="end" className="max-h-80 w-auto min-w-52 max-w-72">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex items-center gap-1.5"><IconFolderShare aria-hidden className="size-3.5" /> Move to project</DropdownMenuLabel>
-          {moves.projects.map((project) => (
-            <DropdownMenuItem key={project.key} disabled={project.key === currentKey} onClick={() => { moves.onMove(artifact, project); }}>
-              <ProjectLabel name={project.name} icon={project.icon} className="min-w-0 flex-1" />
-              {project.key === currentKey ? <IconCheck aria-label="Current project" className="ml-auto" /> : null}
-            </DropdownMenuItem>
-          ))}
+          {moves.projects.map((project) => <MoveItem key={project.key} artifact={artifact} project={project} current={project.key === currentKey} moves={moves} />)}
           {moves.projects.length === 0 ? <p className="px-1.5 py-1 text-sm text-muted-foreground">Create a project in the sidebar first.</p> : null}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

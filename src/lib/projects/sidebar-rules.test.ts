@@ -5,6 +5,8 @@ import {
   afterRowDeleted,
   afterRowRenamed,
   countsFromFacets,
+  homeSpaceOf,
+  moveTarget,
   deleteProjectCopy,
   matchesProjectFilter,
   shiftCount,
@@ -118,5 +120,49 @@ describe("toSidebarRows", () => {
 
   it("should leave out a row when its team is not one of the viewer's shared teams", () => {
     expect(toSidebarRows([{ id: "x", name: "Secret", icon: null, teamId: "other" }, { id: "p", name: "Personal", icon: null, teamId: "me" }], teams)).toEqual([]);
+  });
+});
+
+describe("homeSpaceOf", () => {
+  const teams = [{ id: "acme", slug: "acme", name: "Acme", personal: false }, { id: "me", slug: "me", name: "Me", personal: true }];
+
+  it("should be the viewer's own space when the artifact is private", () => {
+    expect(homeSpaceOf({ authorId: "viewer", visibility: "private", teamId: "acme" }, teams, "viewer")).toEqual({ kind: "own" });
+  });
+
+  it("should be the team when the artifact is shared through a shared team", () => {
+    expect(homeSpaceOf({ authorId: "viewer", visibility: "team", teamId: "acme" }, teams, "viewer")).toEqual({ kind: "team", slug: "acme", name: "Acme" });
+  });
+
+  it("should be the author's own space when the artifact is shared through a personal team", () => {
+    expect(homeSpaceOf({ authorId: "viewer", visibility: "link", teamId: "me" }, teams, "viewer")).toEqual({ kind: "own" });
+  });
+
+  it("should be another person's space when someone else wrote a private artifact", () => {
+    expect(homeSpaceOf({ authorId: "someone", visibility: "private", teamId: null }, teams, "viewer")).toEqual({ kind: "other" });
+  });
+
+  it("should match no rows when the artifact's team is not one of the viewer's", () => {
+    const home = homeSpaceOf({ authorId: "viewer", visibility: "team", teamId: "globex" }, teams, "viewer");
+    expect(moveTarget({ key: "launch", name: "Launch", icon: null, count: 0, rows: [teamRow("t1", "Launch")] }, home)).toHaveProperty("refusal");
+  });
+});
+
+describe("moveTarget", () => {
+  const merged = { key: "design", name: "Design", icon: null, count: 0, rows: [teamRow("t1", "Design"), own("o1", "Design")] };
+
+  it("should pick the row in the artifact's own space when a name exists in several spaces", () => {
+    expect(moveTarget(merged, { kind: "own" })).toEqual({ row: own("o1", "Design") });
+    expect(moveTarget(merged, { kind: "team", slug: "acme", name: "Acme" })).toEqual({ row: teamRow("t1", "Design") });
+  });
+
+  it("should refuse and say to share first when a private artifact goes to a team-only project", () => {
+    const launch = { key: "launch", name: "Launch", icon: null, count: 0, rows: [teamRow("t1", "Launch")] };
+    expect(moveTarget(launch, { kind: "own" })).toEqual({ refusal: "Share it with Acme first to put it in Launch." });
+  });
+
+  it("should refuse and say to stop sharing first when a team artifact goes to the viewer's own project", () => {
+    const research = { key: "research", name: "Research", icon: null, count: 0, rows: [own("o1", "Research")] };
+    expect(moveTarget(research, { kind: "team", slug: "acme", name: "Acme" })).toEqual({ refusal: "Stop sharing it with Acme first to put it in Research." });
   });
 });

@@ -48,7 +48,15 @@ function useDropTarget(onDropArtifact: (artifactId: string) => void) {
   };
 }
 
+/** The row's drop state for styling and tests: "" when a drop would land, "blocked" when it is refused. */
+function dropState(over: boolean, blocked: boolean) {
+  if (!over) return undefined;
+  return blocked ? "blocked" : "";
+}
+
 interface DropRowProps {
+  /** True while the dragged card belongs to another space: the drop is refused with a hint. */
+  blocked?: boolean;
   label: string;
   icon: React.ReactNode;
   count: number;
@@ -60,13 +68,18 @@ interface DropRowProps {
 }
 
 /** One row in the Projects group: filters the list when clicked, and takes dropped artifact cards. */
-export function DropRow({ label, icon, count, active, onFilter, onDropArtifact, children }: DropRowProps) {
+export function DropRow({ blocked = false, label, icon, count, active, onFilter, onDropArtifact, children }: DropRowProps) {
   const { over, handlers } = useDropTarget(onDropArtifact);
   return (
     <li
       {...handlers}
-      data-drop-target={over ? "" : undefined}
-      className={cn("group/entry relative flex items-center rounded-md transition-colors", over && "bg-accent text-accent-foreground ring-1 ring-foreground/25 ring-inset")}
+      data-drop-target={dropState(over, blocked)}
+      className={cn(
+        "group/entry relative flex items-center rounded-md transition",
+        blocked && "opacity-50",
+        over && !blocked && "bg-accent text-accent-foreground ring-1 ring-foreground/25 ring-inset",
+        over && blocked && "cursor-not-allowed ring-1 ring-foreground/15 ring-inset",
+      )}
     >
       <button
         type="button"
@@ -129,14 +142,15 @@ function EntryMenu({ project, namesTeams, onRename, onDelete }: EntryMenuProps) 
 interface ProjectEntryProps extends Omit<EntryMenuProps, "project"> {
   project: SidebarProject;
   active: boolean;
+  blocked: boolean;
   onFilter: () => void;
   onDropArtifact: (artifactId: string) => void;
 }
 
 /** One project in the Projects group: filter, drop target, and its menu. */
-export function ProjectEntry({ project, active, onFilter, onDropArtifact, ...menu }: ProjectEntryProps) {
+export function ProjectEntry({ project, active, blocked, onFilter, onDropArtifact, ...menu }: ProjectEntryProps) {
   return (
-    <DropRow label={project.name} icon={<ProjectIcon icon={project.icon} />} count={project.count} active={active} onFilter={onFilter} onDropArtifact={onDropArtifact}>
+    <DropRow blocked={blocked} label={project.name} icon={<ProjectIcon icon={project.icon} />} count={project.count} active={active} onFilter={onFilter} onDropArtifact={onDropArtifact}>
       <EntryMenu project={project} {...menu} />
     </DropRow>
   );

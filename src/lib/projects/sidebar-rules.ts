@@ -1,3 +1,4 @@
+import { crossSpaceMessage, type MoveSpace } from "./move-rules";
 import { projectNameKey, type ProjectFilter } from "./rules";
 
 /**
@@ -170,4 +171,52 @@ export function toSidebarRows(sources: readonly RowSource[], teams: readonly (Si
     const team = shared.get(source.teamId);
     return team ? [{ id: source.id, name: source.name, icon: source.icon, team }] : [];
   });
+}
+
+/** Where an artifact's projects live, as the browser can tell: the viewer's own, a shared team's, or its author's. */
+export type HomeSpace = { kind: "own" } | { kind: "team"; slug: string; name: string } | { kind: "other" };
+
+/** The fields of a list item that decide its home space. */
+interface HomeSubject {
+  authorId: string;
+  visibility: string;
+  teamId: string | null;
+}
+
+/**
+ * The artifact's home space, as artifactHomeScope decides it on the server:
+ * the shared team it is shared through, else its author's own projects. A
+ * team the viewer is not in has no slug here, so none of its rows match.
+ */
+export function homeSpaceOf(subject: HomeSubject, teams: readonly (SidebarTeam & { id: string; personal: boolean })[], viewerId: string): HomeSpace {
+  const team = subject.visibility !== "private" && subject.teamId !== null ? teams.find((item) => item.id === subject.teamId) : undefined;
+  if (subject.visibility !== "private" && subject.teamId !== null && !team) return { kind: "team", slug: "", name: "its team" };
+  if (team && !team.personal) return { kind: "team", slug: team.slug, name: team.name };
+  return subject.authorId === viewerId ? { kind: "own" } : { kind: "other" };
+}
+
+function inSpace(row: SidebarProjectRow, home: HomeSpace): boolean {
+  if (home.kind === "own") return row.team === null;
+  return home.kind === "team" && row.team?.slug === home.slug;
+}
+
+function moveSpaceOf(row: SidebarProjectRow): MoveSpace {
+  return row.team ? { kind: "team", name: row.team.name } : { kind: "own" };
+}
+
+/** A move onto an entry: the row in the artifact's home space, or why it may not go there. */
+export type MoveTarget = { row: SidebarProjectRow } | { refusal: string };
+
+/**
+ * Which row of an entry an artifact moves into: the one in its home space.
+ * When the entry has none, the move is refused with what to do instead;
+ * a look-alike project is never made.
+ */
+export function moveTarget(entry: SidebarProject, home: HomeSpace): MoveTarget {
+  const row = entry.rows.find((item) => inSpace(item, home));
+  if (row) return { row };
+  const other = entry.rows[0];
+  const target: MoveSpace = other ? moveSpaceOf(other) : { kind: "own" };
+  const from: MoveSpace = home.kind === "team" ? { kind: "team", name: home.name } : home;
+  return { refusal: crossSpaceMessage(entry.name, target, from) };
 }

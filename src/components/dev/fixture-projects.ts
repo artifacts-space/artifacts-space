@@ -1,13 +1,15 @@
 import type { ProjectsApi } from "@/components/app/projects-api";
 import type { ArtifactDto, ArtifactProjectDto } from "@/lib/artifact-types";
 import type { ProjectFacets } from "@/lib/projects/queries";
+import { crossSpaceMessage } from "@/lib/projects/move-rules";
 import { mergeProjectFacets, normalizeProjectName, projectNameKey } from "@/lib/projects/rules";
 import type { SidebarProjectRow } from "@/lib/projects/sidebar-rules";
 
 /**
  * Development only: projects for the /dev/workspace fixture, kept in
- * memory, with a stand-in for the project server actions. "Locked note"
- * refuses every move, so tests can see a move roll back.
+ * memory, with a stand-in for the project server actions. Every fixture
+ * artifact is private, so like the server it refuses team projects.
+ * "Locked note" refuses every move, so tests can see a move roll back.
  */
 
 /** The fixture's projects and which project each artifact is in. */
@@ -72,6 +74,7 @@ export function fixtureProjectsApi(read: Read, update: Update, titleOf: (artifac
       const state = read();
       const row = "name" in choice ? state.rows.find((item) => projectNameKey(item.name) === projectNameKey(choice.name)) : "projectId" in choice ? state.rows.find((item) => item.id === choice.projectId) : undefined;
       if (!("none" in choice) && !row) return fail("Project not found.");
+      if (row?.team) return fail(crossSpaceMessage(row.name, { kind: "team", name: row.team.name }, { kind: "own" }));
       update((current) => ({ ...current, links: { ...current.links, [artifactId]: row?.id ?? null } }));
       return Promise.resolve({ success: true, data: row ? toDto(row) : null });
     },

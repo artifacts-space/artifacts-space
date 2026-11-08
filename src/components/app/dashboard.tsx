@@ -166,7 +166,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
-  const sidebar = useDashboardProjects({ artifacts, setArtifacts, rows: projectRows, facets, api: projectsApi, teams, scopeTeam, tagFilter, listPath });
+  const sidebar = useDashboardProjects({ artifacts, setArtifacts, rows: projectRows, facets, api: projectsApi, teams, scopeTeam, tagFilter, listPath, viewerId });
 
   const serverMatches = useServerSearch(query, scopeTeam?.id ?? null, projectFilter, tagFilter);
   // A card moved out of the filtered project leaves the list at once; Undo brings it back.
@@ -236,6 +236,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
               scopeTeam={scopeTeam}
               teams={sidebar.shared}
               dragging={sidebar.dragging}
+              blockedKeys={sidebar.blockedKeys}
               onDropArtifact={sidebar.dropped}
             />
             <div data-slot="artifact-list" className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">

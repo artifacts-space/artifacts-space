@@ -8,9 +8,12 @@ import {
   afterRowDeleted,
   afterRowRenamed,
   countsFromFacets,
+  moveTarget,
   projectKeyOf,
   shiftCount,
   sidebarProjects,
+  type HomeSpace,
+  type MoveTarget,
   type SidebarProject,
   type SidebarProjectRow,
   type SidebarProjectsState,
@@ -29,7 +32,12 @@ interface SidebarProjectsOptions {
   /** The viewer's shared teams, to name a project created for one. */
   teams: readonly SidebarTeam[];
   setArtifacts: SetArtifacts;
+  /** Where an artifact's projects live: it only ever moves within that space. */
+  homeOf: (artifact: Movable) => HomeSpace;
 }
+
+/** The fields of a card that a move reads. */
+export type Movable = Pick<ArtifactListItemDto, "id" | "title" | "project" | "authorId" | "visibility" | "teamId">;
 
 /** One artifact's project, replaced only while it still holds the value this change expects. */
 function patchProject(setArtifacts: SetArtifacts, id: string, expected: ArtifactProjectDto | null, next: ArtifactProjectDto | null) {
@@ -64,7 +72,7 @@ function moveMessage(title: string, to: ArtifactProjectDto | null, from: Artifac
  * Undo when they land. Fresh server data (after any project change) replaces
  * the local state.
  */
-export function useSidebarProjects({ rows, facets, api, teams, setArtifacts }: SidebarProjectsOptions) {
+export function useSidebarProjects({ rows, facets, api, teams, setArtifacts, homeOf }: SidebarProjectsOptions) {
   const [source, setSource] = useState({ rows, facets });
   const [state, setState] = useState(() => initialState(rows, facets));
   if (source.rows !== rows || source.facets !== facets) {
@@ -95,13 +103,30 @@ export function useSidebarProjects({ rows, facets, api, teams, setArtifacts }: S
     toast.success(move.message, { action: { label: "Undo", onClick: undo } });
   }
 
-  /** Moves an artifact into a project entry, or out of every project (null). */
-  function move(artifact: Pick<ArtifactListItemDto, "id" | "title" | "project">, target: SidebarProject | null) {
+  /** The project row an artifact would land in for an entry, or why it may not. */
+  function targetFor(artifact: Movable, entry: SidebarProject): MoveTarget {
+    return moveTarget(entry, homeOf(artifact));
+  }
+
+  /**
+   * Moves an artifact into a project entry, or out of every project (null).
+   * Only into the entry's project in the artifact's own space: a project in
+   * another space is refused with what to do, and nothing moves.
+   */
+  function move(artifact: Movable, target: SidebarProject | null) {
     const from = artifact.project;
     if (projectKeyOf(from) === (target?.key ?? null)) return;
-    const optimistic = target ? { id: target.rows[0]?.id ?? target.key, name: target.name, icon: target.icon } : null;
-    // By name: the artifact lands in the project with this name in its own home scope.
-    const choice: ProjectChoice = target ? { name: target.name } : { none: true };
+    if (!target) {
+      void apply(artifact, from, { choice: { none: true }, optimistic: null, message: moveMessage(artifact.title, null, from), undoable: true });
+      return;
+    }
+    const resolved = targetFor(artifact, target);
+    if ("refusal" in resolved) {
+      toast.error(resolved.refusal);
+      return;
+    }
+    const optimistic = { id: resolved.row.id, name: resolved.row.name, icon: resolved.row.icon };
+    const choice: ProjectChoice = { projectId: resolved.row.id };
     void apply(artifact, from, { choice, optimistic, message: moveMessage(artifact.title, optimistic, from), undoable: true });
   }
 
@@ -134,7 +159,7 @@ export function useSidebarProjects({ rows, facets, api, teams, setArtifacts }: S
     return true;
   }
 
-  return { entries, none: state.counts.none, move, create, rename, remove };
+  return { entries, none: state.counts.none, move, targetFor, create, rename, remove };
 }
 
 /** What the Projects group reads and calls. */
