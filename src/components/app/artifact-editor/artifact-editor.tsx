@@ -93,6 +93,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
     <section className={detailSection} aria-label={`Edit ${artifact.title}`}>
       <EditorToolbar
         id={artifact.id}
+        publicId={artifact.publicId}
         kind={draft.kind}
         content={artifact.content}
         shareControl={<SharingSlot artifact={artifact} shareUrl={shareUrl} canShare={canShare} manager={onWithdraw !== null} team={team} onUpdated={onUpdated} />}

@@ -35,7 +35,7 @@ export function renderMentionEmail(url: string, author: string, title: string) {
     heading: html`${author} mentioned you`,
     paragraphs: [html`They mentioned you in a comment on “${title}”. Open the thread to read it and reply.`],
     action: { label: "Open thread", url },
-    reason: "You get this email for the first unread mention on an artifact. Your inbox in artifacts.space lists them all.",
+    reason: "You get this email for the first unread mention on an artifact. Your inbox in artifacts.space lists them all, and you can turn these emails off in Settings.",
     text: `${author} mentioned you in a comment on "${title}".\n\nOpen the thread: ${url}`,
   });
 }

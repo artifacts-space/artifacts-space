@@ -54,7 +54,7 @@ for (const theme of themes) {
     const inOrder = tops.every((top, index) => index === 0 || top > (tops[index - 1] ?? Number.POSITIVE_INFINITY));
     expect(inOrder, `sections run hero, ${storySections.join(", ")}`).toBe(true);
 
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
   });
 }
@@ -89,7 +89,7 @@ test("should keep the header pinned to the top with a visible edge when the page
   const edge = await header.evaluate((element) => getComputedStyle(element).borderBottomColor);
   expect(edge, "the edge shows once the page has scrolled").not.toMatch(transparent);
 
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
 });
 
@@ -195,7 +195,7 @@ for (const theme of themes) {
     await expect(pricing.getByRole("article", { name: "Teams" }).getByRole("button", { name: "Start a team" })).toHaveAttribute("href", "/sign-up?next=%2Fteams%2Fnew");
     await expect(pricing.getByText("Free today for individuals and teams. Accounts and teams made now stay free, even if we add paid plans later.")).toBeVisible();
 
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
   });
 }
@@ -236,7 +236,7 @@ test("should stack the plan cards without sideways scroll when the window is pho
   const individuals = await pricing.getByRole("article", { name: "Individuals" }).boundingBox();
   const teams = await pricing.getByRole("article", { name: "Teams" }).boundingBox();
   expect(individuals && teams && teams.y >= individuals.y + individuals.height, "Teams sits below Individuals").toBe(true);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
 });
 
@@ -245,7 +245,7 @@ for (const width of [640, 768, 1024]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
     await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
     const fit = await page.getByRole("navigation", { name: "Main navigation" }).evaluate((nav) => {
       const logo = nav.parentElement?.firstElementChild?.getBoundingClientRect();
@@ -261,5 +261,27 @@ for (const width of [640, 768, 1024]) {
       return header ? Math.abs(box.left + box.width / 2 - (header.left + header.width / 2)) : Number.NaN;
     });
     expect(center, "from 1024px the section links sit in the middle of the header").toBeLessThanOrEqual(2);
+  });
+}
+
+for (const width of [320, 360, 375, 390]) {
+  test(`should keep the homepage within the screen and the install command reachable when the window is ${String(width)}px wide`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "phone", "narrow phones only");
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/");
+    await page.getByRole("region", { name: "One surface for people and agents." }).scrollIntoViewIfNeeded();
+
+    // clientWidth, not innerWidth: a phone browser zooms out to fit wide content, which grows innerWidth with it.
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
+
+    const command = page.getByRole("region", { name: "Use it like the artifacts you already know." }).getByText("npx skills add artifacts-space/skills");
+    const reachable = await command.evaluate((element) => {
+      const line = element.parentElement;
+      if (!line) return false;
+      line.scrollLeft = line.scrollWidth;
+      return element.getBoundingClientRect().right <= line.getBoundingClientRect().right + 1;
+    });
+    expect(reachable, "the whole install command can be read inside its terminal").toBe(true);
   });
 }

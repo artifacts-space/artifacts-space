@@ -6,6 +6,7 @@ import { tooManyRequests } from "@/lib/abuse/responses";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
 import { bearerToken } from "@/lib/mcp/authenticate";
 import { resolveRequestViewer, viewerUserId, type RequestViewer } from "@/lib/request-viewer";
+import { noindexHeader } from "@/lib/search/search-rules";
 import { rawContentPolicy } from "@/lib/security-header-rules";
 
 import { artifactToMarkdown, notFoundMarkdown } from "./artifact-markdown";
@@ -28,13 +29,16 @@ function hasCredentials(request: Request): boolean {
   return bearerToken(request.headers.get("authorization")) !== null || getSessionCookie(request.headers) !== null;
 }
 
-/** Headers on every answer: never mixed with the HTML page in a cache, never indexed. */
+/**
+ * Headers on every answer: never mixed with the HTML page in a cache, and
+ * never indexed, even when the page is (it would repeat the page).
+ */
 export function markdownHeaders(credentialed: boolean, contentType = "text/markdown; charset=utf-8"): Record<string, string> {
   return {
     "Content-Type": contentType,
     "Cache-Control": credentialed ? privateCache : publicCache,
     Vary: "Accept, Authorization, Cookie",
-    "X-Robots-Tag": "noindex",
+    "X-Robots-Tag": noindexHeader,
     "X-Content-Type-Options": "nosniff",
   };
 }
@@ -68,12 +72,16 @@ const unavailable = "# Try again\n\nThe artifact could not be loaded right now. 
 
 type Loaded = { viewable: ViewableArtifact; userId: string | null } | Response;
 
-/** Who is asking and what they may read, or the answer to send instead. */
+/**
+ * Who is asking and what they may read, or the answer to send instead. Any
+ * failure, including a missing network key secret, becomes the 503 below,
+ * so even a misconfigured server answers with markdownHeaders (noindex).
+ */
 async function loadForViewer(request: Request, publicId: string, credentialed: boolean): Promise<Loaded> {
-  const network = networkKey(request.headers);
-  const flood = await refuseOverLimit(markdownLimitChecks(network, null), credentialed);
-  if (flood) return flood;
   try {
+    const network = networkKey(request.headers);
+    const flood = await refuseOverLimit(markdownLimitChecks(network, null), credentialed);
+    if (flood) return flood;
     const viewer = await resolveRequestViewer(request);
     if (viewer.status === "invalid-token") return markdownResponse(invalidToken, 401, true, { "WWW-Authenticate": 'Bearer error="invalid_token"' });
     const tokenChecks = markdownLimitChecks(network, viewer).slice(1);

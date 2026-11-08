@@ -27,6 +27,13 @@ async function expectPageDoesNotScroll(page: Page) {
 
 const slot = (page: Page, name: string) => page.locator(`[data-slot=${name}]`);
 
+/** A box's rendered width. */
+const widthOf = (box: Locator) => box.evaluate((element) => element.getBoundingClientRect().width);
+
+/** The public page's column is 960px with 24px of padding each side, so its content runs 912px wide. */
+const pageContent = 912;
+const wide = { width: 1600, height: 900 };
+
 /** Scrolls a scroll box to its bottom and returns its scrollTop. */
 function scrollToBottom(box: Locator) {
   return box.evaluate((element) => {
@@ -273,6 +280,43 @@ test.describe("desktop and tablet", () => {
   });
 });
 
+test.describe("open and page column", () => {
+  test.skip(({ isMobile }) => isMobile, "measured on desktop; the phone check is below");
+
+  test("should open the artifact's own page in a new tab from beside the copy button", async ({ page }) => {
+    await openWorkspace(page, wide);
+    const open = page.getByRole("link", { name: "Open the artifact page in a new tab" });
+    await expect(open).toHaveAttribute("href", "/artifact/fixtureworkspace0000ui");
+    await expect(open).toHaveAttribute("target", "_blank");
+    await expect(open).toHaveAttribute("rel", /noopener/);
+    await expect(open).toHaveText("Open");
+    // Hover again until the page has hydrated and the tooltip answers.
+    await expect(async () => {
+      await page.mouse.move(0, 0);
+      await open.hover();
+      await expect(page.locator("[data-slot=tooltip-content]")).toHaveText("Open its page in a new tab", { timeout: 1000 });
+    }).toPass();
+  });
+
+  test("should hold the whole preview and the source field to the centered page column when Full width is off", async ({ page }) => {
+    await openWorkspace(page, wide);
+    const body = slot(page, "detail-body");
+    expect(await widthOf(body), "the pane is wider than the page column").toBeGreaterThan(1000);
+    const column = body.locator("[data-slot=page-column]");
+    expect(await widthOf(column)).toBeLessThanOrEqual(960);
+    const gaps = await column.evaluate((element) => {
+      const pane = element.parentElement?.getBoundingClientRect();
+      const box = element.getBoundingClientRect();
+      return pane ? { left: box.left - pane.left, right: pane.right - box.right } : { left: -1, right: 0 };
+    });
+    expect(Math.abs(gaps.left - gaps.right), "the column is centered").toBeLessThanOrEqual(2);
+    expect(await widthOf(body.getByRole("note").first()), "a callout keeps to the column").toBeLessThanOrEqual(pageContent + 1);
+
+    await viewSource(page);
+    expect(await widthOf(page.getByRole("textbox", { name: "Artifact source" })), "the source field keeps to the column").toBeLessThanOrEqual(960);
+  });
+});
+
 test.describe("phone", () => {
   test.skip(({ isMobile }) => !isMobile, "the phone layout");
 
@@ -291,6 +335,14 @@ test.describe("phone", () => {
     const historyBox = await history.boundingBox();
     expect(historyBox?.y ?? -1, "the actions sit below the app header").toBeGreaterThanOrEqual((header?.y ?? 0) + (header?.height ?? 0) - 1);
     expect(await escapedElements(page), "nothing sticks out sideways").toEqual([]);
+  });
+
+  test("should show Open as an icon with its name kept for screen readers", async ({ page }) => {
+    await page.goto("/dev/workspace");
+    const open = page.getByRole("link", { name: "Open the artifact page in a new tab" });
+    await expect(open).toBeVisible();
+    expect(await widthOf(open.getByText("Open")), "the label is visually hidden").toBeLessThanOrEqual(1);
+    expect(await widthOf(open), "icon only").toBeLessThanOrEqual(40);
   });
 });
 

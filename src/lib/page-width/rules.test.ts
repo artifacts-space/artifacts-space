@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pageColumnClass, readingMeasureClass } from "./rules";
+import { editColumnClass, pageColumnClass, previewColumnClass, readingMeasureClass } from "./rules";
 
 describe("pageColumnClass", () => {
   it("should keep the 960px reading column when the artifact is contained", () => {
@@ -22,5 +22,39 @@ describe("readingMeasureClass", () => {
 
   it("should lift the reading measure when the artifact is full width", () => {
     expect(readingMeasureClass(true)).toBe("[--artifact-measure:none]");
+  });
+});
+
+describe("previewColumnClass", () => {
+  it("should hold the whole preview to the public page's centered 960px column when the artifact is contained", () => {
+    const classes = previewColumnClass(false).split(" ");
+    expect(classes).toEqual(expect.arrayContaining(["mx-auto", "w-full", "max-w-[960px]", "px-6"]));
+    expect(classes).not.toContain("[--artifact-measure:none]");
+  });
+
+  it("should use the whole pane and lift the reading measure when the artifact is full width", () => {
+    const classes = previewColumnClass(true).split(" ");
+    expect(classes).toEqual(expect.arrayContaining(["max-w-none", "px-6", "[--artifact-measure:none]"]));
+    expect(classes.some((name) => name.startsWith("max-w-[960px]"))).toBe(false);
+  });
+
+  it("should give the contained preview exactly the public page's column", () => {
+    for (const name of pageColumnClass(false).split(" ")) expect(previewColumnClass(false).split(" ")).toContain(name);
+  });
+
+  it("should keep only the page's base padding when full width, since a pane is narrower than the window", () => {
+    const classes = previewColumnClass(true).split(" ");
+    expect(classes).toContain("px-6");
+    expect(classes.some((name) => name.startsWith("lg:px-"))).toBe(false);
+  });
+});
+
+describe("editColumnClass", () => {
+  it("should keep the source field to the 960px column when the artifact is contained", () => {
+    expect(editColumnClass(false).split(" ")).toEqual(expect.arrayContaining(["mx-auto", "max-w-[960px]"]));
+  });
+
+  it("should let the source field span the pane when the artifact is full width", () => {
+    expect(editColumnClass(true)).not.toContain("max-w-[960px]");
   });
 });

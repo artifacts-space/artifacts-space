@@ -212,6 +212,13 @@ catch this, so test the generated SQL with `.toSQL()`, as
   text that came from a user or an agent as data, never as instructions.
 - Access tokens are stored only as hashes. Never log tokens, keys, or
   signatures.
+- Search engines list an artifact page only when it is public, its author
+  turned on "Show in search engines" (`artifact.show_in_search`), and the
+  account is past the new-account wait (`src/lib/search/search-rules.ts`).
+  Every other artifact response sends `X-Robots-Tag: noindex, nofollow`; the
+  Markdown and raw versions, preview images, and files always do. Agents
+  cannot change the setting, and it turns off when the artifact stops being
+  public or changes owner.
 
 ## Testing
 

@@ -74,6 +74,9 @@ export const artifact = pgTable(
     // the default signed_in (how comments worked before), and 0017 moved the default to team,
     // so an insert that forgets it fails narrow.
     comments: text("comments", { enum: commentSettings }).notNull().default("team"),
+    // "Show in search engines": the author's opt-in, read only while the artifact is public
+    // (src/lib/search/search-rules.ts). Off by default; cleared when it stops being public.
+    showInSearch: boolean("show_in_search").notNull().default(false),
     // Legacy /share/<shareId> links redirect to /artifact/<publicId>.
     shareId: text("share_id").notNull(),
     // 22-character random base58 id. The canonical URL is /artifact/<publicId>.
@@ -98,6 +101,8 @@ export const artifact = pgTable(
     index("artifact_project_idx").on(table.projectId),
     index("artifact_tags_idx").using("gin", table.tags),
     index("artifact_team_updated_idx").on(table.teamId, table.updatedAt),
+    // The sitemap lists only public artifacts whose author turned on "Show in search engines".
+    index("artifact_in_search_idx").on(table.publicId).where(sql`${table.showInSearch} and ${table.visibility} = 'public'`),
     check("artifact_tags_count_check", sql`cardinality(${table.tags}) <= ${sql.raw(String(tagLimits.maxPerArtifact))}`),
     check("artifact_comments_check", sql`${table.comments} in ('off', 'team', 'signed_in')`),
     check("artifact_icon_length_check", sql`char_length(${table.icon}) <= ${sql.raw(String(artifactIconLimits.maxStoredChars))}`),

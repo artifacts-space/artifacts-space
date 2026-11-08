@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
-import { readingMeasureClass } from "@/lib/page-width/rules";
+import { PageColumn } from "@/components/page-width/page-column";
+import { editColumnClass, readingMeasureClass } from "@/lib/page-width/rules";
 import { cn } from "@/lib/utils";
 
 /**
@@ -20,18 +21,30 @@ import { cn } from "@/lib/utils";
  * Mermaid, File notes) show their rendered view, and View source edits them.
  * In the /app pane every surface grows to fill the pane but never shrinks
  * below its content (`flex-[1_0_auto]`), so nothing spills over the files
- * and fields below. On the artifact's own page (`surface="page"`) the
- * content sits on the page as readers see it, and source sits in a card.
+ * and fields below, and the content keeps to the public page's column
+ * (PageColumn) unless the artifact is full width. On the artifact's own page
+ * (`surface="page"`) the content sits on the page as readers see it, and
+ * source sits in a card.
  */
 
 /** Where the content is edited: the /app pane, or the artifact's own page. */
 export type InlineSurface = "pane" | "page";
 
-const pagePane = "min-h-[460px] min-w-0 flex-[1_0_auto] bg-card p-5 sm:p-8";
-const frames: Record<InlineSurface, { content: string; source: string }> = {
-  pane: { content: pagePane, source: "flex flex-[1_0_auto] flex-col" },
-  page: { content: "min-w-0", source: "card-surface flex flex-col overflow-hidden" },
-};
+/** The source field's frame: the page column (or the whole pane when full width) in /app, a card on the artifact page. */
+function sourceFrame(surface: InlineSurface, fullWidth: boolean): string {
+  if (surface === "page") return "card-surface flex flex-col overflow-hidden";
+  return cn("flex flex-[1_0_auto] flex-col", editColumnClass(fullWidth));
+}
+
+/** The rendered content's frame: the pane's card with the page column inside it, or the page's own column. */
+function ContentFrame({ surface, fullWidth, children }: { surface: InlineSurface; fullWidth: boolean; children: React.ReactNode }) {
+  if (surface === "page") return <div className={cn("min-w-0", readingMeasureClass(fullWidth))} data-full-width={fullWidth}>{children}</div>;
+  return (
+    <div className="min-h-[460px] min-w-0 flex-[1_0_auto] bg-card py-5 sm:py-8" data-full-width={fullWidth}>
+      <PageColumn fullWidth={fullWidth}>{children}</PageColumn>
+    </div>
+  );
+}
 const sourceField =
   "min-h-[460px] flex-1 resize-y rounded-none border-0 bg-card p-6 font-mono text-base leading-7 md:text-sm shadow-none outline-none focus-visible:ring-0 sm:p-8";
 
@@ -47,7 +60,7 @@ interface InlineContentProps {
   sourceOpen: boolean;
   /** Defaults to the /app pane. */
   surface?: InlineSurface;
-  /** The artifact's "Full width" setting: in the /app pane, it lifts the reading measure. The artifact page sets it on its own column. */
+  /** The artifact's "Full width" setting: in the /app pane the content spans the pane instead of the page column. The artifact page sets its own column. */
   fullWidth?: boolean;
   onChange: (content: string) => void;
   onShowSource: () => void;
@@ -72,16 +85,16 @@ function SourceEditor({ kind, content, label, frame, fullWidth, onChange }: { ki
 }
 
 /** The rendered view for formats edited through View source, with a quiet way into it. */
-function RenderedWithSource({ kind, content, language, title, files, frame, fullWidth, onShowSource }: Omit<InlineContentProps, "revision" | "sourceOpen" | "onChange" | "surface" | "fullWidth"> & { frame: string; fullWidth: boolean }) {
+function RenderedWithSource({ kind, content, language, title, files, surface, fullWidth, onShowSource }: Omit<InlineContentProps, "revision" | "sourceOpen" | "onChange" | "surface" | "fullWidth"> & { surface: InlineSurface; fullWidth: boolean }) {
   return (
-    <div className={frame} data-full-width={fullWidth}>
+    <ContentFrame surface={surface} fullWidth={fullWidth}>
       <div className="mb-3 flex justify-end">
         <Button variant="ghost" size="sm" onClick={onShowSource} className="text-muted-foreground">
           <IconCode aria-hidden /> Edit source
         </Button>
       </div>
       <ArtifactView kind={kind} content={content} language={language} title={title} files={files} />
-    </div>
+    </ContentFrame>
   );
 }
 
@@ -93,23 +106,22 @@ export function hasInlineField(kind: ArtifactKind, sourceOpen: boolean): boolean
 /** See the notes at the top of this file. */
 export function InlineContent(props: InlineContentProps) {
   const { kind, content, title, files, revision, sourceOpen, surface = "pane", fullWidth = false, onChange, onShowSource } = props;
-  const base = frames[surface];
-  const frame = { ...base, content: cn(base.content, readingMeasureClass(fullWidth)) };
-  if (sourceOpen) return <SourceEditor kind={kind} content={content} label="Artifact source" frame={frame.source} fullWidth={fullWidth} onChange={onChange} />;
-  if (kind === "code") return <SourceEditor kind={kind} content={content} label="Artifact content" frame={frame.source} fullWidth={fullWidth} onChange={onChange} />;
+  const source = sourceFrame(surface, fullWidth);
+  if (sourceOpen) return <SourceEditor kind={kind} content={content} label="Artifact source" frame={source} fullWidth={fullWidth} onChange={onChange} />;
+  if (kind === "code") return <SourceEditor kind={kind} content={content} label="Artifact content" frame={source} fullWidth={fullWidth} onChange={onChange} />;
   if (isDocumentKind(kind)) {
     return (
-      <div className={frame.content} data-full-width={fullWidth}>
+      <ContentFrame surface={surface} fullWidth={fullWidth}>
         <DocumentEditor key={revision} kind={kind} value={content} onChange={onChange} label="Artifact content" sourceToggle={false} onEditSource={onShowSource} />
-      </div>
+      </ContentFrame>
     );
   }
   if (kind === "csv") {
     return (
-      <div className={frame.content} data-full-width={fullWidth}>
+      <ContentFrame surface={surface} fullWidth={fullWidth}>
         <CsvContentEditor key={revision} value={content} onChange={onChange} title={title} files={files} label="Artifact content" />
-      </div>
+      </ContentFrame>
     );
   }
-  return <RenderedWithSource kind={kind} content={content} language={props.language} title={title} files={files} frame={frame.content} fullWidth={fullWidth} onShowSource={onShowSource} />;
+  return <RenderedWithSource kind={kind} content={content} language={props.language} title={title} files={files} surface={surface} fullWidth={fullWidth} onShowSource={onShowSource} />;
 }
