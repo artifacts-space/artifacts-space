@@ -74,6 +74,8 @@ export interface TeamAgentView {
   ownArtifacts: number;
   /** Whether the person who added it is still in the team, and so keeps its own artifacts when it is removed. */
   ownerInTeam: boolean;
+  /** Set when it was handed to a team owner because the person who added it left; it needs a new token. */
+  handedOver: boolean;
 }
 
 async function tokensByAgent(agentIds: string[]) {
@@ -120,7 +122,7 @@ async function deletedOnRemovalByAgent(teamId: string, agentIds: string[]) {
  */
 export async function listTeamAgents(teamId: string, withTokens: boolean): Promise<TeamAgentView[]> {
   const rows = await getDb()
-    .select({ userId: user.id, handle: user.username, name: user.name, ownerName: owner.name, ownerMemberId: ownerMember.id, mutedAt: agent.mutedAt, createdAt: agent.createdAt })
+    .select({ userId: user.id, handle: user.username, name: user.name, ownerName: owner.name, ownerMemberId: ownerMember.id, mutedAt: agent.mutedAt, handedOverAt: agent.handedOverAt, createdAt: agent.createdAt })
     .from(agent)
     .innerJoin(user, eq(user.id, agent.userId))
     .leftJoin(owner, eq(owner.id, agent.ownerId))
@@ -141,6 +143,7 @@ export async function listTeamAgents(teamId: string, withTokens: boolean): Promi
     tokens: tokens.get(row.userId) ?? [],
     ownArtifacts: deleted.get(row.userId) ?? 0,
     ownerInTeam: row.ownerMemberId !== null,
+    handedOver: row.handedOverAt !== null,
   }));
 }
 
