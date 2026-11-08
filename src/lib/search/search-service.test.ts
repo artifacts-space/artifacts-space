@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
- * Who may change "Show in search engines". Only the author, as a person in
- * the web app; teammates, team owners and admins, strangers, and agents are
- * refused before anything is written.
+ * Who may change "Show in search engines": the people who may share the
+ * artifact (its author, or the person who added the agent that wrote it), as
+ * a person in the web app. Teammates, team owners and admins, strangers, and
+ * agents are refused before anything is written.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   set: vi.fn(),
   enforceRateLimit: vi.fn(),
   dtoFor: vi.fn(),
+  actsForAuthor: vi.fn(),
 }));
 
 function selectChain() {
@@ -35,6 +37,7 @@ function updateChain() {
 vi.mock("@/db", () => ({ getDb: () => ({ select: () => selectChain(), update: () => updateChain() }) }));
 vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: mocks.enforceRateLimit }));
 vi.mock("@/lib/sharing/requests", () => ({ dtoFor: mocks.dtoFor }));
+vi.mock("@/lib/agents/owner-access", () => ({ actsForAuthor: mocks.actsForAuthor }));
 
 const { setShowInSearch } = await import("./search-service");
 
@@ -47,6 +50,7 @@ describe("setShowInSearch", () => {
     mocks.updated = [{ id: "art-1" }];
     mocks.enforceRateLimit.mockResolvedValue(undefined);
     mocks.dtoFor.mockResolvedValue({ id: "art-1", showInSearch: true });
+    mocks.actsForAuthor.mockResolvedValue(false);
   });
 
   it("should turn it on when the author asks for a public artifact", async () => {
@@ -56,14 +60,29 @@ describe("setShowInSearch", () => {
 
   it("should refuse and write nothing when someone other than the author asks", async () => {
     for (const actorId of ["teammate", "team-admin", "stranger"]) {
-      await expect(setShowInSearch({ actorId, artifactId: "art-1", on: true, actor: "person" })).rejects.toThrow(/Only its author/);
-      await expect(setShowInSearch({ actorId, artifactId: "art-1", on: false, actor: "person" })).rejects.toThrow(/Only its author/);
+      await expect(setShowInSearch({ actorId, artifactId: "art-1", on: true, actor: "person" })).rejects.toThrow(/Only the people who can share it/);
+      await expect(setShowInSearch({ actorId, artifactId: "art-1", on: false, actor: "person" })).rejects.toThrow(/Only the people who can share it/);
     }
     expect(mocks.set).not.toHaveBeenCalled();
   });
 
+  it("should let the person who added the agent turn it on when an agent wrote the artifact", async () => {
+    mocks.row = { userId: "agent-1", visibility: "public" };
+    mocks.actsForAuthor.mockResolvedValue(true);
+    await setShowInSearch({ actorId: "agent-owner", artifactId: "art-1", on: true, actor: "person" });
+    expect(mocks.actsForAuthor).toHaveBeenCalledWith("agent-owner", "agent-1");
+    expect(mocks.set).toHaveBeenCalledWith({ showInSearch: true });
+  });
+
+  it("should refuse and write nothing when the agent itself asks for its own artifact", async () => {
+    mocks.row = { userId: "agent-1", visibility: "public" };
+    await expect(setShowInSearch({ actorId: "agent-1", artifactId: "art-1", on: true, actor: "agent" })).rejects.toThrow(/Only the people who can share it/);
+    await expect(setShowInSearch({ actorId: "agent-owner", artifactId: "art-1", on: true, actor: "agent" })).rejects.toThrow(/Only the people who can share it/);
+    expect(mocks.set).not.toHaveBeenCalled();
+  });
+
   it("should refuse and write nothing when an agent asks, even for its own artifact", async () => {
-    await expect(setShowInSearch({ actorId: author, artifactId: "art-1", on: true, actor: "agent" })).rejects.toThrow(/Only its author/);
+    await expect(setShowInSearch({ actorId: author, artifactId: "art-1", on: true, actor: "agent" })).rejects.toThrow(/Only the people who can share it/);
     expect(mocks.set).not.toHaveBeenCalled();
   });
 

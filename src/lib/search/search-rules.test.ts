@@ -73,15 +73,20 @@ describe("showInSearchAfterSharing", () => {
 
 describe("canChangeShowInSearch", () => {
   it("should let the author change it when they act in the web app", () => {
-    expect(canChangeShowInSearch({ actorId: "author", authorId: "author", actor: "person" })).toBe(true);
+    expect(canChangeShowInSearch({ actorId: "author", authorId: "author", actsForAuthor: false, actor: "person" })).toBe(true);
+  });
+
+  it("should let the person who added the agent change it when an agent wrote the artifact", () => {
+    expect(canChangeShowInSearch({ actorId: "agent-owner", authorId: "agent", actsForAuthor: true, actor: "person" })).toBe(true);
   });
 
   it("should refuse when an agent asks, even with the author's account", () => {
-    expect(canChangeShowInSearch({ actorId: "author", authorId: "author", actor: "agent" })).toBe(false);
+    expect(canChangeShowInSearch({ actorId: "author", authorId: "author", actsForAuthor: false, actor: "agent" })).toBe(false);
+    expect(canChangeShowInSearch({ actorId: "agent-owner", authorId: "agent", actsForAuthor: true, actor: "agent" })).toBe(false);
   });
 
-  it("should refuse when someone other than the author asks", () => {
-    expect(canChangeShowInSearch({ actorId: "teammate", authorId: "author", actor: "person" })).toBe(false);
+  it("should refuse when someone who cannot share the artifact asks", () => {
+    expect(canChangeShowInSearch({ actorId: "teammate", authorId: "author", actsForAuthor: false, actor: "person" })).toBe(false);
   });
 });
 

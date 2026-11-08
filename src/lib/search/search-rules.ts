@@ -61,11 +61,13 @@ export type SearchActor = "person" | "agent";
 
 /**
  * Who may change "Show in search engines": the people who may share the
- * artifact (its author), in the web app. Listing a page in search engines is
- * a person's decision, so agents cannot change it.
+ * artifact (its author, or the person who added the agent that wrote it,
+ * src/lib/agents/owner-access.ts), in the web app. Listing a page in search
+ * engines is a person's decision, so agents cannot change it.
  */
-export function canChangeShowInSearch(input: { actorId: string; authorId: string; actor: SearchActor }): boolean {
-  return input.actor === "person" && input.actorId === input.authorId;
+export function canChangeShowInSearch(input: { actorId: string; authorId: string; actsForAuthor: boolean; actor: SearchActor }): boolean {
+  if (input.actor !== "person") return false;
+  return input.actorId === input.authorId || input.actsForAuthor;
 }
 
 /** Why turning the setting on is refused for this artifact, or null when it may be turned on. */
