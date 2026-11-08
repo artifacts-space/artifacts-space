@@ -66,11 +66,27 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
   const pendingSinceRef = useRef<number | null>(null);
   const lastSaveAtRef = useRef<number | null>(null);
   const pausedRef = useRef(false);
+  /** The next save resends a merged or kept draft (see SaveTiming.resend). */
+  const resendRef = useRef(false);
   const callbacksRef = useRef({ replaceDraft, onUpdated, save });
 
   useEffect(() => { draftRef.current = draft; }, [draft]);
   useEffect(() => { callbacksRef.current = { replaceDraft, onUpdated, save }; }, [replaceDraft, onUpdated, save]);
   /** Adopts someone else's newer version as the base, merging the draft when that is trivial. */
+  /** Makes `theirs` the base with `next` as the draft, and sends `next` again when it still differs from theirs. */
+  const adopt = useCallback((theirs: ArtifactDto, next: ArtifactDraft, mine: ArtifactDraft) => {
+    baseRef.current = theirs;
+    callbacksRef.current.onUpdated(theirs);
+    callbacksRef.current.replaceDraft(next, next.content !== mine.content);
+    if (!hasChanges(draftFrom(theirs), next)) {
+      setStatus({ kind: "saved", waitingForApproval: Boolean(theirs.pendingEdit) });
+      return;
+    }
+    resendRef.current = true;
+    setStatus({ kind: "saving" });
+    setRetry((count) => count + 1);
+  }, []);
+
   const resolveRefused = useCallback((base: ArtifactDto, theirs: ArtifactDto) => {
     sessionRef.current = closedSession;
     const mine = draftRef.current;
@@ -79,12 +95,8 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
       setStatus({ kind: "conflict", theirs, base });
       return;
     }
-    baseRef.current = theirs;
-    callbacksRef.current.onUpdated(theirs);
-    callbacksRef.current.replaceDraft(outcome.draft, outcome.draft.content !== mine.content);
-    setStatus({ kind: "saving" });
-    setRetry((count) => count + 1);
-  }, []);
+    adopt(theirs, outcome.draft, mine);
+  }, [adopt]);
 
   useEffect(() => {
     const base = baseRef.current;
@@ -136,6 +148,7 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
     }
     inFlightRef.current = true;
     const sentAt = Date.now();
+    resendRef.current = false;
     pendingSinceRef.current = null;
     lastSaveAtRef.current = sentAt;
     setStatus({ kind: "saving" });
@@ -168,7 +181,7 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
     // Runs on every change: the change was made now.
     const now = Date.now();
     pendingSinceRef.current ??= now;
-    const delay = nextSaveDelay({ now, pendingSince: pendingSinceRef.current, lastSaveAt: lastSaveAtRef.current });
+    const delay = nextSaveDelay({ now, pendingSince: pendingSinceRef.current, lastSaveAt: lastSaveAtRef.current, resend: resendRef.current });
     const timer = window.setTimeout(() => { void saveNow(); }, delay);
     return () => { window.clearTimeout(timer); };
   }, [draft, dirty, paused, retry, saveNow]);
@@ -208,13 +221,8 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
   const keepMine = useCallback(() => {
     if (status.kind !== "conflict") return;
     const mine = draftRef.current;
-    const kept = keepMineOver(draftFrom(status.base), mine, draftFrom(status.theirs));
-    baseRef.current = status.theirs;
-    callbacksRef.current.onUpdated(status.theirs);
-    callbacksRef.current.replaceDraft(kept, kept.content !== mine.content);
-    setStatus({ kind: "saving" });
-    setRetry((count) => count + 1);
-  }, [status]);
+    adopt(status.theirs, keepMineOver(draftFrom(status.base), mine, draftFrom(status.theirs)), mine);
+  }, [status, adopt]);
 
   const retryNow = useCallback(() => { void saveNow(); }, [saveNow]);
 

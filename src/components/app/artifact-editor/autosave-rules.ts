@@ -31,15 +31,22 @@ export interface SaveTiming {
   pendingSince: number;
   /** When the last autosave was sent; null before the first. */
   lastSaveAt: number | null;
+  /**
+   * The draft is sent again after someone else's newer save was merged into
+   * it, or after "Keep my changes". That is not typing, and each one needs
+   * someone else's save first, so it waits only the usual second.
+   */
+  resend?: boolean;
 }
 
 /**
  * How long to wait, after a change made now, before saving: a second after
  * typing stops, but no later than AUTOSAVE_MAX_WAIT_MS after the oldest
  * unsaved change, and never sooner than AUTOSAVE_MIN_INTERVAL_MS after the
- * last save.
+ * last save. A resend waits only the second.
  */
-export function nextSaveDelay({ now, pendingSince, lastSaveAt }: SaveTiming): number {
+export function nextSaveDelay({ now, pendingSince, lastSaveAt, resend = false }: SaveTiming): number {
+  if (resend) return AUTOSAVE_DELAY_MS;
   const due = Math.min(now + AUTOSAVE_DELAY_MS, pendingSince + AUTOSAVE_MAX_WAIT_MS);
   const allowed = lastSaveAt === null ? due : Math.max(due, lastSaveAt + AUTOSAVE_MIN_INTERVAL_MS);
   return Math.max(0, allowed - now);

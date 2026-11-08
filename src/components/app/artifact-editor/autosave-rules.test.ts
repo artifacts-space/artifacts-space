@@ -108,6 +108,10 @@ describe("nextSaveDelay", () => {
     expect(nextSaveDelay({ now: 10_000, pendingSince: 10_000, lastSaveAt: 9_000 })).toBe(AUTOSAVE_MIN_INTERVAL_MS - 1_000);
   });
 
+  it("should resend a merged draft a second later even when the last save was moments ago", () => {
+    expect(nextSaveDelay({ now: 10_000, pendingSince: 10_000, lastSaveAt: 9_900, resend: true })).toBe(AUTOSAVE_DELAY_MS);
+  });
+
   it("should save at once when the max wait has passed and the last save is old enough", () => {
     expect(nextSaveDelay({ now: 20_000, pendingSince: 0, lastSaveAt: 0 })).toBe(0);
   });

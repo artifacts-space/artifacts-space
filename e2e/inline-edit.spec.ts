@@ -3,6 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { closeInlineEditDb, saveAsSomeoneElse, storedText, versionKinds } from "./support/inline-edit-db";
 import { cleanUp, createTestArtifact, localDatabaseEnabled, localDatabaseSkipReason, readyDevUser } from "./support/local-db";
 
+/** Autosave sends at most one save every 5 seconds (autosave-rules.ts), so "Saved" can take a little over that. */
+const savedWithin = { timeout: 12_000 };
+
 /**
  * Inline editing in /app and on the artifact page: an artifact you may edit is unlocked where it
  * reads, saves on its own a moment after typing stops, files one version per
@@ -53,9 +56,9 @@ test("should save a Markdown edit in place, keep it after a reload, and file one
   await expect(page.getByRole("tablist", { name: "Editor mode" })).toHaveCount(0);
 
   await typeAfter(page, "First line.", " Second burst.");
-  await expect(saveStatus(page)).toHaveText("Saved");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
   await typeAfter(page, "Second burst.", " Third burst.");
-  await expect(saveStatus(page)).toHaveText("Saved");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
 
   await page.reload();
   await openInApp(page, title);
@@ -70,11 +73,11 @@ test("should merge someone else's newer save when it changed a different field",
   const title = `Inline merge ${testInfo.project.name} ${String(Date.now())}`;
   const publicId = await openSeeded(page, title, "# Notes\n\nMine starts here.");
   await typeAfter(page, "Mine starts here.", " One.");
-  await expect(saveStatus(page)).toHaveText("Saved");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
 
   await saveAsSomeoneElse(publicId, { title: `${title} (renamed)` });
   await typeAfter(page, "One.", " Two.");
-  await expect(saveStatus(page)).toHaveText("Saved");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
   await expect(page.getByRole("textbox", { name: "Artifact title" })).toHaveValue(`${title} (renamed)`);
   expect(await storedText(publicId)).toEqual({ title: `${title} (renamed)`, content: "# Notes\n\nMine starts here. One. Two." });
 });
@@ -83,7 +86,7 @@ test("should refuse to overwrite someone else's newer content and offer their ve
   const title = `Inline conflict ${testInfo.project.name} ${String(Date.now())}`;
   const publicId = await openSeeded(page, title, "# Notes\n\nShared line.");
   await typeAfter(page, "Shared line.", " Mine.");
-  await expect(saveStatus(page)).toHaveText("Saved");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
 
   await saveAsSomeoneElse(publicId, { content: "# Notes\n\nTheirs instead." });
   await typeAfter(page, "Mine.", " Still mine.");
@@ -107,7 +110,7 @@ test("should unlock Markdown in place on the artifact's own page and save it on 
   await content.getByText("Read here.").click();
   await page.keyboard.press("End");
   await page.keyboard.type(" Edited here.");
-  await expect(status).toHaveText("Saved");
+  await expect(status).toHaveText("Saved", savedWithin);
 
   await page.reload();
   await expect(page.getByRole("textbox", { name: "Artifact content" })).toContainText("Read here. Edited here.");
