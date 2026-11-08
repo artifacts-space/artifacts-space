@@ -31,13 +31,17 @@ interface DocumentEditorProps {
   onChange: (value: string) => void;
   label: string;
   autoFocus?: boolean;
+  /** Markdown only: show the editor's own Markdown source switch. The /app editor keeps the source behind View source instead. */
+  sourceToggle?: boolean;
+  /** Markdown only: opens the source when a part can only be edited as Markdown. */
+  onEditSource?: () => void;
 }
 
 /**
  * Plain text, edited as it reads: the same size and line length as the
  * text view, in a native field that keeps every space and line break.
  */
-function PlainTextEditor({ value, onChange, label, autoFocus = false }: Omit<DocumentEditorProps, "kind">) {
+function PlainTextEditor({ value, onChange, label, autoFocus = false }: Omit<DocumentEditorProps, "kind" | "sourceToggle" | "onEditSource">) {
   return (
     <textarea
       value={value}
@@ -57,5 +61,5 @@ function PlainTextEditor({ value, onChange, label, autoFocus = false }: Omit<Doc
  */
 export function DocumentEditor({ kind, ...props }: DocumentEditorProps) {
   if (kind === "markdown") return <RichMarkdownEditor {...props} />;
-  return <PlainTextEditor {...props} />;
+  return <PlainTextEditor value={props.value} onChange={props.onChange} label={props.label} autoFocus={props.autoFocus ?? false} />;
 }

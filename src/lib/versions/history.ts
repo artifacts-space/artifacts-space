@@ -9,7 +9,7 @@ import type { VersionSaveKind } from "@/lib/artifact-types";
 import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { dropsShownImage } from "@/lib/files/icon-cleanup-rules";
 
-import { selectPrunableVersions, shouldMergeInto, versionBytes, versionRetention } from "./history-rules";
+import { mergeGuard, selectPrunableVersions, shouldMergeInto, versionBytes, versionRetention, type EditSessionStep } from "./history-rules";
 import { sameReviewedFields } from "./rules";
 
 /**
@@ -52,7 +52,9 @@ export async function latestVersion(artifactId: string): Promise<ArtifactVersion
  * Versions readers or reviewers rely on. `pinned`: the approved version and
  * versions waiting for approval, which are never pruned. `referenced`: also
  * versions any request ever named, which are never merged into, so an
- * approval or denial always shows what was decided.
+ * approval or denial always shows what was decided. `decided`: the approved
+ * version and versions a decided request named; an editing session may still
+ * merge into its own version while it only waits for approval.
  */
 export async function protectedVersions(artifactId: string, approvedVersionId: string | null) {
   const rows = await getDb()
@@ -61,12 +63,14 @@ export async function protectedVersions(artifactId: string, approvedVersionId: s
     .where(and(eq(sharingRequest.artifactId, artifactId), eq(sharingRequest.kind, "edit")));
   const pinned = new Set<string>(approvedVersionId ? [approvedVersionId] : []);
   const referenced = new Set(pinned);
+  const decided = new Set(pinned);
   for (const row of rows) {
     if (!row.versionId) continue;
     referenced.add(row.versionId);
     if (row.status === "pending") pinned.add(row.versionId);
+    else decided.add(row.versionId);
   }
-  return { pinned, referenced };
+  return { pinned, referenced, decided };
 }
 
 /**
@@ -97,17 +101,18 @@ async function mergeInto(versionId: string, record: ArtifactRecord) {
  * changes nothing the latest version shows returns that version. A quick
  * follow-up save by the same editor merges into the latest version, unless
  * that version is protected (see protectedVersions) or the save drops an
- * uploaded icon or cover image the latest version shows.
+ * uploaded icon or cover image the latest version shows. A web editor
+ * autosave passes its editing-session step: see shouldMergeInto.
  */
 export async function fileVersion(
   record: ArtifactRecord,
-  save: { editorId: string; saveKind: VersionSaveKind; restoredFromId?: string | null },
+  save: { editorId: string; saveKind: VersionSaveKind; restoredFromId?: string | null; session?: EditSessionStep | undefined },
 ): Promise<string> {
   const latest = await latestVersion(record.id);
   if (latest && save.saveKind === "edit" && sameReviewedFields(latest, record)) return latest.id;
-  const { referenced } = await protectedVersions(record.id, record.approvedVersionId);
+  const guarded = mergeGuard(save.session, await protectedVersions(record.id, record.approvedVersionId));
   // A save that drops an uploaded icon or cover image files its own version, so the image stays restorable.
-  if (latest && shouldMergeInto(latest, { ...save, now: new Date() }, referenced) && !dropsShownImage(latest, record)) {
+  if (latest && shouldMergeInto(latest, { ...save, now: new Date() }, guarded) && !dropsShownImage(latest, record)) {
     await mergeInto(latest.id, record);
     return latest.id;
   }

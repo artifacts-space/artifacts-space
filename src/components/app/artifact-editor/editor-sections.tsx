@@ -39,7 +39,7 @@ export function ShareBanner({ shareUrl, isPublic }: { shareUrl: string; isPublic
   );
 }
 
-/** The icon above the title in the editor: part of the draft, saved with Save. */
+/** The icon above the title in the editor: part of the draft, saved with it. */
 function DraftIcon({ icon, update }: { icon: string | null; update: UpdateDraft }) {
   const trigger = icon ? changeIconTrigger(icon, "heading") : addIconTrigger;
   return <div className="mb-1"><IconPicker value={icon} onChange={(next) => { update("icon", next); }} trigger={trigger} /></div>;

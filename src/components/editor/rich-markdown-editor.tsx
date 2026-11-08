@@ -34,6 +34,10 @@ interface RichMarkdownEditorProps {
   onChange: (value: string) => void;
   label: string;
   autoFocus?: boolean;
+  /** Show the Markdown source switch above the document (default). The /app editor keeps the source behind View source. */
+  sourceToggle?: boolean;
+  /** Opens the source elsewhere when a part can only be edited as Markdown; without it, the switch above opens. */
+  onEditSource?: () => void;
 }
 
 function RawBlocksNotice({ count, onShowMarkdown }: { count: number; onShowMarkdown: () => void }) {
@@ -50,6 +54,17 @@ function RawBlocksNotice({ count, onShowMarkdown }: { count: number; onShowMarkd
   );
 }
 
+/** The switch between the document and its Markdown source, above the editor. */
+function SourceSwitch({ markdown, onClick }: { markdown: boolean; onClick: () => void }) {
+  return (
+    <div className="mb-3 flex items-center justify-end">
+      <Button type="button" variant="ghost" size="sm" aria-pressed={markdown} onClick={onClick} className={cn("text-muted-foreground", markdown && "bg-muted text-foreground")}>
+        <IconMarkdown aria-hidden /> Markdown
+      </Button>
+    </div>
+  );
+}
+
 /** True when there is something to link: a selection, or a link under the cursor. */
 function canEditLink(editor: Editor): boolean {
   return !editor.state.selection.empty || editor.isActive("link");
@@ -62,7 +77,7 @@ function canEditLink(editor: Editor): boolean {
  * the raw source. It reads and writes Markdown; blocks nobody touched are
  * saved exactly as they were loaded.
  */
-export default function RichMarkdownEditor({ value, onChange, label, autoFocus = false }: RichMarkdownEditorProps) {
+export default function RichMarkdownEditor({ value, onChange, label, autoFocus = false, sourceToggle = true, onEditSource }: RichMarkdownEditorProps) {
   const [mode, setMode] = useState<Mode>("rich");
   const [loaded] = useState(() => parseMarkdown(value));
   const [rawBlocks, setRawBlocks] = useState(loaded.rawBlocks);
@@ -114,18 +129,7 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
 
   return (
     <div className="rich-editor">
-      <div className="mb-3 flex items-center justify-end">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          aria-pressed={mode === "markdown"}
-          onClick={mode === "rich" ? showMarkdown : showRich}
-          className={cn("text-muted-foreground", mode === "markdown" && "bg-muted text-foreground")}
-        >
-          <IconMarkdown aria-hidden /> Markdown
-        </Button>
-      </div>
+      {sourceToggle ? <SourceSwitch markdown={mode === "markdown"} onClick={mode === "rich" ? showMarkdown : showRich} /> : null}
       {mode === "markdown" ? (
         <HighlightedTextarea
           textareaRef={textareaRef}
@@ -140,7 +144,7 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
       <div hidden={mode !== "rich"}>
         {editor ? (
           <>
-            <RawBlocksNotice count={rawBlocks} onShowMarkdown={showMarkdown} />
+            <RawBlocksNotice count={rawBlocks} onShowMarkdown={onEditSource ?? showMarkdown} />
             {coarse ? <TouchToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /> : <TextBubbleMenu editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
             <TableBubbleMenu editor={editor} />
           </>

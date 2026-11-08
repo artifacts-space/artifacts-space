@@ -5,6 +5,7 @@ import { useState } from "react";
 import { CommentsControl } from "@/components/app/comments-picker";
 import { ShareControl } from "@/components/app/share-control";
 import type { ShareTeam } from "@/components/app/share-teams-context";
+import { useLeaveGuard } from "@/components/artifact-page/use-leave-guard";
 import { AttachedFiles } from "@/components/files/attached-files";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
@@ -13,18 +14,14 @@ import { ViewsDialog } from "@/components/views/views-dialog";
 import { ArtifactOrganizers } from "@/components/projects/artifact-organizers";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
-import { ContentPane } from "./content-pane";
 import { detailBody, detailOuter, detailSection, stickyModeBar, useScrollPlace } from "./detail-scroll";
-import {
-  MetaFields,
-  ModeBar,
-  ShareBanner,
-  TitleFields,
-  type EditorMode,
-} from "./editor-sections";
+import { MetaFields, ShareBanner, TitleFields } from "./editor-sections";
 import { EditorToolbar } from "./editor-toolbar";
+import { hasInlineField, InlineContent } from "./inline-content";
+import { ConflictNotice, SaveStatusBar } from "./save-status";
 import { useArtifactActions } from "./use-artifact-actions";
 import { useArtifactDraft } from "./use-artifact-draft";
+import { useAutosave } from "./use-autosave";
 
 interface ArtifactEditorProps {
   artifact: ArtifactDto;
@@ -59,18 +56,35 @@ function SharingSlot({ artifact, shareUrl, canShare, manager, team, onUpdated }:
   return null;
 }
 
-/** Edit one artifact and read its history. The author (or the person who added the agent that wrote it) also shares and deletes it. */
+/** Files show under formats that use them, and under any artifact that has some. */
+function showsFiles(kind: ArtifactDto["kind"], fileCount: number) {
+  return kind === "file" || kind === "ui" || fileCount > 0;
+}
+
+/**
+ * Edit one artifact in place and read its history. The artifact renders as
+ * itself and is editable where it reads; changes save on their own a moment
+ * after typing stops (use-autosave.ts), and View source in the More menu
+ * shows the raw content. The author (or the person who added the agent that
+ * wrote it) also shares and deletes it.
+ */
 export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, seesComments, onWithdraw, onUpdated, onDeleted }: ArtifactEditorProps) {
-  const { draft, update, dirty, reset } = useArtifactDraft(artifact);
-  const { pending, save, remove } = useArtifactActions({ artifact, draft, onUpdated, onDeleted });
-  const [mode, setMode] = useState<EditorMode>("preview");
+  const { draft, update, replace, reset, remount, revision } = useArtifactDraft(artifact);
+  const autosave = useAutosave({ artifact, draft, replaceDraft: replace, onUpdated });
+  const { deleting, remove } = useArtifactActions({ artifact, onDeleted });
+  const [sourceOpen, setSourceOpen] = useState(false);
   const confirmDelete = useConfirm("deleteArtifact");
   const shareUrl = `${origin}/artifact/${artifact.publicId}`;
   const shared = artifact.visibility === "link" || artifact.visibility === "public";
-  const { outerRef, bodyRef, remember } = useScrollPlace(mode);
-  const changeMode = (next: EditorMode) => {
+  const { outerRef, bodyRef, remember } = useScrollPlace(sourceOpen ? "source" : "page");
+  const saving = autosave.status.kind === "saving";
+  useLeaveGuard(autosave.dirty || saving);
+
+  const toggleSource = () => {
     remember();
-    setMode(next);
+    // Back from the source, editors that keep their own state reload what was typed there.
+    if (sourceOpen) remount();
+    setSourceOpen(!sourceOpen);
   };
 
   return (
@@ -87,7 +101,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
             updatedAt={artifact.updatedAt}
             reviewed={shared}
             files={artifact.files}
-            hasUnsavedChanges={dirty}
+            hasUnsavedChanges={autosave.dirty}
             onRestored={(restored) => { reset(restored); onUpdated(restored); }}
           />
         }
@@ -100,28 +114,45 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           />
         }
         views={<ViewsDialog publicId={artifact.publicId} title={artifact.title} />}
-        dirty={dirty}
-        pending={pending}
-        onSave={() => void save()}
-        onRequestDelete={canDelete ? () => { if (pending !== "delete") confirmDelete.request(remove); } : null}
+        source={{ open: sourceOpen, onToggle: toggleSource }}
+        onRequestDelete={canDelete ? () => { if (!deleting) confirmDelete.request(remove); } : null}
         onWithdraw={onWithdraw}
       />
       <div ref={outerRef} data-slot="detail-outer" className={detailOuter}>
         {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
         <TitleFields title={draft.title} icon={draft.icon} summary={draft.summary} update={update} />
         <ArtifactOrganizers artifact={artifact} onUpdated={onUpdated} />
-        <ModeBar mode={mode} onMode={changeMode} length={draft.content.length} updatedAt={artifact.updatedAt} updatedBy={artifact.updatedBy} className={stickyModeBar} />
-        {/* Preview has no field to focus first, so the pane itself takes focus for Page Up/Down, Space, and the arrows. */}
+        <SaveStatusBar
+          status={autosave.status}
+          dirty={autosave.dirty}
+          length={draft.content.length}
+          updatedAt={artifact.updatedAt}
+          updatedBy={artifact.updatedBy}
+          onRetry={autosave.retryNow}
+          className={stickyModeBar}
+        />
+        <ConflictNotice status={autosave.status} onLoadTheirs={autosave.loadTheirs} onKeepMine={autosave.keepMine} />
+        {/* A rendered view has no field to focus first, so the pane itself takes focus for Page Up/Down, Space, and the arrows. */}
         <div
           ref={bodyRef}
           data-slot="detail-body"
           role="region"
           aria-label="Content"
-          tabIndex={mode === "preview" ? 0 : undefined}
+          tabIndex={hasInlineField(draft.kind, sourceOpen) ? undefined : 0}
           className={detailBody}
         >
-          <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} files={artifact.files} update={update} />
-          {draft.kind === "file" || draft.kind === "ui" || artifact.files.length > 0 ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
+          <InlineContent
+            kind={draft.kind}
+            content={draft.content}
+            language={draft.language}
+            title={draft.title}
+            files={artifact.files}
+            revision={revision}
+            sourceOpen={sourceOpen}
+            onChange={(content) => { update("content", content); }}
+            onShowSource={() => { if (!sourceOpen) toggleSource(); }}
+          />
+          {showsFiles(draft.kind, artifact.files.length) ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
           <MetaFields draft={draft} update={update} />
         </div>
       </div>
@@ -130,7 +161,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
         title="Delete this artifact?"
         description={`“${artifact.title}” will be removed for you and for every agent that reads it. This cannot be undone.`}
         confirmLabel="Delete"
-        pending={pending === "delete"}
+        pending={deleting}
       />
     </section>
   );

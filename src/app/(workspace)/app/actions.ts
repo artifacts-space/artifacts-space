@@ -14,14 +14,16 @@ import {
   listArtifacts,
   updateArtifact,
   type ArtifactUpdateInput,
-  type SaveOptions,
 } from "@/lib/artifacts";
 import type {
   ActionResult,
   ArtifactDto,
   ArtifactInput,
   ArtifactListItemDto,
+  SaveArtifactResult,
 } from "@/lib/artifact-types";
+import { StaleSaveError, type SaveOptions } from "@/lib/save-guard";
+import { editSessionSteps } from "@/lib/versions/history-rules";
 import { isPublicId } from "@/lib/public-id";
 import { tagLimits } from "@/lib/tags/limits";
 import { normalizeTag } from "@/lib/tags/rules";
@@ -35,7 +37,11 @@ const searchSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(tagLimits.maxChars * 4)).max(tagLimits.maxPerArtifact).optional(),
 });
 
-const expectedSchema = z.iso.datetime({ offset: true }).optional();
+/** Every web save names the version its draft is based on, so it can never overwrite a newer save. */
+const saveOptionsSchema = z.object({
+  expectedUpdatedAt: z.iso.datetime({ offset: true }),
+  session: z.enum(editSessionSteps).optional(),
+});
 
 async function requireUserId() {
   const session = await getSession();
@@ -60,23 +66,40 @@ export async function createArtifactAction(
   }
 }
 
+/** The newest version of an artifact the viewer may read, for a refused save; undefined when it cannot load. */
+async function latestFor(publicId: string, userId: string): Promise<ArtifactDto | undefined> {
+  try {
+    const loaded = await loadArtifactForViewer(publicId, userId);
+    return loaded?.dto;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Saves changes to an artifact the person may edit. `options.expectedUpdatedAt`
- * refuses the save when someone else saved since the editor opened it.
+ * is the version the editor's draft is based on: when someone else saved
+ * since, nothing is written and the result carries their newest version.
+ * `options.session` groups an editor's autosaves into one version.
  */
 export async function updateArtifactAction(
   id: string,
   input: ArtifactUpdateInput,
-  options: SaveOptions = {},
-): Promise<ActionResult<ArtifactDto>> {
+  options: SaveOptions,
+): Promise<SaveArtifactResult> {
+  let userId: string | null = null;
   try {
-    const userId = await requireUserId();
-    const updated = await updateArtifact(userId, id, input, "person", { expectedUpdatedAt: expectedSchema.parse(options.expectedUpdatedAt) });
+    userId = await requireUserId();
+    const updated = await updateArtifact(userId, id, input, "person", saveOptionsSchema.parse(options));
     if (!updated) return { success: false, error: "Artifact not found." };
     revalidatePath("/app");
     revalidatePath(`/artifact/${updated.publicId}`);
     return { success: true, data: updated };
   } catch (error) {
+    if (error instanceof StaleSaveError && userId) {
+      const latest = await latestFor(error.publicId, userId);
+      return latest ? { success: false, error: error.message, latest } : { success: false, error: error.message };
+    }
     return { success: false, error: errorMessage(error) };
   }
 }
