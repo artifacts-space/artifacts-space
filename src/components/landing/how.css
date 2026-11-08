@@ -1,0 +1,132 @@
+/*
+ * How it works, driven by scroll. On wide screens the section is taller than
+ * the viewport and its stage pins (sticky) while you scroll through it; the
+ * section is a view timeline (--how), and each piece plays over its own slice
+ * of the pinned stretch: the command types itself, the skill answers, the
+ * chat appears, the artifact travels the line, and the preview opens with
+ * Dana's cursor moving in. On narrow screens, without scroll timelines, or
+ * with reduced motion, nothing pins and every piece shows in its final state.
+ */
+
+/* The artifact's resting place: just after the third chapter number. Columns are equal with a 1.5rem gap. */
+.how-token {
+  left: calc((100% + 1.5rem) * 2 / 3 + 4.5rem);
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) and (min-width: 80rem) {
+    .how-pipeline {
+      height: 260vh;
+      view-timeline: --how block;
+    }
+
+    .how-stage {
+      position: sticky;
+      top: max(2rem, calc(50vh - 22rem));
+    }
+
+    .how-type,
+    .how-out,
+    .how-token,
+    .how-ask-1,
+    .how-ask-2,
+    .how-collab,
+    .how-cursor {
+      animation-timeline: --how;
+      animation-fill-mode: both;
+      animation-timing-function: linear;
+    }
+
+    .how-type {
+      animation-name: how-type;
+      animation-timing-function: steps(37, end);
+      animation-range: contain 2% contain 20%;
+    }
+
+    .how-out {
+      animation-name: how-show;
+      animation-range: contain 22% contain 27%;
+    }
+
+    .how-token {
+      animation-name: how-travel;
+      animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+      animation-range: contain 14% contain 72%;
+    }
+
+    .how-ask-1 {
+      animation-name: how-show;
+      animation-range: contain 32% contain 38%;
+    }
+
+    .how-ask-2 {
+      animation-name: how-show;
+      animation-range: contain 42% contain 48%;
+    }
+
+    .how-collab {
+      animation-name: how-open;
+      animation-range: contain 64% contain 74%;
+    }
+
+    .how-cursor {
+      animation-name: how-cursor;
+      animation-range: contain 72% contain 90%;
+    }
+  }
+}
+
+@keyframes how-type {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes how-show {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes how-open {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+    transform-origin: top left;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes how-travel {
+  from {
+    left: 4.5rem;
+  }
+  to {
+    left: calc((100% + 1.5rem) * 2 / 3 + 4.5rem);
+  }
+}
+
+@keyframes how-cursor {
+  from {
+    opacity: 0;
+    transform: translate(-48px, -36px);
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

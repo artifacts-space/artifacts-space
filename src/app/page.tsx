@@ -2,11 +2,12 @@ import Link from "next/link";
 import { IconArrowRight } from "@tabler/icons-react";
 
 import { GitHubLink } from "@/components/github-link";
-import { ClosingSection } from "@/components/landing/closing-section";
 import { SurfaceSection } from "@/components/landing/surface-section";
 import { ConnectSection } from "@/components/landing/connect-section";
 import { ControlSection } from "@/components/landing/control-section";
 import { HeroDemo } from "@/components/landing/demo/hero-demo";
+import { HowSection } from "@/components/landing/how-section";
+import { OpenSourceSection } from "@/components/landing/open-source-section";
 import { PricingSection } from "@/components/landing/pricing-section";
 import { WhySection } from "@/components/landing/why-section";
 import { Logo } from "@/components/logo";
@@ -17,19 +18,21 @@ import { docsHref } from "@/lib/docs/pages";
 export default function Home() {
   return (
     <div className="min-h-screen">
-      <header className="mx-auto flex h-14 w-full max-w-[1440px] items-center justify-between gap-4 px-6">
-        <Logo />
+      <header className="mx-auto flex h-14 w-full max-w-[1440px] items-center justify-between gap-4 px-6 lg:grid lg:grid-cols-[1fr_auto_1fr]">
+        <Logo className="justify-self-start" />
         <nav className="flex items-center gap-6 text-sm font-medium text-muted-foreground" aria-label="Main navigation">
           <a href="#how" className="hidden transition-colors hover:text-foreground sm:inline">How it works</a>
           <a href="#connect" className="hidden transition-colors hover:text-foreground lg:inline">Connect</a>
           <a href="#pricing" className="hidden transition-colors hover:text-foreground md:inline">Pricing</a>
           <Link href="/docs" className="hidden transition-colors hover:text-foreground sm:inline">Docs</Link>
+        </nav>
+        <div className="flex items-center gap-6 justify-self-end text-sm font-medium text-muted-foreground">
           <GitHubLink className="-mx-2" />
           <Link href="/sign-in" className="transition-colors hover:text-foreground">Sign in</Link>
           <Button render={<Link href="/sign-up" />} nativeButton={false} size="sm" className="hidden px-3 sm:inline-flex">
             Get started
           </Button>
-        </nav>
+        </div>
       </header>
 
       <main className="mx-auto w-full max-w-[1440px] px-6">
@@ -54,12 +57,13 @@ export default function Home() {
         </section>
 
         <HeroDemo />
+        <HowSection />
         <SurfaceSection />
         <WhySection />
         <ConnectSection />
         <ControlSection />
         <PricingSection />
-        <ClosingSection />
+        <OpenSourceSection />
       </main>
 
       <SiteFooter />

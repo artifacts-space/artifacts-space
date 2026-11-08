@@ -3,12 +3,13 @@ import { expect, test } from "@playwright/test";
 const themes = ["light", "dark"] as const;
 
 const storySections = [
-  // The hero demo stays directly under the hero.
-  "How it works",
+  // The hero demo stays directly under the hero; How it works follows it.
+  "Product demo",
+  "Use it like the artifacts you already know.",
   "One surface for people and agents.",
   "But switching accounts cuts you off.",
   "Pricing",
-  "Bring your team and your agents into one space.",
+  "Open source from day one.",
 ] as const;
 
 for (const theme of themes) {
@@ -18,6 +19,12 @@ for (const theme of themes) {
 
     const hero = page.getByRole("heading", { level: 1, name: "The collaboration space for humans and agents." });
     await expect(hero).toBeVisible();
+
+    const how = page.getByRole("region", { name: "Use it like the artifacts you already know." });
+    await how.scrollIntoViewIfNeeded();
+    for (const step of ["Add the skill", "Ask the way you always do", "Edit, share, and work together"]) {
+      await expect(how.getByRole("heading", { level: 3, name: step })).toBeVisible();
+    }
 
     const surface = page.getByRole("region", { name: "One surface for people and agents." });
     await surface.scrollIntoViewIfNeeded();
@@ -31,6 +38,12 @@ for (const theme of themes) {
     await expect(why.getByText("Switch accounts. Lose nothing.")).toBeVisible();
     await expect(why.getByText("Every agent sees the same artifacts.")).toBeVisible();
     await expect(why.getByText("Your team sees them too.")).toBeVisible();
+    await expect(why.getByText("Each account keeps its own artifacts. None can open the others.")).toBeVisible();
+
+    const openSource = page.getByRole("region", { name: "Open source from day one." });
+    await openSource.scrollIntoViewIfNeeded();
+    await expect(openSource.getByRole("button", { name: "Get started" })).toHaveAttribute("href", "/sign-up");
+    await expect(openSource.getByRole("button", { name: "View on GitHub" })).toHaveAttribute("href", "https://github.com/artifacts-space/artifacts-space");
 
     const heroTop = (await hero.boundingBox())?.y ?? Number.NaN;
     const tops = [heroTop];
@@ -46,10 +59,20 @@ for (const theme of themes) {
   });
 }
 
-test("should set the header nav links in medium weight when the landing page loads", async ({ page }) => {
+test("should jump to the How it works section when the header link is clicked", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "the link is hidden on phones");
   await page.goto("/");
-  const nav = page.getByRole("navigation", { name: "Main navigation" });
-  await expect(nav.getByRole("link", { name: "Sign in" })).toHaveCSS("font-weight", "500");
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "How it works" }).click();
+  await expect(page).toHaveURL(/#how$/);
+  await expect(page.getByRole("heading", { level: 2, name: "Use it like the artifacts you already know." })).toBeInViewport();
+});
+
+test("should set the header nav links in medium weight when the landing page loads", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "the section links are hidden on phones");
+  await page.goto("/");
+  const header = page.getByRole("banner");
+  await expect(header.getByRole("link", { name: "Sign in" })).toHaveCSS("font-weight", "500");
+  await expect(header.getByRole("link", { name: "How it works" })).toHaveCSS("font-weight", "500");
 });
 
 const plans = [
@@ -138,5 +161,12 @@ for (const width of [640, 768, 1024]) {
     });
     expect(fit.navRight).toBeLessThanOrEqual(width);
     expect(fit.gap, "the nav must not touch the logo").toBeGreaterThanOrEqual(16);
+    if (width < 1024) return;
+    const center = await page.getByRole("navigation", { name: "Main navigation" }).evaluate((nav) => {
+      const box = nav.getBoundingClientRect();
+      const header = nav.closest("header")?.getBoundingClientRect();
+      return header ? Math.abs(box.left + box.width / 2 - (header.left + header.width / 2)) : Number.NaN;
+    });
+    expect(center, "from 1024px the section links sit in the middle of the header").toBeLessThanOrEqual(2);
   });
 }
