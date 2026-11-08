@@ -5,6 +5,7 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { AppHeader } from "@/components/app/app-header";
 import { Dashboard } from "@/components/app/dashboard";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
+import type { ArtifactLink } from "@/lib/app-link";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { projectFilterId } from "@/lib/projects/filter-params";
@@ -14,7 +15,7 @@ import { matchesProjectFilter } from "@/lib/projects/sidebar-rules";
 import { fixtureArtifact, longCsv, longJson, longMarkdown, longUi } from "./fixture-content";
 import { createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, withProjects } from "./fixture-projects";
 
-/** Four long artifacts first, then enough short ones that the list scrolls. */
+/** Four long artifacts first, then enough short ones that the list scrolls. Note 2 has comments on. */
 function fixtureArtifacts(): ArtifactDto[] {
   const long = [
     fixtureArtifact({ id: "fixture-ui", kind: "ui", title: "Long ui fixture", content: longUi(), publicId: "fixtureworkspace0000ui" }),
@@ -25,7 +26,8 @@ function fixtureArtifacts(): ArtifactDto[] {
   const short = Array.from({ length: 36 }, (_, index) =>
     fixtureArtifact({ id: `fixture-note-${String(index)}`, kind: "text", title: index === 0 ? LOCKED_TITLE : `Note ${String(index + 1)}`, content: `Note ${String(index + 1)}.`, publicId: `fixtureworkspacenote${String(index).padStart(2, "0")}` }),
   );
-  return [...long, ...short];
+  // Note 2 keeps comments on for its author, so links can open a thread (e2e/artifact-link.spec.ts).
+  return [...long, ...short.map((note, index): ArtifactDto => (index === 1 ? { ...note, comments: "team" } : note))];
 }
 
 /** The fixture's projects in memory, and a stand-in for the project server actions over them. */
@@ -41,7 +43,7 @@ function useFixtureProjects(artifacts: readonly ArtifactDto[]) {
  * artifact is handed in full, so none loads. Project changes stay in
  * memory. The app shell and sidebar projects e2e tests use it.
  */
-export function WorkspaceFixture({ projectFilter }: { projectFilter: ProjectFilter | null }) {
+export function WorkspaceFixture({ projectFilter, link = null }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null }) {
   const base = useMemo(() => fixtureArtifacts(), []);
   const { state, api } = useFixtureProjects(base);
   const artifacts = useMemo(() => withProjects(base, state), [base, state]);
@@ -66,6 +68,7 @@ export function WorkspaceFixture({ projectFilter }: { projectFilter: ProjectFilt
           tagFilter={[]}
           projectsApi={api}
           listPath="/dev/workspace"
+          link={link}
         />
       </div>
     </ConfirmationsProvider>
