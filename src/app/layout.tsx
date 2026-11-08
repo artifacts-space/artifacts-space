@@ -24,8 +24,7 @@ export const metadata: Metadata = {
     default: "artifacts.space — Shared artifacts for coding agents",
     template: "%s · artifacts.space",
   },
-  description:
-    "Keep your artifacts when you switch agents or accounts. Claude, Codex, Cursor, Devin, and any MCP client read and edit the same artifacts. Open source.",
+  description: OG_DESCRIPTION,
   openGraph: {
     title: OG_WORDMARK,
     description: OG_DESCRIPTION,

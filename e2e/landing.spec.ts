@@ -2,18 +2,43 @@ import { expect, test } from "@playwright/test";
 
 const themes = ["light", "dark"] as const;
 
+const storySections = [
+  "You need the context now.",
+  "How it works",
+  "But artifacts get stuck.",
+  "Pricing",
+  "Keep up with your agents.",
+] as const;
+
 for (const theme of themes) {
-  test(`should say why artifacts.space exists without sideways scroll when the site theme is ${theme}`, async ({ page }) => {
+  test(`should tell the context story in order without sideways scroll when the site theme is ${theme}`, async ({ page }) => {
     await page.addInitScript((value) => { window.localStorage.setItem("theme", value); }, theme);
     await page.goto("/");
 
-    await expect(page.getByRole("heading", { level: 1, name: "Keep your artifacts when you switch agents or accounts." })).toBeVisible();
-    const why = page.getByRole("region", { name: "Why we built artifacts.space" });
+    const hero = page.getByRole("heading", { level: 1, name: "Your agents have the context. Now you do too." });
+    await expect(hero).toBeVisible();
+
+    const context = page.getByRole("region", { name: "You need the context now." });
+    await context.scrollIntoViewIfNeeded();
+    await expect(context.getByText("Read the plan before the code.")).toBeVisible();
+    await expect(context.getByText("Correct course early.")).toBeVisible();
+    await expect(context.getByText("Keep the why.")).toBeVisible();
+
+    const why = page.getByRole("region", { name: "But artifacts get stuck." });
     await why.scrollIntoViewIfNeeded();
-    await expect(why).toBeVisible();
+    await expect(why.getByRole("heading", { level: 3, name: "One place for every artifact" })).toBeVisible();
     await expect(why.getByText("Switch accounts. Lose nothing.")).toBeVisible();
     await expect(why.getByText("Every agent sees the same artifacts.")).toBeVisible();
     await expect(why.getByText("Your team sees them too.")).toBeVisible();
+
+    const heroTop = (await hero.boundingBox())?.y ?? Number.NaN;
+    const tops = [heroTop];
+    for (const name of storySections) {
+      const box = await page.getByRole("region", { name }).boundingBox();
+      tops.push(box?.y ?? Number.NaN);
+    }
+    const inOrder = tops.every((top, index) => index === 0 || top > (tops[index - 1] ?? Number.POSITIVE_INFINITY));
+    expect(inOrder, `sections run hero, ${storySections.join(", ")}`).toBe(true);
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
