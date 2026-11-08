@@ -97,7 +97,7 @@ For a self-hosted instance, replace `https://artifacts.space` with your origin.
 | Area | Tools |
 | --- | --- |
 | Artifacts | `artifacts_list`, `artifacts_get`, `artifacts_create`, `artifacts_update`, `artifacts_delete`, `teams_list` |
-| Themes | `themes_list` |
+| Themes and cover gradients | `themes_list` |
 | Versions | `artifacts_versions`, `artifacts_restore_version` |
 | Formats | `artifacts_formats_guide`, `artifacts_validate` |
 | Files | `files_request_upload`, `files_finalize`, `files_create_artifact`, `files_attach`, `files_get_download_url`, `files_delete` |
