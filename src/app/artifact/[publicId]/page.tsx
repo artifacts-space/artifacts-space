@@ -33,6 +33,7 @@ import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { lastEditorsFor } from "@/lib/artifacts";
 import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
+import { pageColumnClass, readingMeasureClass } from "@/lib/page-width/rules";
 import { pageOrganizersFor } from "@/lib/projects/page-project";
 import { isReportable } from "@/lib/reports/rules";
 import { getSession } from "@/lib/session";
@@ -221,29 +222,34 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   ]);
   const copy = visibilityCopy(record.visibility);
   const { theme, presetId, source } = resolved;
+  // Full width is a display setting on the row, not part of a version: every reader sees the current choice.
+  const column = pageColumnClass(record.fullWidth);
 
   return (
     // The header, comments, and footer wear the artifact theme's colors (none for an unthemed artifact) and swap with it.
     <ArtifactPageTheme theme={theme} className="min-h-screen">
       <StickyChrome>
-        <ArtifactHeader visibility={record.visibility} sentence={visibilitySentence(copy, byline)} content={view.content} />
+        <ArtifactHeader column={column} visibility={record.visibility} sentence={visibilitySentence(copy, byline)} content={view.content} />
       </StickyChrome>
       {/* A theme that locks light or dark sets that mode on the backdrop too, so comments and controls on it stay readable. */}
       <ThemeBackdrop theme={theme} className={cn("text-foreground", lockedMode(theme))}>
         {view.cover ? (
           <ThemeScope theme={theme}>
-            <ArtifactCover publicId={record.publicId} cover={view.cover} editable={viewable.canEdit} />
+            <ArtifactCover publicId={record.publicId} cover={view.cover} editable={viewable.canEdit} fullWidth={record.fullWidth} />
           </ThemeScope>
         ) : null}
-        <main className={cn("mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16", view.cover && "pt-8 sm:pt-10")}>
-          <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
-            <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={themeIdForReader(presetId, viewable.canEdit)} data-theme-source={source}>
-              <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
-              <article className="mt-10">
-                <ArtifactBody viewable={viewable} files={files} />
-              </article>
-            </ThemeScope>
-          </EditorIsland>
+        <main className={cn("mx-auto w-full py-12 sm:py-16", column, view.cover && "pt-8 sm:pt-10")} data-full-width={record.fullWidth}>
+          {/* The reading measure covers the artifact and its in-place editor, not the comments under it. */}
+          <div className={readingMeasureClass(record.fullWidth)}>
+            <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
+              <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={themeIdForReader(presetId, viewable.canEdit)} data-theme-source={source}>
+                <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
+                <article className="mt-10">
+                  <ArtifactBody viewable={viewable} files={files} />
+                </article>
+              </ThemeScope>
+            </EditorIsland>
+          </div>
           <SignUpAndReport copy={copy} publicId={record.publicId} visibility={record.visibility} />
           {/* Comments are for signed-in readers the comments setting lets in; the thread checks access itself too. */}
           {session && seesComments(viewable, session.user.id) ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" raised /> : null}
@@ -251,7 +257,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
       </ThemeBackdrop>
       {/* Cookieless view count for the author; people who can edit are never counted (the server checks too). */}
       {countsViews(record.visibility) && !viewable.canEdit ? <ViewBeacon publicId={record.publicId} /> : null}
-      <ArtifactPageFooter />
+      <ArtifactPageFooter column={column} />
     </ArtifactPageTheme>
   );
 }

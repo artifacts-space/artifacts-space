@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   index,
   integer,
@@ -52,6 +53,8 @@ export const artifact = pgTable(
     theme: jsonb("theme").$type<StoredArtifactTheme>(),
     // Optional cover banner: a gradient id, or "file:<uuid>[@0-100]" (src/lib/covers). Null shows none.
     cover: text("cover"),
+    // Show the body across the whole width instead of the reading width. A display setting: not versioned, no approval.
+    fullWidth: boolean("full_width").notNull().default(false),
     summary: text("summary").notNull().default(""),
     content: text("content").notNull(),
     kind: text("kind", { enum: artifactKinds }).notNull().default("markdown"),

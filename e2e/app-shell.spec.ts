@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { cleanUp, createTestArtifact, localDatabaseEnabled, localDatabaseSkipReason, readyDevUser, versionCount } from "./support/local-db";
+
 /**
  * The /app workspace is an app shell from md up: the page never scrolls, the
  * list and the artifact scroll on their own, and the header controls stay in
@@ -298,4 +300,81 @@ test("should keep the artifact page scrolling under its pinned header", async ({
   // The pinned header row: the logo and who can see the artifact stay on screen.
   await expect(page.getByRole("link", { name: "artifacts.space home" })).toBeInViewport();
   await expect(page.getByRole("button", { name: "Private. Only you can see this." })).toBeInViewport();
+});
+
+test.describe("full width", () => {
+  test.skip(!localDatabaseEnabled(), localDatabaseSkipReason);
+
+  const created: string[] = [];
+  const paragraph = "A long line of plain prose that runs well past the reading width, so the page width decides how wide it shows. ".repeat(12);
+
+  test.afterAll(async () => {
+    await cleanUp(created, []);
+  });
+
+  /** Signs in as the dev user and seeds a private Markdown artifact for them. */
+  async function seed(page: Page, title: string) {
+    await page.goto("/api/dev/sign-in");
+    await page.waitForURL(/\/app/);
+    const publicId = await createTestArtifact({ userId: await readyDevUser(), title, content: `# Notes\n\n${paragraph}`, visibility: "private", theme: null });
+    created.push(publicId);
+    return publicId;
+  }
+
+  const prose = (page: Page) => slot(page, "detail-body").locator(".artifact-prose").first();
+  const proseWidth = (page: Page) => prose(page).evaluate((element) => element.getBoundingClientRect().width);
+
+  test("should widen the content column when Full width is on and keep it after a reload", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "phone", "the /app editor width is measured on desktop; the phone check is below");
+    const title = `Full width e2e ${testInfo.project.name}`;
+    const publicId = await seed(page, title);
+    await page.setViewportSize(desktop);
+    await page.goto("/app");
+    await slot(page, "artifact-list").getByRole("button", { name: new RegExp(title) }).click();
+    await expect(page.getByRole("textbox", { name: "Artifact title" })).toHaveValue(title);
+    const pane = slot(page, "detail-body").locator("[data-full-width]");
+    await expect(pane).toHaveAttribute("data-full-width", "false");
+    const contained = await proseWidth(page);
+
+    await page.getByRole("button", { name: "More actions" }).click();
+    const toggle = page.getByRole("menuitemcheckbox", { name: "Full width" });
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await toggle.click();
+    await expect(pane).toHaveAttribute("data-full-width", "true");
+    const wide = await proseWidth(page);
+    expect(wide, "the text uses the whole pane instead of the reading width").toBeGreaterThan(contained + 100);
+
+    await page.reload();
+    await slot(page, "artifact-list").getByRole("button", { name: new RegExp(title) }).click();
+    await expect(slot(page, "detail-body").locator("[data-full-width]")).toHaveAttribute("data-full-width", "true");
+    expect(Math.round(await proseWidth(page)), "the setting persists").toBe(Math.round(wide));
+    await page.getByRole("button", { name: "More actions" }).click();
+    await expect(page.getByRole("menuitemcheckbox", { name: "Full width" })).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("Escape");
+    expect(await versionCount(publicId), "a display setting files no version").toBe(0);
+    await expectPageDoesNotScroll(page);
+
+    // The artifact's own page follows the same setting: wider than the 960px column it has when contained.
+    await page.goto(`/artifact/${publicId}`);
+    await expect(page.locator("main")).toHaveAttribute("data-full-width", "true");
+    expect(await page.locator("main").evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(960);
+  });
+
+  test("should keep side padding and no sideways scroll on a full-width page at phone width", async ({ page }, testInfo) => {
+    const publicId = await seed(page, `Full width phone e2e ${testInfo.project.name}`);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/app");
+    await page.getByRole("button", { name: "More actions" }).click();
+    await page.getByRole("menuitemcheckbox", { name: "Full width" }).click();
+    await expect(slot(page, "detail-body").locator("[data-full-width]")).toHaveAttribute("data-full-width", "true");
+    expect((await pageScroll(page)).width, "no horizontal scroll in the workspace").toBeLessThanOrEqual(390 + 1);
+
+    await page.goto(`/artifact/${publicId}`);
+    const main = page.locator("main");
+    await expect(main).toHaveAttribute("data-full-width", "true");
+    const scroll = await pageScroll(page);
+    expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.innerWidth + 1);
+    const padding = await main.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft));
+    expect(padding, "side padding stays").toBeGreaterThanOrEqual(16);
+  });
 });
