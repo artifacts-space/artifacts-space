@@ -27,7 +27,7 @@ export function InstallTerminal() {
         <span className="ml-2">~/acme-app</span>
       </div>
       <div className="px-3 py-3">
-        <p className="flex whitespace-nowrap">
+        <p className="flex overflow-x-auto whitespace-nowrap">
           <span className="mr-2 text-muted-foreground">$</span>
           <span className="how-type inline-block">{SKILL_INSTALL_COMMAND}</span>
         </p>
