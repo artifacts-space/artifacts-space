@@ -72,18 +72,27 @@ export function lastUsedIsStale(lastUsedAt: Date | null, now: Date): boolean {
 }
 
 /**
+ * The lookup behind authenticateApiToken: the token's row by hash, only while
+ * it is not revoked, with its agent's team membership. Revoking a token (as a
+ * handover does, src/lib/agents/handover.ts) stops it at the next request.
+ */
+export function tokenLookupQuery(db: Pick<ReturnType<typeof getDb>, "select">, tokenHash: string) {
+  return db
+    .select({ userId: apiToken.userId, id: apiToken.id, lastUsedAt: apiToken.lastUsedAt, agentTeamId: agent.teamId, agentMemberId: teamMember.id })
+    .from(apiToken)
+    .leftJoin(agent, eq(agent.userId, apiToken.userId))
+    .leftJoin(teamMember, and(eq(teamMember.userId, apiToken.userId), eq(teamMember.teamId, agent.teamId)))
+    .where(and(eq(apiToken.tokenHash, tokenHash), isNull(apiToken.revokedAt)))
+    .limit(1);
+}
+
+/**
  * The user a bearer token acts as, and the token's id, or null. A person's
  * token acts as the person. An agent's token acts as the agent, and only
  * while the agent still belongs to its team.
  */
 export async function authenticateApiToken(token: string) {
-  const [record] = await getDb()
-    .select({ userId: apiToken.userId, id: apiToken.id, lastUsedAt: apiToken.lastUsedAt, agentTeamId: agent.teamId, agentMemberId: teamMember.id })
-    .from(apiToken)
-    .leftJoin(agent, eq(agent.userId, apiToken.userId))
-    .leftJoin(teamMember, and(eq(teamMember.userId, apiToken.userId), eq(teamMember.teamId, agent.teamId)))
-    .where(and(eq(apiToken.tokenHash, hashToken(token)), isNull(apiToken.revokedAt)))
-    .limit(1);
+  const [record] = await tokenLookupQuery(getDb(), hashToken(token));
 
   if (!record || !tokenUserIsActive(record)) return null;
 

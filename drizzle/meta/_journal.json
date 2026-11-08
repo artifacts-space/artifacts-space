@@ -201,8 +201,15 @@
     {
       "idx": 28,
       "version": "7",
-      "when": 1794170315063,
-      "tag": "0028_artifact_full_width",
+      "when": 1794170375326,
+      "tag": "0028_agent_handed_over",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794171765913,
+      "tag": "0029_artifact_full_width",
       "breakpoints": true
     }
   ]

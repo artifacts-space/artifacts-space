@@ -1,5 +1,5 @@
 {
-  "id": "a4aacef9-fde6-4194-9ddb-ea5301145c34",
+  "id": "097ef0c9-7746-43e9-904b-1a49b4005a3c",
   "prevId": "295f2e89-a566-4e8a-b9d2-35dc2de324d3",
   "version": "7",
   "dialect": "postgresql",
@@ -28,6 +28,12 @@
         },
         "muted_at": {
           "name": "muted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "handed_over_at": {
+          "name": "handed_over_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -284,13 +290,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "full_width": {
-          "name": "full_width",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "summary": {
           "name": "summary",
