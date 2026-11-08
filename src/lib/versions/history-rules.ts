@@ -68,7 +68,8 @@ function mergeWindow(session: EditSessionStep | undefined, windowMs: number): nu
  * An autosave that starts an editing session never merges. One that continues
  * a session merges while the pause since the last save is under
  * EDIT_SESSION_IDLE_MS. A save by anyone else in between makes `latest`
- * theirs, so the session's next save files a new version.
+ * theirs, so the session's next save files a new version. Protected
+ * versions are never merged into, even by a session: see canDropSuperseded.
  */
 export function shouldMergeInto(
   latest: MergeTarget | null,
@@ -84,18 +85,33 @@ export function shouldMergeInto(
   return age >= 0 && age <= mergeWindow(save.session, windowMs);
 }
 
+/** A request that names a version, as the superseded-version rule sees it. */
+export interface VersionReference {
+  status: string;
+  requestedBy: string | null;
+  decidedBy: string | null;
+}
+
 /**
- * The versions a save may not merge into. Ordinary saves keep off every
- * version a request ever named. A continuing editing session may keep merging
- * into its own version while that version only waits for approval, so a
- * person editing a link or public artifact files one request per session, not
- * one per keystroke pause; the approved version and decided ones stay fixed.
+ * Whether a continuing editing session may delete `previous`, its own
+ * version from moments ago, now that a newer version holds the session's
+ * work. It applies when the save could not merge into `previous` only
+ * because `previous` was protected at the time (approved, or waiting for
+ * approval) and the approval step has since moved on to the new version:
+ * `previous` is no longer the approved version, and no request names it
+ * except the editor's own instant approvals. A version anyone else decided
+ * on, or that still waits, is never touched, and a version is never edited
+ * in place after a request named it. Together with merging, a session files
+ * one version even on link and public artifacts.
  */
-export function mergeGuard(
-  session: EditSessionStep | undefined,
-  versions: { referenced: ReadonlySet<string>; decided: ReadonlySet<string> },
-): ReadonlySet<string> {
-  return session === "continue" ? versions.decided : versions.referenced;
+export function canDropSuperseded(
+  previous: MergeTarget | null,
+  save: MergeCandidate,
+  state: { newVersionId: string; approvedVersionId: string | null; references: readonly VersionReference[] },
+): boolean {
+  if (!previous || previous.id === state.newVersionId || previous.id === state.approvedVersionId) return false;
+  if (save.session !== "continue" || !shouldMergeInto(previous, save, new Set())) return false;
+  return state.references.every((reference) => reference.status === "approved" && reference.requestedBy === save.editorId && reference.decidedBy === save.editorId);
 }
 
 /** A version as pruning sees it. */
