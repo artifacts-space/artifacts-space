@@ -15,14 +15,14 @@ const desktop = { width: 1280, height: 800 };
 function pageScroll(page: Page) {
   return page.evaluate(() => {
     const root = document.scrollingElement ?? document.documentElement;
-    return { height: root.scrollHeight, width: root.scrollWidth, innerHeight: window.innerHeight, innerWidth: window.innerWidth, scrollY: window.scrollY };
+    return { height: root.scrollHeight, width: root.scrollWidth, innerHeight: window.innerHeight, clientWidth: document.documentElement.clientWidth, scrollY: window.scrollY };
   });
 }
 
 async function expectPageDoesNotScroll(page: Page) {
   const scroll = await pageScroll(page);
   expect(scroll.height, "the page itself does not scroll").toBeLessThanOrEqual(scroll.innerHeight + 1);
-  expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.innerWidth + 1);
+  expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.clientWidth + 1);
 }
 
 const slot = (page: Page, name: string) => page.locator(`[data-slot=${name}]`);
@@ -324,7 +324,7 @@ test.describe("phone", () => {
     await page.goto("/dev/workspace");
     await expect(page.getByText("Checkout v2 rollout").first()).toBeVisible();
     const scroll = await pageScroll(page);
-    expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.innerWidth + 1);
+    expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.clientWidth + 1);
     expect(scroll.height, "phones keep a page that scrolls").toBeGreaterThan(scroll.innerHeight);
 
     await page.evaluate(() => { window.scrollTo(0, document.documentElement.scrollHeight / 2); });
@@ -353,7 +353,9 @@ test("should keep the artifact page scrolling under its pinned header", async ({
   expect(scroll.height, "the artifact page scrolls").toBeGreaterThan(scroll.innerHeight * 2);
   await page.evaluate(() => { window.scrollTo(0, 2000); });
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
-  await expect(page.getByText("Editor fixture", { exact: true })).toBeInViewport();
+  // The pinned header row: the logo and who can see the artifact stay on screen.
+  await expect(page.getByRole("link", { name: "artifacts.space home" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "Private. Only you can see this." })).toBeInViewport();
 });
 
 test.describe("full width", () => {
@@ -427,7 +429,7 @@ test.describe("full width", () => {
     const main = page.locator("main");
     await expect(main).toHaveAttribute("data-full-width", "true");
     const scroll = await pageScroll(page);
-    expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.innerWidth + 1);
+    expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.clientWidth + 1);
     const padding = await main.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft));
     expect(padding, "side padding stays").toBeGreaterThanOrEqual(16);
   });

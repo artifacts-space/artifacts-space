@@ -9,6 +9,9 @@ import { TitleTheme } from "@/components/artifact-theme/title-theme";
 import { AddCoverButton } from "@/components/artifact-cover/add-cover-button";
 import { ArtifactCover } from "@/components/artifact-cover/artifact-cover";
 import { ApprovedArticle } from "@/components/artifact-page/approved-article";
+import { ArtifactHeader } from "@/components/artifact-page/artifact-header";
+import { ArtifactPageFooter } from "@/components/artifact-page/artifact-page-footer";
+import { ArtifactPageTheme } from "@/components/artifact-page/artifact-page-theme";
 import { EditorIsland } from "@/components/artifact-page/editor-island";
 import { InlineBody, InlineSummary, InlineTitle } from "@/components/artifact-page/inline-fields";
 import { ReportDialog } from "@/components/artifact-page/report-dialog";
@@ -17,13 +20,7 @@ import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
 import { PageOrganizers } from "@/components/projects/page-organizers";
 import { CommentThread } from "@/components/comments/comment-thread";
-import { CopyButton } from "@/components/copy-button";
-import { GitHubLink } from "@/components/github-link";
 import { LastEdited } from "@/components/history/last-edited";
-import { LegalLinks } from "@/components/legal-links";
-import { Logo } from "@/components/logo";
-import { PixelAvatar, type AvatarKind } from "@/components/pixel-avatar";
-import { ThemeSwitcher } from "@/components/theme-switcher";
 import { ViewBeacon } from "@/components/views/view-beacon";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
 import { canSeeComments } from "@/lib/comments/setting-rules";
@@ -48,7 +45,7 @@ import { artifactThemeChoices } from "@/lib/themes/theme-choices";
 import { lockedMode } from "@/lib/themes/style";
 import { cn } from "@/lib/utils";
 import { countsViews } from "@/lib/views/view-rules";
-import { visibilityCopy, type VisibilityCopy } from "@/lib/visibility-copy";
+import { visibilityCopy, visibilitySentence, type VisibilityCopy } from "@/lib/visibility-copy";
 
 export const instant = false;
 
@@ -92,33 +89,6 @@ export async function generateMetadata({ params }: PageProps<"/artifact/[publicI
     alternates: { canonical: artifactPagePath(record.publicId), types: { "text/markdown": `/artifact/${record.publicId}.md` } },
     robots: pageRobots(await indexable(record)),
   };
-}
-
-interface NoticeProps {
-  /** The page column's classes (pageColumnClass), so the notice lines up with the artifact. */
-  column: string;
-  copy: VisibilityCopy;
-  author: string;
-  avatar: { seed: string; kind: AvatarKind } | null;
-  teamName: string | null;
-}
-
-/** The note above every artifact: who can see it, and who shared it when that is not the reader. */
-function VisibilityNotice({ column, copy, author, avatar, teamName }: NoticeProps) {
-  return (
-    <div role="note" className="border-b bg-muted/50">
-      <p className={cn("mx-auto w-full py-2 text-sm leading-5 text-muted-foreground", column)}>
-        {copy.showAuthor ? (
-          <>
-            Shared by {avatar ? <PixelAvatar seed={avatar.seed} kind={avatar.kind} size={16} className="mr-1 -mt-px" /> : null}
-            <span className="font-medium text-foreground">{author}</span>
-            {teamName ? <> in <span className="font-medium text-foreground">{teamName}</span></> : null}.{" "}
-          </>
-        ) : null}
-        {copy.note}
-      </p>
-    </div>
-  );
 }
 
 /** Tells the author and team members that readers outside the team still see the approved version. */
@@ -262,16 +232,10 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   const column = pageColumnClass(record.fullWidth);
 
   return (
-    <div className="min-h-screen">
+    // The header, comments, and footer wear the artifact theme's colors (none for an unthemed artifact) and swap with it.
+    <ArtifactPageTheme theme={theme} className="min-h-screen">
       <StickyChrome>
-        <header className={cn("mx-auto flex h-14 w-full items-center justify-between", column)}>
-          <Logo />
-          <div className="flex items-center gap-2">
-            <GitHubLink />
-            <CopyButton value={view.content} label="Copy" variant="outline" size="sm" />
-          </div>
-        </header>
-        <VisibilityNotice column={column} copy={copy} author={byline.author} avatar={byline.avatar} teamName={byline.teamName} />
+        <ArtifactHeader column={column} visibility={record.visibility} sentence={visibilitySentence(copy, byline)} content={view.content} />
       </StickyChrome>
       {/* A theme that locks light or dark sets that mode on the backdrop too, so comments and controls on it stay readable. */}
       <ThemeBackdrop theme={theme} className={cn("text-foreground", lockedMode(theme))}>
@@ -301,15 +265,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
       </ThemeBackdrop>
       {/* Cookieless view count for the author; people who can edit are never counted (the server checks too). */}
       {countsViews(record.visibility) && !viewable.canEdit ? <ViewBeacon publicId={record.publicId} /> : null}
-      <footer className="border-t">
-        <div className={cn("mx-auto flex w-full flex-wrap items-center justify-between gap-4 py-6 text-sm text-muted-foreground", column)}>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <Link href="/" className="transition-colors hover:text-foreground">artifacts.space</Link>
-            <LegalLinks />
-          </div>
-          <ThemeSwitcher />
-        </div>
-      </footer>
-    </div>
+      <ArtifactPageFooter column={column} />
+    </ArtifactPageTheme>
   );
 }

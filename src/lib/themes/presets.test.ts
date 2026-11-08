@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { contrastIssues } from "./contrast";
-import { paletteTokens, syntaxTokens } from "./derive";
+import { mentionTokens, paletteTokens, syntaxTokens } from "./derive";
 import { contrastRatio, normalizeColor, parseColor } from "./color";
 import { themePresets } from "./presets";
 import { builtInPresets } from "./resolve";
@@ -21,6 +21,12 @@ function block(selector: string): Map<string, string> {
 }
 
 const site = { light: block(":root,\n.light,"), dark: block(".dark,\n:root:not(.dark)") };
+
+function siteDefaultColors(mode: "light" | "dark") {
+  const preset = builtInPresets().get("default");
+  if (!preset) throw new Error("default preset missing");
+  return preset.theme[mode];
+}
 
 function siteColor(mode: "light" | "dark", name: string): string | null {
   const value = site[mode].get(name);
@@ -70,6 +76,34 @@ describe("theme presets", () => {
         if (!inline || !foreground || !background) throw new Error(`${id} ${mode}: missing inline code tokens`);
         expect(contrastRatio(foreground, inline), `${id} ${mode} text on inline code`).toBeGreaterThanOrEqual(4.5);
         expect(contrastRatio(inline, background), `${id} ${mode} inline code on the page`).toBeGreaterThan(1.05);
+      }
+    }
+  });
+
+  it("should keep @mention chips readable and set apart from the card on every preset in both modes", () => {
+    for (const [id, preset] of builtInPresets()) {
+      for (const mode of ["light", "dark"] as const) {
+        const tokens = paletteTokens(mode, preset.theme[mode]);
+        const card = parseColor(tokens["--card"] ?? "");
+        if (!card) throw new Error(`${id} ${mode}: no card`);
+        for (const chip of ["--mention", "--mention-agent"]) {
+          const background = parseColor(tokens[chip] ?? "");
+          const ink = parseColor(tokens[`${chip}-foreground`] ?? "");
+          if (!background || !ink) throw new Error(`${id} ${mode}: missing ${chip} tokens`);
+          expect(contrastRatio(ink, background), `${id} ${mode} ${chip} text`).toBeGreaterThanOrEqual(4.5);
+          expect(contrastRatio(background, card), `${id} ${mode} ${chip} on the card`).toBeGreaterThan(1.05);
+        }
+      }
+    }
+  });
+
+  it("should start @mention chip ink from the site's chip colors in globals.css when deriving it", () => {
+    for (const mode of ["light", "dark"] as const) {
+      const tokens = mentionTokens(mode, siteDefaultColors(mode));
+      for (const chip of ["--mention", "--mention-agent"]) {
+        const ink = parseColor(siteColor(mode, `${chip}-foreground`) ?? "");
+        const derived = parseColor(tokens[`${chip}-foreground`] ?? "");
+        expect(ink && derived && Math.abs(ink.h - derived.h), `${mode} ${chip} hue`).toBeLessThan(0.5);
       }
     }
   });
