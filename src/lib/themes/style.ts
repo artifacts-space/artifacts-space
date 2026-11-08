@@ -125,3 +125,23 @@ export function themeKey(theme: Theme): string {
   }
   return hash.toString(36);
 }
+
+/** What the artifact page around the artifact (header, comments, footer) needs to wear its theme. */
+export interface ThemeChromeProps {
+  /** The class that pins the mode, or null to follow the reader. */
+  modeClass: PaletteMode | null;
+  /** The theme's color tokens only: no fonts and no radius, so the page keeps the site's type and shapes. */
+  style: ThemeStyle;
+}
+
+/**
+ * The colors for the page around an artifact (the header with the logo,
+ * visibility, GitHub, and Copy; the comments; the footer), so it changes with
+ * the artifact's theme: the same validated color tokens the content and
+ * backdrop use, and the same mode lock. The site default emits nothing, so an
+ * unthemed artifact's page looks as it always has.
+ */
+export function themeChromeProps(theme: Theme, modeOverride?: PaletteMode): ThemeChromeProps {
+  const mode = lockedMode(theme, modeOverride);
+  return { modeClass: mode, style: usesSitePalette(theme) ? {} : colorStyle(theme, mode) };
+}

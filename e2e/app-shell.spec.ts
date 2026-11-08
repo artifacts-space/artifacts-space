@@ -349,7 +349,9 @@ test("should keep the artifact page scrolling under its pinned header", async ({
   expect(scroll.height, "the artifact page scrolls").toBeGreaterThan(scroll.innerHeight * 2);
   await page.evaluate(() => { window.scrollTo(0, 2000); });
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
-  await expect(page.getByText("Editor fixture", { exact: true })).toBeInViewport();
+  // The pinned header row: the logo and who can see the artifact stay on screen.
+  await expect(page.getByRole("link", { name: "artifacts.space home" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "Private. Only you can see this." })).toBeInViewport();
 });
 
 test.describe("full width", () => {
