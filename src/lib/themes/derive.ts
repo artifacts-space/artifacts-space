@@ -115,7 +115,29 @@ function seriesTokens(colors: ThemeColors): Record<string, string> {
   return Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`--series-${String(index + 1)}`, chart[index % chart.length] ?? colors.foreground]));
 }
 
+/** The site's @mention chip ink per mode, from globals.css: people, and agents in a slightly different hue. */
+const siteMentionInk: Record<PaletteMode, { person: string; agent: string }> = {
+  light: { person: "oklch(0.42 0.13 262)", agent: "oklch(0.42 0.13 300)" },
+  dark: { person: "oklch(0.86 0.08 262)", agent: "oklch(0.86 0.08 300)" },
+};
+
+/** How far a chip's background leans from the card toward its ink: a quiet tint, a little stronger on dark cards. */
+const mentionTint: Record<PaletteMode, number> = { light: 0.1, dark: 0.15 };
+
+/**
+ * @mention chip colors on the themed card: the site's hues, a tint of the
+ * card for the chip, and the ink re-lit until it reads at 4.5:1 on it.
+ */
+export function mentionTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
+  const card = read(colors.card);
+  const chip = (ink: string, prefix: string): Record<string, string> => {
+    const background = mixOklch(card, read(ink), mentionTint[mode]);
+    return { [prefix]: formatOklch(background), [`${prefix}-foreground`]: formatOklch(ensureContrast(read(ink), background, 4.55)) };
+  };
+  return { ...chip(siteMentionInk[mode].person, "--mention"), ...chip(siteMentionInk[mode].agent, "--mention-agent") };
+}
+
 /** Every CSS token a palette sets, keyed by custom property name, with canonical color values. */
 export function paletteTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
-  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors) };
+  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors) };
 }

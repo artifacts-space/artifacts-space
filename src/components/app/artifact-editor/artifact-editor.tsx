@@ -5,6 +5,7 @@ import { useState } from "react";
 import { CommentsControl } from "@/components/app/comments-picker";
 import { ShareControl } from "@/components/app/share-control";
 import type { ShareTeam } from "@/components/app/share-teams-context";
+import { useRenderTheme } from "@/components/app/use-render-theme";
 import { useLeaveGuard } from "@/components/artifact-page/use-leave-guard";
 import { AttachedFiles } from "@/components/files/attached-files";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
@@ -79,6 +80,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   const shareUrl = `${origin}/artifact/${artifact.publicId}`;
   const shared = artifact.visibility === "link" || artifact.visibility === "public";
   const { outerRef, bodyRef, remember } = useScrollPlace(sourceOpen ? "source" : "page");
+  const theme = useRenderTheme(artifact);
   const saving = autosave.status.kind === "saving";
   useLeaveGuard(autosave.dirty || saving);
 
@@ -154,6 +156,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
             revision={revision}
             sourceOpen={sourceOpen}
             fullWidth={artifact.fullWidth}
+            theme={theme}
             onChange={(content) => { update("content", content); }}
             onShowSource={() => { if (!sourceOpen) toggleSource(); }}
           />

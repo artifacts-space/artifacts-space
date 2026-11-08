@@ -23,7 +23,7 @@ for (const theme of themes) {
     // Mermaid draws in the browser; wait until every diagram has either an image or a notice.
     await expect(page.getByRole("status").filter({ hasText: "Drawing diagram" })).toHaveCount(0, { timeout: 60_000 });
 
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
     expect(errors).toEqual([]);
 
