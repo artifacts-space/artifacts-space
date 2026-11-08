@@ -23,7 +23,7 @@ const summary = [
   "You own what you and your agents create. We host and show it only as your sharing settings allow.",
   "You are responsible for what your connected agents do. In a shared team, agents can ask to share but only an owner or admin can approve.",
   "No spam, phishing, malware, illegal content, scraping, abuse of limits, or security testing without permission.",
-  "The service is free today. We will give at least 30 days' notice before any paid plan, and never charge you unless you choose one.",
+  "The service is free today. Accounts made while the service is free stay free, even if we add paid plans later. We will give at least 30 days' notice before any paid plan, and never charge you unless you choose one.",
   "The service comes as is. South Carolina law applies, and disputes go to the courts of Charleston County.",
 ] as const;
 
