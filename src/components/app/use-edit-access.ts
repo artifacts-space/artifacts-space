@@ -15,13 +15,13 @@ type AccessFields = Pick<ArtifactDto, "authorId" | "actsForAuthor" | "visibility
  * What the viewer may do with an artifact in the workspace, from the same
  * rule the server enforces (canEditArtifact): edit it (the author, or a
  * member of the team it is shared through), share it (the author, or the
- * person who added the agent that wrote it), withdraw its sharing and change
+ * person who added the agent that wrote it, who also deletes it), withdraw its sharing and change
  * its comments setting (the team's owners and admins), and see its comments
  * (the comments setting). The server checks every action again.
  */
 export function useEditAccess(artifact: AccessFields | null, viewerId: string) {
   const teams = useShareTeams();
-  if (!artifact) return { team: undefined, isAuthor: false, canShare: false, canEdit: false, canWithdraw: false, seesComments: false };
+  if (!artifact) return { team: undefined, isAuthor: false, canShare: false, canDelete: false, canEdit: false, canWithdraw: false, seesComments: false };
   const team = teams.find((item) => item.id === artifact.teamId);
   const isAuthor = artifact.authorId === viewerId;
   const actsForAuthor = artifact.actsForAuthor === true;
@@ -30,8 +30,9 @@ export function useEditAccess(artifact: AccessFields | null, viewerId: string) {
     { userId: viewerId, isTeamMember: team !== undefined, actsForAuthor },
   );
   const seesComments = canSeeComments(artifact.comments, { canViewArtifact: true, isAuthor, isTeamMember: team !== undefined });
+  // The author, or the person who added the agent that wrote it, shares and deletes it (canDeleteArtifact).
   const canShare = isAuthor || actsForAuthor;
-  return { team, isAuthor, canShare, canEdit, canWithdraw: !canShare && team !== undefined && canManageTeam(team.role), seesComments };
+  return { team, isAuthor, canShare, canDelete: canShare, canEdit, canWithdraw: !canShare && team !== undefined && canManageTeam(team.role), seesComments };
 }
 
 /** Makes a teammate's artifact private again, for the team's owners and admins. */

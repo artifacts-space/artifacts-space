@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z, ZodError } from "zod";
 
 import { getEditableArtifact } from "@/lib/access";
+import { findDeletableArtifact } from "@/lib/agents/owner-access";
 import { ICON_FIELD_DESCRIPTION, isAcceptedIconInput, ICON_RULE_MESSAGE } from "@/lib/artifact-icons";
 import { artifactIconLimits } from "@/lib/artifact-icon-limits";
 import { loadArtifactForViewer } from "@/lib/artifact-read";
@@ -10,7 +11,6 @@ import {
   createArtifact,
   deleteArtifact,
   getEditableArtifactDto,
-  getOwnArtifactByPublicId,
   listArtifacts,
   updateArtifact,
   type ArtifactScope,
@@ -193,12 +193,6 @@ async function shareAfterSave(userId: string, saved: ArtifactDto, teams: TeamMem
   return { artifact: saved, sharing: null, comments: null };
 }
 
-async function ownByPublicId(userId: string, publicId: string) {
-  const record = await getOwnArtifactByPublicId(userId, publicId);
-  if (!record) throw new UserFacingError("Artifact not found, or you are not its author.");
-  return record;
-}
-
 /** An artifact the caller may edit: their own, or one shared through their team. */
 async function editableByPublicId(userId: string, publicId: string) {
   const record = await getEditableArtifact(userId, { publicId });
@@ -347,11 +341,12 @@ function registerWriteTools(server: ToolServer, userId: string) {
     "artifacts_delete",
     {
       title: "Delete artifact",
-      description: "Permanently delete your own artifact by id.",
+      description: "Permanently delete an artifact by id: your own, or one written by an agent you added.",
       inputSchema: { id: publicIdField },
     },
     ({ id }) => respond(async () => {
-      const record = await ownByPublicId(userId, id);
+      const record = await findDeletableArtifact(userId, { publicId: id });
+      if (!record) throw new UserFacingError("Artifact not found, or you cannot delete it. You can delete your own artifacts and those of agents you added.");
       await deleteArtifact(userId, record.id);
       return { deleted: true, id };
     }),
@@ -361,8 +356,8 @@ function registerWriteTools(server: ToolServer, userId: string) {
 /**
  * Registers the artifact and team tools. Every read goes through the access
  * check (getViewableArtifact or listArtifacts). Updates go through the edit
- * check (getEditableArtifact); deleting is author-only, sharing is for the
- * author or the person who added the agent that wrote it, and
+ * check (getEditableArtifact); deleting and sharing are for the author or
+ * the person who added the agent that wrote it, and
  * sharing goes through requestArtifactSharing as an agent, so it can wait for
  * approval but never approve. Write tools are left out for read-only access.
  */

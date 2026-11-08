@@ -32,6 +32,8 @@ interface ArtifactEditorProps {
   isAuthor: boolean;
   /** The author, or the person who added the agent that wrote it, changes who can read it. */
   canShare: boolean;
+  /** The author, or the person who added the agent that wrote it, deletes it. */
+  canDelete: boolean;
   /** The artifact's team, when the viewer belongs to it. */
   team: ShareTeam | undefined;
   /** The comments setting lets the viewer see its comments. */
@@ -58,8 +60,8 @@ function SharingSlot({ artifact, shareUrl, canShare, manager, team, onUpdated }:
   return null;
 }
 
-/** Edit one artifact and read its history. The author also shares and deletes it. */
-export function ArtifactEditor({ artifact, origin, isAuthor, canShare, team, seesComments, onWithdraw, onUpdated, onDeleted }: ArtifactEditorProps) {
+/** Edit one artifact and read its history. The author (or the person who added the agent that wrote it) also shares and deletes it. */
+export function ArtifactEditor({ artifact, origin, isAuthor, canShare, canDelete, team, seesComments, onWithdraw, onUpdated, onDeleted }: ArtifactEditorProps) {
   const { draft, update, dirty, reset } = useArtifactDraft(artifact);
   const { pending, save, remove } = useArtifactActions({ artifact, draft, onUpdated, onDeleted });
   const [mode, setMode] = useState<EditorMode>("preview");
@@ -95,13 +97,13 @@ export function ArtifactEditor({ artifact, origin, isAuthor, canShare, team, see
             publicId={artifact.publicId}
             title={artifact.title}
             seesComments={seesComments}
-            offNotice={`Comments are off for this artifact.${isAuthor ? " Change who can comment in Share." : ""}`}
+            offNotice={`Comments are off for this artifact.${canShare ? " Change who can comment in Share." : ""}`}
           />
         }
         dirty={dirty}
         pending={pending}
         onSave={() => void save()}
-        onRequestDelete={isAuthor ? () => { if (pending !== "delete") confirmDelete.request(remove); } : null}
+        onRequestDelete={canDelete ? () => { if (pending !== "delete") confirmDelete.request(remove); } : null}
         onWithdraw={onWithdraw}
       />
       <div ref={outerRef} data-slot="detail-outer" className={detailOuter}>

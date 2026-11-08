@@ -7,7 +7,7 @@ import { getDb } from "@/db";
 import { artifact, sharingRequest, type ArtifactRecord } from "@/db/schema";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { getEditableArtifact, viewableInTeamCondition } from "@/lib/access";
-import { authoredByViewerCondition, ownedAgentIds } from "@/lib/agents/owner-access";
+import { authoredByViewerCondition, findDeletableArtifact, ownedAgentIds } from "@/lib/agents/owner-access";
 import { loadActors } from "@/lib/agents/queries";
 import { assertValidArtifactContent, assertValidArtifactUpdate } from "@/lib/artifact-content";
 import {
@@ -50,7 +50,8 @@ import { recordArtifactSave } from "@/lib/versions/service";
 
 /**
  * Artifact storage. The author and members of the team an artifact is shared
- * through edit it (getEditableArtifact); only the author deletes it. Every
+ * through edit it (getEditableArtifact); only the author, or the person who
+ * added the agent that wrote it, deletes it (findDeletableArtifact). Every
  * save files a version. Visibility never changes here: sharing goes through
  * requestArtifactSharing in src/lib/sharing.
  */
@@ -296,16 +297,6 @@ export async function getEditableArtifactDto(editorId: string, id: string): Prom
   return dto ?? null;
 }
 
-/** The author's own artifact by internal id, or null. */
-export async function getOwnArtifact(userId: string, id: string) {
-  const [record] = await getDb()
-    .select()
-    .from(artifact)
-    .where(and(eq(artifact.userId, userId), eq(artifact.id, id)))
-    .limit(1);
-  return record ?? null;
-}
-
 /** The author's own artifact by public id, or null. */
 export async function getOwnArtifactByPublicId(userId: string, publicId: string) {
   const [record] = await getDb()
@@ -472,9 +463,9 @@ async function attachUpdatedContentFiles(userId: string, current: ArtifactRecord
   await attachFileRows(userId, current.id, [...new Set([...contentFileIds, ...iconFileIds])]);
 }
 
-/** Deletes the author's own artifact and its files. */
+/** Deletes an artifact and its files, for its author or the person who added the agent that wrote it. */
 export async function deleteArtifact(userId: string, id: string) {
-  const own = await getOwnArtifact(userId, id);
+  const own = await findDeletableArtifact(userId, { id });
   if (!own) return false;
   await deleteArtifactFiles(own.id).catch((error: unknown) => {
     // The rows lose their artifact when it goes; the cleanup job removes them.
@@ -482,7 +473,7 @@ export async function deleteArtifact(userId: string, id: string) {
   });
   const [record] = await getDb()
     .delete(artifact)
-    .where(and(eq(artifact.userId, userId), eq(artifact.id, id)))
+    .where(and(eq(artifact.userId, own.userId), eq(artifact.id, id)))
     .returning();
 
   forgetArtifactCache(own.id);

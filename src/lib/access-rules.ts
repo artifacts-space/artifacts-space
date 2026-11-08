@@ -20,8 +20,8 @@ export interface AccessViewer {
 
 /**
  * Whether the viewer stands in the author's place: the author, or the person
- * who added the agent that wrote it. Used for reading, listing, editing, and
- * sharing; never for deleting.
+ * who added the agent that wrote it. Used for reading, listing, editing,
+ * sharing, and deleting.
  */
 export function isAuthorOrActsFor(subject: Pick<AccessSubject, "userId">, viewer: AccessViewer | null): boolean {
   if (!viewer) return false;
@@ -63,12 +63,13 @@ export function canEditArtifact(subject: EditSubject, viewer: AccessViewer | nul
 }
 
 /**
- * Only the author deletes an artifact. Who can read it is changed by the
- * author or the person who added the agent that wrote it (isAuthorOrActsFor);
- * team owners and admins can still withdraw sharing.
+ * People stay in charge of their own work and their agents' work: the author,
+ * or the person who added the agent that wrote it, deletes an artifact and
+ * changes who can read it (isAuthorOrActsFor). Team owners and admins can
+ * withdraw sharing but never delete a teammate's artifact.
  */
-export function canDeleteArtifact(subject: Pick<AccessSubject, "userId">, viewerId: string | null): boolean {
-  return viewerId !== null && viewerId === subject.userId;
+export function canDeleteArtifact(subject: Pick<AccessSubject, "userId">, viewer: AccessViewer | null): boolean {
+  return isAuthorOrActsFor(subject, viewer);
 }
 
 /**

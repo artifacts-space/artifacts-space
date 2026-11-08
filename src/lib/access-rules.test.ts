@@ -71,8 +71,8 @@ describe("canEditArtifact", () => {
 
 describe("canDeleteArtifact", () => {
   it("should allow only the author when anyone else asks", () => {
-    expect(canDeleteArtifact({ userId: author }, author)).toBe(true);
-    expect(canDeleteArtifact({ userId: author }, "member")).toBe(false);
+    expect(canDeleteArtifact({ userId: author }, { userId: author, isTeamMember: false })).toBe(true);
+    expect(canDeleteArtifact({ userId: author }, { userId: "member", isTeamMember: true })).toBe(false);
     expect(canDeleteArtifact({ userId: author }, null)).toBe(false);
   });
 });
@@ -102,9 +102,20 @@ describe("an agent's artifacts and the person who added the agent", () => {
     });
   }
 
-  it("should never let the owner delete the agent's artifact when they act for it", () => {
-    expect(canDeleteArtifact({ userId: author }, owner.userId)).toBe(false);
+  it("should let the owner delete the agent's artifact when they act for it", () => {
+    expect(canDeleteArtifact({ userId: author }, owner)).toBe(true);
   });
+
+  const nonOwnersWhoMayNotDelete: Record<string, AccessViewer> = {
+    ...notOwners,
+    // Admins of the agent's team withdraw sharing, but never delete a teammate's or an agent's work.
+    teamAdminNotOwner: { userId: "team-admin", isTeamMember: true, actsForAuthor: false },
+  };
+  for (const [name, viewer] of Object.entries(nonOwnersWhoMayNotDelete)) {
+    it(`should never let ${name} delete the agent's artifact when they do not act for the agent`, () => {
+      expect(canDeleteArtifact({ userId: author }, viewer)).toBe(false);
+    });
+  }
 
   it("should deny everyone when no viewer is signed in", () => {
     expect(isAuthorOrActsFor(subject("private"), null)).toBe(false);

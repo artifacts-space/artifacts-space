@@ -2,7 +2,8 @@ import { and, eq, inArray, or, type SQL } from "drizzle-orm";
 import { cache } from "react";
 
 import { getDb } from "@/db";
-import { agent, artifact, teamMember } from "@/db/schema";
+import { agent, artifact, teamMember, type ArtifactRecord } from "@/db/schema";
+import { isPublicId } from "@/lib/public-id";
 
 /**
  * The person who added an agent acts for it on the artifacts it writes: they
@@ -52,4 +53,19 @@ export function authoredByViewerCondition(db: Db, viewerId: string): SQL {
   const condition = or(eq(artifact.userId, viewerId), inArray(artifact.userId, ownedAgentIdsQuery(db, viewerId)));
   if (!condition) throw new Error("The author scope could not be built.");
   return condition;
+}
+
+/**
+ * The artifact by internal or public id when `userId` may delete it: its
+ * author, or the person who added the agent that wrote it (while still in
+ * the agent's team). Null otherwise, so callers answer "not found" either
+ * way. Teammates, team admins, and other agents never can.
+ */
+export async function findDeletableArtifact(userId: string, key: { id: string } | { publicId: string }): Promise<ArtifactRecord | null> {
+  if ("publicId" in key && !isPublicId(key.publicId)) return null;
+  const where = "id" in key ? eq(artifact.id, key.id) : eq(artifact.publicId, key.publicId);
+  const [record] = await getDb().select().from(artifact).where(where).limit(1);
+  if (!record) return null;
+  if (record.userId === userId) return record;
+  return (await actsForAuthor(userId, record.userId)) ? record : null;
 }
