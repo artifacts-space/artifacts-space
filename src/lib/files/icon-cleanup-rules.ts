@@ -47,6 +47,17 @@ export function unusedIconFiles(candidates: readonly string[], current: IconUseS
   return [...new Set(candidates)].filter((fileId) => !used.has(fileId));
 }
 
+/**
+ * True when saving `next` over `latest` would stop showing an uploaded icon
+ * or cover image that `latest` shows. Such a save never merges into the
+ * latest version, so the image stays in the history and Restore can bring it
+ * back, even right after it was added.
+ */
+export function dropsShownImage(latest: ImageRefs, next: ImageRefs): boolean {
+  const kept = new Set(imageFileIdsOf(next));
+  return imageFileIdsOf(latest).some((fileId) => !kept.has(fileId));
+}
+
 /** The version a reader outside the team is served: its icon, cover, and content. */
 export interface ServedImageState extends ImageRefs {
   kind: string;

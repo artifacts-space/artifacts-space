@@ -7,6 +7,7 @@ import { artifact, artifactVersion, sharingRequest, type ArtifactRecord, type Ar
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 import type { VersionSaveKind } from "@/lib/artifact-types";
 import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
+import { dropsShownImage } from "@/lib/files/icon-cleanup-rules";
 
 import { selectPrunableVersions, shouldMergeInto, versionBytes, versionRetention } from "./history-rules";
 import { sameReviewedFields } from "./rules";
@@ -95,7 +96,8 @@ async function mergeInto(versionId: string, record: ArtifactRecord) {
  * Files a save of `record` as a version and returns its id. A save that
  * changes nothing the latest version shows returns that version. A quick
  * follow-up save by the same editor merges into the latest version, unless
- * that version is protected (see protectedVersions).
+ * that version is protected (see protectedVersions) or the save drops an
+ * uploaded icon or cover image the latest version shows.
  */
 export async function fileVersion(
   record: ArtifactRecord,
@@ -104,7 +106,8 @@ export async function fileVersion(
   const latest = await latestVersion(record.id);
   if (latest && save.saveKind === "edit" && sameReviewedFields(latest, record)) return latest.id;
   const { referenced } = await protectedVersions(record.id, record.approvedVersionId);
-  if (latest && shouldMergeInto(latest, { ...save, now: new Date() }, referenced)) {
+  // A save that drops an uploaded icon or cover image files its own version, so the image stays restorable.
+  if (latest && shouldMergeInto(latest, { ...save, now: new Date() }, referenced) && !dropsShownImage(latest, record)) {
     await mergeInto(latest.id, record);
     return latest.id;
   }

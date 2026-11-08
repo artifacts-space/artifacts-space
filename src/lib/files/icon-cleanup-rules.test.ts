@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hiddenImageFiles, imageFileIdOf, imageFileIdsOf, unusedIconFiles, type IconUseState } from "./icon-cleanup-rules";
+import { dropsShownImage, hiddenImageFiles, imageFileIdOf, imageFileIdsOf, unusedIconFiles, type IconUseState } from "./icon-cleanup-rules";
 
 const oldFile = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const newFile = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
@@ -84,5 +84,19 @@ describe("imageFileIdOf", () => {
   it("should list the images an icon and cover pair shows", () => {
     expect(imageFileIdsOf({ icon: `file:${oldFile}`, cover: `file:${newFile}@10` })).toEqual([oldFile, newFile]);
     expect(imageFileIdsOf({ icon: "tabler:rocket", cover: "dusk" })).toEqual([]);
+  });
+});
+
+describe("dropsShownImage", () => {
+  it("should be true when a save removes or replaces an uploaded cover or icon", () => {
+    expect(dropsShownImage({ icon: null, cover: `file:${oldFile}@30` }, { icon: null, cover: null })).toBe(true);
+    expect(dropsShownImage({ icon: null, cover: `file:${oldFile}` }, { icon: null, cover: `file:${newFile}` })).toBe(true);
+    expect(dropsShownImage({ icon: `file:${oldFile}`, cover: null }, { icon: "🚀", cover: null })).toBe(true);
+  });
+
+  it("should be false when the image stays, moves its focal point, or was never an upload", () => {
+    expect(dropsShownImage({ icon: null, cover: `file:${oldFile}@30` }, { icon: null, cover: `file:${oldFile}@60` })).toBe(false);
+    expect(dropsShownImage({ icon: null, cover: "mist" }, { icon: null, cover: null })).toBe(false);
+    expect(dropsShownImage({ icon: null, cover: null }, { icon: null, cover: `file:${newFile}` })).toBe(false);
   });
 });
