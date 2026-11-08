@@ -1,0 +1,22 @@
+/*
+ * The MIT sign fades out toward its edges (a mask, not a color), and a few
+ * of its brightest dim dots twinkle slowly. No twinkle with reduced motion.
+ */
+.matrix-fade {
+  mask-image: radial-gradient(ellipse 58% 62% at center, black 45%, transparent 100%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .matrix-twinkle {
+    animation: matrix-twinkle 4s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes matrix-twinkle {
+  from {
+    opacity: 0.26;
+  }
+  to {
+    opacity: 0.06;
+  }
+}

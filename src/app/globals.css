@@ -301,6 +301,9 @@
   --actor-person: oklch(0.56 0.14 58);
   --actor-person-tint: oklch(0.95 0.045 75);
   --dot-grid: oklch(0.2 0.006 60 / 0.13);
+  /* The open-source sign's dot matrix: lit dots spell MIT, dim dots fill the field. */
+  --matrix-lit: #0051f0;
+  --matrix-dim: #0868f5;
   /*
    * Elevation: soft minimalism. A card is felt, never outlined: a hairline
    * edge (--card-edge) plus a wide, low-opacity shadow with a negative spread,
@@ -422,6 +425,8 @@
   --actor-person: oklch(0.8 0.13 75);
   --actor-person-tint: oklch(0.3 0.05 70);
   --dot-grid: oklch(1 0 0 / 0.1);
+  --matrix-lit: #88c5fb;
+  --matrix-dim: #3d8af7;
   color-scheme: dark;
 }
 

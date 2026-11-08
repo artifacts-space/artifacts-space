@@ -8,6 +8,7 @@ const storySections = [
   "Use it like the artifacts you already know.",
   "One surface for people and agents.",
   "But switching accounts cuts you off.",
+  "Open source from day one.",
   "Pricing",
   "Bring your team and your agents into one space.",
 ] as const;
@@ -38,6 +39,12 @@ for (const theme of themes) {
     await expect(why.getByText("Switch accounts. Lose nothing.")).toBeVisible();
     await expect(why.getByText("Every agent sees the same artifacts.")).toBeVisible();
     await expect(why.getByText("Your team sees them too.")).toBeVisible();
+    await expect(why.getByText("Each account keeps its own artifacts. None can open the others.")).toBeVisible();
+
+    const openSource = page.getByRole("region", { name: "Open source from day one." });
+    await openSource.scrollIntoViewIfNeeded();
+    await expect(openSource.getByRole("img", { name: "MIT" })).toBeVisible();
+    await expect(openSource.getByRole("button", { name: "View on GitHub" })).toHaveAttribute("href", "https://github.com/artifacts-space/artifacts-space");
 
     const heroTop = (await hero.boundingBox())?.y ?? Number.NaN;
     const tops = [heroTop];

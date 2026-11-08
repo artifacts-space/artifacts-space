@@ -2,6 +2,7 @@ import Image from "next/image";
 
 import type { PixelIconName } from "@/lib/landing/pixel-icons";
 
+import { ClaudeCodeMark, CodexMark } from "./agent-marks";
 import { PixelIcon } from "./pixel-icon";
 import { SectionEyebrow } from "./section-marks";
 
@@ -11,7 +12,28 @@ const problem = [
 ] as const;
 
 /** Each account keeps its own artifacts; the dashed edges are the walls between them. */
-const islands = ["Claude Code, work", "Claude Code, personal", "Codex"] as const;
+const islands = [
+  { app: "claude-code", account: "Claude Code · work", artifact: "auth-plan" },
+  { app: "claude-code", account: "Claude Code · personal", artifact: "q3-review" },
+  { app: "codex", account: "Codex", artifact: "launch-notes" },
+] as const;
+
+/** One walled-off account: its app mark and name, and the one artifact only it can open. */
+function Island({ island }: { island: (typeof islands)[number] }) {
+  const Mark = island.app === "codex" ? CodexMark : ClaudeCodeMark;
+  return (
+    <li className="flex min-w-0 flex-col gap-3 rounded-[2px] border border-dashed bg-background px-3 py-3">
+      <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+        <Mark className="size-4 shrink-0 text-foreground" />
+        <span className="truncate">{island.account}</span>
+      </span>
+      <span className="inline-flex w-fit max-w-full items-center gap-1.5 rounded-[2px] border bg-card px-1.5 py-0.5 font-mono text-xs">
+        <PixelIcon name="plan" size={16} />
+        <span className="truncate">{island.artifact}</span>
+      </span>
+    </li>
+  );
+}
 
 interface Answer {
   icon: PixelIconName;
@@ -35,13 +57,12 @@ function ProblemPanel() {
           {paragraph}
         </p>
       ))}
-      <ul aria-label="Accounts that cannot see each other's artifacts" className="mt-auto grid gap-2 pt-8 sm:grid-cols-3">
-        {islands.map((island) => (
-          <li key={island} className="rounded-[2px] border border-dashed px-3 py-3 font-mono text-xs text-muted-foreground">
-            {island}
-          </li>
-        ))}
-      </ul>
+      <div className="mt-auto pt-8">
+        <ul aria-label="Three accounts, each with its own artifact" className="grid gap-2 sm:grid-cols-3">
+          {islands.map((island) => <Island key={island.account} island={island} />)}
+        </ul>
+        <p className="mt-3 text-sm text-muted-foreground">Each account keeps its own artifacts. None can open the others.</p>
+      </div>
     </div>
   );
 }

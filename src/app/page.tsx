@@ -8,6 +8,7 @@ import { ConnectSection } from "@/components/landing/connect-section";
 import { ControlSection } from "@/components/landing/control-section";
 import { HeroDemo } from "@/components/landing/demo/hero-demo";
 import { HowSection } from "@/components/landing/how-section";
+import { OpenSourceSection } from "@/components/landing/open-source-section";
 import { PricingSection } from "@/components/landing/pricing-section";
 import { WhySection } from "@/components/landing/why-section";
 import { Logo } from "@/components/logo";
@@ -62,6 +63,7 @@ export default function Home() {
         <WhySection />
         <ConnectSection />
         <ControlSection />
+        <OpenSourceSection />
         <PricingSection />
         <ClosingSection />
       </main>
