@@ -88,7 +88,7 @@ test("should bring a removed image cover back with its file when an editor resto
 
   const cover = page.locator("[data-artifact-cover]");
   await cover.hover();
-  await page.getByRole("button", { name: "Remove cover" }).click();
+  await cover.getByRole("button", { name: "Remove cover" }).click();
   await expect(cover).toHaveCount(0);
   await expect.poll(async () => (await storedCovers(publicId)).artifact).toBeNull();
   expect(await fileRowExists(fileId)).toBe(true);
