@@ -25,12 +25,13 @@ interface FilterableItem {
   summary: string;
   preview: string;
   project: { name: string } | null;
+  tags: readonly string[];
   source: string;
 }
 
 /**
  * The list after the search and format filters. Items match the search in
- * their title, summary, preview, project, or source; `serverMatches` (from a
+ * their title, summary, preview, project, tags, or source; `serverMatches` (from a
  * search of full content on the server) adds the rest, after the local ones.
  */
 export function filterArtifactList<T extends FilterableItem>(items: readonly T[], filters: { query: string; kind: string }, serverMatches: readonly T[] | null): T[] {
@@ -38,7 +39,7 @@ export function filterArtifactList<T extends FilterableItem>(items: readonly T[]
   const kindMatches = (item: T) => filters.kind === "all" || item.kind === filters.kind;
   const local = items.filter((item) => {
     if (!kindMatches(item)) return false;
-    return !search || [item.title, item.summary, item.preview, item.project?.name ?? "", item.source].join(" ").toLowerCase().includes(search);
+    return !search || [item.title, item.summary, item.preview, item.project?.name ?? "", item.tags.join(" "), item.source].join(" ").toLowerCase().includes(search);
   });
   if (!search || !serverMatches) return local;
   const shown = new Set(local.map((item) => item.id));

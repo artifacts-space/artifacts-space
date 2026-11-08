@@ -5,6 +5,7 @@ import { registerArtifactTools } from "@/lib/mcp/artifact-tools";
 import { registerFileTools } from "@/lib/mcp/file-tools";
 import { registerFormatTools } from "@/lib/mcp/format-tools";
 import { registerProjectTools } from "@/lib/mcp/project-tools";
+import { registerTagTools } from "@/lib/mcp/tag-tools";
 import { registerTeamTools } from "@/lib/mcp/team-tools";
 import { registerThemeTools } from "@/lib/mcp/theme-tools";
 import { toolAccess, type McpToolName } from "@/lib/mcp/tool-access";
@@ -67,6 +68,7 @@ function recordTools(): DocsMcpTool[] {
   const tools: DocsMcpTool[] = [];
   registerArtifactTools(recordingServer("Artifacts", tools), docsUserId, "full");
   registerProjectTools(recordingServer("Artifacts", tools), docsUserId, "full");
+  registerTagTools(recordingServer("Artifacts", tools), docsUserId, "full");
   registerFormatTools(recordingServer("Formats", tools), "full");
   registerThemeTools(recordingServer("Themes", tools), "full");
   registerFileTools(recordingServer("Files", tools), docsUserId, "full");

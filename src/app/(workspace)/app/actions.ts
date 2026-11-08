@@ -23,6 +23,8 @@ import type {
   ArtifactListItemDto,
 } from "@/lib/artifact-types";
 import { isPublicId } from "@/lib/public-id";
+import { tagLimits } from "@/lib/tags/limits";
+import { normalizeTag } from "@/lib/tags/rules";
 
 const publicIdSchema = z.string().refine(isPublicId, "Artifact not found.");
 const projectFilterSchema = z.union([z.object({ key: z.string().trim().min(1).max(240) }), z.object({ none: z.literal(true) })]);
@@ -30,6 +32,7 @@ const searchSchema = z.object({
   query: z.string().trim().min(1).max(300),
   teamId: z.string().trim().min(1).max(200).nullable(),
   project: projectFilterSchema.nullable().optional(),
+  tags: z.array(z.string().trim().min(1).max(tagLimits.maxChars * 4)).max(tagLimits.maxPerArtifact).optional(),
 });
 
 const expectedSchema = z.iso.datetime({ offset: true }).optional();
@@ -117,9 +120,9 @@ export async function loadArtifactAction(publicId: string): Promise<ActionResult
 export async function searchArtifactsAction(input: z.input<typeof searchSchema>): Promise<ActionResult<ArtifactListItemDto[]>> {
   try {
     const userId = await requireUserId();
-    const { query, teamId, project } = searchSchema.parse(input);
+    const { query, teamId, project, tags } = searchSchema.parse(input);
     await enforceRateLimit("readByUser", userId);
-    const items = await listArtifacts(userId, { query, project: project ?? undefined, scope: teamId ? { kind: "team", teamId } : { kind: "mine" } });
+    const items = await listArtifacts(userId, { query, project: project ?? undefined, tags: tags?.map(normalizeTag), scope: teamId ? { kind: "team", teamId } : { kind: "mine" } });
     return { success: true, data: items };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "Search did not work. Please try again.") };

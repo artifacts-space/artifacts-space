@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/* loadArtifactForViewer: what MCP artifacts_get and the workspace get. Readers outside the team never get a project. */
+/* loadArtifactForViewer: what MCP artifacts_get and the workspace get. Readers outside the team never get a project or tags. */
 
 const mocks = vi.hoisted(() => ({ getViewableArtifact: vi.fn(), toArtifactDtos: vi.fn(), lastEditorsFor: vi.fn(), filesForViewer: vi.fn() }));
 vi.mock("@/lib/access", () => ({ getViewableArtifact: mocks.getViewableArtifact }));
@@ -21,7 +21,7 @@ function viewable(canEdit: boolean) {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.toArtifactDtos.mockResolvedValue([{ id: "a1", project: { id: "p1", name: "Billing", icon: null } }]);
+  mocks.toArtifactDtos.mockResolvedValue([{ id: "a1", project: { id: "p1", name: "Billing", icon: null }, tags: ["launch"] }]);
   mocks.lastEditorsFor.mockResolvedValue(new Map());
   mocks.filesForViewer.mockResolvedValue([]);
 });
@@ -31,12 +31,14 @@ describe("loadArtifactForViewer", () => {
     mocks.getViewableArtifact.mockResolvedValue(viewable(true));
     const loaded = await loadArtifactForViewer("pub", "author");
     expect(loaded?.dto.project).toEqual({ id: "p1", name: "Billing", icon: null });
+    expect(loaded?.dto.tags).toEqual(["launch"]);
     expect(mocks.toArtifactDtos).toHaveBeenCalledWith([expect.objectContaining({ id: "a1" })], "author");
   });
 
-  it("should drop the project when a reader outside the team opens a link artifact", async () => {
+  it("should drop the project and tags when a reader outside the team opens a link artifact", async () => {
     mocks.getViewableArtifact.mockResolvedValue(viewable(false));
     const loaded = await loadArtifactForViewer("pub", "stranger");
     expect(loaded?.dto.project).toBeNull();
+    expect(loaded?.dto.tags).toEqual([]);
   });
 });

@@ -16,6 +16,8 @@ interface ProjectFilterProps {
   filter: Filter | null;
   /** The team whose list this is, or null for the viewer's own. */
   scopeTeam: { slug: string } | null;
+  /** The tag filter in the URL, kept when the project changes. */
+  tags: string[];
 }
 
 function filterFromId(id: string): Filter | null {
@@ -35,7 +37,7 @@ function chosenLabel(id: string, facets: ProjectFacets) {
  * The project filter beside the format filter: all projects, no project, or
  * one project with its icon and count. It lives in the URL, so links keep it.
  */
-export function ProjectFilter({ facets, filter, scopeTeam }: ProjectFilterProps) {
+export function ProjectFilter({ facets, filter, scopeTeam, tags }: ProjectFilterProps) {
   const teamSlug = scopeTeam ? scopeTeam.slug : null;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -44,7 +46,7 @@ export function ProjectFilter({ facets, filter, scopeTeam }: ProjectFilterProps)
 
   function choose(id: string | null) {
     const next = filterFromId(id ?? "all");
-    startTransition(() => { router.push(`/app${workspaceQuery(teamSlug, next)}`); });
+    startTransition(() => { router.push(`/app${workspaceQuery(teamSlug, next, tags)}`); });
   }
 
   return (

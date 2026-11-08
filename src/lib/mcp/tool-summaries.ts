@@ -11,6 +11,7 @@ export const toolSummaries = {
   artifacts_get: "Read one artifact in full.",
   teams_list: "List your teams, your role, and how sharing is approved.",
   projects_list: "List your or a team's projects, with how many artifacts each holds.",
+  tags_list: "List the tags in use in your or a team's artifacts, most used first.",
   artifacts_create: "Create an artifact with a title, format, project, and content.",
   artifacts_update: "Change an artifact in place. Every save is kept.",
   artifacts_delete: "Delete an artifact you wrote.",

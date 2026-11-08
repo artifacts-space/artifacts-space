@@ -31,6 +31,7 @@ import { artifactThemeLimits } from "../lib/themes/artifact-theme-limits";
 import { artifactSizeLimits } from "../lib/artifact-limits";
 import { fileLimits, fileStatuses } from "../lib/files/config";
 import { projectLimits } from "../lib/projects/limits";
+import { tagLimits } from "../lib/tags/limits";
 
 // Better Auth tables. Column names follow Better Auth's core schema.
 
@@ -175,6 +176,8 @@ export const artifact = pgTable(
     project: text("project").notNull().default(""),
     // The artifact's project, in its home scope (src/lib/projects). Null is "No project". Not versioned.
     projectId: text("project_id").references((): AnyPgColumn => project.id, { onDelete: "set null" }),
+    // Normalized tags (src/lib/tags), for the author and team only. Not versioned.
+    tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
     sessionId: text("session_id").notNull().default(""),
     source: text("source").notNull().default(""),
     // private: author only. team: members of `teamId`. link: anyone with the URL. public: anyone.
@@ -206,7 +209,9 @@ export const artifact = pgTable(
     index("artifact_user_updated_idx").on(table.userId, table.updatedAt),
     index("artifact_user_project_idx").on(table.userId, table.project),
     index("artifact_project_idx").on(table.projectId),
+    index("artifact_tags_idx").using("gin", table.tags),
     index("artifact_team_updated_idx").on(table.teamId, table.updatedAt),
+    check("artifact_tags_count_check", sql`cardinality(${table.tags}) <= ${sql.raw(String(tagLimits.maxPerArtifact))}`),
     check("artifact_comments_check", sql`${table.comments} in ('off', 'team', 'signed_in')`),
     check("artifact_icon_length_check", sql`char_length(${table.icon}) <= ${sql.raw(String(artifactIconLimits.maxStoredChars))}`),
     check("artifact_theme_size_check", sql`octet_length(${table.theme}::text) <= ${sql.raw(String(artifactThemeLimits.maxStoredBytes))}`),

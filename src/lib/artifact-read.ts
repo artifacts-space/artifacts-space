@@ -23,7 +23,8 @@ export async function loadArtifactForViewer(publicId: string, viewerId: string):
   if (!dto) return null;
   // Who saved the version this viewer reads: the approved one may be older than the last edit.
   const updatedBy = editedBy ? editors.get(editedBy) ?? null : null;
-  // Projects are for the author and the team only: readers outside it never get one.
+  // Projects and tags are for the author and the team only: readers outside it never get them.
   const project = viewable.canEdit ? dto.project : null;
-  return { viewable, dto: { ...dto, ...shown, project, files, updatedBy, updatedAt: shown.updatedAt.toISOString() } };
+  const tags = viewable.canEdit ? dto.tags : [];
+  return { viewable, dto: { ...dto, ...shown, project, tags, files, updatedBy, updatedAt: shown.updatedAt.toISOString() } };
 }

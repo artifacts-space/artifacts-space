@@ -20,6 +20,7 @@ import { kindFieldDescription } from "@/lib/mcp/format-tools";
 import { projectLimits } from "@/lib/projects/limits";
 import { projectChoiceSchema, projectNameKey } from "@/lib/projects/rules";
 import { setArtifactProject } from "@/lib/projects/store";
+import type { TagChange } from "@/lib/tags/rules";
 import { isPublicId } from "@/lib/public-id";
 import { setArtifactComments } from "@/lib/sharing/comments";
 import { requestArtifactSharing } from "@/lib/sharing/service";
@@ -30,6 +31,7 @@ import type { McpAccess } from "@/lib/oauth/scopes";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { toMcpArtifact, toMcpListItem, type McpViewContext } from "./artifact-view";
+import { applyTagChangeFor, tagChangeFields, tagChangeFor, tagFilterField, tagFilterFor, tagsField } from "./tag-tools";
 import { gateTools, type ToolServer } from "./tool-access";
 
 const publicIdField = z.string().refine(isPublicId, "Use the artifact's 22-character id.").describe("Artifact id (22 characters)");
@@ -87,6 +89,7 @@ const editableFields = {
   kind: z.enum(artifactKinds).optional().describe(kindFieldDescription),
   language: z.string().max(60).optional(),
   project: projectField,
+  tags: tagsField,
   sessionId: z.string().max(200).optional(),
   source: z.string().max(120).optional().describe("Agent or harness name"),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -203,9 +206,15 @@ async function moveToProject(userId: string, artifactId: string, name: string | 
   return moved;
 }
 
+/** Applies an update's project and tag changes after its save, returning the artifact as it now is. */
+async function organize(userId: string, artifactId: string, saved: ArtifactDto, project: string | null | undefined, tagChange: TagChange | undefined): Promise<ArtifactDto> {
+  const moved = project === undefined ? saved : { ...saved, project: await moveToProject(userId, artifactId, project) };
+  return tagChange ? { ...moved, tags: await applyTagChangeFor(userId, artifactId, tagChange) } : moved;
+}
+
 /**
  * Saves the content and fields an update supplied, filing a version. When it
- * supplied none (only project, sharing, or comments), nothing is saved and
+ * supplied none (only project, tags, sharing, or comments), nothing is saved and
  * no version is filed.
  */
 async function saveFields(userId: string, artifactId: string, input: ArtifactUpdateInput): Promise<{ artifact: ArtifactDto; edit: "applied" | "pending" | "unchanged" }> {
@@ -225,17 +234,18 @@ function registerReadTools(server: ToolServer, userId: string) {
     {
       title: "List artifacts",
       description:
-        "List and search artifacts by title, summary, content, or project name, or only those in one `project`. scope \"mine\" (default) lists yours; a team slug lists what is shared with that team. Items have no content: text formats carry a short `preview` (the first 280 characters), others none. Call artifacts_get with an id to read the full content.",
+        "List and search artifacts by title, summary, content, project name, or tag, or only those in one `project` or with every one of `tags`. scope \"mine\" (default) lists yours; a team slug lists what is shared with that team. Items have no content: text formats carry a short `preview` (the first 280 characters), others none. Call artifacts_get with an id to read the full content.",
       inputSchema: {
         query: z.string().max(300).optional().describe("Text to find in artifacts"),
         project: z.string().max(projectLimits.maxNameChars * 2).optional().describe("Only artifacts in this project (name, any case)"),
+        tags: tagFilterField,
         scope: z.string().max(39).optional().default("mine").describe("\"mine\" or a team slug from teams_list"),
         limit: z.number().int().min(1).max(100).optional().default(25),
       },
     },
-    ({ query, project, scope, limit }) => respond(async () => {
+    ({ query, project, tags, scope, limit }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
-      const artifacts = await listArtifacts(userId, { scope: scopeFor(teams, scope), query, project: projectFilterFor(project), limit });
+      const artifacts = await listArtifacts(userId, { scope: scopeFor(teams, scope), query, project: projectFilterFor(project), tags: tagFilterFor(tags), limit });
       return artifacts.map((item) => toMcpListItem(item, view));
     }),
   );
@@ -293,25 +303,27 @@ function registerWriteTools(server: ToolServer, userId: string) {
     {
       title: "Update artifact",
       description:
-        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). `project` applies at once, files no version, and never waits for approval; when you send only `project`, sharing, or comments, `edit` is \"unchanged\". Only the author can set visibility, which requests sharing through the team's rule. The author (and the team's owners and admins) can set `comments`. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved. Edits are limited per hour (generously); a limit error says when to try again.",
+        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). `project` and tags apply at once, file no version, and never wait for approval; when you send only those, sharing, or comments, `edit` is \"unchanged\". Only the author can set visibility, which requests sharing through the team's rule. The author (and the team's owners and admins) can set `comments`. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved. Edits are limited per hour (generously); a limit error says when to try again.",
       inputSchema: {
         id: publicIdField,
         ...editableFields,
         title: editableFields.title.optional(),
         content: editableFields.content.optional(),
+        ...tagChangeFields,
         visibility: visibilityField,
         team: teamField,
         comments: commentsField,
       },
     },
-    ({ id, visibility, team, comments, project, ...input }) => respond(async () => {
+    ({ id, visibility, team, comments, project, tags, addTags, removeTags, ...input }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
       const record = await editableByPublicId(userId, id);
       if (team) teamBySlug(teams, team);
       assertTheme(input.theme);
+      const tagChange = tagChangeFor({ tags, addTags, removeTags });
       const saved = await saveFields(userId, record.id, input);
-      // The project changes after the save, on its own: no version, no approval, and nothing if the save failed.
-      const artifact = project === undefined ? saved.artifact : { ...saved.artifact, project: await moveToProject(userId, record.id, project) };
+      // Project and tags change after the save, on their own: no version, no approval, and nothing if the save failed.
+      const artifact = await organize(userId, record.id, saved.artifact, project, tagChange);
       const result = await shareAfterSave(userId, artifact, teams, { visibility, team, comments });
       return { artifact: toMcpArtifact(result.artifact, view), edit: saved.edit, sharing: result.sharing, comments: result.comments };
     }),

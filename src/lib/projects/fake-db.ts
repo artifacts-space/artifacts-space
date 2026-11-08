@@ -4,13 +4,23 @@ import { PgDialect, type PgTable } from "drizzle-orm/pg-core";
 /**
  * A small in-memory stand-in for getDb() in project tests. It understands
  * what src/lib/projects runs: selects, inserts, updates, and deletes on one
- * table whose WHERE is a chain of `column = value` joined by AND (other
- * comparisons are ignored). Not for production code.
+ * table whose WHERE is a chain of `column = value` joined by AND (text
+ * arrays compare as Postgres array literals; other comparisons are ignored). Not for production code.
  */
 
 type Row = Record<string, unknown>;
 
 const dialect = new PgDialect();
+
+/** A text array as Drizzle sends it, so `column = array` compares like Postgres. */
+function arrayLiteral(values: unknown[]): string {
+  const quoted = values.map((value) => `"${String(value).replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`);
+  return `{${quoted.join(",")}}`;
+}
+
+function sameValue(stored: unknown, wanted: unknown): boolean {
+  return Array.isArray(stored) ? arrayLiteral(stored) === wanted : stored === wanted;
+}
 const equality = /"(\w+)" = \$(\d+)/g;
 
 /** Maps SQL column names to the row's field names, per table. */
@@ -42,7 +52,7 @@ export function createFakeDb(tables: ReadonlyMap<unknown, Row[]>) {
     const fields = fieldNames(table);
     const { sql, params } = dialect.sqlToQuery(condition);
     const checks = [...sql.matchAll(equality)].map(([, column = "", index = "0"]) => ({ field: fields.get(column) ?? column, value: params[Number(index) - 1] }));
-    return (row: Row) => checks.every((check) => row[check.field] === check.value);
+    return (row: Row) => checks.every((check) => sameValue(row[check.field], check.value));
   }
 
   const db = {

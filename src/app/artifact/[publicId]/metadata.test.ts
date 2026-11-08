@@ -61,15 +61,16 @@ describe("artifact page generateMetadata", () => {
     expect(JSON.stringify(metadata)).not.toContain("Pending summary");
   });
 
-  it("should never put the project in the title or meta tags, even for the author", async () => {
+  it("should never put the project or tags in the title or meta tags, even for the author", async () => {
     const authored = viewable("public", { title: "Plan", icon: null, summary: "" });
-    Object.assign(authored.record, { projectId: "project-1", project: "Secret project label" });
+    Object.assign(authored.record, { projectId: "project-1", project: "Secret project label", tags: ["secret-tag-label"] });
     mocks.getViewableArtifact.mockResolvedValue({ ...authored, canEdit: true });
     mocks.getSession.mockResolvedValue({ user: { id: "u1" } });
     mocks.artifactOgMetadata.mockResolvedValue({ description: "Approved summary." });
     const serialized = JSON.stringify(await call());
     expect(serialized).not.toContain("Secret project label");
     expect(serialized).not.toContain("project-1");
+    expect(serialized).not.toContain("secret-tag-label");
   });
 
   it("should not index and add no artifact tags when the artifact is not found", async () => {

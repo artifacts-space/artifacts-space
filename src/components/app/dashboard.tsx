@@ -7,6 +7,7 @@ import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor
 import { artifactListState, filterArtifactList, type ArtifactListState } from "@/components/app/artifact-list-state";
 import { CreateArtifactDialog } from "@/components/app/create-artifact-dialog";
 import { ProjectFilter } from "@/components/app/project-filter";
+import { TagFilter } from "@/components/app/tag-filter";
 import { ScopeTabs } from "@/components/app/scope-tabs";
 import { visibilityLabel } from "@/components/app/share-options";
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
@@ -30,6 +31,8 @@ import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
 import type { ProjectFacets } from "@/lib/projects/queries";
 import type { ProjectFilter as ProjectFilterValue } from "@/lib/projects/rules";
+import type { TagFacet } from "@/lib/tags/queries";
+import { rowTags } from "@/lib/tags/rules";
 import { cn } from "@/lib/utils";
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
@@ -66,10 +69,22 @@ function ArtifactListItem({ artifact, active, onSelect }: { artifact: ArtifactLi
               {artifact.project ? <ProjectLabel name={artifact.project.name} icon={artifact.project.icon} /> : <span className="shrink-0">No project</span>}
               <span className="shrink-0 whitespace-pre">{sharingNote(artifact)}</span>
             </p>
+            {artifact.tags.length > 0 ? <RowTags tags={artifact.tags} /> : null}
           </div>
         </div>
       </button>
     </li>
+  );
+}
+
+/** A row's tags: the first two and how many more. */
+function RowTags({ tags }: { tags: readonly string[] }) {
+  const { visible, more } = rowTags(tags);
+  return (
+    <p className="mt-1 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+      {visible.map((tag) => <span key={tag} className="truncate rounded-sm bg-muted px-1">{tag}</span>)}
+      {more > 0 ? <span className="shrink-0">+{more}</span> : null}
+    </p>
   );
 }
 
@@ -208,16 +223,20 @@ interface DashboardProps {
   facets: ProjectFacets;
   /** The project filter in the URL; the list is already filtered by it. */
   projectFilter: ProjectFilterValue | null;
+  /** The tag filter's entries and counts for the whole scope. */
+  tagFacets: TagFacet[];
+  /** The tags in the URL; the list is already filtered by them. */
+  tagFilter: string[];
 }
 
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectFilter }: DashboardProps) {
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectFilter, tagFacets, tagFilter }: DashboardProps) {
   const [artifacts, setArtifacts] = useState(initialArtifacts);
   const [selectedId, setSelectedId] = useState(initialArtifacts[0]?.id ?? "");
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
 
-  const serverMatches = useServerSearch(query, scopeTeam?.id ?? null, projectFilter);
+  const serverMatches = useServerSearch(query, scopeTeam?.id ?? null, projectFilter, tagFilter);
   const filtered = useMemo(() => filterArtifactList(artifacts, { query, kind }, serverMatches), [artifacts, kind, query, serverMatches]);
 
   const selected = pickSelected(artifacts, filtered, selectedId);
@@ -270,8 +289,9 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
                     {kinds.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <ProjectFilter facets={facets} filter={projectFilter} scopeTeam={scopeTeam} />
+                <ProjectFilter facets={facets} filter={projectFilter} scopeTeam={scopeTeam} tags={tagFilter} />
               </div>
+              <TagFilter facets={tagFacets} selected={tagFilter} projectFilter={projectFilter} scopeTeam={scopeTeam} />
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
               <ArtifactList

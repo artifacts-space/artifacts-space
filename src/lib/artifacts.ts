@@ -27,6 +27,8 @@ import { artifactSizeProblem } from "@/lib/artifact-limits";
 import { defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { PREVIEW_CHARS, previewKinds } from "@/lib/artifact-preview";
 import { loadProjectFacets, projectFilterCondition, projectSearchCondition, projectsForViewer, type ProjectFacets, type ProjectFilter } from "@/lib/projects/queries";
+import { loadTagFacets, tagFilterCondition, tagSearchCondition, tagsForViewer, type TagFacet } from "@/lib/tags/queries";
+import { assertRoomForNewTags, parseNewTags } from "@/lib/tags/store";
 import { projectChoiceSchema } from "@/lib/projects/rules";
 import { findOrCreateProject } from "@/lib/projects/store";
 import { checkContentFiles } from "@/lib/files/attach";
@@ -76,6 +78,8 @@ export const artifactInputSchema = artifactUpdateSchema
     language: artifactUpdateSchema.shape.language.default(""),
     // A project name, found or created among the author's projects; "" or null for none. Not part of updates: see src/lib/projects.
     project: projectChoiceSchema.optional().default(null),
+    // Tags, checked and normalized in parseNewTags. Not part of updates: see src/lib/tags.
+    tags: z.array(z.string()).optional(),
     sessionId: artifactUpdateSchema.shape.sessionId.default(""),
     source: artifactUpdateSchema.shape.source.default(""),
     metadata: artifactUpdateSchema.shape.metadata.default({}),
@@ -103,12 +107,13 @@ interface DtoExtras {
   files: FileDto[];
   updatedBy: ArtifactEditorDto | null;
   project: ArtifactProjectDto | null;
+  tags: string[];
 }
 
-const noExtras: DtoExtras = { pending: noPending, files: [], updatedBy: null, project: null };
+const noExtras: DtoExtras = { pending: noPending, files: [], updatedBy: null, project: null, tags: [] };
 
 /** Maps a row without content to the shared DTO fields. */
-function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy, project }: DtoExtras): Omit<ArtifactDto, "content"> {
+function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy, project, tags }: DtoExtras): Omit<ArtifactDto, "content"> {
   return {
     id: record.id,
     publicId: record.publicId,
@@ -119,6 +124,7 @@ function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy,
     kind: record.kind,
     language: record.language,
     project,
+    tags,
     sessionId: record.sessionId,
     source: record.source,
     visibility: record.visibility,
@@ -176,12 +182,19 @@ export async function lastEditorsFor(records: Pick<ArtifactRecord, "updatedBy">[
 /** Each row's extras, loaded together. `viewerId` decides whose projects show (src/lib/projects/queries.ts). */
 async function loadExtras(rows: ArtifactMetaRecord[], viewerId: string): Promise<(row: ArtifactMetaRecord) => DtoExtras> {
   const ids = rows.map((row) => row.id);
-  const [pending, files, editors, projects] = await Promise.all([pendingRequestsFor(ids), listFilesForArtifacts(ids), lastEditorsFor(rows), projectsForViewer(rows, viewerId)]);
+  const [pending, files, editors, projects, tags] = await Promise.all([
+    pendingRequestsFor(ids),
+    listFilesForArtifacts(ids),
+    lastEditorsFor(rows),
+    projectsForViewer(rows, viewerId),
+    tagsForViewer(rows, viewerId),
+  ]);
   return (row) => ({
     pending: pending.get(row.id) ?? noPending,
     files: files.get(row.id) ?? [],
     updatedBy: row.updatedBy ? editors.get(row.updatedBy) ?? null : null,
     project: projects.get(row.id) ?? null,
+    tags: tags.get(row.id) ?? [],
   });
 }
 
@@ -212,16 +225,18 @@ export interface ListOptions {
   query?: string | undefined;
   /** Only artifacts in a project with this name key, or with no project. */
   project?: ProjectFilter | undefined;
+  /** Only artifacts carrying every one of these normalized tags. */
+  tags?: readonly string[] | undefined;
   limit?: number | undefined;
 }
 
-/** Search in the title, summary, content, and the project's name. */
+/** Search in the title, summary, content, the project's name, and the tags. */
 async function searchCondition(viewerId: string, scope: ArtifactScope, query: string | undefined) {
   const text = query?.trim();
   if (!text) return undefined;
   const pattern = `%${text}%`;
-  const inProject = await projectSearchCondition(viewerId, scope, pattern);
-  return or(ilike(artifact.title, pattern), ilike(artifact.summary, pattern), ilike(artifact.content, pattern), inProject);
+  const [inProject, inTags] = await Promise.all([projectSearchCondition(viewerId, scope, pattern), tagSearchCondition(viewerId, pattern)]);
+  return or(ilike(artifact.title, pattern), ilike(artifact.summary, pattern), ilike(artifact.content, pattern), inProject, inTags);
 }
 
 function scopeCondition(viewerId: string, scope: ArtifactScope) {
@@ -232,6 +247,11 @@ function scopeCondition(viewerId: string, scope: ArtifactScope) {
 /** The project filter's entries and counts for a list scope (every artifact, not only the first page). */
 export async function listProjectFacets(viewerId: string, scope: ArtifactScope): Promise<ProjectFacets> {
   return loadProjectFacets(viewerId, scope, scopeCondition(viewerId, scope));
+}
+
+/** The tag filter's entries and counts for a list scope, among artifacts whose tags the viewer may see. */
+export async function listTagFacets(viewerId: string, scope: ArtifactScope): Promise<TagFacet[]> {
+  return loadTagFacets(viewerId, scopeCondition(viewerId, scope));
 }
 
 /**
@@ -245,6 +265,7 @@ export async function listArtifacts(viewerId: string, options: ListOptions = {})
   const search = await searchCondition(viewerId, scope, options.query);
   if (search) conditions.push(search);
   if (options.project) conditions.push(await projectFilterCondition(viewerId, scope, options.project));
+  if (options.tags && options.tags.length > 0) conditions.push(await tagFilterCondition(viewerId, options.tags));
 
   const rows = await getDb()
     .select({ ...artifactMetaColumns(), preview: previewColumn })
@@ -292,7 +313,8 @@ export async function findPublicIdByShareId(shareId: string) {
 
 /** Creates a private artifact for its author, within the hourly creation limit and the account's storage quota. */
 export async function createArtifact(userId: string, input: ArtifactInput) {
-  const { project: projectName, ...parsed } = artifactInputSchema.parse(input);
+  const { project: projectName, tags: tagInput, ...parsed } = artifactInputSchema.parse(input);
+  const tags = parseNewTags(tagInput);
   assertArtifactSize(parsed);
   assertValidArtifactContent(parsed.kind, parsed.content);
   const contentFileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
@@ -300,12 +322,14 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
   await enforceRateLimit("artifactCreate", userId);
   await assertContentFits(userId, parsed.content);
   // New artifacts are private, so their project is among the author's own.
+  await assertRoomForNewTags(userId, tags);
   const chosen = projectName ? await findOrCreateProject({ kind: "user", userId }, projectName, userId) : null;
   const [record] = await getDb()
     .insert(artifact)
     .values({
       ...parsed,
       projectId: chosen?.id ?? null,
+      tags,
       id: randomUUID(),
       shareId: randomUUID().replaceAll("-", ""),
       publicId: generatePublicId(),
