@@ -75,7 +75,7 @@ function PresetCard({ preset }: { preset: ThemePresetSummary }) {
       <div className="flex flex-1 flex-col gap-1 px-4 py-3">
         <div className="flex items-center gap-2">
           <h3 className="text-md font-medium">{preset.name}</h3>
-          <code className="rounded bg-muted px-1 py-0.5 font-mono text-sm">{preset.id}</code>
+          <code className="inline-code">{preset.id}</code>
           <CopyIconButton value={preset.id} label={`Copy the ${preset.name} preset id`} className="ml-auto" />
         </div>
         <p className="text-sm text-muted-foreground">{preset.description}</p>
