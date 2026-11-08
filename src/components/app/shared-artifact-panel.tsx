@@ -4,7 +4,7 @@ import { IconExternalLink, IconLoader2, IconLock } from "@tabler/icons-react";
 import Link from "next/link";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
-import { CommentThread } from "@/components/comments/comment-thread";
+import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { CommentsControl } from "@/components/app/comments-picker";
 import { CopyButton } from "@/components/copy-button";
 import { LastEdited } from "@/components/history/last-edited";
@@ -56,6 +56,7 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
               onRestored={onUpdated}
             />
           ) : null}
+          {seesComments ? <CommentsDialog publicId={artifact.publicId} title={artifact.title} seesComments offNotice="" /> : null}
           <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/artifact/${artifact.publicId}`} />}>
             <IconExternalLink /> Open page
           </Button>
@@ -79,7 +80,6 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
           <div className="min-h-[460px] flex-1 bg-card p-6 sm:p-8">
             <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
           </div>
-          {seesComments ? <CommentThread publicId={artifact.publicId} className="border-t px-5 py-5 sm:px-7" /> : null}
         </div>
       </div>
     </section>
