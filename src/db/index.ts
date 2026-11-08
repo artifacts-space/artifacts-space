@@ -5,8 +5,9 @@ import { Pool } from "pg";
 
 import * as oauthSchema from "./oauth-schema";
 import * as appSchema from "./schema";
+import * as viewsSchema from "./views-schema";
 
-const schema = { ...appSchema, ...oauthSchema };
+const schema = { ...appSchema, ...oauthSchema, ...viewsSchema };
 
 let database: ReturnType<typeof createDatabase> | undefined;
 

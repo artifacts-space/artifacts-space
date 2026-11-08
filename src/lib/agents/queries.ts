@@ -1,12 +1,13 @@
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { getDb } from "@/db";
-import { agent, apiToken, teamMember, user } from "@/db/schema";
+import { agent, apiToken, artifact, teamMember, user } from "@/db/schema";
 
 import { toActor, type Actor } from "./identity";
 
 const owner = alias(user, "agent_owner");
+const ownerMember = alias(teamMember, "agent_owner_member");
 
 function actorRows(userIds: string[]) {
   return getDb()
@@ -69,6 +70,10 @@ export interface TeamAgentView {
   muted: boolean;
   createdAt: string;
   tokens: AgentTokenView[];
+  /** The agent's own artifacts (not shared through its team), which removal moves or deletes. Counted for owners and admins only, else 0. */
+  ownArtifacts: number;
+  /** Whether the person who added it is still in the team, and so keeps its own artifacts when it is removed. */
+  ownerInTeam: boolean;
 }
 
 async function tokensByAgent(agentIds: string[]) {
@@ -88,18 +93,44 @@ async function tokensByAgent(agentIds: string[]) {
 }
 
 /**
- * Agents in a team, oldest first. Tokens are included only when `withTokens`
- * is set (owners and admins). Callers must check the viewer's membership.
+ * Per agent, how many of its own artifacts removal moves to its owner or
+ * deletes: everything not shared through the team (private ones, and any
+ * outside the team), since reconcileTeamArtifacts moves only what is shared
+ * through the team. A
+ * single-table select with no subquery, so no column can match itself.
+ */
+export function deletedOnRemovalQuery(db: Pick<ReturnType<typeof getDb>, "select">, teamId: string, agentIds: string[]) {
+  const staysWithAgent = or(eq(artifact.visibility, "private"), isNull(artifact.teamId), ne(artifact.teamId, teamId));
+  return db
+    .select({ userId: artifact.userId, count: count() })
+    .from(artifact)
+    .where(and(inArray(artifact.userId, agentIds), staysWithAgent))
+    .groupBy(artifact.userId);
+}
+
+async function deletedOnRemovalByAgent(teamId: string, agentIds: string[]) {
+  if (agentIds.length === 0) return new Map<string, number>();
+  const rows = await deletedOnRemovalQuery(getDb(), teamId, agentIds);
+  return new Map(rows.map((row) => [row.userId, row.count]));
+}
+
+/**
+ * Agents in a team, oldest first. Tokens and the count of the agent's own
+ * artifacts are included only when `withTokens` is set (owners and admins). Callers must check the viewer's membership.
  */
 export async function listTeamAgents(teamId: string, withTokens: boolean): Promise<TeamAgentView[]> {
   const rows = await getDb()
-    .select({ userId: user.id, handle: user.username, name: user.name, ownerName: owner.name, mutedAt: agent.mutedAt, createdAt: agent.createdAt })
+    .select({ userId: user.id, handle: user.username, name: user.name, ownerName: owner.name, ownerMemberId: ownerMember.id, mutedAt: agent.mutedAt, createdAt: agent.createdAt })
     .from(agent)
     .innerJoin(user, eq(user.id, agent.userId))
     .leftJoin(owner, eq(owner.id, agent.ownerId))
+    .leftJoin(ownerMember, and(eq(ownerMember.teamId, agent.teamId), eq(ownerMember.userId, agent.ownerId)))
     .where(eq(agent.teamId, teamId))
     .orderBy(asc(agent.createdAt));
-  const tokens = withTokens ? await tokensByAgent(rows.map((row) => row.userId)) : new Map<string, AgentTokenView[]>();
+  const ids = rows.map((row) => row.userId);
+  const [tokens, deleted] = withTokens
+    ? await Promise.all([tokensByAgent(ids), deletedOnRemovalByAgent(teamId, ids)])
+    : [new Map<string, AgentTokenView[]>(), new Map<string, number>()];
   return rows.map((row) => ({
     userId: row.userId,
     handle: row.handle ?? "",
@@ -108,6 +139,8 @@ export async function listTeamAgents(teamId: string, withTokens: boolean): Promi
     muted: row.mutedAt !== null,
     createdAt: row.createdAt.toISOString(),
     tokens: tokens.get(row.userId) ?? [],
+    ownArtifacts: deleted.get(row.userId) ?? 0,
+    ownerInTeam: row.ownerMemberId !== null,
   }));
 }
 

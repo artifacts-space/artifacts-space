@@ -190,6 +190,13 @@
       "when": 1794110713115,
       "tag": "0026_team_theme_revisions",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1794167334487,
+      "tag": "0027_artifact_views",
+      "breakpoints": true
     }
   ]
 }

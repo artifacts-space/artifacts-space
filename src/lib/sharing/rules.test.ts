@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canDecideRequest, canWithdrawSharing, decideSharing, isLevelAllowedInTeam, sharingNeedsApproval } from "./rules";
+import { agentArtifactTeamProblem, canDecideRequest, canWithdrawSharing, decideSharing, isLevelAllowedInTeam, requestStillValid, sharingNeedsApproval } from "./rules";
 
 const personal = { personal: true, teamSharingNeedsApproval: true };
 const strictTeam = { personal: false, teamSharingNeedsApproval: true };
@@ -66,5 +66,36 @@ describe("canDecideRequest", () => {
     expect(canDecideRequest({ viewerRole: "owner", actor: "person" })).toBe(true);
     expect(canDecideRequest({ viewerRole: "member", actor: "person" })).toBe(false);
     expect(canDecideRequest({ viewerRole: "owner", actor: "agent" })).toBe(false);
+  });
+});
+
+describe("requestStillValid", () => {
+  const base = { authorId: "agent-1", requestedBy: "agent-1", requesterActsForAuthor: false, authorInTeam: true };
+
+  it("should hold when the author asked and is still in the team", () => {
+    expect(requestStillValid(base)).toBe(true);
+  });
+
+  it("should hold when the person who added the agent asked and still acts for it", () => {
+    expect(requestStillValid({ ...base, requestedBy: "owner-1", requesterActsForAuthor: true })).toBe(true);
+  });
+
+  it("should fail when someone else asked who does not act for the author", () => {
+    expect(requestStillValid({ ...base, requestedBy: "teammate", requesterActsForAuthor: false })).toBe(false);
+  });
+
+  it("should fail when the author left the team even though the owner asked", () => {
+    expect(requestStillValid({ ...base, requestedBy: "owner-1", requesterActsForAuthor: true, authorInTeam: false })).toBe(false);
+    expect(requestStillValid({ ...base, authorInTeam: false })).toBe(false);
+  });
+});
+
+describe("agentArtifactTeamProblem", () => {
+  it("should accept the agent's own team when the owner shares the agent's artifact", () => {
+    expect(agentArtifactTeamProblem({ authorInTeam: true })).toBeNull();
+  });
+
+  it("should refuse a team the agent is not in when the owner shares the agent's artifact", () => {
+    expect(agentArtifactTeamProblem({ authorInTeam: false })).toMatch(/agent's team/);
   });
 });
