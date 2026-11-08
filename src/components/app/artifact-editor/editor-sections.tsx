@@ -74,12 +74,14 @@ interface ModeBarProps {
   length: number;
   updatedAt: string;
   updatedBy: ArtifactEditorDto | null;
+  /** Extra classes from the surrounding layout, such as sticking in the /app shell. */
+  className?: string;
 }
 
 /** Edit and preview tabs, character count, and who saved it last. */
-export function ModeBar({ mode, onMode, length, updatedAt, updatedBy }: ModeBarProps) {
+export function ModeBar({ mode, onMode, length, updatedAt, updatedBy, className }: ModeBarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b bg-background/60 px-5 py-2 sm:px-7">
+    <div className={cn("flex flex-wrap items-center gap-3 border-b bg-background/60 px-5 py-2 sm:px-7", className)}>
       <div className="flex rounded-sm border bg-muted p-0.5" role="tablist" aria-label="Editor mode">
         {modes.map((value) => (
           <button

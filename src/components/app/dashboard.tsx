@@ -127,6 +127,7 @@ interface DetailPaneProps {
   onUpdated: (artifact: ArtifactDto) => void;
   onDeleted: (id: string) => void;
   onCreate: () => void;
+  initialFull: readonly ArtifactDto[] | undefined;
 }
 
 /** Shown while the selected artifact's content loads, or when it could not. */
@@ -146,8 +147,8 @@ function LoadingPane({ failure, onRetry }: { failure: string | null; onRetry: ()
 }
 
 /** The editor for an artifact the viewer may edit, a read-only view for a teammate's, or the empty state. */
-function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate }: DetailPaneProps) {
-  const { full, failure, remember, retry } = useFullArtifact(selected);
+function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull }: DetailPaneProps) {
+  const { full, failure, remember, retry } = useFullArtifact(selected, initialFull);
   const access = useEditAccess(full, viewerId);
   const withdrawal = useWithdrawSharing(full?.id ?? "", onDeleted);
   const handleUpdated = (artifact: ArtifactDto) => {
@@ -227,9 +228,11 @@ interface DashboardProps {
   tagFacets: TagFacet[];
   /** The tags in the URL; the list is already filtered by them. */
   tagFilter: string[];
+  /** Full artifacts already in hand, so they open without a load (the /dev/workspace fixture). */
+  initialFull?: readonly ArtifactDto[];
 }
 
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectFilter, tagFacets, tagFilter }: DashboardProps) {
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectFilter, tagFacets, tagFilter, initialFull }: DashboardProps) {
   const [artifacts, setArtifacts] = useState(initialArtifacts);
   const [selectedId, setSelectedId] = useState(initialArtifacts[0]?.id ?? "");
   const [query, setQuery] = useState("");
@@ -262,12 +265,14 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
 
   return (
     <ShareTeamsProvider teams={teams}>
-      <main className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col p-4 sm:p-6">
+      {/* An app shell from md up: the frame is the viewport (workspace-frame), and only the list and the artifact scroll. */}
+      <main data-app-shell className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col p-4 sm:p-6 md:min-h-0 md:flex-1">
         <ScopeTabs teams={teams} activeSlug={scopeTeam?.slug ?? null} />
         <DashboardHeading facets={facets} scopeTeam={scopeTeam} onCreate={() => { setCreateOpen(true); }} />
 
-        <div className="card-surface grid min-h-[640px] flex-1 overflow-hidden lg:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="flex min-h-0 flex-col border-b bg-background/60 max-lg:max-h-[360px] lg:border-r lg:border-b-0">
+        {/* overflow-clip, not hidden: it rounds the corners without becoming a scroll box, so the artifact's toolbar can stick on phones. */}
+        <div className="card-surface relative grid min-h-[640px] flex-1 overflow-clip md:min-h-0 md:grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[280px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]">
+          <aside className="relative flex min-h-0 flex-col border-b bg-background/60 max-md:max-h-[360px] md:max-lg:max-h-[min(360px,32dvh)] lg:border-r lg:border-b-0">
             <div className="space-y-2 border-b p-3">
               <div className="relative">
                 <IconSearch className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -293,7 +298,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
               </div>
               <TagFilter facets={tagFacets} selected={tagFilter} projectFilter={projectFilter} scopeTeam={scopeTeam} />
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
+            <div data-slot="artifact-list" className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
               <ArtifactList
                 state={artifactListState({ total: artifacts.length, shown: filtered.length })}
                 artifacts={filtered}
@@ -314,6 +319,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
             onUpdated={updated}
             onDeleted={deleted}
             onCreate={() => { setCreateOpen(true); }}
+            initialFull={initialFull}
           />
         </div>
 

@@ -19,6 +19,16 @@
 }
 
 /*
+ * The /app workspace shell (md and up). On tall viewports the artifact's
+ * header block stays put and only the content under the Edit/Preview bar
+ * scrolls. On short ones (under 700px tall) the title block scrolls away with
+ * the content, so the content keeps its room, and the Edit/Preview bar sticks
+ * to the top of that scroll box. Phones keep a page that scrolls.
+ */
+@custom-variant shell-tall (@media (width >= 48rem) and (height >= 700px));
+@custom-variant shell-short (@media (width >= 48rem) and (height < 700px));
+
+/*
  * Type scale. Four steps for everything that is not a heading. Use these
  * classes only; never an arbitrary `text-md`.
  *   text-xs   13/18  smallest: badges, timestamps, labels, fine print, axis ticks
@@ -423,6 +433,24 @@
 @utility card-nested {
   border: 1px solid var(--card-edge);
   border-radius: var(--radius-lg);
+}
+
+/*
+ * The workspace layout's frame: the app header and the page. A page that
+ * renders an app shell (`data-app-shell`, the /app workspace) gets a frame
+ * exactly as tall as the viewport from md up, so the page itself never
+ * scrolls; the shell's panes do. Other workspace pages scroll as usual.
+ */
+@utility workspace-frame {
+  min-height: 100vh;
+  @media (width >= 48rem) {
+    &:has([data-app-shell]) {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      min-height: 0;
+    }
+  }
 }
 
 @layer base {
