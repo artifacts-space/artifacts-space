@@ -54,13 +54,11 @@ export const permissionsPolicy = [
 ].join(", ");
 
 /**
- * HTTPS only, for two years, on this host and every subdomain. No `preload`:
- * joining the browser preload list is hard to undo, so it is the owner's call.
- */
-export const strictTransportSecurity = "max-age=63072000; includeSubDomains";
-
-/**
- * Headers on every response. `strict-origin-when-cross-origin` sends other
+ * Headers on every response. No Strict-Transport-Security here: Vercel
+ * already sends `max-age=63072000` on every production response, and setting
+ * it again could send two. `includeSubDomains` and `preload` are left out on
+ * purpose: an email provider's link-tracking or bounce subdomain served over
+ * plain HTTP would stop working. `strict-origin-when-cross-origin` sends other
  * sites only the origin, never the path, so an artifact link (which is the
  * key to a link-shared artifact) does not leak through the Referer header.
  * `no-referrer` would also make browsers send `Origin: null` on same-site
@@ -71,7 +69,6 @@ const siteWide: HeaderEntry[] = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: permissionsPolicy },
-  { key: "Strict-Transport-Security", value: strictTransportSecurity },
 ];
 
 /**

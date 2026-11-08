@@ -1,7 +1,7 @@
 import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { describe, expect, it } from "vitest";
 
-import { permissionsPolicy, rawContentPolicy, securityHeaderRules, strictTransportSecurity } from "./security-header-rules";
+import { permissionsPolicy, rawContentPolicy, securityHeaderRules } from "./security-header-rules";
 
 /** The headers a path ends up with, as Next applies the rules: every match, later rules win per header. */
 function headersFor(pathname: string): Map<string, string> {
@@ -48,14 +48,14 @@ describe("securityHeaderRules", () => {
     const headers = headersFor("/artifact/abc123");
     expect(headers.get("x-content-type-options")).toBe("nosniff");
     expect(headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
-    expect(headers.get("strict-transport-security")).toBe(strictTransportSecurity);
     expect(headers.get("permissions-policy")).toBe(permissionsPolicy);
   });
 
-  it("should cover every subdomain without joining the preload list when HTTPS is enforced", () => {
-    expect(strictTransportSecurity).toContain("max-age=63072000");
-    expect(strictTransportSecurity).toContain("includeSubDomains");
-    expect(strictTransportSecurity).not.toContain("preload");
+  it("should leave Strict-Transport-Security to Vercel when any path is served", () => {
+    // Vercel sends max-age=63072000; a second header could conflict, and includeSubDomains or preload would break HTTP-only subdomains.
+    for (const pathname of ["/", "/oauth/consent", "/api/files/x", "/artifact/abc123/raw"]) {
+      expect(headersFor(pathname).has("strict-transport-security")).toBe(false);
+    }
   });
 
   it("should turn off camera, microphone, location, and payments when the site never uses them", () => {
