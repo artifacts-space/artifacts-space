@@ -10,13 +10,15 @@ import { Progress } from "@/components/ui/progress";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 import { parseArtifactCover } from "@/lib/covers/cover";
 import { coverGradientCss, coverGradients } from "@/lib/covers/gradients";
+import { COVER_SOURCE_ACCEPT, coverSourceProblem } from "@/lib/covers/prepare-rules";
 import { isCoverUploadAllowed } from "@/lib/files/cover-rules";
 import { iconGridMove } from "@/lib/icon-grid";
 import { cn } from "@/lib/utils";
 
+import { prepareCoverImage } from "./prepare-cover-image";
+
 const COLUMNS = 4;
-const ACCEPT = "image/png,image/jpeg,image/gif,image/webp,image/avif";
-const RULE = "PNG, JPEG, GIF, WebP, or AVIF, up to 2 MB. Wide images look best.";
+const RULE = "Any photo works. It is resized, and its location data removed. Wide images look best.";
 
 interface CoverPickerProps {
   /** The stored cover, or null. */
@@ -77,24 +79,41 @@ function GradientGrid({ selected, onSelect }: { selected: string | null; onSelec
   );
 }
 
-type UploadState = { phase: "idle" } | { phase: "uploading"; progress: number } | { phase: "error"; message: string };
+type UploadState = { phase: "idle" } | { phase: "preparing" } | { phase: "uploading"; progress: number } | { phase: "error"; message: string };
 
-/** "Upload an image": one image of your own, through the normal file pipeline. The save attaches it to the artifact. */
+/** Resizes and re-encodes the picked image in the browser (see prepare-cover-image.ts); the server checks the result like any upload. */
+async function preparedCover(file: File): Promise<File> {
+  const problem = coverSourceProblem(file);
+  if (problem) throw new Error(problem);
+  const prepared = await prepareCoverImage(file);
+  if (!isCoverUploadAllowed(prepared)) throw new Error("That image could not be made small enough. Try another one.");
+  return prepared;
+}
+
+function busyLabel(state: UploadState): string {
+  if (state.phase === "preparing") return "Preparing…";
+  if (state.phase === "uploading") return "Uploading…";
+  return "Upload an image";
+}
+
+/**
+ * "Upload an image": one photo or image of your own, prepared in the browser
+ * (scaled to at most 2400 px, saved as JPEG, camera data removed) and sent
+ * through the normal file pipeline. The save attaches it to the artifact.
+ */
 function CoverUpload({ onUploaded }: { onUploaded: (fileId: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const hintId = useId();
   const [state, setState] = useState<UploadState>({ phase: "idle" });
-  const busy = state.phase === "uploading";
+  const busy = state.phase === "uploading" || state.phase === "preparing";
 
   async function pick(file: File | undefined) {
     if (!file) return;
-    if (!isCoverUploadAllowed(file)) {
-      setState({ phase: "error", message: `That file cannot be a cover. Use a ${RULE.charAt(0).toLowerCase()}${RULE.slice(1)}` });
-      return;
-    }
-    setState({ phase: "uploading", progress: 0 });
+    setState({ phase: "preparing" });
     try {
-      const fileId = await uploadImageFile(file, (progress) => { setState({ phase: "uploading", progress }); });
+      const prepared = await preparedCover(file);
+      setState({ phase: "uploading", progress: 0 });
+      const fileId = await uploadImageFile(prepared, (progress) => { setState({ phase: "uploading", progress }); });
       setState({ phase: "idle" });
       onUploaded(fileId);
     } catch (error) {
@@ -104,10 +123,10 @@ function CoverUpload({ onUploaded }: { onUploaded: (fileId: string) => void }) {
 
   return (
     <div className="flex flex-col gap-2 border-t px-3 py-3">
-      <input ref={inputRef} type="file" accept={ACCEPT} className="sr-only" tabIndex={-1} aria-describedby={hintId} onChange={(event) => { void pick(event.target.files?.[0]); event.target.value = ""; }} />
+      <input ref={inputRef} type="file" accept={COVER_SOURCE_ACCEPT} className="sr-only" tabIndex={-1} aria-describedby={hintId} onChange={(event) => { void pick(event.target.files?.[0]); event.target.value = ""; }} />
       <div className="flex items-center gap-3">
         <Button type="button" variant="outline" size="sm" disabled={busy} aria-describedby={hintId} onClick={() => { inputRef.current?.click(); }}>
-          {busy ? <IconLoader2 className="animate-spin" /> : <IconPhotoUp />} {busy ? "Uploading…" : "Upload an image"}
+          {busy ? <IconLoader2 className="animate-spin" /> : <IconPhotoUp />} {busyLabel(state)}
         </Button>
         <p id={hintId} className="text-xs text-muted-foreground">{RULE}</p>
       </div>

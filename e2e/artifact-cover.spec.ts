@@ -66,7 +66,7 @@ test("should add, change, and remove a cover as saved versions when an editor us
   expect((await storedCovers(publicId)).versions[0]).toBe("dusk");
 
   await cover.hover();
-  await page.getByRole("button", { name: "Remove cover" }).click();
+  await cover.getByRole("button", { name: "Remove cover" }).click();
   await expect(cover).toHaveCount(0);
   await expect.poll(async () => (await storedCovers(publicId)).artifact).toBeNull();
   expect((await storedCovers(publicId)).versions[0]).toBeNull();

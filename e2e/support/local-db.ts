@@ -101,3 +101,9 @@ export async function cleanUp(publicIds: readonly string[], userIds: readonly st
   await pool?.end();
   pool = null;
 }
+
+/** Whether a file row still exists. */
+export async function fileRowExists(id: string): Promise<boolean> {
+  const result = await db().query(`select 1 from artifact_file where id = $1`, [id]);
+  return result.rowCount === 1;
+}

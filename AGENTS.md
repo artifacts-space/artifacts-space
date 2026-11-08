@@ -242,7 +242,16 @@ text: a gradient id, or `file:<uuid>` with an optional `@<0-100>` focal point.
 Gradients are recipes over theme tokens (`color-mix` in OKLab into
 `--background`), never literal colors, so they follow the theme and light or
 dark; link previews redraw the same recipe as hex (`coverGradientHex`). Cover
-images use the icon image rules (no SVG, uploads only) with a 2 MB cap, are
-checked in `src/lib/files/cover-file.ts`, and are pruned with old icon images
-(`icon-cleanup.ts`). Link previews can draw only PNG and JPEG covers; Satori
-draws nothing for WebP.
+images use the icon image rules (no SVG, uploads only) with a 2 MB cap and are
+checked in `src/lib/files/cover-file.ts`. The web picker prepares every image
+in the browser first (`prepare-cover-image.ts`: upright, at most 2400 px, JPEG
+unless a transparent PNG already fits, camera data dropped); the server cap and
+type checks stay the authority. Link previews can draw only PNG and JPEG
+covers; Satori draws nothing for WebP.
+
+Uploaded icon and cover images are kept while the artifact or any version in
+its history shows them, so Remove is undone by Restore. `icon-cleanup.ts`
+deletes one only when it leaves every retained version (history pruning in
+`versions/history.ts` hands it the dropped versions' images) or with the
+artifact. Kept images never widen access: readers of the approved version get
+only that version's icon and cover (`served-images.ts`, `canReadFile`).

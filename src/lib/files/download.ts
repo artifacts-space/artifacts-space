@@ -9,6 +9,7 @@ import { canReadFile, type FileArtifactAccess } from "./access-rules";
 import { fileLimits, isInlineType } from "./config";
 import { contentDisposition } from "./names";
 import { presignDownload, r2ConfigFromEnv } from "./r2";
+import { hiddenImagesFor } from "./served-images";
 import { listArtifactFiles } from "./store";
 import type { FileDto } from "./types";
 
@@ -33,15 +34,18 @@ export function servedVersionTime(viewable: Pick<ArtifactAccess, "version" | "se
   return viewable.version.source === "approved" ? viewable.served.updatedAt : null;
 }
 
-/** The files this viewer may see with the version they are served. */
+/** The files this viewer may see with the version they are served: never an old icon or cover image that version does not show. */
 export async function filesForViewer(viewable: Pick<ArtifactAccess, "record" | "version" | "served">): Promise<FileDto[]> {
-  return listArtifactFiles(viewable.record.id, { attachedBy: servedVersionTime(viewable) });
+  const [files, hidden] = await Promise.all([listArtifactFiles(viewable.record.id, { attachedBy: servedVersionTime(viewable) }), hiddenImagesFor(viewable)]);
+  return hidden.size === 0 ? files : files.filter((file) => !hidden.has(file.id));
 }
 
-async function artifactAccess(publicId: string | null, viewerId: string | null): Promise<FileArtifactAccess | null> {
+async function artifactAccess(fileId: string, publicId: string | null, viewerId: string | null): Promise<FileArtifactAccess | null> {
   if (!publicId) return null;
   const viewable = await getArtifactAccess(publicId, viewerId);
-  return viewable ? { viewable: true, servedVersionAt: servedVersionTime(viewable) } : { viewable: false, servedVersionAt: null };
+  if (!viewable) return { viewable: false, servedVersionAt: null, hiddenImage: false };
+  const hidden = await hiddenImagesFor(viewable);
+  return { viewable: true, servedVersionAt: servedVersionTime(viewable), hiddenImage: hidden.has(fileId) };
 }
 
 /**
@@ -53,7 +57,7 @@ export async function findReadableFile(fileId: string, viewerId: string | null):
   if (!z.uuid().safeParse(fileId).success) return null;
   const row = await loadWithArtifact(fileId.toLowerCase());
   if (!row) return null;
-  const access = await artifactAccess(row.publicId, viewerId);
+  const access = await artifactAccess(row.file.id, row.publicId, viewerId);
   return canReadFile(row.file, viewerId, access) ? row.file : null;
 }
 

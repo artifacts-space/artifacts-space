@@ -12,23 +12,29 @@ export interface FileAccessSubject {
  * What the artifact's own access check said. `servedVersionAt` is set when
  * the viewer reads an approved version of a link or public artifact (they are
  * outside its team): then only files attached by that version's time count.
+ * `hiddenImage` is true when the file is an icon or cover image that the
+ * served version does not show (see hiddenImageFiles): kept for Restore,
+ * never for readers outside the team.
  */
 export interface FileArtifactAccess {
   viewable: boolean;
   servedVersionAt: Date | null;
+  hiddenImage: boolean;
 }
 
 /**
  * The single read rule for files. A file is readable when it is ready and:
  * unattached files only by their uploader; attached files by whoever can
  * view the artifact, limited to files attached by the version they are
- * served. Everything else reads as "not found".
+ * served, and never an old icon or cover image that version does not show.
+ * Everything else reads as "not found".
  */
 export function canReadFile(file: FileAccessSubject, viewerId: string | null, artifact: FileArtifactAccess | null): boolean {
   if (file.status !== "ready") return false;
   if (file.artifactId === null) return viewerId !== null && file.uploaderId === viewerId;
   if (!artifact?.viewable) return false;
   if (artifact.servedVersionAt === null) return true;
+  if (artifact.hiddenImage) return false;
   return file.attachedAt !== null && file.attachedAt.getTime() <= artifact.servedVersionAt.getTime();
 }
 
