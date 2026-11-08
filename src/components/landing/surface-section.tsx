@@ -2,10 +2,6 @@ import { SectionEyebrow } from "./section-marks";
 import { SurfaceMock, type SurfaceRegion } from "./surface-mock";
 import "./surface.css";
 
-const surface = [
-  "Agents plan, decide, and build fast. Artifacts keep that work in one place where people can see it.",
-  "Each plan, decision, and review becomes a page that you and your agents both read and edit.",
-] as const;
 
 interface Callout {
   region: SurfaceRegion;
@@ -32,13 +28,9 @@ export function SurfaceSection() {
         <h2 id="surface-heading" className="max-w-[640px] text-balance text-3xl font-medium tracking-[-0.025em] sm:text-4xl">
           One surface for people and agents.
         </h2>
-        <div className="mt-5 max-w-[640px]">
-          {surface.map((paragraph) => (
-            <p key={paragraph} className="text-base leading-7 text-muted-foreground [&+p]:mt-3">
-              {paragraph}
-            </p>
-          ))}
-        </div>
+        <p className="mt-5 max-w-[640px] text-base leading-7 text-muted-foreground">
+          Agents plan, decide, and build fast. Artifacts keep that work in one place where people can see it. Each plan, decision, and review becomes a page that you and your agents both read and edit.
+        </p>
       </div>
       <div className="surface-explore mt-12 grid gap-10 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-center">
         <div className="dot-grid relative border border-dashed p-3 sm:p-8 lg:p-12">

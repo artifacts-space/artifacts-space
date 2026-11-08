@@ -61,10 +61,12 @@ test("should jump to the How it works section when the header link is clicked", 
   await expect(page.getByRole("heading", { level: 2, name: "Use it like the artifacts you already know." })).toBeInViewport();
 });
 
-test("should set the header nav links in medium weight when the landing page loads", async ({ page }) => {
+test("should set the header nav links in medium weight when the landing page loads", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "the section links are hidden on phones");
   await page.goto("/");
-  const nav = page.getByRole("navigation", { name: "Main navigation" });
-  await expect(nav.getByRole("link", { name: "Sign in" })).toHaveCSS("font-weight", "500");
+  const header = page.getByRole("banner");
+  await expect(header.getByRole("link", { name: "Sign in" })).toHaveCSS("font-weight", "500");
+  await expect(header.getByRole("link", { name: "How it works" })).toHaveCSS("font-weight", "500");
 });
 
 const plans = [
@@ -153,5 +155,12 @@ for (const width of [640, 768, 1024]) {
     });
     expect(fit.navRight).toBeLessThanOrEqual(width);
     expect(fit.gap, "the nav must not touch the logo").toBeGreaterThanOrEqual(16);
+    if (width < 1024) return;
+    const center = await page.getByRole("navigation", { name: "Main navigation" }).evaluate((nav) => {
+      const box = nav.getBoundingClientRect();
+      const header = nav.closest("header")?.getBoundingClientRect();
+      return header ? Math.abs(box.left + box.width / 2 - (header.left + header.width / 2)) : Number.NaN;
+    });
+    expect(center, "from 1024px the section links sit in the middle of the header").toBeLessThanOrEqual(2);
   });
 }
