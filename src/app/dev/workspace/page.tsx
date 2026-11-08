@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { WorkspaceFixture } from "@/components/dev/workspace-fixture";
+import { parseProjectFilter } from "@/lib/projects/filter-params";
 
 // A development tool, not a navigation target: skip instant-navigation validation.
 export const instant = false;
@@ -13,10 +14,11 @@ export const metadata: Metadata = {
 
 /**
  * Development-only page for the app shell e2e test: the /app workspace with
- * long artifacts and a long list, without a database. Returns 404 in every
- * other environment.
+ * long artifacts, a long list, and projects, without a database. The
+ * project filter in the URL works as on /app. Returns 404 in every other
+ * environment.
  */
-export default function WorkspaceFixturePage() {
+export default async function WorkspaceFixturePage({ searchParams }: PageProps<"/dev/workspace">) {
   if (process.env.NODE_ENV !== "development") notFound();
-  return <WorkspaceFixture />;
+  return <WorkspaceFixture projectFilter={parseProjectFilter(await searchParams)} />;
 }
