@@ -27,6 +27,8 @@ import {
 import { artifactIconLimits } from "../lib/artifact-icon-limits";
 import type { StoredArtifactTheme } from "../lib/themes/artifact-theme";
 import { artifactThemeLimits } from "../lib/themes/artifact-theme-limits";
+import type { Theme } from "../lib/themes/schema";
+import { teamPresetLimits } from "../lib/themes/team-preset-limits";
 import { artifactSizeLimits } from "../lib/artifact-limits";
 import { artifactCoverLimits } from "../lib/covers/limits";
 import { fileLimits, fileStatuses } from "../lib/files/config";
@@ -101,6 +103,34 @@ export const artifact = pgTable(
     check("artifact_content_size_check", sql`octet_length(${table.content}) <= ${sql.raw(String(artifactSizeLimits.maxContentBytes))}`),
     // jsonb prints with extra spaces, so the backstop allows twice the app's limit.
     check("artifact_metadata_size_check", sql`octet_length(${table.metadata}::text) <= ${sql.raw(String(artifactSizeLimits.maxMetadataBytes * 2))}`),
+  ],
+);
+
+// A team's own theme preset, kept by its owners and admins in team settings. Artifacts and the
+// team default refer to it as "team:<slug>" (src/lib/themes/team-preset-rules.ts), a live reference.
+export const teamThemePreset = pgTable(
+  "team_theme_preset",
+  {
+    id: text("id").primaryKey(),
+    teamId: text("team_id").notNull().references(() => team.id, { onDelete: "cascade" }),
+    // Unique across every team and never changed, so references survive a rename.
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    // A validated theme, normalised by parseTheme.
+    theme: jsonb("theme").$type<Theme>().notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("team_theme_preset_slug_idx").on(table.slug),
+    index("team_theme_preset_team_idx").on(table.teamId, table.createdAt),
+    check("team_theme_preset_slug_length_check", sql`char_length(${table.slug}) <= ${sql.raw(String(teamPresetLimits.maxSlugChars))}`),
+    check("team_theme_preset_name_length_check", sql`char_length(${table.name}) <= ${sql.raw(String(teamPresetLimits.maxNameChars))}`),
+    check("team_theme_preset_description_length_check", sql`char_length(${table.description}) <= ${sql.raw(String(teamPresetLimits.maxDescriptionChars))}`),
+    check("team_theme_preset_theme_size_check", sql`octet_length(${table.theme}::text) <= ${sql.raw(String(teamPresetLimits.maxStoredBytes))}`),
   ],
 );
 
@@ -372,6 +402,7 @@ export const confirmationSkip = pgTable(
 export type ArtifactRecord = typeof artifact.$inferSelect;
 export type ProjectRecord = typeof project.$inferSelect;
 export type TeamRecord = typeof team.$inferSelect;
+export type TeamThemePresetRecord = typeof teamThemePreset.$inferSelect;
 export type SharingRequestRecord = typeof sharingRequest.$inferSelect;
 export type ApiTokenRecord = typeof apiToken.$inferSelect;
 export type ArtifactVersionRecord = typeof artifactVersion.$inferSelect;

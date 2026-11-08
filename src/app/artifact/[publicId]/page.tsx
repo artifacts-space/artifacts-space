@@ -38,7 +38,9 @@ import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
 import { pageOrganizersFor } from "@/lib/projects/page-project";
 import { isReportable } from "@/lib/reports/rules";
 import { getSession } from "@/lib/session";
-import { resolveTheme } from "@/lib/themes/resolve";
+import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
+import { noThemeChoices, type ThemeChoices } from "@/lib/themes/theme-choice-types";
+import { artifactThemeChoices } from "@/lib/themes/theme-choices";
 import { lockedMode } from "@/lib/themes/style";
 import { cn } from "@/lib/utils";
 import { visibilityCopy, type VisibilityCopy } from "@/lib/visibility-copy";
@@ -135,14 +137,14 @@ async function lastEditor(userId: string | null): Promise<ArtifactEditorDto | nu
 }
 
 /** The page icon above the title: the icon, theme, and Add cover controls for editors, the icon alone for readers. */
-function HeadingIcon({ viewable }: { viewable: ViewableArtifact }) {
+function HeadingIcon({ viewable, themeChoices }: { viewable: ViewableArtifact; themeChoices: ThemeChoices }) {
   const { view, record } = viewable;
   if (viewable.canEdit) {
     return (
       <div className="flex flex-wrap items-end gap-1">
         <TitleIcon key={view.icon ?? ""} publicId={record.publicId} icon={view.icon} />
         <div className={view.icon ? "mb-2" : "mb-1"}>
-          <TitleTheme key={JSON.stringify(view.theme)} publicId={record.publicId} theme={view.theme} />
+          <TitleTheme key={JSON.stringify(view.theme)} publicId={record.publicId} theme={view.theme} choices={themeChoices} />
         </div>
         {view.cover ? null : <div className={view.icon ? "mb-2" : "mb-1"}><AddCoverButton publicId={record.publicId} /></div>}
       </div>
@@ -156,7 +158,7 @@ function HeadingIcon({ viewable }: { viewable: ViewableArtifact }) {
  * Format, icon, title, summary, the project (for editors only), who saved it
  * last, and whether changes wait for approval.
  */
-function ArtifactHeading({ viewable, editor, organizers }: { viewable: ViewableArtifact; editor: ArtifactEditorDto | null; organizers: React.ReactNode }) {
+function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewable: ViewableArtifact; editor: ArtifactEditorDto | null; organizers: React.ReactNode; themeChoices: ThemeChoices }) {
   const { view, record } = viewable;
   const Icon = kindIcons[view.kind];
   const meta = [view.source ? `Source ${view.source}` : null].filter(Boolean);
@@ -166,7 +168,7 @@ function ArtifactHeading({ viewable, editor, organizers }: { viewable: ViewableA
         <Icon className={`size-3.5 ${kindColors[view.kind]}`} /> {visibilityCopy(record.visibility).kicker} · {view.kind}
       </div>
       <div className="group/title mt-4">
-        <HeadingIcon viewable={viewable} />
+        <HeadingIcon viewable={viewable} themeChoices={themeChoices} />
         <h1 className="text-balance text-4xl font-medium leading-[1.08] tracking-[-0.03em] sm:text-5xl">{view.title}</h1>
       </div>
       {view.summary ? <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{view.summary}</p> : null}
@@ -189,6 +191,15 @@ async function loadOrganizers(viewable: ViewableArtifact, session: { user: { id:
   const values = await pageOrganizersFor(viewable, session ? session.user.id : null).catch(() => undefined);
   if (values === undefined) return null;
   return <PageOrganizers artifactId={viewable.record.id} project={values.project} tags={values.tags} />;
+}
+
+/** The team presets and team default the theme picker offers, only for editors (who belong to the team). */
+async function loadThemeChoices(viewable: ViewableArtifact, viewerId: string | null): Promise<ThemeChoices> {
+  if (!viewable.canEdit || !viewerId) return noThemeChoices;
+  return artifactThemeChoices(viewerId, viewable.record).catch((error: unknown) => {
+    console.error("[themes] Theme choices failed", error instanceof Error ? error.name : "unknown error");
+    return noThemeChoices;
+  });
 }
 
 /**
@@ -223,16 +234,18 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   if (!viewable) notFound();
   const { record, view } = viewable;
   // getSession is deduplicated per request, so these reuse load()'s lookup.
-  const [byline, files, session, editor, organizers] = await Promise.all([
+  const [byline, files, session, editor, organizers, resolved, themeChoices] = await Promise.all([
     loadArtifactByline(record, viewable.isTeamMember),
     filesForViewer(viewable),
     getSession(),
     lastEditor(view.editedBy),
     getSession().then((session) => loadOrganizers(viewable, session)),
+    // The artifact's own theme, then its team's default, then the site default: the same for every reader.
+    resolveThemeFor(record, view.theme),
+    getSession().then((session) => loadThemeChoices(viewable, session?.user.id ?? null)),
   ]);
   const copy = visibilityCopy(record.visibility);
-  // The team default arrives with team presets; until then an artifact's own theme or the site default.
-  const { theme, presetId } = resolveTheme(view.theme, null);
+  const { theme, presetId, source } = resolved;
 
   return (
     <div className="min-h-screen">
@@ -255,8 +268,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
         ) : null}
         <main className={cn("mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16", view.cover && "pt-8 sm:pt-10")}>
           <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
-            <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={presetId ?? "custom"}>
-              <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} />
+            <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={presetId ?? "custom"} data-theme-source={source}>
+              <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
               <article className="mt-10">
                 <ArtifactBody viewable={viewable} files={files} />
               </article>

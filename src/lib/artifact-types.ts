@@ -1,5 +1,6 @@
 import type { FileDto } from "./files/types";
 import type { StoredArtifactTheme } from "./themes/artifact-theme";
+import type { Theme } from "./themes/schema";
 
 export const artifactKinds = ["markdown", "code", "text", "json", "csv", "svg", "mermaid", "ui", "file"] as const;
 export type ArtifactKind = (typeof artifactKinds)[number];
@@ -146,6 +147,8 @@ export interface VersionSummaryDto {
 
 /** One version with everything it saved. */
 export interface VersionDetailDto extends VersionSummaryDto {
+  /** The theme this version renders with now: its own, else the team default, else the site default. Set by the server. */
+  renderTheme?: Theme | undefined;
   summary: string;
   content: string;
   language: string;

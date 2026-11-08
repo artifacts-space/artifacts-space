@@ -176,6 +176,13 @@
       "when": 1794099413164,
       "tag": "0024_artifact_covers",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794106102382,
+      "tag": "0025_team_theme_presets",
+      "breakpoints": true
     }
   ]
 }

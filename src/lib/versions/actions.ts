@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getEditableArtifact } from "@/lib/access";
 import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult, ArtifactDto, VersionDetailDto, VersionSummaryDto } from "@/lib/artifact-types";
+import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
 import { restoreArtifactVersion } from "@/lib/artifacts";
 import { isPublicId } from "@/lib/public-id";
 import { getSession } from "@/lib/session";
@@ -53,7 +54,8 @@ export async function getVersionAction(publicId: string, versionId: string): Pro
     const record = await editable(userId, publicId);
     const detail = await getArtifactVersionDetail(record, versionIdSchema.parse(versionId));
     if (!detail) throw new UserFacingError("That version is no longer in the history.");
-    return detail;
+    const { theme } = await resolveThemeFor(record, detail.theme);
+    return { ...detail, renderTheme: theme };
   });
 }
 

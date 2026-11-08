@@ -4,7 +4,7 @@ import { getArtifactAccess, type ArtifactAccess } from "@/lib/access";
 import { iconTitlePrefix } from "@/lib/artifact-icons";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { filesForViewer } from "@/lib/files/download";
-import { resolveTheme } from "@/lib/themes/resolve";
+import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
 import { cachedVersionView } from "@/lib/versions/cache";
 import { isReviewedLevel } from "@/lib/versions/rules";
 import { OG_DESCRIPTION, OG_WORDMARK } from "@/lib/site-copy";
@@ -120,7 +120,8 @@ export async function loadArtifactOg(publicId: string, versionId: string): Promi
   if (shareable.versionId !== versionId) return null;
   const view = await cachedVersionView(shareable.versionId, shareable.savedAt);
   if (!view) return null;
-  const theme = resolveTheme(view.theme, null).theme;
+  // The version's own theme, then the team default, then the site default, as on the page.
+  const { theme } = await resolveThemeFor(access.record, view.theme);
   const [files, cover] = await Promise.all([view.kind === "file" ? filesForViewer(access) : Promise.resolve([]), loadOgCover(view.cover, theme)]);
   return {
     title: view.title,
@@ -128,7 +129,6 @@ export async function loadArtifactOg(publicId: string, versionId: string): Promi
     kind: view.kind,
     kindLabel: view.kind === "code" && view.language ? `${ogKindLabels.code} · ${truncate(view.language, 16)}` : ogKindLabels[view.kind],
     synopsis: buildSynopsis({ kind: view.kind, content: view.content, language: view.language, files }),
-    // The team default arrives with team presets; until then the version's own theme or the site card.
     palette: ogCardPalette(theme),
     cover: cover.cover,
     coverDegraded: cover.degraded,

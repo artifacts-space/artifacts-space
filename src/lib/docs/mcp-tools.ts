@@ -70,7 +70,7 @@ function recordTools(): DocsMcpTool[] {
   registerProjectTools(recordingServer("Artifacts", tools), docsUserId, "full");
   registerTagTools(recordingServer("Artifacts", tools), docsUserId, "full");
   registerFormatTools(recordingServer("Formats", tools), "full");
-  registerThemeTools(recordingServer("Themes", tools), "full");
+  registerThemeTools(recordingServer("Themes", tools), docsUserId, "full");
   registerFileTools(recordingServer("Files", tools), docsUserId, "full");
   registerTeamTools(recordingServer("Inbox and comments", tools), docsUserId, "full");
   registerVersionTools(recordingServer("Version history", tools), docsUserId, "full");

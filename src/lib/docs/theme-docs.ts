@@ -1,4 +1,4 @@
-import { themesListResult } from "@/lib/mcp/theme-tools";
+import { buildThemesList } from "@/lib/mcp/theme-tools";
 import { artifactThemeLimits } from "@/lib/themes/artifact-theme-limits";
 import { parseArtifactThemeInput } from "@/lib/themes/artifact-theme";
 import { themePresets } from "@/lib/themes/presets";
@@ -45,9 +45,17 @@ export const themeMcpExamples = {
   clear: JSON.stringify({ name: "artifacts_update", arguments: { id: exampleId, theme: null } }, null, 2),
 };
 
-/** What themes_list returns, with the preset list cut to its first two entries. */
+/** An example team in themes_list: one preset, which is also the team default. */
+const exampleTeam = {
+  team: "acme",
+  name: "Acme",
+  default: { id: "team:acme-brand-x7k2p9", name: "Acme brand" },
+  presets: [{ id: "team:acme-brand-x7k2p9", name: "Acme brand", description: "Our colors and Inter.", mode: "auto" as const, fonts: { body: { id: "inter" as const, family: "Inter" }, heading: { id: "inter" as const, family: "Inter" }, mono: { id: "geist-mono" as const, family: "Geist Mono" } } }],
+};
+
+/** What themes_list returns, with the preset list cut to its first two entries and one example team. */
 export function themesListExample(): string {
-  const result = themesListResult();
+  const result = buildThemesList([exampleTeam]);
   return JSON.stringify({ ...result, presets: [...result.presets.slice(0, 2), `…${String(result.presets.length - 2)} more`] }, null, 2);
 }
 

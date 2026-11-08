@@ -55,7 +55,7 @@ beforeEach(async () => {
   data.getEditableArtifact.mockResolvedValue({ id: "internal-1", publicId, cover: null });
   const server = new McpServer({ name: "test", version: "1.0.0" });
   registerArtifactTools(server, "agent-1", "full");
-  registerThemeTools(server, "full");
+  registerThemeTools(server, "agent-1", "full");
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   client = new Client({ name: "test-client", version: "1.0.0" });
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);

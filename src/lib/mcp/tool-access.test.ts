@@ -41,7 +41,7 @@ async function connect(access: McpAccess) {
   registerProjectTools(server, "user-1", access);
   registerTagTools(server, "user-1", access);
   registerFormatTools(server, access);
-  registerThemeTools(server, access);
+  registerThemeTools(server, "agent-1", access);
   registerFileTools(server, "user-1", access);
   registerTeamTools(server, "user-1", access);
   registerVersionTools(server, "user-1", access);

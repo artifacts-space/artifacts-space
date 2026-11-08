@@ -8,6 +8,7 @@ import { ReportsList } from "@/components/teams/reports-list";
 import { Section } from "@/components/teams/section";
 import { TeamAgents } from "@/components/teams/team-agents";
 import { TeamMembers } from "@/components/teams/team-members";
+import { TeamThemes } from "@/components/teams/team-themes";
 import { LeaveTeamButton, SharingRuleSetting } from "@/components/teams/team-settings";
 import { Badge } from "@/components/ui/badge";
 import { listTeamAgents } from "@/lib/agents/queries";
@@ -17,6 +18,8 @@ import { siteOrigin } from "@/lib/site-origin";
 import { listPendingSharing, listTeamSharedArtifacts } from "@/lib/sharing/queries";
 import { getTeamForMember, listPendingInvitations, listTeamMembers, type TeamMembership } from "@/lib/teams/queries";
 import { canEditTeamSettings, canManageTeam, roleLabel } from "@/lib/teams/roles";
+import { loadTeamThemeSettings } from "@/lib/themes/team-presets";
+import { canManageTeamThemes } from "@/lib/themes/team-preset-rules";
 import { listPendingEdits } from "@/lib/versions/queries";
 
 export const metadata: Metadata = { title: "Team" };
@@ -36,6 +39,28 @@ function TeamHeader({ team }: { team: TeamMembership }) {
       </div>
       {team.personal ? null : <LeaveTeamButton teamId={team.id} teamName={team.name} />}
     </div>
+  );
+}
+
+/** Team presets and the team default. Only members reach this page (getTeamForMember), so only members ever see them. */
+async function ThemesSection({ team }: { team: TeamMembership }) {
+  const settings = await loadTeamThemeSettings(team.id);
+  return (
+    <Section title="Themes" description="Give the team's artifacts one look. Readers outside the team see it on shared pages. Agents can use these presets but never change them.">
+      <TeamThemes teamId={team.id} settings={settings} canManage={canManageTeamThemes(team)} />
+    </Section>
+  );
+}
+
+/** Settings of a shared team: its themes and its sharing rule. Personal teams have neither. */
+function SettingsSections({ team }: { team: TeamMembership }) {
+  return (
+    <>
+      <ThemesSection team={team} />
+      <Section title="Sharing rule" description="Does sharing with the team need an admin's approval?">
+        <SharingRuleSetting teamId={team.id} needsApproval={team.teamSharingNeedsApproval} canEdit={canEditTeamSettings(team.role)} />
+      </Section>
+    </>
   );
 }
 
@@ -114,11 +139,7 @@ export default async function TeamPage({ params }: PageProps<"/teams/[slug]">) {
         </Section>
       ) : null}
 
-      {team.personal ? null : (
-        <Section title="Sharing rule" description="Does sharing with the team need an admin's approval?">
-          <SharingRuleSetting teamId={team.id} needsApproval={team.teamSharingNeedsApproval} canEdit={canEditTeamSettings(team.role)} />
-        </Section>
-      )}
+      {team.personal ? null : <SettingsSections team={team} />}
     </main>
   );
 }

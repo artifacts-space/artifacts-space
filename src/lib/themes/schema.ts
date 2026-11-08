@@ -105,27 +105,39 @@ function fontSlot(role: FontRole, fallback: ThemeFontId) {
 
 const defaultFonts = { body: "geist-sans", heading: "geist-sans", mono: "geist-mono" } as const;
 
+/** Theme JSON's shape: known keys only, colors parsed and normalised. Contrast is checked by themeSchema on top. */
+const themeShapeSchema = z.strictObject({
+  version: z.literal(1),
+  mode: z.enum(themeModes).default("auto"),
+  radius: z.enum(radiusSteps).default("md"),
+  fonts: z
+    .strictObject({
+      body: fontSlot("body", defaultFonts.body),
+      heading: fontSlot("heading", defaultFonts.heading),
+      mono: fontSlot("mono", defaultFonts.mono),
+    })
+    .default(defaultFonts),
+  light: paletteSchema,
+  dark: paletteSchema,
+});
+
 /** The zod schema for theme JSON. Known keys only; colors are parsed and normalised; contrast is checked in both modes. */
-export const themeSchema = z
-  .strictObject({
-    version: z.literal(1),
-    mode: z.enum(themeModes).default("auto"),
-    radius: z.enum(radiusSteps).default("md"),
-    fonts: z
-      .strictObject({
-        body: fontSlot("body", defaultFonts.body),
-        heading: fontSlot("heading", defaultFonts.heading),
-        mono: fontSlot("mono", defaultFonts.mono),
-      })
-      .default(defaultFonts),
-    light: paletteSchema,
-    dark: paletteSchema,
-  })
-  .superRefine((theme, ctx) => {
-    for (const issue of contrastIssues(theme)) {
-      ctx.addIssue({ code: "custom", path: issue.path.split("."), message: issue.message });
-    }
-  });
+export const themeSchema = themeShapeSchema.superRefine((theme, ctx) => {
+  for (const issue of contrastIssues(theme)) {
+    ctx.addIssue({ code: "custom", path: issue.path.split("."), message: issue.message });
+  }
+});
+
+/**
+ * The theme a live preview can draw while someone edits: every color parses
+ * and every key is known, but contrast is not checked yet, so an editor sees
+ * a failing theme while the contrast errors show beside it. Null until it
+ * parses. Never store or serve this result; parseTheme decides what saves.
+ */
+export function parseThemeForPreview(input: unknown): Theme | null {
+  const result = themeShapeSchema.safeParse(input);
+  return result.success ? result.data : null;
+}
 
 /** Theme JSON as an author writes it: colors in any accepted syntax, optional fields left out. */
 export type ThemeInput = z.input<typeof themeSchema>;

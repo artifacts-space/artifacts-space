@@ -116,3 +116,66 @@ export async function fileCurrentAsRecentEdit(publicId: string): Promise<void> {
     [randomUUID(), publicId],
   );
 }
+
+/** A shared (not personal) team with one member at `role`. Returns its id and slug. */
+export async function createTestTeam(userId: string, role: "owner" | "admin" | "member" = "owner"): Promise<{ id: string; slug: string }> {
+  const id = randomUUID();
+  const slug = `theme-e2e-${id.slice(0, 8)}`;
+  await db().query(`insert into team (id, name, slug, personal, created_by) values ($1, $2, $3, false, $4)`, [id, `Theme team ${id.slice(0, 4)}`, slug, userId]);
+  await db().query(`insert into team_member (id, team_id, user_id, role) values ($1, $2, $3, $4)`, [randomUUID(), id, userId, role]);
+  return { id, slug };
+}
+
+/** Changes a member's role in a team. */
+export async function setTeamRole(teamId: string, userId: string, role: "owner" | "admin" | "member"): Promise<void> {
+  await db().query(`update team_member set role = $3 where team_id = $1 and user_id = $2`, [teamId, userId, role]);
+}
+
+/** Inserts a team preset with theme JSON and returns its id ("team:<slug>"). */
+export async function createTestTeamPreset(teamId: string, name: string, theme: unknown): Promise<string> {
+  const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${randomUUID().slice(0, 6)}`;
+  await db().query(`insert into team_theme_preset (id, team_id, slug, name, theme) values ($1, $2, $3, $4, $5::jsonb)`, [randomUUID(), teamId, slug, name, JSON.stringify(theme)]);
+  return `team:${slug}`;
+}
+
+/** Sets a team's default theme. */
+export async function setTestTeamDefault(teamId: string, theme: string | null): Promise<void> {
+  await db().query(`update team set default_theme = $2 where id = $1`, [teamId, theme]);
+}
+
+/** A team's default theme and who set it. */
+export async function teamDefaultOf(teamId: string): Promise<{ theme: string | null; setBy: string | null }> {
+  const result = await db().query<{ default_theme: string | null; default_theme_set_by: string | null }>(`select default_theme, default_theme_set_by from team where id = $1`, [teamId]);
+  const row = result.rows[0];
+  return { theme: row?.default_theme ?? null, setBy: row?.default_theme_set_by ?? null };
+}
+
+/** The ids ("team:<slug>") of a team's presets with this name. */
+export async function teamPresetRefs(teamId: string, name: string): Promise<string[]> {
+  const result = await db().query<{ slug: string }>(`select slug from team_theme_preset where team_id = $1 and name = $2`, [teamId, name]);
+  return result.rows.map((row) => `team:${row.slug}`);
+}
+
+/** Moves an artifact into a team at a visibility (as approved sharing would). */
+export async function shareTestArtifact(publicId: string, teamId: string, visibility: "team" | "public"): Promise<void> {
+  await db().query(`update artifact set team_id = $2, visibility = $3 where public_id = $1`, [publicId, teamId, visibility]);
+}
+
+/** How many versions an artifact has. */
+export async function versionCount(publicId: string): Promise<number> {
+  const result = await db().query<{ n: string }>(`select count(*) as n from artifact_version v join artifact a on a.id = v.artifact_id where a.public_id = $1`, [publicId]);
+  return Number(result.rows[0]?.n ?? 0);
+}
+
+/** Deletes seeded teams (their members and presets cascade). */
+export async function deleteTestTeams(teamIds: readonly string[]): Promise<void> {
+  if (!localDatabaseEnabled() || teamIds.length === 0) return;
+  await db().query(`delete from team where id = any($1) and slug like 'theme-e2e-%'`, [teamIds]);
+}
+
+/** The dev user's id, with their username confirmed so workspace pages skip the first-run username step. */
+export async function readyDevUser(): Promise<string> {
+  const id = await devUserId();
+  await db().query(`update "user" set username_confirmed = true where id = $1`, [id]);
+  return id;
+}
