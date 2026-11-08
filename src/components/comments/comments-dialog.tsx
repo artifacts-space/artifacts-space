@@ -1,12 +1,13 @@
 "use client";
 
 import { IconMessage } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { CommentThread } from "./comment-thread";
+import { useLinkedComments } from "./linked-comments";
 
 interface CommentsDialogProps {
   publicId: string;
@@ -21,10 +22,15 @@ interface CommentsDialogProps {
 /**
  * The Comments button and dialog in the /app workspace, beside History: the
  * artifact's thread and composer in one scrolling dialog, so the content pane
- * holds only the artifact. The thread loads when the dialog opens.
+ * holds only the artifact. The thread loads when the dialog opens. A link
+ * such as /app?artifact=<id>&comments=1 opens it once for that artifact.
  */
 export function CommentsDialog({ publicId, title, seesComments, offNotice, className }: CommentsDialogProps) {
-  const [open, setOpen] = useState(false);
+  const { linked, consume } = useLinkedComments(publicId);
+  const [open, setOpen] = useState(linked);
+  useEffect(() => {
+    if (linked) consume();
+  }, [linked, consume]);
   return (
     <>
       <Button variant="ghost" size="sm" className={className} onClick={() => { setOpen(true); }}>
