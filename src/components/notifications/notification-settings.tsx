@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { toast } from "sonner";
 
 import { setNotificationPreferenceAction } from "@/app/(workspace)/app/notification-actions";
@@ -19,7 +18,8 @@ const eventCopy: Record<NotificationEvent, { title: string; description: string 
 const channelLabels: Record<NotificationChannel, string> = { inApp: "In app", browser: "Browser", email: "Email" };
 
 interface NotificationSettingsProps {
-  initial: NotificationPreferences;
+  preferences: NotificationPreferences;
+  onPreferences: (preferences: NotificationPreferences) => void;
   /** The channels to offer. Browser shows only when browser notifications are set up. */
   channels?: readonly NotificationChannel[];
 }
@@ -41,8 +41,7 @@ function ChoiceCell({ event, channel, preferences, onChange }: { event: Notifica
  * Per event, where it reaches the person: in the app (the bell), in the
  * browser, and by email (mentions only). Each switch saves at once.
  */
-export function NotificationSettings({ initial, channels = ["inApp", "email"] }: NotificationSettingsProps) {
-  const [preferences, setPreferences] = useState(initial);
+export function NotificationSettings({ preferences, onPreferences: setPreferences, channels = ["inApp", "email"] }: NotificationSettingsProps) {
   const columns = { gridTemplateColumns: `minmax(0, 1fr) repeat(${String(channels.length)}, 4.5rem)` };
 
   async function change(event: NotificationEvent, channel: NotificationChannel, on: boolean) {

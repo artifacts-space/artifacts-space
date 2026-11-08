@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
+/** Autosave sends at most one save every 5 seconds (autosave-rules.ts), so "Saved" can take a little over that. */
+const savedWithin = { timeout: 12_000 };
+
 declare global {
   interface Window {
     layoutShifts: number[];
@@ -87,10 +90,10 @@ test("should edit a long Markdown artifact in place and save it on its own", asy
   expect((await layout(page)).excess).toBeLessThanOrEqual(1);
 
   await page.getByRole("textbox", { name: "Title" }).fill("Renamed fixture");
-  await expect(saveStatus(page)).toHaveText("Saved");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
   await content.locator("p").first().click();
   await page.keyboard.press("End");
   await page.keyboard.type(" Typed in place.");
-  await expect(saveStatus(page)).toHaveText("Saved");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
   await expect(content).toContainText("Typed in place.");
 });

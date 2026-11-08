@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   returned: vi.fn(),
   getEditableArtifact: vi.fn(),
   recordArtifactSave: vi.fn(),
+  enforceRateLimit: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("@/db", () => ({
@@ -33,7 +34,7 @@ vi.mock("@/lib/access", () => ({ getEditableArtifact: mocks.getEditableArtifact,
 vi.mock("@/lib/versions/history", () => ({ getVersionOf: vi.fn() }));
 vi.mock("@/lib/versions/service", () => ({ recordArtifactSave: mocks.recordArtifactSave }));
 vi.mock("@/lib/versions/cache", () => ({ forgetArtifactCache: vi.fn() }));
-vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: () => Promise.resolve() }));
+vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: mocks.enforceRateLimit }));
 vi.mock("@/lib/quota/usage", () => ({ assertContentFits: () => Promise.resolve() }));
 vi.mock("@/lib/files/attach", () => ({ checkContentFiles: () => Promise.resolve([]) }));
 vi.mock("@/lib/files/icon-file", () => ({ checkIconFile: () => Promise.resolve([]), restorableIcon: vi.fn() }));
@@ -92,5 +93,14 @@ describe("updateArtifact editing sessions", () => {
   it.each(["start", "continue"] as const)("should pass the %s step to the version history when an autosave sends it", async (session) => {
     await updateArtifact("user-1", "artifact-1", { title: "Plan B" }, "person", { expectedUpdatedAt: baseRecord.updatedAt.toISOString(), session });
     expect(mocks.recordArtifactSave).toHaveBeenCalledWith(expect.objectContaining({ saveKind: "edit", session }));
+  });
+
+  it.each([
+    ["start", "artifactUpdate"],
+    ["continue", "artifactAutosave"],
+    [undefined, "artifactUpdate"],
+  ] as const)("should count a save with the %s step against %s", async (session, limit) => {
+    await updateArtifact("user-1", "artifact-1", { title: "Plan B" }, "person", { expectedUpdatedAt: baseRecord.updatedAt.toISOString(), session });
+    expect(mocks.enforceRateLimit).toHaveBeenCalledWith(limit, "user-1");
   });
 });
