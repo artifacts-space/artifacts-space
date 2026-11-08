@@ -5,3 +5,11 @@ overrides:
   # drizzle-kit's @esbuild-kit loader pins esbuild ~0.18, which has
   # GHSA-67mh-4wv8-2f99. 0.25.12 is the version drizzle-kit itself uses.
   "@esbuild-kit/core-utils>esbuild": 0.25.12
+  # minimatch >=7 <11.0.1 has GHSA-g3hv-75wg-m249 and there is no patched
+  # 10.x. This moves the 10.x copies (ts-morph via shadcn, and
+  # typescript-estree) to 11.0.1. The 3.x copies under eslint are outside the
+  # affected range and stay as they are.
+  "minimatch@>=7 <11.0.1": 11.0.1
+  # minimatch 11.0.1 asks for ^1.0.1. Newer 1.x releases are younger than the
+  # two-week dependency-age rule. Remove this pin once they are old enough.
+  "@isaacs/nonrecursive-glob-match": 1.0.1
