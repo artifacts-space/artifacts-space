@@ -84,7 +84,7 @@ export function TermsConduct() {
       <LegalH doc={doc} id="fees" />
       <Prose>
         <p>
-          The Service is free today. If we introduce paid plans, we will tell you at least 30 days before they start, and we will never charge you unless you choose a paid plan and agree to its price. Accounts created before we introduce paid plans keep the free plan at no charge for as long as the account stays open. The Service has usage limits, such as rate limits and storage quotas, listed in the <Link href="/docs/limits">Limits</Link> docs. We may change them to keep the Service healthy, and we will try to keep them generous for real work.
+          The Service is free today. If we introduce paid plans, we will tell you at least 30 days before they start, and we will never charge you unless you choose a paid plan and agree to its price. Accounts created before we introduce paid plans keep the free plan at no charge for as long as the account stays open. Teams created before we introduce paid plans also keep the free plan at no charge for as long as the team exists. The Service has usage limits, such as rate limits and storage quotas, listed in the <Link href="/docs/limits">Limits</Link> docs. We may change them to keep the Service healthy, and we will try to keep them generous for real work.
         </p>
       </Prose>
 
