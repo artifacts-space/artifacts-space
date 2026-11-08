@@ -3,6 +3,7 @@
 import { IconExternalLink, IconLoader2, IconLock } from "@tabler/icons-react";
 import Link from "next/link";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
+import { VisibilityBadge } from "@/components/artifact-page/visibility-badge";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { CommentsControl } from "@/components/app/comments-picker";
@@ -12,15 +13,30 @@ import { VersionHistory } from "@/components/history/version-history";
 import { Button } from "@/components/ui/button";
 import { ViewsDialog } from "@/components/views/views-dialog";
 import type { ArtifactDto } from "@/lib/artifact-types";
+import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
 import { detailBody, detailOuter, detailSection } from "./artifact-editor/detail-scroll";
-import { visibilityLabel } from "./share-options";
 import { useEditAccess, useWithdrawSharing } from "./use-edit-access";
 
-/** "Link · Platform · Read only · Changes waiting for approval", leaving out what does not apply. */
+/** "Platform · Read only · Changes waiting for approval", leaving out what does not apply. The visibility badge comes first. */
 function statusLine(artifact: ArtifactDto, teamName: string | null, canEdit: boolean) {
-  const parts = [visibilityLabel(artifact.visibility), teamName, canEdit ? null : "Read only", artifact.pendingEdit ? "Changes waiting for approval" : null];
+  const parts = [teamName, canEdit ? null : "Read only", artifact.pendingEdit ? "Changes waiting for approval" : null];
   return parts.filter(Boolean).join(" · ");
+}
+
+/** Who can see the artifact, as the same badge the artifact page shows, then the status line. */
+function PanelStatus({ artifact, teamName, canEdit }: { artifact: ArtifactDto; teamName: string | null; canEdit: boolean }) {
+  const status = statusLine(artifact, teamName, canEdit);
+  return (
+    <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+      <VisibilityBadge
+        visibility={artifact.visibility}
+        sentence={visibilitySentence(visibilityCopy(artifact.visibility))}
+        className="-ml-1.5 h-7 px-1.5 text-xs [&>svg]:size-3.5"
+      />
+      {status ? <span>· {status}</span> : null}
+    </span>
+  );
 }
 
 interface SharedArtifactPanelProps {
@@ -42,9 +58,7 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
   return (
     <section className={detailSection} aria-label={artifact.title}>
       <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5">
-        <span className="text-xs text-muted-foreground">
-          {statusLine(artifact, team?.name ?? null, canEdit)}
-        </span>
+        <PanelStatus artifact={artifact} teamName={team?.name ?? null} canEdit={canEdit} />
         <div className="ml-auto flex items-center gap-1">
           <CopyButton value={artifact.content} variant="ghost" size="icon" />
           {canEdit ? (
