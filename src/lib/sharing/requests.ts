@@ -7,6 +7,7 @@ import { artifact, sharingRequest } from "@/db/schema";
 import type { ArtifactDto, CommentSetting, SharingLevel } from "@/lib/artifact-types";
 import { toArtifactDtos } from "@/lib/artifacts";
 import { isUniqueViolation } from "@/lib/db-errors";
+import { notifySharingRequest } from "@/lib/notifications/create";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { forgetArtifactCache } from "@/lib/versions/cache";
 
@@ -35,9 +36,10 @@ export async function cancelPendingComments(artifactId: string, byUserId: string
 
 /** Files a request to open comments to anyone signed in, for the team's owners and admins. */
 export async function storeCommentsRequest(input: { artifactId: string; teamId: string; level: SharingLevel; requesterId: string; comments: CommentSetting }) {
+  const id = randomUUID();
   try {
     await getDb().insert(sharingRequest).values({
-      id: randomUUID(),
+      id,
       artifactId: input.artifactId,
       teamId: input.teamId,
       requestedBy: input.requesterId,
@@ -49,6 +51,7 @@ export async function storeCommentsRequest(input: { artifactId: string; teamId: 
     if (isUniqueViolation(error)) throw new UserFacingError("A request to change comments on this artifact is already waiting.");
     throw error;
   }
+  notifySharingRequest(id);
 }
 
 /**

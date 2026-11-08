@@ -7,6 +7,7 @@ import { artifact, artifactVersion, sharingRequest, team, type ArtifactRecord, t
 import { canEditRecord } from "@/lib/access";
 import type { VersionSaveKind } from "@/lib/artifact-types";
 import { isUniqueViolation } from "@/lib/db-errors";
+import { notifySharingRequest } from "@/lib/notifications/create";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { getTeamMembershipById } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -77,8 +78,11 @@ async function storePendingEdit(record: ArtifactRecord, teamId: string, editorId
     await getDb().update(sharingRequest).set({ versionId, teamId, visibility, requestedBy: editorId, createdAt: new Date() }).where(open);
     return;
   }
+  const id = randomUUID();
   try {
-    await getDb().insert(sharingRequest).values({ id: randomUUID(), kind: "edit", artifactId: record.id, teamId, requestedBy: editorId, visibility, versionId });
+    await getDb().insert(sharingRequest).values({ id, kind: "edit", artifactId: record.id, teamId, requestedBy: editorId, visibility, versionId });
+    // Only a new request notifies; later edits move the open one along quietly.
+    notifySharingRequest(id);
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
     // Another edit filed the request first; point it at this newer version.

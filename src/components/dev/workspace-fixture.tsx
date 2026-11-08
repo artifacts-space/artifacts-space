@@ -9,6 +9,7 @@ import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
 import { fixtureArtifact, longCsv, longJson, longMarkdown, longUi } from "./fixture-content";
+import { fixtureNotifications } from "./notification-fixture";
 
 /** Four long artifacts first, then enough short ones that the list scrolls. */
 function fixtureArtifacts(): ArtifactDto[] {
@@ -32,10 +33,11 @@ function fixtureArtifacts(): ArtifactDto[] {
 export function WorkspaceFixture() {
   const artifacts = useMemo(() => fixtureArtifacts(), []);
   const items = useMemo(() => artifacts.map(toArtifactListItem), [artifacts]);
+  const notifications = useMemo(() => fixtureNotifications(), []);
   return (
     <ConfirmationsProvider initial={[]}>
       <div className="workspace-frame">
-        <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" teams={[]} unreadMentions={0} />
+        <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" teams={[]} unreadNotifications={4} notificationSeed={notifications} />
         <Dashboard
           initialArtifacts={items}
           initialFull={artifacts}
