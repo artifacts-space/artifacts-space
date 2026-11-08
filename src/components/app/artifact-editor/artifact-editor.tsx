@@ -9,6 +9,7 @@ import { AttachedFiles } from "@/components/files/attached-files";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { VersionHistory } from "@/components/history/version-history";
+import { ViewsDialog } from "@/components/views/views-dialog";
 import { ArtifactOrganizers } from "@/components/projects/artifact-organizers";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
@@ -98,6 +99,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
             offNotice={`Comments are off for this artifact.${canShare ? " Change who can comment in Share." : ""}`}
           />
         }
+        views={<ViewsDialog publicId={artifact.publicId} title={artifact.title} />}
         dirty={dirty}
         pending={pending}
         onSave={() => void save()}

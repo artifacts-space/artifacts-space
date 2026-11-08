@@ -8,6 +8,7 @@ import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scop
 import { AvatarGallery } from "@/components/dev/avatar-gallery";
 import { CoverSpecimen } from "@/components/dev/cover-specimen";
 import { ThemePickerSpecimen } from "@/components/dev/theme-picker-specimen";
+import { ViewsSpecimen } from "@/components/dev/views-specimen";
 import { UiView } from "@/components/artifact-view/ui-view";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { uiComponentNames } from "@/lib/ui/catalog";
@@ -91,6 +92,7 @@ export function ComponentGallery() {
         <a href="#formats" className="hover:text-foreground">Formats</a>
         <a href="#themes" className="hover:text-foreground">Themes</a>
         <a href="#avatars" className="hover:text-foreground">Avatars</a>
+        <a href="#views" className="hover:text-foreground">Views</a>
       </nav>
       <div className="space-y-12">
         {uiComponentNames.map((name) => (
@@ -131,6 +133,11 @@ export function ComponentGallery() {
         </Group>
         <Group id="avatars" title="Pixel avatars">
           <AvatarGallery />
+        </Group>
+        <Group id="views" title="Views">
+          <Specimen name="views dialog">
+            <ViewsSpecimen />
+          </Specimen>
         </Group>
       </div>
     </div>

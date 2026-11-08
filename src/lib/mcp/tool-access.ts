@@ -21,6 +21,8 @@ export const toolAccess = {
   // Version history: editors only.
   artifacts_versions: "read",
   artifacts_restore_version: "write",
+  // View counts of public artifacts: editors only.
+  artifacts_views: "read",
   // Formats: guidance and dry-run validation, nothing is saved.
   artifacts_formats_guide: "read",
   artifacts_validate: "read",
