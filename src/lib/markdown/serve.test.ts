@@ -233,6 +233,7 @@ describe("artifactRawResponse", () => {
     const svg = await artifactRawResponse(request(`/artifact/${publicId}/raw`), publicId);
     expect(svg.headers.get("content-type")).toBe("text/plain; charset=utf-8");
     expect(svg.headers.get("content-security-policy")).toContain("sandbox");
+    expect(svg.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
   });
 
   it("should answer the Markdown 404 when the reader may not read the artifact", async () => {

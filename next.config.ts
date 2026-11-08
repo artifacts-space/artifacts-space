@@ -1,11 +1,15 @@
 import type { NextConfig } from "next";
 
+import { securityHeaderRules } from "./src/lib/security-header-rules";
+
 const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
-  // Vendored emoji data and theme fonts live under versioned paths, so they never change in place.
   headers: () =>
     Promise.resolve([
+      // Framing, sniffing, Referer, browser feature, and HTTPS headers on every response.
+      ...securityHeaderRules(),
+      // Vendored emoji data and theme fonts live under versioned paths, so they never change in place.
       { source: "/emoji/:version/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
       { source: "/fonts/:version/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
     ]),
