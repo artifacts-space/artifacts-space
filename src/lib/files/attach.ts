@@ -11,6 +11,7 @@ import { recordArtifactChange } from "@/lib/versions/service";
 
 import { canUseFileInArtifact } from "./access-rules";
 import { fileLimits } from "./config";
+import { countHistoryOnlyImages } from "./icon-cleanup";
 import { fileRefsInContent, maxFileRefs } from "./refs";
 import { attachFileRows, clearIconForFile, countArtifactFiles, getFileRow, getFileRows, removeFiles } from "./store";
 
@@ -37,10 +38,17 @@ export async function assertUsableFiles(authorId: string, artifactId: string | n
     );
   }
   const adding = fileIds.filter((id) => rows.get(id)?.artifactId === null).length;
-  const existing = artifactId ? await countArtifactFiles(artifactId) : 0;
-  if (existing + adding > fileLimits.maxFilesPerArtifact) {
+  if (!(await hasRoomFor(artifactId, adding))) {
     throw new UserFacingError(`An artifact holds at most ${String(fileLimits.maxFilesPerArtifact)} files. Remove some first.`);
   }
+}
+
+/** Whether the artifact (null on create) can take `adding` more files. Old icon and cover images kept only for Restore do not count (see countHistoryOnlyImages). */
+async function hasRoomFor(artifactId: string | null, adding: number): Promise<boolean> {
+  if (!artifactId) return adding <= fileLimits.maxFilesPerArtifact;
+  const existing = await countArtifactFiles(artifactId);
+  if (existing + adding <= fileLimits.maxFilesPerArtifact) return true;
+  return existing - (await countHistoryOnlyImages(artifactId)) + adding <= fileLimits.maxFilesPerArtifact;
 }
 
 /**

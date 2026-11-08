@@ -4,7 +4,7 @@ import { getDb } from "@/db";
 import { artifact, artifactVersion } from "@/db/schema";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 
-import { imageFileIdOf, unusedIconFiles } from "./icon-cleanup-rules";
+import { imageFileIdOf, imageFileIdsOf, unusedIconFiles } from "./icon-cleanup-rules";
 import { getFileRows, removeFiles } from "./store";
 
 /**
@@ -62,6 +62,25 @@ export async function pruneUnusedIconFiles(artifactId: string, candidates: reado
   if (unused.length === 0) return 0;
   const rows = (await getFileRows(unused)).filter((row) => row.artifactId === artifactId);
   return (await removeFiles(rows)).length;
+}
+
+/**
+ * How many of the artifact's attached files are icon or cover images that only
+ * older versions show, kept so Restore can bring them back. They do not count
+ * toward the per-artifact file limit, so changing a cover many times never
+ * blocks the next upload; history retention bounds them instead.
+ */
+export async function countHistoryOnlyImages(artifactId: string): Promise<number> {
+  const [record] = await getDb()
+    .select({ icon: artifact.icon, cover: artifact.cover, kind: artifact.kind, content: artifact.content })
+    .from(artifact)
+    .where(eq(artifact.id, artifactId))
+    .limit(1);
+  if (!record) return 0;
+  const shownByVersions = (await retainedImageRefs(artifactId)).flatMap(imageFileIdsOf);
+  const historyOnly = unusedIconFiles(shownByVersions, record, []);
+  if (historyOnly.length === 0) return 0;
+  return (await getFileRows(historyOnly)).filter((row) => row.artifactId === artifactId).length;
 }
 
 /** pruneUnusedIconFiles as housekeeping: a failure is logged, never thrown, and the save stands. */

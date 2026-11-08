@@ -15,7 +15,7 @@ const store = vi.hoisted(() => ({ getFileRows: vi.fn(), removeFiles: vi.fn() }))
 vi.mock("@/db", () => ({ getDb: () => state.db }));
 vi.mock("./store", () => store);
 
-const { pruneUnusedIconFiles } = await import("./icon-cleanup");
+const { countHistoryOnlyImages, pruneUnusedIconFiles } = await import("./icon-cleanup");
 
 const cover = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const other = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
@@ -60,5 +60,18 @@ describe("pruneUnusedIconFiles", () => {
   it("should read nothing when no candidate is an uploaded image", async () => {
     stage([]);
     await expect(pruneUnusedIconFiles("a1", ["mist", "🚀", null])).resolves.toBe(0);
+  });
+});
+
+describe("countHistoryOnlyImages", () => {
+  it("should count the attached images only older versions show, not the current cover", async () => {
+    stage([[artifact, [[{ ...record, cover: `file:${other}` }]]], [artifactVersion, [[{ icon: null, cover: `file:${cover}@20` }, { icon: null, cover: `file:${other}` }]]]]);
+    await expect(countHistoryOnlyImages("a1")).resolves.toBe(1);
+    expect(store.getFileRows).toHaveBeenCalledWith([cover]);
+  });
+
+  it("should count nothing when every kept image is still shown", async () => {
+    stage([[artifact, [[{ ...record, icon: `file:${cover}` }]]], [artifactVersion, [[{ icon: `file:${cover}`, cover: null }]]]]);
+    await expect(countHistoryOnlyImages("a1")).resolves.toBe(0);
   });
 });
