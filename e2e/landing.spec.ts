@@ -3,8 +3,9 @@ import { expect, test } from "@playwright/test";
 const themes = ["light", "dark"] as const;
 
 const storySections = [
-  // The hero demo stays directly under the hero.
-  "How it works",
+  // The hero demo stays directly under the hero; How it works follows it.
+  "Product demo",
+  "Use it like the artifacts you already know.",
   "One surface for people and agents.",
   "But switching accounts cuts you off.",
   "Pricing",
@@ -18,6 +19,12 @@ for (const theme of themes) {
 
     const hero = page.getByRole("heading", { level: 1, name: "The collaboration space for humans and agents." });
     await expect(hero).toBeVisible();
+
+    const how = page.getByRole("region", { name: "Use it like the artifacts you already know." });
+    await how.scrollIntoViewIfNeeded();
+    for (const step of ["Add the skill", "Ask the way you always do", "Edit, share, and work together"]) {
+      await expect(how.getByRole("heading", { level: 3, name: step })).toBeVisible();
+    }
 
     const surface = page.getByRole("region", { name: "One surface for people and agents." });
     await surface.scrollIntoViewIfNeeded();
@@ -45,6 +52,14 @@ for (const theme of themes) {
     expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
   });
 }
+
+test("should jump to the How it works section when the header link is clicked", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "the link is hidden on phones");
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "How it works" }).click();
+  await expect(page).toHaveURL(/#how$/);
+  await expect(page.getByRole("heading", { level: 2, name: "Use it like the artifacts you already know." })).toBeInViewport();
+});
 
 test("should set the header nav links in medium weight when the landing page loads", async ({ page }) => {
   await page.goto("/");

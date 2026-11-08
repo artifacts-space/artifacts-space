@@ -97,6 +97,7 @@
   --color-window-shadow: var(--window-shadow);
   --color-window-dim: var(--window-dim);
   --color-window-edge: var(--window-edge);
+  --color-pixel-tile: var(--pixel-tile);
   --color-syntax-keyword: var(--syntax-keyword);
   --color-syntax-string: var(--syntax-string);
   --color-syntax-property: var(--syntax-property);
@@ -277,6 +278,17 @@
   --window-dim: oklch(0.12 0.01 60 / 0.2);
   --window-edge: oklch(1 0 0 / 0.14);
   /*
+   * Pixel icons on the landing page (src/lib/landing/pixel-icons.ts), in the
+   * blues of the brand icon: shade (the drop shadow), base (outlines), mid,
+   * light, and pale (fills). --pixel-tile is the square an icon sits on.
+   */
+  --pixel-shade: #0a40c4;
+  --pixel-base: #0051f0;
+  --pixel-mid: #0868f5;
+  --pixel-light: #88c5fb;
+  --pixel-pale: #f7faff;
+  --pixel-tile: #dceeff;
+  /*
    * Elevation: soft minimalism. A card is felt, never outlined: a hairline
    * edge (--card-edge) plus a wide, low-opacity shadow with a negative spread,
    * tinted with the warm ink. The ladder: page, then card (shadow-sm, the
@@ -387,6 +399,12 @@
   --shadow-ambient: oklch(0 0 0 / 0.22);
   --shadow-ambient-strong: oklch(0 0 0 / 0.4);
   --shadow-highlight: oklch(1 0 0 / 0.045);
+  --pixel-shade: oklch(0.3 0.13 262);
+  --pixel-base: #0868f5;
+  --pixel-mid: #3d8af7;
+  --pixel-light: #88c5fb;
+  --pixel-pale: oklch(0.26 0.06 262);
+  --pixel-tile: oklch(0.22 0.035 262);
   color-scheme: dark;
 }
 

@@ -7,6 +7,7 @@ import { SurfaceSection } from "@/components/landing/surface-section";
 import { ConnectSection } from "@/components/landing/connect-section";
 import { ControlSection } from "@/components/landing/control-section";
 import { HeroDemo } from "@/components/landing/demo/hero-demo";
+import { HowSection } from "@/components/landing/how-section";
 import { PricingSection } from "@/components/landing/pricing-section";
 import { WhySection } from "@/components/landing/why-section";
 import { Logo } from "@/components/logo";
@@ -54,6 +55,7 @@ export default function Home() {
         </section>
 
         <HeroDemo />
+        <HowSection />
         <SurfaceSection />
         <WhySection />
         <ConnectSection />
