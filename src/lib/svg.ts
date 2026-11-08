@@ -11,6 +11,49 @@ export interface SvgCheck {
   error?: string;
 }
 
+/** A closing root tag. Linear: the literal comes first, and `\s*` stops at the next non-space. */
+const closingTag = /<\/svg\s*>/gi;
+const whitespace = /\s/;
+
+/** For each position, where the first `-->` at or after it starts, or -1. */
+function commentEnds(text: string): Int32Array {
+  const ends = new Int32Array(text.length + 1).fill(-1);
+  for (let index = text.length - 3; index >= 0; index -= 1) {
+    ends[index] = text.startsWith("-->", index) ? index : (ends[index + 1] ?? -1);
+  }
+  return ends;
+}
+
+/**
+ * For each position in `text`, whether everything from there to the end is
+ * whitespace and complete comments (a comment ends at the first `-->`, as in
+ * XML). One pass from the end, so it runs in linear time on any input, unlike
+ * a regex with a repeated lazy group, which can backtrack exponentially.
+ */
+function commentOnlyTails(text: string): Uint8Array {
+  const ends = commentEnds(text);
+  const tails = new Uint8Array(text.length + 1);
+  tails[text.length] = 1;
+  for (let index = text.length - 1; index >= 0; index -= 1) {
+    if (whitespace.test(text.charAt(index))) {
+      tails[index] = tails[index + 1] ?? 0;
+    } else if (text.startsWith("<!--", index)) {
+      const end = ends[index + 4] ?? -1;
+      tails[index] = end >= 0 ? (tails[end + 3] ?? 0) : 0;
+    }
+  }
+  return tails;
+}
+
+/** Whether the source ends with a closing `</svg>` followed only by whitespace and comments. */
+function closesRoot(svg: string): boolean {
+  const tails = commentOnlyTails(svg);
+  for (const match of svg.matchAll(closingTag)) {
+    if (tails[match.index + match[0].length] === 1) return true;
+  }
+  return false;
+}
+
 function stripBom(text: string) {
   return text.startsWith("﻿") ? text.slice(1) : text;
 }
@@ -30,7 +73,7 @@ export function checkSvg(svg: string): SvgCheck {
   const tag = findRootTag(svg);
   if (!tag) return { ok: false, error: "SVG content must start with an <svg> element (an XML declaration or comments before it are fine)." };
   const selfClosing = tag[0].endsWith("/>");
-  if (!selfClosing && !/<\/svg\s*>\s*(?:<!--[\s\S]*?-->\s*)*$/i.test(svg)) {
+  if (!selfClosing && !closesRoot(svg)) {
     return { ok: false, error: "The <svg> element never closes. End the content with </svg>." };
   }
   return { ok: true };

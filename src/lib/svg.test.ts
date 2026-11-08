@@ -23,6 +23,37 @@ describe("checkSvg", () => {
   });
 });
 
+describe("checkSvg closing tag", () => {
+  it("should accept an svg when comments and whitespace follow its closing tag", () => {
+    expect(checkSvg(`${circle}\n<!-- one -->  <!-- two -->\n`).ok).toBe(true);
+    expect(checkSvg("<svg></SVG ><!---->").ok).toBe(true);
+  });
+
+  it("should reject an svg when text or an open comment follows its closing tag", () => {
+    expect(checkSvg(`${circle}trailing`).ok).toBe(false);
+    expect(checkSvg(`${circle}<!-- never closed`).ok).toBe(false);
+    expect(checkSvg(`${circle}<!-- a --> b`).ok).toBe(false);
+  });
+
+  it("should accept the earlier closing tag when a later one sits inside a trailing comment", () => {
+    expect(checkSvg("<svg></svg><!-- </svg> x -->").ok).toBe(true);
+  });
+
+  it("should finish quickly when the content after the closing tag is built to backtrack", () => {
+    const inputs = [
+      `<svg></svg>${"<!---->".repeat(40)}x`,
+      `<svg>${"</svg><!--".repeat(50_000)}`,
+      `<svg>${"</svg>".repeat(50_000)}x`,
+      `<svg></svg>${" ".repeat(200_000)}x`,
+    ];
+    for (const input of inputs) {
+      const started = performance.now();
+      expect(checkSvg(input).ok).toBe(false);
+      expect(performance.now() - started, "checkSvg must run in linear time").toBeLessThan(250);
+    }
+  });
+});
+
 describe("svgDataUri", () => {
   it("should build an encoded image data URI when given svg", () => {
     const uri = svgDataUri(circle);
