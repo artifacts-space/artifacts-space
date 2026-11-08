@@ -14,6 +14,7 @@ import { matchesProjectFilter } from "@/lib/projects/sidebar-rules";
 
 import { fixtureArtifact, longCsv, longJson, longMarkdown, longUi } from "./fixture-content";
 import { createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, withProjects } from "./fixture-projects";
+import { fixtureNotifications } from "./notification-fixture";
 
 /** Four long artifacts first, then enough short ones that the list scrolls. Note 2 has comments on; Note 9 has a theme. */
 function fixtureArtifacts(): ArtifactDto[] {
@@ -54,10 +55,11 @@ export function WorkspaceFixture({ projectFilter, link = null }: { projectFilter
   const artifacts = useMemo(() => withProjects(base, state), [base, state]);
   const items = useMemo(() => artifacts.filter((artifact) => matchesProjectFilter(artifact.project, projectFilter)).map(toArtifactListItem), [artifacts, projectFilter]);
   const facets = useMemo(() => fixtureFacets(artifacts), [artifacts]);
+  const notifications = useMemo(() => fixtureNotifications(), []);
   return (
     <ConfirmationsProvider initial={[]}>
       <div className="workspace-frame">
-        <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" teams={[]} unreadMentions={0} />
+        <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" teams={[]} unreadNotifications={4} notificationSeed={notifications} />
         <Dashboard
           key={projectFilterId(projectFilter)}
           initialArtifacts={items}
