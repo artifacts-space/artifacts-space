@@ -24,7 +24,8 @@ export const coverMcpExamples = {
 /** The rules a cover image must meet. */
 export const coverImageRows: [string, string][] = [
   ["Types", "PNG, JPEG, GIF, WebP, or AVIF. SVG is refused, because it can carry script."],
-  ["Size", `At most ${String(COVER_MAX_BYTES / 1_048_576)} MB. Wide images look best; about 1500 × 600 px is plenty.`],
+  ["Size", `At most ${String(COVER_MAX_BYTES / 1_048_576)} MB. A bigger file is refused with an error, and nothing is saved. Wide images look best; about 2400 px wide is plenty.`],
+  ["Link previews", `Draw only JPEG and PNG covers of at most ${String(COVER_MAX_BYTES / 1_048_576)} MB. Agents: resize and save as JPEG before you upload. In the web app, Upload an image does this for you.`],
   ["Owner", "Your own finished upload, or a file already attached to this artifact. A file attached to another artifact is refused."],
   ["Source", "Uploads only. Remote URLs are refused."],
   ["coverPosition", "0 (top) to 100 (bottom). 50, the centre, is the default."],

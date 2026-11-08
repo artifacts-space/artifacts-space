@@ -125,9 +125,9 @@ export default function ThemesPage() {
       <Prose>
         <p>If you can edit an artifact, you see <strong>Add cover</strong> beside the icon and theme above its title. It adds a gradient at once. Point at the cover (or tap it on a touch screen) to see its controls:</p>
         <ul>
-          <li><strong>Change cover</strong> opens the gradients and <strong>Upload an image</strong>.</li>
+          <li><strong>Change cover</strong> opens the gradients and <strong>Upload an image</strong>. Any photo works, straight from your phone: your browser turns it upright, resizes it to at most 2400 px, saves it as a JPEG under 2 MB, and removes its camera data, such as the location. A PNG with transparency stays a PNG when it already fits. Browsers that cannot open HEIC photos say so; save the photo as a JPEG first.</li>
           <li><strong>Reposition</strong>, for images, lets you drag the image up or down. You can also use the arrow keys (Shift for bigger steps), Home, and End. Enter or <strong>Save position</strong> saves; Escape or <strong>Cancel</strong> stops.</li>
-          <li><strong>Remove</strong> takes the cover away.</li>
+          <li><strong>Remove</strong> takes the cover away at once. Restore brings it back (see History and approval).</li>
         </ul>
         <p>The <strong>New artifact</strong> dialog has a <strong>Cover</strong> field with the gradients. Readers see only the cover.</p>
       </Prose>
@@ -150,7 +150,7 @@ export default function ThemesPage() {
 
       <DocsH page={page} id="cover-history" />
       <Prose>
-        <p>A cover change, including a new focal point, is saved as a new version. History shows it, and Restore brings an older cover back. If an older cover image was deleted, Restore leaves the artifact without a cover.</p>
+        <p>A cover change, including a new focal point, is saved as a new version. History shows it, and Restore brings an older cover back, image included: an uploaded cover image is kept while any version in the history shows it, and deleted when the last such version leaves the history (after 100 newer versions or a year) or when the artifact is deleted. If you deleted the image file yourself, Restore leaves the artifact without a cover. Readers outside the team can open only the approved version&apos;s cover image.</p>
         <p>On a link or public artifact shared through a team, a cover change by a member or an agent waits for a team owner or admin to approve it. Until then, readers outside the team see the approved cover. Agents never approve.</p>
       </Prose>
 
@@ -165,7 +165,7 @@ export default function ThemesPage() {
       <DocsH page={page} id="previews" />
       <Prose>
         <p>The link preview card of a link or public artifact uses the colors of the approved theme&apos;s light palette. The text on the card stays in Geist, because preview images cannot use the theme fonts.</p>
-        <p>A cover becomes the card&apos;s background. A gradient is drawn in the theme&apos;s light palette, with dark text. A PNG or JPEG image is drawn under a dark shade, with light text. Preview images cannot draw WebP, GIF, or AVIF, so those covers keep the standard background there.</p>
+        <p>A cover becomes the card&apos;s background. A gradient is drawn in the theme&apos;s light palette, with dark text. A PNG or JPEG image of at most 2 MB is drawn under a dark shade, with light text. Preview images cannot draw WebP, GIF, or AVIF, so those covers keep the standard background there. Images uploaded in the web app are always JPEG or PNG.</p>
       </Prose>
 
       <DocsH page={page} id="tokens" />

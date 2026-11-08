@@ -142,7 +142,7 @@ export function coverGradientSummaries(): { id: string; name: string }[] {
 }
 
 /** The field description agents read on artifacts_create and artifacts_update. */
-export const COVER_FIELD_DESCRIPTION = `Optional slim cover banner above the artifact. A gradient id (one of: ${coverGradientIdList()}; they follow the artifact's theme and the reader's light or dark mode), or "file:<file id>" for your own image: upload a PNG, JPEG, GIF, WebP, or AVIF of at most 2 MB (files_request_upload, PUT, files_finalize) and pass its id; it is attached to this artifact on save. SVG and remote URLs are not accepted. On update, null or "" removes the cover; leave it out to keep it. Cover changes follow the same approval rule as title changes.`;
+export const COVER_FIELD_DESCRIPTION = `Optional slim cover banner above the artifact. A gradient id (one of: ${coverGradientIdList()}; they follow the artifact's theme and the reader's light or dark mode), or "file:<file id>" for your own image: upload a PNG, JPEG, GIF, WebP, or AVIF of at most 2 MB (files_request_upload, PUT, files_finalize) and pass its id. Prefer a JPEG (or a PNG) about 2400 px wide or less: link previews draw only JPEG and PNG covers; it is attached to this artifact on save. SVG and remote URLs are not accepted. On update, null or "" removes the cover; leave it out to keep it. Cover changes follow the same approval rule as title changes.`;
 
 /** The field description for the focal point. */
 export const COVER_POSITION_DESCRIPTION = "For an image cover: the vertical focal point, 0 (top) to 100 (bottom); 50 centres it. Sent alone on update, it moves the current image cover.";
