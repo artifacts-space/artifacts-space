@@ -110,6 +110,21 @@ function controlTops(page: Page) {
   return Promise.all(controls(page).map(async (control) => Math.round((await control.boundingBox())?.y ?? -1)));
 }
 
+/** Sections of the content pane that are shorter than what they hold, or that overlap the section before them. */
+function overlappingSections(page: Page) {
+  return slot(page, "detail-body").evaluate((body) => {
+    const problems: string[] = [];
+    let previousBottom = Number.NEGATIVE_INFINITY;
+    for (const [index, child] of [...body.children].entries()) {
+      const box = child.getBoundingClientRect();
+      if (child.scrollHeight > child.clientHeight + 1) problems.push(`section ${String(index)} is ${String(Math.round(box.height))}px but holds ${String(child.scrollHeight)}px`);
+      if (box.top < previousBottom - 1) problems.push(`section ${String(index)} overlaps the one before it`);
+      previousBottom = box.bottom;
+    }
+    return problems;
+  });
+}
+
 test.describe("desktop and tablet", () => {
   test.skip(({ isMobile }) => isMobile, "phones keep a page that scrolls");
 
@@ -139,6 +154,25 @@ test.describe("desktop and tablet", () => {
     const styles = await scrollBoxStyles(page);
     expect(styles.find((box) => box.name === "artifact-list")).toMatchObject({ overflowY: "auto", overscroll: "contain" });
     expect(styles.find((box) => box.name === "detail-body")).toMatchObject({ overflowY: "auto", overscroll: "contain" });
+  });
+
+  test("should stack a long artifact above its files, fields, and comments without overlap in both modes", async ({ page }) => {
+    await openWorkspace(page);
+    expect(await overlappingSections(page), "preview").toEqual([]);
+    await page.getByRole("tab", { name: "edit" }).click();
+    await expect(page.getByRole("textbox", { name: "Artifact content" })).toBeVisible();
+    expect(await overlappingSections(page), "edit").toEqual([]);
+  });
+
+  test("should leave room under the last section when the artifact scrolls to its end", async ({ page }) => {
+    await openWorkspace(page);
+    const body = slot(page, "detail-body");
+    await scrollToBottom(body);
+    const gap = await body.evaluate((element) => {
+      const last = element.lastElementChild?.getBoundingClientRect();
+      return last ? element.getBoundingClientRect().bottom - last.bottom : 0;
+    });
+    expect(gap, "space between the last section and the pane's bottom edge").toBeGreaterThanOrEqual(32);
   });
 
   test("should scroll the source inside the pane in Edit mode, with one scroll bar", async ({ page }) => {
