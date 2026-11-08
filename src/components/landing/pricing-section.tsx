@@ -89,7 +89,7 @@ export function PricingSection() {
         {plans.map((plan) => <PlanCard key={plan.id} plan={plan} />)}
       </div>
       <p className="mt-6 text-md leading-6 text-muted-foreground">
-        Free today for individuals and teams. Accounts made now stay free, even if we add paid plans later.
+        Free today for individuals and teams. Accounts and teams made now stay free, even if we add paid plans later.
       </p>
     </section>
   );

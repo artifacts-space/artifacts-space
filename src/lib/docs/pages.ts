@@ -303,7 +303,7 @@ export const docsPages = [
   {
     slug: "limits",
     title: "Limits and quotas",
-    description: "Rate limits, storage quotas, file limits, and the daily email budget, read straight from the code.",
+    description: "Rate limits, storage quotas, file limits, team size, and the daily email budget, read straight from the code.",
     section: "Run it",
     source: app("limits/"),
     headings: [
@@ -311,6 +311,7 @@ export const docsPages = [
       h2("storage", "Storage quota"),
       h2("artifact-size", "Artifact and spec size"),
       h2("files", "Files"),
+      h2("teams", "Team size"),
       h2("email", "Email budget"),
       h2("comments", "Comment guardrails"),
     ],

@@ -51,7 +51,7 @@ for (const theme of themes) {
     }
     await expect(pricing.getByRole("article", { name: "Individuals" }).getByRole("button", { name: "Get started" })).toHaveAttribute("href", "/sign-up");
     await expect(pricing.getByRole("article", { name: "Teams" }).getByRole("button", { name: "Start a team" })).toHaveAttribute("href", "/sign-up?next=%2Fteams%2Fnew");
-    await expect(pricing.getByText("Accounts made now stay free, even if we add paid plans later.")).toBeVisible();
+    await expect(pricing.getByText("Free today for individuals and teams. Accounts and teams made now stay free, even if we add paid plans later.")).toBeVisible();
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);

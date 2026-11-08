@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { IconBrandGithub, IconLoader2, IconMailCheck } from "@tabler/icons-react";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 
 import { ConsentNotice } from "@/components/legal-links";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth/client";
 import { isDevSignInEnabled } from "@/lib/auth/dev-user";
-import { safeNextPath } from "@/lib/safe-next";
+import { safeNextPath, withNextPath } from "@/lib/safe-next";
 
 type AuthMode = "sign-in" | "sign-up";
 type Pending = "github" | "email" | null;
@@ -73,6 +74,23 @@ function DevSignIn() {
     >
       Continue as dev user
     </a>
+  );
+}
+
+const switchLinkClass = "text-foreground underline underline-offset-4 decoration-border hover:decoration-foreground";
+
+/** The link to the other auth page, keeping the post-auth destination from `?next=`. */
+function SwitchLinkWithNext({ href, label }: { href: string; label: string }) {
+  const next = useSearchParams().get("next");
+  return <Link href={withNextPath(href, next)} className={switchLinkClass}>{label}</Link>;
+}
+
+/** The switch link; the plain link stands in until the query string is read in the browser. */
+function SwitchLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Suspense fallback={<Link href={href} className={switchLinkClass}>{label}</Link>}>
+      <SwitchLinkWithNext href={href} label={label} />
+    </Suspense>
   );
 }
 
@@ -165,9 +183,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
 
       <p className="mt-6 text-sm text-muted-foreground">
         {text.switchPrompt}{" "}
-        <Link href={text.switchHref} className="text-foreground underline underline-offset-4 decoration-border hover:decoration-foreground">
-          {text.switchLabel}
-        </Link>
+        <SwitchLink href={text.switchHref} label={text.switchLabel} />
       </p>
     </div>
   );

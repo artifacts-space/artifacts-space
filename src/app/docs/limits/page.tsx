@@ -11,6 +11,7 @@ import { INVITATION_BUDGET_MESSAGE, NON_SIGN_IN_SHARE, nonSignInDailyLimit, SEND
 import { fileLimits, formatBytes } from "@/lib/files/config";
 import { maxMermaidLength } from "@/lib/mermaid-source";
 import { contentQuotaProblem, fileQuotaProblem, storageQuota } from "@/lib/quota/rules";
+import { teamLimits } from "@/lib/teams/limits";
 import { uiLimits } from "@/lib/ui/limits";
 
 export const metadata = docsMetadata("limits");
@@ -129,6 +130,16 @@ export default function LimitsPage() {
       />
       <Prose>
         <p>Allowed types are listed on <Link href={docsHref("formats", "file")}>Formats</Link>.</p>
+      </Prose>
+
+      <DocsH page={page} id="teams" />
+      <FactTable
+        head={["Limit", "Value"]}
+        rows={[["Members per team", `${n(teamLimits.maxMembers)}, agents included`]]}
+        mono={[1]}
+      />
+      <Prose>
+        <p>People and agent teammates both count toward the cap. Invitations stop being accepted when a team is full. Shared artifacts use their author&apos;s storage, not the team&apos;s.</p>
       </Prose>
 
       <DocsH page={page} id="email" />
