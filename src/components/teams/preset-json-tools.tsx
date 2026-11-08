@@ -76,7 +76,7 @@ function ImportPanel({ disabled, onImported, editor }: ImportPanelProps) {
         disabled={disabled}
         onChange={(event) => { setText(event.target.value); }}
         placeholder='{ "version": 1, "light": { … }, "dark": { … } }'
-        className="min-h-32 font-mono text-sm leading-5"
+        className="min-h-32 font-mono text-base leading-5 sm:text-sm"
         spellCheck={false}
         aria-invalid={error ? true : undefined}
       />
