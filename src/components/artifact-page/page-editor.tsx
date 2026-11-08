@@ -58,7 +58,7 @@ function SourceEditor({ artifact, content, title, onChange }: SourceEditorProps)
   return (
     <div className="card-surface flex flex-col overflow-hidden">
       <ModeBar mode={mode} onMode={setMode} length={content.length} updatedAt={artifact.updatedAt} updatedBy={artifact.updatedBy} />
-      <ContentPane mode={mode} kind={artifact.kind} content={content} language={artifact.language} title={title} files={artifact.files} update={update} />
+      <ContentPane mode={mode} kind={artifact.kind} content={content} language={artifact.language} title={title} files={artifact.files} fullWidth={artifact.fullWidth} update={update} />
     </div>
   );
 }

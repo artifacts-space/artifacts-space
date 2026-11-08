@@ -5,6 +5,8 @@ import { ContentStatus } from "@/components/editor/content-status";
 import { Textarea } from "@/components/ui/textarea";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
+import { readingMeasureClass } from "@/lib/page-width/rules";
+import { cn } from "@/lib/utils";
 
 import type { ArtifactDraft } from "./use-artifact-draft";
 
@@ -22,6 +24,8 @@ interface ContentPaneProps {
   language: string;
   title: string;
   files: readonly FileDto[];
+  /** The artifact's "Full width" setting: preview drops the reading measure. The edit textarea is always full width. */
+  fullWidth: boolean;
   update: UpdateDraft;
 }
 
@@ -32,10 +36,10 @@ interface ContentPaneProps {
  * a shrinkable `flex-1` box stopped at its 460px minimum while the content
  * spilled over the files, Format/Language, and comments below it.
  */
-export function ContentPane({ mode, kind, content, language, title, files, update }: ContentPaneProps) {
+export function ContentPane({ mode, kind, content, language, title, files, fullWidth, update }: ContentPaneProps) {
   if (mode === "edit") {
     return (
-      <div className="flex flex-[1_0_auto] flex-col">
+      <div className="flex flex-[1_0_auto] flex-col" data-full-width={fullWidth}>
         <Textarea
           value={content}
           onChange={(event) => { update("content", event.target.value); }}
@@ -48,7 +52,7 @@ export function ContentPane({ mode, kind, content, language, title, files, updat
     );
   }
   return (
-    <div className="min-h-[460px] min-w-0 flex-[1_0_auto] bg-card p-5 sm:p-8">
+    <div className={cn("min-h-[460px] min-w-0 flex-[1_0_auto] bg-card p-5 sm:p-8", readingMeasureClass(fullWidth))} data-full-width={fullWidth}>
       <ArtifactView kind={kind} content={content} language={language} title={title} files={files} />
     </div>
   );

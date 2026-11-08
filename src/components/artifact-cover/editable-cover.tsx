@@ -6,6 +6,8 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { parseArtifactCover, withCoverPosition } from "@/lib/covers/cover";
 import { positionAfterDrag, positionAfterKey } from "@/lib/covers/reposition";
+import { pageColumnClass } from "@/lib/page-width/rules";
+import { cn } from "@/lib/utils";
 
 import { CoverArt } from "./cover-art";
 import { CoverFrame } from "./cover-frame";
@@ -18,6 +20,8 @@ interface EditableCoverProps {
   publicId: string;
   /** The latest saved cover. */
   cover: string | null;
+  /** Lines the controls up with a full-width page column. */
+  fullWidth: boolean;
 }
 
 /** Moves focus to the reposition slider when it appears, so the arrow keys work at once. A stable function, so React calls it once per mount. */
@@ -81,7 +85,7 @@ function useReposition(onSave: (position: number) => Promise<void>) {
  * approval rule as a title change. Without a cover it renders nothing; "Add
  * cover" sits with the icon and theme controls above the title.
  */
-export function EditableCover({ publicId, cover: initial }: EditableCoverProps) {
+export function EditableCover({ publicId, cover: initial, fullWidth }: EditableCoverProps) {
   const { cover, saving, save } = useCoverSave(publicId, initial);
   const reposition = useReposition(async (position) => { await save(withCoverPosition(cover, position)); });
   const parsed = parseArtifactCover(cover);
@@ -113,13 +117,13 @@ export function EditableCover({ publicId, cover: initial }: EditableCoverProps) 
           >
             <p className="pointer-events-none rounded-lg bg-background/85 px-3 py-1.5 text-sm text-foreground backdrop-blur">Drag the image, or use the arrow keys</p>
           </div>
-          <div className="absolute inset-x-0 bottom-3 mx-auto flex w-full max-w-[960px] justify-end gap-1.5 px-6">
+          <div className={cn("absolute inset-x-0 bottom-3 mx-auto flex w-full justify-end gap-1.5", pageColumnClass(fullWidth))}>
             <Button type="button" variant="outline" size="sm" className={controlClass} onClick={() => { reposition.setDraft(null); }}>Cancel</Button>
             <Button type="button" size="sm" className="h-7" onClick={() => { void save(withCoverPosition(cover, draft)); reposition.setDraft(null); }}>Save position</Button>
           </div>
         </>
       ) : (
-        <div className="absolute inset-x-0 bottom-3 mx-auto flex w-full max-w-[960px] justify-end gap-1.5 px-6 opacity-0 transition-opacity group-hover/cover:opacity-100 group-focus-within/cover:opacity-100 has-[[data-popup-open]]:opacity-100 pointer-coarse:opacity-100">
+        <div className={cn("absolute inset-x-0 bottom-3 mx-auto flex w-full justify-end gap-1.5 opacity-0 transition-opacity group-hover/cover:opacity-100 group-focus-within/cover:opacity-100 has-[[data-popup-open]]:opacity-100 pointer-coarse:opacity-100", pageColumnClass(fullWidth))}>
           <CoverPicker
             value={cover}
             onChange={(next) => void save(next)}
