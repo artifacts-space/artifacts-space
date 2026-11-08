@@ -7,6 +7,7 @@ import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
 import { bearerToken } from "@/lib/mcp/authenticate";
 import { resolveRequestViewer, viewerUserId, type RequestViewer } from "@/lib/request-viewer";
 import { noindexHeader } from "@/lib/search/search-rules";
+import { rawContentPolicy } from "@/lib/security-header-rules";
 
 import { artifactToMarkdown, notFoundMarkdown } from "./artifact-markdown";
 import { loadMarkdownInput } from "./load";
@@ -121,6 +122,6 @@ export async function artifactRawResponse(request: Request, publicId: string): P
   if (loaded instanceof Response) return loaded;
   const { view } = loaded.viewable;
   const type = view.kind === "csv" ? "text/csv; charset=utf-8" : "text/plain; charset=utf-8";
-  const headers = { ...markdownHeaders(credentialed, type), "Content-Security-Policy": "default-src 'none'; sandbox" };
+  const headers = { ...markdownHeaders(credentialed, type), "Content-Security-Policy": rawContentPolicy };
   return new Response(view.content, { status: 200, headers });
 }

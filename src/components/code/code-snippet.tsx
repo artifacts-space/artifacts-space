@@ -11,6 +11,10 @@ export interface CodeSnippetProps {
   title?: string | undefined;
   /** Wraps long lines instead of scrolling sideways. */
   wrap?: boolean;
+  /** "embedded" drops the edge and header, for code inside a frame with its own caption and copy button. */
+  variant?: "block" | "embedded";
+  /** Caps the height so long code scrolls inside the block. */
+  capHeight?: boolean;
   className?: string | undefined;
 }
 
@@ -19,8 +23,8 @@ export interface CodeSnippetProps {
  * it arrives highlighted, with no highlighter in the page; in a client
  * component (Connections, dialogs) the block highlights itself on demand.
  */
-export function CodeSnippet({ code, language, title, wrap = false, className }: CodeSnippetProps) {
-  return <CodeBlock code={code} language={language} title={title} wrap={wrap} className={className} lines={highlightCode(code, language)} />;
+export function CodeSnippet({ code, language, title, wrap = false, variant = "block", capHeight = false, className }: CodeSnippetProps) {
+  return <CodeBlock code={code} language={language} title={title} wrap={wrap} variant={variant} capHeight={capHeight} className={className} lines={highlightCode(code, language)} />;
 }
 
 /** Props for one shell command. */

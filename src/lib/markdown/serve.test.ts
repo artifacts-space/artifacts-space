@@ -79,6 +79,8 @@ const commentView = { id: "c1", parentId: null, body: "Visible comment body", de
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("BETTER_AUTH_URL", "https://artifacts.space");
+  // Network keys need a secret to hash with (src/lib/abuse/network-key.ts).
+  vi.stubEnv("BETTER_AUTH_SECRET", "test-network-key-secret");
   mocks.hitRateLimits.mockResolvedValue(null);
   mocks.getSession.mockResolvedValue(null);
   mocks.filesForViewer.mockResolvedValue([]);
@@ -233,6 +235,7 @@ describe("artifactRawResponse", () => {
     const svg = await artifactRawResponse(request(`/artifact/${publicId}/raw`), publicId);
     expect(svg.headers.get("content-type")).toBe("text/plain; charset=utf-8");
     expect(svg.headers.get("content-security-policy")).toContain("sandbox");
+    expect(svg.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
   });
 
   it("should answer the Markdown 404 when the reader may not read the artifact", async () => {

@@ -33,6 +33,8 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   ogImageByNetwork: { per: "network", where: "Artifact preview images (cache misses only)", refusal: "http-429", group: "Files and pages" },
   reportByUser: { per: "user", where: "Reports from signed-in readers", refusal: "form", group: "Files and pages" },
   reportByNetwork: { per: "network", where: "Reports, signed in or not", refusal: "form", group: "Files and pages" },
+  reportByNetworkDay: { per: "network", where: "Reports, signed in or not, each day", refusal: "form", group: "Files and pages" },
+  reportByNetworkArtifact: { per: "network", where: "Reports about one artifact, signed in or not", refusal: "form", group: "Files and pages" },
   agentCommentMinute: { per: "user", where: "Comments by an agent", refusal: "tool-error", group: "Comments" },
   agentCommentHour: { per: "user", where: "Comments by an agent", refusal: "tool-error", group: "Comments" },
   personCommentMinute: { per: "user", where: "Comments by a person", refusal: "form", group: "Comments" },
@@ -44,6 +46,7 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   agentCreate: { per: "user", where: "New agent teammates", refusal: "form", group: "Teams and accounts" },
   tokenCreate: { per: "user", where: "New access tokens", refusal: "form", group: "Teams and accounts" },
   magicLinkByNetwork: { per: "network", where: "Sign-in links", refusal: "http-429", group: "Sign-in and OAuth" },
+  magicLinkByNetworkDay: { per: "network", where: "Sign-in links, each day", refusal: "http-429", group: "Sign-in and OAuth" },
   magicLinkByEmail: { per: "email address", where: "Sign-in links", refusal: "http-429", group: "Sign-in and OAuth" },
   oauthRegister: { per: "network", where: "OAuth app registration (MCP clients)", refusal: "http-429", group: "Sign-in and OAuth" },
   oauthAuthorize: { per: "network", where: "OAuth authorization requests", refusal: "http-429", group: "Sign-in and OAuth" },
@@ -58,10 +61,12 @@ export interface RateLimitRow extends LimitPlacement {
   message: string;
 }
 
-function windowText(seconds: number): string {
+/** The window in words: "minute", "15 minutes", "hour", or "day". */
+export function windowText(seconds: number): string {
   if (seconds === 60) return "minute";
   if (seconds === 3600) return "hour";
   if (seconds === 86_400) return "day";
+  if (seconds % 60 === 0 && seconds < 3600) return `${String(seconds / 60)} minutes`;
   return `${String(seconds)} s`;
 }
 

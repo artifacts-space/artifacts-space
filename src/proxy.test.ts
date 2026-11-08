@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   canReadArtifact: vi.fn(),
@@ -35,8 +35,14 @@ function location(response: Response) {
 describe("proxy", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // Network keys need a secret to hash with (src/lib/abuse/network-key.ts).
+    vi.stubEnv("BETTER_AUTH_SECRET", "test-network-key-secret");
     mocks.hitRateLimits.mockResolvedValue(null);
     mocks.isPageSearchIndexable.mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("should redirect to sign-in with a return path when a workspace page is loaded signed out", async () => {

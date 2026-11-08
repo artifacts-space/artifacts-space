@@ -52,5 +52,7 @@ describe("describeWait", () => {
     expect(describeWait(30)).toBe("a minute");
     expect(describeWait(600)).toBe("about 10 minutes");
     expect(describeWait(3600)).toBe("about 1 hour");
+    expect(describeWait(5400)).toBe("about 2 hours");
+    expect(describeWait(9 * 3600)).toBe("about 9 hours");
   });
 });
