@@ -1,3 +1,5 @@
+import { SENDIR_DAILY_RECIPIENTS } from "@/lib/email/budget-rules";
+
 /**
  * Every rate limit in one place. Counts are per key (a user, a token, a team,
  * or a hashed network address for signed-out visitors) per window. Limits are
@@ -32,11 +34,14 @@ export const rateLimits = {
   /** Reports per signed-in user per hour. */
   reportByUser: { limit: 10, windowSeconds: hour },
   /**
-   * Reports per network address, signed in or not. A short window, so readers
-   * behind one shared address (an office, a school, mobile carrier NAT) wait
-   * minutes, not an hour: at most about 40 an hour from one address.
+   * Reports per network address, signed in or not: a short window, so a
+   * reader behind a shared address (an office, a school, mobile carrier NAT)
+   * waits minutes, not an hour, plus a daily ceiling. Report emails share the
+   * non-sign-in email budget (src/lib/email/budget-rules.ts) with invitations
+   * and mentions, so one address may file only a few a day.
    */
-  reportByNetwork: { limit: 10, windowSeconds: quarterHour },
+  reportByNetwork: { limit: 5, windowSeconds: quarterHour },
+  reportByNetworkDay: { limit: 10, windowSeconds: day },
   /** Reports about one artifact per network address per hour. Each report emails the team's owners. */
   reportByNetworkArtifact: { limit: 3, windowSeconds: hour },
   /** Started file uploads per user per hour, from the web app and MCP together. */
@@ -52,11 +57,14 @@ export const rateLimits = {
   teamInviteByUserDay: { limit: 50, windowSeconds: day },
   teamInviteByTeamDay: { limit: 100, windowSeconds: day },
   /**
-   * Sign-in links per network address, in a short window so many people
-   * behind one shared address can sign in (at most about 100 an hour), and a
-   * refused network waits minutes, not an hour. Each one sends an email.
+   * Sign-in links per network address. A short window lets a group behind one
+   * shared address sign in together, and a refused network waits minutes,
+   * not an hour. The daily ceiling keeps one address to a tenth of Sendir's
+   * daily recipient cap, which every sign-in on the site shares: once the cap
+   * is spent, nobody gets a sign-in link until midnight UTC.
    */
-  magicLinkByNetwork: { limit: 25, windowSeconds: quarterHour },
+  magicLinkByNetwork: { limit: 10, windowSeconds: quarterHour },
+  magicLinkByNetworkDay: { limit: Math.floor(SENDIR_DAILY_RECIPIENTS / 10), windowSeconds: day },
   /** Sign-in links per email address per hour, from any network, so nobody can flood one inbox. */
   magicLinkByEmail: { limit: 5, windowSeconds: hour },
   /** New teams, agents, and access tokens per person per hour. Each agent gets its own limits, so agents are capped too. */
@@ -87,6 +95,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   sharingRequest: "You have changed sharing a lot in the last hour.",
   reportByUser: "You have sent a lot of reports in the last hour.",
   reportByNetwork: "We have received a lot of reports from your network in the last few minutes.",
+  reportByNetworkDay: "We have received a lot of reports from your network today.",
   reportByNetworkArtifact: "We have received a lot of reports about this artifact from your network in the last hour.",
   fileUpload: "You have uploaded a lot of files in the last hour.",
   agentCommentMinute: "You have posted a lot of comments in the last minute.",
@@ -97,6 +106,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   teamInviteByUserDay: "You have sent a lot of invitations today.",
   teamInviteByTeamDay: "This team has sent a lot of invitations today.",
   magicLinkByNetwork: "Your network has asked for a lot of sign-in links in the last few minutes.",
+  magicLinkByNetworkDay: "Your network has asked for a lot of sign-in links today.",
   magicLinkByEmail: "This email address has asked for a lot of sign-in links in the last hour.",
   teamCreate: "You have created a lot of teams in the last hour.",
   agentCreate: "You have added a lot of agents in the last hour.",

@@ -43,12 +43,13 @@ describe("reportLimitChecks", () => {
     expect(checks).toEqual([
       { name: "reportByNetworkArtifact", subject: "net:art-1" },
       { name: "reportByNetwork", subject: "net" },
+      { name: "reportByNetworkDay", subject: "net" },
       { name: "reportByUser", subject: "user-1" },
     ]);
   });
 
   it("should still count the network limits when the reader is signed out", () => {
-    expect(reportLimitChecks({ networkKey: "net", artifactId: "art-1", viewerId: null }).map((check) => check.name)).toEqual(["reportByNetworkArtifact", "reportByNetwork"]);
+    expect(reportLimitChecks({ networkKey: "net", artifactId: "art-1", viewerId: null }).map((check) => check.name)).toEqual(["reportByNetworkArtifact", "reportByNetwork", "reportByNetworkDay"]);
   });
 
   it("should key the per-artifact limit on both network and artifact when two artifacts are reported", () => {
