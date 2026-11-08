@@ -5,6 +5,7 @@ import { reconcileAfterDeparture } from "@/lib/auth/team-departure";
 import { assertInvitableRole, assertNotPersonal, assertTeamUpdateAllowed, prepareNewTeam } from "@/lib/teams/guards";
 import { sendTeamInvitationEmail } from "@/lib/teams/invitation-email";
 import { assertCanCreateTeam, assertCanInvite } from "@/lib/teams/invitation-limits";
+import { teamLimits } from "@/lib/teams/limits";
 
 const sevenDays = 60 * 60 * 24 * 7;
 
@@ -20,6 +21,7 @@ export function teamsPlugin() {
     creatorRole: "owner",
     // Deleting a team with shared artifacts needs its own design. Not offered yet.
     disableOrganizationDeletion: true,
+    membershipLimit: teamLimits.maxMembers,
     invitationExpiresIn: sevenDays,
     cancelPendingInvitationsOnReInvite: true,
     requireEmailVerificationOnInvitation: true,
