@@ -72,6 +72,17 @@ function removalConfirm(agent: TeamAgentView) {
   };
 }
 
+/** For owners and admins: the agent was handed over when the person who added it left, and needs a new token. */
+function HandedOverNote({ agent }: { agent: TeamAgentView }) {
+  if (!agent.handedOver) return null;
+  const keeper = agent.ownerName ?? "the team's owners";
+  return (
+    <p className="text-sm text-muted-foreground" role="status">
+      {`The person who added @${agent.handle} left the team, so it was handed to ${keeper} and its tokens were turned off. Create a new token to reconnect it.`}
+    </p>
+  );
+}
+
 function AgentRow({ agent, canManage, origin }: { agent: TeamAgentView; canManage: boolean; origin: string }) {
   const { pending, run } = useTeamAction();
   const removal = removalConfirm(agent);
@@ -102,6 +113,7 @@ function AgentRow({ agent, canManage, origin }: { agent: TeamAgentView; canManag
           </div>
         ) : null}
       </div>
+      {canManage ? <HandedOverNote agent={agent} /> : null}
       {canManage ? <AgentTokens agent={agent} origin={origin} /> : null}
       <ConfirmDialog
         state={confirmRemove.dialog}

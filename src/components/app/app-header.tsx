@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { IconBook, IconChevronDown, IconExternalLink, IconInbox, IconKey, IconLogout, IconRestore } from "@tabler/icons-react";
+import { IconBook, IconChevronDown, IconExternalLink, IconInbox, IconKey, IconLogout, IconRestore, IconSettings } from "@tabler/icons-react";
 import { useState } from "react";
 
 import { useConfirmations } from "@/components/confirmations-provider";
 import { GitHubLink } from "@/components/github-link";
 import { Logo } from "@/components/logo";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { TeamSwitcher, type HeaderTeam } from "@/components/teams/team-switcher";
 import { ThemeSwitcher } from "@/components/theme-switcher";
@@ -22,18 +23,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth/client";
+import type { NotificationView } from "@/lib/notifications/feed";
 import { cn } from "@/lib/utils";
 
 const artifactsLink = { href: "/app", label: "Artifacts" };
 const connectionsLink = { href: "/app/connections", label: "Connections" };
 
-/** The inbox link, with the number of unread mentions. */
-function InboxLink({ count, active }: { count: number; active: boolean }) {
-  const label = count > 0 ? `Inbox, ${String(count)} unread` : "Inbox";
+/** The inbox link: every mention with its thread. The bell carries the unread count. */
+function InboxLink({ active }: { active: boolean }) {
   return (
     <Link
       href="/inbox"
-      aria-label={label}
+      aria-label="Inbox"
       className={cn(
         "relative flex h-full items-center gap-1.5 px-2 text-sm transition-colors sm:px-3",
         active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
@@ -41,9 +42,6 @@ function InboxLink({ count, active }: { count: number; active: boolean }) {
     >
       <IconInbox className="size-4 sm:hidden" aria-hidden />
       <span className="hidden sm:inline">Inbox</span>
-      {count > 0 ? (
-        <span className="min-w-4.5 rounded-full bg-foreground px-1 text-center text-xs leading-4.5 font-medium text-background">{count > 49 ? "50+" : count}</span>
-      ) : null}
       {active && <span className="absolute inset-x-2 bottom-0 h-px bg-foreground sm:inset-x-3" />}
     </Link>
   );
@@ -83,10 +81,13 @@ interface AppHeaderProps {
   email: string;
   username: string;
   teams: HeaderTeam[];
-  unreadMentions: number;
+  /** Unread notifications for the bell. */
+  unreadNotifications: number;
+  /** A bell list without a database, for the dev fixture only. */
+  notificationSeed?: NotificationView[];
 }
 
-export function AppHeader({ userId, name, email, username, teams, unreadMentions }: AppHeaderProps) {
+export function AppHeader({ userId, name, email, username, teams, unreadNotifications, notificationSeed }: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -106,12 +107,13 @@ export function AppHeader({ userId, name, email, username, teams, unreadMentions
         <nav className="flex h-full items-center gap-1" aria-label="Workspace navigation">
           <NavLink {...artifactsLink} active={pathname === artifactsLink.href} />
           <TeamSwitcher teams={teams} active={pathname.startsWith("/teams")} />
-          <InboxLink count={unreadMentions} active={pathname.startsWith("/inbox") || pathname.startsWith("/threads")} />
+          <InboxLink active={pathname.startsWith("/inbox") || pathname.startsWith("/threads")} />
           {/* On phones, Connections lives in the account menu ("Access tokens"). */}
           <NavLink {...connectionsLink} active={pathname.startsWith(connectionsLink.href)} className="max-sm:hidden" />
         </nav>
         <div className="ml-auto flex items-center gap-1">
           <GitHubLink className="max-sm:hidden" />
+          <NotificationBell initialUnread={unreadNotifications} {...(notificationSeed ? { seed: notificationSeed } : {})} />
           <DropdownMenu>
             <DropdownMenuTrigger
               render={<Button variant="ghost" className="h-9 gap-2 px-1.5" disabled={signingOut} aria-label="Account menu" />}
@@ -135,6 +137,9 @@ export function AppHeader({ userId, name, email, username, teams, unreadMentions
                 <ThemeSwitcher />
               </div>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => { router.push("/app/settings"); }} className="px-2 py-2">
+                <IconSettings /> Settings
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => { router.push("/app/connections"); }} className="px-2 py-2">
                 <IconKey /> Access tokens
               </DropdownMenuItem>

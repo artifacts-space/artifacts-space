@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { artifactsToTransfer, pickTransferOwner, transferredOwnership, type TransferArtifact } from "./transfer-rules";
+import { agentsToHandOver, artifactsToTransfer, pickTransferOwner, transferredOwnership, type TransferArtifact } from "./transfer-rules";
 
 const day = (n: number) => new Date(Date.UTC(2026, 0, n));
 
@@ -60,5 +60,28 @@ describe("transferredOwnership", () => {
       originalAuthorId: "first",
       showInSearch: false,
     });
+  });
+});
+
+describe("agentsToHandOver", () => {
+  const memberIds = new Set(["owner-1", "stayer"]);
+
+  it("should hand over an agent when the person who added it is no longer a member", () => {
+    const moving = agentsToHandOver([{ userId: "agent-1", ownerId: "leaver", handedOverAt: null }], memberIds);
+    expect(moving.map((item) => item.userId)).toEqual(["agent-1"]);
+  });
+
+  it("should hand over an agent again when its new owner later leaves too", () => {
+    const moving = agentsToHandOver([{ userId: "agent-1", ownerId: "second-leaver", handedOverAt: new Date() }], memberIds);
+    expect(moving).toHaveLength(1);
+  });
+
+  it("should hand over an agent once when the account of the person who added it is gone", () => {
+    expect(agentsToHandOver([{ userId: "agent-1", ownerId: null, handedOverAt: null }], memberIds)).toHaveLength(1);
+    expect(agentsToHandOver([{ userId: "agent-1", ownerId: null, handedOverAt: new Date() }], memberIds)).toHaveLength(0);
+  });
+
+  it("should leave an agent alone when the person who added it is still a member", () => {
+    expect(agentsToHandOver([{ userId: "agent-2", ownerId: "stayer", handedOverAt: null }], memberIds)).toHaveLength(0);
   });
 });

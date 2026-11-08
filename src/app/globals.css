@@ -293,6 +293,18 @@
   --pixel-mid: #0868f5;
   --pixel-light: #88c5fb;
   --pixel-pale: #f7faff;
+  /*
+   * The logo mark (src/components/logo.tsx): fixed brand blues, the same in
+   * both themes. base draws the ring and the planet's outline; spark and glint
+   * are the small highlights.
+   */
+  --mark-base: #0051f0;
+  --mark-shade: #0a40c4;
+  --mark-mid: #0868f5;
+  --mark-light: #88c5fb;
+  --mark-pale: #f7faff;
+  --mark-spark: #ffffff;
+  --mark-glint: #dceeff;
   /* The night sky behind the open-source galaxy (src/components/landing/galaxy.tsx), the same in both themes. */
   --galaxy-sky: oklch(0.18 0.04 265);
   /*
@@ -423,6 +435,14 @@
   --pixel-mid: #3d8af7;
   --pixel-light: #88c5fb;
   --pixel-pale: oklch(0.26 0.06 262);
+  /* The logo mark keeps its light-theme blues. */
+  --mark-base: #0051f0;
+  --mark-shade: #0a40c4;
+  --mark-mid: #0868f5;
+  --mark-light: #88c5fb;
+  --mark-pale: #f7faff;
+  --mark-spark: #ffffff;
+  --mark-glint: #dceeff;
   --galaxy-sky: oklch(0.18 0.04 265);
   --actor-agent: oklch(0.72 0.14 255);
   --actor-agent-tint: oklch(0.28 0.06 262);
@@ -638,8 +658,9 @@
  * example `text-md` on a comment body) can still set a smaller size.
  */
 @layer components {
+  /* The reading measure. A full-width artifact sets --artifact-measure: none on its body (src/lib/page-width). */
   .artifact-prose {
-    max-width: 72ch;
+    max-width: var(--artifact-measure, 72ch);
     font-size: var(--text-base);
     line-height: 1.7;
     overflow-wrap: anywhere;

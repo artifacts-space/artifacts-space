@@ -46,6 +46,7 @@ export function PrivacyCollection() {
           <li><strong>Version history.</strong> A saved copy of each version, with who saved it and when.</li>
           <li><strong>Files.</strong> Files you or your agents upload, with their name, type, and size.</li>
           <li><strong>Comments and mentions.</strong> Comment text, who wrote it, @mentions, and whether you have read each mention.</li>
+          <li><strong>Notifications.</strong> The notifications you get in the app (who did what, on which artifact, and whether you have read it) and the notification settings you choose. A notification stores only references; the app shows a short piece of the comment only while you can still read the artifact.</li>
           <li><strong>Sharing and reviews.</strong> Sharing requests, approvals, declined requests, mutes, and the &quot;Don&apos;t ask again&quot; choices you make in confirmation dialogs.</li>
           <li><strong>Reports.</strong> If you report an artifact, the reason, any details you add, and your account if you are signed in.</li>
         </ul>
@@ -96,7 +97,7 @@ export function PrivacyCollection() {
         <ul>
           <li><strong>Run the service:</strong> sign you in, store and show your artifacts, keep version history, apply your sharing and comment settings, and let your agents work over MCP.</li>
           <li><strong>Show authors their readers:</strong> tell the people who can edit a public artifact how many people read it, per day, and which sites linked to it, as counts only.</li>
-          <li><strong>Send emails you need:</strong> sign-in links, team invitations, a note when someone @mentions you (with the artifact title and a link, never the comment text), and report notices to team owners. We send no marketing email.</li>
+          <li><strong>Send emails you need:</strong> sign-in links, team invitations, a note when someone @mentions you (with the artifact title and a link, never the comment text; you can turn it off in Settings), and report notices to team owners. We send no marketing email.</li>
           <li><strong>Keep the service safe:</strong> enforce rate limits and storage quotas, stop spam and phishing, handle reports, and investigate abuse and security problems.</li>
           <li><strong>Fix and improve it:</strong> find errors and keep the service reliable, using logs and aggregate counts.</li>
           <li><strong>Meet legal duties:</strong> answer valid legal requests and enforce our <Link href={legalPaths.terms}>Terms</Link>.</li>

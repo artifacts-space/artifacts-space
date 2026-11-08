@@ -53,6 +53,8 @@ export const artifact = pgTable(
     theme: jsonb("theme").$type<StoredArtifactTheme>(),
     // Optional cover banner: a gradient id, or "file:<uuid>[@0-100]" (src/lib/covers). Null shows none.
     cover: text("cover"),
+    // Show the body across the whole width instead of the reading width. A display setting: not versioned, no approval.
+    fullWidth: boolean("full_width").notNull().default(false),
     summary: text("summary").notNull().default(""),
     content: text("content").notNull(),
     kind: text("kind", { enum: artifactKinds }).notNull().default("markdown"),
@@ -362,6 +364,9 @@ export const agent = pgTable(
     ownerId: text("owner_id").references(() => user.id, { onDelete: "set null" }),
     // Set when a team owner or admin mutes the agent across the team.
     mutedAt: timestamp("muted_at", { withTimezone: true }),
+    // Set when the person who added it left the team and it was handed to a team owner, with its
+    // tokens revoked (src/lib/agents/handover.ts). Cleared when a new token reconnects it.
+    handedOverAt: timestamp("handed_over_at", { withTimezone: true }),
     mutedBy: text("muted_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

@@ -15,6 +15,8 @@ export interface McpArtifact {
   cover: string | null;
   /** An image cover's vertical focal point, 0 (top) to 100 (bottom). Null for gradients and no cover. */
   coverPosition: number | null;
+  /** Whether the page shows the body full width (true) or at the reading width (false, the default). */
+  fullWidth: boolean;
   summary: string;
   /** The full content. Only artifacts_get and writes return it. */
   content?: string;
@@ -80,6 +82,7 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     icon: dto.icon,
     theme: dto.theme,
     ...mcpCoverFields(dto.cover),
+    fullWidth: dto.fullWidth,
     summary: dto.summary,
     kind: dto.kind,
     language: dto.language,

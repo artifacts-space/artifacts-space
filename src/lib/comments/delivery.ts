@@ -9,6 +9,8 @@ import { getArtifactAccess } from "@/lib/access";
 import { canViewArtifact } from "@/lib/access-rules";
 import type { Actor } from "@/lib/agents/identity";
 import { loadActors } from "@/lib/agents/queries";
+import { wants } from "@/lib/notifications/preference-rules";
+import { loadPreferences } from "@/lib/notifications/preferences";
 
 import { sendMentionEmail } from "./mention-email";
 import { parseMentions } from "./mentions";
@@ -95,13 +97,28 @@ async function alreadyNotified(artifactId: string, recipientIds: string[]) {
   return new Set(rows.map((row) => row.recipientId));
 }
 
+/** The people who keep mention emails on in their notification settings. A failed lookup keeps today's behavior: email. */
+async function keepsMentionEmail(people: { id: string; mentionId: string }[]) {
+  const preferences = await loadPreferences(people.map((person) => person.id)).catch((error: unknown) => {
+    console.error("[comments] Notification settings could not be read", error instanceof Error ? error.name : "unknown error");
+    return null;
+  });
+  if (!preferences) return people;
+  return people.filter((person) => {
+    const chosen = preferences.get(person.id);
+    return !chosen || wants(chosen, "mention", "email");
+  });
+}
+
 async function emailPeople(input: { people: { id: string; mentionId: string }[]; artifact: ArtifactMetaRecord; commentId: string; writer: Actor }) {
   if (input.people.length === 0) return;
-  const rows = await getDb().select({ id: user.id, email: user.email }).from(user).where(inArray(user.id, input.people.map((person) => person.id)));
+  const people = await keepsMentionEmail(input.people);
+  if (people.length === 0) return;
+  const rows = await getDb().select({ id: user.id, email: user.email }).from(user).where(inArray(user.id, people.map((person) => person.id)));
   const emails = new Map(rows.map((row) => [row.id, row.email]));
   const authorLabel = toAuthorView(input.writer).label;
   const results = await Promise.allSettled(
-    input.people.map(async (person) => {
+    people.map(async (person) => {
       // The title this person may read: readers outside the team see the approved version's.
       const viewable = await getArtifactAccess(input.artifact.publicId, person.id);
       if (!viewable) return;

@@ -42,7 +42,7 @@ const publicId = "4fXkP9qR2sT7vW1yZ3aB5c";
 
 function dto(theme: ArtifactDto["theme"]): ArtifactDto {
   return {
-    id: "internal-1", publicId, title: "Plan", icon: null, theme, cover: null, summary: "", content: "# Plan", kind: "markdown", language: "", project: null, tags: [], sessionId: "", source: "",
+    id: "internal-1", publicId, title: "Plan", icon: null, theme, cover: null, fullWidth: false, summary: "", content: "# Plan", kind: "markdown", language: "", project: null, tags: [], sessionId: "", source: "",
     visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null,
     files: [], updatedBy: null, metadata: {}, createdAt: "2026-11-07T00:00:00.000Z", updatedAt: "2026-11-07T00:00:00.000Z",
   };

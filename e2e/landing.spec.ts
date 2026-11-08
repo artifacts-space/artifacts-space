@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const themes = ["light", "dark"] as const;
 
@@ -64,7 +64,100 @@ test("should jump to the How it works section when the header link is clicked", 
   await page.goto("/");
   await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "How it works" }).click();
   await expect(page).toHaveURL(/#how$/);
-  await expect(page.getByRole("heading", { level: 2, name: "Use it like the artifacts you already know." })).toBeInViewport();
+  const heading = page.getByRole("heading", { level: 2, name: "Use it like the artifacts you already know." });
+  await expect(heading).toBeInViewport();
+  const headerBox = await page.getByRole("banner").boundingBox();
+  const headingBox = await heading.boundingBox();
+  expect(headerBox && headingBox && headingBox.y >= headerBox.y + headerBox.height, "the heading sits below the pinned header").toBe(true);
+});
+
+/** A computed color with zero alpha, in whichever color space the browser reports it. */
+const transparent = /(?:\/ 0\)|, 0\))$/;
+
+test("should keep the header pinned to the top with a visible edge when the page scrolls", async ({ page }) => {
+  await page.goto("/");
+  const header = page.getByRole("banner");
+  const edgeAtTop = await header.evaluate((element) => getComputedStyle(element).borderBottomColor);
+  expect(edgeAtTop, "the edge is hidden at the top of the page").toMatch(transparent);
+
+  await page.getByRole("region", { name: "Pricing" }).scrollIntoViewIfNeeded();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
+  await expect(header).toBeInViewport();
+  const box = await header.boundingBox();
+  expect(Math.abs(box?.y ?? Number.NaN), "the header sits at the top of the window").toBeLessThanOrEqual(1);
+  await expect(header.getByRole("link", { name: "Sign in" })).toBeVisible();
+  const edge = await header.evaluate((element) => getComputedStyle(element).borderBottomColor);
+  expect(edge, "the edge shows once the page has scrolled").not.toMatch(transparent);
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
+});
+
+test("should pin the How it works stage below the header when the window is desktop sized", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "the stage pins only on wide screens");
+  await page.goto("/");
+  const how = page.getByRole("region", { name: "Use it like the artifacts you already know." });
+  const sectionTop = await how.evaluate((section) => section.getBoundingClientRect().top + window.scrollY);
+  await page.evaluate((top) => { window.scrollTo(0, top + window.innerHeight); }, sectionTop);
+  const layout = await page.evaluate(() => {
+    const stage = document.querySelector(".how-stage")?.getBoundingClientRect();
+    const header = document.querySelector("header")?.getBoundingClientRect();
+    return { stageTop: stage?.top ?? Number.NaN, headerBottom: header?.bottom ?? Number.NaN, position: getComputedStyle(document.querySelector(".how-stage") ?? document.body).position };
+  });
+  expect(layout.position).toBe("sticky");
+  expect(layout.stageTop, "the pinned stage starts below the header").toBeGreaterThanOrEqual(layout.headerBottom);
+});
+
+/** The logo ring's place and transform, and its highlight's animation, in the header or the footer. */
+const logoRing = (page: Page, scope: "banner" | "contentinfo") =>
+  page.getByRole(scope).locator("svg").filter({ has: page.locator("[data-logo-ring]") }).first().evaluate((mark) => {
+    const ring = mark.querySelector("[data-logo-ring]");
+    const sheen = mark.querySelector("[data-logo-ring-sheen]");
+    const ringBox = ring?.querySelector(":scope > path")?.getBoundingClientRect();
+    const markBox = mark.getBoundingClientRect();
+    const sheenStyle = sheen ? getComputedStyle(sheen) : null;
+    return {
+      ringTransform: ring ? getComputedStyle(ring).transform : "missing",
+      ringOffset: ringBox ? [ringBox.left - markBox.left, ringBox.top - markBox.top, ringBox.width, ringBox.height].map((value) => Math.round(value * 100) / 100) : [],
+      sheen: sheenStyle ? { name: sheenStyle.animationName, display: sheenStyle.display, transform: sheenStyle.transform } : null,
+    };
+  });
+
+const scrollDown = async (page: Page) => {
+  await page.evaluate(() => { window.scrollTo(0, document.documentElement.scrollHeight / 7); });
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+};
+
+test("should send a highlight around the header logo's still ring as the page scrolls", async ({ page }) => {
+  await page.goto("/");
+  const atTop = await logoRing(page, "banner");
+  expect(atTop.ringTransform, "the ring itself never turns").toBe("none");
+  expect(atTop.sheen?.name).toBe("logo-ring-sheen");
+  expect(atTop.sheen?.display).not.toBe("none");
+
+  await scrollDown(page);
+  await expect.poll(async () => (await logoRing(page, "banner")).sheen?.transform).not.toBe(atTop.sheen?.transform);
+  const scrolled = await logoRing(page, "banner");
+  expect(scrolled.ringTransform, "the ring stays put").toBe("none");
+  expect(scrolled.ringOffset, "the ring sits where it did at the top").toEqual(atTop.ringOffset);
+
+  const footer = await logoRing(page, "contentinfo");
+  expect(footer.sheen, "only the landing header's logo has the highlight").toBeNull();
+});
+
+test.describe("with reduced motion", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("should show the still mark with no highlight when the page scrolls", async ({ page }) => {
+    await page.goto("/");
+    const atTop = await logoRing(page, "banner");
+    await scrollDown(page);
+    const scrolled = await logoRing(page, "banner");
+    expect(scrolled.sheen?.name).toBe("none");
+    expect(scrolled.sheen?.display).toBe("none");
+    expect(scrolled.ringTransform).toBe("none");
+    expect(scrolled.ringOffset).toEqual(atTop.ringOffset);
+  });
 });
 
 test("should set the header nav links in medium weight when the landing page loads", async ({ page }, testInfo) => {

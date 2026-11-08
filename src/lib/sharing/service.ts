@@ -10,6 +10,7 @@ import { actsForAuthor } from "@/lib/agents/owner-access";
 import type { ArtifactDto, ArtifactVisibility, CommentSetting, SharingLevel } from "@/lib/artifact-types";
 import { commentsAfterSharing, decideCommentSetting, defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { isUniqueViolation } from "@/lib/db-errors";
+import { notifySharingDecision, notifySharingRequest } from "@/lib/notifications/create";
 import { rehomeArtifactProject } from "@/lib/projects/store";
 import { getTeamMembershipById, listTeamsForUser, type TeamMembership } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -127,12 +128,14 @@ async function recordDecision(record: ArtifactRecord, team: TeamMembership, leve
 }
 
 async function storeRequest(record: ArtifactRecord, team: TeamMembership, level: SharingLevel, requesterId: string, comments: CommentSetting) {
+  const id = randomUUID();
   try {
-    await getDb().insert(sharingRequest).values({ id: randomUUID(), artifactId: record.id, teamId: team.id, requestedBy: requesterId, visibility: level, comments });
+    await getDb().insert(sharingRequest).values({ id, artifactId: record.id, teamId: team.id, requestedBy: requesterId, visibility: level, comments });
   } catch (error) {
     if (isUniqueViolation(error)) throw new UserFacingError("A sharing request for this artifact is already waiting.");
     throw error;
   }
+  notifySharingRequest(id);
 }
 
 /**
@@ -253,6 +256,12 @@ export async function decideSharingRequest(input: { deciderId: string; requestId
   if (!canDecideRequest({ viewerRole: membership?.role ?? null, actor: "person" })) {
     throw new UserFacingError("Only team owners and admins can approve sharing.");
   }
+  await applyDecision(request, input);
+  // Reads the stored outcome, so a request canceled instead of approved notifies nobody.
+  notifySharingDecision(request.id);
+}
+
+async function applyDecision(request: typeof sharingRequest.$inferSelect, input: { deciderId: string; approve: boolean }) {
   if (request.kind === "edit") {
     await decideEditRequest(request, input.deciderId, input.approve);
     return;

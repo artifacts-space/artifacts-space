@@ -117,11 +117,17 @@ export async function setAgentTeamMute(input: { actorId: string; agentId: string
     .where(eq(agent.userId, record.userId));
 }
 
-/** Creates a token for an agent. The secret is returned once; only its hash is stored. */
+/**
+ * Creates a token for an agent. The secret is returned once; only its hash is
+ * stored. A new token reconnects an agent that was handed over, so the team
+ * page stops asking for one.
+ */
 export async function createAgentToken(input: { actorId: string; agentId: string; name: string }) {
   const { record } = await requireManagedAgent(input.actorId, input.agentId);
   await enforceRateLimit("tokenCreate", input.actorId);
-  return createApiToken(record.userId, input.name);
+  const created = await createApiToken(record.userId, input.name);
+  if (record.handedOverAt) await getDb().update(agent).set({ handedOverAt: null }).where(eq(agent.userId, record.userId));
+  return created;
 }
 
 /** Revokes one of an agent's tokens. */

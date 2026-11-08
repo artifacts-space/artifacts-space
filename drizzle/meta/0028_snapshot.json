@@ -1,5 +1,5 @@
 {
-  "id": "228ebdf8-831a-405e-8b2a-6149b536310e",
+  "id": "097ef0c9-7746-43e9-904b-1a49b4005a3c",
   "prevId": "295f2e89-a566-4e8a-b9d2-35dc2de324d3",
   "version": "7",
   "dialect": "postgresql",
@@ -28,6 +28,12 @@
         },
         "muted_at": {
           "name": "muted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "handed_over_at": {
+          "name": "handed_over_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -360,13 +366,6 @@
           "notNull": true,
           "default": "'team'"
         },
-        "show_in_search": {
-          "name": "show_in_search",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "share_id": {
           "name": "share_id",
           "type": "text",
@@ -546,22 +545,6 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "artifact_in_search_idx": {
-          "name": "artifact_in_search_idx",
-          "columns": [
-            {
-              "expression": "public_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"artifact\".\"show_in_search\" and \"artifact\".\"visibility\" = 'public'",
           "concurrently": false,
           "method": "btree",
           "with": {}

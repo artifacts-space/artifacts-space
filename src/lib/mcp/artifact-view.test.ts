@@ -11,6 +11,7 @@ const dto: ArtifactDto = {
   icon: "🧭",
   theme: null,
   cover: null,
+  fullWidth: false,
   summary: "",
   content: "# Plan",
   kind: "markdown",

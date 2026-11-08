@@ -58,7 +58,7 @@ export default function SelfHostingPage() {
 
       <DocsH page={page} id="database" />
       <Prose>
-        <p>The schema lives in <code>src/db/schema.ts</code> and <code>src/db/oauth-schema.ts</code>; migrations are SQL files in <code>drizzle/</code>, managed by drizzle-kit. On Vercel, every production build applies pending migrations before the new code goes live (see <Link href={docsHref(page, "vercel")}>Deploy on Vercel</Link>). Anywhere else, apply them before the first start and after every update:</p>
+        <p>The schema lives in <code>src/db/schema.ts</code>, <code>src/db/oauth-schema.ts</code>, <code>src/db/views-schema.ts</code>, and <code>src/db/notification-schema.ts</code>; migrations are SQL files in <code>drizzle/</code>, managed by drizzle-kit. On Vercel, every production build applies pending migrations before the new code goes live (see <Link href={docsHref(page, "vercel")}>Deploy on Vercel</Link>). Anywhere else, apply them before the first start and after every update:</p>
       </Prose>
       <CommandSnippet command="pnpm db:migrate" />
       <Prose>
