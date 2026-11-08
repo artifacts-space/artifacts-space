@@ -113,6 +113,7 @@
   --color-code: var(--code);
   --color-code-foreground: var(--code-foreground);
   --color-code-border: var(--code-border);
+  --color-code-inline: var(--code-inline);
   --color-diagram-stroke: var(--diagram-stroke);
   --color-diagram-line: var(--diagram-line);
   --color-diff-added: var(--diff-added);
@@ -238,6 +239,8 @@
   --code: oklch(0.995 0.0015 85);
   --code-foreground: oklch(0.24 0.006 60);
   --code-border: oklch(0.2 0.006 60 / 9%);
+  /* Inline code in running text: the card mixed 7% toward the ink, so it reads as code on the page and on cards. */
+  --code-inline: oklch(0.944 0.0004 60);
   --syntax-plain: var(--code-foreground);
   --syntax-keyword: oklch(0.53 0.19 355);
   --syntax-string: oklch(0.5 0.12 150);
@@ -381,6 +384,7 @@
   --code: oklch(0.19 0.004 60);
   --code-foreground: oklch(0.9 0.004 80);
   --code-border: oklch(1 0 0 / 8%);
+  --code-inline: oklch(0.2418 0.004 61.4);
   --syntax-plain: var(--code-foreground);
   --syntax-keyword: oklch(0.76 0.14 355);
   --syntax-string: oklch(0.78 0.12 150);
@@ -490,6 +494,25 @@
 @utility card-nested {
   border: 1px solid var(--card-edge);
   border-radius: var(--radius-lg);
+}
+
+/*
+ * Inline code in running text: Markdown and comments (.artifact-prose), the
+ * docs, and labels that quote an id. A quiet chip a step stronger than the
+ * page or card, with the code blocks' hairline edge, in the mono font (a
+ * theme's mono inside a ThemeScope), a little smaller than the text around it
+ * but never under the 13px floor. It wraps across lines as one chip per line.
+ */
+@utility inline-code {
+  padding: 0.1em 0.35em;
+  border: 1px solid var(--code-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--code-inline);
+  /* Inlined like the font-mono utility, so a ThemeScope's --theme-font-mono applies. */
+  font-family: --theme(--font-mono);
+  font-size: max(0.875em, var(--text-xs));
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 /*
@@ -693,13 +716,9 @@
     border-top: 1px solid var(--border);
     margin: 2em 0;
   }
+  /* Never under the 13px floor, even inside small text such as a comment body. */
   .artifact-prose :not(pre) > code {
-    padding: 0.1em 0.35em;
-    border-radius: 4px;
-    background: var(--muted);
-    font-family: var(--font-mono);
-    /* Never under the 13px floor, even inside small text such as a comment body. */
-    font-size: max(0.86em, var(--text-xs));
+    @apply inline-code;
   }
   .artifact-prose :where(sup, sub, small) {
     font-size: max(0.75em, var(--text-xs));
