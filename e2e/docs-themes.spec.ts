@@ -34,6 +34,6 @@ test("should copy a preset id when its copy button is pressed", async ({ page, c
 test("should not scroll sideways when the themes page is read", async ({ page }) => {
   await page.goto("/docs/themes");
   await page.getByRole("list", { name: "Theme presets" }).scrollIntoViewIfNeeded();
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
