@@ -27,7 +27,7 @@ const publicId = "4fXkP9qR2sT7vW1yZ3aB5c";
 const author = "author-1";
 const savedAt = new Date("2026-11-06T00:00:00Z");
 
-function row(visibility: "private" | "team" | "link" | "public", member: boolean) {
+function row(visibility: "private" | "team" | "link" | "public", member: boolean, ownerMember = false) {
   return {
     record: {
       id: "art-1", publicId, shareId: "s", userId: author, originalAuthorId: null, teamId: "team-1", visibility,
@@ -37,6 +37,8 @@ function row(visibility: "private" | "team" | "link" | "public", member: boolean
       createdAt: savedAt, updatedAt: savedAt, updatedBy: null,
     },
     memberId: member ? "member-1" : null,
+    // Set only when the author is an agent the viewer added and the viewer is still in its team (see subjectQuery).
+    ownerMemberId: ownerMember ? "owner-member-1" : null,
     teamPersonal: false,
     approvedTitle: "Approved title",
     approvedIcon: "🚀",
@@ -77,6 +79,29 @@ describe("access decision and the version cache", () => {
     expect(viewable?.view.content).toBe("latest private content");
     expect(viewable?.version.source).toBe("latest");
     expect(mocks.cachedView).not.toHaveBeenCalled();
+  });
+
+  it("should let the person who added the agent read and edit its private artifact when they are still in the agent's team", async () => {
+    mocks.rows = [[row("private", false, true)], [{ content: "agent notes" }]];
+    const viewable = await getViewableArtifact(publicId, "agent-owner");
+    expect(viewable?.view.content).toBe("agent notes");
+    expect(viewable?.canEdit).toBe(true);
+    expect(viewable?.actsForAuthor).toBe(true);
+    expect(mocks.cachedView).not.toHaveBeenCalled();
+  });
+
+  it("should refuse an agent's private artifact when the viewer is not the person who added the agent", async () => {
+    // A teammate, the owner of another agent, another agent, or an owner who left the team: the owner join finds no row.
+    for (const viewer of ["teammate", "other-agent-owner", "sibling-agent", "former-member-owner"]) {
+      mocks.rows = [[row("private", true, false)]];
+      await expect(getArtifactAccess(publicId, viewer)).resolves.toBeNull();
+    }
+  });
+
+  it("should never mark the author as acting for itself when the author opens its own artifact", async () => {
+    mocks.rows = [[row("private", false, true)]];
+    const access = await getArtifactAccess(publicId, author);
+    expect(access?.actsForAuthor).toBe(false);
   });
 
   it("should read a team artifact fresh for members, never from the cache", async () => {

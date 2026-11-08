@@ -10,6 +10,7 @@ import { CopyButton } from "@/components/copy-button";
 import { LastEdited } from "@/components/history/last-edited";
 import { VersionHistory } from "@/components/history/version-history";
 import { Button } from "@/components/ui/button";
+import { ViewsDialog } from "@/components/views/views-dialog";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
 import { detailBody, detailOuter, detailSection } from "./artifact-editor/detail-scroll";
@@ -47,14 +48,17 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
         <div className="ml-auto flex items-center gap-1">
           <CopyButton value={artifact.content} variant="ghost" size="icon" />
           {canEdit ? (
-            <VersionHistory
-              publicId={artifact.publicId}
-              title={artifact.title}
-              updatedAt={artifact.updatedAt}
-              reviewed={artifact.visibility === "link" || artifact.visibility === "public"}
-              files={artifact.files}
-              onRestored={onUpdated}
-            />
+            <>
+              <VersionHistory
+                publicId={artifact.publicId}
+                title={artifact.title}
+                updatedAt={artifact.updatedAt}
+                reviewed={artifact.visibility === "link" || artifact.visibility === "public"}
+                files={artifact.files}
+                onRestored={onUpdated}
+              />
+              <ViewsDialog publicId={artifact.publicId} title={artifact.title} />
+            </>
           ) : null}
           {seesComments ? <CommentsDialog publicId={artifact.publicId} title={artifact.title} seesComments offNotice="" /> : null}
           <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/artifact/${artifact.publicId}`} />}>

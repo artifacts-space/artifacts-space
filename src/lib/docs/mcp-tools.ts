@@ -10,6 +10,7 @@ import { registerTeamTools } from "@/lib/mcp/team-tools";
 import { registerThemeTools } from "@/lib/mcp/theme-tools";
 import { toolAccess, type McpToolName } from "@/lib/mcp/tool-access";
 import { registerVersionTools } from "@/lib/mcp/version-tools";
+import { registerViewTools } from "@/lib/mcp/view-tools";
 
 import { shapeRows, type PropRow } from "./prop-rows";
 
@@ -30,7 +31,7 @@ export interface DocsMcpTool {
   args: PropRow[];
 }
 
-export const mcpToolGroups = ["Artifacts", "Version history", "Formats", "Themes", "Files", "Inbox and comments"] as const;
+export const mcpToolGroups = ["Artifacts", "Version history", "Views", "Formats", "Themes", "Files", "Inbox and comments"] as const;
 export type McpToolGroup = (typeof mcpToolGroups)[number];
 
 interface ToolConfig {
@@ -74,6 +75,7 @@ function recordTools(): DocsMcpTool[] {
   registerFileTools(recordingServer("Files", tools), docsUserId, "full");
   registerTeamTools(recordingServer("Inbox and comments", tools), docsUserId, "full");
   registerVersionTools(recordingServer("Version history", tools), docsUserId, "full");
+  registerViewTools(recordingServer("Views", tools), docsUserId, "full");
   return tools;
 }
 

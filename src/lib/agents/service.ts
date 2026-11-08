@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { agent, teamMember, user } from "@/db/schema";
+import { agent, artifact, teamMember, user } from "@/db/schema";
+import { isTeamMember } from "@/lib/access";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { cleanHandleInput, validateHandle } from "@/lib/handles";
@@ -15,7 +16,7 @@ import { UserFacingError } from "@/lib/user-facing-error";
 
 import { agentEmail } from "./identity";
 import { getAgentRecord } from "./queries";
-import { canManageAgents } from "./rules";
+import { canManageAgents, removalKeeper } from "./rules";
 
 /**
  * Agent teammates. Owners and admins of a shared team add and remove agents,
@@ -91,14 +92,19 @@ export async function createAgent(input: { actorId: string; teamId: string; hand
 
 /**
  * Removes an agent for good. Artifacts it shared with the team move to a team
- * owner first (as when a person leaves); then its user row goes, which
- * removes its tokens, inbox, and private artifacts. Its comments stay in
- * their threads without an author.
+ * owner first (as when a person leaves). Its own artifacts move to the person
+ * who added it, while they are still in the team (removalKeeper), so people
+ * decide about deleting their agents' work. Then its user row goes, which
+ * removes its tokens, inbox, and any artifacts nobody could keep. Its
+ * comments stay in their threads without an author.
  */
 export async function removeAgent(input: { actorId: string; agentId: string }) {
   const { record } = await requireManagedAgent(input.actorId, input.agentId);
+  const ownerInTeam = record.ownerId ? await isTeamMember(record.ownerId, record.teamId) : false;
   await getDb().delete(teamMember).where(and(eq(teamMember.teamId, record.teamId), eq(teamMember.userId, record.userId)));
   await reconcileTeamArtifacts(record.teamId);
+  const keeper = removalKeeper({ ownerId: record.ownerId, ownerInTeam });
+  if (keeper) await getDb().update(artifact).set({ userId: keeper }).where(eq(artifact.userId, record.userId));
   await getDb().delete(user).where(eq(user.id, record.userId));
 }
 

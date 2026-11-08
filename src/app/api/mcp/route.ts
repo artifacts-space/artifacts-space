@@ -12,6 +12,7 @@ import { jsonRpcId, mcpLimitChecks, mcpRateLimitedResponse, mcpToolCalls } from 
 import { registerTeamTools } from "@/lib/mcp/team-tools";
 import { registerThemeTools } from "@/lib/mcp/theme-tools";
 import { registerVersionTools } from "@/lib/mcp/version-tools";
+import { registerViewTools } from "@/lib/mcp/view-tools";
 import { READ_ONLY_INSTRUCTIONS } from "@/lib/mcp/tool-access";
 import { bearerChallenge } from "@/lib/oauth/metadata";
 
@@ -34,6 +35,7 @@ function createMcpServer({ userId, access }: McpPrincipal) {
   registerFileTools(server, userId, access);
   registerTeamTools(server, userId, access);
   registerVersionTools(server, userId, access);
+  registerViewTools(server, userId, access);
   return server;
 }
 

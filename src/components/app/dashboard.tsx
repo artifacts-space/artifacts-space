@@ -165,7 +165,8 @@ function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate
         key={full.id}
         artifact={full}
         origin={origin}
-        isAuthor={access.isAuthor}
+        canShare={access.canShare}
+        canDelete={access.canDelete}
         team={access.team}
         seesComments={access.seesComments}
         onWithdraw={onWithdraw}
