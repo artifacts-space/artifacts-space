@@ -230,6 +230,27 @@ export function mixOklch(a: Oklch, b: Oklch, amount: number): Oklch {
 }
 
 /**
+ * Mixes `a` toward `b` by `amount` in OKLab, as CSS `color-mix(in oklab, …)`
+ * does. Unlike OKLCH it never sweeps through unrelated hues when one side is
+ * nearly grey, so a soft tint of a color into a paper background stays that color.
+ */
+export function mixOklab(a: Oklch, b: Oklch, amount: number): Oklch {
+  const t = clamp(amount, 0, 1);
+  const lab = (color: Oklch) => [color.c * Math.cos((color.h * Math.PI) / 180), color.c * Math.sin((color.h * Math.PI) / 180)] as const;
+  const [aA, aB] = lab(a);
+  const [bA, bB] = lab(b);
+  const A = aA + (bA - aA) * t;
+  const B = aB + (bB - aB) * t;
+  const c = Math.hypot(A, B);
+  return {
+    l: a.l + (b.l - a.l) * t,
+    c: c < 1e-6 ? 0 : c,
+    h: c < 1e-6 ? 0 : ((Math.atan2(B, A) * 180) / Math.PI + 360) % 360,
+    alpha: a.alpha + (b.alpha - a.alpha) * t,
+  };
+}
+
+/**
  * Moves `color`'s lightness away from `background` in small steps until the
  * pair reaches `minimum` contrast, keeping hue and chroma. Returns the first
  * passing color, or the extreme (black or white side) when none passes.

@@ -28,6 +28,7 @@ import { artifactIconLimits } from "../lib/artifact-icon-limits";
 import type { StoredArtifactTheme } from "../lib/themes/artifact-theme";
 import { artifactThemeLimits } from "../lib/themes/artifact-theme-limits";
 import { artifactSizeLimits } from "../lib/artifact-limits";
+import { artifactCoverLimits } from "../lib/covers/limits";
 import { fileLimits, fileStatuses } from "../lib/files/config";
 import { projectLimits } from "../lib/projects/limits";
 import { tagLimits } from "../lib/tags/limits";
@@ -47,6 +48,8 @@ export const artifact = pgTable(
     icon: text("icon"),
     // Optional theme: a preset id (a JSON string) or theme JSON normalised by src/lib/themes. Null uses the default look.
     theme: jsonb("theme").$type<StoredArtifactTheme>(),
+    // Optional cover banner: a gradient id, or "file:<uuid>[@0-100]" (src/lib/covers). Null shows none.
+    cover: text("cover"),
     summary: text("summary").notNull().default(""),
     content: text("content").notNull(),
     kind: text("kind", { enum: artifactKinds }).notNull().default("markdown"),
@@ -93,6 +96,7 @@ export const artifact = pgTable(
     check("artifact_tags_count_check", sql`cardinality(${table.tags}) <= ${sql.raw(String(tagLimits.maxPerArtifact))}`),
     check("artifact_comments_check", sql`${table.comments} in ('off', 'team', 'signed_in')`),
     check("artifact_icon_length_check", sql`char_length(${table.icon}) <= ${sql.raw(String(artifactIconLimits.maxStoredChars))}`),
+    check("artifact_cover_length_check", sql`char_length(${table.cover}) <= ${sql.raw(String(artifactCoverLimits.maxStoredChars))}`),
     check("artifact_theme_size_check", sql`octet_length(${table.theme}::text) <= ${sql.raw(String(artifactThemeLimits.maxStoredBytes))}`),
     check("artifact_content_size_check", sql`octet_length(${table.content}) <= ${sql.raw(String(artifactSizeLimits.maxContentBytes))}`),
     // jsonb prints with extra spaces, so the backstop allows twice the app's limit.
@@ -115,6 +119,8 @@ export const artifactVersion = pgTable(
     icon: text("icon"),
     // The theme this version showed, versioned with the title and icon.
     theme: jsonb("theme").$type<StoredArtifactTheme>(),
+    // The cover this version showed, versioned with the title, icon, and theme.
+    cover: text("cover"),
     summary: text("summary").notNull().default(""),
     content: text("content").notNull(),
     kind: text("kind", { enum: artifactKinds }).notNull(),

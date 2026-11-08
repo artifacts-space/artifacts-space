@@ -30,8 +30,8 @@ const proposed = alias(artifactVersion, "proposed_version");
 
 function fields(row: typeof artifactVersion.$inferSelect): ReviewedFields {
   // No project: it is not versioned and never reviewed (src/lib/projects).
-  const { title, icon, theme, summary, content, kind, language, source, metadata } = row;
-  return { title, icon, theme, summary, content, kind, language, source, metadata };
+  const { title, icon, theme, cover, summary, content, kind, language, source, metadata } = row;
+  return { title, icon, theme, cover, summary, content, kind, language, source, metadata };
 }
 
 /** Open edit requests for a team, newest first. Callers must check the viewer is an owner or admin. */

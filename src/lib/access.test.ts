@@ -33,19 +33,20 @@ function row(visibility: "private" | "team" | "link" | "public", member: boolean
       id: "art-1", publicId, shareId: "s", userId: author, originalAuthorId: null, teamId: "team-1", visibility,
       // A stale approved version id, as if sharing was just withdrawn: it must never be served.
       approvedVersionId: "version-1",
-      title: "Latest title", icon: "tabler:bug", summary: "", kind: "markdown", language: "", project: "", sessionId: "", source: "", metadata: {},
+      title: "Latest title", icon: "tabler:bug", cover: "file:0f8fad5b-d9cb-469f-a165-70867728950e@20", summary: "", kind: "markdown", language: "", project: "", sessionId: "", source: "", metadata: {},
       createdAt: savedAt, updatedAt: savedAt, updatedBy: null,
     },
     memberId: member ? "member-1" : null,
     teamPersonal: false,
     approvedTitle: "Approved title",
     approvedIcon: "🚀",
+    approvedCover: "mist",
     approvedSavedAt: savedAt,
     approvedBy: author,
   };
 }
 
-const approved = { title: "Approved title", icon: "🚀", summary: "", content: "approved", kind: "markdown", language: "", project: "", source: "", metadata: {}, updatedAt: savedAt };
+const approved = { title: "Approved title", icon: "🚀", cover: "mist", summary: "", content: "approved", kind: "markdown", language: "", project: "", source: "", metadata: {}, updatedAt: savedAt };
 
 describe("access decision and the version cache", () => {
   beforeEach(() => {
@@ -121,6 +122,21 @@ describe("access decision and the version cache", () => {
     mocks.rows = [[row("link", false)], [{ content: "latest" }], []];
     const viewable = await getViewableArtifact(publicId, author);
     expect(viewable?.view.icon).toBe("tabler:bug");
+  });
+
+  it("should keep an unapproved cover from readers outside the team when a link artifact has a pending edit", async () => {
+    for (const viewer of [null, "outsider"]) {
+      mocks.rows = [[row("link", false)]];
+      const viewable = await getViewableArtifact(publicId, viewer);
+      expect(viewable?.view.cover).toBe("mist");
+      expect(viewable?.served.cover).toBe("mist");
+    }
+  });
+
+  it("should show the latest cover to the author and team members when an edit waits for approval", async () => {
+    mocks.rows = [[row("link", false)], [{ content: "latest" }], []];
+    const viewable = await getViewableArtifact(publicId, author);
+    expect(viewable?.view.cover).toBe("file:0f8fad5b-d9cb-469f-a165-70867728950e@20");
   });
 
   it("should answer not found when the artifact does not exist", async () => {

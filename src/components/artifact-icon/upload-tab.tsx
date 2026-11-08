@@ -15,8 +15,8 @@ const RULE = "PNG, JPEG, GIF, WebP, or AVIF, up to 1 MB. Square images look best
 
 type UploadState = { phase: "idle" } | { phase: "uploading"; progress: number } | { phase: "checking" } | { phase: "error"; message: string };
 
-/** Uploads one image through the normal file pipeline and returns its id, or throws with a message for people. */
-async function uploadIcon(file: File, onProgress: (percent: number) => void): Promise<string> {
+/** Uploads one image through the normal file pipeline and returns its id, or throws with a message for people. Shared with cover uploads. */
+export async function uploadImageFile(file: File, onProgress: (percent: number) => void): Promise<string> {
   const ticket = await requestUploadAction({ filename: file.name, contentType: file.type, size: file.size });
   if (!ticket.success) throw new Error(ticket.error);
   await putFile(ticket.data.url, ticket.data.headers, file, onProgress);
@@ -48,7 +48,7 @@ export function UploadTab({ onSelect }: UploadTabProps) {
     }
     setState({ phase: "uploading", progress: 0 });
     try {
-      const fileId = await uploadIcon(file, (progress) => {
+      const fileId = await uploadImageFile(file, (progress) => {
         setState(progress >= 100 ? { phase: "checking" } : { phase: "uploading", progress });
       });
       setState({ phase: "idle" });

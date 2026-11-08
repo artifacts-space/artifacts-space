@@ -7,6 +7,7 @@ import { getEditableArtifact } from "@/lib/access";
 import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult, ArtifactDto } from "@/lib/artifact-types";
 import { artifactIconInputSchema } from "@/lib/artifact-icons";
+import { artifactCoverInputSchema } from "@/lib/covers/cover";
 import { toArtifactDtos, updateArtifact } from "@/lib/artifacts";
 import { isPublicId } from "@/lib/public-id";
 import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
@@ -94,5 +95,36 @@ export async function setArtifactThemeAction(publicId: string, theme: string | n
     return { success: true, data: { theme: saved.theme, pending: saved.pendingEdit !== null } };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The theme could not be saved. Try again.") };
+  }
+}
+
+/** What setting the cover did: live for every reader, or waiting for approval (link and public artifacts). */
+export interface CoverSaveResult {
+  cover: string | null;
+  pending: boolean;
+}
+
+/**
+ * Sets, repositions, or removes the artifact's cover from its page: a
+ * gradient id, "file:<uuid>[@0-100]" for an uploaded image, or null. The same
+ * edit check and save path as a title, icon, or theme change (updateArtifact
+ * as a person), so it files a version and, for link and public artifacts,
+ * waits for approval.
+ */
+export async function setArtifactCoverAction(publicId: string, cover: string | null): Promise<ActionResult<CoverSaveResult>> {
+  try {
+    const session = await getSession();
+    if (!session) return { success: false, error: "Your session ended. Sign in again." };
+    const id = publicIdSchema.parse(publicId);
+    const nextCover = artifactCoverInputSchema.parse(cover);
+    const record = await getEditableArtifact(session.user.id, { publicId: id });
+    if (!record) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+    const saved = await updateArtifact(session.user.id, record.id, { cover: nextCover }, "person");
+    if (!saved) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+    revalidatePath("/app");
+    revalidatePath(`/artifact/${saved.publicId}`);
+    return { success: true, data: { cover: saved.cover, pending: saved.pendingEdit !== null } };
+  } catch (error) {
+    return { success: false, error: actionErrorMessage(error, "The cover could not be saved. Try again.") };
   }
 }

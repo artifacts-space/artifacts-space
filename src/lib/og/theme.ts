@@ -25,6 +25,9 @@ export const OG_HEADLINE_TYPE = {
   letterSpacingEm: -0.035,
 } as const;
 
+/** The scrim over an image cover in a preview, darkest behind the text column, so the light text stays readable on any photo. */
+export const OG_COVER_SCRIM = "linear-gradient(90deg, rgba(10, 17, 24, 0.78) 0%, rgba(10, 17, 24, 0.55) 55%, rgba(10, 17, 24, 0.3) 100%)";
+
 /** Muted text on the ink backdrop: the kind label above an artifact title. */
 export const OG_TEXT_MUTED = "#5ccafc";
 

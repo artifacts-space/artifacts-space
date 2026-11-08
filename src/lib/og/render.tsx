@@ -8,9 +8,10 @@ import { fitText } from "./fit-text";
 import { ogMonoFont, ogSansFonts } from "./fonts";
 import { OgFrame } from "./frame";
 import { OgHeadline } from "./headline";
+import type { OgCover } from "./cover";
 import { OgIconMark } from "./icon";
 import { SynopsisCard } from "./synopsis-card";
-import { OG_ARTIFACT_TEXT_WIDTH, OG_SIZE, OG_TEXT_MUTED, OG_TITLE_TYPE } from "./theme";
+import { OG_ARTIFACT_TEXT_WIDTH, OG_COVER_SCRIM, OG_SIZE, OG_TEXT, OG_TEXT_MUTED, OG_TITLE_TYPE } from "./theme";
 
 /** The site's social preview: Strata Ink, the planet and wordmark, and the headline from src/lib/site-copy.ts. */
 export function siteImageResponse(headers: Record<string, string> = {}): ImageResponse {
@@ -49,14 +50,43 @@ function ArtifactTitle({ title }: { title: string }) {
   );
 }
 
-/** One artifact's social preview: the planet and wordmark, its kind and title, and a synopsis card on the right. */
+const fill = { position: "absolute", left: 0, top: 0, width: OG_SIZE.width, height: OG_SIZE.height } as const;
+
+/** The cover as the full-bleed backdrop: a gradient, or an image under a scrim. */
+function CoverBackdrop({ cover }: { cover: OgCover }) {
+  if (cover.type === "gradient") return <div style={{ ...fill, display: "flex", backgroundImage: `linear-gradient(${String(cover.angle)}deg, ${cover.from}, ${cover.to})` }} />;
+  return (
+    <div style={{ ...fill, display: "flex" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- Satori draws plain <img> only */}
+      <img src={cover.src} alt="" width={OG_SIZE.width} height={OG_SIZE.height} style={{ ...fill, objectFit: "cover", objectPosition: `50% ${String(cover.position)}%` }} />
+      <div style={{ ...fill, display: "flex", backgroundImage: OG_COVER_SCRIM }} />
+    </div>
+  );
+}
+
+/** Text colors on the backdrop: the theme's ink on a light gradient, the standard light text on ink or an image. */
+function textColors(cover: OgCover | null): { text: string; muted: string } {
+  if (cover?.type === "gradient") return { text: cover.ink, muted: cover.muted };
+  return { text: OG_TEXT, muted: OG_TEXT_MUTED };
+}
+
+/** One artifact's social preview: the planet and wordmark, its kind and title, and a synopsis card on the right, over its cover when it has one. */
 export function artifactImageResponse(og: ArtifactOg, headers: Record<string, string> = {}): ImageResponse {
+  const colors = textColors(og.cover);
   return new ImageResponse(
     (
-      <OgFrame background={strataInkPlainBackground} icon={planetIcon40} wordmark={OG_WORDMARK} textWidth={OG_ARTIFACT_TEXT_WIDTH} aside={<SynopsisCard synopsis={og.synopsis} palette={og.palette} />}>
+      <OgFrame
+        background={strataInkPlainBackground}
+        backdrop={og.cover ? <CoverBackdrop cover={og.cover} /> : undefined}
+        color={colors.text}
+        icon={planetIcon40}
+        wordmark={OG_WORDMARK}
+        textWidth={OG_ARTIFACT_TEXT_WIDTH}
+        aside={<SynopsisCard synopsis={og.synopsis} palette={og.palette} />}
+      >
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {og.icon ? <OgIconMark icon={og.icon} /> : null}
-          <div style={{ display: "flex", fontSize: 20, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: OG_TEXT_MUTED }}>{og.kindLabel}</div>
+          <div style={{ display: "flex", fontSize: 20, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: colors.muted }}>{og.kindLabel}</div>
           <ArtifactTitle title={og.title} />
         </div>
       </OgFrame>

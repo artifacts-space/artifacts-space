@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z, ZodError } from "zod";
 
+import { mcpCoverFields } from "@/lib/covers/cover";
 import { getEditableArtifact } from "@/lib/access";
 import type { VersionSummaryDto } from "@/lib/artifact-types";
 import { restoreArtifactVersion } from "@/lib/artifacts";
@@ -39,8 +40,8 @@ async function editable(userId: string, publicId: string) {
 
 /** A history entry as agents see it. */
 function toMcpVersion(version: VersionSummaryDto) {
-  const { editor, ...rest } = version;
-  return { ...rest, savedBy: editor ? { handle: editor.handle, kind: editor.kind } : null };
+  const { editor, cover, ...rest } = version;
+  return { ...rest, ...mcpCoverFields(cover), savedBy: editor ? { handle: editor.handle, kind: editor.kind } : null };
 }
 
 function registerReadTools(server: ToolServer, userId: string) {

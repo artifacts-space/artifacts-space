@@ -1,43 +1,43 @@
-import { and, eq, inArray, like } from "drizzle-orm";
+import { and, eq, inArray, like, or } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, artifactVersion } from "@/db/schema";
-import { FILE_PREFIX, iconFileId } from "@/lib/artifact-icons";
+import { FILE_PREFIX } from "@/lib/artifact-icons";
 import { protectedVersions } from "@/lib/versions/history";
 
-import { unusedIconFiles } from "./icon-cleanup-rules";
+import { imageFileIdOf, unusedIconFiles } from "./icon-cleanup-rules";
 import { getFileRows, removeFiles } from "./store";
 
 /**
- * Deletes old icon images an artifact no longer uses, so replacing or
- * removing an image icon does not leave files behind. Candidates are images
- * any version of the artifact showed as its icon, plus `alsoCheck` (the icon
- * before a save, which a merged version may no longer show). While an edit
+ * Deletes old icon and cover images an artifact no longer uses, so
+ * replacing or removing an image icon or cover does not leave files behind.
+ * Candidates are images any version of the artifact showed as its icon or
+ * cover, plus `alsoCheck` (the icon and cover before a save, which a merged version may no longer show). While an edit
  * waits for approval the approved version is protected, so its icon stays
  * until the edit is approved; approval calls this again. Returns how many
  * files went. Only files attached to this artifact are ever removed.
  */
 export async function pruneUnusedIconFiles(artifactId: string, alsoCheck: readonly (string | null)[] = []): Promise<number> {
   const [record] = await getDb()
-    .select({ icon: artifact.icon, kind: artifact.kind, content: artifact.content, approvedVersionId: artifact.approvedVersionId })
+    .select({ icon: artifact.icon, cover: artifact.cover, kind: artifact.kind, content: artifact.content, approvedVersionId: artifact.approvedVersionId })
     .from(artifact)
     .where(eq(artifact.id, artifactId))
     .limit(1);
   if (!record) return 0;
   const [iconRows, { pinned }] = await Promise.all([
     getDb()
-      .selectDistinct({ icon: artifactVersion.icon })
+      .selectDistinct({ icon: artifactVersion.icon, cover: artifactVersion.cover })
       .from(artifactVersion)
-      .where(and(eq(artifactVersion.artifactId, artifactId), like(artifactVersion.icon, `${FILE_PREFIX}%`))),
+      .where(and(eq(artifactVersion.artifactId, artifactId), or(like(artifactVersion.icon, `${FILE_PREFIX}%`), like(artifactVersion.cover, `${FILE_PREFIX}%`)))),
     protectedVersions(artifactId, record.approvedVersionId),
   ]);
-  const candidates = [...iconRows.map((row) => row.icon), ...alsoCheck].flatMap((icon) => {
-    const fileId = iconFileId(icon);
+  const candidates = [...iconRows.flatMap((row) => [row.icon, row.cover]), ...alsoCheck].flatMap((value) => {
+    const fileId = imageFileIdOf(value);
     return fileId ? [fileId] : [];
   });
   if (candidates.length === 0) return 0;
   const protectedStates = pinned.size === 0 ? [] : await getDb()
-    .select({ icon: artifactVersion.icon, kind: artifactVersion.kind, content: artifactVersion.content })
+    .select({ icon: artifactVersion.icon, cover: artifactVersion.cover, kind: artifactVersion.kind, content: artifactVersion.content })
     .from(artifactVersion)
     .where(inArray(artifactVersion.id, [...pinned]));
   const unused = unusedIconFiles(candidates, record, protectedStates);

@@ -11,6 +11,7 @@ import { filesForViewer } from "@/lib/files/download";
 import { fileUrl } from "@/lib/files/types";
 import { siteUrl } from "@/lib/site-origin";
 import { themeLabel } from "@/lib/themes/artifact-theme";
+import { coverLabel } from "@/lib/covers/cover";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import type { ArtifactMarkdownInput } from "./artifact-markdown";
@@ -89,6 +90,7 @@ export async function loadMarkdownInput(viewable: ViewableArtifact, userId: stri
     title: view.title,
     emoji: emojiOf(view.icon),
     theme: view.theme === null ? null : themeLabel(view.theme),
+    cover: view.cover === null ? null : coverLabel(view.cover),
     summary: view.summary,
     kind: view.kind,
     language: view.language,

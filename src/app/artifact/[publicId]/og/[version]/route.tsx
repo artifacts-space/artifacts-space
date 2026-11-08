@@ -43,6 +43,7 @@ export async function GET(request: NextRequest, context: RouteContext<"/artifact
   if (refusal) return tooManyRequests(refusal);
   const { publicId, version } = await context.params;
   const og = await preview(publicId, version);
-  if (og) return artifactImageResponse(og, { "Cache-Control": versionCache });
+  // A cover image that could not be fetched this time falls back to the standard backdrop; cache that briefly.
+  if (og) return artifactImageResponse(og, { "Cache-Control": og.coverDegraded ? genericCache : versionCache });
   return siteImageResponse({ "Cache-Control": genericCache });
 }

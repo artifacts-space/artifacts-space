@@ -169,6 +169,13 @@
       "when": 1794096116989,
       "tag": "0023_artifact_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794099413164,
+      "tag": "0024_artifact_covers",
+      "breakpoints": true
     }
   ]
 }

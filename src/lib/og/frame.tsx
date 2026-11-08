@@ -15,6 +15,10 @@ interface OgFrameProps {
   aside?: ReactNode;
   /** Width of the text column in px. */
   textWidth?: number;
+  /** Drawn instead of `background`: an artifact's cover. */
+  backdrop?: ReactNode;
+  /** The text color, for a light backdrop. Defaults to the light text on the ink backdrop. */
+  color?: string;
 }
 
 /**
@@ -22,11 +26,11 @@ interface OgFrameProps {
  * planet logo and wordmark above `children`. Satori only lays out flexbox, so
  * every element with more than one child sets `display: flex`.
  */
-export function OgFrame({ background, icon, wordmark, children, aside, textWidth = OG_TEXT_BOX.width }: OgFrameProps) {
+export function OgFrame({ background, icon, wordmark, children, aside, textWidth = OG_TEXT_BOX.width, backdrop, color = OG_TEXT }: OgFrameProps) {
   return (
     <div style={{ position: "relative", display: "flex", width: OG_SIZE.width, height: OG_SIZE.height }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- Satori draws plain <img> only */}
-      <img src={background} alt="" width={OG_SIZE.width} height={OG_SIZE.height} style={{ position: "absolute", left: 0, top: 0 }} />
+      {backdrop ?? <img src={background} alt="" width={OG_SIZE.width} height={OG_SIZE.height} style={{ position: "absolute", left: 0, top: 0 }} />}
       {aside}
       <div
         style={{
@@ -40,7 +44,7 @@ export function OgFrame({ background, icon, wordmark, children, aside, textWidth
           flexDirection: "column",
           justifyContent: "center",
           gap: OG_TEXT_BOX.gap,
-          color: OG_TEXT,
+          color,
           fontFamily: OG_SANS_FAMILY,
         }}
       >

@@ -80,7 +80,7 @@ describe("versionToServe", () => {
 });
 
 describe("sameReviewedFields", () => {
-  const base: ReviewedFields = { title: "T", icon: null, theme: null, summary: "", content: "a", kind: "markdown", language: "", source: "", metadata: { a: 1 } };
+  const base: ReviewedFields = { title: "T", icon: null, theme: null, cover: null, summary: "", content: "a", kind: "markdown", language: "", source: "", metadata: { a: 1 } };
 
   it("should treat versions as the same when only the deprecated project label differs, since projects are never reviewed", () => {
     const withLabel = { ...base, project: "Old label" };
@@ -100,6 +100,13 @@ describe("sameReviewedFields", () => {
     expect(sameReviewedFields(base, { ...base, icon: "🚀" })).toBe(false);
     expect(sameReviewedFields({ ...base, icon: "tabler:bug" }, { ...base, icon: "tabler:rocket" })).toBe(false);
     expect(sameReviewedFields({ ...base, icon: "🚀" }, { ...base, icon: "🚀" })).toBe(true);
+  });
+
+  it("should see a change when only the cover or its focal point differs, so a cover edit goes through approval", () => {
+    expect(sameReviewedFields(base, { ...base, cover: "mist" })).toBe(false);
+    expect(sameReviewedFields({ ...base, cover: "mist" }, { ...base, cover: "dusk" })).toBe(false);
+    expect(sameReviewedFields({ ...base, cover: "file:0f8fad5b-d9cb-469f-a165-70867728950e" }, { ...base, cover: "file:0f8fad5b-d9cb-469f-a165-70867728950e@20" })).toBe(false);
+    expect(sameReviewedFields({ ...base, cover: "mist" }, { ...base, cover: "mist" })).toBe(true);
   });
 
   it("should see a change when only the theme differs, so a theme edit goes through approval", () => {

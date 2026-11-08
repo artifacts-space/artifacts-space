@@ -65,6 +65,7 @@ export interface ReviewedFields {
   title: string;
   icon: string | null;
   theme: StoredArtifactTheme | null;
+  cover: string | null;
   summary: string;
   content: string;
   kind: string;
@@ -73,7 +74,7 @@ export interface ReviewedFields {
   metadata: Record<string, unknown>;
 }
 
-const reviewedKeys = ["title", "icon", "summary", "content", "kind", "language", "source"] as const;
+const reviewedKeys = ["title", "icon", "cover", "summary", "content", "kind", "language", "source"] as const;
 
 /** True when two versions show readers the same thing. */
 export function sameReviewedFields(a: ReviewedFields, b: ReviewedFields): boolean {

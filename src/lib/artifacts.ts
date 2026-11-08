@@ -23,6 +23,7 @@ import {
 import { artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
 import { artifactIconInputSchema, iconFileId } from "@/lib/artifact-icons";
 import { artifactThemeInputSchema } from "@/lib/themes/artifact-theme";
+import { artifactCoverInputSchema, coverFileId } from "@/lib/covers/cover";
 import { artifactSizeProblem } from "@/lib/artifact-limits";
 import { defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { PREVIEW_CHARS, previewKinds } from "@/lib/artifact-preview";
@@ -34,6 +35,7 @@ import { findOrCreateProject } from "@/lib/projects/store";
 import { checkContentFiles } from "@/lib/files/attach";
 import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { checkIconFile, restorableIcon } from "@/lib/files/icon-file";
+import { checkCoverFile, restorableCover } from "@/lib/files/cover-file";
 import { attachFileRows, deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
 import type { FileDto } from "@/lib/files/types";
 import { generatePublicId } from "@/lib/public-id";
@@ -57,6 +59,8 @@ export const artifactUpdateSchema = z.object({
   icon: artifactIconInputSchema.optional(),
   // A preset id or theme JSON (checked and normalised); null or "" removes it. Reviewed like the title.
   theme: artifactThemeInputSchema.optional(),
+  // A gradient id or "file:<uuid>[@0-100]"; null or "" removes it. Reviewed like the title.
+  cover: artifactCoverInputSchema.optional(),
   summary: z.string().trim().max(600).optional(),
   // Empty only for file artifacts, whose content is optional notes; validateArtifactContent checks.
   content: z.string().max(1_000_000).optional(),
@@ -120,6 +124,7 @@ function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy,
     title: record.title,
     icon: record.icon,
     theme: record.theme,
+    cover: record.cover,
     summary: record.summary,
     kind: record.kind,
     language: record.language,
@@ -318,7 +323,8 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
   assertArtifactSize(parsed);
   assertValidArtifactContent(parsed.kind, parsed.content);
   const contentFileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
-  const fileIds = [...new Set([...contentFileIds, ...(await checkIconFile(userId, null, parsed.icon))])];
+  const imageFileIds = [...(await checkIconFile(userId, null, parsed.icon)), ...(await checkCoverFile(userId, null, parsed.cover))];
+  const fileIds = [...new Set([...contentFileIds, ...imageFileIds])];
   await enforceRateLimit("artifactCreate", userId);
   await assertContentFits(userId, parsed.content);
   // New artifacts are private, so their project is among the author's own.
@@ -346,6 +352,11 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
   await recordArtifactSave({ before: null, after: record, editorId: userId, actor: "person", saveKind: "create" });
   const [dto] = await toArtifactDtos([record], userId);
   return dto ?? toArtifactDto(record);
+}
+
+/** True when a save replaced or removed an uploaded image icon or cover. */
+function imageChanged(before: ArtifactRecord, after: ArtifactRecord): boolean {
+  return (iconFileId(before.icon) !== null && after.icon !== before.icon) || (coverFileId(before.cover) !== null && after.cover !== before.cover);
 }
 
 /** Options for one save. */
@@ -400,8 +411,8 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
   }
   const saveKind = context.restoredFromId ? "restore" : "edit";
   await recordArtifactSave({ before, after: record, editorId, actor: context.actor, saveKind, restoredFromId: context.restoredFromId ?? null });
-  // A replaced or removed image icon goes with this save, unless something still shows it (see icon-cleanup.ts).
-  if (iconFileId(before.icon) && record.icon !== before.icon) await pruneUnusedIconFilesQuietly(record.id, [before.icon]);
+  // A replaced or removed image icon or cover goes with this save, unless something still shows it (see icon-cleanup.ts).
+  if (imageChanged(before, record)) await pruneUnusedIconFilesQuietly(record.id, [before.icon, before.cover]);
   const [dto] = await toArtifactDtos([record], editorId);
   return dto ?? null;
 }
@@ -434,8 +445,8 @@ export async function restoreArtifactVersion(userId: string, id: string, version
   if (!version) throw new UserFacingError("That version is no longer in the history.");
   // The project is not versioned: a restore keeps the artifact in its current project.
   const { title, theme, summary, content, kind, language, source, metadata } = version;
-  const icon = await restorableIcon(userId, before.id, version.icon);
-  const changes = artifactUpdateSchema.parse({ title, icon, theme, summary, content, kind, language, source, metadata });
+  const [icon, cover] = await Promise.all([restorableIcon(userId, before.id, version.icon), restorableCover(userId, before.id, version.cover)]);
+  const changes = artifactUpdateSchema.parse({ title, icon, theme, cover, summary, content, kind, language, source, metadata });
   assertArtifactSize(changes);
   return saveChanges(changes, { editorId: userId, before, actor, options, restoredFromId: version.id });
 }
@@ -444,8 +455,8 @@ export async function restoreArtifactVersion(userId: string, id: string, version
  * Checks and attaches the files an update's content and icon point at, before the
  * row changes, so a version saved with the edit already includes them.
  */
-async function attachUpdatedContentFiles(userId: string, current: ArtifactRecord, update: { kind?: string | undefined; content?: string | undefined; icon?: string | null | undefined }) {
-  const iconFileIds = await checkIconFile(userId, current.id, update.icon);
+async function attachUpdatedContentFiles(userId: string, current: ArtifactRecord, update: { kind?: string | undefined; content?: string | undefined; icon?: string | null | undefined; cover?: string | null | undefined }) {
+  const iconFileIds = [...(await checkIconFile(userId, current.id, update.icon)), ...(await checkCoverFile(userId, current.id, update.cover))];
   const contentChanged = update.kind !== undefined || update.content !== undefined;
   const contentFileIds = contentChanged ? await checkContentFiles(userId, current.id, update.kind ?? current.kind, update.content ?? current.content) : [];
   await attachFileRows(userId, current.id, [...new Set([...contentFileIds, ...iconFileIds])]);

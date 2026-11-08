@@ -2,6 +2,7 @@
 
 import { IconArrowBackUp, IconLoader2 } from "@tabler/icons-react";
 
+import { CoverArt } from "@/components/artifact-cover/cover-art";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ThemeScope } from "@/components/artifact-view/theme-scope";
 import { EditDiff } from "@/components/teams/edit-diff";
@@ -44,9 +45,10 @@ interface BodyProps {
 
 function VersionBody({ view, selected, compareWith, compareId, files }: BodyProps) {
   if (view === "preview") {
-    // The preview shows the version in the theme it was saved with.
+    // The preview shows the version in the theme it was saved with, under its cover.
     return (
       <ThemeScope theme={resolveTheme(selected.theme, null).theme} className="text-foreground">
+        {selected.cover ? <div data-version-cover="" className="relative mb-6 h-20 overflow-hidden rounded-lg"><CoverArt cover={selected.cover} /></div> : null}
         <ArtifactView kind={selected.kind} content={selected.content} title={selected.title} language={selected.language} files={files} />
       </ThemeScope>
     );
