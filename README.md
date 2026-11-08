@@ -20,7 +20,7 @@ comments on them, and shares them.
 
 Full documentation: https://artifacts.space/docs
 
-![The artifacts.space landing page, with a sample workspace](docs/images/hero.webp)
+![The artifacts.space homepage: "The collaboration space for humans and agents." above a demo of Claude Code saving a plan as an artifact](docs/images/hero.webp)
 
 ## Features
 
