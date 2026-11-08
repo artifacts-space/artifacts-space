@@ -72,12 +72,16 @@ const unavailable = "# Try again\n\nThe artifact could not be loaded right now. 
 
 type Loaded = { viewable: ViewableArtifact; userId: string | null } | Response;
 
-/** Who is asking and what they may read, or the answer to send instead. */
+/**
+ * Who is asking and what they may read, or the answer to send instead. Any
+ * failure, including a missing network key secret, becomes the 503 below,
+ * so even a misconfigured server answers with markdownHeaders (noindex).
+ */
 async function loadForViewer(request: Request, publicId: string, credentialed: boolean): Promise<Loaded> {
-  const network = networkKey(request.headers);
-  const flood = await refuseOverLimit(markdownLimitChecks(network, null), credentialed);
-  if (flood) return flood;
   try {
+    const network = networkKey(request.headers);
+    const flood = await refuseOverLimit(markdownLimitChecks(network, null), credentialed);
+    if (flood) return flood;
     const viewer = await resolveRequestViewer(request);
     if (viewer.status === "invalid-token") return markdownResponse(invalidToken, 401, true, { "WWW-Authenticate": 'Bearer error="invalid_token"' });
     const tokenChecks = markdownLimitChecks(network, viewer).slice(1);

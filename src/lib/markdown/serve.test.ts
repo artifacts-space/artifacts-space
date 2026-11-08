@@ -223,6 +223,17 @@ describe("artifactMarkdownResponse", () => {
     expect(response.status).toBe(503);
     expect(await response.text()).not.toContain("db down");
   });
+
+  it("should still send noindex, nofollow when the network key secret is missing", async () => {
+    vi.stubEnv("BETTER_AUTH_SECRET", "");
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    for (const respond of [artifactMarkdownResponse, artifactRawResponse]) {
+      const response = await respond(request(`/artifact/${publicId}.md`), publicId);
+      expect(response.status).toBe(503);
+      expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    }
+    expect(mocks.getViewableArtifact).not.toHaveBeenCalled();
+  });
 });
 
 describe("artifactRawResponse", () => {
