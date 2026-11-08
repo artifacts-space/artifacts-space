@@ -1,0 +1,36 @@
+/*
+ * The logo's ring seems to spin in place as the page scrolls. The ring never
+ * moves: a highlight clipped to the ring's cells travels around it, clockwise
+ * as you scroll down and back as you scroll up. The bands turn face on, in
+ * 10-degree steps so the light moves like frames of pixel art, and logo.tsx
+ * tilts them onto the ring's ellipse. Browsers without scroll timelines, and
+ * people who ask for reduced motion, see the still mark with no highlight.
+ */
+.logo-ring-sheen {
+  display: none;
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .logo-ring-sheen {
+      display: inline;
+      transform-box: view-box;
+      transform-origin: 0 0;
+      animation-name: logo-ring-sheen;
+      animation-timing-function: steps(36, end);
+      animation-fill-mode: both;
+      /* Three full turns from the top of the page to the bottom. */
+      animation-iteration-count: 3;
+      animation-timeline: scroll(root block);
+    }
+  }
+}
+
+@keyframes logo-ring-sheen {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
