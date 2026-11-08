@@ -47,7 +47,7 @@ const teamField = z
   .string()
   .max(39)
   .optional()
-  .describe("Team slug from teams_list. Required for team sharing. For link or public, the team whose admins approve it; defaults to your personal team.");
+  .describe("Team slug from teams_list. For team sharing, the team to share with; for link or public, the team whose admins approve it. Left out: the team the artifact is already shared through, else your personal team, else your only team.");
 
 const commentsField = z
   .enum(commentSettings)

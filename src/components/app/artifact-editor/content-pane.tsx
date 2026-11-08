@@ -25,11 +25,17 @@ interface ContentPaneProps {
   update: UpdateDraft;
 }
 
-/** The content textarea in edit mode, or the rendered artifact in preview mode. */
+/**
+ * The content textarea in edit mode, or the rendered artifact in preview mode.
+ * Both grow to fill the pane but never shrink below their content
+ * (`flex-[1_0_auto]`): inside the /app shell the pane has a fixed height, and
+ * a shrinkable `flex-1` box stopped at its 460px minimum while the content
+ * spilled over the files, Format/Language, and comments below it.
+ */
 export function ContentPane({ mode, kind, content, language, title, files, update }: ContentPaneProps) {
   if (mode === "edit") {
     return (
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-[1_0_auto] flex-col">
         <Textarea
           value={content}
           onChange={(event) => { update("content", event.target.value); }}
@@ -42,7 +48,7 @@ export function ContentPane({ mode, kind, content, language, title, files, updat
     );
   }
   return (
-    <div className="min-h-[460px] min-w-0 flex-1 bg-card p-5 sm:p-8">
+    <div className="min-h-[460px] min-w-0 flex-[1_0_auto] bg-card p-5 sm:p-8">
       <ArtifactView kind={kind} content={content} language={language} title={title} files={files} />
     </div>
   );

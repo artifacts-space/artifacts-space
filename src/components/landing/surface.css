@@ -1,0 +1,48 @@
+/*
+ * Explore the artifact: hover a callout and its region of the window lights
+ * up while the rest steps back; hover a region and its callout does the same.
+ * Pure CSS (:has), so the section stays a server component.
+ */
+.surface-region,
+.surface-callout,
+.surface-callout-number,
+.surface-pin {
+  transition-property: opacity, background-color, box-shadow, border-color, color;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.surface-explore:has([data-callout]:hover, [data-region]:hover) .surface-region {
+  opacity: 0.35;
+}
+
+.surface-explore:has([data-callout]:hover, [data-region]:hover) .surface-callout {
+  opacity: 0.5;
+}
+
+.surface-explore:has([data-callout="plan"]:hover, [data-region="plan"]:hover) :is([data-region="plan"], [data-callout="plan"]),
+.surface-explore:has([data-callout="comments"]:hover, [data-region="comments"]:hover) :is([data-region="comments"], [data-callout="comments"]),
+.surface-explore:has([data-callout="history"]:hover, [data-region="history"]:hover) :is([data-region="history"], [data-callout="history"]) {
+  opacity: 1;
+}
+
+.surface-explore:has([data-callout="plan"]:hover, [data-region="plan"]:hover) [data-region="plan"],
+.surface-explore:has([data-callout="comments"]:hover, [data-region="comments"]:hover) [data-region="comments"],
+.surface-explore:has([data-callout="history"]:hover, [data-region="history"]:hover) [data-region="history"] {
+  background-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--foreground);
+}
+
+.surface-explore:has([data-callout="plan"]:hover, [data-region="plan"]:hover) :is([data-region="plan"] .surface-pin, [data-callout="plan"] .surface-callout-number),
+.surface-explore:has([data-callout="comments"]:hover, [data-region="comments"]:hover) :is([data-region="comments"] .surface-pin, [data-callout="comments"] .surface-callout-number),
+.surface-explore:has([data-callout="history"]:hover, [data-region="history"]:hover) :is([data-region="history"] .surface-pin, [data-callout="history"] .surface-callout-number) {
+  border-color: var(--foreground);
+  background-color: var(--foreground);
+  color: var(--background);
+}
+
+.surface-explore:has([data-callout="plan"]:hover, [data-region="plan"]:hover) [data-callout="plan"],
+.surface-explore:has([data-callout="comments"]:hover, [data-region="comments"]:hover) [data-callout="comments"],
+.surface-explore:has([data-callout="history"]:hover, [data-region="history"]:hover) [data-callout="history"] {
+  border-color: var(--foreground);
+}

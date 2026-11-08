@@ -21,7 +21,8 @@ export const detailSection = "flex min-w-0 flex-1 flex-col md:min-h-0";
 export const detailOuter = "relative flex flex-col md:min-h-0 md:flex-1 shell-short:overflow-y-auto shell-short:overscroll-contain";
 
 export const detailBody = [
-  "relative flex flex-1 flex-col",
+  // Room under the last section, so the end of the artifact never sits on the pane's bottom edge.
+  "relative flex flex-1 flex-col pb-10",
   "shell-tall:min-h-0 shell-tall:overflow-y-auto shell-tall:overscroll-contain shell-tall:[container-type:size]",
   "shell-tall:[--data-grid-max-height:max(12rem,min(70vh,calc(100cqh_-_8rem)))]",
   "focus-visible:outline-2 focus-visible:-outline-offset-2",
