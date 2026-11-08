@@ -2,6 +2,7 @@ import { IconArrowRight } from "@tabler/icons-react";
 import Link from "next/link";
 
 import { clientGuides } from "@/components/setup/client-guides";
+import { ClientLogo } from "@/components/setup/client-logos";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { docsHref } from "@/lib/docs/pages";
 import { mcpClients } from "@/lib/setup/client-installs";
@@ -24,6 +25,7 @@ export function ClientPicker({ origin }: { origin: string }) {
               value={client.id}
               className="flex-none px-0 group-data-horizontal/tabs:after:bottom-0"
             >
+              <ClientLogo id={client.id} />
               {client.label}
             </TabsTrigger>
           ))}

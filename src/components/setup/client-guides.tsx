@@ -7,7 +7,11 @@ import {
   codexConfigToml,
   codexMcpAddCommand,
   codexMcpLoginCommand,
+  kimiMcpLoginCommand,
   opencodeConfigJson,
+  opencodeMcpAddCommand,
+  opencodeMcpAuthCommand,
+  opencodeMcpListCommand,
   type McpClientId,
 } from "@/lib/setup/client-installs";
 import { claudeMcpAddOAuthCommand, mcpEndpoint, mcpOAuthConfigJson } from "@/lib/setup/mcp-config";
@@ -141,6 +145,67 @@ export function CodexGuide({ origin, full = false }: ClientGuideProps) {
   );
 }
 
+/** A step that checks the connection, with the command or text that shows it. */
+function CheckStep({ children, note }: { children: ReactNode; note: ReactNode }) {
+  return (
+    <>
+      <Label>Check the connection</Label>
+      <div className="mt-2">{children}</div>
+      <Prose className="mt-2"><p>{note}</p></Prose>
+    </>
+  );
+}
+
+/** OpenCode: `opencode mcp add` with the URL, then `opencode mcp auth`. */
+export function OpenCodeGuide({ origin, full = false }: ClientGuideProps) {
+  return (
+    <>
+      <p className="text-md leading-6 text-muted-foreground">Run one command. There is no token to copy.</p>
+      <CommandSnippet command={opencodeMcpAddCommand(origin)} className="mt-3" />
+      <Prose className="mt-2"><p>The command adds the server to this project. Add <code>--global</code> to use it in every project.</p></Prose>
+      <Label>Sign in</Label>
+      <CommandSnippet command={opencodeMcpAuthCommand()} className="mt-2" />
+      <ApproveSteps opener={<>Run the command above, or open OpenCode, type <code>/mcps</code>, and choose <strong>artifacts</strong>. Your browser opens.</>} />
+      <CheckStep note={<>The list shows <strong>artifacts</strong> as connected. If it shows <strong>needs authentication</strong>, sign in again.</>}>
+        <CommandSnippet command={opencodeMcpListCommand()} />
+      </CheckStep>
+      {full ? (
+        <>
+          <Label>In opencode.json</Label>
+          <Prose className="mt-2"><p>Or add the server to <code>opencode.json</code> in your project by hand. OpenCode turns on sign-in for remote servers by itself.</p></Prose>
+          <CodeSnippet title="opencode.json" language="json" code={opencodeConfigJson(origin)} className="mt-3" />
+          <Prose className="mt-4"><p>On a remote machine, your browser can fail to reach OpenCode after you sign in. If that happens, copy the URL from the address bar and paste it into OpenCode.</p></Prose>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+/** Kimi Code CLI: an entry in `mcp.json`, then `/mcp-config login` inside Kimi Code. */
+export function KimiCodeGuide({ origin, full = false }: ClientGuideProps) {
+  return (
+    <>
+      <NoOneClick client="Kimi Code CLI" />
+      <Prose className="mt-2">
+        <p>Add this to <code>~/.kimi-code/mcp.json</code> for every project, or to <code>.kimi-code/mcp.json</code> in one project. Or type <code>/mcp-config</code> in Kimi Code and ask it to add the server.</p>
+      </Prose>
+      <CodeSnippet title="mcp.json" language="json" code={mcpOAuthConfigJson(origin)} className="mt-3" />
+      <Label>Sign in</Label>
+      <Prose className="mt-2"><p>Start a new Kimi Code session, because open sessions do not see a new server. Then type:</p></Prose>
+      <CodeSnippet title="Kimi Code" code={kimiMcpLoginCommand()} className="mt-3" />
+      <ApproveSteps opener="Kimi Code shows a sign-in link. Open it in your browser." />
+      <CheckStep note={<>Kimi Code lists <strong>artifacts</strong> with its connection status.</>}>
+        <CodeSnippet title="Kimi Code" code="/mcp" />
+      </CheckStep>
+      {full ? (
+        <Prose className="mt-4">
+          <p>Kimi Code CLI replaced the older Kimi CLI. It has no <code>kimi mcp add</code> command. Run <code>kimi migrate</code> to move your servers, then sign in to each one again.</p>
+        </Prose>
+      ) : null}
+    </>
+  );
+}
+
 /** Devin: a custom MCP server with OAuth. */
 export function DevinGuide({ origin, full = false }: ClientGuideProps) {
   return (
@@ -167,15 +232,13 @@ export function DevinGuide({ origin, full = false }: ClientGuideProps) {
   );
 }
 
-/** Any other client: the endpoint, OpenCode's config, and how discovery works. */
+/** Any other client: the endpoint, and how discovery works. */
 export function OtherClientsGuide({ origin, full = false }: ClientGuideProps) {
   return (
     <>
       <Prose className="mt-0">
         <p>Point any client that supports OAuth for remote servers at <code>{mcpEndpoint(origin)}</code> over Streamable HTTP. It needs only the URL.</p>
-        <p>OpenCode reads remote servers from <code>opencode.json</code>:</p>
       </Prose>
-      <CodeSnippet title="opencode.json" language="json" code={opencodeConfigJson(origin)} className="mt-3" />
       <ApproveSteps opener="The client opens your browser when it first connects." />
       {full ? (
         <Prose className="mt-4">
@@ -194,6 +257,8 @@ export const clientGuides: Record<McpClientId, (props: ClientGuideProps) => Reac
   cursor: CursorGuide,
   "claude-desktop": ClaudeDesktopGuide,
   codex: CodexGuide,
+  opencode: OpenCodeGuide,
   devin: DevinGuide,
+  "kimi-code": KimiCodeGuide,
   "other-clients": OtherClientsGuide,
 };

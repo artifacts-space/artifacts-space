@@ -1,0 +1,38 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+
+import { clientGuides } from "@/components/setup/client-guides";
+import { mcpClients } from "@/lib/setup/client-installs";
+
+import { ClientLogo } from "./client-logos";
+
+const origin = "https://artifacts.space";
+const endpoint = "https://artifacts.space/api/mcp";
+
+/** A literal color in markup: hex, rgb(), hsl(), or oklch(). */
+const literalColor = /#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/i;
+
+describe("ClientLogo", () => {
+  it.each(mcpClients.map((client) => [client.label, client.id] as const))("should draw a hidden mark in the text color when showing %s", (_label, id) => {
+    const html = renderToStaticMarkup(<ClientLogo id={id} />);
+    expect(html).toMatch(/^<svg /);
+    expect(html).toContain('aria-hidden="true"');
+    expect(html).toContain('fill="currentColor"');
+    expect(html).not.toMatch(literalColor);
+  });
+
+  it("should carry no title or label of its own when the visible text names the client", () => {
+    const html = renderToStaticMarkup(<ClientLogo id="opencode" />);
+    expect(html).not.toContain("<title");
+    expect(html).not.toContain("aria-label");
+  });
+});
+
+describe("client guides", () => {
+  it.each(mcpClients.map((client) => [client.label, client.id] as const))("should point %s at the canonical endpoint with no local process when rendered", (_label, id) => {
+    const Guide = clientGuides[id];
+    const html = renderToStaticMarkup(<Guide origin={origin} full />);
+    expect(html).toContain(endpoint);
+    expect(html).not.toMatch(/\bnpx\b|mcp-remote|stdio|&quot;command&quot;/);
+  });
+});
