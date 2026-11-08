@@ -16,7 +16,7 @@ test("should show totals, a daily chart, and top sites when an editor opens View
   await expect(dialog.locator('[data-stat="Views"]')).toHaveText("555");
   await expect(dialog.locator('[data-stat="Visitors"]')).toHaveText("265");
   await expect(dialog.getByRole("img", { name: /line chart of Views per day: 2 series over 30 labels/ })).toBeVisible();
-  await expect(dialog.locator("[data-referrer]")).toHaveText([/news\.ycombinator\.com\s*120/, /github\.com\s*48/, /x\.com\s*12/]);
+  await expect(dialog.locator("[data-referrer]")).toHaveText([/^news\.ycombinator\.com\s*120$/, /^github\.com\s*48$/, /^x\.com\s*12$/]);
   await expect(dialog.getByText(/Views are counted while an artifact is public/)).toHaveCount(0);
 
   await dialog.getByRole("button", { name: "90 days" }).click();
