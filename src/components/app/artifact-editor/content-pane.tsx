@@ -1,11 +1,16 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { ThemeScope } from "@/components/artifact-view/theme-scope";
 import { ContentStatus } from "@/components/editor/content-status";
 import { Textarea } from "@/components/ui/textarea";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
 import { readingMeasureClass } from "@/lib/page-width/rules";
+import type { Theme } from "@/lib/themes/schema";
+import { usesSitePalette } from "@/lib/themes/style";
 import { cn } from "@/lib/utils";
 
 import type { ArtifactDraft } from "./use-artifact-draft";
@@ -17,6 +22,11 @@ function isProse(kind: ArtifactKind) {
   return kind === "markdown" || kind === "text";
 }
 
+/** A themed artifact sits on its theme's page color, as on its page; an unthemed one keeps the card. */
+function surfaceClass(theme: Theme | null) {
+  return theme && !usesSitePalette(theme) ? "bg-background" : "bg-card";
+}
+
 interface ContentPaneProps {
   mode: EditorMode;
   kind: ArtifactKind;
@@ -26,6 +36,8 @@ interface ContentPaneProps {
   files: readonly FileDto[];
   /** The artifact's "Full width" setting: preview drops the reading measure. The edit textarea is always full width. */
   fullWidth: boolean;
+  /** The theme the artifact renders with (useRenderTheme). Null draws it in the site theme. */
+  theme?: Theme | null;
   update: UpdateDraft;
 }
 
@@ -34,26 +46,53 @@ interface ContentPaneProps {
  * Both grow to fill the pane but never shrink below their content
  * (`flex-[1_0_auto]`): inside the /app shell the pane has a fixed height, and
  * a shrinkable `flex-1` box stopped at its 460px minimum while the content
- * spilled over the files, Format/Language, and comments below it.
+ * spilled over the files, Format/Language, and comments below it. Both
+ * render inside a ThemeScope with the artifact's theme, as on its page, so
+ * the content wears it while the toolbar and sidebar keep the app's look.
  */
-export function ContentPane({ mode, kind, content, language, title, files, fullWidth, update }: ContentPaneProps) {
+export function ContentPane({ mode, kind, content, language, title, files, fullWidth, theme = null, update }: ContentPaneProps) {
   if (mode === "edit") {
     return (
-      <div className="flex flex-[1_0_auto] flex-col" data-full-width={fullWidth}>
+      <ThemeScope theme={theme} className="flex flex-[1_0_auto] flex-col text-foreground" data-full-width={fullWidth} data-content-theme="">
         <Textarea
           value={content}
           onChange={(event) => { update("content", event.target.value); }}
           aria-label="Artifact content"
           spellCheck={isProse(kind)}
-          className="min-h-[460px] flex-1 resize-y rounded-none border-0 bg-card p-6 font-mono text-base leading-7 md:text-sm shadow-none outline-none focus-visible:ring-0 sm:p-8"
+          className={cn("min-h-[460px] flex-1 resize-y rounded-none border-0 p-6 font-mono text-base leading-7 md:text-sm shadow-none outline-none focus-visible:ring-0 sm:p-8", surfaceClass(theme))}
         />
         <ContentStatus kind={kind} content={content} />
-      </div>
+      </ThemeScope>
     );
   }
   return (
-    <div className={cn("min-h-[460px] min-w-0 flex-[1_0_auto] bg-card p-5 sm:p-8", readingMeasureClass(fullWidth))} data-full-width={fullWidth}>
+    <PreviewSurface theme={theme} fullWidth={fullWidth} className="p-5 sm:p-8">
       <ArtifactView kind={kind} content={content} language={language} title={title} files={files} />
-    </div>
+    </PreviewSurface>
+  );
+}
+
+interface PreviewSurfaceProps {
+  theme: Theme | null;
+  fullWidth: boolean;
+  className?: string;
+  children: ReactNode;
+}
+
+/**
+ * The surface a rendered artifact sits on in /app: a ThemeScope with the
+ * artifact's theme (its page color behind the content when themed, the card
+ * otherwise) at the reading width or full width.
+ */
+export function PreviewSurface({ theme, fullWidth, className, children }: PreviewSurfaceProps) {
+  return (
+    <ThemeScope
+      theme={theme}
+      className={cn("min-h-[460px] min-w-0 flex-[1_0_auto] text-foreground", surfaceClass(theme), readingMeasureClass(fullWidth), className)}
+      data-full-width={fullWidth}
+      data-content-theme=""
+    >
+      {children}
+    </ThemeScope>
   );
 }

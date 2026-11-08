@@ -13,12 +13,12 @@ import { VersionHistory } from "@/components/history/version-history";
 import { Button } from "@/components/ui/button";
 import { ViewsDialog } from "@/components/views/views-dialog";
 import type { ArtifactDto } from "@/lib/artifact-types";
-import { readingMeasureClass } from "@/lib/page-width/rules";
-import { cn } from "@/lib/utils";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
+import { PreviewSurface } from "./artifact-editor/content-pane";
 import { detailBody, detailOuter, detailSection } from "./artifact-editor/detail-scroll";
 import { useEditAccess, useWithdrawSharing } from "./use-edit-access";
+import { useRenderTheme } from "./use-render-theme";
 
 /** "Platform · Read only · Changes waiting for approval", leaving out what does not apply. The visibility badge comes first. */
 function statusLine(artifact: ArtifactDto, teamName: string | null, canEdit: boolean) {
@@ -56,6 +56,7 @@ interface SharedArtifactPanelProps {
 export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn }: SharedArtifactPanelProps) {
   const { team, canEdit, canWithdraw, seesComments } = useEditAccess(artifact, viewerId);
   const { withdrawing, withdraw } = useWithdrawSharing(artifact.id, onWithdrawn);
+  const theme = useRenderTheme(artifact);
 
   return (
     <section className={detailSection} aria-label={artifact.title}>
@@ -97,9 +98,9 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
         </div>
         {/* Read only, so nothing in the pane takes focus first: the pane does, for keyboard scrolling. */}
         <div data-slot="detail-body" role="region" aria-label="Content" tabIndex={0} className={detailBody}>
-          <div className={cn("min-h-[460px] flex-[1_0_auto] bg-card p-6 sm:p-8", readingMeasureClass(artifact.fullWidth))} data-full-width={artifact.fullWidth}>
+          <PreviewSurface theme={theme} fullWidth={artifact.fullWidth} className="p-6 sm:p-8">
             <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
-          </div>
+          </PreviewSurface>
         </div>
       </div>
     </section>

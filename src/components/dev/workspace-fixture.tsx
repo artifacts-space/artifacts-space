@@ -15,7 +15,7 @@ import { matchesProjectFilter } from "@/lib/projects/sidebar-rules";
 import { fixtureArtifact, longCsv, longJson, longMarkdown, longUi } from "./fixture-content";
 import { createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, withProjects } from "./fixture-projects";
 
-/** Four long artifacts first, then enough short ones that the list scrolls. Note 2 has comments on. */
+/** Four long artifacts first, then enough short ones that the list scrolls. Note 2 has comments on; Note 9 has a theme. */
 function fixtureArtifacts(): ArtifactDto[] {
   const long = [
     fixtureArtifact({ id: "fixture-ui", kind: "ui", title: "Long ui fixture", content: longUi(), publicId: "fixtureworkspace0000ui" }),
@@ -27,7 +27,12 @@ function fixtureArtifacts(): ArtifactDto[] {
     fixtureArtifact({ id: `fixture-note-${String(index)}`, kind: "text", title: index === 0 ? LOCKED_TITLE : `Note ${String(index + 1)}`, content: `Note ${String(index + 1)}.`, publicId: `fixtureworkspacenote${String(index).padStart(2, "0")}` }),
   );
   // Note 2 keeps comments on for its author, so links can open a thread (e2e/artifact-link.spec.ts).
-  return [...long, ...short.map((note, index): ArtifactDto => (index === 1 ? { ...note, comments: "team" } : note))];
+  // Note 9 uses the Ocean theme, so the preview shows it in its theme (e2e/app-preview-theme.spec.ts).
+  return [...long, ...short.map((note, index): ArtifactDto => {
+    if (index === 1) return { ...note, comments: "team" };
+    if (index === 8) return { ...note, theme: "ocean", kind: "markdown", content: "# Ocean notes\n\nThe preview wears this artifact's theme." };
+    return note;
+  })];
 }
 
 /** The fixture's projects in memory, and a stand-in for the project server actions over them. */

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { CommentsControl } from "@/components/app/comments-picker";
 import { ShareControl } from "@/components/app/share-control";
 import type { ShareTeam } from "@/components/app/share-teams-context";
+import { useRenderTheme } from "@/components/app/use-render-theme";
 import { AttachedFiles } from "@/components/files/attached-files";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
@@ -70,6 +71,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   const shareUrl = `${origin}/artifact/${artifact.publicId}`;
   const shared = artifact.visibility === "link" || artifact.visibility === "public";
   const { outerRef, bodyRef, remember } = useScrollPlace(mode);
+  const theme = useRenderTheme(artifact);
   const changeMode = (next: EditorMode) => {
     remember();
     setMode(next);
@@ -123,7 +125,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           tabIndex={mode === "preview" ? 0 : undefined}
           className={detailBody}
         >
-          <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} files={artifact.files} fullWidth={artifact.fullWidth} update={update} />
+          <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} files={artifact.files} fullWidth={artifact.fullWidth} theme={theme} update={update} />
           {draft.kind === "file" || draft.kind === "ui" || artifact.files.length > 0 ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
           <MetaFields draft={draft} update={update} />
         </div>

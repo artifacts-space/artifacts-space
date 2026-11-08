@@ -8,6 +8,7 @@ import { updateArtifactAction } from "@/app/(workspace)/app/actions";
 import { ContentPane, type EditorMode } from "@/components/app/artifact-editor/content-pane";
 import { ModeBar } from "@/components/app/artifact-editor/editor-sections";
 import type { ArtifactDraft } from "@/components/app/artifact-editor/use-artifact-draft";
+import { useRenderTheme } from "@/components/app/use-render-theme";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { DocumentEditor, isDocumentKind } from "@/components/editor/document-editor";
@@ -51,6 +52,7 @@ interface SourceEditorProps {
  */
 function SourceEditor({ artifact, content, title, onChange }: SourceEditorProps) {
   const [mode, setMode] = useState<EditorMode>("edit");
+  const theme = useRenderTheme(artifact);
   // The workspace pane edits a whole draft; on this page only the content goes through it.
   function update<K extends keyof ArtifactDraft>(key: K, value: ArtifactDraft[K]) {
     if (key === "content" && typeof value === "string") onChange(value);
@@ -58,7 +60,7 @@ function SourceEditor({ artifact, content, title, onChange }: SourceEditorProps)
   return (
     <div className="card-surface flex flex-col overflow-hidden">
       <ModeBar mode={mode} onMode={setMode} length={content.length} updatedAt={artifact.updatedAt} updatedBy={artifact.updatedBy} />
-      <ContentPane mode={mode} kind={artifact.kind} content={content} language={artifact.language} title={title} files={artifact.files} fullWidth={artifact.fullWidth} update={update} />
+      <ContentPane mode={mode} kind={artifact.kind} content={content} language={artifact.language} title={title} files={artifact.files} fullWidth={artifact.fullWidth} theme={theme} update={update} />
     </div>
   );
 }

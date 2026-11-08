@@ -1,54 +1,13 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { readColors, type ColorReading } from "./support/colors";
+
 /**
  * The parts of the artifact page around the artifact (the header, the
  * comments, and the footer; the gallery's "artifact page chrome" specimen,
  * drawn by the same ArtifactPageTheme the page uses) take the artifact
  * theme's colors, swap when the theme changes, and stay readable.
  */
-
-interface Reading {
-  /** The color behind the element, with every translucent layer above the page composited, as "r,g,b". */
-  background: string;
-  /** The element's text color, composited on that background, as "r,g,b". */
-  text: string;
-  /** The WCAG contrast ratio of the text on the background. */
-  contrast: number;
-}
-
-/**
- * Reads what a reader sees: the browser draws each ancestor's background and
- * then the text color on a 1 by 1 canvas, so oklch(), light-dark(), and
- * translucent bars resolve exactly as painted.
- */
-function read(locator: Locator): Promise<Reading> {
-  return locator.evaluate((element) => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1;
-    canvas.height = 1;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) throw new Error("no canvas");
-    const chain: Element[] = [];
-    for (let node: Element | null = element; node; node = node.parentElement) chain.unshift(node);
-    const paint = (color: string) => {
-      context.fillStyle = color;
-      context.fillRect(0, 0, 1, 1);
-      return Array.from(context.getImageData(0, 0, 1, 1).data.slice(0, 3));
-    };
-    let background = paint("white");
-    for (const node of chain) background = paint(getComputedStyle(node).backgroundColor);
-    const text = paint(getComputedStyle(element).color);
-    const luminance = (rgb: number[]) => {
-      const [r = 0, g = 0, b = 0] = rgb.map((channel) => {
-        const value = channel / 255;
-        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-      });
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    };
-    const [light, dark] = [luminance(background), luminance(text)].sort((a, b) => b - a);
-    return { background: background.join(","), text: text.join(","), contrast: ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05) };
-  });
-}
 
 const partNames = ["header", "visibility", "comment", "commentMeta", "mention", "agentMention", "footer"] as const;
 type Part = (typeof partNames)[number];
@@ -69,18 +28,22 @@ function parts(page: Page): Record<Part, Locator> {
   };
 }
 
-async function readAll(page: Page): Promise<Map<Part, Reading>> {
+async function readAll(page: Page): Promise<Map<Part, ColorReading>> {
   const located = parts(page);
-  const readings = new Map<Part, Reading>();
-  for (const name of partNames) readings.set(name, await read(located[name]));
+  const readings = new Map<Part, ColorReading>();
+  for (const name of partNames) readings.set(name, await readColors(located[name]));
   return readings;
 }
 
 async function pickTheme(page: Page, current: string, next: string) {
   const specimen = page.locator('[data-specimen="artifact page chrome"]');
-  await specimen.getByRole("button", { name: `Page theme: ${current}` }).click();
-  await page.getByRole("radiogroup", { name: "Artifact theme" }).getByRole("radio", { name: new RegExp(`^${next}:`) }).click();
-  await expect(specimen.locator("[data-page-theme]")).toHaveAttribute("data-page-theme", next.toLowerCase());
+  const group = page.getByRole("radiogroup", { name: "Artifact theme" });
+  // A click that lands while the picker is still opening can miss, so open and pick again until the page shows it.
+  await expect(async () => {
+    if (!(await group.isVisible())) await specimen.getByRole("button", { name: `Page theme: ${current}` }).click({ timeout: 2_000 });
+    await group.getByRole("radio", { name: new RegExp(`^${next}:`) }).click({ timeout: 2_000 });
+    await expect(specimen.locator("[data-page-theme]")).toHaveAttribute("data-page-theme", next.toLowerCase(), { timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
   // Links and buttons fade their colors; read them once every transition has finished.
   await page.evaluate(async () => {
     const transitions = document.getAnimations().filter((animation) => animation instanceof CSSTransition);
