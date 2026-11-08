@@ -33,7 +33,7 @@ export function SurfaceSection() {
         </p>
       </div>
       <div className="surface-explore mt-12 grid gap-10 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-center">
-        <div className="dot-grid relative border border-dashed p-3 sm:p-8 lg:p-12">
+        <div className="dot-grid relative min-w-0 border border-dashed p-3 sm:p-8 lg:p-12">
           <SurfaceMock />
         </div>
         <ol className="grid gap-0 sm:grid-cols-3 sm:gap-6 xl:grid-cols-1 xl:gap-0">

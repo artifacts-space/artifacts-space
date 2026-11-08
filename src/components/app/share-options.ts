@@ -7,7 +7,7 @@ export const visibilityOptions: { value: ArtifactVisibility; title: string; deta
   { value: "private", title: "Private", detail: "Only you." },
   { value: "team", title: "Team", detail: "Signed-in members of a team." },
   { value: "link", title: "Link", detail: "Anyone with the link." },
-  { value: "public", title: "Public", detail: "Anyone. Search engines may list it." },
+  { value: "public", title: "Public", detail: "Anyone who has or finds the link." },
 ];
 
 /** Short label for a visibility, for buttons and lists. */

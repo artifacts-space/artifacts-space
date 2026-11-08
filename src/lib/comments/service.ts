@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getDb } from "@/db";
 import { artifact, comment, mention, type CommentRecord } from "@/db/schema";
 import { loadActors } from "@/lib/agents/queries";
+import { notifyComment } from "@/lib/notifications/create";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { COMMENT_MAX_LENGTH } from "./config";
@@ -92,6 +93,7 @@ export async function createComment(input: { actorId: string; publicId: string; 
     loopLimited: isLoopLimited({ writerKind: thread.actor.kind, streakBefore }),
     threadMutes,
   });
+  notifyComment({ artifact: thread.artifact, commentId: record.id, parentId, writer: thread.actor, writerThreadMuted: threadMutes.has(thread.actor.userId) });
   return { comment: await viewOf(record, input.actorId), mentions };
 }
 
@@ -131,6 +133,9 @@ export async function updateComment(input: { actorId: string; commentId: string;
     threadMutes,
     skipHandles,
   });
+  if (mentions.notified.length > 0) {
+    notifyComment({ artifact: thread.artifact, commentId: record.id, parentId: record.parentId, writer: thread.actor, writerThreadMuted: threadMutes.has(thread.actor.userId), edited: true });
+  }
   return { comment: await viewOf(updated, input.actorId), mentions };
 }
 

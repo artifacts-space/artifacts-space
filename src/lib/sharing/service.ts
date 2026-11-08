@@ -10,6 +10,7 @@ import { actsForAuthor } from "@/lib/agents/owner-access";
 import type { ArtifactDto, ArtifactVisibility, CommentSetting, SharingLevel } from "@/lib/artifact-types";
 import { commentsAfterSharing, decideCommentSetting, defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { isUniqueViolation } from "@/lib/db-errors";
+import { notifySharingDecision, notifySharingRequest } from "@/lib/notifications/create";
 import { rehomeArtifactProject } from "@/lib/projects/store";
 import { getTeamMembershipById, listTeamsForUser, type TeamMembership } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -83,9 +84,11 @@ async function rehomeProjectQuietly(artifactId: string) {
 }
 
 async function setVisibility(artifactId: string, visibility: ArtifactVisibility, teamId: string | null, byUserId: string, comments?: CommentSetting) {
+  // "Show in search engines" stays only while the artifact stays public (showInSearchAfterSharing).
+  const keepsSearch = visibility === "public" ? {} : { showInSearch: false };
   await getDb()
     .update(artifact)
-    .set({ visibility, teamId, ...(comments ? { comments } : {}) })
+    .set({ visibility, teamId, ...keepsSearch, ...(comments ? { comments } : {}) })
     .where(eq(artifact.id, artifactId));
   await rehomeProjectQuietly(artifactId);
   // An open edit request follows the artifact to its new approving team.
@@ -125,12 +128,14 @@ async function recordDecision(record: ArtifactRecord, team: TeamMembership, leve
 }
 
 async function storeRequest(record: ArtifactRecord, team: TeamMembership, level: SharingLevel, requesterId: string, comments: CommentSetting) {
+  const id = randomUUID();
   try {
-    await getDb().insert(sharingRequest).values({ id: randomUUID(), artifactId: record.id, teamId: team.id, requestedBy: requesterId, visibility: level, comments });
+    await getDb().insert(sharingRequest).values({ id, artifactId: record.id, teamId: team.id, requestedBy: requesterId, visibility: level, comments });
   } catch (error) {
     if (isUniqueViolation(error)) throw new UserFacingError("A sharing request for this artifact is already waiting.");
     throw error;
   }
+  notifySharingRequest(id);
 }
 
 /**
@@ -231,7 +236,8 @@ async function approve(request: typeof sharingRequest.$inferSelect, deciderId: s
       where id = ${request.id} and status = 'pending'
       returning artifact_id, team_id, visibility, requested_by, comments
     )
-    update ${artifact} set visibility = decided.visibility, team_id = decided.team_id, comments = coalesce(decided.comments, ${artifact.comments})
+    update ${artifact} set visibility = decided.visibility, team_id = decided.team_id, comments = coalesce(decided.comments, ${artifact.comments}),
+      show_in_search = ${artifact.showInSearch} and decided.visibility = 'public'
     from decided
     where ${artifact.id} = decided.artifact_id and ${artifact.userId} = ${target.userId}
   `);
@@ -250,6 +256,12 @@ export async function decideSharingRequest(input: { deciderId: string; requestId
   if (!canDecideRequest({ viewerRole: membership?.role ?? null, actor: "person" })) {
     throw new UserFacingError("Only team owners and admins can approve sharing.");
   }
+  await applyDecision(request, input);
+  // Reads the stored outcome, so a request canceled instead of approved notifies nobody.
+  notifySharingDecision(request.id);
+}
+
+async function applyDecision(request: typeof sharingRequest.$inferSelect, input: { deciderId: string; approve: boolean }) {
   if (request.kind === "edit") {
     await decideEditRequest(request, input.deciderId, input.approve);
     return;

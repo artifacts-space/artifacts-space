@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
+import { FullWidthToggle } from "./full-width-toggle";
 import { PageEditContext, type PageEdit } from "./page-edit-context";
 import { useLeaveGuard } from "./use-leave-guard";
 
@@ -43,17 +44,20 @@ interface PageEditBarProps {
   /** The save line; empty while the editable copy loads. */
   status?: React.ReactNode;
   source: { open: boolean; onToggle: () => void } | null;
+  /** The Full width switch; empty while the editable copy loads. */
+  width?: React.ReactNode;
 }
 
 /**
- * The row above an artifact its viewer may edit: the save status, History,
- * and More (View source). There is no Edit button and no Save button: the
+ * The row above an artifact its viewer may edit: the save status, Full
+ * width, History, and More (View source). There is no Edit button and no Save button: the
  * artifact is editable where it reads, and changes save on their own.
  */
-export function PageEditBar({ history, status, source }: PageEditBarProps) {
+export function PageEditBar({ history, status, source, width }: PageEditBarProps) {
   return (
     <div data-slot="editor-bar" className="mb-6 flex min-h-8 items-center justify-end gap-1">
       {status ?? <span className="mr-auto" />}
+      {width ? <span className="mr-2 shrink-0">{width}</span> : null}
       {history}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="More actions" disabled={!source} />}>
@@ -136,6 +140,7 @@ export function PageInlineEditor({ artifact: loaded, reviewed, onSaved, save, ch
         }
         status={<SaveLine status={autosave.status} dirty={autosave.dirty} onRetry={autosave.retryNow} />}
         source={{ open: sourceOpen, onToggle: toggleSource }}
+        width={<FullWidthToggle artifact={artifact} />}
       />
       <ConflictNotice status={autosave.status} onLoadTheirs={autosave.loadTheirs} onKeepMine={autosave.keepMine} className="mb-6 rounded-lg border sm:px-4" />
       {children}
