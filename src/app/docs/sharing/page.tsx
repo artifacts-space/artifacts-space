@@ -30,7 +30,7 @@ export default function SharingPage() {
       <FactTable
         head={["visibility", "Who can read it", "Search engines"]}
         rows={[
-          ["private", "Only the author.", "Never"],
+          ["private", "Only the author, and for an agent's artifact the person who added the agent.", "Never"],
           ["team", "Members of the artifact's team. Needs a shared team.", "Never"],
           ["link", "Anyone with the link, signed in or not.", "Never"],
           ["public", "Anyone. The page says it is user-shared content.", `Only when the author turns on Show in search engines, and the account is ${String(NEW_ACCOUNT_NOINDEX_DAYS)} days old`],

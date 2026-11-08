@@ -12,6 +12,8 @@ export const confirmationActions = [
   "revokeConnectedApp",
   "leaveTeam",
   "removeAgent",
+  // Removing an agent that would delete artifacts only it (and its owner) can read.
+  "removeAgentWithArtifacts",
   "removeMember",
   "restoreVersion",
   "discardEdits",

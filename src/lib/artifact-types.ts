@@ -110,6 +110,12 @@ export interface ArtifactDto {
   /** The team it is shared with (team), or whose admins approved it (link, public). */
   teamId: string | null;
   authorId: string;
+  /**
+   * True when the viewer added the agent that wrote it and is still in the
+   * agent's team: they read, edit, and share it as its author would, but
+   * never delete it. Left out means no.
+   */
+  actsForAuthor?: boolean;
   /** Set when a team owner took the artifact over from a member who left. */
   originalAuthorId: string | null;
   pendingSharing: PendingSharingDto | null;

@@ -8,7 +8,7 @@ import { rateLimitMessage } from "@/lib/abuse/rate-limit";
  */
 
 /** How a client sees a refusal. */
-export type RefusalShape = "mcp-429" | "tool-error" | "http-429" | "form";
+export type RefusalShape = "mcp-429" | "tool-error" | "http-429" | "form" | "not-counted";
 
 interface LimitPlacement {
   /** Who is counted: a user, a token, a team, or a network address. */
@@ -30,6 +30,8 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   fileUpload: { per: "user", where: "files_request_upload and web uploads", refusal: "tool-error", group: "Files and pages" },
   fileDownloadByNetwork: { per: "network", where: "/api/files views and downloads", refusal: "http-429", group: "Files and pages" },
   artifactPageByNetwork: { per: "network", where: "/artifact/<id> pages", refusal: "http-429", group: "Files and pages" },
+  viewByNetwork: { per: "network", where: "Counted views of public artifact pages", refusal: "not-counted", group: "Files and pages" },
+  viewByNetworkArtifact: { per: "network", where: "Counted views of one public artifact page", refusal: "not-counted", group: "Files and pages" },
   ogImageByNetwork: { per: "network", where: "Artifact preview images (cache misses only)", refusal: "http-429", group: "Files and pages" },
   reportByUser: { per: "user", where: "Reports from signed-in readers", refusal: "form", group: "Files and pages" },
   reportByNetwork: { per: "network", where: "Reports, signed in or not", refusal: "form", group: "Files and pages" },

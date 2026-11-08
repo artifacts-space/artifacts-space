@@ -12,6 +12,9 @@ import { siteOrigin } from "@/lib/site-origin";
 /** The repository's GitHub URL, for the security contact and policy. */
 const repository = "https://github.com/artifacts-space/artifacts-space";
 
+/** Where security reports go first. The GitHub advisory form is the second contact. */
+export const securityContactEmail = "security@artifacts.space";
+
 /**
  * When security.txt stops being valid (RFC 9116 asks for less than a year).
  * Bump it, after checking the contact still works, before the test that
@@ -66,7 +69,9 @@ export function sitemapFor(origin: string, artifactPaths: readonly string[] = []
 
 /** The /.well-known/security.txt body (RFC 9116) for a site at `origin`. */
 export function securityTxtFor(origin: string, expires: Date = securityTxtExpires): string {
+  // RFC 9116: list contacts in order of preference.
   return [
+    `Contact: mailto:${securityContactEmail}`,
     `Contact: ${repository}/security/advisories/new`,
     `Expires: ${expires.toISOString()}`,
     `Policy: ${repository}/blob/main/SECURITY.md`,

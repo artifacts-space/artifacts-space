@@ -17,6 +17,7 @@ export const toolSummaries = {
   artifacts_delete: "Delete an artifact you wrote.",
   artifacts_versions: "List an artifact's saved versions, or read one.",
   artifacts_restore_version: "Bring back an older version as a new save.",
+  artifacts_views: "See how many people read a public artifact you can edit.",
   artifacts_formats_guide: "Explain each format, with the component guide for rich pages.",
   artifacts_validate: "Check content against a format without saving it.",
   themes_list: "List the theme presets and cover gradients an artifact can use.",

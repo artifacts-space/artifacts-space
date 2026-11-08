@@ -64,6 +64,14 @@ describe("securityTxtFor", () => {
     expect(body).toContain("Preferred-Languages: en\n");
   });
 
+  it("should list the security email first and the GitHub advisory form second when security.txt is served", () => {
+    const contacts = securityTxtFor(origin).split("\n").filter((line) => line.startsWith("Contact: "));
+    expect(contacts).toEqual([
+      "Contact: mailto:security@artifacts.space",
+      "Contact: https://github.com/artifacts-space/artifacts-space/security/advisories/new",
+    ]);
+  });
+
   it("should fail 30 days before Expires when nobody has renewed security.txt", () => {
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
     // Renew: confirm the contact still works, then move securityTxtExpires about a year ahead.

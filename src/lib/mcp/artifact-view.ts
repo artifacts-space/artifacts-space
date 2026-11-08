@@ -35,7 +35,7 @@ export interface McpArtifact {
   showInSearch: boolean;
   /** The team's slug, shown only when the caller belongs to that team. */
   team: string | null;
-  /** An open sharing request, shown only to the author. */
+  /** An open sharing request, shown only to the author (and the person who added the agent that wrote it). */
   pendingSharing: { visibility: SharingLevel; team: string | null; comments: CommentSetting | null; requestedAt: string } | null;
   /** An open request to open comments to anyone signed in, shown only to the author. */
   pendingComments: { comments: CommentSetting; requestedAt: string } | null;
@@ -67,8 +67,10 @@ function projectName(project: ArtifactDto["project"]): string {
 /** Maps an artifact, with or without its content, to the agent-facing shape. */
 function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext): McpArtifact {
   const isAuthor = dto.authorId === context.viewerId;
+  // The person who added the agent that wrote it shares it as the author would, so they see its open requests too.
+  const seesRequests = isAuthor || dto.actsForAuthor === true;
   const slug = (teamId: string | null) => (teamId ? context.teamSlugs.get(teamId) ?? null : null);
-  const pending = isAuthor && dto.pendingSharing
+  const pending = seesRequests && dto.pendingSharing
     ? { visibility: dto.pendingSharing.level, team: slug(dto.pendingSharing.teamId), comments: dto.pendingSharing.comments, requestedAt: dto.pendingSharing.requestedAt }
     : null;
   return {
@@ -90,8 +92,8 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     showInSearch: dto.showInSearch,
     team: slug(dto.teamId),
     pendingSharing: pending,
-    pendingComments: isAuthor && dto.pendingComments ? { comments: dto.pendingComments.comments, requestedAt: dto.pendingComments.requestedAt } : null,
-    pendingEdit: isAuthor && dto.pendingEdit ? { requestedAt: dto.pendingEdit.requestedAt } : null,
+    pendingComments: seesRequests && dto.pendingComments ? { comments: dto.pendingComments.comments, requestedAt: dto.pendingComments.requestedAt } : null,
+    pendingEdit: seesRequests && dto.pendingEdit ? { requestedAt: dto.pendingEdit.requestedAt } : null,
     isAuthor,
     updatedBy: dto.updatedBy ? (dto.updatedBy.handle ? `@${dto.updatedBy.handle}` : dto.updatedBy.name) : null,
     files: dto.files.map(({ id, filename, contentType, size }) => ({ id, filename, contentType, size })),

@@ -1,5 +1,5 @@
 {
-  "id": "20b8e201-b2e3-4ebc-8894-61f62af6c025",
+  "id": "295f2e89-a566-4e8a-b9d2-35dc2de324d3",
   "prevId": "bf4c133d-2787-4f5b-8d95-accea64237da",
   "version": "7",
   "dialect": "postgresql",
@@ -360,13 +360,6 @@
           "notNull": true,
           "default": "'team'"
         },
-        "show_in_search": {
-          "name": "show_in_search",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "share_id": {
           "name": "share_id",
           "type": "text",
@@ -546,22 +539,6 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "artifact_in_search_idx": {
-          "name": "artifact_in_search_idx",
-          "columns": [
-            {
-              "expression": "public_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"artifact\".\"show_in_search\" and \"artifact\".\"visibility\" = 'public'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -4330,6 +4307,198 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.artifact_view_day": {
+      "name": "artifact_view_day",
+      "schema": "",
+      "columns": {
+        "artifact_id": {
+          "name": "artifact_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "views": {
+          "name": "views",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "visitors": {
+          "name": "visitors",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "artifact_view_day_artifact_id_artifact_id_fk": {
+          "name": "artifact_view_day_artifact_id_artifact_id_fk",
+          "tableFrom": "artifact_view_day",
+          "tableTo": "artifact",
+          "columnsFrom": [
+            "artifact_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "artifact_view_day_artifact_id_day_pk": {
+          "name": "artifact_view_day_artifact_id_day_pk",
+          "columns": [
+            "artifact_id",
+            "day"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.artifact_view_referrer": {
+      "name": "artifact_view_referrer",
+      "schema": "",
+      "columns": {
+        "artifact_id": {
+          "name": "artifact_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "domain": {
+          "name": "domain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "views": {
+          "name": "views",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "artifact_view_referrer_artifact_id_artifact_id_fk": {
+          "name": "artifact_view_referrer_artifact_id_artifact_id_fk",
+          "tableFrom": "artifact_view_referrer",
+          "tableTo": "artifact",
+          "columnsFrom": [
+            "artifact_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "artifact_view_referrer_artifact_id_day_domain_pk": {
+          "name": "artifact_view_referrer_artifact_id_day_domain_pk",
+          "columns": [
+            "artifact_id",
+            "day",
+            "domain"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.artifact_view_visitor": {
+      "name": "artifact_view_visitor",
+      "schema": "",
+      "columns": {
+        "artifact_id": {
+          "name": "artifact_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "visitor": {
+          "name": "visitor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "artifact_view_visitor_day_idx": {
+          "name": "artifact_view_visitor_day_idx",
+          "columns": [
+            {
+              "expression": "day",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "artifact_view_visitor_artifact_id_artifact_id_fk": {
+          "name": "artifact_view_visitor_artifact_id_artifact_id_fk",
+          "tableFrom": "artifact_view_visitor",
+          "tableTo": "artifact",
+          "columnsFrom": [
+            "artifact_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "artifact_view_visitor_artifact_id_day_visitor_pk": {
+          "name": "artifact_view_visitor_artifact_id_day_visitor_pk",
+          "columns": [
+            "artifact_id",
+            "day",
+            "visitor"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
