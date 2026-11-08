@@ -6,6 +6,7 @@ import type { ArtifactMetaRecord } from "@/lib/artifact-columns";
 import { getArtifactAccess } from "@/lib/access";
 import { canViewArtifact } from "@/lib/access-rules";
 import { loadActors } from "@/lib/agents/queries";
+import { markMentionNotificationsRead } from "@/lib/notifications/feed";
 import { listTeamIdsForUser } from "@/lib/teams/queries";
 
 import { INBOX_CONTEXT_COMMENTS } from "./config";
@@ -107,6 +108,8 @@ export async function markInboxRead(userId: string, ids: string[] | "all"): Prom
     conditions.push(inArray(mention.id, ids));
   }
   const changed = await getDb().update(mention).set({ readAt: new Date() }).where(and(...conditions)).returning();
+  // The bell's mention notifications for the same comments follow.
+  await markMentionNotificationsRead(userId, changed.map((row) => row.commentId));
   return changed.length;
 }
 
