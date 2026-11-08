@@ -9,8 +9,8 @@ import { defaultTeamId } from "./share-options";
 import type { ShareTeam } from "./share-teams-context";
 
 /**
- * The Share dialog's choice: who can read it, through which team, and who can
- * comment. Until the person picks a comments setting, it follows the level and
+ * The Share dialog's choice: who can read it, through which team, who can
+ * comment, and whether a public artifact shows in search engines. Until the person picks a comments setting, it follows the level and
  * team the way the server would decide it.
  */
 export function useShareChoice(artifact: ArtifactDto, teams: readonly ShareTeam[]) {
@@ -18,6 +18,7 @@ export function useShareChoice(artifact: ArtifactDto, teams: readonly ShareTeam[
   const [teamId, setTeamId] = useState(() => defaultTeamId(artifact.visibility, teams, artifact.teamId));
   const [comments, setComments] = useState<CommentSetting>(artifact.comments);
   const [commentsChosen, setCommentsChosen] = useState(false);
+  const [showInSearch, setShowInSearch] = useState(artifact.showInSearch);
 
   function follow(nextVisibility: ArtifactVisibility, nextTeamId: string | null) {
     if (commentsChosen) return;
@@ -30,6 +31,8 @@ export function useShareChoice(artifact: ArtifactDto, teams: readonly ShareTeam[
     teamId,
     team: teams.find((item) => item.id === teamId),
     comments,
+    showInSearch,
+    chooseShowInSearch: setShowInSearch,
     changeLevel: (next: ArtifactVisibility) => {
       const nextTeamId = defaultTeamId(next, teams, teamId ?? artifact.teamId);
       setVisibility(next);

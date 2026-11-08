@@ -6,11 +6,13 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   getTeamForMember: vi.fn(),
   hitRateLimits: vi.fn(),
+  isPageSearchIndexable: vi.fn(),
 }));
 
 vi.mock("@/lib/access", () => ({ canReadArtifact: mocks.canReadArtifact }));
 vi.mock("@/lib/auth/server", () => ({ getAuth: () => ({ api: { getSession: mocks.getSession } }) }));
 vi.mock("@/lib/teams/queries", () => ({ getTeamForMember: mocks.getTeamForMember }));
+vi.mock("@/lib/search/search-queries", () => ({ isPageSearchIndexable: mocks.isPageSearchIndexable }));
 vi.mock("@/lib/abuse/rate-limit", () => ({
   hitRateLimits: mocks.hitRateLimits,
   rateLimitMessage: () => "Your network has opened a lot of artifact pages in the last hour. Try again in about 5 minutes.",
@@ -36,6 +38,7 @@ describe("proxy", () => {
     // Network keys need a secret to hash with (src/lib/abuse/network-key.ts).
     vi.stubEnv("BETTER_AUTH_SECRET", "test-network-key-secret");
     mocks.hitRateLimits.mockResolvedValue(null);
+    mocks.isPageSearchIndexable.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -135,6 +138,46 @@ describe("proxy", () => {
   it("should pass server actions through when the request is a POST", async () => {
     const response = await proxy(request("/app", { method: "POST" }));
     expect(location(response)).toBeNull();
+  });
+
+  it("should send noindex, nofollow when a readable artifact page may not be indexed", async () => {
+    mocks.canReadArtifact.mockResolvedValue(true);
+    mocks.isPageSearchIndexable.mockResolvedValue(false);
+    const response = await proxy(request("/artifact/abc"));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+  });
+
+  it("should send no X-Robots-Tag when the author opted a public artifact into search engines", async () => {
+    mocks.canReadArtifact.mockResolvedValue(true);
+    mocks.isPageSearchIndexable.mockResolvedValue(true);
+    const response = await proxy(request("/artifact/abc"));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-robots-tag")).toBeNull();
+  });
+
+  it("should send noindex, nofollow on the 404 when the viewer cannot read the artifact", async () => {
+    mocks.canReadArtifact.mockResolvedValue(false);
+    mocks.isPageSearchIndexable.mockResolvedValue(true);
+    const response = await proxy(request("/artifact/abc"));
+    expect(response.status).toBe(404);
+    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+  });
+
+  it("should stay noindex when the search visibility check fails", async () => {
+    mocks.canReadArtifact.mockResolvedValue(true);
+    mocks.isPageSearchIndexable.mockRejectedValue(new Error("down"));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = await proxy(request("/artifact/abc"));
+    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+  });
+
+  it("should stay noindex when the read check fails", async () => {
+    mocks.canReadArtifact.mockRejectedValue(new Error("down"));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = await proxy(request("/artifact/abc"));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
   });
 
   it("should not run on auth, API, or invitation routes", () => {

@@ -2,11 +2,13 @@ import { networkKey } from "@/lib/abuse/network-key";
 import { hitRateLimits } from "@/lib/abuse/rate-limit";
 import { tooManyRequests } from "@/lib/abuse/responses";
 import { findReadableFile, signedFileUrl } from "@/lib/files/download";
+import { noindexHeader, robotsHeaderName } from "@/lib/search/search-rules";
 import { resolveRequestViewer, viewerUserId } from "@/lib/request-viewer";
 
-/** Headers on every answer from this route. R2 serves the bytes; these cover what we send. */
+/** Headers on every answer from this route. R2 serves the bytes; these cover what we send. Files are never indexed. */
 const baseHeaders = {
   "Cache-Control": "private, no-store",
+  [robotsHeaderName]: noindexHeader,
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
 };

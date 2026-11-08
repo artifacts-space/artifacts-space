@@ -4,7 +4,7 @@ import { IconClock, IconLink, IconLoader2, IconLock, IconUsersGroup, IconWorld }
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { setCommentsAction, shareArtifactAction } from "@/app/(workspace)/app/sharing-actions";
+import { setCommentsAction, setShowInSearchAction, shareArtifactAction } from "@/app/(workspace)/app/sharing-actions";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,8 @@ import { cn } from "@/lib/utils";
 
 import { commentLabel, commentsWaitForApproval } from "./comment-options";
 import { CommentsPicker } from "./comments-picker";
+import { SearchEnginesPicker } from "./search-engines-picker";
+import { searchChangeAfterSave, searchSwitchState, type SearchSwitchState } from "./search-options";
 import { outcomeText, selectedTeamLabel, teamLabel, teamsFor, visibilityLabel, visibilityOptions } from "./share-options";
 import { useShareTeams, type ShareTeam } from "./share-teams-context";
 import { useShareChoice } from "./use-share-choice";
@@ -119,12 +121,45 @@ function ShareOutcome(props: { artifact: ArtifactDto; visibility: ArtifactVisibi
   return <p className="text-sm leading-5 text-muted-foreground">{text}</p>;
 }
 
-/** Saves the dialog: only the comments setting when the level and team stay, else a sharing change that carries it. */
-function saveChoice(artifact: ArtifactDto, choice: { visibility: ArtifactVisibility; teamId: string | null; comments: CommentSetting }): Promise<ActionResult<{ status: "applied" | "pending"; artifact: ArtifactDto }>> {
+type SaveResult = ActionResult<{ status: "applied" | "pending"; artifact: ArtifactDto }>;
+
+interface SaveChoice {
+  visibility: ArtifactVisibility;
+  teamId: string | null;
+  comments: CommentSetting;
+  showInSearch: boolean;
+  searchState: SearchSwitchState;
+}
+
+/** Whether only "Show in search engines" changed, so sharing and comments need no call. */
+function onlySearchChanged(artifact: ArtifactDto, choice: SaveChoice, teamId: string | null): boolean {
+  const sameSharing = choice.visibility === artifact.visibility && (choice.visibility === "private" || teamId === artifact.teamId);
+  return sameSharing && choice.comments === artifact.comments && choice.showInSearch !== artifact.showInSearch;
+}
+
+/** Saves who can read it and who can comment: only the comments setting when the level and team stay, else a sharing change that carries it. */
+function saveSharing(artifact: ArtifactDto, choice: SaveChoice): Promise<SaveResult> {
   const teamId = choice.visibility === "private" ? null : choice.teamId;
+  if (onlySearchChanged(artifact, choice, teamId)) return Promise.resolve({ success: true, data: { status: "applied", artifact } });
   const sameSharing = choice.visibility === artifact.visibility && (choice.visibility === "private" || teamId === artifact.teamId);
   if (sameSharing && choice.comments !== artifact.comments) return setCommentsAction(artifact.id, choice.comments);
   return shareArtifactAction(artifact.id, { visibility: choice.visibility, teamId, comments: choice.comments });
+}
+
+/**
+ * Saves the dialog: sharing and comments first, then "Show in search engines"
+ * once the artifact is public. When only the second step fails, `onShared`
+ * still gets the saved sharing so the dialog shows what applied.
+ */
+async function saveChoice(artifact: ArtifactDto, choice: SaveChoice, onShared: (artifact: ArtifactDto) => void): Promise<SaveResult> {
+  const shared = await saveSharing(artifact, choice);
+  if (!shared.success) return shared;
+  const saved = shared.data.artifact;
+  if (!searchChangeAfterSave({ state: choice.searchState, savedVisibility: saved.visibility, saved: saved.showInSearch, chosen: choice.showInSearch })) return shared;
+  const search = await setShowInSearchAction(artifact.id, choice.showInSearch);
+  if (search.success) return { success: true, data: { status: shared.data.status, artifact: search.data } };
+  onShared(saved);
+  return search;
 }
 
 interface ShareControlProps {
@@ -141,7 +176,8 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
   const teams = useShareTeams();
   const [open, setOpen] = useState(false);
   const choice = useShareChoice(artifact, teams);
-  const { visibility, teamId, team, comments } = choice;
+  const { visibility, teamId, team, comments, showInSearch } = choice;
+  const searchState = searchSwitchState({ current: artifact.visibility, visibility, team });
   const [saving, setSaving] = useState(false);
   const waiting = artifact.pendingSharing !== null || artifact.pendingEdit !== null || artifact.pendingComments !== null;
   const Icon = waiting ? IconClock : icons[artifact.visibility];
@@ -150,7 +186,7 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
   async function save() {
     setSaving(true);
     try {
-      const result = await saveChoice(artifact, { visibility, teamId, comments });
+      const result = await saveChoice(artifact, { visibility, teamId, comments, showInSearch, searchState }, onUpdated);
       if (!result.success) {
         toast.error(result.error);
         return;
@@ -184,6 +220,7 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
             <PendingEditNotice artifact={artifact} />
             <LevelPicker value={visibility} onChange={choice.changeLevel} />
             <TeamPicker visibility={visibility} teams={teams} value={teamId} onChange={choice.changeTeam} />
+            <SearchEnginesPicker state={searchState} checked={showInSearch} onChange={choice.chooseShowInSearch} />
             <CommentsPicker visibility={visibility} team={team} value={comments} onChange={choice.chooseComments} />
             <ShareOutcome artifact={artifact} visibility={visibility} team={team} comments={comments} />
             {live ? (

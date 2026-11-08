@@ -43,6 +43,7 @@ import type { FileDto } from "@/lib/files/types";
 import { generatePublicId } from "@/lib/public-id";
 import { assertContentFits } from "@/lib/quota/usage";
 import type { SharingActor } from "@/lib/sharing/rules";
+import { showsInSearch } from "@/lib/search/search-rules";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { forgetArtifactCache } from "@/lib/versions/cache";
 import { getVersionOf } from "@/lib/versions/history";
@@ -139,6 +140,7 @@ function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy,
     source: record.source,
     visibility: record.visibility,
     comments: record.comments,
+    showInSearch: showsInSearch(record),
     teamId: record.teamId,
     authorId: record.userId,
     actsForAuthor,

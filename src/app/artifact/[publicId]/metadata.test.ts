@@ -19,9 +19,11 @@ vi.mock("@/lib/og/artifact-og", async (importOriginal) => ({
 
 const { generateMetadata } = await import("./page");
 
-function viewable(visibility: string, view: { title: string; icon: string | null; summary: string }) {
-  return { record: { publicId: "abc123", visibility, userId: "u1" }, view };
+function viewable(visibility: string, view: { title: string; icon: string | null; summary: string }, showInSearch = false) {
+  return { record: { publicId: "abc123", visibility, userId: "u1", showInSearch }, view };
 }
+
+const plan = { title: "Plan", icon: null, summary: "" };
 
 function call() {
   return generateMetadata({ params: Promise.resolve({ publicId: "abc123" }), searchParams: Promise.resolve({}) });
@@ -71,6 +73,40 @@ describe("artifact page generateMetadata", () => {
     expect(serialized).not.toContain("Secret project label");
     expect(serialized).not.toContain("project-1");
     expect(serialized).not.toContain("secret-tag-label");
+  });
+
+  it("should not index when the artifact is private, team, or link, even with the search setting on", async () => {
+    mocks.artifactOgMetadata.mockResolvedValue({});
+    for (const visibility of ["private", "team", "link"]) {
+      mocks.getViewableArtifact.mockResolvedValue(viewable(visibility, plan, true));
+      expect((await call()).robots).toEqual({ index: false, follow: false });
+    }
+  });
+
+  it("should not index a public artifact when its author has not turned on search engines", async () => {
+    mocks.getViewableArtifact.mockResolvedValue(viewable("public", plan));
+    mocks.artifactOgMetadata.mockResolvedValue({});
+    expect((await call()).robots).toEqual({ index: false, follow: false });
+  });
+
+  it("should index without following links when the author turned on search engines and the account is established", async () => {
+    mocks.getViewableArtifact.mockResolvedValue(viewable("public", plan, true));
+    mocks.artifactOgMetadata.mockResolvedValue({});
+    expect((await call()).robots).toEqual({ index: true, follow: false });
+  });
+
+  it("should not index an opted-in public artifact when the author's account is new", async () => {
+    mocks.getViewableArtifact.mockResolvedValue(viewable("public", plan, true));
+    mocks.artifactOgMetadata.mockResolvedValue({});
+    mocks.accountCreatedAt.mockResolvedValue(new Date());
+    expect((await call()).robots).toEqual({ index: false, follow: false });
+  });
+
+  it("should not index when the account age lookup fails", async () => {
+    mocks.getViewableArtifact.mockResolvedValue(viewable("public", plan, true));
+    mocks.artifactOgMetadata.mockResolvedValue({});
+    mocks.accountCreatedAt.mockRejectedValue(new Error("down"));
+    expect((await call()).robots).toEqual({ index: false, follow: false });
   });
 
   it("should not index and add no artifact tags when the artifact is not found", async () => {
