@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const themes = ["light", "dark"] as const;
 
@@ -64,7 +64,80 @@ test("should jump to the How it works section when the header link is clicked", 
   await page.goto("/");
   await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "How it works" }).click();
   await expect(page).toHaveURL(/#how$/);
-  await expect(page.getByRole("heading", { level: 2, name: "Use it like the artifacts you already know." })).toBeInViewport();
+  const heading = page.getByRole("heading", { level: 2, name: "Use it like the artifacts you already know." });
+  await expect(heading).toBeInViewport();
+  const headerBox = await page.getByRole("banner").boundingBox();
+  const headingBox = await heading.boundingBox();
+  expect(headerBox && headingBox && headingBox.y >= headerBox.y + headerBox.height, "the heading sits below the pinned header").toBe(true);
+});
+
+/** A computed color with zero alpha, in whichever color space the browser reports it. */
+const transparent = /(?:\/ 0\)|, 0\))$/;
+
+test("should keep the header pinned to the top with a visible edge when the page scrolls", async ({ page }) => {
+  await page.goto("/");
+  const header = page.getByRole("banner");
+  const edgeAtTop = await header.evaluate((element) => getComputedStyle(element).borderBottomColor);
+  expect(edgeAtTop, "the edge is hidden at the top of the page").toMatch(transparent);
+
+  await page.getByRole("region", { name: "Pricing" }).scrollIntoViewIfNeeded();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
+  await expect(header).toBeInViewport();
+  const box = await header.boundingBox();
+  expect(Math.abs(box?.y ?? Number.NaN), "the header sits at the top of the window").toBeLessThanOrEqual(1);
+  await expect(header.getByRole("link", { name: "Sign in" })).toBeVisible();
+  const edge = await header.evaluate((element) => getComputedStyle(element).borderBottomColor);
+  expect(edge, "the edge shows once the page has scrolled").not.toMatch(transparent);
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
+});
+
+test("should pin the How it works stage below the header when the window is desktop sized", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "the stage pins only on wide screens");
+  await page.goto("/");
+  const how = page.getByRole("region", { name: "Use it like the artifacts you already know." });
+  const sectionTop = await how.evaluate((section) => section.getBoundingClientRect().top + window.scrollY);
+  await page.evaluate((top) => { window.scrollTo(0, top + window.innerHeight); }, sectionTop);
+  const layout = await page.evaluate(() => {
+    const stage = document.querySelector(".how-stage")?.getBoundingClientRect();
+    const header = document.querySelector("header")?.getBoundingClientRect();
+    return { stageTop: stage?.top ?? Number.NaN, headerBottom: header?.bottom ?? Number.NaN, position: getComputedStyle(document.querySelector(".how-stage") ?? document.body).position };
+  });
+  expect(layout.position).toBe("sticky");
+  expect(layout.stageTop, "the pinned stage starts below the header").toBeGreaterThanOrEqual(layout.headerBottom);
+});
+
+const ringTransform = (page: Page, scope: "banner" | "contentinfo") =>
+  page.getByRole(scope).locator("[data-logo-ring]").first().evaluate((ring) => {
+    const style = getComputedStyle(ring);
+    return { name: style.animationName, transform: style.transform };
+  });
+
+test("should turn the header logo's ring as the page scrolls and keep the footer logo still", async ({ page }) => {
+  await page.goto("/");
+  const atTop = await ringTransform(page, "banner");
+  expect(atTop.name).toBe("logo-ring-spin");
+  expect(["none", "matrix(1, 0, 0, 1, 0, 0)"]).toContain(atTop.transform);
+
+  await page.evaluate(() => { window.scrollTo(0, document.documentElement.scrollHeight / 7); });
+  await expect.poll(async () => (await ringTransform(page, "banner")).transform).not.toBe(atTop.transform);
+
+  const footer = await ringTransform(page, "contentinfo");
+  expect(footer.name, "only the landing header's ring turns").toBe("none");
+});
+
+test.describe("with reduced motion", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("should keep the logo's ring still when the page scrolls", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => { window.scrollTo(0, document.documentElement.scrollHeight / 7); });
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    const ring = await ringTransform(page, "banner");
+    expect(ring.name).toBe("none");
+    expect(ring.transform).toBe("none");
+  });
 });
 
 test("should set the header nav links in medium weight when the landing page loads", async ({ page }, testInfo) => {

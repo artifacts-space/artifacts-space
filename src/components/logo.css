@@ -1,0 +1,34 @@
+/*
+ * The logo's ring turns around the planet as the page scrolls: down turns it
+ * clockwise, up turns it back. It turns about the planet's centre (13.5, 10.5
+ * in grid units) in 10-degree steps, so each step reads like a frame of pixel
+ * art rather than a smooth spin, and the planet, drawn on top, hides the part
+ * of the ring that passes behind it. Browsers without scroll timelines, and
+ * people who ask for reduced motion, see the still mark.
+ */
+.logo-ring {
+  transform-box: view-box;
+  transform-origin: 13.5px 10.5px;
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .logo-ring-spin {
+      animation-name: logo-ring-spin;
+      animation-timing-function: steps(36, end);
+      animation-fill-mode: both;
+      /* Three full turns from the top of the page to the bottom. */
+      animation-iteration-count: 3;
+      animation-timeline: scroll(root block);
+    }
+  }
+}
+
+@keyframes logo-ring-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
