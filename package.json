@@ -9,6 +9,10 @@
     "url": "git+https://github.com/artifacts-space/artifacts-space.git"
   },
   "bugs": "https://github.com/artifacts-space/artifacts-space/issues",
+  "engines": {
+    "node": ">=22.22.1",
+    "pnpm": ">=10.11.1"
+  },
   "imports": {
     "#syntax-highlight": {
       "react-server": "./src/lib/syntax/highlight-server.ts",

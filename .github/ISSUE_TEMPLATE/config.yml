@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/artifacts-space/artifacts-space/security/advisories/new
+    about: Report it privately, never in a public issue. See SECURITY.md.
+  - name: Read the documentation
+    url: https://artifacts.space/docs
+    about: Set-up guides for MCP clients, formats, sharing, themes, and self-hosting.

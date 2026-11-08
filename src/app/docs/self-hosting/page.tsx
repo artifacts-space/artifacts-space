@@ -44,8 +44,9 @@ export default function SelfHostingPage() {
           <li><strong>Sendir</strong> for email: sign-in links, invitations, mentions, and reports. People sign in with email links, so production needs it.</li>
           <li><strong>Cloudflare R2</strong> for uploaded files. Without it, everything but files works.</li>
           <li><strong>A GitHub OAuth app</strong>, if you want GitHub sign-in. Optional.</li>
+          <li><strong>Node.js 22.22.1 or later</strong> and <strong>pnpm 10</strong>. CI and production run Node 26, the version in <code>.nvmrc</code>.</li>
         </ul>
-        <p>Node and pnpm versions follow <code>package.json</code>. The source is at <a href={DOCS_REPOSITORY}>{DOCS_REPOSITORY.replace("https://", "")}</a>.</p>
+        <p>The source is at <a href={DOCS_REPOSITORY}>{DOCS_REPOSITORY.replace("https://", "")}</a>.</p>
       </Prose>
 
       <DocsH page={page} id="env" />
