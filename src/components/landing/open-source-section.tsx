@@ -37,7 +37,7 @@ export function OpenSourceSection() {
             Host it yourself
           </Link>
         </div>
-        <div className="frame-sharp overflow-hidden">
+        <div className="card-surface overflow-hidden">
           <Galaxy />
         </div>
       </div>
