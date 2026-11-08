@@ -5,6 +5,7 @@ import { hitRateLimits } from "@/lib/abuse/rate-limit";
 import { tooManyRequests } from "@/lib/abuse/responses";
 import { loadArtifactOg } from "@/lib/og/artifact-og";
 import { artifactImageResponse, siteImageResponse } from "@/lib/og/render";
+import { noindexHeader, robotsHeaderName } from "@/lib/search/search-rules";
 
 /*
  * An artifact's social preview image, at
@@ -17,10 +18,13 @@ import { artifactImageResponse, siteImageResponse } from "@/lib/og/render";
  * Anything that may not be previewed (private, team, deleted, unknown, or a
  * version that is not the approved one) gets the generic site image with the
  * same short cache, so the response never tells whether an artifact exists.
+ * Preview images are never indexed: a year-long cached copy would outlive the
+ * author turning "Show in search engines" off.
  */
 
 const versionCache = "public, max-age=31536000, immutable";
 const genericCache = "public, max-age=300";
+const noindex = { [robotsHeaderName]: noindexHeader };
 
 async function rateLimited(request: NextRequest) {
   try {
@@ -43,10 +47,10 @@ async function preview(publicId: string, version: string) {
 /** Draws the preview, or the generic site image whenever the artifact may not be previewed. */
 export async function GET(request: NextRequest, context: RouteContext<"/artifact/[publicId]/og/[version]">) {
   const refusal = await rateLimited(request);
-  if (refusal) return tooManyRequests(refusal);
+  if (refusal) return tooManyRequests(refusal, noindex);
   const { publicId, version } = await context.params;
   const og = await preview(publicId, version);
   // A cover image that could not be fetched this time falls back to the standard backdrop, and an old theme key draws today's theme; cache those briefly.
-  if (og) return artifactImageResponse(og, { "Cache-Control": og.coverDegraded || !og.themeCurrent ? genericCache : versionCache });
-  return siteImageResponse({ "Cache-Control": genericCache });
+  if (og) return artifactImageResponse(og, { ...noindex, "Cache-Control": og.coverDegraded || !og.themeCurrent ? genericCache : versionCache });
+  return siteImageResponse({ ...noindex, "Cache-Control": genericCache });
 }

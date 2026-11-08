@@ -84,9 +84,11 @@ async function rehomeProjectQuietly(artifactId: string) {
 }
 
 async function setVisibility(artifactId: string, visibility: ArtifactVisibility, teamId: string | null, byUserId: string, comments?: CommentSetting) {
+  // "Show in search engines" stays only while the artifact stays public (showInSearchAfterSharing).
+  const keepsSearch = visibility === "public" ? {} : { showInSearch: false };
   await getDb()
     .update(artifact)
-    .set({ visibility, teamId, ...(comments ? { comments } : {}) })
+    .set({ visibility, teamId, ...keepsSearch, ...(comments ? { comments } : {}) })
     .where(eq(artifact.id, artifactId));
   await rehomeProjectQuietly(artifactId);
   // An open edit request follows the artifact to its new approving team.
@@ -234,7 +236,8 @@ async function approve(request: typeof sharingRequest.$inferSelect, deciderId: s
       where id = ${request.id} and status = 'pending'
       returning artifact_id, team_id, visibility, requested_by, comments
     )
-    update ${artifact} set visibility = decided.visibility, team_id = decided.team_id, comments = coalesce(decided.comments, ${artifact.comments})
+    update ${artifact} set visibility = decided.visibility, team_id = decided.team_id, comments = coalesce(decided.comments, ${artifact.comments}),
+      show_in_search = ${artifact.showInSearch} and decided.visibility = 'public'
     from decided
     where ${artifact.id} = decided.artifact_id and ${artifact.userId} = ${target.userId}
   `);

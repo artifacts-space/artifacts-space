@@ -62,6 +62,7 @@ export function fixtureArtifact({ id, kind, title, content, publicId = "fixture0
     source: "web",
     visibility: "private",
     comments: "off",
+    showInSearch: false,
     teamId: null,
     authorId: "fixture",
     originalAuthorId: null,
