@@ -4,7 +4,7 @@ import { closeInlineEditDb, saveAsSomeoneElse, storedText, versionKinds } from "
 import { cleanUp, createTestArtifact, localDatabaseEnabled, localDatabaseSkipReason, readyDevUser } from "./support/local-db";
 
 /**
- * Inline editing in /app: an artifact you may edit is unlocked where it
+ * Inline editing in /app and on the artifact page: an artifact you may edit is unlocked where it
  * reads, saves on its own a moment after typing stops, files one version per
  * editing session, and never overwrites someone else's newer save. Needs dev
  * sign-in and a local throwaway database (support/local-db.ts); skipped
@@ -93,4 +93,23 @@ test("should refuse to overwrite someone else's newer content and offer their ve
   await page.getByRole("button", { name: "Load their version" }).click();
   await expect(page.getByRole("textbox", { name: "Artifact content" })).toContainText("Theirs instead.");
   await expect(page.getByText(/saved a newer version while you were editing/)).toHaveCount(0);
+});
+
+test("should unlock Markdown in place on the artifact's own page and save it on its own", async ({ page }, testInfo) => {
+  const title = `Inline page ${testInfo.project.name} ${String(Date.now())}`;
+  const publicId = await openSeeded(page, title, "# Page notes\n\nRead here.");
+  await page.goto(`/artifact/${publicId}`);
+  const content = page.getByRole("textbox", { name: "Artifact content" });
+  await expect(content).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
+  const status = page.locator("[data-slot=editor-bar]").getByRole("status");
+
+  await content.getByText("Read here.").click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" Edited here.");
+  await expect(status).toHaveText("Saved");
+
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Artifact content" })).toContainText("Read here. Edited here.");
+  expect(await versionKinds(publicId)).toEqual(["snapshot", "edit"]);
 });

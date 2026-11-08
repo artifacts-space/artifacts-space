@@ -14,7 +14,7 @@ interface EditorIslandProps {
 }
 
 /**
- * Edit and History around the artifact on its page, for a signed-in viewer
+ * The artifact on its page, unlocked for editing in place, for a signed-in viewer
  * who may edit it. Render it only when `viewable.canEdit` is true. It lives
  * outside every cached segment: editors read the latest version, which is
  * never cached, and the editor loads its own copy through a server action.

@@ -237,7 +237,7 @@ test.describe("desktop and tablet", () => {
   test("should fit the CSV grid inside the pane so only one box scrolls at a time", async ({ page }) => {
     await openWorkspace(page);
     await slot(page, "artifact-list").getByRole("button", { name: /Long csv fixture/ }).click();
-    const grid = page.getByRole("grid", { name: "CSV table" });
+    const grid = page.getByRole("grid", { name: "CSV grid editor" });
     await expect(grid).toBeVisible();
     const sizes = await page.evaluate(() => {
       const body = document.querySelector("[data-slot=detail-body]");

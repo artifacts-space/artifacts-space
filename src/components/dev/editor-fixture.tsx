@@ -1,14 +1,14 @@
 "use client";
 
-import { IconPencil } from "@tabler/icons-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
+import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
-import { PageEditor } from "@/components/artifact-page/page-editor";
+import { InlineBody, InlineSummary, InlineTitle } from "@/components/artifact-page/inline-fields";
+import { PageInlineEditor } from "@/components/artifact-page/page-inline-editor";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
-import { Button } from "@/components/ui/button";
-import type { ArtifactKind } from "@/lib/artifact-types";
+import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 
 import { fixtureArtifact, longJson, longMarkdown, longUi } from "./fixture-content";
 
@@ -17,14 +17,25 @@ export type EditorFixtureKind = Extract<ArtifactKind, "ui" | "json" | "markdown"
 
 const contentFor: Record<EditorFixtureKind, () => string> = { ui: longUi, json: longJson, markdown: longMarkdown };
 
+/** A save that keeps the change in memory, so autosave runs end to end without a database. */
+function useMemorySave(initial: ArtifactDto): SaveArtifact {
+  const saved = useRef(initial);
+  return useCallback((_id, changes) => {
+    saved.current = { ...saved.current, ...changes, updatedAt: new Date().toISOString() };
+    return Promise.resolve({ success: true, data: saved.current });
+  }, []);
+}
+
 /**
  * Development only: the artifact page's layout (pinned header and notice,
- * read view, footer) around the real page editor, with a long artifact and
- * no database. The layout e2e test opens Edit here. Save is never pressed.
+ * heading, content, footer) around the real in-place page editor, with a
+ * long artifact and no database. Saves stay in memory. The layout e2e test
+ * edits here.
  */
 export function EditorFixture({ kind }: { kind: EditorFixtureKind }) {
   const artifact = useMemo(() => fixtureArtifact({ id: `fixture-${kind}`, kind, title: `Long ${kind} fixture`, content: contentFor[kind]() }), [kind]);
-  const [editing, setEditing] = useState(false);
+  const save = useMemorySave(artifact);
+  const onSaved = useCallback(() => undefined, []);
   return (
     <div className="min-h-screen">
       <StickyChrome>
@@ -35,19 +46,15 @@ export function EditorFixture({ kind }: { kind: EditorFixtureKind }) {
       </StickyChrome>
       <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
         <ConfirmationsProvider initial={[]}>
-          {editing ? (
-            <PageEditor artifact={artifact} onClose={() => { setEditing(false); }} />
-          ) : (
-            <div>
-              <div className="mb-6 flex justify-end">
-                <Button variant="outline" size="sm" onClick={() => { setEditing(true); }}><IconPencil /> Edit</Button>
-              </div>
-              <h1 className="text-4xl font-medium tracking-[-0.03em]">{artifact.title}</h1>
-              <article className="mt-10">
+          <PageInlineEditor artifact={artifact} reviewed={false} onSaved={onSaved} save={save}>
+            <InlineTitle>{artifact.title}</InlineTitle>
+            <InlineSummary><p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{artifact.summary}</p></InlineSummary>
+            <article className="mt-10">
+              <InlineBody>
                 <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language="" files={artifact.files} />
-              </article>
-            </div>
-          )}
+              </InlineBody>
+            </article>
+          </PageInlineEditor>
         </ConfirmationsProvider>
         <p className="mt-10 text-sm leading-6 text-muted-foreground">Shared from artifacts.space, a shared artifact hub for coding agents.</p>
       </main>

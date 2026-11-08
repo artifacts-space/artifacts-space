@@ -16,11 +16,20 @@ import type { FileDto } from "@/lib/files/types";
  * in place. Markdown and Text are documents you type into; CSV is a grid;
  * Code is its source. Formats without an inline editor yet (ui, JSON, SVG,
  * Mermaid, File notes) show their rendered view, and View source edits them.
- * Every surface grows to fill the pane but never shrinks below its content
- * (`flex-[1_0_auto]`), so nothing spills over the files and fields below.
+ * In the /app pane every surface grows to fill the pane but never shrinks
+ * below its content (`flex-[1_0_auto]`), so nothing spills over the files
+ * and fields below. On the artifact's own page (`surface="page"`) the
+ * content sits on the page as readers see it, and source sits in a card.
  */
 
+/** Where the content is edited: the /app pane, or the artifact's own page. */
+export type InlineSurface = "pane" | "page";
+
 const pagePane = "min-h-[460px] min-w-0 flex-[1_0_auto] bg-card p-5 sm:p-8";
+const frames: Record<InlineSurface, { content: string; source: string }> = {
+  pane: { content: pagePane, source: "flex flex-[1_0_auto] flex-col" },
+  page: { content: "min-w-0", source: "card-surface flex flex-col overflow-hidden" },
+};
 const sourceField =
   "min-h-[460px] flex-1 resize-y rounded-none border-0 bg-card p-6 font-mono text-base leading-7 md:text-sm shadow-none outline-none focus-visible:ring-0 sm:p-8";
 
@@ -34,14 +43,16 @@ interface InlineContentProps {
   revision: number;
   /** View source is open: the raw content replaces the page. */
   sourceOpen: boolean;
+  /** Defaults to the /app pane. */
+  surface?: InlineSurface;
   onChange: (content: string) => void;
   onShowSource: () => void;
 }
 
 /** The raw content, for View source and for code. Spell check only for prose. */
-function SourceEditor({ kind, content, label, onChange }: { kind: ArtifactKind; content: string; label: string; onChange: (content: string) => void }) {
+function SourceEditor({ kind, content, label, frame, onChange }: { kind: ArtifactKind; content: string; label: string; frame: string; onChange: (content: string) => void }) {
   return (
-    <div className="flex flex-[1_0_auto] flex-col">
+    <div className={frame}>
       <Textarea
         value={content}
         onChange={(event) => { onChange(event.target.value); }}
@@ -57,9 +68,9 @@ function SourceEditor({ kind, content, label, onChange }: { kind: ArtifactKind; 
 }
 
 /** The rendered view for formats edited through View source, with a quiet way into it. */
-function RenderedWithSource({ kind, content, language, title, files, onShowSource }: Omit<InlineContentProps, "revision" | "sourceOpen" | "onChange">) {
+function RenderedWithSource({ kind, content, language, title, files, frame, onShowSource }: Omit<InlineContentProps, "revision" | "sourceOpen" | "onChange" | "surface"> & { frame: string }) {
   return (
-    <div className={pagePane}>
+    <div className={frame}>
       <div className="mb-3 flex justify-end">
         <Button variant="ghost" size="sm" onClick={onShowSource} className="text-muted-foreground">
           <IconCode aria-hidden /> Edit source
@@ -77,22 +88,23 @@ export function hasInlineField(kind: ArtifactKind, sourceOpen: boolean): boolean
 
 /** See the notes at the top of this file. */
 export function InlineContent(props: InlineContentProps) {
-  const { kind, content, title, files, revision, sourceOpen, onChange, onShowSource } = props;
-  if (sourceOpen) return <SourceEditor kind={kind} content={content} label="Artifact source" onChange={onChange} />;
-  if (kind === "code") return <SourceEditor kind={kind} content={content} label="Artifact content" onChange={onChange} />;
+  const { kind, content, title, files, revision, sourceOpen, surface = "pane", onChange, onShowSource } = props;
+  const frame = frames[surface];
+  if (sourceOpen) return <SourceEditor kind={kind} content={content} label="Artifact source" frame={frame.source} onChange={onChange} />;
+  if (kind === "code") return <SourceEditor kind={kind} content={content} label="Artifact content" frame={frame.source} onChange={onChange} />;
   if (isDocumentKind(kind)) {
     return (
-      <div className={pagePane}>
+      <div className={frame.content}>
         <DocumentEditor key={revision} kind={kind} value={content} onChange={onChange} label="Artifact content" sourceToggle={false} onEditSource={onShowSource} />
       </div>
     );
   }
   if (kind === "csv") {
     return (
-      <div className={pagePane}>
+      <div className={frame.content}>
         <CsvContentEditor key={revision} value={content} onChange={onChange} title={title} files={files} label="Artifact content" />
       </div>
     );
   }
-  return <RenderedWithSource {...props} />;
+  return <RenderedWithSource kind={kind} content={content} language={props.language} title={title} files={files} frame={frame.content} onShowSource={onShowSource} />;
 }

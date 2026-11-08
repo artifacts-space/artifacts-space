@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { updateArtifactAction } from "@/app/(workspace)/app/actions";
 import type { ArtifactDto, SaveArtifactResult } from "@/lib/artifact-types";
+import type { EditSessionStep } from "@/lib/versions/history-rules";
 
 import { AUTOSAVE_DELAY_MS, changedFields, closedSession, draftProblem, hasChanges, mergeDrafts, sessionStep, type EditSession } from "./autosave-rules";
 import { draftFrom, type ArtifactDraft } from "./use-artifact-draft";
@@ -17,12 +18,20 @@ export type AutosaveStatus =
 
 const offlineMessage = "Not saved. Check your connection.";
 
+/** Sends one save. The default is the web save action; the dev fixtures pass a stand-in that needs no database. */
+export type SaveArtifact = (
+  id: string,
+  changes: Partial<ArtifactDraft>,
+  options: { expectedUpdatedAt: string; session: EditSessionStep },
+) => Promise<SaveArtifactResult>;
+
 interface AutosaveOptions {
   artifact: ArtifactDto;
   draft: ArtifactDraft;
   /** Replaces the draft; `remount` reloads the content editor. */
   replaceDraft: (draft: ArtifactDraft, remount: boolean) => void;
   onUpdated: (artifact: ArtifactDto) => void;
+  save?: SaveArtifact | undefined;
 }
 
 /** True when `next` is at least as new as `current`, so a late, older DTO never replaces the base. */
@@ -39,7 +48,7 @@ function isNewerOrSame(next: ArtifactDto, current: ArtifactDto) {
  * version (see autosave-rules.ts and src/lib/versions/history-rules.ts).
  * Leaving the artifact or the page saves what is left and closes the session.
  */
-export function useAutosave({ artifact, draft, replaceDraft, onUpdated }: AutosaveOptions) {
+export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = updateArtifactAction }: AutosaveOptions) {
   const [status, setStatus] = useState<AutosaveStatus>({ kind: "idle" });
   const [retry, setRetry] = useState(0);
   const baseRef = useRef(artifact);
@@ -47,10 +56,10 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated }: Autosa
   const sessionRef = useRef<EditSession>(closedSession);
   const inFlightRef = useRef(false);
   const queuedRef = useRef(false);
-  const callbacksRef = useRef({ replaceDraft, onUpdated });
+  const callbacksRef = useRef({ replaceDraft, onUpdated, save });
 
   useEffect(() => { draftRef.current = draft; }, [draft]);
-  useEffect(() => { callbacksRef.current = { replaceDraft, onUpdated }; }, [replaceDraft, onUpdated]);
+  useEffect(() => { callbacksRef.current = { replaceDraft, onUpdated, save }; }, [replaceDraft, onUpdated, save]);
   useEffect(() => {
     const base = baseRef.current;
     if (artifact.updatedAt === base.updatedAt || !isNewerOrSame(artifact, base)) return;
@@ -108,7 +117,7 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated }: Autosa
     setStatus({ kind: "saving" });
     try {
       const session = sessionStep(sessionRef.current, Date.now());
-      applyResult(await updateArtifactAction(base.id, changes, { expectedUpdatedAt: base.updatedAt, session }), base);
+      applyResult(await callbacksRef.current.save(base.id, changes, { expectedUpdatedAt: base.updatedAt, session }), base);
     } catch {
       setStatus({ kind: "failed", message: offlineMessage });
     } finally {
@@ -165,5 +174,7 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated }: Autosa
 
   const retryNow = useCallback(() => { void saveNow(); }, [saveNow]);
 
-  return { status, dirty, loadTheirs, keepMine, retryNow };
+  // A held change undone by hand (the draft is back to the saved version) has nothing left to hold.
+  const shown: AutosaveStatus = !dirty && status.kind === "held" ? { kind: "idle" } : status;
+  return { status: shown, dirty, loadTheirs, keepMine, retryNow };
 }

@@ -50,6 +50,8 @@ interface ConflictNoticeProps {
   status: AutosaveStatus;
   onLoadTheirs: () => void;
   onKeepMine: () => void;
+  /** Extra classes from the surrounding layout, such as a framed notice on the artifact page. */
+  className?: string;
 }
 
 /**
@@ -58,12 +60,12 @@ interface ConflictNoticeProps {
  * load the newer version, or save its own changes over it. Either way, the
  * other version stays in the history. Nothing shows without a conflict.
  */
-export function ConflictNotice({ status, onLoadTheirs, onKeepMine }: ConflictNoticeProps) {
+export function ConflictNotice({ status, onLoadTheirs, onKeepMine, className }: ConflictNoticeProps) {
   if (status.kind !== "conflict") return null;
   const editor = status.theirs.updatedBy;
   const who = editor ? editorName(editor) : "Someone";
   return (
-    <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-muted/50 px-5 py-2.5 sm:px-7">
+    <div role="status" className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-muted/50 px-5 py-2.5 sm:px-7", className)}>
       <IconAlertTriangle aria-hidden className="size-4 shrink-0 text-tone-warning" />
       <p className="min-w-0 flex-1 text-sm">
         {who} saved a newer version while you were editing. Your latest changes are not saved yet.

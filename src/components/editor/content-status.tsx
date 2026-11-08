@@ -36,7 +36,7 @@ export function ContentStatus({ kind, content, className }: { kind: ArtifactKind
       ) : (
         <>
           <IconCircleCheck aria-hidden className="mt-0.5 size-3.5 shrink-0 text-tone-success" />
-          <span>Valid {label}. It is ready to save.</span>
+          <span>Valid {label}.</span>
         </>
       )}
     </div>
