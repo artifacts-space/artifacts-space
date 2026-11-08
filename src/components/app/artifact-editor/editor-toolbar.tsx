@@ -71,11 +71,16 @@ interface EditorToolbarProps {
   onWithdraw: (() => void) | null;
 }
 
-/** The editor's top bar: format icon, short id, copy, history, share, more actions, and save. */
+/**
+ * The editor's top bar: format icon, short id, copy, history, share, more
+ * actions, and save. On phones the page scrolls, so it sticks under the app
+ * header (h-14) to keep Save and History in reach; from md up the /app shell
+ * keeps it in place.
+ */
 export function EditorToolbar({ id, kind, content, shareControl, history, dirty, pending, onSave, onRequestDelete, onWithdraw }: EditorToolbarProps) {
   const KindIcon = kindIcons[kind];
   return (
-    <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 sm:px-5">
+    <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5">
       <KindIcon className={cn("size-4 shrink-0", kindColors[kind])} />
       <span className="font-mono text-xs text-muted-foreground">{id.slice(0, 8)}</span>
       <div className="ml-auto flex items-center gap-1">

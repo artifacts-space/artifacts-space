@@ -13,6 +13,7 @@ import { ArtifactOrganizers } from "@/components/projects/artifact-organizers";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
 import { ContentPane } from "./content-pane";
+import { detailBody, detailOuter, detailSection, stickyModeBar, useScrollPlace } from "./detail-scroll";
 import {
   MetaFields,
   ModeBar,
@@ -73,9 +74,14 @@ export function ArtifactEditor({ artifact, origin, isAuthor, team, seesComments,
   const confirmDelete = useConfirm("deleteArtifact");
   const shareUrl = `${origin}/artifact/${artifact.publicId}`;
   const shared = artifact.visibility === "link" || artifact.visibility === "public";
+  const { outerRef, bodyRef, remember } = useScrollPlace(mode);
+  const changeMode = (next: EditorMode) => {
+    remember();
+    setMode(next);
+  };
 
   return (
-    <section className="flex min-w-0 flex-1 flex-col" aria-label={`Edit ${artifact.title}`}>
+    <section className={detailSection} aria-label={`Edit ${artifact.title}`}>
       <EditorToolbar
         id={artifact.id}
         kind={draft.kind}
@@ -98,14 +104,26 @@ export function ArtifactEditor({ artifact, origin, isAuthor, team, seesComments,
         onRequestDelete={isAuthor ? () => { if (pending !== "delete") confirmDelete.request(remove); } : null}
         onWithdraw={onWithdraw}
       />
-      {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
-      <TitleFields title={draft.title} icon={draft.icon} summary={draft.summary} update={update} />
-      <ArtifactOrganizers artifact={artifact} onUpdated={onUpdated} />
-      <ModeBar mode={mode} onMode={setMode} length={draft.content.length} updatedAt={artifact.updatedAt} updatedBy={artifact.updatedBy} />
-      <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} files={artifact.files} update={update} />
-      {draft.kind === "file" || draft.kind === "ui" || artifact.files.length > 0 ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
-      <MetaFields draft={draft} update={update} />
-      <CommentsSection publicId={artifact.publicId} seesComments={seesComments} isAuthor={isAuthor} />
+      <div ref={outerRef} data-slot="detail-outer" className={detailOuter}>
+        {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
+        <TitleFields title={draft.title} icon={draft.icon} summary={draft.summary} update={update} />
+        <ArtifactOrganizers artifact={artifact} onUpdated={onUpdated} />
+        <ModeBar mode={mode} onMode={changeMode} length={draft.content.length} updatedAt={artifact.updatedAt} updatedBy={artifact.updatedBy} className={stickyModeBar} />
+        {/* Preview has no field to focus first, so the pane itself takes focus for Page Up/Down, Space, and the arrows. */}
+        <div
+          ref={bodyRef}
+          data-slot="detail-body"
+          role="region"
+          aria-label="Content"
+          tabIndex={mode === "preview" ? 0 : undefined}
+          className={detailBody}
+        >
+          <ContentPane mode={mode} kind={draft.kind} content={draft.content} language={draft.language} title={draft.title} files={artifact.files} update={update} />
+          {draft.kind === "file" || draft.kind === "ui" || artifact.files.length > 0 ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
+          <MetaFields draft={draft} update={update} />
+          <CommentsSection publicId={artifact.publicId} seesComments={seesComments} isAuthor={isAuthor} />
+        </div>
+      </div>
       <ConfirmDialog
         state={confirmDelete.dialog}
         title="Delete this artifact?"

@@ -5,14 +5,19 @@ import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
 
 const loadFailed = "The artifact could not be loaded. Check your connection and try again.";
 
+function byId(artifacts: readonly ArtifactDto[] | undefined): ReadonlyMap<string, ArtifactDto> {
+  return new Map(artifacts?.map((artifact) => [artifact.id, artifact]));
+}
+
 /**
  * The full artifact behind the selected list item. Lists carry previews
  * only, so content loads when an artifact is opened and is kept for the rest
  * of the visit. Saves and shares hand back the full artifact; `remember`
- * keeps it, so the editor never reloads what it just saved.
+ * keeps it, so the editor never reloads what it just saved. `initial` seeds
+ * artifacts already in hand.
  */
-export function useFullArtifact(selected: ArtifactListItemDto | null) {
-  const [loaded, setLoaded] = useState<ReadonlyMap<string, ArtifactDto>>(() => new Map());
+export function useFullArtifact(selected: ArtifactListItemDto | null, initial?: readonly ArtifactDto[]) {
+  const [loaded, setLoaded] = useState(() => byId(initial));
   const [failure, setFailure] = useState<{ id: string; message: string } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const selectedId = selected?.id ?? null;

@@ -12,6 +12,7 @@ import { VersionHistory } from "@/components/history/version-history";
 import { Button } from "@/components/ui/button";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
+import { detailBody, detailOuter, detailSection } from "./artifact-editor/detail-scroll";
 import { visibilityLabel } from "./share-options";
 import { useEditAccess, useWithdrawSharing } from "./use-edit-access";
 
@@ -38,8 +39,8 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
   const { withdrawing, withdraw } = useWithdrawSharing(artifact.id, onWithdrawn);
 
   return (
-    <section className="flex min-w-0 flex-1 flex-col" aria-label={artifact.title}>
-      <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 sm:px-5">
+    <section className={detailSection} aria-label={artifact.title}>
+      <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5">
         <span className="text-xs text-muted-foreground">
           {statusLine(artifact, team?.name ?? null, canEdit)}
         </span>
@@ -66,16 +67,21 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
           ) : null}
         </div>
       </div>
-      <div className="border-b px-5 py-5 sm:px-7">
-        <ArtifactIcon icon={artifact.icon} size="heading" className="mb-2 block" />
-        <h2 className="text-2xl font-medium tracking-[-0.015em]">{artifact.title}</h2>
-        {artifact.summary ? <p className="mt-2 text-md leading-6 text-muted-foreground">{artifact.summary}</p> : null}
-        <LastEdited editor={artifact.updatedBy} at={artifact.updatedAt} className="mt-2" />
+      <div data-slot="detail-outer" className={detailOuter}>
+        <div className="border-b px-5 py-5 sm:px-7">
+          <ArtifactIcon icon={artifact.icon} size="heading" className="mb-2 block" />
+          <h2 className="text-2xl font-medium tracking-[-0.015em]">{artifact.title}</h2>
+          {artifact.summary ? <p className="mt-2 text-md leading-6 text-muted-foreground">{artifact.summary}</p> : null}
+          <LastEdited editor={artifact.updatedBy} at={artifact.updatedAt} className="mt-2" />
+        </div>
+        {/* Read only, so nothing in the pane takes focus first: the pane does, for keyboard scrolling. */}
+        <div data-slot="detail-body" role="region" aria-label="Content" tabIndex={0} className={detailBody}>
+          <div className="min-h-[460px] flex-1 bg-card p-6 sm:p-8">
+            <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
+          </div>
+          {seesComments ? <CommentThread publicId={artifact.publicId} className="border-t px-5 py-5 sm:px-7" /> : null}
+        </div>
       </div>
-      <div className="min-h-[460px] flex-1 bg-card p-6 sm:p-8">
-        <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
-      </div>
-      {seesComments ? <CommentThread publicId={artifact.publicId} className="border-t px-5 py-5 sm:px-7" /> : null}
     </section>
   );
 }

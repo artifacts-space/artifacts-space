@@ -124,8 +124,9 @@ export function DataGrid(props: DataGridProps) {
   const columns = Array.from({ length: columnCount }, (_, column) => column);
   const totalWidth = `calc(${rowNumberWidth} + ${columns.map((column) => columnWidth(props.widths[column] ?? 12)).join(" + ") || "0px"})`;
 
+  // 70vh tall at most; a layout that scrolls its own pane (the /app shell) lowers it with --data-grid-max-height to fit the pane.
   return (
-    <div ref={scrollerRef} className="max-h-[70vh] overflow-auto overscroll-contain rounded-xl border border-border/70 bg-card shadow-sm">
+    <div ref={scrollerRef} className="max-h-[var(--data-grid-max-height,70vh)] overflow-auto overscroll-contain rounded-xl border border-border/70 bg-card shadow-sm">
       <table
         role="grid"
         tabIndex={0}
