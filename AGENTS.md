@@ -102,6 +102,11 @@ These are enforced by `tsconfig.json`, `eslint.config.mjs`, and
   handlers, and MCP tools.
 - Add a dependency only when it is essential. Pin an exact version that is at
   least two weeks old, and prefer what is already installed.
+- Exception: a security fix may use a patched version younger than two weeks
+  when the owner approves it. Record the waiver and the release dates in the
+  pull request body. A new transitive dependency still gets a release at least
+  two weeks old when one works (pin it with a pnpm override in
+  `pnpm-workspace.yaml`). Agents never waive the rule on their own.
 - Commit messages are conventional: `feat:`, `fix:`, `chore:`, `refactor:`,
   `test:`, `docs:`, `perf:`, `ci:`. The header is at most 100 characters;
   put the detail in the body.
