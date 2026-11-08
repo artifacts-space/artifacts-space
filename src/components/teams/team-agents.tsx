@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { TeamAgentView } from "@/lib/agents/queries";
+import { agentRemovalDescription } from "@/lib/agents/rules";
 
 import { AgentTokens } from "./agent-tokens";
 import { FormError } from "./form-error";
@@ -59,7 +60,8 @@ function AddAgentForm({ teamId }: { teamId: string }) {
 
 function AgentRow({ agent, canManage, origin }: { agent: TeamAgentView; canManage: boolean; origin: string }) {
   const { pending, run } = useTeamAction();
-  const confirmRemove = useConfirm("removeAgent");
+  // Removal that deletes artifacts asks under its own kind, so "Don't ask again" for plain removals never skips this warning.
+  const confirmRemove = useConfirm(agent.deletedOnRemoval > 0 ? "removeAgentWithArtifacts" : "removeAgent");
   const muteLabel = agent.muted ? "Unmute" : "Mute";
   return (
     <li className="space-y-3 border-t px-5 py-3 first:border-t-0">
@@ -90,7 +92,7 @@ function AgentRow({ agent, canManage, origin }: { agent: TeamAgentView; canManag
       <ConfirmDialog
         state={confirmRemove.dialog}
         title={`Remove @${agent.handle}?`}
-        description="Its tokens stop working at once and its handle becomes free. What it shared with the team stays with the team; its comments stay in their threads."
+        description={agentRemovalDescription(agent.deletedOnRemoval)}
         confirmLabel="Remove"
         pending={pending === "remove"}
       />

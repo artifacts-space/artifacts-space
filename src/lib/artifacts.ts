@@ -7,6 +7,7 @@ import { getDb } from "@/db";
 import { artifact, sharingRequest, type ArtifactRecord } from "@/db/schema";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { getEditableArtifact, viewableInTeamCondition } from "@/lib/access";
+import { authoredByViewerCondition, ownedAgentIds } from "@/lib/agents/owner-access";
 import { loadActors } from "@/lib/agents/queries";
 import { assertValidArtifactContent, assertValidArtifactUpdate } from "@/lib/artifact-content";
 import {
@@ -113,12 +114,13 @@ interface DtoExtras {
   updatedBy: ArtifactEditorDto | null;
   project: ArtifactProjectDto | null;
   tags: string[];
+  actsForAuthor: boolean;
 }
 
-const noExtras: DtoExtras = { pending: noPending, files: [], updatedBy: null, project: null, tags: [] };
+const noExtras: DtoExtras = { pending: noPending, files: [], updatedBy: null, project: null, tags: [], actsForAuthor: false };
 
 /** Maps a row without content to the shared DTO fields. */
-function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy, project, tags }: DtoExtras): Omit<ArtifactDto, "content"> {
+function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy, project, tags, actsForAuthor }: DtoExtras): Omit<ArtifactDto, "content"> {
   return {
     id: record.id,
     publicId: record.publicId,
@@ -137,6 +139,7 @@ function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy,
     comments: record.comments,
     teamId: record.teamId,
     authorId: record.userId,
+    actsForAuthor,
     originalAuthorId: record.originalAuthorId,
     pendingSharing: pending.sharing,
     pendingEdit: pending.edit,
@@ -188,12 +191,13 @@ export async function lastEditorsFor(records: Pick<ArtifactRecord, "updatedBy">[
 /** Each row's extras, loaded together. `viewerId` decides whose projects show (src/lib/projects/queries.ts). */
 async function loadExtras(rows: ArtifactMetaRecord[], viewerId: string): Promise<(row: ArtifactMetaRecord) => DtoExtras> {
   const ids = rows.map((row) => row.id);
-  const [pending, files, editors, projects, tags] = await Promise.all([
+  const [pending, files, editors, projects, tags, agents] = await Promise.all([
     pendingRequestsFor(ids),
     listFilesForArtifacts(ids),
     lastEditorsFor(rows),
     projectsForViewer(rows, viewerId),
     tagsForViewer(rows, viewerId),
+    ownedAgentIds(viewerId),
   ]);
   return (row) => ({
     pending: pending.get(row.id) ?? noPending,
@@ -201,6 +205,7 @@ async function loadExtras(rows: ArtifactMetaRecord[], viewerId: string): Promise
     updatedBy: row.updatedBy ? editors.get(row.updatedBy) ?? null : null,
     project: projects.get(row.id) ?? null,
     tags: tags.get(row.id) ?? [],
+    actsForAuthor: row.userId !== viewerId && agents.has(row.userId),
   });
 }
 
@@ -223,7 +228,7 @@ async function toArtifactListItems(rows: (ArtifactMetaRecord & { preview: string
 /** The preview column: the first characters of readable formats, computed in Postgres so content never leaves it. */
 const previewColumn = sql<string>`case when ${artifact.kind} in (${sql.join(previewKinds.map((kind) => sql`${kind}`), sql`, `)}) then left(${artifact.content}, ${PREVIEW_CHARS}) else '' end`;
 
-/** Which artifacts a list shows: the viewer's own, or those shared with one of their teams. */
+/** Which artifacts a list shows: the viewer's own (with their agents'), or those shared with one of their teams. */
 export type ArtifactScope = { kind: "mine" } | { kind: "team"; teamId: string };
 
 export interface ListOptions {
@@ -246,7 +251,7 @@ async function searchCondition(viewerId: string, scope: ArtifactScope, query: st
 }
 
 function scopeCondition(viewerId: string, scope: ArtifactScope) {
-  if (scope.kind === "mine") return eq(artifact.userId, viewerId);
+  if (scope.kind === "mine") return authoredByViewerCondition(getDb(), viewerId);
   return viewableInTeamCondition(viewerId, scope.teamId);
 }
 

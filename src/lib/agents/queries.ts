@@ -1,8 +1,8 @@
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { getDb } from "@/db";
-import { agent, apiToken, teamMember, user } from "@/db/schema";
+import { agent, apiToken, artifact, teamMember, user } from "@/db/schema";
 
 import { toActor, type Actor } from "./identity";
 
@@ -69,6 +69,8 @@ export interface TeamAgentView {
   muted: boolean;
   createdAt: string;
   tokens: AgentTokenView[];
+  /** Artifacts that removing the agent deletes: those not shared through its team. Counted for owners and admins only, else 0. */
+  deletedOnRemoval: number;
 }
 
 async function tokensByAgent(agentIds: string[]) {
@@ -88,8 +90,29 @@ async function tokensByAgent(agentIds: string[]) {
 }
 
 /**
- * Agents in a team, oldest first. Tokens are included only when `withTokens`
- * is set (owners and admins). Callers must check the viewer's membership.
+ * Per agent, how many of its artifacts removing it deletes: everything not
+ * shared through the team (private ones, and any outside the team), since
+ * reconcileTeamArtifacts moves only what is shared through the team. A
+ * single-table select with no subquery, so no column can match itself.
+ */
+export function deletedOnRemovalQuery(db: Pick<ReturnType<typeof getDb>, "select">, teamId: string, agentIds: string[]) {
+  const staysWithAgent = or(eq(artifact.visibility, "private"), isNull(artifact.teamId), ne(artifact.teamId, teamId));
+  return db
+    .select({ userId: artifact.userId, count: count() })
+    .from(artifact)
+    .where(and(inArray(artifact.userId, agentIds), staysWithAgent))
+    .groupBy(artifact.userId);
+}
+
+async function deletedOnRemovalByAgent(teamId: string, agentIds: string[]) {
+  if (agentIds.length === 0) return new Map<string, number>();
+  const rows = await deletedOnRemovalQuery(getDb(), teamId, agentIds);
+  return new Map(rows.map((row) => [row.userId, row.count]));
+}
+
+/**
+ * Agents in a team, oldest first. Tokens and the count of artifacts removal
+ * deletes are included only when `withTokens` is set (owners and admins). Callers must check the viewer's membership.
  */
 export async function listTeamAgents(teamId: string, withTokens: boolean): Promise<TeamAgentView[]> {
   const rows = await getDb()
@@ -99,7 +122,10 @@ export async function listTeamAgents(teamId: string, withTokens: boolean): Promi
     .leftJoin(owner, eq(owner.id, agent.ownerId))
     .where(eq(agent.teamId, teamId))
     .orderBy(asc(agent.createdAt));
-  const tokens = withTokens ? await tokensByAgent(rows.map((row) => row.userId)) : new Map<string, AgentTokenView[]>();
+  const ids = rows.map((row) => row.userId);
+  const [tokens, deleted] = withTokens
+    ? await Promise.all([tokensByAgent(ids), deletedOnRemovalByAgent(teamId, ids)])
+    : [new Map<string, AgentTokenView[]>(), new Map<string, number>()];
   return rows.map((row) => ({
     userId: row.userId,
     handle: row.handle ?? "",
@@ -108,6 +134,7 @@ export async function listTeamAgents(teamId: string, withTokens: boolean): Promi
     muted: row.mutedAt !== null,
     createdAt: row.createdAt.toISOString(),
     tokens: tokens.get(row.userId) ?? [],
+    deletedOnRemoval: deleted.get(row.userId) ?? 0,
   }));
 }
 

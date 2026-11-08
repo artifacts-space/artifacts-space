@@ -11,16 +11,32 @@ export interface AccessSubject {
 export interface AccessViewer {
   userId: string;
   isTeamMember: boolean;
+  /**
+   * The author is an agent this viewer added, and the viewer is still in the
+   * agent's team (src/lib/agents/owner-access.ts). Left out means no.
+   */
+  actsForAuthor?: boolean;
 }
 
 /**
- * The single read rule. Private: the author only. Team: the author and signed-in
- * members of the artifact's team. Link: anyone with the URL. Public: anyone.
+ * Whether the viewer stands in the author's place: the author, or the person
+ * who added the agent that wrote it. Used for reading, listing, editing, and
+ * sharing; never for deleting.
+ */
+export function isAuthorOrActsFor(subject: Pick<AccessSubject, "userId">, viewer: AccessViewer | null): boolean {
+  if (!viewer) return false;
+  return viewer.userId === subject.userId || viewer.actsForAuthor === true;
+}
+
+/**
+ * The single read rule. Private: the author only (and the person who added
+ * the agent that wrote it). Team: the author and signed-in members of the
+ * artifact's team. Link: anyone with the URL. Public: anyone.
  */
 export function canViewArtifact(subject: AccessSubject, viewer: AccessViewer | null): boolean {
   if (subject.visibility === "public" || subject.visibility === "link") return true;
   if (!viewer) return false;
-  if (viewer.userId === subject.userId) return true;
+  if (isAuthorOrActsFor(subject, viewer)) return true;
   return subject.visibility === "team" && subject.teamId !== null && viewer.isTeamMember;
 }
 
@@ -31,7 +47,8 @@ export interface EditSubject extends AccessSubject {
 }
 
 /**
- * The single edit rule, for people and agents alike. The author always edits.
+ * The single edit rule, for people and agents alike. The author (or the
+ * person who added the agent that wrote it) always edits.
  * Members of the artifact's team edit it once it is shared through that team
  * (team, link, or public), unless the team is someone's personal team.
  * Private artifacts stay with their author. Edits to link and public
@@ -40,12 +57,16 @@ export interface EditSubject extends AccessSubject {
  */
 export function canEditArtifact(subject: EditSubject, viewer: AccessViewer | null): boolean {
   if (!viewer) return false;
-  if (viewer.userId === subject.userId) return true;
+  if (isAuthorOrActsFor(subject, viewer)) return true;
   if (subject.visibility === "private" || subject.teamId === null) return false;
   return subject.teamPersonal === false && viewer.isTeamMember;
 }
 
-/** Only the author deletes an artifact or changes who can read it. Team owners and admins can still withdraw sharing. */
+/**
+ * Only the author deletes an artifact. Who can read it is changed by the
+ * author or the person who added the agent that wrote it (isAuthorOrActsFor);
+ * team owners and admins can still withdraw sharing.
+ */
 export function canDeleteArtifact(subject: Pick<AccessSubject, "userId">, viewerId: string | null): boolean {
   return viewerId !== null && viewerId === subject.userId;
 }

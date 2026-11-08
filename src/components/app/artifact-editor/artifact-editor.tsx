@@ -30,6 +30,8 @@ interface ArtifactEditorProps {
   origin: string;
   /** False for a teammate editing an artifact shared through their team: no sharing or delete. */
   isAuthor: boolean;
+  /** The author, or the person who added the agent that wrote it, changes who can read it. */
+  canShare: boolean;
   /** The artifact's team, when the viewer belongs to it. */
   team: ShareTeam | undefined;
   /** The comments setting lets the viewer see its comments. */
@@ -43,21 +45,21 @@ interface ArtifactEditorProps {
 interface SharingSlotProps {
   artifact: ArtifactDto;
   shareUrl: string;
-  isAuthor: boolean;
+  canShare: boolean;
   manager: boolean;
   team: ShareTeam | undefined;
   onUpdated: (artifact: ArtifactDto) => void;
 }
 
 /** The author's Share button, or the comments setting for a team owner or admin. Nothing for other teammates. */
-function SharingSlot({ artifact, shareUrl, isAuthor, manager, team, onUpdated }: SharingSlotProps) {
-  if (isAuthor) return <ShareControl artifact={artifact} shareUrl={shareUrl} onUpdated={onUpdated} />;
+function SharingSlot({ artifact, shareUrl, canShare, manager, team, onUpdated }: SharingSlotProps) {
+  if (canShare) return <ShareControl artifact={artifact} shareUrl={shareUrl} onUpdated={onUpdated} />;
   if (manager) return <CommentsControl artifact={artifact} team={team} onUpdated={onUpdated} />;
   return null;
 }
 
 /** Edit one artifact and read its history. The author also shares and deletes it. */
-export function ArtifactEditor({ artifact, origin, isAuthor, team, seesComments, onWithdraw, onUpdated, onDeleted }: ArtifactEditorProps) {
+export function ArtifactEditor({ artifact, origin, isAuthor, canShare, team, seesComments, onWithdraw, onUpdated, onDeleted }: ArtifactEditorProps) {
   const { draft, update, dirty, reset } = useArtifactDraft(artifact);
   const { pending, save, remove } = useArtifactActions({ artifact, draft, onUpdated, onDeleted });
   const [mode, setMode] = useState<EditorMode>("preview");
@@ -76,7 +78,7 @@ export function ArtifactEditor({ artifact, origin, isAuthor, team, seesComments,
         id={artifact.id}
         kind={draft.kind}
         content={artifact.content}
-        shareControl={<SharingSlot artifact={artifact} shareUrl={shareUrl} isAuthor={isAuthor} manager={onWithdraw !== null} team={team} onUpdated={onUpdated} />}
+        shareControl={<SharingSlot artifact={artifact} shareUrl={shareUrl} canShare={canShare} manager={onWithdraw !== null} team={team} onUpdated={onUpdated} />}
         history={
           <VersionHistory
             publicId={artifact.publicId}

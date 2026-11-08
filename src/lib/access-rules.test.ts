@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ArtifactVisibility } from "@/lib/artifact-types";
 
-import { canDeleteArtifact, canEditArtifact, canViewArtifact, isIndexable, NEW_ACCOUNT_NOINDEX_DAYS, type AccessViewer } from "./access-rules";
+import { canDeleteArtifact, canEditArtifact, canViewArtifact, isAuthorOrActsFor, isIndexable, NEW_ACCOUNT_NOINDEX_DAYS, type AccessViewer } from "./access-rules";
 
 const author = "author";
 const subject = (visibility: ArtifactVisibility, teamId: string | null = "team-1") => ({ userId: author, visibility, teamId });
@@ -74,6 +74,40 @@ describe("canDeleteArtifact", () => {
     expect(canDeleteArtifact({ userId: author }, author)).toBe(true);
     expect(canDeleteArtifact({ userId: author }, "member")).toBe(false);
     expect(canDeleteArtifact({ userId: author }, null)).toBe(false);
+  });
+});
+
+describe("an agent's artifacts and the person who added the agent", () => {
+  // The author here is an agent. Only its owner, still in its team, gets actsForAuthor (src/lib/agents/owner-access.ts).
+  const owner: AccessViewer = { userId: "agent-owner", isTeamMember: true, actsForAuthor: true };
+  const notOwners: Record<string, AccessViewer> = {
+    otherUser: { userId: "stranger", isTeamMember: false, actsForAuthor: false },
+    teammate: { userId: "teammate", isTeamMember: true, actsForAuthor: false },
+    ownerOfAnotherAgent: { userId: "other-owner", isTeamMember: true, actsForAuthor: false },
+    siblingAgent: { userId: "sibling-agent", isTeamMember: true, actsForAuthor: false },
+    flagLeftOut: { userId: "unknown", isTeamMember: true },
+  };
+
+  it("should let the owner read and edit the agent's private artifact when they act for it", () => {
+    expect(canViewArtifact(subject("private"), owner)).toBe(true);
+    expect(canEditArtifact({ ...subject("private"), teamPersonal: false }, owner)).toBe(true);
+    expect(isAuthorOrActsFor(subject("private"), owner)).toBe(true);
+  });
+
+  for (const [name, viewer] of Object.entries(notOwners)) {
+    it(`should deny ${name} the agent's private artifact when they do not act for the agent`, () => {
+      expect(canViewArtifact(subject("private"), viewer)).toBe(false);
+      expect(canEditArtifact({ ...subject("private"), teamPersonal: false }, viewer)).toBe(false);
+      expect(isAuthorOrActsFor(subject("private"), viewer)).toBe(false);
+    });
+  }
+
+  it("should never let the owner delete the agent's artifact when they act for it", () => {
+    expect(canDeleteArtifact({ userId: author }, owner.userId)).toBe(false);
+  });
+
+  it("should deny everyone when no viewer is signed in", () => {
+    expect(isAuthorOrActsFor(subject("private"), null)).toBe(false);
   });
 });
 
