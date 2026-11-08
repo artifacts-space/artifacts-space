@@ -167,6 +167,7 @@ export function TeamThemes({ teamId, settings, canManage }: { teamId: string; se
           key={editing.kind === "edit" ? editing.preset.id : "new"}
           kind={editing.kind}
           start={editing.kind === "edit" ? editing.preset : blankStart()}
+          {...(editing.kind === "edit" ? { history: { teamId, presetId: editing.preset.id } } : {})}
           teamPresets={settings.presets}
           onSave={save}
           onClose={() => { setEditing(null); }}

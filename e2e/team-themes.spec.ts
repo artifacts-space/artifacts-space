@@ -87,6 +87,9 @@ test("should let an admin build a preset with a live preview and make it the tea
   await expect(scope).toHaveAttribute("data-artifact-theme", seeded.ref);
   await expect(scope).toHaveAttribute("data-theme-source", "team");
   await expect(page.getByRole("heading", { level: 1, name: "Team plan" })).toHaveCSS("font-family", /^Inter/);
+  // The team sees its preset's name on the Markdown version; readers outside it see "Custom" (team-theme-fonts.prod.spec.ts).
+  const markdown = await page.request.get(`/artifact/${seeded.publicId}.md`);
+  expect(await markdown.text()).toContain(`- Theme: ${seeded.name} (team default)`);
   await page.getByRole("button", { name: "Choose a theme" }).click();
   await expect(page.getByRole("radio", { name: /^Team default: / })).toHaveAttribute("aria-checked", "true");
 });

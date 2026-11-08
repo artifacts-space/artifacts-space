@@ -7,7 +7,8 @@ import { artifact, team, teamThemePreset, user } from "@/db/schema";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { UserFacingError } from "@/lib/user-facing-error";
 
-import type { Theme } from "./schema";
+import { parseTheme, type Theme } from "./schema";
+import { recordDefaultRevision, recordPresetRevision, revisionOf } from "./team-theme-revisions";
 import {
   duplicatePresetName,
   hasRoomForPreset,
@@ -88,6 +89,18 @@ async function presetCount(teamId: string): Promise<number> {
   return row?.value ?? 0;
 }
 
+/**
+ * Writes a history revision after a save that already happened. A failed
+ * history write is logged, never turned into a failed save.
+ */
+async function keepRevision(write: () => Promise<void>): Promise<void> {
+  try {
+    await write();
+  } catch (error) {
+    console.error("[themes] Revision not recorded", error instanceof Error ? error.name : "unknown error");
+  }
+}
+
 function checkedPreset(input: unknown) {
   const parsed = parseTeamPresetInput(input);
   if (!parsed.ok) throw new UserFacingError(parsed.message);
@@ -103,7 +116,9 @@ async function insertPreset(teamId: string, userId: string, value: { name: strin
         .insert(teamThemePreset)
         .values({ id: randomUUID(), teamId, slug: newPresetSlug(value.name), ...value, createdBy: userId, updatedBy: userId })
         .returning();
-      if (row) return toDto(row);
+      if (!row) continue;
+      await keepRevision(() => recordPresetRevision(teamId, row, userId));
+      return toDto(row);
     } catch (error) {
       if (!isUniqueViolation(error) || attempt > 0) throw error;
     }
@@ -125,6 +140,7 @@ export async function updateTeamPreset(teamId: string, presetId: string, userId:
     .where(and(eq(teamThemePreset.id, presetId), eq(teamThemePreset.teamId, teamId)))
     .returning();
   if (!row) throw new UserFacingError("That preset is gone. Reload the page.");
+  await keepRevision(() => recordPresetRevision(teamId, row, userId));
   return toDto(row);
 }
 
@@ -168,7 +184,9 @@ export async function deleteTeamPreset(teamId: string, presetId: string, userId:
     .set({ defaultTheme: null, defaultThemeSetBy: userId, defaultThemeSetAt: new Date() })
     .where(and(eq(team.id, teamId), eq(team.defaultTheme, ref)))
     .returning();
-  if (cleared.length > 0) console.info("[themes] Team default cleared with its deleted preset", { teamId, by: userId, from: ref });
+  if (cleared.length === 0) return;
+  console.info("[themes] Team default cleared with its deleted preset", { teamId, by: userId, from: ref });
+  await keepRevision(() => recordDefaultRevision(teamId, null, userId));
 }
 
 /**
@@ -183,7 +201,28 @@ export async function setTeamDefaultTheme(teamId: string, userId: string, input:
   const [before] = await getDb().select({ defaultTheme: team.defaultTheme }).from(team).where(eq(team.id, teamId)).limit(1);
   await getDb().update(team).set({ defaultTheme: parsed.value, defaultThemeSetBy: userId, defaultThemeSetAt: new Date() }).where(eq(team.id, teamId));
   console.info("[themes] Team default theme changed", { teamId, by: userId, from: before?.defaultTheme ?? null, to: parsed.value });
+  await keepRevision(() => recordDefaultRevision(teamId, parsed.value, userId));
   return parsed.value;
+}
+
+/** The message when an old revision fails today's checks: the editor shows it with suggestions instead. */
+export const STALE_REVISION_MESSAGE = "That older theme does not pass today's checks. Open it in the editor, apply the suggested colors, and save.";
+
+/**
+ * Restores a preset revision's theme as a new save (and so a new revision);
+ * the preset keeps its current name. The theme must pass today's checks,
+ * contrast included; old revisions are never rewritten.
+ */
+export async function restorePresetRevision(teamId: string, presetId: string, revisionId: string, userId: string): Promise<TeamPresetDto> {
+  const [revision, current] = await Promise.all([revisionOf({ kind: "preset", teamId, presetId }, revisionId), presetInTeam(teamId, presetId)]);
+  if (!parseTheme(revision.theme).ok) throw new UserFacingError(STALE_REVISION_MESSAGE);
+  return updateTeamPreset(teamId, presetId, userId, { name: current.name, description: current.description, theme: revision.theme });
+}
+
+/** Restores an earlier team default as a new change (and so a new revision). A preset that was deleted since is refused. */
+export async function restoreDefaultRevision(teamId: string, revisionId: string, userId: string): Promise<string | null> {
+  const revision = await revisionOf({ kind: "default", teamId }, revisionId);
+  return setTeamDefaultTheme(teamId, userId, revision.defaultTheme);
 }
 
 /** Each team's default theme, by team id. Callers pass only teams the viewer belongs to. */

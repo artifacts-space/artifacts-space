@@ -76,6 +76,14 @@ export default function ThemesPage() {
         <p>Readers do not see the control. They see only the theme.</p>
       </Prose>
 
+      <DocsH page={page} id="custom-theme" />
+      <Prose>
+        <p>When an agent sets theme JSON on an artifact, the picker shows it first as <strong>Custom</strong>, with its swatch. Pick a preset to replace it. Two buttons sit above the swatches:</p>
+        <ul>
+          <li><strong>Copy theme JSON</strong> copies the theme, ready to import as a team preset or to send to an agent.</li>
+          <li><strong>Save as team preset</strong>, for team owners and admins, opens the preset editor with the theme filled in. Give it a name and save; team members can pick it at once. The artifact keeps its own theme until someone picks the new preset.</li>
+        </ul>
+      </Prose>
       <DocsH page={page} id="new" />
       <Prose>
         <p>The <strong>New artifact</strong> dialog has a <strong>Theme</strong> field with the same picker, including the presets of your teams. The artifact starts with the preset you select. Keep Default for the standard look.</p>
@@ -133,13 +141,22 @@ export default function ThemesPage() {
         <p>Before you delete a preset, the team page says how many artifacts use it. They fall back to the team default, then the Default look. If it was the team default, the team goes back to the Default look. An artifact that moves to another team, or that names another team&apos;s preset, falls back the same way.</p>
         <p>A team can keep up to 50 presets.</p>
       </Prose>
+      <DocsH page={page} id="import-export" />
+      <Prose>
+        <p>The preset editor can move a theme in and out as JSON, the same theme JSON agents use:</p>
+        <ul>
+          <li><strong>Copy JSON</strong> and <strong>Download JSON</strong> export the preset once it is valid. Send it to an agent, keep it in a repository, or import it in another team.</li>
+          <li><strong>Import JSON</strong> takes pasted JSON or a <code>.json</code> file and replaces the editor&apos;s theme. It runs the same checks as a save. JSON with unknown keys or colors that do not parse is refused with every problem named. A theme that fails only contrast loads, with the suggested colors marked and <strong>Apply suggestions</strong> ready; it saves once it passes.</li>
+        </ul>
+      </Prose>
       <DocsH page={page} id="team-default" />
       <Prose>
         <p>Owners and admins pick a built-in preset or a team preset as the team default, or <strong>Site default</strong> for none. It is a team setting: it files no artifact versions and needs no approval. The team page shows who changed it last and when, and the server logs each change.</p>
+        <p>Every save of a preset and every change of the team default is kept: owners and admins open <strong>History</strong> in the preset editor, or <strong>Team default history</strong> on the team page, and <strong>Restore</strong> saves that earlier theme again as a new change. Old entries never change, the last 50 are kept, and an old theme that fails today&apos;s checks opens in the editor with suggested colors instead.</p>
       </Prose>
       <DocsH page={page} id="team-mcp" />
       <Prose>
-        <p><code>themes_list</code> returns the presets and default of each team you belong to, never another team&apos;s. Pass a team preset id as <code>theme</code> on an artifact shared through that team, or on a private artifact when you belong to the team. Any other team preset id is refused, and nothing is saved.</p>
+        <p><code>themes_list</code> returns the presets and default of each team you belong to, never another team&apos;s. Pass a team preset id as <code>theme</code> on an artifact shared through that team, or on a private artifact when you belong to the team. Any other team preset id is refused, and nothing is saved. <code>artifacts_get</code> returns a team preset id only to the author and the team; other readers get <code>&quot;custom&quot;</code> in its place.</p>
         <p>Agents use team presets but never create, change, or delete them, and never change the team default. Those stay with the team&apos;s owners and admins.</p>
       </Prose>
 
@@ -160,6 +177,7 @@ export default function ThemesPage() {
         <p>If you can edit an artifact, you see <strong>Add cover</strong> beside the icon and theme above its title. It adds a gradient at once. Point at the cover (or tap it on a touch screen) to see its controls:</p>
         <ul>
           <li><strong>Change cover</strong> opens the gradients and <strong>Upload an image</strong>. Any photo works, straight from your phone: your browser turns it upright, resizes it to at most 2400 px, saves it as a JPEG under 2 MB, and removes its camera data, such as the location. A PNG with transparency stays a PNG when it already fits. Browsers that cannot open HEIC photos say so; save the photo as a JPEG first.</li>
+          <li>Image icons get the same care: in the icon picker&apos;s <strong>Upload</strong> tab, any photo works, resized to at most 512 px and saved under 1 MB without its camera data. A transparent logo stays a PNG, and a GIF that already fits uploads as is.</li>
           <li><strong>Reposition</strong>, for images, lets you drag the image up or down. You can also use the arrow keys (Shift for bigger steps), Home, and End. Enter or <strong>Save position</strong> saves; Escape or <strong>Cancel</strong> stops.</li>
           <li><strong>Remove</strong> takes the cover away at once. Restore brings it back (see History and approval).</li>
         </ul>
@@ -194,11 +212,11 @@ export default function ThemesPage() {
       </Prose>
       <DocsH page={page} id="markdown" />
       <Prose>
-        <p>The Markdown version of an artifact (<code>/artifact/&lt;id&gt;.md</code>) names the theme it shows in the header, as <code>- Theme: Paper</code>, <code>- Theme: Custom</code> for theme JSON, or <code>- Theme: Acme brand (team default)</code> when it shows its team&apos;s default. An artifact that shows the Default look has no Theme line. A cover shows as <code>- Cover: Mist</code>, or <code>- Cover: Image</code>, never with a link to the file. See <Link href={docsHref("mcp", "markdown")}>Read artifacts without MCP</Link>.</p>
+        <p>The Markdown version of an artifact (<code>/artifact/&lt;id&gt;.md</code>) names the theme it shows in the header, as <code>- Theme: Paper</code>, <code>- Theme: Custom</code> for theme JSON, or <code>- Theme: Acme brand (team default)</code> when it shows its team&apos;s default. An artifact that shows the Default look has no Theme line. Team preset names are the team&apos;s own: readers outside the team see <code>- Theme: Custom</code> instead, never the name, and never &quot;team default&quot;. Built-in names show to everyone. A cover shows as <code>- Cover: Mist</code>, or <code>- Cover: Image</code>, never with a link to the file. See <Link href={docsHref("mcp", "markdown")}>Read artifacts without MCP</Link>.</p>
       </Prose>
       <DocsH page={page} id="previews" />
       <Prose>
-        <p>The link preview card of a link or public artifact uses the light palette of the theme the approved version shows: its own, or else the team default. The text on the card stays in Geist, because preview images cannot use the theme fonts.</p>
+        <p>The link preview card of a link or public artifact uses the light palette of the theme the approved version shows: its own, or else the team default. The text on the card stays in Geist, because preview images cannot use the theme fonts. The image link names the approved version and the theme, so a new team default or a preset edit gives the card a fresh link, and sites that keep old cards show the new one.</p>
         <p>A cover becomes the card&apos;s background. A gradient is drawn in the theme&apos;s light palette, with dark text. A PNG or JPEG image of at most 2 MB is drawn under a dark shade, with light text. Preview images cannot draw WebP, GIF, or AVIF, so those covers keep the standard background there. Images uploaded in the web app are always JPEG or PNG.</p>
       </Prose>
 

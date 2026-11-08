@@ -1,11 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { COVER_MAX_BYTES } from "@/lib/files/cover-rules";
+import { ICON_MAX_BYTES } from "@/lib/files/icon-rules";
+import { coverPrepareProfile, iconPrepareProfile } from "@/lib/images/prepare-rules";
 
-import { prepareCoverImage, type CoverImageEnv, type DecodedImage } from "./prepare-cover-image";
+import { prepareImage, type DecodedImage, type ImageEnv } from "./prepare-image";
+
+const prepareCoverImage = (file: File, env: ImageEnv) => prepareImage(file, coverPrepareProfile, env);
+const prepareIconImage = (file: File, env: ImageEnv) => prepareImage(file, iconPrepareProfile, env);
 
 /*
- * Preparing a cover in the browser, with the canvas faked: decoding returns
+ * Preparing a cover or an icon in the browser, with the canvas faked: decoding returns
  * a sized image, and encoding returns a blob of a chosen size per type and
  * quality, so the size, type, and fallback decisions are tested without one.
  */
@@ -24,7 +29,7 @@ function fakeEnv(options: FakeOptions = {}) {
   const draws: { width: number; height: number; opaque: boolean }[] = [];
   const encodes: { type: string; quality: number | undefined }[] = [];
   const image: DecodedImage = { width: options.width ?? 4032, height: options.height ?? 3024, source: {} as CanvasImageSource, close };
-  const env: CoverImageEnv = {
+  const env: ImageEnv = {
     decode: () => (options.decodeFails ? Promise.reject(new Error("decode")) : Promise.resolve(image)),
     surface: (width, height) => ({
       draw: (_image, opaque) => { draws.push({ width, height, opaque }); },
@@ -43,7 +48,7 @@ function photo(name: string, type: string, size: number): File {
   return new File([new Uint8Array(size)], name, { type });
 }
 
-describe("prepareCoverImage", () => {
+describe("prepareImage for covers", () => {
   it("should scale a large phone photo to 2400 px and re-encode it as a JPEG under the cap", async () => {
     const { env, draws, encodes, close } = fakeEnv();
     const prepared = await prepareCoverImage(photo("IMG_0001.JPG", "image/jpeg", 6_000_000), env);
@@ -104,5 +109,33 @@ describe("prepareCoverImage", () => {
     const { env } = fakeEnv({ decodeFails: true });
     await expect(prepareCoverImage(photo("IMG_0002.HEIC", "image/heic", 3_000_000), env)).rejects.toThrow(/cannot open HEIC photos/);
     await expect(prepareCoverImage(photo("broken.jpg", "image/jpeg", 3_000), env)).rejects.toThrow(/could not be opened/);
+  });
+});
+
+describe("prepareImage for icons", () => {
+  it("should scale a phone photo to 512 px and re-encode it as a JPEG under the 1 MB icon cap", async () => {
+    const { env, draws, close } = fakeEnv();
+    const prepared = await prepareIconImage(photo("IMG_0003.JPG", "image/jpeg", 5_000_000), env);
+    expect(prepared).toMatchObject({ name: "IMG_0003.jpg", type: "image/jpeg" });
+    expect(prepared.size).toBeLessThanOrEqual(ICON_MAX_BYTES);
+    expect(draws[0]).toEqual({ width: 512, height: 384, opaque: true });
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("should keep a transparent logo as a PNG when it fits 1 MB, even when the picked file was larger", async () => {
+    const { env, draws } = fakeEnv({ width: 2000, height: 2000, transparent: true });
+    const prepared = await prepareIconImage(photo("logo.png", "image/png", 3_000_000), env);
+    expect(prepared).toMatchObject({ name: "logo.png", type: "image/png" });
+    expect(draws[0]).toEqual({ width: 512, height: 512, opaque: false });
+  });
+
+  it("should fall back to JPEG when the transparent PNG comes out over the icon cap", async () => {
+    const { env } = fakeEnv({ transparent: true, bytes: (type) => (type === "image/png" ? ICON_MAX_BYTES + 1 : 80_000) });
+    await expect(prepareIconImage(photo("noisy.png", "image/png", 900_000), env)).resolves.toMatchObject({ type: "image/jpeg" });
+  });
+
+  it("should refuse with the icon cap in the message when even the lowest quality is over it", async () => {
+    const { env } = fakeEnv({ bytes: () => ICON_MAX_BYTES + 1 });
+    await expect(prepareIconImage(photo("huge.jpg", "image/jpeg", 20_000_000), env)).rejects.toThrow(/still over 1 MB/);
   });
 });

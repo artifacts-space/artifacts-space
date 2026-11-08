@@ -8,8 +8,8 @@ import {
   duplicatePresetName,
   emptyThemeContext,
   hasRoomForPreset,
+  manageableTeams,
   isTeamPresetRef,
-  markdownThemeLabel,
   newPresetSlug,
   parseTeamDefaultInput,
   parseTeamPresetInput,
@@ -21,6 +21,7 @@ import {
   usableTeamPresets,
   type ArtifactThemeContext,
 } from "./team-preset-rules";
+import { markdownThemeLabel } from "./theme-privacy";
 
 function preset(id: string): Theme {
   const theme = presetTheme(id);
@@ -116,13 +117,23 @@ describe("resolveArtifactTheme", () => {
 
   it("should label the Markdown theme line with the team default marked and no line for the site default", () => {
     const context = contextFor("team-a", brandRef);
-    expect(markdownThemeLabel(resolveArtifactTheme(null, context))).toBe("Brand (team default)");
-    expect(markdownThemeLabel(resolveArtifactTheme("paper", context))).toBe("Paper");
-    expect(markdownThemeLabel(resolveArtifactTheme(null, emptyThemeContext))).toBeNull();
+    expect(markdownThemeLabel(resolveArtifactTheme(null, context), true)).toBe("Brand (team default)");
+    expect(markdownThemeLabel(resolveArtifactTheme("paper", context), true)).toBe("Paper");
+    expect(markdownThemeLabel(resolveArtifactTheme(null, emptyThemeContext), true)).toBeNull();
   });
 });
 
 describe("who manages team themes", () => {
+  it("should offer Save as team preset only in teams where the viewer is an owner or admin", () => {
+    const teams = [
+      { id: "t1", name: "Acme", role: "owner" },
+      { id: "t2", name: "Beta", role: "member" },
+      { id: "t3", name: "Gamma", role: "admin" },
+    ];
+    expect(manageableTeams(teams)).toEqual([{ teamId: "t1", teamName: "Acme" }, { teamId: "t3", teamName: "Gamma" }]);
+    expect(manageableTeams([{ id: "t2", name: "Beta", role: "member" }])).toEqual([]);
+  });
+
   it("should allow owners and admins of a shared team", () => {
     expect(canManageTeamThemes({ role: "owner", personal: false })).toBe(true);
     expect(canManageTeamThemes({ role: "admin", personal: false })).toBe(true);

@@ -1,8 +1,25 @@
 import { describe, expect, it } from "vitest";
 
 import { COVER_MAX_BYTES, isCoverUploadAllowed } from "@/lib/files/cover-rules";
+import { isIconUploadAllowed } from "@/lib/files/icon-rules";
 
-import { COVER_MAX_SIDE, coverOutputType, coverSourceProblem, coverTargetSize, hasTransparentPixel, isHeic, mayHaveAlpha, preparedFilename } from "./prepare-rules";
+import {
+  coverPrepareProfile,
+  hasTransparentPixel,
+  iconPrepareProfile,
+  imageOutputType,
+  imageSourceProblem,
+  imageTargetSize,
+  isHeic,
+  mayHaveAlpha,
+  megabytes,
+  preparedFilename,
+} from "./prepare-rules";
+
+const COVER_MAX_SIDE = coverPrepareProfile.maxSide;
+const coverTargetSize = (width: number, height: number) => imageTargetSize(width, height, COVER_MAX_SIDE);
+const coverOutputType = (source: { size: number }, hasAlpha: boolean) => imageOutputType(source, hasAlpha, coverPrepareProfile);
+const coverSourceProblem = (file: { type: string; name: string; size: number }) => imageSourceProblem(file, coverPrepareProfile);
 
 describe("coverTargetSize", () => {
   it("should scale a phone photo down so its longest side is 2400 px when it is larger", () => {
@@ -66,10 +83,38 @@ describe("helpers", () => {
   it("should name the prepared file after the picked one with the new extension", () => {
     expect(preparedFilename("IMG_0001.HEIC", "image/jpeg")).toBe("IMG_0001.jpg");
     expect(preparedFilename("logo.final.png", "image/png")).toBe("logo.final.png");
-    expect(preparedFilename(".png", "image/jpeg")).toBe("cover.jpg");
+    expect(preparedFilename(".png", "image/jpeg", "cover")).toBe("cover.jpg");
+    expect(preparedFilename(".png", "image/png")).toBe("image.png");
   });
 
   it("should leave the server's cap as the authority: an unprepared 3 MB photo still fails the upload check", () => {
     expect(isCoverUploadAllowed({ type: "image/jpeg", size: 3_000_000 })).toBe(false);
+  });
+});
+
+describe("icon profile", () => {
+  it("should size icons to at most 512 px when a phone photo is picked", () => {
+    expect(imageTargetSize(4032, 3024, iconPrepareProfile.maxSide)).toEqual({ width: 512, height: 384 });
+    expect(imageTargetSize(256, 256, iconPrepareProfile.maxSide)).toEqual({ width: 256, height: 256 });
+  });
+
+  it("should keep transparency from a large logo when it is an icon, unlike a cover", () => {
+    expect(imageOutputType({ size: 5_000_000 }, true, iconPrepareProfile)).toBe("image/png");
+    expect(imageOutputType({ size: 5_000_000 }, true, coverPrepareProfile)).toBe("image/jpeg");
+    expect(imageOutputType({ size: 5_000_000 }, false, iconPrepareProfile)).toBe("image/jpeg");
+  });
+
+  it("should accept phone photos as icon sources and name the use in the refusal", () => {
+    expect(imageSourceProblem({ type: "image/heic", name: "IMG.HEIC", size: 4_000_000 }, iconPrepareProfile)).toBeNull();
+    expect(imageSourceProblem({ type: "image/svg+xml", name: "logo.svg", size: 900 }, iconPrepareProfile)).toMatch(/cannot be an icon/);
+  });
+
+  it("should leave the server's 1 MB icon cap as the authority when a photo is not prepared", () => {
+    expect(isIconUploadAllowed({ type: "image/jpeg", size: 2_000_000 })).toBe(false);
+  });
+
+  it("should write byte caps the way people read them", () => {
+    expect(megabytes(1_048_576)).toBe("1 MB");
+    expect(megabytes(2_097_152)).toBe("2 MB");
   });
 });

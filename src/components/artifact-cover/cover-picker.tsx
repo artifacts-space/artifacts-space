@@ -4,18 +4,17 @@ import { IconLoader2, IconPhotoUp } from "@tabler/icons-react";
 import { useId, useRef, useState } from "react";
 
 import { uploadImageFile } from "@/components/artifact-icon/upload-tab";
+import { prepareImage } from "@/components/images/prepare-image";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 import { parseArtifactCover } from "@/lib/covers/cover";
 import { coverGradientCss, coverGradients } from "@/lib/covers/gradients";
-import { COVER_SOURCE_ACCEPT, coverSourceProblem } from "@/lib/covers/prepare-rules";
 import { isCoverUploadAllowed } from "@/lib/files/cover-rules";
+import { coverPrepareProfile, IMAGE_SOURCE_ACCEPT, imageSourceProblem } from "@/lib/images/prepare-rules";
 import { iconGridMove } from "@/lib/icon-grid";
 import { cn } from "@/lib/utils";
-
-import { prepareCoverImage } from "./prepare-cover-image";
 
 const COLUMNS = 4;
 const RULE = "Any photo works. It is resized, and its location data removed. Wide images look best.";
@@ -81,11 +80,11 @@ function GradientGrid({ selected, onSelect }: { selected: string | null; onSelec
 
 type UploadState = { phase: "idle" } | { phase: "preparing" } | { phase: "uploading"; progress: number } | { phase: "error"; message: string };
 
-/** Resizes and re-encodes the picked image in the browser (see prepare-cover-image.ts); the server checks the result like any upload. */
+/** Resizes and re-encodes the picked image in the browser (see src/components/images/prepare-image.ts); the server checks the result like any upload. */
 async function preparedCover(file: File): Promise<File> {
-  const problem = coverSourceProblem(file);
+  const problem = imageSourceProblem(file, coverPrepareProfile);
   if (problem) throw new Error(problem);
-  const prepared = await prepareCoverImage(file);
+  const prepared = await prepareImage(file, coverPrepareProfile);
   if (!isCoverUploadAllowed(prepared)) throw new Error("That image could not be made small enough. Try another one.");
   return prepared;
 }
@@ -123,7 +122,7 @@ function CoverUpload({ onUploaded }: { onUploaded: (fileId: string) => void }) {
 
   return (
     <div className="flex flex-col gap-2 border-t px-3 py-3">
-      <input ref={inputRef} type="file" accept={COVER_SOURCE_ACCEPT} className="sr-only" tabIndex={-1} aria-describedby={hintId} onChange={(event) => { void pick(event.target.files?.[0]); event.target.value = ""; }} />
+      <input ref={inputRef} type="file" accept={IMAGE_SOURCE_ACCEPT} className="sr-only" tabIndex={-1} aria-describedby={hintId} onChange={(event) => { void pick(event.target.files?.[0]); event.target.value = ""; }} />
       <div className="flex items-center gap-3">
         <Button type="button" variant="outline" size="sm" disabled={busy} aria-describedby={hintId} onClick={() => { inputRef.current?.click(); }}>
           {busy ? <IconLoader2 className="animate-spin" /> : <IconPhotoUp />} {busyLabel(state)}

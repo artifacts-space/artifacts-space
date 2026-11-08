@@ -42,8 +42,8 @@ export async function devUserId(): Promise<string> {
   return id;
 }
 
-/** Inserts an artifact with an optional theme and cover and returns its public id. */
-export async function createTestArtifact(input: { userId: string; title: string; content: string; visibility: "private" | "public"; theme: string | null; cover?: string | null }): Promise<string> {
+/** Inserts an artifact with an optional theme (a preset id or theme JSON) and cover and returns its public id. */
+export async function createTestArtifact(input: { userId: string; title: string; content: string; visibility: "private" | "public"; theme: unknown; cover?: string | null }): Promise<string> {
   const result = await db().query<{ public_id: string }>(
     `insert into artifact (id, user_id, title, content, kind, visibility, comments, share_id, theme, cover, updated_by)
      values ($1, $2, $3, $4, 'markdown', $5, 'team', $6, $7::jsonb, $8, $2) returning public_id`,
@@ -154,6 +154,29 @@ export async function teamDefaultOf(teamId: string): Promise<{ theme: string | n
 export async function teamPresetRefs(teamId: string, name: string): Promise<string[]> {
   const result = await db().query<{ slug: string }>(`select slug from team_theme_preset where team_id = $1 and name = $2`, [teamId, name]);
   return result.rows.map((row) => `team:${row.slug}`);
+}
+
+/** The stored theme JSON of a team's preset with this name, or null. */
+export async function teamPresetTheme(teamId: string, name: string): Promise<unknown> {
+  const result = await db().query<{ theme: unknown }>(`select theme from team_theme_preset where team_id = $1 and name = $2`, [teamId, name]);
+  return result.rows[0]?.theme ?? null;
+}
+
+/** Inserts `count` old revisions of a preset, a day ago and a minute apart from minute `from` on, to test the history and its cap. */
+export async function seedPresetRevisions(teamId: string, ref: string, theme: unknown, count: number, from = 1): Promise<void> {
+  const slug = ref.replace(/^team:/, "");
+  await db().query(
+    `insert into team_theme_revision (id, team_id, kind, preset_id, name, theme, created_at)
+     select gen_random_uuid()::text, $1, 'preset', p.id, p.name, $3::jsonb, now() - interval '1 day' + (n * interval '1 minute')
+     from team_theme_preset p, generate_series($5::int, $5::int + $4::int - 1) as n where p.slug = $2`,
+    [teamId, slug, JSON.stringify(theme), count, from],
+  );
+}
+
+/** How many revisions a team preset has. */
+export async function presetRevisionCount(ref: string): Promise<number> {
+  const result = await db().query<{ n: string }>(`select count(*) as n from team_theme_revision r join team_theme_preset p on p.id = r.preset_id where p.slug = $1`, [ref.replace(/^team:/, "")]);
+  return Number(result.rows[0]?.n ?? 0);
 }
 
 /** Moves an artifact into a team at a visibility (as approved sharing would). */

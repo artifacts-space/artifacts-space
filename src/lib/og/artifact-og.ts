@@ -17,6 +17,7 @@ import { buildSynopsis, ogKindLabels } from "./synopsis";
 import type { Synopsis } from "./synopsis-types";
 import { truncate } from "./text-utils";
 import { OG_SIZE } from "./theme";
+import { ogImageSegment, ogThemeKey, parseOgImageSegment } from "./theme-key";
 
 /*
  * Privacy rules for artifact social preview images.
@@ -29,6 +30,11 @@ import { OG_SIZE } from "./theme";
  * generic site image with the same headers, so the image route cannot tell
  * anyone whether an artifact exists. The read decision is the share page's
  * own: getArtifactAccess as a signed-out viewer.
+ *
+ * The image URL also carries a short key of the resolved theme (theme-key.ts),
+ * so a team default or team preset change gives the picture a fresh URL
+ * without a new version. The key comes from the theme the approved version
+ * resolves to, so it says nothing a signed-out reader could not already see.
  */
 
 
@@ -44,9 +50,12 @@ async function publicAccess(publicId: string): Promise<ArtifactAccess | null> {
   return getArtifactAccess(publicId, null);
 }
 
-/** The path of an artifact's preview image at one version. The route is src/app/artifact/[publicId]/og/[version]. */
-export function artifactImagePath(publicId: string, versionId: string): string {
-  return `/artifact/${encodeURIComponent(publicId)}/og/${encodeURIComponent(versionId)}`;
+/**
+ * The path of an artifact's preview image at one version, drawn with the
+ * theme whose key is `themeKey`. The route is src/app/artifact/[publicId]/og/[version].
+ */
+export function artifactImagePath(publicId: string, versionId: string, themeKey: string): string {
+  return `/artifact/${encodeURIComponent(publicId)}/og/${encodeURIComponent(ogImageSegment(versionId, themeKey))}`;
 }
 
 /** The path of an artifact's page, the canonical URL of every way to reach it. */
@@ -54,9 +63,10 @@ export function artifactPagePath(publicId: string): string {
   return `/artifact/${encodeURIComponent(publicId)}`;
 }
 
+type VersionView = NonNullable<Awaited<ReturnType<typeof cachedVersionView>>>;
+
 /** The description of the approved version a signed-out reader sees. Files are listed only when a file artifact has no notes. */
-async function shareableDescription(access: ArtifactAccess, shareable: { versionId: string; savedAt: string }): Promise<string | null> {
-  const view = await cachedVersionView(shareable.versionId, shareable.savedAt);
+async function shareableDescription(access: ArtifactAccess, view: VersionView | null): Promise<string | null> {
   if (!view) return null;
   const needsFiles = view.kind === "file" && !view.summary.trim() && !view.content.trim();
   const files = needsFiles ? await filesForViewer(access) : [];
@@ -68,8 +78,8 @@ async function shareableDescription(access: ArtifactAccess, shareable: { version
  * signed-out reader would get them: its approved title (with its emoji, as
  * in the tab title), a description of its approved version (its summary, or
  * an excerpt of its content), and the preview of that version, whose URL
- * holds the version id so it changes with every approval and can be cached
- * for a year. Empty (the page keeps the site's description, tags, and image)
+ * holds the version id and the resolved theme's key, so it changes with
+ * every approval and every theme change and can be cached for a year. Empty (the page keeps the site's description, tags, and image)
  * when the artifact may not be previewed or the lookup fails, so private,
  * team, and unapproved text never reaches these tags.
  */
@@ -78,13 +88,14 @@ export async function artifactOgMetadata(publicId: string): Promise<Pick<Metadat
     const access = await publicAccess(publicId);
     const shareable = shareableVersion(access);
     if (!access || !shareable) return {};
-    const description = (await shareableDescription(access, shareable)) ?? OG_DESCRIPTION;
+    const view = await cachedVersionView(shareable.versionId, shareable.savedAt);
+    const [description, resolved] = await Promise.all([shareableDescription(access, view), resolveThemeFor(access.record, view?.theme ?? null)]);
     const title = `${iconTitlePrefix(access.served.icon)}${access.served.title}`;
-    const image = { url: artifactImagePath(publicId, shareable.versionId), alt: `${access.served.title} on ${OG_WORDMARK}`, width: OG_SIZE.width, height: OG_SIZE.height, type: "image/png" };
+    const image = { url: artifactImagePath(publicId, shareable.versionId, ogThemeKey(resolved.theme)), alt: `${access.served.title} on ${OG_WORDMARK}`, width: OG_SIZE.width, height: OG_SIZE.height, type: "image/png" };
     return {
-      description,
-      openGraph: { title, description, url: artifactPagePath(publicId), type: "article", siteName: OG_WORDMARK, images: [image] },
-      twitter: { card: "summary_large_image", title, description, images: [image] },
+      description: description ?? OG_DESCRIPTION,
+      openGraph: { title, description: description ?? OG_DESCRIPTION, url: artifactPagePath(publicId), type: "article", siteName: OG_WORDMARK, images: [image] },
+      twitter: { card: "summary_large_image", title, description: description ?? OG_DESCRIPTION, images: [image] },
     };
   } catch (error) {
     console.error("[og] Artifact preview tags failed; keeping the site tags", error);
@@ -106,14 +117,18 @@ export interface ArtifactOg {
   cover: OgCover | null;
   /** True when an image cover could not be fetched this time: cache the picture briefly so it is tried again. */
   coverDegraded: boolean;
+  /** True when the URL named the theme the picture is drawn with. False (an old or missing key): cache it briefly, as the theme changed. */
+  themeCurrent: boolean;
 }
 
 /**
- * The preview for `publicId` at version `versionId`, or null when the preview
- * must be the generic site image: the artifact is not readable signed out,
- * or `versionId` is not its approved version.
+ * The preview for `publicId` at image path segment `segment` (the version
+ * id, then the theme key; theme-key.ts), or null when the preview must be
+ * the generic site image: the artifact is not readable signed out, or the
+ * version is not its approved version. It always draws the current theme.
  */
-export async function loadArtifactOg(publicId: string, versionId: string): Promise<ArtifactOg | null> {
+export async function loadArtifactOg(publicId: string, segment: string): Promise<ArtifactOg | null> {
+  const { versionId, themeKey } = parseOgImageSegment(segment);
   const access = await publicAccess(publicId);
   const shareable = shareableVersion(access);
   if (!access || !shareable) return null;
@@ -132,5 +147,6 @@ export async function loadArtifactOg(publicId: string, versionId: string): Promi
     palette: ogCardPalette(theme),
     cover: cover.cover,
     coverDegraded: cover.degraded,
+    themeCurrent: themeKey === ogThemeKey(theme),
   };
 }

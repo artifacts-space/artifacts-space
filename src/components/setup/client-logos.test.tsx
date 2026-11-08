@@ -12,13 +12,23 @@ const endpoint = "https://artifacts.space/api/mcp";
 /** A literal color in markup: hex, rgb(), hsl(), or oklch(). */
 const literalColor = /#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/i;
 
+/** Clients shown with their label alone: Devin has no mark, by the owner's choice. */
+const withoutMark = new Set(["devin"]);
+
 describe("ClientLogo", () => {
-  it.each(mcpClients.map((client) => [client.label, client.id] as const))("should draw a hidden mark in the text color when showing %s", (_label, id) => {
+  it.each(mcpClients.filter((client) => !withoutMark.has(client.id)).map((client) => [client.label, client.id] as const))("should draw a hidden mark in the text color when showing %s", (_label, id) => {
     const html = renderToStaticMarkup(<ClientLogo id={id} />);
     expect(html).toMatch(/^<svg /);
     expect(html).toContain('aria-hidden="true"');
     expect(html).toContain('fill="currentColor"');
     expect(html).not.toMatch(literalColor);
+  });
+
+  it("should draw no mark for Devin, only a hidden spacer the size of one, so labels stay aligned", () => {
+    const html = renderToStaticMarkup(<ClientLogo id="devin" />);
+    expect(html).not.toContain("<svg");
+    expect(html).toMatch(/^<span aria-hidden="true" data-client-logo-spacer=""/);
+    expect(html).toContain("size-4");
   });
 
   it("should carry no title or label of its own when the visible text names the client", () => {

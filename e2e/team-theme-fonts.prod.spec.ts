@@ -18,7 +18,8 @@ import {
 /**
  * A public artifact in a team whose default is a team preset set in Inter
  * renders with it for a signed-out reader, and loads only Inter: no other
- * theme face. Runs against the production build with rows seeded in a
+ * theme face, and never sees the preset's name or id (they stay with the
+ * team). Runs against the production build with rows seeded in a
  * local throwaway database (support/local-db.ts); skipped otherwise.
  */
 
@@ -55,17 +56,25 @@ test("should render the team default and request only Inter when an unthemed tea
   await page.goto(`/artifact/${seeded.publicId}`);
   const heading = page.getByRole("heading", { level: 1, name: "Inter plan" });
   await expect(heading).toBeVisible();
+  // A signed-out reader is outside the team: the preset's id (with its team-chosen slug) never reaches the page.
   const scope = page.locator("[data-artifact-theme]");
-  await expect(scope).toHaveAttribute("data-artifact-theme", seeded.ref);
+  await expect(scope).toHaveAttribute("data-artifact-theme", "custom");
   await expect(scope).toHaveAttribute("data-theme-source", "team");
+  const html = await page.content();
+  expect(html).not.toContain(seeded.ref);
+  expect(html).not.toContain("Inter brand");
   await expect(heading).toHaveCSS("font-family", /^Inter/);
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   expect([...new Set(urls.flatMap((url) => themeFontPath.exec(url)?.[1] ?? []))]).toEqual(["inter"]);
 });
 
-test("should name the team default on the Markdown version's Theme line", async ({ request }) => {
+test("should keep the team preset's name off the Markdown version for a signed-out reader", async ({ request }) => {
   const response = await request.get(`/artifact/${seeded.publicId}.md`);
   expect(response.ok()).toBe(true);
-  expect(await response.text()).toContain("- Theme: Inter brand (team default)");
+  const text = await response.text();
+  expect(text).toContain("- Theme: Custom");
+  expect(text).not.toContain("Inter brand");
+  expect(text).not.toContain("team default");
+  expect(text).not.toContain(seeded.ref);
 });

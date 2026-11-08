@@ -21,12 +21,20 @@ export interface ThemeChoiceGroup {
   presets: ThemeChoicePreset[];
 }
 
+/** A team whose presets the viewer manages (owner or admin), where this artifact could use a new preset. */
+export interface ThemeChoiceTeam {
+  teamId: string;
+  teamName: string;
+}
+
 /** Everything the picker needs beyond the built-ins. */
 export interface ThemeChoices {
   groups: ThemeChoiceGroup[];
   /** The team default an artifact with no theme of its own shows, or null when it shows the site default. */
   inherited: { name: string; theme: Theme } | null;
+  /** Teams the viewer may save the artifact's custom theme to as a preset ("Save as team preset"). Empty for everyone else. */
+  manageable: ThemeChoiceTeam[];
 }
 
-/** No team presets and no team default. */
-export const noThemeChoices: ThemeChoices = { groups: [], inherited: null };
+/** No team presets, no team default, and nowhere to save a preset. */
+export const noThemeChoices: ThemeChoices = { groups: [], inherited: null, manageable: [] };

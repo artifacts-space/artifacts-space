@@ -15,8 +15,9 @@ function person(name: string, username: string | null) {
 /**
  * Edits to link and public artifacts waiting for approval, each with a
  * before/after view and approve or deny. Owners and admins only.
+ * `themeNames` holds the team's preset names by id, for theme changes.
  */
-export function EditReviewList({ edits }: { edits: PendingEditView[] }) {
+export function EditReviewList({ edits, themeNames }: { edits: PendingEditView[]; themeNames?: ReadonlyMap<string, string> }) {
   if (edits.length === 0) return <p className="px-5 py-6 text-md text-muted-foreground">No edits are waiting for approval.</p>;
   return (
     <ul>
@@ -32,7 +33,7 @@ export function EditReviewList({ edits }: { edits: PendingEditView[] }) {
             </div>
             <EditDecisionButtons requestId={edit.requestId} />
           </div>
-          <EditDiff before={edit.before} after={edit.after} />
+          <EditDiff before={edit.before} after={edit.after} themeNames={themeNames} />
         </li>
       ))}
     </ul>
