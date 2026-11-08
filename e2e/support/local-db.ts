@@ -42,12 +42,12 @@ export async function devUserId(): Promise<string> {
   return id;
 }
 
-/** Inserts an artifact with an optional theme (a preset id or theme JSON) and cover and returns its public id. */
-export async function createTestArtifact(input: { userId: string; title: string; content: string; visibility: "private" | "public"; theme: unknown; cover?: string | null }): Promise<string> {
+/** Inserts an artifact (Markdown unless `kind` says ui) with an optional theme (a preset id or theme JSON) and cover and returns its public id. */
+export async function createTestArtifact(input: { userId: string; title: string; content: string; visibility: "private" | "public"; theme: unknown; cover?: string | null; kind?: "markdown" | "ui" }): Promise<string> {
   const result = await db().query<{ public_id: string }>(
     `insert into artifact (id, user_id, title, content, kind, visibility, comments, share_id, theme, cover, updated_by)
-     values ($1, $2, $3, $4, 'markdown', $5, 'team', $6, $7::jsonb, $8, $2) returning public_id`,
-    [randomUUID(), input.userId, input.title, input.content, input.visibility, randomUUID().replaceAll("-", ""), input.theme === null ? null : JSON.stringify(input.theme), input.cover ?? null],
+     values ($1, $2, $3, $4, $9, $5, 'team', $6, $7::jsonb, $8, $2) returning public_id`,
+    [randomUUID(), input.userId, input.title, input.content, input.visibility, randomUUID().replaceAll("-", ""), input.theme === null ? null : JSON.stringify(input.theme), input.cover ?? null, input.kind ?? "markdown"],
   );
   const publicId = result.rows[0]?.public_id;
   if (!publicId) throw new Error("The test artifact was not created.");

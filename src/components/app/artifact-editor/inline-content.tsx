@@ -8,14 +8,18 @@ import { ContentStatus } from "@/components/editor/content-status";
 import { DocumentEditor, isDocumentKind } from "@/components/editor/document-editor";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { canEditBlocks, UiBlockEditor } from "@/components/ui-editor/ui-block-editor";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
+import { cn } from "@/lib/utils";
 
 /**
  * The artifact's content in the /app editor, rendered as itself and editable
  * in place. Markdown and Text are documents you type into; CSV is a grid;
- * Code is its source. Formats without an inline editor yet (ui, JSON, SVG,
- * Mermaid, File notes) show their rendered view, and View source edits them.
+ * Code is its source; an interface opens in the block editor
+ * (src/components/ui-editor). Formats without an inline editor yet (JSON,
+ * SVG, Mermaid, File notes, and an interface too broken to render) show
+ * their rendered view, and View source edits them.
  * In the /app pane every surface grows to fill the pane but never shrinks
  * below its content (`flex-[1_0_auto]`), so nothing spills over the files
  * and fields below. On the artifact's own page (`surface="page"`) the
@@ -26,9 +30,10 @@ import type { FileDto } from "@/lib/files/types";
 export type InlineSurface = "pane" | "page";
 
 const pagePane = "min-h-[460px] min-w-0 flex-[1_0_auto] bg-card p-5 sm:p-8";
-const frames: Record<InlineSurface, { content: string; source: string }> = {
-  pane: { content: pagePane, source: "flex flex-[1_0_auto] flex-col" },
-  page: { content: "min-w-0", source: "card-surface flex flex-col overflow-hidden" },
+/** `gutter`: room on the left for the interface editor's block handles. */
+const frames: Record<InlineSurface, { content: string; source: string; gutter: string }> = {
+  pane: { content: pagePane, source: "flex flex-[1_0_auto] flex-col", gutter: "sm:pl-14" },
+  page: { content: "min-w-0", source: "card-surface flex flex-col overflow-hidden", gutter: "" },
 };
 const sourceField =
   "min-h-[460px] flex-1 resize-y rounded-none border-0 bg-card p-6 font-mono text-base leading-7 md:text-sm shadow-none outline-none focus-visible:ring-0 sm:p-8";
@@ -83,7 +88,7 @@ function RenderedWithSource({ kind, content, language, title, files, frame, onSh
 
 /** True when the content shows an editable field to focus; otherwise the pane takes focus for keyboard scrolling. */
 export function hasInlineField(kind: ArtifactKind, sourceOpen: boolean): boolean {
-  return sourceOpen || kind === "code" || kind === "csv" || isDocumentKind(kind);
+  return sourceOpen || kind === "code" || kind === "csv" || kind === "ui" || isDocumentKind(kind);
 }
 
 /** See the notes at the top of this file. */
@@ -103,6 +108,13 @@ export function InlineContent(props: InlineContentProps) {
     return (
       <div className={frame.content}>
         <CsvContentEditor key={revision} value={content} onChange={onChange} title={title} files={files} label="Artifact content" />
+      </div>
+    );
+  }
+  if (kind === "ui" && canEditBlocks(content)) {
+    return (
+      <div className={cn(frame.content, frame.gutter)}>
+        <UiBlockEditor content={content} onChange={onChange} />
       </div>
     );
   }

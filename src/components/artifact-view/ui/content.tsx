@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 
 import type { ViewProps } from "./stout";
 
-const headingClass = {
+/** Heading classes by level; the interface editor uses them for headings typed in place. */
+export const headingClass = {
   1: "text-3xl font-medium leading-[1.12] tracking-[-0.025em] sm:text-4xl",
   2: "text-xl font-medium leading-snug tracking-[-0.015em]",
   3: "text-base font-medium leading-snug",
@@ -23,7 +24,8 @@ export function HeadingView({ props }: ViewProps<"Heading">) {
   return <Tag className={cn("min-w-0 text-balance break-words", headingClass[level])}>{props.text}</Tag>;
 }
 
-const textSize = { sm: "text-sm leading-6", md: "text-md leading-7", lg: "text-lg leading-8" } as const;
+/** Text classes by size; the interface editor uses them too. */
+export const textSize = { sm: "text-sm leading-6", md: "text-md leading-7", lg: "text-lg leading-8" } as const;
 
 export function TextView({ props }: ViewProps<"Text">) {
   if (!props.text) return null;
@@ -43,7 +45,8 @@ export function CodeView({ props }: ViewProps<"Code">) {
   return <CodeBlock code={props.code} language={props.language} title={props.title} capHeight />;
 }
 
-const toneStyles: Record<Tone, { box: string; icon: string; Icon: typeof IconInfoCircle }> = {
+/** Callout colors and icon per tone; the interface editor uses them too. */
+export const toneStyles: Record<Tone, { box: string; icon: string; Icon: typeof IconInfoCircle }> = {
   neutral: { box: "border-border bg-muted/50", icon: "text-muted-foreground", Icon: IconNote },
   info: { box: "border-tone-info/30 bg-tone-info/8", icon: "text-tone-info", Icon: IconInfoCircle },
   success: { box: "border-tone-success/30 bg-tone-success/8", icon: "text-tone-success", Icon: IconCircleCheck },

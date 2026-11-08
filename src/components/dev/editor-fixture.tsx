@@ -10,12 +10,14 @@ import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 
-import { fixtureArtifact, longJson, longMarkdown, longUi } from "./fixture-content";
+import { fixtureArtifact, longJson, longMarkdown, longUi, shortUi, type EditorFixtureKind } from "./fixture-content";
 
-/** Formats the fixture can open. */
-export type EditorFixtureKind = Extract<ArtifactKind, "ui" | "json" | "markdown">;
-
-const contentFor: Record<EditorFixtureKind, () => string> = { ui: longUi, json: longJson, markdown: longMarkdown };
+const samples: Record<EditorFixtureKind, { kind: ArtifactKind; content: () => string }> = {
+  ui: { kind: "ui", content: longUi },
+  json: { kind: "json", content: longJson },
+  markdown: { kind: "markdown", content: longMarkdown },
+  blocks: { kind: "ui", content: shortUi },
+};
 
 /** A save that keeps the change in memory, so autosave runs end to end without a database. */
 function useMemorySave(initial: ArtifactDto): SaveArtifact {
@@ -33,7 +35,7 @@ function useMemorySave(initial: ArtifactDto): SaveArtifact {
  * edits here.
  */
 export function EditorFixture({ kind }: { kind: EditorFixtureKind }) {
-  const artifact = useMemo(() => fixtureArtifact({ id: `fixture-${kind}`, kind, title: `Long ${kind} fixture`, content: contentFor[kind]() }), [kind]);
+  const artifact = useMemo(() => fixtureArtifact({ id: `fixture-${kind}`, kind: samples[kind].kind, title: `Long ${kind} fixture`, content: samples[kind].content() }), [kind]);
   const save = useMemorySave(artifact);
   const onSaved = useCallback(() => undefined, []);
   return (
