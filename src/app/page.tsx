@@ -2,7 +2,6 @@ import Link from "next/link";
 import { IconArrowRight } from "@tabler/icons-react";
 
 import { GitHubLink } from "@/components/github-link";
-import { ClosingSection } from "@/components/landing/closing-section";
 import { SurfaceSection } from "@/components/landing/surface-section";
 import { ConnectSection } from "@/components/landing/connect-section";
 import { ControlSection } from "@/components/landing/control-section";
@@ -63,9 +62,8 @@ export default function Home() {
         <WhySection />
         <ConnectSection />
         <ControlSection />
-        <OpenSourceSection />
         <PricingSection />
-        <ClosingSection />
+        <OpenSourceSection />
       </main>
 
       <SiteFooter />

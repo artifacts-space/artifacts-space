@@ -8,9 +8,8 @@ const storySections = [
   "Use it like the artifacts you already know.",
   "One surface for people and agents.",
   "But switching accounts cuts you off.",
-  "Open source from day one.",
   "Pricing",
-  "Bring your team and your agents into one space.",
+  "Open source from day one.",
 ] as const;
 
 for (const theme of themes) {
@@ -43,7 +42,7 @@ for (const theme of themes) {
 
     const openSource = page.getByRole("region", { name: "Open source from day one." });
     await openSource.scrollIntoViewIfNeeded();
-    await expect(openSource.getByRole("img", { name: "MIT" })).toBeVisible();
+    await expect(openSource.getByRole("button", { name: "Get started" })).toHaveAttribute("href", "/sign-up");
     await expect(openSource.getByRole("button", { name: "View on GitHub" })).toHaveAttribute("href", "https://github.com/artifacts-space/artifacts-space");
 
     const heroTop = (await hero.boundingBox())?.y ?? Number.NaN;
