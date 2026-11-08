@@ -12,6 +12,8 @@ export const teamPresetLimits = {
   maxSlugChars: 56,
   /** The longest stored reference, "team:" plus the slug, or a built-in id. */
   maxRefChars: 64,
+  /** Runaway cap: revisions kept per preset, and for the team default. The oldest past it are pruned. */
+  maxRevisions: 50,
   /** Database backstop on the stored theme jsonb text (the input limit is in artifactThemeLimits). */
   maxStoredBytes: 16_000,
 } as const;

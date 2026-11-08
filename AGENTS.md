@@ -254,6 +254,12 @@ instead and never says "team default". Link preview image URLs carry a short
 hash of the resolved theme (`src/lib/og/theme-key.ts`), never a name, so a
 team default or preset edit gives the card a fresh URL.
 
+Every save of a team preset and every team default change writes a row in
+`team_theme_revision` (`src/lib/themes/team-theme-revisions.ts`), newest 50
+kept per preset and per default. Restore (owners and admins only) saves the
+old state again as a new revision through the normal checks; never update or
+re-date an old revision, and never file artifact versions from team settings.
+
 ### Covers
 
 Artifact covers live in `src/lib/covers` (gradients, parsing, reposition

@@ -2,14 +2,17 @@
 
 import { useState } from "react";
 
-import { setTeamDefaultThemeAction } from "@/app/(workspace)/teams/theme-actions";
+import { defaultRevisionsAction, restoreDefaultRevisionAction, setTeamDefaultThemeAction } from "@/app/(workspace)/teams/theme-actions";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatExactTime } from "@/lib/relative-time";
 import { DEFAULT_THEME_ID } from "@/lib/themes/presets";
-import { builtInPresets } from "@/lib/themes/resolve";
+import { builtInPresets, presetTheme, siteDefaultTheme } from "@/lib/themes/resolve";
+import type { Theme } from "@/lib/themes/schema";
 import type { TeamThemeSettings } from "@/lib/themes/team-presets";
+import type { TeamThemeRevisionDto } from "@/lib/themes/team-theme-revisions";
 
+import { HistoryPanel } from "./theme-history";
 import { useTeamAction } from "./use-team-action";
 
 const SITE_DEFAULT = "site";
@@ -20,11 +23,18 @@ function auditLine(settings: TeamThemeSettings): string | null {
   return settings.defaultSetBy ? `Last changed by ${settings.defaultSetBy}, ${when}.` : `Last changed ${when}.`;
 }
 
+/** The theme a default id draws with, for the history swatches; null when its preset is gone. */
+function defaultThemeOf(id: string | null, settings: TeamThemeSettings): Theme | null {
+  if (id === null) return siteDefaultTheme();
+  return presetTheme(id) ?? settings.presets.find((preset) => preset.ref === id)?.theme ?? null;
+}
+
 /**
  * The team default theme: what artifacts shared with the team show when
  * they have no theme of their own. Owners and admins pick a built-in or a
  * team preset; everyone else sees which one it is. Who changed it last is
- * shown and logged.
+ * shown and logged, and owners and admins can restore an earlier default
+ * from its history.
  */
 export function TeamDefaultTheme({ teamId, settings, canManage }: { teamId: string; settings: TeamThemeSettings; canManage: boolean }) {
   const [value, setValue] = useState(settings.defaultTheme ?? SITE_DEFAULT);
@@ -38,6 +48,12 @@ export function TeamDefaultTheme({ teamId, settings, canManage }: { teamId: stri
     setValue(next);
     const saved = await run("default", () => setTeamDefaultThemeAction(teamId, next === SITE_DEFAULT ? null : next), "Team default saved.");
     if (!saved) setValue(previous);
+  }
+
+  async function restore(revision: TeamThemeRevisionDto): Promise<boolean> {
+    const restored = await run("default", () => restoreDefaultRevisionAction(teamId, revision.id), "Team default restored.");
+    if (restored) setValue(revision.defaultTheme ?? SITE_DEFAULT);
+    return restored;
   }
 
   const audit = auditLine(settings);
@@ -67,6 +83,15 @@ export function TeamDefaultTheme({ teamId, settings, canManage }: { teamId: stri
       </Select>
       {audit || !canManage ? (
         <p className="text-xs text-muted-foreground">{[audit, canManage ? null : "Only owners and admins can change it."].filter(Boolean).join(" ")}</p>
+      ) : null}
+      {canManage ? (
+        <HistoryPanel
+          title="Team default history"
+          load={() => defaultRevisionsAction(teamId)}
+          onRestore={restore}
+          describe={(revision) => ({ label: names.get(revision.defaultTheme ?? SITE_DEFAULT) ?? "A removed preset", theme: defaultThemeOf(revision.defaultTheme, settings) })}
+          disabled={pending !== null}
+        />
       ) : null}
     </div>
   );

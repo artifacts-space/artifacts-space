@@ -18,6 +18,7 @@ import type { TeamPresetDto } from "@/lib/themes/team-presets";
 
 import { FormError } from "./form-error";
 import { PresetFormFields } from "./preset-form-fields";
+import { PresetHistory } from "./preset-history";
 import { PresetJsonTools } from "./preset-json-tools";
 import { PresetPreview } from "./preset-preview";
 import { usePresetEditor, type PresetEditorStart, type PresetEditorState } from "./use-preset-editor";
@@ -35,6 +36,8 @@ interface PresetEditorDialogProps {
   start: PresetEditorStart;
   /** The team the preset belongs to, named in the title when saving a custom theme. */
   teamName?: string;
+  /** The saved preset whose history the editor shows (editing only). */
+  history?: { teamId: string; presetId: string };
   /** The team's presets, to start a new one from. */
   teamPresets: readonly TeamPresetDto[];
   onSave: (input: PresetSaveInput) => Promise<ActionResult<TeamPresetDto>>;
@@ -131,7 +134,7 @@ function dialogTitle(kind: PresetEditorDialogProps["kind"], start: PresetEditorS
  * one button to apply them all. Errors show inline; the form never uses
  * browser validation bubbles.
  */
-export function PresetEditorDialog({ kind, start, teamName, teamPresets, onSave, onClose }: PresetEditorDialogProps) {
+export function PresetEditorDialog({ kind, start, teamName, history, teamPresets, onSave, onClose }: PresetEditorDialogProps) {
   const editor = usePresetEditor(start);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -169,6 +172,7 @@ export function PresetEditorDialog({ kind, start, teamName, teamPresets, onSave,
               <NameFields editor={editor} disabled={saving} />
               {kind === "new" ? <StartFrom teamPresets={teamPresets} onPick={editor.startFrom} /> : null}
               <PresetJsonTools editor={editor} disabled={saving} />
+              {history ? <PresetHistory teamId={history.teamId} presetId={history.presetId} editor={editor} disabled={saving} /> : null}
               <ContrastNotice editor={editor} disabled={saving} />
               {general.map((message) => <FormError key={message} message={message} />)}
               <Tabs defaultValue="form">

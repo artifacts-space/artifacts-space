@@ -17,6 +17,7 @@ describe("importThemeJson", () => {
     expect(imported.ok).toBe(true);
     if (!imported.ok) return;
     expect(imported.suggestions).toEqual([]);
+    expect(imported.passes).toBe(true);
     expect(parseTheme(imported.draft)).toEqual({ ok: true, theme: ocean() });
   });
 
@@ -50,6 +51,7 @@ describe("importThemeJson", () => {
     expect(imported.ok).toBe(true);
     if (!imported.ok) return;
     expect(imported.message).toMatch(/hard to read/);
+    expect(imported.passes).toBe(false);
     expect(parseTheme(imported.draft).ok).toBe(false);
     expect(imported.suggestions.map((change) => change.path)).toContain("light.mutedForeground");
     expect(parseTheme(applyContrastChanges(imported.draft, imported.suggestions)).ok).toBe(true);

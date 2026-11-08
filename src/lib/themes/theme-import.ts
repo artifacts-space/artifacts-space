@@ -22,7 +22,7 @@ export const THEME_IMPORT_MAX_FILE_BYTES = 65_536;
 
 /** The result of importing theme JSON. */
 export type ThemeImport =
-  | { ok: true; draft: ThemeDraft; suggestions: ContrastChange[]; message: string }
+  | { ok: true; draft: ThemeDraft; suggestions: ContrastChange[]; message: string; /** True when it passes every check as is, contrast included. */ passes: boolean }
   | { ok: false; message: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -61,13 +61,13 @@ export function importThemeJson(text: string): ThemeImport {
     return { ok: false, message: `Theme JSON is too long. Keep it under ${String(artifactThemeLimits.maxInputChars)} characters.` };
   }
   const parsed = parseTheme(value);
-  if (parsed.ok) return { ok: true, draft: draftFromTheme(parsed.theme), suggestions: [], message: "Theme imported. Check the preview, then save." };
+  if (parsed.ok) return { ok: true, draft: draftFromTheme(parsed.theme), suggestions: [], message: "Theme imported. Check the preview, then save.", passes: true };
   // Every key is known and every color parses: only contrast fails, which the editor can fix.
   const drawable = parseThemeForPreview(value);
   if (!drawable) return { ok: false, message: `This theme cannot be used. ${problemList(parsed.issues)}` };
   const suggestions = contrastSuggestions(value);
   const advice = suggestions.length > 0 ? "Apply the suggested colors, or fix them yourself, before you save." : "Fix the marked colors before you save.";
-  return { ok: true, draft: draftFromTheme(drawable), suggestions, message: `Theme imported, but some text is hard to read. ${advice}` };
+  return { ok: true, draft: draftFromTheme(drawable), suggestions, message: `Theme imported, but some text is hard to read. ${advice}`, passes: false };
 }
 
 /** A validated theme as pretty JSON, ready to copy, download, or send to an agent. */

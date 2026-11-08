@@ -162,6 +162,23 @@ export async function teamPresetTheme(teamId: string, name: string): Promise<unk
   return result.rows[0]?.theme ?? null;
 }
 
+/** Inserts `count` old revisions of a preset, a day ago and a minute apart from minute `from` on, to test the history and its cap. */
+export async function seedPresetRevisions(teamId: string, ref: string, theme: unknown, count: number, from = 1): Promise<void> {
+  const slug = ref.replace(/^team:/, "");
+  await db().query(
+    `insert into team_theme_revision (id, team_id, kind, preset_id, name, theme, created_at)
+     select gen_random_uuid()::text, $1, 'preset', p.id, p.name, $3::jsonb, now() - interval '1 day' + (n * interval '1 minute')
+     from team_theme_preset p, generate_series($5::int, $5::int + $4::int - 1) as n where p.slug = $2`,
+    [teamId, slug, JSON.stringify(theme), count, from],
+  );
+}
+
+/** How many revisions a team preset has. */
+export async function presetRevisionCount(ref: string): Promise<number> {
+  const result = await db().query<{ n: string }>(`select count(*) as n from team_theme_revision r join team_theme_preset p on p.id = r.preset_id where p.slug = $1`, [ref.replace(/^team:/, "")]);
+  return Number(result.rows[0]?.n ?? 0);
+}
+
 /** Moves an artifact into a team at a visibility (as approved sharing would). */
 export async function shareTestArtifact(publicId: string, teamId: string, visibility: "team" | "public"): Promise<void> {
   await db().query(`update artifact set team_id = $2, visibility = $3 where public_id = $1`, [publicId, teamId, visibility]);

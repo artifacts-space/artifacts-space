@@ -15,10 +15,13 @@ import {
   createTeamPreset,
   deleteTeamPreset,
   duplicateTeamPreset,
+  restoreDefaultRevision,
+  restorePresetRevision,
   setTeamDefaultTheme,
   updateTeamPreset,
   type TeamPresetDto,
 } from "@/lib/themes/team-presets";
+import { listDefaultRevisions, listPresetRevisions, type TeamThemeRevisionDto } from "@/lib/themes/team-theme-revisions";
 
 /**
  * Team theme presets and the team default: team settings, so only owners
@@ -96,6 +99,39 @@ export async function setTeamDefaultThemeAction(teamId: string, theme: string | 
   return managed(teamId, "The team default could not be saved. Try again.", ({ membership, userId }) =>
     setTeamDefaultTheme(membership.id, userId, z.string().max(64).nullable().parse(theme)),
   );
+}
+
+/** Reads for owners and admins only, with an error result for everyone else. */
+async function managedRead<T>(teamId: unknown, fallback: string, read: (teamId: string) => Promise<T>): Promise<ActionResult<T>> {
+  try {
+    const checked = await requireThemeManager(teamId);
+    if (!checked.ok) return checked.result;
+    return { success: true, data: await read(checked.membership.id) };
+  } catch (error) {
+    return { success: false, error: actionErrorMessage(error, fallback) };
+  }
+}
+
+/** A preset's saved revisions, newest first, for its history list. Owners and admins only. */
+export async function presetRevisionsAction(teamId: string, presetId: string): Promise<ActionResult<TeamThemeRevisionDto[]>> {
+  return managedRead(teamId, "The history could not load. Try again.", (id) => listPresetRevisions(id, idSchema.parse(presetId)));
+}
+
+/** The team default's revisions, newest first. Owners and admins only. */
+export async function defaultRevisionsAction(teamId: string): Promise<ActionResult<TeamThemeRevisionDto[]>> {
+  return managedRead(teamId, "The history could not load. Try again.", (id) => listDefaultRevisions(id));
+}
+
+/** Restores a preset revision's theme as a new save. Refused when that theme fails today's checks. */
+export async function restorePresetRevisionAction(teamId: string, presetId: string, revisionId: string): Promise<ActionResult<TeamPresetDto>> {
+  return managed(teamId, "The revision could not be restored. Try again.", ({ membership, userId }) =>
+    restorePresetRevision(membership.id, idSchema.parse(presetId), idSchema.parse(revisionId), userId),
+  );
+}
+
+/** Restores an earlier team default as a new change. */
+export async function restoreDefaultRevisionAction(teamId: string, revisionId: string): Promise<ActionResult<string | null>> {
+  return managed(teamId, "The team default could not be restored. Try again.", ({ membership, userId }) => restoreDefaultRevision(membership.id, idSchema.parse(revisionId), userId));
 }
 
 /** The team presets the signed-in person may use on a new (private) artifact. */

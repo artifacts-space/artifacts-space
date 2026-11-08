@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 
 import { themePresets } from "../src/lib/themes/presets";
+import { presetTheme } from "../src/lib/themes/resolve";
 
 import {
   cleanUp,
@@ -12,11 +13,16 @@ import {
   devUserId,
   localDatabaseEnabled,
   localDatabaseSkipReason,
+  presetRevisionCount,
   readyDevUser,
+  seedPresetRevisions,
   setTeamRole,
   shareTestArtifact,
+  createTestTeamPreset,
+  teamDefaultOf,
   teamPresetRefs,
   teamPresetTheme,
+  versionCount,
 } from "./support/local-db";
 import { largePhoto } from "./support/photos";
 
@@ -26,7 +32,8 @@ import { largePhoto } from "./support/photos";
  * Apply suggestions, and an artifact's custom theme (as an agent would set
  * it) shows as Custom in the picker, copies as JSON, and saves as a team
  * preset for owners and admins only. A phone photo picked as an icon is
- * resized in the browser before it uploads. Needs dev sign-in and a local
+ * resized in the browser before it uploads. Team theme history restores an
+ * earlier preset or team default as a new revision, within the cap. Needs dev sign-in and a local
  * throwaway database; skipped otherwise.
  */
 
@@ -57,11 +64,13 @@ async function downloadJson(page: Page, dialog: ReturnType<Page["getByRole"]>): 
   return { name: download.suggestedFilename(), text: await readFile(path, "utf8") };
 }
 
-function oceanTheme() {
-  const preset = themePresets.find((item) => item.id === "ocean");
-  if (!preset) throw new Error("The ocean preset is missing.");
+function presetJson(id: string) {
+  const preset = themePresets.find((item) => item.id === id);
+  if (!preset) throw new Error(`The ${id} preset is missing.`);
   return preset.theme;
 }
+
+const oceanTheme = () => presetJson("ocean");
 
 test("should round-trip a preset through Download JSON and Import JSON, and fix a faint import with one click", async ({ page }, testInfo) => {
   const userId = await signIn(page);
@@ -173,4 +182,68 @@ test("should resize a phone photo to an icon of at most 512 px under 1 MB before
   expect(body[0].size).toBeGreaterThan(0);
   // A 512 × 384 JPEG is a few dozen KB; far under the 1 MB cap.
   expect(body[0].size).toBeLessThanOrEqual(200_000);
+});
+
+test("should keep every preset and team default change, restore an earlier one as a new revision, and cap the history", async ({ page }, testInfo) => {
+  const userId = await signIn(page);
+  const team = await newTeam(userId);
+  const name = `History ${testInfo.project.name}`;
+  const ref = await createTestTeamPreset(team.id, name, oceanTheme());
+  // 54 old Paper revisions, then a newer one that fails today's contrast rules.
+  await seedPresetRevisions(team.id, ref, presetJson("paper"), 54);
+  await seedPresetRevisions(team.id, ref, { ...oceanTheme(), light: { ...oceanTheme().light, mutedForeground: "#d4d4d4" } }, 1, 100);
+  const publicId = await createTestArtifact({ userId, title: "Uses the preset", content: "# Notes", visibility: "private", theme: ref });
+  seeded.publicIds.push(publicId);
+  await shareTestArtifact(publicId, team.id, "team");
+
+  // A save adds a revision; the oldest past 50 are pruned.
+  await page.goto(`/teams/${team.slug}`);
+  await page.getByRole("button", { name: `Edit ${name}` }).click();
+  let dialog = page.getByRole("dialog", { name: `Edit ${name}` });
+  await dialog.getByLabel("Description").fill("Our look");
+  await dialog.getByRole("button", { name: "Save preset" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(await presetRevisionCount(ref)).toBe(50);
+
+  await page.getByRole("button", { name: `Edit ${name}` }).click();
+  dialog = page.getByRole("dialog", { name: `Edit ${name}` });
+  await dialog.getByRole("button", { name: "History" }).click();
+  const history = dialog.getByRole("list", { name: "History" });
+  await expect(history.getByRole("listitem")).toHaveCount(50);
+  await expect(history.getByRole("listitem").first()).toContainText("Current");
+
+  // The faint revision is not restored as is: it opens in the editor with suggestions.
+  await history.getByRole("button", { name: /^Restore previous:/ }).click();
+  await expect(page.getByText(/fails today's checks/)).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Apply suggestions" })).toBeVisible();
+  expect(await presetRevisionCount(ref)).toBe(50);
+
+  // An older Paper revision restores as a new revision; the old ones stay.
+  await history.getByRole("button", { name: /^Restore:/ }).first().click();
+  await expect(page.getByText("Restored. Artifacts that use this preset show it now.")).toBeVisible();
+  expect(await teamPresetTheme(team.id, name)).toEqual(presetTheme("paper"));
+  await expect(history.getByRole("listitem")).toHaveCount(50);
+  expect(await presetRevisionCount(ref)).toBe(50);
+  // Team themes never file artifact versions.
+  expect(await versionCount(publicId)).toBe(0);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+
+  // The team default keeps its history too, and Restore previous brings the last one back.
+  await page.getByRole("combobox", { name: "Team default" }).click();
+  await page.getByRole("option", { name, exact: true }).click();
+  await expect(page.getByText("Team default saved.")).toBeVisible();
+  await page.getByRole("combobox", { name: "Team default" }).click();
+  await page.getByRole("option", { name: "Paper", exact: true }).click();
+  await expect(page.getByText("Team default saved.").first()).toBeVisible();
+  await expect.poll(async () => (await teamDefaultOf(team.id)).theme).toBe("paper");
+  await page.getByRole("button", { name: "Team default history" }).click();
+  await page.getByRole("list", { name: "Team default history" }).getByRole("button", { name: /^Restore previous:/ }).click();
+  await expect(page.getByText("Team default restored.")).toBeVisible();
+  expect((await teamDefaultOf(team.id)).theme).toBe(ref);
+  expect(await versionCount(publicId)).toBe(0);
+
+  // Plain members do not see the history.
+  await setTeamRole(team.id, userId, "member");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Team default history" })).toHaveCount(0);
 });

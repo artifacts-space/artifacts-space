@@ -152,6 +152,7 @@ export default function ThemesPage() {
       <DocsH page={page} id="team-default" />
       <Prose>
         <p>Owners and admins pick a built-in preset or a team preset as the team default, or <strong>Site default</strong> for none. It is a team setting: it files no artifact versions and needs no approval. The team page shows who changed it last and when, and the server logs each change.</p>
+        <p>Every save of a preset and every change of the team default is kept: owners and admins open <strong>History</strong> in the preset editor, or <strong>Team default history</strong> on the team page, and <strong>Restore</strong> saves that earlier theme again as a new change. Old entries never change, the last 50 are kept, and an old theme that fails today&apos;s checks opens in the editor with suggested colors instead.</p>
       </Prose>
       <DocsH page={page} id="team-mcp" />
       <Prose>

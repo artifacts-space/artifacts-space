@@ -134,6 +134,34 @@ export const teamThemePreset = pgTable(
   ],
 );
 
+// One saved state of a team preset (kind "preset": its name and theme) or of
+// the team default (kind "default": a preset id, or null for the site default),
+// written on every change and on every restore. Never rewritten; the oldest
+// past the runaway cap are pruned. Not artifact versions.
+export const teamThemeRevision = pgTable(
+  "team_theme_revision",
+  {
+    id: text("id").primaryKey(),
+    teamId: text("team_id").notNull().references(() => team.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    presetId: text("preset_id").references(() => teamThemePreset.id, { onDelete: "cascade" }),
+    name: text("name"),
+    theme: jsonb("theme").$type<Theme>(),
+    defaultTheme: text("default_theme"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("team_theme_revision_preset_idx").on(table.presetId, table.createdAt),
+    index("team_theme_revision_team_idx").on(table.teamId, table.kind, table.createdAt),
+    check("team_theme_revision_kind_check", sql`${table.kind} in ('preset', 'default')`),
+    check("team_theme_revision_preset_check", sql`${table.kind} <> 'preset' or (${table.presetId} is not null and ${table.theme} is not null)`),
+    check("team_theme_revision_name_length_check", sql`char_length(${table.name}) <= ${sql.raw(String(teamPresetLimits.maxNameChars))}`),
+    check("team_theme_revision_default_length_check", sql`char_length(${table.defaultTheme}) <= ${sql.raw(String(teamPresetLimits.maxRefChars))}`),
+    check("team_theme_revision_theme_size_check", sql`octet_length(${table.theme}::text) <= ${sql.raw(String(teamPresetLimits.maxStoredBytes))}`),
+  ],
+);
+
 // A saved copy of an artifact: one per save, so the history covers every
 // visibility. Quick saves by the same editor merge into the latest version.
 // Link and public artifacts also point at one as their approved version.
