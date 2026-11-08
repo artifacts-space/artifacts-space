@@ -10,8 +10,8 @@ import { cn } from "@/lib/utils";
  * page", and the page itself always agree.
  */
 
-/** An h2 or h3 with an id and a link to itself. */
-export function AnchorHeading({ heading }: { heading: DocsHeading }) {
+/** An h2 or h3 with an id and a link to itself. An `icon` sits before the title and should be `aria-hidden`. */
+export function AnchorHeading({ heading, icon }: { heading: DocsHeading; icon?: ReactNode }) {
   const Tag = heading.level === 2 ? "h2" : "h3";
   return (
     <Tag
@@ -22,6 +22,7 @@ export function AnchorHeading({ heading }: { heading: DocsHeading }) {
       )}
     >
       <a href={`#${heading.id}`} className="inline-flex items-center gap-2">
+        {icon}
         <span>{heading.title}</span>
         <IconLink aria-hidden className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
         <span className="sr-only">Link to this section</span>
@@ -31,8 +32,8 @@ export function AnchorHeading({ heading }: { heading: DocsHeading }) {
 }
 
 /** An h2 or h3 from the page registry, with a link to itself. */
-export function DocsH({ page, id }: { page: DocsSlug; id: string }) {
-  return <AnchorHeading heading={docsHeading(page, id)} />;
+export function DocsH({ page, id, icon }: { page: DocsSlug; id: string; icon?: ReactNode }) {
+  return <AnchorHeading heading={docsHeading(page, id)} icon={icon} />;
 }
 
 /** Running text. Uses the artifact prose styles: paragraphs, lists, inline code, tables, links. */

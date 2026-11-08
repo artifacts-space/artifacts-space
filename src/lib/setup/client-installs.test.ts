@@ -8,8 +8,12 @@ import {
   codexMcpAddCommand,
   codexMcpLoginCommand,
   cursorInstallLink,
+  kimiMcpLoginCommand,
   mcpClients,
   opencodeConfigJson,
+  opencodeMcpAddCommand,
+  opencodeMcpAuthCommand,
+  opencodeMcpListCommand,
   remoteServerConfig,
 } from "./client-installs";
 import { claudeMcpAddOAuthCommand, mcpConfigJson, mcpOAuthConfigJson } from "./mcp-config";
@@ -80,6 +84,30 @@ describe("codex snippets", () => {
   });
 });
 
+describe("opencode snippets", () => {
+  it("should add a remote server by URL when building the add command", () => {
+    expect(opencodeMcpAddCommand(origin)).toBe(`opencode mcp add artifacts --url ${endpoint}`);
+  });
+
+  it("should name the same server when building the auth command", () => {
+    expect(opencodeMcpAuthCommand()).toBe("opencode mcp auth artifacts");
+    expect(opencodeMcpListCommand()).toBe("opencode mcp list");
+  });
+
+  it("should put the server under mcp.servers as a remote entry when building opencode.json", () => {
+    expect(JSON.parse(opencodeConfigJson(origin))).toEqual({
+      $schema: "https://opencode.ai/config.json",
+      mcp: { servers: { artifacts: { type: "remote", url: endpoint } } },
+    });
+  });
+});
+
+describe("kimi code snippets", () => {
+  it("should sign in to the same server when building the login command", () => {
+    expect(kimiMcpLoginCommand()).toBe("/mcp-config login artifacts");
+  });
+});
+
 describe("remote-only configs", () => {
   const jsonConfigs: [string, unknown][] = [
     ["cursor install link", decodeCursorConfig(cursorInstallLink(origin))],
@@ -101,8 +129,8 @@ describe("remote-only configs", () => {
   });
 
   it("should never run a local command when building any shell snippet", () => {
-    for (const command of [claudeMcpAddOAuthCommand(origin), codexMcpAddCommand(origin)]) {
-      expect(command).not.toMatch(/\bnpx\b|mcp-remote| -- /);
+    for (const command of [claudeMcpAddOAuthCommand(origin), codexMcpAddCommand(origin), opencodeMcpAddCommand(origin)]) {
+      expect(command).not.toMatch(/\bnpx\b|mcp-remote| -- |stdio/);
       expect(command).toContain(endpoint);
     }
   });
@@ -113,6 +141,15 @@ describe("mcpClients", () => {
     for (const client of mcpClients) {
       expect(() => docsHeading("clients", client.id)).not.toThrow();
     }
+  });
+
+  it("should list OpenCode and Kimi Code CLI when listing clients", () => {
+    expect(mcpClients.map((client) => client.label)).toEqual(expect.arrayContaining(["OpenCode", "Kimi Code CLI"]));
+  });
+
+  it("should give every client a unique id when listing clients", () => {
+    const ids = mcpClients.map((client) => client.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("should offer a one-click install only for Cursor when listing clients", () => {

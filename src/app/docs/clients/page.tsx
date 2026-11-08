@@ -4,6 +4,7 @@ import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
 import { DocsH, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { clientGuides } from "@/components/setup/client-guides";
+import { ClientLogo } from "@/components/setup/client-logos";
 import { docsMetadata } from "@/lib/docs/metadata";
 import { docsHref } from "@/lib/docs/pages";
 import { codexHeadlessConfigToml, mcpClients } from "@/lib/setup/client-installs";
@@ -20,7 +21,9 @@ const origin = "https://artifacts.space";
  * - Cursor: https://cursor.com/docs/context/mcp/install-links and https://cursor.com/docs/context/mcp
  * - Claude: https://support.claude.com/en/articles/11175166-getting-started-with-custom-connectors-using-remote-mcp
  * - Codex: https://learn.chatgpt.com/docs/extend/mcp?surface=cli
+ * - OpenCode: https://opencode.ai/docs/mcp-servers/
  * - Devin: https://docs.devin.ai/work-with-devin/mcp
+ * - Kimi Code CLI: https://moonshotai.github.io/kimi-code/en/customization/mcp.html
  */
 export default function ClientsPage() {
   const page = "clients" as const;
@@ -28,7 +31,7 @@ export default function ClientsPage() {
     <RegistryPage slug={page}>
       <Prose className="mt-0">
         <p>
-          Every client connects to the same endpoint. Cursor has a one-click button. The others take a command or a short form, and none of them needs a token: you sign in and approve in your browser.
+          Every client connects to the same endpoint. Cursor has a one-click button. The others take a command, a config file, or a short form, and none of them needs a token: you sign in and approve in your browser.
         </p>
       </Prose>
 
@@ -36,7 +39,7 @@ export default function ClientsPage() {
         const Guide = clientGuides[client.id];
         return (
           <section key={client.id} aria-labelledby={client.id}>
-            <DocsH page={page} id={client.id} />
+            <DocsH page={page} id={client.id} icon={<ClientLogo id={client.id} className="size-5" />} />
             <div className="mt-4"><Guide origin={origin} full /></div>
           </section>
         );
@@ -56,6 +59,7 @@ export default function ClientsPage() {
       <Note title="Give team agents their own token">
         An agent that works for a team should be an agent teammate with its own token, so its work shows under its own handle. See <Link href={docsHref("sharing", "agent-tokens")} className="underline underline-offset-2">Agent tokens</Link>.
       </Note>
+      <p className="mt-10 text-xs text-muted-foreground">Product names and logos belong to their owners. They show compatibility only.</p>
     </RegistryPage>
   );
 }

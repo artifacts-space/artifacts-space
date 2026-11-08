@@ -71,19 +71,61 @@ export function codexHeadlessConfigToml(origin: string): string {
   return `${codexConfigToml(origin)}\nbearer_token_env_var = ${JSON.stringify(TOKEN_ENV_VAR)}`;
 }
 
-/** The OpenCode `opencode.json` entry for a remote server. */
+/**
+ * The OpenCode command that adds the server to the project config. `--url`
+ * makes it a remote Streamable HTTP server, which uses OAuth by default.
+ * Source: https://opencode.ai/docs/mcp-servers/
+ */
+export function opencodeMcpAddCommand(origin: string): string {
+  return `opencode mcp add ${MCP_SERVER_NAME} --url ${mcpEndpoint(origin)}`;
+}
+
+/**
+ * The OpenCode sign-in command. It starts the same browser sign-in as
+ * choosing the server from `/mcps` in OpenCode.
+ * Source: https://opencode.ai/docs/mcp-servers/
+ */
+export function opencodeMcpAuthCommand(): string {
+  return `opencode mcp auth ${MCP_SERVER_NAME}`;
+}
+
+/** The OpenCode command that lists servers and whether each one is connected. */
+export function opencodeMcpListCommand(): string {
+  return "opencode mcp list";
+}
+
+/**
+ * The OpenCode `opencode.json` entry for a remote server. Servers sit under
+ * `mcp.servers`, never directly under `mcp`.
+ * Source: https://opencode.ai/docs/mcp-servers/
+ */
 export function opencodeConfigJson(origin: string): string {
-  const config = { $schema: "https://opencode.ai/config.json", mcp: { [MCP_SERVER_NAME]: { type: "remote", url: mcpEndpoint(origin) } } };
+  const config = {
+    $schema: "https://opencode.ai/config.json",
+    mcp: { servers: { [MCP_SERVER_NAME]: { type: "remote", url: mcpEndpoint(origin) } } },
+  };
   return JSON.stringify(config, null, 2);
 }
 
-/** The clients the docs give setup steps for, in picker order. */
+/**
+ * The Kimi Code CLI sign-in, typed inside Kimi Code: a slash command, not a
+ * shell command. Kimi Code CLI replaced the archived Kimi CLI and has no
+ * `kimi mcp add`; servers go in `mcp.json` or through `/mcp-config`.
+ * Source: https://moonshotai.github.io/kimi-code/en/customization/mcp.html
+ */
+export function kimiMcpLoginCommand(): string {
+  return `/mcp-config login ${MCP_SERVER_NAME}`;
+}
+
+/** The clients the docs give setup steps for, most used first. Every list of clients reads this order. */
 export const mcpClients = [
   { id: "claude-code", label: "Claude Code", oneClick: false },
   { id: "cursor", label: "Cursor", oneClick: true },
   { id: "claude-desktop", label: "Claude Desktop", oneClick: false },
   { id: "codex", label: "Codex", oneClick: false },
+  { id: "opencode", label: "OpenCode", oneClick: false },
   { id: "devin", label: "Devin", oneClick: false },
+  { id: "kimi-code", label: "Kimi Code CLI", oneClick: false },
   { id: "other-clients", label: "Other clients", oneClick: false },
 ] as const;
 
