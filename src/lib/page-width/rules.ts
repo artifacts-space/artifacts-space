@@ -24,3 +24,23 @@ export function pageColumnClass(fullWidth: boolean): string {
 export function readingMeasureClass(fullWidth: boolean): string {
   return fullWidth ? "[--artifact-measure:none]" : "";
 }
+
+/**
+ * The column an artifact's body sits in inside the /app panes. Contained,
+ * it is the public page's own column (pageColumnClass): everything (text,
+ * callouts, tabs, diagrams) keeps to the centered 960px column readers see.
+ * Full width uses the whole pane and lifts the reading measure; it keeps the
+ * page's base padding only, because a pane is narrower than the window the
+ * page's wider padding is sized for. The pane keeps its top and bottom padding.
+ */
+export function previewColumnClass(fullWidth: boolean): string {
+  return fullWidth ? "mx-auto w-full min-w-0 max-w-none px-6 [--artifact-measure:none]" : `mx-auto w-full min-w-0 ${pageColumnClass(false)}`;
+}
+
+/**
+ * The /app Edit view's column: the source field keeps to the same 960px
+ * column as the preview when contained, and spans the pane when full width.
+ */
+export function editColumnClass(fullWidth: boolean): string {
+  return fullWidth ? "w-full" : "mx-auto w-full max-w-[960px]";
+}
