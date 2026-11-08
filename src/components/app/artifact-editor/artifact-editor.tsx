@@ -28,8 +28,6 @@ import { useArtifactDraft } from "./use-artifact-draft";
 interface ArtifactEditorProps {
   artifact: ArtifactDto;
   origin: string;
-  /** False for a teammate editing an artifact shared through their team: no sharing or delete. */
-  isAuthor: boolean;
   /** The author, or the person who added the agent that wrote it, changes who can read it. */
   canShare: boolean;
   /** The author, or the person who added the agent that wrote it, deletes it. */
@@ -61,7 +59,7 @@ function SharingSlot({ artifact, shareUrl, canShare, manager, team, onUpdated }:
 }
 
 /** Edit one artifact and read its history. The author (or the person who added the agent that wrote it) also shares and deletes it. */
-export function ArtifactEditor({ artifact, origin, isAuthor, canShare, canDelete, team, seesComments, onWithdraw, onUpdated, onDeleted }: ArtifactEditorProps) {
+export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, seesComments, onWithdraw, onUpdated, onDeleted }: ArtifactEditorProps) {
   const { draft, update, dirty, reset } = useArtifactDraft(artifact);
   const { pending, save, remove } = useArtifactActions({ artifact, draft, onUpdated, onDeleted });
   const [mode, setMode] = useState<EditorMode>("preview");
