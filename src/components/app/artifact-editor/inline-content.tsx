@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
+import { readingMeasureClass } from "@/lib/page-width/rules";
+import { cn } from "@/lib/utils";
 
 /**
  * The artifact's content in the /app editor, rendered as itself and editable
@@ -45,14 +47,16 @@ interface InlineContentProps {
   sourceOpen: boolean;
   /** Defaults to the /app pane. */
   surface?: InlineSurface;
+  /** The artifact's "Full width" setting: in the /app pane, it lifts the reading measure. The artifact page sets it on its own column. */
+  fullWidth?: boolean;
   onChange: (content: string) => void;
   onShowSource: () => void;
 }
 
 /** The raw content, for View source and for code. Spell check only for prose. */
-function SourceEditor({ kind, content, label, frame, onChange }: { kind: ArtifactKind; content: string; label: string; frame: string; onChange: (content: string) => void }) {
+function SourceEditor({ kind, content, label, frame, fullWidth, onChange }: { kind: ArtifactKind; content: string; label: string; frame: string; fullWidth: boolean; onChange: (content: string) => void }) {
   return (
-    <div className={frame}>
+    <div className={frame} data-full-width={fullWidth}>
       <Textarea
         value={content}
         onChange={(event) => { onChange(event.target.value); }}
@@ -68,9 +72,9 @@ function SourceEditor({ kind, content, label, frame, onChange }: { kind: Artifac
 }
 
 /** The rendered view for formats edited through View source, with a quiet way into it. */
-function RenderedWithSource({ kind, content, language, title, files, frame, onShowSource }: Omit<InlineContentProps, "revision" | "sourceOpen" | "onChange" | "surface"> & { frame: string }) {
+function RenderedWithSource({ kind, content, language, title, files, frame, fullWidth, onShowSource }: Omit<InlineContentProps, "revision" | "sourceOpen" | "onChange" | "surface" | "fullWidth"> & { frame: string; fullWidth: boolean }) {
   return (
-    <div className={frame}>
+    <div className={frame} data-full-width={fullWidth}>
       <div className="mb-3 flex justify-end">
         <Button variant="ghost" size="sm" onClick={onShowSource} className="text-muted-foreground">
           <IconCode aria-hidden /> Edit source
@@ -88,23 +92,24 @@ export function hasInlineField(kind: ArtifactKind, sourceOpen: boolean): boolean
 
 /** See the notes at the top of this file. */
 export function InlineContent(props: InlineContentProps) {
-  const { kind, content, title, files, revision, sourceOpen, surface = "pane", onChange, onShowSource } = props;
-  const frame = frames[surface];
-  if (sourceOpen) return <SourceEditor kind={kind} content={content} label="Artifact source" frame={frame.source} onChange={onChange} />;
-  if (kind === "code") return <SourceEditor kind={kind} content={content} label="Artifact content" frame={frame.source} onChange={onChange} />;
+  const { kind, content, title, files, revision, sourceOpen, surface = "pane", fullWidth = false, onChange, onShowSource } = props;
+  const base = frames[surface];
+  const frame = { ...base, content: cn(base.content, readingMeasureClass(fullWidth)) };
+  if (sourceOpen) return <SourceEditor kind={kind} content={content} label="Artifact source" frame={frame.source} fullWidth={fullWidth} onChange={onChange} />;
+  if (kind === "code") return <SourceEditor kind={kind} content={content} label="Artifact content" frame={frame.source} fullWidth={fullWidth} onChange={onChange} />;
   if (isDocumentKind(kind)) {
     return (
-      <div className={frame.content}>
+      <div className={frame.content} data-full-width={fullWidth}>
         <DocumentEditor key={revision} kind={kind} value={content} onChange={onChange} label="Artifact content" sourceToggle={false} onEditSource={onShowSource} />
       </div>
     );
   }
   if (kind === "csv") {
     return (
-      <div className={frame.content}>
+      <div className={frame.content} data-full-width={fullWidth}>
         <CsvContentEditor key={revision} value={content} onChange={onChange} title={title} files={files} label="Artifact content" />
       </div>
     );
   }
-  return <RenderedWithSource kind={kind} content={content} language={props.language} title={title} files={files} frame={frame.content} onShowSource={onShowSource} />;
+  return <RenderedWithSource kind={kind} content={content} language={props.language} title={title} files={files} frame={frame.content} fullWidth={fullWidth} onShowSource={onShowSource} />;
 }

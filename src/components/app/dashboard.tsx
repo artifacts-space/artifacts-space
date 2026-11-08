@@ -1,7 +1,7 @@
 "use client";
 
 import { IconLoader2, IconPlus, IconSearch } from "@tabler/icons-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
 import { ArtifactList } from "@/components/app/artifact-list";
@@ -26,7 +26,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { LinkedCommentsProvider } from "@/components/comments/linked-comments";
 import { SidebarProjects } from "@/components/projects/sidebar-projects";
+import { withoutArtifactLink, type ArtifactLink } from "@/lib/app-link";
 import { kinds } from "@/lib/artifact-kinds";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
@@ -159,11 +161,34 @@ interface DashboardProps {
   projectsApi?: ProjectsApi;
   /** The list's path, for filter links: /app, or the fixture's page. */
   listPath?: string;
+  /** The artifact the URL asked to open (`?artifact=<id>`), and whether to open its comments. */
+  link?: ArtifactLink | null;
 }
 
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app" }: DashboardProps) {
+/** The artifact to select first: the linked one when it is in the list, else the first. */
+function firstSelection(artifacts: ArtifactListItemDto[], link: ArtifactLink | null | undefined) {
+  const linked = link ? artifacts.find((artifact) => artifact.publicId === link.publicId) : undefined;
+  return linked?.id ?? artifacts[0]?.id ?? "";
+}
+
+/** Once the link has opened its artifact, drops it from the address bar so a reload or a later pick does not jump back. */
+function useForgetArtifactLink(link: ArtifactLink | null | undefined) {
+  useEffect(() => {
+    if (!link) return;
+    const { pathname, search, hash } = window.location;
+    window.history.replaceState(window.history.state, "", `${pathname}${withoutArtifactLink(search)}${hash}`);
+  }, [link]);
+}
+
+/** The artifact whose comments the link asked to open, if any. */
+function linkedCommentsId(link: ArtifactLink | null | undefined): string | null {
+  return link?.comments ? link.publicId : null;
+}
+
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", link }: DashboardProps) {
   const [artifacts, setArtifacts] = useState(initialArtifacts);
-  const [selectedId, setSelectedId] = useState(() => initialArtifacts[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState(() => firstSelection(initialArtifacts, link));
+  useForgetArtifactLink(link);
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
@@ -197,6 +222,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
 
   return (
     <ShareTeamsProvider teams={teams}>
+      <LinkedCommentsProvider publicId={linkedCommentsId(link)}>
       {/* An app shell from md up: the frame is the viewport (workspace-frame), and only the list and the artifact scroll. */}
       <main data-app-shell className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col p-4 sm:p-6 md:min-h-0 md:flex-1">
         <ScopeTabs teams={teams} activeSlug={scopeTeam?.slug ?? null} />
@@ -268,6 +294,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
 
         <CreateArtifactDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={created} />
       </main>
+      </LinkedCommentsProvider>
     </ShareTeamsProvider>
   );
 }

@@ -22,6 +22,7 @@ import { ConflictNotice, SaveStatusBar } from "./save-status";
 import { useArtifactActions } from "./use-artifact-actions";
 import { useArtifactDraft } from "./use-artifact-draft";
 import { useAutosave } from "./use-autosave";
+import { useFullWidth } from "./use-full-width";
 
 interface ArtifactEditorProps {
   artifact: ArtifactDto;
@@ -73,6 +74,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   const autosave = useAutosave({ artifact, draft, replaceDraft: replace, onUpdated });
   const { deleting, remove } = useArtifactActions({ artifact, onDeleted });
   const [sourceOpen, setSourceOpen] = useState(false);
+  const fullWidth = useFullWidth(artifact, onUpdated);
   const confirmDelete = useConfirm("deleteArtifact");
   const shareUrl = `${origin}/artifact/${artifact.publicId}`;
   const shared = artifact.visibility === "link" || artifact.visibility === "public";
@@ -117,6 +119,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
         source={{ open: sourceOpen, onToggle: toggleSource }}
         onRequestDelete={canDelete ? () => { if (!deleting) confirmDelete.request(remove); } : null}
         onWithdraw={onWithdraw}
+        fullWidth={fullWidth}
       />
       <div ref={outerRef} data-slot="detail-outer" className={detailOuter}>
         {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
@@ -149,6 +152,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
             files={artifact.files}
             revision={revision}
             sourceOpen={sourceOpen}
+            fullWidth={artifact.fullWidth}
             onChange={(content) => { update("content", content); }}
             onShowSource={() => { if (!sourceOpen) toggleSource(); }}
           />
