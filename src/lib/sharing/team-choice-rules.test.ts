@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { decideSharing } from "./rules";
 import { chooseSharingTeam, notAMemberError } from "./team-choice-rules";
+import { defaultActor } from "@/lib/teams/capability-rules";
 
 const personal = { id: "t-personal", slug: "ada", personal: true };
 const acme = { id: "t-acme", slug: "acme", personal: false };
@@ -69,7 +70,7 @@ describe("chooseSharingTeam", () => {
     const choice = chooseSharingTeam({ level: "link", requestedTeamId: null, currentTeamId: acme.id, memberships: agentTeams });
     expect(choice.ok).toBe(true);
     const team = { personal: acme.personal, teamSharingNeedsApproval: false };
-    expect(decideSharing({ level: "link", team, role: "owner", actor: "agent" })).toBe("pending");
-    expect(decideSharing({ level: "public", team, role: "admin", actor: "agent" })).toBe("pending");
+    expect(decideSharing({ level: "link", team, member: defaultActor("owner"), actor: "agent" })).toBe("pending");
+    expect(decideSharing({ level: "public", team, member: defaultActor("admin"), actor: "agent" })).toBe("pending");
   });
 });

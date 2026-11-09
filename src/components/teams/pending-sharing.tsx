@@ -25,7 +25,7 @@ function askedFor(request: PendingSharingView) {
   return `asks for ${visibilityLabel(request.level).toLowerCase()} sharing${comments}`;
 }
 
-/** Open sharing and comments requests, each with approve and deny. Owners and admins only. */
+/** Open sharing and comments requests, each with approve and deny. People who may approve sharing only. */
 export function PendingSharingList({ requests }: { requests: PendingSharingView[] }) {
   const { pending, run } = useTeamAction();
   if (requests.length === 0) return <p className="px-5 py-6 text-md text-muted-foreground">Nothing is waiting for approval.</p>;

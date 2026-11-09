@@ -14,7 +14,7 @@ function person(name: string, username: string | null) {
 
 /**
  * Edits to link and public artifacts waiting for approval, each with a
- * before/after view and approve or deny. Owners and admins only.
+ * before/after view and approve or deny. People who may approve edits only.
  * `themeNames` holds the team's preset names by id, for theme changes.
  */
 export function EditReviewList({ edits, themeNames }: { edits: PendingEditView[]; themeNames?: ReadonlyMap<string, string> }) {

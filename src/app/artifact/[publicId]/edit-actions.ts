@@ -18,14 +18,25 @@ const publicIdSchema = z.string().refine(isPublicId, "Artifact not found.");
 /** The web picker sends a preset id or null; updateArtifact checks the id is a real preset. */
 const presetIdSchema = z.string().max(64).nullable();
 
+/**
+ * The artifact's save time just before and just after a change from the
+ * title area or the cover, so the page's editor can move its own base
+ * across it (src/components/artifact-page/restore-base-rules.ts) without
+ * mistaking it for someone else's save.
+ */
+export interface OwnSaveTimes {
+  savedFrom: string;
+  savedAt: string;
+}
+
 /** What setting the icon did: live for every reader, or waiting for approval (link and public artifacts). */
-export interface IconSaveResult {
+export interface IconSaveResult extends OwnSaveTimes {
   icon: string | null;
   pending: boolean;
 }
 
 /** What setting the theme did: live for every reader, or waiting for approval (link and public artifacts). */
-export interface ThemeSaveResult {
+export interface ThemeSaveResult extends OwnSaveTimes {
   theme: StoredArtifactTheme | null;
   pending: boolean;
 }
@@ -68,7 +79,7 @@ export async function setArtifactIconAction(publicId: string, icon: string | nul
     if (!saved) throw new UserFacingError("Artifact not found, or you cannot edit it.");
     revalidatePath("/app");
     revalidatePath(`/artifact/${saved.publicId}`);
-    return { success: true, data: { icon: saved.icon, pending: saved.pendingEdit !== null } };
+    return { success: true, data: { icon: saved.icon, pending: saved.pendingEdit !== null, savedFrom: record.updatedAt.toISOString(), savedAt: saved.updatedAt } };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The icon could not be saved. Try again.") };
   }
@@ -92,14 +103,14 @@ export async function setArtifactThemeAction(publicId: string, theme: string | n
     if (!saved) throw new UserFacingError("Artifact not found, or you cannot edit it.");
     revalidatePath("/app");
     revalidatePath(`/artifact/${saved.publicId}`);
-    return { success: true, data: { theme: saved.theme, pending: saved.pendingEdit !== null } };
+    return { success: true, data: { theme: saved.theme, pending: saved.pendingEdit !== null, savedFrom: record.updatedAt.toISOString(), savedAt: saved.updatedAt } };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The theme could not be saved. Try again.") };
   }
 }
 
 /** What setting the cover did: live for every reader, or waiting for approval (link and public artifacts). */
-export interface CoverSaveResult {
+export interface CoverSaveResult extends OwnSaveTimes {
   cover: string | null;
   pending: boolean;
 }
@@ -123,7 +134,7 @@ export async function setArtifactCoverAction(publicId: string, cover: string | n
     if (!saved) throw new UserFacingError("Artifact not found, or you cannot edit it.");
     revalidatePath("/app");
     revalidatePath(`/artifact/${saved.publicId}`);
-    return { success: true, data: { cover: saved.cover, pending: saved.pendingEdit !== null } };
+    return { success: true, data: { cover: saved.cover, pending: saved.pendingEdit !== null, savedFrom: record.updatedAt.toISOString(), savedAt: saved.updatedAt } };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The cover could not be saved. Try again.") };
   }

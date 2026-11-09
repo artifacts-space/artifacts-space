@@ -43,7 +43,7 @@ export function defaultTeamId(visibility: ArtifactVisibility, teams: readonly Sh
 export function outcomeText(visibility: ArtifactVisibility, team: ShareTeam | undefined) {
   if (visibility === "private") return "Only you can read it. Any open request is canceled.";
   if (!team) return visibility === "team" ? "Join or create a team to share with one." : "Choose a team.";
-  const outcome = decideSharing({ level: visibility, team, role: team.role, actor: "person" });
+  const outcome = decideSharing({ level: visibility, team, member: team, actor: "person" });
   if (outcome === "apply") return "It applies as soon as you save.";
-  return `An owner or admin of ${team.name} approves it first. Until then, it stays as it is.`;
+  return `Someone in ${team.name} who approves sharing approves it first. Until then, it stays as it is.`;
 }

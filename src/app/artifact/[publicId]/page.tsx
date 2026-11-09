@@ -12,8 +12,10 @@ import { ApprovedArticle } from "@/components/artifact-page/approved-article";
 import { ArtifactHeader } from "@/components/artifact-page/artifact-header";
 import { ArtifactPageFooter } from "@/components/artifact-page/artifact-page-footer";
 import { ArtifactPageTheme } from "@/components/artifact-page/artifact-page-theme";
+import { ArtifactHeaderMenu } from "@/components/artifact-page/artifact-header-menu";
 import { EditorIsland } from "@/components/artifact-page/editor-island";
 import { InlineBody, InlineSummary, InlineTitle } from "@/components/artifact-page/inline-fields";
+import { PageConflictNotice, PageEditorChromeProvider } from "@/components/artifact-page/page-editor-chrome";
 import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
@@ -30,7 +32,6 @@ import type { FileDto } from "@/lib/files/types";
 import { accountCreatedAt } from "@/lib/account-age";
 import { loadArtifactByline } from "@/lib/artifact-byline";
 import { iconTitlePrefix } from "@/lib/artifact-icons";
-import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { lastEditorsFor } from "@/lib/artifacts";
 import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
@@ -45,6 +46,7 @@ import { noThemeChoices, type ThemeChoices } from "@/lib/themes/theme-choice-typ
 import { artifactThemeChoices } from "@/lib/themes/theme-choices";
 import { lockedMode } from "@/lib/themes/style";
 import { cn } from "@/lib/utils";
+import { isReviewedLevel } from "@/lib/versions/rules";
 import { countsViews } from "@/lib/views/view-rules";
 import { visibilityCopy, visibilitySentence, type VisibilityCopy } from "@/lib/visibility-copy";
 
@@ -118,45 +120,73 @@ async function lastEditor(userId: string | null): Promise<ArtifactEditorDto | nu
   return (await lastEditorsFor([{ updatedBy: userId }])).get(userId) ?? null;
 }
 
+/**
+ * With a cover and an icon, the icon sits across the cover's lower edge, as
+ * in Notion: this box is pulled up by half its height and the icon is
+ * centred in it, whatever the icon's size. It is only as wide as what it
+ * holds, so the cover's own controls at its bottom right stay clickable.
+ */
+const overCoverClass = "relative -mt-8 mb-2 flex h-16 w-fit items-end gap-1 sm:-mt-10 sm:h-20";
+
+/** The editors' icon row: the icon (or Add icon), the theme, and Add cover while there is no cover. */
+function EditorHeadingIcon({ viewable, themeChoices, overCover }: { viewable: ViewableArtifact; themeChoices: ThemeChoices; overCover: boolean }) {
+  const { view, record } = viewable;
+  const controlSpace = view.icon ? "mb-2" : "mb-1";
+  return (
+    <div data-page-icon={overCover ? "over-cover" : "in-flow"} className={overCover ? overCoverClass : "flex flex-wrap items-end gap-1"}>
+      <TitleIcon key={view.icon ?? ""} publicId={record.publicId} icon={view.icon} className={overCover ? "mb-0 flex self-center" : ""} />
+      <div className={controlSpace}>
+        <TitleTheme key={JSON.stringify(view.theme)} publicId={record.publicId} theme={view.theme} choices={themeChoices} />
+      </div>
+      {view.cover ? null : <div className={controlSpace}><AddCoverButton publicId={record.publicId} /></div>}
+    </div>
+  );
+}
+
 /** The page icon above the title: the icon, theme, and Add cover controls for editors, the icon alone for readers. */
 function HeadingIcon({ viewable, themeChoices }: { viewable: ViewableArtifact; themeChoices: ThemeChoices }) {
-  const { view, record } = viewable;
-  if (viewable.canEdit) {
+  const { view } = viewable;
+  const overCover = Boolean(view.cover && view.icon);
+  if (viewable.canEdit) return <EditorHeadingIcon viewable={viewable} themeChoices={themeChoices} overCover={overCover} />;
+  if (!view.icon) return null;
+  if (overCover) {
     return (
-      <div className="flex flex-wrap items-end gap-1">
-        <TitleIcon key={view.icon ?? ""} publicId={record.publicId} icon={view.icon} />
-        <div className={view.icon ? "mb-2" : "mb-1"}>
-          <TitleTheme key={JSON.stringify(view.theme)} publicId={record.publicId} theme={view.theme} choices={themeChoices} />
-        </div>
-        {view.cover ? null : <div className={view.icon ? "mb-2" : "mb-1"}><AddCoverButton publicId={record.publicId} /></div>}
+      <div data-page-icon="over-cover" className={overCoverClass}>
+        <div className="flex self-center"><ArtifactIcon icon={view.icon} size="page" /></div>
       </div>
     );
   }
-  if (!view.icon) return null;
-  return <div className="mb-2"><ArtifactIcon icon={view.icon} size="page" /></div>;
+  return <div data-page-icon="in-flow" className="mb-2"><ArtifactIcon icon={view.icon} size="page" /></div>;
 }
 
 /**
- * Format, icon, title, summary, the project (for editors only), who saved it
- * last, and whether changes wait for approval. For editors the title and
- * summary are fields in the same place (inline-fields.tsx).
+ * The summary as readers see it. For editors an empty summary keeps the
+ * height of the field it becomes ("Add a one-line summary"), so nothing
+ * below moves when editing unlocks.
+ */
+function SummaryReadView({ summary, editable }: { summary: string; editable: boolean }) {
+  if (summary) return <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{summary}</p>;
+  return editable ? <div aria-hidden data-summary-space="" className="mt-4 h-7" /> : null;
+}
+
+/**
+ * Icon, title, summary, the project (for editors only), who saved it last,
+ * and whether changes wait for approval. For editors the title and summary
+ * are fields in the same place (inline-fields.tsx). Who can see it is the
+ * header's visibility badge, so the heading does not repeat it.
  */
 function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewable: ViewableArtifact; editor: ArtifactEditorDto | null; organizers: React.ReactNode; themeChoices: ThemeChoices }) {
-  const { view, record } = viewable;
-  const Icon = kindIcons[view.kind];
+  const { view } = viewable;
   // Who made it: the agent harness of the version this reader is served (anyone who can read it may see it), else the source the agent gave.
   const harness = viewable.served.harness?.id ?? null;
   const meta = [!harness && view.source ? `Source ${view.source}` : null].filter(Boolean);
   return (
     <>
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Icon className={`size-3.5 ${kindColors[view.kind]}`} /> {visibilityCopy(record.visibility).kicker} · {view.kind}
-      </div>
-      <div className="group/title mt-4">
+      <div className="group/title">
         <HeadingIcon viewable={viewable} themeChoices={themeChoices} />
         <InlineTitle>{view.title}</InlineTitle>
       </div>
-      <InlineSummary>{view.summary ? <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{view.summary}</p> : null}</InlineSummary>
+      <InlineSummary><SummaryReadView summary={view.summary} editable={viewable.canEdit} /></InlineSummary>
       {organizers}
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
         <LastEdited editor={editor} at={view.updatedAt.toISOString()} className="text-sm" />
@@ -215,6 +245,26 @@ function SignUpAndReport({ copy, publicId, visibility }: { copy: VisibilityCopy;
   );
 }
 
+/**
+ * The read view of the body. For editors of a Markdown or Text artifact it
+ * takes the room the document editor will (at least half the window, the
+ * rich editor's space under the text, and its format bar on touch screens),
+ * so nothing below moves when editing unlocks.
+ */
+function BodyReadView({ viewable, files }: { viewable: ViewableArtifact; files: FileDto[] }) {
+  const body = <ArtifactBody viewable={viewable} files={files} />;
+  if (!viewable.canEdit) return body;
+  if (viewable.view.kind === "markdown") return <div data-editor-space="" className="pointer-coarse:pt-12"><div className="min-h-[50dvh] pb-24">{body}</div></div>;
+  if (viewable.view.kind === "text") return <div data-editor-space="" className="min-h-[50dvh]">{body}</div>;
+  return body;
+}
+
+/** The space above the heading: less under a cover, and none when the icon sits across the cover's edge (HeadingIcon pulls it up). */
+function mainTopClass(view: ViewableArtifact["view"]) {
+  if (!view.cover) return null;
+  return view.icon ? "pt-0 sm:pt-0" : "pt-8 sm:pt-10";
+}
+
 export default async function ArtifactPage({ params }: PageProps<"/artifact/[publicId]">) {
   const viewable = await load(params);
   if (!viewable) notFound();
@@ -238,35 +288,45 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   return (
     // The header, comments, and footer wear the artifact theme's colors (none for an unthemed artifact) and swap with it.
     <ArtifactPageTheme theme={theme} className="min-h-screen">
-      <StickyChrome>
-        <ArtifactHeader column={column} visibility={record.visibility} sentence={visibilitySentence(copy, byline)} content={view.content} />
-      </StickyChrome>
-      {/* A theme that locks light or dark sets that mode on the backdrop too, so comments and controls on it stay readable. */}
-      <ThemeBackdrop theme={theme} className={cn("text-foreground", lockedMode(theme))}>
-        {view.cover ? (
-          <ThemeScope theme={theme}>
-            <ArtifactCover publicId={record.publicId} cover={view.cover} editable={viewable.canEdit} fullWidth={record.fullWidth} />
-          </ThemeScope>
-        ) : null}
-        <main className={cn("mx-auto w-full py-12 sm:py-16", column, view.cover && "pt-8 sm:pt-10")} data-full-width={record.fullWidth}>
-          {/* The reading measure covers the artifact and its in-place editor, not the comments under it. */}
-          <div className={readingMeasureClass(record.fullWidth)}>
-            <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
-              <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={themeIdForReader(presetId, viewable.canEdit)} data-theme-source={source}>
-                <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
-                <article className="mt-10">
-                  <InlineBody>
-                    <ArtifactBody viewable={viewable} files={files} />
-                  </InlineBody>
-                </article>
-              </ThemeScope>
-            </EditorIsland>
-          </div>
-          <SignUpAndReport copy={copy} publicId={record.publicId} visibility={record.visibility} />
-          {/* Comments are for signed-in readers the comments setting lets in; the thread checks access itself too. */}
-          {session && seesComments(viewable, session.user.id) ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" raised /> : null}
-        </main>
-      </ThemeBackdrop>
+      {/* For editors, the in-place editor below publishes its save status and More menu to the header above it. */}
+      <PageEditorChromeProvider>
+        <StickyChrome>
+          <ArtifactHeader
+            column={column}
+            visibility={record.visibility}
+            sentence={visibilitySentence(copy, byline)}
+            content={view.content}
+            menu={viewable.canEdit ? <ArtifactHeaderMenu theme={theme} waiting={{ publicId: record.publicId, title: record.title, updatedAt: record.updatedAt.toISOString(), reviewed: isReviewedLevel(record.visibility), fullWidth: record.fullWidth, files }} /> : null}
+          />
+        </StickyChrome>
+        {/* A theme that locks light or dark sets that mode on the backdrop too, so comments and controls on it stay readable. */}
+        <ThemeBackdrop theme={theme} className={cn("text-foreground", lockedMode(theme))}>
+          {view.cover ? (
+            <ThemeScope theme={theme}>
+              <ArtifactCover publicId={record.publicId} cover={view.cover} editable={viewable.canEdit} fullWidth={record.fullWidth} />
+            </ThemeScope>
+          ) : null}
+          <main className={cn("mx-auto w-full py-12 sm:py-16", column, mainTopClass(view))} data-full-width={record.fullWidth}>
+            {/* The reading measure covers the artifact and its in-place editor, not the comments under it. */}
+            <div className={readingMeasureClass(record.fullWidth)}>
+              <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
+                <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={themeIdForReader(presetId, viewable.canEdit)} data-theme-source={source}>
+                  <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
+                  <PageConflictNotice />
+                  <article className="mt-10">
+                    <InlineBody>
+                      <BodyReadView viewable={viewable} files={files} />
+                    </InlineBody>
+                  </article>
+                </ThemeScope>
+              </EditorIsland>
+            </div>
+            <SignUpAndReport copy={copy} publicId={record.publicId} visibility={record.visibility} />
+            {/* Comments are for signed-in readers the comments setting lets in; the thread checks access itself too. */}
+            {session && seesComments(viewable, session.user.id) ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" raised /> : null}
+          </main>
+        </ThemeBackdrop>
+      </PageEditorChromeProvider>
       {/* Cookieless view count for the author; people who can edit are never counted (the server checks too). */}
       {countsViews(record.visibility) && !viewable.canEdit ? <ViewBeacon publicId={record.publicId} /> : null}
       <ArtifactPageFooter column={column} />

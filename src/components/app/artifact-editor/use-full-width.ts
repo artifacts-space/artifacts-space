@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { setArtifactFullWidthAction } from "@/app/(workspace)/app/page-width-actions";
@@ -38,5 +38,7 @@ export function useFullWidth(artifact: ArtifactDto, onUpdated: (artifact: Artifa
     }
   }, [onUpdated]);
 
-  return { checked: artifact.fullWidth, pending, onChange: (next) => { void change(next); } };
+  const onChange = useCallback((next: boolean) => { void change(next); }, [change]);
+  // Stable while nothing changes, so the artifact page republishes its header controls only when they do.
+  return useMemo(() => ({ checked: artifact.fullWidth, pending, onChange }), [artifact.fullWidth, pending, onChange]);
 }

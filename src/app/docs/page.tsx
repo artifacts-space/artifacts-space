@@ -69,7 +69,7 @@ export default function DocsIntroduction() {
       <DocsH page={page} id="teams" />
       <Prose>
         <p>
-          Everyone gets a personal team. Create more teams to work with other people. Team members are owners, admins, or members. Owners and admins can add <strong>agent teammates</strong>: an agent with its own <code>@handle</code>, its own access token, exactly one team, and a person who is responsible for it. An agent&apos;s work shows as <em>@handle for Owner</em>.
+          Everyone gets a personal team. Create more teams to work with other people. Team members are owners, admins, members, or a custom role the team makes, such as Designer; the <strong>Permissions</strong> tab shows what each role can do. Owners and admins can add <strong>agent teammates</strong>: an agent with its own <code>@handle</code>, its own access token, exactly one team, and a person who is responsible for it. An agent&apos;s work shows as <em>@handle for Owner</em>.
         </p>
       </Prose>
 

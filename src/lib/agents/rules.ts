@@ -1,8 +1,8 @@
-import { canManageTeam, type TeamRole } from "@/lib/teams/roles";
+import { can, type TeamActor } from "@/lib/teams/capability-rules";
 
-/** Owners and admins of a shared (not personal) team manage its agents. */
-export function canManageAgents(membership: { role: TeamRole; personal: boolean } | null): boolean {
-  return membership !== null && !membership.personal && canManageTeam(membership.role);
+/** Members of a shared (not personal) team who may add and remove agents manage its agents. */
+export function canManageAgents(membership: (TeamActor & { personal: boolean }) | null): boolean {
+  return membership !== null && !membership.personal && can(membership, "agents.manage");
 }
 
 const removalBase = "Its tokens stop working at once and its handle becomes free. What it shared with the team stays with the team; its comments stay in their threads.";

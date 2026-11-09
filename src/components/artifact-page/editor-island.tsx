@@ -26,7 +26,7 @@ export async function EditorIsland({ viewable, viewerId, files, children }: Edit
   const { record } = viewable;
   return (
     <ConfirmationsProvider initial={skipped}>
-      <EditSurface publicId={record.publicId} title={record.title} updatedAt={record.updatedAt.toISOString()} reviewed={isReviewedLevel(record.visibility)} files={files}>
+      <EditSurface publicId={record.publicId} title={record.title} updatedAt={record.updatedAt.toISOString()} reviewed={isReviewedLevel(record.visibility)} fullWidth={record.fullWidth} files={files}>
         {children}
       </EditSurface>
     </ConfirmationsProvider>

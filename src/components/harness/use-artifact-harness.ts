@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { setArtifactHarnessAction } from "@/app/(workspace)/app/harness-actions";
@@ -39,5 +39,7 @@ export function useArtifactHarness(artifact: ArtifactDto, onUpdated: (artifact: 
     }
   }, [onUpdated]);
 
-  return { harness: artifact.harness, pending, onChange: (next) => { void change(next); } };
+  // Stable while nothing changed, so the page header's chrome is not republished on every render.
+  const { harness } = artifact;
+  return useMemo(() => ({ harness, pending, onChange: (next: HarnessId | null) => { void change(next); } }), [harness, pending, change]);
 }

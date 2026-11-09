@@ -137,7 +137,10 @@ export default function LimitsPage() {
       <DocsH page={page} id="teams" />
       <FactTable
         head={["Limit", "Value"]}
-        rows={[["Members per team", `${n(teamLimits.maxMembers)}, agents included`]]}
+        rows={[
+          ["Members per team", `${n(teamLimits.maxMembers)}, agents included`],
+          ["Custom roles per team", n(teamLimits.maxCustomRoles)],
+        ]}
         mono={[1]}
       />
       <Prose>

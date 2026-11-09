@@ -1,13 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import { loadEditableArtifactAction } from "@/app/artifact/[publicId]/edit-actions";
-import { VersionHistory } from "@/components/history/version-history";
 import type { FileDto } from "@/lib/files/types";
 
-import { PageEditBar, PageEditFrame, usePageEditor } from "./page-inline-editor";
+import { usePublishPageEditorChrome, useWaitingChrome } from "./page-editor-chrome";
+import { PageEditFrame, usePageEditor } from "./page-inline-editor";
 
 interface EditSurfaceProps {
   publicId: string;
@@ -16,6 +16,8 @@ interface EditSurfaceProps {
   updatedAt: string;
   /** Link and public artifacts: edits and restores may wait for approval. */
   reviewed: boolean;
+  /** The page's "Full width" setting: shown (not yet changeable) while the editable copy loads, then what the header's checkbox ticks. */
+  fullWidth: boolean;
   files: readonly FileDto[];
   /** The artifact as readers see it. Its title, summary, and body unlock once the editable copy loads. */
   children: React.ReactNode;
@@ -27,10 +29,10 @@ const loadFailed = "Editing is not available right now. Reload the page to try a
  * The artifact page for a signed-in editor. The page renders this only for
  * someone who may edit; it loads the latest saved copy itself, so nothing
  * editable is ever part of a cached page. Until that copy arrives the page
- * shows the read view; then the same page is editable in place
- * (PageEditFrame) with no Edit button.
+ * shows the read view, and the header's More menu offers History; then the
+ * same page is editable in place (PageEditFrame) with no Edit button.
  */
-export function EditSurface({ publicId, title, updatedAt, reviewed, files, children }: EditSurfaceProps) {
+export function EditSurface({ publicId, title, updatedAt, reviewed, fullWidth, files, children }: EditSurfaceProps) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [, startRefresh] = useTransition();
@@ -50,13 +52,11 @@ export function EditSurface({ publicId, title, updatedAt, reviewed, files, child
     return () => { active = false; };
   }, [publicId, start]);
 
-  const loadingBar = (
-    <PageEditBar
-      history={<VersionHistory publicId={publicId} title={title} updatedAt={updatedAt} reviewed={reviewed} files={files} onRestored={refresh} />}
-      status={error ? <p role="alert" className="mr-auto text-xs text-muted-foreground">{error}</p> : null}
-      source={null}
-    />
-  );
+  const waitingInput = useMemo(() => ({ publicId, title, updatedAt, reviewed, fullWidth, files }), [publicId, title, updatedAt, reviewed, fullWidth, files]);
+  const failed = useWaitingChrome(waitingInput, error);
+  // The header builds the waiting controls itself; this tells it only when the editable copy could not load. Once loaded, PageEditFrame's controls publish their own.
+  usePublishPageEditorChrome(!editor.artifact && error ? failed : null);
+
   // One frame for both states: the heading and body never remount when editing unlocks.
-  return <PageEditFrame editor={editor} reviewed={reviewed} loadingBar={loadingBar}>{children}</PageEditFrame>;
+  return <PageEditFrame editor={editor} reviewed={reviewed} pageFullWidth={fullWidth}>{children}</PageEditFrame>;
 }

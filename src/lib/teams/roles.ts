@@ -1,4 +1,7 @@
-/** Team roles, from most to least power. Better Auth stores them as text. */
+/**
+ * The built-in roles Better Auth stores on a membership, from most to least
+ * power. What each may do is decided in capability-rules.ts, never here.
+ */
 export const teamRoles = ["owner", "admin", "member"] as const;
 export type TeamRole = (typeof teamRoles)[number];
 
@@ -23,16 +26,6 @@ export function parseTeamRole(stored: string | null | undefined): TeamRole {
     if (isTeamRole(role) && rank[role] > rank[best]) best = role;
   }
   return best;
-}
-
-/** Owners and admins approve sharing, withdraw it, and manage members. */
-export function canManageTeam(role: TeamRole) {
-  return role === "owner" || role === "admin";
-}
-
-/** Only owners change the team's settings, such as its sharing rule. */
-export function canEditTeamSettings(role: TeamRole) {
-  return role === "owner";
 }
 
 /** UI label for a role. */

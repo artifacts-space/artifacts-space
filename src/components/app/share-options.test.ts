@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { defaultTeamId, outcomeText, selectedTeamLabel, teamsFor } from "./share-options";
 import type { ShareTeam } from "./share-teams-context";
+import { defaultActor } from "@/lib/teams/capability-rules";
 
-const personal: ShareTeam = { id: "p", slug: "me", name: "Me", personal: true, role: "owner", teamSharingNeedsApproval: false };
-const strict: ShareTeam = { id: "s", slug: "strict", name: "Strict", personal: false, role: "member", teamSharingNeedsApproval: true };
+const personal: ShareTeam = { id: "p", slug: "me", name: "Me", personal: true, role: "owner", ...defaultActor("owner"), teamSharingNeedsApproval: false };
+const strict: ShareTeam = { id: "s", slug: "strict", name: "Strict", personal: false, role: "member", ...defaultActor("member"), teamSharingNeedsApproval: true };
 const teams = [personal, strict];
 
 describe("teamsFor", () => {

@@ -3,9 +3,10 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ getEditableArtifact: vi.fn(), loadViewStats: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getEditableArtifact: vi.fn(), loadViewStats: vi.fn(), getTeamMembershipById: vi.fn() }));
 
 vi.mock("@/lib/access", () => ({ getEditableArtifact: mocks.getEditableArtifact }));
+vi.mock("@/lib/teams/queries", () => ({ getTeamMembershipById: mocks.getTeamMembershipById }));
 vi.mock("@/lib/views/view-stats", () => ({ loadViewStats: mocks.loadViewStats }));
 
 const { registerViewTools } = await import("./view-tools");
@@ -37,7 +38,7 @@ describe("artifacts_views", () => {
   });
 
   it("should return the counts when the agent may edit the artifact, even on a read-only connection", async () => {
-    mocks.getEditableArtifact.mockResolvedValue({ id: "artifact-1", visibility: "public" });
+    mocks.getEditableArtifact.mockResolvedValue({ id: "artifact-1", visibility: "public", userId: "agent-1", teamId: "team-1" });
     const client = await connect("agent-1");
     const result = await client.callTool({ name: "artifacts_views", arguments: { id: publicId } });
     expect(result.isError).toBeFalsy();
@@ -50,7 +51,24 @@ describe("artifacts_views", () => {
     const client = await connect("stranger-1");
     const result = await client.callTool({ name: "artifacts_views", arguments: { id: publicId } });
     expect(result.isError).toBe(true);
-    expect(JSON.stringify(result.content)).toMatch(/cannot edit it/);
+    expect(JSON.stringify(result.content)).toMatch(/cannot see its views/);
+    expect(mocks.loadViewStats).not.toHaveBeenCalled();
+  });
+
+  it("should return the counts when a teammate's role may see views", async () => {
+    mocks.getEditableArtifact.mockResolvedValue({ id: "artifact-1", visibility: "public", userId: "author-1", teamId: "team-1" });
+    mocks.getTeamMembershipById.mockResolvedValue({ roleKey: "agent", kind: "agent", capabilities: ["analytics.view"] });
+    const client = await connect("agent-1");
+    const result = await client.callTool({ name: "artifacts_views", arguments: { id: publicId } });
+    expect(result.isError).toBeFalsy();
+  });
+
+  it("should refuse a teammate whose role may not see views, without reading any counts", async () => {
+    mocks.getEditableArtifact.mockResolvedValue({ id: "artifact-1", visibility: "public", userId: "author-1", teamId: "team-1" });
+    mocks.getTeamMembershipById.mockResolvedValue({ roleKey: "agent", kind: "agent", capabilities: [] });
+    const client = await connect("agent-1");
+    const result = await client.callTool({ name: "artifacts_views", arguments: { id: publicId } });
+    expect(result.isError).toBe(true);
     expect(mocks.loadViewStats).not.toHaveBeenCalled();
   });
 

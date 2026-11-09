@@ -4,11 +4,13 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { notification } from "@/db/notification-schema";
-import { agent, artifact, comment, mention, sharingRequest, team, teamMember, user } from "@/db/schema";
+import { agent, artifact, comment, mention, sharingRequest, team, user } from "@/db/schema";
 import { getArtifactAccess } from "@/lib/access";
 import type { ArtifactMetaRecord } from "@/lib/artifact-columns";
 import type { Actor } from "@/lib/agents/identity";
 import { canSeeComments } from "@/lib/comments/setting-rules";
+import { can } from "@/lib/teams/capability-rules";
+import { listTeamMemberActors } from "@/lib/teams/queries";
 
 import { afterResponse } from "./after-response";
 import { readPreferences } from "./preference-rules";
@@ -183,20 +185,18 @@ async function loadRequest(requestId: string) {
   return row ?? null;
 }
 
-async function teamManagers(teamId: string) {
-  const rows = await getDb()
-    .select({ userId: teamMember.userId, agentId: agent.userId })
-    .from(teamMember)
-    .leftJoin(agent, eq(agent.userId, teamMember.userId))
-    .where(and(eq(teamMember.teamId, teamId), inArray(teamMember.role, ["owner", "admin"])));
-  return rows.map((row) => ({ userId: row.userId, isAgent: row.agentId !== null }));
+/** The members who may decide this kind of request (capability-rules.ts). Agents never approve, so they never qualify. */
+async function teamManagers(teamId: string, kind: "sharing" | "comments" | "edit") {
+  const members = await listTeamMemberActors(teamId);
+  const capability = kind === "edit" ? "approve.edits" : "approve.sharing";
+  return members.filter((member) => can(member.actor, capability)).map((member) => ({ userId: member.userId, isAgent: member.isAgent }));
 }
 
 async function requestNotifications(requestId: string) {
   const loaded = await loadRequest(requestId);
   if (loaded?.request.status !== "pending") return;
   const { request, publicId, latestTitle, teamSlug } = loaded;
-  const [managers, parties] = await Promise.all([teamManagers(request.teamId), loadParties([request.requestedBy])]);
+  const [managers, parties] = await Promise.all([teamManagers(request.teamId, request.kind), loadParties([request.requestedBy])]);
   const requester = parties.get(request.requestedBy);
   if (!requester) return;
   const drafts = shareRequestRecipients({ requester, managers });
@@ -204,7 +204,7 @@ async function requestNotifications(requestId: string) {
   await deliver(drafts, { artifactId: request.artifactId, publicId, latestTitle, actorId: request.requestedBy, requestId, managers: managerIds, commentBody: null, requestKind: request.kind, teamSlug });
 }
 
-/** Tells a team's owners and admins that a request waits for them, after the response. */
+/** Tells the people in a team who may decide a request (owners and admins by default) that it waits for them, after the response. */
 export function notifySharingRequest(requestId: string): void {
   afterResponse("Request notifications", () => requestNotifications(requestId));
 }

@@ -19,7 +19,7 @@ import { getAgentRecord } from "./queries";
 import { canManageAgents, removalKeeper } from "./rules";
 
 /**
- * Agent teammates. Owners and admins of a shared team add and remove agents,
+ * Agent teammates. People whose role may add and remove agents (owners and admins by default) add and remove them,
  * mute them across the team, and create or revoke their tokens. Agents are
  * created straight in the database, never through Better Auth, so they get no
  * account, no session, and no personal team.
@@ -31,7 +31,7 @@ async function requireManager(actorId: string, teamId: string) {
   const membership = await getTeamMembershipById(actorId, teamId);
   if (!membership) throw new UserFacingError("Team not found.");
   if (membership.personal) throw new UserFacingError("Your personal team is only you. Create a team to add agents.");
-  if (!canManageAgents(membership)) throw new UserFacingError("Only team owners and admins can manage agents.");
+  if (!canManageAgents(membership)) throw new UserFacingError("You cannot add or remove agents in this team.");
   return membership;
 }
 

@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("next/navigation", () => ({ redirect: vi.fn(() => { throw new Error("redirect"); }) }));
+vi.mock("next/navigation", () => ({ redirect: vi.fn(() => { throw new Error("redirect"); }), unstable_rethrow: vi.fn() }));
 vi.mock("@/lib/session", () => ({ getSession: mocks.session }));
 vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: () => Promise.resolve() }));
 vi.mock("@/lib/artifact-read", () => ({ loadArtifactForViewer: mocks.loadArtifactForViewer }));

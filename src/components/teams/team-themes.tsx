@@ -88,7 +88,7 @@ function PresetsHeader({ canManage, full, onNew }: { canManage: boolean; full: b
       <div>
         <p className="text-md font-medium">Team presets</p>
         <p className="text-sm text-muted-foreground">
-          {canManage ? "Your team's own looks. Members pick them for artifacts shared with the team." : "Your team's own looks. Owners and admins manage them."}
+          {canManage ? "Your team's own looks. Members pick them for artifacts shared with the team." : "Your team's own looks. People who can manage themes keep them."}
         </p>
       </div>
       {canManage ? (

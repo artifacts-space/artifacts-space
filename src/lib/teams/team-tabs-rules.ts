@@ -14,9 +14,9 @@ export type ArtifactView = (typeof artifactViews)[number];
 export interface TeamTabAccess {
   /** A personal team has one member and no settings. */
   personal: boolean;
-  /** The viewer approves sharing and edits here (an owner or admin of a shared team). */
+  /** The viewer approves sharing or edits here: a shared team where their role holds "approve sharing" or "approve edits". */
   reviews: boolean;
-  /** The viewer handles reader reports here (an owner or admin of any team). */
+  /** The viewer handles reader reports here: their role holds "handle reports". */
   reports: boolean;
 }
 

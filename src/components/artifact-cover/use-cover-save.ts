@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { useNoteOwnSave } from "@/components/artifact-page/page-editor-chrome";
 import { setArtifactCoverAction } from "@/app/artifact/[publicId]/edit-actions";
 
 const PENDING_MESSAGE = "Cover saved. Readers outside the team see it once a team owner or admin approves it.";
@@ -15,6 +16,7 @@ const PENDING_MESSAGE = "Cover saved. Readers outside the team see it once a tea
  */
 export function useCoverSave(publicId: string, initial: string | null) {
   const router = useRouter();
+  const noteOwnSave = useNoteOwnSave();
   const [cover, setCover] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [, startRefresh] = useTransition();
@@ -31,6 +33,7 @@ export function useCoverSave(publicId: string, initial: string | null) {
         return false;
       }
       setCover(result.data.cover);
+      noteOwnSave(result.data);
       if (result.data.pending) toast.success(PENDING_MESSAGE);
       startRefresh(() => { router.refresh(); });
       return true;

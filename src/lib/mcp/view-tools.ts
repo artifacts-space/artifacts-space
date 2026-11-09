@@ -5,6 +5,7 @@ import { getEditableArtifact } from "@/lib/access";
 import type { McpAccess } from "@/lib/oauth/scopes";
 import { isPublicId } from "@/lib/public-id";
 import { UserFacingError } from "@/lib/user-facing-error";
+import { canSeeViews } from "@/lib/views/view-access";
 import { loadViewStats } from "@/lib/views/view-stats";
 import { viewRangeSchema } from "@/lib/views/view-stats-rules";
 
@@ -43,7 +44,7 @@ function registerReadTools(server: ToolServer, userId: string) {
     },
     ({ id, days }) => respond(async () => {
       const record = await getEditableArtifact(userId, { publicId: id });
-      if (!record) throw new UserFacingError("Artifact not found, or you cannot edit it. Only people and agents who can edit an artifact see its views.");
+      if (!record || !(await canSeeViews(userId, record))) throw new UserFacingError("Artifact not found, or you cannot see its views. Only people and agents who can edit an artifact, and whose team role may see views, see them.");
       return { id, ...(await loadViewStats(record, days)) };
     }),
   );

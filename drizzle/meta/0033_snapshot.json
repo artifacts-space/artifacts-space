@@ -1,5 +1,5 @@
 {
-  "id": "a598ccfa-7dab-45e4-b175-82fac3226f55",
+  "id": "bfe8fb2a-770d-4515-ab42-8fca1c19107d",
   "prevId": "ea5317d8-5e78-4dfa-9104-c5c3798821ef",
   "version": "7",
   "dialect": "postgresql",
@@ -359,18 +359,6 @@
           "notNull": true,
           "default": "''"
         },
-        "harness": {
-          "name": "harness",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "harness_override": {
-          "name": "harness_override",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "visibility": {
           "name": "visibility",
           "type": "text",
@@ -687,10 +675,6 @@
         "artifact_icon_length_check": {
           "name": "artifact_icon_length_check",
           "value": "char_length(\"artifact\".\"icon\") <= 64"
-        },
-        "artifact_harness_length_check": {
-          "name": "artifact_harness_length_check",
-          "value": "char_length(\"artifact\".\"harness\") <= 32 and char_length(\"artifact\".\"harness_override\") <= 32"
         },
         "artifact_cover_length_check": {
           "name": "artifact_cover_length_check",
@@ -1143,12 +1127,6 @@
           "notNull": true,
           "default": "''"
         },
-        "harness": {
-          "name": "harness",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "metadata": {
           "name": "metadata",
           "type": "jsonb",
@@ -1279,12 +1257,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "artifact_version_harness_length_check": {
-          "name": "artifact_version_harness_length_check",
-          "value": "char_length(\"artifact_version\".\"harness\") <= 32"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.comment": {
@@ -4968,8 +4941,8 @@
       },
       "isRLSEnabled": false
     },
-    "public.mcp_connection": {
-      "name": "mcp_connection",
+    "public.team_permission_audit": {
+      "name": "team_permission_audit",
       "schema": "",
       "columns": {
         "id": {
@@ -4978,47 +4951,141 @@
           "primaryKey": true,
           "notNull": true
         },
-        "user_id": {
-          "name": "user_id",
+        "team_id": {
+          "name": "team_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "oauth_client_id": {
-          "name": "oauth_client_id",
+        "actor_id": {
+          "name": "actor_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "api_token_id": {
-          "name": "api_token_id",
+        "action": {
+          "name": "action",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "before": {
+          "name": "before",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
-        "client_name": {
-          "name": "client_name",
-          "type": "text",
+        "after": {
+          "name": "after",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
-        "client_version": {
-          "name": "client_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "harness_override": {
-          "name": "harness_override",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "client_changed_at": {
-          "name": "client_changed_at",
+        "created_at": {
+          "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "team_permission_audit_team_idx": {
+          "name": "team_permission_audit_team_idx",
+          "columns": [
+            {
+              "expression": "team_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "team_permission_audit_team_id_team_id_fk": {
+          "name": "team_permission_audit_team_id_team_id_fk",
+          "tableFrom": "team_permission_audit",
+          "tableTo": "team",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "team_permission_audit_actor_id_user_id_fk": {
+          "name": "team_permission_audit_actor_id_user_id_fk",
+          "tableFrom": "team_permission_audit",
+          "tableTo": "user",
+          "columnsFrom": [
+            "actor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.team_role": {
+      "name": "team_role",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "built_in": {
+          "name": "built_in",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -5036,91 +5103,35 @@
         }
       },
       "indexes": {
-        "mcp_connection_oauth_idx": {
-          "name": "mcp_connection_oauth_idx",
+        "team_role_team_key_idx": {
+          "name": "team_role_team_key_idx",
           "columns": [
             {
-              "expression": "user_id",
+              "expression": "team_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "oauth_client_id",
+              "expression": "key",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "mcp_connection_token_idx": {
-          "name": "mcp_connection_token_idx",
-          "columns": [
-            {
-              "expression": "api_token_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "mcp_connection_user_idx": {
-          "name": "mcp_connection_user_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
         }
       },
       "foreignKeys": {
-        "mcp_connection_user_id_user_id_fk": {
-          "name": "mcp_connection_user_id_user_id_fk",
-          "tableFrom": "mcp_connection",
-          "tableTo": "user",
+        "team_role_team_id_team_id_fk": {
+          "name": "team_role_team_id_team_id_fk",
+          "tableFrom": "team_role",
+          "tableTo": "team",
           "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mcp_connection_oauth_client_id_oauth_client_client_id_fk": {
-          "name": "mcp_connection_oauth_client_id_oauth_client_client_id_fk",
-          "tableFrom": "mcp_connection",
-          "tableTo": "oauth_client",
-          "columnsFrom": [
-            "oauth_client_id"
-          ],
-          "columnsTo": [
-            "client_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mcp_connection_api_token_id_api_token_id_fk": {
-          "name": "mcp_connection_api_token_id_api_token_id_fk",
-          "tableFrom": "mcp_connection",
-          "tableTo": "api_token",
-          "columnsFrom": [
-            "api_token_id"
+            "team_id"
           ],
           "columnsTo": [
             "id"
@@ -5133,23 +5144,156 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "mcp_connection_kind_check": {
-          "name": "mcp_connection_kind_check",
-          "value": "(\"mcp_connection\".\"oauth_client_id\" is null) <> (\"mcp_connection\".\"api_token_id\" is null)"
+        "team_role_key_length_check": {
+          "name": "team_role_key_length_check",
+          "value": "char_length(\"team_role\".\"key\") between 1 and 40"
         },
-        "mcp_connection_client_name_check": {
-          "name": "mcp_connection_client_name_check",
-          "value": "char_length(\"mcp_connection\".\"client_name\") <= 64"
-        },
-        "mcp_connection_client_version_check": {
-          "name": "mcp_connection_client_version_check",
-          "value": "char_length(\"mcp_connection\".\"client_version\") <= 32"
-        },
-        "mcp_connection_override_check": {
-          "name": "mcp_connection_override_check",
-          "value": "char_length(\"mcp_connection\".\"harness_override\") <= 32"
+        "team_role_name_length_check": {
+          "name": "team_role_name_length_check",
+          "value": "char_length(\"team_role\".\"name\") between 1 and 40"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.team_role_assignment": {
+      "name": "team_role_assignment",
+      "schema": "",
+      "columns": {
+        "member_id": {
+          "name": "member_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "role_id": {
+          "name": "role_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assigned_by": {
+          "name": "assigned_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assigned_at": {
+          "name": "assigned_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "team_role_assignment_role_idx": {
+          "name": "team_role_assignment_role_idx",
+          "columns": [
+            {
+              "expression": "role_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "team_role_assignment_member_id_team_member_id_fk": {
+          "name": "team_role_assignment_member_id_team_member_id_fk",
+          "tableFrom": "team_role_assignment",
+          "tableTo": "team_member",
+          "columnsFrom": [
+            "member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "team_role_assignment_role_id_team_role_id_fk": {
+          "name": "team_role_assignment_role_id_team_role_id_fk",
+          "tableFrom": "team_role_assignment",
+          "tableTo": "team_role",
+          "columnsFrom": [
+            "role_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "team_role_assignment_assigned_by_user_id_fk": {
+          "name": "team_role_assignment_assigned_by_user_id_fk",
+          "tableFrom": "team_role_assignment",
+          "tableTo": "user",
+          "columnsFrom": [
+            "assigned_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.team_role_capability": {
+      "name": "team_role_capability",
+      "schema": "",
+      "columns": {
+        "role_id": {
+          "name": "role_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "capability": {
+          "name": "capability",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "team_role_capability_role_id_team_role_id_fk": {
+          "name": "team_role_capability_role_id_team_role_id_fk",
+          "tableFrom": "team_role_capability",
+          "tableTo": "team_role",
+          "columnsFrom": [
+            "role_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "team_role_capability_role_id_capability_pk": {
+          "name": "team_role_capability_role_id_capability_pk",
+          "columns": [
+            "role_id",
+            "capability"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     }
   },

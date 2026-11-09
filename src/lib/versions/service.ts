@@ -110,7 +110,7 @@ async function auditOwnApproval(record: ArtifactRecord, teamId: string, editorId
 
 async function decideFor(record: ArtifactRecord, editorId: string, actor: SharingActor) {
   const [rule, membership] = await Promise.all([loadTeamRule(record.teamId), record.teamId ? getTeamMembershipById(editorId, record.teamId) : null]);
-  const outcome = decideEdit({ visibility: record.visibility, team: rule, role: membership?.role ?? null, actor });
+  const outcome = decideEdit({ visibility: record.visibility, team: rule, member: membership, actor });
   return { rule, outcome };
 }
 

@@ -21,7 +21,7 @@ import {
 
 /**
  * Team theme presets and the team default in the database. Callers check
- * that the person is an owner or admin of the team first (theme-actions.ts);
+ * that the person may manage the team's themes first (theme-actions.ts);
  * these functions only scope every query to the team. Nothing here files an
  * artifact version: presets and the default are team settings, and artifacts
  * refer to them live.

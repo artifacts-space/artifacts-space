@@ -16,7 +16,7 @@ import { useVersionHistory } from "./use-version-history";
 import { VersionDetail, versionsNeeded, type VersionView } from "./version-detail";
 import { VersionList } from "./version-list";
 
-interface VersionHistoryProps {
+export interface VersionHistoryProps {
   publicId: string;
   title: string;
   /** The artifact's updatedAt the person sees; a newer save by someone else refuses a restore. */
@@ -28,6 +28,8 @@ interface VersionHistoryProps {
   hasUnsavedChanges?: boolean;
   onRestored: (artifact: ArtifactDto) => void;
   className?: string;
+  /** Draws its own way in, such as a menu item, in place of the History button. It gets the function that opens the dialog. */
+  trigger?: (openHistory: () => void) => React.ReactNode;
 }
 
 /** Loading, error, and empty states above the version list. */
@@ -52,7 +54,7 @@ function restoreDescription(reviewed: boolean, hasUnsavedChanges: boolean) {
  * saved version with who saved it and when, a preview or diff of each, and
  * Restore, which files a new version and never rewrites history.
  */
-export function VersionHistory({ publicId, title, updatedAt, reviewed, files, hasUnsavedChanges = false, onRestored, className }: VersionHistoryProps) {
+export function VersionHistory({ publicId, title, updatedAt, reviewed, files, hasUnsavedChanges = false, onRestored, className, trigger }: VersionHistoryProps) {
   const history = useVersionHistory(publicId);
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -102,9 +104,11 @@ export function VersionHistory({ publicId, title, updatedAt, reviewed, files, ha
 
   return (
     <>
-      <Button variant="ghost" size="sm" className={className} onClick={() => void openHistory()}>
-        <IconHistory /> History
-      </Button>
+      {trigger ? trigger(() => void openHistory()) : (
+        <Button variant="ghost" size="sm" className={className} onClick={() => void openHistory()}>
+          <IconHistory /> History
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex h-[min(88dvh,820px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
           <DialogHeader className="border-b px-4 py-3 pr-12 sm:px-5">

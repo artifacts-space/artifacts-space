@@ -9,7 +9,7 @@ import { loadActors } from "@/lib/agents/queries";
 import { canSeeComments } from "@/lib/comments/setting-rules";
 import { toAuthorView } from "@/lib/comments/views";
 import { listTeamsForUser } from "@/lib/teams/queries";
-import { canManageTeam } from "@/lib/teams/roles";
+import { can } from "@/lib/teams/capability-rules";
 
 import { commentExcerpt, notificationHref } from "./display-rules";
 import { mayNotify, type RecipientAccess } from "./recipient-rules";
@@ -98,10 +98,10 @@ async function sightsFor(userId: string, publicIds: string[]): Promise<Map<strin
   return sights;
 }
 
-/** Teams the person decides requests for (owner or admin). */
+/** Teams the person decides requests for: where they may approve sharing or edits. */
 async function managedTeams(userId: string): Promise<Set<string>> {
   const teams = await listTeamsForUser(userId);
-  return new Set(teams.filter((membership) => canManageTeam(membership.role)).map((membership) => membership.id));
+  return new Set(teams.filter((membership) => can(membership, "approve.sharing") || can(membership, "approve.edits")).map((membership) => membership.id));
 }
 
 interface VisibleRow {

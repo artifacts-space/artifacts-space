@@ -70,7 +70,7 @@ export interface TeamAgentView {
   muted: boolean;
   createdAt: string;
   tokens: AgentTokenView[];
-  /** The agent's own artifacts (not shared through its team), which removal moves or deletes. Counted for owners and admins only, else 0. */
+  /** The agent's own artifacts (not shared through its team), which removal moves or deletes. Counted only for viewers who may add and remove agents, else 0. */
   ownArtifacts: number;
   /** Whether the person who added it is still in the team, and so keeps its own artifacts when it is removed. */
   ownerInTeam: boolean;
@@ -118,7 +118,7 @@ async function deletedOnRemovalByAgent(teamId: string, agentIds: string[]) {
 
 /**
  * Agents in a team, oldest first. Tokens and the count of the agent's own
- * artifacts are included only when `withTokens` is set (owners and admins). Callers must check the viewer's membership.
+ * artifacts are included only when `withTokens` is set (viewers who may add and remove agents). Callers must check the viewer's membership.
  */
 export async function listTeamAgents(teamId: string, withTokens: boolean): Promise<TeamAgentView[]> {
   const rows = await getDb()

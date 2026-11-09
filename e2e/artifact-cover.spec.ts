@@ -6,7 +6,7 @@ import { approveVersionWithCover, attachTestImage, cleanUp, createTestArtifact, 
 
 /**
  * Covers on the artifact page: an editor adds, changes, and removes one (each
- * a saved version), the banner is slim on phones and desktops, nothing moves
+ * a saved version), the banner has a fixed height on phones and desktops, nothing moves
  * while the page and its cover load, and readers outside the team see the
  * approved version's cover. Needs dev sign-in and a local throwaway database
  * (support/local-db.ts); skipped otherwise.
@@ -54,7 +54,7 @@ test("should add, change, and remove a cover as saved versions when an editor us
   await page.getByRole("button", { name: "Add cover" }).click();
 
   await expect(cover.locator("[data-cover-gradient]")).toBeVisible();
-  expect((await cover.boundingBox())?.height).toBe(testInfo.project.name === "phone" ? 120 : 180);
+  expect((await cover.boundingBox())?.height).toBe(testInfo.project.name === "phone" ? 160 : 240);
   await expect.poll(async () => (await storedCovers(publicId)).artifact).toMatch(/^[a-z]+$/);
 
   await cover.hover();
@@ -87,7 +87,7 @@ test("should not shift the layout while a page with a gradient or image cover lo
     await expect(page.locator("[data-artifact-cover]")).toBeVisible();
     await page.waitForLoadState("networkidle");
     expect(await layoutShift(page)).toBeLessThan(0.01);
-    expect((await page.locator("[data-artifact-cover]").boundingBox())?.height).toBe(testInfo.project.name === "phone" ? 120 : 180);
+    expect((await page.locator("[data-artifact-cover]").boundingBox())?.height).toBe(testInfo.project.name === "phone" ? 160 : 240);
   }
 });
 

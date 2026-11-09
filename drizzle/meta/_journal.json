@@ -236,8 +236,36 @@
     {
       "idx": 33,
       "version": "7",
-      "when": 1794226491333,
-      "tag": "0033_agent_harness",
+      "when": 1794189591911,
+      "tag": "0033_team_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794189592491,
+      "tag": "0034_team_roles_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794192910166,
+      "tag": "0035_team_keeps_an_owner",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794204651755,
+      "tag": "0036_team_role_assignment_same_team",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794228250137,
+      "tag": "0037_agent_harness",
       "breakpoints": true
     }
   ]

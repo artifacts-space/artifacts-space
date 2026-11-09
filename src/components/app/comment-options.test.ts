@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { commentOptions, commentsWaitForApproval, previewComments } from "./comment-options";
 import type { ShareTeam } from "./share-teams-context";
+import { defaultActor } from "@/lib/teams/capability-rules";
 
-const personal: ShareTeam = { id: "p", slug: "me", name: "Me", personal: true, role: "owner", teamSharingNeedsApproval: false };
-const strict: ShareTeam = { id: "s", slug: "strict", name: "Strict", personal: false, role: "member", teamSharingNeedsApproval: true };
+const personal: ShareTeam = { id: "p", slug: "me", name: "Me", personal: true, role: "owner", ...defaultActor("owner"), teamSharingNeedsApproval: false };
+const strict: ShareTeam = { id: "s", slug: "strict", name: "Strict", personal: false, role: "member", ...defaultActor("member"), teamSharingNeedsApproval: true };
 
 describe("commentOptions", () => {
   it("should call the team option Only you when the artifact has no shared team", () => {

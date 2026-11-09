@@ -1,4 +1,4 @@
-import { ensureContrast, formatOklch, mixOklch, parseColor, type Oklch } from "./color";
+import { contrastRatio, ensureContrast, formatOklch, mixOklch, parseColor, relativeLuminance, type Oklch } from "./color";
 import type { ThemeColors } from "./schema";
 
 /**
@@ -69,6 +69,9 @@ export function syntaxTokens(mode: PaletteMode, code: Oklch): Record<string, str
   );
 }
 
+/** How far each quiet surface leans from the card toward the ink. The focus ring is checked against all of them. */
+const quietTint = { secondary: 0.06, muted: 0.045, accent: 0.07 } as const;
+
 function surfaceTokens(colors: ThemeColors): Record<string, string> {
   const fg = read(colors.foreground);
   const card = read(colors.card);
@@ -83,11 +86,11 @@ function surfaceTokens(colors: ThemeColors): Record<string, string> {
     "--popover-foreground": colors.foreground,
     "--primary": colors.accent,
     "--primary-foreground": colors.accentForeground,
-    "--secondary": toward(0.06),
+    "--secondary": toward(quietTint.secondary),
     "--secondary-foreground": colors.foreground,
-    "--muted": toward(0.045),
+    "--muted": toward(quietTint.muted),
     "--muted-foreground": colors.mutedForeground,
-    "--accent": toward(0.07),
+    "--accent": toward(quietTint.accent),
     "--accent-foreground": colors.foreground,
     "--border": formatOklch(withAlpha(fg, 0.11)),
     "--input": formatOklch(withAlpha(fg, 0.15)),
@@ -137,7 +140,111 @@ export function mentionTokens(mode: PaletteMode, colors: ThemeColors): Record<st
   return { ...chip(siteMentionInk[mode].person, "--mention"), ...chip(siteMentionInk[mode].agent, "--mention-agent") };
 }
 
+/** The site's switch colors per mode, from globals.css: the on track and both thumbs. */
+const siteSwitch: Record<PaletteMode, { on: string; onThumb: string; offThumb: string }> = {
+  light: { on: "oklch(0.56 0.15 150)", onThumb: "oklch(1 0 0)", offThumb: "oklch(0.56 0.008 65)" },
+  dark: { on: "oklch(0.63 0.17 150)", onThumb: "oklch(1 0 0)", offThumb: "oklch(0.6 0.008 70)" },
+};
+
+/** How far the off track leans from the card toward the ink: a quiet well that still reads as a control. */
+const switchOffTint = 0.08;
+
+/** Non-text UI needs 3:1 (WCAG 1.4.11); the small margin keeps rounding from dipping under it. */
+const nonTextMinimum = 3.05;
+
+/**
+ * The hover tints, --switch-on-hover-tint and --switch-off-hover-tint in
+ * globals.css (src/components/ui/switch.test.ts checks they match). The on
+ * track mixes 10% toward the ink in light and toward the page in dark (it
+ * deepens in both), and the off track mixes 6% toward the ink.
+ */
+export const switchOnHover = 0.1;
+export const switchOffHover = 0.06;
+
+/**
+ * Moves `color`'s lightness away from `background` until `passes` holds, like
+ * ensureContrast but for a test across several states. Returns the first
+ * passing color, or the extreme (black or white side) when none passes; the
+ * caller checks `passes` again where it needs to know (switchTokens' white thumb).
+ */
+function holdApart(color: Oklch, background: Oklch, passes: (candidate: Oklch) => boolean): Oklch {
+  // One direction is enough because modeLightness (contrast.ts) keeps a palette's card and page on the same side
+  // (light at oklch 0.7 and up, dark at 0.4 and down): moving away from the card also moves away from the page.
+  const direction = relativeLuminance(background) > 0.18 ? -1 : 1;
+  let candidate = color;
+  for (let step = 0; step < 200 && !passes(candidate); step += 1) {
+    candidate = { ...candidate, l: Math.min(1, Math.max(0, candidate.l + direction * 0.005)) };
+    // At black or white nothing further can pass: return the extreme, as ensureContrast does.
+    if (candidate.l === 0 || candidate.l === 1) break;
+  }
+  return candidate;
+}
+
+/** True when `thumb` reads at 3:1 on every one of `tracks`. */
+const readsOnAll = (tracks: Oklch[]) => (thumb: Oklch) => tracks.every((track) => contrastRatio(thumb, track) >= nonTextMinimum);
+
+/**
+ * Switch colors on the themed card: the site's green re-lit until the on
+ * track reads at 3:1 on the card and the page, at rest and hovered; the off
+ * track a tint of the card; and each thumb at 3:1 on its own track, at rest
+ * and hovered.
+ * The on thumb stays the site's white whenever a green exists that serves
+ * both; on a dark card too light for that (around oklch 0.4), the thumb
+ * takes the card's own color instead, which the track already clears at 3:1.
+ */
+export function switchTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
+  const card = read(colors.card);
+  const ink = read(colors.foreground);
+  const site = siteSwitch[mode];
+  const siteThumb = read(site.onThumb);
+  // The hovered on track, as switch.tsx paints it: toward the ink in light, toward the page in dark (its dark: variant). Change both together.
+  const deepen = (track: Oklch) => mixOklch(track, mode === "light" ? ink : read(colors.background), switchOnHover);
+  // A switch sits on a card in settings and on the page inside an artifact, so the on track clears both.
+  const surfaces = [card, read(colors.background)];
+  const clearsSurfaces = (track: Oklch) => [track, deepen(track)].every((state) => surfaces.every((surface) => contrastRatio(state, surface) >= nonTextMinimum));
+  const keepsWhite = (track: Oklch) => clearsSurfaces(track) && readsOnAll([track, deepen(track)])(siteThumb);
+  const whiteTrack = holdApart(read(site.on), card, keepsWhite);
+  const white = keepsWhite(whiteTrack);
+  const on = white ? whiteTrack : holdApart(read(site.on), card, clearsSurfaces);
+  const off = mixOklch(card, ink, switchOffTint);
+  const offHover = mixOklch(off, ink, switchOffHover);
+  return {
+    "--switch-on": formatOklch(on),
+    "--switch-on-thumb": formatOklch(white ? siteThumb : holdApart(card, on, readsOnAll([on, deepen(on)]))),
+    "--switch-off": formatOklch(off),
+    "--switch-off-thumb": formatOklch(holdApart(read(site.offThumb), offHover, readsOnAll([off, offHover]))),
+  };
+}
+
+/** The site's focus ring per mode, from globals.css: the brand blue (--ring equals --brand). */
+const siteRing: Record<PaletteMode, string> = { light: "oklch(0.5 0.22 262)", dark: "oklch(0.68 0.17 262)" };
+
+/**
+ * The focus ring on the themed card, page, and quiet surfaces (--secondary,
+ * --muted, --accent: the card tinted toward the ink): the site's brand blue,
+ * re-lit until it reads at 3:1 on each, so a focused control inside a themed
+ * artifact is still easy to find. The theme's own colors never replace the
+ * blue; only its lightness moves, and only when the theme needs it.
+ *
+ * Not checked: a filled control's own fill (--primary, a primary button).
+ * The ring sits outside the control, on the card, and a fill that already
+ * reads at 3:1 on the card often leaves no blue that reads on both.
+ *
+ * Moving away from the card alone always works because modeLightness
+ * (contrast.ts) keeps the card and page on the same side, and the quiet
+ * surfaces lie between the card and the ink; if that bound is ever relaxed,
+ * holdApart's black-or-white fallback could ship a ring under 3:1, and the
+ * edge-card tests in derive.test.ts are where that would show.
+ */
+export function ringTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
+  const card = read(colors.card);
+  const ink = read(colors.foreground);
+  const surfaces = [card, read(colors.background), ...Object.values(quietTint).map((amount) => mixOklch(card, ink, amount))];
+  const ring = holdApart(read(siteRing[mode]), card, (candidate) => surfaces.every((surface) => contrastRatio(candidate, surface) >= nonTextMinimum));
+  return { "--ring": formatOklch(ring) };
+}
+
 /** Every CSS token a palette sets, keyed by custom property name, with canonical color values. */
 export function paletteTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
-  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors) };
+  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors), ...switchTokens(mode, colors), ...ringTokens(mode, colors) };
 }

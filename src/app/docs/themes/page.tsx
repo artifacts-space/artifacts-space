@@ -162,7 +162,7 @@ export default function ThemesPage() {
 
       <DocsH page={page} id="covers" />
       <Prose>
-        <p>A cover is a slim banner across the top of the artifact page, like a book jacket: it makes an artifact easy to know at a glance. It is about 180 px tall on a computer and 120 px on a phone, so the content still starts near the top.</p>
+        <p>A cover is a banner across the top of the artifact page, like a book jacket: it makes an artifact easy to know at a glance. It is about 240 px tall on a computer and 160 px on a phone, and the artifact icon sits across its lower edge.</p>
         <p>A cover is a gradient id, such as <code>&quot;mist&quot;</code>, or an image you upload. Every format can have a cover. An artifact with no cover shows none.</p>
       </Prose>
 
@@ -272,6 +272,9 @@ export default function ThemesPage() {
       <FactTable head={["Text", "On", "Minimum", "Why"]} rows={contrastPairs.map((pair) => [pair.text, pair.surface, `${String(pair.minimum)}:1`, pair.use])} mono={[0, 1, 2]} />
       <Note title="Code colors">
         Syntax colors come from the theme. You do not set them. Each reaches {String(syntaxMinimum.keyword)}:1 on the theme&apos;s code background ({String(syntaxMinimum.comment)}:1 for comments and punctuation).
+      </Note>
+      <Note title="Focus ring">
+        The focus ring comes from the theme too. It is the site&apos;s blue, and its lightness changes until it reaches 3:1 on the theme&apos;s card, page, and quieter surfaces. Most themes keep the site&apos;s blue exactly. A theme whose card is near the lightness limit gets a darker or lighter blue, so a focused control stays easy to see.
       </Note>
 
       <DocsH page={page} id="suggestions" />

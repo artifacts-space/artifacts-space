@@ -6,6 +6,7 @@ import { AppHeader } from "@/components/app/app-header";
 import { Dashboard } from "@/components/app/dashboard";
 import type { ShareTeam } from "@/components/app/share-teams-context";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
+import { defaultRoleCapabilities } from "@/lib/teams/capability-rules";
 import type { ArtifactLink } from "@/lib/app-link";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto } from "@/lib/artifact-types";
@@ -18,7 +19,7 @@ import { createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, withProjects }
 import { fixtureNotifications } from "./notification-fixture";
 
 /** The viewer's personal team, so the Share dialog can offer link and public sharing. It adds no scope tab. */
-const fixtureTeams: ShareTeam[] = [{ id: "fixture-team", slug: "fixture", name: "Fixture", personal: true, role: "owner", teamSharingNeedsApproval: false }];
+const fixtureTeams: ShareTeam[] = [{ id: "fixture-team", slug: "fixture", name: "Fixture", personal: true, role: "owner", roleKey: "owner", kind: "person", capabilities: [...defaultRoleCapabilities.owner], teamSharingNeedsApproval: false }];
 
 /** Four long artifacts first, then enough short ones that the list scrolls. Note 2 has comments on; Note 9 has a theme. */
 function fixtureArtifacts(): ArtifactDto[] {

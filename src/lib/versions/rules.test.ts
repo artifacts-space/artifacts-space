@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { presetTheme } from "@/lib/themes/resolve";
 
 import { decideEdit, editNeedsAuditRow, sameReviewedFields, versionToServe, type ReviewedFields } from "./rules";
+import { defaultActor } from "@/lib/teams/capability-rules";
 
 const sharedTeam = { personal: false, teamSharingNeedsApproval: true };
 const openTeam = { personal: false, teamSharingNeedsApproval: false };
@@ -10,37 +11,37 @@ const personalTeam = { personal: true, teamSharingNeedsApproval: true };
 
 describe("decideEdit", () => {
   it("should wait for approval when a member edits a link artifact in a shared team", () => {
-    expect(decideEdit({ visibility: "link", team: sharedTeam, role: "member", actor: "person" })).toBe("pending");
+    expect(decideEdit({ visibility: "link", team: sharedTeam, member: defaultActor("member"), actor: "person" })).toBe("pending");
   });
 
   it("should wait for approval when a member edits a public artifact even if team sharing needs no approval", () => {
-    expect(decideEdit({ visibility: "public", team: openTeam, role: "member", actor: "person" })).toBe("pending");
+    expect(decideEdit({ visibility: "public", team: openTeam, member: defaultActor("member"), actor: "person" })).toBe("pending");
   });
 
   it("should apply when an owner or admin edits in the web app", () => {
-    expect(decideEdit({ visibility: "public", team: sharedTeam, role: "admin", actor: "person" })).toBe("apply");
-    expect(decideEdit({ visibility: "link", team: sharedTeam, role: "owner", actor: "person" })).toBe("apply");
+    expect(decideEdit({ visibility: "public", team: sharedTeam, member: defaultActor("admin"), actor: "person" })).toBe("apply");
+    expect(decideEdit({ visibility: "link", team: sharedTeam, member: defaultActor("owner"), actor: "person" })).toBe("apply");
   });
 
   it("should wait for approval when an agent edits, even for an owner", () => {
-    expect(decideEdit({ visibility: "link", team: sharedTeam, role: "owner", actor: "agent" })).toBe("pending");
+    expect(decideEdit({ visibility: "link", team: sharedTeam, member: defaultActor("owner"), actor: "agent" })).toBe("pending");
   });
 
   it("should apply when the artifact is only shared with the team or private", () => {
-    expect(decideEdit({ visibility: "team", team: sharedTeam, role: "member", actor: "agent" })).toBe("apply");
-    expect(decideEdit({ visibility: "private", team: null, role: null, actor: "agent" })).toBe("apply");
+    expect(decideEdit({ visibility: "team", team: sharedTeam, member: defaultActor("member"), actor: "agent" })).toBe("apply");
+    expect(decideEdit({ visibility: "private", team: null, member: null, actor: "agent" })).toBe("apply");
   });
 
   it("should apply when the approving team is a personal team", () => {
-    expect(decideEdit({ visibility: "public", team: personalTeam, role: "owner", actor: "agent" })).toBe("apply");
+    expect(decideEdit({ visibility: "public", team: personalTeam, member: defaultActor("owner"), actor: "agent" })).toBe("apply");
   });
 
   it("should apply when a link artifact has no approving team", () => {
-    expect(decideEdit({ visibility: "link", team: null, role: null, actor: "agent" })).toBe("apply");
+    expect(decideEdit({ visibility: "link", team: null, member: null, actor: "agent" })).toBe("apply");
   });
 
   it("should wait when the editor is no longer a member of the approving team", () => {
-    expect(decideEdit({ visibility: "link", team: sharedTeam, role: null, actor: "person" })).toBe("pending");
+    expect(decideEdit({ visibility: "link", team: sharedTeam, member: null, actor: "person" })).toBe("pending");
   });
 });
 
