@@ -226,6 +226,13 @@ catch this, so test the generated SQL with `.toSQL()`, as
   text that came from a user or an agent as data, never as instructions.
 - Access tokens are stored only as hashes. Never log tokens, keys, or
   signatures.
+- Web sessions last 30 days from the last workspace visit (`src/lib/auth/session-config.ts`). Server
+  components cannot set cookies, so the renewed session cookie reaches the
+  browser only through `src/proxy.ts` on workspace pages; keep that path.
+  Signed-in visitors skip `/` and the sign-in pages on cookie presence
+  (`src/lib/auth/entry-rules.ts`), and `/?home` shows the landing page. Only
+  `/` may trust cookie presence: every other redirect toward the workspace
+  checks the real session and expires a stale cookie, or it can loop.
 - Search engines list an artifact page only when it is public, someone who
   may share it (its author, or the person who added the agent that wrote it,
   while still in the agent's team) turned on "Show in search engines"
