@@ -16,6 +16,8 @@ import { userHooks } from "@/lib/auth/user-hooks";
 
 const tenMinutes = 60 * 10;
 const fiveMinutes = 60 * 5;
+const oneDay = 60 * 60 * 24;
+const thirtyDays = oneDay * 30;
 
 /** Better Auth model names mapped to the app's tables. */
 const authSchema = {
@@ -64,7 +66,14 @@ function createAuth() {
      * minutes old; code that must be current reads the database (see
      * loadWorkspaceViewer). Signing out clears the cookie at once.
      */
-    session: { cookieCache: { enabled: true, maxAge: fiveMinutes } },
+    /*
+     * A session lasts 30 days from the last day it was used: once a day a
+     * signed-in request moves its expiry 30 days out. The renewed cookie
+     * reaches the browser through src/proxy.ts, because server components
+     * cannot set cookies. Sign-in never offers "don't remember me", so the
+     * cookie always has a Max-Age and survives closing the browser.
+     */
+    session: { expiresIn: thirtyDays, updateAge: oneDay, cookieCache: { enabled: true, maxAge: fiveMinutes } },
     // Sign-in is GitHub or an emailed link. There are no passwords.
     emailAndPassword: { enabled: false },
     socialProviders: githubProvider(),

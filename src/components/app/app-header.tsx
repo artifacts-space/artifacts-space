@@ -24,10 +24,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth/client";
+import { landingPageFlag } from "@/lib/auth/entry-rules";
 import type { NotificationView } from "@/lib/notifications/feed";
 import { cn } from "@/lib/utils";
 
 const artifactsLink = { href: "/app", label: "Artifacts" };
+const landingPageHref = `/?${landingPageFlag}`;
 const connectionsLink = { href: "/app/connections", label: "Connections" };
 
 /** The inbox link: every mention with its thread. The bell carries the unread count. */
@@ -149,7 +151,8 @@ export function AppHeader({ userId, name, email, username, teams, unreadNotifica
               <DropdownMenuItem onClick={() => { router.push("/docs"); }} className="px-2 py-2">
                 <IconBook /> Docs
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { router.push("/"); }} className="px-2 py-2">
+              {/* `/?home` shows the landing page; a plain `/` sends signed-in people back here. */}
+              <DropdownMenuItem onClick={() => { router.push(landingPageHref); }} className="px-2 py-2">
                 <IconExternalLink /> Public site
               </DropdownMenuItem>
               <ResetConfirmationsItem />

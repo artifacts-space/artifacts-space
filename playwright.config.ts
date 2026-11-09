@@ -12,6 +12,19 @@ const prodPort = Number(process.env.PLAYWRIGHT_PROD_PORT ?? port + 1000);
 
 const prodSpecs = /\.prod\.spec\.ts$/;
 
+/**
+ * The production checks run with no reachable database, as in CI. Better Auth
+ * still needs a site URL, a secret, and a database URL to start, so it can
+ * reject a forged session cookie (signed-in-redirect.prod.spec.ts); nothing
+ * listens on the database URL, so every query fails as it would with no
+ * database. Set values win.
+ */
+const productionTestEnv = {
+  BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? `http://localhost:${String(prodPort)}`,
+  BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "e2e-only-secret-not-used-anywhere-else-0123456789",
+  DATABASE_URL: process.env.DATABASE_URL ?? "postgres://e2e@127.0.0.1:9/none",
+};
+
 export default defineConfig({
   testDir: "./e2e",
   outputDir: "./test-results",
@@ -43,6 +56,7 @@ export default defineConfig({
       url: `http://localhost:${String(prodPort)}/preview`,
       reuseExistingServer: false,
       timeout: 600_000,
+      env: productionTestEnv,
     },
   ],
 });
