@@ -149,7 +149,9 @@ test.describe("desktop", () => {
     await handle.press("ArrowLeft");
 
     // From the keyboard, focus shows as the handle's line in --brand, with no ring boxing the grab area.
-    expect(await lineColor(handle)).toBe(await brandColor(page));
+    const brand = await brandColor(page);
+    // The line fades between colors, so wait for it to settle on the brand.
+    await expect.poll(() => lineColor(handle)).toBe(brand);
     expect(await handle.evaluate((element) => getComputedStyle(element).boxShadow)).toBe("none");
     const scroll = await pageScroll(page);
     expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.clientWidth + 1);

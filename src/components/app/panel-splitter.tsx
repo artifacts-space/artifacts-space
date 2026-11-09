@@ -108,6 +108,7 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
     setKeyboard(false);
     event.currentTarget.setPointerCapture(event.pointerId);
     // A pointer focuses the handle for the keyboard after it, without the keyboard focus line.
+    // Browsers without this option (before Chrome 144, Safari 18.4) ignore it and may show the line after a click.
     event.currentTarget.focus({ preventScroll: true, focusVisible: false });
     drag.current = { pointerId: event.pointerId, origin: along(event, orientation), start: now.size, bounds: now.bounds, size: null };
     document.documentElement.style.cursor = cursors[orientation];
@@ -198,12 +199,14 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
       className={cn(
         "absolute z-20 hidden touch-none select-none outline-none lg:block",
         // The line is the only mark: invisible at rest (the border shows), a quiet bar on hover and while dragging,
-        // and the brand from the keyboard. A ring around the handle would box its whole grab area.
+        // and a thicker brand bar from the keyboard. A ring around the handle would box its whole grab area.
+        // Forced colors drop the bar's background, so there keyboard focus gets an outline instead.
         "after:absolute after:bg-transparent after:transition-colors hover:after:bg-foreground/20 data-[dragging]:after:bg-foreground/30 focus-visible:after:bg-brand data-[keyboard]:after:bg-brand",
+        "forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-solid forced-colors:data-[keyboard]:outline-2 forced-colors:data-[keyboard]:outline-solid",
         orientation === "vertical"
           // A vertical handle sits just past its panel's edge, so its line runs along the handle's start, on the border.
-          ? "cursor-col-resize after:inset-y-0 after:left-0 after:w-0.5"
-          : "cursor-row-resize after:inset-x-0 after:top-1/2 after:h-0.5 after:-translate-y-1/2",
+          ? "cursor-col-resize after:inset-y-0 after:left-0 after:w-0.5 focus-visible:after:w-1 data-[keyboard]:after:w-1"
+          : "cursor-row-resize after:inset-x-0 after:top-1/2 after:h-0.5 after:-translate-y-1/2 focus-visible:after:h-1 data-[keyboard]:after:h-1",
         className,
       )}
     />
