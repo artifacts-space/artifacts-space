@@ -25,6 +25,10 @@ function refuse(message: string): never {
  * person's role" against their current role; the custom role itself was
  * checked by the action and is recorded separately (recordMemberRole). Any
  * other call is checked against the built-in role it actually stores.
+ *
+ * The server action has already loaded the same membership and members;
+ * loading them again here is deliberate. This check must stand on its own
+ * for any caller of the Better Auth call, so do not pass the action's data in.
  */
 export async function assertMemberChangeAllowed(input: { actorId: string; teamId: string; memberId: string; nextRole: string | null }): Promise<void> {
   const access = await getTeamAccessById(input.actorId, input.teamId);

@@ -96,5 +96,6 @@ export function resolveActor(stored: StoredRole, roles: ReadonlyMap<string, Team
   const key = effectiveRoleKey(stored);
   const role = roles?.get(key);
   if (!role) return { roleKey: key, kind, capabilities: [], roleName: builtInRoleNames[stored.role] };
-  return { roleKey: key, kind, capabilities: role.capabilities, roleName: role.name };
+  // A copy, so no caller can change the role shared by everyone in this request.
+  return { roleKey: key, kind, capabilities: [...role.capabilities], roleName: role.name };
 }

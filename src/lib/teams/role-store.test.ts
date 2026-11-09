@@ -103,6 +103,11 @@ describe("createCustomRole", () => {
     expect(mocks.execute).toHaveBeenCalledTimes(1);
   });
 
+  it.each(["owner", "admin", "member", "agent"])("should refuse a custom role keyed %s without writing anything", async (key) => {
+    await expect(store.createCustomRole({ teamId: "team-1", key, name: key, capabilities: [], audit: { ...audit, action: "role_created" as const } })).rejects.toThrow("That name belongs to a built-in role.");
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
   it("should refuse a key the team already uses", async () => {
     mocks.execute.mockResolvedValue({ rows: [] });
     await expect(store.createCustomRole({ teamId: "team-1", key: "designer", name: "Designer", capabilities: [], audit: { ...audit, action: "role_created" as const } })).rejects.toThrow("A role with that name already exists.");

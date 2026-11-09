@@ -7,7 +7,7 @@ import { teamPermissionAudit } from "@/db/roles-schema";
 import { user } from "@/db/schema";
 import { UserFacingError } from "@/lib/user-facing-error";
 
-import { builtInRoleKeys, builtInRoleNames, defaultRoleCapabilities, isTeamCapability, type TeamCapability } from "./capability-rules";
+import { builtInRoleKeys, builtInRoleNames, defaultRoleCapabilities, isBuiltInRoleKey, isTeamCapability, type TeamCapability } from "./capability-rules";
 
 /**
  * Storage for team roles: seeding the built-in roles, saving a role's
@@ -54,6 +54,8 @@ function requireRow<T>(rows: readonly T[], message: string): T {
  * so a role never exists without its audit row. Returns the role's id.
  */
 async function insertRole(input: { teamId: string; key: string; name: string; builtIn: boolean; capabilities: readonly TeamCapability[]; audit: AuditInput | null }): Promise<string> {
+  // A custom role can never take a built-in key; role resolution would ignore it anyway (effectiveRoleKey).
+  if (!input.builtIn && isBuiltInRoleKey(input.key)) throw new UserFacingError("That name belongs to a built-in role.");
   const logged = input.audit
     ? sql`, logged as (
         insert into team_permission_audit (id, team_id, actor_id, action, subject, before, after)
