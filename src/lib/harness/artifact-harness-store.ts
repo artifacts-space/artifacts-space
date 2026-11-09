@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { artifact } from "@/db/schema";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
-import { getEditableArtifact } from "@/lib/access";
+import { getEditableArtifactMeta } from "@/lib/access";
 
 import { artifactHarnessOf } from "./harness-rules";
 import type { HarnessId } from "./harnesses";
@@ -23,7 +23,8 @@ export interface SavedArtifactHarness {
  * edit it (callers answer "not found"). Counts against the edit limit.
  */
 export async function setArtifactHarnessOverride(editorId: string, artifactId: string, harness: HarnessId | null): Promise<SavedArtifactHarness | undefined> {
-  const record = await getEditableArtifact(editorId, { id: artifactId });
+  // Without content: a label change never needs it.
+  const record = await getEditableArtifactMeta(editorId, artifactId);
   if (!record) return undefined;
   await enforceRateLimit("harnessChoice", editorId);
   if (record.harnessOverride !== harness) {

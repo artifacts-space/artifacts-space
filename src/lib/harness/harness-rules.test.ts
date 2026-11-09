@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -221,6 +224,12 @@ describe("harnessPhrase", () => {
 });
 
 describe("harness list", () => {
+  it("should ship an icon file for every harness that names one", () => {
+    for (const harness of harnesses) {
+      if (harness.icon) expect(existsSync(join(process.cwd(), "public", harness.icon)), harness.icon).toBe(true);
+    }
+  });
+
   it("should list every id once, with Other agent last and no icon for it", () => {
     expect(harnesses.map((harness) => harness.id)).toEqual([...harnessIds]);
     expect(harnesses.at(-1)).toEqual({ id: "other", name: "Other agent", icon: null });

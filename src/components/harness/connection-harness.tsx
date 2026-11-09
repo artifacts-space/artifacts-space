@@ -41,7 +41,8 @@ export function ConnectionHarness({ target, harness, name, save, onSaved }: Conn
     <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
       <span className="text-xs text-muted-foreground">Agent</span>
       <HarnessSelect detected={harness.detected} override={harness.override} label={`Agent for ${name}`} onChange={change} />
-      {harness.detectedLabel ? <span className="min-w-0 truncate text-xs text-muted-foreground" title={harness.detectedLabel}>Calls itself “{harness.detectedLabel}”</span> : null}
+      {/* The client's own name tells unknown clients apart; once an agent is chosen it would only read as a contradiction. */}
+      {harness.detectedLabel && !harness.override ? <span className="min-w-0 truncate text-xs text-muted-foreground" title={harness.detectedLabel}>Calls itself “{harness.detectedLabel}”</span> : null}
     </div>
   );
 }

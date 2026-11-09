@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const mocks = vi.hoisted(() => ({
-  getEditableArtifact: vi.fn(),
+  getEditableArtifactMeta: vi.fn(),
   set: vi.fn(),
   enforceRateLimit: vi.fn(() => Promise.resolve()),
 }));
@@ -21,7 +21,7 @@ vi.mock("@/db", () => ({
     }),
   }),
 }));
-vi.mock("@/lib/access", () => ({ getEditableArtifact: mocks.getEditableArtifact }));
+vi.mock("@/lib/access", () => ({ getEditableArtifactMeta: mocks.getEditableArtifactMeta }));
 vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: mocks.enforceRateLimit }));
 
 const { setArtifactHarnessOverride } = await import("./artifact-harness-store");
@@ -30,14 +30,14 @@ const record = { id: "artifact-1", publicId: "4fXkP9qR2sT7vW1yZ3aB5c", harness: 
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getEditableArtifact.mockResolvedValue(record);
+  mocks.getEditableArtifactMeta.mockResolvedValue(record);
 });
 
 describe("setArtifactHarnessOverride", () => {
   it("should refuse and write nothing when the person may not edit the artifact", async () => {
-    mocks.getEditableArtifact.mockResolvedValue(null);
+    mocks.getEditableArtifactMeta.mockResolvedValue(null);
     await expect(setArtifactHarnessOverride("stranger", "artifact-1", "cursor")).resolves.toBeUndefined();
-    expect(mocks.getEditableArtifact).toHaveBeenCalledWith("stranger", { id: "artifact-1" });
+    expect(mocks.getEditableArtifactMeta).toHaveBeenCalledWith("stranger", "artifact-1");
     expect(mocks.set).not.toHaveBeenCalled();
     expect(mocks.enforceRateLimit).not.toHaveBeenCalled();
   });
@@ -50,14 +50,14 @@ describe("setArtifactHarnessOverride", () => {
   });
 
   it("should go back to what was detected when the editor clears it", async () => {
-    mocks.getEditableArtifact.mockResolvedValue({ ...record, harnessOverride: "cursor" });
+    mocks.getEditableArtifactMeta.mockResolvedValue({ ...record, harnessOverride: "cursor" });
     const saved = await setArtifactHarnessOverride("author", "artifact-1", null);
     expect(mocks.set).toHaveBeenCalledWith({ harnessOverride: null });
     expect(saved?.harness).toEqual({ id: "codex", stamped: "codex", overridden: false });
   });
 
   it("should write nothing when the choice is already saved", async () => {
-    mocks.getEditableArtifact.mockResolvedValue({ ...record, harnessOverride: "cursor" });
+    mocks.getEditableArtifactMeta.mockResolvedValue({ ...record, harnessOverride: "cursor" });
     await setArtifactHarnessOverride("author", "artifact-1", "cursor");
     expect(mocks.set).not.toHaveBeenCalled();
   });

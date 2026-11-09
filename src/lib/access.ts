@@ -112,7 +112,7 @@ async function teamContext(viewerId: string | null, teamId: string | null) {
 }
 
 /** Whether `editorId` may save changes to this artifact. See canEditArtifact. */
-export async function canEditRecord(editorId: string, record: ArtifactRecord): Promise<boolean> {
+export async function canEditRecord(editorId: string, record: ArtifactMetaRecord): Promise<boolean> {
   if (record.userId === editorId) return true;
   if (record.visibility !== "private") {
     const context = await teamContext(editorId, record.teamId);
@@ -126,6 +126,16 @@ export async function canEditRecord(editorId: string, record: ArtifactRecord): P
  * author, or a member of the team it is shared through. Null otherwise, so
  * callers answer "not found" either way. Every write path uses this.
  */
+/**
+ * An artifact the editor may edit, without its content: for changes that
+ * never touch content, such as its "Made with" label. Null otherwise.
+ */
+export async function getEditableArtifactMeta(editorId: string, artifactId: string): Promise<ArtifactMetaRecord | null> {
+  const [record] = await getDb().select(artifactMetaColumns()).from(artifact).where(eq(artifact.id, artifactId)).limit(1);
+  if (!record) return null;
+  return (await canEditRecord(editorId, record)) ? record : null;
+}
+
 export async function getEditableArtifact(editorId: string, key: { id: string } | { publicId: string }): Promise<ArtifactRecord | null> {
   if ("publicId" in key && !isPublicId(key.publicId)) return null;
   const where = "id" in key ? eq(artifact.id, key.id) : eq(artifact.publicId, key.publicId);
