@@ -21,7 +21,7 @@ vi.mock("@/lib/og/artifact-og", async (importOriginal) => ({
 
 const { generateMetadata } = await import("./page");
 
-function viewable(visibility: string, view: { title: string; icon: string | null; summary: string }, showInSearch = false) {
+function viewable(visibility: ArtifactVisibility, view: { title: string; icon: string | null; summary: string }, showInSearch = false) {
   return { record: { publicId: "abc123", visibility, userId: "u1", showInSearch }, view };
 }
 
@@ -79,7 +79,7 @@ describe("artifact page generateMetadata", () => {
 
   it("should not index when the artifact is private, team, or link, even with the search setting on", async () => {
     mocks.artifactOgMetadata.mockResolvedValue({});
-    for (const visibility of ["private", "team", "link"]) {
+    for (const visibility of ["private", "team", "link"] as const) {
       mocks.getViewableArtifact.mockResolvedValue(viewable(visibility, plan, true));
       expect((await call()).robots).toEqual({ index: false, follow: false });
     }
@@ -153,6 +153,9 @@ describe("artifact page generateMetadata for a signed-out link crawler", () => {
   }
 
   it("should leave description, openGraph, and twitter unset, so the site description and image apply, when the artifact cannot be previewed", async () => {
+    // A link artifact a signed-out reader can open but that has no approved version: artifactOgMetadata returns {} for it
+    // (src/lib/og/artifact-og.test.ts covers that rule). The real merge with the root's site image is checked on the
+    // production build in e2e/link-preview.prod.spec.ts.
     readRuleDecides("link");
     const metadata = await call();
     expect(mocks.artifactOgMetadata).toHaveBeenCalledWith("abc123");
