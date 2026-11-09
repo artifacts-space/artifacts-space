@@ -35,6 +35,7 @@ import { assertRoomForNewTags, parseNewTags } from "@/lib/tags/store";
 import { projectChoiceSchema } from "@/lib/projects/rules";
 import { findOrCreateProject } from "@/lib/projects/store";
 import { checkContentFiles } from "@/lib/files/attach";
+import { artifactHarnessOf, stampColumns, versionStamp, type HarnessStamp } from "@/lib/harness/harness-rules";
 import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { checkIconFile, restorableIcon } from "@/lib/files/icon-file";
 import { checkCoverFile, restorableCover } from "@/lib/files/cover-file";
@@ -139,6 +140,7 @@ function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy,
     tags,
     sessionId: record.sessionId,
     source: record.source,
+    harness: artifactHarnessOf(record),
     visibility: record.visibility,
     comments: record.comments,
     showInSearch: showsInSearch(record),
@@ -317,8 +319,12 @@ export async function findPublicIdByShareId(shareId: string) {
   return record?.publicId ?? null;
 }
 
-/** Creates a private artifact for its author, within the hourly creation limit and the account's storage quota. */
-export async function createArtifact(userId: string, input: ArtifactInput) {
+/**
+ * Creates a private artifact for its author, within the hourly creation limit
+ * and the account's storage quota. `harness` is the agent harness of the MCP
+ * connection that created it; leave it out for the web app.
+ */
+export async function createArtifact(userId: string, input: ArtifactInput, options: { harness?: HarnessStamp | null } = {}) {
   const { project: projectName, tags: tagInput, ...parsed } = artifactInputSchema.parse(input);
   const tags = parseNewTags(tagInput);
   assertArtifactSize(parsed);
@@ -337,6 +343,7 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
     .insert(artifact)
     .values({
       ...parsed,
+      ...stampColumns(options.harness),
       projectId: chosen?.id ?? null,
       tags,
       id: randomUUID(),
@@ -352,7 +359,7 @@ export async function createArtifact(userId: string, input: ArtifactInput) {
 
   if (!record) throw new Error("The artifact could not be created.");
   await attachFileRows(userId, record.id, fileIds);
-  await recordArtifactSave({ before: null, after: record, editorId: userId, actor: "person", saveKind: "create" });
+  await recordArtifactSave({ before: null, after: record, editorId: userId, actor: "person", saveKind: "create", harness: versionStamp(null, options.harness) });
   const [dto] = await toArtifactDtos([record], userId);
   return dto ?? toArtifactDto(record);
 }
@@ -401,7 +408,7 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
   await attachUpdatedContentFiles(editorId, before, changes);
   const [record] = await getDb()
     .update(artifact)
-    .set({ ...changes, updatedBy: editorId, updatedAt: new Date() })
+    .set({ ...changes, ...stampColumns(context.options.harness), updatedBy: editorId, updatedAt: new Date() })
     .where(and(eq(artifact.id, before.id), unchangedSince(context.options.expectedUpdatedAt, before.publicId)))
     .returning();
 
@@ -409,7 +416,7 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
     if (context.options.expectedUpdatedAt) throw new StaleSaveError(before.publicId);
     return null;
   }
-  await recordArtifactSave({ before, after: record, editorId, actor: context.actor, ...saveKindOf(context) });
+  await recordArtifactSave({ before, after: record, editorId, actor: context.actor, ...saveKindOf(context), harness: versionStamp(record.harnessOverride, context.options.harness) });
   // A replaced or removed image icon or cover goes with this save, unless something still shows it (see icon-cleanup.ts).
   if (imageChanged(before, record)) await pruneUnusedIconFilesQuietly(record.id, [before.icon, before.cover]);
   const [dto] = await toArtifactDtos([record], editorId);

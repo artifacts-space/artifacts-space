@@ -8,6 +8,7 @@ import { FILE_PREFIX } from "@/lib/artifact-icons";
 import type { VersionSaveKind } from "@/lib/artifact-types";
 import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { dropsShownImage } from "@/lib/files/icon-cleanup-rules";
+import { stampColumns, type HarnessStamp } from "@/lib/harness/harness-rules";
 
 import { canDropSuperseded, selectPrunableVersions, shouldMergeInto, versionBytes, versionRetention, type EditSessionStep } from "./history-rules";
 import { sameReviewedFields } from "./rules";
@@ -27,13 +28,13 @@ function copiedFields(record: ArtifactRecord) {
 /** Inserts a version of `record` and returns its id. `at` back-dates it, for a snapshot of an older save. */
 export async function insertVersion(
   record: ArtifactRecord,
-  options: { createdBy: string | null; saveKind: VersionSaveKind; restoredFromId?: string | null; at?: Date },
+  options: { createdBy: string | null; saveKind: VersionSaveKind; restoredFromId?: string | null; at?: Date; harness?: HarnessStamp | null | undefined },
 ): Promise<string> {
   const id = randomUUID();
   const at = options.at ? { createdAt: options.at, savedAt: options.at } : {};
   await getDb()
     .insert(artifactVersion)
-    .values({ id, artifactId: record.id, ...copiedFields(record), createdBy: options.createdBy, saveKind: options.saveKind, restoredFromId: options.restoredFromId ?? null, ...at });
+    .values({ id, artifactId: record.id, ...copiedFields(record), ...stampColumns(options.harness), createdBy: options.createdBy, saveKind: options.saveKind, restoredFromId: options.restoredFromId ?? null, ...at });
   return id;
 }
 
@@ -85,10 +86,11 @@ export async function versionMatching(record: ArtifactRecord, createdBy: string 
   return insertVersion(record, { createdBy, saveKind: "snapshot" });
 }
 
-async function mergeInto(versionId: string, record: ArtifactRecord) {
+/** Folds a save into a version. A save from the web app keeps the harness an agent save already recorded there. */
+async function mergeInto(versionId: string, record: ArtifactRecord, harness: HarnessStamp | null | undefined) {
   await getDb()
     .update(artifactVersion)
-    .set({ ...copiedFields(record), savedAt: sql`now()` })
+    .set({ ...copiedFields(record), ...stampColumns(harness), savedAt: sql`now()` })
     .where(eq(artifactVersion.id, versionId));
 }
 
@@ -102,17 +104,17 @@ async function mergeInto(versionId: string, record: ArtifactRecord) {
  */
 export async function fileVersion(
   record: ArtifactRecord,
-  save: { editorId: string; saveKind: VersionSaveKind; restoredFromId?: string | null; session?: EditSessionStep | undefined },
+  save: { editorId: string; saveKind: VersionSaveKind; restoredFromId?: string | null; session?: EditSessionStep | undefined; harness?: HarnessStamp | null | undefined },
 ): Promise<string> {
   const latest = await latestVersion(record.id);
   if (latest && save.saveKind === "edit" && sameReviewedFields(latest, record)) return latest.id;
   const { referenced } = await protectedVersions(record.id, record.approvedVersionId);
   // A save that drops an uploaded icon or cover image files its own version, so the image stays restorable.
   if (latest && shouldMergeInto(latest, { ...save, now: new Date() }, referenced) && !dropsShownImage(latest, record)) {
-    await mergeInto(latest.id, record);
+    await mergeInto(latest.id, record, save.harness);
     return latest.id;
   }
-  return insertVersion(record, { createdBy: save.editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null });
+  return insertVersion(record, { createdBy: save.editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null, harness: save.harness });
 }
 
 /**

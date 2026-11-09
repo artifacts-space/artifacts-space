@@ -12,6 +12,8 @@ import {
 import { ConnectedApps } from "@/components/app/connected-apps";
 import { McpToolsTable } from "@/components/app/mcp-tools-table";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
+import { ConnectionHarness } from "@/components/harness/connection-harness";
+import { HarnessIcon } from "@/components/harness/harness-icon";
 import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
 import { CursorInstallButton } from "@/components/setup/cursor-install-button";
 import { SkillInstall } from "@/components/setup/skill-install";
@@ -145,14 +147,17 @@ export function Connections({
             ) : (
               <ul>
                 {tokens.map((token) => (
-                  <li key={token.id} className="flex items-center gap-3 rounded-sm px-3 py-2.5 hover:bg-muted/60">
-                    <IconKey className="size-3.5 shrink-0 text-muted-foreground" />
+                  <li key={token.id} className="flex items-start gap-3 rounded-sm px-3 py-2.5 hover:bg-muted/60">
+                    <span className="flex h-6 shrink-0 items-center text-muted-foreground">
+                      {token.harness ? <HarnessIcon id={token.harness.override ?? token.harness.detected} /> : <IconKey className="size-3.5" />}
+                    </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-md font-medium">{token.name}</p>
                       <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{token.prefix}</p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         {token.lastUsedAt ? `Last used ${dateFormat.format(new Date(token.lastUsedAt))}` : "Never used"}
                       </p>
+                      {token.harness ? <ConnectionHarness target={{ kind: "api-token", tokenId: token.id }} harness={token.harness} name={token.name} onSaved={(override) => { setTokens((current) => current.map((item) => (item.id === token.id && item.harness ? { ...item, harness: { ...item.harness, override } } : item))); }} /> : null}
                     </div>
                     <Button variant="ghost" size="icon-sm" disabled={revoking !== null} onClick={() => { confirmRevoke.request(() => revoke(token.id)); }} aria-label={`Revoke ${token.name}`} className="text-muted-foreground hover:text-destructive">
                       {revoking === token.id ? <IconLoader2 className="animate-spin" /> : <IconTrash />}

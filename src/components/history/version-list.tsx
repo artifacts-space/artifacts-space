@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { HarnessByline } from "@/components/harness/harness-byline";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import type { VersionSummaryDto } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,7 @@ export function VersionList({ versions, selectedId, onSelect }: VersionListProps
               <span className="flex flex-wrap items-baseline gap-x-1.5 text-sm">
                 <VersionAuthor version={version} />
                 <span className="text-xs text-muted-foreground"><SavedAt at={version.savedAt} /></span>
+                <HarnessByline harness={version.harness} className="text-xs" />
               </span>
               <span className="block truncate text-xs text-muted-foreground">
                 {saveKindLabel(version.saveKind)} · {versionNote(version)}

@@ -8,6 +8,7 @@ import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { CommentsControl } from "@/components/app/comments-picker";
 import { CopyButton } from "@/components/copy-button";
+import { HarnessByline } from "@/components/harness/harness-byline";
 import { LastEdited } from "@/components/history/last-edited";
 import { VersionHistory } from "@/components/history/version-history";
 import { Button } from "@/components/ui/button";
@@ -96,7 +97,10 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
             <a href={artifactPageHref(artifact.publicId)} target="_blank" rel="noopener noreferrer" className="hover:underline">{artifact.title}</a>
           </h2>
           {artifact.summary ? <p className="mt-2 text-md leading-6 text-muted-foreground">{artifact.summary}</p> : null}
-          <LastEdited editor={artifact.updatedBy} at={artifact.updatedAt} className="mt-2" />
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <LastEdited editor={artifact.updatedBy} at={artifact.updatedAt} />
+            <HarnessByline harness={artifact.harness} className="text-xs" />
+          </div>
         </div>
         {/* Read only, so nothing in the pane takes focus first: the pane does, for keyboard scrolling. */}
         <div data-slot="detail-body" role="region" aria-label="Content" tabIndex={0} className={detailBody}>

@@ -41,7 +41,7 @@ const publicId = "4fXkP9qR2sT7vW1yZ3aB5c";
 function dto(icon: string | null): ArtifactDto {
   return {
     id: "internal-1", publicId, title: "Plan", icon, theme: null, cover: null, fullWidth: false, summary: "", content: "# Plan", kind: "markdown", language: "", project: null, tags: [], sessionId: "", source: "",
-    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null,
+    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null, harness: null,
     files: [], updatedBy: null, metadata: {}, createdAt: "2026-11-07T00:00:00.000Z", updatedAt: "2026-11-07T00:00:00.000Z",
   };
 }
@@ -78,7 +78,7 @@ describe("artifacts_create with icon", () => {
     data.createArtifact.mockResolvedValue(dto("🧪"));
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", icon: "🧪" });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ icon: "🧪" }));
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ icon: "🧪" }), { harness: null });
     expect((JSON.parse(result.text) as { artifact: { icon: string } }).artifact.icon).toBe("🧪");
   });
 
@@ -86,7 +86,7 @@ describe("artifacts_create with icon", () => {
     data.createArtifact.mockResolvedValue(dto("tabler:rocket"));
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", icon: "tabler:rocket" });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ icon: "tabler:rocket" }));
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ icon: "tabler:rocket" }), { harness: null });
   });
 
   it.each(["rocket", "🚀🚀", "<svg onload=alert(1)>", "tabler:not-real", "\u0007"])("should refuse %j before anything is saved", async (icon) => {
@@ -102,7 +102,7 @@ describe("artifacts_update with icon", () => {
     data.updateArtifact.mockResolvedValue(dto("tabler:bug"));
     const result = await call("artifacts_update", { id: publicId, icon: "tabler:bug" });
     expect(result.isError).toBe(false);
-    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { icon: "tabler:bug" }, "agent");
+    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { icon: "tabler:bug" }, "agent", { harness: null });
     expect((JSON.parse(result.text) as { artifact: { icon: string } }).artifact.icon).toBe("tabler:bug");
   });
 
@@ -110,7 +110,7 @@ describe("artifacts_update with icon", () => {
     data.updateArtifact.mockResolvedValue(dto(null));
     const result = await call("artifacts_update", { id: publicId, icon });
     expect(result.isError).toBe(false);
-    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { icon }, "agent");
+    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { icon }, "agent", { harness: null });
   });
 
   it("should go through the agent update path so approval rules apply when the artifact is shared", async () => {
@@ -123,7 +123,7 @@ describe("artifacts_update with icon", () => {
     data.updateArtifact.mockResolvedValue(dto("file:0f8fad5b-d9cb-469f-a165-70867728950e"));
     const result = await call("artifacts_update", { id: publicId, icon: "file:0f8fad5b-d9cb-469f-a165-70867728950e" });
     expect(result.isError).toBe(false);
-    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { icon: "file:0f8fad5b-d9cb-469f-a165-70867728950e" }, "agent");
+    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { icon: "file:0f8fad5b-d9cb-469f-a165-70867728950e" }, "agent", { harness: null });
   });
 
   it("should refuse a file icon that is not a uuid before anything is saved", async () => {

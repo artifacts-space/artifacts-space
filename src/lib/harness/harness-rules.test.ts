@@ -1,0 +1,187 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  artifactHarnessOf,
+  clientInfoFromBody,
+  cleanClientText,
+  detectHarness,
+  effectiveHarness,
+  matchHarness,
+  parseClientInfo,
+  resolveHarness,
+  stampColumns,
+  versionStamp,
+} from "./harness-rules";
+import { harnesses, harnessFor, harnessIds } from "./harnesses";
+
+describe("matchHarness", () => {
+  it.each([
+    ["claude-code", "claude-code"],
+    ["Claude Code", "claude-code"],
+    ["claude-ai", "claude"],
+    ["Anthropic/ClaudeAI", "claude"],
+    ["codex-mcp-client", "codex"],
+    ["Codex", "codex"],
+    ["cursor-vscode", "cursor"],
+    ["Cursor", "cursor"],
+    ["Visual Studio Code", "vscode-copilot"],
+    ["Visual Studio Code - Insiders", "vscode-copilot"],
+    ["GitHub Copilot", "vscode-copilot"],
+    ["windsurf-client", "windsurf"],
+    ["Codeium", "windsurf"],
+    ["gemini-cli-mcp-client", "gemini-cli"],
+    ["opencode", "opencode"],
+    ["Cline", "cline"],
+    ["Roo Code", "roo-code"],
+    ["roo-cline", "roo-code"],
+    ["Kilo Code", "kilo-code"],
+    ["goose", "goose"],
+    ["amp-mcp-client", "amp"],
+    ["Trae", "trae"],
+    ["fx", "fx"],
+    ["blackbox-cli", "blackbox"],
+  ])("should map %s to %s when a client names itself that way", (name, harness) => {
+    expect(matchHarness(name)).toBe(harness);
+  });
+
+  it.each(["zed", "Continue", "firefox", "example", "mogplex", "", "   "])("should match nothing when the name is %j", (name) => {
+    expect(matchHarness(name)).toBeNull();
+  });
+});
+
+describe("detectHarness", () => {
+  it("should use the clientInfo name when a rule knows it", () => {
+    expect(detectHarness({ clientName: "claude-code", oauthName: "Some app" })).toEqual({ harness: "claude-code", label: null });
+  });
+
+  it("should fall back to the OAuth client name when clientInfo is missing", () => {
+    expect(detectHarness({ clientName: null, oauthName: "Cursor" })).toEqual({ harness: "cursor", label: null });
+  });
+
+  it("should fall back to the software_id when the name is unknown", () => {
+    expect(detectHarness({ oauthName: "My laptop", softwareId: "com.openai.codex" })).toEqual({ harness: "codex", label: null });
+  });
+
+  it("should prefer the OAuth name when clientInfo only names an MCP library", () => {
+    expect(detectHarness({ clientName: "ai-sdk-mcp-client", oauthName: "Cursor" })).toEqual({ harness: "cursor", label: null });
+  });
+
+  it("should become Other agent with the raw name kept when nothing matches", () => {
+    expect(detectHarness({ clientName: "zed", oauthName: "Zed Editor" })).toEqual({ harness: "other", label: "zed" });
+  });
+
+  it("should keep a generic name as the label when it is all there is", () => {
+    expect(detectHarness({ clientName: "ai-sdk-mcp-client" })).toEqual({ harness: "other", label: "ai-sdk-mcp-client" });
+  });
+
+  it("should be Other agent without a label when the client gave no name", () => {
+    expect(detectHarness({})).toEqual({ harness: "other", label: null });
+  });
+});
+
+describe("parseClientInfo", () => {
+  it("should keep the name and version when clientInfo is well formed", () => {
+    expect(parseClientInfo({ name: "claude-code", version: "2.1.0" })).toEqual({ name: "claude-code", version: "2.1.0" });
+  });
+
+  it.each([null, "claude-code", 42, { version: "1" }, { name: 7 }, { name: "x".repeat(600) }, { name: "   " }])("should ignore clientInfo %j when it is malformed", (value) => {
+    expect(parseClientInfo(value)).toBeNull();
+  });
+
+  it("should strip control and bidirectional characters and cap the length when the name is hostile", () => {
+    const parsed = parseClientInfo({ name: `evil\u202e\u0000<script>${"a".repeat(200)}`, version: "1\n2" });
+    expect(parsed?.name).not.toMatch(/[\u0000\u202e]/);
+    expect(parsed?.name.length).toBeLessThanOrEqual(64);
+    expect(parsed?.version).toBe("1 2");
+  });
+
+  it("should return null when cleaning leaves nothing", () => {
+    expect(cleanClientText("\u200b\u0007", 64)).toBeNull();
+  });
+});
+
+describe("clientInfoFromBody", () => {
+  it("should find clientInfo in an initialize request", () => {
+    const body = { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "codex-mcp-client", version: "0.5" } } };
+    expect(clientInfoFromBody(body)).toEqual({ info: { name: "codex-mcp-client", version: "0.5" }, initialize: true });
+  });
+
+  it("should find clientInfo in a request's _meta when a newer client sends it every time", () => {
+    const body = { jsonrpc: "2.0", id: 7, method: "tools/call", params: { _meta: { "io.modelcontextprotocol/clientInfo": { name: "fx", version: "1.0.0" } }, name: "artifacts_list", arguments: {} } };
+    expect(clientInfoFromBody(body)).toEqual({ info: { name: "fx", version: "1.0.0" }, initialize: false });
+  });
+
+  it("should look through a batch when one message carries it", () => {
+    expect(clientInfoFromBody([{ method: "ping" }, { method: "initialize", params: { clientInfo: { name: "goose" } } }])?.info.name).toBe("goose");
+  });
+
+  it("should ignore clientInfo outside initialize when it is not in _meta", () => {
+    expect(clientInfoFromBody({ method: "tools/call", params: { clientInfo: { name: "claude-code" } } })).toBeNull();
+  });
+
+  it.each([null, "text", { method: 5 }, { params: {} }])("should find nothing when the body is %j", (body) => {
+    expect(clientInfoFromBody(body)).toBeNull();
+  });
+});
+
+describe("harness precedence", () => {
+  const detected = { harness: "codex", label: null } as const;
+
+  it("should show the artifact override over the connection override and detection", () => {
+    expect(resolveHarness({ artifactOverride: "cursor", connectionOverride: "claude-code", detected })).toEqual({ harness: "cursor", label: null });
+  });
+
+  it("should show the connection override over detection when the artifact has none", () => {
+    expect(resolveHarness({ artifactOverride: null, connectionOverride: "claude-code", detected })).toEqual({ harness: "claude-code", label: null });
+  });
+
+  it("should show what was detected when nobody chose one", () => {
+    expect(resolveHarness({ detected: { harness: "other", label: "zed" } })).toEqual({ harness: "other", label: "zed" });
+  });
+
+  it("should ignore an override that is not a known harness id", () => {
+    expect(resolveHarness({ artifactOverride: "<img>", connectionOverride: "nope", detected })).toEqual(detected);
+  });
+
+  it("should show the artifact's override over what its last save stamped", () => {
+    expect(effectiveHarness("cursor", "codex")).toBe("cursor");
+    expect(effectiveHarness(null, "codex")).toBe("codex");
+    expect(effectiveHarness(null, null)).toBeNull();
+  });
+
+  it("should describe an artifact's harness for its DTO", () => {
+    expect(artifactHarnessOf({ harness: "codex", harnessOverride: "cursor" })).toEqual({ id: "cursor", stamped: "codex", overridden: true });
+    expect(artifactHarnessOf({ harness: "codex", harnessOverride: null })).toEqual({ id: "codex", stamped: "codex", overridden: false });
+    expect(artifactHarnessOf({ harness: null, harnessOverride: null })).toBeNull();
+  });
+
+  it("should record the artifact's override on a new version so History matches the byline", () => {
+    expect(versionStamp("cursor", detected)).toEqual({ harness: "cursor", label: null });
+    expect(versionStamp(null, detected)).toEqual(detected);
+  });
+
+  it("should record no harness on a version when the save came from the web app", () => {
+    expect(versionStamp("cursor", null)).toBeNull();
+    expect(stampColumns(null)).toEqual({});
+  });
+
+  it("should keep the raw client name only for Other agent", () => {
+    expect(stampColumns({ harness: "other", label: "zed" })).toEqual({ harness: "other", harnessLabel: "zed" });
+    expect(stampColumns({ harness: "codex", label: "leftover" })).toEqual({ harness: "codex", harnessLabel: null });
+  });
+});
+
+describe("harness list", () => {
+  it("should list every id once, with Other agent last and no icon for it", () => {
+    expect(harnesses.map((harness) => harness.id)).toEqual([...harnessIds]);
+    expect(harnesses.at(-1)).toEqual({ id: "other", name: "Other agent", icon: null });
+  });
+
+  it("should read an id it no longer knows as Other agent", () => {
+    expect(harnessFor("retired-tool").id).toBe("other");
+  });
+
+  it("should point every known harness at an icon in public/agent-icons", () => {
+    for (const harness of harnesses.filter((item) => item.id !== "other")) expect(harness.icon).toMatch(/^\/agent-icons\/[a-z-]+\.svg$/);
+  });
+});

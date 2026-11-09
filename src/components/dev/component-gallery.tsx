@@ -8,6 +8,7 @@ import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scop
 import { AvatarGallery } from "@/components/dev/avatar-gallery";
 import { ArtifactHeaderSpecimen } from "@/components/dev/artifact-header-specimen";
 import { CoverSpecimen } from "@/components/dev/cover-specimen";
+import { HarnessSpecimen } from "@/components/dev/harness-specimen";
 import { NotificationsSpecimen } from "@/components/dev/notifications-specimen";
 import { ThemePickerSpecimen } from "@/components/dev/theme-picker-specimen";
 import { ViewsSpecimen } from "@/components/dev/views-specimen";
@@ -96,6 +97,7 @@ export function ComponentGallery() {
         <a href="#avatars" className="hover:text-foreground">Avatars</a>
         <a href="#views" className="hover:text-foreground">Views</a>
         <a href="#notifications" className="hover:text-foreground">Notifications</a>
+        <a href="#harnesses" className="hover:text-foreground">Agents</a>
       </nav>
       <div className="space-y-12">
         {uiComponentNames.map((name) => (
@@ -147,6 +149,9 @@ export function ComponentGallery() {
         </Group>
         <Group id="notifications" title="Notification settings">
           <NotificationsSpecimen />
+        </Group>
+        <Group id="harnesses" title="Agent harnesses">
+          <HarnessSpecimen />
         </Group>
       </div>
     </div>

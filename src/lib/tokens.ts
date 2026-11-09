@@ -3,8 +3,10 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { getDb } from "@/db";
+import { mcpConnection } from "@/db/connection-schema";
 import { agent, apiToken, teamMember } from "@/db/schema";
 import { tokenUserIsActive } from "@/lib/agents/identity";
+import { toConnectionHarness, type ConnectionHarnessDto } from "@/lib/harness/connection-store";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 function hashToken(token: string) {
@@ -28,6 +30,8 @@ export async function createApiToken(userId: string, name: string) {
     .returning();
 
   if (!record) throw new Error("The access token could not be created.");
+  // A new token has not connected yet, so nothing says which agent it is.
+  const harness: ConnectionHarnessDto | null = null;
   return {
     token: secret,
     record: {
@@ -36,23 +40,32 @@ export async function createApiToken(userId: string, name: string) {
       prefix: record.prefix,
       lastUsedAt: record.lastUsedAt?.toISOString() ?? null,
       createdAt: record.createdAt.toISOString(),
+      harness,
     },
   };
 }
 
+/** A token's harness once its client has named itself or the person chose one; null before that. */
+function tokenHarness(clientName: string | null, override: string | null): ConnectionHarnessDto | null {
+  return clientName || override ? toConnectionHarness({ clientName, override }) : null;
+}
+
+/** A person's live tokens, newest first, with the agent harness each one was detected as. */
 export async function listApiTokens(userId: string) {
   const records = await getDb()
-    .select()
+    .select({ token: apiToken, clientName: mcpConnection.clientName, harnessOverride: mcpConnection.harnessOverride })
     .from(apiToken)
+    .leftJoin(mcpConnection, eq(mcpConnection.apiTokenId, apiToken.id))
     .where(and(eq(apiToken.userId, userId), isNull(apiToken.revokedAt)))
     .orderBy(desc(apiToken.createdAt));
 
-  return records.map((record) => ({
+  return records.map(({ token: record, clientName, harnessOverride }) => ({
     id: record.id,
     name: record.name,
     prefix: record.prefix,
     lastUsedAt: record.lastUsedAt?.toISOString() ?? null,
     createdAt: record.createdAt.toISOString(),
+    harness: tokenHarness(clientName, harnessOverride),
   }));
 }
 

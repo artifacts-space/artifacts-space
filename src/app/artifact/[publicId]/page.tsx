@@ -20,6 +20,7 @@ import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
 import { PageOrganizers } from "@/components/projects/page-organizers";
 import { CommentThread } from "@/components/comments/comment-thread";
+import { HarnessByline } from "@/components/harness/harness-byline";
 import { LastEdited } from "@/components/history/last-edited";
 import { ViewBeacon } from "@/components/views/view-beacon";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
@@ -29,6 +30,7 @@ import type { FileDto } from "@/lib/files/types";
 import { accountCreatedAt } from "@/lib/account-age";
 import { loadArtifactByline } from "@/lib/artifact-byline";
 import { iconTitlePrefix } from "@/lib/artifact-icons";
+import { effectiveHarness } from "@/lib/harness/harness-rules";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { lastEditorsFor } from "@/lib/artifacts";
@@ -143,7 +145,9 @@ function HeadingIcon({ viewable, themeChoices }: { viewable: ViewableArtifact; t
 function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewable: ViewableArtifact; editor: ArtifactEditorDto | null; organizers: React.ReactNode; themeChoices: ThemeChoices }) {
   const { view, record } = viewable;
   const Icon = kindIcons[view.kind];
-  const meta = [view.source ? `Source ${view.source}` : null].filter(Boolean);
+  // Who made it: the agent harness when an agent did (anyone who can read it may see it), else the source the agent gave.
+  const harness = effectiveHarness(record.harnessOverride, record.harness);
+  const meta = [!harness && view.source ? `Source ${view.source}` : null].filter(Boolean);
   return (
     <>
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -157,6 +161,7 @@ function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewa
       {organizers}
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
         <LastEdited editor={editor} at={view.updatedAt.toISOString()} className="text-sm" />
+        <HarnessByline harness={harness} />
         {meta.length > 0 ? <span>· {meta.join(" · ")}</span> : null}
       </div>
       <PendingEditNotice viewable={viewable} />

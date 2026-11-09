@@ -12,6 +12,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
+import { HarnessMenu } from "@/components/harness/harness-menu";
+import { useArtifactHarness } from "@/components/harness/use-artifact-harness";
+
 import { FullWidthToggle } from "./full-width-toggle";
 import { PageEditContext, type PageEdit } from "./page-edit-context";
 import { useLeaveGuard } from "./use-leave-guard";
@@ -46,6 +49,8 @@ interface PageEditBarProps {
   source: { open: boolean; onToggle: () => void } | null;
   /** The Full width switch; empty while the editable copy loads. */
   width?: React.ReactNode;
+  /** More menu entries after View source, such as "Made with"; empty while the editable copy loads. */
+  more?: React.ReactNode;
 }
 
 /**
@@ -53,7 +58,7 @@ interface PageEditBarProps {
  * width, History, and More (View source). There is no Edit button and no Save button: the
  * artifact is editable where it reads, and changes save on their own.
  */
-export function PageEditBar({ history, status, source, width }: PageEditBarProps) {
+export function PageEditBar({ history, status, source, width, more }: PageEditBarProps) {
   return (
     <div data-slot="editor-bar" className="mb-6 flex min-h-8 items-center justify-end gap-1">
       {status ?? <span className="mr-auto" />}
@@ -67,6 +72,7 @@ export function PageEditBar({ history, status, source, width }: PageEditBarProps
           <DropdownMenuItem onClick={source?.onToggle} className="py-2">
             <IconCode /> {source?.open ? "Hide source" : "View source"}
           </DropdownMenuItem>
+          {more}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -102,6 +108,7 @@ export function PageInlineEditor({ artifact: loaded, reviewed, onSaved, save, ch
   }, [onSaved]);
   const autosave = useAutosave({ artifact, draft, replaceDraft: replace, onUpdated, save });
   const [sourceOpen, setSourceOpen] = useState(false);
+  const harness = useArtifactHarness(artifact, onUpdated);
   useLeaveGuard(autosave.dirty || autosave.status.kind === "saving");
 
   const toggleSource = useCallback(() => {
@@ -141,6 +148,7 @@ export function PageInlineEditor({ artifact: loaded, reviewed, onSaved, save, ch
         status={<SaveLine status={autosave.status} dirty={autosave.dirty} onRetry={autosave.retryNow} />}
         source={{ open: sourceOpen, onToggle: toggleSource }}
         width={<FullWidthToggle artifact={artifact} />}
+        more={<HarnessMenu control={harness} />}
       />
       <ConflictNotice status={autosave.status} onLoadTheirs={autosave.loadTheirs} onKeepMine={autosave.keepMine} className="mb-6 rounded-lg border sm:px-4" />
       {children}

@@ -6,6 +6,8 @@ import { registerArtifactTools } from "@/lib/mcp/artifact-tools";
 import { authenticateMcpRequest, bearerToken, type McpPrincipal } from "@/lib/mcp/authenticate";
 import { registerFileTools } from "@/lib/mcp/file-tools";
 import { registerFormatTools } from "@/lib/mcp/format-tools";
+import { connectionHarness, recordRequestClientInfo } from "@/lib/mcp/request-harness";
+import type { HarnessSource } from "@/lib/mcp/harness-context";
 import { registerProjectTools } from "@/lib/mcp/project-tools";
 import { registerTagTools } from "@/lib/mcp/tag-tools";
 import { jsonRpcId, mcpLimitChecks, mcpRateLimitedResponse, mcpToolCalls } from "@/lib/mcp/rate-limits";
@@ -21,20 +23,20 @@ export const maxDuration = 30;
 const INSTRUCTIONS =
   "Use artifacts to preserve useful context across coding sessions. Save decisions, plans, research, code, and outputs. Search before creating duplicates, and include project and session identifiers when available: set `project` to a project name (projects_list shows the ones that exist; a new name creates one), and `tags` to reuse the tags tags_list shows. Give each artifact a fitting page icon with `icon` (one emoji or tabler:<name>), and optionally a `theme` preset and a `cover` gradient from themes_list. Artifacts are private by default; teams_list shows the teams you can share with. You can edit artifacts shared through your team, and every save is kept in the history (artifacts_versions). Sharing and edits to shared artifacts may need a team owner's or admin's approval, and agents never approve.";
 
-function createMcpServer({ userId, access }: McpPrincipal) {
+function createMcpServer({ userId, access }: McpPrincipal, harness: HarnessSource) {
   const server = new McpServer(
     { name: "artifacts.space", version: "1.0.0" },
     { instructions: access === "read" ? `${INSTRUCTIONS} ${READ_ONLY_INSTRUCTIONS}` : INSTRUCTIONS },
   );
 
-  registerArtifactTools(server, userId, access);
+  registerArtifactTools(server, userId, access, harness);
   registerProjectTools(server, userId, access);
   registerTagTools(server, userId, access);
   registerFormatTools(server, access);
   registerThemeTools(server, userId, access);
-  registerFileTools(server, userId, access);
+  registerFileTools(server, userId, access, harness);
   registerTeamTools(server, userId, access);
-  registerVersionTools(server, userId, access);
+  registerVersionTools(server, userId, access, harness);
   registerViewTools(server, userId, access);
   return server;
 }
@@ -61,9 +63,8 @@ function unauthorized(request: Request) {
  * request calls. Returns a 429 to send instead, or null to go on. Fails open:
  * a counter outage must not take MCP down with it.
  */
-async function refuseOverLimit(request: Request, principal: McpPrincipal): Promise<Response | null> {
+async function refuseOverLimit(body: unknown, principal: McpPrincipal): Promise<Response | null> {
   try {
-    const body: unknown = await request.clone().json().catch(() => null);
     const refusal = await hitRateLimits(mcpLimitChecks(principal, mcpToolCalls(body)));
     if (!refusal) return null;
     return mcpRateLimitedResponse(refusal, rateLimitMessage(refusal.name, refusal.retryAfterSeconds), jsonRpcId(body));
@@ -82,10 +83,13 @@ export async function POST(request: Request) {
     return Response.json({ jsonrpc: "2.0", error: { code: -32603, message: "Could not check the access token. Try again." }, id: null }, { status: 503 });
   }
   if (!principal) return unauthorized(request);
-  const refusal = await refuseOverLimit(request, principal);
+  const body: unknown = await request.clone().json().catch(() => null);
+  const refusal = await refuseOverLimit(body, principal);
   if (refusal) return refusal;
 
-  const server = createMcpServer(principal);
+  // The transport is stateless: keep what the client says it is (clientInfo) for its later requests.
+  const clientInfo = await recordRequestClientInfo(principal.connection, body);
+  const server = createMcpServer(principal, connectionHarness(principal.connection, clientInfo));
   // No sessionIdGenerator: the transport runs stateless, one request per server.
   const transport = new WebStandardStreamableHTTPServerTransport({
     enableJsonResponse: true,
