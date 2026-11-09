@@ -15,7 +15,9 @@ export const TEAM_ICON_SOURCE_MAX_BYTES = 2_097_152;
  * Largest upload the server accepts, in decimal bytes (1 MB). What arrives is a
  * 256 px square of a few dozen KB. It stays below Next's 1 MiB server
  * action body limit, with room for the form's own bytes, so an oversized
- * upload gets this app's message instead of the framework's.
+ * upload gets this app's message instead of the framework's. That limit is
+ * Next's default (`serverActions.bodySizeLimit`, unset in next.config.ts):
+ * if it ever changes, check this cap and its test again.
  */
 export const TEAM_ICON_UPLOAD_MAX_BYTES = 1_000_000;
 

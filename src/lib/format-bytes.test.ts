@@ -18,8 +18,9 @@ describe("decimalMegabytes", () => {
     expect(decimalMegabytes(1_000_000)).toBe("1 MB");
   });
 
-  it("should not round a cap just under a million down to 0.9 MB", () => {
-    expect(decimalMegabytes(990_000)).toBe("1 MB");
+  it("should round down, so a printed cap is never larger than the real one", () => {
+    expect(decimalMegabytes(999_999)).toBe("0.9 MB");
+    expect(binaryMegabytes(1_000_000)).toBe("0.9 MB");
   });
 
   it("should keep one decimal for a part", () => {
