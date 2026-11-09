@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { SENDIR_DAILY_RECIPIENTS } from "@/lib/email/budget-rules";
 
+import { magicLinkChecks } from "@/lib/auth/magic-link-limits";
+
 import { rateLimits, type RateLimitName } from "./limits";
+import type { RateLimitCheck } from "./rate-limit";
 import { decideRateLimit, windowStart } from "./rate-limit-window";
 
 /*
@@ -41,6 +44,34 @@ function allowedOnceFull(names: readonly RateLimitName[], periodSeconds: number)
   return allowed;
 }
 
+/**
+ * Replays sign-in requests the way the sign-in route counts them
+ * (hitRateLimits): every request is counted against every limit, refused or
+ * not, and passes only when every limit allowed it. Returns how many passed.
+ */
+function replay(requests: readonly { atMs: number; checks: readonly RateLimitCheck[] }[]): number {
+  const counts = new Map<string, number>();
+  const key = (check: RateLimitCheck, start: number) => `${check.name}:${check.subject}:${String(start)}`;
+  let allowed = 0;
+  for (const { atMs, checks } of requests) {
+    const fits = checks.every((check) => {
+      const { limit, windowSeconds } = rateLimits[check.name];
+      const windowMs = windowSeconds * 1000;
+      const current = windowStart(atMs, windowMs);
+      return decideRateLimit({ previous: counts.get(key(check, current - windowMs)) ?? 0, current: counts.get(key(check, current)) ?? 0, nowMs: atMs, windowMs, limit }).allowed;
+    });
+    for (const check of checks) {
+      const start = windowStart(atMs, rateLimits[check.name].windowSeconds * 1000);
+      counts.set(key(check, start), (counts.get(key(check, start)) ?? 0) + 1);
+    }
+    if (fits) allowed += 1;
+  }
+  return allowed;
+}
+
+/** Some time well inside a window, so a test does not depend on where the windows start. */
+const start = 1_800_000_000_000 + 7_000;
+
 /** Retry-After right after a burst fills a fresh window, the longest wait a refused visitor sees. */
 function longestWait(name: RateLimitName): number {
   const { limit, windowSeconds } = rateLimits[name];
@@ -53,12 +84,38 @@ describe("sign-in link limits", () => {
   });
 
   it("should let one network spend at most a tenth of the daily email cap when it floods", () => {
-    const perDay = allowedOnceFull(["magicLinkByNetwork", "magicLinkByNetworkDay"], daySeconds);
+    const perDay = allowedOnceFull(["magicLinkByNetworkMinute", "magicLinkByNetwork", "magicLinkByNetworkDay"], daySeconds);
     expect(perDay).toBeLessThanOrEqual(SENDIR_DAILY_RECIPIENTS / 10);
   });
 
-  it("should let 10 people behind one shared address ask for a link at once when they sign in together", () => {
-    expect(rateLimits.magicLinkByNetwork.limit).toBeGreaterThanOrEqual(10);
+  it("should send at most 2 links when one network asks for 5 made-up addresses at one domain within 2 seconds", () => {
+    const burst = [1, 2, 3, 4, 5].map((n) => ({ atMs: start + n * 400, checks: magicLinkChecks("net", `probe${String(n)}@example.net`) }));
+    expect(replay(burst)).toBe(2);
+  });
+
+  it("should send at most 2 links a minute when one network asks for a new address every second", () => {
+    const flood = Array.from({ length: 60 }, (_, n) => ({ atMs: start + n * 1000, checks: magicLinkChecks("net", `flood${String(n)}@example.net`) }));
+    expect(replay(flood)).toBeLessThanOrEqual(2);
+  });
+
+  it("should send one address at most 1 link a minute when it is asked for every 5 seconds from different networks", () => {
+    const flood = Array.from({ length: 12 }, (_, n) => ({ atMs: start + n * 5000, checks: magicLinkChecks(`net${String(n)}`, "ada@example.com") }));
+    expect(replay(flood)).toBe(1);
+  });
+
+  it("should let 10 people behind one shared address sign in within 10 minutes when they ask one a minute", () => {
+    const people = Array.from({ length: 10 }, (_, n) => ({ atMs: start + n * 60_000, checks: magicLinkChecks("office", `person${String(n)}@example.com`) }));
+    expect(replay(people)).toBe(10);
+  });
+
+  it("should let 2 people behind one shared address ask for links at the same moment", () => {
+    const pair = ["ann@example.com", "bob@example.com"].map((email) => ({ atMs: start, checks: magicLinkChecks("office", email) }));
+    expect(replay(pair)).toBe(2);
+  });
+
+  it("should make a refused burst wait about a minute when it hit the one-minute window", () => {
+    expect(longestWait("magicLinkByNetworkMinute")).toBeLessThanOrEqual(2 * 60);
+    expect(longestWait("magicLinkByEmailMinute")).toBeLessThanOrEqual(2 * 60);
   });
 
   it("should make a refused network wait under 20 minutes when it hit the short window", () => {

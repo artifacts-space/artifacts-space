@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * verifier); it needs a database, so it is not exercised here.
  */
 
-const mocks = vi.hoisted(() => ({ handler: vi.fn<(request: Request) => Promise<Response>>(), hitRateLimit: vi.fn(), hitRateLimits: vi.fn() }));
+const mocks = vi.hoisted(() => ({ handler: vi.fn<(request: Request) => Promise<Response>>(), hitRateLimit: vi.fn(), hitRateLimits: vi.fn<(checks: readonly { name: string; subject: string }[]) => Promise<unknown>>() }));
 
 vi.mock("@/lib/auth/server", () => ({ getAuth: () => ({ handler: mocks.handler }) }));
 vi.mock("@/lib/abuse/rate-limit", () => ({ hitRateLimit: mocks.hitRateLimit, hitRateLimits: mocks.hitRateLimits, rateLimitMessage: () => "Slow down." }));
@@ -82,5 +82,56 @@ describe("auth route CORS", () => {
     const introspect = OPTIONS(new Request(`${site}/api/auth/oauth2/introspect`, { method: "OPTIONS" }));
     expect(introspect.status).toBe(204);
     expect(introspect.headers.get("access-control-allow-origin")).toBeNull();
+  });
+});
+
+describe("auth route sign-in links", () => {
+  function signIn(email: string) {
+    return new Request(`${site}/api/auth/sign-in/magic-link`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.7" },
+      body: JSON.stringify({ email, callbackURL: `${site}/app` }),
+    });
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.stubEnv("BETTER_AUTH_SECRET", "test-secret");
+    mocks.handler.mockImplementation(() => Promise.resolve(Response.json({ status: true })));
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("should check the burst limits by network and by address when a link is asked for", async () => {
+    mocks.hitRateLimits.mockResolvedValue(null);
+    const response = await POST(signIn("Ada@Example.com"));
+    expect(response.status).toBe(200);
+    const checks = mocks.hitRateLimits.mock.lastCall?.[0] ?? [];
+    expect(checks.map((check) => check.name)).toEqual(["magicLinkByNetworkMinute", "magicLinkByNetwork", "magicLinkByNetworkDay", "magicLinkByEmailMinute", "magicLinkByEmail"]);
+    expect(JSON.stringify(checks)).not.toContain("ada");
+    expect(JSON.stringify(checks)).not.toContain("203.0.113.7");
+    expect(mocks.handler).toHaveBeenCalledOnce();
+  });
+
+  it("should refuse with 429 and never send the link when a limit refuses", async () => {
+    mocks.hitRateLimits.mockResolvedValue({ name: "magicLinkByNetworkMinute", retryAfterSeconds: 42 });
+    const response = await POST(signIn("probe3@example.net"));
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("42");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({ code: "RATE_LIMITED", message: "Slow down." });
+    expect(mocks.handler).not.toHaveBeenCalled();
+  });
+
+  it("should give the same refusal for every address when the network is over its limit", async () => {
+    mocks.hitRateLimits.mockResolvedValue({ name: "magicLinkByNetworkMinute", retryAfterSeconds: 42 });
+    const answers = await Promise.all(["member@example.com", "nobody@example.com"].map(async (email) => {
+      const response = await POST(signIn(email));
+      return { status: response.status, body: await response.text(), retryAfter: response.headers.get("retry-after") };
+    }));
+    expect(answers[0]).toEqual(answers[1]);
+    expect(mocks.handler).not.toHaveBeenCalled();
   });
 });
