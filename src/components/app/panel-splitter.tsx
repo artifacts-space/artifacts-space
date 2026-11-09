@@ -81,7 +81,11 @@ function useMeasured(initial: PanelMeasure, measure: () => PanelMeasure | null, 
 export function PanelSplitter({ panel, label, controls, orientation, measure, watch, initial, className }: PanelSplitterProps) {
   const { value, setValue, measured } = useMeasured(initial, measure, watch);
   const [dragging, setDragging] = useState(false);
-  /** Set once the keyboard moves a handle the pointer focused, which :focus-visible never matches. */
+  /**
+   * Whether the keyboard is driving the handle, which alone draws the brand line: set by keyboard focus and by
+   * the resize keys, cleared by a pointer press and on blur. :focus-visible is decided once, at focus, so it
+   * misses arrow keys after a drag and stays on through a drag after Tab.
+   */
   const [keyboard, setKeyboard] = useState(false);
   const drag = useRef<Drag | null>(null);
   const hintId = useId();
@@ -105,11 +109,11 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
     const now = measure();
     if (!now) return;
     event.preventDefault();
-    setKeyboard(false);
     event.currentTarget.setPointerCapture(event.pointerId);
-    // A pointer focuses the handle for the keyboard after it, without the keyboard focus line.
-    // Browsers without this option (before Chrome 144, Safari 18.4) ignore it and may show the line after a click.
+    // A pointer focuses the handle for the keyboard after it, without the keyboard focus style. Browsers
+    // without this option (before Chrome 144, Safari 18.4) ignore it, so the flag is cleared after focusing.
     event.currentTarget.focus({ preventScroll: true, focusVisible: false });
+    setKeyboard(false);
     drag.current = { pointerId: event.pointerId, origin: along(event, orientation), start: now.size, bounds: now.bounds, size: null };
     document.documentElement.style.cursor = cursors[orientation];
     setDragging(true);
@@ -148,6 +152,10 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
     if (next === now.size) return;
     show(next, now.bounds);
     unsaved.current = next;
+  }
+
+  function onFocus(event: React.FocusEvent<HTMLDivElement>) {
+    setKeyboard(event.currentTarget.matches(":focus-visible"));
   }
 
   function onBlur() {
@@ -194,6 +202,7 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
       onLostPointerCapture={endDrag}
       onKeyDown={onKeyDown}
       onKeyUp={saveKeyboardSize}
+      onFocus={onFocus}
       onBlur={onBlur}
       onDoubleClick={reset}
       className={cn(
@@ -201,12 +210,12 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
         // The line is the only mark: invisible at rest (the border shows), a quiet bar on hover and while dragging,
         // and a thicker brand bar from the keyboard. A ring around the handle would box its whole grab area.
         // Forced colors drop the bar's background, so there keyboard focus gets an outline instead.
-        "after:absolute after:bg-transparent after:transition-colors hover:after:bg-foreground/20 data-[dragging]:after:bg-foreground/30 focus-visible:after:bg-brand data-[keyboard]:after:bg-brand",
-        "forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-solid forced-colors:data-[keyboard]:outline-2 forced-colors:data-[keyboard]:outline-solid",
+        "after:absolute after:bg-transparent after:transition-colors hover:after:bg-foreground/20 data-[dragging]:after:bg-foreground/30 data-[keyboard]:after:bg-brand",
+        "forced-colors:data-[keyboard]:outline-2 forced-colors:data-[keyboard]:outline-solid",
         orientation === "vertical"
           // A vertical handle sits just past its panel's edge, so its line runs along the handle's start, on the border.
-          ? "cursor-col-resize after:inset-y-0 after:left-0 after:w-0.5 focus-visible:after:w-1 data-[keyboard]:after:w-1"
-          : "cursor-row-resize after:inset-x-0 after:top-1/2 after:h-0.5 after:-translate-y-1/2 focus-visible:after:h-1 data-[keyboard]:after:h-1",
+          ? "cursor-col-resize after:inset-y-0 after:left-0 after:w-0.5 data-[keyboard]:after:w-1"
+          : "cursor-row-resize after:inset-x-0 after:top-1/2 after:h-0.5 after:-translate-y-1/2 data-[keyboard]:after:h-1",
         className,
       )}
     />

@@ -117,6 +117,7 @@ test.describe("desktop", () => {
     expect(await widthOf(sidebar(page))).toBe(400);
     // A drag focuses the handle for the keyboard, but never shows the keyboard focus line or a ring.
     await expect(handle).toBeFocused();
+    await expect(handle).not.toHaveAttribute("data-keyboard");
     expect(await lineColor(handle)).not.toBe(await brandColor(page));
     expect(await handle.evaluate((element) => getComputedStyle(element).boxShadow)).toBe("none");
     await expect(handle).toHaveAttribute("aria-valuenow", "400");
@@ -153,6 +154,13 @@ test.describe("desktop", () => {
     // The line fades between colors, so wait for it to settle on the brand.
     await expect.poll(() => lineColor(handle)).toBe(brand);
     expect(await handle.evaluate((element) => getComputedStyle(element).boxShadow)).toBe("none");
+    // A pointer press hands the handle back to the pointer, and leaving it clears the keyboard state.
+    await dragBy(page, handle, 16, 0);
+    await expect(handle).not.toHaveAttribute("data-keyboard");
+    await handle.press("ArrowLeft");
+    await expect(handle).toHaveAttribute("data-keyboard", "");
+    await handle.blur();
+    await expect(handle).not.toHaveAttribute("data-keyboard");
     const scroll = await pageScroll(page);
     expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.clientWidth + 1);
   });
