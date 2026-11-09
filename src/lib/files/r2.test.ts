@@ -128,7 +128,7 @@ describe("readObject", () => {
 
   it("should refuse an object larger than the caller expects", async () => {
     answer(new Uint8Array([1, 2, 3, 4]), 200);
-    await expect(readObject(config, key, 3)).rejects.toThrow("R2 GET failed");
+    await expect(readObject(config, key, 3)).rejects.toThrow("R2 GET failed with status 413.");
   });
 
   it("should throw without details when R2 refuses", async () => {

@@ -182,9 +182,10 @@ export function parseTeamIconKey(teamId: string, key: string | null | undefined)
 }
 
 /**
- * The page URL that checks the viewer is in the team and redirects to a
- * short-lived link, or null when the team has no icon. The `v` changes with
- * every new icon, so browsers never show an old one.
+ * The URL of the members-only route that checks the viewer is in the team
+ * and answers with the icon, or null when the team has no icon. The `v`
+ * changes with every new icon, so the browser may keep the answer for a day
+ * (teamIconCacheControl) and still shows a replaced icon at once.
  */
 export function teamIconUrl(teamId: string, key: string | null | undefined): string | null {
   const parsed = parseTeamIconKey(teamId, key);

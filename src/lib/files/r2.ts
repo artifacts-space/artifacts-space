@@ -204,9 +204,10 @@ export async function readObject(config: R2Config, key: string, maxBytes: number
   const response = await send(config, "GET", "GET", key);
   if (response.status === 404) return null;
   if (!response.ok) throw new R2Error("GET", response.status);
-  if (Number(response.headers.get("content-length") ?? "0") > maxBytes) throw new R2Error("GET", response.status);
+  // 413 (too large), not R2's 200, so a size refusal never reads as an R2 outage in the logs.
+  if (Number(response.headers.get("content-length") ?? "0") > maxBytes) throw new R2Error("GET", 413);
   const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.length > maxBytes) throw new R2Error("GET", response.status);
+  if (bytes.length > maxBytes) throw new R2Error("GET", 413);
   return bytes;
 }
 

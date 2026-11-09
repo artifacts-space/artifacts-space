@@ -157,11 +157,11 @@ describe("team icon limits", () => {
     expect(replay(iconRequests(500 * 100, (index) => `member-${String(index % 500)}`))).toBe(50_000);
   });
 
-  it("should cap one account at its own limit when it scrapes icons", () => {
-    expect(replay(iconRequests(20_000, () => "scraper"))).toBeLessThanOrEqual(rateLimits.teamIconByUser.limit);
+  it("should let one scraping account through exactly its own limit and refuse the rest", () => {
+    expect(replay(iconRequests(20_000, () => "scraper"))).toBe(rateLimits.teamIconByUser.limit);
   });
 
-  it("should cap many accounts or signed-out requests from one address at the network backstop", () => {
-    expect(replay(iconRequests(100_000, (index) => (index % 2 === 0 ? null : `account-${String(index % 1000)}`)))).toBeLessThanOrEqual(rateLimits.teamIconByNetwork.limit);
+  it("should let many accounts or signed-out requests from one address through exactly the network backstop", () => {
+    expect(replay(iconRequests(100_000, (index) => (index % 2 === 0 ? null : `account-${String(index % 1000)}`)))).toBe(rateLimits.teamIconByNetwork.limit);
   });
 });
