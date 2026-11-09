@@ -8,7 +8,7 @@ import { team, teamMember } from "@/db/schema";
 import { deleteObject, putObject, R2Error, r2ConfigFromEnv, streamObject, type ObjectStream } from "@/lib/files/r2";
 import { UserFacingError } from "@/lib/user-facing-error";
 
-import { checkTeamIconBytes, parseTeamIconKey, TEAM_ICON_STORED_MAX_BYTES, teamIconKey, type TeamIconType } from "./team-icon-rules";
+import { checkTeamIconBytes, parseTeamIconKey, TEAM_ICON_UPLOAD_MAX_BYTES, teamIconKey, type TeamIconType } from "./team-icon-rules";
 
 /**
  * Team icons in R2. The rules (team-icon-rules.ts) decide what is accepted
@@ -115,13 +115,15 @@ export async function memberTeamIcon(viewerId: string, teamId: string): Promise<
 }
 
 /**
- * Opens a stored icon, or null when it is gone or over the stored cap. Icons
- * stored before the 512 KB cap could be up to 2 MB; those show the team's
- * letter (the route's 404) until someone uploads a new one, never an error.
+ * Opens a stored icon, or null when it is gone or over the upload cap
+ * (TEAM_ICON_UPLOAD_MAX_BYTES, 1 MB). Icons stored before that cap could be
+ * up to 2 MB; those show the team's letter (the route's 404) until someone
+ * uploads a new one, never an error. The cap also bounds what one request
+ * costs, since the route streams the bytes itself.
  */
 async function openStoredIcon(key: string): Promise<ObjectStream | null> {
   try {
-    return await streamObject(r2ConfigFromEnv(), key, TEAM_ICON_STORED_MAX_BYTES);
+    return await streamObject(r2ConfigFromEnv(), key, TEAM_ICON_UPLOAD_MAX_BYTES);
   } catch (error) {
     if (!(error instanceof R2Error) || error.status !== 413) throw error;
     console.error("[team-icon] A stored icon is over the size cap", error.name);

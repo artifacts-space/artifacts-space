@@ -106,11 +106,11 @@ describe("removeTeamIcon", () => {
 describe("memberTeamIcon", () => {
   const object = { body: new ReadableStream<Uint8Array>(), size: 3 };
 
-  it("should stream the icon for a member of the team, capped at 512 KB, with the id its URL carries", async () => {
+  it("should stream the icon for a member of the team, capped at the 1 MB upload cap, with the id its URL carries", async () => {
     mocks.limit.mockResolvedValue([{ logo: oldKey }]);
     mocks.streamObject.mockResolvedValue(object);
     expect(await memberTeamIcon("user-1", "team-1")).toEqual({ ...object, type: "image/png", id: "7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a" });
-    expect(mocks.streamObject).toHaveBeenCalledWith(expect.anything(), oldKey, 524_288);
+    expect(mocks.streamObject).toHaveBeenCalledWith(expect.anything(), oldKey, 1_000_000);
   });
 
   it("should never read the icon for someone outside the team or for a personal team, which the query returns no row for", async () => {
@@ -131,7 +131,7 @@ describe("memberTeamIcon", () => {
     expect(mocks.streamObject).not.toHaveBeenCalled();
   });
 
-  it("should return null, so the team letter shows, when a stored icon is over the 512 KB cap", async () => {
+  it("should return null, so the team letter shows, when a stored icon is over the 1 MB cap", async () => {
     mocks.limit.mockResolvedValue([{ logo: oldKey }]);
     mocks.streamObject.mockRejectedValue(new R2Error("GET", 413));
     expect(await memberTeamIcon("user-1", "team-1")).toBeNull();

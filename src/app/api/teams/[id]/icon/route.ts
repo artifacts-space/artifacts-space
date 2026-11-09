@@ -59,7 +59,7 @@ function iconResponse(icon: MemberTeamIcon, requestedVersion: string | null) {
  * Shows a team's icon to signed-in members of that team. Everyone else
  * (signed out, not in the team, agents' tokens) and every team without an
  * icon gets the same 404, so the route never says whether a team or its
- * icon exists. The bytes stream from R2 (at most 512 KB, never held in
+ * icon exists. The bytes stream from R2 (at most 1 MB, never held in
  * memory). When `v` names the current icon, the member's browser keeps it
  * for a day, so it is loaded about once a day, not on every page.
  */

@@ -41,8 +41,8 @@ export const rateLimits = {
    * about once a day. A page shows at most a few dozen icons; this still
    * covers 30 page loads an hour of 36 icons each with the cache off. The
    * route streams icons itself, so this also caps what one member costs:
-   * at most 1,200 x 512 KB (TEAM_ICON_STORED_MAX_BYTES), about 600 MB an
-   * hour, where a real icon is a few KB.
+   * at most 1,200 x 1 MB (TEAM_ICON_UPLOAD_MAX_BYTES), about 1.2 GB an
+   * hour, where a real icon is a few dozen KB.
    */
   teamIconByUser: { limit: 1200, windowSeconds: hour },
   /**
@@ -50,8 +50,8 @@ export const rateLimits = {
    * for many accounts or signed-out requests from one address. A 500-person
    * office whose members each load 50 icons in one hour (more than a cold
    * cache on a busy morning) makes 25,000, under this. Worst case it lets
-   * one address pull about 15 GB an hour of 512 KB icons, and only with 25
-   * or more accounts each at its own 1,200 limit; real icons are a few KB.
+   * one address pull about 30 GB an hour of 1 MB icons, and only with 25 or
+   * more accounts each at its own 1,200 limit; real icons are a few dozen KB.
    */
   teamIconByNetwork: { limit: 30_000, windowSeconds: hour },
   /** Artifact page views (/artifact/<id>) per network address per hour. */

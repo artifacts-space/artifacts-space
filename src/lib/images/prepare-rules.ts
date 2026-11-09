@@ -1,4 +1,5 @@
 import { COVER_MAX_BYTES } from "@/lib/files/cover-rules";
+import { binaryMegabytes } from "@/lib/format-bytes";
 import { ICON_MAX_BYTES } from "@/lib/files/icon-rules";
 
 /**
@@ -47,11 +48,6 @@ export const IMAGE_SOURCE_ACCEPT = "image/png,image/jpeg,image/gif,image/webp,im
 
 const useNames: Record<ImagePrepareProfile["use"], string> = { cover: "a cover", icon: "an icon" };
 
-/** A byte cap as people read it, such as "2 MB". */
-export function megabytes(bytes: number): string {
-  return `${String(Math.round((bytes / 1_048_576) * 10) / 10)} MB`;
-}
-
 /** True when the picked file is a HEIC or HEIF photo (by type, or by name when the browser gives no type). */
 export function isHeic(file: { type: string; name: string }): boolean {
   return file.type === "image/heic" || file.type === "image/heif" || (file.type === "" && heicName.test(file.name));
@@ -64,7 +60,7 @@ export function isHeic(file: { type: string; name: string }): boolean {
 export function imageSourceProblem(file: { type: string; name: string; size: number }, profile: ImagePrepareProfile): string | null {
   if (!sourceTypes.has(file.type) && !isHeic(file)) return `That file cannot be ${useNames[profile.use]}. Pick a photo or image: JPEG, PNG, GIF, WebP, AVIF, or HEIC.`;
   if (file.size === 0) return "That file is empty. Pick another image.";
-  if (file.size > IMAGE_SOURCE_MAX_BYTES) return `That image is too large to prepare. Pick one under ${megabytes(IMAGE_SOURCE_MAX_BYTES)}.`;
+  if (file.size > IMAGE_SOURCE_MAX_BYTES) return `That image is too large to prepare. Pick one under ${binaryMegabytes(IMAGE_SOURCE_MAX_BYTES)}.`;
   return null;
 }
 

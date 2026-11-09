@@ -1,3 +1,4 @@
+import { binaryMegabytes } from "@/lib/format-bytes";
 import {
   hasTransparentPixel,
   imageJpegQualities,
@@ -5,7 +6,6 @@ import {
   imageTargetSize,
   isHeic,
   mayHaveAlpha,
-  megabytes,
   preparedFilename,
   type ImagePrepareProfile,
 } from "@/lib/images/prepare-rules";
@@ -134,7 +134,7 @@ export async function prepareImage(file: File, profile: ImagePrepareProfile, env
     surface.draw(image, !checkAlpha);
     const hasAlpha = checkAlpha && hasTransparentPixel(surface.pixels());
     const encoded = await encodeWithin(surface, image, imageOutputType(file, hasAlpha, profile), profile.maxBytes);
-    if (!encoded) throw new Error(`That image is still over ${megabytes(profile.maxBytes)} after resizing. Try a smaller image.`);
+    if (!encoded) throw new Error(`That image is still over ${binaryMegabytes(profile.maxBytes)} after resizing. Try a smaller image.`);
     return new File([encoded.blob], preparedFilename(file.name, encoded.type, profile.use), { type: encoded.type });
   } finally {
     image.close();
