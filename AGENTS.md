@@ -70,6 +70,13 @@ email, and R2 clients on first request, never at import time. CodeQL scans
 the code and the workflows. Dependabot opens grouped weekly updates and waits
 two weeks after a release.
 
+Vercel skips some preview builds (`ignoreCommand` in `vercel.json`, rules in
+`scripts/vercel-ignore-build-rules.mts`): merge queue branches, and previews
+whose changes since the last deploy touch only files the app never reads
+(root docs such as `README.md`, `.github/**`, `docs/images/**`). Production
+always builds, because it applies the migrations. Before you add a path to
+that list, check that the app never reads it at build or run time.
+
 Actions are pinned to full commit SHAs with a version comment. Workflows get
 `contents: read` unless a job needs more, and never use
 `pull_request_target`.

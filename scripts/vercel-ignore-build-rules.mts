@@ -58,6 +58,9 @@ function namePaths(paths: readonly string[]): string {
 export function decideBuild({ env, changedFiles }: BuildInput): BuildDecision {
   if (env.VERCEL_ENV === "production") return { build: true, reason: "Production builds always run: they apply the database migrations." };
   if (env.VERCEL_ENV !== "preview") return { build: true, reason: `Building: unknown environment "${env.VERCEL_ENV ?? ""}".` };
+  // Merge queue previews are skipped by decision: CI's Build job catches compile errors there, and anything
+  // that only fails with Vercel's real environment shows on the production deploy, where the old deployment
+  // keeps serving until a build succeeds.
   if (env.VERCEL_GIT_COMMIT_REF?.startsWith(MERGE_QUEUE_PREFIX)) {
     return { build: false, reason: "Skipping: merge queue branch. CI checks it, and main deploys after the merge." };
   }

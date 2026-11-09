@@ -17,29 +17,35 @@ function failureDetail(error: unknown): string {
   return text.trim().split("\n")[0] ?? "unknown error";
 }
 
-/** Runs git in `cwd` and returns its output, or null when it fails. The failure goes to the build log. */
-function git(cwd: string, args: readonly string[]): string | null {
+/**
+ * Runs git in `cwd` and returns its output, or null when it fails. A failure
+ * goes to the build log unless `quiet` (an expected miss, such as probing for
+ * a commit the shallow clone may not have).
+ */
+function git(cwd: string, args: readonly string[], options: { quiet?: boolean } = {}): string | null {
   try {
     return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: GIT_TIMEOUT_MS });
   } catch (error) {
-    console.error(`git ${args[0] ?? ""} failed: ${failureDetail(error)}`);
+    if (!options.quiet) console.error(`git ${args[0] ?? ""} failed: ${failureDetail(error)}`);
     return null;
   }
 }
 
 function hasCommit(cwd: string, sha: string): boolean {
-  return git(cwd, ["cat-file", "-e", `${sha}^{commit}`]) !== null;
+  return git(cwd, ["cat-file", "-e", `${sha}^{commit}`], { quiet: true }) !== null;
 }
 
 /**
  * Makes sure `sha` is in the clone. Vercel clones shallowly, so an older
- * deployed commit may be missing; fetch just that commit. False when it
- * still cannot be found.
+ * deployed commit may be missing; fetch just that commit. False, with a line
+ * in the build log, when it still cannot be found.
  */
 function ensureCommit(cwd: string, sha: string): boolean {
   if (hasCommit(cwd, sha)) return true;
   if (git(cwd, ["fetch", "--quiet", "--no-tags", "--depth=1", "origin", sha]) === null) return false;
-  return hasCommit(cwd, sha);
+  if (hasCommit(cwd, sha)) return true;
+  console.error(`Commit ${sha} is still missing after fetching it.`);
+  return false;
 }
 
 /**
