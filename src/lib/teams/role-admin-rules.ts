@@ -93,6 +93,12 @@ export interface TargetWithRole extends TargetMember {
  * the Agent role and people never get it; nobody changes their own role;
  * the actor must hold everything both the old and the new role hold; and
  * the last owner stays an owner.
+ *
+ * This compares capabilities, not rank, on purpose: as before custom roles,
+ * an admin may make someone an admin and may demote another admin, because
+ * that grants nothing the admin does not hold. Editing what a role can do is
+ * different (editRoleProblem): it changes everyone with the role, so only
+ * roles below the actor's rank are editable. Only owners make or demote owners.
  */
 export function assignRoleProblem(actor: TeamActor | null, target: TargetWithRole, next: RoleGrant, ownerCount: number): string | null {
   if (!changesRoles(actor)) return "You cannot change roles in this team.";

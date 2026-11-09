@@ -97,6 +97,14 @@ test("should let an owner create, edit, and give a custom role, and log each cha
   await page.getByRole("menuitem", { name: "Remove from team" }).click();
   await page.getByRole("dialog", { name: "Remove Theme e2e?" }).getByRole("button", { name: "Remove" }).click();
   await expect(page.getByRole("table", { name: "Members" }).getByText("Theme e2e")).toHaveCount(0);
+
+  // Invitations pass the invite hook's role ceiling, which asks the same rule as the action.
+  const invitee = `invitee-${team.id.slice(0, 8)}@example.com`;
+  await page.getByRole("button", { name: "Invite people" }).click();
+  const invite = page.getByRole("dialog", { name: "Invite people" });
+  await invite.getByLabel("Email").fill(invitee);
+  await invite.getByRole("button", { name: "Send invitation" }).click();
+  await expect(page.getByRole("table", { name: "Members" }).locator("[data-member-row=invitation]")).toContainText(invitee);
 });
 
 test("should show the approval queue only to a custom role that may approve", async ({ page }) => {

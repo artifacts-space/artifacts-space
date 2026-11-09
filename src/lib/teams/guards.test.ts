@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { defaultActor, type BuiltInRoleKey } from "./capability-rules";
+import { builtInRoleKeys, builtInRoleNames, defaultActor, defaultRoleCapabilities, type BuiltInRoleKey, type TeamActor } from "./capability-rules";
 
 /*
  * The team update guard behind Better Auth's update hook. Every change to
@@ -9,15 +9,15 @@ import { defaultActor, type BuiltInRoleKey } from "./capability-rules";
  * and the membership lookup are mocked at the database boundary.
  */
 
-const mocks = vi.hoisted(() => ({ teamRow: vi.fn(), membership: vi.fn() }));
+const mocks = vi.hoisted(() => ({ teamRow: vi.fn(), membership: vi.fn(), access: vi.fn() }));
 
 vi.mock("@/db", () => ({
   getDb: () => ({ select: () => ({ from: () => ({ where: () => ({ limit: mocks.teamRow }) }) }) }),
 }));
-vi.mock("./queries", () => ({ getTeamMembershipById: mocks.membership }));
+vi.mock("./queries", () => ({ getTeamMembershipById: mocks.membership, getTeamAccessById: mocks.access }));
 vi.mock("./setup", () => ({ isHandleAvailable: vi.fn() }));
 
-const { assertTeamUpdateAllowed } = await import("./guards");
+const { assertCanInviteAs, assertTeamUpdateAllowed } = await import("./guards");
 
 const member = { organizationId: "team-1", userId: "user-1" };
 
@@ -70,5 +70,38 @@ describe("assertTeamUpdateAllowed", () => {
   it("should let an owner change the sharing rule and store nothing else", async () => {
     actingAs("owner");
     await expect(assertTeamUpdateAllowed({ teamSharingNeedsApproval: false }, member)).resolves.toEqual({});
+  });
+});
+
+describe("assertCanInviteAs", () => {
+  const roles = new Map([
+    ...builtInRoleKeys.map((key): [string, { id: string; key: string; name: string; builtIn: boolean; capabilities: string[] }] => [key, { id: key, key, name: builtInRoleNames[key], builtIn: true, capabilities: [...defaultRoleCapabilities[key]] }]),
+  ]);
+  const recruiter: TeamActor = { roleKey: "recruiter", kind: "person", capabilities: ["members.invite", "analytics.view"] };
+
+  function inviter(actor: TeamActor) {
+    mocks.access.mockResolvedValue({ membership: { ...actor, id: "team-1", personal: false }, roles });
+  }
+
+  it("should refuse a custom role that may invite when it invites someone as Admin", async () => {
+    inviter(recruiter);
+    await expect(assertCanInviteAs("user-1", "team-1", "admin")).rejects.toThrow(/do no more than yours/);
+  });
+
+  it("should let a custom role that may invite invite someone as Member", async () => {
+    inviter(recruiter);
+    await expect(assertCanInviteAs("user-1", "team-1", "member")).resolves.toBeUndefined();
+  });
+
+  it("should refuse someone who may not invite, and a role the team does not have", async () => {
+    inviter(defaultActor("member"));
+    await expect(assertCanInviteAs("user-1", "team-1", "member")).rejects.toThrow();
+    inviter(defaultActor("owner"));
+    await expect(assertCanInviteAs("user-1", "team-1", "superuser")).rejects.toThrow("That role does not exist in this team.");
+  });
+
+  it("should refuse when the inviter is not in the team", async () => {
+    mocks.access.mockResolvedValue(null);
+    await expect(assertCanInviteAs("user-1", "team-1", "member")).rejects.toThrow();
   });
 });

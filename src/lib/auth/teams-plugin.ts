@@ -3,7 +3,7 @@ import { adminAc, defaultAc, memberAc, ownerAc } from "better-auth/plugins/organ
 
 import { assertMemberIsNotAgent } from "@/lib/auth/agent-guards";
 import { reconcileAfterDeparture } from "@/lib/auth/team-departure";
-import { assertInvitableRole, assertNotPersonal, assertTeamCapability, assertTeamUpdateAllowed, prepareNewTeam } from "@/lib/teams/guards";
+import { assertCanInviteAs, assertInvitableRole, assertNotPersonal, assertTeamCapability, assertTeamUpdateAllowed, prepareNewTeam } from "@/lib/teams/guards";
 import { sendTeamInvitationEmail } from "@/lib/teams/invitation-email";
 import { assertCanCreateTeam, assertCanInvite } from "@/lib/teams/invitation-limits";
 import { teamLimits } from "@/lib/teams/limits";
@@ -97,7 +97,7 @@ export function teamsPlugin() {
       beforeCreateInvitation: async ({ invitation, inviter, organization: team }) => {
         assertNotPersonal(team, "invite people");
         assertInvitableRole(invitation.role);
-        await assertTeamCapability(inviter.id, team.id, "members.invite");
+        await assertCanInviteAs(inviter.id, team.id, invitation.role);
         await assertCanInvite(inviter.id, team.id);
       },
       beforeCancelInvitation: async ({ cancelledBy, organization: team }) => {

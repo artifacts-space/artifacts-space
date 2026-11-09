@@ -7,7 +7,8 @@ import { team } from "@/db/schema";
 import { cleanHandleInput, validateHandle } from "@/lib/handles";
 
 import { can, type TeamCapability } from "./capability-rules";
-import { getTeamMembershipById } from "./queries";
+import { getTeamAccessById, getTeamMembershipById } from "./queries";
+import { inviteProblem } from "./role-admin-rules";
 import { assignableRoles } from "./roles";
 import { isHandleAvailable } from "./setup";
 
@@ -68,6 +69,18 @@ export async function assertTeamUpdateAllowed(update: Record<string, unknown>, m
   if (changing.length > 0) await assertTeamCapability(member.userId, member.organizationId, "settings.sharing");
   if (changing.includes("name")) return { name: cleanTeamName(update.name) };
   return {};
+}
+
+/**
+ * Refuses an invitation unless the inviter may invite people and the role
+ * does no more than theirs (inviteProblem), the same rule as the invite
+ * action, so Better Auth's hook fails closed on its own. Fails closed.
+ */
+export async function assertCanInviteAs(inviterId: string, teamId: string, roleKey: string) {
+  const access = await getTeamAccessById(inviterId, teamId);
+  const role = access?.roles.get(roleKey);
+  const problem = role ? inviteProblem(access?.membership ?? null, { key: role.key, capabilities: role.capabilities }) : "That role does not exist in this team.";
+  if (problem) reject(problem);
 }
 
 /** Refuses a Better Auth call unless the acting user is a person in the team who holds `capability`. Fails closed. */
