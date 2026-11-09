@@ -1,3 +1,5 @@
+import type { ArtifactKind } from "@/lib/artifact-types";
+
 /**
  * Page width for one artifact, like Notion's "Full width": contained (the
  * default) keeps today's reading width; full width uses the whole window,
@@ -50,11 +52,11 @@ export function editColumnClass(fullWidth: boolean): string {
  * always does, whatever its Full width setting, as a sheet does in a
  * spreadsheet app; every other kind follows the setting.
  */
-export function usesFullWidth(kind: string, fullWidth: boolean): boolean {
+export function usesFullWidth(kind: ArtifactKind, fullWidth: boolean): boolean {
   return fullWidth || kind === "csv";
 }
 
 /** Whether the Full width setting does anything for this kind: it does not for a CSV, which is always full width. */
-export function hasWidthSetting(kind: string): boolean {
+export function hasWidthSetting(kind: ArtifactKind): boolean {
   return kind !== "csv";
 }

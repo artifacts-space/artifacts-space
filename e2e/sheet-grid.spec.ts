@@ -75,13 +75,12 @@ test("should span the window and fill it to the bottom when a CSV opens on its p
     return { left: box.left, right: window.innerWidth - box.right, bottom: window.innerHeight - box.bottom, width: box.width, window: window.innerWidth };
   });
   // It ends just above the bottom of the window, once the heading above it has settled.
-  await expect.poll(async () => (await measure()).bottom).toBeLessThanOrEqual(40);
+  await expect.poll(async () => { const { bottom } = await measure(); return bottom >= 0 && bottom <= 40; }).toBe(true);
   const sizes = await measure();
   // Full width: only the page's side padding is left, never the 960px column.
   expect(sizes.left).toBeLessThanOrEqual(64);
   expect(sizes.right).toBeLessThanOrEqual(64);
   expect(sizes.width).toBeGreaterThan(sizes.window - 130);
-  expect(sizes.bottom).toBeGreaterThanOrEqual(0);
   // The grid has no card around it.
   expect(await grid.evaluate((element) => getComputedStyle(element).boxShadow)).toBe("none");
 });

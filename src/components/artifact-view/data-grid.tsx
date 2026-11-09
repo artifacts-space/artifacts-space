@@ -79,14 +79,19 @@ function headerDragProps(props: DataGridProps, dragging: ReturnType<typeof useCo
   };
 }
 
-/** Gives a hovered cell its full value as a tooltip, only when the cell cuts its text off. */
+/**
+ * Gives a hovered cell its full value as a tooltip, only when the cell cuts
+ * its text off. It writes the title on the DOM node outside React: rows are
+ * reused as the sheet scrolls, so this hover check is what keeps the title
+ * true, rewriting or removing it every time the pointer comes over a cell.
+ */
 function showClippedTitle(event: MouseEvent) {
   if (!(event.target instanceof Element)) return;
   const cell = event.target.closest<HTMLElement>("[role=gridcell]");
   const text = cell?.querySelector<HTMLElement>(":scope > .truncate");
   if (!cell || !text) return;
-  const clipped = text.scrollWidth > text.clientWidth;
-  if (clipped) cell.title = text.textContent;
+  const value = text.textContent;
+  if (value && text.scrollWidth > text.clientWidth) cell.title = value;
   else cell.removeAttribute("title");
 }
 
