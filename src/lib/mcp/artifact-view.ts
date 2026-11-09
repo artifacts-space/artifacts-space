@@ -127,12 +127,13 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
 /**
  * Maps a full DTO to the agent-facing shape, with its content. `reader`
  * says whether the connection may edit it: a CSV whose owner turned
- * downloads off comes without its content to one that cannot, as the
- * Markdown and raw versions do (mayExportCsv). Writes pass canEdit: true,
- * since only editors write.
+ * downloads off comes without its content, and without its file list, to
+ * one that cannot, as the Markdown and raw versions do (mayExportCsv): an
+ * attached file may hold the same export. Writes pass canEdit: true, since
+ * only editors write.
  */
 export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext, reader: { canEdit: boolean }): McpArtifact {
-  if (!mayExportCsv(reader, dto)) return { ...toMcpShape(dto, context), content: "", contentWithheld: csvDownloadOffNote };
+  if (!mayExportCsv(reader, dto)) return { ...toMcpShape(dto, context), content: "", files: [], contentWithheld: csvDownloadOffNote };
   return { ...toMcpShape(dto, context), content: dto.content };
 }
 

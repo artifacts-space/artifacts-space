@@ -70,14 +70,20 @@ describe("setCsvDownload", () => {
   });
 
   it.each([["owner"], ["admin"]] as const)("should turn downloads on when a team %s asks", async (role) => {
-    mocks.membership.mockResolvedValue(defaultActor(role));
+    mocks.membership.mockResolvedValue({ ...defaultActor(role), personal: false });
     await expect(turnOn("lead")).resolves.toMatchObject({ allowCsvDownload: true });
   });
 
+  it("should look nothing up beyond the artifact when the author asks", async () => {
+    await expect(turnOn(author)).resolves.toMatchObject({ allowCsvDownload: true });
+    expect(mocks.membership).not.toHaveBeenCalled();
+    expect(mocks.actsForAuthor).not.toHaveBeenCalled();
+  });
+
   it.each([
-    ["a team member who may only edit", "teammate", () => { mocks.membership.mockResolvedValue(defaultActor("member")); }],
+    ["a team member who may only edit", "teammate", () => { mocks.membership.mockResolvedValue({ ...defaultActor("member"), personal: false }); }],
     ["a stranger", "stranger", () => undefined],
-    ["a team owner when the team is personal", "lead", () => { mocks.row = { ...mocks.row, personal: true }; mocks.membership.mockResolvedValue(defaultActor("owner")); }],
+    ["a team owner when the team is personal", "lead", () => { mocks.membership.mockResolvedValue({ ...defaultActor("owner"), personal: true }); }],
   ])("should refuse %s and write nothing", async (_who, actorId, arrange) => {
     arrange();
     await expect(turnOn(actorId)).rejects.toThrow("Artifact not found");

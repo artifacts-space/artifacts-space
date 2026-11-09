@@ -90,6 +90,7 @@ describe("toMcpArtifact for a CSV whose owner turned downloads off", () => {
     expect(view.contentWithheld).toContain("turned off downloads");
     expect(JSON.stringify(view)).not.toContain("s3cr3t-row");
     expect(view.allowCsvDownload).toBe(false);
+    expect(view.files, "an attached file may hold the same export").toEqual([]);
   });
 
   it("should give a team member's or the author's connection the content", () => {

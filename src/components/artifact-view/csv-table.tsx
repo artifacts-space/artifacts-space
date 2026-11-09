@@ -149,7 +149,7 @@ export function CsvTable({ content }: { content: string }) {
         total={parsed.rows.length}
         onResetOrder={sheet.customOrder ? sheet.resetOrder : null}
       />
-      <p id={hintId} className="sr-only">Use the arrow keys, Tab, and Enter to move between cells, and Shift with the arrows to select a block. Copy copies the selection. On a column header, press Enter to sort, or Alt and Down Arrow for filters. To leave the grid, press Escape, then Tab.</p>
+      <p id={hintId} className="sr-only">Use the arrow keys, Tab, and Enter to move between cells, and Shift with the arrows to select a block. {exportAllowed ? "Copy copies the selection." : "Copying is off for this sheet."} On a column header, press Enter to sort, or Alt and Down Arrow for filters. To leave the grid, press Escape, then Tab.</p>
       {/* While the owner keeps downloads off, the grid and the formula bar copy nothing for this reader. */}
       <div className="min-w-0" onCopyCapture={exportAllowed ? undefined : refuseCopy}>
       <SheetFormulaBar cell={`${String(active.row)}:${String(active.column)}`} place={selectionLabel(selection, (column) => name(dataColumn(column)), rowLabel)} value={valueAt(active)} onCommit={null} onDone={() => { gridOf(0)?.focus(); }} />

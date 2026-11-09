@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
-import { artifact, team } from "@/db/schema";
+import { artifact } from "@/db/schema";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { actsForAuthor } from "@/lib/agents/owner-access";
 import { getTeamMembershipById } from "@/lib/teams/queries";
@@ -23,15 +23,20 @@ const inputSchema = z.object({ actorId: z.string().min(1), artifactId: z.string(
 
 const notFoundMessage = "Artifact not found. Only its author and the team's owners and admins can change whether readers can download it.";
 
-/** Who may change it, from the database: the author, the agent's owner, or a team approver. People only. */
+/**
+ * Who may change it, from the database: the author, the agent's owner, or a
+ * team approver. People only. The author needs no lookup; everyone else
+ * costs the agent-owner check and one membership read, which also says
+ * whether the team is personal.
+ */
 async function mayChange(actorId: string, record: { userId: string; teamId: string | null }, actor: "person" | "agent"): Promise<boolean> {
   if (actor !== "person") return false;
-  const [forAuthor, membership, teamRow] = await Promise.all([
-    actorId === record.userId ? Promise.resolve(false) : actsForAuthor(actorId, record.userId),
+  if (actorId === record.userId) return true;
+  const [forAuthor, membership] = await Promise.all([
+    actsForAuthor(actorId, record.userId),
     record.teamId ? getTeamMembershipById(actorId, record.teamId) : Promise.resolve(null),
-    record.teamId ? getDb().select({ personal: team.personal }).from(team).where(eq(team.id, record.teamId)).limit(1) : Promise.resolve([]),
   ]);
-  return canChangeCsvDownload({ actorId, authorId: record.userId, actsForAuthor: forAuthor, member: membership, teamPersonal: teamRow[0]?.personal ?? null, actor });
+  return canChangeCsvDownload({ actorId, authorId: record.userId, actsForAuthor: forAuthor, member: membership, teamPersonal: membership?.personal ?? null, actor });
 }
 
 /** The saved setting, with the public id for the caller to refresh its page. */
@@ -59,6 +64,7 @@ export async function setCsvDownload(input: { actorId: string; artifactId: strin
     .update(artifact)
     .set({ allowCsvDownload: on })
     .where(and(eq(artifact.id, artifactId), eq(artifact.userId, record.userId)))
+    // The whole row: getDb() is a union of two clients, on which the column-list overload of returning() does not type.
     .returning();
   if (!updated) throw new UserFacingError(notFoundMessage);
   return { publicId: updated.publicId, allowCsvDownload: updated.allowCsvDownload };
