@@ -161,7 +161,7 @@ describe("layout classes", () => {
   it("should draw the Projects rows and the list inside the bounds the handle reports when a size is stored", () => {
     const { min, defaultSize, listMin, cssVar } = projectsPanel;
     expect(projectsRowsHeight).toContain(`lg:max-h-[var(${cssVar},${String(defaultSize)}px)]`);
-    expect(projectsRowsHeight).toContain(`lg:min-h-${String(min / 4)}`);
-    expect(listMinHeight).toBe(`lg:min-h-${String(listMin / 4)}`);
+    expect(projectsRowsHeight).toContain(`lg:min-h-[${String(min)}px]`);
+    expect(listMinHeight).toBe(`lg:min-h-[${String(listMin)}px]`);
   });
 });

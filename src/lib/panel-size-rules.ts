@@ -64,15 +64,15 @@ export const sidebarColumns = "lg:[grid-template-columns:clamp(272px,var(--works
 /** The sidebar handle's place in the workspace card from lg up: the same clamp as `sidebarColumns`, so it sits on the sidebar's edge. */
 export const sidebarHandleLeft = "lg:left-[clamp(272px,var(--workspace-sidebar-width,280px),min(520px,100%_-_480px))]";
 
-/** The Projects rows' height from lg up, mirroring `projectsPanel` (a unit test checks it); phones keep the fixed cap. */
-export const projectsRowsHeight = "max-h-48 lg:min-h-16 lg:max-h-[var(--workspace-projects-height,192px)]";
+/** The Projects rows' height from lg up, mirroring `projectsPanel` in pixels like the handle (a unit test checks it); phones keep the fixed cap. */
+export const projectsRowsHeight = "max-h-48 lg:min-h-[64px] lg:max-h-[var(--workspace-projects-height,192px)]";
 
 /**
  * The artifact list's floor from lg up, so the Projects rows never squeeze it
  * away (`projectsPanel.listMin`). On a window too short for every floor, the
  * sidebar scrolls instead of cutting off its footer.
  */
-export const listMinHeight = "lg:min-h-30";
+export const listMinHeight = "lg:min-h-[120px]";
 
 /** One arrow press moves a handle this far; with Shift held, `bigStep`. */
 export const step = 16;

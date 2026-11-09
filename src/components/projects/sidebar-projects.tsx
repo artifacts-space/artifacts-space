@@ -204,7 +204,7 @@ export function SidebarProjects({ dragging, ...rows }: SidebarProjectsProps) {
   const open = dragging || creating || (openChoice ?? wide);
 
   return (
-    <section aria-label="Projects" className={cn("relative flex shrink-0 flex-col border-b px-2 py-1.5", open && "lg:min-h-26 lg:shrink")}>
+    <section aria-label="Projects" className={cn("relative flex shrink-0 flex-col border-b px-2 py-1.5", open && "lg:min-h-[104px] lg:shrink")}>
       <GroupHeader open={open} dragging={dragging} onToggle={() => { setOpenChoice(!open); setCreating(false); }} onCreate={() => { setCreating(true); setOpenChoice(true); }} />
       {open ? <ProjectRows {...rows} creating={creating} onCreated={() => { setCreating(false); }} /> : null}
     </section>
