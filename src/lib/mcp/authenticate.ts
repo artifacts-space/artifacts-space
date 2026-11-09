@@ -2,6 +2,7 @@ import { authenticateOAuthAccessToken } from "@/lib/oauth/clients";
 import { mcpResource } from "@/lib/oauth/config";
 import { oauthAccessTokenSecret } from "@/lib/oauth/token-rules";
 import type { McpAccess } from "@/lib/oauth/scopes";
+import type { McpConnectionRef } from "@/lib/harness/connection-ref";
 import { authenticateApiToken } from "@/lib/tokens";
 
 /** Who an MCP request acts as, and what it may do. */
@@ -15,6 +16,8 @@ export interface McpPrincipal {
    * app's approval does not).
    */
   tokenKey: string;
+  /** The connection the request came through, for its harness (src/lib/harness). Server-side only; never shown. */
+  connection: McpConnectionRef;
 }
 
 /** The bearer token from an Authorization header, or null. */
@@ -37,9 +40,14 @@ export async function authenticateMcpRequest(request: Request): Promise<McpPrinc
 
   if (oauthAccessTokenSecret(token)) {
     const grant = await authenticateOAuthAccessToken(token, mcpResource());
-    if (grant) return { userId: grant.userId, access: grant.access, via: "oauth", tokenKey: `oauth:${grant.clientId}:${grant.userId}` };
+    if (grant) {
+      const connection: McpConnectionRef = { kind: "oauth", userId: grant.userId, clientId: grant.clientId };
+      return { userId: grant.userId, access: grant.access, via: "oauth", tokenKey: `oauth:${grant.clientId}:${grant.userId}`, connection };
+    }
   }
 
   const apiToken = await authenticateApiToken(token);
-  return apiToken ? { userId: apiToken.userId, access: "full", via: "api-token", tokenKey: `api:${apiToken.tokenId}` } : null;
+  if (!apiToken) return null;
+  const connection: McpConnectionRef = { kind: "api-token", userId: apiToken.userId, tokenId: apiToken.tokenId };
+  return { userId: apiToken.userId, access: "full", via: "api-token", tokenKey: `api:${apiToken.tokenId}`, connection };
 }

@@ -27,6 +27,8 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   artifactUpdate: { per: "user", where: "Every artifact edit, from MCP and the web app, except web autosaves that continue an editing session", refusal: "tool-error", group: "MCP and artifacts" },
   artifactAutosave: { per: "user", where: "Web editor autosaves that continue an editing session (the editor sends at most one every 5 seconds)", refusal: "form", group: "MCP and artifacts" },
   organize: { per: "user", where: "Project and tag changes, from MCP and the web app", refusal: "tool-error", group: "MCP and artifacts" },
+  clientInfoRecord: { per: "user", where: "Storing what an MCP client says it is on initialize (over the limit it is not stored; the request still runs)", refusal: "not-counted", group: "MCP and artifacts" },
+  harnessChoice: { per: "user", where: "Changing an artifact's \"Made with\" agent or a connection's agent in the web app", refusal: "form", group: "MCP and artifacts" },
   sharingRequest: { per: "user", where: "Sharing and comments-setting changes (making private is never limited)", refusal: "tool-error", group: "MCP and artifacts" },
   fileUpload: { per: "user", where: "files_request_upload and web uploads", refusal: "tool-error", group: "Files and pages" },
   fileDownloadByNetwork: { per: "network", where: "/api/files views and downloads", refusal: "http-429", group: "Files and pages" },

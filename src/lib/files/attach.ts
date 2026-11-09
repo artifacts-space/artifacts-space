@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getDb } from "@/db";
 import { artifact } from "@/db/schema";
 import { canEditRecord } from "@/lib/access";
+import type { HarnessStamp } from "@/lib/harness/harness-rules";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -51,17 +52,20 @@ async function hasRoomFor(artifactId: string | null, adding: number): Promise<bo
   return existing - (await countHistoryOnlyImages(artifactId)) + adding <= fileLimits.maxFilesPerArtifact;
 }
 
+/** No harness: a change in the web app. An agent passes its harness, looked up only when the change files a version. */
+const noStamp = () => Promise.resolve(null);
+
 /**
  * Attaches the editor's files to an artifact they may edit, and files a
  * version. For a link or public artifact the change goes through edit review
  * (recordArtifactChange), so readers outside the team see new files only
  * once they are approved. Counts against the per-editor edit limit.
  */
-export async function attachFiles(editorId: string, artifactId: string, fileIds: readonly string[], actor: SharingActor): Promise<void> {
+export async function attachFiles(editorId: string, artifactId: string, fileIds: readonly string[], actor: SharingActor, harness: () => Promise<HarnessStamp | null> = noStamp): Promise<void> {
   await assertUsableFiles(editorId, artifactId, fileIds);
   await enforceRateLimit("artifactUpdate", editorId);
   const attached = await attachFileRows(editorId, artifactId, fileIds);
-  if (attached > 0) await recordArtifactChange({ artifactId, editorId, actor });
+  if (attached > 0) await recordArtifactChange({ artifactId, editorId, actor, harness: await harness() });
 }
 
 /**
@@ -82,9 +86,10 @@ async function mayEditArtifact(userId: string, artifactId: string) {
 /**
  * Deletes a file from R2 and the database. Allowed for the uploader while it
  * is not attached, and for anyone who may edit the artifact it belongs to.
- * Returns the artifact id it belonged to, or null.
+ * Returns the artifact id it belonged to, or null. An agent passes its
+ * harness, looked up only when the deletion files a version.
  */
-export async function deleteOwnFile(userId: string, fileId: string, actor: SharingActor): Promise<string | null> {
+export async function deleteOwnFile(userId: string, fileId: string, actor: SharingActor, harness: () => Promise<HarnessStamp | null> = noStamp): Promise<string | null> {
   const row = z.uuid().safeParse(fileId).success ? await getFileRow(fileId.toLowerCase()) : null;
   const allowed = row !== null && (row.artifactId === null ? row.uploaderId === userId : await mayEditArtifact(userId, row.artifactId));
   if (!row || !allowed) throw new UserFacingError("File not found.");
@@ -93,7 +98,7 @@ export async function deleteOwnFile(userId: string, fileId: string, actor: Shari
   if (row.artifactId) {
     // An icon that showed this image goes back to the format icon, and the change is versioned.
     await clearIconForFile(row.artifactId, row.id);
-    await recordArtifactChange({ artifactId: row.artifactId, editorId: userId, actor });
+    await recordArtifactChange({ artifactId: row.artifactId, editorId: userId, actor, harness: await harness() });
   }
   return row.artifactId;
 }

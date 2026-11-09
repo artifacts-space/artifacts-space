@@ -22,6 +22,7 @@ import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
 import { PageOrganizers } from "@/components/projects/page-organizers";
 import { CommentThread } from "@/components/comments/comment-thread";
+import { HarnessByline } from "@/components/harness/harness-byline";
 import { LastEdited } from "@/components/history/last-edited";
 import { ViewBeacon } from "@/components/views/view-beacon";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
@@ -29,10 +30,10 @@ import { canSeeComments } from "@/lib/comments/setting-rules";
 import { filesForViewer } from "@/lib/files/download";
 import type { FileDto } from "@/lib/files/types";
 import { accountCreatedAt } from "@/lib/account-age";
+import { loadActor } from "@/lib/agents/queries";
 import { loadArtifactByline } from "@/lib/artifact-byline";
 import { iconTitlePrefix } from "@/lib/artifact-icons";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
-import { lastEditorsFor } from "@/lib/artifacts";
 import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
 import { pageColumnClass, readingMeasureClass } from "@/lib/page-width/rules";
 import { pageOrganizersFor } from "@/lib/projects/page-project";
@@ -53,15 +54,26 @@ export const instant = false;
 
 const notFoundMetadata: Metadata = { title: "Artifact not found", robots: { index: false, follow: false } };
 
-async function load(params: Promise<{ publicId: string }>) {
+/** The artifact's public id and the signed-in viewer's id (null when signed out). */
+async function readerOf(params: Promise<{ publicId: string }>) {
   const [{ publicId }, session] = await Promise.all([params, getSession()]);
-  return getViewableArtifact(publicId, session?.user.id ?? null);
+  return { publicId, viewerId: session?.user.id ?? null };
 }
 
 /**
- * Whether search engines may index this page: public, its author turned on
- * "Show in search engines", and the author's account is past its first days.
- * A failed account lookup counts as a new account.
+ * The artifact for this viewer. getViewableArtifact, the session, the team
+ * row, the author, and the account age are deduplicated per request (React
+ * cache), so the page and generateMetadata share one read of each.
+ */
+async function load(params: Promise<{ publicId: string }>) {
+  const { publicId, viewerId } = await readerOf(params);
+  return getViewableArtifact(publicId, viewerId);
+}
+
+/**
+ * Whether search engines may index this page: public, someone who can share
+ * it turned on "Show in search engines", and the author's account is past
+ * its first days. A failed account lookup counts as a new account.
  */
 async function indexable(record: ViewableArtifact["record"]) {
   if (!showsInSearch(record)) return false;
@@ -81,15 +93,18 @@ async function indexable(record: ViewableArtifact["record"]) {
  * cannot read the artifact.
  */
 export async function generateMetadata({ params }: PageProps<"/artifact/[publicId]">): Promise<Metadata> {
-  const viewable = await load(params);
+  const { publicId, viewerId } = await readerOf(params);
+  const viewable = await getViewableArtifact(publicId, viewerId);
   if (!viewable) return notFoundMetadata;
   const { record, view } = viewable;
+  // The preview tags are what a signed-out reader gets, decided from the row this request already loaded.
+  const [ogMetadata, searchIndexable] = await Promise.all([artifactOgMetadata(record.publicId, viewerId), indexable(record)]);
   return {
-    ...(await artifactOgMetadata(record.publicId)),
+    ...ogMetadata,
     title: `${iconTitlePrefix(view.icon)}${view.title}`,
     // Agents that read HTML find the Markdown version here (src/lib/markdown).
     alternates: { canonical: artifactPagePath(record.publicId), types: { "text/markdown": `/artifact/${record.publicId}.md` } },
-    robots: pageRobots(await indexable(record)),
+    robots: pageRobots(searchIndexable),
   };
 }
 
@@ -113,10 +128,11 @@ function ArtifactBody({ viewable, files }: { viewable: ViewableArtifact; files: 
   return <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} />;
 }
 
-/** Who saved the version this reader sees, or null when they are gone. */
+/** Who saved the version this reader sees, or null when they are gone. Shares the byline's lookup when it is the author (loadActor). */
 async function lastEditor(userId: string | null): Promise<ArtifactEditorDto | null> {
   if (!userId) return null;
-  return (await lastEditorsFor([{ updatedBy: userId }])).get(userId) ?? null;
+  const actor = await loadActor(userId);
+  return actor ? { id: userId, kind: actor.kind, handle: actor.handle, name: actor.name } : null;
 }
 
 /**
@@ -176,7 +192,11 @@ function SummaryReadView({ summary, editable }: { summary: string; editable: boo
  */
 function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewable: ViewableArtifact; editor: ArtifactEditorDto | null; organizers: React.ReactNode; themeChoices: ThemeChoices }) {
   const { view } = viewable;
-  const meta = [view.source ? `Source ${view.source}` : null].filter(Boolean);
+  // Who made it: the agent harness of the version this reader is served (anyone who can read it may see it), else the source the agent gave.
+  // A detected unknown client says less than the source it gave, so the source wins over "via another agent"; a chosen "Other agent" still shows.
+  const served = viewable.served.harness;
+  const harness = served?.id === "other" && !served.overridden && view.source ? null : (served?.id ?? null);
+  const meta = [!harness && view.source ? `Source ${view.source}` : null].filter(Boolean);
   return (
     <>
       <div className="group/title">
@@ -187,6 +207,7 @@ function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewa
       {organizers}
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
         <LastEdited editor={editor} at={view.updatedAt.toISOString()} className="text-sm" />
+        <HarnessByline harness={harness} />
         {meta.length > 0 ? <span>· {meta.join(" · ")}</span> : null}
       </div>
       <PendingEditNotice viewable={viewable} />

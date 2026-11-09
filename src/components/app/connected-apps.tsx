@@ -1,13 +1,16 @@
 "use client";
 
-import { IconApps, IconLoader2, IconTrash } from "@tabler/icons-react";
+import { IconLoader2, IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { revokeConnectedAppAction } from "@/app/(workspace)/app/connections/actions";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
+import { ConnectionHarness, type SaveConnectionHarness } from "@/components/harness/connection-harness";
+import { HarnessIcon } from "@/components/harness/harness-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { HarnessId } from "@/lib/harness/harnesses";
 import type { ConnectedApp } from "@/lib/oauth/clients";
 import { accessLabels } from "@/lib/oauth/consent-copy";
 
@@ -17,12 +20,20 @@ function formatDate(value: string | null) {
   return value ? dateFormat.format(new Date(value)) : null;
 }
 
-function AppRow({ app, revoking, onRevoke }: { app: ConnectedApp; revoking: boolean; onRevoke: () => void }) {
+interface AppRowProps {
+  app: ConnectedApp;
+  revoking: boolean;
+  onRevoke: () => void;
+  saveHarness: SaveConnectionHarness | undefined;
+  onHarnessSaved: (override: HarnessId | null) => void;
+}
+
+function AppRow({ app, revoking, onRevoke, saveHarness, onHarnessSaved }: AppRowProps) {
   const approved = formatDate(app.approvedAt);
   const lastActive = formatDate(app.lastActiveAt);
   return (
-    <li className="flex items-center gap-3 rounded-sm px-3 py-2.5 hover:bg-muted/60">
-      <IconApps className="size-3.5 shrink-0 text-muted-foreground" />
+    <li data-connected-app={app.name} className="flex items-start gap-3 rounded-sm px-3 py-2.5 hover:bg-muted/60">
+      <span className="flex h-6 shrink-0 items-center text-muted-foreground"><HarnessIcon id={app.harness.override ?? app.harness.detected} /></span>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <p className="truncate text-md font-medium">{app.name}</p>
@@ -30,6 +41,7 @@ function AppRow({ app, revoking, onRevoke }: { app: ConnectedApp; revoking: bool
         </div>
         {approved ? <p className="mt-0.5 text-xs text-muted-foreground">Approved {approved}</p> : null}
         <p className="mt-0.5 text-xs text-muted-foreground">{lastActive ? `Last active ${lastActive}` : "Not used yet"}</p>
+        <ConnectionHarness target={{ kind: "oauth", clientId: app.clientId }} harness={app.harness} name={app.name} save={saveHarness} onSaved={onHarnessSaved} />
       </div>
       <Button variant="ghost" size="icon-sm" disabled={revoking} onClick={onRevoke} aria-label={`Revoke ${app.name}`} className="text-muted-foreground hover:text-destructive">
         {revoking ? <IconLoader2 className="animate-spin" /> : <IconTrash />}
@@ -38,8 +50,12 @@ function AppRow({ app, revoking, onRevoke }: { app: ConnectedApp; revoking: bool
   );
 }
 
-/** The MCP apps a person approved in the browser, each with a Revoke button. */
-export function ConnectedApps({ initialApps }: { initialApps: ConnectedApp[] }) {
+/**
+ * The MCP apps a person approved in the browser, each with the agent it was
+ * detected as (and a way to change it) and a Revoke button. `saveHarness`
+ * stands in for the server action in the component gallery.
+ */
+export function ConnectedApps({ initialApps, saveHarness }: { initialApps: ConnectedApp[]; saveHarness?: SaveConnectionHarness }) {
   const [apps, setApps] = useState(initialApps);
   const [revoking, setRevoking] = useState<string | null>(null);
   const confirmRevoke = useConfirm("revokeConnectedApp");
@@ -84,6 +100,8 @@ export function ConnectedApps({ initialApps }: { initialApps: ConnectedApp[] }) 
                 app={app}
                 revoking={revoking === app.clientId}
                 onRevoke={() => { confirmRevoke.request(() => revoke(app.clientId)); }}
+                saveHarness={saveHarness}
+                onHarnessSaved={(override) => { setApps((current) => current.map((item) => (item.clientId === app.clientId ? { ...item, harness: { ...item.harness, override } } : item))); }}
               />
             ))}
           </ul>

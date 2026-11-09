@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { useArtifactDraft, type ArtifactDraft } from "@/components/app/artifact-editor/use-artifact-draft";
 import { useAutosave, type SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
+import { useArtifactHarness } from "@/components/harness/use-artifact-harness";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
 import { PageEditContext, type PageEdit } from "./page-edit-context";
@@ -78,8 +79,8 @@ interface PageEditControlsProps {
 
 /**
  * Autosave and the editor's controls once the editable copy has loaded. It
- * draws nothing here: it publishes the save status, Full width, History, and
- * View source to the page header, and a conflicting save to the notice under
+ * draws nothing here: it publishes the save status, Full width, History,
+ * View source, and "Made with" to the page header, and a conflicting save to the notice under
  * the title (page-editor-chrome.tsx).
  */
 function PageEditControls({ artifact, editor, reviewed, pageFullWidth, save }: PageEditControlsProps) {
@@ -89,6 +90,7 @@ function PageEditControls({ artifact, editor, reviewed, pageFullWidth, save }: P
   const { status, dirty, retryNow, loadTheirs, keepMine } = autosave;
   const { restored, sourceOpen, toggleSource } = editor;
   const ownSaves = useOwnSaves();
+  const harness = useArtifactHarness(artifact, editor.onUpdated);
   const chrome = useMemo<PageEditorChrome>(() => ({
     history: {
       publicId: artifact.publicId,
@@ -105,7 +107,8 @@ function PageEditControls({ artifact, editor, reviewed, pageFullWidth, save }: P
     fullWidth,
     save: saveIndicatorFor(status, dirty, retryNow),
     conflict: status.kind === "conflict" ? { status, onLoadTheirs: loadTheirs, onKeepMine: keepMine } : null,
-  }), [artifact, ownSaves, reviewed, dirty, restored, sourceOpen, toggleSource, fullWidth, status, retryNow, loadTheirs, keepMine]);
+    harness,
+  }), [artifact, ownSaves, reviewed, dirty, restored, sourceOpen, toggleSource, fullWidth, status, retryNow, loadTheirs, keepMine, harness]);
   usePublishPageEditorChrome(chrome);
   return null;
 }

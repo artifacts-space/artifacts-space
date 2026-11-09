@@ -21,7 +21,7 @@ function chain(): unknown {
 vi.mock("@/db", () => ({ getDb: () => ({ select: () => chain() }) }));
 vi.mock("@/lib/versions/cache", () => ({ cachedVersionView: mocks.cachedView }));
 
-const { getArtifactAccess, getViewableArtifact } = await import("./access");
+const { getArtifactAccess, getSignedOutAccess, getViewableArtifact } = await import("./access");
 
 const publicId = "4fXkP9qR2sT7vW1yZ3aB5c";
 const author = "author-1";
@@ -35,6 +35,8 @@ function row(visibility: "private" | "team" | "link" | "public", member: boolean
       approvedVersionId: "version-1",
       title: "Latest title", icon: "tabler:bug", cover: "file:0f8fad5b-d9cb-469f-a165-70867728950e@20", summary: "", kind: "markdown", language: "", project: "", sessionId: "", source: "", metadata: {},
       createdAt: savedAt, updatedAt: savedAt, updatedBy: null,
+      // The pending edit came through Cursor; the approved version through Claude Code.
+      harness: "cursor", harnessOverride: null as string | null,
     },
     memberId: member ? "member-1" : null,
     // Set only when the author is an agent the viewer added and the viewer is still in its team (see subjectQuery).
@@ -45,6 +47,7 @@ function row(visibility: "private" | "team" | "link" | "public", member: boolean
     approvedCover: "mist",
     approvedSavedAt: savedAt,
     approvedBy: author,
+    approvedHarness: "claude-code" as string | null,
   };
 }
 
@@ -143,6 +146,36 @@ describe("access decision and the version cache", () => {
     expect(viewable?.served.icon).toBe("🚀");
   });
 
+  it("should show readers outside the team the approved version's agent, never the agent of the pending edit", async () => {
+    for (const viewer of [null, "outsider"]) {
+      mocks.rows = [[row("link", false)]];
+      const access = await getArtifactAccess(publicId, viewer);
+      expect(access?.served.harness?.id).toBe("claude-code");
+    }
+  });
+
+  it("should never show readers outside the team the agent of a denied edit, even when the approved version recorded none", async () => {
+    // After a denial the artifact row keeps the denied draft (Cursor's) and no request is pending.
+    mocks.rows = [[{ ...row("link", false), approvedHarness: null }]];
+    expect((await getArtifactAccess(publicId, "outsider"))?.served.harness).toBeNull();
+  });
+
+  it("should show no agent to readers outside the team when the approved version was saved in the browser", async () => {
+    mocks.rows = [[{ ...row("public", false), approvedHarness: null }]];
+    expect((await getArtifactAccess(publicId, "outsider"))?.served.harness).toBeNull();
+  });
+
+  it("should show the artifact's own choice of agent to every reader", async () => {
+    const chosen = row("link", false);
+    mocks.rows = [[{ ...chosen, record: { ...chosen.record, harnessOverride: "codex" } }]];
+    expect((await getArtifactAccess(publicId, "outsider"))?.served.harness).toEqual({ id: "codex", stamped: "claude-code", overridden: true });
+  });
+
+  it("should show the author the latest agent when a link artifact has a pending edit", async () => {
+    mocks.rows = [[row("link", false)]];
+    expect((await getArtifactAccess(publicId, author))?.served.harness?.id).toBe("cursor");
+  });
+
   it("should show the latest icon to the author when a link artifact has a pending edit", async () => {
     mocks.rows = [[row("link", false)], [{ content: "latest" }], []];
     const viewable = await getViewableArtifact(publicId, author);
@@ -167,5 +200,63 @@ describe("access decision and the version cache", () => {
   it("should answer not found when the artifact does not exist", async () => {
     mocks.rows = [[]];
     await expect(getViewableArtifact(publicId, null)).resolves.toBeNull();
+  });
+});
+
+/*
+ * getSignedOutAccess makes the signed-out decision (for link previews) from
+ * the row the page already loaded for its own viewer. The viewer's team
+ * membership and agent ownership are on that row; none of it may count.
+ */
+describe("getSignedOutAccess", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.rows = [];
+  });
+
+  it("should refuse a private artifact when the row was loaded for its author", async () => {
+    mocks.rows = [[row("private", false)]];
+    await expect(getSignedOutAccess(publicId, author)).resolves.toBeNull();
+  });
+
+  it("should refuse a private artifact when the row was loaded for the person who added its agent", async () => {
+    mocks.rows = [[row("private", false, true)]];
+    await expect(getSignedOutAccess(publicId, "agent-owner")).resolves.toBeNull();
+  });
+
+  it("should refuse a team artifact when the row was loaded for a team member", async () => {
+    mocks.rows = [[row("team", true)]];
+    await expect(getSignedOutAccess(publicId, "member-1")).resolves.toBeNull();
+  });
+
+  it("should give only the approved version, with no editing or team rights, when the row was loaded for a team member", async () => {
+    for (const visibility of ["link", "public"] as const) {
+      mocks.rows = [[row(visibility, true, true)]];
+      const access = await getSignedOutAccess(publicId, "member-1");
+      expect(access?.version).toEqual({ source: "approved", versionId: "version-1" });
+      expect(access?.served.title).toBe("Approved title");
+      expect(access?.canEdit).toBe(false);
+      expect(access?.isTeamMember).toBe(false);
+      expect(access?.actsForAuthor).toBe(false);
+    }
+  });
+
+  it("should give only the approved version when the row was loaded for the author", async () => {
+    mocks.rows = [[row("link", false)]];
+    const access = await getSignedOutAccess(publicId, author);
+    expect(access?.version.source).toBe("approved");
+    expect(access?.canEdit).toBe(false);
+  });
+
+  it("should match the signed-out decision when the row was loaded for a signed-out viewer", async () => {
+    mocks.rows = [[row("link", false)], [row("link", false)]];
+    const reused = await getSignedOutAccess(publicId, null);
+    expect(reused).toEqual(await getArtifactAccess(publicId, null));
+  });
+
+  it("should answer not found when the artifact is missing or the id is malformed", async () => {
+    mocks.rows = [[]];
+    await expect(getSignedOutAccess(publicId, "member-1")).resolves.toBeNull();
+    await expect(getSignedOutAccess("not a public id", "member-1")).resolves.toBeNull();
   });
 });

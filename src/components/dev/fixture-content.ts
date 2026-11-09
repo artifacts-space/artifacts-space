@@ -105,7 +105,7 @@ export function fixtureArtifact({ id, kind, title, content, publicId = "fixture0
     originalAuthorId: null,
     pendingSharing: null,
     pendingEdit: null,
-    pendingComments: null,
+    pendingComments: null, harness: null,
     files: [],
     updatedBy: null,
     metadata: {},

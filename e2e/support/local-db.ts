@@ -238,6 +238,38 @@ export async function readyDevUser(): Promise<string> {
   return id;
 }
 
+/** Stamps an artifact as an agent save through `harness` would, with an optional override from its menu. */
+export async function setArtifactHarness(publicId: string, harness: string | null, override: string | null = null): Promise<void> {
+  await db().query(`update artifact set harness = $2, harness_override = $3 where public_id = $1`, [publicId, harness, override]);
+}
+
+/** The artifact's stored harness override. */
+export async function artifactHarnessOverride(publicId: string): Promise<string | null> {
+  const result = await db().query<{ harness_override: string | null }>(`select harness_override from artifact where public_id = $1`, [publicId]);
+  return result.rows[0]?.harness_override ?? null;
+}
+
+/** Registers an OAuth app the user approved, which said `clientName` in its MCP initialize. Returns its client id. */
+export async function seedConnectedApp(userId: string, name: string, clientName: string): Promise<string> {
+  const clientId = `e2e-${randomUUID()}`;
+  await db().query(`insert into oauth_client (id, client_id, name, redirect_uris, created_at) values ($1, $2, $3, '{http://127.0.0.1/callback}', now())`, [randomUUID(), clientId, name]);
+  await db().query(`insert into oauth_consent (id, client_id, user_id, scopes, created_at, updated_at) values ($1, $2, $3, '{artifacts:read,artifacts:write}', now(), now())`, [randomUUID(), clientId, userId]);
+  await db().query(`insert into mcp_connection (id, user_id, oauth_client_id, client_name) values ($1, $2, $3, $4)`, [randomUUID(), userId, clientId, clientName]);
+  return clientId;
+}
+
+/** The harness the user chose for one of their apps, or null. */
+export async function connectionOverride(userId: string, clientId: string): Promise<string | null> {
+  const result = await db().query<{ harness_override: string | null }>(`select harness_override from mcp_connection where user_id = $1 and oauth_client_id = $2`, [userId, clientId]);
+  return result.rows[0]?.harness_override ?? null;
+}
+
+/** Deletes seeded OAuth apps; their approvals and connection rows cascade. */
+export async function deleteOAuthClients(clientIds: readonly string[]): Promise<void> {
+  if (!localDatabaseEnabled() || clientIds.length === 0) return;
+  await db().query(`delete from oauth_client where client_id = any($1) and client_id like 'e2e-%'`, [clientIds]);
+}
+
 /** The email address of a test user. */
 export async function testUserEmail(id: string): Promise<string> {
   const result = await db().query<{ email: string }>(`select email from "user" where id = $1`, [id]);
