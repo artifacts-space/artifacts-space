@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils";
  *   that allow the use, so it gets a neutral initial in a hairline circle.
  * - Devin: no mark at all, by the owner's choice; an empty spacer of the
  *   same size keeps its label in line with the others.
+ * - fx: its code is Apache-2.0, which grants no trademark rights, and the
+ *   repository ships no logo file, so it gets a neutral "fx" monogram.
  */
 
 /** Props every mark takes. */
@@ -111,6 +113,20 @@ function CodexLogo({ className }: LogoProps) {
   return <InitialMark initial="C" className={className} />;
 }
 
+/** fx. A neutral "fx" monogram, drawn as strokes: no licensed mark found. Matches public/agent-icons/fx.svg on the harness-detection branch. */
+function FxLogo({ className }: LogoProps) {
+  return (
+    <Mark className={className}>
+      <g fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M11 5.2c-2-.7-4 .2-4 2.6V19" />
+        <path d="M4.5 11h5.5" />
+        <path d="M13.5 11l6 8" />
+        <path d="M19.5 11l-6 8" />
+      </g>
+    </Mark>
+  );
+}
+
 /** Devin. No mark: an empty, hidden spacer the size of a mark, so headings and tab labels stay aligned. */
 function DevinLogo({ className }: LogoProps) {
   return <span aria-hidden="true" data-client-logo-spacer="" className={cn("inline-block size-4 shrink-0", className)} />;
@@ -125,6 +141,7 @@ export const clientLogos: Record<McpClientId, (props: LogoProps) => ReactNode> =
   opencode: OpenCodeLogo,
   devin: DevinLogo,
   "kimi-code": KimiLogo,
+  fx: FxLogo,
   "other-clients": McpLogo,
 };
 

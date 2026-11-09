@@ -12,12 +12,14 @@ import { NotificationsSpecimen } from "@/components/dev/notifications-specimen";
 import { ThemePickerSpecimen } from "@/components/dev/theme-picker-specimen";
 import { ViewsSpecimen } from "@/components/dev/views-specimen";
 import { UiView } from "@/components/artifact-view/ui-view";
+import { ClientLogo } from "@/components/setup/client-logos";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { uiComponentNames } from "@/lib/ui/catalog";
 import { componentFixtures, fixtureFiles, fixtureSpec } from "@/lib/ui/fixtures/components";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
 import { formatFixtures } from "@/lib/ui/fixtures/formats";
 import { deepSpec, invalidPropsSpec, javascriptLinkSpec, manyElementsSpec, repeatSpec, unknownTypeSpec } from "@/lib/ui/fixtures/specs";
+import { mcpClients } from "@/lib/setup/client-installs";
 import { presetTheme } from "@/lib/themes/resolve";
 
 const specFixtures: { name: string; spec: unknown }[] = [
@@ -96,6 +98,7 @@ export function ComponentGallery() {
         <a href="#avatars" className="hover:text-foreground">Avatars</a>
         <a href="#views" className="hover:text-foreground">Views</a>
         <a href="#notifications" className="hover:text-foreground">Notifications</a>
+        <a href="#clients" className="hover:text-foreground">Clients</a>
       </nav>
       <div className="space-y-12">
         {uiComponentNames.map((name) => (
@@ -147,6 +150,18 @@ export function ComponentGallery() {
         </Group>
         <Group id="notifications" title="Notification settings">
           <NotificationsSpecimen />
+        </Group>
+        <Group id="clients" title="MCP client marks">
+          <Specimen name="every client, in setup order">
+            <ul className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
+              {mcpClients.map((client) => (
+                <li key={client.id} data-client={client.id} className="flex items-center gap-2">
+                  <ClientLogo id={client.id} />
+                  <span data-client-label="">{client.label}</span>
+                </li>
+              ))}
+            </ul>
+          </Specimen>
         </Group>
       </div>
     </div>

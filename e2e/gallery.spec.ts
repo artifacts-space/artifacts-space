@@ -32,3 +32,11 @@ for (const theme of themes) {
     await testInfo.attach("gallery", { path, contentType: "image/png" });
   });
 }
+
+test("should show every MCP client's mark, fx included, when the gallery opens", async ({ page }) => {
+  await page.goto("/dev/components");
+  const clients = page.locator('[data-specimen="every client, in setup order"]');
+
+  await expect(clients.locator('[data-client="fx"] svg[data-client-logo]')).toHaveCount(1);
+  await expect(clients.locator("[data-client-label]")).toHaveText(["Claude Code", "Cursor", "Claude Desktop", "Codex", "OpenCode", "Devin", "Kimi Code CLI", "fx", "Other clients"]);
+});

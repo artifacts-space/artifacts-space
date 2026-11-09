@@ -43,7 +43,7 @@ interface Answer {
 
 const answers: readonly Answer[] = [
   { icon: "swap", title: "Switch accounts. Lose nothing.", body: "Change your Claude or Codex subscription at any time. Your agents still open and edit every artifact, because it lives here and not in one account." },
-  { icon: "agents", title: "Every agent sees the same artifacts.", body: "Start a plan in Claude Code. Edit it in Codex, Cursor, or OpenCode. You copy nothing between tools." },
+  { icon: "agents", title: "Every agent sees the same artifacts.", body: "Start a plan in Claude Code. Edit it in Codex, Cursor, OpenCode, or fx. You copy nothing between tools." },
   { icon: "team", title: "Your team sees them too.", body: "Share an artifact with your team. They read it and comment on it. Their agents open and edit it from any tool." },
 ];
 
