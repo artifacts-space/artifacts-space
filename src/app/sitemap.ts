@@ -17,7 +17,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
-      reject(new Error(`Timed out after ${String(ms)} ms`));
+      const error = new Error(`Timed out after ${String(ms)} ms`);
+      error.name = "TimeoutError";
+      reject(error);
     }, ms);
   });
   return Promise.race([promise, timeout]).finally(() => {
@@ -36,6 +38,10 @@ function failureLabel(error: unknown): string {
  * Artifact pages for the sitemap, cached for an hour. When the database
  * cannot be read (as in a CI build, which has none), the sitemap lists only
  * the site's pages, cached for a minute so the next request tries again.
+ * This holds after the build too: each background rebuild stores its own
+ * lifetime with the route (Next's incremental cache keeps the latest
+ * render's cache control, not only the build's), so a failed rebuild is
+ * retried within a minute, and the next good one goes back to an hour.
  */
 async function artifactPaths(): Promise<string[]> {
   "use cache";

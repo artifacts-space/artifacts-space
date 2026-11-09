@@ -75,6 +75,7 @@ describe("sitemap", () => {
       const entries = await pending;
       expect(entries.some((entry) => new URL(entry.url).pathname.startsWith("/artifact/"))).toBe(false);
       expect(mocks.cacheLife).toHaveBeenCalledExactlyOnceWith("minutes");
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining("TimeoutError"));
     } finally {
       vi.useRealTimers();
     }
