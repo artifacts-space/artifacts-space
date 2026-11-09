@@ -64,7 +64,6 @@ export const GridRow = memo(function GridRow({ row, gridId, columns, offsets, to
         data-cell={`${String(row)}:${String(column)}`}
         aria-colindex={column + 2}
         aria-selected={isActive}
-        title={value.length > 24 && !editing ? value : undefined}
         style={columnPlace(offsets, column)}
         className={`${cellBase}${editing ? " overflow-visible" : " overflow-hidden"}${numeric[column] ? " justify-end tabular-nums" : ""}${isActive ? ` ${activeRing}` : ""}`}
       >

@@ -116,3 +116,23 @@ test("should keep the active cell in view when the keyboard moves it past the ed
   expect(row).toBeGreaterThan(4);
   await expect(page.locator(`[id="${active ?? ""}"]`)).toBeInViewport();
 });
+
+test("should slide the sheet's frozen header under the page header when the page scrolls", async ({ page }) => {
+  await page.goto("/dev/editor?kind=sheet");
+  const grid = page.getByRole("grid", { name: "CSV grid editor" });
+  await expect(grid).toBeVisible();
+  // Room below the sheet, as comments give a real page, then scroll until the grid's top sits under the pinned page header.
+  await page.evaluate(() => {
+    const room = document.createElement("div");
+    room.style.height = "2000px";
+    document.body.append(room);
+    const box = document.querySelector("[role=grid]")?.getBoundingClientRect();
+    if (box) window.scrollBy(0, box.top - 20);
+  });
+  await expect.poll(() => grid.evaluate((element) => element.getBoundingClientRect().top)).toBeLessThan(30);
+  const banner = page.getByRole("banner");
+  const box = await banner.boundingBox();
+  if (!box) throw new Error("No page header.");
+  const onTop = await page.evaluate(({ x, y }) => Boolean(document.elementFromPoint(x, y)?.closest("header, [role=banner]")), { x: box.x + box.width / 2, y: box.y + box.height - 4 });
+  expect(onTop, "the page header stays above the sheet").toBe(true);
+});
