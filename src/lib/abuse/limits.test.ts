@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { SENDIR_DAILY_RECIPIENTS } from "@/lib/email/budget-rules";
 
 import { magicLinkChecks } from "@/lib/auth/magic-link-limits";
+import { teamIconMemberCheck, teamIconNetworkCheck } from "@/lib/teams/team-icon-rules";
 
 import { rateLimits, type RateLimitName } from "./limits";
 import type { RateLimitCheck } from "./rate-limit";
@@ -134,5 +135,40 @@ describe("report limits", () => {
 
   it("should make a refused network wait under 20 minutes when it hit the short window", () => {
     expect(longestWait("reportByNetwork")).toBeLessThanOrEqual(20 * 60);
+  });
+});
+
+function iconChecks(userId: string | null, network: string): RateLimitCheck[] {
+  return userId ? [teamIconNetworkCheck(network), teamIconMemberCheck(userId)] : [teamIconNetworkCheck(network)];
+}
+
+/**
+ * Icon requests spread evenly over 48 minutes inside one hour window, the
+ * way the icon route counts them: every request against the network
+ * backstop, and a signed-in one against the member's limit too. The route
+ * makes two calls and stops at the first refusal, so a member refused by
+ * the network is not counted against their own limit; this replay counts
+ * both, which only lets fewer through.
+ */
+function iconRequests(count: number, userFor: (index: number) => string | null, network = "office") {
+  const spacingMs = (48 * 60 * 1000) / count;
+  return Array.from({ length: count }, (_, index) => ({ atMs: start + index * spacingMs, checks: iconChecks(userFor(index), network) }));
+}
+
+describe("team icon limits", () => {
+  it("should never refuse a member who opens 30 pages of 36 icons each in an hour with the browser cache off", () => {
+    expect(replay(iconRequests(30 * 36, () => "member-1"))).toBe(30 * 36);
+  });
+
+  it("should never refuse a 500-person office behind one address when each member loads 50 icons in an hour", () => {
+    expect(replay(iconRequests(500 * 50, (index) => `member-${String(index % 500)}`))).toBe(500 * 50);
+  });
+
+  it("should let one scraping account through exactly its own limit and refuse the rest", () => {
+    expect(replay(iconRequests(20_000, () => "scraper"))).toBe(rateLimits.teamIconByUser.limit);
+  });
+
+  it("should let many accounts or signed-out requests from one address through exactly the network backstop", () => {
+    expect(replay(iconRequests(100_000, (index) => (index % 2 === 0 ? null : `account-${String(index % 1000)}`)))).toBe(rateLimits.teamIconByNetwork.limit);
   });
 });

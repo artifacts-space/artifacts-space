@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { amzDate, downloadSigningTime, parseEndpoint, presignDownload, presignUpload, presignUrl, r2ConfigFromEnv, r2ObjectUrl, type R2Config } from "./r2";
+import { amzDate, downloadSigningTime, parseEndpoint, presignDownload, presignUpload, presignUrl, r2ConfigFromEnv, r2ObjectUrl, streamObject, type R2Config } from "./r2";
 
 const config: R2Config = {
   accountId: "0123456789abcdef0123456789abcdef",
@@ -104,5 +104,50 @@ describe("endpoint override", () => {
 
   it("should accept an https endpoint anywhere", () => {
     expect(parseEndpoint("https://eu.example.com/")).toBe("https://eu.example.com");
+  });
+});
+
+describe("streamObject", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function answer(body: Uint8Array<ArrayBuffer> | null, status: number, headers: Record<string, string> = {}) {
+    const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() => Promise.resolve(new Response(body, { status, headers })));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("should stream the object with its size when it fits, asking R2 for no more than the cap plus one byte", async () => {
+    const fetchMock = answer(new Uint8Array([1, 2, 3]), 206, { "Content-Length": "3" });
+    const object = await streamObject(config, key, 3);
+    expect(object?.size).toBe(3);
+    expect(new Uint8Array(await new Response(object?.body).arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+    expect(new Headers(fetchMock.mock.calls[0]?.[1].headers).get("range")).toBe("bytes=0-3");
+  });
+
+  it("should return null when the object does not exist", async () => {
+    answer(null, 404);
+    expect(await streamObject(config, key, 3)).toBeNull();
+  });
+
+  it("should refuse an object larger than the caller expects", async () => {
+    answer(new Uint8Array([1, 2, 3, 4]), 206, { "Content-Length": "4" });
+    await expect(streamObject(config, key, 3)).rejects.toThrow("R2 GET failed with status 413.");
+  });
+
+  it("should refuse an answer that does not say its length", async () => {
+    answer(new Uint8Array([1, 2]), 200);
+    await expect(streamObject(config, key, 3)).rejects.toThrow("R2 GET failed with status 413.");
+  });
+
+  it.each([[""], ["0"], ["1.5"]])("should refuse an answer whose length is %j", async (length) => {
+    answer(new Uint8Array([1, 2]), 206, { "Content-Length": length });
+    await expect(streamObject(config, key, 3)).rejects.toThrow("R2 GET failed with status 413.");
+  });
+
+  it("should throw without details when R2 refuses", async () => {
+    answer(null, 403);
+    await expect(streamObject(config, key, 3)).rejects.toThrow("R2 GET failed with status 403.");
   });
 });

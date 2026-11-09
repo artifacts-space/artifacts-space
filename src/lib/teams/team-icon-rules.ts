@@ -1,3 +1,4 @@
+import type { RateLimitCheck } from "@/lib/abuse/rate-limit";
 import { binaryMegabytes, decimalMegabytes } from "@/lib/format-bytes";
 
 import { can, type TeamActor } from "./capability-rules";
@@ -199,14 +200,52 @@ export function parseTeamIconKey(teamId: string, key: string | null | undefined)
 }
 
 /**
- * The page URL that checks the viewer is in the team and redirects to a
- * short-lived link, or null when the team has no icon. The `v` changes with
- * every new icon, so browsers never show an old one.
+ * The URL of the members-only route that checks the viewer is in the team
+ * and answers with the icon, or null when the team has no icon. The `v`
+ * changes with every new icon, so the browser may keep the answer for a day
+ * (teamIconCacheControl) and still shows a replaced icon at once.
  */
 export function teamIconUrl(teamId: string, key: string | null | undefined): string | null {
   const parsed = parseTeamIconKey(teamId, key);
   if (!parsed) return null;
   return `/api/teams/${encodeURIComponent(teamId)}/icon?v=${parsed.id}`;
+}
+
+// --- Serving icons ----------------------------------------------------------
+
+/** How long a browser keeps an icon whose URL names the current version: one day. */
+export const TEAM_ICON_CACHE_SECONDS = 86_400;
+
+/**
+ * The Cache-Control for an icon answer. When the URL's `v` names the icon
+ * now stored, the bytes behind that URL never change (a new icon gets a new
+ * key, so a new `v`), and the browser keeps them for a day without asking
+ * again: a member loads each icon about once a day, not on every page. Any
+ * other `v` (missing, or an icon since replaced) is answered but never kept.
+ * Always `private`: only members may see an icon, so no shared cache or CDN
+ * may store it.
+ */
+export function teamIconCacheControl(requestedVersion: string | null, currentId: string): string {
+  if (requestedVersion !== currentId) return "private, no-store";
+  return `private, max-age=${String(TEAM_ICON_CACHE_SECONDS)}, immutable`;
+}
+
+/**
+ * The network backstop one icon request counts against first, before any
+ * session work, so a flood is refused with one cheap statement. It is much
+ * larger than a member's own limit; see teamIconByNetwork.
+ */
+export function teamIconNetworkCheck(network: string): RateLimitCheck {
+  return { name: "teamIconByNetwork", subject: network };
+}
+
+/**
+ * The signed-in member's own icon budget, counted once the session is known,
+ * so people behind one office address never share it. Signed-out requests
+ * (always a 404) count against the network only.
+ */
+export function teamIconMemberCheck(userId: string): RateLimitCheck {
+  return { name: "teamIconByUser", subject: userId };
 }
 
 /**

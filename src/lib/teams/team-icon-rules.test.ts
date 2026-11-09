@@ -12,6 +12,10 @@ import {
   TEAM_ICON_SOURCE_MAX_BYTES,
   teamIconKey,
   teamIconSourceProblem,
+  TEAM_ICON_CACHE_SECONDS,
+  teamIconCacheControl,
+  teamIconMemberCheck,
+  teamIconNetworkCheck,
   teamIconUrl,
   teamMonogram,
 } from "./team-icon-rules";
@@ -232,6 +236,41 @@ describe("team icon keys", () => {
 
   it("should have no URL when the team has no icon", () => {
     expect(teamIconUrl("team-1", null)).toBeNull();
+  });
+});
+
+describe("teamIconCacheControl", () => {
+  it("should let only the member's browser keep the icon for a day when the URL names the current icon", () => {
+    expect(teamIconCacheControl(uuid, uuid)).toBe("private, max-age=86400, immutable");
+    expect(TEAM_ICON_CACHE_SECONDS).toBe(86_400);
+  });
+
+  it("should keep nothing when the URL names a replaced icon, so the new one shows at once", () => {
+    expect(teamIconCacheControl("00000000-0000-4000-8000-000000000000", uuid)).toBe("private, no-store");
+  });
+
+  it("should keep nothing when the URL has no version", () => {
+    expect(teamIconCacheControl(null, uuid)).toBe("private, no-store");
+  });
+
+  it.each([[uuid], [null], ["other"]])("should never let a shared cache or CDN store an icon when v is %s", (version) => {
+    const value = teamIconCacheControl(version, uuid);
+    expect(value).toMatch(/^private,/);
+    expect(value).not.toMatch(/public|s-maxage/);
+  });
+});
+
+describe("team icon rate limit keys", () => {
+  it("should key a member's icon views by their own id", () => {
+    expect(teamIconMemberCheck("user-1")).toEqual({ name: "teamIconByUser", subject: "user-1" });
+  });
+
+  it("should give two people behind one address separate budgets", () => {
+    expect(teamIconMemberCheck("user-1").subject).not.toBe(teamIconMemberCheck("user-2").subject);
+  });
+
+  it("should key the backstop by the network", () => {
+    expect(teamIconNetworkCheck("network-1")).toEqual({ name: "teamIconByNetwork", subject: "network-1" });
   });
 });
 

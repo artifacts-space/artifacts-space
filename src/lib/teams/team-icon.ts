@@ -5,16 +5,15 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { team, teamMember } from "@/db/schema";
-import { deleteObject, presignDownload, putObject, r2ConfigFromEnv } from "@/lib/files/r2";
-import { fileLimits } from "@/lib/files/config";
+import { deleteObject, putObject, R2Error, r2ConfigFromEnv, streamObject, type ObjectStream } from "@/lib/files/r2";
 import { UserFacingError } from "@/lib/user-facing-error";
 
-import { checkTeamIconBytes, parseTeamIconKey, teamIconKey } from "./team-icon-rules";
+import { checkTeamIconBytes, parseTeamIconKey, TEAM_ICON_UPLOAD_MAX_BYTES, teamIconKey, type TeamIconType } from "./team-icon-rules";
 
 /**
  * Team icons in R2. The rules (team-icon-rules.ts) decide what is accepted
  * and who may change it; this file stores the bytes, swaps the key in
- * `team.logo`, deletes the old object, and signs links for members.
+ * `team.logo`, deletes the old object, and reads the icon for members.
  */
 
 const previousRowSchema = z.object({ previous: z.string().nullable() });
@@ -91,22 +90,43 @@ export function memberIconKeyQuery(db: Pick<ReturnType<typeof getDb>, "select">,
     .limit(1);
 }
 
+/** A member's view of the team icon: its bytes as a stream, their size, its type, and the id its URL carries as `v`. */
+export interface MemberTeamIcon {
+  body: ReadableStream<Uint8Array>;
+  size: number;
+  type: TeamIconType;
+  id: string;
+}
+
 /**
- * A short-lived link to the team's icon for `viewerId`, or null when they
- * are not in the team, the team is personal or has no icon, or its stored
- * key is not one this app made for this team. Callers answer "not found"
- * for null, so a team's icon never shows outside the team.
+ * The team's icon for `viewerId`, or null when they are not in the team, the
+ * team is personal or has no icon, its stored key is not one this app made
+ * for this team, or the object is gone. R2 is read only after the membership
+ * check passes, and the bytes are streamed, never held in memory. Callers answer "not found" for null, so a team's icon never
+ * shows outside the team.
  */
-export async function signedTeamIconUrl(viewerId: string, teamId: string): Promise<string | null> {
+export async function memberTeamIcon(viewerId: string, teamId: string): Promise<MemberTeamIcon | null> {
   const [row] = await memberIconKeyQuery(getDb(), viewerId, teamId);
   const key = row?.logo ?? null;
   const parsed = parseTeamIconKey(teamId, key);
   if (!parsed || !key) return null;
-  const { url } = await presignDownload(r2ConfigFromEnv(), {
-    key,
-    contentType: parsed.type,
-    disposition: `inline; filename="team-icon.${parsed.type === "image/webp" ? "webp" : "png"}"`,
-    expiresIn: fileLimits.downloadUrlSeconds,
-  });
-  return url;
+  const object = await openStoredIcon(key);
+  return object ? { ...object, type: parsed.type, id: parsed.id } : null;
+}
+
+/**
+ * Opens a stored icon, or null when it is gone or over the upload cap
+ * (TEAM_ICON_UPLOAD_MAX_BYTES, 1 MB). Icons stored before that cap could be
+ * up to 2 MB; those show the team's letter (the route's 404) until someone
+ * uploads a new one, never an error. The cap also bounds what one request
+ * costs, since the route streams the bytes itself.
+ */
+async function openStoredIcon(key: string): Promise<ObjectStream | null> {
+  try {
+    return await streamObject(r2ConfigFromEnv(), key, TEAM_ICON_UPLOAD_MAX_BYTES);
+  } catch (error) {
+    if (!(error instanceof R2Error) || error.status !== 413) throw error;
+    console.error("[team-icon] A stored icon is over the size cap", error.name);
+    return null;
+  }
 }
