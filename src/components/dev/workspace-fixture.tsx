@@ -34,8 +34,10 @@ function fixtureArtifacts(): ArtifactDto[] {
   );
   // Note 2 keeps comments on for its author, so links can open a thread (e2e/artifact-link.spec.ts).
   // Note 9 uses the Ocean theme, so the preview shows it in its theme (e2e/app-preview-theme.spec.ts).
+  // Note 3 was made with Claude Code, so its card and byline show the harness (e2e/agent-harness.spec.ts).
   return [...long, ...short.map((note, index): ArtifactDto => {
     if (index === 1) return { ...note, comments: "team" };
+    if (index === 2) return { ...note, harness: { id: "claude-code", stamped: "claude-code", overridden: false } };
     if (index === 8) return { ...note, theme: "ocean", kind: "markdown", content: "# Ocean notes\n\nThe preview wears this artifact's theme." };
     return note;
   })];

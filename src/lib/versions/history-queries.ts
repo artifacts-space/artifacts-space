@@ -4,6 +4,7 @@ import { getDb } from "@/db";
 import { artifactVersion, sharingRequest, type ArtifactRecord, type ArtifactVersionRecord } from "@/db/schema";
 import type { VersionDetailDto, VersionSummaryDto } from "@/lib/artifact-types";
 import { lastEditorsFor } from "@/lib/artifacts";
+import { harnessFor } from "@/lib/harness/harnesses";
 
 import { versionRetention } from "./history-rules";
 
@@ -25,6 +26,7 @@ const summaryColumns = {
   theme: artifactVersion.theme,
   cover: artifactVersion.cover,
   createdBy: artifactVersion.createdBy,
+  harness: artifactVersion.harness,
 };
 
 type SummaryRow = Pick<ArtifactVersionRecord, keyof typeof summaryColumns>;
@@ -59,6 +61,7 @@ function toSummary(row: SummaryRow, context: SummaryContext): VersionSummaryDto 
     theme: row.theme,
     cover: row.cover,
     editor: row.createdBy ? context.editors.get(row.createdBy) ?? null : null,
+    harness: row.harness ? harnessFor(row.harness).id : null,
     approved: row.id === context.record.approvedVersionId,
     pending: row.id === context.pendingId,
     latest: row.id === context.latestId,

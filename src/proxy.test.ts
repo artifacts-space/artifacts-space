@@ -3,16 +3,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   canReadArtifact: vi.fn(),
+  checkArtifactPage: vi.fn(),
   getSession: vi.fn(),
   getTeamForMember: vi.fn(),
   hitRateLimits: vi.fn(),
-  isPageSearchIndexable: vi.fn(),
 }));
 
 vi.mock("@/lib/access", () => ({ canReadArtifact: mocks.canReadArtifact }));
 vi.mock("@/lib/auth/server", () => ({ getAuth: () => ({ api: { getSession: mocks.getSession } }) }));
 vi.mock("@/lib/teams/queries", () => ({ getTeamForMember: mocks.getTeamForMember }));
-vi.mock("@/lib/search/search-queries", () => ({ isPageSearchIndexable: mocks.isPageSearchIndexable }));
+vi.mock("@/lib/artifact-page-check", () => ({ checkArtifactPage: mocks.checkArtifactPage }));
 vi.mock("@/lib/abuse/rate-limit", () => ({
   hitRateLimits: mocks.hitRateLimits,
   rateLimitMessage: () => "Your network has opened a lot of artifact pages in the last hour. Try again in about 5 minutes.",
@@ -28,6 +28,11 @@ function request(path: string, options: { cookie?: string; method?: string; acce
   return new NextRequest(new URL(path, origin), { method: options.method ?? "GET", headers });
 }
 
+/** What checkArtifactPage answers. */
+function page(readable: boolean, indexable = false) {
+  return { readable, indexable };
+}
+
 function location(response: Response) {
   return response.headers.get("location");
 }
@@ -38,7 +43,6 @@ describe("proxy", () => {
     // Network keys need a secret to hash with (src/lib/abuse/network-key.ts).
     vi.stubEnv("BETTER_AUTH_SECRET", "test-network-key-secret");
     mocks.hitRateLimits.mockResolvedValue(null);
-    mocks.isPageSearchIndexable.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -83,7 +87,7 @@ describe("proxy", () => {
   });
 
   it("should leave artifact pages open when the viewer is signed out", async () => {
-    mocks.canReadArtifact.mockResolvedValue(true);
+    mocks.checkArtifactPage.mockResolvedValue(page(true));
     const response = await proxy(request("/artifact/abc"));
     expect(response.status).toBe(200);
     expect(location(response)).toBeNull();
@@ -95,11 +99,11 @@ describe("proxy", () => {
     expect(response.status).toBe(429);
     expect(response.headers.get("Retry-After")).toBe("300");
     await expect(response.text()).resolves.toContain("Try again");
-    expect(mocks.canReadArtifact).not.toHaveBeenCalled();
+    expect(mocks.checkArtifactPage).not.toHaveBeenCalled();
   });
 
   it("should count artifact page views per network and leave other pages uncounted", async () => {
-    mocks.canReadArtifact.mockResolvedValue(true);
+    mocks.checkArtifactPage.mockResolvedValue(page(true));
     await proxy(request("/artifact/abc"));
     expect(mocks.hitRateLimits).toHaveBeenCalledWith([{ name: "artifactPageByNetwork", subject: expect.stringMatching(/^[a-f0-9]{32}$/) as unknown }]);
     mocks.hitRateLimits.mockClear();
@@ -109,7 +113,7 @@ describe("proxy", () => {
 
   it("should still serve the page when the rate limit check fails", async () => {
     mocks.hitRateLimits.mockRejectedValue(new Error("down"));
-    mocks.canReadArtifact.mockResolvedValue(true);
+    mocks.checkArtifactPage.mockResolvedValue(page(true));
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const response = await proxy(request("/artifact/abc"));
     expect(response.status).toBe(200);
@@ -119,7 +123,7 @@ describe("proxy", () => {
     const response = await proxy(request("/artifact/abc.md?comments=1"));
     expect(response.headers.get("x-middleware-rewrite")).toBe(`${origin}/artifact/abc/markdown?comments=1`);
     // The handler runs the access check and rate limits, with bearer tokens too.
-    expect(mocks.canReadArtifact).not.toHaveBeenCalled();
+    expect(mocks.checkArtifactPage).not.toHaveBeenCalled();
     expect(mocks.hitRateLimits).not.toHaveBeenCalled();
   });
 
@@ -129,10 +133,11 @@ describe("proxy", () => {
   });
 
   it("should serve the normal page when a browser loads the artifact", async () => {
-    mocks.canReadArtifact.mockResolvedValue(true);
+    mocks.checkArtifactPage.mockResolvedValue(page(true));
     const response = await proxy(request("/artifact/abc", { accept: "text/html,application/xhtml+xml,*/*;q=0.8" }));
     expect(response.headers.get("x-middleware-rewrite")).toBeNull();
-    expect(mocks.canReadArtifact).toHaveBeenCalled();
+    expect(mocks.checkArtifactPage).toHaveBeenCalledWith("abc", expect.any(Function));
+    expect(mocks.canReadArtifact).not.toHaveBeenCalled();
   });
 
   it("should pass server actions through when the request is a POST", async () => {
@@ -141,39 +146,28 @@ describe("proxy", () => {
   });
 
   it("should send noindex, nofollow when a readable artifact page may not be indexed", async () => {
-    mocks.canReadArtifact.mockResolvedValue(true);
-    mocks.isPageSearchIndexable.mockResolvedValue(false);
+    mocks.checkArtifactPage.mockResolvedValue(page(true, false));
     const response = await proxy(request("/artifact/abc"));
     expect(response.status).toBe(200);
     expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
   });
 
   it("should send no X-Robots-Tag when the author opted a public artifact into search engines", async () => {
-    mocks.canReadArtifact.mockResolvedValue(true);
-    mocks.isPageSearchIndexable.mockResolvedValue(true);
+    mocks.checkArtifactPage.mockResolvedValue(page(true, true));
     const response = await proxy(request("/artifact/abc"));
     expect(response.status).toBe(200);
     expect(response.headers.get("x-robots-tag")).toBeNull();
   });
 
   it("should send noindex, nofollow on the 404 when the viewer cannot read the artifact", async () => {
-    mocks.canReadArtifact.mockResolvedValue(false);
-    mocks.isPageSearchIndexable.mockResolvedValue(true);
+    mocks.checkArtifactPage.mockResolvedValue(page(false, true));
     const response = await proxy(request("/artifact/abc"));
     expect(response.status).toBe(404);
     expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
   });
 
-  it("should stay noindex when the search visibility check fails", async () => {
-    mocks.canReadArtifact.mockResolvedValue(true);
-    mocks.isPageSearchIndexable.mockRejectedValue(new Error("down"));
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const response = await proxy(request("/artifact/abc"));
-    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
-  });
-
-  it("should stay noindex when the read check fails", async () => {
-    mocks.canReadArtifact.mockRejectedValue(new Error("down"));
+  it("should stay noindex when the page check fails", async () => {
+    mocks.checkArtifactPage.mockRejectedValue(new Error("down"));
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const response = await proxy(request("/artifact/abc"));
     expect(response.status).toBe(200);

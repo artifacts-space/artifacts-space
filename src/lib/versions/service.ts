@@ -7,6 +7,7 @@ import { artifact, artifactVersion, sharingRequest, team, type ArtifactRecord, t
 import { canEditRecord } from "@/lib/access";
 import type { VersionSaveKind } from "@/lib/artifact-types";
 import { isUniqueViolation } from "@/lib/db-errors";
+import { stampColumns, type HarnessStamp } from "@/lib/harness/harness-rules";
 import { notifySharingRequest } from "@/lib/notifications/create";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { getTeamMembershipById } from "@/lib/teams/queries";
@@ -139,6 +140,8 @@ export interface ArtifactSave {
   restoredFromId?: string | null;
   /** For a web editor autosave: where it sits in its editing session (one version per session). */
   session?: EditSessionStep | undefined;
+  /** For a save over MCP: the agent harness the version records. Undefined for saves in the web app. */
+  harness?: HarnessStamp | null | undefined;
 }
 
 /**
@@ -154,7 +157,7 @@ export async function recordArtifactSave(save: ArtifactSave): Promise<EditStatus
   const approvedId = before && isReviewedLevel(after.visibility) ? await ensureApprovedBefore(before) : null;
   // A continuing session that could not merge (its version was approved or waiting) replaces that version once approval moved on.
   const previous = save.session === "continue" ? await latestVersion(after.id) : null;
-  const versionId = await fileVersion({ ...after, approvedVersionId: approvedId ?? after.approvedVersionId }, { editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null, session: save.session });
+  const versionId = await fileVersion({ ...after, approvedVersionId: approvedId ?? after.approvedVersionId }, { editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null, session: save.session, harness: save.harness });
   const status = approvedId ? await approvalFor(after, approvedId, versionId, save) : "applied";
   await dropSupersededSessionVersion(after, previous, { editorId, saveKind: save.saveKind, session: save.session, newVersionId: versionId }).catch((error: unknown) => {
     // Housekeeping only: an extra version in History is the worst case.
@@ -183,16 +186,16 @@ async function approvalFor(after: ArtifactRecord, approvedId: string, versionId:
  * the approved version (and its files) until the change is approved. Call it
  * after the change is saved.
  */
-export async function recordArtifactChange(input: { artifactId: string; editorId: string; actor: SharingActor }): Promise<EditStatus> {
+export async function recordArtifactChange(input: { artifactId: string; editorId: string; actor: SharingActor; harness?: HarnessStamp | null | undefined }): Promise<EditStatus> {
   const [before] = await getDb().select().from(artifact).where(eq(artifact.id, input.artifactId)).limit(1);
   if (!before) return "applied";
   const [after] = await getDb()
     .update(artifact)
-    .set({ updatedBy: input.editorId, updatedAt: new Date() })
+    .set({ ...stampColumns(input.harness), updatedBy: input.editorId, updatedAt: new Date() })
     .where(eq(artifact.id, input.artifactId))
     .returning();
   if (!after) return "applied";
-  return recordArtifactSave({ before, after, editorId: input.editorId, actor: input.actor, saveKind: "files" });
+  return recordArtifactSave({ before, after, editorId: input.editorId, actor: input.actor, saveKind: "files", harness: input.harness ?? null });
 }
 
 /**

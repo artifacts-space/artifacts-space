@@ -6,6 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, u
 import type { SourceToggle } from "@/components/app/artifact-editor/editor-toolbar";
 import { ConflictNotice } from "@/components/app/artifact-editor/save-status";
 import type { AutosaveStatus } from "@/components/app/artifact-editor/use-autosave";
+import type { HarnessControl } from "@/components/harness/use-artifact-harness";
 import type { VersionHistoryProps } from "@/components/history/version-history";
 import type { FileDto } from "@/lib/files/types";
 
@@ -23,7 +24,7 @@ export interface PageConflict {
 /**
  * What the in-place editor on an artifact's page shows outside the
  * artifact itself: the page header's save indicator and More menu (Full
- * width, History, View source), and the notice about a conflicting save.
+ * width, History, View source, Made with), and the notice about a conflicting save.
  */
 export interface PageEditorChrome {
   /** History's dialog, with the restore check for the version the editor sees. */
@@ -35,6 +36,8 @@ export interface PageEditorChrome {
   save: SaveIndicatorState;
   /** Set only while a save conflicts with someone else's newer one. */
   conflict: PageConflict | null;
+  /** "Made with": the agent harness the artifact shows; null while the editable copy loads. */
+  harness: HarnessControl | null;
 }
 
 const ChromeContext = createContext<PageEditorChrome | null>(null);
@@ -134,6 +137,7 @@ export function useWaitingChrome(input: WaitingChromeInput | null, error: string
       fullWidth: { checked: fullWidth, pending: true, busy: !error, onChange: unchangeable },
       save: error ? saveProblem(error) : idleSave,
       conflict: null,
+      harness: null,
     };
   }, [input, error, refresh, ownSaves]);
 }

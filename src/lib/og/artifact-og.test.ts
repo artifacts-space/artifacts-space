@@ -6,13 +6,13 @@ import { presetTheme as builtInTheme } from "@/lib/themes/resolve";
 import { emptyThemeContext, resolveArtifactTheme, type ArtifactThemeContext } from "@/lib/themes/team-preset-rules";
 
 const mocks = vi.hoisted(() => ({
-  getArtifactAccess: vi.fn(),
+  getSignedOutAccess: vi.fn(),
   cachedVersionView: vi.fn(),
   filesForViewer: vi.fn(),
   resolveThemeFor: vi.fn(),
 }));
 
-vi.mock("@/lib/access", () => ({ getArtifactAccess: mocks.getArtifactAccess }));
+vi.mock("@/lib/access", () => ({ getSignedOutAccess: mocks.getSignedOutAccess }));
 vi.mock("@/lib/versions/cache", () => ({ cachedVersionView: mocks.cachedVersionView }));
 vi.mock("@/lib/files/download", () => ({ filesForViewer: mocks.filesForViewer }));
 // The team context is the database boundary: each test says what the team default and presets are.
@@ -87,13 +87,20 @@ describe("artifactOgMetadata", () => {
   });
 
   it("should decide as a signed-out reader when it looks the artifact up", async () => {
-    mocks.getArtifactAccess.mockResolvedValue(null);
+    mocks.getSignedOutAccess.mockResolvedValue(null);
     await artifactOgMetadata("abc");
-    expect(mocks.getArtifactAccess).toHaveBeenCalledWith("abc", null);
+    expect(mocks.getSignedOutAccess).toHaveBeenCalledWith("abc", null);
+  });
+
+  it("should still decide as a signed-out reader when the page hands over its viewer to reuse the loaded row", async () => {
+    mocks.getSignedOutAccess.mockResolvedValue(null);
+    await artifactOgMetadata("abc", "viewer-1");
+    // getSignedOutAccess ignores the viewer's membership and agent ownership (src/lib/access.test.ts).
+    expect(mocks.getSignedOutAccess).toHaveBeenCalledWith("abc", "viewer-1");
   });
 
   it("should point og:image and twitter:image at the approved version with the approved title when the artifact is link", async () => {
-    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("link"));
     const tags = await artifactOgMetadata("abc");
     const image = { url: `/artifact/abc/og/${approvedId}.${siteKey}`, alt: "Approved title on artifacts.space", width: 1200, height: 630, type: "image/png" };
     expect(tags.openGraph).toMatchObject({ title: "Approved title", images: [image] });
@@ -103,13 +110,13 @@ describe("artifactOgMetadata", () => {
 
   it("should add no tags, keeping the site image, when the artifact is private, team, missing, or has no approved version", async () => {
     for (const result of [null, access("team"), access("private"), access("link", "latest")]) {
-      mocks.getArtifactAccess.mockResolvedValue(result);
+      mocks.getSignedOutAccess.mockResolvedValue(result);
       expect(await artifactOgMetadata("abc")).toEqual({});
     }
   });
 
   it("should describe the approved version with its summary in every description tag, with og:url, when the artifact is public", async () => {
-    mocks.getArtifactAccess.mockResolvedValue(access("public"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("public"));
     mocks.cachedVersionView.mockResolvedValue({ ...approvedView, summary: "Approved summary." });
     const tags = await artifactOgMetadata("abc");
     expect(mocks.cachedVersionView).toHaveBeenCalledWith(approvedId, savedAt.toISOString());
@@ -119,14 +126,14 @@ describe("artifactOgMetadata", () => {
   });
 
   it("should excerpt the approved content when the approved version has no summary", async () => {
-    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("link"));
     mocks.cachedVersionView.mockResolvedValue(approvedView);
     expect((await artifactOgMetadata("abc")).description).toBe("Approved body.");
   });
 
   it("should never describe a pending edit when the latest version differs from the approved one", async () => {
     const pending = { summary: "Pending summary secret", content: "Pending body secret" };
-    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("link"));
     mocks.cachedVersionView.mockImplementation((versionId: string) => Promise.resolve(versionId === approvedId ? approvedView : { ...approvedView, ...pending }));
     const serialized = JSON.stringify(await artifactOgMetadata("abc"));
     expect(serialized).not.toContain("secret");
@@ -136,14 +143,14 @@ describe("artifactOgMetadata", () => {
   it("should put the approved emoji before the title in og:title and twitter:title, as in the tab title", async () => {
     const withEmoji = access("public");
     withEmoji.served.icon = "🚀";
-    mocks.getArtifactAccess.mockResolvedValue(withEmoji);
+    mocks.getSignedOutAccess.mockResolvedValue(withEmoji);
     const tags = await artifactOgMetadata("abc");
     expect(tags.openGraph).toMatchObject({ title: "🚀 Approved title" });
     expect(tags.twitter).toMatchObject({ title: "🚀 Approved title" });
   });
 
   it("should list the approved files only when a file artifact has no notes or summary", async () => {
-    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("link"));
     mocks.cachedVersionView.mockResolvedValue({ ...approvedView, kind: "file", content: "" });
     mocks.filesForViewer.mockResolvedValue([{ id: "f", filename: "deck.pdf", contentType: "application/pdf", size: 1, createdAt: "" }]);
     expect((await artifactOgMetadata("abc")).description).toBe("1 file: deck.pdf");
@@ -155,7 +162,7 @@ describe("artifactOgMetadata", () => {
 
   it("should add no description and never read content when the artifact is private, team, missing, or unapproved", async () => {
     for (const result of [null, access("team"), access("private"), access("link", "latest"), access("public", "latest")]) {
-      mocks.getArtifactAccess.mockResolvedValue(result);
+      mocks.getSignedOutAccess.mockResolvedValue(result);
       expect((await artifactOgMetadata("abc")).description).toBeUndefined();
     }
     expect(mocks.cachedVersionView).not.toHaveBeenCalled();
@@ -164,7 +171,7 @@ describe("artifactOgMetadata", () => {
 
   it("should keep the site tags when the lookup fails", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    mocks.getArtifactAccess.mockRejectedValue(new Error("db down"));
+    mocks.getSignedOutAccess.mockRejectedValue(new Error("db down"));
     expect(await artifactOgMetadata("abc")).toEqual({});
   });
 });
@@ -191,7 +198,7 @@ describe("link preview URLs and theme changes", () => {
   });
 
   async function imageUrl(visibility: ArtifactVisibility = "public"): Promise<unknown> {
-    mocks.getArtifactAccess.mockResolvedValue(access(visibility));
+    mocks.getSignedOutAccess.mockResolvedValue(access(visibility));
     const images = (await artifactOgMetadata("abc")).openGraph?.images;
     return Array.isArray(images) ? (images[0] as { url?: unknown } | undefined)?.url : undefined;
   }
@@ -225,7 +232,7 @@ describe("link preview URLs and theme changes", () => {
     useThemeContext(teamContext("paper"));
     for (const visibility of ["private", "team"] as const) {
       expect(await imageUrl(visibility)).toBeUndefined();
-      mocks.getArtifactAccess.mockResolvedValue(access(visibility));
+      mocks.getSignedOutAccess.mockResolvedValue(access(visibility));
       expect(await loadArtifactOg("abc", `${approvedId}.${ogThemeKey(presetTheme("paper"))}`)).toBeNull();
     }
     expect(mocks.resolveThemeFor).not.toHaveBeenCalled();
@@ -233,7 +240,7 @@ describe("link preview URLs and theme changes", () => {
 
   it("should mark the picture current only when the URL names the theme it is drawn with", async () => {
     useThemeContext(teamContext("paper"));
-    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("link"));
     const paperKey = ogThemeKey(presetTheme("paper"));
     expect((await loadArtifactOg("abc", `${approvedId}.${paperKey}`))?.themeCurrent).toBe(true);
     expect((await loadArtifactOg("abc", `${approvedId}.${siteKey}`))?.themeCurrent).toBe(false);
@@ -243,7 +250,7 @@ describe("link preview URLs and theme changes", () => {
   it("should never put a team preset's name or id in the preview or its tags", async () => {
     const secret = { ref: "team:acme-q3-launch-x7k2p9", teamId: "t1", name: "Acme Q3 launch", theme: presetTheme("ocean") };
     useThemeContext({ teamDefault: secret.ref, presets: new Map([[secret.ref, secret]]) });
-    mocks.getArtifactAccess.mockResolvedValue(access("public"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("public"));
     const tags = await artifactOgMetadata("abc");
     const url = (tags.openGraph?.images as { url: string }[] | undefined)?.[0]?.url ?? "";
     const og = await loadArtifactOg("abc", url.split("/").at(-1) ?? "");
@@ -256,7 +263,7 @@ describe("link preview URLs and theme changes", () => {
 
   it("should stay generic when the theme key is right but the version is not the approved one", async () => {
     useThemeContext(teamContext("paper"));
-    mocks.getArtifactAccess.mockResolvedValue(access("public"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("public"));
     expect(await loadArtifactOg("abc", `22222222-2222-4222-8222-222222222222.${ogThemeKey(presetTheme("paper"))}`)).toBeNull();
   });
 });
@@ -268,7 +275,7 @@ describe("loadArtifactOg", () => {
   });
 
   it("should read only the approved version when an edit is pending", async () => {
-    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("link"));
     mocks.cachedVersionView.mockResolvedValue(approvedView);
     const og = await loadArtifactOg("abc", approvedId);
     expect(mocks.cachedVersionView).toHaveBeenCalledWith(approvedId, savedAt.toISOString());
@@ -277,7 +284,7 @@ describe("loadArtifactOg", () => {
   });
 
   it("should draw the approved version's icon, never a pending one, when the preview renders", async () => {
-    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("link"));
     mocks.cachedVersionView.mockResolvedValue({ ...approvedView, icon: "tabler:gavel" });
     expect((await loadArtifactOg("abc", approvedId))?.icon).toEqual({ type: "tabler", name: "gavel" });
     mocks.cachedVersionView.mockResolvedValue({ ...approvedView, icon: null });
@@ -285,7 +292,7 @@ describe("loadArtifactOg", () => {
   });
 
   it("should draw the card in the approved version's theme, and the site card without one", async () => {
-    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("link"));
     mocks.cachedVersionView.mockResolvedValue({ ...approvedView, theme: "paper" });
     const themed = await loadArtifactOg("abc", approvedId);
     expect(themed?.palette).not.toEqual(siteCardPalette);
@@ -295,7 +302,7 @@ describe("loadArtifactOg", () => {
   });
 
   it("should use the approved version's gradient cover as the backdrop, and none without a cover", async () => {
-    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("link"));
     mocks.cachedVersionView.mockResolvedValue({ ...approvedView, cover: "dusk" });
     const covered = await loadArtifactOg("abc", approvedId);
     expect(covered?.cover).toMatchObject({ type: "gradient", from: expect.stringMatching(/^#[0-9a-f]{6}$/) as unknown });
@@ -307,7 +314,7 @@ describe("loadArtifactOg", () => {
   it("should never put the project or tags in the preview or its meta tags, even when the row and version carry them", async () => {
     const withProject = access("public");
     Object.assign(withProject.record, { projectId: "project-1", project: "Secret project label", tags: ["secret-tag-label"] });
-    mocks.getArtifactAccess.mockResolvedValue(withProject);
+    mocks.getSignedOutAccess.mockResolvedValue(withProject);
     mocks.cachedVersionView.mockResolvedValue({ ...approvedView, project: "Secret project label" });
     const serialized = JSON.stringify([await loadArtifactOg("abc", approvedId), await artifactOgMetadata("abc")]);
     expect(serialized).not.toContain("Secret project label");
@@ -316,21 +323,21 @@ describe("loadArtifactOg", () => {
   });
 
   it("should return null when the requested version is no longer the approved one", async () => {
-    mocks.getArtifactAccess.mockResolvedValue(access("public"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("public"));
     expect(await loadArtifactOg("abc", "22222222-2222-4222-8222-222222222222")).toBeNull();
     expect(mocks.cachedVersionView).not.toHaveBeenCalled();
   });
 
   it("should return null when the artifact is private, team, or missing", async () => {
-    mocks.getArtifactAccess.mockResolvedValue(null);
+    mocks.getSignedOutAccess.mockResolvedValue(null);
     expect(await loadArtifactOg("abc", approvedId)).toBeNull();
-    mocks.getArtifactAccess.mockResolvedValue(access("team"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("team"));
     expect(await loadArtifactOg("abc", approvedId)).toBeNull();
     expect(mocks.cachedVersionView).not.toHaveBeenCalled();
   });
 
   it("should list files only when the artifact holds files", async () => {
-    mocks.getArtifactAccess.mockResolvedValue(access("link"));
+    mocks.getSignedOutAccess.mockResolvedValue(access("link"));
     mocks.cachedVersionView.mockResolvedValue({ ...approvedView, kind: "file", content: "" });
     mocks.filesForViewer.mockResolvedValue([{ id: "f", filename: "deck.pdf", contentType: "application/pdf", size: 1, createdAt: "" }]);
     const og = await loadArtifactOg("abc", approvedId);

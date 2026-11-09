@@ -33,6 +33,7 @@ import { teamPresetLimits } from "../lib/themes/team-preset-limits";
 import { artifactSizeLimits } from "../lib/artifact-limits";
 import { artifactCoverLimits } from "../lib/covers/limits";
 import { fileLimits, fileStatuses } from "../lib/files/config";
+import { harnessLimits } from "../lib/harness/limits";
 import { projectLimits } from "../lib/projects/limits";
 import { tagLimits } from "../lib/tags/limits";
 
@@ -67,6 +68,10 @@ export const artifact = pgTable(
     tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
     sessionId: text("session_id").notNull().default(""),
     source: text("source").notNull().default(""),
+    // The agent harness its last MCP save came through (src/lib/harness). An unknown client's own name stays on its connection.
+    harness: text("harness"),
+    // A harness someone who can edit it chose from its menu. Wins over `harness`. Not versioned.
+    harnessOverride: text("harness_override"),
     // private: author only. team: members of `teamId`. link: anyone with the URL. public: anyone.
     visibility: text("visibility", { enum: artifactVisibilities }).notNull().default("private"),
     // Who can read and write its comments: off, team (the author and the team), or signed_in
@@ -101,11 +106,12 @@ export const artifact = pgTable(
     index("artifact_project_idx").on(table.projectId),
     index("artifact_tags_idx").using("gin", table.tags),
     index("artifact_team_updated_idx").on(table.teamId, table.updatedAt),
-    // The sitemap lists only public artifacts whose author turned on "Show in search engines".
+    // The sitemap lists only public artifacts with "Show in search engines" turned on.
     index("artifact_in_search_idx").on(table.publicId).where(sql`${table.showInSearch} and ${table.visibility} = 'public'`),
     check("artifact_tags_count_check", sql`cardinality(${table.tags}) <= ${sql.raw(String(tagLimits.maxPerArtifact))}`),
     check("artifact_comments_check", sql`${table.comments} in ('off', 'team', 'signed_in')`),
     check("artifact_icon_length_check", sql`char_length(${table.icon}) <= ${sql.raw(String(artifactIconLimits.maxStoredChars))}`),
+    check("artifact_harness_length_check", sql`char_length(${table.harness}) <= ${sql.raw(String(harnessLimits.maxIdChars))} and char_length(${table.harnessOverride}) <= ${sql.raw(String(harnessLimits.maxIdChars))}`),
     check("artifact_cover_length_check", sql`char_length(${table.cover}) <= ${sql.raw(String(artifactCoverLimits.maxStoredChars))}`),
     check("artifact_theme_size_check", sql`octet_length(${table.theme}::text) <= ${sql.raw(String(artifactThemeLimits.maxStoredBytes))}`),
     check("artifact_content_size_check", sql`octet_length(${table.content}) <= ${sql.raw(String(artifactSizeLimits.maxContentBytes))}`),
@@ -193,6 +199,8 @@ export const artifactVersion = pgTable(
     language: text("language").notNull().default(""),
     project: text("project").notNull().default(""),
     source: text("source").notNull().default(""),
+    // The harness the save came through over MCP; null for saves in the web app.
+    harness: text("harness"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -207,6 +215,7 @@ export const artifactVersion = pgTable(
   (table) => [
     index("artifact_version_artifact_created_idx").on(table.artifactId, table.createdAt),
     index("artifact_version_saved_idx").on(table.savedAt),
+    check("artifact_version_harness_length_check", sql`char_length(${table.harness}) <= ${sql.raw(String(harnessLimits.maxIdChars))}`),
   ],
 );
 

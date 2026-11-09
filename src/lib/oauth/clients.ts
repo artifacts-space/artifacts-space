@@ -1,7 +1,9 @@
 import { and, count, desc, eq, gt, isNotNull, isNull, lt, max, notExists, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
+import { mcpConnection } from "@/db/connection-schema";
 import { oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken } from "@/db/oauth-schema";
+import { toConnectionHarness, type ConnectionHarnessDto } from "@/lib/harness/connection-store";
 
 import { hashOAuthToken, oauthLimits } from "./config";
 import { accessFromScopes, type McpAccess } from "./scopes";
@@ -17,6 +19,8 @@ export interface ConnectedApp {
   access: McpAccess;
   approvedAt: string | null;
   lastActiveAt: string | null;
+  /** The agent harness it was detected as, and the person's override. */
+  harness: ConnectionHarnessDto;
 }
 
 /** An app asking for access, for the consent page. */
@@ -80,14 +84,18 @@ export async function listConnectedApps(userId: string): Promise<ConnectedApp[]>
       name: oauthClient.name,
       uri: oauthClient.uri,
       scopes: oauthConsent.scopes,
+      softwareId: oauthClient.softwareId,
       approvedAt: oauthConsent.updatedAt,
       lastActiveAt: max(oauthAccessToken.createdAt),
+      clientName: mcpConnection.clientName,
+      harnessOverride: mcpConnection.harnessOverride,
     })
     .from(oauthConsent)
     .innerJoin(oauthClient, eq(oauthClient.clientId, oauthConsent.clientId))
     .leftJoin(oauthAccessToken, and(eq(oauthAccessToken.clientId, oauthConsent.clientId), eq(oauthAccessToken.userId, userId)))
+    .leftJoin(mcpConnection, and(eq(mcpConnection.oauthClientId, oauthConsent.clientId), eq(mcpConnection.userId, userId)))
     .where(eq(oauthConsent.userId, userId))
-    .groupBy(oauthConsent.id, oauthClient.id)
+    .groupBy(oauthConsent.id, oauthClient.id, mcpConnection.id)
     .orderBy(desc(oauthConsent.updatedAt));
 
   return rows.map((row) => ({
@@ -97,6 +105,7 @@ export async function listConnectedApps(userId: string): Promise<ConnectedApp[]>
     access: accessFromScopes(row.scopes) ?? "read",
     approvedAt: row.approvedAt?.toISOString() ?? null,
     lastActiveAt: row.lastActiveAt?.toISOString() ?? null,
+    harness: toConnectionHarness({ clientName: row.clientName, override: row.harnessOverride, oauthName: row.name, softwareId: row.softwareId }),
   }));
 }
 
@@ -110,6 +119,8 @@ export async function revokeConnectedApp(userId: string, clientId: string): Prom
   await db.delete(oauthConsent).where(and(eq(oauthConsent.userId, userId), eq(oauthConsent.clientId, clientId)));
   await db.delete(oauthAccessToken).where(and(eq(oauthAccessToken.userId, userId), eq(oauthAccessToken.clientId, clientId)));
   await db.delete(oauthRefreshToken).where(and(eq(oauthRefreshToken.userId, userId), eq(oauthRefreshToken.clientId, clientId)));
+  // What the app said it was, and the harness the person chose for it, go too.
+  await db.delete(mcpConnection).where(and(eq(mcpConnection.userId, userId), eq(mcpConnection.oauthClientId, clientId)));
 }
 
 /** How many registered apps nobody has approved yet, within the cleanup window. */

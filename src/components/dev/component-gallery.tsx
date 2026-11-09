@@ -9,6 +9,7 @@ import { SheetKeyContext } from "@/components/artifact-view/use-sheet-prefs";
 import { AvatarGallery } from "@/components/dev/avatar-gallery";
 import { ArtifactHeaderSpecimen } from "@/components/dev/artifact-header-specimen";
 import { CoverSpecimen } from "@/components/dev/cover-specimen";
+import { HarnessSpecimen } from "@/components/dev/harness-specimen";
 import { NotificationsSpecimen } from "@/components/dev/notifications-specimen";
 import { SwitchSpecimen } from "@/components/dev/switch-specimen";
 import { ThemeFocusSpecimen } from "@/components/dev/theme-focus-specimen";
@@ -103,6 +104,7 @@ export function ComponentGallery() {
         <a href="#switches" className="hover:text-foreground">Switches</a>
         <a href="#notifications" className="hover:text-foreground">Notifications</a>
         <a href="#clients" className="hover:text-foreground">Clients</a>
+        <a href="#harnesses" className="hover:text-foreground">Agents</a>
       </nav>
       <div className="space-y-12">
         {uiComponentNames.map((name) => (
@@ -177,6 +179,9 @@ export function ComponentGallery() {
               ))}
             </ul>
           </Specimen>
+        </Group>
+        <Group id="harnesses" title="Agent harnesses">
+          <HarnessSpecimen />
         </Group>
       </div>
     </div>

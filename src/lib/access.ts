@@ -4,10 +4,11 @@ import { cache } from "react";
 
 import { getDb } from "@/db";
 import { agent, artifact, artifactVersion, sharingRequest, team, teamMember, type ArtifactRecord } from "@/db/schema";
-import { canEditArtifact, canViewArtifact, isAuthorOrActsFor } from "@/lib/access-rules";
+import { canEditArtifact, canViewArtifact, isAuthorOrActsFor, type AccessSubject } from "@/lib/access-rules";
 import { actsForAuthor } from "@/lib/agents/owner-access";
 import { artifactContentColumn, artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
-import type { ArtifactKind } from "@/lib/artifact-types";
+import { approvedHarnessOf, artifactHarnessOf } from "@/lib/harness/harness-rules";
+import type { ArtifactHarnessDto, ArtifactKind } from "@/lib/artifact-types";
 import { isPublicId } from "@/lib/public-id";
 import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
 import { cachedVersionView } from "@/lib/versions/cache";
@@ -70,8 +71,13 @@ export interface ArtifactAccess {
   record: ArtifactMetaRecord;
   /** Which version the viewer reads. Readers outside the team get the approved version. */
   version: { source: "latest" | "approved"; versionId: string | null };
-  /** The title, icon, theme, cover, save time, and saver of the version this viewer reads. */
-  served: { title: string; icon: string | null; theme: StoredArtifactTheme | null; cover: string | null; updatedAt: Date; editedBy: string | null };
+  /**
+   * The title, icon, theme, cover, save time, and saver of the version this
+   * viewer reads, and the agent harness it shows (approvedHarnessOf): readers
+   * of the approved version never see the agent of an edit that waits for
+   * approval.
+   */
+  served: { title: string; icon: string | null; theme: StoredArtifactTheme | null; cover: string | null; updatedAt: Date; editedBy: string | null; harness: ArtifactHarnessDto | null };
   /** Whether the viewer may edit it and read its history: the author, or a member of the team it is shared through. */
   canEdit: boolean;
   /** Whether the viewer belongs to the artifact's team. Pages show the team's name only then. */
@@ -106,7 +112,7 @@ async function teamContext(viewerId: string | null, teamId: string | null) {
 }
 
 /** Whether `editorId` may save changes to this artifact. See canEditArtifact. */
-export async function canEditRecord(editorId: string, record: ArtifactRecord): Promise<boolean> {
+export async function canEditRecord(editorId: string, record: ArtifactMetaRecord): Promise<boolean> {
   if (record.userId === editorId) return true;
   if (record.visibility !== "private") {
     const context = await teamContext(editorId, record.teamId);
@@ -116,9 +122,20 @@ export async function canEditRecord(editorId: string, record: ArtifactRecord): P
 }
 
 /**
+ * An artifact the editor may edit, without its content: for changes that
+ * never touch content, such as its "Made with" label. Null otherwise.
+ */
+export async function getEditableArtifactMeta(editorId: string, artifactId: string): Promise<ArtifactMetaRecord | null> {
+  const [record] = await getDb().select(artifactMetaColumns()).from(artifact).where(eq(artifact.id, artifactId)).limit(1);
+  if (!record) return null;
+  return (await canEditRecord(editorId, record)) ? record : null;
+}
+
+/**
  * The artifact by internal or public id when `editorId` may edit it: its
  * author, or a member of the team it is shared through. Null otherwise, so
- * callers answer "not found" either way. Every write path uses this.
+ * callers answer "not found" either way. Every write path that changes
+ * content uses this; it loads the whole row, content included.
  */
 export async function getEditableArtifact(editorId: string, key: { id: string } | { publicId: string }): Promise<ArtifactRecord | null> {
   if ("publicId" in key && !isPublicId(key.publicId)) return null;
@@ -165,6 +182,7 @@ export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publi
       approvedCover: artifactVersion.cover,
       approvedSavedAt: artifactVersion.savedAt,
       approvedBy: artifactVersion.createdBy,
+      approvedHarness: artifactVersion.harness,
     })
     .from(artifact)
     .leftJoin(team, eq(team.id, artifact.teamId))
@@ -179,25 +197,46 @@ export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publi
 /**
  * Everything the read decision needs, in one query and without content: the
  * row, whether the viewer is in its team, whether that team is personal, and
- * the approved version's title, save time, and saver.
+ * the approved version's title, save time, and saver. Deduplicated per
+ * request, so the page, its metadata, and its link-preview tags share one
+ * query (getSignedOutAccess).
  */
-async function loadSubject(publicId: string, viewerId: string | null) {
+const loadSubject = cache(async (publicId: string, viewerId: string | null) => {
   const [row] = await subjectQuery(getDb(), publicId, viewerId);
   if (!row) return null;
   const { memberId, ownerMemberId, ...rest } = row;
   return { ...rest, member: memberId !== null, actsForAuthor: viewerId !== null && viewerId !== rest.record.userId && ownerMemberId !== null };
-}
+});
 
 type Subject = NonNullable<Awaited<ReturnType<typeof loadSubject>>>;
 
 /** The approved version a reader outside the team gets, or null for the latest. */
 function approvedVersionFor(subject: Subject, versionId: string) {
   if (subject.approvedTitle === null || subject.approvedSavedAt === null) return null;
-  return { versionId, served: { title: subject.approvedTitle, icon: subject.approvedIcon, theme: subject.approvedTheme, cover: subject.approvedCover, updatedAt: subject.approvedSavedAt, editedBy: subject.approvedBy } };
+  const harness = approvedHarnessOf({ harnessOverride: subject.record.harnessOverride, approvedHarness: subject.approvedHarness });
+  return { versionId, served: { title: subject.approvedTitle, icon: subject.approvedIcon, theme: subject.approvedTheme, cover: subject.approvedCover, updatedAt: subject.approvedSavedAt, editedBy: subject.approvedBy, harness } };
 }
 
 function latestServed(record: ArtifactMetaRecord) {
-  return { title: record.title, icon: record.icon, theme: record.theme, cover: record.cover, updatedAt: record.updatedAt, editedBy: record.updatedBy ?? record.userId };
+  return { title: record.title, icon: record.icon, theme: record.theme, cover: record.cover, updatedAt: record.updatedAt, editedBy: record.updatedBy ?? record.userId, harness: artifactHarnessOf(record) };
+}
+
+/**
+ * The read decision for `viewerId` from a loaded subject. A signed-out
+ * viewer (null) is never a team member and never acts for the author,
+ * whoever the subject was loaded for.
+ */
+function decideAccess(subject: Subject, viewerId: string | null): ArtifactAccess | null {
+  const { record } = subject;
+  const member = viewerId === null || record.visibility === "private" ? false : subject.member;
+  const actsFor = viewerId === null ? false : subject.actsForAuthor;
+  const viewer = viewerId ? { userId: viewerId, isTeamMember: member, actsForAuthor: actsFor } : null;
+  if (!canViewArtifact(record, viewer)) return null;
+  const decided = versionToServe({ visibility: record.visibility, approvedVersionId: record.approvedVersionId, isAuthor: isAuthorOrActsFor(record, viewer), isTeamMember: member });
+  const base = { record, canEdit: canEditArtifact({ ...record, teamPersonal: subject.teamPersonal }, viewer), isTeamMember: member, actsForAuthor: actsFor };
+  const approved = decided.source === "approved" ? approvedVersionFor(subject, decided.versionId) : null;
+  if (approved) return { ...base, version: { source: "approved", versionId: approved.versionId }, served: approved.served };
+  return { ...base, version: { source: "latest", versionId: null }, served: latestServed(record) };
 }
 
 /**
@@ -208,17 +247,21 @@ function latestServed(record: ArtifactMetaRecord) {
 export const getArtifactAccess = cache(async (publicId: string, viewerId: string | null): Promise<ArtifactAccess | null> => {
   if (!isPublicId(publicId)) return null;
   const subject = await loadSubject(publicId, viewerId);
-  if (!subject) return null;
-  const { record } = subject;
-  const member = record.visibility === "private" ? false : subject.member;
-  const viewer = viewerId ? { userId: viewerId, isTeamMember: member, actsForAuthor: subject.actsForAuthor } : null;
-  if (!canViewArtifact(record, viewer)) return null;
-  const decided = versionToServe({ visibility: record.visibility, approvedVersionId: record.approvedVersionId, isAuthor: isAuthorOrActsFor(record, viewer), isTeamMember: member });
-  const base = { record, canEdit: canEditArtifact({ ...record, teamPersonal: subject.teamPersonal }, viewer), isTeamMember: member, actsForAuthor: subject.actsForAuthor };
-  const approved = decided.source === "approved" ? approvedVersionFor(subject, decided.versionId) : null;
-  if (approved) return { ...base, version: { source: "approved", versionId: approved.versionId }, served: approved.served };
-  return { ...base, version: { source: "latest", versionId: null }, served: latestServed(record) };
+  return subject ? decideAccess(subject, viewerId) : null;
 });
+
+/**
+ * The read decision for a signed-out reader (as getArtifactAccess(publicId,
+ * null) makes it), for link previews. It reuses the row this request already
+ * loaded for `loadedFor`, the page's own viewer, instead of reading the
+ * artifact again: the row's own fields do not depend on the viewer, and the
+ * viewer's team membership and agent ownership are ignored.
+ */
+export async function getSignedOutAccess(publicId: string, loadedFor: string | null): Promise<ArtifactAccess | null> {
+  if (!isPublicId(publicId)) return null;
+  const subject = await loadSubject(publicId, loadedFor);
+  return subject ? decideAccess(subject, null) : null;
+}
 
 async function latestContent(artifactId: string): Promise<string | null> {
   const [row] = await getDb().select({ content: artifactContentColumn }).from(artifact).where(eq(artifact.id, artifactId)).limit(1);
@@ -255,9 +298,10 @@ export const getViewableArtifact = cache(async (publicId: string, viewerId: stri
 });
 
 /**
- * A quick read check by public id that loads no content, for src/proxy.ts.
- * `viewerId` is resolved only when the artifact is private or team, so link
- * and public pages cost one indexed query.
+ * A quick read check by public id that loads no content, for src/proxy.ts
+ * (comment threads; artifact pages use checkArtifactPage, which also reads
+ * the search setting). `viewerId` is resolved only when the artifact is
+ * private or team, so link and public pages cost one indexed query.
  */
 export async function canReadArtifact(publicId: string, resolveViewer: () => Promise<string | null>): Promise<boolean> {
   if (!isPublicId(publicId)) return false;
@@ -266,7 +310,15 @@ export async function canReadArtifact(publicId: string, resolveViewer: () => Pro
     .from(artifact)
     .where(eq(artifact.publicId, publicId))
     .limit(1);
-  if (!subject) return false;
+  return subject ? canReadSubject(subject, resolveViewer) : false;
+}
+
+/**
+ * canReadArtifact's decision for a row the caller already loaded (src/lib/artifact-page-check.ts).
+ * Link and public artifacts need no viewer; for private and team ones the
+ * viewer is resolved, then their team membership and agent ownership checked.
+ */
+export async function canReadSubject(subject: AccessSubject, resolveViewer: () => Promise<string | null>): Promise<boolean> {
   if (canViewArtifact(subject, null)) return true;
   const viewerId = await resolveViewer();
   if (!viewerId) return false;

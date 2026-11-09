@@ -14,6 +14,7 @@ import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { VersionHistory } from "@/components/history/version-history";
 import { ViewsDialog } from "@/components/views/views-dialog";
 import { ArtifactOrganizers } from "@/components/projects/artifact-organizers";
+import { useArtifactHarness } from "@/components/harness/use-artifact-harness";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { usesFullWidth } from "@/lib/page-width/rules";
 
@@ -78,6 +79,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   const { deleting, remove } = useArtifactActions({ artifact, onDeleted });
   const [sourceOpen, setSourceOpen] = useState(false);
   const fullWidth = useFullWidth(artifact, onUpdated);
+  const harness = useArtifactHarness(artifact, onUpdated);
   const confirmDelete = useConfirm("deleteArtifact");
   const shareUrl = `${origin}/artifact/${artifact.publicId}`;
   const shared = artifact.visibility === "link" || artifact.visibility === "public";
@@ -125,6 +127,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
         onRequestDelete={canDelete ? () => { if (!deleting) confirmDelete.request(remove); } : null}
         onWithdraw={onWithdraw}
         fullWidth={fullWidth}
+        harness={harness}
       />
       <div ref={outerRef} data-slot="detail-outer" className={detailOuter}>
         {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
@@ -136,6 +139,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           length={draft.content.length}
           updatedAt={artifact.updatedAt}
           updatedBy={artifact.updatedBy}
+          harness={artifact.harness}
           onRetry={autosave.retryNow}
           className={stickyModeBar}
         />

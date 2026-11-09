@@ -3,8 +3,10 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { getDb } from "@/db";
+import { mcpConnection } from "@/db/connection-schema";
 import { agent, apiToken, teamMember } from "@/db/schema";
 import { tokenUserIsActive } from "@/lib/agents/identity";
+import { toConnectionHarness, type ConnectionHarnessDto } from "@/lib/harness/connection-store";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 function hashToken(token: string) {
@@ -28,6 +30,8 @@ export async function createApiToken(userId: string, name: string) {
     .returning();
 
   if (!record) throw new Error("The access token could not be created.");
+  // A new token has not connected yet, so nothing says which agent it is.
+  const harness: ConnectionHarnessDto | null = null;
   return {
     token: secret,
     record: {
@@ -36,31 +40,47 @@ export async function createApiToken(userId: string, name: string) {
       prefix: record.prefix,
       lastUsedAt: record.lastUsedAt?.toISOString() ?? null,
       createdAt: record.createdAt.toISOString(),
+      harness,
     },
   };
 }
 
+/**
+ * A token's harness once it has connected (so a client that never names
+ * itself can still be given one), named itself, or the person chose one;
+ * null for a token never used.
+ */
+export function tokenHarness(input: { clientName: string | null; override: string | null; used: boolean }): ConnectionHarnessDto | null {
+  const { clientName, override, used } = input;
+  return used || clientName || override ? toConnectionHarness({ clientName, override }) : null;
+}
+
+/** A person's live tokens, newest first, with the agent harness each one was detected as. */
 export async function listApiTokens(userId: string) {
   const records = await getDb()
-    .select()
+    .select({ token: apiToken, clientName: mcpConnection.clientName, harnessOverride: mcpConnection.harnessOverride })
     .from(apiToken)
+    .leftJoin(mcpConnection, eq(mcpConnection.apiTokenId, apiToken.id))
     .where(and(eq(apiToken.userId, userId), isNull(apiToken.revokedAt)))
     .orderBy(desc(apiToken.createdAt));
 
-  return records.map((record) => ({
+  return records.map(({ token: record, clientName, harnessOverride }) => ({
     id: record.id,
     name: record.name,
     prefix: record.prefix,
     lastUsedAt: record.lastUsedAt?.toISOString() ?? null,
     createdAt: record.createdAt.toISOString(),
+    harness: tokenHarness({ clientName, override: harnessOverride, used: record.lastUsedAt !== null }),
   }));
 }
 
+/** Revokes one of a person's tokens. What its client said it was, and the agent chosen for it, go too. */
 export async function revokeApiToken(userId: string, id: string) {
   await getDb()
     .update(apiToken)
     .set({ revokedAt: new Date() })
     .where(and(eq(apiToken.userId, userId), eq(apiToken.id, id)));
+  await getDb().delete(mcpConnection).where(and(eq(mcpConnection.userId, userId), eq(mcpConnection.apiTokenId, id)));
 }
 
 /** lastUsedAt is written at most this often per token, so busy agents do not write on every call. */

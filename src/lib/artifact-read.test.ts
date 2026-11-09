@@ -15,6 +15,8 @@ function viewable(canEdit: boolean) {
   return {
     record: { id: "a1", publicId: "pub", userId: "author", visibility: "link", teamId: "acme", projectId: "p1" },
     canEdit,
+    version: { source: "latest", versionId: null },
+    served: { harness: null },
     view: { title: "Plan", icon: null, theme: "team:acme-q3-launch-x7k2p9", summary: "", content: "Body", kind: "markdown", language: "", source: "", metadata: {}, updatedAt: savedAt, editedBy: null },
   };
 }

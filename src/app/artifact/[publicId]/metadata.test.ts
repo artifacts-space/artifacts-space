@@ -162,7 +162,7 @@ describe("artifact page generateMetadata for a signed-out link crawler", () => {
     // production build in e2e/link-preview.prod.spec.ts.
     readRuleDecides("link");
     const metadata = await call();
-    expect(mocks.artifactOgMetadata).toHaveBeenCalledWith("abc123");
+    expect(mocks.artifactOgMetadata).toHaveBeenCalledWith("abc123", null);
     expect(metadata).not.toHaveProperty("description");
     expect(metadata).not.toHaveProperty("openGraph");
     expect(metadata).not.toHaveProperty("twitter");

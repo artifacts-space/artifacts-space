@@ -1,5 +1,6 @@
 import type { ArtifactDto, ArtifactListItemDto, ArtifactVisibility, CommentSetting, SharingLevel } from "@/lib/artifact-types";
 import { mcpCoverFields } from "@/lib/covers/cover";
+import { harnessFor } from "@/lib/harness/harnesses";
 import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
 
 /** How an artifact looks to an agent. Ids are public ids; internal ids never leave the server. */
@@ -30,10 +31,15 @@ export interface McpArtifact {
   tags: string[];
   sessionId: string;
   source: string;
+  /**
+   * The agent harness it was made with, such as { id: "claude-code", name: "Claude Code" }, detected from the
+   * MCP connection or chosen by a person. Read-only: agents cannot set it. Null when no agent saved it.
+   */
+  harness: { id: string; name: string } | null;
   visibility: ArtifactVisibility;
   /** Who can read and write its comments: off, team, or signed_in. */
   comments: CommentSetting;
-  /** Whether search engines may list it: only public artifacts whose author turned this on in the web app. Read-only for agents. */
+  /** Whether search engines may list it: only public artifacts that someone who can share them turned this on for in the web app. Read-only for agents. */
   showInSearch: boolean;
   /** The team's slug, shown only when the caller belongs to that team. */
   team: string | null;
@@ -66,6 +72,11 @@ function projectName(project: ArtifactDto["project"]): string {
   return project ? project.name : "";
 }
 
+/** The harness as agents read it: its id and display name, never how it was detected. */
+function mcpHarness(harness: ArtifactDto["harness"]): McpArtifact["harness"] {
+  return harness ? { id: harness.id, name: harnessFor(harness.id).name } : null;
+}
+
 /** Maps an artifact, with or without its content, to the agent-facing shape. */
 function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext): McpArtifact {
   const isAuthor = dto.authorId === context.viewerId;
@@ -90,6 +101,7 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     tags: dto.tags,
     sessionId: dto.sessionId,
     source: dto.source,
+    harness: mcpHarness(dto.harness),
     visibility: dto.visibility,
     comments: dto.comments,
     showInSearch: dto.showInSearch,
