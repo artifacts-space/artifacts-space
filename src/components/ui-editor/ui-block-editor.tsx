@@ -12,14 +12,15 @@ import { validateArtifactContent } from "@/lib/artifact-content";
 import type { BlockTemplate } from "@/lib/ui/block-templates";
 import { containerComponents, isUiComponentName, type UiComponentName } from "@/lib/ui/catalog";
 import { containsExpression } from "@/lib/ui/expressions";
-import { toRendererSpec, type UiElement } from "@/lib/ui/spec";
-import { readRawSpec, setProp as setRawProp, writeRawSpec, type RawSpec } from "@/lib/ui/spec-blocks";
+import { toRendererSpec, type UiElement, type UiSpec } from "@/lib/ui/spec";
+import { readRawSpec, replaceProps, setProp as setRawProp, writeRawSpec, type RawSpec } from "@/lib/ui/spec-blocks";
 import { validateUiSpec } from "@/lib/ui/validate";
 
 import { insertAt, isContainerType } from "./block-changes";
 import { BlockEditorContext, createActiveBlockStore, createDraggedBlock, useBlockEditor, type BlockEditor, type InsertTarget } from "./block-editor-context";
 import { BlockFrame } from "./block-frame";
 import { InsertPicker } from "./insert-picker";
+import { PropsDialog } from "./props-dialog";
 import { renderEditableBlock } from "./text-blocks";
 
 const noHandlers = {};
@@ -38,6 +39,13 @@ function firstError(content: string): string | null {
 /** Elements driven by state (repeat, visible, or an expression in a prop) render as they do for readers and edit through View source. */
 function isStateDriven(element: UiElement): boolean {
   return element.repeat !== undefined || element.visible !== undefined || containsExpression(element.props);
+}
+
+/** The block the properties form edits, or null when it is closed or the block is gone. */
+function propsBlock(spec: UiSpec, key: string | null) {
+  const element = key ? spec.elements[key] : undefined;
+  if (!key || !element || !isUiComponentName(element.type)) return null;
+  return { key, type: element.type, props: element.props };
 }
 
 /** "Add a block" inside a container with no blocks yet. */
@@ -134,13 +142,15 @@ export function UiBlockEditor({ content, onChange }: UiBlockEditorProps) {
   const raw = useMemo(() => readRawSpec(content), [content]);
   const { apply, setProp, takeFocus, problem } = useBlockActions(raw, onChange);
   const [insert, setInsert] = useState<{ target: InsertTarget; anchor: HTMLElement } | null>(null);
+  const [propsKey, setPropsKey] = useState<string | null>(null);
+  const openProps = useCallback((key: string) => { setPropsKey(key); }, []);
   const [dragging] = useState(createDraggedBlock);
   const [active] = useState(createActiveBlockStore);
   const openInsert = useCallback((target: InsertTarget, anchor: HTMLElement) => { setInsert({ target, anchor }); }, []);
 
   const editor = useMemo<BlockEditor | null>(
-    () => (spec ? { spec, apply, setProp, openInsert, takeFocus, dragging, active } : null),
-    [spec, apply, setProp, openInsert, takeFocus, dragging, active],
+    () => (spec ? { spec, apply, setProp, openInsert, openProps, takeFocus, dragging, active } : null),
+    [spec, apply, setProp, openInsert, openProps, takeFocus, dragging, active],
   );
   if (!editor || !spec) return null;
 
@@ -162,6 +172,11 @@ export function UiBlockEditor({ content, onChange }: UiBlockEditorProps) {
           </Button>
         </div>
         <InsertPicker anchor={insert?.anchor ?? null} onPick={pick} onClose={() => { setInsert(null); }} />
+        <PropsDialog
+          block={propsBlock(spec, propsKey)}
+          onValid={(key, props) => { apply((current) => ({ spec: replaceProps(current, key, props) })); }}
+          onClose={() => { setPropsKey(null); }}
+        />
       </BlockEditorContext>
     </JSONUIProvider>
   );

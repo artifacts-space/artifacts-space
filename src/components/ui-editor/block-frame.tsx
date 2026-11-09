@@ -1,6 +1,6 @@
 "use client";
 
-import { IconArrowDown, IconArrowUp, IconCopy, IconGripVertical, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconAdjustmentsHorizontal, IconArrowDown, IconArrowUp, IconCopy, IconGripVertical, IconPlus, IconTrash } from "@tabler/icons-react";
 import { useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -75,7 +75,9 @@ function BlockHandle({ id, type, frame }: { id: string; type: string; frame: Rea
         <IconGripVertical />
       </Button>
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-        <DropdownMenuContent anchor={grip} align="start" className="w-44">
+        <DropdownMenuContent anchor={grip} align="start" className="w-48">
+          <DropdownMenuItem onClick={() => { editor.openProps(id); }}><IconAdjustmentsHorizontal /> Edit properties</DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => { editor.apply((raw) => duplicate(raw, id)); }}><IconCopy /> Duplicate</DropdownMenuItem>
           <DropdownMenuItem onClick={() => { editor.apply((raw) => nudge(raw, id, -1)); }}><IconArrowUp /> Move up</DropdownMenuItem>
           <DropdownMenuItem onClick={() => { editor.apply((raw) => nudge(raw, id, 1)); }}><IconArrowDown /> Move down</DropdownMenuItem>
@@ -133,6 +135,12 @@ export function BlockFrame({ id, type, parent, index, children }: BlockFrameProp
       onFocus={activate}
       onDragOver={onDragOver}
       onDragLeave={() => { setDrop(null); }}
+      onDoubleClick={(event) => {
+        // Double-click a chart, table, or other data block to edit its data; text keeps its own double-click (select a word).
+        if (event.target instanceof HTMLElement && event.target.closest("[contenteditable], input, textarea, .rich-editor")) return;
+        event.stopPropagation();
+        editor.openProps(id);
+      }}
       onDrop={onDrop}
     >
       {drop ? <span aria-hidden className={cn("pointer-events-none absolute inset-x-0 z-10 h-0.5 rounded-full bg-foreground/40", drop === "before" ? "-top-1" : "-bottom-1")} /> : null}

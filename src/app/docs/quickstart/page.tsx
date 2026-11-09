@@ -104,7 +104,7 @@ export default function QuickstartPage() {
       <DocsH page={page} id="troubleshooting" />
       <Prose>
         <ul>
-          <li><strong>401 or &quot;Authentication required&quot;</strong>: the client has no token, or its token expired or was revoked. Sign in again from your client: in Claude Code, run <code>/mcp</code> and authenticate; in Codex, run <code>codex mcp login artifacts</code>.</li>
+          <li><strong>401 or &quot;Authentication required&quot;</strong>: the client has no token, or its token expired or was revoked. Sign in again from your client: in Claude Code, run <code>/mcp</code> and authenticate; in Codex, run <code>codex mcp login artifacts</code>; in fx, run <code>fx mcp login artifacts</code>.</li>
           <li><strong>Write tools are missing</strong>: the connection is read-only. Remove it and connect again without <strong>Read-only access</strong>.</li>
           <li><strong>HTTP 429 with JSON-RPC error -32029</strong>: a rate limit. The message and the <code>Retry-After</code> header say when to try again. See <Link href={docsHref("limits")}>Limits</Link>.</li>
           <li><strong>&quot;Use POST for MCP requests&quot;</strong>: the client opened a GET event stream. This server answers POST only; pick Streamable HTTP, not SSE.</li>

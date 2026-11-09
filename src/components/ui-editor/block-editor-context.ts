@@ -31,6 +31,8 @@ export interface BlockEditor {
   /** Changes one prop as someone types. Autosave holds a value that breaks the spec (see draftProblem). */
   setProp: (key: string, name: string, value: unknown) => void;
   openInsert: (target: InsertTarget, anchor: HTMLElement) => void;
+  /** Opens the properties form for a block: its data, such as a chart's series or a tab's label. */
+  openProps: (key: string) => void;
   /** Takes the pending focus request when it names `key`; true when the caller should focus. */
   takeFocus: (key: string) => boolean;
   /** The block being dragged, if any. */

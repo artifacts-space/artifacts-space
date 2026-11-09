@@ -19,7 +19,7 @@ export function SkillInstall({ intro }: { intro: string }) {
       <p className="text-sm leading-5 text-muted-foreground">
         {comingSoon
           ? "The skill is not public yet. Your agent can use the MCP server without it."
-          : "Run it in your project. It works with Claude Code, Cursor, Codex, and other agents."}
+          : "Run it in your project. It works with Claude Code, Cursor, Codex, OpenCode, fx, and other agents."}
       </p>
     </div>
   );

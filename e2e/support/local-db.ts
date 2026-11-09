@@ -234,3 +234,18 @@ export async function deleteOAuthClients(clientIds: readonly string[]): Promise<
   if (!localDatabaseEnabled() || clientIds.length === 0) return;
   await db().query(`delete from oauth_client where client_id = any($1) and client_id like 'e2e-%'`, [clientIds]);
 }
+
+/** The email address of a test user. */
+export async function testUserEmail(id: string): Promise<string> {
+  const result = await db().query<{ email: string }>(`select email from "user" where id = $1`, [id]);
+  const email = result.rows[0]?.email;
+  if (!email) throw new Error("The test user does not exist.");
+  return email;
+}
+
+/** Deletes the sign-in links Better Auth stored for these @example.com addresses. */
+export async function deleteSignInLinks(emails: readonly string[]): Promise<void> {
+  const testEmails = emails.filter((email) => email.endsWith("@example.com"));
+  if (!localDatabaseEnabled() || testEmails.length === 0) return;
+  await db().query(`delete from verification where value::jsonb ->> 'email' = any($1)`, [testEmails]);
+}

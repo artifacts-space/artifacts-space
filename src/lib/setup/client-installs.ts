@@ -1,3 +1,4 @@
+import { SKILLS_REPO } from "./install-command";
 import { MCP_SERVER_NAME, mcpEndpoint, TOKEN_ENV_VAR } from "./mcp-config";
 
 /**
@@ -117,6 +118,58 @@ export function kimiMcpLoginCommand(): string {
   return `/mcp-config login ${MCP_SERVER_NAME}`;
 }
 
+/**
+ * The fx installer, from fx's own docs. It puts `fx` in `~/.local/bin` on
+ * macOS and Linux.
+ * Source: https://fx.sh/docs/getting-started/installation
+ */
+export const FX_INSTALL_COMMAND = "curl -fsSL https://fx.sh/setup.sh | bash";
+
+/**
+ * The fx command that adds the server to `~/.fx/mcp.json`. A URL makes it a
+ * remote Streamable HTTP server, and fx opens the browser sign-in at once
+ * when the server asks for one.
+ * Source: https://fx.sh/docs/using-fx/cli#mcp-management
+ */
+export function fxMcpAddCommand(origin: string): string {
+  return `fx mcp add ${MCP_SERVER_NAME} ${mcpEndpoint(origin)}`;
+}
+
+/**
+ * The fx sign-in command, for signing in later or again. It uses dynamic
+ * client registration and a loopback callback.
+ * Source: https://fx.sh/docs/capabilities/mcp#sign-in-to-a-remote-server
+ */
+export function fxMcpLoginCommand(): string {
+  return `fx mcp login ${MCP_SERVER_NAME}`;
+}
+
+/**
+ * The fx command that connects to the server and lists its status and tools.
+ * Source: https://fx.sh/docs/using-fx/cli#mcp-management
+ */
+export function fxMcpShowCommand(): string {
+  return `fx mcp show ${MCP_SERVER_NAME}`;
+}
+
+/**
+ * The skill install, typed inside fx: a slash command, not a shell command.
+ * fx installs it to `~/.fx/skills/`, for every project.
+ * Source: https://fx.sh/docs/capabilities/skills#install
+ */
+export function fxSkillInstallCommand(): string {
+  return `/skills install ${SKILLS_REPO}`;
+}
+
+/**
+ * The `~/.fx/mcp.json` entry for a remote server. fx reads `"type": "http"`
+ * as Streamable HTTP; a project's `.mcp.json` takes the same shape.
+ * Source: https://fx.sh/docs/capabilities/mcp#project-configuration-and-trust
+ */
+export function fxConfigJson(origin: string): string {
+  return JSON.stringify({ mcpServers: { [MCP_SERVER_NAME]: { type: "http", url: mcpEndpoint(origin) } } }, null, 2);
+}
+
 /** The clients the docs give setup steps for, most used first. Every list of clients reads this order. */
 export const mcpClients = [
   { id: "claude-code", label: "Claude Code", oneClick: false },
@@ -126,6 +179,7 @@ export const mcpClients = [
   { id: "opencode", label: "OpenCode", oneClick: false },
   { id: "devin", label: "Devin", oneClick: false },
   { id: "kimi-code", label: "Kimi Code CLI", oneClick: false },
+  { id: "fx", label: "fx", oneClick: false },
   { id: "other-clients", label: "Other clients", oneClick: false },
 ] as const;
 
