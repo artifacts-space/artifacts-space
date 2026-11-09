@@ -73,6 +73,8 @@ async function thumbOffset(control: Locator): Promise<number> {
 for (const theme of ["light", "dark"] as const) {
   for (const scope of ["default", "ocean"] as const) {
     test(`should draw a green on track and readable thumbs at 3:1 when the ${scope} look is ${theme}`, async ({ page }, testInfo) => {
+      // Reduced motion turns the color transitions off, so every reading is the final color.
+      await page.emulateMedia({ reducedMotion: "reduce" });
       await openSpecimen(page, theme);
       const specimen = page.locator(`[data-switch-specimen="${scope}"]`);
       const on = specimen.getByRole("switch", { name: "On", exact: true });
@@ -90,8 +92,6 @@ for (const theme of ["light", "dark"] as const) {
       if (testInfo.project.name !== "phone") {
         await on.hover();
         await expect.poll(async () => (await readSwitch(on)).track.join(","), "the hovered track changes color").not.toBe(onReading.track.join(","));
-        // Let the 200ms color transition finish before measuring.
-        await expect.poll(async () => { const first = (await readSwitch(on)).track.join(","); await page.waitForTimeout(250); return first === (await readSwitch(on)).track.join(","); }).toBe(true);
         const hovered = await readSwitch(on);
         expect(hovered.thumbOnTrack, "on thumb on its hovered track").toBeGreaterThanOrEqual(3);
         expect(hovered.trackOnCard, "hovered on track on the card").toBeGreaterThanOrEqual(3);
