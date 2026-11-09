@@ -121,6 +121,32 @@ Agents follow the same rules as people, and the hooks and CI check them the
 same way. A person stays responsible for each pull request an agent opens:
 read the diff, run the checks, and answer review comments.
 
+### Measure tool routing
+
+Agents pick tools by their words: the MCP server instructions and the tool
+descriptions in `src/lib/mcp/routing-copy.ts`. When you change those words,
+run the routing eval before and after, and put both numbers in the pull
+request:
+
+```bash
+pnpm eval:routing                          # the server's own words only
+pnpm eval:routing --variant default-line   # plus the "make it the default" line
+```
+
+It sends about 30 everyday prompts ("write up the plan", "make a report for
+the team", "save this for later") and a few near misses to Claude Code
+headless (`claude -p`), and reports how many saved to artifacts.space and
+which near misses saved when they should not. The `artifacts` server is a
+local stub that serves the same words and records calls, so nothing is saved.
+
+It uses your own Claude Code login, and one pass counts against your plan's
+usage (about $3 to $4 of usage at Opus rates), so run it on demand, never on a
+schedule or in CI. The prompts are in
+`scripts/evals/artifact-routing-cases.json`; the options are in the header of
+`scripts/evals/artifact-routing.mts`. Reports go to `scripts/evals/results/`,
+which git ignores. One pass varies by a prompt or two between runs, so treat
+small differences as noise.
+
 ## License
 
 By contributing, you agree that your contributions are licensed under the

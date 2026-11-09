@@ -1,6 +1,7 @@
 "use client";
 
 import { IconKey, IconLoader2, IconPlus, IconTrash } from "@tabler/icons-react";
+import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -19,7 +20,9 @@ import { TokenRevealDialog } from "@/components/tokens/token-reveal-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { docsHref } from "@/lib/docs/pages";
 import type { ConnectedApp } from "@/lib/oauth/clients";
+import { DEFAULT_INSTRUCTION_LINE } from "@/lib/setup/default-routing";
 import { claudeMcpAddOAuthCommand, mcpConfigJson, mcpOAuthConfigJson, TOKEN_PLACEHOLDER } from "@/lib/setup/mcp-config";
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });
@@ -112,6 +115,13 @@ export function Connections({
             <div className="mt-2">
               <SkillInstall intro="Teach your agent when to save, update, and share artifacts." />
             </div>
+          </div>
+          <div className="border-t px-5 py-4">
+            <h3 className="text-md font-medium">Make it the default</h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Add this line to <code className="font-mono">~/.claude/CLAUDE.md</code> or your project&apos;s <code className="font-mono">AGENTS.md</code>, and your agent saves docs, plans, and reports here every time. <Link href={docsHref("clients", "default")} className="underline underline-offset-2">Where each agent reads it</Link>.
+            </p>
+            <CodeSnippet title="Add this line" code={DEFAULT_INSTRUCTION_LINE} wrap className="mt-3" />
           </div>
           <div className="border-t px-5 py-4">
             <h3 className="text-md font-medium">Tools</h3>

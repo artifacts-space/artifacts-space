@@ -4,6 +4,7 @@ import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
 import { DocsH, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { ClientPicker } from "@/components/setup/client-picker";
+import { DefaultRoutingSteps } from "@/components/setup/default-routing";
 import { SkillInstall } from "@/components/setup/skill-install";
 import { docsMetadata } from "@/lib/docs/metadata";
 import { docsHref } from "@/lib/docs/pages";
@@ -77,6 +78,9 @@ export default function QuickstartPage() {
       </Prose>
       <div className="mt-4"><SkillInstall intro="Run it in your project:" /></div>
       <Note>The skill gives guidance, not access. Your agent still needs the MCP connection above.</Note>
+
+      <DocsH page={page} id="default" />
+      <DefaultRoutingSteps />
 
       <DocsH page={page} id="first-artifact" />
       <Prose><p>Ask your agent in plain words. It picks the tool and the arguments:</p></Prose>

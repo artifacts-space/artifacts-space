@@ -5,6 +5,7 @@ import { DocsH, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { clientGuides } from "@/components/setup/client-guides";
 import { ClientLogo } from "@/components/setup/client-logos";
+import { DefaultRoutingSteps } from "@/components/setup/default-routing";
 import { docsMetadata } from "@/lib/docs/metadata";
 import { docsHref } from "@/lib/docs/pages";
 import { codexHeadlessConfigToml, mcpClients } from "@/lib/setup/client-installs";
@@ -59,6 +60,9 @@ export default function ClientsPage() {
       <Note title="Give team agents their own token">
         An agent that works for a team should be an agent teammate with its own token, so its work shows under its own handle. See <Link href={docsHref("sharing", "agent-tokens")} className="underline underline-offset-2">Agent tokens</Link>.
       </Note>
+
+      <DocsH page={page} id="default" />
+      <DefaultRoutingSteps full />
       <p className="mt-10 text-xs text-muted-foreground">Product names and logos belong to their owners. They show compatibility only.</p>
     </RegistryPage>
   );

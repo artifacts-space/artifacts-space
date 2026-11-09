@@ -64,6 +64,7 @@ export const docsPages = [
       h2("connect", "Connect your agent"),
       h2("tokens", "Tokens for CI and headless agents"),
       h2("skill", "Add the agent skill"),
+      h2("default", "Make it the default"),
       h2("first-artifact", "Save your first artifact"),
       h2("first-ui", "Make a rich page"),
       h2("troubleshooting", "Troubleshooting"),
@@ -85,6 +86,7 @@ export const docsPages = [
       h2("kimi-code", "Kimi Code CLI"),
       h2("other-clients", "Other clients"),
       h2("headless", "Headless and CI"),
+      h2("default", "Make it the default"),
     ],
   },
   {
