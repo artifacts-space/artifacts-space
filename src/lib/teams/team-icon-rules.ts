@@ -231,14 +231,21 @@ export function teamIconCacheControl(requestedVersion: string | null, currentId:
 }
 
 /**
- * The rate limits one icon request counts against: the signed-in member's
- * own budget, so people behind one office address never share it, and the
- * network's much larger backstop. Signed-out requests (always a 404) count
- * against the network only.
+ * The network backstop one icon request counts against first, before any
+ * session work, so a flood is refused with one cheap statement. It is much
+ * larger than a member's own limit; see teamIconByNetwork.
  */
-export function teamIconRateLimitChecks(userId: string | null, network: string): RateLimitCheck[] {
-  const byNetwork: RateLimitCheck = { name: "teamIconByNetwork", subject: network };
-  return userId ? [{ name: "teamIconByUser", subject: userId }, byNetwork] : [byNetwork];
+export function teamIconNetworkCheck(network: string): RateLimitCheck {
+  return { name: "teamIconByNetwork", subject: network };
+}
+
+/**
+ * The signed-in member's own icon budget, counted once the session is known,
+ * so people behind one office address never share it. Signed-out requests
+ * (always a 404) count against the network only.
+ */
+export function teamIconMemberCheck(userId: string): RateLimitCheck {
+  return { name: "teamIconByUser", subject: userId };
 }
 
 /**

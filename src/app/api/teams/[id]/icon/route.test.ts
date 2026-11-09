@@ -81,27 +81,36 @@ describe("GET /api/teams/[id]/icon", () => {
     expect(await response.text()).toBe("Not found");
   });
 
-  it("should answer 404 to a malformed team id without looking it up", async () => {
+  it("should answer 404 to a malformed team id without a session lookup", async () => {
     expect((await call("../files")).status).toBe(404);
+    expect(mocks.session).not.toHaveBeenCalled();
     expect(mocks.icon).not.toHaveBeenCalled();
   });
 
-  it("should count a member against their own limit and the network backstop", async () => {
+  it("should count the network backstop before the session, then the member's own limit", async () => {
     await call("team-1");
-    expect(mocks.limits).toHaveBeenCalledWith([
-      { name: "teamIconByUser", subject: "user-1" },
-      { name: "teamIconByNetwork", subject: "network-1" },
+    expect(mocks.limits.mock.calls).toEqual([
+      [[{ name: "teamIconByNetwork", subject: "network-1" }]],
+      [[{ name: "teamIconByUser", subject: "user-1" }]],
     ]);
+    expect(mocks.limits.mock.invocationCallOrder[0]).toBeLessThan(mocks.session.mock.invocationCallOrder[0] ?? 0);
   });
 
   it("should count a signed-out request against the network only", async () => {
     mocks.session.mockResolvedValue(null);
     await call("team-1");
-    expect(mocks.limits).toHaveBeenCalledWith([{ name: "teamIconByNetwork", subject: "network-1" }]);
+    expect(mocks.limits.mock.calls).toEqual([[[{ name: "teamIconByNetwork", subject: "network-1" }]]]);
   });
 
-  it("should answer an uncached 429 without reading the icon when a limit refuses", async () => {
-    mocks.limits.mockResolvedValue({ name: "teamIconByUser", retryAfterSeconds: 60 });
+  it("should refuse a network flood with 429 before looking up the session", async () => {
+    mocks.limits.mockResolvedValueOnce({ name: "teamIconByNetwork", retryAfterSeconds: 60 });
+    expect((await call("team-1")).status).toBe(429);
+    expect(mocks.session).not.toHaveBeenCalled();
+    expect(mocks.icon).not.toHaveBeenCalled();
+  });
+
+  it("should answer an uncached 429 without reading the icon when the member's own limit refuses", async () => {
+    mocks.limits.mockResolvedValueOnce(null).mockResolvedValueOnce({ name: "teamIconByUser", retryAfterSeconds: 60 });
     const response = await call("team-1");
     expect(response.status).toBe(429);
     expect(response.headers.get("Cache-Control")).toBe("no-store");

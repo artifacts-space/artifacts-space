@@ -14,7 +14,8 @@ import {
   teamIconSourceProblem,
   TEAM_ICON_CACHE_SECONDS,
   teamIconCacheControl,
-  teamIconRateLimitChecks,
+  teamIconMemberCheck,
+  teamIconNetworkCheck,
   teamIconUrl,
   teamMonogram,
 } from "./team-icon-rules";
@@ -259,22 +260,17 @@ describe("teamIconCacheControl", () => {
   });
 });
 
-describe("teamIconRateLimitChecks", () => {
-  it("should key a member's icon views by their own id, plus the network backstop", () => {
-    expect(teamIconRateLimitChecks("user-1", "network-1")).toEqual([
-      { name: "teamIconByUser", subject: "user-1" },
-      { name: "teamIconByNetwork", subject: "network-1" },
-    ]);
+describe("team icon rate limit keys", () => {
+  it("should key a member's icon views by their own id", () => {
+    expect(teamIconMemberCheck("user-1")).toEqual({ name: "teamIconByUser", subject: "user-1" });
   });
 
   it("should give two people behind one address separate budgets", () => {
-    const [first] = teamIconRateLimitChecks("user-1", "office");
-    const [second] = teamIconRateLimitChecks("user-2", "office");
-    expect(first?.subject).not.toBe(second?.subject);
+    expect(teamIconMemberCheck("user-1").subject).not.toBe(teamIconMemberCheck("user-2").subject);
   });
 
-  it("should count a signed-out request against the network only", () => {
-    expect(teamIconRateLimitChecks(null, "network-1")).toEqual([{ name: "teamIconByNetwork", subject: "network-1" }]);
+  it("should key the backstop by the network", () => {
+    expect(teamIconNetworkCheck("network-1")).toEqual({ name: "teamIconByNetwork", subject: "network-1" });
   });
 });
 
