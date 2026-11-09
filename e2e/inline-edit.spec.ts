@@ -139,14 +139,13 @@ test("should save a heading typed into an interface, keep it after a reload, and
   await expect(page.getByRole("list", { name: "Versions" }).getByRole("listitem")).toHaveCount(2);
 });
 
-test("should keep a picker open on the artifact page when editing unlocks", async ({ page }, testInfo) => {
-  const title = `Inline unlock ${testInfo.project.name} ${String(Date.now())}`;
-  await page.goto("/api/dev/sign-in");
-  await page.waitForURL(/\/app/);
-  const publicId = await createTestArtifact({ userId: await readyDevUser(), title, content: "# Notes\n\nOpen a picker first.", visibility: "private", theme: null });
-  created.push(publicId);
-
-  // Hold the page's server actions (the editable copy among them) until a picker is open.
+/**
+ * Opens the artifact page with its server actions (the editable copy among
+ * them) held back. Resolves once the page has hydrated and asked for its
+ * copy, so clicks land; the returned function lets the copy load.
+ */
+async function openWithEditableCopyHeld(page: Page, publicId: string): Promise<() => void> {
+  await page.unrouteAll({ behavior: "wait" });
   let release: () => void = () => undefined;
   const held = new Promise<void>((resolve) => { release = resolve; });
   await page.route(`**/artifact/${publicId}`, async (route) => {
@@ -155,17 +154,58 @@ test("should keep a picker open on the artifact page when editing unlocks", asyn
   });
   const loading = page.waitForRequest((request) => request.method() === "POST" && request.url().endsWith(`/artifact/${publicId}`));
   await page.goto(`/artifact/${publicId}`);
-  // The request goes out once the page has hydrated, so the click below lands.
   await loading;
-  await page.getByRole("button", { name: "Choose a theme" }).click();
-  const themes = page.getByRole("radiogroup", { name: "Artifact theme" });
-  await expect(themes).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Artifact content" })).toHaveCount(0);
+  return release;
+}
 
+/** The pickers in the artifact's heading: how to open each, and something inside it while it is open. */
+const headingPickers = [
+  {
+    name: "theme",
+    open: (page: Page) => page.getByRole("button", { name: "Choose a theme" }).click(),
+    inside: (page: Page) => page.getByRole("radiogroup", { name: "Artifact theme" }),
+  },
+  {
+    name: "icon",
+    open: (page: Page) => page.getByRole("button", { name: "Add icon" }).click(),
+    inside: (page: Page) => page.getByRole("tab", { name: "Upload" }),
+  },
+  {
+    name: "cover",
+    open: async (page: Page) => {
+      await page.locator("[data-artifact-cover]").hover();
+      await page.getByRole("button", { name: "Change cover" }).click();
+    },
+    inside: (page: Page) => page.getByRole("radio", { name: "Dusk" }),
+  },
+] as const;
+
+test("should keep the theme, icon, and cover pickers open on the artifact page when editing unlocks", async ({ page }, testInfo) => {
+  const title = `Inline unlock ${testInfo.project.name} ${String(Date.now())}`;
+  await page.goto("/api/dev/sign-in");
+  await page.waitForURL(/\/app/);
+  const publicId = await createTestArtifact({ userId: await readyDevUser(), title, content: "# Notes\n\nOpen a picker first.", visibility: "private", theme: null, cover: "mist" });
+  created.push(publicId);
+  const content = page.getByRole("textbox", { name: "Artifact content" });
+
+  for (const picker of headingPickers) {
+    const release = await openWithEditableCopyHeld(page, publicId);
+    await picker.open(page);
+    await expect(picker.inside(page), `${picker.name} picker opens`).toBeVisible();
+    await expect(content).toHaveCount(0);
+
+    release();
+    await expect(content).toBeVisible();
+    // The heading and its pickers keep their place when the read view turns editable.
+    await expect(picker.inside(page), `${picker.name} picker stays open`).toBeVisible();
+    await page.keyboard.press("Escape");
+  }
+
+  // The picker still works after the switch.
+  const release = await openWithEditableCopyHeld(page, publicId);
+  await page.getByRole("button", { name: "Choose a theme" }).click();
   release();
-  await expect(page.getByRole("textbox", { name: "Artifact content" })).toBeVisible();
-  // The heading and its pickers keep their place when the read view turns editable.
-  await expect(themes).toBeVisible();
-  await themes.getByRole("radio", { name: /^Paper:/ }).click();
+  await expect(content).toBeVisible();
+  await page.getByRole("radiogroup", { name: "Artifact theme" }).getByRole("radio", { name: /^Paper:/ }).click();
   await expect(page.getByRole("button", { name: "Theme: Paper. Change theme" })).toBeVisible();
 });

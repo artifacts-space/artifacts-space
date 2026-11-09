@@ -73,8 +73,12 @@ export function PageEditBar({ history, status, source, width }: PageEditBarProps
   );
 }
 
-/** Stands in until the editable copy loads; nothing reads it while the editor's artifact is null. */
-const noDraft: ArtifactDraft = { title: "", icon: null, summary: "", content: "", language: "", kind: "markdown" };
+/**
+ * An empty draft that only fills the draft state until the editable copy
+ * loads. Nothing shows it: `value` stays null while `artifact` is null, and
+ * the edit controls mount only once it has loaded.
+ */
+const placeholderDraft: ArtifactDraft = { title: "", icon: null, summary: "", content: "", language: "", kind: "markdown" };
 
 /**
  * The in-place edit state of an artifact page: the latest saved copy (null
@@ -84,7 +88,7 @@ const noDraft: ArtifactDraft = { title: "", icon: null, summary: "", content: ""
  */
 export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: ArtifactDto) => void) {
   const [artifact, setArtifact] = useState(initial);
-  const { draft, update, replace, reset, remount, revision } = useArtifactDraft(initial ?? noDraft);
+  const { draft, update, replace, reset, remount, revision } = useArtifactDraft(initial ?? placeholderDraft);
   const [sourceOpen, setSourceOpen] = useState(false);
 
   const onUpdated = useCallback((next: ArtifactDto) => {
@@ -109,6 +113,7 @@ export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: A
     setSourceOpen(!sourceOpen);
   }, [sourceOpen, remount]);
 
+  // Null until the editable copy loads: the heading and body then show the read view, never the placeholder draft.
   const value = useMemo<PageEdit | null>(() => artifact && ({
     artifact,
     draft,
