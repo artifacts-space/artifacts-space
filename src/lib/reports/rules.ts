@@ -44,7 +44,7 @@ export function isReportable(visibility: ArtifactVisibility): boolean {
 
 /**
  * The limits one report counts against, checked in this order: reports about
- * this artifact from this network (each report emails the team's owners),
+ * this artifact from this network (each report emails the site operator),
  * reports from this network (short window, then daily), and reports from
  * this signed-in reader.
  */
@@ -56,4 +56,21 @@ export function reportLimitChecks(input: { networkKey: string; artifactId: strin
   ];
   if (input.viewerId) checks.push({ name: "reportByUser", subject: input.viewerId });
   return checks;
+}
+
+/** Where report emails go: the site operator's address, or why there is none. */
+export type OperatorAddress = { ok: true; email: string } | { ok: false; problem: "unset" | "invalid" };
+
+const operatorEmailSchema = z.email();
+
+/**
+ * Reads ABUSE_REPORT_EMAIL, the site operator's address for report emails.
+ * Empty or missing is "unset"; anything that is not one email address is
+ * "invalid". Either way no email goes out, and the report is still stored.
+ */
+export function parseAbuseReportEmail(value: string | undefined): OperatorAddress {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return { ok: false, problem: "unset" };
+  const parsed = operatorEmailSchema.safeParse(trimmed);
+  return parsed.success ? { ok: true, email: parsed.data } : { ok: false, problem: "invalid" };
 }

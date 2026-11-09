@@ -34,7 +34,7 @@ export function TermsConduct() {
       <LegalH doc={doc} id="reports" />
       <Prose>
         <p>
-          Every link and public artifact has a <strong>Report</strong> button. A report goes to the owners and admins of the team that approved the sharing (or to the author, for their personal team). They can make the artifact private at once. You can also write to us about any content on the Service at <Mail to={legalContact.legalEmail} subject="Content report" />.
+          Every link and public artifact has a <strong>Report</strong> button. A report comes to us by email. The owners and admins of the team that approved the sharing (or the author, for their personal team) also see it on their team page, and they can make the artifact private at once. You can also write to us about any content on the Service at <Mail to={legalContact.legalEmail} subject="Content report" />.
         </p>
         <p>
           We do not monitor content, but we may review reported content or content we otherwise learn about. If content or conduct breaks these Terms or the law, or puts people or the Service at risk, we may remove or restrict content, withdraw sharing, keep pages out of search engines, limit features, or suspend or close accounts. When we act on your account or content, we tell you why, unless the law forbids it or telling you would put someone at risk. If you think we got it wrong, reply to our notice or email <Mail to={legalContact.legalEmail} subject="Enforcement appeal" />, and a person will review the decision.

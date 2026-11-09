@@ -1,68 +1,73 @@
 import { createHash } from "node:crypto";
 
 import { reserveBudgetedEmail } from "@/lib/email/budget";
-import { emailLink, html, renderEmail } from "@/lib/email/layout";
+import { emailLink, html, renderEmail, type SafeHtml } from "@/lib/email/layout";
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
 import { siteUrl } from "@/lib/site-origin";
-import { teamTabHref } from "@/lib/teams/team-tabs-rules";
 
 interface ReportEmail {
   reportId: string;
-  ownerId: string;
-  ownerEmail: string;
-  teamName: string;
-  teamSlug: string;
+  /** The site operator's address, from ABUSE_REPORT_EMAIL. */
+  operatorEmail: string;
+  /** The team the report landed with, or null when there is none. */
+  team: { name: string; slug: string } | null;
   artifactTitle: string;
   publicId: string;
   reasonLabel: string;
+  /** What the reader wrote. May be empty. */
+  details: string;
 }
 
 interface ReportEmailContent {
-  teamName: string;
+  reportId: string;
+  team: ReportEmail["team"];
   artifactTitle: string;
   reasonLabel: string;
-  teamUrl: string;
+  details: string;
   artifactUrl: string;
 }
 
-/** The report email in the shared layout. Team name, artifact title, and reason are escaped. */
-export function renderReportEmail({ teamName, artifactTitle, reasonLabel, teamUrl, artifactUrl }: ReportEmailContent) {
+/** The report email to the site operator, in the shared layout. Every value from users is escaped. */
+export function renderReportEmail({ reportId, team, artifactTitle, reasonLabel, details, artifactUrl }: ReportEmailContent) {
+  const teamLabel = team ? `${team.name} (${team.slug})` : "None";
+  const paragraphs: SafeHtml[] = [html`Artifact: ${emailLink(artifactUrl, artifactTitle)}`, html`Team: ${teamLabel}`, html`Reason: ${reasonLabel}`];
+  if (details) paragraphs.push(html`Details from the reader: ${details}`);
+  const detailsText = details ? `\nDetails from the reader: ${details}\n` : "";
   return renderEmail({
-    title: `A reader reported an artifact in ${teamName}`,
+    title: "A reader reported an artifact",
     preview: `Reason: ${reasonLabel}`,
-    heading: html`A reader reported an artifact in ${teamName}`,
-    paragraphs: [html`Artifact: ${emailLink(artifactUrl, artifactTitle)}`, html`Reason: ${reasonLabel}`],
-    action: { label: "Review the report", url: teamUrl },
-    note: html`On the team page you can withdraw sharing or dismiss the report.`,
-    reason: "You get this email because you own the team.",
-    text: `A reader reported an artifact in ${teamName}.\n\nArtifact: ${artifactTitle}\n${artifactUrl}\n\nReason: ${reasonLabel}\n\nReview the report: ${teamUrl}`,
+    heading: html`A reader reported an artifact`,
+    paragraphs,
+    action: { label: "Open the artifact", url: artifactUrl },
+    note: team ? html`Report ${reportId}. The team's owners and admins also see it on their team page.` : html`Report ${reportId}.`,
+    reason: "You get this email because this address receives abuse reports for this artifacts.space site.",
+    text: `A reader reported an artifact.\n\nArtifact: ${artifactTitle}\n${artifactUrl}\n\nTeam: ${teamLabel}\nReason: ${reasonLabel}\n${detailsText}\nReport ${reportId}`,
   });
 }
 
 /**
- * Tells one team owner about a new report, with Sendir. In local development
- * without Sendir keys, it prints the links to the server log instead. Links
- * are absolute and built from siteUrl, never from the request. Over the
- * shared daily email budget the email is skipped (and logged); the report
- * still waits on the team page.
+ * Tells the site operator about a new report, with Sendir. In local
+ * development without Sendir keys, it prints the report to the server log
+ * instead. Links are absolute and built from siteUrl, never from the request.
+ * Over the shared daily email budget the email is skipped (and logged); the
+ * report is already stored.
  */
 export async function sendReportEmail(input: ReportEmail) {
-  const teamUrl = siteUrl(teamTabHref(input.teamSlug, "artifacts", "reports"));
   const artifactUrl = siteUrl(`/artifact/${encodeURIComponent(input.publicId)}`);
   if (!(await reserveBudgetedEmail("report"))) return;
   if (!isSendirConfigured()) {
     if (process.env.NODE_ENV === "production") throw new Error("Sendir is not configured, so report emails cannot be sent.");
-    console.info(`[reports] Report on ${artifactUrl} (${input.reasonLabel}) for ${input.ownerEmail}: ${teamUrl}`);
+    console.info(`[reports] Report ${input.reportId} on ${artifactUrl} (${input.reasonLabel}) for the site operator.`);
     return;
   }
   const { error } = await sendEmail(
     {
-      to: input.ownerEmail,
+      to: input.operatorEmail,
       fromName: "artifacts.space",
-      subject: `Report on “${input.artifactTitle}” in ${input.teamName}`,
-      ...renderReportEmail({ ...input, teamUrl, artifactUrl }),
+      subject: `Report on “${input.artifactTitle}”`,
+      ...renderReportEmail({ ...input, artifactUrl }),
     },
-    { idempotencyKey: `artifact-report:${createHash("sha256").update(`${input.reportId}:${input.ownerId}`).digest("hex")}` },
+    { idempotencyKey: `artifact-report:${createHash("sha256").update(input.reportId).digest("hex")}` },
   );
   if (error) throw new Error(`Sendir could not send the report email: ${error.name} (${String(error.statusCode ?? "no answer")})`);
 }
