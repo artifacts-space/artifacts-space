@@ -1,5 +1,5 @@
 {
-  "id": "54e007ac-d3ee-4f6a-aa5d-1e023be607ff",
+  "id": "4e94a483-4612-4977-8b7b-4c3b264f36cc",
   "prevId": "67fd5977-8368-4244-b399-21b20a42fc55",
   "version": "7",
   "dialect": "postgresql",
@@ -5423,21 +5423,6 @@
             }
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "mcp_connection_user_idx": {
-          "name": "mcp_connection_user_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}

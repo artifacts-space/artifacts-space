@@ -178,7 +178,9 @@ function SummaryReadView({ summary, editable }: { summary: string; editable: boo
 function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewable: ViewableArtifact; editor: ArtifactEditorDto | null; organizers: React.ReactNode; themeChoices: ThemeChoices }) {
   const { view } = viewable;
   // Who made it: the agent harness of the version this reader is served (anyone who can read it may see it), else the source the agent gave.
-  const harness = viewable.served.harness?.id ?? null;
+  // An unrecognized client says less than the source it gave, so the source wins over "via an unknown agent".
+  const served = viewable.served.harness?.id ?? null;
+  const harness = served === "other" && view.source ? null : served;
   const meta = [!harness && view.source ? `Source ${view.source}` : null].filter(Boolean);
   return (
     <>

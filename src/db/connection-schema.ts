@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { check, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 // Relative imports: drizzle-kit loads this file without the "@/" alias.
 import { harnessLimits } from "../lib/harness/limits";
@@ -31,9 +31,9 @@ export const mcpConnection = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    // Also serves lookups by user alone (its leading column).
     uniqueIndex("mcp_connection_oauth_idx").on(table.userId, table.oauthClientId),
     uniqueIndex("mcp_connection_token_idx").on(table.apiTokenId),
-    index("mcp_connection_user_idx").on(table.userId),
     check("mcp_connection_kind_check", sql`(${table.oauthClientId} is null) <> (${table.apiTokenId} is null)`),
     check("mcp_connection_client_name_check", sql`char_length(${table.clientName}) <= ${sql.raw(String(harnessLimits.maxLabelChars))}`),
     check("mcp_connection_client_version_check", sql`char_length(${table.clientVersion}) <= ${sql.raw(String(harnessLimits.maxVersionChars))}`),
