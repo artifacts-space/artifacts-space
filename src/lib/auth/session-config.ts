@@ -7,10 +7,12 @@ export const sessionLifetimeSeconds = oneDay * 30;
 /**
  * Better Auth's session options (src/lib/auth/server.ts).
  *
- * A session lasts 30 days from the last day it was used: once a day a
- * signed-in request moves its expiry 30 days out. The renewed cookie reaches
- * the browser through src/proxy.ts, because server components cannot set
- * cookies. Sign-in never offers "don't remember me", so the cookie always has
+ * A session lasts 30 days from the last day it was used in the workspace:
+ * once a day a signed-in request moves its expiry 30 days out. The renewed
+ * cookie reaches the browser only through src/proxy.ts on workspace pages
+ * (every signed-in visit to `/` lands there), because server components
+ * cannot set cookies. Artifact and team pages do not forward it: artifact
+ * responses can be cached, and must never carry a Set-Cookie. Sign-in never offers "don't remember me", so the cookie always has
  * a Max-Age and survives closing the browser.
  *
  * The session and user are also kept in a signed cookie for 5 minutes, so

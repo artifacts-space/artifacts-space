@@ -33,7 +33,7 @@ const auth = { current: createTestAuth() };
 
 vi.mock("@/lib/auth/server", () => ({ getAuth: () => auth.current }));
 
-const { proxy } = await import("@/proxy");
+const { config, proxy } = await import("@/proxy");
 
 /** A signed-in browser's session cookie, without the 5-minute cache, and the session token. */
 async function signIn() {
@@ -52,6 +52,15 @@ function sessionCookieFrom(response: Response) {
 describe("session renewal through the proxy", () => {
   beforeEach(() => {
     auth.current = createTestAuth();
+  });
+
+  it("should name Better Auth's real session cookie in the proxy matcher when a person signs in", async () => {
+    const { cookie } = await signIn();
+    const name = cookie.slice(0, cookie.indexOf("="));
+    const matcherCookies = config.matcher.flatMap((entry) => (typeof entry === "string" ? [] : entry.has.map((condition) => condition.key)));
+    // The matcher spells out the HTTPS name and the plain one; a renamed cookie would silently skip the redirect.
+    expect(matcherCookies).toContain(name);
+    expect(matcherCookies).toContain(name.replace(/^__Secure-/, ""));
   });
 
   it("should renew the session cookie for 30 days when the session was last renewed over a day ago", async () => {

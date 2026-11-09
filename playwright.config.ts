@@ -15,8 +15,13 @@ const prodSpecs = /\.prod\.spec\.ts$/;
 /** True when `url` is a database on this machine (the E2E_LOCAL_DB specs seed one). */
 function isLocalDatabase(url: string | undefined): url is string {
   if (!url) return false;
-  const host = new URL(url).hostname;
-  return host === "localhost" || host === "127.0.0.1";
+  try {
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "127.0.0.1";
+  } catch {
+    // A malformed URL is not a local database; the placeholder is used instead.
+    return false;
+  }
 }
 
 /**
