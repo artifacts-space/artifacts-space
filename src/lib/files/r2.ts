@@ -136,7 +136,7 @@ export async function presignUpload(
   return { url, method: "PUT", headers, expiresAt: new Date(now.getTime() + input.expiresIn * 1000) };
 }
 
-/** Signing time for downloads, rounded down to five minutes so repeat views reuse one URL and the browser cache. */
+/** Signing time for downloads, rounded down to fileLimits.downloadSigningWindowSeconds so repeat views reuse one URL and the browser cache. */
 export function downloadSigningTime(now: Date): Date {
   const window = fileLimits.downloadSigningWindowSeconds * 1000;
   return new Date(Math.floor(now.getTime() / window) * window);
@@ -144,8 +144,8 @@ export function downloadSigningTime(now: Date): Date {
 
 /**
  * A presigned GET that makes R2 answer with our content type, disposition,
- * and cache policy. The URL stays valid for at least `expiresIn` minus five
- * minutes, because the signing time is rounded down.
+ * and cache policy. The URL stays valid for at least `expiresIn` minus
+ * fileLimits.downloadSigningWindowSeconds, because the signing time is rounded down.
  */
 export async function presignDownload(
   config: R2Config,
