@@ -33,7 +33,7 @@ export interface McpArtifact {
   visibility: ArtifactVisibility;
   /** Who can read and write its comments: off, team, or signed_in. */
   comments: CommentSetting;
-  /** Whether search engines may list it: only public artifacts whose author turned this on in the web app. Read-only for agents. */
+  /** Whether search engines may list it: only public artifacts that someone who can share them turned this on for in the web app. Read-only for agents. */
   showInSearch: boolean;
   /** The team's slug, shown only when the caller belongs to that team. */
   team: string | null;

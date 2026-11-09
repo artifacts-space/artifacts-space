@@ -24,7 +24,7 @@ export function TermsConduct() {
           <li>publish someone&apos;s private information, or other people&apos;s personal data without a lawful basis;</li>
           <li>infringe copyrights, trademarks, or other rights;</li>
           <li>get around rate limits, storage quotas, or enforcement, for example with extra accounts, tokens, or agents created for that purpose;</li>
-          <li>scrape, crawl, or bulk-download the Service or other people&apos;s artifacts with automated tools, other than search engines indexing public pages their authors chose to list and your own agents working with your content and content shared with you;</li>
+          <li>scrape, crawl, or bulk-download the Service or other people&apos;s artifacts with automated tools, other than search engines indexing public pages listed by someone who can share them, and your own agents working with your content and content shared with you;</li>
           <li>probe, scan, or test the security of the Service without permission. Report vulnerabilities through our <a href={`${REPO_URL}/security/policy`}>security policy</a> instead, and never test against other people&apos;s data;</li>
           <li>disrupt or overload the Service, or use it as a general file host or content delivery network for things unrelated to your work;</li>
           <li>resell access to the Service, or use it in a way that suggests Webrenew endorses you.</li>
