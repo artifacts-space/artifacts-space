@@ -5,6 +5,26 @@ import { crawlOrigin, sitemapFor } from "@/lib/crawl-rules";
 import { sitemapCandidates } from "@/lib/search/search-queries";
 import { artifactSitemapPaths } from "@/lib/search/search-rules";
 
+/**
+ * Longest the artifact list may take. A database that hangs (rather than
+ * refusing) would otherwise stall the build's prerender until Next's own
+ * cache timeout fails it; this makes it fall back to the site's pages.
+ */
+const ARTIFACT_LIST_TIMEOUT_MS = 10_000;
+
+/** Rejects when `promise` takes longer than `ms`, and always clears its timer. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`Timed out after ${String(ms)} ms`));
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    clearTimeout(timer);
+  });
+}
+
 /** A short, non-sensitive label for a failed read: the error's name and, when it has one, its code (such as a Postgres SQLSTATE). */
 function failureLabel(error: unknown): string {
   const name = error instanceof Error ? error.name : "unknown error";
@@ -20,7 +40,7 @@ function failureLabel(error: unknown): string {
 async function artifactPaths(): Promise<string[]> {
   "use cache";
   try {
-    const paths = artifactSitemapPaths(await sitemapCandidates());
+    const paths = artifactSitemapPaths(await withTimeout(sitemapCandidates(), ARTIFACT_LIST_TIMEOUT_MS));
     cacheLife("hours");
     return paths;
   } catch (error) {

@@ -6,7 +6,9 @@ import type { SitemapCandidate } from "@/lib/search/search-rules";
  * sitemap.xml: it lists only public artifacts opted into search engines,
  * even when the query returns more, keeps the list for an hour, and falls
  * back to the site's pages, kept for a minute, when the database fails. The
- * query and Next's cache lifetime are mocked at their boundaries.
+ * query and Next's cache lifetime are mocked at their boundaries, so these
+ * tests cannot see the "use cache" directive itself; the production e2e
+ * check in e2e/search-visibility.prod.spec.ts covers that.
  */
 
 const mocks = vi.hoisted(() => ({ candidates: vi.fn(), cacheLife: vi.fn() }));
@@ -62,5 +64,19 @@ describe("sitemap", () => {
     expect(await listedArtifacts()).toEqual([]);
     expect(mocks.cacheLife).toHaveBeenLastCalledWith("minutes");
     expect(mocks.cacheLife).not.toHaveBeenCalledWith("hours");
+  });
+
+  it("should list the site's pages, kept for a minute, when the database hangs", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.candidates.mockReturnValue(new Promise(() => undefined));
+      const pending = sitemap();
+      await vi.advanceTimersByTimeAsync(10_000);
+      const entries = await pending;
+      expect(entries.some((entry) => new URL(entry.url).pathname.startsWith("/artifact/"))).toBe(false);
+      expect(mocks.cacheLife).toHaveBeenCalledExactlyOnceWith("minutes");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
