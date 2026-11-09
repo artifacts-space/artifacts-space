@@ -3,22 +3,15 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { registerArtifactTools } from "./artifact-tools";
-import { registerFileTools } from "./file-tools";
-import { registerFormatTools } from "./format-tools";
-import { registerProjectTools } from "./project-tools";
-import { registerTagTools } from "./tag-tools";
-import { registerTeamTools } from "./team-tools";
-import { registerThemeTools } from "./theme-tools";
-import { registerVersionTools } from "./version-tools";
-import { registerViewTools } from "./view-tools";
+import { registerAllTools } from "./register-tools";
 
 /*
  * `anthropic/alwaysLoad` asks Claude Code to load a tool up front instead of
  * behind tool search. Every always-loaded tool costs context in every
- * session, so only artifacts_create carries it. The registrations match
- * src/app/api/mcp/route.ts, and the list comes through the SDK's own client,
- * which shows a standard client accepts the extra `_meta` key. Nothing here
+ * session, so only artifacts_create carries it. The tools come from
+ * registerAllTools, as src/app/api/mcp/route.ts registers them, and the list
+ * comes through the SDK's own client, which shows a standard client accepts
+ * the extra `_meta` key. Nothing here
  * calls a handler, so no storage is touched.
  */
 
@@ -26,15 +19,7 @@ let client: Client;
 
 beforeEach(async () => {
   const server = new McpServer({ name: "test", version: "1.0.0" });
-  registerArtifactTools(server, "user-1", "full");
-  registerProjectTools(server, "user-1", "full");
-  registerTagTools(server, "user-1", "full");
-  registerFormatTools(server, "full");
-  registerThemeTools(server, "user-1", "full");
-  registerFileTools(server, "user-1", "full");
-  registerTeamTools(server, "user-1", "full");
-  registerVersionTools(server, "user-1", "full");
-  registerViewTools(server, "user-1", "full");
+  registerAllTools(server, "user-1", "full");
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   client = new Client({ name: "test-client", version: "1.0.0" });
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);

@@ -113,6 +113,7 @@ describe("summarize", () => {
     const saved = transcriptOf(assistant({ name: "mcp__artifacts__artifacts_create" }));
     const summary = summarize([gradeCase(planCase, saved, { error: "claude ended with an error (error_max_turns)" })]);
     expect(summary.routed).toBe(0);
+    expect(summary.shouldRoute).toBe(0);
     expect(summary.misroutes).toEqual([]);
     expect(summary.errors).toBe(1);
     expect(renderMarkdown(summary, { variant: "mcp", model: "m", startedAt: "t" })).toMatch(/error_max_turns/);
@@ -123,7 +124,21 @@ describe("summarize", () => {
     const summary = summarize([gradeCase(planCase, fileFirst), gradeCase({ ...planCase, id: "plan-2" }, transcriptOf(assistant({ name: "mcp__artifacts__artifacts_create" })))]);
     expect(summary.routed).toBe(2);
     expect(summary.routedFirst).toBe(1);
-    expect(summary.fileFirstCases.map((item) => item.id)).toEqual(["plan"]);
+    expect(summary.elsewhereFirstCases.map((item) => item.id)).toEqual(["plan"]);
+  });
+
+  it("should count an errored near miss that saved only as an error, never as a false positive", () => {
+    const saved = transcriptOf(assistant({ name: "mcp__artifacts__artifacts_create" }));
+    const summary = summarize([gradeCase(nearCase, saved, { error: "timed out after 240s" }), gradeCase({ ...nearCase, id: "near-2" }, transcriptOf())]);
+    expect(summary.falsePositives).toBe(0);
+    expect(summary.falsePositiveCases).toEqual([]);
+    expect(summary.nearMisses).toBe(1);
+    expect(summary.errors).toBe(1);
+  });
+
+  it("should note in the report that the default-line variant also loads the operator's own CLAUDE.md", () => {
+    expect(renderMarkdown(summarize([]), { variant: "default-line", model: "m", startedAt: "t" })).toMatch(/~\/\.claude\/CLAUDE\.md loaded too/);
+    expect(renderMarkdown(summarize([]), { variant: "mcp", model: "m", startedAt: "t" })).not.toMatch(/loaded too/);
   });
 
   it("should count routed prompts and near-miss false positives separately", () => {

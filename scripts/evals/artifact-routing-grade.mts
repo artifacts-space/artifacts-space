@@ -198,21 +198,24 @@ export function gradeCase(testCase: RoutingCase, transcript: Transcript, run: { 
   };
 }
 
-/** The headline numbers for a pass. */
+/** The headline numbers for a pass. Runs with errors are left out of every count but `errors`. */
 export interface RoutingSummary {
+  /** Prompts that should save, among runs without errors. */
   shouldRoute: number;
-  /** Saved to artifacts.space at all, in a run without errors. */
+  /** Saved to artifacts.space at all. */
   routed: number;
   routedPercent: number;
   /** Saved to artifacts.space before writing any local file. */
   routedFirst: number;
   routedFirstPercent: number;
+  /** Near misses among runs without errors. */
   nearMisses: number;
   falsePositives: number;
   errors: number;
   costUsd: number;
   misroutes: CaseResult[];
-  fileFirstCases: CaseResult[];
+  /** Saved, but the first save or write went elsewhere (a local file, or only the stub's log showed the save). */
+  elsewhereFirstCases: CaseResult[];
   falsePositiveCases: CaseResult[];
   errorCases: CaseResult[];
 }
@@ -221,24 +224,29 @@ function percent(part: number, whole: number) {
   return whole === 0 ? 0 : Math.round((part / whole) * 1000) / 10;
 }
 
-/** Counts routed prompts, prompts routed first, misroutes, near-miss false positives, and errors. */
+/**
+ * Counts routed prompts, prompts routed first, misroutes, and near-miss false
+ * positives over the runs without errors, and lists the errored runs apart.
+ */
 export function summarize(results: readonly CaseResult[]): RoutingSummary {
   const clean = results.filter((result) => !result.error);
-  const should = results.filter((result) => result.expect === "artifacts");
-  const routed = clean.filter((result) => result.expect === "artifacts" && result.saved);
-  const falsePositiveCases = results.filter((result) => result.expect === "elsewhere" && result.saved);
+  const should = clean.filter((result) => result.expect === "artifacts");
+  const near = clean.filter((result) => result.expect === "elsewhere");
+  const routed = should.filter((result) => result.saved);
+  const routedFirst = routed.filter((result) => result.route === "artifacts");
+  const falsePositiveCases = near.filter((result) => result.saved);
   return {
     shouldRoute: should.length,
     routed: routed.length,
     routedPercent: percent(routed.length, should.length),
-    routedFirst: routed.filter((result) => result.route === "artifacts").length,
-    routedFirstPercent: percent(routed.filter((result) => result.route === "artifacts").length, should.length),
-    nearMisses: results.length - should.length,
+    routedFirst: routedFirst.length,
+    routedFirstPercent: percent(routedFirst.length, should.length),
+    nearMisses: near.length,
     falsePositives: falsePositiveCases.length,
     errors: results.length - clean.length,
     costUsd: Math.round(results.reduce((sum, result) => sum + result.costUsd, 0) * 100) / 100,
-    misroutes: clean.filter((result) => result.expect === "artifacts" && !result.saved),
-    fileFirstCases: routed.filter((result) => result.route !== "artifacts"),
+    misroutes: should.filter((result) => !result.saved),
+    elsewhereFirstCases: routed.filter((result) => result.route !== "artifacts"),
     falsePositiveCases,
     errorCases: results.filter((result) => result.error),
   };
@@ -254,23 +262,35 @@ function section(title: string, cases: readonly CaseResult[]) {
   return [`## ${title}`, "", ...(cases.length > 0 ? cases.map(caseLine) : ["None."]), ""];
 }
 
+/** What each variant loads from the operator's own setup, which can move its numbers. */
+const variantCaveats: Record<string, string> = {
+  "default-line": "This variant loads CLAUDE.md files, so your own ~/.claude/CLAUDE.md loaded too. If it mentions artifacts.space, it raised these numbers.",
+  skill: "This variant loads skills, so your own ~/.claude/skills loaded too.",
+};
+
+function caveatLines(variant: string) {
+  const caveat = variantCaveats[variant];
+  return caveat ? [caveat, ""] : [];
+}
+
 /** The Markdown report for one pass. */
 export function renderMarkdown(summary: RoutingSummary, meta: { variant: string; model: string; startedAt: string }): string {
   return [
     `# Artifact routing eval: ${meta.variant}`,
     "",
-    `Run ${meta.startedAt} on ${meta.model || "the default model"}.`,
+    `Run ${meta.startedAt} on ${meta.model || "the default model"}. Runs with errors are left out of every count but their own row.`,
     "",
+    ...caveatLines(meta.variant),
     "| Measure | Result |",
     "| --- | --- |",
     `| Saved to artifacts.space | ${summary.routed} of ${summary.shouldRoute} (${summary.routedPercent}%) |`,
     `| Saved there before any local file | ${summary.routedFirst} of ${summary.shouldRoute} (${summary.routedFirstPercent}%) |`,
     `| Near-miss false positives | ${summary.falsePositives} of ${summary.nearMisses} |`,
-    `| Runs with errors (not graded as routes) | ${summary.errors} |`,
+    `| Runs with errors (left out of the counts above) | ${summary.errors} |`,
     `| Estimated cost | $${summary.costUsd.toFixed(2)} |`,
     "",
     ...section("Misroutes", summary.misroutes),
-    ...section("Saved, but wrote a local file first", summary.fileFirstCases),
+    ...section("Saved, but went elsewhere first (file: wrote a local file; chat: only the stub's log showed the save)", summary.elsewhereFirstCases),
     ...section("Near-miss false positives", summary.falsePositiveCases),
     ...section("Runs with errors", summary.errorCases),
   ].join("\n");

@@ -2,17 +2,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
 import { hitRateLimits, rateLimitMessage } from "@/lib/abuse/rate-limit";
-import { registerArtifactTools } from "@/lib/mcp/artifact-tools";
 import { authenticateMcpRequest, bearerToken, type McpPrincipal } from "@/lib/mcp/authenticate";
-import { registerFileTools } from "@/lib/mcp/file-tools";
-import { registerFormatTools } from "@/lib/mcp/format-tools";
-import { registerProjectTools } from "@/lib/mcp/project-tools";
-import { registerTagTools } from "@/lib/mcp/tag-tools";
+import { registerAllTools } from "@/lib/mcp/register-tools";
 import { jsonRpcId, mcpLimitChecks, mcpRateLimitedResponse, mcpToolCalls } from "@/lib/mcp/rate-limits";
-import { registerTeamTools } from "@/lib/mcp/team-tools";
-import { registerThemeTools } from "@/lib/mcp/theme-tools";
-import { registerVersionTools } from "@/lib/mcp/version-tools";
-import { registerViewTools } from "@/lib/mcp/view-tools";
 import { SERVER_INSTRUCTIONS } from "@/lib/mcp/routing-copy";
 import { READ_ONLY_INSTRUCTIONS } from "@/lib/mcp/tool-access";
 import { bearerChallenge } from "@/lib/oauth/metadata";
@@ -25,15 +17,7 @@ function createMcpServer({ userId, access }: McpPrincipal) {
     { instructions: access === "read" ? `${SERVER_INSTRUCTIONS} ${READ_ONLY_INSTRUCTIONS}` : SERVER_INSTRUCTIONS },
   );
 
-  registerArtifactTools(server, userId, access);
-  registerProjectTools(server, userId, access);
-  registerTagTools(server, userId, access);
-  registerFormatTools(server, access);
-  registerThemeTools(server, userId, access);
-  registerFileTools(server, userId, access);
-  registerTeamTools(server, userId, access);
-  registerVersionTools(server, userId, access);
-  registerViewTools(server, userId, access);
+  registerAllTools(server, userId, access);
   return server;
 }
 

@@ -91,6 +91,7 @@ interface Options {
 /** Writes the sample project, the variant's extras, and the stub's MCP config into a fresh folder. */
 function prepareWorkspace(options: Options) {
   const dir = mkdtempSync(join(tmpdir(), "artifact-routing-"));
+  activeWorkspaces.add(dir);
   for (const [path, content] of Object.entries(sampleProject)) {
     mkdirSync(join(dir, path, ".."), { recursive: true });
     writeFileSync(join(dir, path), content);
@@ -150,6 +151,8 @@ const KILL_GRACE_MS = 5_000;
 
 /** Runs that are still going, so Ctrl+C can stop them and the stubs they started. */
 const activeRuns = new Set<ChildProcess>();
+/** Workspaces not yet removed, so Ctrl+C can remove them too. */
+const activeWorkspaces = new Set<string>();
 
 /** Signals the run's whole process group: `claude` and the stub server it started. */
 function signalGroup(child: ChildProcess, signal: NodeJS.Signals) {
@@ -211,6 +214,7 @@ async function runCase(testCase: RoutingCase, options: Options): Promise<CaseRes
   } finally {
     // runClaude settles only after the run has exited, so nothing still writes here.
     rmSync(dir, { recursive: true, force: true });
+    activeWorkspaces.delete(dir);
   }
 }
 
@@ -234,6 +238,7 @@ async function runAll(cases: RoutingCase[], options: Options): Promise<CaseResul
 /** Rebuilds artifact-routing-tools.json from the code, so the stub serves what the working tree would ship. */
 function refreshToolsSnapshot() {
   const result = spawnSync("pnpm", ["exec", "vitest", "run", toolsTestPath, "--update"], { cwd: repoRoot, encoding: "utf8" });
+  if (result.error) throw new Error(`Could not run pnpm to refresh artifact-routing-tools.json: ${result.error.message}`);
   if (result.status !== 0) throw new Error(`Could not refresh artifact-routing-tools.json: ${tail(`${result.stdout}${result.stderr}`, 600)}`);
 }
 
@@ -272,10 +277,11 @@ async function readOptions(): Promise<Options> {
   };
 }
 
-/** Stops every running `claude` and its stub on Ctrl+C, so no run outlives the eval. */
+/** Stops every running `claude` and its stub on Ctrl+C and removes their workspaces, so nothing outlives the eval. */
 function stopRunsOnInterrupt() {
   process.once("SIGINT", () => {
     for (const child of activeRuns) signalGroup(child, "SIGKILL");
+    for (const dir of activeWorkspaces) rmSync(dir, { recursive: true, force: true });
     process.exit(130);
   });
 }
