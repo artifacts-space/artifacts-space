@@ -15,6 +15,18 @@ async function scrollGrid(grid: Locator, to: { top?: number; left?: number }) {
   await grid.evaluate((element, position) => { element.scrollTo(position); }, to);
 }
 
+/**
+ * Scrolls the grid until `shows` is in the page. Scrolling again covers a
+ * scroll made while the page was still hydrating, which a slow first load
+ * on CI can undo.
+ */
+async function scrollGridTo(grid: Locator, to: { top?: number; left?: number }, shows: Locator) {
+  await expect(async () => {
+    await scrollGrid(grid, to);
+    await expect(shows).toBeAttached({ timeout: 1000 });
+  }).toPass();
+}
+
 async function pageScrollsSideways(page: Page) {
   return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 }
@@ -29,13 +41,11 @@ test("should keep only the cells in view in the page when a sheet at the size li
   // 50,000 cells in the file; a few hundred at most in the page.
   expect(await cellCount(grid)).toBeLessThan(800);
 
-  await scrollGrid(grid, { top: 16_000 });
-  await expect(grid.getByRole("gridcell", { name: "r501c1", exact: true })).toBeAttached();
+  await scrollGridTo(grid, { top: 16_000 }, grid.getByRole("gridcell", { name: "r501c1", exact: true }));
   await expect(grid.getByRole("gridcell", { name: "r2c1", exact: true })).toHaveCount(0);
   expect(await cellCount(grid)).toBeLessThan(800);
 
-  await scrollGrid(grid, { left: 100_000 });
-  await expect(grid.getByRole("gridcell", { name: /^r\d+c50$/ }).first()).toBeAttached();
+  await scrollGridTo(grid, { left: 100_000 }, grid.getByRole("gridcell", { name: /^r\d+c50$/ }).first());
   // Column 1 holds the active cell, so it stays; its neighbour scrolled out of the page.
   await expect(grid.getByRole("gridcell", { name: /^r\d+c2$/ })).toHaveCount(0);
   expect(await cellCount(grid)).toBeLessThan(800);
@@ -48,9 +58,8 @@ test("should keep only the cells in view in the page when a sheet at the size li
 test("should label every rendered cell with its place in the whole sheet when the grid is virtualized", async ({ page }) => {
   await page.goto("/dev/components#formats");
   const grid = largeSheet(page);
-  await scrollGrid(grid, { top: 32 * 300, left: 2000 });
   const row = grid.locator('[role=row][aria-rowindex="302"]');
-  await expect(row).toBeAttached();
+  await scrollGridTo(grid, { top: 32 * 300, left: 2000 }, row);
   const cell = row.getByRole("gridcell").last();
   const index = Number(await cell.getAttribute("aria-colindex"));
   expect(index).toBeGreaterThan(2);
@@ -81,8 +90,10 @@ test("should scroll only the grid sideways and keep the page header in view when
   await page.goto("/dev/editor?kind=sheet");
   const grid = page.getByRole("grid", { name: "CSV grid editor" });
   await expect(grid).toBeVisible();
-  await scrollGrid(grid, { top: 5000, left: 3000 });
-  await expect.poll(() => grid.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  await expect(async () => {
+    await scrollGrid(grid, { top: 5000, left: 3000 });
+    expect(await grid.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  }).toPass();
   expect(await pageScrollsSideways(page)).toBeLessThanOrEqual(0);
   await grid.scrollIntoViewIfNeeded();
   await expect(page.getByRole("banner")).toBeInViewport();
