@@ -112,6 +112,11 @@ function tabLeaves(exit: TabExit, event: KeyboardEvent): boolean {
   return event.shiftKey ? exit.backward : exit.forward;
 }
 
+/** Whether an event comes from a text field inside the grid (a cell or name being edited), whose own copy must work as usual. */
+function fromField(event: { target: EventTarget }): boolean {
+  return event.target instanceof Element && event.target.closest("textarea, input") !== null;
+}
+
 /** When focus comes into the grid from outside, the first Tab back toward where it came from leaves again. */
 function exitOnFocus(event: FocusEvent<HTMLDivElement>): TabExit {
   const from = event.relatedTarget;
@@ -181,6 +186,7 @@ export function DataGrid(props: DataGridProps) {
   // With Tab moving between cells, keyboard users still get out: Escape then Tab leaves either way, and
   // the first Tab back the way focus came in leaves too, so Shift+Tab then Tab returns where it started.
   const leaveRef = useRef<TabExit>(noExit);
+  const pointerFocus = useRef(false);
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (props.onGridKeyDown?.(event) || event.defaultPrevented) return;
@@ -212,11 +218,14 @@ export function DataGrid(props: DataGridProps) {
         aria-multiselectable
         aria-activedescendant={kept.column === -1 ? undefined : gridCellId(gridId, active)}
         onKeyDown={handleKeyDown}
-        onFocus={(event) => { leaveRef.current = exitOnFocus(event); }}
+        // A click into the grid is not a Tab into it, so Shift+Tab then moves left instead of leaving.
+        onPointerDownCapture={() => { pointerFocus.current = true; }}
+        onPointerUpCapture={() => { pointerFocus.current = false; }}
+        onFocus={(event) => { leaveRef.current = pointerFocus.current ? noExit : exitOnFocus(event); }}
         onPointerDown={pointer.onPointerDown}
         onClick={pointer.onClick}
         onPaste={props.onPaste}
-        onCopy={props.onCopy}
+        onCopy={(event) => { if (!fromField(event)) props.onCopy?.(event); }}
         onMouseOver={showClippedTitle}
         style={fillHeight === null ? undefined : { maxHeight: fillHeight }}
         // 70vh tall at most, unless it fills an artifact page; the /app shell lowers it with --data-grid-max-height to fit the pane.

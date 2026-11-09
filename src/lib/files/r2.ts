@@ -1,5 +1,7 @@
 import { AwsV4Signer } from "aws4fetch";
 
+import { fileLimits } from "./config";
+
 /**
  * Cloudflare R2 storage over its S3-compatible API, signed with SigV4.
  * Server only: it reads the R2 keys from the environment, and nothing here
@@ -134,16 +136,16 @@ export async function presignUpload(
   return { url, method: "PUT", headers, expiresAt: new Date(now.getTime() + input.expiresIn * 1000) };
 }
 
-/** Signing time for downloads, rounded down to five minutes so repeat views reuse one URL and the browser cache. */
+/** Signing time for downloads, rounded down to fileLimits.downloadSigningWindowSeconds so repeat views reuse one URL and the browser cache. */
 export function downloadSigningTime(now: Date): Date {
-  const window = 5 * 60 * 1000;
+  const window = fileLimits.downloadSigningWindowSeconds * 1000;
   return new Date(Math.floor(now.getTime() / window) * window);
 }
 
 /**
  * A presigned GET that makes R2 answer with our content type, disposition,
- * and cache policy. The URL stays valid for at least `expiresIn` minus five
- * minutes, because the signing time is rounded down.
+ * and cache policy. The URL stays valid for at least `expiresIn` minus
+ * fileLimits.downloadSigningWindowSeconds, because the signing time is rounded down.
  */
 export async function presignDownload(
   config: R2Config,

@@ -94,7 +94,6 @@ const headerInRange = (range: CellRange | null, column: number) => range !== nul
 /** Whether a column is in the selected block. */
 const columnSelected = (range: CellRange | null, column: number) => range !== null && column >= range.left && column <= range.right;
 
-/** One column's header: its name and controls, or the editor while it is renamed. */
 /** A header cell's state: active, being renamed, selected, and how it looks. */
 function headerState(row: HeaderRowProps, column: number) {
   const isActive = row.active.row === -1 && row.active.column === column;
@@ -106,6 +105,7 @@ function headerState(row: HeaderRowProps, column: number) {
   };
 }
 
+/** One column's header: its name and controls, or the editor while it is renamed. */
 function HeaderCell({ column, row }: { column: number; row: HeaderRowProps }) {
   const { activeContent, onMoveStart, onResizeStart } = row;
   const { editing, selected, className } = headerState(row, column);

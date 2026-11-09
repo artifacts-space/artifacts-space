@@ -70,6 +70,13 @@ email, and R2 clients on first request, never at import time. CodeQL scans
 the code and the workflows. Dependabot opens grouped weekly updates and waits
 two weeks after a release.
 
+Vercel skips some preview builds (`ignoreCommand` in `vercel.json`, rules in
+`scripts/vercel-ignore-build-rules.mts`): merge queue branches, and previews
+whose changes since the last deploy touch only files the app never reads
+(root docs such as `README.md`, `.github/**`, `docs/images/**`). Production
+always builds, because it applies the migrations. Before you add a path to
+that list, check that the app never reads it at build or run time.
+
 Actions are pinned to full commit SHAs with a version comment. Workflows get
 `contents: read` unless a job needs more, and never use
 `pull_request_target`.
@@ -205,6 +212,12 @@ catch this, so test the generated SQL with `.toSQL()`, as
 
 - Every read, in the web app and over MCP, goes through the same access check
   (`src/lib/access.ts`, `src/lib/access-rules.ts`).
+  One deliberate exception: `/api/files/<id>` lets the viewer's own browser
+  keep its redirect to a signed R2 URL for 4 minutes (`private`, with
+  `Vary: Cookie, Authorization`), so someone who loses access can reload a
+  file they just loaded for that long. Refusals and errors are never cached.
+  The numbers are tied in `src/lib/files/redirect-cache-rules.ts`; keep them
+  there rather than going back to `no-store`.
 - Every MCP tool is classified read or write in `src/lib/mcp/tool-access.ts`.
   A tool missing from that list cannot be registered, and read-only
   connections never see write tools.
