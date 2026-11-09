@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { decideBuild, isUnreadByApp } from "./vercel-ignore-build.mjs";
+import { decideBuild, exitCodeFor, isCommitSha, isUnreadByApp } from "./vercel-ignore-build-rules.mts";
 
 const preview = { VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "feature/docs" };
 
@@ -39,7 +39,9 @@ describe("decideBuild", () => {
 
   it("should skip when a preview changed only docs, GitHub settings, and README images", () => {
     const changedFiles = ["README.md", "AGENTS.md", "CLAUDE.md", "LICENSE", ".github/ISSUE_TEMPLATE/bug_report.yml", ".github/workflows/ci.yml", "docs/images/hero.webp"];
-    expect(decideBuild({ env: preview, changedFiles }).build).toBe(false);
+    const decision = decideBuild({ env: preview, changedFiles });
+    expect(decision.build).toBe(false);
+    expect(decision.reason).toBe("Skipping: only files the app never reads changed: README.md, AGENTS.md, CLAUDE.md, LICENSE, .github/ISSUE_TEMPLATE/bug_report.yml, and 2 more.");
   });
 
   it("should build when any changed file is one the app reads", () => {
@@ -59,6 +61,22 @@ describe("isUnreadByApp", () => {
     const read = ["src/app/docs/page.tsx", "src/lib/README.md", "public/robots.txt", "drizzle/0001_init.sql", "package.json", "pnpm-lock.yaml", "vercel.json", "next.config.ts", "scripts/migrate-on-deploy.mts", ".nvmrc", "docs/guide.md", "readme.md", ".githubx/file"];
     for (const path of read) {
       expect(isUnreadByApp(path)).toBe(false);
+    }
+  });
+});
+
+describe("exitCodeFor", () => {
+  it("should exit 1 to build and 0 to skip, as Vercel expects", () => {
+    expect(exitCodeFor({ build: true, reason: "" })).toBe(1);
+    expect(exitCodeFor({ build: false, reason: "" })).toBe(0);
+  });
+});
+
+describe("isCommitSha", () => {
+  it("should accept only a full lowercase hex SHA", () => {
+    expect(isCommitSha("0123456789abcdef0123456789abcdef01234567")).toBe(true);
+    for (const value of [undefined, "", "0123456", "--upload-pack=evil", "HEAD", "0123456789ABCDEF0123456789ABCDEF01234567"]) {
+      expect(isCommitSha(value)).toBe(false);
     }
   });
 });
