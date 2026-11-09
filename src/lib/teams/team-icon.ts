@@ -4,12 +4,11 @@ import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
-import { team } from "@/db/schema";
+import { team, teamMember } from "@/db/schema";
 import { deleteObject, presignDownload, putObject, r2ConfigFromEnv } from "@/lib/files/r2";
 import { fileLimits } from "@/lib/files/config";
 import { UserFacingError } from "@/lib/user-facing-error";
 
-import { getTeamMembershipById } from "./queries";
 import { checkTeamIconBytes, parseTeamIconKey, teamIconKey } from "./team-icon-rules";
 
 /**
@@ -78,22 +77,29 @@ export async function removeTeamIcon(teamId: string): Promise<void> {
   await deleteOldIcon(teamId, swapped.previous);
 }
 
-/** The team's stored icon key, or null. */
-async function storedIconKey(teamId: string): Promise<string | null> {
-  const [row] = await getDb().select({ logo: team.logo }).from(team).where(and(eq(team.id, teamId), eq(team.personal, false))).limit(1);
-  return row?.logo ?? null;
+/**
+ * The icon key of a shared team, read through the viewer's own membership
+ * row: one statement, a join (never a correlated subquery, see AGENTS.md),
+ * and no rows for anyone outside the team. Exported for its `.toSQL()` test.
+ */
+export function memberIconKeyQuery(db: Pick<ReturnType<typeof getDb>, "select">, viewerId: string, teamId: string) {
+  return db
+    .select({ logo: team.logo })
+    .from(teamMember)
+    .innerJoin(team, eq(team.id, teamMember.teamId))
+    .where(and(eq(teamMember.userId, viewerId), eq(team.id, teamId), eq(team.personal, false)))
+    .limit(1);
 }
 
 /**
  * A short-lived link to the team's icon for `viewerId`, or null when they
- * are not in the team, the team has no icon, or its stored key is not one
- * this app made for this team. Callers answer "not found" for null, so a
- * team's icon never shows outside the team.
+ * are not in the team, the team is personal or has no icon, or its stored
+ * key is not one this app made for this team. Callers answer "not found"
+ * for null, so a team's icon never shows outside the team.
  */
 export async function signedTeamIconUrl(viewerId: string, teamId: string): Promise<string | null> {
-  const membership = await getTeamMembershipById(viewerId, teamId);
-  if (!membership || membership.personal) return null;
-  const key = await storedIconKey(teamId);
+  const [row] = await memberIconKeyQuery(getDb(), viewerId, teamId);
+  const key = row?.logo ?? null;
   const parsed = parseTeamIconKey(teamId, key);
   if (!parsed || !key) return null;
   const { url } = await presignDownload(r2ConfigFromEnv(), {

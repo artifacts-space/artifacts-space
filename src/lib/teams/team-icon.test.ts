@@ -10,16 +10,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   execute: vi.fn(),
   limit: vi.fn(),
-  membership: vi.fn(),
   putObject: vi.fn(),
   deleteObject: vi.fn(),
   presignDownload: vi.fn(),
 }));
 
 vi.mock("@/db", () => ({
-  getDb: () => ({ execute: mocks.execute, select: () => ({ from: () => ({ where: () => ({ limit: mocks.limit }) }) }) }),
+  getDb: () => ({ execute: mocks.execute, select: () => ({ from: () => ({ innerJoin: () => ({ where: () => ({ limit: mocks.limit }) }) }) }) }),
 }));
-vi.mock("./queries", () => ({ getTeamMembershipById: mocks.membership }));
 vi.mock("@/lib/files/r2", () => ({
   r2ConfigFromEnv: () => ({ accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }),
   putObject: mocks.putObject,
@@ -27,7 +25,9 @@ vi.mock("@/lib/files/r2", () => ({
   presignDownload: mocks.presignDownload,
 }));
 
-const { removeTeamIcon, saveTeamIcon, signedTeamIconUrl } = await import("./team-icon");
+const { memberIconKeyQuery, removeTeamIcon, saveTeamIcon, signedTeamIconUrl } = await import("./team-icon");
+const { neon } = await import("@neondatabase/serverless");
+const { drizzle } = await import("drizzle-orm/neon-http");
 
 const oldKey = "team-icons/team-1/7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a.png";
 const newKeyPattern = /^team-icons\/team-1\/[0-9a-f-]{36}\.png$/;
@@ -101,30 +101,39 @@ describe("removeTeamIcon", () => {
 
 describe("signedTeamIconUrl", () => {
   it("should sign a link for a member of the team", async () => {
-    mocks.membership.mockResolvedValue({ id: "team-1", personal: false });
     mocks.limit.mockResolvedValue([{ logo: oldKey }]);
     mocks.presignDownload.mockResolvedValue({ url: "https://r2.example.com/signed" });
     expect(await signedTeamIconUrl("user-1", "team-1")).toBe("https://r2.example.com/signed");
     expect(mocks.presignDownload).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ key: oldKey, contentType: "image/png" }));
   });
 
-  it("should sign nothing for someone outside the team", async () => {
-    mocks.membership.mockResolvedValue(null);
-    mocks.limit.mockResolvedValue([{ logo: oldKey }]);
+  it("should sign nothing for someone outside the team or for a personal team, which the query returns no row for", async () => {
+    mocks.limit.mockResolvedValue([]);
     expect(await signedTeamIconUrl("stranger", "team-1")).toBeNull();
     expect(mocks.presignDownload).not.toHaveBeenCalled();
   });
 
   it("should sign nothing when the stored key belongs to another team", async () => {
-    mocks.membership.mockResolvedValue({ id: "team-1", personal: false });
     mocks.limit.mockResolvedValue([{ logo: "team-icons/team-2/7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a.png" }]);
     expect(await signedTeamIconUrl("user-1", "team-1")).toBeNull();
     expect(mocks.presignDownload).not.toHaveBeenCalled();
   });
 
-  it("should sign nothing for a personal team", async () => {
-    mocks.membership.mockResolvedValue({ id: "team-1", personal: true });
+  it("should sign nothing when the team has no icon", async () => {
+    mocks.limit.mockResolvedValue([{ logo: null }]);
     expect(await signedTeamIconUrl("user-1", "team-1")).toBeNull();
     expect(mocks.presignDownload).not.toHaveBeenCalled();
+  });
+});
+
+describe("memberIconKeyQuery", () => {
+  const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+
+  it("should reach the icon only through the viewer's own membership in a shared team", () => {
+    const { sql, params } = memberIconKeyQuery(db, "user-1", "team-1").toSQL();
+    expect(sql).toContain('inner join "team" on "team"."id" = "team_member"."team_id"');
+    expect(sql).toMatch(/where \("team_member"\."user_id" = \$\d+ and "team"\."id" = \$\d+ and "team"\."personal" = \$\d+\)/);
+    expect(params).toEqual(expect.arrayContaining(["user-1", "team-1", false]));
+    expect(sql).not.toMatch(/"(\w+)" = "\1"(?!\.)/);
   });
 });

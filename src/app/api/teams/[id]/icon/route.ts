@@ -7,26 +7,30 @@ import { noindexHeader, robotsHeaderName } from "@/lib/search/search-rules";
 import { getSession } from "@/lib/session";
 import { signedTeamIconUrl } from "@/lib/teams/team-icon";
 
-/** Headers on every answer. Team icons are team-only, so nothing here is shared or indexed. */
+/**
+ * Headers on every answer. Team icons are team-only, so nothing here is
+ * shared, indexed, or kept: like /api/files, the redirect is never cached,
+ * so after sign-out a shared browser cannot follow it again. R2's answer is
+ * cached privately for five minutes (presignDownload), so repeat views cost
+ * one redirect, not a new download.
+ */
 const baseHeaders = {
+  "Cache-Control": "private, no-store",
   [robotsHeaderName]: noindexHeader,
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
 };
 
-/** The redirect may stay in this person's browser for five minutes: the signed link lasts at least ten, and a new icon gets a new URL. */
-const redirectCache = "private, max-age=300";
-
 const teamIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 
 function notFound() {
-  return new Response("Not found", { status: 404, headers: { ...baseHeaders, "Cache-Control": "private, no-store", "Content-Type": "text/plain; charset=utf-8" } });
+  return new Response("Not found", { status: 404, headers: { ...baseHeaders, "Content-Type": "text/plain; charset=utf-8" } });
 }
 
-/** The per-network limit shared with file views. Fails open, so a counter outage never hides icons. */
+/** The per-network limit on icon views, apart from file views. Fails open, so a counter outage never hides icons. */
 async function overLimit(request: Request) {
   try {
-    return await hitRateLimits([{ name: "fileDownloadByNetwork", subject: networkKey(request.headers) }]);
+    return await hitRateLimits([{ name: "teamIconByNetwork", subject: networkKey(request.headers) }]);
   } catch (error) {
     console.error("[team-icon] Rate limit check failed", error instanceof Error ? error.name : "unknown error");
     return null;
@@ -50,9 +54,9 @@ export async function GET(request: Request, context: RouteContext<"/api/teams/[i
     if (!session) return notFound();
     const url = await signedTeamIconUrl(session.user.id, teamId.data);
     if (!url) return notFound();
-    return new Response(null, { status: 302, headers: { ...baseHeaders, "Cache-Control": redirectCache, Location: url } });
+    return new Response(null, { status: 302, headers: { ...baseHeaders, Location: url } });
   } catch (error) {
     console.error("[team-icon] Loading the icon failed", error instanceof Error ? error.name : "unknown error");
-    return new Response("The icon could not be loaded. Try again.", { status: 500, headers: { ...baseHeaders, "Cache-Control": "private, no-store", "Content-Type": "text/plain; charset=utf-8" } });
+    return new Response("The icon could not be loaded. Try again.", { status: 500, headers: { ...baseHeaders, "Content-Type": "text/plain; charset=utf-8" } });
   }
 }
