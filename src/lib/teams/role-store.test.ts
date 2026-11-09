@@ -75,7 +75,12 @@ describe("setRoleCapability", () => {
     expect(mocks.execute).toHaveBeenCalledTimes(1);
   });
 
-  it("should throw when no audit row was written", async () => {
+  it("should log only a real change: a new role, an added cell, or a removed one", async () => {
+    await store.setRoleCapability(input);
+    expect(lastQuery().text).toContain("where role.created or exists (select 1 from added) or exists (select 1 from removed)");
+  });
+
+  it("should throw when the role could not be stored", async () => {
     mocks.execute.mockResolvedValue({ rows: [] });
     await expect(store.setRoleCapability(input)).rejects.toThrow("The role could not be saved.");
   });

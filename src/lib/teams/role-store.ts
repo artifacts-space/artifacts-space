@@ -102,8 +102,8 @@ export async function seedBuiltInRoles(teamId: string) {
 }
 
 /**
- * Turns one capability of a role on or off, and writes its audit row, in
- * one statement. Only that capability changes, so two people editing
+ * Turns one capability of a role on or off, and writes its audit row when
+ * that changed anything, in one statement. Only that capability changes, so two people editing
  * different cells of the same role never undo each other. A built-in role
  * with no stored row yet is stored first with `next`, its capabilities after
  * this change.
@@ -129,13 +129,18 @@ export async function setRoleCapability(input: { teamId: string; key: string; na
       insert into team_role_capability (role_id, capability)
       select role.id, ${input.capability} from role where not role.created and ${input.on}
       on conflict do nothing
+      returning team_role_capability.role_id
     ), removed as (
       delete from team_role_capability using role
       where team_role_capability.role_id = role.id and team_role_capability.capability = ${input.capability} and not role.created and not ${input.on}
+      returning team_role_capability.role_id
+    ), logged as (
+      -- Only a real change is logged: a repeated click on a cell already in that state writes nothing.
+      insert into team_permission_audit (id, team_id, actor_id, action, subject, before, after)
+      select ${auditValues(input.teamId, input.audit)} from role
+      where role.created or exists (select 1 from added) or exists (select 1 from removed)
     )
-    insert into team_permission_audit (id, team_id, actor_id, action, subject, before, after)
-    select ${auditValues(input.teamId, input.audit)} from role
-    returning team_permission_audit.id
+    select role.id from role
   `);
   requireRow(result.rows, "The role could not be saved.");
 }

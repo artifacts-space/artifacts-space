@@ -83,6 +83,8 @@ test("should let an owner create, edit, and give a custom role, and log each cha
   await memberLink.click();
   await expect(memberLink).toBeChecked();
   await expect(matrix.getByRole("checkbox", { name: "See views for Member" })).toBeChecked();
+  // The first edit stored the role with all of its defaults plus the new cell, never the one cell alone.
+  await expect.poll(() => roleCapabilities(team.id, "member")).toEqual(["analytics.view", "share.link"]);
   await memberLink.click();
   await expect(memberLink).not.toBeChecked();
   await expect(matrix.getByRole("checkbox", { name: "See views for Member" })).toBeChecked();
