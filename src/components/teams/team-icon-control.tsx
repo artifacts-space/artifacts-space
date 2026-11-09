@@ -9,7 +9,7 @@ import { removeTeamIconAction, uploadTeamIconAction } from "@/app/(workspace)/te
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { TEAM_ICON_ACCEPT } from "@/lib/teams/team-icon-rules";
+import { TEAM_ICON_ACCEPT, TEAM_ICON_SOURCE_LIMIT_LABEL } from "@/lib/teams/team-icon-rules";
 
 import { FormError } from "./form-error";
 import { prepareTeamIcon } from "./prepare-team-icon";
@@ -102,7 +102,7 @@ export function TeamIconControl({ teamId, teamName, iconUrl }: TeamIconControlPr
           <form noValidate onSubmit={(event) => { event.preventDefault(); }} className="grid gap-4">
             <div className="flex items-center gap-4">
               <TeamIcon name={teamName} iconUrl={iconUrl} size={64} className="text-lg" />
-              <p id={hintId} className="text-sm leading-5 text-muted-foreground">PNG, JPEG, or WebP, up to 2 MB. We cut it to a square.</p>
+              <p id={hintId} className="text-sm leading-5 text-muted-foreground">PNG, JPEG, or WebP, up to {TEAM_ICON_SOURCE_LIMIT_LABEL}. We cut it to a square.</p>
             </div>
             <input
               ref={inputRef}

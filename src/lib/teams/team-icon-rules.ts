@@ -1,13 +1,32 @@
+import { binaryMegabytes, decimalMegabytes } from "@/lib/format-bytes";
+
 import { can, type TeamActor } from "./capability-rules";
 
 /**
  * Rules for a team's icon: who may change it, which pictures it accepts,
- * and where it is stored. Pure and client-safe, so the browser checks a
- * picked file with the same rules the server uses on the upload.
+ * and where it is stored. Pure and client-safe: the browser applies the
+ * picked-file rules (type, and 2 MB before it shrinks the image), and the
+ * server re-checks the uploaded bytes (PNG or WebP, square, size, 1 MB).
  */
 
-/** Largest picked image and largest upload, in bytes (2 MB). */
-export const TEAM_ICON_MAX_BYTES = 2_097_152;
+/** Largest image a person may pick, in binary bytes (2 MB). The browser shrinks it before upload. */
+export const TEAM_ICON_SOURCE_MAX_BYTES = 2_097_152;
+
+/**
+ * Largest upload the server accepts, in decimal bytes (1 MB). What arrives is a
+ * 256 px square of a few dozen KB. It stays below Next's 1 MiB server
+ * action body limit, with room for the form's own bytes, so an oversized
+ * upload gets this app's message instead of the framework's. That limit is
+ * Next's default (`serverActions.bodySizeLimit`, unset in next.config.ts):
+ * if it ever changes, check this cap and its test again.
+ */
+export const TEAM_ICON_UPLOAD_MAX_BYTES = 1_000_000;
+
+/** The picked-file limit as people read it ("2 MB"), for copy that states it. */
+export const TEAM_ICON_SOURCE_LIMIT_LABEL = binaryMegabytes(TEAM_ICON_SOURCE_MAX_BYTES);
+
+/** The refusal for an upload over the server's cap, derived from the cap so the two never drift. */
+export const TEAM_ICON_TOO_LARGE = `The icon can be at most ${decimalMegabytes(TEAM_ICON_UPLOAD_MAX_BYTES)}.`;
 
 /** The side of the square the browser draws the icon at, in pixels. */
 export const TEAM_ICON_SIDE = 256;
@@ -43,7 +62,7 @@ export function canManageTeamIcon(member: TeamIconManager | null | undefined): b
 export function teamIconSourceProblem(file: { type: string; size: number }): string | null {
   if (!teamIconSourceTypes.has(file.type)) return "Pick a PNG, JPEG, or WebP image.";
   if (file.size === 0) return "That file is empty. Pick another image.";
-  if (file.size > TEAM_ICON_MAX_BYTES) return "Pick an image of 2 MB or less.";
+  if (file.size > TEAM_ICON_SOURCE_MAX_BYTES) return `Pick an image of ${TEAM_ICON_SOURCE_LIMIT_LABEL} or less.`;
   return null;
 }
 
@@ -137,12 +156,12 @@ export function readWebp(bytes: Uint8Array): TeamIconImage | null {
 
 /**
  * Checks an uploaded team icon by its bytes, never by its name or the type
- * the browser claims: a still PNG or WebP of at most 2 MB, square, between
+ * the browser claims: a still PNG or WebP of at most 1 MB, square, between
  * 16 and 256 pixels a side. Returns the picture, or why it was refused.
  */
 export function checkTeamIconBytes(bytes: Uint8Array): { ok: true; image: TeamIconImage } | { ok: false; error: string } {
   if (bytes.length === 0) return { ok: false, error: "That file is empty. Pick another image." };
-  if (bytes.length > TEAM_ICON_MAX_BYTES) return { ok: false, error: "The icon can be at most 2 MB." };
+  if (bytes.length > TEAM_ICON_UPLOAD_MAX_BYTES) return { ok: false, error: TEAM_ICON_TOO_LARGE };
   const image = readPng(bytes) ?? readWebp(bytes);
   if (!image) return { ok: false, error: "The icon must be a PNG or WebP image." };
   if (image.width !== image.height) return { ok: false, error: "The icon must be square." };

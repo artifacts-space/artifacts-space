@@ -8,7 +8,8 @@ import {
   parseTeamIconKey,
   readPng,
   readWebp,
-  TEAM_ICON_MAX_BYTES,
+  TEAM_ICON_UPLOAD_MAX_BYTES,
+  TEAM_ICON_SOURCE_MAX_BYTES,
   teamIconKey,
   teamIconSourceProblem,
   teamIconUrl,
@@ -96,8 +97,12 @@ describe("teamIconSourceProblem", () => {
     expect(teamIconSourceProblem({ type, size: 1000 })).toBe("Pick a PNG, JPEG, or WebP image.");
   });
 
+  it("should accept a picked file of exactly 2 MB, which the browser shrinks before upload", () => {
+    expect(teamIconSourceProblem({ type: "image/jpeg", size: TEAM_ICON_SOURCE_MAX_BYTES })).toBeNull();
+  });
+
   it("should refuse a file over 2 MB", () => {
-    expect(teamIconSourceProblem({ type: "image/png", size: TEAM_ICON_MAX_BYTES + 1 })).toBe("Pick an image of 2 MB or less.");
+    expect(teamIconSourceProblem({ type: "image/png", size: TEAM_ICON_SOURCE_MAX_BYTES + 1 })).toBe("Pick an image of 2 MB or less.");
   });
 
   it("should refuse an empty file", () => {
@@ -137,10 +142,21 @@ describe("checkTeamIconBytes", () => {
     expect(checkTeamIconBytes(png(side, side)).ok).toBe(false);
   });
 
-  it("should refuse bytes over 2 MB even when they start like a PNG", () => {
-    const big = new Uint8Array(TEAM_ICON_MAX_BYTES + 1);
+  it("should accept a PNG of exactly the cap", () => {
+    const filler = TEAM_ICON_UPLOAD_MAX_BYTES - png(256, 256).length - 12;
+    const exact = png(256, 256, { extra: chunk("tEXt", new Array<number>(filler).fill(0x20)) });
+    expect(exact.length).toBe(TEAM_ICON_UPLOAD_MAX_BYTES);
+    expect(checkTeamIconBytes(exact).ok).toBe(true);
+  });
+
+  it("should refuse an upload over 1 MB even when it starts like a PNG", () => {
+    const big = new Uint8Array(TEAM_ICON_UPLOAD_MAX_BYTES + 1);
     big.set(png(256, 256));
-    expect(checkTeamIconBytes(big)).toEqual({ ok: false, error: "The icon can be at most 2 MB." });
+    expect(checkTeamIconBytes(big)).toEqual({ ok: false, error: "The icon can be at most 1 MB." });
+  });
+
+  it("should keep the upload cap under Next's 1 MiB server action limit, with room for the form", () => {
+    expect(TEAM_ICON_UPLOAD_MAX_BYTES).toBeLessThanOrEqual(1_048_576 - 16_384);
   });
 
   it("should refuse a JPEG, which the browser should have re-encoded", () => {

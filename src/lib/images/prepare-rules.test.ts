@@ -12,7 +12,6 @@ import {
   imageTargetSize,
   isHeic,
   mayHaveAlpha,
-  megabytes,
   preparedFilename,
 } from "./prepare-rules";
 
@@ -111,10 +110,5 @@ describe("icon profile", () => {
 
   it("should leave the server's 1 MB icon cap as the authority when a photo is not prepared", () => {
     expect(isIconUploadAllowed({ type: "image/jpeg", size: 2_000_000 })).toBe(false);
-  });
-
-  it("should write byte caps the way people read them", () => {
-    expect(megabytes(1_048_576)).toBe("1 MB");
-    expect(megabytes(2_097_152)).toBe("2 MB");
   });
 });

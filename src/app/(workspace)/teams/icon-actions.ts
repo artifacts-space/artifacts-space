@@ -6,7 +6,7 @@ import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult } from "@/lib/artifact-types";
 import { removeTeamIcon, saveTeamIcon } from "@/lib/teams/team-icon";
-import { canManageTeamIcon, TEAM_ICON_MAX_BYTES } from "@/lib/teams/team-icon-rules";
+import { canManageTeamIcon, TEAM_ICON_UPLOAD_MAX_BYTES, TEAM_ICON_TOO_LARGE } from "@/lib/teams/team-icon-rules";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { guardTeam } from "./team-guard";
@@ -18,7 +18,7 @@ function iconFile(form: FormData): File | string {
   const file = form.get("icon");
   if (!(file instanceof File)) return "Pick an image to upload.";
   if (file.size === 0) return "That file is empty. Pick another image.";
-  if (file.size > TEAM_ICON_MAX_BYTES) return "The icon can be at most 2 MB.";
+  if (file.size > TEAM_ICON_UPLOAD_MAX_BYTES) return TEAM_ICON_TOO_LARGE;
   return file;
 }
 
