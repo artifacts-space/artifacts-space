@@ -24,8 +24,14 @@ function readOutline(control: Locator, property: "outlineColor" | "borderTopColo
     canvas.height = 1;
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) throw new Error("no canvas");
-    const paint = (color: string) => {
+    // The canvas ignores a color it cannot parse and keeps the old one, so set a sentinel first and fail loudly if it stays.
+    const setFill = (color: string) => {
+      context.fillStyle = "#010203";
       context.fillStyle = color;
+      if (context.fillStyle === "#010203") throw new Error(`the canvas could not read the color "${color}"`);
+    };
+    const paint = (color: string) => {
+      setFill(color);
       context.fillRect(0, 0, 1, 1);
       return Array.from(context.getImageData(0, 0, 1, 1).data.slice(0, 3));
     };
@@ -35,7 +41,7 @@ function readOutline(control: Locator, property: "outlineColor" | "borderTopColo
     for (const node of chain) card = paint(getComputedStyle(node).backgroundColor);
     // Read the outline on an empty pixel first: a transparent color would otherwise read as black and pass.
     context.clearRect(0, 0, 1, 1);
-    context.fillStyle = getComputedStyle(element)[colorProperty];
+    setFill(getComputedStyle(element)[colorProperty]);
     context.fillRect(0, 0, 1, 1);
     const opaque = context.getImageData(0, 0, 1, 1).data[3] === 255;
     const outline = paint(getComputedStyle(element)[colorProperty]);
@@ -80,7 +86,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(await control.evaluate((element) => getComputedStyle(element).outlineColor)).toBe(await ringAt(control));
     expect(reading.contrast, `outline ${reading.outline.join(",")} on card ${reading.card.join(",")}`).toBeGreaterThanOrEqual(3);
     // The theme set its own ring: it differs from the site ring the header sees.
-    expect(await ringAt(specimen)).not.toBe(await ringAt(page.getByRole("heading", { name: "Component gallery" })));
+    expect(await ringAt(specimen)).not.toBe(await ringAt(page.locator("html")));
   });
 }
 
