@@ -17,6 +17,7 @@ import {
   permissionAuditActions,
   readyDevUser,
   requestTestSharing,
+  roleCapabilities,
   seededRoles,
   setTeamRole,
 } from "./support/local-db";
@@ -91,7 +92,18 @@ test("should let an owner create, edit, and give a custom role, and log each cha
   await expect(matrix.getByRole("columnheader", { name: /Reviewer/ })).toHaveCount(0);
   await expect.poll(() => customRoleOf(team.id, teammate)).toBeNull();
   await expect(page.getByText(/deleted the Reviewer role\./)).toBeVisible();
-  await expect.poll(() => permissionAuditActions(team.id)).toEqual(["role_created", "role_updated", "member_role_changed", "role_updated", "role_updated", "role_deleted"]);
+  // The person who had it is logged too, in the same statement as the deletion.
+  await expect(page.getByText(/changed Theme e2e's role from Reviewer to Member\./)).toBeVisible();
+  await expect.poll(async () => (await permissionAuditActions(team.id)).sort()).toEqual(["member_role_changed", "member_role_changed", "role_created", "role_deleted", "role_updated", "role_updated", "role_updated"]);
+
+  // A narrowed built-in role stays narrow: taking See views away and then adding Share by link never brings the defaults back.
+  const memberViews = matrix.getByRole("checkbox", { name: "See views for Member" });
+  await memberViews.click();
+  await expect(memberViews).not.toBeChecked();
+  await memberLink.click();
+  await expect(memberLink).toBeChecked();
+  await expect(memberViews).not.toBeChecked();
+  await expect.poll(() => roleCapabilities(team.id, "member")).toEqual(["share.link"]);
 
   // Removal goes through the same capability lock on the Better Auth call itself.
   await page.getByRole("tab", { name: "Members" }).click();

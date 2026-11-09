@@ -331,3 +331,12 @@ export async function seededRoles(slug: string): Promise<{ teamId: string; roles
   );
   return { teamId, roles: Object.fromEntries(result.rows.map((row) => [row.key, Number(row.n)])) };
 }
+
+/** The capabilities a team's role holds, sorted. */
+export async function roleCapabilities(teamId: string, key: string): Promise<string[]> {
+  const result = await db().query<{ capability: string }>(
+    `select c.capability from team_role r join team_role_capability c on c.role_id = r.id where r.team_id = $1 and r.key = $2 order by c.capability`,
+    [teamId, key],
+  );
+  return result.rows.map((row) => row.capability);
+}

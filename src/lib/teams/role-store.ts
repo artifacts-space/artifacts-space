@@ -144,15 +144,28 @@ export async function createCustomRole(input: { teamId: string; key: string; nam
 }
 
 /**
- * Deletes a custom role, and writes its audit row, in one statement; people
- * who had it go back to their built-in role. Built-in roles are never deleted.
+ * Deletes a custom role in one statement, with its audit row and a
+ * member_role_changed row for each person who had it: they go back to their
+ * built-in role, which is always Member under a custom role. Built-in roles
+ * are never deleted.
  */
 export async function deleteCustomRole(input: { teamId: string; key: string; audit: AuditInput }): Promise<void> {
   const result = await getDb().execute<{ id: string }>(sql`
-    with gone as (
+    with holders as (
+      select "user".name as name from team_role_assignment
+      join team_role on team_role.id = team_role_assignment.role_id
+      join team_member on team_member.id = team_role_assignment.member_id
+      join "user" on "user".id = team_member.user_id
+      where team_role.team_id = ${input.teamId} and team_role.key = ${input.key} and team_role.built_in = false
+    ), gone as (
       delete from team_role
       where team_role.team_id = ${input.teamId} and team_role.key = ${input.key} and team_role.built_in = false
       returning team_role.id
+    ), moved as (
+      insert into team_permission_audit (id, team_id, actor_id, action, subject, before, after)
+      select gen_random_uuid()::text, ${input.teamId}, ${input.audit.actorId}, 'member_role_changed', holders.name,
+        jsonb_build_object('role', ${input.audit.subject}::text), jsonb_build_object('role', ${builtInRoleNames.member}::text)
+      from holders where exists (select 1 from gone)
     )
     insert into team_permission_audit (id, team_id, actor_id, action, subject, before, after)
     select ${auditValues(input.teamId, input.audit)} from gone

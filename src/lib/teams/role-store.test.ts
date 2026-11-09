@@ -80,6 +80,15 @@ describe("deleteCustomRole", () => {
     expect(text).toContain("insert into team_permission_audit");
   });
 
+  it("should write a role change row for each person who had the role, in the same statement", async () => {
+    await store.deleteCustomRole({ teamId: "team-1", key: "designer", audit: { ...audit, action: "role_deleted" as const, subject: "Designer" } });
+    const { text } = lastQuery();
+    expect(text).toContain("join team_role on team_role.id = team_role_assignment.role_id");
+    expect(text).toContain("join team_member on team_member.id = team_role_assignment.member_id");
+    expect(text).toContain("'member_role_changed', holders.name");
+    expect(text).toContain("from holders where exists (select 1 from gone)");
+  });
+
   it("should throw when the role was not there to delete", async () => {
     mocks.execute.mockResolvedValue({ rows: [] });
     await expect(store.deleteCustomRole({ teamId: "team-1", key: "owner", audit: { ...audit, action: "role_deleted" as const } })).rejects.toThrow("That role does not exist in this team.");
