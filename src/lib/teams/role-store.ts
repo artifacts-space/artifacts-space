@@ -17,10 +17,10 @@ import { builtInRoleKeys, builtInRoleNames, defaultRoleCapabilities, isTeamCapab
 
 export type AuditAction = "role_created" | "role_updated" | "role_deleted" | "member_role_changed";
 
-/** One audit row, as the Permissions tab lists it. */
+/** One audit row, as the Permissions tab lists it. `action` is one of AuditAction, or a newer action this code does not know yet. */
 export interface PermissionAuditView {
   id: string;
-  action: AuditAction;
+  action: string;
   subject: string;
   actorName: string | null;
   before: string[];
@@ -177,11 +177,7 @@ function capabilityList(value: unknown): string[] {
   return [];
 }
 
-function isAuditAction(value: string): value is AuditAction {
-  return value === "role_created" || value === "role_updated" || value === "role_deleted" || value === "member_role_changed";
-}
-
-/** The newest audit rows for a team. Callers must check the viewer is a member. */
+/** The newest `limit` audit rows for a team, every action included. Callers must check the viewer is a member. */
 export async function listPermissionAudit(teamId: string, limit = 50): Promise<PermissionAuditView[]> {
   const rows = await getDb()
     .select({ id: teamPermissionAudit.id, action: teamPermissionAudit.action, subject: teamPermissionAudit.subject, actorName: user.name, before: teamPermissionAudit.before, after: teamPermissionAudit.after, createdAt: teamPermissionAudit.createdAt })
@@ -190,10 +186,7 @@ export async function listPermissionAudit(teamId: string, limit = 50): Promise<P
     .where(eq(teamPermissionAudit.teamId, teamId))
     .orderBy(desc(teamPermissionAudit.createdAt))
     .limit(limit);
-  return rows.flatMap((row) => {
-    if (!isAuditAction(row.action)) return [];
-    return [{ ...row, action: row.action, before: capabilityList(row.before), after: capabilityList(row.after), createdAt: row.createdAt.toISOString() }];
-  });
+  return rows.map((row) => ({ ...row, before: capabilityList(row.before), after: capabilityList(row.after), createdAt: row.createdAt.toISOString() }));
 }
 
 /** Capabilities from untrusted input, known names only, without repeats. */

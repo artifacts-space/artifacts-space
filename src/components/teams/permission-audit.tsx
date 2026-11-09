@@ -21,10 +21,12 @@ export function auditSentence(entry: PermissionAuditView): string {
   if (entry.action === "member_role_changed") return `${who} changed ${entry.subject}'s role from ${entry.before.join("") || "none"} to ${entry.after.join("") || "none"}.`;
   if (entry.action === "role_created") return `${who} created the ${entry.subject} role${entry.after.length > 0 ? `: ${names(entry.after)}` : ""}.`;
   if (entry.action === "role_deleted") return `${who} deleted the ${entry.subject} role.`;
-  return changeSentence(who, entry);
+  if (entry.action === "role_updated") return changeSentence(who, entry);
+  // A newer kind of change than this page knows: still listed, never dropped.
+  return `${who} changed ${entry.subject} (${entry.action.replaceAll("_", " ")}).`;
 }
 
-/** The newest changes to roles and members' roles, for everyone in the team to read. */
+/** The newest changes to roles and members' roles (up to 50), for everyone in the team to read. */
 export function PermissionAudit({ entries }: { entries: readonly PermissionAuditView[] }) {
   if (entries.length === 0) return <p className="px-5 py-6 text-md text-muted-foreground">No role changes yet. Every change shows here, with who made it.</p>;
   return (

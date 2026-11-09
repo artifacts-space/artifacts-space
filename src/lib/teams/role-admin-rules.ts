@@ -99,6 +99,9 @@ export interface TargetWithRole extends TargetMember {
  * that grants nothing the admin does not hold. Editing what a role can do is
  * different (editRoleProblem): it changes everyone with the role, so only
  * roles below the actor's rank are editable. Only owners make or demote owners.
+ * The same holds for custom roles: one that holds every capability Admin
+ * holds may give the Admin role, since that grants nothing it lacks, yet it
+ * still cannot change what Admin may do.
  */
 export function assignRoleProblem(actor: TeamActor | null, target: TargetWithRole, next: RoleGrant, ownerCount: number): string | null {
   if (!changesRoles(actor)) return "You cannot change roles in this team.";
