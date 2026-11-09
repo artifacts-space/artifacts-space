@@ -125,7 +125,8 @@ export function normalizeClientName(name: string): string {
  */
 const harnessRules: readonly (readonly [HarnessId, RegExp])[] = [
   ["claude-code", /\bclaude ?code\b/],
-  ["claude", /\b(claude|anthropic)\b/],
+  // claude.ai calls itself "Anthropic/ClaudeAI"; a bare "Anthropic" could be any of its tools, so it is not enough.
+  ["claude", /\b(claude|claudeai)\b/],
   ["fx", /^fx( cli)?$/],
   ["cursor", /\bcursor\b/],
   ["windsurf", /\b(windsurf|codeium)\b/],
@@ -139,7 +140,8 @@ const harnessRules: readonly (readonly [HarnessId, RegExp])[] = [
   ["amp", /^amp\b/],
   ["trae", /\btrae\b/],
   ["blackbox", /\bblackbox\b/],
-  ["vscode-copilot", /\b(visual studio code|vs ?code|copilot)\b/],
+  // VS Code itself, never a bare "Copilot": GitHub Copilot also runs in other editors and as a CLI.
+  ["vscode-copilot", /\b(visual studio code|vs ?code)\b/],
 ];
 
 /**
@@ -209,13 +211,6 @@ export function connectionStamp(detected: HarnessStamp, connectionOverride: stri
  */
 export function effectiveHarness(artifactOverride: string | null | undefined, stamped: string | null | undefined): HarnessId | null {
   return overrideOf(artifactOverride) ?? (stamped ? harnessFor(stamped).id : null);
-}
-
-/** The full precedence in one place: artifact override, then connection override, then detected. */
-export function resolveHarness(input: { artifactOverride?: string | null | undefined; connectionOverride?: string | null | undefined; detected: HarnessStamp }): HarnessStamp {
-  const artifactOverride = overrideOf(input.artifactOverride);
-  if (artifactOverride) return { harness: artifactOverride, label: null };
-  return connectionStamp(input.detected, input.connectionOverride);
 }
 
 /** What an artifact row says about its harness, for its DTO: what it shows, what was stamped, and whether someone chose it. */

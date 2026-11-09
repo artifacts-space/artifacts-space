@@ -5,11 +5,11 @@ import {
   artifactHarnessOf,
   clientInfoFromBody,
   cleanClientText,
+  connectionStamp,
   detectHarness,
   effectiveHarness,
   matchHarness,
   parseClientInfo,
-  resolveHarness,
   restampTo,
   stampColumns,
   stampOf,
@@ -28,7 +28,6 @@ describe("matchHarness", () => {
     ["Cursor", "cursor"],
     ["Visual Studio Code", "vscode-copilot"],
     ["Visual Studio Code - Insiders", "vscode-copilot"],
-    ["GitHub Copilot", "vscode-copilot"],
     ["windsurf-client", "windsurf"],
     ["Codeium", "windsurf"],
     ["gemini-cli-mcp-client", "gemini-cli"],
@@ -46,7 +45,7 @@ describe("matchHarness", () => {
     expect(matchHarness(name)).toBe(harness);
   });
 
-  it.each(["zed", "Continue", "firefox", "example", "mogplex", "", "   "])("should match nothing when the name is %j", (name) => {
+  it.each(["zed", "Continue", "firefox", "example", "mogplex", "GitHub Copilot", "copilot-cli", "Anthropic", "", "   "])("should match nothing when the name is %j", (name) => {
     expect(matchHarness(name)).toBeNull();
   });
 });
@@ -141,19 +140,22 @@ describe("harness precedence", () => {
   const detected = { harness: "codex", label: null } as const;
 
   it("should show the artifact override over the connection override and detection", () => {
-    expect(resolveHarness({ artifactOverride: "cursor", connectionOverride: "claude-code", detected })).toEqual({ harness: "cursor", label: null });
+    // The connection's choice is stamped on the save; the artifact's own choice wins over that stamp.
+    const stamped = connectionStamp(detected, "claude-code");
+    expect(artifactHarnessOf({ harness: stamped.harness, harnessOverride: "cursor" })?.id).toBe("cursor");
   });
 
-  it("should show the connection override over detection when the artifact has none", () => {
-    expect(resolveHarness({ artifactOverride: null, connectionOverride: "claude-code", detected })).toEqual({ harness: "claude-code", label: null });
+  it("should stamp the connection override over detection", () => {
+    expect(connectionStamp(detected, "claude-code")).toEqual({ harness: "claude-code", label: null });
   });
 
-  it("should show what was detected when nobody chose one", () => {
-    expect(resolveHarness({ detected: { harness: "other", label: "zed" } })).toEqual({ harness: "other", label: "zed" });
+  it("should stamp what was detected when nobody chose one", () => {
+    expect(connectionStamp({ harness: "other", label: "zed" }, null)).toEqual({ harness: "other", label: "zed" });
   });
 
   it("should ignore an override that is not a known harness id", () => {
-    expect(resolveHarness({ artifactOverride: "<img>", connectionOverride: "nope", detected })).toEqual(detected);
+    expect(connectionStamp(detected, "nope")).toEqual(detected);
+    expect(artifactHarnessOf({ harness: "codex", harnessOverride: "<img>" })?.id).toBe("codex");
   });
 
   it("should show the artifact's override over what its last save stamped", () => {

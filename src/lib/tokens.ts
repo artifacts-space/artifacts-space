@@ -74,11 +74,13 @@ export async function listApiTokens(userId: string) {
   }));
 }
 
+/** Revokes one of a person's tokens. What its client said it was, and the agent chosen for it, go too. */
 export async function revokeApiToken(userId: string, id: string) {
   await getDb()
     .update(apiToken)
     .set({ revokedAt: new Date() })
     .where(and(eq(apiToken.userId, userId), eq(apiToken.id, id)));
+  await getDb().delete(mcpConnection).where(and(eq(mcpConnection.userId, userId), eq(mcpConnection.apiTokenId, id)));
 }
 
 /** lastUsedAt is written at most this often per token, so busy agents do not write on every call. */
