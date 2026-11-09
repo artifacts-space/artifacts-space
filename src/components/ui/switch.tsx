@@ -24,7 +24,7 @@ function Switch({
       className={cn(
         // Focus is a solid --brand outline, offset from the pill: the track has no border to tint, and a
         // translucent ring falls under 3:1 on a white card. An invalid switch gets a solid destructive ring.
-        "peer group/switch relative inline-flex shrink-0 cursor-pointer items-center rounded-full transition-[background-color] duration-200 ease-out outline-none motion-reduce:transition-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring aria-invalid:ring-2 aria-invalid:ring-destructive",
+        "peer group/switch relative inline-flex shrink-0 cursor-pointer items-center rounded-full transition-[background-color,box-shadow] duration-200 ease-out outline-none motion-reduce:transition-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring aria-invalid:ring-2 aria-invalid:ring-destructive",
         // All in rem, so the thumb keeps its inset when the reader raises the default font size.
         "data-[size=default]:h-6 data-[size=default]:w-11 data-[size=default]:p-[0.1875rem] data-[size=sm]:h-[1.125rem] data-[size=sm]:w-8 data-[size=sm]:p-[0.125rem]",
         // Hover deepens the on track in both modes (toward the ink in light, toward the page in dark), so the white thumb never drops

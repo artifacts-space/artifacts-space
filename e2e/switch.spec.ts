@@ -161,8 +161,8 @@ test("should show a solid brand outline when the switch has keyboard focus", asy
     probe.remove();
     return color;
   });
-  // The outline color fades in with the track's color transition, so wait for it to settle.
-  await expect.poll(() => on.evaluate((element) => getComputedStyle(element).outlineColor)).toBe(brand);
+  // Only the fill and the edge animate, so the outline is there in full at once.
+  expect(await on.evaluate((element) => getComputedStyle(element).outlineColor)).toBe(brand);
 });
 
 test("should shrink the thumb while a switch is pressed and leave a disabled one alone", async ({ page }) => {

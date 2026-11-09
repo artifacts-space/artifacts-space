@@ -165,6 +165,8 @@ export const switchOffHover = 0.06;
  * caller checks `passes` again where it needs to know (switchTokens' white thumb).
  */
 function holdApart(color: Oklch, background: Oklch, passes: (candidate: Oklch) => boolean): Oklch {
+  // One direction is enough because modeLightness (contrast.ts) keeps a palette's card and page on the same side
+  // (light at oklch 0.7 and up, dark at 0.4 and down): moving away from the card also moves away from the page.
   const direction = relativeLuminance(background) > 0.18 ? -1 : 1;
   let candidate = color;
   for (let step = 0; step < 200 && !passes(candidate); step += 1) {
