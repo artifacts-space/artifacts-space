@@ -7,16 +7,17 @@ import { fileLimits } from "./config";
  * mocked at their module boundaries.
  */
 
+const versions = vi.hoisted(() => ({ recordArtifactChange: vi.fn() }));
 const store = vi.hoisted(() => ({ getFileRows: vi.fn(), countArtifactFiles: vi.fn(), attachFileRows: vi.fn(), clearIconForFile: vi.fn(), getFileRow: vi.fn(), removeFiles: vi.fn() }));
 const cleanup = vi.hoisted(() => ({ countHistoryOnlyImages: vi.fn() }));
 
 vi.mock("./store", () => store);
 vi.mock("./icon-cleanup", () => cleanup);
 vi.mock("@/lib/access", () => ({ canEditRecord: vi.fn() }));
-vi.mock("@/lib/versions/service", () => ({ recordArtifactChange: vi.fn() }));
+vi.mock("@/lib/versions/service", () => versions);
 vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
 
-const { assertUsableFiles } = await import("./attach");
+const { assertUsableFiles, attachFiles } = await import("./attach");
 
 const upload = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
 
@@ -42,5 +43,21 @@ describe("assertUsableFiles", () => {
     store.countArtifactFiles.mockResolvedValue(2);
     await expect(assertUsableFiles("author", "a1", [upload])).resolves.toBeUndefined();
     expect(cleanup.countHistoryOnlyImages).not.toHaveBeenCalled();
+  });
+});
+
+describe("attachFiles", () => {
+  it("should record the agent's harness on the files save when an agent attaches files", async () => {
+    store.countArtifactFiles.mockResolvedValue(0);
+    store.attachFileRows.mockResolvedValue(1);
+    await attachFiles("author", "a1", [upload], "agent", { harness: "codex", label: null });
+    expect(versions.recordArtifactChange).toHaveBeenCalledWith({ artifactId: "a1", editorId: "author", actor: "agent", harness: { harness: "codex", label: null } });
+  });
+
+  it("should record no harness when a person attaches files in the browser", async () => {
+    store.countArtifactFiles.mockResolvedValue(0);
+    store.attachFileRows.mockResolvedValue(1);
+    await attachFiles("author", "a1", [upload], "person");
+    expect(versions.recordArtifactChange).toHaveBeenCalledWith(expect.objectContaining({ harness: null }));
   });
 });

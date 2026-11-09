@@ -106,8 +106,9 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
     },
     ({ files, notes, ...input }) => respond(async () => {
       await assertUsableFiles(userId, null, files);
-      const created = await createArtifact(userId, { ...input, kind: "file", content: notes ?? "" }, { harness: await harness() });
-      await attachFiles(userId, created.id, files, "agent");
+      const stamp = await harness();
+      const created = await createArtifact(userId, { ...input, kind: "file", content: notes ?? "" }, { harness: stamp });
+      await attachFiles(userId, created.id, files, "agent", stamp);
       return artifactResult(userId, await ownArtifact(userId, created.publicId));
     }),
   );
@@ -121,7 +122,7 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
     },
     ({ artifact, files }) => respond(async () => {
       const record = await editableArtifact(userId, artifact);
-      await attachFiles(userId, record.id, files, "agent");
+      await attachFiles(userId, record.id, files, "agent", await harness());
       return artifactResult(userId, record);
     }),
   );

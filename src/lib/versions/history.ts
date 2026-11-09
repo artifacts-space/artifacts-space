@@ -8,7 +8,7 @@ import { FILE_PREFIX } from "@/lib/artifact-icons";
 import type { VersionSaveKind } from "@/lib/artifact-types";
 import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { dropsShownImage } from "@/lib/files/icon-cleanup-rules";
-import { stampColumns, type HarnessStamp } from "@/lib/harness/harness-rules";
+import { stampColumns, stampOf, type HarnessStamp } from "@/lib/harness/harness-rules";
 
 import { canDropSuperseded, selectPrunableVersions, shouldMergeInto, versionBytes, versionRetention, type EditSessionStep } from "./history-rules";
 import { sameReviewedFields } from "./rules";
@@ -76,14 +76,15 @@ export async function protectedVersions(artifactId: string, approvedVersionId: s
  */
 export async function ensureHistoryStart(before: ArtifactRecord): Promise<void> {
   if (await latestVersion(before.id)) return;
-  await insertVersion(before, { createdBy: before.updatedBy ?? before.userId, saveKind: "snapshot", at: before.updatedAt });
+  // A snapshot keeps the harness the artifact showed, so readers of it see the same byline.
+  await insertVersion(before, { createdBy: before.updatedBy ?? before.userId, saveKind: "snapshot", at: before.updatedAt, harness: stampOf(before.harness) });
 }
 
 /** The latest version when it shows exactly what `record` shows; otherwise a new snapshot of it. */
 export async function versionMatching(record: ArtifactRecord, createdBy: string | null): Promise<string> {
   const latest = await latestVersion(record.id);
   if (latest && sameReviewedFields(latest, record)) return latest.id;
-  return insertVersion(record, { createdBy, saveKind: "snapshot" });
+  return insertVersion(record, { createdBy, saveKind: "snapshot", harness: stampOf(record.harness) });
 }
 
 /** Folds a save into a version. A save from the web app keeps the harness an agent save already recorded there. */

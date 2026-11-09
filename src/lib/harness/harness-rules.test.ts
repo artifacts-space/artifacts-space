@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  approvedHarnessOf,
   artifactHarnessOf,
   clientInfoFromBody,
   cleanClientText,
@@ -10,6 +11,7 @@ import {
   parseClientInfo,
   resolveHarness,
   stampColumns,
+  stampOf,
   versionStamp,
 } from "./harness-rules";
 import { harnesses, harnessFor, harnessIds } from "./harnesses";
@@ -168,6 +170,31 @@ describe("harness precedence", () => {
   it("should write only the harness id on artifacts, never the client's own name", () => {
     expect(stampColumns({ harness: "other", label: "zed" })).toEqual({ harness: "other" });
     expect(stampColumns({ harness: "codex", label: null })).toEqual({ harness: "codex" });
+  });
+
+  it("should keep a stored harness on a snapshot, and none when the artifact had none", () => {
+    expect(stampOf("codex")).toEqual({ harness: "codex", label: null });
+    expect(stampOf("gone-harness")).toEqual({ harness: "other", label: null });
+    expect(stampOf(null)).toBeNull();
+  });
+});
+
+describe("approvedHarnessOf", () => {
+  const stored = { harness: "cursor", harnessOverride: null, approvedHarness: "claude-code" };
+
+  it("should show the approved version's harness, never the waiting edit's, when an edit waits for approval", () => {
+    expect(approvedHarnessOf({ ...stored, pendingEdit: true })).toEqual({ id: "claude-code", stamped: "claude-code", overridden: false });
+    expect(approvedHarnessOf({ ...stored, approvedHarness: null, pendingEdit: true })).toBeNull();
+  });
+
+  it("should show the artifact's last agent when no edit waits, like its team sees it", () => {
+    expect(approvedHarnessOf({ ...stored, approvedHarness: null, pendingEdit: false })).toEqual({ id: "cursor", stamped: "cursor", overridden: false });
+  });
+
+  it("should show the artifact's own choice whether or not an edit waits", () => {
+    for (const pendingEdit of [true, false]) {
+      expect(approvedHarnessOf({ ...stored, harnessOverride: "codex", pendingEdit })?.id).toBe("codex");
+    }
   });
 });
 

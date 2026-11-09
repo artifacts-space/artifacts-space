@@ -7,9 +7,8 @@ import { agent, artifact, artifactVersion, sharingRequest, team, teamMember, typ
 import { canEditArtifact, canViewArtifact, isAuthorOrActsFor } from "@/lib/access-rules";
 import { actsForAuthor } from "@/lib/agents/owner-access";
 import { artifactContentColumn, artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
-import { effectiveHarness } from "@/lib/harness/harness-rules";
-import type { HarnessId } from "@/lib/harness/harnesses";
-import type { ArtifactKind } from "@/lib/artifact-types";
+import { approvedHarnessOf, artifactHarnessOf } from "@/lib/harness/harness-rules";
+import type { ArtifactHarnessDto, ArtifactKind } from "@/lib/artifact-types";
 import { isPublicId } from "@/lib/public-id";
 import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
 import { cachedVersionView } from "@/lib/versions/cache";
@@ -74,12 +73,11 @@ export interface ArtifactAccess {
   version: { source: "latest" | "approved"; versionId: string | null };
   /**
    * The title, icon, theme, cover, save time, and saver of the version this
-   * viewer reads, and the agent harness it shows: the artifact's own choice,
-   * else the harness of that version's save (for the latest, of the last
-   * agent save), so readers of the approved version never see the agent of
-   * an edit that waits for approval.
+   * viewer reads, and the agent harness it shows (approvedHarnessOf): readers
+   * of the approved version never see the agent of an edit that waits for
+   * approval.
    */
-  served: { title: string; icon: string | null; theme: StoredArtifactTheme | null; cover: string | null; updatedAt: Date; editedBy: string | null; harness: HarnessId | null };
+  served: { title: string; icon: string | null; theme: StoredArtifactTheme | null; cover: string | null; updatedAt: Date; editedBy: string | null; harness: ArtifactHarnessDto | null };
   /** Whether the viewer may edit it and read its history: the author, or a member of the team it is shared through. */
   canEdit: boolean;
   /** Whether the viewer belongs to the artifact's team. Pages show the team's name only then. */
@@ -174,6 +172,7 @@ export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publi
       approvedSavedAt: artifactVersion.savedAt,
       approvedBy: artifactVersion.createdBy,
       approvedHarness: artifactVersion.harness,
+      pendingEditId: sharingRequest.id,
     })
     .from(artifact)
     .leftJoin(team, eq(team.id, artifact.teamId))
@@ -181,6 +180,8 @@ export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publi
     .leftJoin(agent, ownedAgentOn)
     .leftJoin(ownerMember, ownerMemberOn)
     .leftJoin(artifactVersion, eq(artifactVersion.id, artifact.approvedVersionId))
+    // At most one open edit request per artifact (a unique index), so this adds no rows.
+    .leftJoin(sharingRequest, and(eq(sharingRequest.artifactId, artifact.id), eq(sharingRequest.kind, "edit"), eq(sharingRequest.status, "pending")))
     .where(eq(artifact.publicId, publicId))
     .limit(1);
 }
@@ -202,12 +203,13 @@ type Subject = NonNullable<Awaited<ReturnType<typeof loadSubject>>>;
 /** The approved version a reader outside the team gets, or null for the latest. */
 function approvedVersionFor(subject: Subject, versionId: string) {
   if (subject.approvedTitle === null || subject.approvedSavedAt === null) return null;
-  const harness = effectiveHarness(subject.record.harnessOverride, subject.approvedHarness);
+  const { harness: rowHarness, harnessOverride } = subject.record;
+  const harness = approvedHarnessOf({ harness: rowHarness, harnessOverride, approvedHarness: subject.approvedHarness, pendingEdit: subject.pendingEditId !== null });
   return { versionId, served: { title: subject.approvedTitle, icon: subject.approvedIcon, theme: subject.approvedTheme, cover: subject.approvedCover, updatedAt: subject.approvedSavedAt, editedBy: subject.approvedBy, harness } };
 }
 
 function latestServed(record: ArtifactMetaRecord) {
-  return { title: record.title, icon: record.icon, theme: record.theme, cover: record.cover, updatedAt: record.updatedAt, editedBy: record.updatedBy ?? record.userId, harness: effectiveHarness(record.harnessOverride, record.harness) };
+  return { title: record.title, icon: record.icon, theme: record.theme, cover: record.cover, updatedAt: record.updatedAt, editedBy: record.updatedBy ?? record.userId, harness: artifactHarnessOf(record) };
 }
 
 /**

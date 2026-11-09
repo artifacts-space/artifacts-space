@@ -145,7 +145,7 @@ function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewa
   const { view, record } = viewable;
   const Icon = kindIcons[view.kind];
   // Who made it: the agent harness of the version this reader is served (anyone who can read it may see it), else the source the agent gave.
-  const { harness } = viewable.served;
+  const harness = viewable.served.harness?.id ?? null;
   const meta = [!harness && view.source ? `Source ${view.source}` : null].filter(Boolean);
   return (
     <>

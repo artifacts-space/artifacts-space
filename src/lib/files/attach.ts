@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getDb } from "@/db";
 import { artifact } from "@/db/schema";
 import { canEditRecord } from "@/lib/access";
+import type { HarnessStamp } from "@/lib/harness/harness-rules";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -57,11 +58,11 @@ async function hasRoomFor(artifactId: string | null, adding: number): Promise<bo
  * (recordArtifactChange), so readers outside the team see new files only
  * once they are approved. Counts against the per-editor edit limit.
  */
-export async function attachFiles(editorId: string, artifactId: string, fileIds: readonly string[], actor: SharingActor): Promise<void> {
+export async function attachFiles(editorId: string, artifactId: string, fileIds: readonly string[], actor: SharingActor, harness: HarnessStamp | null = null): Promise<void> {
   await assertUsableFiles(editorId, artifactId, fileIds);
   await enforceRateLimit("artifactUpdate", editorId);
   const attached = await attachFileRows(editorId, artifactId, fileIds);
-  if (attached > 0) await recordArtifactChange({ artifactId, editorId, actor });
+  if (attached > 0) await recordArtifactChange({ artifactId, editorId, actor, harness });
 }
 
 /**

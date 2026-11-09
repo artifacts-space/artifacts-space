@@ -24,7 +24,11 @@ export const META_CLIENT_INFO_KEY = "io.modelcontextprotocol/clientInfo";
 /** A harness as stamped on an artifact or version: the id, and the client's own name for "other". */
 export interface HarnessStamp {
   harness: HarnessId;
-  /** The client's cleaned name, kept only for "other" so the owner can tell unknown clients apart. */
+  /**
+   * For "other", the client's cleaned name, so its owner can tell unknown
+   * clients apart on the Connections page. Never stored on artifacts or
+   * versions, and never shown to readers.
+   */
   label: string | null;
 }
 
@@ -229,4 +233,20 @@ export function stampColumns(stamp: HarnessStamp | null | undefined): { harness:
 export function versionStamp(artifactOverride: string | null | undefined, stamp: HarnessStamp | null | undefined): HarnessStamp | null {
   if (!stamp) return null;
   return resolveHarness({ artifactOverride, detected: stamp });
+}
+
+/** A stored harness id as a stamp, for snapshots of what an artifact already showed. Null when it had none. */
+export function stampOf(id: string | null | undefined): HarnessStamp | null {
+  return id ? { harness: harnessFor(id).id, label: null } : null;
+}
+
+/**
+ * The harness a reader of the approved version is shown. Without a pending
+ * edit the approved version is what the artifact shows, so it reads like the
+ * team's view (the artifact's last agent stamp). With one, it is the approved
+ * version's own harness, never the agent of the edit that waits. The
+ * artifact's own choice wins either way.
+ */
+export function approvedHarnessOf(input: { harness: string | null; harnessOverride: string | null; approvedHarness: string | null; pendingEdit: boolean }) {
+  return artifactHarnessOf({ harness: input.pendingEdit ? input.approvedHarness : input.harness, harnessOverride: input.harnessOverride });
 }

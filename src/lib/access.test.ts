@@ -48,6 +48,8 @@ function row(visibility: "private" | "team" | "link" | "public", member: boolean
     approvedSavedAt: savedAt,
     approvedBy: author,
     approvedHarness: "claude-code" as string | null,
+    // The open edit request (Cursor's save) that waits for approval.
+    pendingEditId: "edit-1" as string | null,
   };
 }
 
@@ -150,8 +152,14 @@ describe("access decision and the version cache", () => {
     for (const viewer of [null, "outsider"]) {
       mocks.rows = [[row("link", false)]];
       const access = await getArtifactAccess(publicId, viewer);
-      expect(access?.served.harness).toBe("claude-code");
+      expect(access?.served.harness?.id).toBe("claude-code");
     }
+  });
+
+  it("should show readers outside the team the artifact's last agent when no edit waits for approval", async () => {
+    // Snapshots and file saves keep the approved version in step with the artifact, so its stamp is current.
+    mocks.rows = [[{ ...row("public", false), pendingEditId: null, approvedHarness: null }]];
+    expect((await getArtifactAccess(publicId, "outsider"))?.served.harness).toEqual({ id: "cursor", stamped: "cursor", overridden: false });
   });
 
   it("should show no agent to readers outside the team when the approved version was saved in the browser", async () => {
@@ -162,12 +170,12 @@ describe("access decision and the version cache", () => {
   it("should show the artifact's own choice of agent to every reader", async () => {
     const chosen = row("link", false);
     mocks.rows = [[{ ...chosen, record: { ...chosen.record, harnessOverride: "codex" } }]];
-    expect((await getArtifactAccess(publicId, "outsider"))?.served.harness).toBe("codex");
+    expect((await getArtifactAccess(publicId, "outsider"))?.served.harness).toEqual({ id: "codex", stamped: "claude-code", overridden: true });
   });
 
   it("should show the author the latest agent when a link artifact has a pending edit", async () => {
     mocks.rows = [[row("link", false)]];
-    expect((await getArtifactAccess(publicId, author))?.served.harness).toBe("cursor");
+    expect((await getArtifactAccess(publicId, author))?.served.harness?.id).toBe("cursor");
   });
 
   it("should show the latest icon to the author when a link artifact has a pending edit", async () => {
