@@ -213,6 +213,12 @@ export async function listPendingInvitations(teamId: string): Promise<PendingInv
   return rows.map((row) => ({ ...row, role: parseTeamRole(row.role), expiresAt: row.expiresAt.toISOString() }));
 }
 
+/** The team an invitation belongs to, or null when there is no such invitation. */
+export async function getInvitationTeamId(invitationId: string): Promise<string | null> {
+  const [row] = await getDb().select({ teamId: teamInvitation.teamId }).from(teamInvitation).where(eq(teamInvitation.id, invitationId)).limit(1);
+  return row?.teamId ?? null;
+}
+
 /** An invitation as the invited person sees it. */
 export interface InvitationForInvitee {
   id: string;

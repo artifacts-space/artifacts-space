@@ -39,6 +39,7 @@ async function notifyOwners(input: { reportId: string; teamId: string; title: st
     getDb().select({ name: team.name, slug: team.slug }).from(team).where(eq(team.id, input.teamId)).limit(1),
   ]);
   if (!teamRow) return;
+  // Owners only, on purpose: before custom roles, admins could already handle reports on the team page without this email, and every email spends the shared daily budget.
   const recipients = owners.filter((owner) => parseTeamRole(owner.role) === "owner");
   const results = await Promise.allSettled(
     recipients.map((owner) =>

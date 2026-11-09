@@ -12,7 +12,7 @@ import type { TeamRoleView } from "@/lib/teams/capabilities";
 import { can, type TeamCapability } from "@/lib/teams/capability-rules";
 import { assignRoleProblem, countOwners, inviteProblem, leaveProblem, removeMemberProblem } from "@/lib/teams/role-admin-rules";
 import { recordMemberRole, restoreStoredRole } from "@/lib/teams/role-store";
-import { listTeamMemberActors, type TeamMemberActor, type TeamMembership } from "@/lib/teams/queries";
+import { getInvitationTeamId, listTeamMemberActors, type TeamMemberActor, type TeamMembership } from "@/lib/teams/queries";
 import { assignableRoles, type TeamRole } from "@/lib/teams/roles";
 import { UserFacingError } from "@/lib/user-facing-error";
 
@@ -79,7 +79,10 @@ export async function cancelInvitationAction(teamId: string, invitationId: strin
   try {
     const checked = await guardTeam(teamId, holds("members.invite"), "You cannot cancel invitations in this team.");
     if (!checked.ok) return checked.result;
-    await getAuth().api.cancelInvitation({ body: { invitationId: idSchema.parse(invitationId) }, headers: await headers() });
+    // The guard checked this team, so the invitation must belong to it.
+    const id = idSchema.parse(invitationId);
+    if ((await getInvitationTeamId(id)) !== checked.membership.id) return { success: false, error: "That invitation is not in this team." };
+    await getAuth().api.cancelInvitation({ body: { invitationId: id }, headers: await headers() });
     revalidatePath(`/teams/${checked.membership.slug}`);
     return { success: true, data: null };
   } catch (error) {
@@ -136,7 +139,7 @@ async function applyRole(input: { membership: TeamMembership; target: TeamMember
   } catch (error) {
     // Put back the role Better Auth stored before, read with the member. This app only ever stores one role, so that is all there is to restore.
     await restoreStoredRole({ teamId: membership.id, memberId: target.memberId, role: target.storedRole }).catch((undoError: unknown) => {
-      console.error("[teams] could not undo a role change", { memberId: target.memberId, undoError });
+      console.error("[teams] could not undo a role change", { memberId: target.memberId, error: undoError instanceof Error ? undoError.name : "unknown error" });
     });
     throw error;
   }

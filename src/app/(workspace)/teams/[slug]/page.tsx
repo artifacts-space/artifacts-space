@@ -54,6 +54,7 @@ async function loadTeamPage({ membership: team, roles }: TeamAccess, viewerId: s
     teamPresetNames(team.id, shared && can(team, "approve.edits")),
     shared ? loadTeamThemeSettings(team.id) : Promise.resolve(null),
     // Not gated on purpose: everyone in the team may read who changed which roles, as they read the matrix.
+    // Loaded for every tab because tabs switch in the browser (team-tabs.tsx), with no new server render.
     when(shared, () => listPermissionAudit(team.id)),
   ]);
   return { team, viewerId, origin: siteOrigin(), members, agents, invitations, shared: sharedArtifacts, requests, edits, reports, themeNames, themes, roles: [...roles.values()], audit };

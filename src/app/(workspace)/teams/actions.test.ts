@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   session: vi.fn(),
   membership: vi.fn(),
   members: vi.fn(),
+  invitationTeamId: vi.fn(),
   createInvitation: vi.fn(),
   cancelInvitation: vi.fn(),
   removeMember: vi.fn(),
@@ -49,6 +50,7 @@ vi.mock("@/lib/teams/queries", () => ({
     return membership ? { membership, roles: teamRoles } : null;
   },
   listTeamMemberActors: mocks.members,
+  getInvitationTeamId: mocks.invitationTeamId,
 }));
 vi.mock("@/lib/teams/role-store", () => ({ recordMemberRole: mocks.recordMemberRole, restoreStoredRole: mocks.restoreStoredRole }));
 
@@ -104,6 +106,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.session.mockResolvedValue({ user: { id: "viewer-1" } });
   for (const write of writes) write.mockResolvedValue(undefined);
+  mocks.invitationTeamId.mockResolvedValue("team-1");
 });
 
 describe("refusals for every member action", () => {
@@ -302,5 +305,21 @@ describe("updateSharingRuleAction", () => {
     signInAs(viewer("owner"));
     await expect(actions.updateSharingRuleAction("team-1", false)).resolves.toEqual({ success: true, data: null });
     expect(mocks.updateOrganization).toHaveBeenCalledWith(expect.objectContaining({ body: { organizationId: "team-1", data: { teamSharingNeedsApproval: false } } }));
+  });
+});
+
+describe("cancelInvitationAction", () => {
+  it("should refuse an invitation from another team even when the viewer may invite here", async () => {
+    signInAs(viewer("owner"));
+    mocks.invitationTeamId.mockResolvedValue("team-2");
+    await expect(actions.cancelInvitationAction("team-1", "invite-1")).resolves.toEqual({ success: false, error: "That invitation is not in this team." });
+    expectNothingWritten();
+  });
+
+  it("should cancel an invitation of the viewer's team", async () => {
+    signInAs(viewer("admin"));
+    await expect(actions.cancelInvitationAction("team-1", "invite-1")).resolves.toEqual({ success: true, data: null });
+    expect(mocks.cancelInvitation).toHaveBeenCalledTimes(1);
+    expect(mocks.cancelInvitation.mock.calls[0]?.[0]).toMatchObject({ body: { invitationId: "invite-1" } });
   });
 });
