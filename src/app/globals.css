@@ -275,7 +275,9 @@
    * The off track is deliberately quiet: about 1.2:1 on the card, under the
    * 3:1 asked of non-text UI. The grey thumb (3:1 on the track) and its place
    * on the left carry "this is a switch, and it is off"; the --input hairline
-   * edge only helps. This follows the mockup Charles asked for.
+   * edge only helps. This follows the owner's mockup for Settings >
+   * Notifications; the exception was agreed in PR #78. Do not darken the
+   * tint without that sign-off.
    */
   --switch-on: oklch(0.56 0.15 150);
   --switch-on-thumb: oklch(1 0 0);
