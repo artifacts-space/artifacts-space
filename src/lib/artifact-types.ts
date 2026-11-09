@@ -1,4 +1,5 @@
 import type { FileDto } from "./files/types";
+import type { HarnessId } from "./harness/harnesses";
 import type { StoredArtifactTheme } from "./themes/artifact-theme";
 import type { Theme } from "./themes/schema";
 
@@ -76,6 +77,19 @@ export interface ArtifactProjectDto {
   icon: string | null;
 }
 
+/**
+ * The agent harness an artifact shows ("via Claude Code"). Anyone who can read
+ * the artifact may see it; it never carries OAuth client ids or user agents.
+ */
+export interface ArtifactHarnessDto {
+  /** What it shows: the override from its menu, else what its last agent save stamped. */
+  id: HarnessId;
+  /** What its last agent save stamped, for "Use detected" in the menu. Null when no agent saved it. */
+  stamped: HarnessId | null;
+  /** Someone who can edit it chose the harness from its menu. */
+  overridden: boolean;
+}
+
 export interface ArtifactDto {
   /** Internal id, used by the workspace's own actions. Never shown in URLs. */
   id: string;
@@ -100,6 +114,8 @@ export interface ArtifactDto {
   tags: string[];
   sessionId: string;
   source: string;
+  /** The agent harness it was made with, or null when no agent saved it and nobody chose one. */
+  harness: ArtifactHarnessDto | null;
   visibility: ArtifactVisibility;
   /** Who can read and write its comments. */
   comments: CommentSetting;
@@ -151,6 +167,8 @@ export interface VersionSummaryDto {
   cover: string | null;
   /** Who saved it. Null when they are gone. */
   editor: ArtifactEditorDto | null;
+  /** The agent harness the save came through over MCP. Null for saves in the web app. */
+  harness: HarnessId | null;
   /** Readers outside the team see this version (link and public artifacts). */
   approved: boolean;
   /** This version waits for a team owner or admin. */

@@ -2,6 +2,8 @@
 
 import { IconAlertTriangle, IconArrowsHorizontal, IconCheck, IconCode, IconDots, IconHistory, IconLoader2, IconRefresh } from "@tabler/icons-react";
 
+import { HarnessMenu } from "@/components/harness/harness-menu";
+import type { HarnessControl } from "@/components/harness/use-artifact-harness";
 import { VersionHistory } from "@/components/history/version-history";
 import { Button } from "@/components/ui/button";
 import {
@@ -88,8 +90,8 @@ function SaveProblemItems({ save }: { save: SaveIndicatorState | undefined }) {
  * "please wait" only while that wait can end. The tick moves only when the
  * page has the new width.
  */
-function FullWidthItem({ control }: { control: PageFullWidthControl | undefined }) {
-  if (!control) return null;
+function FullWidthItem({ control, shown }: { control: PageFullWidthControl | undefined; shown: boolean }) {
+  if (!control || !shown) return null;
   const { busy } = control;
   return (
     <DropdownMenuCheckboxItem checked={control.checked} disabled={control.pending} aria-busy={busy} aria-label={busy ? `${FULL_WIDTH_LABEL}, please wait` : FULL_WIDTH_LABEL} onCheckedChange={control.onChange} className="py-2">
@@ -98,7 +100,12 @@ function FullWidthItem({ control }: { control: PageFullWidthControl | undefined 
   );
 }
 
-/** The page header's "⋯": why a change is not saved (and Try again after a failed save), Full width, History, and View source. Disabled until the editor is ready. */
+/** "Made with", once the editable copy has loaded. */
+function HarnessItem({ control }: { control: HarnessControl | null | undefined }) {
+  return control ? <HarnessMenu control={control} /> : null;
+}
+
+/** The page header's "⋯": why a change is not saved (and Try again after a failed save), Full width (not for a CSV), History, View source, and Made with. Disabled until the editor is ready. */
 function MoreMenu({ chrome, onHistory, theme, widthSetting }: MoreMenuProps) {
   // Menus open in a layer above the page, so the popup takes the artifact theme's colors itself, like the header around its button.
   const popup = themeChromeProps(theme ?? siteDefaultTheme());
@@ -110,11 +117,12 @@ function MoreMenu({ chrome, onHistory, theme, widthSetting }: MoreMenuProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className={cn("w-60", popup.modeClass)} style={popup.style}>
         <SaveProblemItems save={chrome?.save} />
-        {widthSetting ? <FullWidthItem control={chrome?.fullWidth} /> : null}
+        <FullWidthItem control={chrome?.fullWidth} shown={widthSetting} />
         <DropdownMenuItem onClick={onHistory} className="py-2"><IconHistory /> History</DropdownMenuItem>
         <DropdownMenuItem onClick={source?.onToggle} disabled={!source} className="py-2">
           <IconCode /> {source?.open ? "Hide source" : "View source"}
         </DropdownMenuItem>
+        <HarnessItem control={chrome?.harness} />
       </DropdownMenuContent>
     </DropdownMenu>
   );

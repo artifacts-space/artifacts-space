@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { team, teamMember, teamThemePreset } from "@/db/schema";
+import { loadTeamBasics } from "@/lib/teams/team-basics";
 
 import {
   allowedPresetTeamIds,
@@ -31,7 +32,7 @@ export interface ThemeSubject {
 
 async function loadThemeTeam(subject: ThemeSubject): Promise<{ teamId: string | null; teamDefault: string | null }> {
   if (subject.visibility === "private" || subject.teamId === null) return { teamId: null, teamDefault: null };
-  const [row] = await getDb().select({ personal: team.personal, defaultTheme: team.defaultTheme }).from(team).where(eq(team.id, subject.teamId)).limit(1);
+  const row = await loadTeamBasics(subject.teamId);
   const teamId = themeTeamId(subject, row?.personal ?? null);
   return { teamId, teamDefault: teamId ? row?.defaultTheme ?? null : null };
 }

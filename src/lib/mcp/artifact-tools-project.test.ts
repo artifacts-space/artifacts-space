@@ -42,7 +42,7 @@ const publicId = "4fXkP9qR2sT7vW1yZ3aB5c";
 function dto(project: ArtifactProjectDto | null): ArtifactDto {
   return {
     id: "internal-1", publicId, title: "Plan", icon: null, theme: null, cover: null, fullWidth: false, summary: "", content: "# Plan", kind: "markdown", language: "", project, tags: [], sessionId: "", source: "",
-    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null,
+    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null, harness: null,
     files: [], updatedBy: null, metadata: {}, createdAt: "2026-11-07T00:00:00.000Z", updatedAt: "2026-11-07T00:00:00.000Z",
   };
 }
@@ -75,7 +75,7 @@ describe("artifacts_create with project", () => {
     data.createArtifact.mockResolvedValue(dto(billing));
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", project: "billing" });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ project: "billing" }));
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ project: "billing" }), { harness: null });
     expect((JSON.parse(result.text) as { artifact: { project: string } }).artifact.project).toBe("Billing");
   });
 
@@ -107,7 +107,7 @@ describe("artifacts_update with project", () => {
   it("should save the other fields as a version and keep the project out of them", async () => {
     data.updateArtifact.mockResolvedValue(dto(billing));
     const result = await call("artifacts_update", { id: publicId, title: "New title", project: "Billing" });
-    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { title: "New title" }, "agent");
+    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { title: "New title" }, "agent", { harness: null });
     expect(JSON.parse(result.text)).toMatchObject({ edit: "applied" });
   });
 

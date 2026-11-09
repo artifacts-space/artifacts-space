@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { getArtifactAccess, type ArtifactAccess } from "@/lib/access";
+import { getSignedOutAccess, type ArtifactAccess } from "@/lib/access";
 import { iconTitlePrefix } from "@/lib/artifact-icons";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { filesForViewer } from "@/lib/files/download";
@@ -45,9 +45,14 @@ export function shareableVersion(access: ArtifactAccess | null): { versionId: st
   return { versionId: access.version.versionId, savedAt: access.served.updatedAt.toISOString() };
 }
 
-/** The read decision for a signed-out viewer, the same one the share page makes. */
-async function publicAccess(publicId: string): Promise<ArtifactAccess | null> {
-  return getArtifactAccess(publicId, null);
+/**
+ * The read decision for a signed-out viewer, the same one the share page
+ * makes. `loadedFor` is the viewer whose row this request already loaded
+ * (the page's own reader), so the artifact is not read twice; the decision
+ * is still made as a signed-out viewer (getSignedOutAccess).
+ */
+async function publicAccess(publicId: string, loadedFor: string | null = null): Promise<ArtifactAccess | null> {
+  return getSignedOutAccess(publicId, loadedFor);
 }
 
 /**
@@ -81,11 +86,12 @@ async function shareableDescription(access: ArtifactAccess, view: VersionView | 
  * holds the version id and the resolved theme's key, so it changes with
  * every approval and every theme change and can be cached for a year. Empty (the page keeps the site's description, tags, and image)
  * when the artifact may not be previewed or the lookup fails, so private,
- * team, and unapproved text never reaches these tags.
+ * team, and unapproved text never reaches these tags. `loadedFor` is the
+ * page's viewer (null when signed out), only to reuse the row the page loaded.
  */
-export async function artifactOgMetadata(publicId: string): Promise<Pick<Metadata, "description" | "openGraph" | "twitter">> {
+export async function artifactOgMetadata(publicId: string, loadedFor: string | null = null): Promise<Pick<Metadata, "description" | "openGraph" | "twitter">> {
   try {
-    const access = await publicAccess(publicId);
+    const access = await publicAccess(publicId, loadedFor);
     const shareable = shareableVersion(access);
     if (!access || !shareable) return {};
     const view = await cachedVersionView(shareable.versionId, shareable.savedAt);

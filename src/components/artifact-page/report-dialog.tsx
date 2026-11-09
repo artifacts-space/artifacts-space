@@ -83,7 +83,8 @@ function ReportForm({ publicId, onSent }: { publicId: string; onSent: () => void
 
 /**
  * The "Report" link on shared artifact pages and its short form. Works signed
- * out. The team that shared the artifact reviews each report.
+ * out. Each report emails the site operator and shows on the sharing team's
+ * page.
  */
 export function ReportDialog({ publicId }: { publicId: string }) {
   const [open, setOpen] = useState(false);
@@ -104,7 +105,7 @@ export function ReportDialog({ publicId }: { publicId: string }) {
           <DialogHeader>
             <DialogTitle>{sent ? "Thank you" : "Report this artifact"}</DialogTitle>
             <DialogDescription className="leading-6">
-              {sent ? "The team that shared it will review your report." : "Tell the team that shared it what is wrong. They can take it down."}
+              {sent ? "We will review your report." : "Tell us what is wrong. We review every report, and the team that shared it can take it down."}
             </DialogDescription>
           </DialogHeader>
           {sent ? (

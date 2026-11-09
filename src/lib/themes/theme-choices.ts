@@ -1,7 +1,4 @@
-import { eq } from "drizzle-orm";
-
-import { getDb } from "@/db";
-import { team } from "@/db/schema";
+import { loadTeamBasics } from "@/lib/teams/team-basics";
 import { listTeamsForUser, type TeamMembership } from "@/lib/teams/queries";
 
 import { loadArtifactThemeContext, type ThemeSubject } from "./artifact-theme-context";
@@ -41,8 +38,7 @@ export async function newArtifactThemeChoices(viewerId: string): Promise<ThemeCh
 
 async function teamPersonal(teamId: string | null): Promise<boolean | null> {
   if (!teamId) return null;
-  const [row] = await getDb().select({ personal: team.personal }).from(team).where(eq(team.id, teamId)).limit(1);
-  return row?.personal ?? null;
+  return (await loadTeamBasics(teamId))?.personal ?? null;
 }
 
 /**

@@ -3,7 +3,9 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 
 import { hitRateLimits, rateLimitMessage } from "@/lib/abuse/rate-limit";
 import { authenticateMcpRequest, bearerToken, type McpPrincipal } from "@/lib/mcp/authenticate";
+import type { HarnessSource } from "@/lib/mcp/harness-context";
 import { registerAllTools } from "@/lib/mcp/register-tools";
+import { connectionHarness, recordRequestClientInfo } from "@/lib/mcp/request-harness";
 import { jsonRpcId, mcpLimitChecks, mcpRateLimitedResponse, mcpToolCalls } from "@/lib/mcp/rate-limits";
 import { SERVER_INSTRUCTIONS } from "@/lib/mcp/routing-copy";
 import { READ_ONLY_INSTRUCTIONS } from "@/lib/mcp/tool-access";
@@ -11,13 +13,13 @@ import { bearerChallenge } from "@/lib/oauth/metadata";
 
 export const maxDuration = 30;
 
-function createMcpServer({ userId, access }: McpPrincipal) {
+function createMcpServer({ userId, access }: McpPrincipal, harness: HarnessSource) {
   const server = new McpServer(
     { name: "artifacts.space", version: "1.0.0" },
     { instructions: access === "read" ? `${SERVER_INSTRUCTIONS} ${READ_ONLY_INSTRUCTIONS}` : SERVER_INSTRUCTIONS },
   );
 
-  registerAllTools(server, userId, access);
+  registerAllTools(server, userId, access, harness);
   return server;
 }
 
@@ -43,9 +45,8 @@ function unauthorized(request: Request) {
  * request calls. Returns a 429 to send instead, or null to go on. Fails open:
  * a counter outage must not take MCP down with it.
  */
-async function refuseOverLimit(request: Request, principal: McpPrincipal): Promise<Response | null> {
+async function refuseOverLimit(body: unknown, principal: McpPrincipal): Promise<Response | null> {
   try {
-    const body: unknown = await request.clone().json().catch(() => null);
     const refusal = await hitRateLimits(mcpLimitChecks(principal, mcpToolCalls(body)));
     if (!refusal) return null;
     return mcpRateLimitedResponse(refusal, rateLimitMessage(refusal.name, refusal.retryAfterSeconds), jsonRpcId(body));
@@ -64,10 +65,13 @@ export async function POST(request: Request) {
     return Response.json({ jsonrpc: "2.0", error: { code: -32603, message: "Could not check the access token. Try again." }, id: null }, { status: 503 });
   }
   if (!principal) return unauthorized(request);
-  const refusal = await refuseOverLimit(request, principal);
+  const body: unknown = await request.clone().json().catch(() => null);
+  const refusal = await refuseOverLimit(body, principal);
   if (refusal) return refusal;
 
-  const server = createMcpServer(principal);
+  // The transport is stateless: keep what the client says it is (clientInfo) for its later requests.
+  const clientInfo = await recordRequestClientInfo(principal.connection, body);
+  const server = createMcpServer(principal, connectionHarness(principal.connection, clientInfo));
   // No sessionIdGenerator: the transport runs stateless, one request per server.
   const transport = new WebStandardStreamableHTTPServerTransport({
     enableJsonResponse: true,
