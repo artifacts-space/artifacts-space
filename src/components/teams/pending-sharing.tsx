@@ -1,14 +1,14 @@
 "use client";
 
-import { IconCheck, IconLoader2, IconLock, IconX } from "@tabler/icons-react";
+import { IconCheck, IconLoader2, IconX } from "@tabler/icons-react";
 
-import { decideSharingAction, withdrawSharingAction } from "@/app/(workspace)/app/sharing-actions";
+import { decideSharingAction } from "@/app/(workspace)/app/sharing-actions";
 import { commentLabel } from "@/components/app/comment-options";
 import { visibilityLabel } from "@/components/app/share-options";
 import { ArtifactTitleLink } from "@/components/artifact-icon/artifact-title-link";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
-import type { PendingSharingView, TeamSharedView } from "@/lib/sharing/queries";
+import type { PendingSharingView } from "@/lib/sharing/queries";
 
 import { useTeamAction } from "./use-team-action";
 
@@ -46,32 +46,6 @@ export function PendingSharingList({ requests }: { requests: PendingSharingView[
           <Button size="sm" variant="ghost" className="text-xs" disabled={pending !== null} onClick={() => void run(`${request.requestId}-deny`, () => decideSharingAction(request.requestId, false), "Request denied.")}>
             {pending === `${request.requestId}-deny` ? <IconLoader2 className="animate-spin" /> : <IconX />} Deny
           </Button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** Artifacts shared through the team. Owners and admins can make any of them private again. */
-export function TeamSharedList({ artifacts, canWithdraw }: { artifacts: TeamSharedView[]; canWithdraw: boolean }) {
-  const { pending, run } = useTeamAction();
-  if (artifacts.length === 0) return <p className="px-5 py-6 text-md text-muted-foreground">No artifacts are shared through this team yet.</p>;
-  return (
-    <ul>
-      {artifacts.map((item) => (
-        <li key={item.artifactId} className="flex flex-wrap items-center gap-3 border-b px-5 py-3 last:border-b-0">
-          <div className="min-w-0 flex-1">
-            <ArtifactTitleLink publicId={item.publicId} title={item.title} icon={item.icon} />
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              <PixelAvatar seed={item.authorId} kind={item.authorKind} size={16} className="mr-1 -mt-px" />
-              {person(item.authorName, item.authorUsername)} · {visibilityLabel(item.visibility)}
-            </p>
-          </div>
-          {canWithdraw ? (
-            <Button size="sm" variant="outline" className="text-xs" disabled={pending !== null} onClick={() => void run(item.artifactId, () => withdrawSharingAction(item.artifactId), "Sharing withdrawn.")}>
-              {pending === item.artifactId ? <IconLoader2 className="animate-spin" /> : <IconLock />} Withdraw
-            </Button>
-          ) : null}
         </li>
       ))}
     </ul>

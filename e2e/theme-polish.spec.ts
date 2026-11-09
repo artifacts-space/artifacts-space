@@ -77,7 +77,7 @@ test("should round-trip a preset through Download JSON and Import JSON, and fix 
   const team = await newTeam(userId);
   const project = testInfo.project.name;
 
-  await page.goto(`/teams/${team.slug}`);
+  await page.goto(`/teams/${team.slug}?tab=themes`);
   await page.getByRole("button", { name: "New preset" }).click();
   let dialog = page.getByRole("dialog", { name: "New team preset" });
   await dialog.getByLabel("Name").fill(`Exported ${project}`);
@@ -197,7 +197,7 @@ test("should keep every preset and team default change, restore an earlier one a
   await shareTestArtifact(publicId, team.id, "team");
 
   // A save adds a revision; the oldest past 50 are pruned.
-  await page.goto(`/teams/${team.slug}`);
+  await page.goto(`/teams/${team.slug}?tab=themes`);
   await page.getByRole("button", { name: `Edit ${name}` }).click();
   let dialog = page.getByRole("dialog", { name: `Edit ${name}` });
   await dialog.getByLabel("Description").fill("Our look");

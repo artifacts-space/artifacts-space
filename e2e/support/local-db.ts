@@ -184,6 +184,23 @@ export async function shareTestArtifact(publicId: string, teamId: string, visibi
   await db().query(`update artifact set team_id = $2, visibility = $3 where public_id = $1`, [publicId, teamId, visibility]);
 }
 
+/** Files a pending sharing request for an artifact in a team, as a member asking to share it would. */
+export async function requestTestSharing(publicId: string, teamId: string, requestedBy: string, visibility: "team" | "link" | "public"): Promise<void> {
+  await db().query(
+    `insert into sharing_request (id, artifact_id, team_id, requested_by, kind, visibility, status)
+     select $1, id, $2, $3, 'sharing', $4, 'pending' from artifact where public_id = $5`,
+    [randomUUID(), teamId, requestedBy, visibility, publicId],
+  );
+}
+
+/** Opens an invitation to an @example.com address that expires in a week. Deleting the team removes it. */
+export async function inviteTestPerson(teamId: string, inviterId: string, email: string): Promise<void> {
+  await db().query(
+    `insert into team_invitation (id, team_id, email, role, status, expires_at, inviter_id) values ($1, $2, $3, 'member', 'pending', now() + interval '7 days', $4)`,
+    [randomUUID(), teamId, email, inviterId],
+  );
+}
+
 /** How many versions an artifact has. */
 export async function versionCount(publicId: string): Promise<number> {
   const result = await db().query<{ n: string }>(`select count(*) as n from artifact_version v join artifact a on a.id = v.artifact_id where a.public_id = $1`, [publicId]);
