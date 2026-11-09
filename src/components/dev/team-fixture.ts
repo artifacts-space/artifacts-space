@@ -42,7 +42,7 @@ function fixtureAudit(): TeamPageData["audit"] {
 export function teamFixture(role: TeamRole, personal: boolean): TeamPageData {
   const manager = role !== "member" && !personal;
   return {
-    team: { id: "fixture-team", slug: "fixture", name: personal ? "Dev User" : "Fixture team", personal, teamSharingNeedsApproval: true, createdBy: viewerId, role, memberId: "fixture-member-viewer", userId: viewerId, ...defaultActor(role), roleName: builtInRoleNames[role] },
+    team: { id: "fixture-team", slug: "fixture", name: personal ? "Dev User" : "Fixture team", personal, teamSharingNeedsApproval: true, createdBy: viewerId, role, memberId: "fixture-member-viewer", userId: viewerId, ...defaultActor(role), roleName: builtInRoleNames[role], iconUrl: null },
     viewerId,
     origin: "http://localhost:3000",
     members: [

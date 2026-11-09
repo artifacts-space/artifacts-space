@@ -9,6 +9,7 @@ import { effectiveRoleKey, loadTeamRoles, resolveActor, type TeamRoleView } from
 import { builtInRoleNames, type ActorKind, type TeamActor, type TeamCapability } from "./capability-rules";
 import type { TeamHeadcount } from "./member-counts";
 import { parseTeamRole, type TeamRole } from "./roles";
+import { teamIconUrl } from "./team-icon-rules";
 
 /** A team as one member sees it. */
 export interface TeamMembership {
@@ -28,6 +29,8 @@ export interface TeamMembership {
   roleName: string;
   kind: ActorKind;
   capabilities: readonly TeamCapability[];
+  /** The access-checked URL of the team's icon, or null when it has none. The storage key stays on the server. */
+  iconUrl: string | null;
 }
 
 const assignedRole = alias(teamRole, "assigned_role");
@@ -44,9 +47,10 @@ const membershipColumns = {
   userId: teamMember.userId,
   agentId: agent.userId,
   customKey: assignedRole.key,
+  logo: team.logo,
 };
 
-type MembershipRow = Omit<TeamMembership, "role" | "roleKey" | "roleName" | "kind" | "capabilities"> & { role: string; agentId: string | null; customKey: string | null };
+type MembershipRow = Omit<TeamMembership, "role" | "roleKey" | "roleName" | "kind" | "capabilities" | "iconUrl"> & { role: string; agentId: string | null; customKey: string | null; logo: string | null };
 
 /**
  * The user's membership rows joined to the team, the member's agent row
@@ -68,10 +72,11 @@ export function membershipQuery(db: Pick<ReturnType<typeof getDb>, "select">, us
 }
 
 /** One membership with its role and capabilities, from its team's roles. */
-function toMembership({ agentId, customKey, ...row }: MembershipRow, roles: ReadonlyMap<string, TeamRoleView> | undefined): TeamMembership {
+function toMembership({ agentId, customKey, logo, ...row }: MembershipRow, roles: ReadonlyMap<string, TeamRoleView> | undefined): TeamMembership {
   const role = parseTeamRole(row.role);
   const actor = resolveActor({ role, isAgent: agentId !== null, customKey }, roles);
-  return { ...row, role, roleKey: actor.roleKey, roleName: actor.roleName, kind: actor.kind, capabilities: [...actor.capabilities] };
+  const iconUrl = row.personal ? null : teamIconUrl(row.id, logo);
+  return { ...row, role, roleKey: actor.roleKey, roleName: actor.roleName, kind: actor.kind, capabilities: [...actor.capabilities], iconUrl };
 }
 
 /** Fills in each membership's role and capabilities from its team's roles. */

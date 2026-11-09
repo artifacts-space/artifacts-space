@@ -22,6 +22,7 @@ export const envDocs: readonly EnvDoc[] = [
   { name: "R2_BUCKET", need: "for files", what: "The bucket that holds uploads." },
   { name: "R2_ACCESS_KEY_ID", need: "for files", what: "S3 access key: the id of an API token scoped to the bucket." },
   { name: "R2_SECRET_ACCESS_KEY", need: "for files", what: "S3 secret: the SHA-256 of that token." },
+  { name: "R2_ENDPOINT", need: "optional", what: "Another S3-compatible endpoint, such as http://localhost:9000 for a local store in end-to-end tests. https, or http on localhost only. Leave it unset in production." },
   { name: "CRON_SECRET", need: "required", what: "At least 16 characters. Vercel Cron sends it as a bearer token to /api/cron/*." },
   { name: "VAPID_PUBLIC_KEY", need: "optional", what: "Browser notifications (Web Push). Generate a pair with node scripts/generate-vapid-keys.mts. Without all three VAPID values, the browser option is hidden and in-app notifications still work." },
   { name: "VAPID_PRIVATE_KEY", need: "optional", what: "The private half of the VAPID pair. Keep it secret; changing it ends every browser's subscription." },

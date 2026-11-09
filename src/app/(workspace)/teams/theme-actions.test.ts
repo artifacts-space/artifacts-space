@@ -45,7 +45,7 @@ vi.mock("@/lib/themes/theme-choices", () => ({ newArtifactThemeChoices: mocks.ne
 const actions = await import("./theme-actions");
 
 function membership(role: TeamMembership["role"], personal = false): TeamMembership {
-  return { id: "team-1", slug: "acme", name: "Acme", personal, teamSharingNeedsApproval: true, createdBy: "owner-1", role, memberId: "m-1", userId: "viewer-1", ...defaultActor(role), roleName: role, capabilities: [...defaultActor(role).capabilities] };
+  return { id: "team-1", slug: "acme", name: "Acme", personal, teamSharingNeedsApproval: true, createdBy: "owner-1", role, memberId: "m-1", userId: "viewer-1", ...defaultActor(role), roleName: role, capabilities: [...defaultActor(role).capabilities], iconUrl: null };
 }
 
 const input = { name: "Brand", description: "", theme: { version: 1 } };

@@ -70,7 +70,7 @@ const teamRoles = new Map<string, TeamRoleView>([
 function viewer(roleKey: string, overrides: Partial<TeamMembership> = {}): TeamMembership {
   const role = teamRoles.get(roleKey);
   const betterAuthRole = roleKey === "owner" || roleKey === "admin" ? roleKey : "member";
-  return { id: "team-1", slug: "acme", name: "Acme", personal: false, teamSharingNeedsApproval: true, createdBy: "viewer-1", role: betterAuthRole, memberId: "m-viewer", userId: "viewer-1", roleKey, roleName: role?.name ?? roleKey, kind: "person", capabilities: role?.capabilities ?? [], ...overrides };
+  return { id: "team-1", slug: "acme", name: "Acme", personal: false, teamSharingNeedsApproval: true, createdBy: "viewer-1", role: betterAuthRole, memberId: "m-viewer", userId: "viewer-1", roleKey, roleName: role?.name ?? roleKey, kind: "person", capabilities: role?.capabilities ?? [], iconUrl: null, ...overrides };
 }
 
 function member(memberId: string, actor: TeamActor, extra: Partial<TeamMemberActor> = {}): TeamMemberActor {

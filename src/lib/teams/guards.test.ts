@@ -17,7 +17,8 @@ vi.mock("@/db", () => ({
 vi.mock("./queries", () => ({ getTeamMembershipById: mocks.membership, getTeamAccessById: mocks.access }));
 vi.mock("./setup", () => ({ isHandleAvailable: vi.fn() }));
 
-const { assertCanInviteAs, assertTeamUpdateAllowed } = await import("./guards");
+const { assertCanInviteAs, assertTeamUpdateAllowed, prepareNewTeam } = await import("./guards");
+const setup = await import("./setup");
 
 const member = { organizationId: "team-1", userId: "user-1" };
 
@@ -103,5 +104,14 @@ describe("assertCanInviteAs", () => {
   it("should refuse when the inviter is not in the team", async () => {
     mocks.access.mockResolvedValue(null);
     await expect(assertCanInviteAs("user-1", "team-1", "member")).rejects.toThrow();
+  });
+});
+
+describe("prepareNewTeam", () => {
+  it("should never let a new team start with an icon key sent by the caller", async () => {
+    vi.mocked(setup.isHandleAvailable).mockResolvedValue(true);
+    const sent = { name: "Acme", slug: "acme-team", logo: "team-icons/other-team/7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a.png" };
+    // The create hook stores { ...sent, ...prepared }, so the prepared value must win.
+    expect({ ...sent, ...(await prepareNewTeam(sent, "user-1")) }.logo).toBeNull();
   });
 });

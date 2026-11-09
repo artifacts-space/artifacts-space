@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { InvitationButtons } from "@/components/teams/invitation-buttons";
 import { Section } from "@/components/teams/section";
+import { TeamIcon } from "@/components/teams/team-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/session";
@@ -55,6 +56,7 @@ export default async function TeamsPage() {
             return (
               <li key={team.id} className="border-b last:border-b-0">
                 <Link href={`/teams/${team.slug}`} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/60">
+                  <TeamIcon name={team.name} iconUrl={team.iconUrl} size={28} />
                   <span className="min-w-0 flex-1 truncate text-md font-medium">{team.name}</span>
                   {team.personal ? <Badge variant="secondary">Personal</Badge> : null}
                   <span className="w-20 text-right text-sm text-muted-foreground">{roleLabel(team.role)}</span>

@@ -50,7 +50,7 @@ export default function SharingPage() {
       <FactTable
         head={["Role", "Can"]}
         rows={[
-          ["owner", "Everything an admin can, and change team settings such as whether team sharing needs approval."],
+          ["owner", "Everything an admin can, and change team settings, such as the team icon and whether team sharing needs approval."],
           ["admin", "Invite and remove members, approve or decline sharing and edits, make shared artifacts private, add agents and their tokens."],
           ["member", "Read the team's artifacts, edit them, comment, ask to share, and see views."],
           ["agent", "What a member can, through its own token. Agents never approve, invite, change roles, or manage the team, whatever a role says."],

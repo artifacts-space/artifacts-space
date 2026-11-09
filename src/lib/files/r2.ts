@@ -13,6 +13,11 @@ export interface R2Config {
   bucket: string;
   accessKeyId: string;
   secretAccessKey: string;
+  /**
+   * Another S3-compatible endpoint, such as a local MinIO for end-to-end
+   * tests. Unset in production, where the account's R2 endpoint is used.
+   */
+  endpoint?: string;
 }
 
 /** A failed R2 call. The message never includes keys or signatures. */
@@ -28,6 +33,26 @@ export class R2Error extends Error {
 
 const envNames = ["R2_ACCOUNT_ID", "R2_BUCKET", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"] as const;
 
+const loopbackHosts: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * The R2_ENDPOINT override, checked: an https URL, or plain http only on
+ * this machine (a local MinIO for tests). Anything else is refused, so a
+ * typo can never send files in the clear.
+ */
+export function parseEndpoint(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("R2_ENDPOINT must be a URL.");
+  }
+  const local = url.protocol === "http:" && loopbackHosts.has(url.hostname);
+  if (url.protocol !== "https:" && !local) throw new Error("R2_ENDPOINT must use https, or http on localhost.");
+  if (url.pathname !== "/" || url.search || url.hash || url.username || url.password) throw new Error("R2_ENDPOINT must be a bare origin, such as http://localhost:9000.");
+  return url.origin;
+}
+
 /** Reads the R2 settings from the environment. Throws, naming the missing variables, when any is unset. */
 export function r2ConfigFromEnv(env: NodeJS.ProcessEnv = process.env): R2Config {
   const missing = envNames.filter((name) => !env[name]);
@@ -37,13 +62,15 @@ export function r2ConfigFromEnv(env: NodeJS.ProcessEnv = process.env): R2Config 
     bucket: env.R2_BUCKET ?? "",
     accessKeyId: env.R2_ACCESS_KEY_ID ?? "",
     secretAccessKey: env.R2_SECRET_ACCESS_KEY ?? "",
+    ...(env.R2_ENDPOINT ? { endpoint: parseEndpoint(env.R2_ENDPOINT) } : {}),
   };
 }
 
-/** The object's URL on R2's S3 endpoint. */
+/** The object's URL on R2's S3 endpoint (path style), or on the configured endpoint. */
 export function r2ObjectUrl(config: R2Config, key: string): URL {
   const path = key.split("/").map(encodeURIComponent).join("/");
-  return new URL(`https://${config.accountId}.r2.cloudflarestorage.com/${encodeURIComponent(config.bucket)}/${path}`);
+  const origin = config.endpoint ?? `https://${config.accountId}.r2.cloudflarestorage.com`;
+  return new URL(`${origin}/${encodeURIComponent(config.bucket)}/${path}`);
 }
 
 /** SigV4's timestamp format: 20130524T000000Z. */
@@ -131,11 +158,12 @@ export async function presignDownload(
   return { url, expiresAt: new Date(signedAt.getTime() + input.expiresIn * 1000) };
 }
 
-async function send(config: R2Config, operation: string, method: "HEAD" | "GET" | "DELETE", key: string, extra: Record<string, string> = {}): Promise<Response> {
+async function send(config: R2Config, operation: string, method: "HEAD" | "GET" | "DELETE" | "PUT", key: string, extra: Record<string, string> = {}, body?: Uint8Array<ArrayBuffer>): Promise<Response> {
   const signer = new AwsV4Signer({
     url: r2ObjectUrl(config, key).toString(),
     method,
     headers: extra,
+    ...(body ? { body } : {}),
     accessKeyId: config.accessKeyId,
     secretAccessKey: config.secretAccessKey,
     service: "s3",
@@ -143,7 +171,7 @@ async function send(config: R2Config, operation: string, method: "HEAD" | "GET" 
   });
   const signed = await signer.sign();
   try {
-    return await fetch(signed.url, { method, headers: signed.headers, cache: "no-store" });
+    return await fetch(signed.url, { method, headers: signed.headers, cache: "no-store", ...(body ? { body } : {}) });
   } catch {
     throw new R2Error(operation, null);
   }
@@ -171,4 +199,13 @@ export async function readObjectStart(config: R2Config, key: string, length: num
 export async function deleteObject(config: R2Config, key: string): Promise<void> {
   const response = await send(config, "DELETE", "DELETE", key);
   if (!response.ok && response.status !== 404) throw new R2Error("DELETE", response.status);
+}
+
+/**
+ * Stores bytes the server already checked, such as a team icon. The body is
+ * signed, so R2 refuses it if anything changes on the way.
+ */
+export async function putObject(config: R2Config, key: string, body: Uint8Array<ArrayBuffer>, contentType: string): Promise<void> {
+  const response = await send(config, "PUT", "PUT", key, { "Content-Type": contentType }, body);
+  if (!response.ok) throw new R2Error("PUT", response.status);
 }
