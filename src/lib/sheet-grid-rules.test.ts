@@ -60,6 +60,22 @@ describe("columnSpan", () => {
 });
 
 describe("rowSpan", () => {
+  it("should include every row in view, with no overscan, at any scroll position", () => {
+    const viewport = sheetHeaderHeight + 7.5 * sheetRowHeight;
+    const count = 300;
+    const fullHeight = sheetHeaderHeight + count * sheetRowHeight;
+    for (let scrollTop = 0; scrollTop <= fullHeight - viewport; scrollTop += 7) {
+      const span = rowSpan(scrollTop, viewport, count, 0);
+      // Rows under the frozen header (from scrollTop + header) to the bottom edge of the box.
+      for (let row = 0; row < count; row += 1) {
+        const top = sheetHeaderHeight + row * sheetRowHeight;
+        const inView = top + sheetRowHeight > scrollTop + sheetHeaderHeight && top < scrollTop + viewport;
+        if (inView) expect(row >= span.start && row < span.end, `row ${String(row)} at scrollTop ${String(scrollTop)}`).toBe(true);
+      }
+    }
+    expect(rowSpan(fullHeight - viewport, viewport, count, 0).end).toBe(count);
+  });
+
   it("should render only the rows on screen plus overscan when scrolled down", () => {
     const height = sheetHeaderHeight + 10 * sheetRowHeight;
     expect(rowSpan(100 * sheetRowHeight, height, 1000, 5)).toEqual({ start: 95, end: 116 });
