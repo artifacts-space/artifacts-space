@@ -251,6 +251,9 @@ export function stampOf(id: string | null | undefined): HarnessStamp | null {
  * never see the agent of content they are not shown. The artifact's own
  * choice wins, and applies at once without approval: like Full width it is
  * a label on the artifact, not content, so anyone who may edit it can set it.
+ * That is acceptable for link and public artifacts because detection can be
+ * wrong and only editors can correct it, and the byline names a tool, not an
+ * author: who saved each version stays in History, which no label changes.
  */
 export function approvedHarnessOf(input: { harnessOverride: string | null; approvedHarness: string | null }): ArtifactHarnessDto | null {
   return artifactHarnessOf({ harness: input.approvedHarness, harnessOverride: input.harnessOverride });

@@ -45,9 +45,14 @@ export async function createApiToken(userId: string, name: string) {
   };
 }
 
-/** A token's harness once its client has named itself or the person chose one; null before that. */
-function tokenHarness(clientName: string | null, override: string | null): ConnectionHarnessDto | null {
-  return clientName || override ? toConnectionHarness({ clientName, override }) : null;
+/**
+ * A token's harness once it has connected (so a client that never names
+ * itself can still be given one), named itself, or the person chose one;
+ * null for a token never used.
+ */
+export function tokenHarness(input: { clientName: string | null; override: string | null; used: boolean }): ConnectionHarnessDto | null {
+  const { clientName, override, used } = input;
+  return used || clientName || override ? toConnectionHarness({ clientName, override }) : null;
 }
 
 /** A person's live tokens, newest first, with the agent harness each one was detected as. */
@@ -65,7 +70,7 @@ export async function listApiTokens(userId: string) {
     prefix: record.prefix,
     lastUsedAt: record.lastUsedAt?.toISOString() ?? null,
     createdAt: record.createdAt.toISOString(),
-    harness: tokenHarness(clientName, harnessOverride),
+    harness: tokenHarness({ clientName, override: harnessOverride, used: record.lastUsedAt !== null }),
   }));
 }
 
