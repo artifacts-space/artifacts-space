@@ -2,10 +2,14 @@ import { networkKey } from "@/lib/abuse/network-key";
 import { hitRateLimits } from "@/lib/abuse/rate-limit";
 import { tooManyRequests } from "@/lib/abuse/responses";
 import { findReadableFile, signedFileUrl } from "@/lib/files/download";
+import { fileRedirectCacheHeaders } from "@/lib/files/redirect-cache-rules";
 import { noindexHeader, robotsHeaderName } from "@/lib/search/search-rules";
 import { resolveRequestViewer, viewerUserId } from "@/lib/request-viewer";
 
-/** Headers on every answer from this route. R2 serves the bytes; these cover what we send. Files are never indexed. */
+/**
+ * Headers on every answer from this route. R2 serves the bytes; these cover what we send. Files are never indexed.
+ * Refusals and errors are never cached; only the redirect is, briefly (redirect-cache-rules.ts).
+ */
 const baseHeaders = {
   "Cache-Control": "private, no-store",
   [robotsHeaderName]: noindexHeader,
@@ -38,8 +42,9 @@ async function overLimit(request: Request) {
 
 /**
  * Shows or downloads a file. Views are limited per network address (429 with Retry-After). Access goes through the file's artifact: whoever
- * can view the artifact (signed in, or with an access token) gets a 302 to a short-lived R2 link; everyone else,
- * and every unknown id, gets the same 404. `?download=1` forces a download.
+ * can view the artifact (signed in, or with an access token) gets a 302 to a short-lived R2 link, which only their
+ * browser may keep for a few minutes; everyone else, and every unknown id, gets the same uncached 404. `?download=1`
+ * forces a download.
  */
 export async function GET(request: Request, context: RouteContext<"/api/files/[id]">) {
   const refusal = await overLimit(request);
@@ -50,7 +55,7 @@ export async function GET(request: Request, context: RouteContext<"/api/files/[i
     if (!file) return notFound();
     const download = new URL(request.url).searchParams.get("download") === "1";
     const { url } = await signedFileUrl(file, { download });
-    return new Response(null, { status: 302, headers: { ...baseHeaders, Location: url } });
+    return new Response(null, { status: 302, headers: { ...baseHeaders, ...fileRedirectCacheHeaders, Location: url } });
   } catch (error) {
     console.error("[files] Download failed", error instanceof Error ? error.name : "unknown error");
     return new Response("The file could not be loaded. Try again.", { status: 500, headers: { ...baseHeaders, "Content-Type": "text/plain; charset=utf-8" } });
