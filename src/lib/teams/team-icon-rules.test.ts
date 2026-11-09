@@ -155,6 +155,12 @@ describe("checkTeamIconBytes", () => {
     expect(readPng(png(256, 256, { trailing: [...encoder.encode("<html>")] }))).toBeNull();
   });
 
+  it("should refuse a PNG whose IHDR is not 13 bytes, so its size is never read from the wrong bytes", () => {
+    const bytes = png(256, 256);
+    bytes[11] = 12;
+    expect(readPng(bytes)).toBeNull();
+  });
+
   it("should refuse an animated PNG", () => {
     expect(readPng(png(256, 256, { extra: chunk("acTL", [0, 0, 0, 2, 0, 0, 0, 0]) }))).toBeNull();
   });

@@ -81,13 +81,15 @@ export interface TeamIconImage {
 }
 
 /**
- * Reads a PNG's size by walking its chunks: IHDR first, IEND last with
- * nothing after it, and no animation (acTL). Null when the bytes are not
- * a well-formed still PNG.
+ * Reads a PNG's size by walking its chunks: a 13-byte IHDR first, IEND
+ * last with nothing after it, and no animation (acTL). Null when the bytes
+ * are not a well-formed still PNG. Chunk CRCs are not checked: they guard
+ * against corruption, not forgery, and the browser that drew the icon
+ * wrote them.
  */
 export function readPng(bytes: Uint8Array): TeamIconImage | null {
   if (!pngSignature.every((value, index) => bytes[index] === value)) return null;
-  if (ascii(bytes, 12, 4) !== "IHDR") return null;
+  if (uint32BE(bytes, 8) !== 13 || ascii(bytes, 12, 4) !== "IHDR") return null;
   const image: TeamIconImage = { type: "image/png", width: uint32BE(bytes, 16), height: uint32BE(bytes, 20) };
   let offset = 8;
   while (offset + 12 <= bytes.length) {
