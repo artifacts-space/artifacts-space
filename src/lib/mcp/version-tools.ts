@@ -10,6 +10,7 @@ import { isPublicId } from "@/lib/public-id";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { getArtifactVersionDetail, listArtifactVersions } from "@/lib/versions/history-queries";
 
+import { noHarness, type HarnessSource } from "./harness-context";
 import { gateTools, type ToolServer } from "./tool-access";
 
 /**
@@ -67,7 +68,7 @@ function registerReadTools(server: ToolServer, userId: string) {
   );
 }
 
-function registerWriteTools(server: ToolServer, userId: string) {
+function registerWriteTools(server: ToolServer, userId: string, harness: HarnessSource) {
   server.registerTool(
     "artifacts_restore_version",
     {
@@ -78,7 +79,7 @@ function registerWriteTools(server: ToolServer, userId: string) {
     },
     ({ id, version }) => respond(async () => {
       const record = await editable(userId, id);
-      const restored = await restoreArtifactVersion(userId, record.id, version, "agent");
+      const restored = await restoreArtifactVersion(userId, record.id, version, "agent", { harness: await harness() });
       if (!restored) throw new UserFacingError("Artifact not found, or you cannot edit it.");
       return { id, restoredFrom: version, edit: restored.pendingEdit ? "pending" : "applied", updatedAt: restored.updatedAt };
     }),
@@ -86,8 +87,8 @@ function registerWriteTools(server: ToolServer, userId: string) {
 }
 
 /** Registers the history tools. The restore tool is left out for read-only access. */
-export function registerVersionTools(server: McpServer, userId: string, access: McpAccess) {
+export function registerVersionTools(server: McpServer, userId: string, access: McpAccess, harness: HarnessSource = noHarness) {
   const gated = gateTools(server, access);
   registerReadTools(gated, userId);
-  registerWriteTools(gated, userId);
+  registerWriteTools(gated, userId, harness);
 }

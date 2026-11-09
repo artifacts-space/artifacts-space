@@ -22,6 +22,7 @@ import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
 import { PageOrganizers } from "@/components/projects/page-organizers";
 import { CommentThread } from "@/components/comments/comment-thread";
+import { HarnessByline } from "@/components/harness/harness-byline";
 import { LastEdited } from "@/components/history/last-edited";
 import { ViewBeacon } from "@/components/views/view-beacon";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
@@ -191,7 +192,11 @@ function SummaryReadView({ summary, editable }: { summary: string; editable: boo
  */
 function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewable: ViewableArtifact; editor: ArtifactEditorDto | null; organizers: React.ReactNode; themeChoices: ThemeChoices }) {
   const { view } = viewable;
-  const meta = [view.source ? `Source ${view.source}` : null].filter(Boolean);
+  // Who made it: the agent harness of the version this reader is served (anyone who can read it may see it), else the source the agent gave.
+  // A detected unknown client says less than the source it gave, so the source wins over "via another agent"; a chosen "Other agent" still shows.
+  const served = viewable.served.harness;
+  const harness = served?.id === "other" && !served.overridden && view.source ? null : (served?.id ?? null);
+  const meta = [!harness && view.source ? `Source ${view.source}` : null].filter(Boolean);
   return (
     <>
       <div className="group/title">
@@ -202,6 +207,7 @@ function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewa
       {organizers}
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
         <LastEdited editor={editor} at={view.updatedAt.toISOString()} className="text-sm" />
+        <HarnessByline harness={harness} />
         {meta.length > 0 ? <span>· {meta.join(" · ")}</span> : null}
       </div>
       <PendingEditNotice viewable={viewable} />

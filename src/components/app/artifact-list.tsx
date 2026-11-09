@@ -4,6 +4,7 @@ import { IconCheck, IconDots, IconFolderShare, IconX } from "@tabler/icons-react
 
 import { visibilityLabel } from "@/components/app/share-options";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
+import { HarnessMark } from "@/components/harness/harness-byline";
 import { startArtifactDrag } from "@/components/projects/artifact-drag";
 import { ProjectLabel } from "@/components/projects/project-label";
 import {
@@ -122,6 +123,7 @@ function ArtifactListItem({ artifact, active, onSelect, moves }: ListItemProps) 
             <p className="mt-1 flex min-w-0 items-center pr-6 text-xs text-muted-foreground">
               {artifact.project ? <ProjectLabel name={artifact.project.name} icon={artifact.project.icon} /> : <span className="shrink-0">No project</span>}
               <span className="shrink-0 whitespace-pre">{sharingNote(artifact)}</span>
+              <HarnessMark harness={artifact.harness} className="ml-1.5" />
             </p>
             {artifact.tags.length > 0 ? <RowTags tags={artifact.tags} /> : null}
           </div>

@@ -44,7 +44,7 @@ const publicId = "4fXkP9qR2sT7vW1yZ3aB5c";
 function dto(project: ArtifactProjectDto | null, tags: string[] = []): ArtifactDto {
   return {
     id: "internal-1", publicId, title: "Plan", icon: null, theme: null, cover: null, fullWidth: false, summary: "", content: "# Plan", kind: "markdown", language: "", project, tags, sessionId: "", source: "",
-    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null,
+    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null, harness: null,
     files: [], updatedBy: null, metadata: {}, createdAt: "2026-11-07T00:00:00.000Z", updatedAt: "2026-11-07T00:00:00.000Z",
   };
 }
@@ -77,7 +77,7 @@ describe("artifacts_create with tags", () => {
   it("should pass the tags to the create and return them", async () => {
     data.createArtifact.mockResolvedValue(dto(null, ["launch"]));
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", tags: ["Launch"] });
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ tags: ["Launch"] }));
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ tags: ["Launch"] }), { harness: null });
     expect(JSON.parse(result.text)).toMatchObject({ artifact: { tags: ["launch"] } });
   });
 });

@@ -43,7 +43,7 @@ const publicId = "4fXkP9qR2sT7vW1yZ3aB5c";
 function dto(fullWidth: boolean): ArtifactDto {
   return {
     id: "internal-1", publicId, title: "Plan", icon: null, theme: null, cover: null, fullWidth, summary: "", content: "# Plan", kind: "markdown", language: "", project: null, tags: [], sessionId: "", source: "",
-    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null,
+    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null, harness: null,
     files: [], updatedBy: null, metadata: {}, createdAt: "2026-11-07T00:00:00.000Z", updatedAt: "2026-11-07T00:00:00.000Z",
   };
 }
@@ -101,7 +101,7 @@ describe("artifacts_update with fullWidth", () => {
   it("should keep fullWidth out of the fields saved as a version", async () => {
     data.updateArtifact.mockResolvedValue(dto(false));
     await call("artifacts_update", { id: publicId, title: "New title", fullWidth: true });
-    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { title: "New title" }, "agent");
+    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { title: "New title" }, "agent", { harness: null });
   });
 
   it("should refuse and write nothing when the agent cannot edit the artifact", async () => {

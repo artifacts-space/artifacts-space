@@ -35,6 +35,8 @@ function row(visibility: "private" | "team" | "link" | "public", member: boolean
       approvedVersionId: "version-1",
       title: "Latest title", icon: "tabler:bug", cover: "file:0f8fad5b-d9cb-469f-a165-70867728950e@20", summary: "", kind: "markdown", language: "", project: "", sessionId: "", source: "", metadata: {},
       createdAt: savedAt, updatedAt: savedAt, updatedBy: null,
+      // The pending edit came through Cursor; the approved version through Claude Code.
+      harness: "cursor", harnessOverride: null as string | null,
     },
     memberId: member ? "member-1" : null,
     // Set only when the author is an agent the viewer added and the viewer is still in its team (see subjectQuery).
@@ -45,6 +47,7 @@ function row(visibility: "private" | "team" | "link" | "public", member: boolean
     approvedCover: "mist",
     approvedSavedAt: savedAt,
     approvedBy: author,
+    approvedHarness: "claude-code" as string | null,
   };
 }
 
@@ -141,6 +144,36 @@ describe("access decision and the version cache", () => {
     const viewable = await getViewableArtifact(publicId, "outsider");
     expect(viewable?.view.icon).toBe("🚀");
     expect(viewable?.served.icon).toBe("🚀");
+  });
+
+  it("should show readers outside the team the approved version's agent, never the agent of the pending edit", async () => {
+    for (const viewer of [null, "outsider"]) {
+      mocks.rows = [[row("link", false)]];
+      const access = await getArtifactAccess(publicId, viewer);
+      expect(access?.served.harness?.id).toBe("claude-code");
+    }
+  });
+
+  it("should never show readers outside the team the agent of a denied edit, even when the approved version recorded none", async () => {
+    // After a denial the artifact row keeps the denied draft (Cursor's) and no request is pending.
+    mocks.rows = [[{ ...row("link", false), approvedHarness: null }]];
+    expect((await getArtifactAccess(publicId, "outsider"))?.served.harness).toBeNull();
+  });
+
+  it("should show no agent to readers outside the team when the approved version was saved in the browser", async () => {
+    mocks.rows = [[{ ...row("public", false), approvedHarness: null }]];
+    expect((await getArtifactAccess(publicId, "outsider"))?.served.harness).toBeNull();
+  });
+
+  it("should show the artifact's own choice of agent to every reader", async () => {
+    const chosen = row("link", false);
+    mocks.rows = [[{ ...chosen, record: { ...chosen.record, harnessOverride: "codex" } }]];
+    expect((await getArtifactAccess(publicId, "outsider"))?.served.harness).toEqual({ id: "codex", stamped: "claude-code", overridden: true });
+  });
+
+  it("should show the author the latest agent when a link artifact has a pending edit", async () => {
+    mocks.rows = [[row("link", false)]];
+    expect((await getArtifactAccess(publicId, author))?.served.harness?.id).toBe("cursor");
   });
 
   it("should show the latest icon to the author when a link artifact has a pending edit", async () => {
