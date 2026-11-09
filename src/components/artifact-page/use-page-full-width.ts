@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 
 import { useFullWidth, type FullWidthControl } from "@/components/app/artifact-editor/use-full-width";
 import type { ArtifactDto } from "@/lib/artifact-types";
@@ -22,5 +22,5 @@ export function usePageFullWidth(artifact: ArtifactDto): FullWidthControl {
     startRefresh(() => { router.refresh(); });
   }, [router]);
   const control = useFullWidth(current, onUpdated);
-  return { ...control, pending: control.pending || refreshing };
+  return useMemo(() => ({ ...control, pending: control.pending || refreshing }), [control, refreshing]);
 }

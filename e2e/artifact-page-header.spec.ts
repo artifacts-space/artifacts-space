@@ -195,6 +195,7 @@ test("should give the header ⋯ menu the artifact theme's colors", async ({ pag
   await signIn(page);
   const publicId = await seed(`Header theme ${testInfo.project.name}`, { theme: "ocean" });
   await page.goto(`/artifact/${publicId}`);
+  await expect(page.getByRole("textbox", { name: "Title" }), "the editor is ready").toBeVisible();
   await moreActions(page).click();
   const popup = page.locator("[data-slot=dropdown-menu-content]");
   await expect(popup).toBeVisible();
@@ -205,4 +206,59 @@ test("should give the header ⋯ menu the artifact theme's colors", async ({ pag
   });
   expect(colors.popup).toBe(colors.page);
   expect(colors.page, "the artifact theme changes the menu color").not.toBe(colors.site);
+});
+
+/** Fails the page's server actions (load, save, Full width) while `state.failing` is true, as a dropped connection would. */
+async function failActionsWhile(page: Page, publicId: string, state: { failing: boolean }) {
+  await page.route(`**/artifact/${publicId}`, async (route) => {
+    if (route.request().method() === "POST" && state.failing) await route.abort("internetdisconnected");
+    else await route.continue();
+  });
+}
+
+test("should say editing is not available and keep only History in the ⋯ when the editable copy cannot load", async ({ page }, testInfo) => {
+  await signIn(page);
+  const publicId = await seed(`Header load failure ${testInfo.project.name}`);
+  await failActionsWhile(page, publicId, { failing: true });
+  await page.goto(`/artifact/${publicId}`);
+
+  const status = header(page).locator("[data-slot=save-indicator]");
+  await expect(status).toHaveText("Editing is not available right now. Reload the page to try again.");
+  await expect(status).toHaveAttribute("data-tone", "problem");
+  await expect(page.getByRole("textbox", { name: "Title" }), "the page stays a read view").toHaveCount(0);
+
+  await moreActions(page).click();
+  await expect(page.getByRole("menuitemcheckbox", { name: "Full width" })).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByRole("menuitem", { name: "View source" })).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByRole("menuitem", { name: "History" })).not.toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByRole("menuitem", { name: "Try saving again" })).toHaveCount(0);
+});
+
+test("should offer Try saving again in the ⋯ after a save fails and save when it is used", async ({ page }, testInfo) => {
+  await signIn(page);
+  const title = `Header retry ${testInfo.project.name}`;
+  const publicId = await seed(title);
+  const connection = { failing: false };
+  await failActionsWhile(page, publicId, connection);
+  await page.goto(`/artifact/${publicId}`);
+  const field = page.getByRole("textbox", { name: "Title" });
+  await expect(field).toHaveValue(title);
+
+  connection.failing = true;
+  await field.fill(`${title} renamed`);
+  const status = header(page).locator("[data-slot=save-indicator]");
+  await expect(status).toHaveText("Not saved. Check your connection.", { timeout: 12_000 });
+  await expect(status).toHaveAttribute("data-tone", "problem");
+
+  // Opening the menu leaves the title field, which saves at once: still offline, so it fails again.
+  await moreActions(page).click();
+  const retry = page.getByRole("menuitem", { name: "Try saving again" });
+  await expect(retry).toBeVisible();
+  await expect(status).toHaveText("Not saved. Check your connection.", { timeout: 12_000 });
+  connection.failing = false;
+  await retry.click();
+  await expect(status).toHaveText("Saved", { timeout: 12_000 });
+  await moreActions(page).click();
+  await expect(page.getByRole("menuitem", { name: "History" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Try saving again" })).toHaveCount(0);
 });
