@@ -273,6 +273,9 @@ export default function ThemesPage() {
       <Note title="Code colors">
         Syntax colors come from the theme. You do not set them. Each reaches {String(syntaxMinimum.keyword)}:1 on the theme&apos;s code background ({String(syntaxMinimum.comment)}:1 for comments and punctuation).
       </Note>
+      <Note title="Focus ring">
+        The focus ring comes from the theme too. It is the site&apos;s blue, and its lightness changes until it reaches 3:1 on the theme&apos;s card, page, and quieter surfaces. Most themes keep the site&apos;s blue exactly. A theme whose card is near the lightness limit gets a darker or lighter blue, so a focused control stays easy to see.
+      </Note>
 
       <DocsH page={page} id="suggestions" />
       <Prose>

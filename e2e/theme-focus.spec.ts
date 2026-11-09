@@ -67,7 +67,7 @@ for (const theme of ["light", "dark"] as const) {
   test(`should draw a focus outline at 3:1 on a themed artifact's card when the page is ${theme}`, async ({ page }) => {
     await openSpecimen(page, theme);
     const specimen = page.locator("[data-focus-specimen]");
-    const control = specimen.getByRole("switch");
+    const control = specimen.getByRole("switch", { name: /Dark launch/ });
     await control.focus();
     // Reach it from the keyboard, so :focus-visible applies.
     await page.keyboard.press("Shift+Tab");
@@ -98,4 +98,17 @@ test("should draw a focused button's solid ring-colored border at 3:1 on a theme
   const reading = await readOutline(button, "borderTopColor");
   expect(reading.opaque, "the border is painted solid").toBe(true);
   expect(reading.contrast, `border ${reading.outline.join(",")} on card ${reading.card.join(",")}`).toBeGreaterThanOrEqual(3);
+});
+
+test("should draw a focus outline at 3:1 on the theme's accent surface, the one the ring is tuned to", async ({ page }) => {
+  await openSpecimen(page, "light");
+  const control = page.locator("[data-focus-accent]").getByRole("switch", { name: "On the accent surface" });
+  await control.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(control).toBeFocused();
+  await expect(control).toHaveCSS("outline-style", "solid");
+  const reading = await readOutline(control);
+  expect(reading.opaque, "the outline is painted solid").toBe(true);
+  expect(reading.contrast, `outline ${reading.outline.join(",")} on accent ${reading.card.join(",")}`).toBeGreaterThanOrEqual(3);
 });

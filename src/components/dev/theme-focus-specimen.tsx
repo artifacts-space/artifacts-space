@@ -2,6 +2,7 @@
 
 import { ThemeScope } from "@/components/artifact-view/theme-scope";
 import { UiView } from "@/components/artifact-view/ui-view";
+import { Switch } from "@/components/ui/switch";
 
 import { focusTheme } from "./focus-theme-fixture";
 
@@ -24,8 +25,13 @@ const spec = JSON.stringify({
 export function ThemeFocusSpecimen() {
   return (
     <ThemeScope theme={focusTheme()} className="rounded-md bg-background p-3 text-foreground" data-focus-specimen="">
-      <div className="card-surface p-4">
+      <div className="card-surface space-y-3 p-4">
         <UiView content={spec} />
+        {/* --accent is the darkest quiet surface, the one that sets how far the ring is re-lit. */}
+        <div className="flex items-center justify-between gap-4 rounded-lg bg-accent p-3 text-sm" data-focus-accent="">
+          <span>On the accent surface</span>
+          <Switch defaultChecked aria-label="On the accent surface" />
+        </div>
       </div>
     </ThemeScope>
   );
