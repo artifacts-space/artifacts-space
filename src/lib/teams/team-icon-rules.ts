@@ -1,4 +1,4 @@
-import { megabytes } from "@/lib/images/prepare-rules";
+import { binaryMegabytes, decimalMegabytes } from "@/lib/format-bytes";
 
 import { can, type TeamActor } from "./capability-rules";
 
@@ -8,22 +8,22 @@ import { can, type TeamActor } from "./capability-rules";
  * picked file with the same rules the server uses on the upload.
  */
 
-/** Largest image a person may pick, in bytes (2 MB). The browser shrinks it before upload. */
+/** Largest image a person may pick, in binary bytes (2 MB). The browser shrinks it before upload. */
 export const TEAM_ICON_SOURCE_MAX_BYTES = 2_097_152;
 
 /**
- * Largest upload the server accepts, in bytes (1 MB). What arrives is a
+ * Largest upload the server accepts, in decimal bytes (1 MB). What arrives is a
  * 256 px square of a few dozen KB. It stays below Next's 1 MiB server
  * action body limit, with room for the form's own bytes, so an oversized
  * upload gets this app's message instead of the framework's.
  */
-export const TEAM_ICON_MAX_BYTES = 1_000_000;
+export const TEAM_ICON_UPLOAD_MAX_BYTES = 1_000_000;
 
 /** The picked-file limit as people read it ("2 MB"), for copy that states it. */
-export const TEAM_ICON_SOURCE_LIMIT_LABEL = megabytes(TEAM_ICON_SOURCE_MAX_BYTES);
+export const TEAM_ICON_SOURCE_LIMIT_LABEL = binaryMegabytes(TEAM_ICON_SOURCE_MAX_BYTES);
 
 /** The refusal for an upload over the server's cap, derived from the cap so the two never drift. */
-export const TEAM_ICON_TOO_LARGE = `The icon can be at most ${megabytes(TEAM_ICON_MAX_BYTES)}.`;
+export const TEAM_ICON_TOO_LARGE = `The icon can be at most ${decimalMegabytes(TEAM_ICON_UPLOAD_MAX_BYTES)}.`;
 
 /** The side of the square the browser draws the icon at, in pixels. */
 export const TEAM_ICON_SIDE = 256;
@@ -158,7 +158,7 @@ export function readWebp(bytes: Uint8Array): TeamIconImage | null {
  */
 export function checkTeamIconBytes(bytes: Uint8Array): { ok: true; image: TeamIconImage } | { ok: false; error: string } {
   if (bytes.length === 0) return { ok: false, error: "That file is empty. Pick another image." };
-  if (bytes.length > TEAM_ICON_MAX_BYTES) return { ok: false, error: TEAM_ICON_TOO_LARGE };
+  if (bytes.length > TEAM_ICON_UPLOAD_MAX_BYTES) return { ok: false, error: TEAM_ICON_TOO_LARGE };
   const image = readPng(bytes) ?? readWebp(bytes);
   if (!image) return { ok: false, error: "The icon must be a PNG or WebP image." };
   if (image.width !== image.height) return { ok: false, error: "The icon must be square." };

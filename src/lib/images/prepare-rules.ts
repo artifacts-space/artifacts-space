@@ -1,4 +1,5 @@
 import { COVER_MAX_BYTES } from "@/lib/files/cover-rules";
+import { binaryMegabytes } from "@/lib/format-bytes";
 import { ICON_MAX_BYTES } from "@/lib/files/icon-rules";
 
 /**
@@ -47,10 +48,8 @@ export const IMAGE_SOURCE_ACCEPT = "image/png,image/jpeg,image/gif,image/webp,im
 
 const useNames: Record<ImagePrepareProfile["use"], string> = { cover: "a cover", icon: "an icon" };
 
-/** A byte cap as people read it, such as "2 MB". */
-export function megabytes(bytes: number): string {
-  return `${String(Math.round((bytes / 1_048_576) * 10) / 10)} MB`;
-}
+/** A binary byte cap as people read it, such as "2 MB" (src/lib/format-bytes.ts). */
+export const megabytes = binaryMegabytes;
 
 /** True when the picked file is a HEIC or HEIF photo (by type, or by name when the browser gives no type). */
 export function isHeic(file: { type: string; name: string }): boolean {
