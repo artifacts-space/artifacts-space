@@ -13,6 +13,7 @@ const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
 /** The site's `--ring` in one mode, from the first block whose selector starts with `selector`. */
 function siteRing(selector: string): string | null {
   const start = css.indexOf(selector);
+  if (start < 0) throw new Error(`globals.css has no block starting "${selector}": the test's selector drifted`);
   const body = css.slice(css.indexOf("{", start) + 1, css.indexOf("\n}", start));
   const value = /^\s*--ring:\s*([^;]+);/m.exec(body)?.[1];
   return value ? normalizeColor(value.trim()) : null;
@@ -46,19 +47,21 @@ describe("the themed focus ring", () => {
     }
   });
 
-  it("should reach 3:1 on the card and the page on every preset in both modes", () => {
+  it("should reach 3:1 on the card and the page, keeping the site blue, on every preset in both modes", () => {
     for (const [id, preset] of builtInPresets()) {
       for (const mode of ["light", "dark"] as const) {
         const tokens = paletteTokens(mode, preset.theme[mode]);
         const ring = color(tokens["--ring"]);
         expect(contrastRatio(ring, color(tokens["--card"])), `${id} ${mode} ring on the card`).toBeGreaterThanOrEqual(3);
         expect(contrastRatio(ring, color(tokens["--background"])), `${id} ${mode} ring on the page`).toBeGreaterThanOrEqual(3);
+        // Built-in presets already pass with the site blue, so none should re-light it.
+        expect(tokens["--ring"], `${id} ${mode} keeps the site ring`).toBe(site[mode]);
       }
     }
   });
 
   it("should re-light the brand blue to 3:1 when a card sits at the edge of each mode", () => {
-    // The lightest light card and the lightest dark card validation allows (modeLightness), plain and blue-tinted.
+    // The darkest light card and the lightest dark card validation allows (modeLightness), plain and blue-tinted.
     const edges: Record<PaletteMode, string[]> = {
       light: ["oklch(0.7 0 0)", "oklch(0.72 0.05 262)"],
       dark: ["oklch(0.4 0 0)", "oklch(0.4 0.08 262)"],

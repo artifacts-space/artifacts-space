@@ -220,7 +220,11 @@ const siteRing: Record<PaletteMode, string> = { light: "oklch(0.5 0.22 262)", da
  * The focus ring on the themed card and page: the site's brand blue, re-lit
  * until it reads at 3:1 on both, so a focused control inside a themed
  * artifact is still easy to find. The theme's own colors never replace the
- * blue; only its lightness moves, and only when the theme needs it.
+ * blue; only its lightness moves, and only when the theme needs it. Moving
+ * away from the card alone always works because modeLightness (contrast.ts)
+ * keeps the card and page on the same side; if that bound is ever relaxed,
+ * holdApart's black-or-white fallback could ship a ring under 3:1, and the
+ * edge-card tests in derive.test.ts are where that would show.
  */
 export function ringTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
   const surfaces = [read(colors.card), read(colors.background)];
