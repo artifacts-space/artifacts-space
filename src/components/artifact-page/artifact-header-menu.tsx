@@ -89,7 +89,7 @@ function FullWidthItem({ control }: { control: FullWidthControl | undefined }) {
   if (!control) return null;
   return (
     <DropdownMenuCheckboxItem checked={control.checked} disabled={control.pending} aria-busy={control.pending} onCheckedChange={control.onChange} className="py-2">
-      {control.pending ? <IconLoader2 className="animate-spin" /> : <IconArrowsHorizontal />} {FULL_WIDTH_LABEL}
+      {control.pending ? <IconLoader2 aria-hidden className="animate-spin motion-reduce:animate-none" /> : <IconArrowsHorizontal aria-hidden />} {FULL_WIDTH_LABEL}
     </DropdownMenuCheckboxItem>
   );
 }
