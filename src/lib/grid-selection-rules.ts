@@ -115,7 +115,8 @@ export function jumpCell(cell: GridCell, direction: JumpDirection, bounds: GridB
   return current;
 }
 
-const needsQuotes = /[\t\r\n"]/;
+// Commas too, so a copied column of values such as "Doe, Jane" pastes back as one column, not as CSV.
+const needsQuotes = /[\t\r\n",]/;
 
 /** One value for TSV: quoted, with quotes doubled, when it holds a tab, a line break, or a quote, as Sheets and Excel copy it. */
 function tsvValue(value: string): string {
