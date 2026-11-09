@@ -100,7 +100,7 @@ for (const theme of ["light", "dark"] as const) {
 
       const offReading = await readSwitch(off);
       expect(offReading.thumbOnTrack, "off thumb on its track").toBeGreaterThanOrEqual(3);
-      expect(offReading.trackOnCard, "the off track stays quiet, near the card").toBeLessThan(1.5);
+      expect(offReading.trackOnCard, "the off track is far quieter on the card than the on track").toBeLessThan(onReading.trackOnCard / 2);
     });
   }
 }

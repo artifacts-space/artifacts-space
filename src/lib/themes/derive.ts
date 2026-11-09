@@ -150,8 +150,8 @@ const switchOffTint = 0.08;
 const switchMinimum = 3.05;
 
 /**
- * The hover tints in src/components/ui/switch.tsx; keep them in step (the
- * contrast tests in presets.test.ts import these). The on
+ * The hover tints, --switch-on-hover-tint and --switch-off-hover-tint in
+ * globals.css (src/components/ui/switch.test.ts checks they match). The on
  * track mixes 10% toward the ink in light and toward the page in dark (it
  * deepens in both), and the off track mixes 6% toward the ink.
  */
@@ -180,8 +180,9 @@ const readsOnAll = (tracks: Oklch[]) => (thumb: Oklch) => tracks.every((track) =
 
 /**
  * Switch colors on the themed card: the site's green re-lit until the on
- * track reads at 3:1 on the card and the page, at rest and hovered; the off track a tint
- * of the card; and each thumb at 3:1 on its own track, at rest and hovered.
+ * track reads at 3:1 on the card and the page, at rest and hovered; the off
+ * track a tint of the card; and each thumb at 3:1 on its own track, at rest
+ * and hovered.
  * The on thumb stays the site's white whenever a green exists that serves
  * both; on a dark card too light for that (around oklch 0.4), the thumb
  * takes the card's own color instead, which the track already clears at 3:1.
@@ -194,11 +195,11 @@ export function switchTokens(mode: PaletteMode, colors: ThemeColors): Record<str
   const deepen = (track: Oklch) => mixOklch(track, mode === "light" ? ink : read(colors.background), switchOnHover);
   // A switch sits on a card in settings and on the page inside an artifact, so the on track clears both.
   const surfaces = [card, read(colors.background)];
-  const clearsCard = (track: Oklch) => [track, deepen(track)].every((state) => surfaces.every((surface) => contrastRatio(state, surface) >= switchMinimum));
-  const keepsWhite = (track: Oklch) => clearsCard(track) && readsOnAll([track, deepen(track)])(siteThumb);
+  const clearsSurfaces = (track: Oklch) => [track, deepen(track)].every((state) => surfaces.every((surface) => contrastRatio(state, surface) >= switchMinimum));
+  const keepsWhite = (track: Oklch) => clearsSurfaces(track) && readsOnAll([track, deepen(track)])(siteThumb);
   const whiteTrack = holdApart(read(site.on), card, keepsWhite);
   const white = keepsWhite(whiteTrack);
-  const on = white ? whiteTrack : holdApart(read(site.on), card, clearsCard);
+  const on = white ? whiteTrack : holdApart(read(site.on), card, clearsSurfaces);
   const off = mixOklch(card, ink, switchOffTint);
   const offHover = mixOklch(off, ink, switchOffHover);
   return {

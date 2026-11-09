@@ -281,6 +281,9 @@
   --switch-on-thumb: oklch(1 0 0);
   --switch-off: oklch(0.936 0.0005 60);
   --switch-off-thumb: oklch(0.56 0.008 65);
+  /* How far hover tints each track (on: toward the ink in light, the page in dark; off: toward the ink). derive.ts checks contrast with the same amounts. */
+  --switch-on-hover-tint: 10%;
+  --switch-off-hover-tint: 6%;
   --sidebar: oklch(0.975 0.003 85);
   --sidebar-foreground: oklch(0.2 0.006 60);
   --sidebar-primary: oklch(0.2 0.006 60);
