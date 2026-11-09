@@ -319,3 +319,15 @@ export async function permissionAuditActions(teamId: string): Promise<string[]> 
 export async function setTestFullWidth(publicId: string, fullWidth: boolean): Promise<void> {
   await db().query(`update artifact set full_width = $2 where public_id = $1`, [publicId, fullWidth]);
 }
+
+/** A team's id by slug, and how many capabilities each of its stored built-in roles holds. */
+export async function seededRoles(slug: string): Promise<{ teamId: string; roles: Record<string, number> }> {
+  const team = await db().query<{ id: string }>(`select id from team where slug = $1`, [slug]);
+  const teamId = team.rows[0]?.id;
+  if (!teamId) throw new Error("No team with that slug.");
+  const result = await db().query<{ key: string; n: string }>(
+    `select r.key, count(c.capability) as n from team_role r left join team_role_capability c on c.role_id = r.id where r.team_id = $1 and r.built_in group by r.key`,
+    [teamId],
+  );
+  return { teamId, roles: Object.fromEntries(result.rows.map((row) => [row.key, Number(row.n)])) };
+}

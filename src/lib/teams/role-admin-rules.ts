@@ -123,6 +123,15 @@ export function removeMemberProblem(actor: TeamActor | null, target: TargetWithR
   return null;
 }
 
+/**
+ * How many people in a team are owners. Agents never count. The database
+ * trigger team_keeps_an_owner (drizzle/0035) applies the same rule in SQL;
+ * keep the two in step.
+ */
+export function countOwners(members: readonly { isAgent: boolean; actor: { roleKey: string } }[]): number {
+  return members.filter((member) => !member.isAgent && member.actor.roleKey === "owner").length;
+}
+
 /** Why the actor may not leave the team, or null. The last owner stays, so the team can always be run. */
 export function leaveProblem(actor: TeamActor | null, ownerCount: number): string | null {
   if (actor?.kind === "person" && actor.roleKey === "owner" && ownerCount <= 1) return "Make someone else an owner before you leave. A team always keeps at least one owner.";

@@ -25,11 +25,12 @@ const people: TeamActor = { roleKey: "people", kind: "person", capabilities: ["m
 function teamWith(actor: TeamActor) {
   mocks.access.mockResolvedValue({ membership: { ...actor, id: "team-1", personal: false, userId: "actor" }, roles });
   mocks.members.mockResolvedValue([
-    { userId: "actor", name: "Actor", memberId: "m-actor", isAgent: false, actor },
-    { userId: "owner", name: "Owner", memberId: "m-owner", isAgent: false, actor: defaultActor("owner") },
-    { userId: "admin", name: "Admin", memberId: "m-admin", isAgent: false, actor: defaultActor("admin") },
-    { userId: "member", name: "Member", memberId: "m-member", isAgent: false, actor: defaultActor("member") },
-    { userId: "agent", name: "Agent", memberId: "m-agent", isAgent: true, actor: defaultActor("agent") },
+    { userId: "actor", name: "Actor", memberId: "m-actor", isAgent: false, storedRole: actor.roleKey === "owner" || actor.roleKey === "admin" ? actor.roleKey : "member", actor },
+    { userId: "owner", name: "Owner", memberId: "m-owner", isAgent: false, storedRole: "owner", actor: defaultActor("owner") },
+    { userId: "admin", name: "Admin", memberId: "m-admin", isAgent: false, storedRole: "admin", actor: defaultActor("admin") },
+    { userId: "member", name: "Member", memberId: "m-member", isAgent: false, storedRole: "member", actor: defaultActor("member") },
+    { userId: "designer", name: "Designer", memberId: "m-designer", isAgent: false, storedRole: "member", actor: { roleKey: "designer", kind: "person", capabilities: ["share.team"] } },
+    { userId: "agent", name: "Agent", memberId: "m-agent", isAgent: true, storedRole: "member", actor: defaultActor("agent") },
   ]);
 }
 
@@ -79,5 +80,16 @@ describe("assertMemberChangeAllowed", () => {
     await expect(change("m-member", null)).resolves.toBeUndefined();
     teamWith(people);
     await expect(change("m-member", "member")).resolves.toBeUndefined();
+  });
+
+  it("should let a narrow custom role move someone between custom roles, which keeps Better Auth's Member role", async () => {
+    // Lead may change roles and share with the team, but does not hold "see views", which the built-in Member role has.
+    teamWith({ roleKey: "lead", kind: "person", capabilities: ["members.roles", "share.team"] });
+    await expect(change("m-designer", "member")).resolves.toBeUndefined();
+  });
+
+  it("should still check a custom-role move against the person's current role", async () => {
+    teamWith({ roleKey: "lead", kind: "person", capabilities: ["members.roles"] });
+    await expect(change("m-designer", "member")).rejects.toThrow(/can do more than you/);
   });
 });

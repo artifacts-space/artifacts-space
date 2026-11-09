@@ -72,7 +72,8 @@ function viewer(roleKey: string, overrides: Partial<TeamMembership> = {}): TeamM
 }
 
 function member(memberId: string, actor: TeamActor, extra: Partial<TeamMemberActor> = {}): TeamMemberActor {
-  return { userId: `user-${memberId}`, name: `Person ${memberId}`, memberId, isAgent: actor.kind === "agent", actor, ...extra };
+  const storedRole = actor.roleKey === "owner" || actor.roleKey === "admin" ? actor.roleKey : "member";
+  return { userId: `user-${memberId}`, name: `Person ${memberId}`, memberId, isAgent: actor.kind === "agent", storedRole, actor, ...extra };
 }
 
 /** The team: the viewer, a second owner, an admin, a member, a designer, and an agent. */

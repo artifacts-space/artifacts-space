@@ -296,6 +296,8 @@ export interface TeamMemberActor {
   name: string;
   memberId: string;
   isAgent: boolean;
+  /** The built-in role Better Auth stores on the membership row; Member under a custom role. */
+  storedRole: TeamRole;
   actor: TeamActor;
 }
 
@@ -319,6 +321,7 @@ export async function listTeamMemberActors(teamId: string, knownRoles?: Readonly
   const [rows, roles] = await Promise.all([listTeamMemberActorsQuery(getDb(), teamId), knownRoles ?? loadTeamRoles([teamId]).then((byTeam) => byTeam.get(teamId))]);
   return rows.map((row) => {
     const isAgent = row.agentId !== null;
-    return { userId: row.userId, name: row.name, memberId: row.memberId, isAgent, actor: resolveActor({ role: parseTeamRole(row.role), isAgent, customKey: row.customKey }, roles) };
+    const storedRole = parseTeamRole(row.role);
+    return { userId: row.userId, name: row.name, memberId: row.memberId, isAgent, storedRole, actor: resolveActor({ role: storedRole, isAgent, customKey: row.customKey }, roles) };
   });
 }

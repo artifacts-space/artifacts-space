@@ -10,7 +10,7 @@ import { getAuth } from "@/lib/auth/server";
 import { cleanHandleInput } from "@/lib/handles";
 import type { TeamRoleView } from "@/lib/teams/capabilities";
 import { can, type TeamCapability } from "@/lib/teams/capability-rules";
-import { assignRoleProblem, inviteProblem, leaveProblem, removeMemberProblem } from "@/lib/teams/role-admin-rules";
+import { assignRoleProblem, countOwners, inviteProblem, leaveProblem, removeMemberProblem } from "@/lib/teams/role-admin-rules";
 import { recordMemberRole } from "@/lib/teams/role-store";
 import { listTeamMemberActors, type TeamMemberActor, type TeamMembership } from "@/lib/teams/queries";
 import { assignableRoles, type TeamRole } from "@/lib/teams/roles";
@@ -87,11 +87,6 @@ export async function cancelInvitationAction(teamId: string, invitationId: strin
   }
 }
 
-/** How many people in the team are owners. */
-function countOwners(members: readonly TeamMemberActor[]) {
-  return members.filter((member) => !member.isAgent && member.actor.roleKey === "owner").length;
-}
-
 /** The member being changed and how many owners the team has. Unknown members read as not found. */
 async function loadTarget(membership: TeamMembership, roles: ReadonlyMap<string, TeamRoleView>, memberId: string) {
   const members = await listTeamMemberActors(membership.id, roles);
@@ -120,7 +115,7 @@ export async function removeMemberAction(teamId: string, memberId: string): Prom
   }
 }
 
-/** The role Better Auth stores for a role key: the built-in role itself, or Member under a custom role. */
+/** The role Better Auth stores for a role key: Owner or Admin itself, or Member, which every custom role sits on. */
 function storedRole(roleKey: string): TeamRole {
   return roleKey === "owner" || roleKey === "admin" ? roleKey : "member";
 }
@@ -141,7 +136,8 @@ async function applyRole(input: { membership: TeamMembership; target: TeamMember
     const audit = { actorId: membership.userId, action: "member_role_changed" as const, subject: target.name, before: { role: input.previousName }, after: { role: next.name } };
     await recordMemberRole({ teamId: membership.id, memberId: target.memberId, roleId: next.builtIn ? null : next.id, audit });
   } catch (error) {
-    await setStoredRole(storedRole(target.actor.roleKey)).catch((undoError: unknown) => {
+    // Put back exactly what Better Auth stored before, read with the member, never a role derived from it.
+    await setStoredRole(target.storedRole).catch((undoError: unknown) => {
       console.error("[teams] could not undo a role change", { memberId: target.memberId, undoError });
     });
     throw error;

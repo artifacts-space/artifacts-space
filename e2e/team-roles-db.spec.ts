@@ -17,6 +17,7 @@ import {
   permissionAuditActions,
   readyDevUser,
   requestTestSharing,
+  seededRoles,
   setTeamRole,
 } from "./support/local-db";
 
@@ -160,4 +161,17 @@ test("should refuse demoting every owner in one statement", async () => {
   seeded.teamIds.push(team.id);
   await addTestMember(team.id, second, "owner");
   await expect(demoteEveryoneDirectly(team.id)).rejects.toThrow("A team always keeps at least one owner.");
+});
+
+test("should give a new team its built-in roles with today's rules", async ({ page }) => {
+  await page.goto("/api/dev/sign-in");
+  await page.waitForURL(/\/app/);
+  await readyDevUser();
+  const slug = `theme-e2e-new-${String(Date.now()).slice(-8)}`;
+  await page.goto("/teams/new");
+  await page.getByLabel("Name").fill("Seeded roles");
+  await page.getByLabel("Team URL").fill(slug);
+  await page.getByRole("button", { name: "Create team" }).click();
+  await expect.poll(async () => (await seededRoles(slug).catch(() => null))?.roles ?? null).toEqual({ owner: 14, admin: 13, member: 1, agent: 1 });
+  seeded.teamIds.push((await seededRoles(slug)).teamId);
 });

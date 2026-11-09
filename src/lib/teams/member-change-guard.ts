@@ -1,7 +1,7 @@
 import { APIError } from "better-auth/api";
 
-import { assignRoleProblem, removeMemberProblem } from "./role-admin-rules";
-import { getTeamAccessById, listTeamMemberActors, type TeamMemberActor } from "./queries";
+import { assignRoleProblem, countOwners, removeMemberProblem } from "./role-admin-rules";
+import { getTeamAccessById, listTeamMemberActors } from "./queries";
 
 /**
  * The full rule for changing or removing a member, for a check that only
@@ -14,14 +14,17 @@ function refuse(message: string): never {
   throw new APIError("FORBIDDEN", { message });
 }
 
-function countOwners(members: readonly TeamMemberActor[]) {
-  return members.filter((member) => !member.isAgent && member.actor.roleKey === "owner").length;
-}
-
 /**
  * Refuses unless `actorId` may change the member `memberId` in `teamId`:
  * to the built-in role `nextRole`, or out of the team when `nextRole` is
  * null. Fails closed: an unknown team, member, or role is refused.
+ *
+ * Better Auth stores Member under every custom role, so a move between
+ * custom roles (or into one from Member) sends the role the member already
+ * has. That call grants nothing new, so it is checked as "may change this
+ * person's role" against their current role; the custom role itself was
+ * checked by the action and is recorded separately (recordMemberRole). Any
+ * other call is checked against the built-in role it actually stores.
  */
 export async function assertMemberChangeAllowed(input: { actorId: string; teamId: string; memberId: string; nextRole: string | null }): Promise<void> {
   const access = await getTeamAccessById(input.actorId, input.teamId);
@@ -37,6 +40,7 @@ export async function assertMemberChangeAllowed(input: { actorId: string; teamId
   }
   const next = access.roles.get(input.nextRole);
   if (!next?.builtIn) refuse("That role does not exist in this team.");
-  const problem = assignRoleProblem(access.membership, targetRole, { key: next.key, capabilities: next.capabilities }, countOwners(members));
+  const grant = next.key === target.storedRole ? { key: targetRole.roleKey, capabilities: targetRole.capabilities } : { key: next.key, capabilities: next.capabilities };
+  const problem = assignRoleProblem(access.membership, targetRole, grant, countOwners(members));
   if (problem) refuse(problem);
 }

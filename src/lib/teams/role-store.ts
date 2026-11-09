@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { teamPermissionAudit, teamRole } from "@/db/roles-schema";
+import { teamPermissionAudit } from "@/db/roles-schema";
 import { user } from "@/db/schema";
 import { UserFacingError } from "@/lib/user-facing-error";
 
@@ -76,12 +76,27 @@ async function insertRole(input: { teamId: string; key: string; name: string; bu
   return requireRow(result.rows, "A role with that name already exists.").id;
 }
 
-/** Gives a new team its built-in roles with today's default capabilities. Safe to run again. */
+/**
+ * Gives a new team its built-in roles with today's default capabilities, in
+ * one statement, like the 0034 backfill. A role the team already has is
+ * left as it is, with its capabilities, so running it again changes nothing.
+ */
 export async function seedBuiltInRoles(teamId: string) {
-  for (const key of builtInRoleKeys) {
-    const [existing] = await getDb().select({ id: teamRole.id }).from(teamRole).where(and(eq(teamRole.teamId, teamId), eq(teamRole.key, key))).limit(1);
-    if (!existing) await insertRole({ teamId, key, name: builtInRoleNames[key], builtIn: true, capabilities: defaultRoleCapabilities[key], audit: null });
-  }
+  const roles = sql.join(builtInRoleKeys.map((key) => sql`(${key}, ${builtInRoleNames[key]})`), sql`, `);
+  const grants = sql.join(builtInRoleKeys.flatMap((key) => defaultRoleCapabilities[key].map((capability) => sql`(${key}, ${capability})`)), sql`, `);
+  await getDb().execute(sql`
+    with defaults (key, name) as (values ${roles}),
+    grants (key, capability) as (values ${grants}),
+    created as (
+      insert into team_role (id, team_id, key, name, built_in)
+      select gen_random_uuid()::text, ${teamId}, defaults.key, defaults.name, true from defaults
+      on conflict (team_id, key) do nothing
+      returning team_role.id, team_role.key
+    )
+    insert into team_role_capability (role_id, capability)
+    select created.id, grants.capability from created join grants on grants.key = created.key
+    on conflict do nothing
+  `);
 }
 
 /**
@@ -93,6 +108,12 @@ export async function seedBuiltInRoles(teamId: string) {
  */
 export async function setRoleCapability(input: { teamId: string; key: string; name: string; builtIn: boolean; capability: TeamCapability; on: boolean; next: readonly TeamCapability[]; audit: AuditInput }): Promise<void> {
   const result = await getDb().execute<{ id: string }>(sql`
+    -- (xmax = 0) is true only when this statement inserted the row: the
+    -- update branch of ON CONFLICT leaves xmax set. Only a role stored for
+    -- the first time takes the whole list (seeded); an existing role only
+    -- ever flips the one capability (added / removed). Never widen "seeded"
+    -- to existing roles: a team that narrowed a built-in role would
+    -- silently get the defaults back.
     with role as (
       insert into team_role (id, team_id, key, name, built_in)
       values (${randomUUID()}, ${input.teamId}, ${input.key}, ${input.name}, ${input.builtIn})
