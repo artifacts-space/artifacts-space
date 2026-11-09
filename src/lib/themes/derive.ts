@@ -158,12 +158,19 @@ const switchMinimum = 3.05;
 export const switchOnHover = 0.1;
 export const switchOffHover = 0.06;
 
-/** Moves `color`'s lightness away from `background` until `passes` holds, like ensureContrast but for a test across several states. */
+/**
+ * Moves `color`'s lightness away from `background` until `passes` holds, like
+ * ensureContrast but for a test across several states. Returns the first
+ * passing color, or the extreme (black or white side) when none passes; the
+ * caller checks `passes` again where it needs to know (switchTokens' white thumb).
+ */
 function holdApart(color: Oklch, background: Oklch, passes: (candidate: Oklch) => boolean): Oklch {
   const direction = relativeLuminance(background) > 0.18 ? -1 : 1;
   let candidate = color;
   for (let step = 0; step < 200 && !passes(candidate); step += 1) {
     candidate = { ...candidate, l: Math.min(1, Math.max(0, candidate.l + direction * 0.005)) };
+    // At black or white nothing further can pass: return the extreme, as ensureContrast does.
+    if (candidate.l === 0 || candidate.l === 1) break;
   }
   return candidate;
 }

@@ -200,4 +200,9 @@ test("should stop the thumb sliding when the reader asks for reduced motion", as
   await openSpecimen(page, "light");
   const thumb = page.locator('[data-switch-specimen="default"]').getByRole("switch", { name: "On", exact: true }).locator('[data-slot="switch-thumb"]');
   await expect(thumb).toHaveCSS("transition-property", "none");
+  // The thumb jumps: right after the click it is already 23px in, with no slide in between.
+  const off = page.locator('[data-switch-specimen="default"]').getByRole("switch", { name: "Off", exact: true });
+  await off.click();
+  await expect(off).toBeChecked();
+  expect(await thumbOffset(off)).toBe(23);
 });
