@@ -52,7 +52,7 @@ test("should let an admin build a preset with a live preview and make it the tea
   seeded.publicIds.push(seeded.publicId);
   await shareTestArtifact(seeded.publicId, team.id, "team");
 
-  await page.goto(`/teams/${team.slug}`);
+  await page.goto(`/teams/${team.slug}?tab=themes`);
   await page.getByRole("button", { name: "New preset" }).click();
   const dialog = page.getByRole("dialog", { name: "New team preset" });
   await dialog.getByLabel("Name").fill(seeded.name);
@@ -101,7 +101,7 @@ test("should show a plain member the team preset in the picker but not the contr
   const userId = await readyDevUser();
   await setTeamRole(seeded.teamId, userId, "member");
 
-  await page.goto(`/teams/${seeded.slug}`);
+  await page.goto(`/teams/${seeded.slug}?tab=themes`);
   await expect(page.locator(`[data-team-preset="${seeded.ref}"]`)).toBeVisible();
   await expect(page.getByRole("button", { name: "New preset" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: `Edit ${seeded.name}` })).toHaveCount(0);
@@ -129,7 +129,7 @@ test("should say how many artifacts use a preset before deleting it, then fall b
   await page.waitForURL(/\/app/);
   await setTeamRole(seeded.teamId, await readyDevUser(), "admin");
 
-  await page.goto(`/teams/${seeded.slug}`);
+  await page.goto(`/teams/${seeded.slug}?tab=themes`);
   await page.getByRole("button", { name: `Delete ${seeded.name}` }).click();
   const confirm = page.getByRole("dialog", { name: `Delete ${seeded.name}?` });
   await expect(confirm).toContainText("Used by 1 artifact.");

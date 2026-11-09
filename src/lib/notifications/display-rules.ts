@@ -1,4 +1,5 @@
 import type { SharingRequestKind } from "@/lib/artifact-types";
+import { teamTabHref } from "@/lib/teams/team-tabs-rules";
 
 import type { NotificationType } from "./types";
 
@@ -31,10 +32,10 @@ export function commentExcerpt(body: string, max: number = EXCERPT_MAX): string 
   return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 }
 
-/** Where a notification opens: the artifact in /app with its comments, the team page for a request, or the artifact. */
+/** Where a notification opens: the artifact in /app with its comments, the team's approval queue for a request, or the artifact. */
 export function notificationHref(input: { type: NotificationType; publicId: string; teamSlug: string | null }): string {
   const artifact = `/app?artifact=${encodeURIComponent(input.publicId)}`;
-  if (input.type === "share_request") return input.teamSlug ? `/teams/${encodeURIComponent(input.teamSlug)}` : artifact;
+  if (input.type === "share_request") return input.teamSlug ? teamTabHref(input.teamSlug, "artifacts", "approval") : artifact;
   if (input.type === "share_approved" || input.type === "share_declined") return artifact;
   return `${artifact}&comments=1`;
 }

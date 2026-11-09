@@ -28,7 +28,7 @@ describe("notificationHref", () => {
   });
 
   it("should open the team page for a waiting request", () => {
-    expect(notificationHref({ type: "share_request", publicId: "abc", teamSlug: "core" })).toBe("/teams/core");
+    expect(notificationHref({ type: "share_request", publicId: "abc", teamSlug: "core" })).toBe("/teams/core?tab=artifacts&view=approval");
   });
 
   it("should open the artifact for a decision", () => {

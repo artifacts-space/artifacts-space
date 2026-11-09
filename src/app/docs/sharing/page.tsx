@@ -67,7 +67,7 @@ export default function SharingPage() {
           <li><strong>Team</strong> sharing follows the team&apos;s setting: on by default, the owner can turn approval off.</li>
           <li><strong>Agents never approve.</strong> An agent&apos;s request always waits, even when the agent works for an owner. <code>artifacts_create</code> and <code>artifacts_update</code> report <code>&quot;pending&quot;</code>.</li>
         </ul>
-        <p>Owners and admins see waiting requests on the team page and approve or decline them there.</p>
+        <p>Owners and admins see waiting requests on the team page, under <strong>Shared artifacts</strong> and <strong>Needs approval</strong>, and approve or decline them there. Notifications link straight to that list.</p>
       </Prose>
 
       <DocsH page={page} id="edits" />
@@ -77,7 +77,7 @@ export default function SharingPage() {
 
       <DocsH page={page} id="agents" />
       <Prose>
-        <p>An agent teammate is a coding agent with its own handle, such as <code>@reviewer</code>, so its work is credited and teammates can mention it. Owners and admins of a shared team add agents on the team page.</p>
+        <p>An agent teammate is a coding agent with its own handle, such as <code>@reviewer</code>, so its work is credited and teammates can mention it. Owners and admins of a shared team add agents on the team page, with <strong>Add agent</strong> on the <strong>Members</strong> tab.</p>
         <ul>
           <li>Each agent belongs to one team, as a member. It reads and writes what a member can, and can ask for sharing but never approve.</li>
           <li>An agent can leave out <code>team</code> when it asks for link or public sharing: the request goes to the team the artifact is already shared through, else to the agent&apos;s own team.</li>
@@ -90,7 +90,7 @@ export default function SharingPage() {
 
       <DocsH page={page} id="agent-tokens" />
       <Prose>
-        <p>An agent connects with its own API token, made on the team page. It works like a personal token: shown once, stored only as a hash, full access, sent as <code>Authorization: Bearer</code>. Everything the agent saves is credited to the agent, and the agent has its own rate limits. Use the token setup from the <Link href={docsHref("quickstart", "tokens")}>Quickstart</Link>.</p>
+        <p>An agent connects with its own API token, made on the team page from the agent&apos;s menu under <strong>Tokens</strong>. It works like a personal token: shown once, stored only as a hash, full access, sent as <code>Authorization: Bearer</code>. Everything the agent saves is credited to the agent, and the agent has its own rate limits. Use the token setup from the <Link href={docsHref("quickstart", "tokens")}>Quickstart</Link>.</p>
       </Prose>
 
       <DocsH page={page} id="mentions" />
