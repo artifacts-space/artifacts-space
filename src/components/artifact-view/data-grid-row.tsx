@@ -10,8 +10,11 @@ export function gridCellId(gridId: string, cell: GridCell): string {
   return `${gridId}-${cell.row === -1 ? "h" : String(cell.row)}-${String(cell.column)}`;
 }
 
-/** The selection outline on the active cell, drawn while the grid has focus. */
-export const activeRing = "group-focus-within/grid:ring-2 group-focus-within/grid:ring-ring group-focus-within/grid:ring-inset";
+/** The selection outline on the active cell, in the brand color: full while the grid has focus, softer when it does not. */
+export const activeRing = "ring-2 ring-inset ring-brand/50 group-focus-within/grid:ring-brand";
+
+/** The fill on selected cells beyond the active one. */
+export const rangeFill = "bg-brand/10";
 
 /** Plain strings, not cn(): a sheet renders hundreds of cells per scroll step. */
 const cellBase = "absolute top-0 bottom-0 flex items-center border-r border-border/50 px-3 whitespace-nowrap";
@@ -43,6 +46,17 @@ interface GridRowProps {
   keepColumn: number;
   /** The cell editor, only for the row that holds it. */
   activeContent: ReactNode;
+  /** The selected columns in this row, or -1 for both when none are (or only one cell is selected). */
+  rangeLeft: number;
+  rangeRight: number;
+}
+
+function cellClass(editing: boolean, numeric: boolean, active: boolean, selected: boolean): string {
+  let name = `${cellBase}${editing ? " overflow-visible" : " overflow-hidden"}`;
+  if (numeric) name += " justify-end tabular-nums";
+  if (active) name += ` ${activeRing}`;
+  if (selected) name += ` ${rangeFill}`;
+  return name;
 }
 
 /**
@@ -51,11 +65,12 @@ interface GridRowProps {
  * re-renders only the rows it leaves and enters, as long as `cell` and
  * `rowLabel` keep their identity.
  */
-export const GridRow = memo(function GridRow({ row, gridId, columns, offsets, totalWidth, cell, rowLabel, numeric, activeColumn, keepColumn, activeContent }: GridRowProps) {
+export const GridRow = memo(function GridRow({ row, gridId, columns, offsets, totalWidth, cell, rowLabel, numeric, activeColumn, keepColumn, activeContent, rangeLeft, rangeRight }: GridRowProps) {
   const cells = withKept(columns, keepColumn).map((column) => {
     const value = cell(row, column);
     const isActive = column === activeColumn;
     const editing = isActive && activeContent !== undefined && activeContent !== null;
+    const selected = column >= rangeLeft && column <= rangeRight;
     return (
       <div
         key={column}
@@ -63,9 +78,9 @@ export const GridRow = memo(function GridRow({ row, gridId, columns, offsets, to
         id={gridCellId(gridId, { row, column })}
         data-cell={`${String(row)}:${String(column)}`}
         aria-colindex={column + 2}
-        aria-selected={isActive}
+        aria-selected={isActive || selected}
         style={columnPlace(offsets, column)}
-        className={`${cellBase}${editing ? " overflow-visible" : " overflow-hidden"}${numeric[column] ? " justify-end tabular-nums" : ""}${isActive ? ` ${activeRing}` : ""}`}
+        className={cellClass(editing, numeric[column] ?? false, isActive, selected && !isActive)}
       >
         {editing ? activeContent : <span className="truncate">{value}</span>}
       </div>
@@ -73,7 +88,7 @@ export const GridRow = memo(function GridRow({ row, gridId, columns, offsets, to
   });
   return (
     <div role="row" data-row={row} aria-rowindex={row + 2} style={rowPlace(row, totalWidth)} className="group/row absolute left-0 flex border-b border-border/50 hover:bg-muted/40">
-      <div role="rowheader" aria-colindex={1} style={{ width: rowNumberWidth }} className="sticky left-0 z-10 flex shrink-0 items-center justify-end border-r border-border/60 bg-muted px-2 text-xs text-muted-foreground tabular-nums">
+      <div role="rowheader" aria-colindex={1} style={{ width: rowNumberWidth }} className={`sticky left-0 z-10 flex shrink-0 items-center justify-end border-r border-border/60 bg-muted px-2 text-xs tabular-nums ${activeColumn >= 0 || rangeLeft >= 0 ? "font-medium text-foreground" : "text-muted-foreground"}`}>
         {rowLabel(row)}
       </div>
       {cells}

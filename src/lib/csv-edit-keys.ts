@@ -34,11 +34,12 @@ function isMenuKey(press: KeyPress): boolean {
  * redo; Alt+Down, the context-menu key, and Shift+F10 open the column menu;
  * Enter and F2 edit the cell; Delete and Backspace clear it; any other
  * printable key starts editing with that character. Returns null for keys
- * the grid moves with, such as arrows and Tab.
+ * the grid moves with, such as arrows, Tab, and Shift+Enter.
  */
 export function gridEditKey(press: KeyPress): GridEditKey | null {
   if (press.ctrlKey || press.metaKey) return shortcut(press);
   if (isMenuKey(press)) return "menu";
-  if (press.altKey) return null;
+  // Shift+Enter moves up, as in a spreadsheet; only Enter on its own edits.
+  if (press.altKey || (press.shiftKey && press.key === "Enter")) return null;
   return plainKeys[press.key] ?? (press.key.length === 1 ? "type" : null);
 }

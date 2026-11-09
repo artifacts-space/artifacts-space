@@ -3,11 +3,12 @@
 import type { MouseEvent, PointerEvent, ReactNode } from "react";
 
 import type { GridCell } from "@/lib/csv-edit-rules";
+import type { CellRange } from "@/lib/grid-selection-rules";
 import { dropLineX } from "@/lib/sheet-column-rules";
 import { rowNumberWidth } from "@/lib/sheet-grid-rules";
 import { cn } from "@/lib/utils";
 
-import { activeRing, columnPlace, gridCellId, rowPlace } from "./data-grid-row";
+import { activeRing, columnPlace, gridCellId, rangeFill, rowPlace } from "./data-grid-row";
 import type { ColumnDrag } from "./use-column-drag";
 
 export interface HeaderRowProps {
@@ -16,6 +17,8 @@ export interface HeaderRowProps {
   offsets: readonly number[];
   totalWidth: number;
   active: GridCell;
+  /** The selected block when more than one cell is selected. */
+  range: CellRange | null;
   activeContent: ReactNode;
   header: (column: number) => ReactNode;
   headerSort?: ((column: number) => "ascending" | "descending" | "none") | undefined;
@@ -73,20 +76,40 @@ export function HeaderRow(props: HeaderRowProps) {
 
 const hasContent = (content: ReactNode) => content !== undefined && content !== null;
 
-function headerClass(editing: boolean, active: boolean, dragged: boolean) {
+function headerClass(editing: boolean, active: boolean, dragged: boolean, look: { inRange: boolean; columnSelected: boolean }) {
   return cn(
-    "absolute top-0 bottom-0 border-r border-border/60 text-left font-medium text-muted-foreground",
+    "absolute top-0 bottom-0 border-r border-border/60 text-left font-medium",
     editing ? "overflow-visible" : "overflow-hidden",
     active && activeRing,
+    // Filled only when the header cell itself is selected, so the fill and aria-selected agree.
+    look.inRange && !active ? rangeFill : null,
+    // A column with selected cells has its name stand out, as row numbers do and as in a spreadsheet.
+    active || look.columnSelected ? "text-foreground" : "text-muted-foreground",
     dragged && "opacity-50",
   );
 }
 
+/** Whether a header cell itself is selected: its column is in a block that reaches the header row. */
+const headerInRange = (range: CellRange | null, column: number) => range !== null && range.top === -1 && column >= range.left && column <= range.right;
+
+/** Whether a column is in the selected block. */
+const columnSelected = (range: CellRange | null, column: number) => range !== null && column >= range.left && column <= range.right;
+
+/** A header cell's state: active, being renamed, selected, and how it looks. */
+function headerState(row: HeaderRowProps, column: number) {
+  const isActive = row.active.row === -1 && row.active.column === column;
+  const editing = isActive && hasContent(row.activeContent);
+  return {
+    editing,
+    selected: isActive || headerInRange(row.range, column),
+    className: headerClass(editing, isActive, row.drag?.from === column, { inRange: headerInRange(row.range, column), columnSelected: columnSelected(row.range, column) }),
+  };
+}
+
 /** One column's header: its name and controls, or the editor while it is renamed. */
 function HeaderCell({ column, row }: { column: number; row: HeaderRowProps }) {
-  const { active, activeContent, onMoveStart, onResizeStart } = row;
-  const isActive = active.row === -1 && active.column === column;
-  const editing = isActive && hasContent(activeContent);
+  const { activeContent, onMoveStart, onResizeStart } = row;
+  const { editing, selected, className } = headerState(row, column);
   const movable = !editing && onMoveStart !== null;
   const resizable = !editing && onResizeStart !== null;
   return (
@@ -96,10 +119,10 @@ function HeaderCell({ column, row }: { column: number; row: HeaderRowProps }) {
       data-cell={`-1:${String(column)}`}
       aria-colindex={column + 2}
       aria-sort={row.headerSort?.(column)}
-      aria-selected={isActive}
       style={columnPlace(row.offsets, column)}
       onPointerDown={movable ? (event) => { onMoveStart(column, event); } : undefined}
-      className={headerClass(editing, isActive, row.drag?.from === column)}
+      aria-selected={selected}
+      className={className}
     >
       {editing ? <div className="relative h-full">{activeContent}</div> : row.header(column)}
       {resizable ? <ResizeHandle column={column} onResizeStart={onResizeStart} onFit={row.onFit} /> : null}

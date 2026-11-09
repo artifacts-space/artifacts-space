@@ -34,5 +34,6 @@ describe("gridEditKey", () => {
     expect(gridEditKey(press("ArrowLeft"))).toBeNull();
     expect(gridEditKey(press("Tab"))).toBeNull();
     expect(gridEditKey(press("a", { altKey: true }))).toBeNull();
+    expect(gridEditKey(press("Enter", { shiftKey: true }))).toBeNull();
   });
 });

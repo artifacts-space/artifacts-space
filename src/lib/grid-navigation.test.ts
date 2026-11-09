@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { clampCell, keyToMove, moveCell } from "./grid-navigation";
+import { clampCell, keyIntent, keyToMove, moveCell } from "./grid-navigation";
 
 const bounds = { rows: 3, columns: 2 };
 
@@ -14,6 +14,29 @@ describe("keyToMove", () => {
 
   it("should return null when the key does not move", () => {
     expect(keyToMove("a", { shift: false, ctrl: false })).toBeNull();
+  });
+});
+
+describe("keyIntent", () => {
+  it("should move down on Enter and up on Shift+Enter, without extending", () => {
+    expect(keyIntent("Enter", { shift: false, ctrl: false })).toEqual({ move: "down", jump: null, extend: false });
+    expect(keyIntent("Enter", { shift: true, ctrl: false })).toEqual({ move: "up", jump: null, extend: false });
+  });
+
+  it("should extend the selection when Shift is held with an arrow, Home, End, or Page key", () => {
+    expect(keyIntent("ArrowRight", { shift: true, ctrl: false })).toEqual({ move: "right", jump: null, extend: true });
+    expect(keyIntent("PageDown", { shift: true, ctrl: false })?.extend).toBe(true);
+    expect(keyIntent("Tab", { shift: true, ctrl: false })).toEqual({ move: "previous", jump: null, extend: false });
+  });
+
+  it("should jump to the data's edge when Cmd or Ctrl is held with an arrow, extending with Shift", () => {
+    expect(keyIntent("ArrowDown", { shift: false, ctrl: true })).toEqual({ move: null, jump: "down", extend: false });
+    expect(keyIntent("ArrowLeft", { shift: true, ctrl: true })).toEqual({ move: null, jump: "left", extend: true });
+    expect(keyIntent("Home", { shift: false, ctrl: true })).toEqual({ move: "gridStart", jump: null, extend: false });
+  });
+
+  it("should return null when the key does not move", () => {
+    expect(keyIntent("c", { shift: false, ctrl: true })).toBeNull();
   });
 });
 
