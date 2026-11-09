@@ -20,7 +20,7 @@ export interface SavedArtifactHarness {
  * person who added the agent that wrote it, and its team. Like Full width it
  * is a label, not content: no version, no approval, and the save time and
  * last editor stay as they are. Returns undefined when the editor may not
- * edit it (callers answer "not found"). Counts against the edit limit.
+ * edit it (callers answer "not found"). Counts against the harnessChoice limit.
  */
 export async function setArtifactHarnessOverride(editorId: string, artifactId: string, harness: HarnessId | null): Promise<SavedArtifactHarness | undefined> {
   // Without content: a label change never needs it.

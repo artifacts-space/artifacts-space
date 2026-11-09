@@ -6,7 +6,8 @@
  * every surface that names harnesses: the byline, the pickers, the docs, and
  * the landing page.
  *
- * Icons live in public/agent-icons/<id>.svg. They are single-color marks
+ * Icons live in public/agent-icons/<id>.svg (Claude shares the Claude Code
+ * mark, claude-code.svg). They are single-color marks
  * drawn in `currentColor`, so they follow the theme when used as a CSS mask
  * (HarnessIcon) and draw black in a plain <img>. Most come from the
  * memories.sh agent marquee; fx has no published logo license, so it gets a

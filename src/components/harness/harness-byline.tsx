@@ -17,12 +17,15 @@ function idOf(value: HarnessValue): HarnessId | null {
   return typeof value === "string" ? value : value.id;
 }
 
+/** What the byline's tooltip says: the agent's app names itself, and nobody verifies it. */
+const SELF_REPORTED = "The agent's app reports its own name. It is not verified.";
+
 /** "via Claude Code" with the harness's icon, for an artifact's byline. Nothing when no agent made it. */
 export function HarnessByline({ harness, className }: { harness: HarnessValue; className?: string }) {
   const id = idOf(harness);
   if (!id) return null;
   return (
-    <span data-harness={id} className={cn("inline-flex min-w-0 items-center gap-1.5 text-muted-foreground", className)}>
+    <span data-harness={id} title={SELF_REPORTED} className={cn("inline-flex min-w-0 items-center gap-1.5 text-muted-foreground", className)}>
       <HarnessIcon id={id} />
       <span className="truncate">via <span className="font-medium text-foreground">{harnessPhrase(id)}</span></span>
     </span>

@@ -323,5 +323,7 @@ review, because detection can be wrong and the byline names a tool, not an
 author. Versions record the agent that actually saved them, so History stays
 factual; the override is a label shown on top in bylines. clientInfo is
 untrusted: it is checked with zod, cleaned, capped, and shown only as plain
-text to the connection's owner. Readers see the harness name and icon, never
+text to the connection's owner. The byline is what the client claims, not a
+verified attribution: any client can name itself "Claude Code", and the
+byline's tooltip says so. Readers see the harness name and icon, never
 OAuth client ids or raw client names.
