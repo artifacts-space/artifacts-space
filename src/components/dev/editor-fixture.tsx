@@ -10,8 +10,11 @@ import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
 import { InlineBody, InlineSummary, InlineTitle } from "@/components/artifact-page/inline-fields";
 import { PageInlineEditor } from "@/components/artifact-page/page-inline-editor";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { SheetFill } from "@/components/artifact-view/sheet-fill";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
+import { pageColumnClass, usesFullWidth } from "@/lib/page-width/rules";
+import { sheetAtLimit } from "@/lib/ui/fixtures/formats";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
 import { dataUi, fixtureArtifact, longJson, longMarkdown, longUi, shortUi, type EditorFixtureKind } from "./fixture-content";
@@ -22,6 +25,7 @@ const samples: Record<EditorFixtureKind, { kind: ArtifactKind; content: () => st
   markdown: { kind: "markdown", content: longMarkdown },
   blocks: { kind: "ui", content: shortUi },
   data: { kind: "ui", content: dataUi },
+  sheet: { kind: "csv", content: sheetAtLimit },
 };
 
 /** A save that keeps the change in memory, so autosave runs end to end without a database. */
@@ -49,16 +53,18 @@ export function EditorFixture({ kind }: { kind: EditorFixtureKind }) {
         <StickyChrome>
           <ArtifactHeader visibility="private" sentence={visibilitySentence(visibilityCopy("private"))} content={artifact.content} menu={<ArtifactHeaderMenu />} />
         </StickyChrome>
-        <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
+        <main className={`mx-auto w-full py-12 sm:py-16 ${pageColumnClass(usesFullWidth(artifact.kind, false))}`}>
           <ConfirmationsProvider initial={[]}>
             <PageInlineEditor artifact={artifact} reviewed={false} onSaved={onSaved} save={save}>
               <InlineTitle>{artifact.title}</InlineTitle>
               <InlineSummary><p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{artifact.summary}</p></InlineSummary>
               <PageConflictNotice />
               <article className="mt-10">
-                <InlineBody>
-                  <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language="" files={artifact.files} />
-                </InlineBody>
+                <SheetFill>
+                  <InlineBody>
+                    <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language="" files={artifact.files} />
+                  </InlineBody>
+                </SheetFill>
               </article>
             </PageInlineEditor>
           </ConfirmationsProvider>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { editColumnClass, pageColumnClass, previewColumnClass, readingMeasureClass } from "./rules";
+import { editColumnClass, hasWidthSetting, pageColumnClass, previewColumnClass, readingMeasureClass, usesFullWidth } from "./rules";
 
 describe("pageColumnClass", () => {
   it("should keep the 960px reading column when the artifact is contained", () => {
@@ -56,5 +56,24 @@ describe("editColumnClass", () => {
 
   it("should let the source field span the pane when the artifact is full width", () => {
     expect(editColumnClass(true)).not.toContain("max-w-[960px]");
+  });
+});
+
+describe("usesFullWidth", () => {
+  it("should always use the whole width when the artifact is a CSV", () => {
+    expect(usesFullWidth("csv", false)).toBe(true);
+    expect(usesFullWidth("csv", true)).toBe(true);
+  });
+
+  it("should follow the Full width setting when the artifact is not a CSV", () => {
+    expect(usesFullWidth("markdown", false)).toBe(false);
+    expect(usesFullWidth("markdown", true)).toBe(true);
+  });
+});
+
+describe("hasWidthSetting", () => {
+  it("should offer the Full width setting only when it changes the page", () => {
+    expect(hasWidthSetting("csv")).toBe(false);
+    expect(hasWidthSetting("ui")).toBe(true);
   });
 });

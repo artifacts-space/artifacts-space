@@ -1,12 +1,17 @@
 "use client";
 
-import { type ClipboardEvent, type KeyboardEvent, memo, type MouseEvent, type ReactNode, useEffect, useId, useRef } from "react";
+import { type ClipboardEvent, type KeyboardEvent, type MouseEvent, type ReactNode, useEffect, useId, useMemo, useRef } from "react";
 
 import type { GridCell } from "@/lib/csv-edit-rules";
-import { keyToMove, moveCell } from "@/lib/grid-navigation";
+import { type GridBounds, keyToMove, moveCell } from "@/lib/grid-navigation";
+import { columnOffsets, keptCell, outsideSpan, revealCell, rowNumberWidth, rowsPerPage, sheetHeaderHeight, sheetRowHeight, withKept } from "@/lib/sheet-grid-rules";
 import { cn } from "@/lib/utils";
 
-import { useVirtualRows } from "./use-virtual-rows";
+import { activeRing, columnPlace, gridCellId, GridRow, rowPlace } from "./data-grid-row";
+import { useSheetFillHeight } from "./sheet-fill";
+import { useSheetViewport } from "./use-sheet-viewport";
+
+export { gridCellId } from "./data-grid-row";
 
 export interface DataGridProps {
   /** Base for cell element ids. Pass one to anchor popovers to header cells. */
@@ -17,7 +22,7 @@ export interface DataGridProps {
   describedBy?: string | undefined;
   columnCount: number;
   rowCount: number;
-  /** Column widths in `ch`. */
+  /** Column widths in pixels (sheet-grid-rules.ts). */
   widths: readonly number[];
   /** Columns shown right-aligned in tabular figures. */
   numeric: readonly boolean[];
@@ -31,22 +36,17 @@ export interface DataGridProps {
   active: GridCell;
   onActiveChange: (cell: GridCell) => void;
   /** Runs before the grid's own keys. Return true when the key was handled. */
-  onGridKeyDown?: ((event: KeyboardEvent<HTMLTableElement>) => boolean) | undefined;
+  onGridKeyDown?: ((event: KeyboardEvent<HTMLDivElement>) => boolean) | undefined;
   /** Shown in place of the active cell's text, such as a cell editor. */
   activeContent?: ReactNode;
   /** A click on the cell that is already active, such as to start editing. */
   onActiveClick?: ((cell: GridCell) => void) | undefined;
-  onPaste?: ((event: ClipboardEvent<HTMLTableElement>) => void) | undefined;
-  onCopy?: ((event: ClipboardEvent<HTMLTableElement>) => void) | undefined;
+  onPaste?: ((event: ClipboardEvent<HTMLDivElement>) => void) | undefined;
+  onCopy?: ((event: ClipboardEvent<HTMLDivElement>) => void) | undefined;
   /** Tab moves between cells, as in a spreadsheet. Otherwise Tab leaves the grid. */
   tabMoves?: boolean;
   /** Shown under the header when there are no rows. */
   empty?: ReactNode;
-}
-
-/** The element id of a cell, for aria-activedescendant and popover anchors. */
-export function gridCellId(gridId: string, cell: GridCell): string {
-  return `${gridId}-${cell.row === -1 ? "h" : String(cell.row)}-${String(cell.column)}`;
 }
 
 function cellFromEvent(event: MouseEvent): GridCell | null {
@@ -60,186 +60,174 @@ function cellFromEvent(event: MouseEvent): GridCell | null {
 
 const sameCell = (a: GridCell, b: GridCell) => a.row === b.row && a.column === b.column;
 
-const rowNumberWidth = "3.25rem";
+/**
+ * Gives a hovered cell or column header its full text as a tooltip, only when it cuts
+ * its text off. It writes the title on the DOM node outside React: rows are
+ * reused as the sheet scrolls, so this hover check is what keeps the title
+ * true, rewriting or removing it every time the pointer comes over a cell.
+ */
+function showClippedTitle(event: MouseEvent) {
+  if (!(event.target instanceof Element)) return;
+  const cell = event.target.closest<HTMLElement>("[role=gridcell], [role=columnheader]");
+  // The cell's text, or a column's name inside its header buttons. A cell being edited has none.
+  const text = cell?.querySelector<HTMLElement>(".truncate");
+  if (!cell || !text) return;
+  const value = text.textContent;
+  if (value && text.scrollWidth > text.clientWidth) cell.title = value;
+  else cell.removeAttribute("title");
+}
 
-/** Width of a column: its text width plus the cell's side padding. */
-const columnWidth = (width: number) => `calc(${String(width)}ch + 1.5rem)`;
+/** Where a key press moves the active cell, or null when the grid leaves the key alone. */
+function keyTarget(event: KeyboardEvent, active: GridCell, bounds: GridBounds, tabMoves: boolean): GridCell | null {
+  if (event.altKey || (event.key === "Tab" && !tabMoves)) return null;
+  const move = keyToMove(event.key, { shift: event.shiftKey, ctrl: event.ctrlKey || event.metaKey });
+  return move === null ? null : moveCell(active, move, bounds);
+}
 
-const activeRing = "group-focus-within/grid:ring-2 group-focus-within/grid:ring-ring group-focus-within/grid:ring-inset";
-
-/** Plain strings, not cn(): a 1,000-row grid renders thousands of cells. */
-const cellBase = "relative h-8 scroll-mt-9 scroll-ml-[3.25rem] border-r border-b border-border/50 px-3 whitespace-nowrap last:border-r-0 group-hover/row:bg-muted/50";
+/** Every column's width, with a default for any the caller did not size. */
+function useOffsets(widths: readonly number[], columnCount: number) {
+  return useMemo(() => columnOffsets(Array.from({ length: columnCount }, (_, column) => widths[column] ?? 120)), [widths, columnCount]);
+}
 
 /**
- * A spreadsheet-style table: sticky header and row numbers, fixed column
- * widths, hairline grid lines, and one active cell moved with the arrow
- * keys, Home, End, and Page Up or Down. Long tables render only the rows
- * near the screen. The table holds focus and points at the active cell
- * with aria-activedescendant, so rows can come and go while scrolling.
+ * A spreadsheet grid: a frozen header row and row-number column, fixed
+ * column widths, hairline grid lines, and one active cell moved with the
+ * arrow keys, Tab, Home, End, and Page Up or Down. Only the rows and
+ * columns in view are in the DOM (use-sheet-viewport.ts), so a sheet at the
+ * size limit scrolls smoothly. The grid holds focus and points at the
+ * active cell with aria-activedescendant, so cells can come and go while
+ * scrolling. On an artifact's page it fills the window (sheet-fill.tsx).
  */
 export function DataGrid(props: DataGridProps) {
   const { columnCount, rowCount, active, onActiveChange } = props;
   const ownId = useId();
   const gridId = props.gridId ?? ownId;
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const revealRef = useRef(false);
-  const rows = useVirtualRows(scrollerRef, rowCount);
-  const activeShown = active.row === -1 || (active.row >= rows.start && active.row < rows.end);
+  // A click picks a cell already in view; every other move (keys, a cell editor's Enter or Tab) scrolls to it.
+  const pointerMoveRef = useRef(false);
+  const shownActive = useRef(active);
+  const offsets = useOffsets(props.widths, columnCount);
+  const view = useSheetViewport(scrollerRef, rowCount, offsets);
+  const fillHeight = useSheetFillHeight(scrollerRef);
+  const totalWidth = rowNumberWidth + (offsets[columnCount] ?? 0);
+  const kept = keptCell(active, rowCount, columnCount);
 
   useEffect(() => {
-    if (!revealRef.current) return;
-    const element = document.getElementById(gridCellId(gridId, active));
-    if (element) {
-      revealRef.current = false;
-      element.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const scroller = scrollerRef.current;
+    const moved = !sameCell(shownActive.current, active);
+    shownActive.current = active;
+    const fromPointer = pointerMoveRef.current;
+    pointerMoveRef.current = false;
+    if (!moved || fromPointer || !scroller) return;
+    const next = revealCell({ top: scroller.scrollTop, left: scroller.scrollLeft, width: scroller.clientWidth, height: scroller.clientHeight }, active, offsets);
+    if (next.top !== scroller.scrollTop || next.left !== scroller.scrollLeft) scroller.scrollTo({ top: next.top, left: next.left });
+  }, [active, offsets]);
+
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (props.onGridKeyDown?.(event) || event.defaultPrevented) return;
+    const page = rowsPerPage(scrollerRef.current?.clientHeight ?? 0);
+    const next = keyTarget(event, active, { rows: rowCount, columns: columnCount, page }, props.tabMoves ?? false);
+    if (next === null) return;
+    event.preventDefault();
+    onActiveChange(next);
+  }
+
+  function handleClick(event: MouseEvent<HTMLDivElement>) {
+    const cell = cellFromEvent(event);
+    if (cell === null) return;
+    if (sameCell(cell, active)) {
+      props.onActiveClick?.(cell);
       return;
     }
-    const scroller = scrollerRef.current;
-    if (scroller && rows.rowHeight > 0) scroller.scrollTop = active.row * rows.rowHeight - scroller.clientHeight / 2;
-  }, [gridId, active, rows.start, rows.rowHeight]);
-
-  function moveTo(cell: GridCell) {
-    revealRef.current = true;
+    pointerMoveRef.current = true;
     onActiveChange(cell);
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLTableElement>) {
-    if (props.onGridKeyDown?.(event) || event.defaultPrevented) return;
-    if (event.altKey || (event.key === "Tab" && !props.tabMoves)) return;
-    const move = keyToMove(event.key, { shift: event.shiftKey, ctrl: event.ctrlKey || event.metaKey });
-    if (move === null) return;
-    const next = moveCell(active, move, { rows: rowCount, columns: columnCount });
-    if (next === null) return;
-    event.preventDefault();
-    moveTo(next);
-  }
+  const columns = withKept(view.columns, kept.column);
+  const rows = withKept(view.rows, kept.row);
 
-  function handleClick(event: MouseEvent<HTMLTableElement>) {
-    const cell = cellFromEvent(event);
-    if (cell === null) return;
-    if (sameCell(cell, active)) props.onActiveClick?.(cell);
-    else onActiveChange(cell);
-  }
-
-  const columns = Array.from({ length: columnCount }, (_, column) => column);
-  const totalWidth = `calc(${rowNumberWidth} + ${columns.map((column) => columnWidth(props.widths[column] ?? 12)).join(" + ") || "0px"})`;
-
-  // 70vh tall at most; a layout that scrolls its own pane (the /app shell) lowers it with --data-grid-max-height to fit the pane.
   return (
-    <div ref={scrollerRef} className="max-h-[var(--data-grid-max-height,70vh)] overflow-auto overscroll-contain rounded-xl border border-border/70 bg-card shadow-sm">
-      <table
+    <div className="min-w-0">
+      <div
+        ref={scrollerRef}
         role="grid"
         tabIndex={0}
         aria-label={props.label}
         aria-describedby={props.describedBy}
         aria-rowcount={rowCount + 1}
         aria-colcount={columnCount + 1}
-        aria-activedescendant={activeShown ? gridCellId(gridId, active) : undefined}
+        aria-activedescendant={kept.column === -1 ? undefined : gridCellId(gridId, active)}
         onKeyDown={handleKeyDown}
         onClick={handleClick}
         onPaste={props.onPaste}
         onCopy={props.onCopy}
-        style={{ width: totalWidth }}
-        className="group/grid min-w-full table-fixed border-separate border-spacing-0 text-sm outline-none"
+        onMouseOver={showClippedTitle}
+        style={fillHeight === null ? undefined : { maxHeight: fillHeight }}
+        // 70vh tall at most, unless it fills an artifact page; the /app shell lowers it with --data-grid-max-height to fit the pane.
+        className={cn("group/grid relative isolate min-w-0 overflow-auto overscroll-x-contain border border-border/70 bg-card text-sm outline-none", fillHeight === null && "max-h-[var(--data-grid-max-height,70vh)]")}
       >
-        <colgroup>
-          <col style={{ width: rowNumberWidth }} />
-          {columns.map((column) => <col key={column} style={{ width: columnWidth(props.widths[column] ?? 12) }} />)}
-        </colgroup>
-        <thead className="sticky top-0 z-20">
-          <tr aria-rowindex={1}>
-            <th scope="col" aria-colindex={1} className="sticky left-0 z-10 h-9 border-r border-b border-border/60 bg-card px-2 text-right text-xs font-normal text-muted-foreground/70">
-              <span className="sr-only">Row</span>#
-            </th>
-            {columns.map((column) => (
-              <th
-                key={column}
-                id={gridCellId(gridId, { row: -1, column })}
-                data-cell={`-1:${String(column)}`}
-                scope="col"
-                aria-colindex={column + 2}
-                aria-sort={props.headerSort?.(column)}
-                aria-selected={sameCell(active, { row: -1, column })}
-                className={cn(
-                  "h-9 border-r border-b border-border/60 bg-card p-0 text-left font-medium text-muted-foreground last:border-r-0",
-                  sameCell(active, { row: -1, column }) && activeRing,
-                )}
-              >
-                {sameCell(active, { row: -1, column }) && props.activeContent ? <div className="relative h-9">{props.activeContent}</div> : props.header(column)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.padTop > 0 ? <tr aria-hidden style={{ height: rows.padTop }} /> : null}
-          {Array.from({ length: rows.end - rows.start }, (_, offset) => {
-            const row = rows.start + offset;
+        <div role="presentation" className="relative" style={{ width: totalWidth, minWidth: "100%", height: sheetHeaderHeight + rowCount * sheetRowHeight }}>
+          <HeaderRow gridId={gridId} columns={columns} offsets={offsets} totalWidth={totalWidth} active={active} activeContent={props.activeContent} header={props.header} headerSort={props.headerSort} />
+          {rows.map((row) => {
             const isActiveRow = row === active.row;
             return (
               <GridRow
                 key={row}
                 row={row}
                 gridId={gridId}
-                columnCount={columnCount}
+                columns={view.columns}
+                offsets={offsets}
+                totalWidth={totalWidth}
                 cell={props.cell}
                 rowLabel={props.rowLabel}
                 numeric={props.numeric}
                 activeColumn={isActiveRow ? active.column : -1}
+                keepColumn={outsideSpan(view.columns, kept.column)}
                 activeContent={isActiveRow ? props.activeContent : null}
               />
             );
           })}
-          {rows.padBottom > 0 ? <tr aria-hidden style={{ height: rows.padBottom }} /> : null}
-        </tbody>
-      </table>
-      {rowCount === 0 && props.empty ? <div className="sticky left-0 px-4 py-6 text-center text-sm text-muted-foreground">{props.empty}</div> : null}
+        </div>
+      </div>
+      {/* Outside the grid, which holds only rows. */}
+      {rowCount === 0 && props.empty ? <p className="border-x border-b border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">{props.empty}</p> : null}
     </div>
   );
 }
 
-interface GridRowProps {
-  row: number;
+interface HeaderRowProps extends Pick<DataGridProps, "header" | "headerSort" | "active" | "activeContent"> {
   gridId: string;
-  columnCount: number;
-  cell: DataGridProps["cell"];
-  rowLabel: DataGridProps["rowLabel"];
-  numeric: DataGridProps["numeric"];
-  /** The active column when the active cell is in this row, else -1. */
-  activeColumn: number;
-  /** The cell editor, only for the row that holds it. */
-  activeContent: ReactNode;
+  columns: readonly number[];
+  offsets: readonly number[];
+  totalWidth: number;
 }
 
-/**
- * One body row. Memoized: moving the active cell re-renders only the rows it
- * leaves and enters, as long as `cell` and `rowLabel` keep their identity.
- */
-const GridRow = memo(function GridRow({ row, gridId, columnCount, cell, rowLabel, numeric, activeColumn, activeContent }: GridRowProps) {
-  const cells: ReactNode[] = [];
-  for (let column = 0; column < columnCount; column += 1) {
-    const value = cell(row, column);
-    const isActive = column === activeColumn;
-    const editing = isActive && activeContent !== undefined && activeContent !== null;
-    cells.push(
-      <td
-        key={column}
-        id={gridCellId(gridId, { row, column })}
-        data-cell={`${String(row)}:${String(column)}`}
-        aria-colindex={column + 2}
-        aria-selected={isActive}
-        title={value.length > 24 && !editing ? value : undefined}
-        className={`${cellBase} ${editing ? "overflow-visible" : "overflow-hidden text-ellipsis"}${numeric[column] ? " text-right tabular-nums" : ""}${isActive ? ` ${activeRing}` : ""}`}
-      >
-        {editing ? activeContent : value}
-      </td>,
-    );
-  }
+/** The frozen header row: the row-number corner, then the column names in view. */
+function HeaderRow({ gridId, columns, offsets, totalWidth, active, activeContent, header, headerSort }: HeaderRowProps) {
   return (
-    <tr data-row={row} aria-rowindex={row + 2} className="group/row">
-      <th scope="row" aria-colindex={1} className="sticky left-0 z-10 h-8 border-r border-b border-border/50 bg-card px-2 text-right text-xs font-normal text-muted-foreground/70 tabular-nums group-hover/row:bg-muted">
-        {rowLabel(row)}
-      </th>
-      {cells}
-    </tr>
+    <div role="row" aria-rowindex={1} style={rowPlace(-1, totalWidth)} className="sticky top-0 z-20 flex border-b border-border/60 bg-muted">
+      <div role="columnheader" aria-colindex={1} style={{ width: rowNumberWidth }} className="sticky left-0 z-10 flex shrink-0 items-center justify-end border-r border-border/60 bg-muted px-2 text-xs text-muted-foreground/70">
+        <span className="sr-only">Row</span>#
+      </div>
+      {columns.map((column) => {
+        const isActive = sameCell(active, { row: -1, column });
+        const editing = isActive && activeContent !== undefined && activeContent !== null;
+        return (
+          <div
+            key={column}
+            role="columnheader"
+            id={gridCellId(gridId, { row: -1, column })}
+            data-cell={`-1:${String(column)}`}
+            aria-colindex={column + 2}
+            aria-sort={headerSort?.(column)}
+            aria-selected={isActive}
+            style={columnPlace(offsets, column)}
+            className={cn("absolute top-0 bottom-0 border-r border-border/60 text-left font-medium text-muted-foreground", editing ? "overflow-visible" : "overflow-hidden", isActive && activeRing)}
+          >
+            {editing ? <div className="relative h-full">{activeContent}</div> : header(column)}
+          </div>
+        );
+      })}
+    </div>
   );
-});
+}

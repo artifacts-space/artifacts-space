@@ -7,9 +7,11 @@ export type GridMove = "up" | "down" | "left" | "right" | "rowStart" | "rowEnd" 
 export interface GridBounds {
   rows: number;
   columns: number;
+  /** Rows a Page Up or Page Down moves: a screenful in a grid that knows its height. */
+  page?: number;
 }
 
-/** Rows a Page Up or Page Down moves. */
+/** Rows a Page Up or Page Down moves when the grid does not say. */
 export const pageRows = 10;
 
 const arrowMoves: Partial<Record<string, GridMove>> = {
@@ -38,6 +40,8 @@ function wrapMove(cell: GridCell, step: 1 | -1, bounds: GridBounds): GridCell | 
   return { row: Math.floor(flat / bounds.columns) - 1, column: flat % bounds.columns };
 }
 
+const pageSize = (bounds: GridBounds) => bounds.page ?? pageRows;
+
 function lineMove(cell: GridCell, move: GridMove, bounds: GridBounds): GridCell {
   const lastRow = bounds.rows - 1;
   const lastColumn = bounds.columns - 1;
@@ -46,8 +50,8 @@ function lineMove(cell: GridCell, move: GridMove, bounds: GridBounds): GridCell 
     case "down": return { row: Math.min(lastRow, cell.row + 1), column: cell.column };
     case "left": return { row: cell.row, column: Math.max(0, cell.column - 1) };
     case "right": return { row: cell.row, column: Math.min(lastColumn, cell.column + 1) };
-    case "pageUp": return { row: Math.max(-1, cell.row - pageRows), column: cell.column };
-    case "pageDown": return { row: Math.min(lastRow, cell.row + pageRows), column: cell.column };
+    case "pageUp": return { row: Math.max(-1, cell.row - pageSize(bounds)), column: cell.column };
+    case "pageDown": return { row: Math.min(lastRow, cell.row + pageSize(bounds)), column: cell.column };
     case "rowStart": return { row: cell.row, column: 0 };
     case "rowEnd": return { row: cell.row, column: lastColumn };
     case "gridStart": return { row: -1, column: 0 };
@@ -69,22 +73,4 @@ export function moveCell(cell: GridCell, move: GridMove, bounds: GridBounds): Gr
 /** Keeps a cell inside the grid after rows or columns are removed. */
 export function clampCell(cell: GridCell, bounds: GridBounds): GridCell {
   return { row: clamp(cell.row, -1, bounds.rows - 1), column: clamp(cell.column, 0, Math.max(0, bounds.columns - 1)) };
-}
-
-/** The rows to render for a scroll position: those on screen plus `overscan` either side. */
-export interface RowWindow {
-  start: number;
-  /** One past the last row to render. */
-  end: number;
-}
-
-/**
- * Which rows to render when only part of a long table is on screen. Rows
- * have one fixed height; `scrollTop` is measured from the first data row.
- */
-export function rowWindow(scrollTop: number, viewportHeight: number, rowHeight: number, count: number, overscan: number): RowWindow {
-  if (rowHeight <= 0) return { start: 0, end: count };
-  const first = Math.floor(Math.max(0, scrollTop) / rowHeight);
-  const visible = Math.ceil(viewportHeight / rowHeight) + 1;
-  return { start: clamp(first - overscan, 0, count), end: clamp(first + visible + overscan, 0, count) };
 }

@@ -22,6 +22,7 @@ import {
 import { detectColumnTypes } from "@/lib/csv-values";
 import { columnWidths } from "@/lib/csv-view-rules";
 import { clampCell, moveCell } from "@/lib/grid-navigation";
+import { pixelWidth } from "@/lib/sheet-grid-rules";
 
 import { type CellCommitMove, CsvCellEditor } from "./csv-cell-editor";
 import { type ColumnAction, CsvEditMenu } from "./csv-edit-menu";
@@ -64,11 +65,11 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
   const wrapperRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLElement | null>(null);
   const tabLeavesRef = useRef(false);
-  const widths = useMemo(() => columnWidths(grid.header, grid.rows, width), [grid, width]);
+  const widths = useMemo(() => columnWidths(grid.header, grid.rows, width).map(pixelWidth), [grid, width]);
   const cellText = useCallback((row: number, column: number) => grid.rows[row]?.[column] ?? "", [grid.rows]);
   const numeric = useMemo(() => detectColumnTypes(grid.rows, width).map((type) => type === "number"), [grid.rows, width]);
 
-  const focusGrid = () => { wrapperRef.current?.querySelector("table")?.focus({ preventScroll: true }); };
+  const focusGrid = () => { wrapperRef.current?.querySelector<HTMLElement>("[role=grid]")?.focus({ preventScroll: true }); };
   const startEdit = (cell: GridCell, draft = cellValue(grid, cell)) => { setStatus(""); setEditing({ cell, draft }); };
 
   function commit(move: CellCommitMove) {
@@ -88,7 +89,7 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
   }
 
   function openMenu(column: number) {
-    tableRef.current = wrapperRef.current?.querySelector("table") ?? null;
+    tableRef.current = wrapperRef.current?.querySelector<HTMLElement>("[role=grid]") ?? null;
     setActive({ row: -1, column });
     setMenuColumn(column);
   }
@@ -107,7 +108,7 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
     setActive({ row: active.row, column: at });
   }
 
-  function handleGridKey(event: KeyboardEvent<HTMLTableElement>): boolean {
+  function handleGridKey(event: KeyboardEvent<HTMLDivElement>): boolean {
     const action = gridEditKey(event);
     const leaving = tabLeavesRef.current && event.key === "Tab";
     tabLeavesRef.current = action === "escape";
@@ -123,7 +124,7 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
     return true;
   }
 
-  function handlePaste(event: ClipboardEvent<HTMLTableElement>) {
+  function handlePaste(event: ClipboardEvent<HTMLDivElement>) {
     const text = event.clipboardData.getData("text/plain");
     if (editing || text === "") return;
     event.preventDefault();
@@ -134,7 +135,7 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
     setStatus(`Pasted ${cellsLabel(rows, columns)}.`);
   }
 
-  function handleCopy(event: ClipboardEvent<HTMLTableElement>) {
+  function handleCopy(event: ClipboardEvent<HTMLDivElement>) {
     event.clipboardData.setData("text/plain", cellValue(grid, active));
     event.preventDefault();
   }
@@ -208,7 +209,7 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
 
 function EditorHeader({ name, onMenu }: { name: string; onMenu: () => void }) {
   return (
-    <div className="group/header flex h-9 items-center">
+    <div className="group/header flex h-full items-center">
       <span className="min-w-0 flex-1 truncate pr-1 pl-3">{name || <span className="text-muted-foreground/60">Untitled</span>}</span>
       <button
         type="button"

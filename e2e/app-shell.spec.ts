@@ -250,7 +250,7 @@ test.describe("desktop and tablet", () => {
     await expect(grid).toBeVisible();
     const sizes = await page.evaluate(() => {
       const body = document.querySelector("[data-slot=detail-body]");
-      const scroller = document.querySelector("[role=grid]")?.parentElement;
+      const scroller = document.querySelector("[role=grid]");
       return { pane: body?.clientHeight ?? 0, grid: scroller?.getBoundingClientRect().height ?? Infinity, gridScrolls: (scroller?.scrollHeight ?? 0) > (scroller?.clientHeight ?? 0) };
     });
     expect(sizes.gridScrolls, "the grid scrolls its rows").toBe(true);

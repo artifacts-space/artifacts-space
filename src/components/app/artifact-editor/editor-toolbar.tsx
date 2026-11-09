@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import type { ArtifactKind } from "@/lib/artifact-types";
-import { FULL_WIDTH_LABEL } from "@/lib/page-width/rules";
+import { FULL_WIDTH_LABEL, hasWidthSetting } from "@/lib/page-width/rules";
 import { cn } from "@/lib/utils";
 
 import type { FullWidthControl } from "./use-full-width";
@@ -29,7 +29,8 @@ export interface SourceToggle {
 
 interface MoreMenuProps {
   source: SourceToggle;
-  fullWidth: FullWidthControl;
+  /** Null for a CSV, which is always full width. */
+  fullWidth: FullWidthControl | null;
   harness: HarnessControl;
   onRequestDelete: (() => void) | null;
   onWithdraw: (() => void) | null;
@@ -46,9 +47,11 @@ function MoreMenu({ source, fullWidth, harness, onRequestDelete, onWithdraw }: M
         <DropdownMenuItem onClick={source.onToggle} className="py-2">
           <IconCode /> {source.open ? "Hide source" : "View source"}
         </DropdownMenuItem>
-        <DropdownMenuCheckboxItem checked={fullWidth.checked} disabled={fullWidth.pending} onCheckedChange={fullWidth.onChange} className="py-2">
-          <IconArrowsHorizontal /> {FULL_WIDTH_LABEL}
-        </DropdownMenuCheckboxItem>
+        {fullWidth ? (
+          <DropdownMenuCheckboxItem checked={fullWidth.checked} disabled={fullWidth.pending} onCheckedChange={fullWidth.onChange} className="py-2">
+            <IconArrowsHorizontal /> {FULL_WIDTH_LABEL}
+          </DropdownMenuCheckboxItem>
+        ) : null}
         <HarnessMenu control={harness} />
         {onWithdraw ? (
           <DropdownMenuItem onClick={onWithdraw} className="py-2">
@@ -111,7 +114,7 @@ export function EditorToolbar({ id, publicId, kind, content, shareControl, histo
         {views}
         {comments}
         {shareControl}
-        <MoreMenu source={source} fullWidth={fullWidth} harness={harness} onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
+        <MoreMenu source={source} fullWidth={hasWidthSetting(kind) ? fullWidth : null} harness={harness} onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
       </div>
     </div>
   );

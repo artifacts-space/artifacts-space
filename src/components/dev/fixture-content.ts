@@ -3,7 +3,7 @@ import { specJson, type DocElement } from "@/lib/docs/spec-builders";
 import { checkoutRolloutSpec } from "@/lib/preview/samples";
 
 /** Samples the editor fixture can open: long ones for layout, and a short interface ("blocks") for the block editor. */
-export const editorFixtureKinds = ["ui", "json", "markdown", "blocks", "data"] as const;
+export const editorFixtureKinds = ["ui", "json", "markdown", "blocks", "data", "sheet"] as const;
 export type EditorFixtureKind = (typeof editorFixtureKinds)[number];
 
 /** The rollout dashboard twelve times over: a long ui with charts, timelines, and tables. */
