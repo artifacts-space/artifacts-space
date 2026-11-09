@@ -27,10 +27,11 @@ function headMeta(html: string, key: string): string | null {
   return tag?.get("content") ?? null;
 }
 
-/** The href of the first <link> in <head> with this rel (and type, when given), or null. */
-function headLink(html: string, rel: string, type?: string): string | null {
+/** The attributes of the first <link> in <head> with this rel (and type, when given). Fails the test when there is none. */
+function headLink(html: string, rel: string, type?: string): Map<string, string> {
   const tag = headTags(html, "link").find((attrs) => attrs.get("rel") === rel && (!type || attrs.get("type") === type));
-  return tag?.get("href") ?? null;
+  expect(tag, `a <link rel="${rel}"> in <head>`).toBeDefined();
+  return tag ?? new Map<string, string>();
 }
 
 /**
@@ -83,10 +84,13 @@ for (const { name, path, status } of previewPages) {
 
   test(`should link the brand favicon and Apple touch icon when Slack unfurls ${name}`, async ({ request }) => {
     const { html } = await page(request, path);
-    expect(headLink(html, "icon", "image/x-icon")).toMatch(/^\/favicon\.ico/);
-    const apple = headLink(html, "apple-touch-icon");
+    const favicon = headLink(html, "icon", "image/x-icon");
+    expect(favicon.get("href")).toMatch(/^\/favicon\.ico/);
+    // Next takes sizes from the ICO's first entry, which is why 48 px goes first.
+    expect(favicon.get("sizes")).toBe("48x48");
+    const apple = headLink(html, "apple-touch-icon").get("href") ?? "";
     expect(apple).toMatch(/^\/apple-icon\.png/);
-    expect(await fetchPng(request, apple ?? "")).toEqual({ width: 180, height: 180 });
+    expect(await fetchPng(request, apple)).toEqual({ width: 180, height: 180 });
   });
 }
 
@@ -95,6 +99,14 @@ function icoEntries(ico: Buffer): { width: number; offset: number }[] {
   return Array.from({ length: ico.readUInt16LE(4) }, (_, i) => ({ width: ico[6 + i * 16] ?? 0, offset: ico.readUInt32LE(6 + i * 16 + 12) }));
 }
 
+/**
+ * A pixel counts as brand blue when its blue channel beats red by this much.
+ * The brand 48 px entry has about 600 such pixels; the default "N" has none.
+ */
+const BRAND_BLUE_OVER_RED = 60;
+/** Half the brand 48 px entry's blue pixels: room for a re-render, far above the default's zero. */
+const BRAND_BLUE_MIN_PIXELS = 300;
+
 /** Pixels in one 32-bit BMP entry of an ICO whose blue channel clearly beats red. */
 function bluePixels(ico: Buffer, entry: { width: number; offset: number }): number {
   const pixels = entry.offset + ico.readUInt32LE(entry.offset);
@@ -102,7 +114,7 @@ function bluePixels(ico: Buffer, entry: { width: number; offset: number }): numb
   for (let i = 0; i < entry.width * entry.width; i++) {
     const b = ico[pixels + i * 4] ?? 0;
     const r = ico[pixels + i * 4 + 2] ?? 0;
-    if (b - r > 60) blue++;
+    if (b - r > BRAND_BLUE_OVER_RED) blue++;
   }
   return blue;
 }
@@ -113,12 +125,12 @@ test("should serve a 48, 32, and 16 pixel brand favicon, not the Next.js default
   const body = await response.body();
   expect(body.readUInt16LE(2)).toBe(1);
   const entries = icoEntries(body);
-  // Next reads the first entry for the link's sizes attribute, so 48 px goes first.
+  // Next reads the first entry for the link's sizes attribute (checked above), so 48 px goes first.
   expect(entries.map((entry) => entry.width)).toEqual([48, 32, 16]);
   const large = entries.find((entry) => entry.width === 48);
   expect(large).toBeDefined();
   // create-next-app's default is a black and white "N" of the same sizes; the brand planet is blue.
-  expect(large ? bluePixels(body, large) : 0).toBeGreaterThan(300);
+  expect(large ? bluePixels(body, large) : 0).toBeGreaterThan(BRAND_BLUE_MIN_PIXELS);
 });
 
 test("should answer an unknown artifact's preview image with the site image", async ({ request }) => {

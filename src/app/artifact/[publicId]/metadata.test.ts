@@ -122,7 +122,11 @@ describe("artifact page generateMetadata", () => {
 describe("artifact page generateMetadata for a signed-out link crawler", () => {
   const secret = { title: "Secret staging plan", icon: "🔒", summary: "Secret summary for the team" };
 
-  /** getViewableArtifact as the real read rule decides it: the artifact for a viewer who may read it, null for everyone else. */
+  /**
+   * getViewableArtifact stubbed with the real read rule (canViewArtifact): the artifact for a viewer who may read it,
+   * null for everyone else. That getViewableArtifact itself refuses signed-out viewers is proven in src/lib/access.test.ts;
+   * these tests prove the page asks as the signed-out viewer and leaks nothing when refused.
+   */
   function readRuleDecides(visibility: ArtifactVisibility) {
     mocks.getViewableArtifact.mockImplementation((_publicId: string, viewerId: string | null) => {
       const viewer = viewerId ? { userId: viewerId, isTeamMember: false } : null;
