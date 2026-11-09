@@ -49,7 +49,9 @@ export const rateLimits = {
    * Team icon views per network address per hour: an abuse backstop only,
    * for many accounts or signed-out requests from one address. A 500-person
    * office whose members each load 50 icons in one hour (more than a cold
-   * cache on a busy morning) makes 25,000, under this.
+   * cache on a busy morning) makes 25,000, under this. Worst case it lets
+   * one address pull about 15 GB an hour of 512 KB icons, and only with 25
+   * or more accounts each at its own 1,200 limit; real icons are a few KB.
    */
   teamIconByNetwork: { limit: 30_000, windowSeconds: hour },
   /** Artifact page views (/artifact/<id>) per network address per hour. */

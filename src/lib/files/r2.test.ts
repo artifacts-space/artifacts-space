@@ -141,6 +141,11 @@ describe("streamObject", () => {
     await expect(streamObject(config, key, 3)).rejects.toThrow("R2 GET failed with status 413.");
   });
 
+  it.each([[""], ["0"], ["1.5"]])("should refuse an answer whose length is %j", async (length) => {
+    answer(new Uint8Array([1, 2]), 206, { "Content-Length": length });
+    await expect(streamObject(config, key, 3)).rejects.toThrow("R2 GET failed with status 413.");
+  });
+
   it("should throw without details when R2 refuses", async () => {
     answer(null, 403);
     await expect(streamObject(config, key, 3)).rejects.toThrow("R2 GET failed with status 403.");

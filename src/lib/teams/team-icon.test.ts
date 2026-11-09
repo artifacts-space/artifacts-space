@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type * as R2 from "@/lib/files/r2";
+
 /*
  * Team icon storage: the bytes are checked before anything is stored, the
  * old object is deleted after a replace or remove (best effort, logged),
@@ -18,7 +20,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/db", () => ({
   getDb: () => ({ execute: mocks.execute, select: () => ({ from: () => ({ innerJoin: () => ({ where: () => ({ limit: mocks.limit }) }) }) }) }),
 }));
-vi.mock("@/lib/files/r2", () => ({
+vi.mock("@/lib/files/r2", async (importOriginal) => ({
+  R2Error: (await importOriginal<typeof R2>()).R2Error,
   r2ConfigFromEnv: () => ({ accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }),
   putObject: mocks.putObject,
   deleteObject: mocks.deleteObject,
@@ -26,6 +29,7 @@ vi.mock("@/lib/files/r2", () => ({
 }));
 
 const { memberIconKeyQuery, memberTeamIcon, removeTeamIcon, saveTeamIcon } = await import("./team-icon");
+const { R2Error } = await import("@/lib/files/r2");
 const { neon } = await import("@neondatabase/serverless");
 const { drizzle } = await import("drizzle-orm/neon-http");
 
@@ -125,6 +129,18 @@ describe("memberTeamIcon", () => {
     mocks.limit.mockResolvedValue([{ logo: null }]);
     expect(await memberTeamIcon("user-1", "team-1")).toBeNull();
     expect(mocks.streamObject).not.toHaveBeenCalled();
+  });
+
+  it("should return null, so the team letter shows, when a stored icon is over the 512 KB cap", async () => {
+    mocks.limit.mockResolvedValue([{ logo: oldKey }]);
+    mocks.streamObject.mockRejectedValue(new R2Error("GET", 413));
+    expect(await memberTeamIcon("user-1", "team-1")).toBeNull();
+  });
+
+  it("should still fail when R2 itself fails", async () => {
+    mocks.limit.mockResolvedValue([{ logo: oldKey }]);
+    mocks.streamObject.mockRejectedValue(new R2Error("GET", 503));
+    await expect(memberTeamIcon("user-1", "team-1")).rejects.toThrow("status 503");
   });
 
   it("should return null when the object is gone from storage", async () => {

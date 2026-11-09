@@ -204,16 +204,18 @@ export interface ObjectStream {
 /**
  * Opens an object for streaming, or null when it does not exist. R2 is
  * asked for at most `maxBytes + 1` bytes (Range), and an object larger than
- * `maxBytes`, or an answer without a length, is refused (R2Error 413), so a
- * caller never passes on more than it expects and never holds the bytes in
- * memory. For small objects the server already checked, such as team icons.
+ * `maxBytes`, or an answer without a positive length, is refused (R2Error
+ * 413), so a caller never passes on more than it expects and never holds
+ * the bytes in memory. For small objects the server already checked, such
+ * as team icons.
  */
 export async function streamObject(config: R2Config, key: string, maxBytes: number): Promise<ObjectStream | null> {
   const response = await send(config, "GET", "GET", key, { Range: `bytes=0-${String(maxBytes)}` });
   if (response.status === 404) return null;
   if (!response.ok) throw new R2Error("GET", response.status);
-  const size = Number(response.headers.get("content-length") ?? "NaN");
-  if (!response.body || !Number.isInteger(size) || size > maxBytes) {
+  const length = response.headers.get("content-length") ?? "";
+  const size = /^\d+$/.test(length) ? Number(length) : 0;
+  if (!response.body || size <= 0 || size > maxBytes) {
     await response.body?.cancel().catch(() => undefined);
     // 413 (too large), not R2's own status, so a size refusal never reads as an R2 outage in the logs.
     throw new R2Error("GET", 413);
