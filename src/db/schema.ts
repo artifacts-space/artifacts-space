@@ -101,7 +101,7 @@ export const artifact = pgTable(
     index("artifact_project_idx").on(table.projectId),
     index("artifact_tags_idx").using("gin", table.tags),
     index("artifact_team_updated_idx").on(table.teamId, table.updatedAt),
-    // The sitemap lists only public artifacts whose author turned on "Show in search engines".
+    // The sitemap lists only public artifacts with "Show in search engines" turned on.
     index("artifact_in_search_idx").on(table.publicId).where(sql`${table.showInSearch} and ${table.visibility} = 'public'`),
     check("artifact_tags_count_check", sql`cardinality(${table.tags}) <= ${sql.raw(String(tagLimits.maxPerArtifact))}`),
     check("artifact_comments_check", sql`${table.comments} in ('off', 'team', 'signed_in')`),

@@ -18,8 +18,8 @@ import { noindexHeader, robotsHeaderName } from "@/lib/search/search-rules";
  * Anything that may not be previewed (private, team, deleted, unknown, or a
  * version that is not the approved one) gets the generic site image with the
  * same short cache, so the response never tells whether an artifact exists.
- * Preview images are never indexed: a year-long cached copy would outlive the
- * author turning "Show in search engines" off.
+ * Preview images are never indexed: a year-long cached copy would outlive
+ * "Show in search engines" being turned off.
  */
 
 const versionCache = "public, max-age=31536000, immutable";

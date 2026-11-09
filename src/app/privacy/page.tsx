@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 
 const summary = [
   "We collect what we need to run artifacts.space: your account details, what you and your agents save, and basic technical logs.",
-  "Your artifacts are private until you share them. Anyone with a link can read link-shared artifacts, and search engines list a public one only when its author turns that on.",
+  "Your artifacts are private until you share them. Anyone with a link can read link-shared artifacts, and search engines list a public one only when someone who can share it turns that on.",
   "We never sell your data or share it for ads. We run no analytics or ad trackers, and we do not train AI models on your content.",
   "A few providers help us run the service: Vercel, Neon, Cloudflare R2, Sendir, and GitHub for sign-in.",
   "You can edit, delete, or make private anything you own at any time. Email us to get a copy of your data or delete your account.",

@@ -37,7 +37,7 @@ export default function SharingPage() {
         ]}
       />
       <Prose>
-        <p>Public artifacts stay out of search engines until someone who can share them turns on <strong>Show in search engines</strong> in the Share dialog. Only the people who can share the artifact (its author, or the person who added the agent that wrote it) can turn it on, and agents cannot. Making the artifact link, team, or private turns it off again. Only the page itself is listed: its Markdown version, raw content, files, and preview images never are.</p>
+        <p>Public artifacts stay out of search engines until someone who can share them turns on <strong>Show in search engines</strong> in the Share dialog. Only the people who can share the artifact can turn it on: its author, or, while they are still in that agent&apos;s team, the person who added the agent that wrote it. Agents cannot. Making the artifact link, team, or private turns it off again. Only the page itself is listed: its Markdown version, raw content, files, and preview images never are.</p>
       </Prose>
       <Prose>
         <p>Link and public pages carry a <strong>Report</strong> button. Readers pick one of {reasons.length} reasons ({reasons.join(", ").toLowerCase()}), and the team&apos;s owners and admins see the report. The author, or an owner or admin of the artifact&apos;s team, can always make an artifact private again, with no approval and no limit.</p>
