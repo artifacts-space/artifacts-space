@@ -3,7 +3,9 @@ import type { TeamAgentView } from "@/lib/agents/queries";
 import type { OpenReportView } from "@/lib/reports/service";
 import type { PendingSharingView, TeamSharedView } from "@/lib/sharing/queries";
 import type { PendingInvitationView, TeamMemberView, TeamMembership } from "@/lib/teams/queries";
-import { canEditTeamSettings, canManageTeam, roleLabel } from "@/lib/teams/roles";
+import type { TeamRoleView } from "@/lib/teams/capabilities";
+import { can } from "@/lib/teams/capability-rules";
+import type { PermissionAuditView } from "@/lib/teams/role-store";
 import { availableArtifactViews, availableTeamTabs, type ArtifactView, type TeamTab, type TeamTabAccess, type TeamTabSelection } from "@/lib/teams/team-tabs-rules";
 import type { TeamThemeSettings } from "@/lib/themes/team-presets";
 import { canManageTeamThemes } from "@/lib/themes/team-preset-rules";
@@ -12,13 +14,13 @@ import type { PendingEditView } from "@/lib/versions/queries";
 import { EditReviewList } from "./edit-reviews";
 import { MembersTable } from "./members-table";
 import { PendingSharingList } from "./pending-sharing";
-import { PermissionsTable } from "./permissions-table";
+import { PermissionsPanel } from "./permissions-panel";
 import { ReportsList } from "./reports-list";
 import { Section } from "./section";
 import { SharedArtifactsTable } from "./shared-artifacts-table";
 import { TeamTabs, type TabPanel } from "./team-tabs";
 import { TeamThemes } from "./team-themes";
-import { LeaveTeamButton, SharingRuleSetting } from "./team-settings";
+import { LeaveTeamButton } from "./team-settings";
 
 /** Everything the team page shows, loaded by the page (or a dev fixture) before it renders. */
 export interface TeamPageData {
@@ -35,12 +37,16 @@ export interface TeamPageData {
   themeNames: ReadonlyMap<string, string>;
   /** Null for personal teams, which have no themes. */
   themes: TeamThemeSettings | null;
+  /** Every role in the team with its capabilities. */
+  roles: TeamRoleView[];
+  /** The newest role changes. */
+  audit: PermissionAuditView[];
 }
 
 /** What the viewer may see, which decides the tabs and views. Reports show only while some are open. */
 export function teamTabAccess(team: TeamMembership, openReports: number): TeamTabAccess {
-  const manager = canManageTeam(team.role);
-  return { personal: team.personal, reviews: manager && !team.personal, reports: manager && openReports > 0 };
+  const reviews = !team.personal && (can(team, "approve.sharing") || can(team, "approve.edits"));
+  return { personal: team.personal, reviews, reports: can(team, "reports.handle") && openReports > 0 };
 }
 
 function TeamHeader({ team }: { team: TeamMembership }) {
@@ -52,7 +58,7 @@ function TeamHeader({ team }: { team: TeamMembership }) {
           {team.personal ? <Badge variant="secondary">Personal</Badge> : null}
         </div>
         <p className="mt-1 text-md text-muted-foreground">
-          <span className="font-mono">/teams/{team.slug}</span> · You are {roleLabel(team.role).toLowerCase()}
+          <span className="font-mono">/teams/{team.slug}</span> · You are {team.roleName.toLowerCase()}
         </p>
       </div>
       {team.personal ? null : <LeaveTeamButton teamId={team.id} teamName={team.name} />}
@@ -60,40 +66,31 @@ function TeamHeader({ team }: { team: TeamMembership }) {
   );
 }
 
-function PermissionsPanel({ team }: { team: TeamMembership }) {
-  return (
-    <>
-      <Section title="Permissions" description="What each role can do in this team. Owners always can do everything, and agents never approve.">
-        <PermissionsTable team={team} />
-      </Section>
-      <Section title="Sharing rule" description="Does sharing with the team need an admin's approval?">
-        <SharingRuleSetting teamId={team.id} needsApproval={team.teamSharingNeedsApproval} canEdit={canEditTeamSettings(team.role)} />
-      </Section>
-    </>
-  );
-}
-
 function ApprovalPanel({ data }: { data: TeamPageData }) {
   return (
     <>
-      <Section title="Sharing requests" description="Approve or deny requests to share with the team, by link, or in public.">
-        <PendingSharingList requests={data.requests} />
-      </Section>
-      <Section title="Edits" description="Readers outside the team see the last approved version until you approve an edit.">
-        <EditReviewList edits={data.edits} themeNames={data.themeNames} />
-      </Section>
+      {can(data.team, "approve.sharing") ? (
+        <Section title="Sharing requests" description="Approve or deny requests to share with the team, by link, or in public.">
+          <PendingSharingList requests={data.requests} />
+        </Section>
+      ) : null}
+      {can(data.team, "approve.edits") ? (
+        <Section title="Edits" description="Readers outside the team see the last approved version until you approve an edit.">
+          <EditReviewList edits={data.edits} themeNames={data.themeNames} />
+        </Section>
+      ) : null}
     </>
   );
 }
 
 function artifactViewPanels(data: TeamPageData, views: ArtifactView[]): TabPanel<ArtifactView>[] {
-  const manager = canManageTeam(data.team.role);
+  const withdraw = can(data.team, "artifacts.withdraw");
   const panels: Record<ArtifactView, TabPanel<ArtifactView>> = {
     shared: {
       id: "shared",
       content: (
-        <Section title="Shared through this team" description={manager ? "Withdraw makes an artifact private to its author again." : undefined}>
-          <SharedArtifactsTable artifacts={data.shared} canWithdraw={manager} />
+        <Section title="Shared through this team" description={withdraw ? "Withdraw makes an artifact private to its author again." : undefined}>
+          <SharedArtifactsTable artifacts={data.shared} canWithdraw={withdraw} />
         </Section>
       ),
     },
@@ -113,13 +110,12 @@ function artifactViewPanels(data: TeamPageData, views: ArtifactView[]): TabPanel
 
 function tabPanels(data: TeamPageData, tabs: TeamTab[], approvals: number): TabPanel<TeamTab>[] {
   const { team } = data;
-  const canManage = canManageTeam(team.role) && !team.personal;
   const panels: Record<TeamTab, TabPanel<TeamTab>> = {
     members: {
       id: "members",
-      content: <MembersTable teamId={team.id} personal={team.personal} viewerId={data.viewerId} viewerRole={team.role} canManage={canManage} members={data.members} agents={data.agents} invitations={data.invitations} origin={data.origin} />,
+      content: <MembersTable viewer={team} members={data.members} agents={data.agents} invitations={data.invitations} roles={data.roles} origin={data.origin} />,
     },
-    permissions: { id: "permissions", content: <PermissionsPanel team={team} /> },
+    permissions: { id: "permissions", content: <PermissionsPanel team={team} roles={data.roles} audit={data.audit} /> },
     artifacts: { id: "artifacts", count: approvals, content: null },
     themes: {
       id: "themes",

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { agentArtifactTeamProblem, canDecideRequest, canWithdrawSharing, decideSharing, isLevelAllowedInTeam, requestStillValid, sharingNeedsApproval } from "./rules";
+import { defaultActor } from "@/lib/teams/capability-rules";
 
 const personal = { personal: true, teamSharingNeedsApproval: true };
 const strictTeam = { personal: false, teamSharingNeedsApproval: true };
@@ -25,22 +26,22 @@ describe("sharingNeedsApproval", () => {
 
 describe("decideSharing", () => {
   it("should apply when no approval is needed", () => {
-    expect(decideSharing({ level: "public", team: personal, role: "owner", actor: "agent" })).toBe("apply");
-    expect(decideSharing({ level: "team", team: openTeam, role: "member", actor: "agent" })).toBe("apply");
+    expect(decideSharing({ level: "public", team: personal, member: defaultActor("owner"), actor: "agent" })).toBe("apply");
+    expect(decideSharing({ level: "team", team: openTeam, member: defaultActor("member"), actor: "agent" })).toBe("apply");
   });
 
   it("should wait for approval when a member asks", () => {
-    expect(decideSharing({ level: "team", team: strictTeam, role: "member", actor: "person" })).toBe("pending");
-    expect(decideSharing({ level: "link", team: openTeam, role: "member", actor: "person" })).toBe("pending");
+    expect(decideSharing({ level: "team", team: strictTeam, member: defaultActor("member"), actor: "person" })).toBe("pending");
+    expect(decideSharing({ level: "link", team: openTeam, member: defaultActor("member"), actor: "person" })).toBe("pending");
   });
 
   it("should apply when an owner or admin asks in the web app", () => {
-    expect(decideSharing({ level: "public", team: strictTeam, role: "admin", actor: "person" })).toBe("apply");
-    expect(decideSharing({ level: "team", team: strictTeam, role: "owner", actor: "person" })).toBe("apply");
+    expect(decideSharing({ level: "public", team: strictTeam, member: defaultActor("admin"), actor: "person" })).toBe("apply");
+    expect(decideSharing({ level: "team", team: strictTeam, member: defaultActor("owner"), actor: "person" })).toBe("apply");
   });
 
   it("should wait for approval when an agent asks, even for an owner", () => {
-    expect(decideSharing({ level: "public", team: strictTeam, role: "owner", actor: "agent" })).toBe("pending");
+    expect(decideSharing({ level: "public", team: strictTeam, member: defaultActor("owner"), actor: "agent" })).toBe("pending");
   });
 });
 
@@ -54,18 +55,18 @@ describe("isLevelAllowedInTeam", () => {
 
 describe("canWithdrawSharing", () => {
   it("should let the author or a team manager withdraw", () => {
-    expect(canWithdrawSharing({ viewerId: "a", authorId: "a", viewerRole: null })).toBe(true);
-    expect(canWithdrawSharing({ viewerId: "b", authorId: "a", viewerRole: "admin" })).toBe(true);
-    expect(canWithdrawSharing({ viewerId: "b", authorId: "a", viewerRole: "member" })).toBe(false);
-    expect(canWithdrawSharing({ viewerId: "b", authorId: "a", viewerRole: null })).toBe(false);
+    expect(canWithdrawSharing({ viewerId: "a", authorId: "a", member: null })).toBe(true);
+    expect(canWithdrawSharing({ viewerId: "b", authorId: "a", member: defaultActor("admin") })).toBe(true);
+    expect(canWithdrawSharing({ viewerId: "b", authorId: "a", member: defaultActor("member") })).toBe(false);
+    expect(canWithdrawSharing({ viewerId: "b", authorId: "a", member: null })).toBe(false);
   });
 });
 
 describe("canDecideRequest", () => {
   it("should let only owners and admins decide, and never agents", () => {
-    expect(canDecideRequest({ viewerRole: "owner", actor: "person" })).toBe(true);
-    expect(canDecideRequest({ viewerRole: "member", actor: "person" })).toBe(false);
-    expect(canDecideRequest({ viewerRole: "owner", actor: "agent" })).toBe(false);
+    expect(canDecideRequest({ member: defaultActor("owner"), actor: "person", kind: "sharing" })).toBe(true);
+    expect(canDecideRequest({ member: defaultActor("member"), actor: "person", kind: "sharing" })).toBe(false);
+    expect(canDecideRequest({ member: defaultActor("owner"), actor: "agent", kind: "sharing" })).toBe(false);
   });
 });
 

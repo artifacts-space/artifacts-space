@@ -1,5 +1,5 @@
 import type { SharingLevel } from "@/lib/artifact-types";
-import { canManageTeam, type TeamRole } from "@/lib/teams/roles";
+import { actingAs, can, type TeamActor, type TeamCapability } from "@/lib/teams/capability-rules";
 
 /** The team settings that decide whether sharing needs approval. */
 export interface SharingTeamRule {
@@ -23,13 +23,17 @@ export function sharingNeedsApproval(level: SharingLevel, team: SharingTeamRule)
 
 export type SharingOutcome = "apply" | "pending";
 
+/** The capability that lets a member share at a level without asking first. */
+export const shareCapability: Record<SharingLevel, TeamCapability> = { team: "share.team", link: "share.link", public: "share.public" };
+
 /**
- * Applies at once when no approval is needed, or when a person who could
- * approve it asks (an owner or admin in the web app). Agents always wait.
+ * Applies at once when no approval is needed, or when the member holds the
+ * level's share capability (owners and admins by default). Agents always
+ * wait, because sharing at once would approve their own request.
  */
-export function decideSharing(input: { level: SharingLevel; team: SharingTeamRule; role: TeamRole; actor: SharingActor }): SharingOutcome {
+export function decideSharing(input: { level: SharingLevel; team: SharingTeamRule; member: TeamActor | null; actor: SharingActor }): SharingOutcome {
   if (!sharingNeedsApproval(input.level, input.team)) return "apply";
-  if (input.actor === "person" && canManageTeam(input.role)) return "apply";
+  if (can(actingAs(input.member, input.actor), shareCapability[input.level])) return "apply";
   return "pending";
 }
 
@@ -38,15 +42,15 @@ export function isLevelAllowedInTeam(level: SharingLevel, team: SharingTeamRule)
   return !(level === "team" && team.personal);
 }
 
-/** The author, or an owner or admin of the artifact's team, may make it private again. */
-export function canWithdrawSharing(input: { viewerId: string; authorId: string; viewerRole: TeamRole | null }): boolean {
+/** The author, or a member of the artifact's team who may withdraw others' sharing, may make it private again. */
+export function canWithdrawSharing(input: { viewerId: string; authorId: string; member: TeamActor | null }): boolean {
   if (input.viewerId === input.authorId) return true;
-  return input.viewerRole !== null && canManageTeam(input.viewerRole);
+  return can(input.member, "artifacts.withdraw");
 }
 
-/** Owners and admins of the request's team decide; agents never do. */
-export function canDecideRequest(input: { viewerRole: TeamRole | null; actor: SharingActor }): boolean {
-  return input.actor === "person" && input.viewerRole !== null && canManageTeam(input.viewerRole);
+/** Members of the request's team who may approve that kind of request decide; agents never do. */
+export function canDecideRequest(input: { member: TeamActor | null; actor: SharingActor; kind: "sharing" | "comments" | "edit" }): boolean {
+  return can(actingAs(input.member, input.actor), input.kind === "edit" ? "approve.edits" : "approve.sharing");
 }
 
 /**

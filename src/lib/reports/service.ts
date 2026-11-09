@@ -8,7 +8,8 @@ import { enforceRateLimits } from "@/lib/abuse/rate-limit";
 import { getArtifactAccess } from "@/lib/access";
 import type { ArtifactVisibility, ReportReason } from "@/lib/artifact-types";
 import { findPersonalTeam, getTeamMembershipById } from "@/lib/teams/queries";
-import { canManageTeam, parseTeamRole } from "@/lib/teams/roles";
+import { can } from "@/lib/teams/capability-rules";
+import { parseTeamRole } from "@/lib/teams/roles";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { sendReportEmail } from "./email";
@@ -128,7 +129,7 @@ export async function getManagedReport(reportId: string, viewerId: string) {
   const [report] = await getDb().select().from(artifactReport).where(and(eq(artifactReport.id, reportId), eq(artifactReport.status, "open"))).limit(1);
   if (!report?.teamId) throw new UserFacingError("This report is no longer open.");
   const membership = await getTeamMembershipById(viewerId, report.teamId);
-  if (!membership || !canManageTeam(membership.role)) throw new UserFacingError("Only team owners and admins can handle reports.");
+  if (!membership || !can(membership, "reports.handle")) throw new UserFacingError("You cannot handle reports in this team.");
   return { report, team: membership };
 }
 

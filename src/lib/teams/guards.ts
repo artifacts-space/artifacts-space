@@ -6,7 +6,9 @@ import { getDb } from "@/db";
 import { team } from "@/db/schema";
 import { cleanHandleInput, validateHandle } from "@/lib/handles";
 
-import { assignableRoles, parseTeamRole } from "./roles";
+import { can, type TeamCapability } from "./capability-rules";
+import { getTeamMembershipById } from "./queries";
+import { assignableRoles } from "./roles";
 import { isHandleAvailable } from "./setup";
 
 /**
@@ -47,16 +49,23 @@ export async function prepareNewTeam(data: { name?: unknown; slug?: unknown }, u
   return { name, slug, personal: false, createdBy: userId };
 }
 
-/** Only owners change the sharing rule, slugs never change, and personal teams stay as they are. */
-export async function assertTeamUpdateAllowed(update: Record<string, unknown>, member: { organizationId: string; role: string }) {
+/**
+ * Only people who may change the sharing rule (owners by default) change it,
+ * slugs never change, and personal teams stay as they are.
+ */
+export async function assertTeamUpdateAllowed(update: Record<string, unknown>, member: { organizationId: string; userId: string }) {
   const [current] = await getDb().select({ personal: team.personal }).from(team).where(eq(team.id, member.organizationId)).limit(1);
   if (!current) reject("Team not found.");
   if (current.personal) reject("Personal team settings cannot change.");
   if ("slug" in update && update.slug !== undefined) reject("A team's URL cannot change.");
-  if ("teamSharingNeedsApproval" in update && parseTeamRole(member.role) !== "owner") {
-    reject("Only team owners can change the sharing rule.");
-  }
+  if ("teamSharingNeedsApproval" in update) await assertTeamCapability(member.userId, member.organizationId, "settings.sharing");
   if ("name" in update && update.name !== undefined) cleanTeamName(update.name);
+}
+
+/** Refuses a Better Auth call unless the acting user is a person in the team who holds `capability`. Fails closed. */
+export async function assertTeamCapability(userId: string, teamId: string, capability: TeamCapability) {
+  const actor = await getTeamMembershipById(userId, teamId);
+  if (actor?.kind !== "person" || !can(actor, capability)) reject("You do not have permission to do that in this team.");
 }
 
 /** Invitations offer the admin or member role; owners are made from the team page. */

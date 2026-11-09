@@ -1,57 +1,58 @@
 import { describe, expect, it } from "vitest";
 
-import { currentGrant, matrixCapabilities, matrixRoles, type MatrixCapability, type MatrixRole } from "./permission-matrix-rules";
+import { defaultActor, defaultRoleCapabilities, teamCapabilities, type TeamActor } from "./capability-rules";
+import { grantableCapabilities, matrixCell, orderRoles, toggledCapabilities, type MatrixRole } from "./permission-matrix-rules";
 
-const open = { teamSharingNeedsApproval: false };
-const approval = { teamSharingNeedsApproval: true };
+const roleOf = (key: "owner" | "admin" | "member" | "agent"): MatrixRole => ({ key, name: key, builtIn: true, capabilities: defaultRoleCapabilities[key] });
+const designer: MatrixRole = { key: "designer", name: "Designer", builtIn: false, capabilities: ["themes.manage"] };
 
-function column(role: MatrixRole, team = open) {
-  return (capability: MatrixCapability) => currentGrant(role, capability, team);
-}
-
-describe("currentGrant", () => {
-  it("should give owners every capability when the team is shared", () => {
-    const owner = column("owner");
-    expect(matrixCapabilities.filter((capability) => owner(capability) !== "yes")).toEqual([]);
+describe("orderRoles", () => {
+  it("should put Owner and Admin first, custom roles next, then Member and Agent", () => {
+    expect(orderRoles([roleOf("agent"), roleOf("member"), designer, roleOf("owner"), roleOf("admin")]).map((role) => role.key)).toEqual(["owner", "admin", "designer", "member", "agent"]);
   });
+});
 
-  it("should keep admins off owners and off the sharing rule when they manage the team", () => {
-    const admin = column("admin");
-    expect(admin("removeMembers")).toBe("limited");
-    expect(admin("changeRoles")).toBe("limited");
-    expect(admin("sharingRule")).toBe("no");
-    expect(admin("approveSharing")).toBe("yes");
-  });
-
-  it("should make members ask first when they share by link or in public", () => {
-    const member = column("member");
-    expect(member("shareLink")).toBe("asks");
-    expect(member("sharePublic")).toBe("asks");
-    expect(member("shareTeam")).toBe("yes");
-  });
-
-  it("should make members ask first for team sharing when the team rule needs approval", () => {
-    expect(currentGrant("member", "shareTeam", approval)).toBe("asks");
-  });
-
-  it("should never let a member approve, invite, or manage when the table is drawn", () => {
-    const member = column("member");
-    for (const capability of ["approveSharing", "approveEdits", "invite", "removeMembers", "changeRoles", "manageAgents", "manageThemes", "withdrawOthers", "sharingRule"] as const) {
-      expect(member(capability), capability).toBe("no");
+describe("matrixCell", () => {
+  it("should lock every Owner cell and show it as held", () => {
+    for (const capability of teamCapabilities) {
+      const cell = matrixCell(defaultActor("owner"), roleOf("owner"), capability);
+      expect(cell.held).toBe(true);
+      expect(cell.locked).toBeTypeOf("string");
     }
   });
 
-  it("should never let an agent approve or manage anything when the table is drawn", () => {
-    const agent = column("agent", approval);
-    for (const capability of ["approveSharing", "approveEdits", "invite", "removeMembers", "changeRoles", "manageAgents", "manageThemes", "withdrawOthers", "sharingRule"] as const) {
-      expect(agent(capability), capability).toBe("no");
-    }
-    expect(agent("shareTeam")).toBe("asks");
+  it("should lock approval cells for agents and show them as not held, even when a row says otherwise", () => {
+    const agent: MatrixRole = { ...roleOf("agent"), capabilities: ["approve.sharing", "analytics.view"] };
+    const approval = matrixCell(defaultActor("owner"), agent, "approve.sharing");
+    expect(approval.held).toBe(false);
+    expect(approval.locked).toBeTypeOf("string");
+    expect(matrixCell(defaultActor("owner"), agent, "analytics.view")).toEqual({ held: true, locked: null, blocked: null });
   });
 
-  it("should fill every cell when every role is drawn", () => {
-    for (const role of matrixRoles) {
-      for (const capability of matrixCapabilities) expect(["yes", "asks", "limited", "no"]).toContain(currentGrant(role, capability, open));
-    }
+  it("should let an admin change Member cells for capabilities the admin holds", () => {
+    expect(matrixCell(defaultActor("admin"), roleOf("member"), "approve.sharing")).toEqual({ held: false, locked: null, blocked: null });
+  });
+
+  it("should block an admin on the Admin column and on capabilities the admin lacks", () => {
+    expect(matrixCell(defaultActor("admin"), roleOf("admin"), "approve.sharing").blocked).not.toBeNull();
+    expect(matrixCell(defaultActor("admin"), roleOf("member"), "settings.sharing").blocked).not.toBeNull();
+  });
+
+  it("should block every cell when the viewer cannot change roles", () => {
+    const viewers: (TeamActor | null)[] = [defaultActor("member"), defaultActor("agent"), null];
+    for (const viewer of viewers) expect(matrixCell(viewer, designer, "themes.manage").blocked).not.toBeNull();
+  });
+});
+
+describe("toggledCapabilities and grantableCapabilities", () => {
+  it("should add and remove one capability in the canonical order", () => {
+    expect(toggledCapabilities(designer, "share.team", true)).toEqual(["share.team", "themes.manage"]);
+    expect(toggledCapabilities(designer, "themes.manage", false)).toEqual([]);
+  });
+
+  it("should offer only what the viewer holds when they may create roles", () => {
+    expect(grantableCapabilities(defaultActor("admin"))).not.toContain("settings.sharing");
+    expect(grantableCapabilities(defaultActor("owner"))).toEqual([...teamCapabilities]);
+    expect(grantableCapabilities(defaultActor("member"))).toEqual([]);
   });
 });

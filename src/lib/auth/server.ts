@@ -10,7 +10,8 @@ import { sessionHooks } from "@/lib/auth/agent-guards";
 import { sendMagicLinkEmail } from "@/lib/auth/magic-link-email";
 import { oauthPlugins } from "@/lib/auth/oauth-plugins";
 import { teamDepartureHook } from "@/lib/auth/team-departure";
-import { teamsPlugin } from "@/lib/auth/teams-plugin";
+import { closedTeamRoutesHook } from "@/lib/auth/closed-team-routes";
+import { teamRoutesClosedOverHttp, teamsPlugin } from "@/lib/auth/teams-plugin";
 import { userHooks } from "@/lib/auth/user-hooks";
 
 const tenMinutes = 60 * 10;
@@ -75,7 +76,8 @@ function createAuth() {
       },
     },
     databaseHooks: { user: userHooks, session: sessionHooks },
-    hooks: { after: teamDepartureHook },
+    hooks: { before: closedTeamRoutesHook, after: teamDepartureHook },
+    disabledPaths: teamRoutesClosedOverHttp,
     plugins: [
       magicLink({
         expiresIn: tenMinutes,

@@ -6,8 +6,7 @@ import { artifact, sharingRequest, team, type ArtifactRecord, type SharingReques
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { commentSettings, type ArtifactDto, type CommentSetting } from "@/lib/artifact-types";
 import { canChangeCommentSetting, decideCommentSetting } from "@/lib/comments/setting-rules";
-import { getTeamMembershipById } from "@/lib/teams/queries";
-import type { TeamRole } from "@/lib/teams/roles";
+import { getTeamMembershipById, type TeamMembership } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { forgetArtifactCache } from "@/lib/versions/cache";
 
@@ -30,12 +29,12 @@ export interface CommentsChangeResult {
 }
 
 /** The team's sharing rule and the viewer's role in it. Both null for an artifact without a team. */
-async function teamContext(viewerId: string, teamId: string | null): Promise<{ rule: SharingTeamRule | null; role: TeamRole | null }> {
-  if (!teamId) return { rule: null, role: null };
+async function teamContext(viewerId: string, teamId: string | null): Promise<{ rule: SharingTeamRule | null; member: TeamMembership | null }> {
+  if (!teamId) return { rule: null, member: null };
   const membership = await getTeamMembershipById(viewerId, teamId);
-  if (membership) return { rule: membership, role: membership.role };
+  if (membership) return { rule: membership, member: membership };
   const [row] = await getDb().select({ personal: team.personal, teamSharingNeedsApproval: team.teamSharingNeedsApproval }).from(team).where(eq(team.id, teamId)).limit(1);
-  return { rule: row ?? null, role: null };
+  return { rule: row ?? null, member: null };
 }
 
 async function loadArtifact(artifactId: string): Promise<ArtifactRecord | null> {
@@ -52,12 +51,12 @@ export async function setArtifactComments(input: { actorId: string; artifactId: 
   const next = commentsSchema.parse(input.comments);
   const record = await loadArtifact(input.artifactId);
   if (!record) throw new UserFacingError("Artifact not found.");
-  const { rule, role } = await teamContext(input.actorId, record.teamId);
-  const allowed = canChangeCommentSetting({ viewerId: input.actorId, authorId: record.userId, viewerRole: role, teamPersonal: rule?.personal ?? null, actor: input.actor });
+  const { rule, member } = await teamContext(input.actorId, record.teamId);
+  const allowed = canChangeCommentSetting({ viewerId: input.actorId, authorId: record.userId, member, teamPersonal: rule?.personal ?? null, actor: input.actor });
   if (!allowed) throw new UserFacingError("Artifact not found, or you cannot change its comments. Its author and the team's owners and admins can.");
   if (next !== "off") await enforceRateLimit("sharingRequest", input.actorId);
 
-  const outcome = decideCommentSetting({ current: record.comments, next, sameTeam: true, team: rule, role, actor: input.actor });
+  const outcome = decideCommentSetting({ current: record.comments, next, sameTeam: true, team: rule, member, actor: input.actor });
   await cancelPendingComments(record.id, input.actorId);
   const level = record.visibility === "private" ? null : record.visibility;
   if (outcome === "pending" && record.teamId && level) {

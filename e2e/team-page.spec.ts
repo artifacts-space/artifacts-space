@@ -79,7 +79,7 @@ test("should show only Members and Shared artifacts when the team is personal", 
 test("should list people, agents, and invitations in one table", async ({ page }) => {
   await page.goto("/dev/team");
   const table = membersTable(page);
-  await expect(table.locator("[data-member-row=person]")).toHaveCount(4);
+  await expect(table.locator("[data-member-row=person]")).toHaveCount(5);
   await expect(table.locator("[data-member-row=agent]")).toHaveCount(3);
   await expect(table.locator("[data-member-row=invitation]")).toHaveCount(2);
   await expect(table.locator("[data-member-row=agent]").first().getByText("Agent", { exact: true }).first()).toBeVisible();

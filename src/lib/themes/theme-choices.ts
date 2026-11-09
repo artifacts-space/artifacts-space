@@ -1,7 +1,8 @@
-import { and, asc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { team, teamMember } from "@/db/schema";
+import { team } from "@/db/schema";
+import { listTeamsForUser, type TeamMembership } from "@/lib/teams/queries";
 
 import { loadArtifactThemeContext, type ThemeSubject } from "./artifact-theme-context";
 import { noThemeChoices, type ThemeChoiceGroup, type ThemeChoices } from "./theme-choice-types";
@@ -15,22 +16,12 @@ import { manageableTeams, resolveArtifactTheme, themeTeamId } from "./team-prese
  * presets: readers outside a team never reach this.
  */
 
-interface TeamRow {
-  id: string;
-  name: string;
-  role: string;
-}
+type TeamRow = TeamMembership;
 
-/** The viewer's shared teams, or just `onlyTeamId` when given (and they belong to it). */
+/** The viewer's shared teams, or just `onlyTeamId` when given (and they belong to it), with their capabilities there. */
 async function viewerTeams(viewerId: string, onlyTeamId?: string): Promise<TeamRow[]> {
-  const conditions = [eq(teamMember.userId, viewerId), eq(team.personal, false)];
-  if (onlyTeamId) conditions.push(eq(team.id, onlyTeamId));
-  return getDb()
-    .select({ id: team.id, name: team.name, role: teamMember.role })
-    .from(teamMember)
-    .innerJoin(team, eq(team.id, teamMember.teamId))
-    .where(and(...conditions))
-    .orderBy(asc(team.name));
+  const teams = await listTeamsForUser(viewerId);
+  return teams.filter((row) => !row.personal && (onlyTeamId === undefined || row.id === onlyTeamId));
 }
 
 async function groupsFor(teams: readonly TeamRow[]): Promise<ThemeChoiceGroup[]> {

@@ -7,29 +7,30 @@ import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { resendableRole, rolesFor } from "@/lib/teams/member-row-rules";
+import { resendableRole, type RoleOption } from "@/lib/teams/member-row-rules";
 import type { PendingInvitationView, TeamMemberView } from "@/lib/teams/queries";
-import { roleLabel, type TeamRole } from "@/lib/teams/roles";
+import { roleLabel } from "@/lib/teams/roles";
 
 import { cell, dateFormat } from "./member-table-cells";
 import { NameCell, RowMenu } from "./member-table-parts";
 import { useTeamAction } from "./use-team-action";
 
-function RoleCell({ member, teamId, editable, viewerRole }: { member: TeamMemberView; teamId: string; editable: boolean; viewerRole: TeamRole }) {
+function RoleCell({ member, teamId, options }: { member: TeamMemberView; teamId: string; options: readonly RoleOption[] }) {
   const { pending, run } = useTeamAction();
-  if (!editable) return <span>{roleLabel(member.role)}</span>;
+  if (options.length === 0) return <span>{member.roleName}</span>;
+  const names = new Map(options.map((option) => [option.key, option.name]));
   return (
     <Select
-      value={member.role}
+      value={member.roleKey}
       onValueChange={(role) => {
-        if (!role || role === member.role) return;
+        if (!role || role === member.roleKey) return;
         void run(member.memberId, () => updateMemberRoleAction(teamId, member.memberId, role), "Role changed.");
       }}
       disabled={pending !== null}
     >
-      <SelectTrigger size="sm" className="h-7 w-24 text-sm" aria-label={`Role for ${member.name || "this member"}`}><SelectValue>{(value: TeamRole) => roleLabel(value)}</SelectValue></SelectTrigger>
+      <SelectTrigger size="sm" className="h-7 w-28 text-sm" aria-label={`Role for ${member.name || "this member"}`}><SelectValue>{(value: string) => names.get(value) ?? member.roleName}</SelectValue></SelectTrigger>
       <SelectContent>
-        {rolesFor(viewerRole).map((role) => <SelectItem key={role} value={role}>{roleLabel(role)}</SelectItem>)}
+        {options.map((role) => <SelectItem key={role.key} value={role.key}>{role.name}</SelectItem>)}
       </SelectContent>
     </Select>
   );
@@ -57,8 +58,8 @@ function PersonMenu({ member, teamId }: { member: TeamMemberView; teamId: string
   );
 }
 
-/** One person in the Members table, with a role picker and a ⋯ menu when the viewer may change them. */
-export function PersonRow({ member, teamId, viewerRole, isViewer, editable }: { member: TeamMemberView; teamId: string; viewerRole: TeamRole; isViewer: boolean; editable: boolean }) {
+/** One person in the Members table, with a role picker and a ⋯ menu when the viewer may change them (member-row-rules.ts). */
+export function PersonRow({ member, teamId, isViewer, roleOptions, canRemove }: { member: TeamMemberView; teamId: string; isViewer: boolean; roleOptions: readonly RoleOption[]; canRemove: boolean }) {
   const detail = [member.username ? `@${member.username}` : "", member.email].filter(Boolean).join(" · ");
   return (
     <tr className="border-t" data-member-row="person">
@@ -67,19 +68,19 @@ export function PersonRow({ member, teamId, viewerRole, isViewer, editable }: { 
         name={<>{member.name || "Unnamed"}{isViewer ? <span className="ml-1.5 text-xs font-normal text-muted-foreground">(you)</span> : null}</>}
         detail={detail}
       />
-      <td className={cell.middle}><RoleCell member={member} teamId={teamId} editable={editable} viewerRole={viewerRole} /></td>
+      <td className={cell.middle}><RoleCell member={member} teamId={teamId} options={roleOptions} /></td>
       <td className={cell.wide} />
       <td className={`${cell.wide} text-muted-foreground`}>Joined {dateFormat.format(new Date(member.joinedAt))}</td>
-      <td className={cell.last}>{editable ? <PersonMenu member={member} teamId={teamId} /> : null}</td>
+      <td className={cell.last}>{canRemove ? <PersonMenu member={member} teamId={teamId} /> : null}</td>
     </tr>
   );
 }
 
-/** An open invitation in the Members table, with Resend and Cancel in its ⋯ menu. Owners and admins only. */
-export function InvitationRow({ invitation, teamId }: { invitation: PendingInvitationView; teamId: string }) {
+/** An open invitation in the Members table, with Resend (when the viewer may invite to its role) and Cancel in its ⋯ menu. */
+export function InvitationRow({ invitation, teamId, canResend }: { invitation: PendingInvitationView; teamId: string; canResend: boolean }) {
   const { pending, run } = useTeamAction();
   const status = `Invited · expires ${dateFormat.format(new Date(invitation.expiresAt))}`;
-  const role = resendableRole(invitation.role);
+  const role = canResend ? resendableRole(invitation.role) : null;
   return (
     <tr className="border-t" data-member-row="invitation">
       <NameCell

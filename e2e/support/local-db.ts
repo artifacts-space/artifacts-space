@@ -234,3 +234,32 @@ export async function deleteSignInLinks(emails: readonly string[]): Promise<void
   if (!localDatabaseEnabled() || testEmails.length === 0) return;
   await db().query(`delete from verification where value::jsonb ->> 'email' = any($1)`, [testEmails]);
 }
+
+/** Adds a user to a team at a built-in role. */
+export async function addTestMember(teamId: string, userId: string, role: "owner" | "admin" | "member"): Promise<void> {
+  await db().query(`insert into team_member (id, team_id, user_id, role) values ($1, $2, $3, $4)`, [randomUUID(), teamId, userId, role]);
+}
+
+/** Creates a custom role with `capabilities` in a team and gives it to a member, as the Members tab would. */
+export async function giveTestCustomRole(teamId: string, userId: string, name: string, capabilities: readonly string[]): Promise<void> {
+  const roleId = randomUUID();
+  await db().query(`insert into team_role (id, team_id, key, name, built_in) values ($1, $2, $3, $4, false)`, [roleId, teamId, name.toLowerCase(), name]);
+  await db().query(`insert into team_role_capability (role_id, capability) select $1, unnest($2::text[])`, [roleId, capabilities]);
+  await db().query(`update team_member set role = 'member' where team_id = $1 and user_id = $2`, [teamId, userId]);
+  await db().query(`insert into team_role_assignment (member_id, role_id) select id, $3 from team_member where team_id = $1 and user_id = $2`, [teamId, userId, roleId]);
+}
+
+/** The custom role a member holds in a team, or null. */
+export async function customRoleOf(teamId: string, userId: string): Promise<string | null> {
+  const result = await db().query<{ key: string }>(
+    `select r.key from team_role_assignment a join team_member m on m.id = a.member_id join team_role r on r.id = a.role_id where m.team_id = $1 and m.user_id = $2`,
+    [teamId, userId],
+  );
+  return result.rows[0]?.key ?? null;
+}
+
+/** The audit actions written for a team, oldest first. */
+export async function permissionAuditActions(teamId: string): Promise<string[]> {
+  const result = await db().query<{ action: string }>(`select action from team_permission_audit where team_id = $1 order by created_at`, [teamId]);
+  return result.rows.map((row) => row.action);
+}

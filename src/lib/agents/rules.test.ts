@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import { agentRemovalDescription, canManageAgents, removalKeeper } from "./rules";
+import { defaultActor } from "@/lib/teams/capability-rules";
 
 describe("canManageAgents", () => {
   it("should let owners and admins of a shared team manage agents", () => {
-    expect(canManageAgents({ role: "owner", personal: false })).toBe(true);
-    expect(canManageAgents({ role: "admin", personal: false })).toBe(true);
+    expect(canManageAgents({ ...defaultActor("owner"), personal: false })).toBe(true);
+    expect(canManageAgents({ ...defaultActor("admin"), personal: false })).toBe(true);
   });
 
   it("should refuse members, personal teams, and non-members", () => {
-    expect(canManageAgents({ role: "member", personal: false })).toBe(false);
-    expect(canManageAgents({ role: "owner", personal: true })).toBe(false);
+    expect(canManageAgents({ ...defaultActor("member"), personal: false })).toBe(false);
+    expect(canManageAgents({ ...defaultActor("owner"), personal: true })).toBe(false);
     expect(canManageAgents(null)).toBe(false);
   });
 });

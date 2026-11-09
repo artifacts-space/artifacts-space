@@ -51,5 +51,5 @@ export function previewComments(input: { current: CommentSetting; currentTeamId:
 export function commentsWaitForApproval(input: { current: CommentSetting; next: CommentSetting; currentTeamId: string | null; visibility: ArtifactVisibility; team: ShareTeam | undefined }): boolean {
   if (input.visibility === "private" || !input.team) return false;
   const sameTeam = input.team.id === input.currentTeamId;
-  return decideCommentSetting({ current: input.current, next: input.next, sameTeam, team: input.team, role: input.team.role, actor: "person" }) === "pending";
+  return decideCommentSetting({ current: input.current, next: input.next, sameTeam, team: input.team, member: input.team, actor: "person" }) === "pending";
 }

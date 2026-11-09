@@ -1,13 +1,41 @@
 import { organization } from "better-auth/plugins";
+import { adminAc, defaultAc, memberAc, ownerAc } from "better-auth/plugins/organization/access";
 
 import { assertMemberIsNotAgent } from "@/lib/auth/agent-guards";
 import { reconcileAfterDeparture } from "@/lib/auth/team-departure";
-import { assertInvitableRole, assertNotPersonal, assertTeamUpdateAllowed, prepareNewTeam } from "@/lib/teams/guards";
+import { assertInvitableRole, assertNotPersonal, assertTeamCapability, assertTeamUpdateAllowed, prepareNewTeam } from "@/lib/teams/guards";
 import { sendTeamInvitationEmail } from "@/lib/teams/invitation-email";
 import { assertCanCreateTeam, assertCanInvite } from "@/lib/teams/invitation-limits";
 import { teamLimits } from "@/lib/teams/limits";
+import { seedBuiltInRoles } from "@/lib/teams/role-store";
 
 const sevenDays = 60 * 60 * 24 * 7;
+
+/**
+ * Better Auth's own permission check is only an outer fence. A person with a
+ * custom role keeps Better Auth's member role, so member may invite, cancel,
+ * update, and remove at this level; the real decision is `can` in
+ * capability-rules.ts, which our server actions and the hooks below ask
+ * first. The HTTP routes for these calls are closed (teamRoutesClosedOverHttp),
+ * so nothing reaches them without that check.
+ */
+const memberBase = defaultAc.newRole({ ...memberAc.statements, organization: ["update"], member: ["update", "delete"], invitation: ["create", "cancel"] });
+
+/**
+ * Better Auth team routes the web app never calls over HTTP. Our server
+ * actions call them in-process after `can`; over HTTP they would skip the
+ * checks that need the acting user (role changes and removals pass hooks
+ * only the target), or show invitations to members who may not invite.
+ */
+export const teamRoutesClosedOverHttp = [
+  "/organization/invite-member",
+  "/organization/cancel-invitation",
+  "/organization/remove-member",
+  "/organization/update-member-role",
+  "/organization/update",
+  "/organization/list-invitations",
+  "/organization/get-full-organization",
+];
 
 /**
  * Better Auth's organization plugin, configured as artifacts.space teams.
@@ -19,6 +47,7 @@ export function teamsPlugin() {
   return organization({
     allowUserToCreateOrganization: true,
     creatorRole: "owner",
+    roles: { owner: ownerAc, admin: adminAc, member: memberBase },
     // Deleting a team with shared artifacts needs its own design. Not offered yet.
     disableOrganizationDeletion: true,
     membershipLimit: teamLimits.maxMembers,
@@ -51,6 +80,12 @@ export function teamsPlugin() {
         await assertCanCreateTeam(user.id);
         return { data: { ...data, ...prepared } };
       },
+      afterCreateOrganization: async ({ organization: created }) => {
+        // A team without rows keeps today's rules (capabilities.ts), so a failed seed is logged, never fatal.
+        await seedBuiltInRoles(created.id).catch((error: unknown) => {
+          console.error("[teams] Seeding roles failed", error instanceof Error ? error.name : "unknown error");
+        });
+      },
       beforeUpdateOrganization: async ({ organization: update, member }) => {
         await assertTeamUpdateAllowed(update, member);
       },
@@ -61,7 +96,11 @@ export function teamsPlugin() {
       beforeCreateInvitation: async ({ invitation, inviter, organization: team }) => {
         assertNotPersonal(team, "invite people");
         assertInvitableRole(invitation.role);
+        await assertTeamCapability(inviter.id, team.id, "members.invite");
         await assertCanInvite(inviter.id, team.id);
+      },
+      beforeCancelInvitation: async ({ cancelledBy, organization: team }) => {
+        await assertTeamCapability(cancelledBy.id, team.id, "members.invite");
       },
       afterRemoveMember: ({ organization: team }) => reconcileAfterDeparture(team.id),
       beforeUpdateMemberRole: async ({ organization: team, member }) => {

@@ -1,6 +1,6 @@
 import type { ArtifactVisibility, CommentSetting } from "@/lib/artifact-types";
 import { decideSharing, type SharingActor, type SharingOutcome, type SharingTeamRule } from "@/lib/sharing/rules";
-import { canManageTeam, type TeamRole } from "@/lib/teams/roles";
+import { actingAs, can, type TeamActor } from "@/lib/teams/capability-rules";
 
 /**
  * Pure rules for an artifact's comments setting: who sees and writes its
@@ -85,19 +85,19 @@ export function decideCommentSetting(input: {
   next: CommentSetting;
   sameTeam: boolean;
   team: SharingTeamRule | null;
-  role: TeamRole | null;
+  member: TeamActor | null;
   actor: SharingActor;
 }): SharingOutcome {
   if (!input.team || !opensCommentsInTeam(input)) return "apply";
-  return decideSharing({ level: "public", team: input.team, role: input.role ?? "member", actor: input.actor });
+  return decideSharing({ level: "public", team: input.team, member: input.member, actor: input.actor });
 }
 
 /**
- * Who may change the setting: the author, and owners and admins of the
- * artifact's shared team (people only; agents act as members).
+ * Who may change the setting: the author, and members of the artifact's
+ * shared team who may approve sharing (people only; agents never approve).
  */
-export function canChangeCommentSetting(input: { viewerId: string; authorId: string; viewerRole: TeamRole | null; teamPersonal: boolean | null; actor: SharingActor }): boolean {
+export function canChangeCommentSetting(input: { viewerId: string; authorId: string; member: TeamActor | null; teamPersonal: boolean | null; actor: SharingActor }): boolean {
   if (input.viewerId === input.authorId) return true;
-  if (input.actor !== "person" || input.teamPersonal !== false || input.viewerRole === null) return false;
-  return canManageTeam(input.viewerRole);
+  if (input.teamPersonal !== false) return false;
+  return can(actingAs(input.member, input.actor), "approve.sharing");
 }

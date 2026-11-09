@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { assignableRoles, roleLabel, type AssignableRole } from "@/lib/teams/roles";
+import { roleLabel, type AssignableRole } from "@/lib/teams/roles";
 
 import { FormError } from "./form-error";
 import { useTeamAction } from "./use-team-action";
@@ -17,9 +17,9 @@ import { useTeamAction } from "./use-team-action";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** The invitation form inside the dialog. Calls `onSent` after the invitation goes out. */
-function InviteForm({ teamId, onSent }: { teamId: string; onSent: () => void }) {
+function InviteForm({ teamId, roles, onSent }: { teamId: string; roles: readonly AssignableRole[]; onSent: () => void }) {
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<AssignableRole>("member");
+  const [role, setRole] = useState<AssignableRole>(roles.includes("member") ? "member" : roles[0] ?? "member");
   const [error, setError] = useState("");
   const { pending, run } = useTeamAction();
 
@@ -46,7 +46,7 @@ function InviteForm({ teamId, onSent }: { teamId: string; onSent: () => void }) 
         <Select value={role} onValueChange={(value) => { if (value) setRole(value); }}>
           <SelectTrigger className="h-9 w-full text-sm" aria-label="Role for the invited person"><SelectValue>{(value: AssignableRole) => roleLabel(value)}</SelectValue></SelectTrigger>
           <SelectContent>
-            {assignableRoles.map((value) => <SelectItem key={value} value={value}>{roleLabel(value)}</SelectItem>)}
+            {roles.map((value) => <SelectItem key={value} value={value}>{roleLabel(value)}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -60,8 +60,8 @@ function InviteForm({ teamId, onSent }: { teamId: string; onSent: () => void }) 
   );
 }
 
-/** "Invite people": a button that opens the invitation form. Owners and admins only. */
-export function InviteDialog({ teamId }: { teamId: string }) {
+/** "Invite people": a button that opens the invitation form, offering the roles the viewer may invite to. */
+export function InviteDialog({ teamId, roles }: { teamId: string; roles: readonly AssignableRole[] }) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -72,7 +72,7 @@ export function InviteDialog({ teamId }: { teamId: string }) {
           <DialogDescription>They join when they accept the emailed invitation.</DialogDescription>
         </DialogHeader>
         {/* Remount on open so a closed dialog never keeps an old email or error. */}
-        {open ? <InviteForm teamId={teamId} onSent={() => { setOpen(false); }} /> : null}
+        {open ? <InviteForm teamId={teamId} roles={roles} onSent={() => { setOpen(false); }} /> : null}
       </DialogContent>
     </Dialog>
   );

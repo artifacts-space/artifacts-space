@@ -17,7 +17,7 @@ export function searchSwitchState(input: { current: ArtifactVisibility; visibili
   if (input.current === "public") return "available";
   // No team to approve it yet: the dialog asks for one first, and Save waits.
   if (!input.team) return "hidden";
-  return decideSharing({ level: "public", team: input.team, role: input.team.role, actor: "person" }) === "apply" ? "available" : "after-approval";
+  return decideSharing({ level: "public", team: input.team, member: input.team, actor: "person" }) === "apply" ? "available" : "after-approval";
 }
 
 /**

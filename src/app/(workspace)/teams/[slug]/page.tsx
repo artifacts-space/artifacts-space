@@ -8,7 +8,9 @@ import { getSession } from "@/lib/session";
 import { siteOrigin } from "@/lib/site-origin";
 import { listPendingSharing, listTeamSharedArtifacts } from "@/lib/sharing/queries";
 import { getTeamForMember, listPendingInvitations, listTeamMembers, type TeamMembership } from "@/lib/teams/queries";
-import { canManageTeam } from "@/lib/teams/roles";
+import { loadTeamRoles } from "@/lib/teams/capabilities";
+import { can } from "@/lib/teams/capability-rules";
+import { listPermissionAudit } from "@/lib/teams/role-store";
 import { parseTeamTabs } from "@/lib/teams/team-tabs-rules";
 import { listPresetsForTeams, loadTeamThemeSettings } from "@/lib/themes/team-presets";
 import { listPendingEdits } from "@/lib/versions/queries";
@@ -28,26 +30,33 @@ async function teamPresetNames(teamId: string, reviews: boolean): Promise<Map<st
   }
 }
 
+/** Loads a list only when the viewer's role allows it; otherwise an empty one. */
+function when<T>(allowed: boolean, load: () => Promise<T[]>): Promise<T[]> {
+  return allowed ? load() : Promise.resolve([]);
+}
+
 /**
- * Everything the tabs show. Pending sharing and edits load for owners and
- * admins of shared teams, invitations and reports for owners and admins, and
- * themes for shared teams. Only members reach this (getTeamForMember).
+ * Everything the tabs show, each list only for a role that may see it
+ * (capability-rules.ts): invitations for "invite people", requests and edits
+ * for their approvers, reports for "handle reports", agent tokens for
+ * "add and remove agents". Only members reach this (getTeamForMember).
  */
 async function loadTeamPage(team: TeamMembership, viewerId: string): Promise<TeamPageData> {
-  const manager = canManageTeam(team.role);
-  const canManage = manager && !team.personal;
-  const [members, invitations, agents, shared, requests, edits, reports, themeNames, themes] = await Promise.all([
+  const shared = !team.personal;
+  const [members, invitations, agents, sharedArtifacts, requests, edits, reports, themeNames, themes, roles, audit] = await Promise.all([
     listTeamMembers(team.id),
-    canManage ? listPendingInvitations(team.id) : Promise.resolve([]),
-    team.personal ? Promise.resolve([]) : listTeamAgents(team.id, canManage),
+    when(shared && can(team, "members.invite"), () => listPendingInvitations(team.id)),
+    when(shared, () => listTeamAgents(team.id, can(team, "agents.manage"))),
     listTeamSharedArtifacts(team.id),
-    canManage ? listPendingSharing(team.id) : Promise.resolve([]),
-    canManage ? listPendingEdits(team.id) : Promise.resolve([]),
-    manager ? listOpenReports(team.id) : Promise.resolve([]),
-    teamPresetNames(team.id, canManage),
-    team.personal ? Promise.resolve(null) : loadTeamThemeSettings(team.id),
+    when(shared && can(team, "approve.sharing"), () => listPendingSharing(team.id)),
+    when(shared && can(team, "approve.edits"), () => listPendingEdits(team.id)),
+    when(can(team, "reports.handle"), () => listOpenReports(team.id)),
+    teamPresetNames(team.id, shared && can(team, "approve.edits")),
+    shared ? loadTeamThemeSettings(team.id) : Promise.resolve(null),
+    loadTeamRoles([team.id]).then((byTeam) => [...(byTeam.get(team.id)?.values() ?? [])]),
+    when(shared, () => listPermissionAudit(team.id)),
   ]);
-  return { team, viewerId, origin: siteOrigin(), members, agents, invitations, shared, requests, edits, reports, themeNames, themes };
+  return { team, viewerId, origin: siteOrigin(), members, agents, invitations, shared: sharedArtifacts, requests, edits, reports, themeNames, themes, roles, audit };
 }
 
 export default async function TeamPage({ params, searchParams }: PageProps<"/teams/[slug]">) {

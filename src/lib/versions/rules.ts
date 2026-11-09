@@ -1,6 +1,6 @@
 import type { ArtifactVisibility } from "@/lib/artifact-types";
 import { sharingNeedsApproval, type SharingActor, type SharingTeamRule } from "@/lib/sharing/rules";
-import { canManageTeam, type TeamRole } from "@/lib/teams/roles";
+import { actingAs, can, type TeamActor } from "@/lib/teams/capability-rules";
 import { sameArtifactTheme, type StoredArtifactTheme } from "@/lib/themes/artifact-theme";
 
 /**
@@ -27,12 +27,12 @@ export type EditOutcome = "apply" | "pending";
 export function decideEdit(input: {
   visibility: ArtifactVisibility;
   team: SharingTeamRule | null;
-  role: TeamRole | null;
+  member: TeamActor | null;
   actor: SharingActor;
 }): EditOutcome {
   if (!isReviewedLevel(input.visibility) || !input.team) return "apply";
   if (!sharingNeedsApproval(input.visibility, input.team)) return "apply";
-  if (input.actor === "person" && input.role !== null && canManageTeam(input.role)) return "apply";
+  if (can(actingAs(input.member, input.actor), "approve.edits")) return "apply";
   return "pending";
 }
 

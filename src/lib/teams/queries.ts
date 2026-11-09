@@ -1,8 +1,12 @@
 import { and, asc, desc, eq, gt, inArray, notExists, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import { getDb } from "@/db";
+import { teamRole, teamRoleAssignment } from "@/db/roles-schema";
 import { agent, team, teamInvitation, teamMember, user } from "@/db/schema";
 
+import { loadTeamRoles, resolveActor } from "./capabilities";
+import { builtInRoleNames, type ActorKind, type TeamActor, type TeamCapability } from "./capability-rules";
 import type { TeamHeadcount } from "./member-counts";
 import { parseTeamRole, type TeamRole } from "./roles";
 
@@ -14,9 +18,19 @@ export interface TeamMembership {
   personal: boolean;
   teamSharingNeedsApproval: boolean;
   createdBy: string | null;
+  /** The built-in role Better Auth stores: owner, admin, or member. */
   role: TeamRole;
   memberId: string;
+  /** The member's user id: a person, or an agent acting over MCP. */
+  userId: string;
+  /** The role that applies (capability-rules.ts): a built-in key, "agent", or a custom role's key. */
+  roleKey: string;
+  roleName: string;
+  kind: ActorKind;
+  capabilities: readonly TeamCapability[];
 }
+
+const assignedRole = alias(teamRole, "assigned_role");
 
 const membershipColumns = {
   id: team.id,
@@ -27,27 +41,44 @@ const membershipColumns = {
   createdBy: team.createdBy,
   role: teamMember.role,
   memberId: teamMember.id,
+  userId: teamMember.userId,
+  agentId: agent.userId,
+  customKey: assignedRole.key,
 };
 
-type MembershipRow = Omit<TeamMembership, "role"> & { role: string };
+type MembershipRow = Omit<TeamMembership, "role" | "roleKey" | "roleName" | "kind" | "capabilities"> & { role: string; agentId: string | null; customKey: string | null };
 
-function toMembership(row: MembershipRow): TeamMembership {
-  return { ...row, role: parseTeamRole(row.role) };
-}
-
-function membershipQuery(userId: string) {
-  return getDb()
+/**
+ * Membership rows joined to the team, the member's agent row (agents act as
+ * the Agent role), and their custom role in the same team. Joins only, never
+ * correlated subqueries (see AGENTS.md). Exported for its `.toSQL()` test.
+ */
+export function membershipQuery(db: Pick<ReturnType<typeof getDb>, "select">, userId: string) {
+  return db
     .select(membershipColumns)
     .from(teamMember)
     .innerJoin(team, eq(team.id, teamMember.teamId))
+    .leftJoin(agent, eq(agent.userId, teamMember.userId))
+    .leftJoin(teamRoleAssignment, eq(teamRoleAssignment.memberId, teamMember.id))
+    .leftJoin(assignedRole, and(eq(assignedRole.id, teamRoleAssignment.roleId), eq(assignedRole.teamId, teamMember.teamId)))
     .where(eq(teamMember.userId, userId))
     .$dynamic();
 }
 
+/** Fills in each membership's role and capabilities from its team's roles. */
+async function toMemberships(rows: readonly MembershipRow[]): Promise<TeamMembership[]> {
+  const roles = await loadTeamRoles([...new Set(rows.map((row) => row.id))]);
+  return rows.map(({ agentId, customKey, ...row }) => {
+    const role = parseTeamRole(row.role);
+    const actor = resolveActor({ role, isAgent: agentId !== null, customKey }, roles.get(row.id));
+    return { ...row, role, roleKey: actor.roleKey, roleName: actor.roleName, kind: actor.kind, capabilities: [...actor.capabilities] };
+  });
+}
+
 /** Every team the user belongs to: the personal team first, then by name. */
 export async function listTeamsForUser(userId: string): Promise<TeamMembership[]> {
-  const rows = await membershipQuery(userId).orderBy(desc(team.personal), asc(team.name));
-  return rows.map(toMembership);
+  const rows = await membershipQuery(getDb(), userId).orderBy(desc(team.personal), asc(team.name));
+  return toMemberships(rows);
 }
 
 /** The ids of every team the user belongs to. */
@@ -61,24 +92,16 @@ export async function listTeamIdsForUser(userId: string): Promise<Set<string>> {
  * exist or the user is not a member, so callers never reveal other teams.
  */
 export async function getTeamForMember(userId: string, slug: string): Promise<TeamMembership | null> {
-  const [row] = await getDb()
-    .select(membershipColumns)
-    .from(teamMember)
-    .innerJoin(team, eq(team.id, teamMember.teamId))
-    .where(and(eq(teamMember.userId, userId), eq(team.slug, slug)))
-    .limit(1);
-  return row ? toMembership(row) : null;
+  const rows = await membershipQuery(getDb(), userId).where(and(eq(teamMember.userId, userId), eq(team.slug, slug))).limit(1);
+  const [membership] = await toMemberships(rows);
+  return membership ?? null;
 }
 
 /** Same as getTeamForMember, by team id. */
 export async function getTeamMembershipById(userId: string, teamId: string): Promise<TeamMembership | null> {
-  const [row] = await getDb()
-    .select(membershipColumns)
-    .from(teamMember)
-    .innerJoin(team, eq(team.id, teamMember.teamId))
-    .where(and(eq(teamMember.userId, userId), eq(team.id, teamId)))
-    .limit(1);
-  return row ? toMembership(row) : null;
+  const rows = await membershipQuery(getDb(), userId).where(and(eq(teamMember.userId, userId), eq(team.id, teamId))).limit(1);
+  const [membership] = await toMemberships(rows);
+  return membership ?? null;
 }
 
 /** The user's personal team, or null when it has not been created yet. */
@@ -98,7 +121,11 @@ export interface TeamMemberView {
   name: string;
   email: string;
   username: string | null;
+  /** The built-in role Better Auth stores. */
   role: TeamRole;
+  /** The role that applies: the built-in role, or a custom role's key. */
+  roleKey: string;
+  roleName: string;
   joinedAt: string;
 }
 
@@ -112,13 +139,20 @@ export async function listTeamMembers(teamId: string): Promise<TeamMemberView[]>
       email: user.email,
       username: user.username,
       role: teamMember.role,
+      customKey: assignedRole.key,
+      customName: assignedRole.name,
       joinedAt: teamMember.createdAt,
     })
     .from(teamMember)
     .innerJoin(user, eq(user.id, teamMember.userId))
+    .leftJoin(teamRoleAssignment, eq(teamRoleAssignment.memberId, teamMember.id))
+    .leftJoin(assignedRole, and(eq(assignedRole.id, teamRoleAssignment.roleId), eq(assignedRole.teamId, teamMember.teamId)))
     .where(and(eq(teamMember.teamId, teamId), notExists(getDb().select({ id: agent.userId }).from(agent).where(eq(agent.userId, teamMember.userId)))))
     .orderBy(asc(teamMember.createdAt));
-  return rows.map((row) => ({ ...row, role: parseTeamRole(row.role), joinedAt: row.joinedAt.toISOString() }));
+  return rows.map(({ customKey, customName, ...row }) => {
+    const role = parseTeamRole(row.role);
+    return { ...row, role, roleKey: customKey ?? role, roleName: customName ?? builtInRoleNames[role], joinedAt: row.joinedAt.toISOString() };
+  });
 }
 
 /** An invitation that is still open. */
@@ -214,4 +248,35 @@ export async function countMembers(teamIds: string[]): Promise<Map<string, TeamH
     .where(inArray(teamMember.teamId, teamIds))
     .groupBy(teamMember.teamId);
   return new Map(rows.map((row) => [row.teamId, { people: row.people, agents: row.agents }]));
+}
+
+/** A member of a team with the role that applies to them, for deciding who to notify. */
+export interface TeamMemberActor {
+  userId: string;
+  name: string;
+  memberId: string;
+  isAgent: boolean;
+  actor: TeamActor;
+}
+
+/** The query behind listTeamMemberActors: joins only, filtered by the team id. Exported for its `.toSQL()` test. */
+export function listTeamMemberActorsQuery(db: Pick<ReturnType<typeof getDb>, "select">, teamId: string) {
+  return db
+    .select({ userId: teamMember.userId, name: user.name, memberId: teamMember.id, role: teamMember.role, agentId: agent.userId, customKey: assignedRole.key })
+    .from(teamMember)
+    .innerJoin(user, eq(user.id, teamMember.userId))
+    .leftJoin(agent, eq(agent.userId, teamMember.userId))
+    .leftJoin(teamRoleAssignment, eq(teamRoleAssignment.memberId, teamMember.id))
+    .leftJoin(assignedRole, and(eq(assignedRole.id, teamRoleAssignment.roleId), eq(assignedRole.teamId, teamMember.teamId)))
+    .where(eq(teamMember.teamId, teamId));
+}
+
+/** Every member of one team, people and agents, with their roles resolved. Callers decide with `can`. */
+export async function listTeamMemberActors(teamId: string): Promise<TeamMemberActor[]> {
+  const [rows, roleMap] = await Promise.all([listTeamMemberActorsQuery(getDb(), teamId), loadTeamRoles([teamId])]);
+  const roles = roleMap.get(teamId);
+  return rows.map((row) => {
+    const isAgent = row.agentId !== null;
+    return { userId: row.userId, name: row.name, memberId: row.memberId, isAgent, actor: resolveActor({ role: parseTeamRole(row.role), isAgent, customKey: row.customKey }, roles) };
+  });
 }
