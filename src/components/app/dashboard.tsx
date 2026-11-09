@@ -1,7 +1,7 @@
 "use client";
 
 import { IconLoader2, IconPlus, IconSearch } from "@tabler/icons-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
 import { ArtifactList } from "@/components/app/artifact-list";
@@ -17,6 +17,7 @@ import { useEditAccess, useWithdrawSharing } from "@/components/app/use-edit-acc
 import { useFullArtifact } from "@/components/app/use-full-artifact";
 import { useServerSearch } from "@/components/app/use-server-search";
 import { useDashboardProjects } from "@/components/app/use-dashboard-projects";
+import { PanelSizesBeforePaint, SidebarSplitter, sidebarPanelId } from "@/components/app/workspace-splitters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,10 +33,12 @@ import { withoutArtifactLink, type ArtifactLink } from "@/lib/app-link";
 import { kinds } from "@/lib/artifact-kinds";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
+import { listMinHeight, sidebarColumns } from "@/lib/panel-size-rules";
 import type { ProjectFacets } from "@/lib/projects/queries";
 import type { ProjectFilter as ProjectFilterValue } from "@/lib/projects/rules";
 import { matchesProjectFilter, type SidebarProjectRow } from "@/lib/projects/sidebar-rules";
 import type { TagFacet } from "@/lib/tags/queries";
+import { cn } from "@/lib/utils";
 
 interface DetailPaneProps {
   selected: ArtifactListItemDto | null;
@@ -192,6 +195,9 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const sidebar = useDashboardProjects({ artifacts, setArtifacts, rows: projectRows, facets, api: projectsApi, teams, scopeTeam, tagFilter, listPath, viewerId });
 
   const serverMatches = useServerSearch(query, scopeTeam?.id ?? null, projectFilter, tagFilter);
@@ -228,10 +234,11 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
         <ScopeTabs teams={teams} activeSlug={scopeTeam?.slug ?? null} />
         <DashboardHeading facets={facets} scopeTeam={scopeTeam} onCreate={() => { setCreateOpen(true); }} />
 
+        <PanelSizesBeforePaint />
         {/* overflow-clip, not hidden: it rounds the corners without becoming a scroll box, so the artifact's toolbar can stick on phones. */}
-        <div className="card-surface relative grid min-h-[640px] flex-1 overflow-clip md:min-h-0 md:grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[280px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]">
-          <aside className="relative flex min-h-0 flex-col border-b bg-background/60 max-md:max-h-[360px] md:max-lg:max-h-[min(360px,32dvh)] lg:border-r lg:border-b-0">
-            <div className="space-y-2 border-b p-3">
+        <div ref={shellRef} className={cn("card-surface relative grid min-h-[640px] flex-1 overflow-clip md:min-h-0 md:grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]", sidebarColumns)}>
+          <aside ref={sidebarRef} id={sidebarPanelId} className="relative flex min-h-0 min-w-0 flex-col border-b bg-background/60 max-md:max-h-[360px] md:max-lg:max-h-[min(360px,32dvh)] lg:border-r lg:border-b-0">
+            <div className="shrink-0 space-y-2 border-b p-3">
               <div className="relative">
                 <IconSearch className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -242,7 +249,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
                   className="h-8 bg-card pl-8"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-1">
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-1">
                 <Select value={kind} onValueChange={(value) => { setKind(value ?? "all"); }}>
                   <SelectTrigger size="sm" className="h-7 w-full min-w-0 border-0 bg-transparent px-1 text-sm text-muted-foreground shadow-none" aria-label="Filter by format">
                     <SelectValue>{(value: string) => (value === "all" ? "All formats" : value)}</SelectValue>
@@ -265,8 +272,9 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
               dragging={sidebar.dragging}
               blockedKeys={sidebar.blockedKeys}
               onDropArtifact={sidebar.dropped}
+              listRef={listRef}
             />
-            <div data-slot="artifact-list" className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
+            <div ref={listRef} data-slot="artifact-list" className={cn("relative min-h-0 flex-1 overflow-y-auto overscroll-contain p-2", listMinHeight)}>
               <ArtifactList
                 state={artifactListState({ total: artifacts.length, shown: filtered.length })}
                 artifacts={filtered}
@@ -276,9 +284,10 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
                 moves={sidebar.moves}
               />
             </div>
-            <div className="border-t px-4 py-2.5 text-xs text-muted-foreground">
+            <div className="shrink-0 border-t px-4 py-2.5 text-xs text-muted-foreground">
               {filtered.length} shown
             </div>
+            <SidebarSplitter shell={shellRef} sidebar={sidebarRef} />
           </aside>
 
           <DetailPane

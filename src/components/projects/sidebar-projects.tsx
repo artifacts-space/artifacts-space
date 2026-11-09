@@ -1,12 +1,14 @@
 "use client";
 
 import { IconChevronRight, IconPlus } from "@tabler/icons-react";
-import { useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 
 import { useMediaQuery } from "@/components/app/use-media-query";
 import type { SidebarProjectsControls } from "@/components/app/use-sidebar-projects";
+import { ProjectsSplitter, projectsPanelId } from "@/components/app/workspace-splitters";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { projectsRowsHeight } from "@/lib/panel-size-rules";
 import { projectNameKey, type ProjectFilter } from "@/lib/projects/rules";
 import { deleteProjectCopy, type SidebarProject, type SidebarProjectRow, type SidebarTeam } from "@/lib/projects/sidebar-rules";
 import { cn } from "@/lib/utils";
@@ -27,6 +29,8 @@ interface SidebarProjectsProps {
   /** Entries the dragged card may not go into: they live in another space. */
   blockedKeys: ReadonlySet<string>;
   onDropArtifact: (artifactId: string, target: SidebarProject | null) => void;
+  /** The artifact list under the group: the resize handle trades height with it. */
+  listRef: RefObject<HTMLElement | null>;
 }
 
 /** The "Only me" choice. Team slugs never hold an underscore, so it cannot name a team. */
@@ -151,30 +155,58 @@ function GroupHeader({ open, dragging, onToggle, onCreate }: { open: boolean; dr
   );
 }
 
+type RowsProps = Pick<SidebarProjectsProps, "controls" | "filter" | "onFilter" | "scopeTeam" | "teams" | "blockedKeys" | "onDropArtifact" | "listRef"> & {
+  creating: boolean;
+  onCreated: () => void;
+};
+
+/**
+ * The group's rows in their own scroll box under the heading, and the handle
+ * under them. Once the rows scroll, a divider marks the box's top edge, so a
+ * row leaving the view slides below the heading instead of seeming to run
+ * under it.
+ */
+function ProjectRows({ controls, filter, onFilter, scopeTeam, teams, blockedKeys, onDropArtifact, listRef, creating, onCreated }: RowsProps) {
+  const [scrolled, setScrolled] = useState(false);
+  const rowsRef = useRef<HTMLDivElement>(null);
+  return (
+    <>
+      <div
+        ref={rowsRef}
+        id={projectsPanelId}
+        data-slot="sidebar-projects"
+        data-scrolled={scrolled ? "" : undefined}
+        onScroll={(event) => { setScrolled(event.currentTarget.scrollTop > 0); }}
+        className={cn("relative min-h-0 overflow-y-auto overscroll-contain border-t transition-colors", projectsRowsHeight, scrolled ? "border-border" : "border-transparent")}
+      >
+        {creating ? <CreateForm controls={controls} scopeTeam={scopeTeam} teams={teams} onDone={onCreated} /> : null}
+        <ProjectEntries controls={controls} filter={filter} onFilter={onFilter} onDropArtifact={onDropArtifact} blockedKeys={blockedKeys} namesTeams={scopeTeam === null} />
+        {controls.entries.length === 0 && !creating ? <p className="px-2 pb-1 text-xs text-muted-foreground">Create a project, then move artifacts into it.</p> : null}
+      </div>
+      <ProjectsSplitter rows={rowsRef} list={listRef} />
+    </>
+  );
+}
+
 /**
  * The sidebar's Projects group: every project the viewer may use here, with
  * how many artifacts in this list it holds, plus "No project". Click one to
  * filter the list (the filter select follows), drop an artifact card on one
  * to move it, and create, rename, or delete projects in place. Deleting
  * keeps the artifacts; they just leave the project. Open on wide screens,
- * closed at first where the sidebar is short.
+ * closed at first where the sidebar is short. While open on wide screens, a
+ * handle under the rows trades height with the artifact list.
  */
-export function SidebarProjects({ controls, filter, onFilter, scopeTeam, teams, dragging, blockedKeys, onDropArtifact }: SidebarProjectsProps) {
+export function SidebarProjects({ dragging, ...rows }: SidebarProjectsProps) {
   const wide = useMediaQuery("(min-width: 64rem)", true);
   const [openChoice, setOpenChoice] = useState<boolean | null>(null);
   const [creating, setCreating] = useState(false);
   const open = dragging || creating || (openChoice ?? wide);
 
   return (
-    <section aria-label="Projects" className="border-b px-2 py-1.5">
+    <section aria-label="Projects" className={cn("relative flex shrink-0 flex-col border-b px-2 py-1.5", open && "lg:min-h-26 lg:shrink")}>
       <GroupHeader open={open} dragging={dragging} onToggle={() => { setOpenChoice(!open); setCreating(false); }} onCreate={() => { setCreating(true); setOpenChoice(true); }} />
-      {open ? (
-        <div data-slot="sidebar-projects" className="relative max-h-48 overflow-y-auto overscroll-contain">
-          {creating ? <CreateForm controls={controls} scopeTeam={scopeTeam} teams={teams} onDone={() => { setCreating(false); }} /> : null}
-          <ProjectEntries controls={controls} filter={filter} onFilter={onFilter} onDropArtifact={onDropArtifact} blockedKeys={blockedKeys} namesTeams={scopeTeam === null} />
-          {controls.entries.length === 0 && !creating ? <p className="px-2 pb-1 text-xs text-muted-foreground">Create a project, then move artifacts into it.</p> : null}
-        </div>
-      ) : null}
+      {open ? <ProjectRows {...rows} creating={creating} onCreated={() => { setCreating(false); }} /> : null}
     </section>
   );
 }
