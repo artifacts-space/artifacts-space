@@ -69,15 +69,25 @@ export const rateLimits = {
   teamInviteByUserDay: { limit: 50, windowSeconds: day },
   teamInviteByTeamDay: { limit: 100, windowSeconds: day },
   /**
-   * Sign-in links per network address. A short window lets a group behind one
-   * shared address sign in together, and a refused network waits minutes,
-   * not an hour. The daily ceiling keeps one address to a tenth of Sendir's
+   * Sign-in links per network address. Every link is an email, and a link to
+   * a made-up address bounces, which hurts the site's sending reputation for
+   * everyone. The one-minute window stops a scripted burst after two emails
+   * (five links to made-up addresses in two seconds once got through). The
+   * 15-minute window still lets a group behind one shared address sign in
+   * together within a few minutes, and a refused network waits minutes, not
+   * an hour. The daily ceiling keeps one address to a tenth of Sendir's
    * daily recipient cap, which every sign-in on the site shares: once the cap
    * is spent, nobody gets a sign-in link until midnight UTC.
    */
+  magicLinkByNetworkMinute: { limit: 2, windowSeconds: 60 },
   magicLinkByNetwork: { limit: 10, windowSeconds: quarterHour },
   magicLinkByNetworkDay: { limit: Math.floor(SENDIR_DAILY_RECIPIENTS / 10), windowSeconds: day },
-  /** Sign-in links per email address per hour, from any network, so nobody can flood one inbox. */
+  /**
+   * Sign-in links per email address, from any network, so nobody can flood
+   * one inbox: one a minute (a second click waits for the first email), and
+   * a few an hour.
+   */
+  magicLinkByEmailMinute: { limit: 1, windowSeconds: 60 },
   magicLinkByEmail: { limit: 5, windowSeconds: hour },
   /** New teams, agents, and access tokens per person per hour. Each agent gets its own limits, so agents are capped too. */
   teamCreate: { limit: 10, windowSeconds: hour },
@@ -123,8 +133,10 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   teamInviteByUserHour: "You have sent a lot of invitations in the last hour.",
   teamInviteByUserDay: "You have sent a lot of invitations today.",
   teamInviteByTeamDay: "This team has sent a lot of invitations today.",
+  magicLinkByNetworkMinute: "Your network has asked for several sign-in links in the last minute.",
   magicLinkByNetwork: "Your network has asked for a lot of sign-in links in the last few minutes.",
   magicLinkByNetworkDay: "Your network has asked for a lot of sign-in links today.",
+  magicLinkByEmailMinute: "This email address asked for a sign-in link in the last minute. Check your inbox and spam folder for it.",
   magicLinkByEmail: "This email address has asked for a lot of sign-in links in the last hour.",
   teamCreate: "You have created a lot of teams in the last hour.",
   agentCreate: "You have added a lot of agents in the last hour.",
