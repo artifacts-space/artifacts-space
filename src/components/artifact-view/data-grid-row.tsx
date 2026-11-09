@@ -3,6 +3,7 @@
 import { memo, type ReactNode } from "react";
 
 import type { GridCell } from "@/lib/csv-edit-rules";
+import type { SheetAlignment } from "@/lib/sheet-format/rules";
 import { withKept, rowNumberWidth, sheetHeaderHeight, sheetRowHeight, type Span } from "@/lib/sheet-grid-rules";
 
 /** The element id of a cell, for aria-activedescendant and popover anchors. */
@@ -39,7 +40,12 @@ interface GridRowProps {
   totalWidth: number;
   cell: (row: number, column: number) => string;
   rowLabel: (row: number) => string;
+  /** Columns shown in tabular figures. */
   numeric: readonly boolean[];
+  /** How each column's cells line up (sheet-format/rules.ts). */
+  align: readonly SheetAlignment[];
+  /** The banding fill for this row, or "" (every other row is banded when banding is on). */
+  band: string;
   /** The active column when the active cell is in this row, else -1. */
   activeColumn: number;
   /** The active column when it is outside `columns`, else -1, so the active cell stays in the DOM while it scrolls out of view. */
@@ -51,9 +57,11 @@ interface GridRowProps {
   rangeRight: number;
 }
 
-function cellClass(editing: boolean, numeric: boolean, active: boolean, selected: boolean): string {
-  let name = `${cellBase}${editing ? " overflow-visible" : " overflow-hidden"}`;
-  if (numeric) name += " justify-end tabular-nums";
+const alignClass: Record<SheetAlignment, string> = { left: "", center: " justify-center", right: " justify-end" };
+
+function cellClass(editing: boolean, numeric: boolean, align: SheetAlignment, active: boolean, selected: boolean): string {
+  let name = `${cellBase}${editing ? " overflow-visible" : " overflow-hidden"}${alignClass[align]}`;
+  if (numeric) name += " tabular-nums";
   if (active) name += ` ${activeRing}`;
   if (selected) name += ` ${rangeFill}`;
   return name;
@@ -65,7 +73,7 @@ function cellClass(editing: boolean, numeric: boolean, active: boolean, selected
  * re-renders only the rows it leaves and enters, as long as `cell` and
  * `rowLabel` keep their identity.
  */
-export const GridRow = memo(function GridRow({ row, gridId, columns, offsets, totalWidth, cell, rowLabel, numeric, activeColumn, keepColumn, activeContent, rangeLeft, rangeRight }: GridRowProps) {
+export const GridRow = memo(function GridRow({ row, gridId, columns, offsets, totalWidth, cell, rowLabel, numeric, align, band, activeColumn, keepColumn, activeContent, rangeLeft, rangeRight }: GridRowProps) {
   const cells = withKept(columns, keepColumn).map((column) => {
     const value = cell(row, column);
     const isActive = column === activeColumn;
@@ -80,14 +88,14 @@ export const GridRow = memo(function GridRow({ row, gridId, columns, offsets, to
         aria-colindex={column + 2}
         aria-selected={isActive || selected}
         style={columnPlace(offsets, column)}
-        className={cellClass(editing, numeric[column] ?? false, isActive, selected && !isActive)}
+        className={cellClass(editing, numeric[column] ?? false, align[column] ?? "left", isActive, selected && !isActive)}
       >
         {editing ? activeContent : <span className="truncate">{value}</span>}
       </div>
     );
   });
   return (
-    <div role="row" data-row={row} aria-rowindex={row + 2} style={rowPlace(row, totalWidth)} className="group/row absolute left-0 flex border-b border-border/50 hover:bg-muted/40">
+    <div role="row" data-row={row} aria-rowindex={row + 2} style={rowPlace(row, totalWidth)} className={`group/row absolute left-0 flex border-b border-border/50 hover:bg-muted/40 ${band}`}>
       <div role="rowheader" aria-colindex={1} style={{ width: rowNumberWidth }} className={`sticky left-0 z-10 flex shrink-0 items-center justify-end border-r border-border/60 bg-muted px-2 text-xs tabular-nums ${activeColumn >= 0 || rangeLeft >= 0 ? "font-medium text-foreground" : "text-muted-foreground"}`}>
         {rowLabel(row)}
       </div>

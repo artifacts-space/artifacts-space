@@ -11,9 +11,11 @@ import { InlineBody, InlineSummary, InlineTitle } from "@/components/artifact-pa
 import { PageInlineEditor } from "@/components/artifact-page/page-inline-editor";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { SheetFill } from "@/components/artifact-view/sheet-fill";
+import { SheetFormatProvider, type SheetFormatSaver } from "@/components/artifact-view/sheet-format";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { pageColumnClass, usesFullWidth } from "@/lib/page-width/rules";
+import { plainSheetFormat } from "@/lib/sheet-format/rules";
 import { sheetAtLimit } from "@/lib/ui/fixtures/formats";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
@@ -27,6 +29,9 @@ const samples: Record<EditorFixtureKind, { kind: ArtifactKind; content: () => st
   data: { kind: "ui", content: dataUi },
   sheet: { kind: "csv", content: sheetAtLimit },
 };
+
+/** Sheet formatting kept in memory, so the format menus work without a database. */
+const keepFormatInMemory: SheetFormatSaver = (next) => Promise.resolve(next);
 
 /** A save that keeps the change in memory, so autosave runs end to end without a database. */
 function useMemorySave(initial: ArtifactDto): SaveArtifact {
@@ -61,9 +66,11 @@ export function EditorFixture({ kind }: { kind: EditorFixtureKind }) {
               <PageConflictNotice />
               <article className="mt-10">
                 <SheetFill artifactKey={artifact.publicId}>
-                  <InlineBody>
-                    <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language="" files={artifact.files} />
-                  </InlineBody>
+                  <SheetFormatProvider stored={plainSheetFormat} save={keepFormatInMemory}>
+                    <InlineBody>
+                      <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language="" files={artifact.files} />
+                    </InlineBody>
+                  </SheetFormatProvider>
                 </SheetFill>
               </article>
             </PageInlineEditor>

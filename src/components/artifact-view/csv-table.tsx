@@ -26,6 +26,7 @@ import { pixelWidth } from "@/lib/sheet-grid-rules";
 
 import { CsvColumnMenu } from "./csv-column-menu";
 import { DataGrid, gridCellId } from "./data-grid";
+import { SheetFormatMenu } from "./sheet-format";
 import { SheetFormulaBar } from "./sheet-formula-bar";
 import { useSheetColumns } from "./use-sheet-columns";
 import { copySelection, selectionLabel, useSheetSelection } from "./use-sheet-selection";
@@ -106,6 +107,7 @@ export function CsvTable({ content }: { content: string }) {
       onMoveLeft: column > 0 ? moveTo(column - 1) : null,
       onMoveRight: column < columns - 1 ? moveTo(column + 1) : null,
       onFit: () => { sheet.fit(column, gridOf(column)); },
+      align: sheet.alignControl(column),
     };
   }
 
@@ -156,6 +158,8 @@ export function CsvTable({ content }: { content: string }) {
         rowCount={shown.length}
         widths={sheet.widths}
         numeric={sheet.numeric}
+        align={sheet.align}
+        banding={sheet.banding}
         header={(column) => (
           <ColumnHeader
             name={name(dataColumn(column))}
@@ -286,6 +290,7 @@ function CsvToolbar({ searchId, view, onViewChange, name, shown, total, onResetO
         </Button>
       ) : null}
       {onResetOrder ? <OwnOrderNote onReset={onResetOrder} /> : null}
+      <SheetFormatMenu />
       <p role="status" className="ml-auto text-sm text-muted-foreground tabular-nums">
         Showing {count(shown)} of {count(total)} {total === 1 ? "row" : "rows"}
       </p>

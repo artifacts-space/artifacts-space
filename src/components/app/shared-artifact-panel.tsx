@@ -5,6 +5,7 @@ import { IconLoader2, IconLock } from "@tabler/icons-react";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { VisibilityBadge } from "@/components/artifact-page/visibility-badge";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { ArtifactSheetFormat } from "@/components/artifact-view/sheet-format";
 import { SheetKeyContext } from "@/components/artifact-view/use-sheet-prefs";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { CommentsControl } from "@/components/app/comments-picker";
@@ -108,7 +109,9 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
         <div data-slot="detail-body" role="region" aria-label="Content" tabIndex={0} className={detailBody}>
           <PreviewSurface theme={theme} fullWidth={usesFullWidth(artifact.kind, artifact.fullWidth)} className="py-6 sm:py-8">
             <SheetKeyContext value={artifact.publicId}>
-              <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
+              <ArtifactSheetFormat artifactId={null} stored={artifact.sheetFormat}>
+                <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
+              </ArtifactSheetFormat>
             </SheetKeyContext>
           </PreviewSurface>
         </div>

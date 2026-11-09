@@ -4,6 +4,7 @@ import { type ClipboardEvent, type FocusEvent, type KeyboardEvent, type MouseEve
 
 import type { GridCell } from "@/lib/csv-edit-rules";
 import { type CellRange, type GridSelection, isSingleCell, sameCell, selectionAfterKey, selectionRange } from "@/lib/grid-selection-rules";
+import { bandClass, type SheetAlignment, type SheetBanding } from "@/lib/sheet-format/rules";
 import { columnOffsets, keptCell, outsideSpan, revealCell, rowNumberWidth, rowsPerPage, sheetHeaderHeight, sheetRowHeight, withKept } from "@/lib/sheet-grid-rules";
 import { cn } from "@/lib/utils";
 
@@ -27,8 +28,12 @@ export interface DataGridProps {
   rowCount: number;
   /** Column widths in pixels (sheet-grid-rules.ts). */
   widths: readonly number[];
-  /** Columns shown right-aligned in tabular figures. */
+  /** Columns shown in tabular figures. */
   numeric: readonly boolean[];
+  /** How each column's cells line up; numbers right and text left when left out. */
+  align?: readonly SheetAlignment[] | undefined;
+  /** Every other row tinted from a theme token, or null for none. */
+  banding?: SheetBanding | null | undefined;
   /** The content of a column header. */
   header: (column: number) => ReactNode;
   headerSort?: ((column: number) => "ascending" | "descending" | "none") | undefined;
@@ -57,6 +62,12 @@ export interface DataGridProps {
   onColumnResize?: ((column: number, width: number) => void) | undefined;
   /** A header's edge was double-clicked: fit the column to its content. */
   onColumnFit?: ((column: number) => void) | undefined;
+}
+
+/** Each column's alignment (numbers right and text left by default) and the banding fill. Stable unless they change, so rows keep skipping re-renders. */
+function useRowLook({ numeric, align, banding }: Pick<DataGridProps, "numeric" | "align" | "banding">) {
+  const autoAlign = useMemo(() => numeric.map((isNumber): SheetAlignment => (isNumber ? "right" : "left")), [numeric]);
+  return { align: align ?? autoAlign, band: bandClass(banding ?? null) };
 }
 
 /** What the header row needs to move and resize columns, leaving out what the caller does not allow. */
@@ -144,6 +155,7 @@ export function DataGrid(props: DataGridProps) {
   const view = useSheetViewport(scrollerRef, rowCount, offsets);
   const fillHeight = useSheetFillHeight(scrollerRef);
   const totalWidth = rowNumberWidth + (offsets[columnCount] ?? 0);
+  const { align, band } = useRowLook(props);
   const kept = keptCell(active, rowCount, columnCount);
 
   useEffect(() => {
@@ -236,6 +248,8 @@ export function DataGrid(props: DataGridProps) {
                 cell={props.cell}
                 rowLabel={props.rowLabel}
                 numeric={props.numeric}
+                align={align}
+                band={row % 2 === 1 ? band : ""}
                 activeColumn={isActiveRow ? active.column : -1}
                 {...rowRange(range, row)}
                 keepColumn={outsideSpan(view.columns, kept.column)}

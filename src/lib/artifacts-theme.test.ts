@@ -45,7 +45,7 @@ vi.mock("@/lib/agents/queries", () => ({ loadActors: () => Promise.resolve(new M
 vi.mock("@/lib/agents/owner-access", () => ({ ownedAgentIds: () => Promise.resolve(new Set()), authoredByViewerCondition: vi.fn() }));
 
 const baseRecord = {
-  id: "artifact-1", publicId: "4fXkP9qR2sT7vW1yZ3aB5c", userId: "user-1", title: "Plan", icon: null, theme: "ocean", cover: null, fullWidth: false, summary: "", content: "# Plan",
+  id: "artifact-1", publicId: "4fXkP9qR2sT7vW1yZ3aB5c", userId: "user-1", title: "Plan", icon: null, theme: "ocean", cover: null, fullWidth: false, sheetFormat: null, summary: "", content: "# Plan",
   kind: "markdown", language: "", project: "", projectId: null, tags: [], sessionId: "", source: "", harness: null, harnessOverride: null, visibility: "private", comments: "team", showInSearch: false, shareId: "s", teamId: null,
   originalAuthorId: null, metadata: {}, approvedVersionId: null, updatedBy: "user-1", createdAt: new Date(), updatedAt: new Date(),
 } satisfies ArtifactRecord;

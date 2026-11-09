@@ -4,6 +4,7 @@ import { IconArrowBackUp, IconChevronDown, IconColumnInsertRight, IconColumnRemo
 import { type ClipboardEvent, type KeyboardEvent, type ReactNode, useCallback, useId, useMemo, useRef, useState } from "react";
 
 import { DataGrid, gridCellId } from "@/components/artifact-view/data-grid";
+import { SheetFormatMenu } from "@/components/artifact-view/sheet-format";
 import { SheetFormulaBar } from "@/components/artifact-view/sheet-formula-bar";
 import { useSheetColumns } from "@/components/artifact-view/use-sheet-columns";
 import { copySelection, selectionLabel, useSheetSelection } from "@/components/artifact-view/use-sheet-selection";
@@ -164,6 +165,7 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
       onMoveLeft: column > 0 ? moveTo(column - 1) : null,
       onMoveRight: column < width - 1 ? moveTo(column + 1) : null,
       onFit: () => { sheet.fit(column, gridOf(column)); },
+      align: sheet.alignControl(column),
     };
   }
 
@@ -195,6 +197,7 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
           <Button type="button" variant="ghost" size="sm" onClick={() => { apply((current) => deleteColumn(current, active.column)); }} disabled={width <= 1} aria-label="Delete column"><IconColumnRemove /><span className="hidden sm:inline">Delete column</span></Button>
           <Button type="button" variant="ghost" size="icon-sm" onClick={() => { undo(); focusGrid(); }} aria-label="Undo"><IconArrowBackUp /></Button>
         </div>
+        <SheetFormatMenu />
         <p role="status" className="ml-auto text-sm text-muted-foreground">{status}</p>
       </div>
       <div className="min-w-0">
@@ -212,6 +215,8 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
         rowCount={grid.rows.length}
         widths={sheet.widths}
         numeric={sheet.numeric}
+        align={sheet.align}
+        banding={sheet.banding}
         onColumnMove={moveFileColumn}
         onColumnResize={sheet.resize}
         onColumnFit={(column) => { sheet.fit(column, gridOf(column)); }}
