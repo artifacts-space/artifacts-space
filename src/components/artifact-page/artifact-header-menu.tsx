@@ -58,6 +58,8 @@ interface MoreMenuProps {
   chrome: PageEditorChrome | null;
   onHistory: () => void;
   theme: Theme | null;
+  /** False for a CSV, which is always full width, so the menu leaves Full width out. */
+  widthSetting: boolean;
 }
 
 /**
@@ -97,7 +99,7 @@ function FullWidthItem({ control }: { control: PageFullWidthControl | undefined 
 }
 
 /** The page header's "⋯": why a change is not saved (and Try again after a failed save), Full width, History, and View source. Disabled until the editor is ready. */
-function MoreMenu({ chrome, onHistory, theme }: MoreMenuProps) {
+function MoreMenu({ chrome, onHistory, theme, widthSetting }: MoreMenuProps) {
   // Menus open in a layer above the page, so the popup takes the artifact theme's colors itself, like the header around its button.
   const popup = themeChromeProps(theme ?? siteDefaultTheme());
   const source = chrome?.source ?? null;
@@ -108,7 +110,7 @@ function MoreMenu({ chrome, onHistory, theme }: MoreMenuProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className={cn("w-60", popup.modeClass)} style={popup.style}>
         <SaveProblemItems save={chrome?.save} />
-        <FullWidthItem control={chrome?.fullWidth} />
+        {widthSetting ? <FullWidthItem control={chrome?.fullWidth} /> : null}
         <DropdownMenuItem onClick={onHistory} className="py-2"><IconHistory /> History</DropdownMenuItem>
         <DropdownMenuItem onClick={source?.onToggle} disabled={!source} className="py-2">
           <IconCode /> {source?.open ? "Hide source" : "View source"}
@@ -127,7 +129,7 @@ function MoreMenu({ chrome, onHistory, theme }: MoreMenuProps) {
  * header never shifts. History opens the same dialog as in
  * /app, and the menu returns focus to its button when it closes.
  */
-export function ArtifactHeaderMenu({ theme = null, waiting = null }: { theme?: Theme | null; waiting?: WaitingChromeInput | null }) {
+export function ArtifactHeaderMenu({ theme = null, waiting = null, widthSetting = true }: { theme?: Theme | null; waiting?: WaitingChromeInput | null; widthSetting?: boolean }) {
   // What the editor published, or, until it does, the controls the server data allows.
   const fromServer = useWaitingChrome(waiting, "");
   const chrome = usePageEditorChrome() ?? fromServer;
@@ -135,14 +137,14 @@ export function ArtifactHeaderMenu({ theme = null, waiting = null }: { theme?: T
     return (
       <>
         <SaveIndicator save={idleSave} />
-        <MoreMenu chrome={null} onHistory={noHistory} theme={theme} />
+        <MoreMenu chrome={null} onHistory={noHistory} theme={theme} widthSetting={widthSetting} />
       </>
     );
   }
   return (
     <>
       <SaveIndicator save={chrome.save} />
-      <VersionHistory {...chrome.history} trigger={(openHistory) => <MoreMenu chrome={chrome} onHistory={openHistory} theme={theme} />} />
+      <VersionHistory {...chrome.history} trigger={(openHistory) => <MoreMenu chrome={chrome} onHistory={openHistory} theme={theme} widthSetting={widthSetting} />} />
     </>
   );
 }

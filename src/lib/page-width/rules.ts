@@ -44,3 +44,17 @@ export function previewColumnClass(fullWidth: boolean): string {
 export function editColumnClass(fullWidth: boolean): string {
   return fullWidth ? "w-full" : "mx-auto w-full max-w-[960px]";
 }
+
+/**
+ * Whether an artifact's body uses the whole width. A spreadsheet (CSV)
+ * always does, whatever its Full width setting, as a sheet does in a
+ * spreadsheet app; every other kind follows the setting.
+ */
+export function usesFullWidth(kind: string, fullWidth: boolean): boolean {
+  return fullWidth || kind === "csv";
+}
+
+/** Whether the Full width setting does anything for this kind: it does not for a CSV, which is always full width. */
+export function hasWidthSetting(kind: string): boolean {
+  return kind !== "csv";
+}

@@ -24,7 +24,7 @@ async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/editor"
 
 /**
  * Development-only page for the editor layout e2e test: the page editor on
- * a long artifact, without a database. `?kind=` picks ui, json, markdown, or blocks (a short interface).
+ * a long artifact, without a database. `?kind=` picks ui, json, markdown, blocks (a short interface), data, or sheet (a CSV at the size limit).
  * Returns 404 in every other environment.
  */
 export default function EditorFixturePage({ searchParams }: PageProps<"/dev/editor">) {

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { ViewsDialog } from "@/components/views/views-dialog";
 import { OpenPageButton } from "@/components/page-width/open-page-button";
 import type { ArtifactDto } from "@/lib/artifact-types";
+import { usesFullWidth } from "@/lib/page-width/rules";
 import { artifactPageHref } from "@/lib/artifact-page-href";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
@@ -100,7 +101,7 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
         </div>
         {/* Read only, so nothing in the pane takes focus first: the pane does, for keyboard scrolling. */}
         <div data-slot="detail-body" role="region" aria-label="Content" tabIndex={0} className={detailBody}>
-          <PreviewSurface theme={theme} fullWidth={artifact.fullWidth} className="py-6 sm:py-8">
+          <PreviewSurface theme={theme} fullWidth={usesFullWidth(artifact.kind, artifact.fullWidth)} className="py-6 sm:py-8">
             <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
           </PreviewSurface>
         </div>

@@ -23,6 +23,7 @@ import {
   viewRowIndexes,
 } from "@/lib/csv-view-rules";
 import { clampCell } from "@/lib/grid-navigation";
+import { pixelWidth } from "@/lib/sheet-grid-rules";
 
 import { CsvColumnMenu } from "./csv-column-menu";
 import { DataGrid, gridCellId } from "./data-grid";
@@ -35,7 +36,7 @@ function useParsedCsv(content: string) {
     const parsed = parseCsv(content, { maxRows: csvRowCap });
     const columns = Math.min(Math.max(parsed.columnCount, parsed.header.length), csvColumnCap);
     const types = detectColumnTypes(parsed.rows, columns);
-    return { parsed, columns, types, widths: columnWidths(parsed.header, parsed.rows, columns), numeric: types.map((type) => type === "number") };
+    return { parsed, columns, types, widths: columnWidths(parsed.header, parsed.rows, columns).map(pixelWidth), numeric: types.map((type) => type === "number") };
   }, [content]);
 }
 
@@ -75,12 +76,12 @@ export function CsvTable({ content }: { content: string }) {
   const toggleSort = (column: number) => { setView((current) => ({ ...current, sort: nextSort(current.sort, column) })); };
 
   function openMenu(column: number) {
-    gridRef.current = document.getElementById(gridCellId(gridId, { row: -1, column }))?.closest("table") ?? null;
+    gridRef.current = document.getElementById(gridCellId(gridId, { row: -1, column }))?.closest<HTMLElement>("[role=grid]") ?? null;
     setActive({ row: -1, column });
     setMenuColumn(column);
   }
 
-  function handleGridKey(event: KeyboardEvent<HTMLTableElement>): boolean {
+  function handleGridKey(event: KeyboardEvent<HTMLDivElement>): boolean {
     if ((event.altKey && event.key === "ArrowDown") || event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
       event.preventDefault();
       openMenu(active.column);
@@ -92,7 +93,7 @@ export function CsvTable({ content }: { content: string }) {
     return true;
   }
 
-  function copyCell(event: ClipboardEvent<HTMLTableElement>) {
+  function copyCell(event: ClipboardEvent<HTMLDivElement>) {
     const row = active.row === -1 ? parsed.header : parsed.rows[shown[active.row] ?? -1];
     event.clipboardData.setData("text/plain", row?.[active.column] ?? "");
     event.preventDefault();
@@ -168,7 +169,7 @@ interface ColumnHeaderProps {
 function ColumnHeader({ name, sort, filtered, onSort, onMenu }: ColumnHeaderProps) {
   const SortIcon = sort === "desc" ? IconArrowDown : IconArrowUp;
   return (
-    <div className="group/header flex h-9 items-center">
+    <div className="group/header flex h-full items-center">
       <button type="button" tabIndex={-1} onClick={onSort} className="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1 pr-1 pl-3 text-left outline-none hover:text-foreground">
         <span className="truncate">{name}</span>
         {sort ? <SortIcon aria-hidden className="size-3.5 shrink-0 text-foreground" /> : null}

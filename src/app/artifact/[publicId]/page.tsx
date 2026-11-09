@@ -19,6 +19,7 @@ import { PageConflictNotice, PageEditorChromeProvider } from "@/components/artif
 import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { SheetFill } from "@/components/artifact-view/sheet-fill";
 import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
 import { PageOrganizers } from "@/components/projects/page-organizers";
 import { CommentThread } from "@/components/comments/comment-thread";
@@ -34,7 +35,7 @@ import { iconTitlePrefix } from "@/lib/artifact-icons";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { lastEditorsFor } from "@/lib/artifacts";
 import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
-import { pageColumnClass, readingMeasureClass } from "@/lib/page-width/rules";
+import { hasWidthSetting, pageColumnClass, readingMeasureClass, usesFullWidth } from "@/lib/page-width/rules";
 import { pageOrganizersFor } from "@/lib/projects/page-project";
 import { isReportable } from "@/lib/reports/rules";
 import { isSearchIndexable, pageRobots, showsInSearch } from "@/lib/search/search-rules";
@@ -278,8 +279,9 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   ]);
   const copy = visibilityCopy(record.visibility);
   const { theme, presetId, source } = resolved;
-  // Full width is a display setting on the row, not part of a version: every reader sees the current choice.
-  const column = pageColumnClass(record.fullWidth);
+  // Full width is a display setting on the row, not part of a version: every reader sees the current choice. A CSV is always full width.
+  const fullWidth = usesFullWidth(view.kind, record.fullWidth);
+  const column = pageColumnClass(fullWidth);
 
   return (
     // The header, comments, and footer wear the artifact theme's colors (none for an unthemed artifact) and swap with it.
@@ -292,27 +294,30 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
             visibility={record.visibility}
             sentence={visibilitySentence(copy, byline)}
             content={view.content}
-            menu={viewable.canEdit ? <ArtifactHeaderMenu theme={theme} waiting={{ publicId: record.publicId, title: record.title, updatedAt: record.updatedAt.toISOString(), reviewed: isReviewedLevel(record.visibility), fullWidth: record.fullWidth, files }} /> : null}
+            menu={viewable.canEdit ? <ArtifactHeaderMenu theme={theme} widthSetting={hasWidthSetting(view.kind)} waiting={{ publicId: record.publicId, title: record.title, updatedAt: record.updatedAt.toISOString(), reviewed: isReviewedLevel(record.visibility), fullWidth: record.fullWidth, files }} /> : null}
           />
         </StickyChrome>
         {/* A theme that locks light or dark sets that mode on the backdrop too, so comments and controls on it stay readable. */}
         <ThemeBackdrop theme={theme} className={cn("text-foreground", lockedMode(theme))}>
           {view.cover ? (
             <ThemeScope theme={theme}>
-              <ArtifactCover publicId={record.publicId} cover={view.cover} editable={viewable.canEdit} fullWidth={record.fullWidth} />
+              <ArtifactCover publicId={record.publicId} cover={view.cover} editable={viewable.canEdit} fullWidth={fullWidth} />
             </ThemeScope>
           ) : null}
-          <main className={cn("mx-auto w-full py-12 sm:py-16", column, mainTopClass(view))} data-full-width={record.fullWidth}>
+          <main className={cn("mx-auto w-full py-12 sm:py-16", column, mainTopClass(view))} data-full-width={fullWidth}>
             {/* The reading measure covers the artifact and its in-place editor, not the comments under it. */}
-            <div className={readingMeasureClass(record.fullWidth)}>
+            <div className={readingMeasureClass(fullWidth)}>
               <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
                 <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={themeIdForReader(presetId, viewable.canEdit)} data-theme-source={source}>
                   <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
                   <PageConflictNotice />
                   <article className="mt-10">
-                    <InlineBody>
-                      <BodyReadView viewable={viewable} files={files} />
-                    </InlineBody>
+                    {/* A CSV's grid fills the window under the header, as a sheet does. */}
+                    <SheetFill>
+                      <InlineBody>
+                        <BodyReadView viewable={viewable} files={files} />
+                      </InlineBody>
+                    </SheetFill>
                   </article>
                 </ThemeScope>
               </EditorIsland>

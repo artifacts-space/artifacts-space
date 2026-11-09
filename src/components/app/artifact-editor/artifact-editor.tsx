@@ -14,6 +14,7 @@ import { VersionHistory } from "@/components/history/version-history";
 import { ViewsDialog } from "@/components/views/views-dialog";
 import { ArtifactOrganizers } from "@/components/projects/artifact-organizers";
 import type { ArtifactDto } from "@/lib/artifact-types";
+import { usesFullWidth } from "@/lib/page-width/rules";
 
 import { detailBody, detailOuter, detailSection, stickyModeBar, useScrollPlace } from "./detail-scroll";
 import { MetaFields, ShareBanner, TitleFields } from "./editor-sections";
@@ -155,7 +156,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
             files={artifact.files}
             revision={revision}
             sourceOpen={sourceOpen}
-            fullWidth={artifact.fullWidth}
+            fullWidth={usesFullWidth(draft.kind, artifact.fullWidth)}
             theme={theme}
             onChange={(content) => { update("content", content); }}
             onShowSource={() => { if (!sourceOpen) toggleSource(); }}
