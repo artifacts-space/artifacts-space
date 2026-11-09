@@ -5,10 +5,10 @@ import { networkKey } from "@/lib/abuse/network-key";
 import { hitRateLimits } from "@/lib/abuse/rate-limit";
 import { tooManyRequests } from "@/lib/abuse/responses";
 import { canReadArtifact } from "@/lib/access";
+import { checkArtifactPage } from "@/lib/artifact-page-check";
 import { getAuth } from "@/lib/auth/server";
 import { markdownRequestFor, markdownRoutePath } from "@/lib/markdown/negotiation";
 import { routeCheckFor, signInPath, type RouteCheck } from "@/lib/route-status";
-import { isPageSearchIndexable } from "@/lib/search/search-queries";
 import { noindexHeader, robotsHeaderName } from "@/lib/search/search-rules";
 import { getTeamForMember } from "@/lib/teams/queries";
 
@@ -65,19 +65,13 @@ function noindex<T extends Response>(response: T): T {
   return response;
 }
 
-/** Whether search engines may index the page. A failed lookup counts as no. */
-async function pageIndexable(publicId: string) {
-  try {
-    return await isPageSearchIndexable(publicId);
-  } catch (error) {
-    console.error("[proxy] Search visibility check failed", error instanceof Error ? error.name : "unknown error");
-    return false;
-  }
-}
-
-/** The artifact page: 404 when the viewer cannot read it, noindex unless search engines may list it. */
+/**
+ * The artifact page: 404 when the viewer cannot read it, noindex unless search
+ * engines may list it. Both answers come from one query (checkArtifactPage);
+ * when it fails, proxy() sends the page on with noindex.
+ */
 async function checkArtifact(request: NextRequest, publicId: string) {
-  const [readable, indexable] = await Promise.all([canReadArtifact(publicId, () => viewerId(request)), pageIndexable(publicId)]);
+  const { readable, indexable } = await checkArtifactPage(publicId, () => viewerId(request));
   if (!readable) return noindex(notFound(request));
   return indexable ? NextResponse.next() : noindex(NextResponse.next());
 }

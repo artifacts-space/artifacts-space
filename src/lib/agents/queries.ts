@@ -1,5 +1,6 @@
 import { and, asc, count, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { cache } from "react";
 
 import { getDb } from "@/db";
 import { agent, apiToken, artifact, teamMember, user } from "@/db/schema";
@@ -41,10 +42,14 @@ export async function loadActors(userIds: string[]): Promise<Map<string, Actor>>
   return actors;
 }
 
-/** The actor for one user id, or null for an unknown user or an agent without its team. */
-export async function loadActor(userId: string): Promise<Actor | null> {
+/**
+ * The actor for one user id, or null for an unknown user or an agent without
+ * its team. Deduplicated per request: an artifact page asks for its author
+ * twice (the byline, and the last editor when they are the same person).
+ */
+export const loadActor = cache(async (userId: string): Promise<Actor | null> => {
   return (await loadActors([userId])).get(userId) ?? null;
-}
+});
 
 /** True when the user is an agent. */
 export async function isAgentUser(userId: string): Promise<boolean> {
