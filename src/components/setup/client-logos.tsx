@@ -19,8 +19,6 @@ import { cn } from "@/lib/utils";
  *   same size keeps its label in line with the others.
  * - fx: its code is Apache-2.0, which grants no trademark rights, and the
  *   repository ships no logo file, so it gets a neutral "fx" monogram.
- * - Mogplex: the glyph from Mogplex's own brandmark
- *   (mogplex/public/mogplex-brandmark.svg), used with the owner's approval.
  */
 
 /** Props every mark takes. */
@@ -28,11 +26,11 @@ interface LogoProps {
   className?: string | undefined;
 }
 
-/** A square mark, 24×24 unless `viewBox` says otherwise, that fills with the current text color. */
-function Mark({ className, children, viewBox = "0 0 24 24" }: LogoProps & { children: ReactNode; viewBox?: string }) {
+/** A 24×24 mark that fills with the current text color. */
+function Mark({ className, children }: LogoProps & { children: ReactNode }) {
   return (
     <svg
-      viewBox={viewBox}
+      viewBox="0 0 24 24"
       fill="currentColor"
       aria-hidden="true"
       focusable="false"
@@ -115,7 +113,7 @@ function CodexLogo({ className }: LogoProps) {
   return <InitialMark initial="C" className={className} />;
 }
 
-/** fx. A neutral "fx" monogram, drawn as strokes: no licensed mark found. Matches public/agent-icons/fx.svg on the harness branch. */
+/** fx. A neutral "fx" monogram, drawn as strokes: no licensed mark found. Matches public/agent-icons/fx.svg on the harness-detection branch. */
 function FxLogo({ className }: LogoProps) {
   return (
     <Mark className={className}>
@@ -125,19 +123,6 @@ function FxLogo({ className }: LogoProps) {
         <path d="M13.5 11l6 8" />
         <path d="M19.5 11l-6 8" />
       </g>
-    </Mark>
-  );
-}
-
-/** Mogplex. The glyph of Mogplex's brandmark, without the wordmark, cropped as in public/agent-icons/mogplex.svg on the harness branch. */
-function MogplexLogo({ className }: LogoProps) {
-  return (
-    <Mark className={className} viewBox="3.5 3 34 34">
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M9.21939 4L20.5 13.3122L31.7806 4L37 8.2328V31.9365L32.9592 36H8.04082L4 31.9365V8.2328L9.21939 4ZM11.5765 17.2063V26.6878L17.9745 21.9471L11.5765 17.2063ZM29.4235 17.2063V26.6878L23.0255 21.9471L29.4235 17.2063Z"
-      />
     </Mark>
   );
 }
@@ -157,7 +142,6 @@ export const clientLogos: Record<McpClientId, (props: LogoProps) => ReactNode> =
   devin: DevinLogo,
   "kimi-code": KimiLogo,
   fx: FxLogo,
-  mogplex: MogplexLogo,
   "other-clients": McpLogo,
 };
 

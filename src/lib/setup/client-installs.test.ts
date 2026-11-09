@@ -16,9 +16,6 @@ import {
   fxSkillInstallCommand,
   kimiMcpLoginCommand,
   mcpClients,
-  MOGPLEX_INSTALL_COMMAND,
-  mogplexConfigToml,
-  mogplexSkillInstallCommand,
   opencodeConfigJson,
   opencodeMcpAddCommand,
   opencodeMcpAuthCommand,
@@ -140,22 +137,6 @@ describe("fx snippets", () => {
   });
 });
 
-describe("mogplex snippets", () => {
-  it("should read the token from the environment, never from the file, when building config.toml", () => {
-    const toml = mogplexConfigToml(origin);
-    expect(toml).toBe(`[mcp_servers.artifacts]\nurl = "${endpoint}"\nbearer_token_env_var = "ARTIFACTS_SPACE_TOKEN"`);
-    expect(toml).not.toMatch(/Bearer |http_headers/);
-  });
-
-  it("should install the skill to the project's .agents/skills when building the skill command", () => {
-    expect(mogplexSkillInstallCommand()).toBe("npx skills add artifacts-space/skills -a universal");
-  });
-
-  it("should use Mogplex's documented installer when showing the install command", () => {
-    expect(MOGPLEX_INSTALL_COMMAND).toBe("curl -fsSL https://mogplex.com/install.sh | sh");
-  });
-});
-
 describe("remote-only configs", () => {
   const jsonConfigs: [string, unknown][] = [
     ["cursor install link", decodeCursorConfig(cursorInstallLink(origin))],
@@ -173,7 +154,7 @@ describe("remote-only configs", () => {
     expect(stdioKeysIn({ mcpServers: { bad: { command: "npx", args: ["x"] } } })).toEqual(["command", "args"]);
   });
 
-  it.each([codexConfigToml(origin), codexHeadlessConfigToml(origin), mogplexConfigToml(origin)])("should hold no stdio keys when building config.toml %#", (toml) => {
+  it.each([codexConfigToml(origin), codexHeadlessConfigToml(origin)])("should hold no stdio keys when building config.toml %#", (toml) => {
     expect(toml).not.toMatch(/^\s*(command|args|env)\s*=/m);
   });
 
@@ -196,8 +177,8 @@ describe("mcpClients", () => {
     expect(mcpClients.map((client) => client.label)).toEqual(expect.arrayContaining(["OpenCode", "Kimi Code CLI"]));
   });
 
-  it("should list fx and Mogplex just before Other clients when listing clients", () => {
-    expect(mcpClients.slice(-3).map((client) => client.id)).toEqual(["fx", "mogplex", "other-clients"]);
+  it("should list fx just before Other clients when listing clients", () => {
+    expect(mcpClients.slice(-2).map((client) => client.id)).toEqual(["fx", "other-clients"]);
   });
 
   it("should give every client a unique id when listing clients", () => {

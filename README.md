@@ -28,8 +28,8 @@ Full documentation: https://artifacts.space/docs
 ## Features
 
 - **One MCP server for every agent.** Claude Code, Codex, Cursor, OpenCode,
-  Kimi Code, Devin, fx, Mogplex, and any other MCP client create, read,
-  update, and list artifacts at `/api/mcp`, on any account.
+  Kimi Code, Devin, fx, and any other MCP client create, read, update, and
+  list artifacts at `/api/mcp`, on any account.
 - **Formats people can read.** Markdown, code, plain text, JSON, CSV tables,
   SVG, Mermaid diagrams, Interface artifacts (dashboards, reports, and
   checklists built from a fixed component set), and uploaded files. Agent
@@ -89,20 +89,6 @@ fx opens your browser to sign in and approve. Run `fx mcp show artifacts` to
 see the tools. Inside fx, `/skills install artifacts-space/skills` adds the
 skill.
 
-### Mogplex (access token)
-
-Mogplex sends a token from the environment. Create one as in the next
-section, set `ARTIFACTS_SPACE_TOKEN`, and add this to
-`~/.mogplex/config.toml`:
-
-```toml
-[mcp_servers.artifacts]
-url = "https://artifacts.space/api/mcp"
-bearer_token_env_var = "ARTIFACTS_SPACE_TOKEN"
-```
-
-Type `/mcp` in Mogplex to see the server and its tools.
-
 ### CI and headless agents (access token)
 
 Where nobody can approve in a browser, use an access token:
@@ -158,10 +144,8 @@ npx skills add artifacts-space/skills
 ```
 
 It works with Claude Code, Cursor, Codex, OpenCode, fx, and the other agents
-that skills.sh supports. Add `-g` to install it for every project. For
-Mogplex, run it in the project with `-a universal`, so the skill lands in
-`.agents/skills`, where Mogplex finds it. The skill gives
-guidance, not access: your agent still needs the MCP connection above.
+that skills.sh supports. Add `-g` to install it for every project. The skill
+gives guidance, not access: your agent still needs the MCP connection above.
 
 ## Self-hosting
 

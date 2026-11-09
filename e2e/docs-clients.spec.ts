@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 const endpoint = "https://artifacts.space/api/mcp";
-const clients = ["Claude Code", "Cursor", "Claude Desktop and claude.ai", "Codex", "OpenCode", "Devin", "Kimi Code CLI", "fx", "Mogplex", "Other clients"];
+const clients = ["Claude Code", "Cursor", "Claude Desktop and claude.ai", "Codex", "OpenCode", "Devin", "Kimi Code CLI", "fx", "Other clients"];
 
 /** A section heading's accessible name: its title, then the hidden "Link to this section". */
 function headingName(title: string): RegExp {
@@ -50,24 +50,18 @@ test("should show the new clients' steps when their quickstart tab is chosen", a
   expect(await pageScrollsSideways(page)).toBe(false);
 });
 
-test("should give the fx and Mogplex steps when their sections and quickstart tabs open", async ({ page }) => {
+test("should give the fx steps when its section and quickstart tab open", async ({ page }) => {
   await page.goto("/docs/clients");
 
   await expect(page.locator('[data-variant="command"]').filter({ hasText: "curl -fsSL https://fx.sh/setup.sh | bash" })).toBeVisible();
   await expect(page.locator('[data-variant="command"]').filter({ hasText: `fx mcp add artifacts ${endpoint}` })).toBeVisible();
   await expect(page.locator("figure[data-code-block]").filter({ hasText: "/skills install artifacts-space/skills" })).toBeVisible();
   await expect(page.locator('[data-variant="command"]').filter({ hasText: "fx mcp show artifacts" })).toBeVisible();
-  const mogplex = page.locator('section[aria-labelledby="mogplex"]');
-  await expect(mogplex.locator("figure[data-code-block]").filter({ hasText: "bearer_token_env_var" })).toBeVisible();
-  await expect(mogplex.locator('[data-variant="command"]').filter({ hasText: "npx skills add artifacts-space/skills -a universal" })).toBeVisible();
 
   await page.goto("/docs/quickstart");
   const fxTab = page.getByRole("tab", { name: "fx", exact: true });
   await expect(fxTab.locator("svg[data-client-logo]")).toHaveCount(1);
   await fxTab.click();
   await expect(page.getByRole("tabpanel").locator('[data-variant="command"]').filter({ hasText: `fx mcp add artifacts ${endpoint}` })).toBeVisible();
-
-  await page.getByRole("tab", { name: "Mogplex" }).click();
-  await expect(page.getByRole("tabpanel").locator("figure[data-code-block]").filter({ hasText: "bearer_token_env_var" })).toBeVisible();
   expect(await pageScrollsSideways(page)).toBe(false);
 });

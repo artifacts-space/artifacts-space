@@ -33,12 +33,10 @@ for (const theme of themes) {
   });
 }
 
-test("should show every MCP client's mark, fx and Mogplex included, when the gallery opens", async ({ page }) => {
+test("should show every MCP client's mark, fx included, when the gallery opens", async ({ page }) => {
   await page.goto("/dev/components");
   const clients = page.locator('[data-specimen="every client, in setup order"]');
 
-  for (const id of ["fx", "mogplex"]) {
-    await expect(clients.locator(`[data-client="${id}"] svg[data-client-logo]`)).toHaveCount(1);
-  }
-  await expect(clients.locator("[data-client-label]")).toHaveText(["Claude Code", "Cursor", "Claude Desktop", "Codex", "OpenCode", "Devin", "Kimi Code CLI", "fx", "Mogplex", "Other clients"]);
+  await expect(clients.locator('[data-client="fx"] svg[data-client-logo]')).toHaveCount(1);
+  await expect(clients.locator("[data-client-label]")).toHaveText(["Claude Code", "Cursor", "Claude Desktop", "Codex", "OpenCode", "Devin", "Kimi Code CLI", "fx", "Other clients"]);
 });

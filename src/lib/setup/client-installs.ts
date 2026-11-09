@@ -1,4 +1,4 @@
-import { SKILL_INSTALL_COMMAND, SKILLS_REPO } from "./install-command";
+import { SKILLS_REPO } from "./install-command";
 import { MCP_SERVER_NAME, mcpEndpoint, TOKEN_ENV_VAR } from "./mcp-config";
 
 /**
@@ -170,33 +170,6 @@ export function fxConfigJson(origin: string): string {
   return JSON.stringify({ mcpServers: { [MCP_SERVER_NAME]: { type: "http", url: mcpEndpoint(origin) } } }, null, 2);
 }
 
-/**
- * The Mogplex CLI installer, from Mogplex's own docs. It puts `mogplex` in
- * `~/.mogplex/bin` on macOS and Linux.
- * Source: https://github.com/webrenew/mogplex-docs (content/docs/cli/installation.mdx)
- */
-export const MOGPLEX_INSTALL_COMMAND = "curl -fsSL https://mogplex.com/install.sh | sh";
-
-/**
- * The `~/.mogplex/config.toml` entry. The Mogplex CLI sends a bearer token
- * from an environment variable; it does not sign in to MCP servers in the
- * browser, so the token is the documented path.
- * Source: the Mogplex CLI's `HttpServerSchema` (packages/mcp-client/src/config.ts).
- */
-export function mogplexConfigToml(origin: string): string {
-  return `[mcp_servers.${MCP_SERVER_NAME}]\nurl = ${JSON.stringify(mcpEndpoint(origin))}\nbearer_token_env_var = ${JSON.stringify(TOKEN_ENV_VAR)}`;
-}
-
-/**
- * The skill install for Mogplex. The `universal` target writes to the
- * project's `.agents/skills/`, which the Mogplex CLI reads.
- * Sources: https://github.com/vercel-labs/skills/blob/main/docs/agents.md and
- * the Mogplex CLI's skill roots (packages/skills/src/discovery.ts).
- */
-export function mogplexSkillInstallCommand(): string {
-  return `${SKILL_INSTALL_COMMAND} -a universal`;
-}
-
 /** The clients the docs give setup steps for, most used first. Every list of clients reads this order. */
 export const mcpClients = [
   { id: "claude-code", label: "Claude Code", oneClick: false },
@@ -207,7 +180,6 @@ export const mcpClients = [
   { id: "devin", label: "Devin", oneClick: false },
   { id: "kimi-code", label: "Kimi Code CLI", oneClick: false },
   { id: "fx", label: "fx", oneClick: false },
-  { id: "mogplex", label: "Mogplex", oneClick: false },
   { id: "other-clients", label: "Other clients", oneClick: false },
 ] as const;
 
