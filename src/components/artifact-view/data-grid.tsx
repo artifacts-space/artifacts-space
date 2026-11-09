@@ -60,6 +60,17 @@ function cellFromEvent(event: MouseEvent): GridCell | null {
 
 const sameCell = (a: GridCell, b: GridCell) => a.row === b.row && a.column === b.column;
 
+/** Gives a hovered cell its full value as a tooltip, only when the cell cuts its text off. */
+function showClippedTitle(event: MouseEvent) {
+  if (!(event.target instanceof Element)) return;
+  const cell = event.target.closest<HTMLElement>("[role=gridcell]");
+  const text = cell?.querySelector<HTMLElement>(":scope > .truncate");
+  if (!cell || !text) return;
+  const clipped = text.scrollWidth > text.clientWidth;
+  if (clipped) cell.title = text.textContent;
+  else cell.removeAttribute("title");
+}
+
 /** Where a key press moves the active cell, or null when the grid leaves the key alone. */
 function keyTarget(event: KeyboardEvent, active: GridCell, bounds: GridBounds, tabMoves: boolean): GridCell | null {
   if (event.altKey || (event.key === "Tab" && !tabMoves)) return null;
@@ -136,9 +147,10 @@ export function DataGrid(props: DataGridProps) {
         onClick={handleClick}
         onPaste={props.onPaste}
         onCopy={props.onCopy}
+        onMouseOver={showClippedTitle}
         style={fillHeight === null ? undefined : { maxHeight: fillHeight }}
         // 70vh tall at most, unless it fills an artifact page; the /app shell lowers it with --data-grid-max-height to fit the pane.
-        className={cn("group/grid relative min-w-0 overflow-auto overscroll-x-contain border border-border/70 bg-card text-sm outline-none", fillHeight === null && "max-h-[var(--data-grid-max-height,70vh)]")}
+        className={cn("group/grid relative isolate min-w-0 overflow-auto overscroll-x-contain border border-border/70 bg-card text-sm outline-none", fillHeight === null && "max-h-[var(--data-grid-max-height,70vh)]")}
       >
         <div role="presentation" className="relative" style={{ width: totalWidth, minWidth: "100%", height: sheetHeaderHeight + rowCount * sheetRowHeight }}>
           <HeaderRow gridId={gridId} columns={columns} offsets={offsets} totalWidth={totalWidth} active={active} activeContent={props.activeContent} header={props.header} headerSort={props.headerSort} />
