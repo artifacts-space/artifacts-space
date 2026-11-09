@@ -3,7 +3,7 @@
 import { type ClipboardEvent, type FocusEvent, type KeyboardEvent, type MouseEvent, type ReactNode, useEffect, useId, useMemo, useRef } from "react";
 
 import type { GridCell } from "@/lib/csv-edit-rules";
-import { type CellRange, type GridSelection, isSingleCell, selectionAfterKey, selectionRange } from "@/lib/grid-selection-rules";
+import { type CellRange, type GridSelection, isSingleCell, sameCell, selectionAfterKey, selectionRange } from "@/lib/grid-selection-rules";
 import { columnOffsets, keptCell, outsideSpan, revealCell, rowNumberWidth, rowsPerPage, sheetHeaderHeight, sheetRowHeight, withKept } from "@/lib/sheet-grid-rules";
 import { cn } from "@/lib/utils";
 
@@ -71,15 +71,16 @@ function headerDragProps(props: DataGridProps, dragging: ReturnType<typeof useCo
 }
 
 /**
- * Gives a hovered cell its full value as a tooltip, only when the cell cuts
+ * Gives a hovered cell or column header its full text as a tooltip, only when it cuts
  * its text off. It writes the title on the DOM node outside React: rows are
  * reused as the sheet scrolls, so this hover check is what keeps the title
  * true, rewriting or removing it every time the pointer comes over a cell.
  */
 function showClippedTitle(event: MouseEvent) {
   if (!(event.target instanceof Element)) return;
-  const cell = event.target.closest<HTMLElement>("[role=gridcell]");
-  const text = cell?.querySelector<HTMLElement>(":scope > .truncate");
+  const cell = event.target.closest<HTMLElement>("[role=gridcell], [role=columnheader]");
+  // The cell's text, or a column's name inside its header buttons. A cell being edited has none.
+  const text = cell?.querySelector<HTMLElement>(".truncate");
   if (!cell || !text) return;
   const value = text.textContent;
   if (value && text.scrollWidth > text.clientWidth) cell.title = value;
@@ -134,7 +135,9 @@ export function DataGrid(props: DataGridProps) {
   const ownId = useId();
   const gridId = props.gridId ?? ownId;
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const revealRef = useRef(false);
+  // A click picks a cell already in view; every other move (keys, a cell editor's Enter or Tab) scrolls to it.
+  const pointerMoveRef = useRef(false);
+  const shownActive = useRef(active);
   const baseOffsets = useOffsets(props.widths, columnCount);
   const dragging = useColumnDrag(scrollerRef, baseOffsets, props);
   const offsets = useOffsets(props.widths, columnCount, dragging.resize);
@@ -145,13 +148,21 @@ export function DataGrid(props: DataGridProps) {
 
   useEffect(() => {
     const scroller = scrollerRef.current;
-    if (!revealRef.current || !scroller) return;
-    revealRef.current = false;
+    const moved = !sameCell(shownActive.current, active);
+    shownActive.current = active;
+    const fromPointer = pointerMoveRef.current;
+    pointerMoveRef.current = false;
+    if (!moved || fromPointer || !scroller) return;
     const next = revealCell({ top: scroller.scrollTop, left: scroller.scrollLeft, width: scroller.clientWidth, height: scroller.clientHeight }, active, offsets);
     if (next.top !== scroller.scrollTop || next.left !== scroller.scrollLeft) scroller.scrollTo({ top: next.top, left: next.left });
   }, [active, offsets]);
 
-  const pointer = useGridPointer({ selection, onSelectionChange, onActiveClick: props.onActiveClick });
+  function selectByPointer(next: GridSelection) {
+    pointerMoveRef.current = true;
+    onSelectionChange(next);
+  }
+
+  const pointer = useGridPointer({ selection, onSelectionChange: selectByPointer, onActiveClick: props.onActiveClick });
   const { cell } = props;
   const isBlank = (at: GridCell) => at.row >= 0 && cell(at.row, at.column) === "";
 
@@ -168,7 +179,6 @@ export function DataGrid(props: DataGridProps) {
     const next = selectionAfterKey(event, selection, { rows: rowCount, columns: columnCount, page }, isBlank, props.tabMoves ?? false);
     if (next === null) return;
     event.preventDefault();
-    revealRef.current = true;
     onSelectionChange(next);
   }
 

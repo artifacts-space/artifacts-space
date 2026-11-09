@@ -3,7 +3,7 @@
 import { type MouseEvent, type PointerEvent, useRef } from "react";
 
 import type { GridCell } from "@/lib/csv-edit-rules";
-import { extendTo, type GridSelection, isSingleCell, singleCell } from "@/lib/grid-selection-rules";
+import { extendTo, type GridSelection, isSingleCell, sameCell, singleCell } from "@/lib/grid-selection-rules";
 
 /** The cell an element belongs to, from its `data-cell` attribute, or null. */
 export function cellOf(target: EventTarget | Element | null): GridCell | null {
@@ -15,7 +15,6 @@ export function cellOf(target: EventTarget | Element | null): GridCell | null {
   return { row, column };
 }
 
-const sameCell = (a: GridCell, b: GridCell) => a.row === b.row && a.column === b.column;
 
 /**
  * The body cell a mouse or pen press starts a selection on, or null: touch

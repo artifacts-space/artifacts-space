@@ -20,6 +20,11 @@ export interface CellRange {
   right: number;
 }
 
+/** Whether two cells are the same place. */
+export function sameCell(a: GridCell, b: GridCell): boolean {
+  return a.row === b.row && a.column === b.column;
+}
+
 /** A selection of one cell. */
 export function singleCell(cell: GridCell): GridSelection {
   return { anchor: cell, active: cell };
