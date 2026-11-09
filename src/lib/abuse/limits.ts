@@ -38,17 +38,20 @@ export const rateLimits = {
    * Only members can load an icon, so each person gets their own budget and
    * an office behind one address never shares one. Browsers keep each icon
    * for a day (teamIconCacheControl), so a member normally loads each one
-   * about once a day. A page shows at most a few dozen icons; one a second
-   * still covers 100 page loads an hour of 36 icons each with the cache off.
+   * about once a day. A page shows at most a few dozen icons; this still
+   * covers 30 page loads an hour of 36 icons each with the cache off. The
+   * route streams icons itself, so this also caps what one member costs:
+   * at most 1,200 x 512 KB (TEAM_ICON_STORED_MAX_BYTES), about 600 MB an
+   * hour, where a real icon is a few KB.
    */
-  teamIconByUser: { limit: 3600, windowSeconds: hour },
+  teamIconByUser: { limit: 1200, windowSeconds: hour },
   /**
    * Team icon views per network address per hour: an abuse backstop only,
    * for many accounts or signed-out requests from one address. A 500-person
-   * office whose members each load 100 icons in one hour (more than a cold
-   * cache on a busy morning) makes 50,000, under this.
+   * office whose members each load 50 icons in one hour (more than a cold
+   * cache on a busy morning) makes 25,000, under this.
    */
-  teamIconByNetwork: { limit: 60_000, windowSeconds: hour },
+  teamIconByNetwork: { limit: 30_000, windowSeconds: hour },
   /** Artifact page views (/artifact/<id>) per network address per hour. */
   artifactPageByNetwork: { limit: 1800, windowSeconds: hour },
   /** Counted page views (the view beacon) per network address per hour, across all artifacts. Over the limit, views are not counted; the page is unaffected. */

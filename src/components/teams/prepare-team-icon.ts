@@ -1,5 +1,5 @@
 import { browserImageEnv } from "@/components/images/prepare-image";
-import { centerSquare, TEAM_ICON_MAX_BYTES, TEAM_ICON_SIDE, teamIconSourceProblem } from "@/lib/teams/team-icon-rules";
+import { centerSquare, TEAM_ICON_SIDE, TEAM_ICON_STORED_MAX_BYTES, teamIconSourceProblem } from "@/lib/teams/team-icon-rules";
 
 /**
  * Prepares a picked image as a team icon in the browser: decoded upright,
@@ -38,7 +38,7 @@ export async function prepareTeamIcon(file: File): Promise<File> {
     context.imageSmoothingQuality = "high";
     context.drawImage(image.source, crop.x, crop.y, crop.side, crop.side, 0, 0, TEAM_ICON_SIDE, TEAM_ICON_SIDE);
     const blob = await encodeIcon(canvas);
-    if (!blob || blob.size > TEAM_ICON_MAX_BYTES) throw new Error("That image could not be prepared. Try another one.");
+    if (!blob || blob.size > TEAM_ICON_STORED_MAX_BYTES) throw new Error("That image could not be prepared. Try another one.");
     return new File([blob], blob.type === "image/webp" ? "team-icon.webp" : "team-icon.png", { type: blob.type });
   } finally {
     image.close();

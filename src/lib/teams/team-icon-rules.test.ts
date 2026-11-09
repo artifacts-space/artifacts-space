@@ -10,6 +10,7 @@ import {
   readWebp,
   TEAM_ICON_CACHE_SECONDS,
   TEAM_ICON_MAX_BYTES,
+  TEAM_ICON_STORED_MAX_BYTES,
   teamIconCacheControl,
   teamIconKey,
   teamIconRateLimitChecks,
@@ -140,10 +141,15 @@ describe("checkTeamIconBytes", () => {
     expect(checkTeamIconBytes(png(side, side)).ok).toBe(false);
   });
 
-  it("should refuse bytes over 2 MB even when they start like a PNG", () => {
-    const big = new Uint8Array(TEAM_ICON_MAX_BYTES + 1);
+  it("should refuse bytes over 512 KB even when they start like a PNG", () => {
+    const big = new Uint8Array(TEAM_ICON_STORED_MAX_BYTES + 1);
     big.set(png(256, 256));
-    expect(checkTeamIconBytes(big)).toEqual({ ok: false, error: "The icon can be at most 2 MB." });
+    expect(checkTeamIconBytes(big)).toEqual({ ok: false, error: "The icon can be at most 512 KB." });
+  });
+
+  it("should leave room for the largest icon the browser can draw, a 256 px PNG of noise", () => {
+    const worstCasePng = 256 * (256 * 4 + 1) + 1024;
+    expect(TEAM_ICON_STORED_MAX_BYTES).toBeGreaterThan(worstCasePng);
   });
 
   it("should refuse a JPEG, which the browser should have re-encoded", () => {

@@ -24,6 +24,10 @@ const { GET } = await import("./route");
 const iconId = "7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a";
 const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
 
+function memberIcon() {
+  return { body: new Response(pngBytes).body, size: pngBytes.length, type: "image/png", id: iconId };
+}
+
 function call(id: string, version: string | null = iconId) {
   const query = version === null ? "" : `?v=${version}`;
   const request = new Request(`http://localhost/api/teams/${id}/icon${query}`);
@@ -35,7 +39,7 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => undefined);
   mocks.limits.mockResolvedValue(null);
   mocks.session.mockResolvedValue({ user: { id: "user-1" } });
-  mocks.icon.mockResolvedValue({ bytes: pngBytes, type: "image/png", id: iconId });
+  mocks.icon.mockImplementation(() => Promise.resolve(memberIcon()));
 });
 
 describe("GET /api/teams/[id]/icon", () => {
@@ -44,6 +48,7 @@ describe("GET /api/teams/[id]/icon", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("image/png");
     expect(response.headers.get("Cache-Control")).toBe("private, max-age=86400, immutable");
+    expect(response.headers.get("Content-Length")).toBe("4");
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(pngBytes);
     expect(mocks.icon).toHaveBeenCalledWith("user-1", "team-1");
   });
@@ -68,7 +73,7 @@ describe("GET /api/teams/[id]/icon", () => {
 
   it("should never send the icon to a signed-in person outside the team", async () => {
     mocks.session.mockResolvedValue({ user: { id: "stranger" } });
-    mocks.icon.mockImplementation((viewerId: string) => Promise.resolve(viewerId === "user-1" ? { bytes: pngBytes, type: "image/png", id: iconId } : null));
+    mocks.icon.mockImplementation((viewerId: string) => Promise.resolve(viewerId === "user-1" ? memberIcon() : null));
     const response = await call("team-1");
     expect(response.status).toBe(404);
     expect(response.headers.get("Content-Type")).toBe("text/plain; charset=utf-8");

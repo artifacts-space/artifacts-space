@@ -195,20 +195,30 @@ export async function readObjectStart(config: R2Config, key: string, length: num
   return new Uint8Array(await response.arrayBuffer()).slice(0, length);
 }
 
+/** An object opened for streaming: its body and its exact size in bytes. */
+export interface ObjectStream {
+  body: ReadableStream<Uint8Array>;
+  size: number;
+}
+
 /**
- * A whole object's bytes, or null when it does not exist. Refuses (R2Error)
- * an object larger than `maxBytes`, so a caller never buffers more than it
- * expects. For small objects the server already checked, such as team icons.
+ * Opens an object for streaming, or null when it does not exist. R2 is
+ * asked for at most `maxBytes + 1` bytes (Range), and an object larger than
+ * `maxBytes`, or an answer without a length, is refused (R2Error 413), so a
+ * caller never passes on more than it expects and never holds the bytes in
+ * memory. For small objects the server already checked, such as team icons.
  */
-export async function readObject(config: R2Config, key: string, maxBytes: number): Promise<Uint8Array<ArrayBuffer> | null> {
-  const response = await send(config, "GET", "GET", key);
+export async function streamObject(config: R2Config, key: string, maxBytes: number): Promise<ObjectStream | null> {
+  const response = await send(config, "GET", "GET", key, { Range: `bytes=0-${String(maxBytes)}` });
   if (response.status === 404) return null;
   if (!response.ok) throw new R2Error("GET", response.status);
-  // 413 (too large), not R2's 200, so a size refusal never reads as an R2 outage in the logs.
-  if (Number(response.headers.get("content-length") ?? "0") > maxBytes) throw new R2Error("GET", 413);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.length > maxBytes) throw new R2Error("GET", 413);
-  return bytes;
+  const size = Number(response.headers.get("content-length") ?? "NaN");
+  if (!response.body || !Number.isInteger(size) || size > maxBytes) {
+    await response.body?.cancel().catch(() => undefined);
+    // 413 (too large), not R2's own status, so a size refusal never reads as an R2 outage in the logs.
+    throw new R2Error("GET", 413);
+  }
+  return { body: response.body, size };
 }
 
 /** Deletes an object. Deleting one that is already gone succeeds. */

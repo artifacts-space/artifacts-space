@@ -8,8 +8,16 @@ import { can, type TeamActor } from "./capability-rules";
  * picked file with the same rules the server uses on the upload.
  */
 
-/** Largest picked image and largest upload, in bytes (2 MB). */
+/** Largest picked image, in bytes (2 MB). The browser shrinks it before upload. */
 export const TEAM_ICON_MAX_BYTES = 2_097_152;
+
+/**
+ * Largest stored icon, in bytes (512 KB). The browser draws every icon at
+ * 256 x 256, and even a PNG of pure noise at that size is about 260 KB, so
+ * no real icon comes near it. Members load icons through this app (the
+ * route streams them), so the cap also bounds what one request can cost.
+ */
+export const TEAM_ICON_STORED_MAX_BYTES = 524_288;
 
 /** The side of the square the browser draws the icon at, in pixels. */
 export const TEAM_ICON_SIDE = 256;
@@ -139,12 +147,12 @@ export function readWebp(bytes: Uint8Array): TeamIconImage | null {
 
 /**
  * Checks an uploaded team icon by its bytes, never by its name or the type
- * the browser claims: a still PNG or WebP of at most 2 MB, square, between
+ * the browser claims: a still PNG or WebP of at most 512 KB, square, between
  * 16 and 256 pixels a side. Returns the picture, or why it was refused.
  */
 export function checkTeamIconBytes(bytes: Uint8Array): { ok: true; image: TeamIconImage } | { ok: false; error: string } {
   if (bytes.length === 0) return { ok: false, error: "That file is empty. Pick another image." };
-  if (bytes.length > TEAM_ICON_MAX_BYTES) return { ok: false, error: "The icon can be at most 2 MB." };
+  if (bytes.length > TEAM_ICON_STORED_MAX_BYTES) return { ok: false, error: "The icon can be at most 512 KB." };
   const image = readPng(bytes) ?? readWebp(bytes);
   if (!image) return { ok: false, error: "The icon must be a PNG or WebP image." };
   if (image.width !== image.height) return { ok: false, error: "The icon must be square." };

@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   limit: vi.fn(),
   putObject: vi.fn(),
   deleteObject: vi.fn(),
-  readObject: vi.fn(),
+  streamObject: vi.fn(),
 }));
 
 vi.mock("@/db", () => ({
@@ -22,7 +22,7 @@ vi.mock("@/lib/files/r2", () => ({
   r2ConfigFromEnv: () => ({ accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }),
   putObject: mocks.putObject,
   deleteObject: mocks.deleteObject,
-  readObject: mocks.readObject,
+  streamObject: mocks.streamObject,
 }));
 
 const { memberIconKeyQuery, memberTeamIcon, removeTeamIcon, saveTeamIcon } = await import("./team-icon");
@@ -100,36 +100,36 @@ describe("removeTeamIcon", () => {
 });
 
 describe("memberTeamIcon", () => {
-  const bytes = new Uint8Array([1, 2, 3]);
+  const object = { body: new ReadableStream<Uint8Array>(), size: 3 };
 
-  it("should read the icon for a member of the team, with the id its URL carries", async () => {
+  it("should stream the icon for a member of the team, capped at 512 KB, with the id its URL carries", async () => {
     mocks.limit.mockResolvedValue([{ logo: oldKey }]);
-    mocks.readObject.mockResolvedValue(bytes);
-    expect(await memberTeamIcon("user-1", "team-1")).toEqual({ bytes, type: "image/png", id: "7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a" });
-    expect(mocks.readObject).toHaveBeenCalledWith(expect.anything(), oldKey, 2_097_152);
+    mocks.streamObject.mockResolvedValue(object);
+    expect(await memberTeamIcon("user-1", "team-1")).toEqual({ ...object, type: "image/png", id: "7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a" });
+    expect(mocks.streamObject).toHaveBeenCalledWith(expect.anything(), oldKey, 524_288);
   });
 
   it("should never read the icon for someone outside the team or for a personal team, which the query returns no row for", async () => {
     mocks.limit.mockResolvedValue([]);
     expect(await memberTeamIcon("stranger", "team-1")).toBeNull();
-    expect(mocks.readObject).not.toHaveBeenCalled();
+    expect(mocks.streamObject).not.toHaveBeenCalled();
   });
 
   it("should never read a stored key that belongs to another team", async () => {
     mocks.limit.mockResolvedValue([{ logo: "team-icons/team-2/7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a.png" }]);
     expect(await memberTeamIcon("user-1", "team-1")).toBeNull();
-    expect(mocks.readObject).not.toHaveBeenCalled();
+    expect(mocks.streamObject).not.toHaveBeenCalled();
   });
 
   it("should return null when the team has no icon", async () => {
     mocks.limit.mockResolvedValue([{ logo: null }]);
     expect(await memberTeamIcon("user-1", "team-1")).toBeNull();
-    expect(mocks.readObject).not.toHaveBeenCalled();
+    expect(mocks.streamObject).not.toHaveBeenCalled();
   });
 
   it("should return null when the object is gone from storage", async () => {
     mocks.limit.mockResolvedValue([{ logo: oldKey }]);
-    mocks.readObject.mockResolvedValue(null);
+    mocks.streamObject.mockResolvedValue(null);
     expect(await memberTeamIcon("user-1", "team-1")).toBeNull();
   });
 });

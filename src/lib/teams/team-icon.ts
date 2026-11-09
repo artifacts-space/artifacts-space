@@ -5,10 +5,10 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { team, teamMember } from "@/db/schema";
-import { deleteObject, putObject, r2ConfigFromEnv, readObject } from "@/lib/files/r2";
+import { deleteObject, putObject, r2ConfigFromEnv, streamObject } from "@/lib/files/r2";
 import { UserFacingError } from "@/lib/user-facing-error";
 
-import { checkTeamIconBytes, parseTeamIconKey, TEAM_ICON_MAX_BYTES, teamIconKey, type TeamIconType } from "./team-icon-rules";
+import { checkTeamIconBytes, parseTeamIconKey, TEAM_ICON_STORED_MAX_BYTES, teamIconKey, type TeamIconType } from "./team-icon-rules";
 
 /**
  * Team icons in R2. The rules (team-icon-rules.ts) decide what is accepted
@@ -90,9 +90,10 @@ export function memberIconKeyQuery(db: Pick<ReturnType<typeof getDb>, "select">,
     .limit(1);
 }
 
-/** A member's view of the team icon: its bytes, type, and the id its URL carries as `v`. */
+/** A member's view of the team icon: its bytes as a stream, their size, its type, and the id its URL carries as `v`. */
 export interface MemberTeamIcon {
-  bytes: Uint8Array<ArrayBuffer>;
+  body: ReadableStream<Uint8Array>;
+  size: number;
   type: TeamIconType;
   id: string;
 }
@@ -101,7 +102,7 @@ export interface MemberTeamIcon {
  * The team's icon for `viewerId`, or null when they are not in the team, the
  * team is personal or has no icon, its stored key is not one this app made
  * for this team, or the object is gone. R2 is read only after the membership
- * check passes. Callers answer "not found" for null, so a team's icon never
+ * check passes, and the bytes are streamed, never held in memory. Callers answer "not found" for null, so a team's icon never
  * shows outside the team.
  */
 export async function memberTeamIcon(viewerId: string, teamId: string): Promise<MemberTeamIcon | null> {
@@ -109,6 +110,6 @@ export async function memberTeamIcon(viewerId: string, teamId: string): Promise<
   const key = row?.logo ?? null;
   const parsed = parseTeamIconKey(teamId, key);
   if (!parsed || !key) return null;
-  const bytes = await readObject(r2ConfigFromEnv(), key, TEAM_ICON_MAX_BYTES);
-  return bytes ? { bytes, type: parsed.type, id: parsed.id } : null;
+  const object = await streamObject(r2ConfigFromEnv(), key, TEAM_ICON_STORED_MAX_BYTES);
+  return object ? { ...object, type: parsed.type, id: parsed.id } : null;
 }
