@@ -7,7 +7,7 @@ import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult } from "@/lib/artifact-types";
 import { isTeamCapability } from "@/lib/teams/capability-rules";
 import { toggledCapabilities } from "@/lib/teams/permission-matrix-rules";
-import { capabilityChangeProblem, createRoleProblem, customRoleKey, customRoleNameProblem, deleteRoleProblem } from "@/lib/teams/role-admin-rules";
+import { capabilityChangeProblem, createRoleProblem, customRoleKey, customRoleNameMaxLength, customRoleNameProblem, deleteRoleProblem } from "@/lib/teams/role-admin-rules";
 import { cleanCapabilities, createCustomRole, deleteCustomRole, setRoleCapability } from "@/lib/teams/role-store";
 import type { TeamMembership } from "@/lib/teams/queries";
 
@@ -58,7 +58,7 @@ export async function updateRoleCapabilityAction(teamId: string, roleKey: string
   }
 }
 
-const newRoleSchema = z.object({ name: z.string().max(80), capabilities: capabilitiesSchema });
+const newRoleSchema = z.object({ name: z.string().trim().max(customRoleNameMaxLength), capabilities: capabilitiesSchema });
 
 /** Creates a custom role, between Member and Admin, with capabilities the viewer holds. */
 export async function createRoleAction(teamId: string, input: z.input<typeof newRoleSchema>): Promise<ActionResult<{ key: string }>> {
@@ -67,9 +67,10 @@ export async function createRoleAction(teamId: string, input: z.input<typeof new
     if (!loaded.ok) return loaded.result;
     const { membership, roles } = loaded;
     const parsed = newRoleSchema.parse(input);
-    const name = parsed.name.trim();
+    const { name } = parsed;
     const capabilities = cleanCapabilities(parsed.capabilities);
-    const problem = customRoleNameProblem(name) ?? createRoleProblem(membership, capabilities);
+    const customRoleCount = [...roles.values()].filter((role) => !role.builtIn).length;
+    const problem = customRoleNameProblem(name) ?? createRoleProblem(membership, capabilities, customRoleCount);
     if (problem) return { success: false, error: problem };
     const key = customRoleKey(name);
     const taken = roles.get(key);

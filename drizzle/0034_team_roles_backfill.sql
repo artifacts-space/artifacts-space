@@ -1,18 +1,19 @@
 -- Backfill: every existing team gets the built-in roles with today's rules
 -- (src/lib/teams/capability-rules.ts, defaultRoleCapabilities), so nothing
--- anyone can do changes. Inserts only, so it never errors, but run it only
--- before any team edits its roles: once a team has narrowed a built-in role,
--- running it again would quietly put the default grants back, with no audit
--- row. A test checks that these rows equal the defaults.
-INSERT INTO "team_role" ("id", "team_id", "key", "name", "built_in")
-SELECT gen_random_uuid()::text, "team"."id", "roles"."key", "roles"."name", true
-FROM "team"
-CROSS JOIN (VALUES ('owner', 'Owner'), ('admin', 'Admin'), ('member', 'Member'), ('agent', 'Agent')) AS "roles" ("key", "name")
-ON CONFLICT ("team_id", "key") DO NOTHING;
---> statement-breakpoint
+-- anyone can do changes. One statement: capabilities are seeded only for the
+-- role rows this statement creates, so running it again never puts back a
+-- grant a team removed. A test checks that these rows equal the defaults.
+WITH "created" AS (
+  INSERT INTO "team_role" ("id", "team_id", "key", "name", "built_in")
+  SELECT gen_random_uuid()::text, "team"."id", "roles"."key", "roles"."name", true
+  FROM "team"
+  CROSS JOIN (VALUES ('owner', 'Owner'), ('admin', 'Admin'), ('member', 'Member'), ('agent', 'Agent')) AS "roles" ("key", "name")
+  ON CONFLICT ("team_id", "key") DO NOTHING
+  RETURNING "id", "key"
+)
 INSERT INTO "team_role_capability" ("role_id", "capability")
-SELECT "team_role"."id", "defaults"."capability"
-FROM "team_role"
+SELECT "created"."id", "defaults"."capability"
+FROM "created"
 JOIN (VALUES
   ('owner', 'share.team'),
   ('owner', 'share.link'),
@@ -43,6 +44,5 @@ JOIN (VALUES
   ('admin', 'reports.handle'),
   ('member', 'analytics.view'),
   ('agent', 'analytics.view')
-) AS "defaults" ("key", "capability") ON "defaults"."key" = "team_role"."key"
-WHERE "team_role"."built_in"
+) AS "defaults" ("key", "capability") ON "defaults"."key" = "created"."key"
 ON CONFLICT DO NOTHING;

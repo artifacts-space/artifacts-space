@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TeamRoleView } from "@/lib/teams/capabilities";
 import { builtInRoleNames, defaultRoleCapabilities, type BuiltInRoleKey, type TeamCapability } from "@/lib/teams/capability-rules";
+import { teamLimits } from "@/lib/teams/limits";
 import type { TeamMembership } from "@/lib/teams/queries";
 import type * as RoleStore from "@/lib/teams/role-store";
 
@@ -196,6 +197,18 @@ describe("createRoleAction", () => {
     mocks.membership.mockResolvedValue(viewer("designer"));
     await expect(actions.createRoleAction("team-1", { name: "Brand Lead", capabilities: ["themes.manage"] })).resolves.toMatchObject({ success: false });
     expectNothingWritten();
+  });
+
+  it("should refuse a new role when the team already has the most custom roles it can hold", async () => {
+    mocks.membership.mockResolvedValue(viewer("owner"));
+    const fillerKeys = Array.from({ length: teamLimits.maxCustomRoles - 2 }, (_, index) => `filler-${String(index)}`);
+    for (const key of fillerKeys) teamRoles.set(key, { id: `role-${key}`, key, name: key, builtIn: false, capabilities: [] });
+    try {
+      await expect(actions.createRoleAction("team-1", { name: "Brand Lead", capabilities: [] })).resolves.toEqual({ success: false, error: `A team can have ${String(teamLimits.maxCustomRoles)} custom roles. Delete one to make another.` });
+      expectNothingWritten();
+    } finally {
+      for (const key of fillerKeys) teamRoles.delete(key);
+    }
   });
 
   it("should create and audit a role the viewer may make", async () => {

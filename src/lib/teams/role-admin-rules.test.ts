@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { defaultActor, defaultRoleCapabilities, teamCapabilities, type TeamActor, type TeamCapability } from "./capability-rules";
+import { teamLimits } from "./limits";
 import {
   assignRoleProblem,
   capabilityChangeProblem,
@@ -87,15 +88,20 @@ describe("capabilityChangeProblem, for every capability", () => {
 
 describe("createRoleProblem and deleteRoleProblem", () => {
   it("should let an admin create a custom role with capabilities the admin holds", () => {
-    expect(createRoleProblem(admin, ["themes.manage", "analytics.view"])).toBeNull();
+    expect(createRoleProblem(admin, ["themes.manage", "analytics.view"], 0)).toBeNull();
   });
 
   it("should refuse a custom role with a capability the creator lacks", () => {
-    expect(createRoleProblem(admin, ["settings.team"])).not.toBeNull();
+    expect(createRoleProblem(admin, ["settings.team"], 0)).not.toBeNull();
   });
 
   it("should refuse a custom-role holder creating a role at their own level", () => {
-    expect(createRoleProblem(lead, [])).not.toBeNull();
+    expect(createRoleProblem(lead, [], 0)).not.toBeNull();
+  });
+
+  it("should refuse a new custom role when the team has the most it can hold", () => {
+    expect(createRoleProblem(admin, ["analytics.view"], teamLimits.maxCustomRoles - 1)).toBeNull();
+    expect(createRoleProblem(admin, ["analytics.view"], teamLimits.maxCustomRoles)).toMatch(/Delete one/);
   });
 
   it("should never delete a built-in role", () => {

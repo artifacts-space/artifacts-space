@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { capabilityLabels } from "@/lib/teams/capability-labels";
 import type { TeamCapability } from "@/lib/teams/capability-rules";
-import { customRoleNameProblem } from "@/lib/teams/role-admin-rules";
+import { customRoleNameMaxLength, customRoleNameProblem } from "@/lib/teams/role-admin-rules";
 
 import { FormError } from "./form-error";
 import { useTeamAction } from "./use-team-action";
@@ -47,7 +47,7 @@ function NewRoleForm({ teamId, grantable, onCreated }: { teamId: string; grantab
     <form onSubmit={(event) => void submit(event)} noValidate className="grid gap-4">
       <div className="grid gap-2">
         <Label htmlFor="role-name">Name</Label>
-        <Input id="role-name" value={name} onChange={(event) => { setName(event.target.value); setError(""); }} placeholder="Designer" maxLength={40} className="h-9" />
+        <Input id="role-name" value={name} onChange={(event) => { setName(event.target.value); setError(""); }} placeholder="Designer" maxLength={customRoleNameMaxLength} className="h-9" />
       </div>
       <fieldset className="grid gap-2">
         <legend className="mb-2 text-sm font-medium">What it can do</legend>

@@ -1,4 +1,5 @@
 import { can, isBuiltInRoleKey, lockedReason, roleRank, type TeamActor, type TeamCapability } from "./capability-rules";
+import { teamLimits } from "./limits";
 
 /**
  * Pure rules for changing roles: who may edit a role's capabilities, create
@@ -56,8 +57,11 @@ export function capabilityChangeProblem(actor: TeamActor | null, roleKey: string
 }
 
 /** Why the actor may not create a custom role with these capabilities, or null. Custom roles rank between Member and Admin. */
-export function createRoleProblem(actor: TeamActor | null, capabilities: readonly TeamCapability[]): string | null {
-  return capabilityChangeProblem(actor, "custom", [], capabilities);
+export function createRoleProblem(actor: TeamActor | null, capabilities: readonly TeamCapability[], customRoleCount: number): string | null {
+  const problem = capabilityChangeProblem(actor, "custom", [], capabilities);
+  if (problem) return problem;
+  if (customRoleCount >= teamLimits.maxCustomRoles) return `A team can have ${String(teamLimits.maxCustomRoles)} custom roles. Delete one to make another.`;
+  return null;
 }
 
 /** Why the actor may not delete this role, or null. Only custom roles below the actor can go. */
@@ -152,11 +156,14 @@ export function customRoleKey(name: string): string {
   return name.toLowerCase().replace(keyPattern, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
 
+/** The longest custom role name. The team_role name check constraint uses the same number. */
+export const customRoleNameMaxLength = 40;
+
 /** Why a custom role name cannot be used, or null. Built-in names are taken. */
 export function customRoleNameProblem(name: string): string | null {
   const trimmed = name.trim();
   if (!trimmed) return "Give the role a name.";
-  if (trimmed.length > 40) return "Use 40 characters or fewer for the name.";
+  if (trimmed.length > customRoleNameMaxLength) return `Use ${String(customRoleNameMaxLength)} characters or fewer for the name.`;
   const key = customRoleKey(trimmed);
   if (!key) return "Include at least one letter from A to Z or a number in the name.";
   if (isBuiltInRoleKey(key)) return "That name belongs to a built-in role.";
