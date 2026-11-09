@@ -16,7 +16,7 @@ interface EditSurfaceProps {
   updatedAt: string;
   /** Link and public artifacts: edits and restores may wait for approval. */
   reviewed: boolean;
-  /** The page's "Full width" setting, shown (not yet changeable) while the editable copy loads. */
+  /** The page's "Full width" setting: shown (not yet changeable) while the editable copy loads, then what the header's checkbox ticks. */
   fullWidth: boolean;
   files: readonly FileDto[];
   /** The artifact as readers see it. Its title, summary, and body unlock once the editable copy loads. */

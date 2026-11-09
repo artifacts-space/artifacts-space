@@ -151,6 +151,7 @@ test("should widen the page from Full width in the header's ⋯ and keep it afte
   await expect(toggle).toHaveAttribute("aria-checked", "false");
   await toggle.click();
   await expect(toggle, "the item shows it is saving").toHaveAttribute("aria-busy", "true");
+  await expect(toggle, "screen readers hear it is busy").toHaveAccessibleName("Full width, please wait");
   await expect(toggle, "the tick waits for the page").toHaveAttribute("aria-checked", "false");
   release();
   await expect(main).toHaveAttribute("data-full-width", "true");

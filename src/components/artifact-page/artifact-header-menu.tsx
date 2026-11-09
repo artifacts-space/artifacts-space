@@ -88,7 +88,7 @@ function SaveProblemItems({ save }: { save: SaveIndicatorState | undefined }) {
 function FullWidthItem({ control }: { control: FullWidthControl | undefined }) {
   if (!control) return null;
   return (
-    <DropdownMenuCheckboxItem checked={control.checked} disabled={control.pending} aria-busy={control.pending} onCheckedChange={control.onChange} className="py-2">
+    <DropdownMenuCheckboxItem checked={control.checked} disabled={control.pending} aria-busy={control.pending} aria-label={control.pending ? `${FULL_WIDTH_LABEL}, please wait` : FULL_WIDTH_LABEL} onCheckedChange={control.onChange} className="py-2">
       {control.pending ? <IconLoader2 aria-hidden className="animate-spin motion-reduce:animate-none" /> : <IconArrowsHorizontal aria-hidden />} {FULL_WIDTH_LABEL}
     </DropdownMenuCheckboxItem>
   );
