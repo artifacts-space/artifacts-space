@@ -1,9 +1,9 @@
-import { eq, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
+import { eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { agent, artifact, user } from "@/db/schema";
 import { canReadSubject } from "@/lib/access";
+import { accountCreatedField, accountOwner } from "@/lib/account-age";
 import { isPublicId } from "@/lib/public-id";
 import { isSearchIndexable } from "@/lib/search/search-rules";
 
@@ -14,11 +14,6 @@ import { isSearchIndexable } from "@/lib/search/search-rules";
  * author's account is (the owner's, for an agent; see src/lib/account-age.ts).
  */
 
-const owner = alias(user, "owner");
-
-/** The author's account creation time, or null when the author is gone. */
-const accountCreated = sql<Date | null>`coalesce(${owner.createdAt}, ${user.createdAt})`.mapWith((value: string | Date | null) => (value === null ? null : new Date(value)));
-
 /**
  * The query behind checkArtifactPage. Joins with an alias, so every column
  * is qualified (see the correlated-subquery tripwire in AGENTS.md). The joins
@@ -26,11 +21,11 @@ const accountCreated = sql<Date | null>`coalesce(${owner.createdAt}, ${user.crea
  */
 export function pageCheckQuery(db: Pick<ReturnType<typeof getDb>, "select">, publicId: string) {
   return db
-    .select({ userId: artifact.userId, visibility: artifact.visibility, teamId: artifact.teamId, showInSearch: artifact.showInSearch, accountCreatedAt: accountCreated })
+    .select({ userId: artifact.userId, visibility: artifact.visibility, teamId: artifact.teamId, showInSearch: artifact.showInSearch, accountCreatedAt: accountCreatedField() })
     .from(artifact)
     .leftJoin(user, eq(user.id, artifact.userId))
     .leftJoin(agent, eq(agent.userId, user.id))
-    .leftJoin(owner, eq(owner.id, agent.ownerId))
+    .leftJoin(accountOwner, eq(accountOwner.id, agent.ownerId))
     .where(eq(artifact.publicId, publicId))
     .limit(1);
 }
