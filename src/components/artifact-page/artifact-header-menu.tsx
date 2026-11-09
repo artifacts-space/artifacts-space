@@ -80,12 +80,16 @@ function SaveProblemItems({ save }: { save: SaveIndicatorState | undefined }) {
   );
 }
 
-/** The "Full width" checkbox; it waits (disabled) while the editable copy loads or a change is saving. */
+/**
+ * The "Full width" checkbox; it waits (disabled, with a spinner) while the
+ * editable copy loads or a change saves and the page catches up. The tick
+ * moves only when the page has the new width.
+ */
 function FullWidthItem({ control }: { control: FullWidthControl | undefined }) {
   if (!control) return null;
   return (
-    <DropdownMenuCheckboxItem checked={control.checked} disabled={control.pending} onCheckedChange={control.onChange} className="py-2">
-      <IconArrowsHorizontal /> {FULL_WIDTH_LABEL}
+    <DropdownMenuCheckboxItem checked={control.checked} disabled={control.pending} aria-busy={control.pending} onCheckedChange={control.onChange} className="py-2">
+      {control.pending ? <IconLoader2 className="animate-spin" /> : <IconArrowsHorizontal />} {FULL_WIDTH_LABEL}
     </DropdownMenuCheckboxItem>
   );
 }

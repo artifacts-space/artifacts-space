@@ -138,11 +138,24 @@ test("should widen the page from Full width in the header's ⋯ and keep it afte
   const main = page.locator("main");
   await expect(main).toHaveAttribute("data-full-width", "false");
 
+  await expect(page.getByRole("textbox", { name: "Title" }), "the editor is ready").toBeVisible();
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  // Hold the width save so the menu can be read while it waits.
+  await page.route(`**/artifact/${publicId}`, async (route) => {
+    if (route.request().method() === "POST") await held;
+    await route.fallback();
+  });
   await moreActions(page).click();
   const toggle = page.getByRole("menuitemcheckbox", { name: "Full width" });
   await expect(toggle).toHaveAttribute("aria-checked", "false");
   await toggle.click();
+  await expect(toggle, "the item shows it is saving").toHaveAttribute("aria-busy", "true");
+  await expect(toggle, "the tick waits for the page").toHaveAttribute("aria-checked", "false");
+  release();
   await expect(main).toHaveAttribute("data-full-width", "true");
+  await expect(toggle).toHaveAttribute("aria-busy", "false");
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("textbox", { name: "Title" }), "the page stays editable").toHaveValue(title);
   expect(await main.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(960);
 
