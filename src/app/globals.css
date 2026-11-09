@@ -269,7 +269,13 @@
    * Switches (src/components/ui/switch.tsx): a green track with a white thumb
    * when on; when off, the card 8% toward the ink with a muted grey thumb.
    * The on track keeps 3:1 against the card, and each thumb 3:1 against its
-   * track. Themes derive the same four (src/lib/themes/derive.ts).
+   * track, at rest and hovered. Themes derive the same four
+   * (src/lib/themes/derive.ts).
+   *
+   * The off track is deliberately quiet: about 1.2:1 on the card, under the
+   * 3:1 asked of non-text UI. The grey thumb (3:1 on the track) and its place
+   * on the left carry "this is a switch, and it is off"; the --input hairline
+   * edge only helps. This follows the mockup Charles asked for.
    */
   --switch-on: oklch(0.56 0.15 150);
   --switch-on-thumb: oklch(1 0 0);

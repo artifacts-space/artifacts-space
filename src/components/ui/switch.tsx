@@ -27,10 +27,11 @@ function Switch({
         "peer group/switch relative inline-flex shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-out outline-none motion-reduce:transition-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring aria-invalid:ring-2 aria-invalid:ring-destructive",
         // All in rem, so the thumb keeps its inset when the reader raises the default font size.
         "data-[size=default]:h-6 data-[size=default]:w-11 data-[size=default]:p-[0.1875rem] data-[size=sm]:h-[1.125rem] data-[size=sm]:w-8 data-[size=sm]:p-[0.125rem]",
-        // Hover deepens the on track in both modes (toward the ink in light, toward the page in dark), so the white thumb never drops under 3:1.
-        "data-checked:bg-switch-on data-checked:hover:bg-[color-mix(in_oklch,var(--switch-on),var(--foreground)_10%)] dark:data-checked:hover:bg-[color-mix(in_oklch,var(--switch-on),var(--background)_10%)]",
-        "data-unchecked:bg-switch-off data-unchecked:inset-ring data-unchecked:inset-ring-input data-unchecked:hover:bg-[color-mix(in_oklch,var(--switch-off),var(--foreground)_6%)]",
-        "data-disabled:cursor-not-allowed data-disabled:opacity-50 data-disabled:hover:data-checked:bg-switch-on dark:data-disabled:hover:data-checked:bg-switch-on data-disabled:hover:data-unchecked:bg-switch-off",
+        // Hover deepens the on track in both modes (toward the ink in light, toward the page in dark), so the white thumb never drops
+        // under 3:1. Themes derive their tokens with these tints in mind (src/lib/themes/derive.ts); keep the two in step.
+        "data-checked:bg-switch-on data-checked:hover:not-data-disabled:bg-[color-mix(in_oklch,var(--switch-on),var(--foreground)_10%)] dark:data-checked:hover:not-data-disabled:bg-[color-mix(in_oklch,var(--switch-on),var(--background)_10%)]",
+        "data-unchecked:bg-switch-off data-unchecked:inset-ring data-unchecked:inset-ring-input data-unchecked:hover:not-data-disabled:bg-[color-mix(in_oklch,var(--switch-off),var(--foreground)_6%)]",
+        "data-disabled:cursor-not-allowed data-disabled:opacity-50",
         className
       )}
       {...props}

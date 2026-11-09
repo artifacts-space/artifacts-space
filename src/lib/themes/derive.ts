@@ -1,4 +1,4 @@
-import { ensureContrast, formatOklch, mixOklch, parseColor, type Oklch } from "./color";
+import { contrastRatio, ensureContrast, formatOklch, mixOklch, parseColor, relativeLuminance, type Oklch } from "./color";
 import type { ThemeColors } from "./schema";
 
 /**
@@ -150,20 +150,45 @@ const switchOffTint = 0.08;
 const switchMinimum = 3.05;
 
 /**
+ * The hover tints in src/components/ui/switch.tsx; keep them in step. The on
+ * track mixes 10% toward the ink in light and toward the page in dark (it
+ * deepens in both), and the off track mixes 6% toward the ink.
+ */
+const switchOnHover = 0.1;
+const switchOffHover = 0.06;
+
+/** Moves `color`'s lightness away from `background` until `passes` holds, like ensureContrast but for a test across several states. */
+function holdApart(color: Oklch, background: Oklch, passes: (candidate: Oklch) => boolean): Oklch {
+  const direction = relativeLuminance(background) > 0.18 ? -1 : 1;
+  let candidate = color;
+  for (let step = 0; step < 200 && !passes(candidate); step += 1) {
+    candidate = { ...candidate, l: Math.min(1, Math.max(0, candidate.l + direction * 0.005)) };
+  }
+  return candidate;
+}
+
+/**
  * Switch colors on the themed card: the site's green re-lit until the on
- * track reads at 3:1 on the card, the off track a tint of the card, and each
- * thumb re-lit until it reads at 3:1 on its own track.
+ * track reads at 3:1 on the card, at rest and hovered; the off track a tint
+ * of the card; and each thumb re-lit until it reads at 3:1 on its own track,
+ * at rest and hovered.
  */
 export function switchTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
   const card = read(colors.card);
+  const ink = read(colors.foreground);
   const site = siteSwitch[mode];
-  const on = ensureContrast(read(site.on), card, switchMinimum);
-  const off = mixOklch(card, read(colors.foreground), switchOffTint);
+  const deepen = (track: Oklch) => mixOklch(track, mode === "light" ? ink : read(colors.background), switchOnHover);
+  const on = holdApart(read(site.on), card, (track) => [track, deepen(track)].every((state) => contrastRatio(state, card) >= switchMinimum));
+  const off = mixOklch(card, ink, switchOffTint);
+  const onTracks = [on, deepen(on)];
+  const offHover = mixOklch(off, ink, switchOffHover);
+  const offTracks = [off, offHover];
+  const readsOn = (tracks: Oklch[]) => (thumb: Oklch) => tracks.every((track) => contrastRatio(thumb, track) >= switchMinimum);
   return {
     "--switch-on": formatOklch(on),
-    "--switch-on-thumb": formatOklch(ensureContrast(read(site.onThumb), on, switchMinimum)),
+    "--switch-on-thumb": formatOklch(holdApart(read(site.onThumb), on, readsOn(onTracks))),
     "--switch-off": formatOklch(off),
-    "--switch-off-thumb": formatOklch(ensureContrast(read(site.offThumb), off, switchMinimum)),
+    "--switch-off-thumb": formatOklch(holdApart(read(site.offThumb), offHover, readsOn(offTracks))),
   };
 }
 
