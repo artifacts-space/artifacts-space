@@ -15,7 +15,7 @@ export const capabilityLabels: Record<TeamCapability, { label: string; descripti
   "analytics.view": { label: "See views", description: "See how often artifacts shared through the team are read." },
   "artifacts.withdraw": { label: "Withdraw others' sharing", description: "Make a teammate's shared artifact private again. Only its author deletes it." },
   "reports.handle": { label: "Handle reports", description: "Review what readers report, and dismiss it or withdraw sharing." },
-  "settings.team": { label: "Change team settings", description: "Rename the team, and decide whether team sharing needs approval." },
+  "settings.team": { label: "Change team settings", description: "Rename the team, set its icon, and decide whether team sharing needs approval." },
 };
 
 /** Sharing capabilities: without one, a member still shares, after approval. */

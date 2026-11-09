@@ -33,6 +33,8 @@ export const rateLimits = {
   readByToken: { limit: 1800, windowSeconds: hour },
   /** File views and downloads (/api/files) per network address per hour. */
   fileDownloadByNetwork: { limit: 3600, windowSeconds: hour },
+  /** Team icon views (/api/teams/<id>/icon) per network address per hour: one per team on every workspace page, so kept apart from file views. */
+  teamIconByNetwork: { limit: 7200, windowSeconds: hour },
   /** Artifact page views (/artifact/<id>) per network address per hour. */
   artifactPageByNetwork: { limit: 1800, windowSeconds: hour },
   /** Counted page views (the view beacon) per network address per hour, across all artifacts. Over the limit, views are not counted; the page is unaffected. */
@@ -116,6 +118,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   readByUser: "You have read a lot of artifacts in the last hour.",
   readByToken: "This connection has read a lot in the last hour.",
   fileDownloadByNetwork: "Your network has opened a lot of files in the last hour.",
+  teamIconByNetwork: "Your network has loaded a lot of team icons in the last hour.",
   artifactPageByNetwork: "Your network has opened a lot of artifact pages in the last hour.",
   viewByNetwork: "Your network has opened a lot of artifact pages in the last hour, so further views are not counted.",
   viewByNetworkArtifact: "Your network has opened this artifact a lot in the last hour, so further views are not counted.",

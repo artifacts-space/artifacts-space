@@ -16,7 +16,7 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
   const viewer = await loadWorkspaceViewer(session.user);
   if (!viewer.usernameConfirmed) return <UsernameOnboarding suggestion={viewer.username} />;
 
-  const teams = viewer.teams.map(({ slug, name, personal }) => ({ slug, name, personal }));
+  const teams = viewer.teams.map(({ slug, name, personal, iconUrl }) => ({ slug, name, personal, iconUrl }));
   const [unreadNotifications, skippedConfirmations] = await Promise.all([
     countUnreadNotifications(session.user.id).catch(() => 0),
     // Without the list, every confirmation shows. That is the safe side.

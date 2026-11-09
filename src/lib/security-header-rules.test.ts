@@ -36,6 +36,12 @@ describe("securityHeaderRules", () => {
     expect(headers.get("referrer-policy")).toBe("no-referrer");
   });
 
+  it("should send no Referer to R2 when a team icon redirects, and still forbid framing", () => {
+    const headers = headersFor("/api/teams/team-1/icon");
+    expect(headers.get("referrer-policy")).toBe("no-referrer");
+    expect(headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
+  });
+
   it("should keep the sandbox on raw content when the site-wide policy also matches", () => {
     const policy = headersFor("/artifact/abc123/raw").get("content-security-policy");
     expect(policy).toBe(rawContentPolicy);

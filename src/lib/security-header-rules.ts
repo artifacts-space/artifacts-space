@@ -90,6 +90,8 @@ export function securityHeaderRules(): HeaderRule[] {
       source: "/api/files/:path*",
       headers: [...sameOriginFraming, { key: "Referrer-Policy", value: "no-referrer" }],
     },
+    // Team icons redirect to a short-lived R2 link too: no Referer to R2. Shown in <img>, so the site-wide framing rule stays.
+    { source: "/api/teams/:id/icon", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
     { source: "/artifact/:publicId/raw", headers: [{ key: "Content-Security-Policy", value: rawContentPolicy }] },
   ];
 }

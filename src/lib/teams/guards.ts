@@ -40,14 +40,18 @@ export function cleanTeamName(name: unknown) {
   return trimmed;
 }
 
-/** Checks a new team's slug and fills in the fields only the server may set. */
+/**
+ * Checks a new team's slug and fills in the fields only the server may set.
+ * A new team never starts with an icon: `logo` holds a storage key that
+ * only the team icon upload writes (team-icon.ts).
+ */
 export async function prepareNewTeam(data: { name?: unknown; slug?: unknown }, userId: string) {
   const name = cleanTeamName(data.name);
   const slug = cleanHandleInput(typeof data.slug === "string" ? data.slug : "");
   const problem = validateHandle(slug);
   if (problem) reject(problem);
   if (!(await isHandleAvailable(slug))) reject("That team URL is taken. Try another one.");
-  return { name, slug, personal: false, createdBy: userId };
+  return { name, slug, personal: false, createdBy: userId, logo: null };
 }
 
 /** Team settings a team update may change. Anything else is refused, so a new field is never open by accident. */

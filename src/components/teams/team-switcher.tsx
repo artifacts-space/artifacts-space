@@ -1,6 +1,6 @@
 "use client";
 
-import { IconChevronDown, IconPlus, IconUser, IconUsers, IconUsersGroup } from "@tabler/icons-react";
+import { IconChevronDown, IconPlus, IconUser, IconUsers } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -14,11 +14,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+import { TeamIcon } from "./team-icon";
+
 /** The fields of a team the header needs. */
 export interface HeaderTeam {
   slug: string;
   name: string;
   personal: boolean;
+  /** The members-only icon URL, or null for the monogram. */
+  iconUrl: string | null;
 }
 
 /** Header menu: open a team's artifacts or its page, or create a team. */
@@ -46,7 +50,7 @@ export function TeamSwitcher({ teams, active }: { teams: HeaderTeam[]; active: b
           ) : (
             shared.map((team) => (
               <DropdownMenuItem key={team.slug} onClick={() => { router.push(`/app?team=${encodeURIComponent(team.slug)}`); }} className="px-2 py-2">
-                <IconUsersGroup /> <span className="truncate">{team.name}</span>
+                <TeamIcon name={team.name} iconUrl={team.iconUrl} size={20} className="rounded" /> <span className="truncate">{team.name}</span>
               </DropdownMenuItem>
             ))
           )}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { amzDate, downloadSigningTime, presignDownload, presignUpload, presignUrl, r2ConfigFromEnv, r2ObjectUrl, type R2Config } from "./r2";
+import { amzDate, downloadSigningTime, parseEndpoint, presignDownload, presignUpload, presignUrl, r2ConfigFromEnv, r2ObjectUrl, type R2Config } from "./r2";
 
 const config: R2Config = {
   accountId: "0123456789abcdef0123456789abcdef",
@@ -83,5 +83,26 @@ describe("helpers", () => {
 
   it("should name every missing variable when the config is incomplete", () => {
     expect(() => r2ConfigFromEnv({ NODE_ENV: "test", R2_BUCKET: "b" })).toThrow("R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY");
+  });
+});
+
+describe("endpoint override", () => {
+  const env = { NODE_ENV: "test" as const, R2_ACCOUNT_ID: "acct", R2_BUCKET: "bucket", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret" };
+
+  it("should use the account's R2 endpoint when no override is set", () => {
+    expect(r2ObjectUrl(r2ConfigFromEnv(env), "files/a/b.png").origin).toBe("https://acct.r2.cloudflarestorage.com");
+  });
+
+  it("should use a local endpoint with the bucket in the path when one is set", () => {
+    const url = r2ObjectUrl(r2ConfigFromEnv({ ...env, R2_ENDPOINT: "http://localhost:9000" }), "files/a/b.png");
+    expect(url.toString()).toBe("http://localhost:9000/bucket/files/a/b.png");
+  });
+
+  it.each(["http://storage.example.com", "ftp://localhost:21", "not a url", "https://example.com/path", "https://user:pass@example.com"])("should refuse the endpoint %s", (value) => {
+    expect(() => parseEndpoint(value)).toThrow();
+  });
+
+  it("should accept an https endpoint anywhere", () => {
+    expect(parseEndpoint("https://eu.example.com/")).toBe("https://eu.example.com");
   });
 });

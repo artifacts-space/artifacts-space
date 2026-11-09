@@ -8,6 +8,7 @@ import { can } from "@/lib/teams/capability-rules";
 import type { PermissionAuditView } from "@/lib/teams/role-store";
 import { availableArtifactViews, availableTeamTabs, type ArtifactView, type TeamTab, type TeamTabAccess, type TeamTabSelection } from "@/lib/teams/team-tabs-rules";
 import type { TeamThemeSettings } from "@/lib/themes/team-presets";
+import { canManageTeamIcon } from "@/lib/teams/team-icon-rules";
 import { canManageTeamThemes } from "@/lib/themes/team-preset-rules";
 import type { PendingEditView } from "@/lib/versions/queries";
 
@@ -18,6 +19,8 @@ import { PermissionsPanel } from "./permissions-panel";
 import { ReportsList } from "./reports-list";
 import { Section } from "./section";
 import { SharedArtifactsTable } from "./shared-artifacts-table";
+import { TeamIcon } from "./team-icon";
+import { TeamIconControl } from "./team-icon-control";
 import { TeamTabs, type TabPanel } from "./team-tabs";
 import { TeamThemes } from "./team-themes";
 import { LeaveTeamButton } from "./team-settings";
@@ -52,16 +55,24 @@ export function teamTabAccess(team: TeamMembership, openReports: number): TeamTa
 function TeamHeader({ team }: { team: TeamMembership }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <h1 className="truncate text-xl font-medium tracking-[-0.01em]">{team.name}</h1>
-          {team.personal ? <Badge variant="secondary">Personal</Badge> : null}
+      <div className="flex min-w-0 items-center gap-3">
+        <TeamIcon name={team.name} iconUrl={team.iconUrl} size={48} className="text-lg" />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="truncate text-xl font-medium tracking-[-0.01em]">{team.name}</h1>
+            {team.personal ? <Badge variant="secondary">Personal</Badge> : null}
+          </div>
+          <p className="mt-1 text-md text-muted-foreground">
+            <span className="font-mono">/teams/{team.slug}</span> · You are {team.roleName.toLowerCase()}
+          </p>
         </div>
-        <p className="mt-1 text-md text-muted-foreground">
-          <span className="font-mono">/teams/{team.slug}</span> · You are {team.roleName.toLowerCase()}
-        </p>
       </div>
-      {team.personal ? null : <LeaveTeamButton teamId={team.id} teamName={team.name} />}
+      {team.personal ? null : (
+        <div className="flex flex-wrap items-center gap-2">
+          {canManageTeamIcon(team) ? <TeamIconControl teamId={team.id} teamName={team.name} iconUrl={team.iconUrl} /> : null}
+          <LeaveTeamButton teamId={team.id} teamName={team.name} />
+        </div>
+      )}
     </div>
   );
 }
