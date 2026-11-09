@@ -35,6 +35,13 @@ function heightOf(box: Locator) {
   return box.evaluate((element) => Math.round(element.getBoundingClientRect().height));
 }
 
+/** How far the sidebar handle's left edge is from the sidebar's right edge, in pixels. */
+async function sidebarEdgeGap(page: Page) {
+  const [handle, aside] = await Promise.all([sidebarHandle(page).boundingBox(), sidebar(page).boundingBox()]);
+  if (!handle || !aside) return Number.POSITIVE_INFINITY;
+  return Math.abs(handle.x - (aside.x + aside.width));
+}
+
 /** Drags a handle by `dx`, `dy` pixels with real mouse moves. */
 async function dragBy(page: Page, handle: Locator, dx: number, dy: number) {
   const box = await handle.boundingBox();
@@ -104,10 +111,12 @@ test.describe("desktop", () => {
     await dragBy(page, handle, 120, 0);
     expect(await widthOf(sidebar(page))).toBe(400);
     await expect(handle).toHaveAttribute("aria-valuenow", "400");
+    expect(await sidebarEdgeGap(page), "the handle sits on the sidebar's right edge").toBeLessThan(2);
 
     // Past either edge, the drag stops at the bounds.
     await dragBy(page, handle, 600, 0);
     expect(await widthOf(sidebar(page))).toBe(520);
+    expect(await sidebarEdgeGap(page), "the handle follows the clamped edge").toBeLessThan(2);
     expect(await widthOf(page.getByRole("region", { name: "Content" })), "the artifact pane keeps a usable width").toBeGreaterThanOrEqual(480);
     await dragBy(page, handle, -600, 0);
     expect(await widthOf(sidebar(page))).toBe(272);
@@ -123,7 +132,7 @@ test.describe("desktop", () => {
     await handle.press("ArrowLeft");
     expect(await widthOf(sidebar(page))).toBe(336);
     await expect(handle).toHaveAttribute("aria-valuetext", "336 pixels");
-    await expect(handle).toHaveAccessibleDescription(/arrow keys to resize/);
+    await expect(handle).toHaveAccessibleDescription(/Left and Right arrows to resize/);
     // Enter goes back to the default, as a double-click does.
     await handle.press("Enter");
     expect(await widthOf(sidebar(page))).toBe(280);
@@ -167,6 +176,11 @@ test.describe("desktop", () => {
     await handle.press("Home");
     expect(await heightOf(rows(page))).toBe(64);
     await expect(handle).toHaveAttribute("aria-valuenow", "64");
+    const handleBox = await handle.boundingBox();
+    const rowsBox = await rows(page).boundingBox();
+    const centre = (handleBox?.y ?? 0) + (handleBox?.height ?? 0) / 2;
+    expect(Math.abs(centre - ((rowsBox?.y ?? 0) + (rowsBox?.height ?? 0))), "the handle straddles the rows' bottom edge").toBeLessThan(10);
+    await expect(handle).toHaveAccessibleDescription(/Up and Down arrows/);
     expect((await heightOf(rows(page))) + (await heightOf(list(page))), "the list takes the height the rows gave up").toBe(total);
 
     await dragBy(page, handle, 0, 24);
@@ -223,8 +237,14 @@ test.describe("desktop", () => {
     await storeSizes(page, { [sidebarKey]: "400", [projectsKey]: "64" });
     await page.setViewportSize(desktop);
     // Hold the page's scripts so only the server HTML and its inline script run.
-    await page.route(/\/_next\/static\/chunks\/.*\.js(\?|$)/, (route) => route.abort());
+    let held = 0;
+    await page.route(/\/_next\/static\/chunks\/.*\.js(\?|$)/, (route) => {
+      held += 1;
+      return route.abort();
+    });
     await page.goto("/dev/workspace", { waitUntil: "domcontentloaded" });
+    expect(held, "the page's scripts were held back").toBeGreaterThan(0);
+    await expect(sidebarHandle(page), "the page has not hydrated").not.toHaveAttribute("data-measured");
     expect(await widthOf(sidebar(page))).toBe(400);
     expect(await heightOf(rows(page))).toBe(64);
   });

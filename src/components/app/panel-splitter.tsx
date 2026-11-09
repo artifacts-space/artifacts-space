@@ -42,6 +42,9 @@ interface Drag {
 
 const cursors: Record<SplitterOrientation, string> = { vertical: "col-resize", horizontal: "row-resize" };
 
+/** The keys that move each kind of handle, for its screen reader hint. */
+const arrowKeys: Record<SplitterOrientation, string> = { vertical: "the Left and Right arrows", horizontal: "the Up and Down arrows" };
+
 /** Where the pointer is along the axis the handle moves on. */
 function along(event: React.PointerEvent, orientation: SplitterOrientation) {
   return orientation === "vertical" ? event.clientX : event.clientY;
@@ -189,7 +192,7 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
         className,
       )}
     />
-    <span id={hintId} hidden>Use the arrow keys to resize, Home and End for the smallest and largest size, and Enter or a double-click to reset.</span>
+    <span id={hintId} hidden>Use {arrowKeys[orientation]} to resize, Home and End for the smallest and largest size, and Enter or a double-click to reset.</span>
     </>
   );
 }
