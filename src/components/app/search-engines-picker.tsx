@@ -24,7 +24,7 @@ export function SearchEnginesPicker({ state, checked, onChange }: SearchEnginesP
             : "When on, Google and other search engines can list this page."}
         </span>
       </span>
-      <Switch className="mt-0.5" checked={checked && !waiting} disabled={waiting} onCheckedChange={(next) => { onChange(next); }} aria-label="Show in search engines" />
+      <Switch className="-mt-0.5" checked={checked && !waiting} disabled={waiting} onCheckedChange={(next) => { onChange(next); }} aria-label="Show in search engines" />
     </label>
   );
 }

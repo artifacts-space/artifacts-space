@@ -137,7 +137,37 @@ export function mentionTokens(mode: PaletteMode, colors: ThemeColors): Record<st
   return { ...chip(siteMentionInk[mode].person, "--mention"), ...chip(siteMentionInk[mode].agent, "--mention-agent") };
 }
 
+/** The site's switch colors per mode, from globals.css: the on track and both thumbs. */
+const siteSwitch: Record<PaletteMode, { on: string; onThumb: string; offThumb: string }> = {
+  light: { on: "oklch(0.56 0.15 150)", onThumb: "oklch(1 0 0)", offThumb: "oklch(0.56 0.008 65)" },
+  dark: { on: "oklch(0.63 0.17 150)", onThumb: "oklch(1 0 0)", offThumb: "oklch(0.6 0.008 70)" },
+};
+
+/** How far the off track leans from the card toward the ink: a quiet well that still reads as a control. */
+const switchOffTint = 0.08;
+
+/** Non-text UI needs 3:1 (WCAG 1.4.11); the small margin keeps rounding from dipping under it. */
+const switchMinimum = 3.05;
+
+/**
+ * Switch colors on the themed card: the site's green re-lit until the on
+ * track reads at 3:1 on the card, the off track a tint of the card, and each
+ * thumb re-lit until it reads at 3:1 on its own track.
+ */
+export function switchTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
+  const card = read(colors.card);
+  const site = siteSwitch[mode];
+  const on = ensureContrast(read(site.on), card, switchMinimum);
+  const off = mixOklch(card, read(colors.foreground), switchOffTint);
+  return {
+    "--switch-on": formatOklch(on),
+    "--switch-on-thumb": formatOklch(ensureContrast(read(site.onThumb), on, switchMinimum)),
+    "--switch-off": formatOklch(off),
+    "--switch-off-thumb": formatOklch(ensureContrast(read(site.offThumb), off, switchMinimum)),
+  };
+}
+
 /** Every CSS token a palette sets, keyed by custom property name, with canonical color values. */
 export function paletteTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
-  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors) };
+  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors), ...switchTokens(mode, colors) };
 }

@@ -61,7 +61,7 @@ export function SwitchView({ props, bindings, emit }: ViewProps<"Switch">) {
         <span className="block break-words">{props.label}</span>
         {props.description ? <span className="block text-sm text-muted-foreground break-words">{props.description}</span> : null}
       </span>
-      <Switch className="mt-1" checked={value} onCheckedChange={(next) => { setValue(next); emit("change"); }} />
+      <Switch checked={value} onCheckedChange={(next) => { setValue(next); emit("change"); }} />
     </label>
   );
 }

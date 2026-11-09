@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { contrastIssues } from "./contrast";
-import { mentionTokens, paletteTokens, syntaxTokens } from "./derive";
+import { mentionTokens, paletteTokens, switchTokens, syntaxTokens } from "./derive";
 import { contrastRatio, normalizeColor, parseColor } from "./color";
 import { themePresets } from "./presets";
 import { builtInPresets } from "./resolve";
@@ -108,6 +108,19 @@ describe("theme presets", () => {
     }
   });
 
+  it("should keep switches at 3:1 for the on track on the card and each thumb on its track on every preset in both modes", () => {
+    for (const [id, preset] of builtInPresets()) {
+      for (const mode of ["light", "dark"] as const) {
+        const tokens = paletteTokens(mode, preset.theme[mode]);
+        const [card, on, onThumb, off, offThumb] = ["--card", "--switch-on", "--switch-on-thumb", "--switch-off", "--switch-off-thumb"].map((name) => parseColor(tokens[name] ?? ""));
+        if (!card || !on || !onThumb || !off || !offThumb) throw new Error(`${id} ${mode}: missing switch tokens`);
+        expect(contrastRatio(on, card), `${id} ${mode} on track on the card`).toBeGreaterThanOrEqual(3);
+        expect(contrastRatio(onThumb, on), `${id} ${mode} on thumb on its track`).toBeGreaterThanOrEqual(3);
+        expect(contrastRatio(offThumb, off), `${id} ${mode} off thumb on its track`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
   it("should show off at least one pairing beyond Geist when listing presets", () => {
     const fonts = themePresets.flatMap((preset) => Object.values(preset.theme.fonts ?? {}));
     expect(fonts).toEqual(expect.arrayContaining(["instrument-serif", "source-serif-4", "roboto"]));
@@ -135,6 +148,24 @@ describe("the Default preset", () => {
     expect(preset.theme.fonts).toEqual({ body: "geist-sans", heading: "geist-sans", mono: "geist-mono" });
     expect(preset.theme.radius).toBe("md");
     expect(site.light.get("--radius")).toBe("0.375rem");
+  });
+
+  it("should keep the site switches at 3:1 for the on track on the card and each thumb on its track in globals.css", () => {
+    for (const mode of ["light", "dark"] as const) {
+      const [card, on, onThumb, off, offThumb] = ["--card", "--switch-on", "--switch-on-thumb", "--switch-off", "--switch-off-thumb"].map((name) => parseColor(siteColor(mode, name) ?? ""));
+      if (!card || !on || !onThumb || !off || !offThumb) throw new Error(`${mode}: missing site switch tokens`);
+      expect(contrastRatio(on, card), `${mode} on track on the card`).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(onThumb, on), `${mode} on thumb on its track`).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(offThumb, off), `${mode} off thumb on its track`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("should reproduce the site switch tokens in globals.css when deriving them from the Default preset", () => {
+    for (const mode of ["light", "dark"] as const) {
+      for (const [name, value] of Object.entries(switchTokens(mode, siteDefaultColors(mode)))) {
+        expect(value, `${mode} ${name}`).toBe(siteColor(mode, name));
+      }
+    }
   });
 
   it("should start syntax colors from the site palette when they already pass on the site code surface", () => {
