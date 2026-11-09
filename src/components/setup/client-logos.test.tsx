@@ -1,8 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { clientGuides } from "@/components/setup/client-guides";
+import { clientGuides, FxGuide, MogplexGuide } from "@/components/setup/client-guides";
 import { mcpClients } from "@/lib/setup/client-installs";
+import { SKILL_INSTALL_COMMAND } from "@/lib/setup/install-command";
 
 import { ClientLogo } from "./client-logos";
 
@@ -43,6 +44,21 @@ describe("client guides", () => {
     const Guide = clientGuides[id];
     const html = renderToStaticMarkup(<Guide origin={origin} full />);
     expect(html).toContain(endpoint);
-    expect(html).not.toMatch(/\bnpx\b|mcp-remote|stdio|&quot;command&quot;/);
+    // The skill install is the one npx a guide may show: it copies instructions, it runs no MCP server.
+    expect(html.replaceAll(SKILL_INSTALL_COMMAND, "")).not.toMatch(/\bnpx\b|mcp-remote|stdio|&quot;command&quot;/);
+  });
+
+  it("should give fx its install, sign-in, skill, and check steps when rendered in full", () => {
+    const html = renderToStaticMarkup(<FxGuide origin={origin} full />);
+    for (const step of ["fx.sh/setup.sh", `fx mcp add artifacts ${endpoint}`, "fx mcp login artifacts", "/skills install artifacts-space/skills", "fx mcp show artifacts"]) {
+      expect(html).toContain(step);
+    }
+  });
+
+  it("should give Mogplex a token from the environment, never a pasted one, when rendered", () => {
+    const html = renderToStaticMarkup(<MogplexGuide origin={origin} />);
+    expect(html).toContain("bearer_token_env_var");
+    expect(html).toContain(`${SKILL_INSTALL_COMMAND} -a universal`);
+    expect(html).not.toContain("YOUR_TOKEN");
   });
 });

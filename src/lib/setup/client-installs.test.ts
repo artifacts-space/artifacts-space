@@ -8,8 +8,17 @@ import {
   codexMcpAddCommand,
   codexMcpLoginCommand,
   cursorInstallLink,
+  FX_INSTALL_COMMAND,
+  fxConfigJson,
+  fxMcpAddCommand,
+  fxMcpLoginCommand,
+  fxMcpShowCommand,
+  fxSkillInstallCommand,
   kimiMcpLoginCommand,
   mcpClients,
+  MOGPLEX_INSTALL_COMMAND,
+  mogplexConfigToml,
+  mogplexSkillInstallCommand,
   opencodeConfigJson,
   opencodeMcpAddCommand,
   opencodeMcpAuthCommand,
@@ -108,12 +117,52 @@ describe("kimi code snippets", () => {
   });
 });
 
+describe("fx snippets", () => {
+  it("should add a remote server by URL with no transport flag when building the add command", () => {
+    expect(fxMcpAddCommand(origin)).toBe(`fx mcp add artifacts ${endpoint}`);
+  });
+
+  it("should name the same server when building the login and show commands", () => {
+    expect(fxMcpLoginCommand()).toBe("fx mcp login artifacts");
+    expect(fxMcpShowCommand()).toBe("fx mcp show artifacts");
+  });
+
+  it("should write an http entry under mcpServers when building mcp.json", () => {
+    expect(JSON.parse(fxConfigJson(origin))).toEqual({ mcpServers: { artifacts: { type: "http", url: endpoint } } });
+  });
+
+  it("should install the public skills repository from inside fx when building the skill command", () => {
+    expect(fxSkillInstallCommand()).toBe("/skills install artifacts-space/skills");
+  });
+
+  it("should use fx's documented installer when showing the install command", () => {
+    expect(FX_INSTALL_COMMAND).toBe("curl -fsSL https://fx.sh/setup.sh | bash");
+  });
+});
+
+describe("mogplex snippets", () => {
+  it("should read the token from the environment, never from the file, when building config.toml", () => {
+    const toml = mogplexConfigToml(origin);
+    expect(toml).toBe(`[mcp_servers.artifacts]\nurl = "${endpoint}"\nbearer_token_env_var = "ARTIFACTS_SPACE_TOKEN"`);
+    expect(toml).not.toMatch(/Bearer |http_headers/);
+  });
+
+  it("should install the skill to the project's .agents/skills when building the skill command", () => {
+    expect(mogplexSkillInstallCommand()).toBe("npx skills add artifacts-space/skills -a universal");
+  });
+
+  it("should use Mogplex's documented installer when showing the install command", () => {
+    expect(MOGPLEX_INSTALL_COMMAND).toBe("curl -fsSL https://mogplex.com/install.sh | sh");
+  });
+});
+
 describe("remote-only configs", () => {
   const jsonConfigs: [string, unknown][] = [
     ["cursor install link", decodeCursorConfig(cursorInstallLink(origin))],
     ["mcp.json (OAuth)", JSON.parse(mcpOAuthConfigJson(origin))],
     ["mcp.json (token)", JSON.parse(mcpConfigJson(origin))],
     ["opencode.json", JSON.parse(opencodeConfigJson(origin))],
+    ["fx mcp.json", JSON.parse(fxConfigJson(origin))],
   ];
 
   it.each(jsonConfigs)("should hold no stdio fields when building the %s config", (_name, config) => {
@@ -124,12 +173,12 @@ describe("remote-only configs", () => {
     expect(stdioKeysIn({ mcpServers: { bad: { command: "npx", args: ["x"] } } })).toEqual(["command", "args"]);
   });
 
-  it.each([codexConfigToml(origin), codexHeadlessConfigToml(origin)])("should hold no stdio keys when building config.toml %#", (toml) => {
+  it.each([codexConfigToml(origin), codexHeadlessConfigToml(origin), mogplexConfigToml(origin)])("should hold no stdio keys when building config.toml %#", (toml) => {
     expect(toml).not.toMatch(/^\s*(command|args|env)\s*=/m);
   });
 
   it("should never run a local command when building any shell snippet", () => {
-    for (const command of [claudeMcpAddOAuthCommand(origin), codexMcpAddCommand(origin), opencodeMcpAddCommand(origin)]) {
+    for (const command of [claudeMcpAddOAuthCommand(origin), codexMcpAddCommand(origin), opencodeMcpAddCommand(origin), fxMcpAddCommand(origin)]) {
       expect(command).not.toMatch(/\bnpx\b|mcp-remote| -- |stdio/);
       expect(command).toContain(endpoint);
     }
@@ -145,6 +194,10 @@ describe("mcpClients", () => {
 
   it("should list OpenCode and Kimi Code CLI when listing clients", () => {
     expect(mcpClients.map((client) => client.label)).toEqual(expect.arrayContaining(["OpenCode", "Kimi Code CLI"]));
+  });
+
+  it("should list fx and Mogplex just before Other clients when listing clients", () => {
+    expect(mcpClients.slice(-3).map((client) => client.id)).toEqual(["fx", "mogplex", "other-clients"]);
   });
 
   it("should give every client a unique id when listing clients", () => {

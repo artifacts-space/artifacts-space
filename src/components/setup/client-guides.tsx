@@ -7,14 +7,23 @@ import {
   codexConfigToml,
   codexMcpAddCommand,
   codexMcpLoginCommand,
+  FX_INSTALL_COMMAND,
+  fxConfigJson,
+  fxMcpAddCommand,
+  fxMcpLoginCommand,
+  fxMcpShowCommand,
+  fxSkillInstallCommand,
   kimiMcpLoginCommand,
+  MOGPLEX_INSTALL_COMMAND,
+  mogplexConfigToml,
+  mogplexSkillInstallCommand,
   opencodeConfigJson,
   opencodeMcpAddCommand,
   opencodeMcpAuthCommand,
   opencodeMcpListCommand,
   type McpClientId,
 } from "@/lib/setup/client-installs";
-import { claudeMcpAddOAuthCommand, mcpEndpoint, mcpOAuthConfigJson } from "@/lib/setup/mcp-config";
+import { claudeMcpAddOAuthCommand, mcpEndpoint, mcpOAuthConfigJson, TOKEN_ENV_VAR } from "@/lib/setup/mcp-config";
 
 /**
  * Setup steps for each MCP client, shared by the quickstart picker and the
@@ -206,6 +215,87 @@ export function KimiCodeGuide({ origin, full = false }: ClientGuideProps) {
   );
 }
 
+/** Installing the agent itself, for the clients page: what it is, then its installer. */
+function InstallStep({ label, about, command }: { label: string; about: string; command: string }) {
+  return (
+    <>
+      <Label>{label}</Label>
+      <Prose className="mt-2"><p>{about}</p></Prose>
+      <CommandSnippet command={command} className="mt-2" />
+      <Label>Connect it</Label>
+    </>
+  );
+}
+
+/** fx: install, `fx mcp add` with the URL, the skill from inside fx, then `fx mcp show`. */
+export function FxGuide({ origin, full = false }: ClientGuideProps) {
+  return (
+    <>
+      {full ? (
+        <InstallStep label="Install fx" about="fx is a minimal, open-source coding agent CLI from Vercel Labs. It runs on macOS and Linux." command={FX_INSTALL_COMMAND} />
+      ) : null}
+      <p className="text-md leading-6 text-muted-foreground">Run one command. There is no token to copy.</p>
+      <CommandSnippet command={fxMcpAddCommand(origin)} className="mt-3" />
+      <Prose className="mt-2"><p>fx saves the server in <code>~/.fx/mcp.json</code>, sees that it uses sign-in, and opens your browser. Inside fx, <code>/mcp add artifacts {mcpEndpoint(origin)}</code> does the same.</p></Prose>
+      <ApproveSteps opener={<>Your browser opens on the sign-in page. To sign in later or again, run <code>{fxMcpLoginCommand()}</code>.</>} />
+      <Label>Add the skill</Label>
+      <Prose className="mt-2"><p>Type this inside fx. It installs the skill to <code>~/.fx/skills</code>, so it works in every project.</p></Prose>
+      <CodeSnippet title="fx" code={fxSkillInstallCommand()} className="mt-3" />
+      <CheckStep note={<>fx connects and lists the artifacts tools. Inside fx, <code>/mcp</code> shows the same.</>}>
+        <CommandSnippet command={fxMcpShowCommand()} />
+      </CheckStep>
+      {full ? (
+        <>
+          <Label>In mcp.json</Label>
+          <Prose className="mt-2"><p>Or add the server to <code>~/.fx/mcp.json</code> by hand, then sign in with <code>{fxMcpLoginCommand()}</code>. In a project&apos;s <code>.mcp.json</code>, fx waits until you approve the server with <code>fx mcp approve artifacts</code>.</p></Prose>
+          <CodeSnippet title="mcp.json" language="json" code={fxConfigJson(origin)} className="mt-3" />
+          <Prose className="mt-4"><p>On a machine without a browser, such as over SSH, run <code>fx mcp login --no-browser artifacts</code>. fx prints a link to open on any device, and you paste back the address your browser ends up on.</p></Prose>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+/** Mogplex: a token from the environment in `config.toml`; the CLI does not sign in to MCP servers in the browser. */
+export function MogplexGuide({ origin, full = false }: ClientGuideProps) {
+  return (
+    <>
+      {full ? (
+        <InstallStep
+          label="Install Mogplex"
+          about="Mogplex is the open-source engine for building and maintaining software. This installs the CLI on macOS and Linux; Mogplex's docs have the Windows installer."
+          command={MOGPLEX_INSTALL_COMMAND}
+        />
+      ) : null}
+      <NoOneClick client="Mogplex" />
+      <Prose className="mt-2">
+        <ol>
+          <li>Create a token on the <strong>Connections</strong> page in artifacts.space. Name it after the machine, so you can revoke it alone.</li>
+          <li>Keep it in the <code>{TOKEN_ENV_VAR}</code> environment variable, for example in your shell profile. Never put it in a file you commit.</li>
+          <li>Add this to <code>~/.mogplex/config.toml</code>. Mogplex reads the token from the environment.</li>
+        </ol>
+      </Prose>
+      <CodeSnippet title="config.toml" language="toml" code={mogplexConfigToml(origin)} className="mt-3" />
+      <Label>Add the skill</Label>
+      <Prose className="mt-2"><p>Run it in your project. It puts the skill in <code>.agents/skills</code>, where Mogplex finds it.</p></Prose>
+      <CommandSnippet command={mogplexSkillInstallCommand()} className="mt-2" />
+      <CheckStep note={<>Type this in Mogplex. The MCP drawer lists <strong>artifacts</strong> with its status and tools.</>}>
+        <CodeSnippet title="Mogplex" code="/mcp" />
+      </CheckStep>
+      {full ? (
+        <>
+          <Label>In the Mogplex app</Label>
+          <Prose className="mt-2">
+            <p>
+              Or add the server once for every machine you sign in on. In the Mogplex app, open <strong>Connections</strong>, then <strong>MCP Servers</strong>, and choose <strong>Add server</strong>. Keep <strong>Streamable HTTP</strong>, paste <code>{mcpEndpoint(origin)}</code>, and add the header <code>Authorization</code> with the value <code>Bearer</code> and your token. Save it with <strong>Enabled</strong> on. The CLI picks it up when you sign in with <code>/login</code>.
+            </p>
+          </Prose>
+        </>
+      ) : null}
+    </>
+  );
+}
+
 /** Devin: a custom MCP server with OAuth. */
 export function DevinGuide({ origin, full = false }: ClientGuideProps) {
   return (
@@ -260,5 +350,7 @@ export const clientGuides: Record<McpClientId, (props: ClientGuideProps) => Reac
   opencode: OpenCodeGuide,
   devin: DevinGuide,
   "kimi-code": KimiCodeGuide,
+  fx: FxGuide,
+  mogplex: MogplexGuide,
   "other-clients": OtherClientsGuide,
 };

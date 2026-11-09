@@ -24,6 +24,9 @@ const origin = "https://artifacts.space";
  * - OpenCode: https://opencode.ai/docs/mcp-servers/
  * - Devin: https://docs.devin.ai/work-with-devin/mcp
  * - Kimi Code CLI: https://moonshotai.github.io/kimi-code/en/customization/mcp.html
+ * - fx: https://fx.sh/docs/capabilities/mcp, https://fx.sh/docs/using-fx/cli, and https://fx.sh/docs/capabilities/skills
+ * - Mogplex: https://github.com/webrenew/mogplex-docs (cli/installation, configure-and-extend/connections-and-mcp)
+ *   and the Mogplex CLI source for `config.toml` (packages/mcp-client/src/config.ts)
  */
 export default function ClientsPage() {
   const page = "clients" as const;
@@ -31,7 +34,7 @@ export default function ClientsPage() {
     <RegistryPage slug={page}>
       <Prose className="mt-0">
         <p>
-          Every client connects to the same endpoint. Cursor has a one-click button. The others take a command, a config file, or a short form, and none of them needs a token: you sign in and approve in your browser.
+          Every client connects to the same endpoint. Cursor has a one-click button. The others take a command, a config file, or a short form. Almost none of them needs a token: you sign in and approve in your browser. Mogplex is the exception, and uses an access token.
         </p>
       </Prose>
 

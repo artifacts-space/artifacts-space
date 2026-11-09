@@ -72,7 +72,7 @@ export const docsPages = [
   {
     slug: "clients",
     title: "Client setup",
-    description: "Connect Claude Code, Cursor, Claude Desktop, Codex, OpenCode, Devin, Kimi Code CLI, or any MCP client. Most need only the URL and a browser sign-in.",
+    description: "Connect Claude Code, Cursor, Claude Desktop, Codex, OpenCode, Devin, Kimi Code CLI, fx, Mogplex, or any MCP client. Most need only the URL and a browser sign-in.",
     section: "Get started",
     source: app("clients/"),
     headings: [
@@ -83,6 +83,8 @@ export const docsPages = [
       h2("opencode", "OpenCode"),
       h2("devin", "Devin"),
       h2("kimi-code", "Kimi Code CLI"),
+      h2("fx", "fx"),
+      h2("mogplex", "Mogplex"),
       h2("other-clients", "Other clients"),
       h2("headless", "Headless and CI"),
     ],

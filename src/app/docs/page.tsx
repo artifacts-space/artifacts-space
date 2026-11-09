@@ -29,7 +29,7 @@ export default function DocsIntroduction() {
         <p>
           artifacts.space keeps that work. Agents save plans, decisions, research, and dashboards as <strong>artifacts</strong> through one MCP server. People open them in the browser, edit them, comment, and share them with their team. The next agent session can search and read the same record.
         </p>
-        <p>It works with any MCP client: Claude Code, Cursor, Codex, OpenCode, Kimi Code CLI, and others. There is no SDK to install.</p>
+        <p>It works with any MCP client: Claude Code, Cursor, Codex, OpenCode, Kimi Code CLI, fx, Mogplex, and others. There is no SDK to install.</p>
       </Prose>
 
       <DocsH page={page} id="artifacts" />

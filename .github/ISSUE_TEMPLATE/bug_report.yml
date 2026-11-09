@@ -41,7 +41,7 @@ body:
     id: client
     attributes:
       label: Browser or MCP client
-      description: The name and version, for example of your browser or of Claude Code, Codex, or Cursor.
+      description: The name and version, for example of your browser or of Claude Code, Codex, Cursor, fx, or Mogplex.
   - type: textarea
     id: logs
     attributes:

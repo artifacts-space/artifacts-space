@@ -8,8 +8,8 @@ const tools = toolRows();
 const readCount = tools.filter((tool) => tool.access === "read").length;
 
 const baseWays = [
-  ["Approve it in your browser", "Add one server to Claude Code, Cursor, OpenCode, or another MCP client. Sign in and approve the connection. There is no token to paste."],
-  ["Run it in CI", "Headless agents send an API token instead. You see the token once. The server keeps only a hash."],
+  ["Approve it in your browser", "Add one server to Claude Code, Cursor, OpenCode, fx, or another MCP client. Sign in and approve the connection. There is no token to paste."],
+  ["Run it in CI", "Headless agents and Mogplex send an API token instead. You see the token once. The server keeps only a hash."],
 ] as const;
 
 const skillWay = ["Teach it when to save", "Add the artifacts.space skill. Your agent learns when to save, update, and share its work."] as const;
