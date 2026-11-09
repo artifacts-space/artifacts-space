@@ -11,7 +11,7 @@ import { cleanHandleInput } from "@/lib/handles";
 import type { TeamRoleView } from "@/lib/teams/capabilities";
 import { can, type TeamCapability } from "@/lib/teams/capability-rules";
 import { assignRoleProblem, countOwners, inviteProblem, leaveProblem, removeMemberProblem } from "@/lib/teams/role-admin-rules";
-import { recordMemberRole, restoreStoredRole } from "@/lib/teams/role-store";
+import { changeMemberRole } from "@/lib/teams/role-store";
 import { getInvitationTeamId, listTeamMemberActors, type TeamMemberActor, type TeamMembership } from "@/lib/teams/queries";
 import { assignableRoles, type TeamRole } from "@/lib/teams/roles";
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -124,25 +124,19 @@ function storedRole(roleKey: string): TeamRole {
 }
 
 /**
- * Stores a role change. Better Auth's membership row comes first, because
- * it cannot join our statement; then one statement records the custom role
- * assignment and its audit row together. When that statement fails, the
- * stored role is written back directly (restoreStoredRole), not through
- * Better Auth, so the repair never depends on the actor's own authority.
+ * Stores a role change in one statement (changeMemberRole): the role on the
+ * membership, the custom role assignment, and the audit row land together or
+ * not at all, so a failure leaves nothing half applied. The membership row is
+ * written directly, not through Better Auth's updateMemberRole, because that
+ * call cannot join our statement. The checks Better Auth's route would run
+ * already ran here: guardTeam (a person holding "change roles" in a shared
+ * team) and assignRoleProblem (escalation, agents, the last owner), and the
+ * database refuses demoting the last owner.
  */
 async function applyRole(input: { membership: TeamMembership; target: TeamMemberActor; next: TeamRoleView; previousName: string }) {
   const { membership, target, next } = input;
-  await getAuth().api.updateMemberRole({ body: { memberId: target.memberId, role: storedRole(next.key), organizationId: membership.id }, headers: await headers() });
-  try {
-    const audit = { actorId: membership.userId, action: "member_role_changed" as const, subject: target.name, before: { role: input.previousName }, after: { role: next.name } };
-    await recordMemberRole({ teamId: membership.id, memberId: target.memberId, roleId: next.builtIn ? null : next.id, audit });
-  } catch (error) {
-    // Put back the role Better Auth stored before, read with the member. This app only ever stores one role, so that is all there is to restore.
-    await restoreStoredRole({ teamId: membership.id, memberId: target.memberId, role: target.storedRole }).catch((undoError: unknown) => {
-      console.error("[teams] could not undo a role change", { memberId: target.memberId, error: undoError instanceof Error ? undoError.name : "unknown error" });
-    });
-    throw error;
-  }
+  const audit = { actorId: membership.userId, action: "member_role_changed" as const, subject: target.name, before: { role: input.previousName }, after: { role: next.name } };
+  await changeMemberRole({ teamId: membership.id, memberId: target.memberId, storedRole: storedRole(next.key), roleId: next.builtIn ? null : next.id, audit });
 }
 
 /** Gives a member another role, built-in or custom. Escalation and the last owner are refused (role-admin-rules.ts); every change is audited. */

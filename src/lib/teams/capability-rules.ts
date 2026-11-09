@@ -96,17 +96,20 @@ export function can(actor: TeamActor | null | undefined, capability: TeamCapabil
   return actor.capabilities.includes(capability);
 }
 
+/** Where every custom role stands: between Member and Admin. */
+export const customRoleRank = 200;
+
 /**
- * Where a role stands. A person may edit only roles below their own and
- * assign only roles below it; owners may also make owners. Custom roles sit
- * between Member and Admin.
+ * Where a role stands. A person may edit only roles below their own
+ * (role-admin-rules.ts, editRoleProblem). Giving someone a role is decided
+ * by capabilities, not by rank (assignRoleProblem).
  */
 export function roleRank(roleKey: string): number {
   if (roleKey === "owner") return 400;
   if (roleKey === "admin") return 300;
   if (roleKey === "member") return 100;
   if (roleKey === "agent") return 50;
-  return 200;
+  return customRoleRank;
 }
 
 /** Why a cell of the permissions matrix cannot change, or null when it can. */

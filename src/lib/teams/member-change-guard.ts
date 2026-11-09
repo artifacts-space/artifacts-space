@@ -23,8 +23,12 @@ function refuse(message: string): never {
  * custom roles (or into one from Member) sends the role the member already
  * has. That call grants nothing new, so it is checked as "may change this
  * person's role" against their current role; the custom role itself was
- * checked by the action and is recorded separately (recordMemberRole). Any
+ * checked by the action and is stored with it (changeMemberRole). Any
  * other call is checked against the built-in role it actually stores.
+ *
+ * The app's role changes no longer go through updateMemberRole; they write
+ * the membership row in one statement (changeMemberRole). This check still
+ * guards removeMember and any other in-process caller of updateMemberRole.
  *
  * The server action has already loaded the same membership and members;
  * loading them again here is deliberate. This check must stand on its own

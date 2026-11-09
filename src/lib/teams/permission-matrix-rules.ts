@@ -1,5 +1,5 @@
 import { can, lockedReason, teamCapabilities, type TeamActor, type TeamCapability } from "./capability-rules";
-import { editRoleProblem } from "./role-admin-rules";
+import { editRoleProblem, mayCreateRoles } from "./role-admin-rules";
 
 /**
  * Pure rules for the Permissions tab: the order of its columns and what
@@ -50,6 +50,6 @@ export function toggledCapabilities(role: MatrixRole, capability: TeamCapability
 
 /** Capabilities the viewer may put in a new custom role: the ones they hold. Empty when they may not create roles. */
 export function grantableCapabilities(viewer: TeamActor | null): TeamCapability[] {
-  if (editRoleProblem(viewer, "custom")) return [];
+  if (!mayCreateRoles(viewer)) return [];
   return teamCapabilities.filter((capability) => can(viewer, capability));
 }

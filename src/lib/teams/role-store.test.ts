@@ -31,35 +31,45 @@ beforeEach(() => {
   mocks.execute.mockResolvedValue({ rows: [{ id: "row-1" }] });
 });
 
-describe("recordMemberRole", () => {
-  it("should only assign a role and a member that both belong to the team", async () => {
-    await store.recordMemberRole({ teamId: "team-1", memberId: "member-1", roleId: "role-1", audit });
-    const { text, params } = lastQuery();
-    expect(text).toContain("where team_member.id = $1 and team_member.team_id = $2");
-    expect(text).toContain("where team_role.id = $3 and team_role.team_id = $4");
-    expect(params.slice(0, 4)).toEqual(["member-1", "team-1", "role-1", "team-1"]);
+describe("changeMemberRole", () => {
+  const change = { teamId: "team-1", memberId: "member-1", storedRole: "member" as const, roleId: "role-1", audit };
+
+  beforeEach(() => {
+    mocks.execute.mockResolvedValue({ rows: [{ found: true, changed: true }] });
   });
 
-  it("should write the audit row in the same statement as the assignment", async () => {
-    await store.recordMemberRole({ teamId: "team-1", memberId: "member-1", roleId: "role-1", audit });
+  it("should only touch a member and a custom role that both belong to the team", async () => {
+    await store.changeMemberRole(change);
     const { text, params } = lastQuery();
-    expect(text).toMatch(/insert into team_role_assignment .* insert into team_permission_audit/);
+    expect(text).toContain("where team_role.id = $1 and team_role.team_id = $2 and team_role.built_in = false");
+    expect(text).toContain("where team_member.id = $3 and team_member.team_id = $4");
+    expect(params.slice(0, 4)).toEqual(["role-1", "team-1", "member-1", "team-1"]);
+  });
+
+  it("should store the membership role, the assignment, and the audit row in one statement, with no repair step", async () => {
+    await store.changeMemberRole(change);
+    const { text, params } = lastQuery();
+    expect(text).toMatch(/update team_member set role = \$\d+ from changed .* insert into team_role_assignment .* insert into team_permission_audit/);
     expect(params).toContain(JSON.stringify({ role: "Designer" }));
     expect(mocks.execute).toHaveBeenCalledTimes(1);
   });
 
-  it("should throw when nothing was written, so a role from another team is never applied silently", async () => {
-    mocks.execute.mockResolvedValue({ rows: [] });
-    await expect(store.recordMemberRole({ teamId: "team-1", memberId: "member-1", roleId: "role-other-team", audit })).rejects.toThrow("The role could not be changed.");
+  it("should write only when the stored role or the custom role differs from what the member has", async () => {
+    await store.changeMemberRole(change);
+    const { text } = lastQuery();
+    expect(text).toContain("where prior.stored_role is distinct from $");
+    expect(text).toContain("or prior.custom_role_id is distinct from $");
+    expect(text).toContain("::jsonb from changed returning team_permission_audit.id");
   });
-});
 
-describe("restoreStoredRole", () => {
-  it("should only touch the member in that team", async () => {
-    await store.restoreStoredRole({ teamId: "team-1", memberId: "member-1", role: "admin" });
-    const { text, params } = lastQuery();
-    expect(text).toContain("where team_member.id = $2 and team_member.team_id = $3");
-    expect(params).toEqual(["admin", "member-1", "team-1"]);
+  it("should report no change when the member already had that role", async () => {
+    mocks.execute.mockResolvedValue({ rows: [{ found: true, changed: false }] });
+    await expect(store.changeMemberRole(change)).resolves.toEqual({ changed: false });
+  });
+
+  it("should throw when the member or the role is not in the team, so nothing is applied silently", async () => {
+    mocks.execute.mockResolvedValue({ rows: [{ found: false, changed: false }] });
+    await expect(store.changeMemberRole({ ...change, roleId: "role-other-team" })).rejects.toThrow("The role could not be changed.");
   });
 });
 
@@ -78,6 +88,20 @@ describe("setRoleCapability", () => {
   it("should log only a real change: a new role, an added cell, or a removed one", async () => {
     await store.setRoleCapability(input);
     expect(lastQuery().text).toContain("where role.created or exists (select 1 from added) or exists (select 1 from removed)");
+  });
+
+  it("should store the whole list only for a built-in role this statement inserted, never by guessing from the row", async () => {
+    await store.setRoleCapability(input);
+    const { text } = lastQuery();
+    expect(text).not.toContain("xmax");
+    expect(text).toMatch(/inserted as \( insert into team_role .* where \$\d+ and not exists \(select 1 from existing\) on conflict \(team_id, key\) do nothing/);
+    expect(text).toContain("select existing.id, false as created from existing union all select inserted.id, true as created from inserted");
+    expect(text).toContain("from role where role.created");
+  });
+
+  it("should never create a custom role that is gone", async () => {
+    await store.setRoleCapability({ ...input, key: "designer", name: "Designer", builtIn: false });
+    expect(lastQuery().params).toContain(false);
   });
 
   it("should throw when the role could not be stored", async () => {

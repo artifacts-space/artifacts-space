@@ -86,13 +86,13 @@ describe("refusals for every role action", () => {
 
   it.each(Object.entries(calls))("should refuse %s when an agent's token holds an owner's membership", async (_name, call) => {
     mocks.membership.mockResolvedValue(viewer("owner", { kind: "agent" }));
-    await expect(call()).resolves.toMatchObject({ success: false });
+    await expect(call()).resolves.toEqual({ success: false, error: "Only people can change roles." });
     expectNothingWritten();
   });
 
   it.each(Object.entries(calls))("should refuse %s in a personal team", async (_name, call) => {
     mocks.membership.mockResolvedValue(viewer("owner", { personal: true }));
-    await expect(call()).resolves.toEqual({ success: false, error: "Team not found." });
+    await expect(call()).resolves.toEqual({ success: false, error: "A personal team has no roles to change." });
     expectNothingWritten();
   });
 

@@ -11,7 +11,7 @@ import { capabilityChangeProblem, createRoleProblem, customRoleKey, customRoleNa
 import { cleanCapabilities, createCustomRole, deleteCustomRole, setRoleCapability } from "@/lib/teams/role-store";
 import type { TeamMembership } from "@/lib/teams/queries";
 
-import { guardTeam } from "./team-guard";
+import { guardTeam, type Guarded } from "./team-guard";
 
 /**
  * Editing a team's roles from the Permissions tab. Every action loads the
@@ -24,8 +24,11 @@ const roleKeySchema = z.string().trim().min(1).max(40);
 const capabilitiesSchema = z.array(z.string().max(40)).max(40);
 
 /** A person's membership in a shared team (never an agent's token), with the team's roles. Each action then asks role-admin-rules.ts. */
-function loadEditor(teamId: string) {
-  return guardTeam(teamId, (membership) => membership.kind === "person" && !membership.personal, "Team not found.");
+/** The viewer's membership and roles when they are a person in a shared team; otherwise why not. */
+async function loadEditor(teamId: string): Promise<Guarded> {
+  const loaded = await guardTeam(teamId, (membership) => membership.kind === "person", "Only people can change roles.");
+  if (loaded.ok && loaded.membership.personal) return { ok: false, result: { success: false, error: "A personal team has no roles to change." } };
+  return loaded;
 }
 
 function refresh(membership: TeamMembership) {

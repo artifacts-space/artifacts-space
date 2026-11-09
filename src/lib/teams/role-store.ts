@@ -8,6 +8,7 @@ import { user } from "@/db/schema";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { builtInRoleKeys, builtInRoleNames, defaultRoleCapabilities, isBuiltInRoleKey, isTeamCapability, type TeamCapability } from "./capability-rules";
+import type { TeamRole } from "./roles";
 
 /**
  * Storage for team roles: seeding the built-in roles, saving a role's
@@ -103,24 +104,36 @@ export async function seedBuiltInRoles(teamId: string) {
 
 /**
  * Turns one capability of a role on or off, and writes its audit row when
- * that changed anything, in one statement. Only that capability changes, so two people editing
- * different cells of the same role never undo each other. A built-in role
- * with no stored row yet is stored first with `next`, its capabilities after
- * this change.
+ * that changed anything, in one statement. Only that capability changes, so
+ * two people editing different cells of the same role never undo each other.
+ * A built-in role with no stored row yet is stored first with `next`, its
+ * capabilities after this change. A custom role is never created here: when
+ * it is gone, nothing is written and this throws.
  */
 export async function setRoleCapability(input: { teamId: string; key: string; name: string; builtIn: boolean; capability: TeamCapability; on: boolean; next: readonly TeamCapability[]; audit: AuditInput }): Promise<void> {
   const result = await getDb().execute<{ id: string }>(sql`
-    -- (xmax = 0) is true only when this statement inserted the row: the
-    -- update branch of ON CONFLICT leaves xmax set. Only a role stored for
-    -- the first time takes the whole list (seeded); an existing role only
-    -- ever flips the one capability (added / removed). Never widen "seeded"
-    -- to existing roles: a team that narrowed a built-in role would
-    -- silently get the defaults back.
-    with role as (
+    -- "created" is true only for the row the inserted CTE returns, which
+    -- exists only when there was no stored row before this statement. Only
+    -- that role takes the whole list (seeded); an existing role only ever
+    -- flips the one capability (added / removed). Never widen "seeded" to
+    -- existing roles: a team that narrowed a built-in role would silently
+    -- get the defaults back. When two first edits race, the second inserts
+    -- nothing, finds no role, writes nothing, and throws.
+    with existing as (
+      select team_role.id from team_role
+      where team_role.team_id = ${input.teamId} and team_role.key = ${input.key}
+    ), inserted as (
       insert into team_role (id, team_id, key, name, built_in)
-      values (${randomUUID()}, ${input.teamId}, ${input.key}, ${input.name}, ${input.builtIn})
-      on conflict (team_id, key) do update set updated_at = now()
-      returning team_role.id, (xmax = 0) as created
+      select ${randomUUID()}, ${input.teamId}, ${input.key}, ${input.name}, true
+      where ${input.builtIn} and not exists (select 1 from existing)
+      on conflict (team_id, key) do nothing
+      returning team_role.id
+    ), role as (
+      select existing.id, false as created from existing
+      union all
+      select inserted.id, true as created from inserted
+    ), touched as (
+      update team_role set updated_at = now() from existing where team_role.id = existing.id
     ), seeded as (
       insert into team_role_capability (role_id, capability)
       select role.id, unnest(${sql.param([...input.next])}::text[]) from role where role.created
@@ -182,47 +195,50 @@ export async function deleteCustomRole(input: { teamId: string; key: string; aud
 }
 
 /**
- * Puts back the role Better Auth stored on a membership, after a role change
- * could not be recorded. A repair of our own half-applied write, not a new
- * change, so it skips the role-change checks and writes no audit row (the
- * change it undoes was never recorded). The last-owner trigger still applies.
+ * Gives a member another role in one statement: the role stored on the
+ * membership (`storedRole`, always owner, admin or member), the custom role
+ * assignment (`roleId`, or null to clear it), and the audit row. Either all
+ * of it lands or none of it, so there is nothing to repair: the last-owner
+ * trigger, or a role from another team, stops the whole statement. When the
+ * member already has exactly this role, nothing is written and no audit row
+ * is added. Callers check who may give the role first
+ * (role-admin-rules.ts, assignRoleProblem). Throws when the member or the
+ * custom role is not in `teamId`. Returns whether anything changed.
  */
-export async function restoreStoredRole(input: { teamId: string; memberId: string; role: string }): Promise<void> {
-  await getDb().execute(sql`
-    update team_member set role = ${input.role}
-    where team_member.id = ${input.memberId} and team_member.team_id = ${input.teamId}
-  `);
-}
-
-/**
- * Records a member's custom role, or clears it with a null `roleId`, and
- * writes the audit row, in one statement. The statement itself checks that
- * the member and the role both belong to `teamId`; otherwise nothing is
- * written and it throws.
- */
-export async function recordMemberRole(input: { teamId: string; memberId: string; roleId: string | null; audit: AuditInput }): Promise<void> {
-  const result = await getDb().execute<{ id: string }>(sql`
-    with target as (
-      select team_member.id as member_id from team_member
-      where team_member.id = ${input.memberId} and team_member.team_id = ${input.teamId}
-    ), granted as (
+export async function changeMemberRole(input: { teamId: string; memberId: string; storedRole: TeamRole; roleId: string | null; audit: AuditInput }): Promise<{ changed: boolean }> {
+  const result = await getDb().execute<{ found: boolean; changed: boolean }>(sql`
+    with granted as (
       select team_role.id as role_id from team_role
-      where team_role.id = ${input.roleId} and team_role.team_id = ${input.teamId}
+      where team_role.id = ${input.roleId} and team_role.team_id = ${input.teamId} and team_role.built_in = false
+    ), prior as (
+      select team_member.id as member_id, team_member.role as stored_role, team_role_assignment.role_id as custom_role_id
+      from team_member
+      left join team_role_assignment on team_role_assignment.member_id = team_member.id
+      where team_member.id = ${input.memberId} and team_member.team_id = ${input.teamId}
+        and (${input.roleId === null} or exists (select 1 from granted))
+    ), changed as (
+      select prior.member_id from prior
+      where prior.stored_role is distinct from ${input.storedRole} or prior.custom_role_id is distinct from ${input.roleId}
+    ), stored as (
+      update team_member set role = ${input.storedRole} from changed
+      where team_member.id = changed.member_id
     ), cleared as (
-      delete from team_role_assignment using target
-      where team_role_assignment.member_id = target.member_id and ${input.roleId === null}
+      delete from team_role_assignment using changed
+      where team_role_assignment.member_id = changed.member_id and ${input.roleId === null}
     ), assigned as (
       insert into team_role_assignment (member_id, role_id, assigned_by, assigned_at)
-      select target.member_id, granted.role_id, ${input.audit.actorId}, now() from target, granted
+      select changed.member_id, granted.role_id, ${input.audit.actorId}, now() from changed, granted
       on conflict (member_id) do update set role_id = excluded.role_id, assigned_by = excluded.assigned_by, assigned_at = excluded.assigned_at
-      returning team_role_assignment.member_id
+    ), logged as (
+      insert into team_permission_audit (id, team_id, actor_id, action, subject, before, after)
+      select ${auditValues(input.teamId, input.audit)} from changed
+      returning team_permission_audit.id
     )
-    insert into team_permission_audit (id, team_id, actor_id, action, subject, before, after)
-    select ${auditValues(input.teamId, input.audit)} from target
-    where ${input.roleId === null} or exists (select 1 from assigned)
-    returning team_permission_audit.id
+    select exists (select 1 from prior) as found, exists (select 1 from logged) as changed
   `);
-  requireRow(result.rows, "The role could not be changed.");
+  const [row] = result.rows;
+  if (!row?.found) throw new UserFacingError("The role could not be changed.");
+  return { changed: row.changed };
 }
 
 function capabilityList(value: unknown): string[] {

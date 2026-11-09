@@ -340,3 +340,25 @@ export async function roleCapabilities(teamId: string, key: string): Promise<str
   );
   return result.rows.map((row) => row.capability);
 }
+
+/** A member's id and stored (Better Auth) role in a team. */
+export async function membershipOf(teamId: string, userId: string): Promise<{ memberId: string; role: string }> {
+  const result = await db().query<{ id: string; role: string }>(`select id, role from team_member where team_id = $1 and user_id = $2`, [teamId, userId]);
+  const row = result.rows[0];
+  if (!row) throw new Error("That user is not in the team.");
+  return { memberId: row.id, role: row.role };
+}
+
+/** Creates a custom role with `capabilities` in a team, given to nobody. Returns its id. */
+export async function createTestCustomRole(teamId: string, name: string, capabilities: readonly string[]): Promise<string> {
+  const roleId = randomUUID();
+  await db().query(`insert into team_role (id, team_id, key, name, built_in) values ($1, $2, $3, $4, false)`, [roleId, teamId, name.toLowerCase(), name]);
+  await db().query(`insert into team_role_capability (role_id, capability) select $1, unnest($2::text[])`, [roleId, capabilities]);
+  return roleId;
+}
+
+/** The keys of every role a team has stored, sorted. */
+export async function storedRoleKeys(teamId: string): Promise<string[]> {
+  const result = await db().query<{ key: string }>(`select key from team_role where team_id = $1 order by key`, [teamId]);
+  return result.rows.map((row) => row.key);
+}

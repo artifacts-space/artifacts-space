@@ -13,6 +13,7 @@ import {
   editRoleProblem,
   inviteProblem,
   leaveProblem,
+  mayCreateRoles,
   removeMemberProblem,
   type TargetWithRole,
 } from "./role-admin-rules";
@@ -83,6 +84,21 @@ describe("capabilityChangeProblem, for every capability", () => {
 
   it("should list only the capabilities that changed", () => {
     expect(changedCapabilities(["share.team", "analytics.view"], ["analytics.view", "approve.edits"])).toEqual(["share.team", "approve.edits"]);
+  });
+});
+
+describe("mayCreateRoles", () => {
+  it("should let owners and admins create roles, but never an agent holding an admin's capabilities", () => {
+    expect(mayCreateRoles(defaultActor("owner"))).toBe(true);
+    expect(mayCreateRoles(admin)).toBe(true);
+    expect(mayCreateRoles({ ...admin, kind: "agent" })).toBe(false);
+  });
+
+  it("should refuse a custom-role holder, a member, an agent, and no member at all", () => {
+    expect(mayCreateRoles(lead)).toBe(false);
+    expect(mayCreateRoles(member)).toBe(false);
+    expect(mayCreateRoles(agent)).toBe(false);
+    expect(mayCreateRoles(null)).toBe(false);
   });
 });
 

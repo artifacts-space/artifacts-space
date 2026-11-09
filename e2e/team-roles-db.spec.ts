@@ -1,9 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+import { changeMemberRole, setRoleCapability } from "../src/lib/teams/role-store";
+
 import {
   addTestMember,
   cleanUp,
   createTestArtifact,
+  createTestCustomRole,
   createTestTeam,
   createTestUser,
   customRoleOf,
@@ -14,12 +17,14 @@ import {
   giveTestCustomRole,
   localDatabaseEnabled,
   localDatabaseSkipReason,
+  membershipOf,
   permissionAuditActions,
   readyDevUser,
   requestTestSharing,
   roleCapabilities,
   seededRoles,
   setTeamRole,
+  storedRoleKeys,
 } from "./support/local-db";
 
 /**
@@ -188,4 +193,57 @@ test("should give a new team its built-in roles with today's rules", async ({ pa
   await page.getByRole("button", { name: "Create team" }).click();
   await expect.poll(async () => (await seededRoles(slug).catch(() => null))?.roles ?? null).toEqual({ owner: 14, admin: 13, member: 1, agent: 1 });
   seeded.teamIds.push((await seededRoles(slug)).teamId);
+});
+
+test("should store a role change with its assignment and audit row together, or not at all", async () => {
+  const [owner, person] = await Promise.all([createTestUser(), createTestUser()]);
+  seeded.userIds.push(owner, person);
+  const team = await createTestTeam(owner, "owner");
+  const otherTeam = await createTestTeam(owner, "owner");
+  seeded.teamIds.push(team.id, otherTeam.id);
+  await addTestMember(team.id, person, "member");
+  const [designer, otherDesigner] = await Promise.all([createTestCustomRole(team.id, "Designer", ["themes.manage"]), createTestCustomRole(otherTeam.id, "Designer", ["themes.manage"])]);
+  const audit = (before: string, after: string) => ({ actorId: owner, action: "member_role_changed" as const, subject: "Person", before: { role: before }, after: { role: after } });
+  const ownerRow = await membershipOf(team.id, owner);
+  const personRow = await membershipOf(team.id, person);
+
+  // The last-owner trigger stops the whole statement: no role change, no audit row.
+  await expect(changeMemberRole({ teamId: team.id, memberId: ownerRow.memberId, storedRole: "member", roleId: null, audit: audit("Owner", "Member") })).rejects.toThrow();
+  expect((await membershipOf(team.id, owner)).role).toBe("owner");
+  // A role from another team writes nothing either.
+  await expect(changeMemberRole({ teamId: team.id, memberId: personRow.memberId, storedRole: "member", roleId: otherDesigner, audit: audit("Member", "Designer") })).rejects.toThrow("The role could not be changed.");
+  expect(await customRoleOf(team.id, person)).toBeNull();
+  expect(await permissionAuditActions(team.id)).toEqual([]);
+
+  await expect(changeMemberRole({ teamId: team.id, memberId: personRow.memberId, storedRole: "member", roleId: designer, audit: audit("Member", "Designer") })).resolves.toEqual({ changed: true });
+  expect(await customRoleOf(team.id, person)).toBe("designer");
+  // The same role again changes nothing and logs nothing.
+  await expect(changeMemberRole({ teamId: team.id, memberId: personRow.memberId, storedRole: "member", roleId: designer, audit: audit("Designer", "Designer") })).resolves.toEqual({ changed: false });
+  await expect(changeMemberRole({ teamId: team.id, memberId: personRow.memberId, storedRole: "admin", roleId: null, audit: audit("Designer", "Admin") })).resolves.toEqual({ changed: true });
+  expect(await membershipOf(team.id, person)).toMatchObject({ role: "admin" });
+  expect(await customRoleOf(team.id, person)).toBeNull();
+  expect(await permissionAuditActions(team.id)).toEqual(["member_role_changed", "member_role_changed"]);
+});
+
+test("should store a built-in role's whole list on its first edit, and never create a custom role", async () => {
+  const owner = await createTestUser();
+  seeded.userIds.push(owner);
+  const team = await createTestTeam(owner, "owner");
+  seeded.teamIds.push(team.id);
+  const audit = { actorId: owner, action: "role_updated" as const, subject: "Member", before: [], after: [] };
+  const edit = { teamId: team.id, key: "member", name: "Member", builtIn: true, audit };
+
+  // No stored Member role yet: the first edit stores the whole list, not only the toggled cell.
+  await setRoleCapability({ ...edit, capability: "share.team", on: true, next: ["share.team", "analytics.view"] });
+  expect(await roleCapabilities(team.id, "member")).toEqual(["analytics.view", "share.team"]);
+  // A stored role, even one left with no capabilities, only ever flips the one cell.
+  await setRoleCapability({ ...edit, capability: "analytics.view", on: false, next: ["share.team"] });
+  await setRoleCapability({ ...edit, capability: "share.team", on: false, next: [] });
+  expect(await roleCapabilities(team.id, "member")).toEqual([]);
+  await setRoleCapability({ ...edit, capability: "themes.manage", on: true, next: ["themes.manage", "analytics.view"] });
+  expect(await roleCapabilities(team.id, "member")).toEqual(["themes.manage"]);
+
+  await expect(setRoleCapability({ ...edit, key: "ghost", name: "Ghost", builtIn: false, capability: "share.team", on: true, next: ["share.team"] })).rejects.toThrow("The role could not be saved.");
+  expect(await storedRoleKeys(team.id)).toEqual(["member"]);
+  expect(await permissionAuditActions(team.id)).toEqual(["role_updated", "role_updated", "role_updated", "role_updated"]);
 });

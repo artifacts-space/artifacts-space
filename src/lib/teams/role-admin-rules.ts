@@ -1,4 +1,4 @@
-import { can, isBuiltInRoleKey, lockedReason, roleRank, type TeamActor, type TeamCapability } from "./capability-rules";
+import { can, customRoleRank, isBuiltInRoleKey, lockedReason, roleRank, type TeamActor, type TeamCapability } from "./capability-rules";
 import { teamLimits } from "./limits";
 
 /**
@@ -24,6 +24,11 @@ function isOwner(actor: TeamActor) {
 /** Whether the actor may change roles at all: a person holding "change roles". */
 function changesRoles(actor: TeamActor | null): actor is TeamActor {
   return actor !== null && actor.kind === "person" && can(actor, "members.roles");
+}
+
+/** Whether the actor may create custom roles: a person holding "change roles" whose own role ranks above custom roles. */
+export function mayCreateRoles(actor: TeamActor | null): actor is TeamActor {
+  return changesRoles(actor) && roleRank(actor.roleKey) > customRoleRank;
 }
 
 /** Why the actor may not edit this role's capabilities, or null. Owner is never editable; others only below the actor. */
@@ -58,8 +63,9 @@ export function capabilityChangeProblem(actor: TeamActor | null, roleKey: string
 
 /** Why the actor may not create a custom role with these capabilities, or null. Custom roles rank between Member and Admin. */
 export function createRoleProblem(actor: TeamActor | null, capabilities: readonly TeamCapability[], customRoleCount: number): string | null {
-  const problem = capabilityChangeProblem(actor, "custom", [], capabilities);
-  if (problem) return problem;
+  if (!changesRoles(actor)) return "You cannot change roles in this team.";
+  if (!mayCreateRoles(actor)) return "You can only create roles below your own.";
+  if (!capabilities.every((capability) => can(actor, capability))) return "You can only grant or take away capabilities you hold.";
   if (customRoleCount >= teamLimits.maxCustomRoles) return `A team can have ${String(teamLimits.maxCustomRoles)} custom roles. Delete one to make another.`;
   return null;
 }

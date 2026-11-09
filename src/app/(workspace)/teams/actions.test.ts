@@ -23,8 +23,7 @@ const mocks = vi.hoisted(() => ({
   updateMemberRole: vi.fn(),
   updateOrganization: vi.fn(),
   leaveOrganization: vi.fn(),
-  recordMemberRole: vi.fn(),
-  restoreStoredRole: vi.fn(),
+  changeMemberRole: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -52,7 +51,7 @@ vi.mock("@/lib/teams/queries", () => ({
   listTeamMemberActors: mocks.members,
   getInvitationTeamId: mocks.invitationTeamId,
 }));
-vi.mock("@/lib/teams/role-store", () => ({ recordMemberRole: mocks.recordMemberRole, restoreStoredRole: mocks.restoreStoredRole }));
+vi.mock("@/lib/teams/role-store", () => ({ changeMemberRole: mocks.changeMemberRole }));
 
 const actions = await import("./actions");
 
@@ -96,7 +95,7 @@ function signInAs(membership: TeamMembership) {
   mocks.members.mockResolvedValue(teamWith(membership));
 }
 
-const writes = [mocks.createInvitation, mocks.cancelInvitation, mocks.removeMember, mocks.updateMemberRole, mocks.updateOrganization, mocks.leaveOrganization, mocks.recordMemberRole, mocks.restoreStoredRole];
+const writes = [mocks.createInvitation, mocks.cancelInvitation, mocks.removeMember, mocks.updateMemberRole, mocks.updateOrganization, mocks.leaveOrganization, mocks.changeMemberRole];
 
 function expectNothingWritten() {
   for (const write of writes) expect(write).not.toHaveBeenCalled();
@@ -239,13 +238,15 @@ describe("updateMemberRoleAction", () => {
     expectNothingWritten();
   });
 
-  it("should store a custom role as Member plus the assignment, recorded with its audit row", async () => {
+  it("should store a custom role as Member plus the assignment and its audit row, in one store call", async () => {
     signInAs(viewer("owner"));
     await expect(actions.updateMemberRoleAction("team-1", "m-member", "designer")).resolves.toEqual({ success: true, data: null });
-    expect(mocks.updateMemberRole).toHaveBeenCalledWith(expect.objectContaining({ body: { memberId: "m-member", role: "member", organizationId: "team-1" } }));
-    expect(mocks.recordMemberRole).toHaveBeenCalledWith({
+    expect(mocks.updateMemberRole).not.toHaveBeenCalled();
+    expect(mocks.changeMemberRole).toHaveBeenCalledTimes(1);
+    expect(mocks.changeMemberRole).toHaveBeenCalledWith({
       teamId: "team-1",
       memberId: "m-member",
+      storedRole: "member",
       roleId: "role-designer",
       audit: { actorId: "viewer-1", action: "member_role_changed", subject: "Person m-member", before: { role: "Member" }, after: { role: "Designer" } },
     });
@@ -257,20 +258,18 @@ describe("updateMemberRoleAction", () => {
     expectNothingWritten();
   });
 
-  it("should store a built-in role in Better Auth and clear any custom assignment", async () => {
+  it("should store a built-in role and clear any custom assignment in the same store call", async () => {
     signInAs(viewer("owner"));
     await expect(actions.updateMemberRoleAction("team-1", "m-designer", "admin")).resolves.toEqual({ success: true, data: null });
-    expect(mocks.updateMemberRole).toHaveBeenCalledWith(expect.objectContaining({ body: { memberId: "m-designer", role: "admin", organizationId: "team-1" } }));
-    expect(mocks.recordMemberRole).toHaveBeenCalledWith(expect.objectContaining({ memberId: "m-designer", roleId: null }));
+    expect(mocks.changeMemberRole).toHaveBeenCalledWith(expect.objectContaining({ memberId: "m-designer", storedRole: "admin", roleId: null }));
   });
 
-  it("should write the stored role back directly when the assignment and audit row cannot be recorded", async () => {
+  it("should report a failure and make no other write when the role change cannot be stored", async () => {
     signInAs(viewer("owner"));
-    mocks.recordMemberRole.mockRejectedValue(new Error("connection lost"));
-    await expect(actions.updateMemberRoleAction("team-1", "m-admin", "designer")).resolves.toMatchObject({ success: false });
-    expect(mocks.updateMemberRole).toHaveBeenCalledTimes(1);
-    expect(mocks.updateMemberRole).toHaveBeenCalledWith(expect.objectContaining({ body: { memberId: "m-admin", role: "member", organizationId: "team-1" } }));
-    expect(mocks.restoreStoredRole).toHaveBeenCalledWith({ teamId: "team-1", memberId: "m-admin", role: "admin" });
+    mocks.changeMemberRole.mockRejectedValue(new Error("connection lost"));
+    await expect(actions.updateMemberRoleAction("team-1", "m-admin", "designer")).resolves.toEqual({ success: false, error: "The role could not be changed. Please try again." });
+    expect(mocks.changeMemberRole).toHaveBeenCalledTimes(1);
+    for (const write of writes.filter((item) => item !== mocks.changeMemberRole)) expect(write).not.toHaveBeenCalled();
   });
 });
 
