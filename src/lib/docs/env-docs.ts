@@ -18,6 +18,7 @@ export const envDocs: readonly EnvDoc[] = [
   { name: "SENDIR_API_KEY", need: "for email", what: "Sendir key scoped to the sending identity. Production cannot send sign-in links without it." },
   { name: "SENDIR_IDENTITY_ID", need: "for email", what: "The Sendir identity whose address sends every email." },
   { name: "SENDIR_URL", need: "optional", what: "Overrides https://sendir.ai." },
+  { name: "ABUSE_REPORT_EMAIL", need: "for email", what: "The site operator's address. Every reader report on an artifact is emailed here, and only here. Without it, reports are still stored and shown on the team page, and each one logs a warning." },
   { name: "R2_ACCOUNT_ID", need: "for files", what: "Cloudflare account id for R2." },
   { name: "R2_BUCKET", need: "for files", what: "The bucket that holds uploads." },
   { name: "R2_ACCESS_KEY_ID", need: "for files", what: "S3 access key: the id of an API token scoped to the bucket." },

@@ -35,8 +35,8 @@ async function sendEach() {
   await sendMentionEmail({ mentionId: "m1", email: "ann@example.com", authorLabel: HOSTILE, artifactTitle: HOSTILE, publicId: "pub1", commentId: "c1" });
   const mention = lastSend();
   await sendReportEmail({
-    reportId: "r1", ownerId: "o1", ownerEmail: "ann@example.com", teamName: HOSTILE, teamSlug: "acme",
-    artifactTitle: HOSTILE, publicId: "pub1", reasonLabel: HOSTILE,
+    reportId: "r1", operatorEmail: "operator@example.com", team: { name: HOSTILE, slug: "acme" },
+    artifactTitle: HOSTILE, publicId: "pub1", reasonLabel: HOSTILE, details: HOSTILE,
   });
   const report = lastSend();
   return { magic, invitation, mention, report };
@@ -73,8 +73,8 @@ describe("transactional emails", () => {
     expect(magic.message.text).toContain("https://artifacts.space/api/auth/magic-link/verify?token=t1");
     expect(invitation.message.text).toContain("https://artifacts.space/invitations/inv1");
     expect(mention.message.text).toContain("https://artifacts.space/threads/pub1#comment-c1");
-    expect(report.message.text).toContain("https://artifacts.space/teams/acme");
     expect(report.message.text).toContain("https://artifacts.space/artifact/pub1");
+    expect(report.message.text).toContain("https://artifacts.space/teams/acme");
   });
 
   it("should keep subjects, links, expiry copy, and idempotency keys when the layout changes", async () => {
@@ -88,8 +88,9 @@ describe("transactional emails", () => {
     expect(invitation.key).toBe(`team-invitation:${sha("inv1")}`);
     expect(mention.message.subject).toBe(`${HOSTILE} mentioned you on artifacts.space`);
     expect(mention.key).toBe(`mention:${sha("m1")}`);
-    expect(report.message.subject).toBe(`Report on “${HOSTILE}” in ${HOSTILE}`);
-    expect(report.key).toBe(`artifact-report:${sha("r1:o1")}`);
+    expect(report.message.to).toBe("operator@example.com");
+    expect(report.message.subject).toBe(`Report on “${HOSTILE}”`);
+    expect(report.key).toBe(`artifact-report:${sha("r1")}`);
   });
 
   it("should render the sign-in heading with a quiet site link when the magic link is sent", async () => {

@@ -98,7 +98,7 @@ export function PrivacyCollection() {
         <ul>
           <li><strong>Run the service:</strong> sign you in, store and show your artifacts, keep version history, apply your sharing and comment settings, and let your agents work over MCP.</li>
           <li><strong>Show authors their readers:</strong> tell the people who can edit a public artifact how many people read it, per day, and which sites linked to it, as counts only.</li>
-          <li><strong>Send emails you need:</strong> sign-in links, team invitations, a note when someone @mentions you (with the artifact title and a link, never the comment text; you can turn it off in Settings), and report notices to team owners. We send no marketing email.</li>
+          <li><strong>Send emails you need:</strong> sign-in links, team invitations, a note when someone @mentions you (with the artifact title and a link, never the comment text; you can turn it off in Settings). We send no marketing email.</li>
           <li><strong>Send the notifications you choose:</strong> in the app, and in your browser if you turn that on. A browser notification says who did what on which artifact, with a link and at most a short excerpt of the comment, and goes only to people who can still read the artifact.</li>
           <li><strong>Keep the service safe:</strong> enforce rate limits and storage quotas, stop spam and phishing, handle reports, and investigate abuse and security problems.</li>
           <li><strong>Fix and improve it:</strong> find errors and keep the service reliable, using logs and aggregate counts.</li>

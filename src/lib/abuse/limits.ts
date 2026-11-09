@@ -75,7 +75,7 @@ export const rateLimits = {
    */
   reportByNetwork: { limit: 5, windowSeconds: quarterHour },
   reportByNetworkDay: { limit: 10, windowSeconds: day },
-  /** Reports about one artifact per network address per hour. Each report emails the team's owners. */
+  /** Reports about one artifact per network address per hour. Each report emails the site operator. */
   reportByNetworkArtifact: { limit: 3, windowSeconds: hour },
   /** Started file uploads per user per hour, from the web app and MCP together. */
   fileUpload: { limit: 200, windowSeconds: hour },
