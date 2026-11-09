@@ -189,6 +189,28 @@ test("should select a cell on the first click and edit it on the second when an 
   await expect(page.getByRole("textbox", { name: /row 2$/ })).toBeFocused();
 });
 
+test("should move left, not leave, on Shift+Tab after a click into the grid", async ({ page, isMobile }) => {
+  test.skip(isMobile, "a mouse click; phones tap");
+  const grid = await openViewer(page);
+  await page.locator('[data-specimen="csv · Sheet at the size limit"]').getByRole("searchbox").focus();
+  await grid.getByRole("gridcell", { name: "r2c3", exact: true }).click();
+  await page.keyboard.press("Shift+Tab");
+  await expect(grid).toBeFocused();
+  expect(await activeText(grid)).toBe("r2c2");
+});
+
+test("should copy only the selected text when an editor copies inside a cell being edited", async ({ page, isMobile }) => {
+  test.skip(isMobile, "a hardware keyboard copy");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/dev/editor?kind=sheet");
+  const grid = page.getByRole("grid", { name: "CSV grid editor" });
+  await grid.getByRole("gridcell", { name: "r1c1", exact: true }).click();
+  await page.keyboard.type("hello world");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+c");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("hello world");
+});
+
 test("should select a cell on tap and never scroll the page sideways on a phone", async ({ page, isMobile }) => {
   test.skip(!isMobile, "phones only");
   const grid = await openViewer(page);
