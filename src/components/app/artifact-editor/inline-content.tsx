@@ -4,11 +4,12 @@ import { IconCode } from "@tabler/icons-react";
 
 import { CsvContentEditor } from "@/components/artifact-page/csv-content-editor";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { ThemeScope } from "@/components/artifact-view/theme-scope";
 import { ContentStatus } from "@/components/editor/content-status";
 import { DocumentEditor, isDocumentKind } from "@/components/editor/document-editor";
 import { Button } from "@/components/ui/button";
-import { ThemeScope } from "@/components/artifact-view/theme-scope";
 import { Textarea } from "@/components/ui/textarea";
+import { canEditBlocks, UiBlockEditor } from "@/components/ui-editor/ui-block-editor";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
 import { editColumnClass, readingMeasureClass } from "@/lib/page-width/rules";
@@ -20,8 +21,10 @@ import { isThemed, PreviewSurface, surfaceClass } from "./preview-surface";
 /**
  * The artifact's content in the /app editor, rendered as itself and editable
  * in place. Markdown and Text are documents you type into; CSV is a grid;
- * Code is its source. Formats without an inline editor yet (ui, JSON, SVG,
- * Mermaid, File notes) show their rendered view, and View source edits them.
+ * Code is its source; an interface opens in the block editor
+ * (src/components/ui-editor). Formats without an inline editor yet (JSON,
+ * SVG, Mermaid, File notes, and an interface too broken to render) show
+ * their rendered view, and View source edits them.
  * In the /app pane every surface grows to fill the pane but never shrinks
  * below its content (`flex-[1_0_auto]`), so nothing spills over the files
  * and fields below, and the content keeps to the public page's column
@@ -42,11 +45,16 @@ interface Placement {
   theme: Theme | null;
 }
 
-/** The rendered content's frame: the pane's themed surface with the page column inside it, or the page's own column. */
-function ContentFrame({ place, children }: { place: Placement; children: React.ReactNode }) {
+/**
+ * The rendered content's frame: the pane's themed surface with the page
+ * column inside it, or the page's own column. `gutter` keeps room on both
+ * sides of the pane's column for the interface editor's block handles, which
+ * hang left of each block; both sides, so the column stays centered.
+ */
+function ContentFrame({ place, gutter = false, children }: { place: Placement; gutter?: boolean; children: React.ReactNode }) {
   const { surface, fullWidth, theme } = place;
   if (surface === "page") return <div className={cn("min-w-0", readingMeasureClass(fullWidth))} data-full-width={fullWidth}>{children}</div>;
-  return <PreviewSurface theme={theme} fullWidth={fullWidth} className="py-5 sm:py-8">{children}</PreviewSurface>;
+  return <PreviewSurface theme={theme} fullWidth={fullWidth} className={cn("py-5 sm:py-8", gutter && "sm:px-14")}>{children}</PreviewSurface>;
 }
 
 /** The source field's frame: a card on the artifact page; in /app, the theme across the pane around the page column (the whole pane when full width). */
@@ -117,7 +125,7 @@ function RenderedWithSource({ kind, content, language, title, files, place, onSh
 
 /** True when the content shows an editable field to focus; otherwise the pane takes focus for keyboard scrolling. */
 export function hasInlineField(kind: ArtifactKind, sourceOpen: boolean): boolean {
-  return sourceOpen || kind === "code" || kind === "csv" || isDocumentKind(kind);
+  return sourceOpen || kind === "code" || kind === "csv" || kind === "ui" || isDocumentKind(kind);
 }
 
 /** See the notes at the top of this file. */
@@ -137,6 +145,13 @@ export function InlineContent(props: InlineContentProps) {
     return (
       <ContentFrame place={place}>
         <CsvContentEditor key={revision} value={content} onChange={onChange} title={title} files={files} label="Artifact content" />
+      </ContentFrame>
+    );
+  }
+  if (kind === "ui" && canEditBlocks(content)) {
+    return (
+      <ContentFrame place={place} gutter>
+        <UiBlockEditor content={content} onChange={onChange} />
       </ContentFrame>
     );
   }

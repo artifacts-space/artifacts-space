@@ -69,12 +69,25 @@ function firstProblem(type: UiComponentName, props: Record<string, unknown>): { 
  * and the view sits behind its own error boundary.
  */
 export function renderStout<K extends UiComponentName>(type: K, context: BaseComponentProps, View: ComponentType<ViewProps<K>>): ReactNode {
-  const checked = firstProblem(type, withoutNulls(context.props));
+  return renderStoutView(type, { props: context.props, children: context.children, emit: context.emit, bindings: context.bindings }, View);
+}
+
+/** What renderStoutView needs: the element's props as written or resolved, its rendered children, and its event emitter. */
+export interface StoutInput {
+  props: Record<string, unknown>;
+  children?: ReactNode;
+  emit: (event: string) => void;
+  bindings?: Record<string, string> | undefined;
+}
+
+/** renderStout without json-render's renderer context, for the interface editor, which walks the spec itself. */
+export function renderStoutView<K extends UiComponentName>(type: K, input: StoutInput, View: ComponentType<ViewProps<K>>): ReactNode {
+  const checked = firstProblem(type, withoutNulls(input.props));
   if ("problem" in checked) return <ElementNotice type={type} detail={checked.problem.slice(0, 200)} />;
   return (
     <ElementBoundary type={type}>
-      <View props={checked.data as UiProps<K>} emit={context.emit} bindings={context.bindings}>
-        {context.children}
+      <View props={checked.data as UiProps<K>} emit={input.emit} bindings={input.bindings}>
+        {input.children}
       </View>
     </ElementBoundary>
   );

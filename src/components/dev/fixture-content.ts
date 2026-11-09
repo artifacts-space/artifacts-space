@@ -2,6 +2,10 @@ import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { specJson, type DocElement } from "@/lib/docs/spec-builders";
 import { checkoutRolloutSpec } from "@/lib/preview/samples";
 
+/** Samples the editor fixture can open: long ones for layout, and a short interface ("blocks") for the block editor. */
+export const editorFixtureKinds = ["ui", "json", "markdown", "blocks"] as const;
+export type EditorFixtureKind = (typeof editorFixtureKinds)[number];
+
 /** The rollout dashboard twelve times over: a long ui with charts, timelines, and tables. */
 export function longUi(): string {
   const elements: Record<string, DocElement> = {};
@@ -15,6 +19,23 @@ export function longUi(): string {
   }
   elements.root = { type: "Stack", props: { gap: "lg" }, children: sections };
   return specJson({ version: checkoutRolloutSpec.version, root: "root", elements });
+}
+
+/** A short interface for the block editor checks: a heading, text, a callout, and two tabs. */
+export function shortUi(): string {
+  return JSON.stringify({
+    version: checkoutRolloutSpec.version,
+    root: "page",
+    elements: {
+      page: { type: "Stack", props: {}, children: ["title", "intro", "note", "tabs"] },
+      title: { type: "Heading", props: { text: "Launch plan", level: 1 } },
+      intro: { type: "Text", props: { text: "First line." } },
+      note: { type: "Callout", props: { text: "Ship on Friday.", tone: "info" } },
+      tabs: { type: "Tabs", props: { tabs: [{ label: "Risks" }, { label: "Owners" }] }, children: ["risks", "owners"] },
+      risks: { type: "Text", props: { text: "Payments could lag." } },
+      owners: { type: "Text", props: { text: "Ann and Bo." } },
+    },
+  }, null, 2);
 }
 
 /** Two hundred JSON items, pretty-printed. */

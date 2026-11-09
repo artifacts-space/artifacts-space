@@ -20,8 +20,8 @@ import { renderStout, type ViewProps } from "./stout";
 
 type Views = { [K in UiComponentName]: ComponentType<ViewProps<K>> };
 
-/** One view per catalog component. */
-const views: Views = {
+/** One view per catalog component. The interface editor renders blocks with these too. */
+export const uiViews: Views = {
   Section: SectionView,
   Stack: StackView,
   Grid: GridView,
@@ -60,12 +60,12 @@ const views: Views = {
 
 function stoutComponent(type: UiComponentName) {
   // Each view matches its own component's props; the map erases that pairing, so restore the general type.
-  const View = views[type] as ComponentType<ViewProps<UiComponentName>>;
+  const View = uiViews[type] as ComponentType<ViewProps<UiComponentName>>;
   return (context: BaseComponentProps) => renderStout(type, context, View);
 }
 
 const components = Object.fromEntries(
-  (Object.keys(views) as UiComponentName[]).map((type) => [type, stoutComponent(type)]),
+  (Object.keys(uiViews) as UiComponentName[]).map((type) => [type, stoutComponent(type)]),
 ) as Record<UiComponentName, (context: BaseComponentProps) => ReactNode>;
 
 /** The React registry for ui artifacts: every catalog component, each checked and isolated. */

@@ -116,3 +116,25 @@ test("should unlock Markdown in place on the artifact's own page and save it on 
   await expect(page.getByRole("textbox", { name: "Artifact content" })).toContainText("Read here. Edited here.");
   expect(await versionKinds(publicId)).toEqual(["snapshot", "edit"]);
 });
+
+test("should save a heading typed into an interface, keep it after a reload, and file one version", async ({ page }, testInfo) => {
+  const title = `Inline interface ${testInfo.project.name} ${String(Date.now())}`;
+  await page.goto("/api/dev/sign-in");
+  await page.waitForURL(/\/app/);
+  const spec = { version: 1, root: "page", elements: { page: { type: "Stack", props: {}, children: ["title"] }, title: { type: "Heading", props: { text: "Launch plan", level: 1 } } } };
+  const publicId = await createTestArtifact({ userId: await readyDevUser(), title, content: JSON.stringify(spec), visibility: "private", theme: null, kind: "ui" });
+  created.push(publicId);
+  await page.goto(`/artifact/${publicId}`);
+  const heading = page.locator("[data-slot=ui-block-editor]").getByRole("textbox", { name: "Heading" });
+  await heading.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" for Friday");
+  await page.keyboard.type(" and Monday");
+  await expect(page.locator("[data-slot=editor-bar]").getByRole("status")).toHaveText("Saved", savedWithin);
+
+  await page.reload();
+  await expect(page.locator("[data-slot=ui-block-editor]").getByRole("textbox", { name: "Heading" })).toHaveText("Launch plan for Friday and Monday");
+  expect(await versionKinds(publicId)).toEqual(["snapshot", "edit"]);
+  await page.locator("[data-slot=editor-bar]").getByRole("button", { name: "History" }).click();
+  await expect(page.getByRole("list", { name: "Versions" }).getByRole("listitem")).toHaveCount(2);
+});
