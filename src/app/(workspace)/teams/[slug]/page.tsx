@@ -53,6 +53,7 @@ async function loadTeamPage({ membership: team, roles }: TeamAccess, viewerId: s
     when(can(team, "reports.handle"), () => listOpenReports(team.id)),
     teamPresetNames(team.id, shared && can(team, "approve.edits")),
     shared ? loadTeamThemeSettings(team.id) : Promise.resolve(null),
+    // Not gated on purpose: everyone in the team may read who changed which roles, as they read the matrix.
     when(shared, () => listPermissionAudit(team.id)),
   ]);
   return { team, viewerId, origin: siteOrigin(), members, agents, invitations, shared: sharedArtifacts, requests, edits, reports, themeNames, themes, roles: [...roles.values()], audit };

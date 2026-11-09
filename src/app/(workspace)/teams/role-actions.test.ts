@@ -186,6 +186,12 @@ describe("createRoleAction", () => {
     expectNothingWritten();
   });
 
+  it("should say a name is too close when it shortens to an existing role's key", async () => {
+    mocks.membership.mockResolvedValue(viewer("owner"));
+    await expect(actions.createRoleAction("team-1", { name: "Designer!", capabilities: [] })).resolves.toEqual({ success: false, error: "That name is too close to the Designer role. Try a different one." });
+    expectNothingWritten();
+  });
+
   it("should refuse a custom role creating another custom role, which would sit at its own rank", async () => {
     mocks.membership.mockResolvedValue(viewer("designer"));
     await expect(actions.createRoleAction("team-1", { name: "Brand Lead", capabilities: ["themes.manage"] })).resolves.toMatchObject({ success: false });

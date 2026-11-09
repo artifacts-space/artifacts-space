@@ -72,7 +72,8 @@ export async function createRoleAction(teamId: string, input: z.input<typeof new
     const problem = customRoleNameProblem(name) ?? createRoleProblem(membership, capabilities);
     if (problem) return { success: false, error: problem };
     const key = customRoleKey(name);
-    if (roles.has(key)) return { success: false, error: "A role with that name already exists." };
+    const taken = roles.get(key);
+    if (taken) return { success: false, error: taken.name.toLowerCase() === name.toLowerCase() ? "A role with that name already exists." : `That name is too close to the ${taken.name} role. Try a different one.` };
     await createCustomRole({ teamId: membership.id, key, name, capabilities, audit: { actorId: membership.userId, action: "role_created", subject: name, before: null, after: capabilities } });
     refresh(membership);
     return { success: true, data: { key } };

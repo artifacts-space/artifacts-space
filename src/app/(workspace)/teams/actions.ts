@@ -134,7 +134,7 @@ async function applyRole(input: { membership: TeamMembership; target: TeamMember
     const audit = { actorId: membership.userId, action: "member_role_changed" as const, subject: target.name, before: { role: input.previousName }, after: { role: next.name } };
     await recordMemberRole({ teamId: membership.id, memberId: target.memberId, roleId: next.builtIn ? null : next.id, audit });
   } catch (error) {
-    // Put back exactly what Better Auth stored before, read with the member, never a role derived from it.
+    // Put back the role Better Auth stored before, read with the member. This app only ever stores one role, so that is all there is to restore.
     await restoreStoredRole({ teamId: membership.id, memberId: target.memberId, role: target.storedRole }).catch((undoError: unknown) => {
       console.error("[teams] could not undo a role change", { memberId: target.memberId, undoError });
     });
@@ -151,6 +151,8 @@ export async function updateMemberRoleAction(teamId: string, memberId: string, r
     const next = roles.get(roleKeySchema.parse(roleKey));
     if (!next) return { success: false, error: "That role does not exist in this team." };
     const { target, targetRole, ownerCount } = await loadTarget(membership, roles, idSchema.parse(memberId));
+    // Already in that role: nothing to store, and nothing to log.
+    if (next.key === target.actor.roleKey) return { success: true, data: null };
     const problem = assignRoleProblem(membership, targetRole, { key: next.key, capabilities: next.capabilities }, ownerCount);
     if (problem) return { success: false, error: problem };
     await applyRole({ membership, target, next, previousName: roles.get(target.actor.roleKey)?.name ?? target.actor.roleKey });

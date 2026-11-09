@@ -158,7 +158,7 @@ export function customRoleNameProblem(name: string): string | null {
   if (!trimmed) return "Give the role a name.";
   if (trimmed.length > 40) return "Use 40 characters or fewer for the name.";
   const key = customRoleKey(trimmed);
-  if (!key) return "Use letters or numbers in the name.";
+  if (!key) return "Include at least one letter from A to Z or a number in the name.";
   if (isBuiltInRoleKey(key)) return "That name belongs to a built-in role.";
   return null;
 }

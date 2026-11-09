@@ -248,6 +248,12 @@ describe("updateMemberRoleAction", () => {
     });
   });
 
+  it("should store and log nothing when the person already has that role", async () => {
+    signInAs(viewer("owner"));
+    await expect(actions.updateMemberRoleAction("team-1", "m-designer", "designer")).resolves.toEqual({ success: true, data: null });
+    expectNothingWritten();
+  });
+
   it("should store a built-in role in Better Auth and clear any custom assignment", async () => {
     signInAs(viewer("owner"));
     await expect(actions.updateMemberRoleAction("team-1", "m-designer", "admin")).resolves.toEqual({ success: true, data: null });
