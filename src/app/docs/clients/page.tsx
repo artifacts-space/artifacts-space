@@ -24,6 +24,7 @@ const origin = "https://artifacts.space";
  * - OpenCode: https://opencode.ai/docs/mcp-servers/
  * - Devin: https://docs.devin.ai/work-with-devin/mcp
  * - Kimi Code CLI: https://moonshotai.github.io/kimi-code/en/customization/mcp.html
+ * - fx: https://fx.sh/docs/capabilities/mcp, https://fx.sh/docs/using-fx/cli, and https://fx.sh/docs/capabilities/skills
  */
 export default function ClientsPage() {
   const page = "clients" as const;

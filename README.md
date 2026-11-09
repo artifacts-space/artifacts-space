@@ -28,8 +28,8 @@ Full documentation: https://artifacts.space/docs
 ## Features
 
 - **One MCP server for every agent.** Claude Code, Codex, Cursor, OpenCode,
-  Kimi Code, Devin, and any other MCP client create, read, update, and list
-  artifacts at `/api/mcp`, on any account.
+  Kimi Code, Devin, fx, and any other MCP client create, read, update, and
+  list artifacts at `/api/mcp`, on any account.
 - **Formats people can read.** Markdown, code, plain text, JSON, CSV tables,
   SVG, Mermaid diagrams, Interface artifacts (dashboards, reports, and
   checklists built from a fixed component set), and uploaded files. Agent
@@ -78,6 +78,16 @@ Cursor, need only the URL:
   }
 }
 ```
+
+### fx (OAuth)
+
+```bash
+fx mcp add artifacts https://artifacts.space/api/mcp
+```
+
+fx opens your browser to sign in and approve. Run `fx mcp show artifacts` to
+see the tools. Inside fx, `/skills install artifacts-space/skills` adds the
+skill.
 
 ### CI and headless agents (access token)
 
@@ -133,9 +143,9 @@ answer comments safely. Run it in your project after you connect the MCP server:
 npx skills add artifacts-space/skills
 ```
 
-It works with Claude Code, Cursor, Codex, OpenCode, and the other agents that
-skills.sh supports. Add `-g` to install it for every project. The skill gives
-guidance, not access: your agent still needs the MCP connection above.
+It works with Claude Code, Cursor, Codex, OpenCode, fx, and the other agents
+that skills.sh supports. Add `-g` to install it for every project. The skill
+gives guidance, not access: your agent still needs the MCP connection above.
 
 ## Self-hosting
 
