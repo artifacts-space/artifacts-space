@@ -69,6 +69,9 @@ export function syntaxTokens(mode: PaletteMode, code: Oklch): Record<string, str
   );
 }
 
+/** How far each quiet surface leans from the card toward the ink. The focus ring is checked against all of them. */
+const quietTint = { secondary: 0.06, muted: 0.045, accent: 0.07 } as const;
+
 function surfaceTokens(colors: ThemeColors): Record<string, string> {
   const fg = read(colors.foreground);
   const card = read(colors.card);
@@ -83,11 +86,11 @@ function surfaceTokens(colors: ThemeColors): Record<string, string> {
     "--popover-foreground": colors.foreground,
     "--primary": colors.accent,
     "--primary-foreground": colors.accentForeground,
-    "--secondary": toward(0.06),
+    "--secondary": toward(quietTint.secondary),
     "--secondary-foreground": colors.foreground,
-    "--muted": toward(0.045),
+    "--muted": toward(quietTint.muted),
     "--muted-foreground": colors.mutedForeground,
-    "--accent": toward(0.07),
+    "--accent": toward(quietTint.accent),
     "--accent-foreground": colors.foreground,
     "--border": formatOklch(withAlpha(fg, 0.11)),
     "--input": formatOklch(withAlpha(fg, 0.15)),
@@ -217,18 +220,27 @@ export function switchTokens(mode: PaletteMode, colors: ThemeColors): Record<str
 const siteRing: Record<PaletteMode, string> = { light: "oklch(0.5 0.22 262)", dark: "oklch(0.68 0.17 262)" };
 
 /**
- * The focus ring on the themed card and page: the site's brand blue, re-lit
- * until it reads at 3:1 on both, so a focused control inside a themed
+ * The focus ring on the themed card, page, and quiet surfaces (--secondary,
+ * --muted, --accent: the card tinted toward the ink): the site's brand blue,
+ * re-lit until it reads at 3:1 on each, so a focused control inside a themed
  * artifact is still easy to find. The theme's own colors never replace the
- * blue; only its lightness moves, and only when the theme needs it. Moving
- * away from the card alone always works because modeLightness (contrast.ts)
- * keeps the card and page on the same side; if that bound is ever relaxed,
+ * blue; only its lightness moves, and only when the theme needs it.
+ *
+ * Not checked: a filled control's own fill (--primary, a primary button).
+ * The ring sits outside the control, on the card, and a fill that already
+ * reads at 3:1 on the card often leaves no blue that reads on both.
+ *
+ * Moving away from the card alone always works because modeLightness
+ * (contrast.ts) keeps the card and page on the same side, and the quiet
+ * surfaces lie between the card and the ink; if that bound is ever relaxed,
  * holdApart's black-or-white fallback could ship a ring under 3:1, and the
  * edge-card tests in derive.test.ts are where that would show.
  */
 export function ringTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
-  const surfaces = [read(colors.card), read(colors.background)];
-  const ring = holdApart(read(siteRing[mode]), read(colors.card), (candidate) => surfaces.every((surface) => contrastRatio(candidate, surface) >= nonTextMinimum));
+  const card = read(colors.card);
+  const ink = read(colors.foreground);
+  const surfaces = [card, read(colors.background), ...Object.values(quietTint).map((amount) => mixOklch(card, ink, amount))];
+  const ring = holdApart(read(siteRing[mode]), card, (candidate) => surfaces.every((surface) => contrastRatio(candidate, surface) >= nonTextMinimum));
   return { "--ring": formatOklch(ring) };
 }
 

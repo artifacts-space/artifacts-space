@@ -54,6 +54,9 @@ describe("the themed focus ring", () => {
         const ring = color(tokens["--ring"]);
         expect(contrastRatio(ring, color(tokens["--card"])), `${id} ${mode} ring on the card`).toBeGreaterThanOrEqual(3);
         expect(contrastRatio(ring, color(tokens["--background"])), `${id} ${mode} ring on the page`).toBeGreaterThanOrEqual(3);
+        for (const surface of ["--secondary", "--muted", "--accent"]) {
+          expect(contrastRatio(ring, color(tokens[surface])), `${id} ${mode} ring on ${surface}`).toBeGreaterThanOrEqual(3);
+        }
         // Built-in presets already pass with the site blue, so none should re-light it.
         expect(tokens["--ring"], `${id} ${mode} keeps the site ring`).toBe(site[mode]);
       }
@@ -68,7 +71,12 @@ describe("the themed focus ring", () => {
     };
     for (const mode of ["light", "dark"] as const) {
       for (const card of edges[mode]) {
-        const { ring, card: onCard, page } = ringContrast(mode, { ...defaultColors(mode), card, background: card });
+        const colors = { ...defaultColors(mode), card, background: card };
+        const { ring, card: onCard, page } = ringContrast(mode, colors);
+        const tokens = paletteTokens(mode, colors);
+        for (const surface of ["--secondary", "--muted", "--accent"]) {
+          expect(contrastRatio(ring, color(tokens[surface])), `${mode} card ${card}: ring on ${surface}`).toBeGreaterThanOrEqual(3);
+        }
         expect(onCard, `${mode} card ${card}: ring on the card`).toBeGreaterThanOrEqual(3);
         expect(page, `${mode} card ${card}: ring on the page`).toBeGreaterThanOrEqual(3);
         expect(Math.abs(ring.h - 262), `${mode} card ${card}: ring keeps the brand hue`).toBeLessThan(0.5);

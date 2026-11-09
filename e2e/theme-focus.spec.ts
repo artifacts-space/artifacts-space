@@ -17,7 +17,7 @@ async function openSpecimen(page: Page, theme: "light" | "dark") {
 }
 
 /** The painted outline (or border) color and the painted card behind the control, and their WCAG contrast. */
-function readOutline(control: Locator, property: "outlineColor" | "borderTopColor" = "outlineColor"): Promise<{ outline: number[]; card: number[]; contrast: number }> {
+function readOutline(control: Locator, property: "outlineColor" | "borderTopColor" = "outlineColor"): Promise<{ outline: number[]; opaque: boolean; card: number[]; contrast: number }> {
   return control.evaluate((element, colorProperty) => {
     const canvas = document.createElement("canvas");
     canvas.width = 1;
@@ -33,6 +33,11 @@ function readOutline(control: Locator, property: "outlineColor" | "borderTopColo
     for (let node: Element | null = element.parentElement; node; node = node.parentElement) chain.unshift(node);
     let card = paint("white");
     for (const node of chain) card = paint(getComputedStyle(node).backgroundColor);
+    // Read the outline on an empty pixel first: a transparent color would otherwise read as black and pass.
+    context.clearRect(0, 0, 1, 1);
+    context.fillStyle = getComputedStyle(element)[colorProperty];
+    context.fillRect(0, 0, 1, 1);
+    const opaque = context.getImageData(0, 0, 1, 1).data[3] === 255;
     const outline = paint(getComputedStyle(element)[colorProperty]);
     const luminance = (rgb: number[]) => {
       const [r = 0, g = 0, b = 0] = rgb.map((channel) => {
@@ -42,7 +47,7 @@ function readOutline(control: Locator, property: "outlineColor" | "borderTopColo
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     };
     const [light = 0, dark = 0] = [luminance(outline), luminance(card)].sort((a, b) => b - a);
-    return { outline, card, contrast: (light + 0.05) / (dark + 0.05) };
+    return { outline, opaque, card, contrast: (light + 0.05) / (dark + 0.05) };
   }, property);
 }
 
@@ -71,6 +76,8 @@ for (const theme of ["light", "dark"] as const) {
     await expect(control).toHaveCSS("outline-style", "solid");
 
     const reading = await readOutline(control);
+    expect(reading.opaque, "the outline is painted solid").toBe(true);
+    expect(await control.evaluate((element) => getComputedStyle(element).outlineColor)).toBe(await ringAt(control));
     expect(reading.contrast, `outline ${reading.outline.join(",")} on card ${reading.card.join(",")}`).toBeGreaterThanOrEqual(3);
     // The theme set its own ring: it differs from the site ring the header sees.
     expect(await ringAt(specimen)).not.toBe(await ringAt(page.getByRole("heading", { name: "Component gallery" })));
@@ -86,5 +93,9 @@ test("should draw a focused button's solid ring-colored border at 3:1 on a theme
   await expect(button).toBeFocused();
   // Button pairs a solid 1px --ring border with a wider 50% --ring halo. The halo blends into the card and is decoration;
   // the solid border is what must read at 3:1, and it uses the theme's derived ring.
-  await expect.poll(async () => (await readOutline(button, "borderTopColor")).contrast).toBeGreaterThanOrEqual(3);
+  // The border is transparent until :focus-visible applies, so wait for it to become the ring color.
+  await expect.poll(() => button.evaluate((element) => getComputedStyle(element).borderTopColor)).toBe(await ringAt(button));
+  const reading = await readOutline(button, "borderTopColor");
+  expect(reading.opaque, "the border is painted solid").toBe(true);
+  expect(reading.contrast, `border ${reading.outline.join(",")} on card ${reading.card.join(",")}`).toBeGreaterThanOrEqual(3);
 });
