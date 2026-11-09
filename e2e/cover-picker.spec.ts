@@ -3,10 +3,10 @@ import { expect, test } from "@playwright/test";
 /**
  * The cover picker (the gallery's "cover picker" specimen, the same
  * component editors get on the artifact page and in the New artifact
- * dialog): keyboard use, gradients that follow the theme, the slim banner
+ * dialog): keyboard use, gradients that follow the theme, the banner
  * height on phones and desktops, and removal.
  */
-test("should show a slim gradient cover picked with the keyboard, in each theme", async ({ page }, testInfo) => {
+test("should show a gradient cover picked with the keyboard, in each theme", async ({ page }, testInfo) => {
   await page.goto("/dev/components#themes");
   const specimen = page.locator('[data-specimen="cover picker"]');
   await specimen.getByRole("button", { name: "Cover: No cover" }).click();
@@ -21,7 +21,7 @@ test("should show a slim gradient cover picked with the keyboard, in each theme"
   const covers = specimen.locator("[data-artifact-cover]");
   await expect(covers).toHaveCount(2);
   await expect(specimen.locator('[data-cover-gradient="mist"]')).toHaveCount(2);
-  const expectedHeight = testInfo.project.name === "phone" ? 120 : 180;
+  const expectedHeight = testInfo.project.name === "phone" ? 160 : 240;
   for (const cover of await covers.all()) {
     const box = await cover.boundingBox();
     expect(box?.height).toBe(expectedHeight);

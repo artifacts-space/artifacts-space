@@ -7,8 +7,8 @@ import { cleanUp, createTestArtifact, localDatabaseEnabled, localDatabaseSkipRea
 /**
  * The page column in /app and on the artifact's page, with a real artifact:
  * the /app preview holds callouts and diagrams to the same column readers
- * see, Full width widens them and the View source field, and the editor bar
- * on the artifact's page has the setting too.
+ * see, Full width widens them and the View source field, and the More menu
+ * in the artifact page's header has the setting too.
  */
 
 test.skip(!localDatabaseEnabled(), localDatabaseSkipReason);
@@ -87,18 +87,23 @@ test("should match the public page's column in the /app preview and widen it wit
   expect(await widthOf(diagram), "diagrams widen").toBeGreaterThan(1000);
 });
 
-test("should offer Full width in the editor bar on the artifact's page and widen the page while it stays editable", async ({ page }) => {
+test("should offer Full width in the page header's More menu and widen the page while it stays editable", async ({ page }) => {
   const title = "Page editor width e2e";
   const publicId = await seed(page, title, "markdown");
   await page.goto(`/artifact/${publicId}`);
   const main = page.locator("main");
   await expect(main).toHaveAttribute("data-full-width", "false");
 
-  const toggle = page.getByRole("switch", { name: "Full width" });
-  await expect(toggle).not.toBeChecked();
+  const more = page.getByRole("banner").getByRole("button", { name: "More actions" });
+  await more.click();
+  const toggle = page.getByRole("menuitemcheckbox", { name: "Full width" });
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
   await toggle.click();
   await expect(main).toHaveAttribute("data-full-width", "true");
-  await expect(toggle).toBeChecked();
+  await expect(more).toBeEnabled();
+  await more.click();
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("textbox", { name: "Title" }), "the page stays editable").toHaveValue(title);
   expect(await widthOf(main)).toBeGreaterThan(960);
 });

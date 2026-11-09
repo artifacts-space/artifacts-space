@@ -10,8 +10,9 @@ const savedWithin = { timeout: 12_000 };
  * result back from View source, the raw spec that would be saved.
  */
 
-const editorBar = (page: Page) => page.locator("[data-slot=editor-bar]");
-const saveStatus = (page: Page) => editorBar(page).getByRole("status");
+/** The page header, where the save status and the More menu live. */
+const pageHeader = (page: Page) => page.getByRole("banner");
+const saveStatus = (page: Page) => page.locator("[data-slot=save-indicator]");
 const editor = (page: Page) => page.locator("[data-slot=ui-block-editor]");
 
 async function openBlocks(page: Page) {
@@ -21,10 +22,10 @@ async function openBlocks(page: Page) {
 
 /** The spec as saved, read from View source, then back to the page. */
 async function savedSpec(page: Page): Promise<{ root: string; elements: Record<string, { type: string; props?: Record<string, unknown>; children?: string[] }> }> {
-  await editorBar(page).getByRole("button", { name: "More actions" }).click();
+  await pageHeader(page).getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: "View source" }).click();
   const source = await page.getByRole("textbox", { name: "Artifact source" }).inputValue();
-  await editorBar(page).getByRole("button", { name: "More actions" }).click();
+  await pageHeader(page).getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: "Hide source" }).click();
   return JSON.parse(source) as Awaited<ReturnType<typeof savedSpec>>;
 }

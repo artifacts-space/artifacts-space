@@ -13,7 +13,7 @@ interface ArtifactCoverProps {
 }
 
 /**
- * The slim cover banner at the top of an artifact's page, full-bleed under
+ * The cover banner at the top of an artifact's page, full-bleed under
  * the sticky chrome. Readers see only the picture; editors also get its
  * controls. Render it inside a ThemeScope so gradients take the theme.
  */

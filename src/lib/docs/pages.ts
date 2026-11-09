@@ -127,7 +127,7 @@ export const docsPages = [
   {
     slug: "themes",
     title: "Themes",
-    description: "Give an artifact its own colors, fonts, and a slim cover, in the web app or over MCP. Every theme passes contrast checks, so every reader can read it.",
+    description: "Give an artifact its own colors, fonts, and a cover, in the web app or over MCP. Every theme passes contrast checks, so every reader can read it.",
     section: "Reference",
     source: app("themes/"),
     headings: [

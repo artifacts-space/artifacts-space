@@ -15,6 +15,8 @@ import { CoverPicker } from "./cover-picker";
 import { useCoverSave } from "./use-cover-save";
 
 const controlClass = "h-7 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70";
+/** On phones the controls are icons (their names stay for screen readers), so they never run under a page icon on the cover's left. */
+const phoneLabel = "max-sm:sr-only";
 
 interface EditableCoverProps {
   publicId: string;
@@ -129,12 +131,12 @@ export function EditableCover({ publicId, cover: initial, fullWidth }: EditableC
             onChange={(next) => void save(next)}
             disabled={saving}
             allowUpload
-            trigger={<Button type="button" variant="outline" size="sm" className={controlClass}><IconPhoto /> Change cover</Button>}
+            trigger={<Button type="button" variant="outline" size="sm" className={controlClass} aria-label="Change cover"><IconPhoto /> <span className={phoneLabel}>Change cover</span></Button>}
           />
           {parsed.type === "image" ? (
-            <Button type="button" variant="outline" size="sm" className={controlClass} disabled={saving} onClick={startReposition}><IconArrowsVertical /> Reposition</Button>
+            <Button type="button" variant="outline" size="sm" className={controlClass} disabled={saving} onClick={startReposition} aria-label="Reposition"><IconArrowsVertical /> <span className={phoneLabel}>Reposition</span></Button>
           ) : null}
-          <Button type="button" variant="outline" size="sm" className={controlClass} disabled={saving} onClick={() => void save(null)} aria-label="Remove cover"><IconTrash /> Remove</Button>
+          <Button type="button" variant="outline" size="sm" className={controlClass} disabled={saving} onClick={() => void save(null)} aria-label="Remove cover"><IconTrash /> <span className={phoneLabel}>Remove</span></Button>
         </div>
       )}
     </CoverFrame>

@@ -4,8 +4,6 @@ import type { ArtifactVisibility } from "@/lib/artifact-types";
 export interface VisibilityCopy {
   /** The short label in the page header, beside its icon: "Private", "Team", "Link", "Public". */
   label: string;
-  /** The label above the title, before the kind: "Private · ui". */
-  kicker: string;
   /** Whether the full sentence names who shared it. A private artifact is the reader's own. */
   showAuthor: boolean;
   /** Who can see it, the full sentence's last part. */
@@ -25,13 +23,13 @@ const USER_CONTENT = "This is user-shared content; artifacts.space does not revi
 export function visibilityCopy(visibility: ArtifactVisibility): VisibilityCopy {
   switch (visibility) {
     case "private":
-      return { label: "Private", kicker: "Private", showAuthor: false, note: "Only you can see this.", showSignUp: false };
+      return { label: "Private", showAuthor: false, note: "Only you can see this.", showSignUp: false };
     case "team":
-      return { label: "Team", kicker: "Team only", showAuthor: true, note: "Only team members can see this.", showSignUp: false };
+      return { label: "Team", showAuthor: true, note: "Only team members can see this.", showSignUp: false };
     case "link":
-      return { label: "Link", kicker: "Shared artifact", showAuthor: true, note: `Anyone with the link can see this. ${USER_CONTENT}`, showSignUp: true };
+      return { label: "Link", showAuthor: true, note: `Anyone with the link can see this. ${USER_CONTENT}`, showSignUp: true };
     default:
-      return { label: "Public", kicker: "Shared artifact", showAuthor: true, note: `Anyone can see this. ${USER_CONTENT}`, showSignUp: true };
+      return { label: "Public", showAuthor: true, note: `Anyone can see this. ${USER_CONTENT}`, showSignUp: true };
   }
 }
 

@@ -10,7 +10,7 @@ describe("StickyChrome", () => {
     expect(html).toMatch(/class="[^"]*\bsticky\b[^"]*\btop-0\b/);
   });
 
-  it("should name the height variable the editor bar offsets by", () => {
+  it("should name the height variable sticky toolbars offset by", () => {
     expect(CHROME_HEIGHT_VAR).toBe("--artifact-chrome-height");
   });
 });

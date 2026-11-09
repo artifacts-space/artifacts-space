@@ -25,6 +25,8 @@ test.afterAll(async () => {
 });
 
 const saveStatus = (page: Page) => page.locator("[data-slot=save-status]").getByRole("status");
+/** On the artifact's own page, the save status sits in the page header beside its More menu. */
+const pageSaveStatus = (page: Page) => page.getByRole("banner").locator("[data-slot=save-indicator]");
 
 /** Signs in, seeds a Markdown artifact, and opens it in /app. Returns its public id. */
 async function openSeeded(page: Page, title: string, content: string) {
@@ -105,7 +107,7 @@ test("should unlock Markdown in place on the artifact's own page and save it on 
   const content = page.getByRole("textbox", { name: "Artifact content" });
   await expect(content).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
-  const status = page.locator("[data-slot=editor-bar]").getByRole("status");
+  const status = pageSaveStatus(page);
 
   await content.getByText("Read here.").click();
   await page.keyboard.press("End");
@@ -130,11 +132,12 @@ test("should save a heading typed into an interface, keep it after a reload, and
   await page.keyboard.press("End");
   await page.keyboard.type(" for Friday");
   await page.keyboard.type(" and Monday");
-  await expect(page.locator("[data-slot=editor-bar]").getByRole("status")).toHaveText("Saved", savedWithin);
+  await expect(pageSaveStatus(page)).toHaveText("Saved", savedWithin);
 
   await page.reload();
   await expect(page.locator("[data-slot=ui-block-editor]").getByRole("textbox", { name: "Heading" })).toHaveText("Launch plan for Friday and Monday");
   expect(await versionKinds(publicId)).toEqual(["snapshot", "edit"]);
-  await page.locator("[data-slot=editor-bar]").getByRole("button", { name: "History" }).click();
+  await page.getByRole("banner").getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "History" }).click();
   await expect(page.getByRole("list", { name: "Versions" }).getByRole("listitem")).toHaveCount(2);
 });
