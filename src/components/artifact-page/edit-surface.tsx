@@ -5,10 +5,9 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 
 import { loadEditableArtifactAction } from "@/app/artifact/[publicId]/edit-actions";
 import { VersionHistory } from "@/components/history/version-history";
-import type { ArtifactDto } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
 
-import { PageEditBar, PageInlineEditor } from "./page-inline-editor";
+import { PageEditBar, PageEditFrame, usePageEditor } from "./page-inline-editor";
 
 interface EditSurfaceProps {
   publicId: string;
@@ -29,39 +28,35 @@ const loadFailed = "Editing is not available right now. Reload the page to try a
  * someone who may edit; it loads the latest saved copy itself, so nothing
  * editable is ever part of a cached page. Until that copy arrives the page
  * shows the read view; then the same page is editable in place
- * (PageInlineEditor) with no Edit button.
+ * (PageEditFrame) with no Edit button.
  */
 export function EditSurface({ publicId, title, updatedAt, reviewed, files, children }: EditSurfaceProps) {
   const router = useRouter();
-  const [loaded, setLoaded] = useState<ArtifactDto | null>(null);
   const [error, setError] = useState("");
   const [, startRefresh] = useTransition();
+  const refresh = useCallback(() => { startRefresh(() => { router.refresh(); }); }, [router]);
+  const editor = usePageEditor(null, refresh);
+  const { start } = editor;
 
   useEffect(() => {
     let active = true;
     loadEditableArtifactAction(publicId)
       .then((result) => {
         if (!active) return;
-        if (result.success) setLoaded(result.data);
+        if (result.success) start(result.data);
         else setError(result.error);
       })
       .catch(() => { if (active) setError(loadFailed); });
     return () => { active = false; };
-  }, [publicId]);
+  }, [publicId, start]);
 
-  const refresh = useCallback(() => { startRefresh(() => { router.refresh(); }); }, [router]);
-
-  if (loaded) {
-    return <PageInlineEditor artifact={loaded} reviewed={reviewed} onSaved={refresh}>{children}</PageInlineEditor>;
-  }
-  return (
-    <div>
-      <PageEditBar
-        history={<VersionHistory publicId={publicId} title={title} updatedAt={updatedAt} reviewed={reviewed} files={files} onRestored={refresh} />}
-        status={error ? <p role="alert" className="mr-auto text-xs text-muted-foreground">{error}</p> : null}
-        source={null}
-      />
-      {children}
-    </div>
+  const loadingBar = (
+    <PageEditBar
+      history={<VersionHistory publicId={publicId} title={title} updatedAt={updatedAt} reviewed={reviewed} files={files} onRestored={refresh} />}
+      status={error ? <p role="alert" className="mr-auto text-xs text-muted-foreground">{error}</p> : null}
+      source={null}
+    />
   );
+  // One frame for both states: the heading and body never remount when editing unlocks.
+  return <PageEditFrame editor={editor} reviewed={reviewed} loadingBar={loadingBar}>{children}</PageEditFrame>;
 }

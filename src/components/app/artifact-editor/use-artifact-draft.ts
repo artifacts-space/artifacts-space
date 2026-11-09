@@ -34,7 +34,7 @@ export function draftFrom(artifact: Pick<ArtifactDto, keyof ArtifactDraft>): Art
  * a merge that changed the content), so editors that keep their own state,
  * such as the rich Markdown editor, remount with the new content.
  */
-export function useArtifactDraft(artifact: ArtifactDto) {
+export function useArtifactDraft(artifact: Pick<ArtifactDto, keyof ArtifactDraft>) {
   const [draft, setDraft] = useState<ArtifactDraft>(() => draftFrom(artifact));
   const [revision, setRevision] = useState(0);
 
