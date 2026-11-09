@@ -17,8 +17,8 @@ async function artifactPaths(): Promise<string[]> {
 
 /**
  * sitemap.xml: the home page, legal pages, and docs, plus public artifacts
- * whose author turned on "Show in search engines" (from accounts past the
- * new-account wait). Built per request, never at build time, so it needs no
+ * for which someone who can share them turned on "Show in search engines"
+ * (from author accounts past the new-account wait). Built per request, never at build time, so it needs no
  * database during the build and drops an artifact as soon as it is hidden.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

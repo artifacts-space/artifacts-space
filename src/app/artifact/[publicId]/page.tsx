@@ -59,8 +59,8 @@ async function load(params: Promise<{ publicId: string }>) {
 }
 
 /**
- * Whether search engines may index this page: public, its author turned on
- * "Show in search engines", and the author's account is past its first days.
+ * Whether search engines may index this page: public, someone who can share
+ * it turned on "Show in search engines", and the author's account is past its first days.
  * A failed account lookup counts as a new account.
  */
 async function indexable(record: ViewableArtifact["record"]) {
