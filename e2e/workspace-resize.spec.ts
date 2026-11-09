@@ -95,6 +95,11 @@ function brandColor(page: Page) {
   });
 }
 
+/** The color of a handle's line, drawn by its ::after. */
+function lineColor(handle: Locator) {
+  return handle.evaluate((element) => getComputedStyle(element, "::after").backgroundColor);
+}
+
 test.describe("desktop", () => {
   test.skip(({ isMobile }) => isMobile, "phones have no handles; checked below");
 
@@ -110,6 +115,10 @@ test.describe("desktop", () => {
 
     await dragBy(page, handle, 120, 0);
     expect(await widthOf(sidebar(page))).toBe(400);
+    // A drag focuses the handle for the keyboard, but never shows the keyboard focus line or a ring.
+    await expect(handle).toBeFocused();
+    expect(await lineColor(handle)).not.toBe(await brandColor(page));
+    expect(await handle.evaluate((element) => getComputedStyle(element).boxShadow)).toBe("none");
     await expect(handle).toHaveAttribute("aria-valuenow", "400");
     expect(await sidebarEdgeGap(page), "the handle sits on the sidebar's right edge").toBeLessThan(2);
 
@@ -139,9 +148,9 @@ test.describe("desktop", () => {
     expect(await stored(page, sidebarKey)).toBeNull();
     await handle.press("ArrowLeft");
 
-    // The keyboard focus ring is drawn in --brand.
-    const ring = await handle.evaluate((element) => getComputedStyle(element).boxShadow);
-    expect(ring).toContain(await brandColor(page));
+    // From the keyboard, focus shows as the handle's line in --brand, with no ring boxing the grab area.
+    expect(await lineColor(handle)).toBe(await brandColor(page));
+    expect(await handle.evaluate((element) => getComputedStyle(element).boxShadow)).toBe("none");
     const scroll = await pageScroll(page);
     expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.clientWidth + 1);
   });

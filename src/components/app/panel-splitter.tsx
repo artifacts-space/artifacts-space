@@ -81,6 +81,8 @@ function useMeasured(initial: PanelMeasure, measure: () => PanelMeasure | null, 
 export function PanelSplitter({ panel, label, controls, orientation, measure, watch, initial, className }: PanelSplitterProps) {
   const { value, setValue, measured } = useMeasured(initial, measure, watch);
   const [dragging, setDragging] = useState(false);
+  /** Set once the keyboard moves a handle the pointer focused, which :focus-visible never matches. */
+  const [keyboard, setKeyboard] = useState(false);
   const drag = useRef<Drag | null>(null);
   const hintId = useId();
   /** A size set from the keyboard and not yet stored: held keys repeat, so it is stored on key up or blur. */
@@ -103,8 +105,10 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
     const now = measure();
     if (!now) return;
     event.preventDefault();
+    setKeyboard(false);
     event.currentTarget.setPointerCapture(event.pointerId);
-    event.currentTarget.focus({ preventScroll: true });
+    // A pointer focuses the handle for the keyboard after it, without the keyboard focus line.
+    event.currentTarget.focus({ preventScroll: true, focusVisible: false });
     drag.current = { pointerId: event.pointerId, origin: along(event, orientation), start: now.size, bounds: now.bounds, size: null };
     document.documentElement.style.cursor = cursors[orientation];
     setDragging(true);
@@ -130,6 +134,7 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
   function onKeyDown(event: React.KeyboardEvent) {
     if (isResetKey(event.key)) {
       event.preventDefault();
+      setKeyboard(true);
       reset();
       return;
     }
@@ -138,9 +143,15 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
     const next = keyboardResize(event.key, event.shiftKey, now.size, now.bounds, orientation);
     if (next === null) return;
     event.preventDefault();
+    setKeyboard(true);
     if (next === now.size) return;
     show(next, now.bounds);
     unsaved.current = next;
+  }
+
+  function onBlur() {
+    setKeyboard(false);
+    saveKeyboardSize();
   }
 
   function saveKeyboardSize() {
@@ -174,6 +185,7 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
       data-slot="panel-splitter"
       data-measured={measured ? "" : undefined}
       data-dragging={dragging ? "" : undefined}
+      data-keyboard={keyboard ? "" : undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
@@ -181,12 +193,13 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
       onLostPointerCapture={endDrag}
       onKeyDown={onKeyDown}
       onKeyUp={saveKeyboardSize}
-      onBlur={saveKeyboardSize}
+      onBlur={onBlur}
       onDoubleClick={reset}
       className={cn(
-        "absolute z-20 hidden touch-none rounded-sm select-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none lg:block",
-        // The line: invisible at rest (the border shows), a quiet bar on hover and while dragging, the brand on focus.
-        "after:absolute after:bg-transparent after:transition-colors hover:after:bg-foreground/20 data-[dragging]:after:bg-foreground/30 focus-visible:after:bg-brand",
+        "absolute z-20 hidden touch-none select-none outline-none lg:block",
+        // The line is the only mark: invisible at rest (the border shows), a quiet bar on hover and while dragging,
+        // and the brand from the keyboard. A ring around the handle would box its whole grab area.
+        "after:absolute after:bg-transparent after:transition-colors hover:after:bg-foreground/20 data-[dragging]:after:bg-foreground/30 focus-visible:after:bg-brand data-[keyboard]:after:bg-brand",
         orientation === "vertical"
           // A vertical handle sits just past its panel's edge, so its line runs along the handle's start, on the border.
           ? "cursor-col-resize after:inset-y-0 after:left-0 after:w-0.5"
