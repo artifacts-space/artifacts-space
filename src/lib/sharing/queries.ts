@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, max, ne } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { agent, artifact, sharingRequest, user } from "@/db/schema";
@@ -71,11 +71,26 @@ export interface TeamSharedView {
   authorName: string;
   authorUsername: string | null;
   updatedAt: string;
+  /** When its latest approved sharing in this team was decided. Null when it was shared without approval, which leaves no record. */
+  sharedAt: string | null;
 }
 
-/** Artifacts shared with or approved by a team, newest first. Callers must check membership. */
-export async function listTeamSharedArtifacts(teamId: string, limit = 100): Promise<TeamSharedView[]> {
-  const rows = await getDb()
+type Db = Pick<ReturnType<typeof getDb>, "select">;
+
+/**
+ * The query behind listTeamSharedArtifacts. The approval dates come from a
+ * grouped subquery filtered by the team id and joined on the artifact id, never
+ * a correlated subquery (see the tripwire in AGENTS.md). Exported for its
+ * `.toSQL()` test.
+ */
+export function teamSharedQuery(db: Db, teamId: string, limit: number) {
+  const approvals = db
+    .select({ artifactId: sharingRequest.artifactId, sharedAt: max(sharingRequest.decidedAt).as("shared_at") })
+    .from(sharingRequest)
+    .where(and(eq(sharingRequest.teamId, teamId), eq(sharingRequest.kind, "sharing"), eq(sharingRequest.status, "approved")))
+    .groupBy(sharingRequest.artifactId)
+    .as("approvals");
+  return db
     .select({
       artifactId: artifact.id,
       publicId: artifact.publicId,
@@ -87,12 +102,24 @@ export async function listTeamSharedArtifacts(teamId: string, limit = 100): Prom
       authorName: user.name,
       authorUsername: user.username,
       updatedAt: artifact.updatedAt,
+      sharedAt: approvals.sharedAt,
     })
     .from(artifact)
     .innerJoin(user, eq(user.id, artifact.userId))
     .leftJoin(agent, eq(agent.userId, user.id))
+    .leftJoin(approvals, eq(approvals.artifactId, artifact.id))
     .where(and(eq(artifact.teamId, teamId), ne(artifact.visibility, "private")))
     .orderBy(desc(artifact.updatedAt))
     .limit(limit);
-  return rows.map(({ authorAgentId, ...row }) => ({ ...row, authorKind: authorAgentId ? "agent" : "person", updatedAt: row.updatedAt.toISOString() }));
+}
+
+/** Artifacts shared with or approved by a team, newest first. Callers must check membership. */
+export async function listTeamSharedArtifacts(teamId: string, limit = 100): Promise<TeamSharedView[]> {
+  const rows = await teamSharedQuery(getDb(), teamId, limit);
+  return rows.map(({ authorAgentId, ...row }) => ({
+    ...row,
+    authorKind: authorAgentId ? "agent" : "person",
+    updatedAt: row.updatedAt.toISOString(),
+    sharedAt: row.sharedAt ? row.sharedAt.toISOString() : null,
+  }));
 }

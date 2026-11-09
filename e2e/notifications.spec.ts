@@ -24,12 +24,12 @@ test("should show the unread count and list notifications newest first when the 
   await expect(popup.getByRole("region", { name: "Earlier" }).getByRole("link")).toContainText("approved your changes to");
 });
 
-test("should open the artifact with its comments, or the team page for a request, when a row is chosen", async ({ page }) => {
+test("should open the artifact with its comments, or the team approval queue for a request, when a row is chosen", async ({ page }) => {
   await page.goto("/dev/workspace");
   await page.getByRole("button", { name: /^Notifications/ }).click();
   const rows = page.getByRole("dialog").getByRole("region", { name: "New" }).getByRole("link");
   await expect(rows.nth(0)).toHaveAttribute("href", "/app?artifact=fixtureworkspace000md&comments=1");
-  await expect(rows.nth(2)).toHaveAttribute("href", "/teams/fixture");
+  await expect(rows.nth(2)).toHaveAttribute("href", "/teams/fixture?tab=artifacts&view=approval");
 });
 
 test("should clear the badge at once when the person marks everything read", async ({ page }) => {
