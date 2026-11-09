@@ -39,9 +39,9 @@ const approvedId = "11111111-1111-4111-8111-111111111111";
 const pendingTitle = "Pending edit title";
 const savedAt = new Date("2026-11-01T00:00:00Z");
 
-function access(visibility: ArtifactVisibility, source: "approved" | "latest" = "approved"): ArtifactAccess {
+function access(visibility: ArtifactVisibility, source: "approved" | "latest" = "approved", allowCsvDownload = false): ArtifactAccess {
   const fixture = {
-    record: { id: "internal", visibility, title: pendingTitle },
+    record: { id: "internal", visibility, title: pendingTitle, allowCsvDownload },
     version: source === "approved" ? { source, versionId: approvedId } : { source, versionId: null },
     served: { title: source === "approved" ? "Approved title" : pendingTitle, icon: null, updatedAt: savedAt, editedBy: null },
     canEdit: false,
@@ -281,6 +281,18 @@ describe("loadArtifactOg", () => {
     expect(mocks.cachedVersionView).toHaveBeenCalledWith(approvedId, savedAt.toISOString());
     expect(og).toMatchObject({ title: "Approved title", kindLabel: "Markdown", synopsis: { type: "prose", heading: "Approved heading" } });
     expect(JSON.stringify(og)).not.toContain(pendingTitle);
+  });
+
+  it("should draw no cell values on the card when a sheet's downloads are off, and the table when they are on", async () => {
+    const sheet = { ...approvedView, kind: "csv", content: "name,secret\nAda,s3cret\n" };
+    mocks.cachedVersionView.mockResolvedValue(sheet);
+    mocks.getSignedOutAccess.mockResolvedValue(access("public", "approved", false));
+    const withheld = await loadArtifactOg("abc", approvedId);
+    expect(withheld?.synopsis).toEqual({ type: "glyph", glyph: "page", label: "CSV", detail: null });
+    expect(JSON.stringify(withheld)).not.toContain("s3cret");
+
+    mocks.getSignedOutAccess.mockResolvedValue(access("public", "approved", true));
+    expect((await loadArtifactOg("abc", approvedId))?.synopsis).toEqual({ type: "table", header: ["name", "secret"], rows: [["Ada", "s3cret"]] });
   });
 
   it("should draw the approved version's icon, never a pending one, when the preview renders", async () => {

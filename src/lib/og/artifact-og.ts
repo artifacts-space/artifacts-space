@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getSignedOutAccess, type ArtifactAccess } from "@/lib/access";
 import { iconTitlePrefix } from "@/lib/artifact-icons";
 import type { ArtifactKind } from "@/lib/artifact-types";
+import { mayExportCsv } from "@/lib/csv-export/rules";
 import { filesForViewer } from "@/lib/files/download";
 import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
 import { cachedVersionView } from "@/lib/versions/cache";
@@ -128,6 +129,15 @@ export interface ArtifactOg {
 }
 
 /**
+ * What the card may draw from. A card request is always anonymous, so a
+ * sheet whose downloads are off gives it no cell values (mayExportCsv), only
+ * the generic CSV glyph, like the Markdown version and `/raw`.
+ */
+function cardContent(access: ArtifactAccess, view: Pick<VersionView, "kind" | "content">): string {
+  return mayExportCsv({ canEdit: false }, { kind: view.kind, allowCsvDownload: access.record.allowCsvDownload }) ? view.content : "";
+}
+
+/**
  * The preview for `publicId` at image path segment `segment` (the version
  * id, then the theme key; theme-key.ts), or null when the preview must be
  * the generic site image: the artifact is not readable signed out, or the
@@ -149,7 +159,7 @@ export async function loadArtifactOg(publicId: string, segment: string): Promise
     icon: ogIconFor(view.icon),
     kind: view.kind,
     kindLabel: view.kind === "code" && view.language ? `${ogKindLabels.code} · ${truncate(view.language, 16)}` : ogKindLabels[view.kind],
-    synopsis: buildSynopsis({ kind: view.kind, content: view.content, language: view.language, files }),
+    synopsis: buildSynopsis({ kind: view.kind, content: cardContent(access, view), language: view.language, files }),
     palette: ogCardPalette(theme),
     cover: cover.cover,
     coverDegraded: cover.degraded,
