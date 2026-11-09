@@ -262,9 +262,11 @@ export function shownStamp(record: { harness: string | null; harnessOverride: st
 /**
  * The harness to write on the latest version when an agent save changed
  * nothing, so History agrees with the byline; null when nothing changes (a
- * web save, or the version already records it).
+ * web save, or the version already records it). Never on the approved
+ * version: readers outside the team read its harness, and it changes only
+ * through approval.
  */
-export function restampTo(versionHarness: string | null, stamp: HarnessStamp | null | undefined): HarnessId | null {
-  if (!stamp || stamp.harness === versionHarness) return null;
+export function restampTo(version: { harness: string | null; approved: boolean }, stamp: HarnessStamp | null | undefined): HarnessId | null {
+  if (version.approved || !stamp || stamp.harness === version.harness) return null;
   return stamp.harness;
 }

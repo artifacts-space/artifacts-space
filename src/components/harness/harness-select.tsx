@@ -41,6 +41,12 @@ interface HarnessSelectProps {
 export function HarnessSelect({ detected, override, label, onChange }: HarnessSelectProps) {
   const [value, setValue] = useState<HarnessId | null>(override);
   const [saving, setSaving] = useState(false);
+  // Follow the server's value when it changes (another tab, or the page refreshing after a save).
+  const [shown, setShown] = useState<HarnessId | null>(override);
+  if (override !== shown) {
+    setShown(override);
+    setValue(override);
+  }
 
   async function change(next: string | null) {
     if (next === null) return;

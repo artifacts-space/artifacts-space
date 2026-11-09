@@ -195,12 +195,16 @@ describe("snapshots and unchanged saves", () => {
   });
 
   it("should restamp the latest version when another agent saves the same content", () => {
-    expect(restampTo("claude-code", { harness: "cursor", label: null })).toBe("cursor");
+    expect(restampTo({ harness: "claude-code", approved: false }, { harness: "cursor", label: null })).toBe("cursor");
+  });
+
+  it("should never restamp the approved version, whose byline readers outside the team see", () => {
+    expect(restampTo({ harness: "claude-code", approved: true }, { harness: "cursor", label: null })).toBeNull();
   });
 
   it("should leave the latest version alone when a web save or the same agent changes nothing", () => {
-    expect(restampTo("claude-code", null)).toBeNull();
-    expect(restampTo("claude-code", { harness: "claude-code", label: null })).toBeNull();
+    expect(restampTo({ harness: "claude-code", approved: false }, null)).toBeNull();
+    expect(restampTo({ harness: "claude-code", approved: false }, { harness: "claude-code", label: null })).toBeNull();
   });
 });
 

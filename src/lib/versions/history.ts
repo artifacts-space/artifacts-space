@@ -90,8 +90,8 @@ export async function versionMatching(record: ArtifactRecord, createdBy: string 
  * An agent save that changes nothing still says which agent saved last, so
  * the latest version records it too and History agrees with the byline.
  */
-async function restampVersion(latest: ArtifactVersionRecord, harness: HarnessStamp | null | undefined) {
-  const next = restampTo(latest.harness, harness);
+async function restampVersion(latest: ArtifactVersionRecord, approvedVersionId: string | null, harness: HarnessStamp | null | undefined) {
+  const next = restampTo({ harness: latest.harness, approved: latest.id === approvedVersionId }, harness);
   if (!next) return;
   await getDb().update(artifactVersion).set({ harness: next }).where(eq(artifactVersion.id, latest.id));
 }
@@ -118,7 +118,7 @@ export async function fileVersion(
 ): Promise<string> {
   const latest = await latestVersion(record.id);
   if (latest && save.saveKind === "edit" && sameReviewedFields(latest, record)) {
-    await restampVersion(latest, save.harness);
+    await restampVersion(latest, record.approvedVersionId, save.harness);
     return latest.id;
   }
   const { referenced } = await protectedVersions(record.id, record.approvedVersionId);

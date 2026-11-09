@@ -26,6 +26,20 @@ function keyOf(ref: McpConnectionRef) {
     : { where: eq(mcpConnection.apiTokenId, ref.tokenId), target: [mcpConnection.apiTokenId], values: { oauthClientId: null, apiTokenId: ref.tokenId } };
 }
 
+/** True when a request's clientInfo differs from the stored one. */
+function clientInfoChanged(info: ClientInfo, stored: { clientName: string | null; clientVersion: string | null }): boolean {
+  return info.name !== stored.clientName || info.version !== stored.clientVersion;
+}
+
+/** Records clientInfo, failing open: a failed write never costs the save its harness, which detection still finds. */
+async function recordQuietly(ref: McpConnectionRef, info: ClientInfo): Promise<void> {
+  try {
+    await recordClientInfo(ref, info);
+  } catch (error) {
+    console.error("[mcp] Recording clientInfo failed", error instanceof Error ? error.name : "unknown error");
+  }
+}
+
 /** Keeps the clientInfo a connection sent. The row changes only when the name or version did. */
 export async function recordClientInfo(ref: McpConnectionRef, info: ClientInfo): Promise<void> {
   const key = keyOf(ref);
@@ -47,14 +61,14 @@ async function registrationOf(ref: McpConnectionRef): Promise<{ oauthName: strin
   return { oauthName: client?.name ?? null, softwareId: client?.softwareId ?? null };
 }
 
-/** What the database knows about one connection: its stored clientInfo name and override, and the OAuth registration. */
+/** What the database knows about one connection: its stored clientInfo and override, and the OAuth registration. */
 async function loadSignals(ref: McpConnectionRef) {
   const [rows, registration] = await Promise.all([
-    getDb().select({ clientName: mcpConnection.clientName, override: mcpConnection.harnessOverride }).from(mcpConnection).where(keyOf(ref).where).limit(1),
+    getDb().select({ clientName: mcpConnection.clientName, clientVersion: mcpConnection.clientVersion, override: mcpConnection.harnessOverride }).from(mcpConnection).where(keyOf(ref).where).limit(1),
     registrationOf(ref),
   ]);
   const row = rows[0];
-  return { clientName: row?.clientName ?? null, override: row?.override ?? null, ...registration };
+  return { clientName: row?.clientName ?? null, clientVersion: row?.clientVersion ?? null, override: row?.override ?? null, ...registration };
 }
 
 /**
@@ -64,8 +78,8 @@ async function loadSignals(ref: McpConnectionRef) {
  */
 export async function loadConnectionStamp(ref: McpConnectionRef, requestInfo: ClientInfo | null = null): Promise<HarnessStamp> {
   const signals = await loadSignals(ref);
-  // A client that names itself on every request (and may never send initialize) is stored the first time it saves.
-  if (requestInfo && requestInfo.name !== signals.clientName) await recordClientInfo(ref, requestInfo);
+  // A client that names itself on every request (and may never send initialize) is stored when it saves with a new name or version.
+  if (requestInfo && clientInfoChanged(requestInfo, signals)) await recordQuietly(ref, requestInfo);
   const detected = detectHarness({ clientName: requestInfo?.name ?? signals.clientName, oauthName: signals.oauthName, softwareId: signals.softwareId });
   return connectionStamp(detected, signals.override);
 }

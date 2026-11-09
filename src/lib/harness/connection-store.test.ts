@@ -27,7 +27,7 @@ vi.mock("@/db", () => ({
   }),
 }));
 
-const { setConnectionHarnessOverride, toConnectionHarness } = await import("./connection-store");
+const { loadConnectionStamp, setConnectionHarnessOverride, toConnectionHarness } = await import("./connection-store");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -79,5 +79,29 @@ describe("toConnectionHarness", () => {
 
   it("should drop an override that is not a known harness", () => {
     expect(toConnectionHarness({ clientName: null, override: "bogus", oauthName: "Windsurf" })).toEqual({ detected: "windsurf", detectedLabel: null, override: null });
+  });
+});
+
+describe("loadConnectionStamp", () => {
+  const token = { kind: "api-token", userId: "user-1", tokenId: "token-1" } as const;
+  const stored = { clientName: "codex-mcp-client", clientVersion: "1.0.0", override: null };
+
+  it("should store a new version when a client keeps its name and upgrades", async () => {
+    mocks.ownerRows.mockReturnValue([stored]);
+    await loadConnectionStamp(token, { name: "codex-mcp-client", version: "1.1.0" });
+    expect(mocks.inserted).toHaveBeenCalledWith(expect.objectContaining({ clientName: "codex-mcp-client", clientVersion: "1.1.0" }));
+  });
+
+  it("should write nothing when the client sends what is already stored", async () => {
+    mocks.ownerRows.mockReturnValue([stored]);
+    await loadConnectionStamp(token, { name: "codex-mcp-client", version: "1.0.0" });
+    expect(mocks.inserted).not.toHaveBeenCalled();
+  });
+
+  it("should still stamp the detected harness when storing the clientInfo fails", async () => {
+    mocks.ownerRows.mockReturnValue([]);
+    mocks.conflict.mockImplementationOnce(() => { throw new Error("db down"); });
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(loadConnectionStamp(token, { name: "claude-code", version: "2.0.0" })).resolves.toEqual({ harness: "claude-code", label: null });
   });
 });
