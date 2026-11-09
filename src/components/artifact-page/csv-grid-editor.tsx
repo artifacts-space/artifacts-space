@@ -4,7 +4,9 @@ import { IconArrowBackUp, IconChevronDown, IconColumnInsertRight, IconColumnRemo
 import { type ClipboardEvent, type KeyboardEvent, type ReactNode, useCallback, useId, useMemo, useRef, useState } from "react";
 
 import { DataGrid, gridCellId } from "@/components/artifact-view/data-grid";
+import { SheetFormulaBar } from "@/components/artifact-view/sheet-formula-bar";
 import { useSheetColumns } from "@/components/artifact-view/use-sheet-columns";
+import { copySelection, selectionLabel, useSheetSelection } from "@/components/artifact-view/use-sheet-selection";
 import { Button } from "@/components/ui/button";
 import type { CsvTextStyle } from "@/lib/csv";
 import { gridEditKey } from "@/lib/csv-edit-keys";
@@ -16,13 +18,13 @@ import {
   gridWidth,
   insertColumn,
   insertRow,
-  parseClipboardBlock,
   pasteBlock,
   setCell,
 } from "@/lib/csv-edit-rules";
 import { detectColumnTypes } from "@/lib/csv-values";
 import { columnWidths } from "@/lib/csv-view-rules";
-import { clampCell, moveCell } from "@/lib/grid-navigation";
+import { moveCell } from "@/lib/grid-navigation";
+import { clearRange, parsePasteBlock, pastePlan, selectionRange, singleCell } from "@/lib/grid-selection-rules";
 import { moveColumn } from "@/lib/sheet-column-rules";
 import { pixelWidth } from "@/lib/sheet-grid-rules";
 
@@ -65,8 +67,7 @@ const cellsLabel = (rows: number, columns: number) => `${String(rows)} ${rows ==
 export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEditorProps) {
   const { grid, apply, undo, redo } = useCsvGrid(value, onChange, style);
   const width = gridWidth(grid);
-  const [rawActive, setActive] = useState<GridCell>({ row: 0, column: 0 });
-  const active = clampCell(rawActive, { rows: grid.rows.length, columns: width });
+  const { selection, active, setSelection, setActive } = useSheetSelection({ rows: grid.rows.length, columns: width });
   const [editing, setEditing] = useState<Editing | null>(null);
   const [menuColumn, setMenuColumn] = useState<number | null>(null);
   const [status, setStatus] = useState("");
@@ -129,7 +130,7 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
     else if (action === "redo") redo();
     else if (action === "menu") openMenu(active.column);
     else if (action === "edit") startEdit(active);
-    else if (action === "clear") apply((current) => setCell(current, active, ""));
+    else if (action === "clear") apply((current) => clearRange(current, selectionRange(selection)));
     else if (action === "type") startEdit(active, event.key);
     return true;
   }
@@ -138,16 +139,14 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
     const text = event.clipboardData.getData("text/plain");
     if (editing || text === "") return;
     event.preventDefault();
-    const block = parseClipboardBlock(text);
-    const rows = block.length;
-    const columns = block.reduce((widest, line) => Math.max(widest, line.length), 0);
-    apply((current) => pasteBlock(current, active, block).grid);
+    const plan = pastePlan(selectionRange(selection), parsePasteBlock(text));
+    const rows = plan.block.length;
+    const columns = plan.block.reduce((widest, line) => Math.max(widest, line.length), 0);
+    if (rows === 0 || columns === 0) return;
+    apply((current) => pasteBlock(current, plan.at, plan.block).grid);
+    // The pasted block stays selected, as in a spreadsheet.
+    setSelection({ anchor: plan.at, active: { row: plan.at.row + rows - 1, column: plan.at.column + columns - 1 } });
     setStatus(`Pasted ${cellsLabel(rows, columns)}.`);
-  }
-
-  function handleCopy(event: ClipboardEvent<HTMLDivElement>) {
-    event.clipboardData.setData("text/plain", cellValue(grid, active));
-    event.preventDefault();
   }
 
   const gridOf = (column: number) => document.getElementById(gridCellId(gridId, { row: -1, column }))?.closest("[role=grid]") ?? null;
@@ -198,6 +197,13 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
         </div>
         <p role="status" className="ml-auto text-sm text-muted-foreground">{status}</p>
       </div>
+      <div className="min-w-0">
+      <SheetFormulaBar
+        place={selectionLabel(selection, columnName, rowNumber)}
+        value={cellValue(grid, active)}
+        onCommit={(next) => { const at = active; apply((current) => setCell(current, at, next)); }}
+        onDone={focusGrid}
+      />
       <DataGrid
         gridId={gridId}
         label="CSV grid editor"
@@ -212,18 +218,19 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
         header={(column) => <EditorHeader name={columnName(column)} onMenu={() => { openMenu(column); }} />}
         cell={cellText}
         rowLabel={rowNumber}
-        active={editing ? editing.cell : active}
-        onActiveChange={(cell) => { setStatus(""); setActive(cell); }}
+        selection={editing ? singleCell(editing.cell) : selection}
+        onSelectionChange={(next) => { setStatus(""); setSelection(next); }}
         onActiveClick={(cell) => { if (!editing) startEdit(cell); }}
         onGridKeyDown={handleGridKey}
         activeContent={editor}
         onPaste={handlePaste}
-        onCopy={handleCopy}
+        onCopy={(event) => { copySelection(event, selection, (cell) => cellValue(grid, cell)); }}
         tabMoves
         empty={width === 0 ? "This CSV is empty. Add a column to start." : "No rows yet. Add a row to start."}
       />
+      </div>
       <p id={hintId} className="text-xs text-muted-foreground">
-        Double-click a cell, press Enter, or start typing to edit. Paste from Sheets or Excel to fill many cells. To leave the grid, press Escape, then Tab.
+        Double-click a cell, press Enter, or start typing to edit. Shift with the arrows selects a block to copy, paste over, or clear. Paste from Sheets, Excel, or a CSV to fill many cells. To leave the grid, press Escape, then Tab.
       </p>
       {menuColumn !== null ? (
         <CsvEditMenu

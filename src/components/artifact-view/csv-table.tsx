@@ -1,7 +1,7 @@
 "use client";
 
 import { IconArrowDown, IconArrowUp, IconChevronDown, IconEye, IconFilter, IconSearch, IconX } from "@tabler/icons-react";
-import { type ClipboardEvent, type KeyboardEvent, useCallback, useDeferredValue, useId, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useCallback, useDeferredValue, useId, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,12 +22,13 @@ import {
   type SortDirection,
   viewRowIndexes,
 } from "@/lib/csv-view-rules";
-import { clampCell } from "@/lib/grid-navigation";
 import { pixelWidth } from "@/lib/sheet-grid-rules";
 
 import { CsvColumnMenu } from "./csv-column-menu";
 import { DataGrid, gridCellId } from "./data-grid";
+import { SheetFormulaBar } from "./sheet-formula-bar";
 import { useSheetColumns } from "./use-sheet-columns";
+import { copySelection, selectionLabel, useSheetSelection } from "./use-sheet-selection";
 import { ViewNotice } from "./view-notice";
 
 const count = (value: number) => value.toLocaleString("en-US");
@@ -58,7 +59,6 @@ export function CsvTable({ content }: { content: string }) {
   const { parsed, columns, types, widths, numeric } = useParsedCsv(content);
   const [view, setView] = useState<CsvViewState>(initialViewState);
   const quick = useDeferredValue(view.quick);
-  const [rawActive, setActive] = useState<GridCell>({ row: 0, column: 0 });
   const [menuColumn, setMenuColumn] = useState<number | null>(null);
   const gridId = useId();
   const hintId = useId();
@@ -70,12 +70,12 @@ export function CsvTable({ content }: { content: string }) {
   const { dataColumn } = sheet;
   const cellText = useCallback((row: number, column: number) => parsed.rows[shown[row] ?? -1]?.[dataColumn(column)] ?? "", [parsed.rows, shown, dataColumn]);
   const rowLabel = useCallback((row: number) => String((shown[row] ?? 0) + 1), [shown]);
-  const active = clampCell(rawActive, { rows: shown.length, columns });
+  const { selection, active, setSelection, setActive } = useSheetSelection({ rows: shown.length, columns });
 
   if (parsed.header.length === 0) return <ViewNotice title="This CSV has no rows yet." />;
   const notes = csvNotes(parsed);
   const name = (column: number) => parsed.header[column] ?? "";
-  const gridOf = (column: number) => document.getElementById(gridCellId(gridId, { row: -1, column }))?.closest("[role=grid]") ?? null;
+  const gridOf = (column: number) => document.getElementById(gridCellId(gridId, { row: -1, column }))?.closest<HTMLElement>("[role=grid]") ?? null;
   const setFilter = (column: number, filter: ColumnFilter) => { setView((current) => ({ ...current, filters: { ...current.filters, [column]: filter } })); };
   const toggleSort = (column: number) => { setView((current) => ({ ...current, sort: nextSort(current.sort, column) })); };
 
@@ -97,11 +97,7 @@ export function CsvTable({ content }: { content: string }) {
     return true;
   }
 
-  function copyCell(event: ClipboardEvent<HTMLDivElement>) {
-    const row = active.row === -1 ? parsed.header : parsed.rows[shown[active.row] ?? -1];
-    event.clipboardData.setData("text/plain", row?.[dataColumn(active.column)] ?? "");
-    event.preventDefault();
-  }
+  const valueAt = (cell: GridCell) => (cell.row === -1 ? name(dataColumn(cell.column)) : cellText(cell.row, cell.column));
 
 
   function layoutFor(column: number) {
@@ -149,7 +145,9 @@ export function CsvTable({ content }: { content: string }) {
         total={parsed.rows.length}
         onResetOrder={sheet.customOrder ? sheet.resetOrder : null}
       />
-      <p id={hintId} className="sr-only">Use the arrow keys to move between cells. On a column header, press Enter to sort, or Alt and Down Arrow for filters.</p>
+      <p id={hintId} className="sr-only">Use the arrow keys, Tab, and Enter to move between cells, and Shift with the arrows to select a block. Copy copies the selection. On a column header, press Enter to sort, or Alt and Down Arrow for filters. To leave the grid, press Escape, then Tab.</p>
+      <div className="min-w-0">
+      <SheetFormulaBar place={selectionLabel(selection, (column) => name(dataColumn(column)), rowLabel)} value={valueAt(active)} onCommit={null} onDone={() => { gridOf(0)?.focus(); }} />
       <DataGrid
         gridId={gridId}
         label="CSV table"
@@ -173,12 +171,14 @@ export function CsvTable({ content }: { content: string }) {
         onColumnFit={(column) => { sheet.fit(column, gridOf(column)); }}
         cell={cellText}
         rowLabel={rowLabel}
-        active={active}
-        onActiveChange={setActive}
+        selection={selection}
+        onSelectionChange={setSelection}
         onGridKeyDown={handleGridKey}
-        onCopy={copyCell}
+        tabMoves
+        onCopy={(event) => { copySelection(event, selection, valueAt); }}
         empty={parsed.rows.length === 0 ? "Only a header row so far." : "No rows match these filters."}
       />
+      </div>
       {menuColumn !== null ? renderMenu(menuColumn) : null}
       {notes.length > 0 ? <p className="text-sm text-muted-foreground">{notes.join(" ")}</p> : null}
     </div>

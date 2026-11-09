@@ -26,9 +26,37 @@ const arrowMoves: Partial<Record<string, GridMove>> = {
 /** The move a key press asks for, or null. Ctrl or Cmd with Home or End jumps to the grid's corners. */
 export function keyToMove(key: string, modifiers: { shift: boolean; ctrl: boolean }): GridMove | null {
   if (key === "Tab") return modifiers.shift ? "previous" : "next";
+  if (key === "Enter") return modifiers.shift ? "up" : "down";
   if (key === "Home") return modifiers.ctrl ? "gridStart" : "rowStart";
   if (key === "End") return modifiers.ctrl ? "gridEnd" : "rowEnd";
   return arrowMoves[key] ?? null;
+}
+
+/** A direction Cmd or Ctrl+arrow jumps in. */
+export type JumpDirection = "up" | "down" | "left" | "right";
+
+const jumps: Partial<Record<string, JumpDirection>> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
+
+/** What a key press does to the selection: a move or a jump, and whether Shift extends the selection instead of moving it. */
+export interface KeyIntent {
+  move: GridMove | null;
+  jump: JumpDirection | null;
+  extend: boolean;
+}
+
+/**
+ * The selection change a key press asks for, as in a spreadsheet: arrows,
+ * Home, End, and Page Up or Down move; with Cmd or Ctrl an arrow jumps to
+ * the edge of the data; with Shift each of them extends the selection
+ * instead. Tab, Shift+Tab, Enter, and Shift+Enter always move one cell.
+ * Returns null for keys that do not move.
+ */
+export function keyIntent(key: string, modifiers: { shift: boolean; ctrl: boolean }): KeyIntent | null {
+  const jump = modifiers.ctrl ? (jumps[key] ?? null) : null;
+  const move = jump === null ? keyToMove(key, modifiers) : null;
+  if (jump === null && move === null) return null;
+  const extend = modifiers.shift && key !== "Tab" && key !== "Enter";
+  return { move, jump, extend };
 }
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
