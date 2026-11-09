@@ -73,6 +73,8 @@ export function useColumnDrag(scrollerRef: RefObject<HTMLElement | null>, offset
   function startMove(column: number, event: ReactPointerEvent) {
     const onColumnMove = handlers.onColumnMove;
     if (!onColumnMove || !canDrag(event)) return;
+    // A latch left by an earlier drag that never ended in a header click must not eat this gesture's click.
+    swallowClick.current = false;
     const startX = event.clientX;
     let current: ColumnDrag | null = null;
     track(event, (move) => {
@@ -83,15 +85,16 @@ export function useColumnDrag(scrollerRef: RefObject<HTMLElement | null>, offset
       setDrag(current);
     }, (_end, cancelled) => {
       setDrag(null);
-      if (current === null) return;
+      if (current === null || cancelled) return;
       swallowClick.current = true;
-      if (!cancelled && current.to !== current.from) onColumnMove(current.from, current.to);
+      if (current.to !== current.from) onColumnMove(current.from, current.to);
     });
   }
 
   function startResize(column: number, event: ReactPointerEvent) {
     const onColumnResize = handlers.onColumnResize;
     if (!onColumnResize || !canDrag(event)) return;
+    swallowClick.current = false;
     event.stopPropagation();
     event.preventDefault();
     const startX = event.clientX;

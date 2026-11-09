@@ -52,6 +52,25 @@ test.describe("with a mouse", () => {
     await expect.poll(() => width(header(again, "col_01"))).toBeCloseTo(before + 120, 0);
   });
 
+  test("should keep a resized width for the visit and drop it on reload when the browser refuses storage", async ({ page }) => {
+    await page.addInitScript(() => {
+      Storage.prototype.setItem = () => {
+        throw new DOMException("Storage is full.", "QuotaExceededError");
+      };
+    });
+    const grid = await openGallerySheet(page);
+    const column = header(grid, "col_01");
+    const before = await width(column);
+    await dragBy(page, grid.locator('[data-resize-handle="0"]'), 120);
+    await expect.poll(() => width(column)).toBeCloseTo(before + 120, 0);
+
+    await page.reload();
+    const again = viewerGrid(page);
+    await again.scrollIntoViewIfNeeded();
+    await expect(header(again, "col_01")).toBeVisible();
+    expect(await width(header(again, "col_01"))).toBeCloseTo(before, 0);
+  });
+
   test("should fit a column to its content when its header edge is double-clicked", async ({ page }) => {
     const grid = await openGallerySheet(page);
     const column = header(grid, "col_01");

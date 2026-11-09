@@ -115,7 +115,9 @@ export function columnKeys(header: readonly string[], count: number): string[] {
     if (name === "") return `#${String(column)}`;
     const times = (seen.get(name) ?? 0) + 1;
     seen.set(name, times);
-    return times === 1 ? `=${name}` : `=${name}#${String(times)}`;
+    // The name is quoted, so a column literally named "a#2" never shares a key with the second "a".
+    const quoted = JSON.stringify(name);
+    return times === 1 ? `=${quoted}` : `=${quoted}#${String(times)}`;
   });
 }
 

@@ -107,12 +107,17 @@ describe("widths", () => {
   });
 
   it("should key columns by name, counting repeats, and by place when unnamed", () => {
-    expect(columnKeys(["id", "", "id", "score"], 5)).toEqual(["=id", "#1", "=id#2", "=score", "#4"]);
+    expect(columnKeys(["id", "", "id", "score"], 5)).toEqual(['="id"', "#1", '="id"#2', '="score"', "#4"]);
+  });
+
+  it("should give every column its own key when a name looks like a repeat of another", () => {
+    const keys = columnKeys(["a", "a", "a#2"], 3);
+    expect(new Set(keys).size).toBe(3);
   });
 
   it("should use a viewer's own width when set and the default otherwise", () => {
-    expect(appliedWidths([100, 120], ["=a", "=b"], { "=b": 300, "=gone": 90 })).toEqual([100, 300]);
-    expect(appliedWidths([100], ["=a"], { "=a": 2 })).toEqual([minColumnWidth]);
+    expect(appliedWidths([100, 120], ['="a"', '="b"'], { '="b"': 300, '="gone"': 90 })).toEqual([100, 300]);
+    expect(appliedWidths([100], ['="a"'], { '="a"': 2 })).toEqual([minColumnWidth]);
   });
 });
 

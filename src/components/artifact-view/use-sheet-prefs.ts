@@ -21,12 +21,14 @@ function subscribe(listener: () => void) {
   };
 }
 
+/** Memory holds only writes storage refused, so it always wins over an older stored copy. */
 function readText(storageKey: string, persistent: boolean): string | null {
-  if (!persistent) return memory.get(storageKey) ?? null;
+  const unsaved = memory.get(storageKey);
+  if (unsaved !== undefined || !persistent) return unsaved ?? null;
   try {
-    return window.localStorage.getItem(storageKey) ?? memory.get(storageKey) ?? null;
+    return window.localStorage.getItem(storageKey);
   } catch {
-    return memory.get(storageKey) ?? null;
+    return null;
   }
 }
 
@@ -35,8 +37,10 @@ function writeText(storageKey: string, persistent: boolean, text: string) {
   if (persistent) {
     try {
       window.localStorage.setItem(storageKey, text);
+      // Stored: storage is the source again, so another tab's later change shows here.
+      memory.delete(storageKey);
     } catch {
-      // Kept in memory instead.
+      // Kept in memory instead, until the page reloads.
     }
   }
   for (const listener of listeners) listener();
