@@ -111,7 +111,7 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     // A pointer focuses the handle for the keyboard after it, without the keyboard focus style. Browsers
-    // without this option (before Chrome 144, Safari 18.4) ignore it, so the flag is cleared after focusing.
+    // that ignore the option may still match :focus-visible, so the flag is cleared after focusing.
     event.currentTarget.focus({ preventScroll: true, focusVisible: false });
     setKeyboard(false);
     drag.current = { pointerId: event.pointerId, origin: along(event, orientation), start: now.size, bounds: now.bounds, size: null };

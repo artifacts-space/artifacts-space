@@ -165,6 +165,19 @@ test.describe("desktop", () => {
     expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.clientWidth + 1);
   });
 
+  test("should outline a keyboard-driven handle in forced colors, where the line's background is dropped", async ({ page }) => {
+    await page.emulateMedia({ forcedColors: "active" });
+    await openWorkspace(page);
+    const handle = sidebarHandle(page);
+    const outline = () => handle.evaluate((element) => getComputedStyle(element).outlineStyle);
+
+    await dragBy(page, handle, 16, 0);
+    await expect(handle).toBeFocused();
+    expect(await outline(), "no outline after a drag").toBe("none");
+    await handle.press("ArrowLeft");
+    await expect.poll(outline, "an outline from the keyboard").toBe("solid");
+  });
+
   test("should stop the sidebar where the artifact pane keeps its minimum width on a narrow desktop", async ({ page }) => {
     // At 1024 px the workspace card is under 1000 px wide, so the pane's 480 px floor binds before the 520 px cap.
     await openWorkspace(page, { width: 1024, height: 900 });
