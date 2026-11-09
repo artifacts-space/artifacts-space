@@ -12,13 +12,14 @@ import { ConfirmationsProvider } from "@/components/confirmations-provider";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
-import { fixtureArtifact, longJson, longMarkdown, longUi, shortUi, type EditorFixtureKind } from "./fixture-content";
+import { dataUi, fixtureArtifact, longJson, longMarkdown, longUi, shortUi, type EditorFixtureKind } from "./fixture-content";
 
 const samples: Record<EditorFixtureKind, { kind: ArtifactKind; content: () => string }> = {
   ui: { kind: "ui", content: longUi },
   json: { kind: "json", content: longJson },
   markdown: { kind: "markdown", content: longMarkdown },
   blocks: { kind: "ui", content: shortUi },
+  data: { kind: "ui", content: dataUi },
 };
 
 /** A save that keeps the change in memory, so autosave runs end to end without a database. */
