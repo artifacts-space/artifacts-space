@@ -88,6 +88,9 @@ test("should show the selected cell's whole value read-only in the formula bar f
   await expect(bar).toHaveValue("r3c4");
   await expect(bar).toHaveAttribute("readonly", "");
   await expect(page.locator('[data-specimen="csv · Sheet at the size limit"] [data-formula-bar]')).toContainText("col_04 · 3");
+  await bar.focus();
+  await page.keyboard.press("Enter");
+  await expect(grid, "Enter in the read-only bar goes back to the grid").toBeFocused();
 });
 
 test.describe("an editor", () => {
@@ -126,6 +129,14 @@ test.describe("an editor", () => {
     await formula(page).fill("thrown away");
     await page.keyboard.press("Escape");
     await expect(formula(page)).toHaveValue("from the bar");
+  });
+
+  test("should save a value typed in the formula bar when another cell is clicked", async ({ page }) => {
+    await grid(page).getByRole("gridcell", { name: "r1c3", exact: true }).click();
+    await formula(page).fill("kept on click");
+    await grid(page).getByRole("gridcell", { name: "r4c4", exact: true }).click();
+    await expect(grid(page).getByRole("gridcell", { name: "kept on click", exact: true })).toHaveAttribute("aria-colindex", "4");
+    await expect(formula(page)).toHaveValue("r4c4");
   });
 
   test("should still edit a cell by typing and clear a selected block with Delete", async ({ page }) => {

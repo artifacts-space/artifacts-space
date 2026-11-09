@@ -1,4 +1,4 @@
-import { type CsvGrid, type GridCell, parseClipboardBlock, setCell } from "./csv-edit-rules";
+import { type CsvGrid, type GridCell, parseClipboardBlock } from "./csv-edit-rules";
 import { parseCsv } from "./csv";
 import { type GridBounds, type JumpDirection, type KeyIntent, keyIntent, moveCell } from "./grid-navigation";
 
@@ -172,13 +172,36 @@ export function pastePlan(range: CellRange, block: readonly (readonly string[])[
   return { at: { row: top, column: range.left }, block: Array.from({ length: rows }, () => Array.from({ length: size.columns }, () => value)) };
 }
 
-/** The grid with every cell in the block cleared. The header row is kept, so Delete never removes column names. */
-export function clearRange(grid: CsvGrid, range: CellRange): CsvGrid {
-  let next = grid;
-  for (let row = Math.max(0, range.top); row <= range.bottom; row += 1) {
-    for (let column = range.left; column <= range.right; column += 1) next = setCell(next, { row, column }, "");
+/** One row with the columns `left` to `right` cleared, or the same row when they are already empty. */
+function clearedRow(row: readonly string[], left: number, right: number): readonly string[] {
+  const end = Math.min(right, row.length - 1);
+  let copy: string[] | null = null;
+  for (let column = Math.max(0, left); column <= end; column += 1) {
+    if (row[column] === "" || row[column] === undefined) continue;
+    copy ??= [...row];
+    copy[column] = "";
   }
-  return next;
+  return copy ?? row;
+}
+
+/**
+ * The grid with every cell in the block cleared, in one pass, so clearing a
+ * whole sheet (Ctrl+A, then Delete) stays fast. Unchanged rows, and the
+ * grid itself when nothing changed, keep their identity. The header row is
+ * kept, so Delete never removes column names.
+ */
+export function clearRange(grid: CsvGrid, range: CellRange): CsvGrid {
+  const top = Math.max(0, range.top);
+  const bottom = Math.min(range.bottom, grid.rows.length - 1);
+  let rows: (readonly string[])[] | null = null;
+  for (let index = top; index <= bottom; index += 1) {
+    const row = grid.rows[index] ?? [];
+    const next = clearedRow(row, range.left, range.right);
+    if (next === row) continue;
+    rows ??= [...grid.rows];
+    rows[index] = next;
+  }
+  return rows === null ? grid : { header: grid.header, rows };
 }
 
 /** A key press, as the grid sees it. */

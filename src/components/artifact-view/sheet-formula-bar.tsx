@@ -1,6 +1,6 @@
 "use client";
 
-import { type KeyboardEvent, useId, useRef, useState } from "react";
+import { type KeyboardEvent, type RefObject, useEffect, useId, useRef, useState } from "react";
 
 interface SheetFormulaBarProps {
   /** Where the selection is, such as "region · 14". */
@@ -21,7 +21,8 @@ const fieldClass =
  * as a spreadsheet's formula bar does: long text and line breaks that the
  * cell cuts off are all here. Readers can select and read it. Editors can
  * change it: Enter saves, Shift+Enter adds a line break, Escape puts it
- * back, and leaving the field saves.
+ * back, and leaving the field saves, also when a click on another cell
+ * moves the selection away. Enter or Escape hands focus back to the grid.
  */
 export function SheetFormulaBar({ place, value, onCommit, onDone }: SheetFormulaBarProps) {
   const id = useId();
@@ -35,33 +36,59 @@ export function SheetFormulaBar({ place, value, onCommit, onDone }: SheetFormula
       {onCommit ? (
         <EditableValue key={`${place}\u0000${value}`} id={id} value={value} onCommit={onCommit} onDone={onDone} />
       ) : (
-        <textarea id={id} readOnly value={value} rows={1} spellCheck={false} aria-label="Cell value" className={fieldClass} />
+        <textarea id={id} readOnly value={value} rows={1} spellCheck={false} aria-label="Cell value" onKeyDown={(event) => { backToGrid(event, onDone); }} className={fieldClass} />
       )}
     </div>
   );
 }
 
+/** Enter or Escape in the read-only field goes back to the grid. */
+function backToGrid(event: KeyboardEvent<HTMLTextAreaElement>, onDone: () => void) {
+  if (event.key !== "Enter" && event.key !== "Escape") return;
+  event.preventDefault();
+  onDone();
+}
+
+/**
+ * Saves a draft the field still holds when it goes away: a click on another
+ * cell changes the selection, and with it this field, before the browser
+ * moves focus, so its blur never comes.
+ */
+function useSaveOnUnmount(pending: RefObject<string | null>, value: string, onCommit: (value: string) => void) {
+  const commit = useRef(onCommit);
+  useEffect(() => { commit.current = onCommit; }, [onCommit]);
+  useEffect(() => () => {
+    const draft = pending.current;
+    if (draft !== null && draft !== value) commit.current(draft);
+  }, [pending, value]);
+}
+
 function EditableValue({ id, value, onCommit, onDone }: { id: string; value: string; onCommit: (value: string) => void; onDone: () => void }) {
   const [draft, setDraft] = useState(value);
-  // Enter and Escape decide themselves; the blur their focus move causes must not save again.
-  const decided = useRef(false);
+  // The draft not saved yet, or null once Enter, Escape, or a blur decided. A blur after Enter or Escape must not save again.
+  const unsaved = useRef<string | null>(null);
+  useSaveOnUnmount(unsaved, value, onCommit);
 
-  function finish(save: boolean) {
-    decided.current = true;
-    if (save && draft !== value) onCommit(draft);
-    else setDraft(value);
-    onDone();
+  function change(next: string) {
+    unsaved.current = next;
+    setDraft(next);
+  }
+
+  function save() {
+    if (unsaved.current === null) return;
+    unsaved.current = null;
+    if (draft !== value) onCommit(draft);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      finish(false);
-      return;
-    }
-    if (event.key !== "Enter" || event.shiftKey || event.altKey) return;
+    const escape = event.key === "Escape";
+    if (!escape && (event.key !== "Enter" || event.shiftKey || event.altKey)) return;
     event.preventDefault();
-    finish(true);
+    if (escape) {
+      unsaved.current = null;
+      setDraft(value);
+    } else save();
+    onDone();
   }
 
   return (
@@ -71,9 +98,9 @@ function EditableValue({ id, value, onCommit, onDone }: { id: string; value: str
       rows={1}
       spellCheck={false}
       aria-label="Cell value"
-      onChange={(event) => { decided.current = false; setDraft(event.target.value); }}
+      onChange={(event) => { change(event.target.value); }}
       onKeyDown={handleKeyDown}
-      onBlur={() => { if (!decided.current && draft !== value) onCommit(draft); }}
+      onBlur={save}
       className={fieldClass}
     />
   );

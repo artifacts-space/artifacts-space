@@ -4,6 +4,7 @@ import type { GridCell } from "./csv-edit-rules";
 import {
   clampSelection,
   clearRange,
+  sameCell,
   extendTo,
   inRange,
   isSingleCell,
@@ -124,6 +125,28 @@ describe("clearRange", () => {
   it("should blank every selected cell and keep the column names when Delete is pressed", () => {
     const grid = { header: ["a", "b"], rows: [["1", "2"], ["3", "4"]] };
     expect(clearRange(grid, { top: -1, left: 1, bottom: 1, right: 1 })).toEqual({ header: ["a", "b"], rows: [["1", ""], ["3", ""]] });
+  });
+
+  it("should keep the same grid and rows when the block is already empty", () => {
+    const grid = { header: ["a", "b"], rows: [["1", ""], ["3"], ["5", "6"]] };
+    const cleared = clearRange(grid, { top: 0, left: 1, bottom: 1, right: 4 });
+    expect(cleared).toBe(grid);
+    expect(clearRange(grid, { top: 2, left: 1, bottom: 2, right: 1 }).rows[0]).toBe(grid.rows[0]);
+  });
+
+  it("should clear a whole sheet at the grid editor's size limit quickly when everything is selected", () => {
+    const rows = Array.from({ length: 5000 }, (_, row) => Array.from({ length: 100 }, (_, column) => `r${String(row)}c${String(column)}`));
+    const started = performance.now();
+    const cleared = clearRange({ header: [], rows }, { top: -1, left: 0, bottom: 4999, right: 99 });
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(cleared.rows.every((row) => row.every((value) => value === ""))).toBe(true);
+  });
+});
+
+describe("sameCell", () => {
+  it("should match only the same row and column", () => {
+    expect(sameCell({ row: 1, column: 2 }, { row: 1, column: 2 })).toBe(true);
+    expect(sameCell({ row: 1, column: 2 }, { row: 2, column: 1 })).toBe(false);
   });
 });
 
