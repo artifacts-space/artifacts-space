@@ -71,7 +71,22 @@ test("should let an owner create, edit, and give a custom role, and log each cha
   await expect(page.getByText(/created the Reviewer role: Approve sharing\./)).toBeVisible();
   await expect(page.getByText(/changed Reviewer: added Approve edits\./)).toBeVisible();
   await expect(page.getByText(/changed Theme e2e's role from Member to Reviewer\./)).toBeVisible();
-  expect(await permissionAuditActions(team.id)).toEqual(["role_created", "role_updated", "member_role_changed"]);
+
+  // The seeded team has no stored Member role yet: the first change stores it, the second removes one capability.
+  const memberLink = matrix.getByRole("checkbox", { name: "Share by link for Member" });
+  await memberLink.click();
+  await expect(memberLink).toBeChecked();
+  await expect(matrix.getByRole("checkbox", { name: "See views for Member" })).toBeChecked();
+  await memberLink.click();
+  await expect(memberLink).not.toBeChecked();
+  await expect(matrix.getByRole("checkbox", { name: "See views for Member" })).toBeChecked();
+
+  await matrix.getByRole("button", { name: "Delete the Reviewer role" }).click();
+  await page.getByRole("dialog", { name: "Delete the Reviewer role?" }).getByRole("button", { name: "Delete role" }).click();
+  await expect(matrix.getByRole("columnheader", { name: /Reviewer/ })).toHaveCount(0);
+  await expect.poll(() => customRoleOf(team.id, teammate)).toBeNull();
+  await expect(page.getByText(/deleted the Reviewer role\./)).toBeVisible();
+  await expect.poll(() => permissionAuditActions(team.id)).toEqual(["role_created", "role_updated", "member_role_changed", "role_updated", "role_updated", "role_deleted"]);
 });
 
 test("should show the approval queue only to a custom role that may approve", async ({ page }) => {

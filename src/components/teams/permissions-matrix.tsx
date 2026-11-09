@@ -2,14 +2,14 @@
 
 import { IconCheck, IconLock, IconMinus, IconTrash, IconUserQuestion } from "@tabler/icons-react";
 
-import { deleteRoleAction, updateRoleCapabilitiesAction } from "@/app/(workspace)/teams/role-actions";
+import { deleteRoleAction, updateRoleCapabilityAction } from "@/app/(workspace)/teams/role-actions";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { askFirstCapabilities, capabilityLabels } from "@/lib/teams/capability-labels";
 import { teamCapabilities, type TeamActor, type TeamCapability } from "@/lib/teams/capability-rules";
-import { matrixCell, toggledCapabilities, type MatrixCell, type MatrixRole } from "@/lib/teams/permission-matrix-rules";
+import { matrixCell, type MatrixCell, type MatrixRole } from "@/lib/teams/permission-matrix-rules";
 import { deleteRoleProblem } from "@/lib/teams/role-admin-rules";
 
 import { useTeamAction } from "./use-team-action";
@@ -36,13 +36,13 @@ function StaticCell({ cell, capability, roleName }: { cell: MatrixCell; capabili
   );
 }
 
-function EditableCell({ teamId, role, capability, held, busy, onToggle }: { teamId: string; role: MatrixRole; capability: TeamCapability; held: boolean; busy: boolean; onToggle: (key: string, run: () => ReturnType<typeof updateRoleCapabilitiesAction>) => void }) {
+function EditableCell({ teamId, role, capability, held, busy, onToggle }: { teamId: string; role: MatrixRole; capability: TeamCapability; held: boolean; busy: boolean; onToggle: (key: string, run: () => ReturnType<typeof updateRoleCapabilityAction>) => void }) {
   return (
     <Checkbox
       checked={held}
       disabled={busy}
       aria-label={`${capabilityLabels[capability].label} for ${role.name}`}
-      onCheckedChange={(on) => { onToggle(`${role.key}:${capability}`, () => updateRoleCapabilitiesAction(teamId, role.key, toggledCapabilities(role, capability, on))); }}
+      onCheckedChange={(on) => { onToggle(`${role.key}:${capability}`, () => updateRoleCapabilityAction(teamId, role.key, capability, on)); }}
     />
   );
 }
@@ -76,7 +76,7 @@ function RoleHeader({ teamId, viewer, role }: { teamId: string; viewer: TeamActo
  */
 export function PermissionsMatrix({ teamId, viewer, roles }: { teamId: string; viewer: TeamActor | null; roles: readonly MatrixRole[] }) {
   const { pending, run } = useTeamAction();
-  const toggle = (key: string, action: () => ReturnType<typeof updateRoleCapabilitiesAction>) => void run(key, action, "Permissions saved.");
+  const toggle = (key: string, action: () => ReturnType<typeof updateRoleCapabilityAction>) => void run(key, action, "Permissions saved.");
   return (
     // The table scrolls inside the card on narrow phones, never the page.
     <div className="overflow-x-auto">

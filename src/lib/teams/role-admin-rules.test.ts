@@ -11,6 +11,7 @@ import {
   deleteRoleProblem,
   editRoleProblem,
   inviteProblem,
+  leaveProblem,
   removeMemberProblem,
   type TargetWithRole,
 } from "./role-admin-rules";
@@ -158,6 +159,20 @@ describe("removeMemberProblem", () => {
     expect(removeMemberProblem({ ...admin, kind: "agent" }, target("member"), 1)).not.toBeNull();
     expect(removeMemberProblem(admin, target("member", [], { isSelf: true }), 1)).not.toBeNull();
     expect(removeMemberProblem(admin, target("agent", [], { isAgent: true }), 1)).not.toBeNull();
+  });
+});
+
+describe("leaveProblem", () => {
+  it("should refuse the last owner leaving", () => {
+    expect(leaveProblem(defaultActor("owner"), 1)).toMatch(/at least one owner/);
+  });
+
+  it("should let an owner leave when another owner stays", () => {
+    expect(leaveProblem(defaultActor("owner"), 2)).toBeNull();
+  });
+
+  it("should let admins, members, and custom roles leave whatever the owner count", () => {
+    for (const actor of [defaultActor("admin"), defaultActor("member"), { roleKey: "designer", kind: "person" as const, capabilities: [] }]) expect(leaveProblem(actor, 1)).toBeNull();
   });
 });
 

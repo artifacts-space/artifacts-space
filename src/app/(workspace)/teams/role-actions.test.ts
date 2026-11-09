@@ -16,24 +16,26 @@ import type * as RoleStore from "@/lib/teams/role-store";
 const mocks = vi.hoisted(() => ({
   session: vi.fn(),
   membership: vi.fn(),
-  roles: vi.fn(),
-  saveRoleCapabilities: vi.fn(),
+  setRoleCapability: vi.fn(),
   createCustomRole: vi.fn(),
   deleteCustomRole: vi.fn(),
-  writePermissionAudit: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/session", () => ({ getSession: mocks.session }));
-vi.mock("@/lib/teams/queries", () => ({ getTeamMembershipById: mocks.membership }));
-vi.mock("@/lib/teams/capabilities", () => ({ loadTeamRoles: mocks.roles }));
+// The viewer's membership comes with the team's roles, as getTeamAccessById loads them.
+vi.mock("@/lib/teams/queries", () => ({
+  getTeamAccessById: async (userId: string, teamId: string) => {
+    const membership: unknown = await mocks.membership(userId, teamId);
+    return membership ? { membership, roles: teamRoles } : null;
+  },
+}));
 vi.mock("@/lib/teams/role-store", async (importOriginal) => ({
   ...(await importOriginal<typeof RoleStore>()),
-  saveRoleCapabilities: mocks.saveRoleCapabilities,
+  setRoleCapability: mocks.setRoleCapability,
   createCustomRole: mocks.createCustomRole,
   deleteCustomRole: mocks.deleteCustomRole,
-  writePermissionAudit: mocks.writePermissionAudit,
 }));
 
 const actions = await import("./role-actions");
@@ -56,7 +58,7 @@ function viewer(roleKey: string, overrides: Partial<TeamMembership> = {}): TeamM
   return { id: "team-1", slug: "acme", name: "Acme", personal: false, teamSharingNeedsApproval: true, createdBy: "viewer-1", role: betterAuthRole, memberId: "m-viewer", userId: "viewer-1", roleKey, roleName: role?.name ?? roleKey, kind: "person", capabilities: role?.capabilities ?? [], ...overrides };
 }
 
-const writes = [mocks.saveRoleCapabilities, mocks.createCustomRole, mocks.deleteCustomRole, mocks.writePermissionAudit];
+const writes = [mocks.setRoleCapability, mocks.createCustomRole, mocks.deleteCustomRole];
 
 function expectNothingWritten() {
   for (const write of writes) expect(write).not.toHaveBeenCalled();
@@ -65,13 +67,12 @@ function expectNothingWritten() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.session.mockResolvedValue({ user: { id: "viewer-1" } });
-  mocks.roles.mockResolvedValue(new Map([["team-1", teamRoles]]));
   for (const write of writes) write.mockResolvedValue("role-new");
 });
 
 describe("refusals for every role action", () => {
   const calls = {
-    update: () => actions.updateRoleCapabilitiesAction("team-1", "member", ["analytics.view", "share.team"]),
+    update: () => actions.updateRoleCapabilityAction("team-1", "member", "share.team", true),
     create: () => actions.createRoleAction("team-1", { name: "Writer", capabilities: ["share.team"] }),
     delete: () => actions.deleteRoleAction("team-1", "designer"),
   };
@@ -101,48 +102,68 @@ describe("refusals for every role action", () => {
   });
 });
 
-describe("updateRoleCapabilitiesAction", () => {
+describe("updateRoleCapabilityAction", () => {
   it("should refuse editing the Owner role, even for an owner", async () => {
     mocks.membership.mockResolvedValue(viewer("owner"));
-    await expect(actions.updateRoleCapabilitiesAction("team-1", "owner", [])).resolves.toMatchObject({ success: false });
+    await expect(actions.updateRoleCapabilityAction("team-1", "owner", "share.team", false)).resolves.toMatchObject({ success: false });
     expectNothingWritten();
   });
 
   it("should refuse an admin editing the Admin role", async () => {
     mocks.membership.mockResolvedValue(viewer("admin"));
-    await expect(actions.updateRoleCapabilitiesAction("team-1", "admin", [...defaultRoleCapabilities.admin, "settings.sharing"])).resolves.toMatchObject({ success: false });
+    await expect(actions.updateRoleCapabilityAction("team-1", "admin", "settings.sharing", true)).resolves.toMatchObject({ success: false });
     expectNothingWritten();
   });
 
   it("should refuse an admin granting a capability the admin does not hold", async () => {
     mocks.membership.mockResolvedValue(viewer("admin"));
-    await expect(actions.updateRoleCapabilitiesAction("team-1", "member", ["analytics.view", "settings.sharing"])).resolves.toMatchObject({ success: false });
+    await expect(actions.updateRoleCapabilityAction("team-1", "member", "settings.sharing", true)).resolves.toMatchObject({ success: false });
     expectNothingWritten();
   });
 
   it("should refuse a custom role editing a custom role at its own rank", async () => {
     mocks.membership.mockResolvedValue(viewer("designer"));
-    await expect(actions.updateRoleCapabilitiesAction("team-1", "reviewer", ["approve.sharing", "themes.manage"])).resolves.toMatchObject({ success: false });
+    await expect(actions.updateRoleCapabilityAction("team-1", "reviewer", "themes.manage", true)).resolves.toMatchObject({ success: false });
     expectNothingWritten();
   });
 
   it("should refuse giving the Agent role a locked capability", async () => {
     mocks.membership.mockResolvedValue(viewer("owner"));
-    await expect(actions.updateRoleCapabilitiesAction("team-1", "agent", ["analytics.view", "approve.sharing"])).resolves.toMatchObject({ success: false });
+    await expect(actions.updateRoleCapabilityAction("team-1", "agent", "approve.sharing", true)).resolves.toMatchObject({ success: false });
     expectNothingWritten();
   });
 
   it("should refuse a role that does not exist in the team", async () => {
     mocks.membership.mockResolvedValue(viewer("owner"));
-    await expect(actions.updateRoleCapabilitiesAction("team-1", "ghost", [])).resolves.toEqual({ success: false, error: "That role does not exist in this team." });
+    await expect(actions.updateRoleCapabilityAction("team-1", "ghost", "share.team", true)).resolves.toEqual({ success: false, error: "That role does not exist in this team." });
     expectNothingWritten();
   });
 
-  it("should save and audit a change the viewer may make, dropping unknown capabilities", async () => {
+  it("should refuse a capability that does not exist", async () => {
+    mocks.membership.mockResolvedValue(viewer("owner"));
+    await expect(actions.updateRoleCapabilityAction("team-1", "member", "root.everything", true)).resolves.toEqual({ success: false, error: "That capability does not exist." });
+    expectNothingWritten();
+  });
+
+  it("should change only the one cell and audit it", async () => {
     mocks.membership.mockResolvedValue(viewer("admin"));
-    await expect(actions.updateRoleCapabilitiesAction("team-1", "member", ["analytics.view", "share.team", "root.everything"])).resolves.toEqual({ success: true, data: null });
-    expect(mocks.saveRoleCapabilities).toHaveBeenCalledWith({ teamId: "team-1", key: "member", name: "Member", builtIn: true, capabilities: ["analytics.view", "share.team"] });
-    expect(mocks.writePermissionAudit).toHaveBeenCalledWith({ teamId: "team-1", actorId: "viewer-1", action: "role_updated", subject: "Member", before: ["analytics.view"], after: ["analytics.view", "share.team"] });
+    await expect(actions.updateRoleCapabilityAction("team-1", "member", "share.team", true)).resolves.toEqual({ success: true, data: null });
+    expect(mocks.setRoleCapability).toHaveBeenCalledWith({
+      teamId: "team-1",
+      key: "member",
+      name: "Member",
+      builtIn: true,
+      capability: "share.team",
+      on: true,
+      next: ["share.team", "analytics.view"],
+      audit: { actorId: "viewer-1", action: "role_updated", subject: "Member", before: ["analytics.view"], after: ["share.team", "analytics.view"] },
+    });
+  });
+
+  it("should let an admin take a capability away from a custom role", async () => {
+    mocks.membership.mockResolvedValue(viewer("admin"));
+    await expect(actions.updateRoleCapabilityAction("team-1", "designer", "themes.manage", false)).resolves.toEqual({ success: true, data: null });
+    expect(mocks.setRoleCapability).toHaveBeenCalledWith(expect.objectContaining({ key: "designer", capability: "themes.manage", on: false }));
   });
 });
 
@@ -174,8 +195,7 @@ describe("createRoleAction", () => {
   it("should create and audit a role the viewer may make", async () => {
     mocks.membership.mockResolvedValue(viewer("admin"));
     await expect(actions.createRoleAction("team-1", { name: "  Brand Lead ", capabilities: ["themes.manage"] })).resolves.toEqual({ success: true, data: { key: "brand-lead" } });
-    expect(mocks.createCustomRole).toHaveBeenCalledWith({ teamId: "team-1", key: "brand-lead", name: "Brand Lead", capabilities: ["themes.manage"] });
-    expect(mocks.writePermissionAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "role_created", subject: "Brand Lead", before: null, after: ["themes.manage"] }));
+    expect(mocks.createCustomRole).toHaveBeenCalledWith({ teamId: "team-1", key: "brand-lead", name: "Brand Lead", capabilities: ["themes.manage"], audit: { actorId: "viewer-1", action: "role_created", subject: "Brand Lead", before: null, after: ["themes.manage"] } });
   });
 });
 
@@ -195,7 +215,6 @@ describe("deleteRoleAction", () => {
   it("should delete and audit a custom role below an admin", async () => {
     mocks.membership.mockResolvedValue(viewer("admin"));
     await expect(actions.deleteRoleAction("team-1", "designer")).resolves.toEqual({ success: true, data: null });
-    expect(mocks.deleteCustomRole).toHaveBeenCalledWith("team-1", "designer");
-    expect(mocks.writePermissionAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "role_deleted", subject: "Designer", before: designerCapabilities, after: null }));
+    expect(mocks.deleteCustomRole).toHaveBeenCalledWith({ teamId: "team-1", key: "designer", audit: { actorId: "viewer-1", action: "role_deleted", subject: "Designer", before: designerCapabilities, after: null } });
   });
 });

@@ -114,6 +114,12 @@ export function removeMemberProblem(actor: TeamActor | null, target: TargetWithR
   return null;
 }
 
+/** Why the actor may not leave the team, or null. The last owner stays, so the team can always be run. */
+export function leaveProblem(actor: TeamActor | null, ownerCount: number): string | null {
+  if (actor?.kind === "person" && actor.roleKey === "owner" && ownerCount <= 1) return "Make someone else an owner before you leave. A team always keeps at least one owner.";
+  return null;
+}
+
 /** Why the actor may not invite someone as `role`, or null. Invitations offer built-in roles that do no more than the inviter's. */
 export function inviteProblem(actor: TeamActor | null, role: RoleGrant): string | null {
   if (actor?.kind !== "person" || !can(actor, "members.invite")) return "You cannot invite people to this team.";

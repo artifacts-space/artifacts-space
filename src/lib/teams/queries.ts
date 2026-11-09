@@ -5,7 +5,7 @@ import { getDb } from "@/db";
 import { teamRole, teamRoleAssignment } from "@/db/roles-schema";
 import { agent, team, teamInvitation, teamMember, user } from "@/db/schema";
 
-import { loadTeamRoles, resolveActor } from "./capabilities";
+import { loadTeamRoles, resolveActor, type TeamRoleView } from "./capabilities";
 import { builtInRoleNames, type ActorKind, type TeamActor, type TeamCapability } from "./capability-rules";
 import type { TeamHeadcount } from "./member-counts";
 import { parseTeamRole, type TeamRole } from "./roles";
@@ -65,14 +65,30 @@ export function membershipQuery(db: Pick<ReturnType<typeof getDb>, "select">, us
     .$dynamic();
 }
 
+/** One membership with its role and capabilities, from its team's roles. */
+function toMembership({ agentId, customKey, ...row }: MembershipRow, roles: ReadonlyMap<string, TeamRoleView> | undefined): TeamMembership {
+  const role = parseTeamRole(row.role);
+  const actor = resolveActor({ role, isAgent: agentId !== null, customKey }, roles);
+  return { ...row, role, roleKey: actor.roleKey, roleName: actor.roleName, kind: actor.kind, capabilities: [...actor.capabilities] };
+}
+
 /** Fills in each membership's role and capabilities from its team's roles. */
 async function toMemberships(rows: readonly MembershipRow[]): Promise<TeamMembership[]> {
   const roles = await loadTeamRoles([...new Set(rows.map((row) => row.id))]);
-  return rows.map(({ agentId, customKey, ...row }) => {
-    const role = parseTeamRole(row.role);
-    const actor = resolveActor({ role, isAgent: agentId !== null, customKey }, roles.get(row.id));
-    return { ...row, role, roleKey: actor.roleKey, roleName: actor.roleName, kind: actor.kind, capabilities: [...actor.capabilities] };
-  });
+  return rows.map((row) => toMembership(row, roles.get(row.id)));
+}
+
+/** A membership together with every role of its team, so callers need no second role query. */
+export interface TeamAccess {
+  membership: TeamMembership;
+  roles: ReadonlyMap<string, TeamRoleView>;
+}
+
+async function toAccess(rows: readonly MembershipRow[]): Promise<TeamAccess | null> {
+  const [row] = rows;
+  if (!row) return null;
+  const roles = (await loadTeamRoles([row.id])).get(row.id) ?? new Map<string, TeamRoleView>();
+  return { membership: toMembership(row, roles), roles };
 }
 
 /** Every team the user belongs to: the personal team first, then by name. */
@@ -95,6 +111,16 @@ export async function getTeamForMember(userId: string, slug: string): Promise<Te
   const rows = await membershipQuery(getDb(), userId).where(and(eq(teamMember.userId, userId), eq(team.slug, slug))).limit(1);
   const [membership] = await toMemberships(rows);
   return membership ?? null;
+}
+
+/** Same as getTeamForMember, with the team's roles. */
+export async function getTeamAccessForMember(userId: string, slug: string): Promise<TeamAccess | null> {
+  return toAccess(await membershipQuery(getDb(), userId).where(and(eq(teamMember.userId, userId), eq(team.slug, slug))).limit(1));
+}
+
+/** Same as getTeamMembershipById, with the team's roles. */
+export async function getTeamAccessById(userId: string, teamId: string): Promise<TeamAccess | null> {
+  return toAccess(await membershipQuery(getDb(), userId).where(and(eq(teamMember.userId, userId), eq(team.id, teamId))).limit(1));
 }
 
 /** Same as getTeamForMember, by team id. */
@@ -271,10 +297,12 @@ export function listTeamMemberActorsQuery(db: Pick<ReturnType<typeof getDb>, "se
     .where(eq(teamMember.teamId, teamId));
 }
 
-/** Every member of one team, people and agents, with their roles resolved. Callers decide with `can`. */
-export async function listTeamMemberActors(teamId: string): Promise<TeamMemberActor[]> {
-  const [rows, roleMap] = await Promise.all([listTeamMemberActorsQuery(getDb(), teamId), loadTeamRoles([teamId])]);
-  const roles = roleMap.get(teamId);
+/**
+ * Every member of one team, people and agents, with their roles resolved.
+ * Pass the team's roles when they are already loaded. Callers decide with `can`.
+ */
+export async function listTeamMemberActors(teamId: string, knownRoles?: ReadonlyMap<string, TeamRoleView>): Promise<TeamMemberActor[]> {
+  const [rows, roles] = await Promise.all([listTeamMemberActorsQuery(getDb(), teamId), knownRoles ?? loadTeamRoles([teamId]).then((byTeam) => byTeam.get(teamId))]);
   return rows.map((row) => {
     const isAgent = row.agentId !== null;
     return { userId: row.userId, name: row.name, memberId: row.memberId, isAgent, actor: resolveActor({ role: parseTeamRole(row.role), isAgent, customKey: row.customKey }, roles) };

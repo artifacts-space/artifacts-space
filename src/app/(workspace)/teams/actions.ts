@@ -10,12 +10,12 @@ import type { ActionResult } from "@/lib/artifact-types";
 import { getAuth } from "@/lib/auth/server";
 import { cleanHandleInput } from "@/lib/handles";
 import { getSession } from "@/lib/session";
-import { loadTeamRoles } from "@/lib/teams/capabilities";
+import type { TeamRoleView } from "@/lib/teams/capabilities";
 import { can, type TeamCapability } from "@/lib/teams/capability-rules";
-import { assignRoleProblem, inviteProblem, removeMemberProblem } from "@/lib/teams/role-admin-rules";
-import { setMemberCustomRole, writePermissionAudit } from "@/lib/teams/role-store";
-import { getTeamMembershipById, listTeamMemberActors, type TeamMemberActor, type TeamMembership } from "@/lib/teams/queries";
-import { assignableRoles, teamRoles as builtInTeamRoles } from "@/lib/teams/roles";
+import { assignRoleProblem, inviteProblem, leaveProblem, removeMemberProblem } from "@/lib/teams/role-admin-rules";
+import { recordMemberRole } from "@/lib/teams/role-store";
+import { getTeamAccessById, listTeamMemberActors, type TeamMemberActor, type TeamMembership } from "@/lib/teams/queries";
+import { assignableRoles, type TeamRole } from "@/lib/teams/roles";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 const idSchema = z.string().trim().min(1).max(200);
@@ -27,15 +27,15 @@ async function requireUser() {
   return session.user;
 }
 
-type Guarded = { ok: true; membership: TeamMembership } | { ok: false; result: { success: false; error: string } };
+type Guarded = { ok: true; membership: TeamMembership; roles: ReadonlyMap<string, TeamRoleView> } | { ok: false; result: { success: false; error: string } };
 
-/** The viewer's membership when `allowed` passes; every check goes through capability-rules.ts. */
+/** The viewer's membership and the team's roles, from one load, when `allowed` passes; every check goes through capability-rules.ts. */
 async function guard(teamId: string, allowed: (membership: TeamMembership) => boolean, denied: string): Promise<Guarded> {
   const viewer = await requireUser();
-  const membership = await getTeamMembershipById(viewer.id, idSchema.parse(teamId));
-  if (!membership) return { ok: false, result: { success: false, error: "Team not found." } };
-  if (!allowed(membership)) return { ok: false, result: { success: false, error: denied } };
-  return { ok: true, membership };
+  const access = await getTeamAccessById(viewer.id, idSchema.parse(teamId));
+  if (!access) return { ok: false, result: { success: false, error: "Team not found." } };
+  if (!allowed(access.membership)) return { ok: false, result: { success: false, error: denied } };
+  return { ok: true, ...access };
 }
 
 /** A person (never an agent's token) in a shared team who holds `capability`. */
@@ -76,7 +76,7 @@ export async function inviteMemberAction(teamId: string, input: z.input<typeof i
     const checked = await guard(teamId, holds("members.invite"), "You cannot invite people to this team.");
     if (!checked.ok) return checked.result;
     const { email, role } = inviteSchema.parse(input);
-    const grant = (await loadTeamRoles([checked.membership.id])).get(checked.membership.id)?.get(role);
+    const grant = checked.roles.get(role);
     const problem = inviteProblem(checked.membership, { key: role, capabilities: grant?.capabilities ?? [] });
     if (problem) return { success: false, error: problem };
     await getAuth().api.createInvitation({
@@ -103,13 +103,17 @@ export async function cancelInvitationAction(teamId: string, invitationId: strin
   }
 }
 
-/** The member being changed, everyone's roles, and how many owners the team has. Unknown members read as not found. */
-async function loadTarget(membership: TeamMembership, memberId: string) {
-  const members = await listTeamMemberActors(membership.id);
+/** How many people in the team are owners. */
+function countOwners(members: readonly TeamMemberActor[]) {
+  return members.filter((member) => !member.isAgent && member.actor.roleKey === "owner").length;
+}
+
+/** The member being changed and how many owners the team has. Unknown members read as not found. */
+async function loadTarget(membership: TeamMembership, roles: ReadonlyMap<string, TeamRoleView>, memberId: string) {
+  const members = await listTeamMemberActors(membership.id, roles);
   const target = members.find((member) => member.memberId === memberId);
   if (!target) throw new UserFacingError("Member not found.");
-  const ownerCount = members.filter((member) => !member.isAgent && member.actor.roleKey === "owner").length;
-  return { target, ownerCount, targetRole: { roleKey: target.actor.roleKey, capabilities: target.actor.capabilities, isAgent: target.isAgent, isSelf: target.userId === membership.userId } };
+  return { target, ownerCount: countOwners(members), targetRole: { roleKey: target.actor.roleKey, capabilities: target.actor.capabilities, isAgent: target.isAgent, isSelf: target.userId === membership.userId } };
 }
 
 /** Removes a member below the viewer. Their artifacts shared with the team move to the team. */
@@ -117,7 +121,7 @@ export async function removeMemberAction(teamId: string, memberId: string): Prom
   try {
     const checked = await guard(teamId, holds("members.remove"), "You cannot remove people from this team.");
     if (!checked.ok) return checked.result;
-    const { targetRole, ownerCount } = await loadTarget(checked.membership, idSchema.parse(memberId));
+    const { targetRole, ownerCount } = await loadTarget(checked.membership, checked.roles, idSchema.parse(memberId));
     const problem = removeMemberProblem(checked.membership, targetRole, ownerCount);
     if (problem) return { success: false, error: problem };
     await getAuth().api.removeMember({
@@ -131,14 +135,32 @@ export async function removeMemberAction(teamId: string, memberId: string): Prom
   }
 }
 
+/** The role Better Auth stores for a role key: the built-in role itself, or Member under a custom role. */
+function storedRole(roleKey: string): TeamRole {
+  return roleKey === "owner" || roleKey === "admin" ? roleKey : "member";
+}
+
 /**
- * Stores a role change: built-in roles go to Better Auth's membership row;
- * a custom role sets the built-in role to Member and adds the assignment.
+ * Stores a role change. Better Auth's membership row comes first, because
+ * it cannot join our statement; then one statement records the custom role
+ * assignment and its audit row together. When that statement fails, the
+ * Better Auth role is put back, so a half-applied change never stays.
  */
-async function applyRole(input: { membership: TeamMembership; target: TeamMemberActor; roleKey: string; roleId: string | null; builtIn: boolean }) {
-  const role = input.builtIn ? z.enum(builtInTeamRoles).parse(input.roleKey) : "member";
-  await getAuth().api.updateMemberRole({ body: { memberId: input.target.memberId, role, organizationId: input.membership.id }, headers: await headers() });
-  await setMemberCustomRole({ memberId: input.target.memberId, roleId: input.builtIn ? null : input.roleId, actorId: input.membership.userId });
+async function applyRole(input: { membership: TeamMembership; target: TeamMemberActor; next: TeamRoleView; previousName: string }) {
+  const { membership, target, next } = input;
+  const setStoredRole = async (role: TeamRole) => {
+    await getAuth().api.updateMemberRole({ body: { memberId: target.memberId, role, organizationId: membership.id }, headers: await headers() });
+  };
+  await setStoredRole(storedRole(next.key));
+  try {
+    const audit = { actorId: membership.userId, action: "member_role_changed" as const, subject: target.name, before: { role: input.previousName }, after: { role: next.name } };
+    await recordMemberRole({ teamId: membership.id, memberId: target.memberId, roleId: next.builtIn ? null : next.id, audit });
+  } catch (error) {
+    await setStoredRole(storedRole(target.actor.roleKey)).catch((undoError: unknown) => {
+      console.error("[teams] could not undo a role change", { memberId: target.memberId, undoError });
+    });
+    throw error;
+  }
 }
 
 /** Gives a member another role, built-in or custom. Escalation and the last owner are refused (role-admin-rules.ts); every change is audited. */
@@ -146,15 +168,13 @@ export async function updateMemberRoleAction(teamId: string, memberId: string, r
   try {
     const checked = await guard(teamId, holds("members.roles"), "You cannot change roles in this team.");
     if (!checked.ok) return checked.result;
-    const { membership } = checked;
-    const [{ target, targetRole, ownerCount }, roles] = await Promise.all([loadTarget(membership, idSchema.parse(memberId)), loadTeamRoles([membership.id])]);
-    const teamRoles = roles.get(membership.id);
-    const next = teamRoles?.get(roleKeySchema.parse(roleKey));
+    const { membership, roles } = checked;
+    const next = roles.get(roleKeySchema.parse(roleKey));
     if (!next) return { success: false, error: "That role does not exist in this team." };
+    const { target, targetRole, ownerCount } = await loadTarget(membership, roles, idSchema.parse(memberId));
     const problem = assignRoleProblem(membership, targetRole, { key: next.key, capabilities: next.capabilities }, ownerCount);
     if (problem) return { success: false, error: problem };
-    await applyRole({ membership, target, roleKey: next.key, roleId: next.id, builtIn: next.builtIn });
-    await writePermissionAudit({ teamId: membership.id, actorId: membership.userId, action: "member_role_changed", subject: target.name, before: { role: teamRoles?.get(target.actor.roleKey)?.name ?? target.actor.roleKey }, after: { role: next.name } });
+    await applyRole({ membership, target, next, previousName: roles.get(target.actor.roleKey)?.name ?? target.actor.roleKey });
     revalidatePath(`/teams/${membership.slug}`);
     return { success: true, data: null };
   } catch (error) {
@@ -162,11 +182,13 @@ export async function updateMemberRoleAction(teamId: string, memberId: string, r
   }
 }
 
-/** Leaves a team. Artifacts the viewer shared with it stay with the team. */
+/** Leaves a team. Artifacts the viewer shared with it stay with the team. The last owner cannot leave. */
 export async function leaveTeamAction(teamId: string): Promise<ActionResult<null>> {
   try {
     const checked = await guard(teamId, (m) => !m.personal, "You cannot leave your personal team.");
     if (!checked.ok) return checked.result;
+    const problem = leaveProblem(checked.membership, countOwners(await listTeamMemberActors(checked.membership.id, checked.roles)));
+    if (problem) return { success: false, error: problem };
     await getAuth().api.leaveOrganization({ body: { organizationId: checked.membership.id }, headers: await headers() });
     revalidatePath("/teams");
     return { success: true, data: null };

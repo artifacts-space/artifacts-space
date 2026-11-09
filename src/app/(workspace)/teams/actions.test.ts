@@ -16,14 +16,13 @@ const mocks = vi.hoisted(() => ({
   session: vi.fn(),
   membership: vi.fn(),
   members: vi.fn(),
-  roles: vi.fn(),
   createInvitation: vi.fn(),
   cancelInvitation: vi.fn(),
   removeMember: vi.fn(),
   updateMemberRole: vi.fn(),
   updateOrganization: vi.fn(),
-  setMemberCustomRole: vi.fn(),
-  writePermissionAudit: vi.fn(),
+  leaveOrganization: vi.fn(),
+  recordMemberRole: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -38,12 +37,19 @@ vi.mock("@/lib/auth/server", () => ({
       removeMember: mocks.removeMember,
       updateMemberRole: mocks.updateMemberRole,
       updateOrganization: mocks.updateOrganization,
+      leaveOrganization: mocks.leaveOrganization,
     },
   }),
 }));
-vi.mock("@/lib/teams/queries", () => ({ getTeamMembershipById: mocks.membership, listTeamMemberActors: mocks.members }));
-vi.mock("@/lib/teams/capabilities", () => ({ loadTeamRoles: mocks.roles }));
-vi.mock("@/lib/teams/role-store", () => ({ setMemberCustomRole: mocks.setMemberCustomRole, writePermissionAudit: mocks.writePermissionAudit }));
+// The viewer's membership comes with the team's roles, as getTeamAccessById loads them.
+vi.mock("@/lib/teams/queries", () => ({
+  getTeamAccessById: async (userId: string, teamId: string) => {
+    const membership: unknown = await mocks.membership(userId, teamId);
+    return membership ? { membership, roles: teamRoles } : null;
+  },
+  listTeamMemberActors: mocks.members,
+}));
+vi.mock("@/lib/teams/role-store", () => ({ recordMemberRole: mocks.recordMemberRole }));
 
 const actions = await import("./actions");
 
@@ -86,7 +92,7 @@ function signInAs(membership: TeamMembership) {
   mocks.members.mockResolvedValue(teamWith(membership));
 }
 
-const writes = [mocks.createInvitation, mocks.cancelInvitation, mocks.removeMember, mocks.updateMemberRole, mocks.updateOrganization, mocks.setMemberCustomRole, mocks.writePermissionAudit];
+const writes = [mocks.createInvitation, mocks.cancelInvitation, mocks.removeMember, mocks.updateMemberRole, mocks.updateOrganization, mocks.leaveOrganization, mocks.recordMemberRole];
 
 function expectNothingWritten() {
   for (const write of writes) expect(write).not.toHaveBeenCalled();
@@ -95,7 +101,6 @@ function expectNothingWritten() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.session.mockResolvedValue({ user: { id: "viewer-1" } });
-  mocks.roles.mockResolvedValue(new Map([["team-1", teamRoles]]));
   for (const write of writes) write.mockResolvedValue(undefined);
 });
 
@@ -229,19 +234,52 @@ describe("updateMemberRoleAction", () => {
     expectNothingWritten();
   });
 
-  it("should store a custom role as Member plus the assignment, and audit it", async () => {
+  it("should store a custom role as Member plus the assignment, recorded with its audit row", async () => {
     signInAs(viewer("owner"));
     await expect(actions.updateMemberRoleAction("team-1", "m-member", "designer")).resolves.toEqual({ success: true, data: null });
     expect(mocks.updateMemberRole).toHaveBeenCalledWith(expect.objectContaining({ body: { memberId: "m-member", role: "member", organizationId: "team-1" } }));
-    expect(mocks.setMemberCustomRole).toHaveBeenCalledWith({ memberId: "m-member", roleId: "role-designer", actorId: "viewer-1" });
-    expect(mocks.writePermissionAudit).toHaveBeenCalledWith({ teamId: "team-1", actorId: "viewer-1", action: "member_role_changed", subject: "Person m-member", before: { role: "Member" }, after: { role: "Designer" } });
+    expect(mocks.recordMemberRole).toHaveBeenCalledWith({
+      teamId: "team-1",
+      memberId: "m-member",
+      roleId: "role-designer",
+      audit: { actorId: "viewer-1", action: "member_role_changed", subject: "Person m-member", before: { role: "Member" }, after: { role: "Designer" } },
+    });
   });
 
   it("should store a built-in role in Better Auth and clear any custom assignment", async () => {
     signInAs(viewer("owner"));
     await expect(actions.updateMemberRoleAction("team-1", "m-designer", "admin")).resolves.toEqual({ success: true, data: null });
     expect(mocks.updateMemberRole).toHaveBeenCalledWith(expect.objectContaining({ body: { memberId: "m-designer", role: "admin", organizationId: "team-1" } }));
-    expect(mocks.setMemberCustomRole).toHaveBeenCalledWith({ memberId: "m-designer", roleId: null, actorId: "viewer-1" });
+    expect(mocks.recordMemberRole).toHaveBeenCalledWith(expect.objectContaining({ memberId: "m-designer", roleId: null }));
+  });
+
+  it("should put the Better Auth role back when the assignment and audit row cannot be recorded", async () => {
+    signInAs(viewer("owner"));
+    mocks.recordMemberRole.mockRejectedValue(new Error("connection lost"));
+    await expect(actions.updateMemberRoleAction("team-1", "m-admin", "designer")).resolves.toMatchObject({ success: false });
+    expect(mocks.updateMemberRole).toHaveBeenCalledTimes(2);
+    expect(mocks.updateMemberRole).toHaveBeenNthCalledWith(1, expect.objectContaining({ body: { memberId: "m-admin", role: "member", organizationId: "team-1" } }));
+    expect(mocks.updateMemberRole).toHaveBeenNthCalledWith(2, expect.objectContaining({ body: { memberId: "m-admin", role: "admin", organizationId: "team-1" } }));
+  });
+});
+
+describe("leaveTeamAction", () => {
+  it("should refuse the last owner leaving", async () => {
+    mocks.membership.mockResolvedValue(viewer("owner"));
+    mocks.members.mockResolvedValue([member("m-viewer", defaultActor("owner"), { userId: "viewer-1" }), member("m-admin", defaultActor("admin"))]);
+    await expect(actions.leaveTeamAction("team-1")).resolves.toMatchObject({ success: false, error: expect.stringMatching(/at least one owner/) as unknown });
+    expectNothingWritten();
+  });
+
+  it("should let an owner leave when another owner stays", async () => {
+    signInAs(viewer("owner"));
+    await expect(actions.leaveTeamAction("team-1")).resolves.toEqual({ success: true, data: null });
+    expect(mocks.leaveOrganization).toHaveBeenCalledWith(expect.objectContaining({ body: { organizationId: "team-1" } }));
+  });
+
+  it("should let a member leave", async () => {
+    signInAs(viewer("member"));
+    await expect(actions.leaveTeamAction("team-1")).resolves.toEqual({ success: true, data: null });
   });
 });
 

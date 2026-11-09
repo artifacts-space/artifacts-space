@@ -7,10 +7,12 @@ import { z } from "zod";
 import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult } from "@/lib/artifact-types";
 import { getSession } from "@/lib/session";
-import { loadTeamRoles, type TeamRoleView } from "@/lib/teams/capabilities";
+import type { TeamRoleView } from "@/lib/teams/capabilities";
+import { isTeamCapability } from "@/lib/teams/capability-rules";
+import { toggledCapabilities } from "@/lib/teams/permission-matrix-rules";
 import { capabilityChangeProblem, createRoleProblem, customRoleKey, customRoleNameProblem, deleteRoleProblem } from "@/lib/teams/role-admin-rules";
-import { cleanCapabilities, createCustomRole, deleteCustomRole, saveRoleCapabilities, writePermissionAudit } from "@/lib/teams/role-store";
-import { getTeamMembershipById, type TeamMembership } from "@/lib/teams/queries";
+import { cleanCapabilities, createCustomRole, deleteCustomRole, setRoleCapability } from "@/lib/teams/role-store";
+import { getTeamAccessById, type TeamMembership } from "@/lib/teams/queries";
 
 /**
  * Editing a team's roles from the Permissions tab. Every action loads the
@@ -23,34 +25,40 @@ const idSchema = z.string().trim().min(1).max(200);
 const roleKeySchema = z.string().trim().min(1).max(40);
 const capabilitiesSchema = z.array(z.string().max(40)).max(40);
 
-type Loaded = { ok: true; membership: TeamMembership; roles: Map<string, TeamRoleView> } | { ok: false; result: { success: false; error: string } };
+type Loaded = { ok: true; membership: TeamMembership; roles: ReadonlyMap<string, TeamRoleView> } | { ok: false; result: { success: false; error: string } };
 
+/** The viewer's membership in a shared team, with the team's roles from the same load. */
 async function loadEditor(teamId: string): Promise<Loaded> {
   const session = await getSession();
   if (!session) redirect("/sign-in");
-  const membership = await getTeamMembershipById(session.user.id, idSchema.parse(teamId));
-  if (!membership || membership.personal) return { ok: false, result: { success: false, error: "Team not found." } };
-  const roles = (await loadTeamRoles([membership.id])).get(membership.id) ?? new Map<string, TeamRoleView>();
-  return { ok: true, membership, roles };
+  const access = await getTeamAccessById(session.user.id, idSchema.parse(teamId));
+  if (!access || access.membership.personal) return { ok: false, result: { success: false, error: "Team not found." } };
+  return { ok: true, ...access };
 }
 
 function refresh(membership: TeamMembership) {
   revalidatePath(`/teams/${membership.slug}`);
 }
 
-/** Replaces what one role may do. Locked cells and capabilities the viewer does not hold are refused. */
-export async function updateRoleCapabilitiesAction(teamId: string, roleKey: string, capabilities: string[]): Promise<ActionResult<null>> {
+/**
+ * Turns one capability of one role on or off: one cell of the matrix. Locked
+ * cells, roles at or above the viewer's, and capabilities the viewer does not
+ * hold are refused. Only that cell changes, with its audit row.
+ */
+export async function updateRoleCapabilityAction(teamId: string, roleKey: string, capability: string, on: boolean): Promise<ActionResult<null>> {
   try {
     const loaded = await loadEditor(teamId);
     if (!loaded.ok) return loaded.result;
     const { membership, roles } = loaded;
     const role = roles.get(roleKeySchema.parse(roleKey));
     if (!role) return { success: false, error: "That role does not exist in this team." };
-    const next = cleanCapabilities(capabilitiesSchema.parse(capabilities));
+    if (!isTeamCapability(capability)) return { success: false, error: "That capability does not exist." };
+    const turnOn = z.boolean().parse(on);
+    const next = toggledCapabilities(role, capability, turnOn);
     const problem = capabilityChangeProblem(membership, role.key, role.capabilities, next);
     if (problem) return { success: false, error: problem };
-    await saveRoleCapabilities({ teamId: membership.id, key: role.key, name: role.name, builtIn: role.builtIn, capabilities: next });
-    await writePermissionAudit({ teamId: membership.id, actorId: membership.userId, action: "role_updated", subject: role.name, before: role.capabilities, after: next });
+    const audit = { actorId: membership.userId, action: "role_updated" as const, subject: role.name, before: role.capabilities, after: next };
+    await setRoleCapability({ teamId: membership.id, key: role.key, name: role.name, builtIn: role.builtIn, capability, on: turnOn, next, audit });
     refresh(membership);
     return { success: true, data: null };
   } catch (error) {
@@ -73,8 +81,7 @@ export async function createRoleAction(teamId: string, input: z.input<typeof new
     if (problem) return { success: false, error: problem };
     const key = customRoleKey(name);
     if (roles.has(key)) return { success: false, error: "A role with that name already exists." };
-    await createCustomRole({ teamId: membership.id, key, name, capabilities });
-    await writePermissionAudit({ teamId: membership.id, actorId: membership.userId, action: "role_created", subject: name, before: null, after: capabilities });
+    await createCustomRole({ teamId: membership.id, key, name, capabilities, audit: { actorId: membership.userId, action: "role_created", subject: name, before: null, after: capabilities } });
     refresh(membership);
     return { success: true, data: { key } };
   } catch (error) {
@@ -92,8 +99,7 @@ export async function deleteRoleAction(teamId: string, roleKey: string): Promise
     if (!role) return { success: false, error: "That role does not exist in this team." };
     const problem = deleteRoleProblem(membership, role.key);
     if (problem) return { success: false, error: problem };
-    await deleteCustomRole(membership.id, role.key);
-    await writePermissionAudit({ teamId: membership.id, actorId: membership.userId, action: "role_deleted", subject: role.name, before: role.capabilities, after: null });
+    await deleteCustomRole({ teamId: membership.id, key: role.key, audit: { actorId: membership.userId, action: "role_deleted", subject: role.name, before: role.capabilities, after: null } });
     refresh(membership);
     return { success: true, data: null };
   } catch (error) {

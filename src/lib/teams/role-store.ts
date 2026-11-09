@@ -3,8 +3,9 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { teamPermissionAudit, teamRole, teamRoleAssignment } from "@/db/roles-schema";
+import { teamPermissionAudit, teamRole } from "@/db/roles-schema";
 import { user } from "@/db/schema";
+import { UserFacingError } from "@/lib/user-facing-error";
 
 import { builtInRoleKeys, builtInRoleNames, defaultRoleCapabilities, isTeamCapability, type TeamCapability } from "./capability-rules";
 
@@ -27,77 +28,147 @@ export interface PermissionAuditView {
   createdAt: string;
 }
 
-/** Writes one audit row: who changed what, with the values before and after. */
-export async function writePermissionAudit(input: { teamId: string; actorId: string; action: AuditAction; subject: string; before: unknown; after: unknown }) {
-  await getDb().insert(teamPermissionAudit).values({ id: randomUUID(), ...input, before: input.before ?? null, after: input.after ?? null });
+/** The audit row a change writes: who made it, what changed, and the values before and after. */
+export interface AuditInput {
+  actorId: string;
+  action: AuditAction;
+  subject: string;
+  before: unknown;
+  after: unknown;
 }
 
-/** Inserts a role and its capabilities in one statement, or adds missing capabilities to an existing one. Returns its id. */
-async function upsertRole(input: { teamId: string; key: string; name: string; builtIn: boolean; capabilities: readonly TeamCapability[] }): Promise<string> {
+/** The audit row's values, for the insert that ends each write below. */
+function auditValues(teamId: string, audit: AuditInput) {
+  return sql`${randomUUID()}, ${teamId}, ${audit.actorId}, ${audit.action}, ${audit.subject}, ${JSON.stringify(audit.before ?? null)}::jsonb, ${JSON.stringify(audit.after ?? null)}::jsonb`;
+}
+
+/** Throws when a write's closing audit insert returned no row, which means nothing was written. */
+function requireRow<T>(rows: readonly T[], message: string): T {
+  const [row] = rows;
+  if (!row) throw new UserFacingError(message);
+  return row;
+}
+
+/**
+ * Inserts a role with its capabilities, and its audit row, in one statement,
+ * so a role never exists without its audit row. Returns the role's id.
+ */
+async function insertRole(input: { teamId: string; key: string; name: string; builtIn: boolean; capabilities: readonly TeamCapability[]; audit: AuditInput | null }): Promise<string> {
+  const logged = input.audit
+    ? sql`, logged as (
+        insert into team_permission_audit (id, team_id, actor_id, action, subject, before, after)
+        select ${auditValues(input.teamId, input.audit)} from role
+      )`
+    : sql``;
   const result = await getDb().execute<{ id: string }>(sql`
     with role as (
-      insert into ${teamRole} (id, team_id, key, name, built_in)
+      insert into team_role (id, team_id, key, name, built_in)
       values (${randomUUID()}, ${input.teamId}, ${input.key}, ${input.name}, ${input.builtIn})
-      on conflict (team_id, key) do update set updated_at = now()
-      returning id
+      on conflict (team_id, key) do nothing
+      returning team_role.id
     ), caps as (
       insert into team_role_capability (role_id, capability)
       select role.id, unnest(${sql.param([...input.capabilities])}::text[]) from role
       on conflict do nothing
-    )
-    select id from role
+    )${logged}
+    select role.id from role
   `);
-  const id = result.rows[0]?.id;
-  if (!id) throw new Error("The role could not be saved.");
-  return id;
+  return requireRow(result.rows, "A role with that name already exists.").id;
 }
 
 /** Gives a new team its built-in roles with today's default capabilities. Safe to run again. */
 export async function seedBuiltInRoles(teamId: string) {
   for (const key of builtInRoleKeys) {
     const [existing] = await getDb().select({ id: teamRole.id }).from(teamRole).where(and(eq(teamRole.teamId, teamId), eq(teamRole.key, key))).limit(1);
-    if (!existing) await upsertRole({ teamId, key, name: builtInRoleNames[key], builtIn: true, capabilities: defaultRoleCapabilities[key] });
+    if (!existing) await insertRole({ teamId, key, name: builtInRoleNames[key], builtIn: true, capabilities: defaultRoleCapabilities[key], audit: null });
   }
 }
 
 /**
- * Replaces a role's capabilities in one statement: the role row is created
- * first when a built-in role has none yet. Returns the role's id.
+ * Turns one capability of a role on or off, and writes its audit row, in
+ * one statement. Only that capability changes, so two people editing
+ * different cells of the same role never undo each other. A built-in role
+ * with no stored row yet is stored first with `next`, its capabilities after
+ * this change.
  */
-export async function saveRoleCapabilities(input: { teamId: string; key: string; name: string; builtIn: boolean; capabilities: readonly TeamCapability[] }): Promise<string> {
-  const roleId = await upsertRole({ ...input, capabilities: [] });
-  const capabilities = [...input.capabilities];
-  await getDb().execute(sql`
-    with removed as (
-      delete from team_role_capability where role_id = ${roleId} and not (capability = any(${sql.param(capabilities)}::text[]))
+export async function setRoleCapability(input: { teamId: string; key: string; name: string; builtIn: boolean; capability: TeamCapability; on: boolean; next: readonly TeamCapability[]; audit: AuditInput }): Promise<void> {
+  const result = await getDb().execute<{ id: string }>(sql`
+    with role as (
+      insert into team_role (id, team_id, key, name, built_in)
+      values (${randomUUID()}, ${input.teamId}, ${input.key}, ${input.name}, ${input.builtIn})
+      on conflict (team_id, key) do update set updated_at = now()
+      returning team_role.id, (xmax = 0) as created
+    ), seeded as (
+      insert into team_role_capability (role_id, capability)
+      select role.id, unnest(${sql.param([...input.next])}::text[]) from role where role.created
+      on conflict do nothing
+    ), added as (
+      insert into team_role_capability (role_id, capability)
+      select role.id, ${input.capability} from role where not role.created and ${input.on}
+      on conflict do nothing
+    ), removed as (
+      delete from team_role_capability using role
+      where team_role_capability.role_id = role.id and team_role_capability.capability = ${input.capability} and not role.created and not ${input.on}
     )
-    insert into team_role_capability (role_id, capability)
-    select ${roleId}, unnest(${sql.param(capabilities)}::text[])
-    on conflict do nothing
+    insert into team_permission_audit (id, team_id, actor_id, action, subject, before, after)
+    select ${auditValues(input.teamId, input.audit)} from role
+    returning team_permission_audit.id
   `);
-  return roleId;
+  requireRow(result.rows, "The role could not be saved.");
 }
 
-/** Creates a custom role. Returns its id. */
-export async function createCustomRole(input: { teamId: string; key: string; name: string; capabilities: readonly TeamCapability[] }): Promise<string> {
-  return upsertRole({ ...input, builtIn: false });
+/** Creates a custom role, and its audit row, in one statement. Returns its id. */
+export async function createCustomRole(input: { teamId: string; key: string; name: string; capabilities: readonly TeamCapability[]; audit: AuditInput }): Promise<string> {
+  return insertRole({ ...input, builtIn: false });
 }
 
-/** Deletes a custom role; people who had it go back to their built-in role. Built-in roles are never deleted. */
-export async function deleteCustomRole(teamId: string, key: string) {
-  await getDb().delete(teamRole).where(and(eq(teamRole.teamId, teamId), eq(teamRole.key, key), eq(teamRole.builtIn, false)));
+/**
+ * Deletes a custom role, and writes its audit row, in one statement; people
+ * who had it go back to their built-in role. Built-in roles are never deleted.
+ */
+export async function deleteCustomRole(input: { teamId: string; key: string; audit: AuditInput }): Promise<void> {
+  const result = await getDb().execute<{ id: string }>(sql`
+    with gone as (
+      delete from team_role
+      where team_role.team_id = ${input.teamId} and team_role.key = ${input.key} and team_role.built_in = false
+      returning team_role.id
+    )
+    insert into team_permission_audit (id, team_id, actor_id, action, subject, before, after)
+    select ${auditValues(input.teamId, input.audit)} from gone
+    returning team_permission_audit.id
+  `);
+  requireRow(result.rows, "That role does not exist in this team.");
 }
 
-/** Gives a member a custom role, or takes it away with null. The role must belong to the member's team. */
-export async function setMemberCustomRole(input: { memberId: string; roleId: string | null; actorId: string }) {
-  if (input.roleId === null) {
-    await getDb().delete(teamRoleAssignment).where(eq(teamRoleAssignment.memberId, input.memberId));
-    return;
-  }
-  await getDb()
-    .insert(teamRoleAssignment)
-    .values({ memberId: input.memberId, roleId: input.roleId, assignedBy: input.actorId })
-    .onConflictDoUpdate({ target: teamRoleAssignment.memberId, set: { roleId: input.roleId, assignedBy: input.actorId, assignedAt: new Date() } });
+/**
+ * Records a member's custom role, or clears it with a null `roleId`, and
+ * writes the audit row, in one statement. The statement itself checks that
+ * the member and the role both belong to `teamId`; otherwise nothing is
+ * written and it throws.
+ */
+export async function recordMemberRole(input: { teamId: string; memberId: string; roleId: string | null; audit: AuditInput }): Promise<void> {
+  const result = await getDb().execute<{ id: string }>(sql`
+    with target as (
+      select team_member.id as member_id from team_member
+      where team_member.id = ${input.memberId} and team_member.team_id = ${input.teamId}
+    ), granted as (
+      select team_role.id as role_id from team_role
+      where team_role.id = ${input.roleId} and team_role.team_id = ${input.teamId}
+    ), cleared as (
+      delete from team_role_assignment using target
+      where team_role_assignment.member_id = target.member_id and ${input.roleId === null}
+    ), assigned as (
+      insert into team_role_assignment (member_id, role_id, assigned_by, assigned_at)
+      select target.member_id, granted.role_id, ${input.audit.actorId}, now() from target, granted
+      on conflict (member_id) do update set role_id = excluded.role_id, assigned_by = excluded.assigned_by, assigned_at = excluded.assigned_at
+      returning team_role_assignment.member_id
+    )
+    insert into team_permission_audit (id, team_id, actor_id, action, subject, before, after)
+    select ${auditValues(input.teamId, input.audit)} from target
+    where ${input.roleId === null} or exists (select 1 from assigned)
+    returning team_permission_audit.id
+  `);
+  requireRow(result.rows, "The role could not be changed.");
 }
 
 function capabilityList(value: unknown): string[] {
