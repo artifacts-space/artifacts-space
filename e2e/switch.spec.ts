@@ -178,7 +178,11 @@ test("should shrink the thumb while a switch is pressed and leave a disabled one
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     if (pressed) await expect.poll(() => thumbWidth(name), `${name} thumb while pressed`).toBeLessThan(17);
-    else expect(await thumbWidth(name), `${name} thumb while pressed`).toBe(18);
+    else {
+      // Wait out the 200ms scale transition, so a disabled thumb that did shrink would show it.
+      await page.waitForTimeout(250);
+      expect(await thumbWidth(name), `${name} thumb while pressed`).toBe(18);
+    }
     await page.mouse.up();
   }
 });

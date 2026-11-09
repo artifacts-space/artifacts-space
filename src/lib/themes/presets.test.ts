@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { contrastIssues } from "./contrast";
-import { mentionTokens, paletteTokens, switchTokens, syntaxTokens } from "./derive";
+import { mentionTokens, paletteTokens, switchOffHover, switchOnHover, switchTokens, syntaxTokens } from "./derive";
 import { contrastRatio, mixOklch, normalizeColor, parseColor, type Oklch } from "./color";
 import { themePresets } from "./presets";
 import { builtInPresets } from "./resolve";
@@ -35,8 +35,8 @@ function siteColor(mode: "light" | "dark", name: string): string | null {
 
 /**
  * Every pair a switch must keep at 3:1, at rest and hovered. The hover tints
- * mirror switch.tsx: on mixes 10% toward the ink in light and toward the page
- * in dark; off mixes 6% toward the ink.
+ * mirror switch.tsx: on mixes toward the ink in light and toward the page in
+ * dark; off mixes toward the ink.
  */
 function switchPairs(mode: "light" | "dark", colors: ThemeColors): { name: string; a: Oklch; b: Oklch }[] {
   const tokens = switchTokens(mode, colors);
@@ -48,11 +48,13 @@ function switchPairs(mode: "light" | "dark", colors: ThemeColors): { name: strin
   const [card, ink, page] = [colors.card, colors.foreground, colors.background].map(color);
   const [on, onThumb, off, offThumb] = ["--switch-on", "--switch-on-thumb", "--switch-off", "--switch-off-thumb"].map((name) => color(tokens[name]));
   if (!card || !ink || !page || !on || !onThumb || !off || !offThumb) throw new Error("missing switch colors");
-  const onHover = mixOklch(on, mode === "light" ? ink : page, 0.1);
-  const offHover = mixOklch(off, ink, 0.06);
+  const onHover = mixOklch(on, mode === "light" ? ink : page, switchOnHover);
+  const offHover = mixOklch(off, ink, switchOffHover);
   return [
     { name: "on track on the card", a: on, b: card },
     { name: "hovered on track on the card", a: onHover, b: card },
+    { name: "on track on the page", a: on, b: page },
+    { name: "hovered on track on the page", a: onHover, b: page },
     { name: "on thumb on its track", a: onThumb, b: on },
     { name: "on thumb on its hovered track", a: onThumb, b: onHover },
     { name: "off thumb on its track", a: offThumb, b: off },
