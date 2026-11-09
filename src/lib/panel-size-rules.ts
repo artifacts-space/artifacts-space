@@ -121,6 +121,11 @@ export function keyboardResize(key: string, shiftKey: boolean, current: number, 
   return null;
 }
 
+/** True for the key that puts a panel back at its default size, as a double-click does. */
+export function isResetKey(key: string): boolean {
+  return key === "Enter";
+}
+
 /** A size read back from storage, or null when there is none or it is not a sensible pixel size. */
 export function parseStoredSize(raw: string | null): number | null {
   if (raw === null || raw.trim() === "") return null;

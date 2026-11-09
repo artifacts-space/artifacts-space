@@ -122,6 +122,13 @@ test.describe("desktop", () => {
     await expect(handle).toHaveAttribute("aria-valuenow", "352");
     await handle.press("ArrowLeft");
     expect(await widthOf(sidebar(page))).toBe(336);
+    await expect(handle).toHaveAttribute("aria-valuetext", "336 pixels");
+    await expect(handle).toHaveAccessibleDescription(/arrow keys to resize/);
+    // Enter goes back to the default, as a double-click does.
+    await handle.press("Enter");
+    expect(await widthOf(sidebar(page))).toBe(280);
+    expect(await stored(page, sidebarKey)).toBeNull();
+    await handle.press("ArrowLeft");
 
     // The keyboard focus ring is drawn in --brand.
     const ring = await handle.evaluate((element) => getComputedStyle(element).boxShadow);

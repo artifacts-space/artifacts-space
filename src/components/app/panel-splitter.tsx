@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 
 import { applyPanelSize, savePanelSize } from "@/components/app/panel-size-storage";
-import { clampSize, keyboardResize, type PanelSpec, type SizeBounds, type SplitterOrientation } from "@/lib/panel-size-rules";
+import { clampSize, isResetKey, keyboardResize, type PanelSpec, type SizeBounds, type SplitterOrientation } from "@/lib/panel-size-rules";
 import { cn } from "@/lib/utils";
 
 /** A panel's drawn size and how far it may go, measured from the page. */
@@ -69,7 +69,8 @@ function useMeasured(initial: PanelMeasure, measure: () => PanelMeasure | null, 
 /**
  * A handle on the edge between two panels: drag it, or focus it and use the
  * arrow keys (Shift for bigger steps, Home and End for the minimum and
- * maximum), to resize the panel; double-click it to go back to the default.
+ * maximum), to resize the panel; double-click it or press Enter to go back
+ * to the default.
  * Sizes are remembered per viewer. It follows the WAI-ARIA window splitter
  * pattern. Shown from lg up only: below that the sidebar stacks over the
  * artifact, and the layout keeps its fixed sizes.
@@ -78,6 +79,7 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
   const { value, setValue, measured } = useMeasured(initial, measure, watch);
   const [dragging, setDragging] = useState(false);
   const drag = useRef<Drag | null>(null);
+  const hintId = useId();
   /** A size set from the keyboard and not yet stored: held keys repeat, so it is stored on key up or blur. */
   const unsaved = useRef<number | null>(null);
 
@@ -121,6 +123,11 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
   }
 
   function onKeyDown(event: React.KeyboardEvent) {
+    if (isResetKey(event.key)) {
+      event.preventDefault();
+      reset();
+      return;
+    }
     const now = measure();
     if (!now) return;
     const next = keyboardResize(event.key, event.shiftKey, now.size, now.bounds, orientation);
@@ -146,6 +153,7 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
   }
 
   return (
+    <>
     <div
       role="separator"
       tabIndex={0}
@@ -155,6 +163,8 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
       aria-valuenow={Math.round(value.size)}
       aria-valuemin={value.bounds.min}
       aria-valuemax={value.bounds.max}
+      aria-valuetext={`${String(Math.round(value.size))} pixels`}
+      aria-describedby={hintId}
       title="Drag to resize. Double-click to reset."
       data-slot="panel-splitter"
       data-measured={measured ? "" : undefined}
@@ -179,5 +189,7 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
         className,
       )}
     />
+    <span id={hintId} hidden>Use the arrow keys to resize, Home and End for the smallest and largest size, and Enter or a double-click to reset.</span>
+    </>
   );
 }

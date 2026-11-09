@@ -6,6 +6,7 @@ import {
   beforePaintScript,
   bigStep,
   clampSize,
+  isResetKey,
   keyboardResize,
   listMinHeight,
   parseStoredSize,
@@ -93,6 +94,13 @@ describe("keyboardResize", () => {
     expect(keyboardResize("ArrowDown", false, 300, bounds, "vertical")).toBeNull();
     expect(keyboardResize("ArrowLeft", false, 100, bounds, "horizontal")).toBeNull();
     expect(keyboardResize("Enter", false, 300, bounds, "vertical")).toBeNull();
+  });
+});
+
+describe("isResetKey", () => {
+  it("should reset on Enter and on no other key", () => {
+    expect(isResetKey("Enter")).toBe(true);
+    for (const key of ["Escape", " ", "Home", "ArrowLeft"]) expect(isResetKey(key), key).toBe(false);
   });
 });
 
