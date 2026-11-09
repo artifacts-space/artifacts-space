@@ -1,6 +1,6 @@
 "use client";
 
-import { IconArrowDown, IconArrowUp, IconChevronDown, IconFilter, IconSearch, IconX } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconChevronDown, IconEye, IconFilter, IconSearch, IconX } from "@tabler/icons-react";
 import { type ClipboardEvent, type KeyboardEvent, useCallback, useDeferredValue, useId, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import { pixelWidth } from "@/lib/sheet-grid-rules";
 
 import { CsvColumnMenu } from "./csv-column-menu";
 import { DataGrid, gridCellId } from "./data-grid";
+import { useSheetColumns } from "./use-sheet-columns";
 import { ViewNotice } from "./view-notice";
 
 const count = (value: number) => value.toLocaleString("en-US");
@@ -65,13 +66,16 @@ export function CsvTable({ content }: { content: string }) {
   const gridRef = useRef<HTMLElement | null>(null);
   const { sort, filters } = view;
   const shown = useMemo(() => viewRowIndexes(parsed.rows, types, { sort, filters, quick }), [parsed.rows, types, sort, filters, quick]);
-  const cellText = useCallback((row: number, column: number) => parsed.rows[shown[row] ?? -1]?.[column] ?? "", [parsed.rows, shown]);
+  const sheet = useSheetColumns({ header: parsed.header, rows: parsed.rows, columnCount: columns, defaults: widths, numeric, localOrder: true });
+  const { dataColumn } = sheet;
+  const cellText = useCallback((row: number, column: number) => parsed.rows[shown[row] ?? -1]?.[dataColumn(column)] ?? "", [parsed.rows, shown, dataColumn]);
   const rowLabel = useCallback((row: number) => String((shown[row] ?? 0) + 1), [shown]);
   const active = clampCell(rawActive, { rows: shown.length, columns });
 
   if (parsed.header.length === 0) return <ViewNotice title="This CSV has no rows yet." />;
   const notes = csvNotes(parsed);
   const name = (column: number) => parsed.header[column] ?? "";
+  const gridOf = (column: number) => document.getElementById(gridCellId(gridId, { row: -1, column }))?.closest("[role=grid]") ?? null;
   const setFilter = (column: number, filter: ColumnFilter) => { setView((current) => ({ ...current, filters: { ...current.filters, [column]: filter } })); };
   const toggleSort = (column: number) => { setView((current) => ({ ...current, sort: nextSort(current.sort, column) })); };
 
@@ -89,17 +93,50 @@ export function CsvTable({ content }: { content: string }) {
     }
     if (active.row !== -1 || (event.key !== "Enter" && event.key !== " ")) return false;
     event.preventDefault();
-    toggleSort(active.column);
+    toggleSort(dataColumn(active.column));
     return true;
   }
 
   function copyCell(event: ClipboardEvent<HTMLDivElement>) {
     const row = active.row === -1 ? parsed.header : parsed.rows[shown[active.row] ?? -1];
-    event.clipboardData.setData("text/plain", row?.[active.column] ?? "");
+    event.clipboardData.setData("text/plain", row?.[dataColumn(active.column)] ?? "");
     event.preventDefault();
   }
 
-  const menuSort: SortDirection | null = menuColumn !== null && view.sort?.column === menuColumn ? view.sort.direction : null;
+
+  function layoutFor(column: number) {
+    const moveTo = (to: number) => () => { moveShown(column, to); setMenuColumn(to); };
+    return {
+      onMoveLeft: column > 0 ? moveTo(column - 1) : null,
+      onMoveRight: column < columns - 1 ? moveTo(column + 1) : null,
+      onFit: () => { sheet.fit(column, gridOf(column)); },
+    };
+  }
+
+  function renderMenu(column: number) {
+    const data = dataColumn(column);
+    const sortHere: SortDirection | null = view.sort?.column === data ? view.sort.direction : null;
+    return (
+      <CsvColumnMenu
+        open
+        onOpenChange={(open) => { if (!open) setMenuColumn(null); }}
+        anchor={() => document.getElementById(gridCellId(gridId, { row: -1, column }))}
+        returnFocus={gridRef}
+        name={name(data)}
+        type={types[data] ?? "text"}
+        sort={sortHere}
+        onSort={(direction) => { setView((current) => ({ ...current, sort: direction === null ? null : { column: data, direction } })); }}
+        filter={view.filters[data] ?? emptyColumnFilter}
+        onFilterChange={(filter) => { setFilter(data, filter); }}
+        layout={layoutFor(column)}
+      />
+    );
+  }
+
+  function moveShown(from: number, to: number) {
+    sheet.moveLocal(from, to);
+    setActive((current) => (current.column === from ? { ...current, column: to } : current));
+  }
 
   return (
     <div className="min-w-0 space-y-3">
@@ -110,6 +147,7 @@ export function CsvTable({ content }: { content: string }) {
         name={name}
         shown={shown.length}
         total={parsed.rows.length}
+        onResetOrder={sheet.customOrder ? sheet.resetOrder : null}
       />
       <p id={hintId} className="sr-only">Use the arrow keys to move between cells. On a column header, press Enter to sort, or Alt and Down Arrow for filters.</p>
       <DataGrid
@@ -118,18 +156,21 @@ export function CsvTable({ content }: { content: string }) {
         describedBy={hintId}
         columnCount={columns}
         rowCount={shown.length}
-        widths={widths}
-        numeric={numeric}
+        widths={sheet.widths}
+        numeric={sheet.numeric}
         header={(column) => (
           <ColumnHeader
-            name={name(column)}
-            sort={view.sort?.column === column ? view.sort.direction : null}
-            filtered={isFilterActive(view.filters[column])}
-            onSort={() => { toggleSort(column); }}
+            name={name(dataColumn(column))}
+            sort={view.sort?.column === dataColumn(column) ? view.sort.direction : null}
+            filtered={isFilterActive(view.filters[dataColumn(column)])}
+            onSort={() => { toggleSort(dataColumn(column)); }}
             onMenu={() => { openMenu(column); }}
           />
         )}
-        headerSort={(column) => ariaSort(view.sort, column)}
+        headerSort={(column) => ariaSort(view.sort, dataColumn(column))}
+        onColumnMove={moveShown}
+        onColumnResize={sheet.resize}
+        onColumnFit={(column) => { sheet.fit(column, gridOf(column)); }}
         cell={cellText}
         rowLabel={rowLabel}
         active={active}
@@ -138,20 +179,7 @@ export function CsvTable({ content }: { content: string }) {
         onCopy={copyCell}
         empty={parsed.rows.length === 0 ? "Only a header row so far." : "No rows match these filters."}
       />
-      {menuColumn !== null ? (
-        <CsvColumnMenu
-          open
-          onOpenChange={(open) => { if (!open) setMenuColumn(null); }}
-          anchor={() => document.getElementById(gridCellId(gridId, { row: -1, column: menuColumn }))}
-          returnFocus={gridRef}
-          name={name(menuColumn)}
-          type={types[menuColumn] ?? "text"}
-          sort={menuSort}
-          onSort={(direction) => { setView((current) => ({ ...current, sort: direction === null ? null : { column: menuColumn, direction } })); }}
-          filter={view.filters[menuColumn] ?? emptyColumnFilter}
-          onFilterChange={(filter) => { setFilter(menuColumn, filter); }}
-        />
-      ) : null}
+      {menuColumn !== null ? renderMenu(menuColumn) : null}
       {notes.length > 0 ? <p className="text-sm text-muted-foreground">{notes.join(" ")}</p> : null}
     </div>
   );
@@ -189,6 +217,17 @@ function ColumnHeader({ name, sort, filtered, onSort, onMenu }: ColumnHeaderProp
   );
 }
 
+/** Tells a reader who moved columns that the order is theirs alone, with a way back to the file's order. */
+function OwnOrderNote({ onReset }: { onReset: () => void }) {
+  return (
+    <p data-own-order="" className="flex items-center gap-1 text-sm text-muted-foreground">
+      <IconEye aria-hidden className="size-4 shrink-0" />
+      Only you see this order.
+      <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onReset}>Reset order</Button>
+    </p>
+  );
+}
+
 interface ToolbarProps {
   searchId: string;
   view: CsvViewState;
@@ -196,6 +235,8 @@ interface ToolbarProps {
   name: (column: number) => string;
   shown: number;
   total: number;
+  /** Puts the columns back in the file's order; null when this reader has not moved any. */
+  onResetOrder: (() => void) | null;
 }
 
 function filterLabel(name: string, filter: ColumnFilter): string {
@@ -208,7 +249,7 @@ function filterLabel(name: string, filter: ColumnFilter): string {
 }
 
 /** The search box, active column filters as removable chips, and the row count. */
-function CsvToolbar({ searchId, view, onViewChange, name, shown, total }: ToolbarProps) {
+function CsvToolbar({ searchId, view, onViewChange, name, shown, total, onResetOrder }: ToolbarProps) {
   const filters = Object.entries(view.filters).flatMap(([column, filter]) => (isFilterActive(filter) ? [{ column: Number(column), filter }] : []));
   const filtering = view.quick.trim() !== "" || filters.length > 0;
   return (
@@ -244,6 +285,7 @@ function CsvToolbar({ searchId, view, onViewChange, name, shown, total }: Toolba
           Clear filters
         </Button>
       ) : null}
+      {onResetOrder ? <OwnOrderNote onReset={onResetOrder} /> : null}
       <p role="status" className="ml-auto text-sm text-muted-foreground tabular-nums">
         Showing {count(shown)} of {count(total)} {total === 1 ? "row" : "rows"}
       </p>

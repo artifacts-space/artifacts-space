@@ -313,7 +313,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
                   <PageConflictNotice />
                   <article className="mt-10">
                     {/* A CSV's grid fills the window under the header, as a sheet does. */}
-                    <SheetFill>
+                    <SheetFill artifactKey={record.publicId}>
                       <InlineBody>
                         <BodyReadView viewable={viewable} files={files} />
                       </InlineBody>

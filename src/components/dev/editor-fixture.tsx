@@ -60,7 +60,7 @@ export function EditorFixture({ kind }: { kind: EditorFixtureKind }) {
               <InlineSummary><p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{artifact.summary}</p></InlineSummary>
               <PageConflictNotice />
               <article className="mt-10">
-                <SheetFill>
+                <SheetFill artifactKey={artifact.publicId}>
                   <InlineBody>
                     <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language="" files={artifact.files} />
                   </InlineBody>

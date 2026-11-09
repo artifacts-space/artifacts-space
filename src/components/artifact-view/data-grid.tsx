@@ -7,8 +7,10 @@ import { type GridBounds, keyToMove, moveCell } from "@/lib/grid-navigation";
 import { columnOffsets, keptCell, outsideSpan, revealCell, rowNumberWidth, rowsPerPage, sheetHeaderHeight, sheetRowHeight, withKept } from "@/lib/sheet-grid-rules";
 import { cn } from "@/lib/utils";
 
-import { activeRing, columnPlace, gridCellId, GridRow, rowPlace } from "./data-grid-row";
+import { DropLine, HeaderRow } from "./data-grid-header";
+import { gridCellId, GridRow } from "./data-grid-row";
 import { useSheetFillHeight } from "./sheet-fill";
+import { type ColumnResize, useColumnDrag } from "./use-column-drag";
 import { useSheetViewport } from "./use-sheet-viewport";
 
 export { gridCellId } from "./data-grid-row";
@@ -47,6 +49,12 @@ export interface DataGridProps {
   tabMoves?: boolean;
   /** Shown under the header when there are no rows. */
   empty?: ReactNode;
+  /** A header was dragged to a new place. Without it, headers do not drag. */
+  onColumnMove?: ((from: number, to: number) => void) | undefined;
+  /** A header's edge was dragged to a new width, in pixels. Without it, columns do not resize. */
+  onColumnResize?: ((column: number, width: number) => void) | undefined;
+  /** A header's edge was double-clicked: fit the column to its content. */
+  onColumnFit?: ((column: number) => void) | undefined;
 }
 
 function cellFromEvent(event: MouseEvent): GridCell | null {
@@ -60,6 +68,17 @@ function cellFromEvent(event: MouseEvent): GridCell | null {
 
 const sameCell = (a: GridCell, b: GridCell) => a.row === b.row && a.column === b.column;
 
+/** What the header row needs to move and resize columns, leaving out what the caller does not allow. */
+function headerDragProps(props: DataGridProps, dragging: ReturnType<typeof useColumnDrag>) {
+  return {
+    drag: dragging.drag,
+    onMoveStart: props.onColumnMove ? dragging.startMove : null,
+    onResizeStart: props.onColumnResize ? dragging.startResize : null,
+    onFit: props.onColumnFit ?? null,
+    takeSwallowedClick: dragging.takeSwallowedClick,
+  };
+}
+
 /** Where a key press moves the active cell, or null when the grid leaves the key alone. */
 function keyTarget(event: KeyboardEvent, active: GridCell, bounds: GridBounds, tabMoves: boolean): GridCell | null {
   if (event.altKey || (event.key === "Tab" && !tabMoves)) return null;
@@ -67,9 +86,9 @@ function keyTarget(event: KeyboardEvent, active: GridCell, bounds: GridBounds, t
   return move === null ? null : moveCell(active, move, bounds);
 }
 
-/** Every column's width, with a default for any the caller did not size. */
-function useOffsets(widths: readonly number[], columnCount: number) {
-  return useMemo(() => columnOffsets(Array.from({ length: columnCount }, (_, column) => widths[column] ?? 120)), [widths, columnCount]);
+/** Every column's width, with a default for any the caller did not size, and the width of a column being resized. */
+function useOffsets(widths: readonly number[], columnCount: number, resize: ColumnResize | null = null) {
+  return useMemo(() => columnOffsets(Array.from({ length: columnCount }, (_, column) => (resize?.column === column ? resize.width : widths[column] ?? 120))), [widths, columnCount, resize]);
 }
 
 /**
@@ -87,7 +106,9 @@ export function DataGrid(props: DataGridProps) {
   const gridId = props.gridId ?? ownId;
   const scrollerRef = useRef<HTMLDivElement>(null);
   const revealRef = useRef(false);
-  const offsets = useOffsets(props.widths, columnCount);
+  const baseOffsets = useOffsets(props.widths, columnCount);
+  const dragging = useColumnDrag(scrollerRef, baseOffsets, props);
+  const offsets = useOffsets(props.widths, columnCount, dragging.resize);
   const view = useSheetViewport(scrollerRef, rowCount, offsets);
   const fillHeight = useSheetFillHeight(scrollerRef);
   const totalWidth = rowNumberWidth + (offsets[columnCount] ?? 0);
@@ -141,7 +162,17 @@ export function DataGrid(props: DataGridProps) {
         className={cn("group/grid relative min-w-0 overflow-auto overscroll-x-contain border border-border/70 bg-card text-sm outline-none", fillHeight === null && "max-h-[var(--data-grid-max-height,70vh)]")}
       >
         <div role="presentation" className="relative" style={{ width: totalWidth, minWidth: "100%", height: sheetHeaderHeight + rowCount * sheetRowHeight }}>
-          <HeaderRow gridId={gridId} columns={columns} offsets={offsets} totalWidth={totalWidth} active={active} activeContent={props.activeContent} header={props.header} headerSort={props.headerSort} />
+          <HeaderRow
+            gridId={gridId}
+            columns={columns}
+            offsets={offsets}
+            totalWidth={totalWidth}
+            active={active}
+            activeContent={props.activeContent}
+            header={props.header}
+            headerSort={props.headerSort}
+            {...headerDragProps(props, dragging)}
+          />
           {rows.map((row) => {
             const isActiveRow = row === active.row;
             return (
@@ -161,47 +192,11 @@ export function DataGrid(props: DataGridProps) {
               />
             );
           })}
+          <DropLine drag={dragging.drag} offsets={offsets} />
         </div>
       </div>
       {/* Outside the grid, which holds only rows. */}
       {rowCount === 0 && props.empty ? <p className="border-x border-b border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">{props.empty}</p> : null}
-    </div>
-  );
-}
-
-interface HeaderRowProps extends Pick<DataGridProps, "header" | "headerSort" | "active" | "activeContent"> {
-  gridId: string;
-  columns: readonly number[];
-  offsets: readonly number[];
-  totalWidth: number;
-}
-
-/** The frozen header row: the row-number corner, then the column names in view. */
-function HeaderRow({ gridId, columns, offsets, totalWidth, active, activeContent, header, headerSort }: HeaderRowProps) {
-  return (
-    <div role="row" aria-rowindex={1} style={rowPlace(-1, totalWidth)} className="sticky top-0 z-20 flex border-b border-border/60 bg-muted">
-      <div role="columnheader" aria-colindex={1} style={{ width: rowNumberWidth }} className="sticky left-0 z-10 flex shrink-0 items-center justify-end border-r border-border/60 bg-muted px-2 text-xs text-muted-foreground/70">
-        <span className="sr-only">Row</span>#
-      </div>
-      {columns.map((column) => {
-        const isActive = sameCell(active, { row: -1, column });
-        const editing = isActive && activeContent !== undefined && activeContent !== null;
-        return (
-          <div
-            key={column}
-            role="columnheader"
-            id={gridCellId(gridId, { row: -1, column })}
-            data-cell={`-1:${String(column)}`}
-            aria-colindex={column + 2}
-            aria-sort={headerSort?.(column)}
-            aria-selected={isActive}
-            style={columnPlace(offsets, column)}
-            className={cn("absolute top-0 bottom-0 border-r border-border/60 text-left font-medium text-muted-foreground", editing ? "overflow-visible" : "overflow-hidden", isActive && activeRing)}
-          >
-            {editing ? <div className="relative h-full">{activeContent}</div> : header(column)}
-          </div>
-        );
-      })}
     </div>
   );
 }

@@ -11,6 +11,8 @@ import { Separator } from "@/components/ui/separator";
 import type { ColumnType } from "@/lib/csv-values";
 import { type ColumnFilter, emptyColumnFilter, isFilterActive, type SortDirection } from "@/lib/csv-view-rules";
 
+import { type ColumnLayoutProps, ColumnLayoutOptions } from "./column-layout-options";
+
 const sortLabels: Record<ColumnType, Record<SortDirection, string>> = {
   number: { asc: "Sort smallest first", desc: "Sort largest first" },
   date: { asc: "Sort oldest first", desc: "Sort newest first" },
@@ -33,6 +35,8 @@ export interface CsvColumnMenuProps {
   onSort: (direction: SortDirection | null) => void;
   filter: ColumnFilter;
   onFilterChange: (filter: ColumnFilter) => void;
+  /** Move and fit options; a reader's moves change only their own view. */
+  layout: ColumnLayoutProps;
 }
 
 /**
@@ -50,6 +54,8 @@ export function CsvColumnMenu(props: CsvColumnMenuProps) {
         </div>
         <SortOption icon={<IconArrowUp />} label={sortLabels[type].asc} selected={sort === "asc"} onClick={() => { props.onSort(sort === "asc" ? null : "asc"); }} />
         <SortOption icon={<IconArrowDown />} label={sortLabels[type].desc} selected={sort === "desc"} onClick={() => { props.onSort(sort === "desc" ? null : "desc"); }} />
+        <Separator className="my-1.5" />
+        <ColumnLayoutOptions {...props.layout} />
         <Separator className="my-1.5" />
         <form noValidate onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); props.onOpenChange(false); }} className="space-y-2 px-2 pt-1 pb-1.5">
           {type === "number" ? <RangeFields filter={filter} onChange={onFilterChange} /> : <ContainsField filter={filter} onChange={onFilterChange} />}

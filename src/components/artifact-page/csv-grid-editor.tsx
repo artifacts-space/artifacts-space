@@ -4,6 +4,7 @@ import { IconArrowBackUp, IconChevronDown, IconColumnInsertRight, IconColumnRemo
 import { type ClipboardEvent, type KeyboardEvent, type ReactNode, useCallback, useId, useMemo, useRef, useState } from "react";
 
 import { DataGrid, gridCellId } from "@/components/artifact-view/data-grid";
+import { useSheetColumns } from "@/components/artifact-view/use-sheet-columns";
 import { Button } from "@/components/ui/button";
 import type { CsvTextStyle } from "@/lib/csv";
 import { gridEditKey } from "@/lib/csv-edit-keys";
@@ -22,6 +23,7 @@ import {
 import { detectColumnTypes } from "@/lib/csv-values";
 import { columnWidths } from "@/lib/csv-view-rules";
 import { clampCell, moveCell } from "@/lib/grid-navigation";
+import { moveColumn } from "@/lib/sheet-column-rules";
 import { pixelWidth } from "@/lib/sheet-grid-rules";
 
 import { type CellCommitMove, CsvCellEditor } from "./csv-cell-editor";
@@ -44,6 +46,14 @@ interface Editing {
 
 const rowNumber = (row: number) => String(row + 1);
 
+/** Default column widths from the content, and which columns hold numbers. */
+function useColumnDefaults(grid: { header: readonly string[]; rows: readonly (readonly string[])[] }, width: number) {
+  return useMemo(() => ({
+    widths: columnWidths(grid.header, grid.rows, width).map(pixelWidth),
+    numeric: detectColumnTypes(grid.rows, width).map((type) => type === "number"),
+  }), [grid.header, grid.rows, width]);
+}
+
 const cellsLabel = (rows: number, columns: number) => `${String(rows)} ${rows === 1 ? "row" : "rows"} × ${String(columns)} ${columns === 1 ? "column" : "columns"}`;
 
 /**
@@ -65,9 +75,9 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
   const wrapperRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLElement | null>(null);
   const tabLeavesRef = useRef(false);
-  const widths = useMemo(() => columnWidths(grid.header, grid.rows, width).map(pixelWidth), [grid, width]);
+  const { widths, numeric } = useColumnDefaults(grid, width);
   const cellText = useCallback((row: number, column: number) => grid.rows[row]?.[column] ?? "", [grid.rows]);
-  const numeric = useMemo(() => detectColumnTypes(grid.rows, width).map((type) => type === "number"), [grid.rows, width]);
+  const sheet = useSheetColumns({ header: grid.header, rows: grid.rows, columnCount: width, defaults: widths, numeric, localOrder: false });
 
   const focusGrid = () => { wrapperRef.current?.querySelector<HTMLElement>("[role=grid]")?.focus({ preventScroll: true }); };
   const startEdit = (cell: GridCell, draft = cellValue(grid, cell)) => { setStatus(""); setEditing({ cell, draft }); };
@@ -140,6 +150,24 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
     event.preventDefault();
   }
 
+  const gridOf = (column: number) => document.getElementById(gridCellId(gridId, { row: -1, column }))?.closest("[role=grid]") ?? null;
+
+  /** Moves a column in the file, as a spreadsheet does; the move saves like any other edit. */
+  function moveFileColumn(from: number, to: number) {
+    apply((current) => moveColumn(current, from, to));
+    setActive((current) => (current.column === from ? { ...current, column: to } : current));
+    setStatus(`Moved “${columnName(from) || "Untitled"}”. Everyone sees the new order.`);
+  }
+
+  function layoutFor(column: number) {
+    const moveTo = (to: number) => () => { moveFileColumn(column, to); setMenuColumn(to); };
+    return {
+      onMoveLeft: column > 0 ? moveTo(column - 1) : null,
+      onMoveRight: column < width - 1 ? moveTo(column + 1) : null,
+      onFit: () => { sheet.fit(column, gridOf(column)); },
+    };
+  }
+
   const addRow = () => {
     const at = active.row + 1;
     apply((current) => insertRow(current, at));
@@ -176,8 +204,11 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
         describedBy={hintId}
         columnCount={width}
         rowCount={grid.rows.length}
-        widths={widths}
-        numeric={numeric}
+        widths={sheet.widths}
+        numeric={sheet.numeric}
+        onColumnMove={moveFileColumn}
+        onColumnResize={sheet.resize}
+        onColumnFit={(column) => { sheet.fit(column, gridOf(column)); }}
         header={(column) => <EditorHeader name={columnName(column)} onMenu={() => { openMenu(column); }} />}
         cell={cellText}
         rowLabel={rowNumber}
@@ -201,6 +232,7 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
           returnFocus={tableRef}
           name={columnName(menuColumn)}
           onAction={(action) => { runColumnAction(action, menuColumn); }}
+          layout={layoutFor(menuColumn)}
         />
       ) : null}
     </div>
