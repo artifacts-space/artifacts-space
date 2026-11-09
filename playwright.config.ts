@@ -12,17 +12,26 @@ const prodPort = Number(process.env.PLAYWRIGHT_PROD_PORT ?? port + 1000);
 
 const prodSpecs = /\.prod\.spec\.ts$/;
 
+/** True when `url` is a database on this machine (the E2E_LOCAL_DB specs seed one). */
+function isLocalDatabase(url: string | undefined): url is string {
+  if (!url) return false;
+  const host = new URL(url).hostname;
+  return host === "localhost" || host === "127.0.0.1";
+}
+
 /**
  * The production checks run with no reachable database, as in CI. Better Auth
  * still needs a site URL, a secret, and a database URL to start, so it can
- * reject a forged session cookie (signed-in-redirect.prod.spec.ts); nothing
- * listens on the database URL, so every query fails as it would with no
- * database. Set values win.
+ * reject a forged session cookie (signed-in-redirect.prod.spec.ts). Nothing
+ * listens on the placeholder database URL, so every query fails as it would
+ * with no database. Only a database on this machine (for the E2E_LOCAL_DB
+ * specs) replaces it; a shared or production one from the shell never does.
+ * CI sets none of these.
  */
 const productionTestEnv = {
-  BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? `http://localhost:${String(prodPort)}`,
-  BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "e2e-only-secret-not-used-anywhere-else-0123456789",
-  DATABASE_URL: process.env.DATABASE_URL ?? "postgres://e2e@127.0.0.1:9/none",
+  BETTER_AUTH_URL: `http://localhost:${String(prodPort)}`,
+  BETTER_AUTH_SECRET: "e2e-only-secret-not-used-anywhere-else-0123456789",
+  DATABASE_URL: isLocalDatabase(process.env.DATABASE_URL) ? process.env.DATABASE_URL : "postgres://e2e@127.0.0.1:9/none",
 };
 
 export default defineConfig({

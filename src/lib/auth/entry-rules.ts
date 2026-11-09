@@ -44,6 +44,10 @@ export type EntryDecision =
  * page is served as is. With one, `/` redirects to the workspace (unless the
  * visitor asked for the landing page with `/?home`), and the sign-in pages
  * ask for the real session first.
+ *
+ * The redirect from `/` drops the query on purpose: landing-page parameters
+ * (campaign tags and the like) mean nothing to the workspace, and `/app`
+ * reads its own query (search, filters), which a stray parameter could set.
  */
 export function entryDecisionFor(page: Exclude<EntryPage, null>, hasSessionCookie: boolean, search: URLSearchParams): EntryDecision {
   if (!hasSessionCookie) return { action: "pass" };

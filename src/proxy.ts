@@ -95,6 +95,11 @@ async function checkArtifact(request: NextRequest, publicId: string) {
  * sending the visitor back here. A live session passes, with any refreshed
  * session cookies from Better Auth: this is how a session that is in use
  * keeps its cookie for the full session lifetime.
+ *
+ * The workspace layout looks the session up again in the same request. That
+ * second lookup is the accepted cost: both are usually answered from the
+ * 5-minute cookie cache, which only stays warm because this path forwards
+ * the refreshed cache cookie (server components cannot).
  */
 async function checkWorkspace(request: NextRequest) {
   const session = await proxySession(request);

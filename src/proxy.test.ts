@@ -289,6 +289,27 @@ describe("proxy on the landing and sign-in pages", () => {
     expect(response.headers.getSetCookie()).toEqual([expect.stringMatching(/^better-auth\.session_token=;.*Max-Age=0/) as unknown]);
   });
 
+  it("should end a stale cookie on sign-in with no loop when the real proxy is followed hop by hop", async () => {
+    signedOut();
+    for (const start of ["/", "/sign-in", "/sign-up", "/app"]) {
+      let cookie: string | null = `__Secure-${sessionCookie}`;
+      let path = start;
+      const visited: string[] = [];
+      for (;;) {
+        expect(visited.length, `${start}: ${visited.join(" -> ")}`).toBeLessThan(5);
+        visited.push(path);
+        const response = await proxy(request(path, cookie ? { cookie } : {}));
+        if (response.headers.getSetCookie().some((value) => value.includes("Max-Age=0"))) cookie = null;
+        const next = location(response);
+        if (!next) break;
+        path = next.replace(origin, "");
+      }
+      expect(cookie, start).toBeNull();
+      // With the cookie gone, / is the static landing page.
+      expect(location(await proxy(request("/")))).toBeNull();
+    }
+  });
+
   it("should show the sign-in page when the session check fails", async () => {
     mocks.getSession.mockRejectedValue(new Error("down"));
     vi.spyOn(console, "error").mockImplementation(() => undefined);
