@@ -36,6 +36,7 @@ import { UserFacingError } from "@/lib/user-facing-error";
 import { toMcpArtifact, toMcpListItem, type McpViewContext } from "./artifact-view";
 import { noHarness, type HarnessSource } from "./harness-context";
 import { applyTagChangeFor, tagChangeFields, tagChangeFor, tagFilterField, tagFilterFor, tagsField } from "./tag-tools";
+import { artifactToolCopy } from "./routing-copy";
 import { gateTools, type ToolServer } from "./tool-access";
 
 const publicIdField = z.string().refine(isPublicId, "Use the artifact's 22-character id.").describe("Artifact id (22 characters)");
@@ -112,7 +113,7 @@ const editableFields = {
   project: projectField,
   tags: tagsField,
   sessionId: z.string().max(200).optional(),
-  source: z.string().max(120).optional().describe("Optional free-text origin, such as the task or tool that produced it. The agent harness is detected from your connection and shown on its own; you do not need to set it here."),
+  source: z.string().max(120).optional().describe("Agent or harness name"),
   metadata: z.record(z.string(), z.unknown()).optional(),
 };
 
@@ -255,9 +256,7 @@ function registerReadTools(server: ToolServer, userId: string) {
   server.registerTool(
     "artifacts_list",
     {
-      title: "List artifacts",
-      description:
-        "List and search artifacts by title, summary, content, project name, or tag, or only those in one `project` or with every one of `tags`. scope \"mine\" (default) lists yours, and those of agents you added; a team slug lists what is shared with that team. Items have no content: text formats carry a short `preview` (the first 280 characters), others none. Call artifacts_get with an id to read the full content.",
+      ...artifactToolCopy.artifacts_list,
       inputSchema: {
         query: z.string().max(300).optional().describe("Text to find in artifacts"),
         project: z.string().max(projectLimits.maxNameChars * 2).optional().describe("Only artifacts in this project (name, any case)"),
@@ -276,9 +275,7 @@ function registerReadTools(server: ToolServer, userId: string) {
   server.registerTool(
     "artifacts_get",
     {
-      title: "Get artifact",
-      description:
-        "Retrieve a complete artifact you can read, by its id. `version` says whether you got the latest version or the approved version that readers outside the team see; `editPending` says whether newer changes wait for approval.",
+      ...artifactToolCopy.artifacts_get,
       inputSchema: { id: publicIdField },
     },
     ({ id }) => respond(async () => {
@@ -291,8 +288,7 @@ function registerReadTools(server: ToolServer, userId: string) {
   server.registerTool(
     "teams_list",
     {
-      title: "List teams",
-      description: "List your teams with their slugs, your role, and whether sharing with the team needs approval.",
+      ...artifactToolCopy.teams_list,
       inputSchema: {},
     },
     () => respond(async () => {
@@ -306,9 +302,7 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
   server.registerTool(
     "artifacts_create",
     {
-      title: "Create artifact",
-      description:
-        "Create an artifact to share context with future coding sessions and other agents. It is private unless you set visibility, and `comments` sets who can comment. Creation is limited per hour; a limit error says when to try again.",
+      ...artifactToolCopy.artifacts_create,
       inputSchema: { ...editableFields, visibility: visibilityField, team: teamField, comments: commentsField },
     },
     ({ visibility, team, comments, cover, coverPosition, ...input }) => respond(async () => {
@@ -324,9 +318,7 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
   server.registerTool(
     "artifacts_update",
     {
-      title: "Update artifact",
-      description:
-        "Update an artifact you can edit: your own, or one shared through your team (team, link, or public). Only supplied fields change, and every save is kept in the history (artifacts_versions). `project`, tags, and `fullWidth` apply at once, file no version, and never wait for approval; when you send only those, sharing, or comments, `edit` is \"unchanged\". Only the author (or the person who added the agent that wrote it) can set visibility, which requests sharing through the team's rule. The author (and the team's owners and admins) can set `comments`. Edits to link or public artifacts shared through a team need an owner's or admin's approval: the edit saves for you and the team, `edit` is \"pending\", and readers outside the team keep seeing the last approved version until it is approved. Edits are limited per hour (generously); a limit error says when to try again.",
+      ...artifactToolCopy.artifacts_update,
       inputSchema: {
         id: publicIdField,
         ...editableFields,
@@ -357,8 +349,7 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
   server.registerTool(
     "artifacts_delete",
     {
-      title: "Delete artifact",
-      description: "Permanently delete an artifact by id: your own, or one written by an agent you added.",
+      ...artifactToolCopy.artifacts_delete,
       inputSchema: { id: publicIdField },
     },
     ({ id }) => respond(async () => {
