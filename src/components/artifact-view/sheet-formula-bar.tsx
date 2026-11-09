@@ -5,6 +5,8 @@ import { type KeyboardEvent, type RefObject, useEffect, useId, useRef, useState 
 interface SheetFormulaBarProps {
   /** Where the selection is, such as "region · 14". */
   place: string;
+  /** Which cell is active, such as "3:2": the field's identity, since two cells can share a place label. */
+  cell: string;
   /** The active cell's full value. */
   value: string;
   /** Null for readers, who can read and select the value but not change it. */
@@ -24,7 +26,7 @@ const fieldClass =
  * back, and leaving the field saves, also when a click on another cell
  * moves the selection away. Enter or Escape hands focus back to the grid.
  */
-export function SheetFormulaBar({ place, value, onCommit, onDone }: SheetFormulaBarProps) {
+export function SheetFormulaBar({ place, cell, value, onCommit, onDone }: SheetFormulaBarProps) {
   const id = useId();
   return (
     <div data-formula-bar="" className="flex min-w-0 items-stretch border border-b-0 border-border/70 bg-card text-sm">
@@ -34,7 +36,7 @@ export function SheetFormulaBar({ place, value, onCommit, onDone }: SheetFormula
       </label>
       {/* A fresh field per cell and value, so the draft never carries over to another cell. */}
       {onCommit ? (
-        <EditableValue key={`${place}\u0000${value}`} id={id} label={`Cell value, ${place}`} value={value} onCommit={onCommit} onDone={onDone} />
+        <EditableValue key={`${cell}\u0000${value}`} id={id} label={`Cell value, ${place}`} value={value} onCommit={onCommit} onDone={onDone} />
       ) : (
         <textarea id={id} readOnly value={value} rows={1} spellCheck={false} aria-label={`Cell value, ${place}`} onKeyDown={(event) => { backToGrid(event, onDone); }} className={fieldClass} />
       )}

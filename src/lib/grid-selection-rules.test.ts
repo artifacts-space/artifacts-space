@@ -90,6 +90,12 @@ describe("rangeToTsv", () => {
 });
 
 describe("parsePasteBlock", () => {
+  it("should paste a copied column of values with commas back as the same column", () => {
+    const values = ["Doe, Jane", "Roe, Richard", "1,000"];
+    const copied = rangeToTsv({ top: 0, left: 0, bottom: 2, right: 0 }, (cell) => values[cell.row] ?? "");
+    expect(parsePasteBlock(copied)).toEqual(values.map((value) => [value]));
+  });
+
   it("should paste a copied cell holding a quote as the original text", () => {
     const copied = rangeToTsv({ top: 0, left: 0, bottom: 0, right: 0 }, () => '6" pipe');
     expect(parsePasteBlock(copied)).toEqual([['6" pipe']]);

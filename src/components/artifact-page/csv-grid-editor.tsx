@@ -207,6 +207,7 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
       </div>
       <div className="min-w-0">
       <SheetFormulaBar
+        cell={`${String(active.row)}:${String(active.column)}`}
         place={selectionLabel(selection, columnName, rowNumber)}
         value={cellValue(grid, active)}
         onCommit={(next) => { const at = active; apply((current) => setCell(current, at, next)); }}

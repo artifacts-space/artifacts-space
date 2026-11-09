@@ -152,7 +152,7 @@ export function CsvTable({ content }: { content: string }) {
       <p id={hintId} className="sr-only">Use the arrow keys, Tab, and Enter to move between cells, and Shift with the arrows to select a block. Copy copies the selection. On a column header, press Enter to sort, or Alt and Down Arrow for filters. To leave the grid, press Escape, then Tab.</p>
       {/* While the owner keeps downloads off, the grid and the formula bar copy nothing for this reader. */}
       <div className="min-w-0" onCopyCapture={exportAllowed ? undefined : refuseCopy}>
-      <SheetFormulaBar place={selectionLabel(selection, (column) => name(dataColumn(column)), rowLabel)} value={valueAt(active)} onCommit={null} onDone={() => { gridOf(0)?.focus(); }} />
+      <SheetFormulaBar cell={`${String(active.row)}:${String(active.column)}`} place={selectionLabel(selection, (column) => name(dataColumn(column)), rowLabel)} value={valueAt(active)} onCommit={null} onDone={() => { gridOf(0)?.focus(); }} />
       <DataGrid
         gridId={gridId}
         label="CSV table"

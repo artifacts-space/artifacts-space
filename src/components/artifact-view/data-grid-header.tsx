@@ -76,14 +76,15 @@ export function HeaderRow(props: HeaderRowProps) {
 
 const hasContent = (content: ReactNode) => content !== undefined && content !== null;
 
-function headerClass(editing: boolean, active: boolean, dragged: boolean, selected: boolean) {
+function headerClass(editing: boolean, active: boolean, dragged: boolean, look: { inRange: boolean; columnSelected: boolean }) {
   return cn(
     "absolute top-0 bottom-0 border-r border-border/60 text-left font-medium",
     editing ? "overflow-visible" : "overflow-hidden",
     active && activeRing,
-    selected && !active ? rangeFill : null,
-    // A selected column's name stands out, as in a spreadsheet.
-    active || selected ? "text-foreground" : "text-muted-foreground",
+    // Filled only when the header cell itself is selected, so the fill and aria-selected agree.
+    look.inRange && !active ? rangeFill : null,
+    // A column with selected cells has its name stand out, as row numbers do and as in a spreadsheet.
+    active || look.columnSelected ? "text-foreground" : "text-muted-foreground",
     dragged && "opacity-50",
   );
 }
@@ -101,7 +102,7 @@ function headerState(row: HeaderRowProps, column: number) {
   return {
     editing,
     selected: isActive || headerInRange(row.range, column),
-    className: headerClass(editing, isActive, row.drag?.from === column, columnSelected(row.range, column)),
+    className: headerClass(editing, isActive, row.drag?.from === column, { inRange: headerInRange(row.range, column), columnSelected: columnSelected(row.range, column) }),
   };
 }
 
