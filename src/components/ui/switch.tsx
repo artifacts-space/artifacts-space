@@ -22,7 +22,9 @@ function Switch({
       data-slot="switch"
       data-size={size}
       className={cn(
-        "peer group/switch relative inline-flex shrink-0 cursor-pointer items-center rounded-full transition-colors outline-none motion-reduce:transition-none group-has-[:focus-visible]/field-label:ring-0 after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
+        // Focus is a solid --brand outline, offset from the pill: the track has no border to tint, and a
+        // translucent ring falls under 3:1 on a white card. An invalid switch gets a solid destructive ring.
+        "peer group/switch relative inline-flex shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-out outline-none motion-reduce:transition-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring aria-invalid:ring-2 aria-invalid:ring-destructive",
         "data-[size=default]:h-6 data-[size=default]:w-11 data-[size=default]:p-[3px] data-[size=sm]:h-[18px] data-[size=sm]:w-8 data-[size=sm]:p-[2px]",
         "data-checked:bg-switch-on data-checked:hover:bg-[color-mix(in_oklch,var(--switch-on),var(--foreground)_10%)]",
         "data-unchecked:bg-switch-off data-unchecked:inset-ring data-unchecked:inset-ring-input data-unchecked:hover:bg-[color-mix(in_oklch,var(--switch-off),var(--foreground)_6%)]",

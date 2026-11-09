@@ -109,6 +109,50 @@ test("should size the switch as a 44 by 24 pill with an 18px thumb and move the 
   await expect.poll(() => thumbOffset(off)).toBe(23);
 });
 
+test("should size the small switch as a 32 by 18 pill with a 14px thumb and move the thumb across when clicked", async ({ page }) => {
+  await openSpecimen(page, "light");
+  const small = page.locator('[data-switch-specimen="default"]').getByRole("switch", { name: "Small, off" });
+  const box = await small.boundingBox();
+  const thumb = await small.locator('[data-slot="switch-thumb"]').boundingBox();
+  expect(box && { width: Math.round(box.width), height: Math.round(box.height) }).toEqual({ width: 32, height: 18 });
+  expect(thumb && Math.round(thumb.width)).toBe(14);
+  // A 2px inset on every side: flush left when off, 32 - 14 - 2 = 16px in when on.
+  expect(await thumbOffset(small)).toBe(2);
+
+  await small.click();
+  await expect(small).toBeChecked();
+  await expect.poll(() => thumbOffset(small)).toBe(16);
+});
+
+test("should edge the off track with a hairline and leave the on track without one", async ({ page }) => {
+  await openSpecimen(page, "dark");
+  const specimen = page.locator('[data-switch-specimen="default"]');
+  const shadow = (name: string) => specimen.getByRole("switch", { name, exact: true }).evaluate((element) => getComputedStyle(element).boxShadow);
+  expect(await shadow("Off")).toMatch(/0px 0px 0px 1px inset/);
+  expect(await shadow("On")).not.toMatch(/inset/);
+});
+
+test("should show a solid brand outline when the switch has keyboard focus", async ({ page }) => {
+  await openSpecimen(page, "light");
+  const on = page.locator('[data-switch-specimen="default"]').getByRole("switch", { name: "On", exact: true });
+  await on.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(on).toBeFocused();
+  await expect(on).toHaveCSS("outline-style", "solid");
+  await expect(on).toHaveCSS("outline-width", "2px");
+  const brand = await on.evaluate((element) => {
+    const probe = document.createElement("span");
+    probe.style.outlineColor = "var(--brand)";
+    element.append(probe);
+    const color = getComputedStyle(probe).outlineColor;
+    probe.remove();
+    return color;
+  });
+  // The outline color fades in with the track's color transition, so wait for it to settle.
+  await expect.poll(() => on.evaluate((element) => getComputedStyle(element).outlineColor)).toBe(brand);
+});
+
 test("should not change a disabled switch when it is clicked", async ({ page }) => {
   await openSpecimen(page, "light");
   const disabled = page.locator('[data-switch-specimen="default"]').getByRole("switch", { name: "Off, disabled" });
