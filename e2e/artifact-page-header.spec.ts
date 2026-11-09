@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 
+import { closeInlineEditDb, saveAsSomeoneElse } from "./support/inline-edit-db";
 import { cleanUp, createTestArtifact, localDatabaseEnabled, localDatabaseSkipReason, readyDevUser, setTestFullWidth } from "./support/local-db";
 
 /**
@@ -16,6 +17,7 @@ test.skip(!localDatabaseEnabled(), localDatabaseSkipReason);
 const created: string[] = [];
 
 test.afterAll(async () => {
+  await closeInlineEditDb();
   await cleanUp(created, []);
 });
 
@@ -264,4 +266,66 @@ test("should offer Try saving again in the ⋯ after a save fails and save when 
   await moreActions(page).click();
   await expect(page.getByRole("menuitem", { name: "History" })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Try saving again" })).toHaveCount(0);
+});
+
+/** Opens History from the header's ⋯ and restores the oldest version. */
+async function restoreOlderVersion(page: Page) {
+  await moreActions(page).click();
+  await page.getByRole("menuitem", { name: "History" }).click();
+  const versions = page.getByRole("list", { name: "Versions" }).getByRole("button");
+  await expect(versions.nth(1)).toBeVisible();
+  await versions.last().click();
+  await page.getByRole("dialog", { name: /^History of / }).getByRole("button", { name: "Restore", exact: true }).click();
+  await page.getByRole("dialog", { name: "Restore this version?" }).getByRole("button", { name: "Restore" }).click();
+}
+
+test("should restore from History right after a theme change, and still refuse when someone else saved meanwhile", async ({ page }, testInfo) => {
+  await signIn(page);
+  const publicId = await seed(`Header restore ${testInfo.project.name}`);
+  await page.goto(`/artifact/${publicId}`);
+  await expect(page.getByRole("textbox", { name: "Title" })).toBeVisible();
+
+  // A theme saves through its own action and moves the artifact's save time past the editor's copy.
+  await page.getByRole("button", { name: "Choose a theme" }).click();
+  await page.getByRole("radiogroup", { name: "Artifact theme" }).getByRole("radio", { name: /^Paper:/ }).click();
+  await expect(page.getByRole("button", { name: "Theme: Paper. Change theme" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-artifact-theme]")).toHaveAttribute("data-artifact-theme", "paper");
+
+  await restoreOlderVersion(page);
+  await expect(page.getByText("Restored.")).toBeVisible();
+  await expect(page.getByText(/Someone saved a newer version/)).toHaveCount(0);
+  await page.keyboard.press("Escape");
+
+  // Someone else's save that this page has not seen still stops a restore.
+  await saveAsSomeoneElse(publicId, { title: "Changed elsewhere" });
+  await restoreOlderVersion(page);
+  await expect(page.getByText(/Someone saved a newer version/)).toBeVisible();
+});
+
+test("should keep History open when editing unlocks while it is open", async ({ page }, testInfo) => {
+  await signIn(page);
+  const title = `Header history unlock ${testInfo.project.name}`;
+  const publicId = await seed(title);
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  // Hold the page's server actions (the editable copy among them) until History is open.
+  await page.route(`**/artifact/${publicId}`, async (route) => {
+    if (route.request().method() === "POST") await held;
+    await route.fallback();
+  });
+  const loading = page.waitForRequest((request) => request.method() === "POST" && request.url().endsWith(`/artifact/${publicId}`));
+  await page.goto(`/artifact/${publicId}`);
+  await loading;
+  await moreActions(page).click();
+  await page.getByRole("menuitem", { name: "History" }).click();
+  const dialog = page.getByRole("dialog", { name: `History of ${title}` });
+  await expect(dialog).toBeVisible();
+  // The open dialog hides the page from the accessibility tree, so look for the title field itself.
+  const titleField = page.locator("textarea[aria-label=Title]");
+  await expect(titleField).toHaveCount(0);
+
+  release();
+  await expect(titleField, "editing unlocks behind the dialog").toBeAttached({ timeout: 15_000 });
+  await expect(dialog, "History stays open across the unlock").toBeVisible();
 });

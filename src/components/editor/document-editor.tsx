@@ -1,11 +1,21 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { createContext, useContext, type ReactNode } from "react";
 
 import type { ArtifactKind } from "@/lib/artifact-types";
 
-/** A quiet stand-in with the editor's height while the editor code loads. */
+/**
+ * What shows while the rich editor's code loads. The artifact page passes
+ * its read view, so the text stays where it is and nothing moves when
+ * editing unlocks; elsewhere a quiet stand-in with the editor's height shows.
+ */
+export const EditorLoadingFallback = createContext<ReactNode>(null);
+
+/** The read view from EditorLoadingFallback, or a quiet stand-in with the editor's height while the editor code loads. */
 function EditorLoading() {
+  const readView = useContext(EditorLoadingFallback);
+  if (readView) return readView;
   return (
     <div role="status" aria-label="Loading the editor" className="min-h-[50dvh] pt-12">
       <div className="h-4 w-2/3 max-w-[var(--artifact-measure,72ch)] animate-pulse rounded-sm bg-muted" />

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { useNoteOwnSave } from "@/components/artifact-page/page-editor-chrome";
 import { setArtifactIconAction } from "@/app/artifact/[publicId]/edit-actions";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ const PENDING_MESSAGE = "Icon saved. Readers outside the team see it once a team
  */
 export function TitleIcon({ publicId, icon, className }: TitleIconProps) {
   const router = useRouter();
+  const noteOwnSave = useNoteOwnSave();
   const [value, setValue] = useState(icon);
   const [saving, setSaving] = useState(false);
   const [, startRefresh] = useTransition();
@@ -44,6 +46,7 @@ export function TitleIcon({ publicId, icon, className }: TitleIconProps) {
         return;
       }
       setValue(result.data.icon);
+      noteOwnSave(result.data);
       if (result.data.pending) toast.success(PENDING_MESSAGE);
       startRefresh(() => { router.refresh(); });
     } catch {

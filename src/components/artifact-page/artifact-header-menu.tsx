@@ -21,7 +21,7 @@ import type { Theme } from "@/lib/themes/schema";
 import { themeChromeProps } from "@/lib/themes/style";
 import { cn } from "@/lib/utils";
 
-import { usePageEditorChrome, type PageEditorChrome } from "./page-editor-chrome";
+import { usePageEditorChrome, useWaitingChrome, type PageEditorChrome, type WaitingChromeInput } from "./page-editor-chrome";
 import { idleSave, type SaveIndicatorState, type SaveTone } from "./save-indicator-rules";
 
 const toneIcons: Record<Exclude<SaveTone, "idle">, React.ReactNode> = {
@@ -116,12 +116,15 @@ function MoreMenu({ chrome, onHistory, theme }: MoreMenuProps) {
  * The editing controls at the end of the artifact page's header, for people
  * who may edit it: the save status and the More menu. The page renders it
  * only for editors, so readers get no "⋯" at all. It reads what the editor
- * publishes (page-editor-chrome.tsx); until then the "⋯" holds its place,
- * disabled, so the header never shifts. History opens the same dialog as in
+ * publishes (page-editor-chrome.tsx); until then it works from `waiting`
+ * (the server's data), or without it holds its place, disabled, so the
+ * header never shifts. History opens the same dialog as in
  * /app, and the menu returns focus to its button when it closes.
  */
-export function ArtifactHeaderMenu({ theme = null }: { theme?: Theme | null }) {
-  const chrome = usePageEditorChrome();
+export function ArtifactHeaderMenu({ theme = null, waiting = null }: { theme?: Theme | null; waiting?: WaitingChromeInput | null }) {
+  // What the editor published, or, until it does, the controls the server data allows.
+  const fromServer = useWaitingChrome(waiting, "");
+  const chrome = usePageEditorChrome() ?? fromServer;
   if (!chrome) {
     return (
       <>

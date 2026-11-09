@@ -45,6 +45,7 @@ import { noThemeChoices, type ThemeChoices } from "@/lib/themes/theme-choice-typ
 import { artifactThemeChoices } from "@/lib/themes/theme-choices";
 import { lockedMode } from "@/lib/themes/style";
 import { cn } from "@/lib/utils";
+import { isReviewedLevel } from "@/lib/versions/rules";
 import { countsViews } from "@/lib/views/view-rules";
 import { visibilityCopy, visibilitySentence, type VisibilityCopy } from "@/lib/visibility-copy";
 
@@ -158,6 +159,16 @@ function HeadingIcon({ viewable, themeChoices }: { viewable: ViewableArtifact; t
 }
 
 /**
+ * The summary as readers see it. For editors an empty summary keeps the
+ * height of the field it becomes ("Add a one-line summary"), so nothing
+ * below moves when editing unlocks.
+ */
+function SummaryReadView({ summary, editable }: { summary: string; editable: boolean }) {
+  if (summary) return <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{summary}</p>;
+  return editable ? <div aria-hidden data-summary-space="" className="mt-4 h-7" /> : null;
+}
+
+/**
  * Icon, title, summary, the project (for editors only), who saved it last,
  * and whether changes wait for approval. For editors the title and summary
  * are fields in the same place (inline-fields.tsx). Who can see it is the
@@ -172,7 +183,7 @@ function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewa
         <HeadingIcon viewable={viewable} themeChoices={themeChoices} />
         <InlineTitle>{view.title}</InlineTitle>
       </div>
-      <InlineSummary>{view.summary ? <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{view.summary}</p> : null}</InlineSummary>
+      <InlineSummary><SummaryReadView summary={view.summary} editable={viewable.canEdit} /></InlineSummary>
       {organizers}
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
         <LastEdited editor={editor} at={view.updatedAt.toISOString()} className="text-sm" />
@@ -230,6 +241,20 @@ function SignUpAndReport({ copy, publicId, visibility }: { copy: VisibilityCopy;
   );
 }
 
+/**
+ * The read view of the body. For editors of a Markdown or Text artifact it
+ * takes the room the document editor will (at least half the window, the
+ * rich editor's space under the text, and its format bar on touch screens),
+ * so nothing below moves when editing unlocks.
+ */
+function BodyReadView({ viewable, files }: { viewable: ViewableArtifact; files: FileDto[] }) {
+  const body = <ArtifactBody viewable={viewable} files={files} />;
+  if (!viewable.canEdit) return body;
+  if (viewable.view.kind === "markdown") return <div data-editor-space="" className="pointer-coarse:pt-12"><div className="min-h-[50dvh] pb-24">{body}</div></div>;
+  if (viewable.view.kind === "text") return <div data-editor-space="" className="min-h-[50dvh]">{body}</div>;
+  return body;
+}
+
 /** The space above the heading: less under a cover, and none when the icon sits across the cover's edge (HeadingIcon pulls it up). */
 function mainTopClass(view: ViewableArtifact["view"]) {
   if (!view.cover) return null;
@@ -267,7 +292,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
             visibility={record.visibility}
             sentence={visibilitySentence(copy, byline)}
             content={view.content}
-            menu={viewable.canEdit ? <ArtifactHeaderMenu theme={theme} /> : null}
+            menu={viewable.canEdit ? <ArtifactHeaderMenu theme={theme} waiting={{ publicId: record.publicId, title: record.title, updatedAt: record.updatedAt.toISOString(), reviewed: isReviewedLevel(record.visibility), fullWidth: record.fullWidth, files }} /> : null}
           />
         </StickyChrome>
         {/* A theme that locks light or dark sets that mode on the backdrop too, so comments and controls on it stay readable. */}
@@ -286,7 +311,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
                   <PageConflictNotice />
                   <article className="mt-10">
                     <InlineBody>
-                      <ArtifactBody viewable={viewable} files={files} />
+                      <BodyReadView viewable={viewable} files={files} />
                     </InlineBody>
                   </article>
                 </ThemeScope>

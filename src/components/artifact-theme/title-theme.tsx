@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { useNoteOwnSave } from "@/components/artifact-page/page-editor-chrome";
 import { setArtifactThemeAction } from "@/app/artifact/[publicId]/edit-actions";
 import { themeLabel, type StoredArtifactTheme } from "@/lib/themes/artifact-theme";
 import { noThemeChoices, type ThemeChoices } from "@/lib/themes/theme-choice-types";
@@ -32,6 +33,7 @@ const PENDING_MESSAGE = "Theme saved. Readers outside the team see it once a tea
 export function TitleTheme({ publicId, theme, choices = noThemeChoices }: TitleThemeProps) {
   const names = useMemo(() => teamPresetNames(choices), [choices]);
   const router = useRouter();
+  const noteOwnSave = useNoteOwnSave();
   const [value, setValue] = useState(theme);
   const [saving, setSaving] = useState(false);
   const [, startRefresh] = useTransition();
@@ -48,6 +50,7 @@ export function TitleTheme({ publicId, theme, choices = noThemeChoices }: TitleT
         return;
       }
       setValue(result.data.theme);
+      noteOwnSave(result.data);
       if (result.data.pending) toast.success(PENDING_MESSAGE);
       startRefresh(() => { router.refresh(); });
     } catch {

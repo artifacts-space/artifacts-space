@@ -4,6 +4,7 @@ import { reserveBudgetedEmail } from "@/lib/email/budget";
 import { emailLink, html, renderEmail } from "@/lib/email/layout";
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
 import { siteUrl } from "@/lib/site-origin";
+import { teamTabHref } from "@/lib/teams/team-tabs-rules";
 
 interface ReportEmail {
   reportId: string;
@@ -46,7 +47,7 @@ export function renderReportEmail({ teamName, artifactTitle, reasonLabel, teamUr
  * still waits on the team page.
  */
 export async function sendReportEmail(input: ReportEmail) {
-  const teamUrl = siteUrl(`/teams/${encodeURIComponent(input.teamSlug)}`);
+  const teamUrl = siteUrl(teamTabHref(input.teamSlug, "artifacts", "reports"));
   const artifactUrl = siteUrl(`/artifact/${encodeURIComponent(input.publicId)}`);
   if (!(await reserveBudgetedEmail("report"))) return;
   if (!isSendirConfigured()) {
