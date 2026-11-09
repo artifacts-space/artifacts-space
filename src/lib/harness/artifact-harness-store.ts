@@ -25,7 +25,7 @@ export interface SavedArtifactHarness {
 export async function setArtifactHarnessOverride(editorId: string, artifactId: string, harness: HarnessId | null): Promise<SavedArtifactHarness | undefined> {
   const record = await getEditableArtifact(editorId, { id: artifactId });
   if (!record) return undefined;
-  await enforceRateLimit("artifactUpdate", editorId);
+  await enforceRateLimit("harnessChoice", editorId);
   if (record.harnessOverride !== harness) {
     await getDb().update(artifact).set({ harnessOverride: harness }).where(eq(artifact.id, record.id));
   }

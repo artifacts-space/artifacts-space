@@ -46,7 +46,7 @@ describe("setArtifactHarnessOverride", () => {
     const saved = await setArtifactHarnessOverride("teammate", "artifact-1", "cursor");
     expect(mocks.set).toHaveBeenCalledWith({ harnessOverride: "cursor" });
     expect(saved).toEqual({ publicId: record.publicId, harness: { id: "cursor", stamped: "codex", overridden: true } });
-    expect(mocks.enforceRateLimit).toHaveBeenCalledWith("artifactUpdate", "teammate");
+    expect(mocks.enforceRateLimit).toHaveBeenCalledWith("harnessChoice", "teammate");
   });
 
   it("should go back to what was detected when the editor clears it", async () => {

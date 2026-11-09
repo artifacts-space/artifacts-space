@@ -51,7 +51,7 @@ describe("setConnectionHarnessOverride", () => {
     await expect(setConnectionHarnessOverride({ kind: "oauth", userId: "user-1", clientId: "app-1" }, "claude-code")).resolves.toBe(true);
     expect(mocks.inserted).toHaveBeenCalledWith(expect.objectContaining({ userId: "user-1", oauthClientId: "app-1", apiTokenId: null, harnessOverride: "claude-code" }));
     expect(mocks.conflict).toHaveBeenCalledWith(expect.objectContaining({ set: expect.objectContaining({ harnessOverride: "claude-code" }) as unknown }));
-    expect(mocks.enforceRateLimit).toHaveBeenCalledWith("artifactUpdate", "user-1");
+    expect(mocks.enforceRateLimit).toHaveBeenCalledWith("harnessChoice", "user-1");
   });
 
   it("should write nothing when the person is over the rate limit", async () => {

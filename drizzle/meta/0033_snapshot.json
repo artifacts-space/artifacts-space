@@ -1,5 +1,5 @@
 {
-  "id": "764e294d-fba1-4c83-934f-19cb9e538a11",
+  "id": "a598ccfa-7dab-45e4-b175-82fac3226f55",
   "prevId": "ea5317d8-5e78-4dfa-9104-c5c3798821ef",
   "version": "7",
   "dialect": "postgresql",
@@ -1279,7 +1279,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "artifact_version_harness_length_check": {
+          "name": "artifact_version_harness_length_check",
+          "value": "char_length(\"artifact_version\".\"harness\") <= 32"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.comment": {

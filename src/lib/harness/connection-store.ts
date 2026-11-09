@@ -112,7 +112,7 @@ async function ownsConnection(ref: McpConnectionRef): Promise<boolean> {
  */
 export async function setConnectionHarnessOverride(ref: McpConnectionRef, harness: HarnessId | null): Promise<boolean> {
   if (!(await ownsConnection(ref))) return false;
-  await enforceRateLimit("artifactUpdate", ref.userId);
+  await enforceRateLimit("harnessChoice", ref.userId);
   const key = keyOf(ref);
   const now = new Date();
   await getDb()

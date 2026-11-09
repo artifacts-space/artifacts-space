@@ -29,7 +29,9 @@ export function HarnessMenu({ control }: { control: HarnessControl }) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger className="py-2" disabled={pending}>
-        {harness ? <HarnessIcon id={harness.id} className="size-4" /> : <IconRobot />} Made with
+        {harness ? <HarnessIcon id={harness.id} className="size-4" /> : <IconRobot aria-hidden />} Made with
+        {/* The icon is decorative, so screen readers hear the current agent here. */}
+        <span className="sr-only">: {harness ? harnessFor(harness.id).name : "no agent"}</span>
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent className="max-h-80 w-52 overflow-y-auto">
         <DropdownMenuRadioGroup value={value} onValueChange={(next: string) => { onChange(isHarnessId(next) ? next : null); }}>

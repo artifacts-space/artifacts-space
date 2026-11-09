@@ -215,6 +215,7 @@ export const artifactVersion = pgTable(
   (table) => [
     index("artifact_version_artifact_created_idx").on(table.artifactId, table.createdAt),
     index("artifact_version_saved_idx").on(table.savedAt),
+    check("artifact_version_harness_length_check", sql`char_length(${table.harness}) <= ${sql.raw(String(harnessLimits.maxIdChars))}`),
   ],
 );
 
