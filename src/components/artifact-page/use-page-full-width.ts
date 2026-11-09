@@ -39,7 +39,9 @@ export function usePageFullWidth(artifact: ArtifactDto, pageFullWidth?: boolean)
     startRefresh(() => { router.refresh(); });
   }, [router]);
   const control = useFullWidth(current, onUpdated);
-  const checked = shownFullWidth(pageFullWidth, control.checked);
+  const checked = shownFullWidth({ page: pageFullWidth, followed: control.checked });
+  // Next never leaves a failed refresh hanging quietly: after a network error it retries when the
+  // connection returns (the item stays busy), and after any other error it reloads the whole page.
   const pending = control.pending || refreshing;
   return useMemo(() => ({ ...control, checked, pending, busy: pending }), [control, checked, pending]);
 }

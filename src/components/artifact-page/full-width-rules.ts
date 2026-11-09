@@ -6,6 +6,6 @@
  * page width (the dev fixture), it shows the width the control last saved or
  * followed from the editor's copy.
  */
-export function shownFullWidth(pageFullWidth: boolean | undefined, followed: boolean): boolean {
-  return pageFullWidth ?? followed;
+export function shownFullWidth({ page, followed }: { page: boolean | undefined; followed: boolean }): boolean {
+  return page ?? followed;
 }
