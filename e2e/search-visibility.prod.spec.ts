@@ -27,3 +27,9 @@ test("should list the site's pages and no artifacts in the sitemap when the data
   expect(body).toContain("/docs");
   expect(body).not.toContain("/artifact/");
 });
+
+test("should serve the sitemap from the cache instead of building it per request", async ({ request }) => {
+  const response = await request.get("/sitemap.xml");
+  // HIT or STALE: served from the prerendered cache. A per-request route sends no x-nextjs-cache header.
+  expect(["HIT", "STALE"]).toContain(response.headers()["x-nextjs-cache"]);
+});

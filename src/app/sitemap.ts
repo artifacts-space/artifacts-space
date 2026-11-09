@@ -5,6 +5,13 @@ import { crawlOrigin, sitemapFor } from "@/lib/crawl-rules";
 import { sitemapCandidates } from "@/lib/search/search-queries";
 import { artifactSitemapPaths } from "@/lib/search/search-rules";
 
+/** A short, non-sensitive label for a failed read: the error's name and, when it has one, its code (such as a Postgres SQLSTATE). */
+function failureLabel(error: unknown): string {
+  const name = error instanceof Error ? error.name : "unknown error";
+  const code = typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" ? error.code : null;
+  return code ? `${name} (${code})` : name;
+}
+
 /**
  * Artifact pages for the sitemap, cached for an hour. When the database
  * cannot be read (as in a CI build, which has none), the sitemap lists only
@@ -17,7 +24,7 @@ async function artifactPaths(): Promise<string[]> {
     cacheLife("hours");
     return paths;
   } catch (error) {
-    console.error("[sitemap] Artifact list failed", error instanceof Error ? error.name : "unknown error");
+    console.error(`[sitemap] Artifact list failed, listing the site's pages only: ${failureLabel(error)}`);
     cacheLife("minutes");
     return [];
   }
@@ -27,7 +34,12 @@ async function artifactPaths(): Promise<string[]> {
  * sitemap.xml: the home page, legal pages, and docs, plus public artifacts
  * whose author turned on "Show in search engines" (from accounts past the
  * new-account wait). Served from the cache and rebuilt in the background
- * about once an hour, so crawlers never wait on the database.
+ * about once an hour, so crawlers never wait on the database. A newly
+ * listed artifact can also take up to an hour to appear.
+ *
+ * The first copy is built during `next build`, so the origin comes from the
+ * build's environment (BETTER_AUTH_URL, or Vercel's production URL), as it
+ * does for robots.txt.
  *
  * An artifact hidden from search engines (made private, or the setting
  * turned off) can stay listed until the next rebuild. Nothing leaks: the
