@@ -72,6 +72,7 @@ interface PageEditControlsProps {
   artifact: ArtifactDto;
   editor: PageEditor;
   reviewed: boolean;
+  pageFullWidth?: boolean | undefined;
   save?: SaveArtifact | undefined;
 }
 
@@ -81,17 +82,18 @@ interface PageEditControlsProps {
  * View source to the page header, and a conflicting save to the notice under
  * the title (page-editor-chrome.tsx).
  */
-function PageEditControls({ artifact, editor, reviewed, save }: PageEditControlsProps) {
+function PageEditControls({ artifact, editor, reviewed, pageFullWidth, save }: PageEditControlsProps) {
   const autosave = useAutosave({ artifact, draft: editor.draft, replaceDraft: editor.replace, onUpdated: editor.onUpdated, save });
   useLeaveGuard(autosave.dirty || autosave.status.kind === "saving");
-  const fullWidth = usePageFullWidth(artifact);
+  const fullWidth = usePageFullWidth(artifact, pageFullWidth);
   const { status, dirty, retryNow, loadTheirs, keepMine } = autosave;
-  const { draft, restored, sourceOpen, toggleSource } = editor;
+  const { restored, sourceOpen, toggleSource } = editor;
   const ownSaves = useOwnSaves();
   const chrome = useMemo<PageEditorChrome>(() => ({
     history: {
       publicId: artifact.publicId,
-      title: draft.title,
+      // The saved title, as in /app: the header republishes on each save, not on each keystroke in the title.
+      title: artifact.title,
       // Cover, icon, and theme save through their own actions and leave the editor's copy at its older time; the restore check follows them.
       updatedAt: ownSaveBase(artifact.updatedAt, ownSaves),
       reviewed,
@@ -103,7 +105,7 @@ function PageEditControls({ artifact, editor, reviewed, save }: PageEditControls
     fullWidth,
     save: saveIndicatorFor(status, dirty, retryNow),
     conflict: status.kind === "conflict" ? { status, onLoadTheirs: loadTheirs, onKeepMine: keepMine } : null,
-  }), [artifact, draft.title, ownSaves, reviewed, dirty, restored, sourceOpen, toggleSource, fullWidth, status, retryNow, loadTheirs, keepMine]);
+  }), [artifact, ownSaves, reviewed, dirty, restored, sourceOpen, toggleSource, fullWidth, status, retryNow, loadTheirs, keepMine]);
   usePublishPageEditorChrome(chrome);
   return null;
 }
@@ -112,6 +114,8 @@ interface PageEditFrameProps {
   editor: PageEditor;
   /** Link and public artifacts: edits and restores may wait for approval. */
   reviewed: boolean;
+  /** The width the server-rendered page has, which the Full width checkbox shows. The dev fixture has none. */
+  pageFullWidth?: boolean | undefined;
   /** Sends a save; the dev fixture passes a stand-in. Defaults to the web save action. */
   save?: SaveArtifact | undefined;
   /** The page's heading and body, which read the edit state through PageEditContext. */
@@ -124,10 +128,10 @@ interface PageEditFrameProps {
  * React never remounts them (and the icon, theme, and cover pickers in the
  * heading never close) when editing unlocks.
  */
-export function PageEditFrame({ editor, reviewed, save, children }: PageEditFrameProps) {
+export function PageEditFrame({ editor, reviewed, pageFullWidth, save, children }: PageEditFrameProps) {
   return (
     <PageEditContext value={editor.value}>
-      {editor.artifact ? <PageEditControls artifact={editor.artifact} editor={editor} reviewed={reviewed} save={save} /> : null}
+      {editor.artifact ? <PageEditControls artifact={editor.artifact} editor={editor} reviewed={reviewed} pageFullWidth={pageFullWidth} save={save} /> : null}
       {children}
     </PageEditContext>
   );

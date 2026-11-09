@@ -2,7 +2,6 @@
 
 import { IconAlertTriangle, IconArrowsHorizontal, IconCheck, IconCode, IconDots, IconHistory, IconLoader2, IconRefresh } from "@tabler/icons-react";
 
-import type { FullWidthControl } from "@/components/app/artifact-editor/use-full-width";
 import { VersionHistory } from "@/components/history/version-history";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +22,7 @@ import { cn } from "@/lib/utils";
 
 import { usePageEditorChrome, useWaitingChrome, type PageEditorChrome, type WaitingChromeInput } from "./page-editor-chrome";
 import { idleSave, type SaveIndicatorState, type SaveTone } from "./save-indicator-rules";
+import type { PageFullWidthControl } from "./use-page-full-width";
 
 const toneIcons: Record<Exclude<SaveTone, "idle">, React.ReactNode> = {
   saving: <IconLoader2 aria-hidden className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none sm:hidden" />,
@@ -80,12 +80,18 @@ function SaveProblemItems({ save }: { save: SaveIndicatorState | undefined }) {
   );
 }
 
-/** The "Full width" checkbox; it waits (disabled) while the editable copy loads or a change is saving. */
-function FullWidthItem({ control }: { control: FullWidthControl | undefined }) {
+/**
+ * The "Full width" checkbox; it is disabled while the editable copy loads
+ * or a change saves and the page catches up, with a spinner and a spoken
+ * "please wait" only while that wait can end. The tick moves only when the
+ * page has the new width.
+ */
+function FullWidthItem({ control }: { control: PageFullWidthControl | undefined }) {
   if (!control) return null;
+  const { busy } = control;
   return (
-    <DropdownMenuCheckboxItem checked={control.checked} disabled={control.pending} onCheckedChange={control.onChange} className="py-2">
-      <IconArrowsHorizontal /> {FULL_WIDTH_LABEL}
+    <DropdownMenuCheckboxItem checked={control.checked} disabled={control.pending} aria-busy={busy} aria-label={busy ? `${FULL_WIDTH_LABEL}, please wait` : FULL_WIDTH_LABEL} onCheckedChange={control.onChange} className="py-2">
+      {busy ? <IconLoader2 aria-hidden className="animate-spin motion-reduce:animate-none" /> : <IconArrowsHorizontal aria-hidden />} {FULL_WIDTH_LABEL}
     </DropdownMenuCheckboxItem>
   );
 }
