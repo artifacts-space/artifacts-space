@@ -222,6 +222,10 @@ describe("teamMonogram", () => {
     expect(teamMonogram("  #équipe")).toBe("É");
   });
 
+  it("should give the same letter on every locale when the name starts with i", () => {
+    expect(teamMonogram("istanbul")).toBe("I");
+  });
+
   it("should fall back to T when the name has no letter or digit", () => {
     expect(teamMonogram("--")).toBe("T");
   });
