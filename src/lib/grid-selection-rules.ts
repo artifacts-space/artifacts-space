@@ -2,6 +2,9 @@ import { type CsvGrid, type GridCell, parseClipboardBlock } from "./csv-edit-rul
 import { parseCsv } from "./csv";
 import { type GridBounds, type JumpDirection, type KeyIntent, keyIntent, moveCell } from "./grid-navigation";
 
+/** A whole paste that is one quoted CSV field, with any quotes inside doubled. */
+const quotedField = /^"(?:[^"]|"")*"$/;
+
 /**
  * A selection in the sheet, as in a spreadsheet: the anchor where it
  * started and the active cell it was extended to. A single cell has both
@@ -150,8 +153,18 @@ function csvBlock(text: string): string[][] | null {
  */
 export function parsePasteBlock(text: string): string[][] {
   const trimmed = text.replace(/\r?\n$/, "");
+  // One quoted field, as a copied cell holding a quote, tab, or line break is: unquote it, as Sheets does.
+  if (quotedField.test(trimmed)) return [[trimmed.slice(1, -1).replaceAll('""', '"')]];
   if (trimmed.includes("\t") || !/[\r\n]/.test(trimmed)) return parseClipboardBlock(text);
   return csvBlock(trimmed) ?? parseClipboardBlock(text);
+}
+
+/** Whether a paste plan stays inside the grid editor's limits once the grid grows to fit it. */
+export function pasteFits(plan: { at: GridCell; block: readonly (readonly string[])[] }, size: { rows: number; columns: number }, limits: { rows: number; columns: number }): boolean {
+  const widest = plan.block.reduce((most, line) => Math.max(most, line.length), 0);
+  const rows = Math.max(size.rows, Math.max(0, plan.at.row) + plan.block.length);
+  const columns = Math.max(size.columns, plan.at.column + widest);
+  return rows <= limits.rows && columns <= limits.columns;
 }
 
 /**

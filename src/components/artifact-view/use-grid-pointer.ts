@@ -1,6 +1,6 @@
 "use client";
 
-import { type MouseEvent, type PointerEvent, useRef } from "react";
+import { type MouseEvent, type PointerEvent, useEffect, useRef } from "react";
 
 import type { GridCell } from "@/lib/csv-edit-rules";
 import { extendTo, type GridSelection, isSingleCell, sameCell, singleCell } from "@/lib/grid-selection-rules";
@@ -48,6 +48,9 @@ export function useGridPointer({ selection, onSelectionChange, onActiveClick }: 
   const pressed = useRef<{ cell: GridCell; wasActive: boolean } | null>(null);
   // Whether the grid had focus when the press began: the first click into a grid only selects, never edits.
   const hadFocus = useRef(false);
+  // The drag-select in progress, so its window listeners go when the grid does.
+  const stopDrag = useRef<(() => void) | null>(null);
+  useEffect(() => () => { stopDrag.current?.(); }, []);
 
   function dragSelect(event: PointerEvent, anchor: GridSelection) {
     const pointer = event.pointerId;
@@ -59,12 +62,17 @@ export function useGridPointer({ selection, onSelectionChange, onActiveClick }: 
       current = extendTo(current, cell);
       onSelectionChange(current);
     };
-    const end = (next: globalThis.PointerEvent) => {
-      if (next.pointerId !== pointer) return;
+    const stop = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", end);
       window.removeEventListener("pointercancel", end);
+      stopDrag.current = null;
     };
+    function end(next: globalThis.PointerEvent) {
+      if (next.pointerId === pointer) stop();
+    }
+    stopDrag.current?.();
+    stopDrag.current = stop;
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);

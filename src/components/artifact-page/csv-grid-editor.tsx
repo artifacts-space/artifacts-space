@@ -9,6 +9,7 @@ import { useSheetColumns } from "@/components/artifact-view/use-sheet-columns";
 import { copySelection, selectionLabel, useSheetSelection } from "@/components/artifact-view/use-sheet-selection";
 import { Button } from "@/components/ui/button";
 import type { CsvTextStyle } from "@/lib/csv";
+import { csvGridEditLimits } from "@/lib/csv-limits";
 import { gridEditKey } from "@/lib/csv-edit-keys";
 import {
   cellValue,
@@ -24,7 +25,7 @@ import {
 import { detectColumnTypes } from "@/lib/csv-values";
 import { columnWidths } from "@/lib/csv-view-rules";
 import { moveCell } from "@/lib/grid-navigation";
-import { clearRange, parsePasteBlock, pastePlan, selectionRange, singleCell } from "@/lib/grid-selection-rules";
+import { clearRange, parsePasteBlock, pasteFits, pastePlan, selectionRange, singleCell } from "@/lib/grid-selection-rules";
 import { moveColumn } from "@/lib/sheet-column-rules";
 import { pixelWidth } from "@/lib/sheet-grid-rules";
 
@@ -143,6 +144,10 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
     const rows = plan.block.length;
     const columns = plan.block.reduce((widest, line) => Math.max(widest, line.length), 0);
     if (rows === 0 || columns === 0) return;
+    if (!pasteFits(plan, { rows: grid.rows.length, columns: width }, csvGridEditLimits)) {
+      setStatus(`That paste would make the sheet bigger than ${csvGridEditLimits.rows.toLocaleString("en-US")} rows or ${String(csvGridEditLimits.columns)} columns, so nothing changed. Paste it in Raw instead.`);
+      return;
+    }
     apply((current) => pasteBlock(current, plan.at, plan.block).grid);
     // The pasted block stays selected, as in a spreadsheet.
     setSelection({ anchor: plan.at, active: { row: plan.at.row + rows - 1, column: plan.at.column + columns - 1 } });

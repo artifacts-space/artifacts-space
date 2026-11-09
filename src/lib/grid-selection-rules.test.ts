@@ -4,6 +4,7 @@ import type { GridCell } from "./csv-edit-rules";
 import {
   clampSelection,
   clearRange,
+  pasteFits,
   sameCell,
   extendTo,
   inRange,
@@ -89,6 +90,12 @@ describe("rangeToTsv", () => {
 });
 
 describe("parsePasteBlock", () => {
+  it("should paste a copied cell holding a quote as the original text", () => {
+    const copied = rangeToTsv({ top: 0, left: 0, bottom: 0, right: 0 }, () => '6" pipe');
+    expect(parsePasteBlock(copied)).toEqual([['6" pipe']]);
+    expect(parsePasteBlock('"a\tb"')).toEqual([["a\tb"]]);
+  });
+
   it("should read tab-separated text as a block when pasted from a spreadsheet", () => {
     expect(parsePasteBlock("a\tb\n1\t2\n")).toEqual([["a", "b"], ["1", "2"]]);
   });
@@ -145,6 +152,19 @@ describe("clearRange", () => {
     // Far above a single pass (tens of milliseconds); one setCell per cell took minutes.
     expect(performance.now() - started).toBeLessThan(10_000);
     expect(cleared.rows.every((row) => row.every((value) => value === ""))).toBe(true);
+  });
+});
+
+describe("pasteFits", () => {
+  const limits = { rows: 5000, columns: 100 };
+  it("should allow a paste that keeps the grid inside the editor's limits", () => {
+    expect(pasteFits({ at: { row: 10, column: 2 }, block: [["a", "b"]] }, { rows: 20, columns: 5 }, limits)).toBe(true);
+  });
+
+  it("should refuse a paste that would grow the grid past the editor's limits", () => {
+    const tall = Array.from({ length: 4995 }, () => ["x"]);
+    expect(pasteFits({ at: { row: 10, column: 0 }, block: tall }, { rows: 20, columns: 5 }, limits)).toBe(false);
+    expect(pasteFits({ at: { row: 0, column: 99 }, block: [["a", "b"]] }, { rows: 20, columns: 100 }, limits)).toBe(false);
   });
 });
 
