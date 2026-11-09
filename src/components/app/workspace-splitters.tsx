@@ -4,7 +4,8 @@ import { useLayoutEffect, type RefObject } from "react";
 
 import { PanelSplitter } from "@/components/app/panel-splitter";
 import { applyStoredPanelSizes } from "@/components/app/panel-size-storage";
-import { beforePaintScript, projectsBounds, projectsPanel, sidebarBounds, sidebarPanel } from "@/lib/panel-size-rules";
+import { beforePaintScript, projectsBounds, projectsPanel, sidebarBounds, sidebarHandleLeft, sidebarPanel } from "@/lib/panel-size-rules";
+import { cn } from "@/lib/utils";
 
 /** The ids the handles point at with aria-controls. The workspace renders once per page. */
 export const sidebarPanelId = "workspace-sidebar";
@@ -28,7 +29,7 @@ export function PanelSizesBeforePaint() {
   return <script suppressHydrationWarning type={typeof window === "undefined" ? undefined : "text/plain"} dangerouslySetInnerHTML={{ __html: script }} />;
 }
 
-/** The handle on the sidebar's right edge, sizing its width against the artifact pane. */
+/** The handle on the sidebar's right edge, sizing its width against the artifact pane. It sits in the workspace card, not the sidebar. */
 export function SidebarSplitter({ shell, sidebar }: { shell: RefObject<HTMLElement | null>; sidebar: RefObject<HTMLElement | null> }) {
   const measure = () => {
     if (!shell.current || !sidebar.current) return null;
@@ -43,8 +44,8 @@ export function SidebarSplitter({ shell, sidebar }: { shell: RefObject<HTMLEleme
       measure={measure}
       watch={() => [shell.current, sidebar.current]}
       initial={{ size: sidebarPanel.defaultSize, bounds: { min: sidebarPanel.min, max: sidebarPanel.max } }}
-      // Just outside the sidebar, so the artifact list's scroll bar along its edge stays free.
-      className="inset-y-0 -right-2 w-2"
+      // In the workspace card, just past the sidebar's edge: the sidebar can scroll on short windows, and its list's scroll bar stays free.
+      className={cn("inset-y-0 w-3", sidebarHandleLeft)}
     />
   );
 }
@@ -68,7 +69,8 @@ export function ProjectsSplitter({ rows, list }: { rows: RefObject<HTMLElement |
       measure={measure}
       watch={() => [rows.current, rows.current?.querySelector("ul"), list.current]}
       initial={{ size: projectsPanel.defaultSize, bounds: { min: projectsPanel.min, max: projectsPanel.defaultSize } }}
-      className="inset-x-0 -bottom-1 h-2"
+      // Centred on the group's bottom border, within the padding of the group and the list.
+      className="inset-x-0 -bottom-1.5 h-3"
     />
   );
 }

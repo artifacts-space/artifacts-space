@@ -237,7 +237,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
         <PanelSizesBeforePaint />
         {/* overflow-clip, not hidden: it rounds the corners without becoming a scroll box, so the artifact's toolbar can stick on phones. */}
         <div ref={shellRef} className={cn("card-surface relative grid min-h-[640px] flex-1 overflow-clip md:min-h-0 md:grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]", sidebarColumns)}>
-          <aside ref={sidebarRef} id={sidebarPanelId} className="relative flex min-h-0 min-w-0 flex-col border-b bg-background/60 max-md:max-h-[360px] md:max-lg:max-h-[min(360px,32dvh)] lg:border-r lg:border-b-0">
+          <aside ref={sidebarRef} id={sidebarPanelId} className="relative flex min-h-0 min-w-0 flex-col border-b bg-background/60 max-md:max-h-[360px] md:max-lg:max-h-[min(360px,32dvh)] lg:overflow-y-auto lg:overscroll-contain lg:border-r lg:border-b-0">
             <div className="shrink-0 space-y-2 border-b p-3">
               <div className="relative">
                 <IconSearch className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -287,8 +287,8 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
             <div className="shrink-0 border-t px-4 py-2.5 text-xs text-muted-foreground">
               {filtered.length} shown
             </div>
-            <SidebarSplitter shell={shellRef} sidebar={sidebarRef} />
           </aside>
+          <SidebarSplitter shell={shellRef} sidebar={sidebarRef} />
 
           <DetailPane
             selected={selected}

@@ -14,6 +14,7 @@ import {
   projectsRowsHeight,
   sidebarBounds,
   sidebarColumns,
+  sidebarHandleLeft,
   sidebarPanel,
   step,
 } from "./panel-size-rules";
@@ -144,7 +145,9 @@ describe("beforePaintScript", () => {
 describe("layout classes", () => {
   it("should draw the sidebar column inside the same bounds the handle reports when a size is stored", () => {
     const { min, max, contentMin, defaultSize, cssVar } = sidebarPanel;
-    expect(sidebarColumns).toContain(`clamp(${String(min)}px,var(${cssVar},${String(defaultSize)}px),min(${String(max)}px,100%_-_${String(contentMin)}px))`);
+    const clamp = `clamp(${String(min)}px,var(${cssVar},${String(defaultSize)}px),min(${String(max)}px,100%_-_${String(contentMin)}px))`;
+    expect(sidebarColumns).toContain(clamp);
+    expect(sidebarHandleLeft, "the handle sits on the same edge").toBe(`lg:left-[${clamp}]`);
   });
 
   it("should draw the Projects rows and the list inside the bounds the handle reports when a size is stored", () => {

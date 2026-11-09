@@ -262,6 +262,57 @@ test.describe("desktop", () => {
     expect(rowTop, "the first row has scrolled up out of the box").toBeLessThan(rowsBox.y);
   });
 
+  test("should keep working and stay quiet when the browser blocks storage", async ({ page }) => {
+    await page.addInitScript(() => {
+      const blocked = () => { throw new DOMException("Storage is blocked", "SecurityError"); };
+      Storage.prototype.getItem = blocked;
+      Storage.prototype.setItem = blocked;
+      Storage.prototype.removeItem = blocked;
+    });
+    const problems = collectProblems(page);
+    await openWorkspace(page);
+    await sidebarHandle(page).press("End");
+    expect(await widthOf(sidebar(page))).toBe(520);
+    await projectsHandle(page).press("Home");
+    expect(await heightOf(rows(page))).toBe(64);
+    // The size holds for the visit, through a client remount, though it cannot be stored.
+    await page.getByRole("region", { name: "Projects" }).getByRole("button", { name: /^Design, / }).click();
+    await expect(page).toHaveURL(/project=design/);
+    expect(await widthOf(sidebar(page))).toBe(520);
+    await sidebarHandle(page).dblclick();
+    expect(await widthOf(sidebar(page))).toBe(280);
+    expect(problems).toEqual([]);
+  });
+
+  test("should end a cancelled drag without leaving the resize cursor on the page", async ({ page }) => {
+    await openWorkspace(page);
+    const handle = sidebarHandle(page);
+    const box = await handle.boundingBox();
+    if (!box) throw new Error("The handle is not on screen.");
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2, { steps: 4 });
+    await expect(handle).toHaveAttribute("data-dragging", "");
+    expect(await page.evaluate(() => document.documentElement.style.cursor)).toBe("col-resize");
+    await handle.dispatchEvent("pointercancel", { pointerId: 1, isPrimary: true, pointerType: "mouse" });
+    await expect(handle).not.toHaveAttribute("data-dragging");
+    expect(await page.evaluate(() => document.documentElement.style.cursor)).toBe("");
+    await page.mouse.up();
+  });
+
+  test("should let the sidebar scroll to its footer on a short, wide window instead of cutting it off", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 480 });
+    await page.goto("/dev/workspace");
+    await expect(page.getByRole("region", { name: "Content" })).toBeVisible();
+    const footer = sidebar(page).getByText(/\d+ shown/);
+    await footer.scrollIntoViewIfNeeded();
+    const aside = await sidebar(page).boundingBox();
+    const foot = await footer.boundingBox();
+    expect((foot?.y ?? 0) + (foot?.height ?? 0), "the footer is inside the sidebar").toBeLessThanOrEqual((aside?.y ?? 0) + (aside?.height ?? 0) + 1);
+    await expect(footer).toBeInViewport();
+    expect(await page.evaluate(() => window.scrollY), "the page itself does not scroll").toBe(0);
+  });
+
   test("should have no handles on a tablet, where the sidebar stacks over the artifact", async ({ page }) => {
     await storeSizes(page, { [sidebarKey]: "520" });
     await page.setViewportSize({ width: 820, height: 1180 });
