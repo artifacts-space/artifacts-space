@@ -18,8 +18,10 @@ export const fileLimits = {
   maxPendingPerUser: 20,
   /** How long a presigned upload URL works, in seconds. */
   uploadUrlSeconds: 10 * 60,
-  /** How long a presigned download URL works, in seconds. */
+  /** How long a presigned download URL works, in seconds, counted from its signing time. */
   downloadUrlSeconds: 15 * 60,
+  /** Download signing times round down to this step, so repeat views within it reuse one URL (r2.ts). */
+  downloadSigningWindowSeconds: 5 * 60,
   /** Uploads not finished within this time are deleted. */
   pendingTtlMs: 60 * 60 * 1000,
   /** Finished uploads not attached to an artifact within this time are deleted. */
