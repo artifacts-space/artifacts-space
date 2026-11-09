@@ -204,6 +204,12 @@ catch this, so test the generated SQL with `.toSQL()`, as
 
 - Every read, in the web app and over MCP, goes through the same access check
   (`src/lib/access.ts`, `src/lib/access-rules.ts`).
+  One deliberate exception: `/api/files/<id>` lets the viewer's own browser
+  keep its redirect to a signed R2 URL for 4 minutes (`private`, with
+  `Vary: Cookie, Authorization`), so someone who loses access can reload a
+  file they just loaded for that long. Refusals and errors are never cached.
+  The numbers are tied in `src/lib/files/redirect-cache-rules.ts`; keep them
+  there rather than going back to `no-store`.
 - Every MCP tool is classified read or write in `src/lib/mcp/tool-access.ts`.
   A tool missing from that list cannot be registered, and read-only
   connections never see write tools.

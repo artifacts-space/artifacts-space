@@ -12,6 +12,11 @@ import { fileLimits } from "./config";
  * for 4 minutes leaves 6 minutes of margin for clock skew and slow loads.
  * redirect-cache-rules.test.ts fails if the margin ever goes.
  *
+ * R2's own `private, max-age=300` on the bytes (presignDownload) does not
+ * add to this: bytes served from the browser cache never contact R2, and the
+ * browser only requests the signed URL again by following a kept redirect,
+ * which happens within the first 4 minutes.
+ *
  * The cost: someone who loses access can still load a file they loaded in the
  * last 4 minutes, from their own browser. The cache is `private`, so no shared
  * cache or CDN keeps it, and it varies on the cookie and the bearer token, so

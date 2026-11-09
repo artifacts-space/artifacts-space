@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type * as RateLimit from "@/lib/abuse/rate-limit";
+import type * as RequestViewer from "@/lib/request-viewer";
 
 /*
  * The file route: a viewer who may read the file gets a redirect to a signed
@@ -13,7 +14,7 @@ import type * as RateLimit from "@/lib/abuse/rate-limit";
 const mocks = vi.hoisted(() => ({ viewer: vi.fn(), file: vi.fn(), sign: vi.fn(), limits: vi.fn() }));
 
 vi.mock("@/lib/abuse/network-key", () => ({ networkKey: () => "network-1" }));
-vi.mock("@/lib/request-viewer", () => ({ resolveRequestViewer: mocks.viewer, viewerUserId: (viewer: { userId?: string }) => viewer.userId ?? null }));
+vi.mock("@/lib/request-viewer", async (importOriginal) => ({ ...(await importOriginal<typeof RequestViewer>()), resolveRequestViewer: mocks.viewer }));
 vi.mock("@/lib/files/download", () => ({ findReadableFile: mocks.file, signedFileUrl: mocks.sign }));
 vi.mock("@/lib/abuse/rate-limit", async (importOriginal) => ({ ...(await importOriginal<typeof RateLimit>()), hitRateLimits: mocks.limits }));
 
@@ -43,6 +44,16 @@ describe("GET /api/files/[id]", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, max-age=240");
     expect(response.headers.get("Vary")).toBe("Cookie, Authorization");
     expect(response.headers.get("X-Robots-Tag")).toBe("noindex, nofollow");
+    expect(mocks.file).toHaveBeenCalledWith(fileId, "user-1");
+  });
+
+  it("should look the file up as signed out when the bearer token is refused", async () => {
+    mocks.viewer.mockResolvedValue({ status: "invalid-token" });
+    mocks.file.mockResolvedValue(null);
+    const response = await call();
+    expect(response.status).toBe(404);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(mocks.file).toHaveBeenCalledWith(fileId, null);
   });
 
   it("should answer an uncached 404 when the viewer may not read the file", async () => {
