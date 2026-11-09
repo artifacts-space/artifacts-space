@@ -48,7 +48,9 @@ const unsafeChars = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060
 /** Untrusted text cleaned for storage: unsafe characters out, whitespace collapsed, capped. Null when nothing is left. */
 export function cleanClientText(value: string | null | undefined, max: number): string | null {
   if (!value) return null;
-  const cleaned = value.replace(unsafeChars, " ").replace(/\s+/g, " ").trim().slice(0, max).trim();
+  const collapsed = value.replace(unsafeChars, " ").replace(/\s+/g, " ").trim();
+  // Cut by code point, never inside an emoji's surrogate pair; Postgres char_length counts the same way.
+  const cleaned = Array.from(collapsed).slice(0, max).join("").trim();
   return cleaned || null;
 }
 
@@ -245,7 +247,8 @@ export function stampOf(id: string | null | undefined): HarnessStamp | null {
  * version recorded, never the artifact's latest stamp. The latest stamp can
  * belong to an edit that waits for approval or was denied, and readers must
  * never see the agent of content they are not shown. The artifact's own
- * choice wins.
+ * choice wins, and applies at once without approval: like Full width it is
+ * a label on the artifact, not content, so anyone who may edit it can set it.
  */
 export function approvedHarnessOf(input: { harnessOverride: string | null; approvedHarness: string | null }) {
   return artifactHarnessOf({ harness: input.approvedHarness, harnessOverride: input.harnessOverride });

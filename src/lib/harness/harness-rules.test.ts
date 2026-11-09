@@ -100,6 +100,12 @@ describe("parseClientInfo", () => {
   it("should return null when cleaning leaves nothing", () => {
     expect(cleanClientText("\u200b\u0007", 64)).toBeNull();
   });
+
+  it("should never cut an emoji in half when a name reaches the cap", () => {
+    const cleaned = cleanClientText(`${"a".repeat(63)}\u{1F916}tail`, 64);
+    expect(cleaned).toBe(`${"a".repeat(63)}\u{1F916}`);
+    expect(Array.from(cleaned ?? "")).toHaveLength(64);
+  });
 });
 
 describe("clientInfoFromBody", () => {

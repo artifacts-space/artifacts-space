@@ -315,7 +315,9 @@ stateless, so `mcp_connection` keeps what each OAuth app or API token said
 it was, and the person's override from the Connections page. Saves over MCP
 stamp `artifact.harness` and the version's `harness`; web saves stamp nothing.
 An artifact's own override (its More menu, for anyone who may edit it) wins
-over the connection's override, which wins over detection. clientInfo is
+over the connection's override, which wins over detection. The artifact's
+override is a label, not content: it applies at once, files no version, and
+needs no approval, so readers of the approved version see it too. clientInfo is
 untrusted: it is checked with zod, cleaned, capped, and shown only as plain
 text to the connection's owner. Readers see the harness name and icon, never
 OAuth client ids or raw client names.
