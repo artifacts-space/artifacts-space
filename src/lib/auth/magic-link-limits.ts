@@ -25,14 +25,21 @@ export function magicLinkEmail(body: unknown): string | null {
 }
 
 /**
- * The limits for one sign-in link request: per network (a short window and a
- * daily ceiling), and per address when there is one (hashed, never stored raw).
+ * The limits for one sign-in link request: per network (a one-minute burst
+ * window, a 15-minute window, and a daily ceiling), and per address when
+ * there is one (a minute and an hour; hashed, never stored raw). Network
+ * limits come first, so a scripted burst is refused with the network's
+ * message. None of them depends on whether the address has an account, so a
+ * refusal reveals nothing about who has signed up.
  */
 export function magicLinkChecks(networkKey: string, email: string | null): RateLimitCheck[] {
   const checks: RateLimitCheck[] = [
+    { name: "magicLinkByNetworkMinute", subject: networkKey },
     { name: "magicLinkByNetwork", subject: networkKey },
     { name: "magicLinkByNetworkDay", subject: networkKey },
   ];
-  if (email) checks.push({ name: "magicLinkByEmail", subject: createHash("sha256").update(email).digest("hex").slice(0, 32) });
+  if (!email) return checks;
+  const emailKey = createHash("sha256").update(email).digest("hex").slice(0, 32);
+  checks.push({ name: "magicLinkByEmailMinute", subject: emailKey }, { name: "magicLinkByEmail", subject: emailKey });
   return checks;
 }
