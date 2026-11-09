@@ -1,5 +1,5 @@
 import { browserImageEnv } from "@/components/images/prepare-image";
-import { centerSquare, TEAM_ICON_SIDE, TEAM_ICON_TOO_LARGE, TEAM_ICON_UPLOAD_MAX_BYTES, teamIconSourceProblem } from "@/lib/teams/team-icon-rules";
+import { centerSquare, TEAM_ICON_SIDE, TEAM_ICON_UPLOAD_MAX_BYTES, teamIconSourceProblem } from "@/lib/teams/team-icon-rules";
 
 /**
  * Prepares a picked image as a team icon in the browser: decoded upright,
@@ -39,7 +39,8 @@ export async function prepareTeamIcon(file: File): Promise<File> {
     context.drawImage(image.source, crop.x, crop.y, crop.side, crop.side, 0, 0, TEAM_ICON_SIDE, TEAM_ICON_SIDE);
     const blob = await encodeIcon(canvas);
     if (!blob) throw new Error("That image could not be prepared. Try another one.");
-    if (blob.size > TEAM_ICON_UPLOAD_MAX_BYTES) throw new Error(TEAM_ICON_TOO_LARGE);
+    // Its own wording: the picked file already met the 2 MB rule, so "at most 1 MB" here would read as a contradiction.
+    if (blob.size > TEAM_ICON_UPLOAD_MAX_BYTES) throw new Error("That image is still too large after resizing. Try another one.");
     return new File([blob], blob.type === "image/webp" ? "team-icon.webp" : "team-icon.png", { type: blob.type });
   } finally {
     image.close();
