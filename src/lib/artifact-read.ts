@@ -5,6 +5,17 @@ import { filesForViewer } from "@/lib/files/download";
 import { storedThemeForReader } from "@/lib/themes/theme-privacy";
 
 /**
+ * The harness this viewer is shown: the row's for the latest version; for the
+ * approved version, that version's (with the artifact's own choice over it),
+ * never the agent of an edit that waits for approval.
+ */
+export function servedHarness(latest: ArtifactDto["harness"], viewable: Pick<ViewableArtifact, "version" | "served">): ArtifactDto["harness"] {
+  if (viewable.version.source === "latest") return latest;
+  const id = viewable.served.harness;
+  return id ? { id, stamped: null, overridden: false } : null;
+}
+
+/**
  * One artifact, in full, as this viewer may read it: through the one access
  * check, with the version they are served (readers outside the team get the
  * approved version) and the files that go with it. Null when the viewer may
@@ -29,5 +40,6 @@ export async function loadArtifactForViewer(publicId: string, viewerId: string):
   const tags = viewable.canEdit ? dto.tags : [];
   // A team preset id carries a name the team chose: outsiders read "custom" (theme-privacy.ts).
   const theme = storedThemeForReader(shown.theme, viewable.canEdit);
-  return { viewable, dto: { ...dto, ...shown, theme, project, tags, files, updatedBy, updatedAt: shown.updatedAt.toISOString() } };
+  const harness = servedHarness(dto.harness, viewable);
+  return { viewable, dto: { ...dto, ...shown, theme, project, tags, files, updatedBy, harness, updatedAt: shown.updatedAt.toISOString() } };
 }

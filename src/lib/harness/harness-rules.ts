@@ -211,10 +211,14 @@ export function artifactHarnessOf(row: { harness: string | null; harnessOverride
   return { id, stamped: row.harness ? harnessFor(row.harness).id : null, overridden: overrideOf(row.harnessOverride) !== null };
 }
 
-/** The columns a save writes for its stamp, or nothing for a save from the web app (which keeps the artifact's last agent stamp). */
-export function stampColumns(stamp: HarnessStamp | null | undefined): { harness: HarnessId; harnessLabel: string | null } | Record<string, never> {
+/**
+ * The column a save writes for its stamp, or nothing for a save from the web
+ * app (which keeps the artifact's last agent stamp). Only the id: an unknown
+ * client's own name stays on its connection, for its owner.
+ */
+export function stampColumns(stamp: HarnessStamp | null | undefined): { harness: HarnessId } | Record<string, never> {
   if (!stamp) return {};
-  return { harness: stamp.harness, harnessLabel: stamp.harness === "other" ? stamp.label : null };
+  return { harness: stamp.harness };
 }
 
 /**

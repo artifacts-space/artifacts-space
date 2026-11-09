@@ -1,5 +1,5 @@
 {
-  "id": "bb446b41-3ece-4e64-8205-2b22358b787d",
+  "id": "aea39b4f-438e-40d1-b883-7e28bcc3bf08",
   "prevId": "ea5317d8-5e78-4dfa-9104-c5c3798821ef",
   "version": "7",
   "dialect": "postgresql",
@@ -365,12 +365,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "harness_label": {
-          "name": "harness_label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "harness_override": {
           "name": "harness_override",
           "type": "text",
@@ -697,10 +691,6 @@
         "artifact_harness_length_check": {
           "name": "artifact_harness_length_check",
           "value": "char_length(\"artifact\".\"harness\") <= 32 and char_length(\"artifact\".\"harness_override\") <= 32"
-        },
-        "artifact_harness_label_length_check": {
-          "name": "artifact_harness_label_length_check",
-          "value": "char_length(\"artifact\".\"harness_label\") <= 64"
         },
         "artifact_cover_length_check": {
           "name": "artifact_cover_length_check",
@@ -1155,12 +1145,6 @@
         },
         "harness": {
           "name": "harness",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "harness_label": {
-          "name": "harness_label",
           "type": "text",
           "primaryKey": false,
           "notNull": false

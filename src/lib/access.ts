@@ -7,6 +7,8 @@ import { agent, artifact, artifactVersion, sharingRequest, team, teamMember, typ
 import { canEditArtifact, canViewArtifact, isAuthorOrActsFor } from "@/lib/access-rules";
 import { actsForAuthor } from "@/lib/agents/owner-access";
 import { artifactContentColumn, artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
+import { effectiveHarness } from "@/lib/harness/harness-rules";
+import type { HarnessId } from "@/lib/harness/harnesses";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { isPublicId } from "@/lib/public-id";
 import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
@@ -70,8 +72,14 @@ export interface ArtifactAccess {
   record: ArtifactMetaRecord;
   /** Which version the viewer reads. Readers outside the team get the approved version. */
   version: { source: "latest" | "approved"; versionId: string | null };
-  /** The title, icon, theme, cover, save time, and saver of the version this viewer reads. */
-  served: { title: string; icon: string | null; theme: StoredArtifactTheme | null; cover: string | null; updatedAt: Date; editedBy: string | null };
+  /**
+   * The title, icon, theme, cover, save time, and saver of the version this
+   * viewer reads, and the agent harness it shows: the artifact's own choice,
+   * else the harness of that version's save (for the latest, of the last
+   * agent save), so readers of the approved version never see the agent of
+   * an edit that waits for approval.
+   */
+  served: { title: string; icon: string | null; theme: StoredArtifactTheme | null; cover: string | null; updatedAt: Date; editedBy: string | null; harness: HarnessId | null };
   /** Whether the viewer may edit it and read its history: the author, or a member of the team it is shared through. */
   canEdit: boolean;
   /** Whether the viewer belongs to the artifact's team. Pages show the team's name only then. */
@@ -165,6 +173,7 @@ export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publi
       approvedCover: artifactVersion.cover,
       approvedSavedAt: artifactVersion.savedAt,
       approvedBy: artifactVersion.createdBy,
+      approvedHarness: artifactVersion.harness,
     })
     .from(artifact)
     .leftJoin(team, eq(team.id, artifact.teamId))
@@ -193,11 +202,12 @@ type Subject = NonNullable<Awaited<ReturnType<typeof loadSubject>>>;
 /** The approved version a reader outside the team gets, or null for the latest. */
 function approvedVersionFor(subject: Subject, versionId: string) {
   if (subject.approvedTitle === null || subject.approvedSavedAt === null) return null;
-  return { versionId, served: { title: subject.approvedTitle, icon: subject.approvedIcon, theme: subject.approvedTheme, cover: subject.approvedCover, updatedAt: subject.approvedSavedAt, editedBy: subject.approvedBy } };
+  const harness = effectiveHarness(subject.record.harnessOverride, subject.approvedHarness);
+  return { versionId, served: { title: subject.approvedTitle, icon: subject.approvedIcon, theme: subject.approvedTheme, cover: subject.approvedCover, updatedAt: subject.approvedSavedAt, editedBy: subject.approvedBy, harness } };
 }
 
 function latestServed(record: ArtifactMetaRecord) {
-  return { title: record.title, icon: record.icon, theme: record.theme, cover: record.cover, updatedAt: record.updatedAt, editedBy: record.updatedBy ?? record.userId };
+  return { title: record.title, icon: record.icon, theme: record.theme, cover: record.cover, updatedAt: record.updatedAt, editedBy: record.updatedBy ?? record.userId, harness: effectiveHarness(record.harnessOverride, record.harness) };
 }
 
 /**

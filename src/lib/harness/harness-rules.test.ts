@@ -165,9 +165,9 @@ describe("harness precedence", () => {
     expect(stampColumns(null)).toEqual({});
   });
 
-  it("should keep the raw client name only for Other agent", () => {
-    expect(stampColumns({ harness: "other", label: "zed" })).toEqual({ harness: "other", harnessLabel: "zed" });
-    expect(stampColumns({ harness: "codex", label: "leftover" })).toEqual({ harness: "codex", harnessLabel: null });
+  it("should write only the harness id on artifacts, never the client's own name", () => {
+    expect(stampColumns({ harness: "other", label: "zed" })).toEqual({ harness: "other" });
+    expect(stampColumns({ harness: "codex", label: null })).toEqual({ harness: "codex" });
   });
 });
 

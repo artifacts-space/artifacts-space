@@ -45,7 +45,7 @@ vi.mock("@/lib/agents/owner-access", () => ({ ownedAgentIds: () => Promise.resol
 
 const baseRecord = {
   id: "artifact-1", publicId: "4fXkP9qR2sT7vW1yZ3aB5c", userId: "user-1", title: "Plan", icon: null, theme: null, cover: null, summary: "", content: "# Plan",
-  kind: "markdown", language: "", project: "", projectId: null, tags: [], sessionId: "", source: "", harness: null, harnessLabel: null, harnessOverride: null, visibility: "private", comments: "team", shareId: "s", teamId: null,
+  kind: "markdown", language: "", project: "", projectId: null, tags: [], sessionId: "", source: "", harness: null, harnessOverride: null, visibility: "private", comments: "team", shareId: "s", teamId: null,
   originalAuthorId: null, metadata: {}, approvedVersionId: null, fullWidth: false, showInSearch: false, updatedBy: "user-1", createdAt: new Date(), updatedAt: new Date("2026-11-08T10:00:00.000Z"),
 } satisfies ArtifactRecord;
 
@@ -110,20 +110,21 @@ describe("updateArtifact agent harness", () => {
 
   it("should stamp the artifact and its new version when a save comes over MCP", async () => {
     await updateArtifact("user-1", "artifact-1", { content: "# Plan v2" }, "agent", { harness: codex });
-    expect(mocks.set).toHaveBeenCalledWith(expect.objectContaining({ harness: "codex", harnessLabel: null }));
+    expect(mocks.set).toHaveBeenCalledWith(expect.objectContaining({ harness: "codex" }));
     expect(mocks.recordArtifactSave).toHaveBeenCalledWith(expect.objectContaining({ harness: codex }));
   });
 
-  it("should keep the raw client name only when the harness is Other agent", async () => {
+  it("should stamp Other agent without the client's own name when the client is unknown", async () => {
     await updateArtifact("user-1", "artifact-1", { content: "# Plan v2" }, "agent", { harness: { harness: "other", label: "zed" } });
-    expect(mocks.set).toHaveBeenCalledWith(expect.objectContaining({ harness: "other", harnessLabel: "zed" }));
+    const values = mocks.set.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(values.harness).toBe("other");
+    expect(Object.values(values)).not.toContain("zed");
   });
 
   it("should leave the artifact's harness alone and record none on the version when a person saves in the web app", async () => {
     await updateArtifact("user-1", "artifact-1", { content: "# Edited by hand" }, "person", { expectedUpdatedAt: baseRecord.updatedAt.toISOString() });
     const values = mocks.set.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(values).not.toHaveProperty("harness");
-    expect(values).not.toHaveProperty("harnessLabel");
     expect(mocks.recordArtifactSave).toHaveBeenCalledWith(expect.objectContaining({ harness: null }));
   });
 

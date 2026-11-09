@@ -30,7 +30,6 @@ import type { FileDto } from "@/lib/files/types";
 import { accountCreatedAt } from "@/lib/account-age";
 import { loadArtifactByline } from "@/lib/artifact-byline";
 import { iconTitlePrefix } from "@/lib/artifact-icons";
-import { effectiveHarness } from "@/lib/harness/harness-rules";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { lastEditorsFor } from "@/lib/artifacts";
@@ -145,8 +144,8 @@ function HeadingIcon({ viewable, themeChoices }: { viewable: ViewableArtifact; t
 function ArtifactHeading({ viewable, editor, organizers, themeChoices }: { viewable: ViewableArtifact; editor: ArtifactEditorDto | null; organizers: React.ReactNode; themeChoices: ThemeChoices }) {
   const { view, record } = viewable;
   const Icon = kindIcons[view.kind];
-  // Who made it: the agent harness when an agent did (anyone who can read it may see it), else the source the agent gave.
-  const harness = effectiveHarness(record.harnessOverride, record.harness);
+  // Who made it: the agent harness of the version this reader is served (anyone who can read it may see it), else the source the agent gave.
+  const { harness } = viewable.served;
   const meta = [!harness && view.source ? `Source ${view.source}` : null].filter(Boolean);
   return (
     <>
