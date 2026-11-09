@@ -108,6 +108,23 @@ describe("createSaveQueue", () => {
     expect(onSettled).toHaveBeenCalledWith(bandedCentered);
   });
 
+  it("should report, settle, and keep taking changes when the saver throws before it returns a promise", async () => {
+    const onSettled = vi.fn<(value: Format) => void>();
+    const onFailed = vi.fn<(error: unknown) => void>();
+    const line = createSaveQueue<Format>(plain, { onSettled, onFailed });
+    const broken = () => {
+      throw new Error("broken saver");
+    };
+    line.push(banded, broken);
+    await flush();
+    expect(onFailed).toHaveBeenCalledTimes(1);
+    expect(onSettled).toHaveBeenCalledWith(plain);
+
+    line.push(bandedCentered, (next) => Promise.resolve(next));
+    await flush();
+    expect(onSettled, "the line is free again").toHaveBeenLastCalledWith(bandedCentered);
+  });
+
   it("should roll back to the value the server last sent when one arrived from elsewhere", async () => {
     const { queue, sends, onSettled } = setUp(plain);
     queue.reset(bandedRight);
