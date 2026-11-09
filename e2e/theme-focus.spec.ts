@@ -25,10 +25,12 @@ function readOutline(control: Locator, property: "outlineColor" | "borderTopColo
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) throw new Error("no canvas");
     // The canvas ignores a color it cannot parse and keeps the old one, so set a sentinel first and fail loudly if it stays.
+    // The sentinel is half transparent, which no surface or ring measured here is, so a real color never matches it.
     const setFill = (color: string) => {
-      context.fillStyle = "#010203";
+      context.fillStyle = "rgba(1, 2, 3, 0.5)";
+      const sentinel = context.fillStyle;
       context.fillStyle = color;
-      if (context.fillStyle === "#010203") throw new Error(`the canvas could not read the color "${color}"`);
+      if (context.fillStyle === sentinel) throw new Error(`the canvas could not read the color "${color}"`);
     };
     const paint = (color: string) => {
       setFill(color);
@@ -61,6 +63,8 @@ function readOutline(control: Locator, property: "outlineColor" | "borderTopColo
 function ringAt(element: Locator): Promise<string> {
   return element.evaluate((node) => {
     const probe = document.createElement("span");
+    // Without --ring, var() falls back to the text color and comparisons would pass for the wrong reason.
+    if (!getComputedStyle(node).getPropertyValue("--ring").trim()) throw new Error("no --ring here: was the token renamed?");
     probe.style.outlineColor = "var(--ring)";
     node.append(probe);
     const color = getComputedStyle(probe).outlineColor;
@@ -85,7 +89,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(reading.opaque, "the outline is painted solid").toBe(true);
     expect(await control.evaluate((element) => getComputedStyle(element).outlineColor)).toBe(await ringAt(control));
     expect(reading.contrast, `outline ${reading.outline.join(",")} on card ${reading.card.join(",")}`).toBeGreaterThanOrEqual(3);
-    // The theme set its own ring: it differs from the site ring the header sees.
+    // The theme set its own ring: it differs from the site ring on <html>.
     expect(await ringAt(specimen)).not.toBe(await ringAt(page.locator("html")));
   });
 }
