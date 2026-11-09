@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("next/navigation", () => ({ redirect: vi.fn(), unstable_rethrow: vi.fn() }));
 vi.mock("@/lib/session", () => ({ getSession: mocks.session }));
 // The viewer's membership comes with the team's roles, as getTeamAccessById loads them.
 vi.mock("@/lib/teams/queries", () => ({

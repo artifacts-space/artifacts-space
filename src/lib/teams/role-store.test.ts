@@ -54,6 +54,15 @@ describe("recordMemberRole", () => {
   });
 });
 
+describe("restoreStoredRole", () => {
+  it("should only touch the member in that team", async () => {
+    await store.restoreStoredRole({ teamId: "team-1", memberId: "member-1", role: "admin" });
+    const { text, params } = lastQuery();
+    expect(text).toContain("where team_member.id = $2 and team_member.team_id = $3");
+    expect(params).toEqual(["admin", "member-1", "team-1"]);
+  });
+});
+
 describe("setRoleCapability", () => {
   const input = { teamId: "team-1", key: "member", name: "Member", builtIn: true, capability: "share.team" as const, on: true, next: ["share.team" as const, "analytics.view" as const], audit: { ...audit, action: "role_updated" as const } };
 

@@ -3,7 +3,8 @@
 -- owners take a lock on the team row first, so two owners demoting or
 -- removing each other at the same moment wait for one another, and the second
 -- is refused. Deleting the whole team is allowed; deleting the account of a
--- team's only owner is refused, so an owner hands the team on first.
+-- shared team's only owner is refused, so an owner hands the team on first.
+-- Personal teams are left alone: a person's own team goes with their account.
 CREATE OR REPLACE FUNCTION team_keeps_an_owner() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -14,9 +15,10 @@ BEGIN
   IF TG_OP = 'UPDATE' AND NEW.team_id = OLD.team_id AND 'owner' = ANY (string_to_array(NEW.role, ',')) THEN
     RETURN NEW;
   END IF;
-  PERFORM 1 FROM team WHERE team.id = OLD.team_id FOR NO KEY UPDATE;
+  PERFORM 1 FROM team WHERE team.id = OLD.team_id AND NOT team.personal FOR NO KEY UPDATE;
   IF NOT FOUND THEN
-    -- The team itself is being deleted.
+    -- The team itself is being deleted, or it is a personal team: it holds
+    -- only its owner, can gain no other, and goes when their account does.
     IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
     RETURN NEW;
   END IF;

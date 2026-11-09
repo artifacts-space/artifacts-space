@@ -1,4 +1,5 @@
 import { APIError } from "better-auth/api";
+import { redirect } from "next/navigation";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -44,5 +45,17 @@ describe("actionErrorMessage with the last-owner trigger", () => {
   it("should keep other database errors behind the fallback", () => {
     const wrapped = new Error("Failed query", { cause: new Error("duplicate key value violates unique constraint") });
     expect(actionErrorMessage(wrapped, "fallback")).toBe("fallback");
+  });
+});
+
+describe("actionErrorMessage with Next's control flow", () => {
+  it("should let a redirect through instead of turning it into an error message", () => {
+    let thrown: unknown = null;
+    try {
+      redirect("/sign-in");
+    } catch (error) {
+      thrown = error;
+    }
+    expect(() => actionErrorMessage(thrown, "fallback")).toThrow();
   });
 });

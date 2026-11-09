@@ -177,6 +177,19 @@ export async function deleteCustomRole(input: { teamId: string; key: string; aud
 }
 
 /**
+ * Puts back the role Better Auth stored on a membership, after a role change
+ * could not be recorded. A repair of our own half-applied write, not a new
+ * change, so it skips the role-change checks and writes no audit row (the
+ * change it undoes was never recorded). The last-owner trigger still applies.
+ */
+export async function restoreStoredRole(input: { teamId: string; memberId: string; role: string }): Promise<void> {
+  await getDb().execute(sql`
+    update team_member set role = ${input.role}
+    where team_member.id = ${input.memberId} and team_member.team_id = ${input.teamId}
+  `);
+}
+
+/**
  * Records a member's custom role, or clears it with a null `roleId`, and
  * writes the audit row, in one statement. The statement itself checks that
  * the member and the role both belong to `teamId`; otherwise nothing is

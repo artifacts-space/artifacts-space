@@ -23,9 +23,9 @@ import { guardTeam } from "./team-guard";
 const roleKeySchema = z.string().trim().min(1).max(40);
 const capabilitiesSchema = z.array(z.string().max(40)).max(40);
 
-/** A person's membership in a shared team, with the team's roles. Each action then asks role-admin-rules.ts. */
+/** A person's membership in a shared team (never an agent's token), with the team's roles. Each action then asks role-admin-rules.ts. */
 function loadEditor(teamId: string) {
-  return guardTeam(teamId, (membership) => !membership.personal, "Team not found.");
+  return guardTeam(teamId, (membership) => membership.kind === "person" && !membership.personal, "Team not found.");
 }
 
 function refresh(membership: TeamMembership) {

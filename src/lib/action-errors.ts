@@ -1,4 +1,5 @@
 import { isAPIError } from "better-auth/api";
+import { unstable_rethrow } from "next/navigation";
 import { ZodError } from "zod";
 
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -31,6 +32,8 @@ function isLastOwnerRefusal(error: unknown): boolean {
  * our guards write plain, user-facing messages; anything else is generic.
  */
 export function actionErrorMessage(error: unknown, fallback: string) {
+  // A redirect or notFound() thrown inside the action is Next's control flow, never a failure to show.
+  unstable_rethrow(error);
   if (error instanceof ZodError) return error.issues[0]?.message ?? fallback;
   if (error instanceof UserFacingError) return error.message;
   if (isLastOwnerRefusal(error)) return lastOwnerMessage;

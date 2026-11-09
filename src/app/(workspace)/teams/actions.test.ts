@@ -23,11 +23,12 @@ const mocks = vi.hoisted(() => ({
   updateOrganization: vi.fn(),
   leaveOrganization: vi.fn(),
   recordMemberRole: vi.fn(),
+  restoreStoredRole: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/headers", () => ({ headers: () => Promise.resolve(new Headers()) }));
-vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("next/navigation", () => ({ redirect: vi.fn(), unstable_rethrow: vi.fn() }));
 vi.mock("@/lib/session", () => ({ getSession: mocks.session }));
 vi.mock("@/lib/auth/server", () => ({
   getAuth: () => ({
@@ -49,7 +50,7 @@ vi.mock("@/lib/teams/queries", () => ({
   },
   listTeamMemberActors: mocks.members,
 }));
-vi.mock("@/lib/teams/role-store", () => ({ recordMemberRole: mocks.recordMemberRole }));
+vi.mock("@/lib/teams/role-store", () => ({ recordMemberRole: mocks.recordMemberRole, restoreStoredRole: mocks.restoreStoredRole }));
 
 const actions = await import("./actions");
 
@@ -93,7 +94,7 @@ function signInAs(membership: TeamMembership) {
   mocks.members.mockResolvedValue(teamWith(membership));
 }
 
-const writes = [mocks.createInvitation, mocks.cancelInvitation, mocks.removeMember, mocks.updateMemberRole, mocks.updateOrganization, mocks.leaveOrganization, mocks.recordMemberRole];
+const writes = [mocks.createInvitation, mocks.cancelInvitation, mocks.removeMember, mocks.updateMemberRole, mocks.updateOrganization, mocks.leaveOrganization, mocks.recordMemberRole, mocks.restoreStoredRole];
 
 function expectNothingWritten() {
   for (const write of writes) expect(write).not.toHaveBeenCalled();
@@ -254,13 +255,13 @@ describe("updateMemberRoleAction", () => {
     expect(mocks.recordMemberRole).toHaveBeenCalledWith(expect.objectContaining({ memberId: "m-designer", roleId: null }));
   });
 
-  it("should put the Better Auth role back when the assignment and audit row cannot be recorded", async () => {
+  it("should write the stored role back directly when the assignment and audit row cannot be recorded", async () => {
     signInAs(viewer("owner"));
     mocks.recordMemberRole.mockRejectedValue(new Error("connection lost"));
     await expect(actions.updateMemberRoleAction("team-1", "m-admin", "designer")).resolves.toMatchObject({ success: false });
-    expect(mocks.updateMemberRole).toHaveBeenCalledTimes(2);
-    expect(mocks.updateMemberRole).toHaveBeenNthCalledWith(1, expect.objectContaining({ body: { memberId: "m-admin", role: "member", organizationId: "team-1" } }));
-    expect(mocks.updateMemberRole).toHaveBeenNthCalledWith(2, expect.objectContaining({ body: { memberId: "m-admin", role: "admin", organizationId: "team-1" } }));
+    expect(mocks.updateMemberRole).toHaveBeenCalledTimes(1);
+    expect(mocks.updateMemberRole).toHaveBeenCalledWith(expect.objectContaining({ body: { memberId: "m-admin", role: "member", organizationId: "team-1" } }));
+    expect(mocks.restoreStoredRole).toHaveBeenCalledWith({ teamId: "team-1", memberId: "m-admin", role: "admin" });
   });
 });
 
