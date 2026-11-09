@@ -90,6 +90,13 @@ test("should let an owner create, edit, and give a custom role, and log each cha
   await expect.poll(() => customRoleOf(team.id, teammate)).toBeNull();
   await expect(page.getByText(/deleted the Reviewer role\./)).toBeVisible();
   await expect.poll(() => permissionAuditActions(team.id)).toEqual(["role_created", "role_updated", "member_role_changed", "role_updated", "role_updated", "role_deleted"]);
+
+  // Removal goes through the same capability lock on the Better Auth call itself.
+  await page.getByRole("tab", { name: "Members" }).click();
+  await page.getByRole("button", { name: "Actions for Theme e2e" }).click();
+  await page.getByRole("menuitem", { name: "Remove from team" }).click();
+  await page.getByRole("dialog", { name: "Remove Theme e2e?" }).getByRole("button", { name: "Remove" }).click();
+  await expect(page.getByRole("table", { name: "Members" }).getByText("Theme e2e")).toHaveCount(0);
 });
 
 test("should show the approval queue only to a custom role that may approve", async ({ page }) => {

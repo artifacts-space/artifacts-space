@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { actorCheckedTeamRoutes } from "./closed-team-routes";
 import { teamRoutesClosedOverHttp, teamsPlugin } from "./teams-plugin";
 
 /*
@@ -58,5 +59,10 @@ describe("team routes over HTTP", () => {
       "/organization/update-member-role",
       "/organization/update",
     ]));
+  });
+
+  it("should check the acting user's capability on role changes and removals, which are also closed over HTTP", () => {
+    expect(actorCheckedTeamRoutes).toEqual({ "/organization/update-member-role": "members.roles", "/organization/remove-member": "members.remove" });
+    for (const path of Object.keys(actorCheckedTeamRoutes)) expect(teamRoutesClosedOverHttp).toContain(path);
   });
 });

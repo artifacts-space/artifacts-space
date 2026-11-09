@@ -49,18 +49,24 @@ export async function prepareNewTeam(data: { name?: unknown; slug?: unknown }, u
   return { name, slug, personal: false, createdBy: userId };
 }
 
+/** Team settings a team update may change. Anything else is refused, so a new field is never open by accident. */
+const changeableTeamSettings = new Set(["name", "teamSharingNeedsApproval"]);
+
 /**
- * Only people who may change the sharing rule (owners by default) change it,
- * slugs never change, and personal teams stay as they are. Returns the
- * cleaned values to store: a new name, trimmed and length-checked.
+ * Team settings (the sharing rule and the name) change only for people who
+ * may change the sharing rule (owners by default); slugs never change, and
+ * personal teams stay as they are. Returns the cleaned values to store: a
+ * new name, trimmed and length-checked.
  */
 export async function assertTeamUpdateAllowed(update: Record<string, unknown>, member: { organizationId: string; userId: string }): Promise<{ name?: string }> {
   const [current] = await getDb().select({ personal: team.personal }).from(team).where(eq(team.id, member.organizationId)).limit(1);
   if (!current) reject("Team not found.");
   if (current.personal) reject("Personal team settings cannot change.");
   if ("slug" in update && update.slug !== undefined) reject("A team's URL cannot change.");
-  if ("teamSharingNeedsApproval" in update) await assertTeamCapability(member.userId, member.organizationId, "settings.sharing");
-  if ("name" in update && update.name !== undefined) return { name: cleanTeamName(update.name) };
+  const changing = Object.keys(update).filter((key) => update[key] !== undefined);
+  if (changing.some((key) => !changeableTeamSettings.has(key))) reject("That team setting cannot change.");
+  if (changing.length > 0) await assertTeamCapability(member.userId, member.organizationId, "settings.sharing");
+  if (changing.includes("name")) return { name: cleanTeamName(update.name) };
   return {};
 }
 

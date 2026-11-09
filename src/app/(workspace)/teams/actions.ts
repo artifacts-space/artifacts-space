@@ -121,11 +121,12 @@ export async function removeMemberAction(teamId: string, memberId: string): Prom
   try {
     const checked = await guard(teamId, holds("members.remove"), "You cannot remove people from this team.");
     if (!checked.ok) return checked.result;
-    const { targetRole, ownerCount } = await loadTarget(checked.membership, checked.roles, idSchema.parse(memberId));
+    const { target, targetRole, ownerCount } = await loadTarget(checked.membership, checked.roles, idSchema.parse(memberId));
     const problem = removeMemberProblem(checked.membership, targetRole, ownerCount);
     if (problem) return { success: false, error: problem };
+    // Remove exactly the member the checks above looked at, never the raw input.
     await getAuth().api.removeMember({
-      body: { memberIdOrEmail: memberId, organizationId: checked.membership.id },
+      body: { memberIdOrEmail: target.memberId, organizationId: checked.membership.id },
       headers: await headers(),
     });
     revalidatePath(`/teams/${checked.membership.slug}`);
