@@ -37,7 +37,6 @@ export interface InstructionFile {
  * - Cursor: https://cursor.com/docs/context/rules (rule files must be `.mdc`)
  * - OpenCode: https://opencode.ai/docs/rules/
  * - fx: https://fx.sh/docs/configure-fx/project-instructions
- * - Mogplex: webrenew/mogplex-docs, content/docs/configure-and-extend/repo-instructions.mdx
  * - Kimi Code CLI: https://moonshotai.github.io/kimi-code/
  * - Devin CLI: https://docs.devin.ai/cli/extensibility/rules
  * - Claude Desktop and claude.ai: https://support.claude.com/en/articles/10185728
@@ -48,7 +47,6 @@ export const instructionFiles: readonly InstructionFile[] = [
   { harness: "Cursor", everyProject: "Cursor Settings, Rules, User Rules", oneProject: "`AGENTS.md`, or a `.cursor/rules/*.mdc` rule with `alwaysApply: true`" },
   { harness: "OpenCode", everyProject: "`~/.config/opencode/AGENTS.md`", oneProject: "`AGENTS.md`" },
   { harness: "fx", everyProject: "`~/.fx/AGENTS.md`", oneProject: "`AGENTS.md`" },
-  { harness: "Mogplex", everyProject: "`~/.mogplex/AGENTS.md`", oneProject: "`AGENTS.md`" },
   { harness: "Kimi Code CLI", everyProject: "`~/.kimi-code/AGENTS.md`", oneProject: "`AGENTS.md`" },
   { harness: "Devin CLI", everyProject: "`~/.config/devin/AGENTS.md`", oneProject: "`AGENTS.md`" },
   { harness: "Claude Desktop and claude.ai", everyProject: "Settings, Instructions for Claude", oneProject: "The project's instructions" },
