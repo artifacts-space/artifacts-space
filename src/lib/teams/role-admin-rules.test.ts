@@ -77,7 +77,7 @@ describe("capabilityChangeProblem, for every capability", () => {
   });
 
   it("should refuse an admin giving members the sharing rule, which admins do not hold", () => {
-    expect(capabilityChangeProblem(admin, "member", [], ["settings.sharing"])).not.toBeNull();
+    expect(capabilityChangeProblem(admin, "member", [], ["settings.team"])).not.toBeNull();
   });
 
   it("should list only the capabilities that changed", () => {
@@ -91,7 +91,7 @@ describe("createRoleProblem and deleteRoleProblem", () => {
   });
 
   it("should refuse a custom role with a capability the creator lacks", () => {
-    expect(createRoleProblem(admin, ["settings.sharing"])).not.toBeNull();
+    expect(createRoleProblem(admin, ["settings.team"])).not.toBeNull();
   });
 
   it("should refuse a custom-role holder creating a role at their own level", () => {

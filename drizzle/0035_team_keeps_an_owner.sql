@@ -5,6 +5,8 @@
 -- is refused. Deleting the whole team is allowed; deleting the account of a
 -- shared team's only owner is refused, so an owner hands the team on first.
 -- Personal teams are left alone: a person's own team goes with their account.
+-- The app has no account deletion yet; when it does, actionErrorMessage
+-- already shows this refusal as "A team always keeps at least one owner."
 CREATE OR REPLACE FUNCTION team_keeps_an_owner() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN

@@ -253,6 +253,13 @@
       "when": 1794192910166,
       "tag": "0035_team_keeps_an_owner",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794204651755,
+      "tag": "0036_team_role_assignment_same_team",
+      "breakpoints": true
     }
   ]
 }

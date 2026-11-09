@@ -4,7 +4,7 @@ import { builtInRoleKeys, builtInRoleNames, defaultActor, defaultRoleCapabilitie
 
 /*
  * The team update guard behind Better Auth's update hook. Every change to
- * team settings needs "change the sharing rule" (owners by default), unknown
+ * team settings needs "change team settings" (owners by default), unknown
  * settings are refused, and a new name is stored trimmed. The team lookup
  * and the membership lookup are mocked at the database boundary.
  */

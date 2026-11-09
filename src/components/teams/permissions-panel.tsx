@@ -27,7 +27,7 @@ export function PermissionsPanel({ team, roles, audit }: { team: TeamMembership;
         <PermissionsMatrix teamId={team.id} viewer={viewer} roles={orderRoles(roles)} />
       </Section>
       <Section title="Sharing rule" description="Does sharing with the team need approval?">
-        <SharingRuleSetting teamId={team.id} needsApproval={team.teamSharingNeedsApproval} canEdit={viewer !== null && can(viewer, "settings.sharing")} />
+        <SharingRuleSetting teamId={team.id} needsApproval={team.teamSharingNeedsApproval} canEdit={viewer !== null && can(viewer, "settings.team")} />
       </Section>
       <Section title="Role changes" description="The latest 50 changes to roles and to people's roles, with who made each one. Every change is kept.">
         <PermissionAudit entries={audit} />

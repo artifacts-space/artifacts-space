@@ -27,7 +27,7 @@ JOIN (VALUES
   ('owner', 'analytics.view'),
   ('owner', 'artifacts.withdraw'),
   ('owner', 'reports.handle'),
-  ('owner', 'settings.sharing'),
+  ('owner', 'settings.team'),
   ('admin', 'share.team'),
   ('admin', 'share.link'),
   ('admin', 'share.public'),

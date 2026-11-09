@@ -20,7 +20,7 @@ async function expectTooltip(page: Page, cell: string | RegExp, reason: string) 
 test("should let an owner toggle cells below Owner and lock every Owner cell", async ({ page }) => {
   await page.goto("/dev/team?tab=permissions");
   await expect(matrix(page).getByRole("checkbox", { name: "Approve sharing for Member" })).toBeEnabled();
-  await expect(matrix(page).getByRole("checkbox", { name: "Change the sharing rule for Admin" })).toBeEnabled();
+  await expect(matrix(page).getByRole("checkbox", { name: "Change team settings for Admin" })).toBeEnabled();
   await expect(matrix(page).getByRole("checkbox", { name: /for Owner$/ })).toHaveCount(0);
 
   await expectTooltip(page, /^Approve sharing for Owner: Yes\. Locked/, "Owners always have every capability, so a team can always be run.");
@@ -38,7 +38,7 @@ test("should keep an admin to roles below Admin and to capabilities the admin ho
   await expect(matrix(page).getByRole("checkbox", { name: /for Admin$/ })).toHaveCount(0);
   await expect(matrix(page).getByRole("checkbox", { name: "Approve sharing for Member" })).toBeEnabled();
   await expect(matrix(page).getByRole("checkbox", { name: "Manage themes for Designer" })).toBeEnabled();
-  await expect(matrix(page).getByRole("checkbox", { name: "Change the sharing rule for Member" })).toHaveCount(0);
+  await expect(matrix(page).getByRole("checkbox", { name: "Change team settings for Member" })).toHaveCount(0);
   await expectTooltip(page, /^Approve sharing for Admin: Yes\. You can only change roles below your own\./, "You can only change roles below your own.");
 });
 
@@ -54,7 +54,7 @@ test("should check the name in the New role dialog before creating", async ({ pa
   await page.getByRole("button", { name: "New role" }).click();
   const dialog = page.getByRole("dialog", { name: "New role" });
   await expect(dialog.getByText("Approve sharing", { exact: true })).toBeVisible();
-  await expect(dialog.getByText("Change the sharing rule", { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText("Change team settings", { exact: true })).toHaveCount(0);
 
   await dialog.getByRole("button", { name: "Create role" }).click();
   await expect(dialog.getByText("Give the role a name.")).toBeVisible();

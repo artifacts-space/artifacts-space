@@ -111,13 +111,13 @@ describe("updateRoleCapabilityAction", () => {
 
   it("should refuse an admin editing the Admin role", async () => {
     mocks.membership.mockResolvedValue(viewer("admin"));
-    await expect(actions.updateRoleCapabilityAction("team-1", "admin", "settings.sharing", true)).resolves.toMatchObject({ success: false });
+    await expect(actions.updateRoleCapabilityAction("team-1", "admin", "settings.team", true)).resolves.toMatchObject({ success: false });
     expectNothingWritten();
   });
 
   it("should refuse an admin granting a capability the admin does not hold", async () => {
     mocks.membership.mockResolvedValue(viewer("admin"));
-    await expect(actions.updateRoleCapabilityAction("team-1", "member", "settings.sharing", true)).resolves.toMatchObject({ success: false });
+    await expect(actions.updateRoleCapabilityAction("team-1", "member", "settings.team", true)).resolves.toMatchObject({ success: false });
     expectNothingWritten();
   });
 
@@ -170,7 +170,7 @@ describe("updateRoleCapabilityAction", () => {
 describe("createRoleAction", () => {
   it("should refuse a new role with a capability the viewer does not hold", async () => {
     mocks.membership.mockResolvedValue(viewer("admin"));
-    await expect(actions.createRoleAction("team-1", { name: "Rule Keeper", capabilities: ["settings.sharing"] })).resolves.toMatchObject({ success: false });
+    await expect(actions.createRoleAction("team-1", { name: "Rule Keeper", capabilities: ["settings.team"] })).resolves.toMatchObject({ success: false });
     expectNothingWritten();
   });
 

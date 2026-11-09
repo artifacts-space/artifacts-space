@@ -176,10 +176,10 @@ export async function leaveTeamAction(teamId: string): Promise<ActionResult<null
   }
 }
 
-/** Sets whether sharing with the team needs approval. Needs "change the sharing rule" (owners by default). */
+/** Sets whether sharing with the team needs approval. Needs "change team settings" (owners by default). */
 export async function updateSharingRuleAction(teamId: string, teamSharingNeedsApproval: boolean): Promise<ActionResult<null>> {
   try {
-    const checked = await guardTeam(teamId, holds("settings.sharing"), "You cannot change the sharing rule in this team.");
+    const checked = await guardTeam(teamId, holds("settings.team"), "You cannot change the sharing rule in this team.");
     if (!checked.ok) return checked.result;
     await getAuth().api.updateOrganization({
       body: { organizationId: checked.membership.id, data: { teamSharingNeedsApproval: z.boolean().parse(teamSharingNeedsApproval) } },

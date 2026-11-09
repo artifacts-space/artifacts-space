@@ -35,7 +35,7 @@ describe("matrixCell", () => {
 
   it("should block an admin on the Admin column and on capabilities the admin lacks", () => {
     expect(matrixCell(defaultActor("admin"), roleOf("admin"), "approve.sharing").blocked).not.toBeNull();
-    expect(matrixCell(defaultActor("admin"), roleOf("member"), "settings.sharing").blocked).not.toBeNull();
+    expect(matrixCell(defaultActor("admin"), roleOf("member"), "settings.team").blocked).not.toBeNull();
   });
 
   it("should block every cell when the viewer cannot change roles", () => {
@@ -51,7 +51,7 @@ describe("toggledCapabilities and grantableCapabilities", () => {
   });
 
   it("should offer only what the viewer holds when they may create roles", () => {
-    expect(grantableCapabilities(defaultActor("admin"))).not.toContain("settings.sharing");
+    expect(grantableCapabilities(defaultActor("admin"))).not.toContain("settings.team");
     expect(grantableCapabilities(defaultActor("owner"))).toEqual([...teamCapabilities]);
     expect(grantableCapabilities(defaultActor("member"))).toEqual([]);
   });

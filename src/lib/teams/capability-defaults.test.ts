@@ -27,7 +27,7 @@ const todaysRules: Record<TeamCapability, [string, string, string, string]> = {
   "analytics.view": ["yes", "yes", "yes", "yes"],
   "artifacts.withdraw": ["yes", "yes", "no", "no"],
   "reports.handle": ["yes", "yes", "no", "no"],
-  "settings.sharing": ["yes", "no", "no", "no"],
+  "settings.team": ["yes", "no", "no", "no"],
 };
 
 function heldToday(role: BuiltInRoleKey, capability: TeamCapability) {

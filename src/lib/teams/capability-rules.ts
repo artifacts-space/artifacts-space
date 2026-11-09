@@ -20,7 +20,7 @@ export const teamCapabilities = [
   "analytics.view",
   "artifacts.withdraw",
   "reports.handle",
-  "settings.sharing",
+  "settings.team",
 ] as const;
 export type TeamCapability = (typeof teamCapabilities)[number];
 
@@ -55,7 +55,7 @@ export const agentLockedCapabilities: ReadonlySet<TeamCapability> = new Set<Team
   "themes.manage",
   "artifacts.withdraw",
   "reports.handle",
-  "settings.sharing",
+  "settings.team",
 ]);
 
 const allCapabilities: readonly TeamCapability[] = teamCapabilities;
@@ -67,7 +67,7 @@ const allCapabilities: readonly TeamCapability[] = teamCapabilities;
  */
 export const defaultRoleCapabilities: Record<BuiltInRoleKey, readonly TeamCapability[]> = {
   owner: allCapabilities,
-  admin: allCapabilities.filter((capability) => capability !== "settings.sharing"),
+  admin: allCapabilities.filter((capability) => capability !== "settings.team"),
   member: ["analytics.view"],
   agent: ["analytics.view"],
 };

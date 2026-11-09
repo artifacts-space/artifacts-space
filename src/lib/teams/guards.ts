@@ -55,7 +55,7 @@ const changeableTeamSettings = new Set(["name", "teamSharingNeedsApproval"]);
 
 /**
  * Team settings (the sharing rule and the name) change only for people who
- * may change the sharing rule (owners by default); slugs never change, and
+ * may change team settings (owners by default); slugs never change, and
  * personal teams stay as they are. Returns the cleaned values to store: a
  * new name, trimmed and length-checked.
  */
@@ -66,7 +66,7 @@ export async function assertTeamUpdateAllowed(update: Record<string, unknown>, m
   if ("slug" in update && update.slug !== undefined) reject("A team's URL cannot change.");
   const changing = Object.keys(update).filter((key) => update[key] !== undefined);
   if (changing.some((key) => !changeableTeamSettings.has(key))) reject("That team setting cannot change.");
-  if (changing.length > 0) await assertTeamCapability(member.userId, member.organizationId, "settings.sharing");
+  if (changing.length > 0) await assertTeamCapability(member.userId, member.organizationId, "settings.team");
   if (changing.includes("name")) return { name: cleanTeamName(update.name) };
   return {};
 }
