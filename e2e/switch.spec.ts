@@ -72,7 +72,7 @@ async function thumbOffset(control: Locator): Promise<number> {
 
 for (const theme of ["light", "dark"] as const) {
   for (const scope of ["default", "ocean"] as const) {
-    test(`should draw a green on track and readable thumbs at 3:1 when the ${scope} look is ${theme}`, async ({ page }) => {
+    test(`should draw a green on track and readable thumbs at 3:1 when the ${scope} look is ${theme}`, async ({ page }, testInfo) => {
       await openSpecimen(page, theme);
       const specimen = page.locator(`[data-switch-specimen="${scope}"]`);
       const on = specimen.getByRole("switch", { name: "On", exact: true });
@@ -85,6 +85,18 @@ for (const theme of ["light", "dark"] as const) {
       expect(green, `the on track is green: ${onReading.track.join(",")}`).toBeGreaterThan(Math.max(red, blue) + 40);
       expect(onReading.trackOnCard, "on track on the card").toBeGreaterThanOrEqual(3);
       expect(onReading.thumbOnTrack, "on thumb on its track").toBeGreaterThanOrEqual(3);
+
+      // Hover tints the track; the thumb must still read at 3:1 on it. Phones have no hover.
+      if (testInfo.project.name !== "phone") {
+        await on.hover();
+        await expect.poll(async () => (await readSwitch(on)).track.join(","), "the hovered track changes color").not.toBe(onReading.track.join(","));
+        // Let the 200ms color transition finish before measuring.
+        await expect.poll(async () => { const first = (await readSwitch(on)).track.join(","); await page.waitForTimeout(250); return first === (await readSwitch(on)).track.join(","); }).toBe(true);
+        const hovered = await readSwitch(on);
+        expect(hovered.thumbOnTrack, "on thumb on its hovered track").toBeGreaterThanOrEqual(3);
+        expect(hovered.trackOnCard, "hovered on track on the card").toBeGreaterThanOrEqual(3);
+        await page.mouse.move(0, 0);
+      }
 
       const offReading = await readSwitch(off);
       expect(offReading.thumbOnTrack, "off thumb on its track").toBeGreaterThanOrEqual(3);
@@ -151,6 +163,24 @@ test("should show a solid brand outline when the switch has keyboard focus", asy
   });
   // The outline color fades in with the track's color transition, so wait for it to settle.
   await expect.poll(() => on.evaluate((element) => getComputedStyle(element).outlineColor)).toBe(brand);
+});
+
+test("should shrink the thumb while a switch is pressed and leave a disabled one alone", async ({ page }) => {
+  await openSpecimen(page, "light");
+  const specimen = page.locator('[data-switch-specimen="default"]');
+  const thumbWidth = async (name: string) => {
+    const box = await specimen.getByRole("switch", { name, exact: true }).locator('[data-slot="switch-thumb"]').boundingBox();
+    return box ? Math.round(box.width * 10) / 10 : 0;
+  };
+  for (const [name, pressed] of [["Off", true], ["Off, disabled", false]] as const) {
+    const box = await specimen.getByRole("switch", { name, exact: true }).boundingBox();
+    if (!box) throw new Error("switch not drawn");
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    if (pressed) await expect.poll(() => thumbWidth(name), `${name} thumb while pressed`).toBeLessThan(17);
+    else expect(await thumbWidth(name), `${name} thumb while pressed`).toBe(18);
+    await page.mouse.up();
+  }
 });
 
 test("should not change a disabled switch when it is clicked", async ({ page }) => {

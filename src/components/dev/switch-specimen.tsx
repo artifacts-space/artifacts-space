@@ -32,12 +32,19 @@ function SwitchRowView({ row }: { row: SwitchRow }) {
   );
 }
 
+/** The preset for one half of the specimen. Fails loudly, so a renamed preset never shows Default twice. */
+function specimenTheme(id: string) {
+  const theme = presetTheme(id);
+  if (!theme) throw new Error(`Switch specimen: no preset "${id}"`);
+  return theme;
+}
+
 /** Every switch state on a card, in the Default look and in Ocean, for the gallery and its e2e test. */
 export function SwitchSpecimen() {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {(["default", "ocean"] as const).map((themeId) => (
-        <ThemeScope key={themeId} theme={presetTheme(themeId) ?? null} className="rounded-md bg-background p-3 text-foreground" data-switch-specimen={themeId}>
+        <ThemeScope key={themeId} theme={specimenTheme(themeId)} className="rounded-md bg-background p-3 text-foreground" data-switch-specimen={themeId}>
           <div className="card-surface">
             {rows.map((row) => <SwitchRowView key={row.label} row={row} />)}
           </div>
