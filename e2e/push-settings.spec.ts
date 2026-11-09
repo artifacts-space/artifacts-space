@@ -23,6 +23,9 @@ test("should offer in-app, browser, and email choices with email only for mentio
   await expect(table.getByRole("switch", { name: "In app: Replies" })).toBeChecked();
   await expect(table.getByRole("switch", { name: "Email: Mentions" })).toBeChecked();
   await expect(table.getByRole("switch", { name: "Email: Replies" })).toHaveCount(0);
+  // Where an event has no email, the cell shows a quiet dash instead of a disabled switch.
+  const replies = table.getByRole("row").filter({ has: page.getByRole("rowheader", { name: /^Replies/ }) });
+  await expect(replies.getByRole("cell").last()).toHaveText("–");
 });
 
 test("should list the browsers with a remove button and a test button", async ({ page }) => {

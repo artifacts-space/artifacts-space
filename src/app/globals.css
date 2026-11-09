@@ -145,6 +145,10 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-card-edge: var(--card-edge);
+  --color-switch-on: var(--switch-on);
+  --color-switch-on-thumb: var(--switch-on-thumb);
+  --color-switch-off: var(--switch-off);
+  --color-switch-off-thumb: var(--switch-off-thumb);
   --shadow-xs: var(--elevation-xs);
   --shadow-sm: var(--elevation-sm);
   --shadow-md: var(--elevation-md);
@@ -159,7 +163,8 @@
 /*
  * Two neutral palettes. Light is a warm paper; dark is a warm near-black.
  * The only chromatic token is --brand, taken from the logo mark, and it is
- * reserved for focus rings and text selection.
+ * reserved for focus rings and text selection. The one deliberate accent in
+ * the controls is the green of a switch that is on (--switch-on).
  *
  * `.theme-invert` takes the other palette: light inside a dark page, dark
  * inside a light page. Each palette is still written once. A `.light` or
@@ -260,6 +265,27 @@
   --diff-added-foreground: oklch(0.38 0.1 150);
   --diff-removed: oklch(0.95 0.035 25);
   --diff-removed-foreground: oklch(0.45 0.15 27);
+  /*
+   * Switches (src/components/ui/switch.tsx): a green track with a white thumb
+   * when on; when off, the card 8% toward the ink with a muted grey thumb.
+   * The on track keeps 3:1 against the card, and each thumb 3:1 against its
+   * track, at rest and hovered. Themes derive the same four
+   * (src/lib/themes/derive.ts).
+   *
+   * The off track is deliberately quiet: about 1.2:1 on the card, under the
+   * 3:1 asked of non-text UI. The grey thumb (3:1 on the track) and its place
+   * on the left carry "this is a switch, and it is off"; the --input hairline
+   * edge only helps. This follows the owner's mockup for Settings >
+   * Notifications; the exception was agreed in PR #78. Do not darken the
+   * tint without that sign-off.
+   */
+  --switch-on: oklch(0.56 0.15 150);
+  --switch-on-thumb: oklch(1 0 0);
+  --switch-off: oklch(0.936 0.0005 60);
+  --switch-off-thumb: oklch(0.56 0.008 65);
+  /* How far hover tints each track (on: toward the ink in light, the page in dark; off: toward the ink). derive.ts checks contrast with the same amounts. */
+  --switch-on-hover-tint: 10%;
+  --switch-off-hover-tint: 6%;
   --sidebar: oklch(0.975 0.003 85);
   --sidebar-foreground: oklch(0.2 0.006 60);
   --sidebar-primary: oklch(0.2 0.006 60);
@@ -415,6 +441,10 @@
   --diff-added-foreground: oklch(0.85 0.1 150);
   --diff-removed: oklch(0.3 0.06 25);
   --diff-removed-foreground: oklch(0.85 0.09 25);
+  --switch-on: oklch(0.63 0.17 150);
+  --switch-on-thumb: oklch(1 0 0);
+  --switch-off: oklch(0.2492 0.004 61.6);
+  --switch-off-thumb: oklch(0.6 0.008 70);
   /* The landing demo's Claude Code terminal, in its dark theme. */
   --term: oklch(0.2 0.003 100);
   --term-bar: oklch(0.225 0.003 100);

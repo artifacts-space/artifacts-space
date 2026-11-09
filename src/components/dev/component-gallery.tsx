@@ -9,6 +9,7 @@ import { AvatarGallery } from "@/components/dev/avatar-gallery";
 import { ArtifactHeaderSpecimen } from "@/components/dev/artifact-header-specimen";
 import { CoverSpecimen } from "@/components/dev/cover-specimen";
 import { NotificationsSpecimen } from "@/components/dev/notifications-specimen";
+import { SwitchSpecimen } from "@/components/dev/switch-specimen";
 import { ThemePickerSpecimen } from "@/components/dev/theme-picker-specimen";
 import { ViewsSpecimen } from "@/components/dev/views-specimen";
 import { UiView } from "@/components/artifact-view/ui-view";
@@ -97,6 +98,7 @@ export function ComponentGallery() {
         <a href="#themes" className="hover:text-foreground">Themes</a>
         <a href="#avatars" className="hover:text-foreground">Avatars</a>
         <a href="#views" className="hover:text-foreground">Views</a>
+        <a href="#switches" className="hover:text-foreground">Switches</a>
         <a href="#notifications" className="hover:text-foreground">Notifications</a>
         <a href="#clients" className="hover:text-foreground">Clients</a>
       </nav>
@@ -146,6 +148,11 @@ export function ComponentGallery() {
         <Group id="views" title="Views">
           <Specimen name="views dialog">
             <ViewsSpecimen />
+          </Specimen>
+        </Group>
+        <Group id="switches" title="Switches">
+          <Specimen name="switch states">
+            <SwitchSpecimen />
           </Specimen>
         </Group>
         <Group id="notifications" title="Notification settings">

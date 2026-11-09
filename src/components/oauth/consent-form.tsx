@@ -88,7 +88,7 @@ export function ConsentForm({ oauthQuery, clientName, clientUri, identityNote, r
             <span className="block text-md font-medium">Read-only access</span>
             <span className="mt-0.5 block text-sm leading-5 text-muted-foreground">Let it read and search, but not change anything.</span>
           </label>
-          <Switch id={switchId} checked={readOnly} onCheckedChange={setReadOnly} disabled={pending !== null} className="mt-1" />
+          <Switch id={switchId} checked={readOnly} onCheckedChange={setReadOnly} disabled={pending !== null} />
         </div>
       ) : null}
 
