@@ -4,7 +4,12 @@ import { fitWidth } from "@/lib/sheet-column-rules";
 
 let canvas: HTMLCanvasElement | null = null;
 
-/** Room for the header's sort arrow and menu button beside the name. */
+/**
+ * Room beside a column's name for the header's padding, sort and filter
+ * icons, and menu button: ColumnHeader in csv-table.tsx and EditorHeader in
+ * csv-grid-editor.tsx. Change it with them; fitWidth's own padding adds
+ * some slack on top.
+ */
 const headerControls = 44;
 
 function firstLine(value: string): string {

@@ -103,10 +103,30 @@ export function resizedWidth(startWidth: number, startX: number, x: number): num
   return clampColumnWidth(startWidth + x - startX);
 }
 
+/** Longest column name used whole in a key; a longer one is cut and gets a hash of the whole name. */
+const keyNameChars = 120;
+
+/** A short, stable FNV-1a hash of a name, as 8 hex digits. */
+function nameHash(name: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < name.length; index += 1) {
+    hash ^= name.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+/** The quoted name in a key, cut with a hash when long, so every key stays short enough to store. */
+function keyName(name: string): string {
+  if (name.length <= keyNameChars) return JSON.stringify(name);
+  return `${JSON.stringify(name.slice(0, keyNameChars))}~${nameHash(name)}`;
+}
+
 /**
  * A key per column that survives columns being added, removed, or moved:
  * its name, with a count for repeated names, or its position when it has no
- * name. Widths are stored under these keys.
+ * name. Widths are stored under these keys. A very long name is cut and
+ * hashed, so every key fits the stored limit.
  */
 export function columnKeys(header: readonly string[], count: number): string[] {
   const seen = new Map<string, number>();
@@ -116,7 +136,7 @@ export function columnKeys(header: readonly string[], count: number): string[] {
     const times = (seen.get(name) ?? 0) + 1;
     seen.set(name, times);
     // The name is quoted, so a column literally named "a#2" never shares a key with the second "a".
-    const quoted = JSON.stringify(name);
+    const quoted = keyName(name);
     return times === 1 ? `=${quoted}` : `=${quoted}#${String(times)}`;
   });
 }
@@ -124,8 +144,22 @@ export function columnKeys(header: readonly string[], count: number): string[] {
 /** How many columns a stored view keeps, so storage stays small. */
 const storedColumnLimit = 500;
 
+/** The longest column key a width is kept for. A longer column name keeps its default width. */
+const maxStoredKeyChars = 200;
+
+/** Whether a column's width can be kept: its key (a quoted column name) is short enough to store. */
+export function canStoreWidth(key: string): boolean {
+  return key.length <= maxStoredKeyChars;
+}
+
+/** Stored widths with any over-long keys left out, so one bad key never throws the others away. */
+function storableWidths(widths: unknown): unknown {
+  if (typeof widths !== "object" || widths === null || Array.isArray(widths)) return widths;
+  return Object.fromEntries(Object.entries(widths).filter(([key]) => canStoreWidth(key)));
+}
+
 const prefsSchema = z.object({
-  widths: z.record(z.string().max(200), z.number().int().min(1).max(10_000)).optional(),
+  widths: z.preprocess(storableWidths, z.record(z.string().max(maxStoredKeyChars), z.number().int().min(1).max(10_000)).optional()),
   order: z.array(z.number().int().min(0).max(100_000)).max(storedColumnLimit).optional(),
 });
 
@@ -152,7 +186,7 @@ export function parseSheetPrefs(text: string | null): SheetPrefs {
 
 /** The text stored for these prefs, keeping at most the column limit of widths. */
 export function serializeSheetPrefs(prefs: SheetPrefs): string {
-  const widths = Object.fromEntries(Object.entries(prefs.widths).slice(0, storedColumnLimit));
+  const widths = Object.fromEntries(Object.entries(prefs.widths).filter(([key]) => canStoreWidth(key)).slice(0, storedColumnLimit));
   return JSON.stringify(prefs.order === null ? { widths } : { widths, order: prefs.order.slice(0, storedColumnLimit) });
 }
 
