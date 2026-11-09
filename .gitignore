@@ -42,3 +42,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# routing eval reports (pnpm eval:routing)
+/scripts/evals/results/
