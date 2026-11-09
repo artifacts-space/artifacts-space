@@ -31,6 +31,8 @@ interface PanelSplitterProps {
 }
 
 interface Drag {
+  /** The pointer that started the drag; a second finger on the handle is ignored. */
+  pointerId: number;
   origin: number;
   start: number;
   bounds: SizeBounds;
@@ -90,27 +92,27 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
   }
 
   function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || drag.current) return;
     const now = measure();
     if (!now) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     event.currentTarget.focus({ preventScroll: true });
-    drag.current = { origin: along(event, orientation), start: now.size, bounds: now.bounds, size: null };
+    drag.current = { pointerId: event.pointerId, origin: along(event, orientation), start: now.size, bounds: now.bounds, size: null };
     document.documentElement.style.cursor = cursors[orientation];
     setDragging(true);
   }
 
   function onPointerMove(event: React.PointerEvent) {
     const current = drag.current;
-    if (!current) return;
+    if (current?.pointerId !== event.pointerId) return;
     current.size = clampSize(current.start + along(event, orientation) - current.origin, current.bounds);
     show(current.size, current.bounds);
   }
 
-  function endDrag() {
+  function endDrag(event: React.PointerEvent) {
     const current = drag.current;
-    if (!current) return;
+    if (current?.pointerId !== event.pointerId) return;
     drag.current = null;
     document.documentElement.style.removeProperty("cursor");
     setDragging(false);

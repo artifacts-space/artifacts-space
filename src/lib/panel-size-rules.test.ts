@@ -128,6 +128,14 @@ describe("beforePaintScript", () => {
     expect(runScript((key) => stored.get(key) ?? null)).toEqual({ [sidebarPanel.cssVar]: "333px" });
   });
 
+  it("should read every stored value exactly as parseStoredSize does", () => {
+    for (const raw of [null, "", "  ", "abc", "0", "-5", "312.6", " 300 ", "4000", "4001", "1e2", "Infinity", "NaN"]) {
+      const expected = parseStoredSize(raw);
+      const drawn = runScript((key) => (key === sidebarPanel.storageKey ? raw : null));
+      expect(drawn, String(raw)).toEqual(expected === null ? {} : { [sidebarPanel.cssVar]: `${String(expected)}px` });
+    }
+  });
+
   it("should do nothing when storage cannot be read", () => {
     expect(runScript(() => { throw new Error("blocked"); })).toEqual({});
   });
