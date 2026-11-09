@@ -134,7 +134,12 @@ export function filesToMarkdown(files: readonly MarkdownFile[], heading: string)
   return [`## ${heading}`, lines.join("\n"), note].join("\n\n");
 }
 
-/** The Markdown for a reader the owner turned downloads off for: the title, the summary, and why there is nothing else. */
+/**
+ * The Markdown for a reader the owner turned downloads off for: the title,
+ * the summary, and why there is nothing else, with a link to the page. On
+ * purpose it also leaves out the files and the comment thread, even with
+ * `?comments=1`, since a comment may quote rows; the page shows both.
+ */
 export function withheldMarkdown(input: Pick<ArtifactMarkdownInput, "title" | "emoji" | "summary" | "url">): string {
   const title = `# ${input.emoji ? `${input.emoji} ` : ""}${inlineText(input.title) || "Untitled"}`;
   const summary = inlineText(input.summary);

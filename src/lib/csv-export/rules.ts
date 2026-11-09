@@ -34,8 +34,11 @@ export interface CsvExportArtifact {
 
 /**
  * Whether this reader may take the sheet's data out (download, raw file,
- * Markdown table, copy, MCP content). Only CSV artifacts are limited.
- * Editors always may; everyone else only while the setting is on.
+ * Markdown table, copy, MCP content, the link preview's cells). Only CSV
+ * artifacts are limited. Editors always may; everyone else only while the
+ * setting is on. Attached files are not part of this rule: they are
+ * separate uploads with their own access check (canReadFile), listed and
+ * served as always.
  */
 export function mayExportCsv(viewer: CsvExportViewer, artifact: CsvExportArtifact): boolean {
   if (artifact.kind !== "csv") return true;

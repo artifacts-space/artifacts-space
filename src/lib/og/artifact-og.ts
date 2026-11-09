@@ -83,8 +83,8 @@ function cardContent(access: ArtifactAccess, view: Pick<VersionView, "kind" | "c
 }
 
 /** The card key for this theme: the theme's own, with a variant when the card withholds a sheet's cells, so turning downloads on or off gives the picture a fresh URL. */
-function cardKey(theme: Theme, access: ArtifactAccess, view: Pick<VersionView, "kind" | "content"> | null | undefined): string {
-  const withheld = view?.kind === "csv" && cardContent(access, view) === "";
+function cardKey(theme: Theme, access: ArtifactAccess, view: Pick<VersionView, "kind"> | null | undefined): string {
+  const withheld = view?.kind === "csv" && !mayExportCsv({ canEdit: false }, { kind: view.kind, allowCsvDownload: access.record.allowCsvDownload });
   return ogThemeKey(theme, withheld ? "csv-off" : null);
 }
 
