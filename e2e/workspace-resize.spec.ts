@@ -95,6 +95,11 @@ function brandColor(page: Page) {
   });
 }
 
+/** The color of a handle's line, drawn by its ::after. */
+function lineColor(handle: Locator) {
+  return handle.evaluate((element) => getComputedStyle(element, "::after").backgroundColor);
+}
+
 test.describe("desktop", () => {
   test.skip(({ isMobile }) => isMobile, "phones have no handles; checked below");
 
@@ -110,6 +115,11 @@ test.describe("desktop", () => {
 
     await dragBy(page, handle, 120, 0);
     expect(await widthOf(sidebar(page))).toBe(400);
+    // A drag focuses the handle for the keyboard, but never shows the keyboard focus line or a ring.
+    await expect(handle).toBeFocused();
+    await expect(handle).not.toHaveAttribute("data-keyboard");
+    expect(await lineColor(handle)).not.toBe(await brandColor(page));
+    expect(await handle.evaluate((element) => getComputedStyle(element).boxShadow)).toBe("none");
     await expect(handle).toHaveAttribute("aria-valuenow", "400");
     expect(await sidebarEdgeGap(page), "the handle sits on the sidebar's right edge").toBeLessThan(2);
 
@@ -139,11 +149,33 @@ test.describe("desktop", () => {
     expect(await stored(page, sidebarKey)).toBeNull();
     await handle.press("ArrowLeft");
 
-    // The keyboard focus ring is drawn in --brand.
-    const ring = await handle.evaluate((element) => getComputedStyle(element).boxShadow);
-    expect(ring).toContain(await brandColor(page));
+    // From the keyboard, focus shows as the handle's line in --brand, with no ring boxing the grab area.
+    const brand = await brandColor(page);
+    // The line fades between colors, so wait for it to settle on the brand.
+    await expect.poll(() => lineColor(handle)).toBe(brand);
+    expect(await handle.evaluate((element) => getComputedStyle(element).boxShadow)).toBe("none");
+    // A pointer press hands the handle back to the pointer, and leaving it clears the keyboard state.
+    await dragBy(page, handle, 16, 0);
+    await expect(handle).not.toHaveAttribute("data-keyboard");
+    await handle.press("ArrowLeft");
+    await expect(handle).toHaveAttribute("data-keyboard", "");
+    await handle.blur();
+    await expect(handle).not.toHaveAttribute("data-keyboard");
     const scroll = await pageScroll(page);
     expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.clientWidth + 1);
+  });
+
+  test("should outline a keyboard-driven handle in forced colors, where the line's background is dropped", async ({ page }) => {
+    await page.emulateMedia({ forcedColors: "active" });
+    await openWorkspace(page);
+    const handle = sidebarHandle(page);
+    const outline = () => handle.evaluate((element) => getComputedStyle(element).outlineStyle);
+
+    await dragBy(page, handle, 16, 0);
+    await expect(handle).toBeFocused();
+    expect(await outline(), "no outline after a drag").toBe("none");
+    await handle.press("ArrowLeft");
+    await expect.poll(outline, "an outline from the keyboard").toBe("solid");
   });
 
   test("should stop the sidebar where the artifact pane keeps its minimum width on a narrow desktop", async ({ page }) => {
