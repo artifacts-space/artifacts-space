@@ -59,18 +59,18 @@ function readOutline(control: Locator, property: "outlineColor" | "borderTopColo
   }, property);
 }
 
-/** The --ring an element sees, resolved to a color by the browser. */
-function ringAt(element: Locator): Promise<string> {
-  return element.evaluate((node) => {
+/** The --ring an element sees, resolved to a color by the browser. `label` names the element in a failure. */
+function ringAt(element: Locator, label: string): Promise<string> {
+  return element.evaluate((node, name) => {
     const probe = document.createElement("span");
     // Without --ring, var() falls back to the text color and comparisons would pass for the wrong reason.
-    if (!getComputedStyle(node).getPropertyValue("--ring").trim()) throw new Error("no --ring here: was the token renamed?");
+    if (!getComputedStyle(node).getPropertyValue("--ring").trim()) throw new Error(`no --ring on the ${name}: was the token renamed?`);
     probe.style.outlineColor = "var(--ring)";
     node.append(probe);
     const color = getComputedStyle(probe).outlineColor;
     probe.remove();
     return color;
-  });
+  }, label);
 }
 
 for (const theme of ["light", "dark"] as const) {
@@ -87,10 +87,10 @@ for (const theme of ["light", "dark"] as const) {
 
     const reading = await readOutline(control);
     expect(reading.opaque, "the outline is painted solid").toBe(true);
-    expect(await control.evaluate((element) => getComputedStyle(element).outlineColor)).toBe(await ringAt(control));
+    expect(await control.evaluate((element) => getComputedStyle(element).outlineColor)).toBe(await ringAt(control, "switch"));
     expect(reading.contrast, `outline ${reading.outline.join(",")} on card ${reading.card.join(",")}`).toBeGreaterThanOrEqual(3);
     // The theme set its own ring: it differs from the site ring on <html>.
-    expect(await ringAt(specimen)).not.toBe(await ringAt(page.locator("html")));
+    expect(await ringAt(specimen, "themed artifact")).not.toBe(await ringAt(page.locator("html"), "page root"));
   });
 }
 
@@ -104,7 +104,7 @@ test("should draw a focused button's solid ring-colored border at 3:1 on a theme
   // Button pairs a solid 1px --ring border with a wider 50% --ring halo. The halo blends into the card and is decoration;
   // the solid border is what must read at 3:1, and it uses the theme's derived ring.
   // The border is transparent until :focus-visible applies, so wait for it to become the ring color.
-  await expect.poll(() => button.evaluate((element) => getComputedStyle(element).borderTopColor)).toBe(await ringAt(button));
+  await expect.poll(() => button.evaluate((element) => getComputedStyle(element).borderTopColor)).toBe(await ringAt(button, "button"));
   const reading = await readOutline(button, "borderTopColor");
   expect(reading.opaque, "the border is painted solid").toBe(true);
   expect(reading.contrast, `border ${reading.outline.join(",")} on card ${reading.card.join(",")}`).toBeGreaterThanOrEqual(3);
