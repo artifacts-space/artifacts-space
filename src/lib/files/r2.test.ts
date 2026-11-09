@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { amzDate, downloadSigningTime, parseEndpoint, presignDownload, presignUpload, presignUrl, r2ConfigFromEnv, r2ObjectUrl, type R2Config } from "./r2";
+import { amzDate, downloadSigningTime, parseEndpoint, presignDownload, presignUpload, presignUrl, r2ConfigFromEnv, r2ObjectUrl, readObject, type R2Config } from "./r2";
 
 const config: R2Config = {
   accountId: "0123456789abcdef0123456789abcdef",
@@ -104,5 +104,35 @@ describe("endpoint override", () => {
 
   it("should accept an https endpoint anywhere", () => {
     expect(parseEndpoint("https://eu.example.com/")).toBe("https://eu.example.com");
+  });
+});
+
+describe("readObject", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function answer(body: Uint8Array<ArrayBuffer> | null, status: number) {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(body, { status }))));
+  }
+
+  it("should return the object's bytes when it exists and fits", async () => {
+    answer(new Uint8Array([1, 2, 3]), 200);
+    expect(await readObject(config, key, 3)).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it("should return null when the object does not exist", async () => {
+    answer(null, 404);
+    expect(await readObject(config, key, 3)).toBeNull();
+  });
+
+  it("should refuse an object larger than the caller expects", async () => {
+    answer(new Uint8Array([1, 2, 3, 4]), 200);
+    await expect(readObject(config, key, 3)).rejects.toThrow("R2 GET failed");
+  });
+
+  it("should throw without details when R2 refuses", async () => {
+    answer(null, 403);
+    await expect(readObject(config, key, 3)).rejects.toThrow("R2 GET failed with status 403.");
   });
 });

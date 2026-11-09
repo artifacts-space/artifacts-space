@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /*
  * Team icon storage: the bytes are checked before anything is stored, the
  * old object is deleted after a replace or remove (best effort, logged),
- * and a link is signed only for members of a shared team whose key is one
- * this app made for that team. The database and R2 are mocked.
+ * and an icon is read from R2 only for members of a shared team whose key
+ * is one this app made for that team. The database and R2 are mocked.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   limit: vi.fn(),
   putObject: vi.fn(),
   deleteObject: vi.fn(),
-  presignDownload: vi.fn(),
+  readObject: vi.fn(),
 }));
 
 vi.mock("@/db", () => ({
@@ -22,10 +22,10 @@ vi.mock("@/lib/files/r2", () => ({
   r2ConfigFromEnv: () => ({ accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }),
   putObject: mocks.putObject,
   deleteObject: mocks.deleteObject,
-  presignDownload: mocks.presignDownload,
+  readObject: mocks.readObject,
 }));
 
-const { memberIconKeyQuery, removeTeamIcon, saveTeamIcon, signedTeamIconUrl } = await import("./team-icon");
+const { memberIconKeyQuery, memberTeamIcon, removeTeamIcon, saveTeamIcon } = await import("./team-icon");
 const { neon } = await import("@neondatabase/serverless");
 const { drizzle } = await import("drizzle-orm/neon-http");
 
@@ -99,30 +99,38 @@ describe("removeTeamIcon", () => {
   });
 });
 
-describe("signedTeamIconUrl", () => {
-  it("should sign a link for a member of the team", async () => {
+describe("memberTeamIcon", () => {
+  const bytes = new Uint8Array([1, 2, 3]);
+
+  it("should read the icon for a member of the team, with the id its URL carries", async () => {
     mocks.limit.mockResolvedValue([{ logo: oldKey }]);
-    mocks.presignDownload.mockResolvedValue({ url: "https://r2.example.com/signed" });
-    expect(await signedTeamIconUrl("user-1", "team-1")).toBe("https://r2.example.com/signed");
-    expect(mocks.presignDownload).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ key: oldKey, contentType: "image/png" }));
+    mocks.readObject.mockResolvedValue(bytes);
+    expect(await memberTeamIcon("user-1", "team-1")).toEqual({ bytes, type: "image/png", id: "7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a" });
+    expect(mocks.readObject).toHaveBeenCalledWith(expect.anything(), oldKey, 2_097_152);
   });
 
-  it("should sign nothing for someone outside the team or for a personal team, which the query returns no row for", async () => {
+  it("should never read the icon for someone outside the team or for a personal team, which the query returns no row for", async () => {
     mocks.limit.mockResolvedValue([]);
-    expect(await signedTeamIconUrl("stranger", "team-1")).toBeNull();
-    expect(mocks.presignDownload).not.toHaveBeenCalled();
+    expect(await memberTeamIcon("stranger", "team-1")).toBeNull();
+    expect(mocks.readObject).not.toHaveBeenCalled();
   });
 
-  it("should sign nothing when the stored key belongs to another team", async () => {
+  it("should never read a stored key that belongs to another team", async () => {
     mocks.limit.mockResolvedValue([{ logo: "team-icons/team-2/7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a.png" }]);
-    expect(await signedTeamIconUrl("user-1", "team-1")).toBeNull();
-    expect(mocks.presignDownload).not.toHaveBeenCalled();
+    expect(await memberTeamIcon("user-1", "team-1")).toBeNull();
+    expect(mocks.readObject).not.toHaveBeenCalled();
   });
 
-  it("should sign nothing when the team has no icon", async () => {
+  it("should return null when the team has no icon", async () => {
     mocks.limit.mockResolvedValue([{ logo: null }]);
-    expect(await signedTeamIconUrl("user-1", "team-1")).toBeNull();
-    expect(mocks.presignDownload).not.toHaveBeenCalled();
+    expect(await memberTeamIcon("user-1", "team-1")).toBeNull();
+    expect(mocks.readObject).not.toHaveBeenCalled();
+  });
+
+  it("should return null when the object is gone from storage", async () => {
+    mocks.limit.mockResolvedValue([{ logo: oldKey }]);
+    mocks.readObject.mockResolvedValue(null);
+    expect(await memberTeamIcon("user-1", "team-1")).toBeNull();
   });
 });
 

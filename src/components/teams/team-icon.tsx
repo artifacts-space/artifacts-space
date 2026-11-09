@@ -17,7 +17,7 @@ interface TeamIconProps {
 /**
  * A team's icon, or its monogram (the first letter of its name) when it has
  * none or the image cannot load. The image comes through the members-only
- * redirect (/api/teams/<id>/icon), so only the team ever sees it. Never use
+ * route (/api/teams/<id>/icon), so only the team ever sees it. Never use
  * this on public pages, link previews, or exports.
  */
 export function TeamIcon({ name, iconUrl, size, className }: TeamIconProps) {
@@ -25,7 +25,7 @@ export function TeamIcon({ name, iconUrl, size, className }: TeamIconProps) {
   const box = { width: size, height: size };
   if (iconUrl && failedUrl !== iconUrl) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- a members-only redirect to R2, which next/image cannot optimize
+      // eslint-disable-next-line @next/next/no-img-element -- a members-only, privately cached route, which next/image cannot optimize
       <img
         src={iconUrl}
         alt=""

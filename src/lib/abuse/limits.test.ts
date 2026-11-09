@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { SENDIR_DAILY_RECIPIENTS } from "@/lib/email/budget-rules";
 
 import { magicLinkChecks } from "@/lib/auth/magic-link-limits";
+import { teamIconRateLimitChecks } from "@/lib/teams/team-icon-rules";
 
 import { rateLimits, type RateLimitName } from "./limits";
 import type { RateLimitCheck } from "./rate-limit";
@@ -134,5 +135,33 @@ describe("report limits", () => {
 
   it("should make a refused network wait under 20 minutes when it hit the short window", () => {
     expect(longestWait("reportByNetwork")).toBeLessThanOrEqual(20 * 60);
+  });
+});
+
+/**
+ * Icon requests spread evenly over 48 minutes inside one hour window, the
+ * way the icon route counts them: every request against the member's limit
+ * and the network backstop.
+ */
+function iconRequests(count: number, userFor: (index: number) => string | null, network = "office") {
+  const spacingMs = (48 * 60 * 1000) / count;
+  return Array.from({ length: count }, (_, index) => ({ atMs: start + index * spacingMs, checks: teamIconRateLimitChecks(userFor(index), network) }));
+}
+
+describe("team icon limits", () => {
+  it("should never refuse a member who opens 100 pages of 36 icons each in an hour with the browser cache off", () => {
+    expect(replay(iconRequests(100 * 36, () => "member-1"))).toBe(3600);
+  });
+
+  it("should never refuse a 500-person office behind one address when each member loads 100 icons in an hour", () => {
+    expect(replay(iconRequests(500 * 100, (index) => `member-${String(index % 500)}`))).toBe(50_000);
+  });
+
+  it("should cap one account at its own limit when it scrapes icons", () => {
+    expect(replay(iconRequests(20_000, () => "scraper"))).toBeLessThanOrEqual(rateLimits.teamIconByUser.limit);
+  });
+
+  it("should cap many accounts or signed-out requests from one address at the network backstop", () => {
+    expect(replay(iconRequests(100_000, (index) => (index % 2 === 0 ? null : `account-${String(index % 1000)}`)))).toBeLessThanOrEqual(rateLimits.teamIconByNetwork.limit);
   });
 });

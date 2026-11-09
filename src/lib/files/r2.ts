@@ -195,6 +195,21 @@ export async function readObjectStart(config: R2Config, key: string, length: num
   return new Uint8Array(await response.arrayBuffer()).slice(0, length);
 }
 
+/**
+ * A whole object's bytes, or null when it does not exist. Refuses (R2Error)
+ * an object larger than `maxBytes`, so a caller never buffers more than it
+ * expects. For small objects the server already checked, such as team icons.
+ */
+export async function readObject(config: R2Config, key: string, maxBytes: number): Promise<Uint8Array<ArrayBuffer> | null> {
+  const response = await send(config, "GET", "GET", key);
+  if (response.status === 404) return null;
+  if (!response.ok) throw new R2Error("GET", response.status);
+  if (Number(response.headers.get("content-length") ?? "0") > maxBytes) throw new R2Error("GET", response.status);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.length > maxBytes) throw new R2Error("GET", response.status);
+  return bytes;
+}
+
 /** Deletes an object. Deleting one that is already gone succeeds. */
 export async function deleteObject(config: R2Config, key: string): Promise<void> {
   const response = await send(config, "DELETE", "DELETE", key);

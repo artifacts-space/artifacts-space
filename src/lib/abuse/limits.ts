@@ -33,8 +33,22 @@ export const rateLimits = {
   readByToken: { limit: 1800, windowSeconds: hour },
   /** File views and downloads (/api/files) per network address per hour. */
   fileDownloadByNetwork: { limit: 3600, windowSeconds: hour },
-  /** Team icon views (/api/teams/<id>/icon) per network address per hour: one per team on every workspace page, so kept apart from file views. */
-  teamIconByNetwork: { limit: 7200, windowSeconds: hour },
+  /**
+   * Team icon views (/api/teams/<id>/icon) per signed-in member per hour.
+   * Only members can load an icon, so each person gets their own budget and
+   * an office behind one address never shares one. Browsers keep each icon
+   * for a day (teamIconCacheControl), so a member normally loads each one
+   * about once a day. A page shows at most a few dozen icons; one a second
+   * still covers 100 page loads an hour of 36 icons each with the cache off.
+   */
+  teamIconByUser: { limit: 3600, windowSeconds: hour },
+  /**
+   * Team icon views per network address per hour: an abuse backstop only,
+   * for many accounts or signed-out requests from one address. A 500-person
+   * office whose members each load 100 icons in one hour (more than a cold
+   * cache on a busy morning) makes 50,000, under this.
+   */
+  teamIconByNetwork: { limit: 60_000, windowSeconds: hour },
   /** Artifact page views (/artifact/<id>) per network address per hour. */
   artifactPageByNetwork: { limit: 1800, windowSeconds: hour },
   /** Counted page views (the view beacon) per network address per hour, across all artifacts. Over the limit, views are not counted; the page is unaffected. */
@@ -118,6 +132,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   readByUser: "You have read a lot of artifacts in the last hour.",
   readByToken: "This connection has read a lot in the last hour.",
   fileDownloadByNetwork: "Your network has opened a lot of files in the last hour.",
+  teamIconByUser: "You have loaded a lot of team icons in the last hour.",
   teamIconByNetwork: "Your network has loaded a lot of team icons in the last hour.",
   artifactPageByNetwork: "Your network has opened a lot of artifact pages in the last hour.",
   viewByNetwork: "Your network has opened a lot of artifact pages in the last hour, so further views are not counted.",

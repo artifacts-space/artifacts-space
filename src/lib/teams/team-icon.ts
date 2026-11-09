@@ -5,16 +5,15 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { team, teamMember } from "@/db/schema";
-import { deleteObject, presignDownload, putObject, r2ConfigFromEnv } from "@/lib/files/r2";
-import { fileLimits } from "@/lib/files/config";
+import { deleteObject, putObject, r2ConfigFromEnv, readObject } from "@/lib/files/r2";
 import { UserFacingError } from "@/lib/user-facing-error";
 
-import { checkTeamIconBytes, parseTeamIconKey, teamIconKey } from "./team-icon-rules";
+import { checkTeamIconBytes, parseTeamIconKey, TEAM_ICON_MAX_BYTES, teamIconKey, type TeamIconType } from "./team-icon-rules";
 
 /**
  * Team icons in R2. The rules (team-icon-rules.ts) decide what is accepted
  * and who may change it; this file stores the bytes, swaps the key in
- * `team.logo`, deletes the old object, and signs links for members.
+ * `team.logo`, deletes the old object, and reads the icon for members.
  */
 
 const previousRowSchema = z.object({ previous: z.string().nullable() });
@@ -91,22 +90,25 @@ export function memberIconKeyQuery(db: Pick<ReturnType<typeof getDb>, "select">,
     .limit(1);
 }
 
+/** A member's view of the team icon: its bytes, type, and the id its URL carries as `v`. */
+export interface MemberTeamIcon {
+  bytes: Uint8Array<ArrayBuffer>;
+  type: TeamIconType;
+  id: string;
+}
+
 /**
- * A short-lived link to the team's icon for `viewerId`, or null when they
- * are not in the team, the team is personal or has no icon, or its stored
- * key is not one this app made for this team. Callers answer "not found"
- * for null, so a team's icon never shows outside the team.
+ * The team's icon for `viewerId`, or null when they are not in the team, the
+ * team is personal or has no icon, its stored key is not one this app made
+ * for this team, or the object is gone. R2 is read only after the membership
+ * check passes. Callers answer "not found" for null, so a team's icon never
+ * shows outside the team.
  */
-export async function signedTeamIconUrl(viewerId: string, teamId: string): Promise<string | null> {
+export async function memberTeamIcon(viewerId: string, teamId: string): Promise<MemberTeamIcon | null> {
   const [row] = await memberIconKeyQuery(getDb(), viewerId, teamId);
   const key = row?.logo ?? null;
   const parsed = parseTeamIconKey(teamId, key);
   if (!parsed || !key) return null;
-  const { url } = await presignDownload(r2ConfigFromEnv(), {
-    key,
-    contentType: parsed.type,
-    disposition: `inline; filename="team-icon.${parsed.type === "image/webp" ? "webp" : "png"}"`,
-    expiresIn: fileLimits.downloadUrlSeconds,
-  });
-  return url;
+  const bytes = await readObject(r2ConfigFromEnv(), key, TEAM_ICON_MAX_BYTES);
+  return bytes ? { bytes, type: parsed.type, id: parsed.id } : null;
 }
