@@ -109,6 +109,8 @@ const BRAND_BLUE_MIN_PIXELS = 300;
 
 /** Pixels in one 32-bit BMP entry of an ICO whose blue channel clearly beats red. */
 function bluePixels(ico: Buffer, entry: { width: number; offset: number }): number {
+  expect(ico.readUInt32LE(entry.offset), "favicon entry is a BMP (BITMAPINFOHEADER), not a PNG").toBe(40);
+  expect(ico.readUInt16LE(entry.offset + 14), "favicon entry is 32-bit").toBe(32);
   const pixels = entry.offset + ico.readUInt32LE(entry.offset);
   let blue = 0;
   for (let i = 0; i < entry.width * entry.width; i++) {
