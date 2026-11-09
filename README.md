@@ -174,6 +174,7 @@ dev user.
 | `BETTER_AUTH_URL` | Yes | This site's origin, such as `http://localhost:3000` or `https://your-domain`. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | For GitHub sign-in | From a GitHub OAuth app. GitHub sign-in stays off while the id is empty. |
 | `SENDIR_API_KEY`, `SENDIR_IDENTITY_ID` | In production | Send magic sign-in links and other email. Use a key scoped to the identity. `SENDIR_URL` overrides the API base. |
+| `ABUSE_REPORT_EMAIL` | In production | The site operator's address. Every reader report on an artifact is emailed here, and only here. Without it, reports are still stored and each one logs a warning. |
 | `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | For files | The R2 bucket and an S3 API key scoped to it. |
 | `CRON_SECRET` | In production | At least 16 characters. Vercel Cron sends it to `/api/cron/*`. |
 | `STORAGE_QUOTA_CONTENT_BYTES`, `STORAGE_QUOTA_FILE_BYTES` | No | Per-account quotas. Defaults: 100 MB of content and 1 GB of files. |
