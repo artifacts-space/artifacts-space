@@ -95,7 +95,7 @@ export const GridRow = memo(function GridRow({ row, gridId, columns, offsets, to
     );
   });
   return (
-    <div role="row" data-row={row} aria-rowindex={row + 2} style={rowPlace(row, totalWidth)} className={`group/row absolute left-0 flex border-b border-border/50 hover:bg-muted/40 ${band}`}>
+    <div role="row" data-row={row} aria-rowindex={row + 2} style={rowPlace(row, totalWidth)} className={`group/row absolute left-0 flex border-b border-border/50 ${band || "hover:bg-muted/40"}`}>
       <div role="rowheader" aria-colindex={1} style={{ width: rowNumberWidth }} className={`sticky left-0 z-10 flex shrink-0 items-center justify-end border-r border-border/60 bg-muted px-2 text-xs tabular-nums ${activeColumn >= 0 || rangeLeft >= 0 ? "font-medium text-foreground" : "text-muted-foreground"}`}>
         {rowLabel(row)}
       </div>

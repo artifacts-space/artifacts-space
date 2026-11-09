@@ -91,8 +91,8 @@ describe("storedSheetFormat", () => {
 });
 
 describe("bandClass", () => {
-  it("should tint rows only with theme tokens when banding is on", () => {
+  it("should tint rows only with theme tokens, and keep the tint under the pointer, when banding is on", () => {
     expect(bandClass(null)).toBe("");
-    for (const banding of ["muted", "accent", "primary"] as const) expect(bandClass(banding)).toMatch(/^bg-(muted|accent|primary)\/\d+$/);
+    for (const banding of ["muted", "accent", "primary"] as const) expect(bandClass(banding)).toMatch(/^bg-(muted|accent|primary)\/\d+ hover:bg-\1\/\d+$/);
   });
 });

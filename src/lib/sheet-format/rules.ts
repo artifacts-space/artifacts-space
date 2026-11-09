@@ -97,13 +97,14 @@ export function canAlignColumn(key: string): boolean {
 
 /**
  * The fill of every other row (the even ones, counting from 1), from theme
- * tokens at a low mix so text keeps its contrast in light and dark. Literal
- * class names so Tailwind finds them.
+ * tokens at a low mix so text keeps its contrast in light and dark, with a
+ * slightly deeper fill under the pointer so a hovered row stays banded.
+ * Literal class names so Tailwind finds them.
  */
 export function bandClass(banding: SheetBanding | null): string {
-  if (banding === "muted") return "bg-muted/60";
-  if (banding === "accent") return "bg-accent/60";
-  if (banding === "primary") return "bg-primary/6";
+  if (banding === "muted") return "bg-muted/60 hover:bg-muted/80";
+  if (banding === "accent") return "bg-accent/60 hover:bg-accent/80";
+  if (banding === "primary") return "bg-primary/6 hover:bg-primary/10";
   return "";
 }
 

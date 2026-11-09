@@ -5,8 +5,9 @@ import { createFakeDb } from "@/lib/projects/fake-db";
 
 /*
  * Saving a sheet's formatting, against an in-memory database. The edit
- * check (getEditableArtifact) and the rate limit are mocked at their module
- * boundary; the edit check answers for the caller.
+ * check (getEditableArtifactMeta) and the rate limit are mocked at their
+ * module boundary; the edit check answers for the caller and hands back the
+ * artifact asked for, so a write to the wrong artifact shows.
  */
 
 type Row = Record<string, unknown>;
@@ -18,7 +19,8 @@ vi.mock("@/db", () => ({ getDb: () => state.db }));
 vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: mocks.enforceRateLimit }));
 vi.mock("@/lib/versions/service", () => ({ recordArtifactSave: mocks.recordArtifactSave }));
 vi.mock("@/lib/access", () => ({
-  getEditableArtifact: (editorId: string) => Promise.resolve(state.editors.has(editorId) ? tables.get(artifact)?.[0] ?? null : null),
+  getEditableArtifactMeta: (editorId: string, artifactId: string) =>
+    Promise.resolve(state.editors.has(editorId) ? tables.get(artifact)?.find((row) => row.id === artifactId) ?? null : null),
 }));
 
 const { setSheetFormat } = await import("./store");
@@ -31,7 +33,13 @@ const banded = { banding: "muted", align: { '="price"': "right" } } as const;
 beforeEach(() => {
   vi.resetAllMocks();
   tables = new Map<unknown, Row[]>([
-    [artifact, [{ id: "a1", publicId: "pub-1", kind: "csv", userId: "author", visibility: "team", teamId: "t1", sheetFormat: null, updatedAt, updatedBy: "author" }]],
+    [
+      artifact,
+      [
+        { id: "a1", publicId: "pub-1", kind: "csv", userId: "author", visibility: "team", teamId: "t1", sheetFormat: null, updatedAt, updatedBy: "author" },
+        { id: "a2", publicId: "pub-2", kind: "csv", userId: "author", visibility: "team", teamId: "t1", sheetFormat: null, updatedAt, updatedBy: "author" },
+      ],
+    ],
     [artifactVersion, []],
   ]);
   const fake = createFakeDb(tables);
@@ -40,14 +48,26 @@ beforeEach(() => {
   state.editors = new Set(["author", "teammate"]);
 });
 
-function current() {
-  return tables.get(artifact)?.[0];
+function current(id = "a1") {
+  return tables.get(artifact)?.find((row) => row.id === id);
 }
 
 describe("setSheetFormat", () => {
   it("should save the formatting when someone who may edit changes it", async () => {
     await expect(setSheetFormat("teammate", "a1", banded)).resolves.toEqual({ publicId: "pub-1", format: banded });
     expect(current()?.sheetFormat).toEqual(banded);
+  });
+
+  it("should write only the artifact it was given when the editor may edit several", async () => {
+    await expect(setSheetFormat("author", "a2", banded)).resolves.toEqual({ publicId: "pub-2", format: banded });
+    expect(current("a2")?.sheetFormat).toEqual(banded);
+    expect(current("a1")?.sheetFormat, "the other artifact stays as it was").toBeNull();
+    expect(log).toHaveLength(1);
+  });
+
+  it("should answer not found when the artifact does not exist", async () => {
+    await expect(setSheetFormat("author", "missing", banded)).resolves.toBeUndefined();
+    expect(log).toEqual([]);
   });
 
   it.each([

@@ -33,6 +33,9 @@ const samples: Record<EditorFixtureKind, { kind: ArtifactKind; content: () => st
 /** Sheet formatting kept in memory, so the format menus work without a database. */
 const keepFormatInMemory: SheetFormatSaver = (next) => Promise.resolve(next);
 
+/** A formatting save that always fails, as when the connection drops: the failing-save test uses it. */
+const failFormatSave: SheetFormatSaver = () => Promise.reject(new Error("The fixture is offline."));
+
 /** A save that keeps the change in memory, so autosave runs end to end without a database. */
 function useMemorySave(initial: ArtifactDto): SaveArtifact {
   const saved = useRef(initial);
@@ -45,10 +48,11 @@ function useMemorySave(initial: ArtifactDto): SaveArtifact {
 /**
  * Development only: the artifact page's layout (pinned header,
  * heading, content, footer) around the real in-place page editor, with a
- * long artifact and no database. Saves stay in memory. The layout e2e test
- * edits here.
+ * long artifact and no database. Saves stay in memory, or fail on purpose
+ * (`failingSaves`) for the test of a save that does not go through. The
+ * layout e2e test edits here.
  */
-export function EditorFixture({ kind }: { kind: EditorFixtureKind }) {
+export function EditorFixture({ kind, failingSaves = false }: { kind: EditorFixtureKind; failingSaves?: boolean }) {
   const artifact = useMemo(() => fixtureArtifact({ id: `fixture-${kind}`, kind: samples[kind].kind, title: `Long ${kind} fixture`, content: samples[kind].content() }), [kind]);
   const save = useMemorySave(artifact);
   const onSaved = useCallback(() => undefined, []);
@@ -66,7 +70,7 @@ export function EditorFixture({ kind }: { kind: EditorFixtureKind }) {
               <PageConflictNotice />
               <article className="mt-10">
                 <SheetFill artifactKey={artifact.publicId}>
-                  <SheetFormatProvider stored={plainSheetFormat} save={keepFormatInMemory}>
+                  <SheetFormatProvider stored={plainSheetFormat} save={failingSaves ? failFormatSave : keepFormatInMemory}>
                     <InlineBody>
                       <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language="" files={artifact.files} />
                     </InlineBody>

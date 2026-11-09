@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { artifact } from "@/db/schema";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
-import { getEditableArtifact } from "@/lib/access";
+import { getEditableArtifactMeta } from "@/lib/access";
 
 import { readSheetFormat, type SheetFormat, storedSheetFormat } from "./rules";
 
@@ -12,6 +12,12 @@ import { readSheetFormat, type SheetFormat, storedSheetFormat } from "./rules";
  * Like "Full width", it is a display setting: anyone who may edit the
  * artifact changes it at once, with no version in History, no approval, and
  * the save time and last editor kept as they are. Readers only see it.
+ *
+ * Each save writes the whole formatting, and the last write wins: two
+ * people changing the same sheet at the same moment keep whichever save
+ * lands last, as with "Full width". That is deliberate for a small display
+ * setting; the client sends one save at a time, so a person never races
+ * themselves (src/lib/sheet-format/save-queue.ts).
  */
 
 /** The formatting as saved, with the public id for the caller to refresh its page. */
@@ -24,10 +30,11 @@ export interface SavedSheetFormat {
  * Saves the formatting, already validated by sheetFormatSchema. Returns the
  * saved formatting, or undefined when the editor may not edit the artifact
  * or it is not a CSV (callers answer "not found"). Counts against the
- * artifact edit limit; never files a version.
+ * artifact edit limit; never files a version. Reads only the artifact's
+ * metadata (getEditableArtifactMeta), never its content.
  */
 export async function setSheetFormat(editorId: string, artifactId: string, format: SheetFormat): Promise<SavedSheetFormat | undefined> {
-  const record = await getEditableArtifact(editorId, { id: artifactId });
+  const record = await getEditableArtifactMeta(editorId, artifactId);
   if (record?.kind !== "csv") return undefined;
   await enforceRateLimit("artifactUpdate", editorId);
   const stored = storedSheetFormat(format);

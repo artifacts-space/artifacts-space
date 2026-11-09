@@ -12,8 +12,8 @@ const background = (element: Locator) => element.evaluate((node) => getComputedS
 const justify = (element: Locator) => element.evaluate((node) => getComputedStyle(node).justifyContent);
 const row = (grid: Locator, index: number) => grid.locator(`[role=row][aria-rowindex="${String(index + 2)}"]`);
 
-async function openEditorSheet(page: Page) {
-  await page.goto("/dev/editor?kind=sheet");
+async function openEditorSheet(page: Page, query = "") {
+  await page.goto(`/dev/editor?kind=sheet${query}`);
   const grid = page.getByRole("grid", { name: "CSV grid editor" });
   await expect(grid.getByRole("gridcell").first()).toBeVisible();
   return grid;
@@ -70,4 +70,18 @@ test("should align a column's cells when an editor picks an alignment from its m
 
   await align.getByRole("button", { name: "Align automatically" }).click();
   await expect.poll(() => justify(cell)).not.toBe("center");
+});
+
+test("should say so once and put the saved formatting back when a change does not save", async ({ page }) => {
+  const grid = await openEditorSheet(page, "&save=fail");
+  await page.mouse.move(0, 0);
+  const plain = await background(row(grid, 1));
+
+  await page.getByRole("button", { name: "Banding" }).click();
+  await page.getByRole("menuitemradio", { name: "Gray" }).click();
+  await page.mouse.move(0, 0);
+  const notice = page.locator("[data-sonner-toast]").filter({ hasText: "Something went wrong. Check your connection and try again." });
+  await expect(notice).toHaveCount(1);
+  await expect.poll(() => background(row(grid, 1)), "the banding that did not save goes away").toBe(plain);
+  await expect(notice, "one failed save, one notice").toHaveCount(1);
 });

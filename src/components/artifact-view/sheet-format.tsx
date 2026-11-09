@@ -1,7 +1,7 @@
 "use client";
 
 import { IconAlignCenter, IconAlignLeft, IconAlignRight, IconLayoutRows, IconWand } from "@tabler/icons-react";
-import { createContext, type ReactNode, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { setSheetFormatAction } from "@/app/(workspace)/app/sheet-format-actions";
@@ -18,6 +18,7 @@ import {
   type SheetFormat,
   withBanding,
 } from "@/lib/sheet-format/rules";
+import { createSaveQueue } from "@/lib/sheet-format/save-queue";
 
 /** A sheet's formatting, and the change handler when this viewer may edit it (null for readers). */
 export interface SheetFormatControl {
@@ -48,33 +49,31 @@ interface ProviderProps {
 
 /**
  * Holds a sheet's formatting. A change shows at once and saves in the
- * background; if the save fails, the last saved formatting comes back.
+ * background, one save at a time so quick changes never overtake each
+ * other; if a save fails, the last saved formatting comes back.
  */
 export function SheetFormatProvider({ stored, save, children }: ProviderProps) {
   const [shown, setShown] = useState(stored);
   const [seen, setSeen] = useState(stored);
+  // One save line per provider, for the life of the sheet.
+  const [queue] = useState(() =>
+    createSaveQueue<SheetFormat>(stored, {
+      onSettled: setShown,
+      onFailed: () => { toast.error("Something went wrong. Check your connection and try again."); },
+    }),
+  );
   if (seen !== stored) {
     setSeen(stored);
     setShown(stored);
+    // What the server now holds is what a failed save rolls back to.
+    queue.reset(stored);
   }
-  const saved = useRef(stored);
-  const latest = useRef(0);
 
   const change = useCallback((next: SheetFormat) => {
     if (!save) return;
     setShown(next);
-    const attempt = ++latest.current;
-    save(next)
-      .then((result) => {
-        if (result) saved.current = result;
-        // Only the newest change decides what shows; an older answer never undoes a newer click.
-        if (attempt === latest.current) setShown(result ?? saved.current);
-      })
-      .catch(() => {
-        toast.error("Something went wrong. Check your connection and try again.");
-        if (attempt === latest.current) setShown(saved.current);
-      });
-  }, [save]);
+    queue.push(next, save);
+  }, [save, queue]);
 
   const value = useMemo(() => ({ format: shown, onChange: save ? change : null }), [shown, save, change]);
   return <SheetFormatContext value={value}>{children}</SheetFormatContext>;
