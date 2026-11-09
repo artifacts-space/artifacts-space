@@ -86,10 +86,12 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
   /** A size set from the keyboard and not yet stored: held keys repeat, so it is stored on key up or blur. */
   const unsaved = useRef<number | null>(null);
 
-  // A handle that leaves mid-drag (the Projects group closing, say) must not leave its cursor on the page.
+  // A handle that leaves mid-drag or mid-keypress (the Projects group closing, the window narrowing past lg)
+  // must not leave its cursor on the page, and must still store a size the keyboard set.
   useEffect(() => () => {
     if (drag.current) document.documentElement.style.removeProperty("cursor");
-  }, []);
+    if (unsaved.current !== null) savePanelSize(panel, unsaved.current);
+  }, [panel]);
 
   function show(size: number, bounds: SizeBounds) {
     applyPanelSize(panel, size);

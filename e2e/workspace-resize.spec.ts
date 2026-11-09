@@ -146,6 +146,24 @@ test.describe("desktop", () => {
     expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.clientWidth + 1);
   });
 
+  test("should stop the sidebar where the artifact pane keeps its minimum width on a narrow desktop", async ({ page }) => {
+    // At 1024 px the workspace card is under 1000 px wide, so the pane's 480 px floor binds before the 520 px cap.
+    await openWorkspace(page, { width: 1024, height: 900 });
+    const card = await sidebar(page).evaluate((element) => element.parentElement?.clientWidth ?? 0);
+    const widest = card - 480;
+    expect(widest, "the floor binds before the cap").toBeLessThan(520);
+    const handle = sidebarHandle(page);
+    await expect(handle).toHaveAttribute("aria-valuemax", String(widest));
+    await handle.press("End");
+    expect(await widthOf(sidebar(page))).toBe(widest);
+    expect(await sidebarEdgeGap(page), "the handle stays on the sidebar's edge").toBeLessThan(2);
+    await dragBy(page, handle, 200, 0);
+    expect(await widthOf(sidebar(page)), "a drag stops at the same edge").toBe(widest);
+    expect(await sidebarEdgeGap(page)).toBeLessThan(2);
+    const scroll = await pageScroll(page);
+    expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.clientWidth + 1);
+  });
+
   test("should fit the filters and card titles when the sidebar is at its narrowest", async ({ page }) => {
     await openWorkspace(page);
     await sidebarHandle(page).press("Home");
