@@ -19,6 +19,13 @@ export interface HeaderRule {
   headers: HeaderEntry[];
 }
 
+/*
+ * No rule here sets `script-src`. The /app workspace runs one small inline
+ * script before the first paint (`PanelSizesBeforePaint` in
+ * src/components/app/workspace-splitters.tsx); a policy that adds
+ * `script-src` must give it a nonce or allow its hash.
+ */
+
 /** No site may frame these pages, so nobody can overlay the consent screen or the app (clickjacking). */
 export const denyFraming: HeaderEntry[] = [
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },

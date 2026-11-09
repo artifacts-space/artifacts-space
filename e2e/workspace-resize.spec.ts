@@ -66,6 +66,16 @@ function pageScroll(page: Page) {
   });
 }
 
+/** Collects console errors and warnings and uncaught errors, such as a hydration mismatch. */
+function collectProblems(page: Page) {
+  const problems: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" || message.type() === "warning") problems.push(`${message.type()}: ${message.text()}`);
+  });
+  page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
+  return problems;
+}
+
 /** `--brand` as the browser resolves it, to compare with the focus ring. */
 function brandColor(page: Page) {
   return page.evaluate(() => {
@@ -165,6 +175,7 @@ test.describe("desktop", () => {
   });
 
   test("should remember both sizes after a reload and go back to the defaults on double-click", async ({ page }) => {
+    const problems = collectProblems(page);
     await openWorkspace(page);
     const defaultRows = await heightOf(rows(page));
     await sidebarHandle(page).press("End");
@@ -183,7 +194,16 @@ test.describe("desktop", () => {
     expect(await stored(page, sidebarKey)).toBeNull();
     await projectsHandle(page).dblclick();
     expect(await heightOf(rows(page))).toBe(defaultRows);
+    await expect(projectsHandle(page)).toHaveAttribute("aria-valuenow", String(defaultRows));
     expect(await stored(page, projectsKey)).toBeNull();
+
+    // A filter remounts the workspace on the client, so the before-paint script renders again there, inert.
+    await sidebarHandle(page).press("ArrowRight");
+    await page.getByRole("region", { name: "Projects" }).getByRole("button", { name: /^Design, / }).click();
+    await expect(page).toHaveURL(/project=design/);
+    await expect(sidebarHandle(page)).toHaveAttribute("aria-valuenow", "296");
+    expect(await widthOf(sidebar(page))).toBe(296);
+    expect(problems, "no hydration or script warnings").toEqual([]);
   });
 
   test("should open at the stored sizes from the server HTML, before the page hydrates", async ({ page }) => {

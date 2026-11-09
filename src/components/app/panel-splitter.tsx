@@ -76,6 +76,13 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
   const { value, setValue, measured } = useMeasured(initial, measure, watch);
   const [dragging, setDragging] = useState(false);
   const drag = useRef<Drag | null>(null);
+  /** A size set from the keyboard and not yet stored: held keys repeat, so it is stored on key up or blur. */
+  const unsaved = useRef<number | null>(null);
+
+  // A handle that leaves mid-drag (the Projects group closing, say) must not leave its cursor on the page.
+  useEffect(() => () => {
+    if (drag.current) document.documentElement.style.removeProperty("cursor");
+  }, []);
 
   function show(size: number, bounds: SizeBounds) {
     applyPanelSize(panel, size);
@@ -117,13 +124,23 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
     const next = keyboardResize(event.key, event.shiftKey, now.size, now.bounds, orientation);
     if (next === null) return;
     event.preventDefault();
+    if (next === now.size) return;
     show(next, now.bounds);
-    savePanelSize(panel, next);
+    unsaved.current = next;
+  }
+
+  function saveKeyboardSize() {
+    if (unsaved.current === null) return;
+    savePanelSize(panel, unsaved.current);
+    unsaved.current = null;
   }
 
   function reset() {
+    unsaved.current = null;
     applyPanelSize(panel, null);
     savePanelSize(panel, null);
+    const now = measure();
+    if (now) setValue(now);
   }
 
   return (
@@ -146,6 +163,8 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
       onPointerCancel={endDrag}
       onLostPointerCapture={endDrag}
       onKeyDown={onKeyDown}
+      onKeyUp={saveKeyboardSize}
+      onBlur={saveKeyboardSize}
       onDoubleClick={reset}
       className={cn(
         "absolute z-20 hidden touch-none rounded-sm select-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none lg:block",

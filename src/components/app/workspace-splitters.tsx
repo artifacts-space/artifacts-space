@@ -17,6 +17,11 @@ const script = beforePaintScript();
  * script runs while the server HTML parses, and the layout effect covers
  * client renders. React never runs a script it creates on the client, so
  * there the script is marked as inert data.
+ *
+ * The script is inline and has no nonce. The site sends no `script-src`
+ * today (`src/lib/security-header-rules.ts`); a policy that adds one must
+ * allow this script (a nonce or its hash), or the panels open at their
+ * defaults and then jump to the stored sizes once the page hydrates.
  */
 export function PanelSizesBeforePaint() {
   useLayoutEffect(() => { applyStoredPanelSizes(); }, []);
