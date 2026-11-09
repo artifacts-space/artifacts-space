@@ -253,3 +253,18 @@ export function stampOf(id: string | null | undefined): HarnessStamp | null {
 export function approvedHarnessOf(input: { harnessOverride: string | null; approvedHarness: string | null }) {
   return artifactHarnessOf({ harness: input.approvedHarness, harnessOverride: input.harnessOverride });
 }
+
+/** What a snapshot records: the harness the artifact showed, its own choice first, so readers of it see the same byline. */
+export function shownStamp(record: { harness: string | null; harnessOverride: string | null }): HarnessStamp | null {
+  return stampOf(effectiveHarness(record.harnessOverride, record.harness));
+}
+
+/**
+ * The harness to write on the latest version when an agent save changed
+ * nothing, so History agrees with the byline; null when nothing changes (a
+ * web save, or the version already records it).
+ */
+export function restampTo(versionHarness: string | null, stamp: HarnessStamp | null | undefined): HarnessId | null {
+  if (!stamp || stamp.harness === versionHarness) return null;
+  return stamp.harness;
+}

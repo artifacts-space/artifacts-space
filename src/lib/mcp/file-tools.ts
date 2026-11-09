@@ -123,7 +123,8 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
     ({ artifact, files }) => respond(async () => {
       const record = await editableArtifact(userId, artifact);
       await attachFiles(userId, record.id, files, "agent", await harness());
-      return artifactResult(userId, record);
+      // Read it again: the save stamped the harness and moved updatedAt.
+      return artifactResult(userId, await editableArtifact(userId, artifact));
     }),
   );
 }

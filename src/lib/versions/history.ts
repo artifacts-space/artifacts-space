@@ -8,7 +8,7 @@ import { FILE_PREFIX } from "@/lib/artifact-icons";
 import type { VersionSaveKind } from "@/lib/artifact-types";
 import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { dropsShownImage } from "@/lib/files/icon-cleanup-rules";
-import { stampColumns, stampOf, type HarnessStamp } from "@/lib/harness/harness-rules";
+import { restampTo, shownStamp, stampColumns, type HarnessStamp } from "@/lib/harness/harness-rules";
 
 import { canDropSuperseded, selectPrunableVersions, shouldMergeInto, versionBytes, versionRetention, type EditSessionStep } from "./history-rules";
 import { sameReviewedFields } from "./rules";
@@ -76,15 +76,24 @@ export async function protectedVersions(artifactId: string, approvedVersionId: s
  */
 export async function ensureHistoryStart(before: ArtifactRecord): Promise<void> {
   if (await latestVersion(before.id)) return;
-  // A snapshot keeps the harness the artifact showed, so readers of it see the same byline.
-  await insertVersion(before, { createdBy: before.updatedBy ?? before.userId, saveKind: "snapshot", at: before.updatedAt, harness: stampOf(before.harness) });
+  await insertVersion(before, { createdBy: before.updatedBy ?? before.userId, saveKind: "snapshot", at: before.updatedAt, harness: shownStamp(before) });
 }
 
 /** The latest version when it shows exactly what `record` shows; otherwise a new snapshot of it. */
 export async function versionMatching(record: ArtifactRecord, createdBy: string | null): Promise<string> {
   const latest = await latestVersion(record.id);
   if (latest && sameReviewedFields(latest, record)) return latest.id;
-  return insertVersion(record, { createdBy, saveKind: "snapshot", harness: stampOf(record.harness) });
+  return insertVersion(record, { createdBy, saveKind: "snapshot", harness: shownStamp(record) });
+}
+
+/**
+ * An agent save that changes nothing still says which agent saved last, so
+ * the latest version records it too and History agrees with the byline.
+ */
+async function restampVersion(latest: ArtifactVersionRecord, harness: HarnessStamp | null | undefined) {
+  const next = restampTo(latest.harness, harness);
+  if (!next) return;
+  await getDb().update(artifactVersion).set({ harness: next }).where(eq(artifactVersion.id, latest.id));
 }
 
 /** Folds a save into a version. A save from the web app keeps the harness an agent save already recorded there. */
@@ -108,7 +117,10 @@ export async function fileVersion(
   save: { editorId: string; saveKind: VersionSaveKind; restoredFromId?: string | null; session?: EditSessionStep | undefined; harness?: HarnessStamp | null | undefined },
 ): Promise<string> {
   const latest = await latestVersion(record.id);
-  if (latest && save.saveKind === "edit" && sameReviewedFields(latest, record)) return latest.id;
+  if (latest && save.saveKind === "edit" && sameReviewedFields(latest, record)) {
+    await restampVersion(latest, save.harness);
+    return latest.id;
+  }
   const { referenced } = await protectedVersions(record.id, record.approvedVersionId);
   // A save that drops an uploaded icon or cover image files its own version, so the image stays restorable.
   if (latest && shouldMergeInto(latest, { ...save, now: new Date() }, referenced) && !dropsShownImage(latest, record)) {

@@ -10,6 +10,8 @@ import {
   matchHarness,
   parseClientInfo,
   resolveHarness,
+  restampTo,
+  shownStamp,
   stampColumns,
   stampOf,
   versionStamp,
@@ -182,6 +184,23 @@ describe("harness precedence", () => {
     expect(stampOf("codex")).toEqual({ harness: "codex", label: null });
     expect(stampOf("gone-harness")).toEqual({ harness: "other", label: null });
     expect(stampOf(null)).toBeNull();
+  });
+});
+
+describe("snapshots and unchanged saves", () => {
+  it("should snapshot the harness the artifact showed, its own choice first", () => {
+    expect(shownStamp({ harness: "codex", harnessOverride: "cursor" })).toEqual({ harness: "cursor", label: null });
+    expect(shownStamp({ harness: "codex", harnessOverride: null })).toEqual({ harness: "codex", label: null });
+    expect(shownStamp({ harness: null, harnessOverride: null })).toBeNull();
+  });
+
+  it("should restamp the latest version when another agent saves the same content", () => {
+    expect(restampTo("claude-code", { harness: "cursor", label: null })).toBe("cursor");
+  });
+
+  it("should leave the latest version alone when a web save or the same agent changes nothing", () => {
+    expect(restampTo("claude-code", null)).toBeNull();
+    expect(restampTo("claude-code", { harness: "claude-code", label: null })).toBeNull();
   });
 });
 
