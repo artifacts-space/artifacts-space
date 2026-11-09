@@ -50,8 +50,15 @@ describe("sheetFormatSchema", () => {
   });
 
   it("should refuse input bigger than the input limit before it is parsed", () => {
-    expect(fitsSheetFormatInput({ banding: null, align: { a: "x".repeat(sheetFormatLimits.maxInputChars) } })).toBe(false);
+    expect(fitsSheetFormatInput({ banding: null, align: { a: "x".repeat(sheetFormatLimits.maxInputBytes) } })).toBe(false);
     expect(fitsSheetFormatInput(plainSheetFormat)).toBe(true);
+  });
+
+  it("should count bytes, not characters, so wide text cannot pass the input cap and still fail the stored one", () => {
+    // 100 keys of 200 CJK characters: about 20,000 characters, but about 60,000 bytes.
+    const align = Object.fromEntries(Array.from({ length: 100 }, (_, index) => [`${"字".repeat(197)}${String(index).padStart(3, "0")}`, "left"]));
+    expect(JSON.stringify({ banding: null, align }).length).toBeLessThan(sheetFormatLimits.maxInputBytes);
+    expect(fitsSheetFormatInput({ banding: null, align })).toBe(false);
   });
 });
 

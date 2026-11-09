@@ -36,10 +36,10 @@ export const sheetFormatSchema = z
   })
   .strict();
 
-/** Whether a JSON text of the formatting is small enough to parse. */
+/** Whether the formatting, as JSON text, is small enough to parse and store: measured in UTF-8 bytes, as the database measures it. */
 export function fitsSheetFormatInput(value: unknown): boolean {
   try {
-    return JSON.stringify(value).length <= sheetFormatLimits.maxInputChars;
+    return new TextEncoder().encode(JSON.stringify(value)).length <= sheetFormatLimits.maxInputBytes;
   } catch {
     return false;
   }

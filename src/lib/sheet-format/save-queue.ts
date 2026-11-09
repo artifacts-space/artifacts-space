@@ -47,7 +47,8 @@ export function createSaveQueue<T>(initial: T, handlers: SaveQueueHandlers<T>): 
 
   const run = (next: T, save: QueuedSaver<T>) => {
     inFlight = true;
-    save(next)
+    // Inside a promise, so a saver that throws before it returns one still settles the line.
+    new Promise<T | null>((resolve) => { resolve(save(next)); })
       .then((result) => {
         if (result !== null) saved = result;
         settle(result ?? saved);
