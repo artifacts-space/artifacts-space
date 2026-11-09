@@ -85,7 +85,9 @@ jobs:
   e2e:
     name: Component gallery
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The suite runs on one worker and takes 17-19 minutes as of Nov 2026, so
+    # 20 cut off healthy runs. Split it into shards before this is reached.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
