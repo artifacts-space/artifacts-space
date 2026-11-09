@@ -75,6 +75,9 @@ export async function checkContentFiles(authorId: string, artifactId: string | n
   return ids;
 }
 
+/** No harness: a deletion in the web app. */
+const noStamp = () => Promise.resolve(null);
+
 async function mayEditArtifact(userId: string, artifactId: string) {
   const [record] = await getDb().select().from(artifact).where(eq(artifact.id, artifactId)).limit(1);
   return record ? canEditRecord(userId, record) : false;
@@ -83,9 +86,10 @@ async function mayEditArtifact(userId: string, artifactId: string) {
 /**
  * Deletes a file from R2 and the database. Allowed for the uploader while it
  * is not attached, and for anyone who may edit the artifact it belongs to.
- * Returns the artifact id it belonged to, or null.
+ * Returns the artifact id it belonged to, or null. An agent passes its
+ * harness, looked up only when the deletion files a version.
  */
-export async function deleteOwnFile(userId: string, fileId: string, actor: SharingActor): Promise<string | null> {
+export async function deleteOwnFile(userId: string, fileId: string, actor: SharingActor, harness: () => Promise<HarnessStamp | null> = noStamp): Promise<string | null> {
   const row = z.uuid().safeParse(fileId).success ? await getFileRow(fileId.toLowerCase()) : null;
   const allowed = row !== null && (row.artifactId === null ? row.uploaderId === userId : await mayEditArtifact(userId, row.artifactId));
   if (!row || !allowed) throw new UserFacingError("File not found.");
@@ -94,7 +98,7 @@ export async function deleteOwnFile(userId: string, fileId: string, actor: Shari
   if (row.artifactId) {
     // An icon that showed this image goes back to the format icon, and the change is versioned.
     await clearIconForFile(row.artifactId, row.id);
-    await recordArtifactChange({ artifactId: row.artifactId, editorId: userId, actor });
+    await recordArtifactChange({ artifactId: row.artifactId, editorId: userId, actor, harness: await harness() });
   }
   return row.artifactId;
 }

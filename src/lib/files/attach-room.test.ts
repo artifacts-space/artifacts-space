@@ -13,11 +13,13 @@ const cleanup = vi.hoisted(() => ({ countHistoryOnlyImages: vi.fn() }));
 
 vi.mock("./store", () => store);
 vi.mock("./icon-cleanup", () => cleanup);
-vi.mock("@/lib/access", () => ({ canEditRecord: vi.fn() }));
+const access = vi.hoisted(() => ({ canEditRecord: vi.fn() }));
+vi.mock("@/lib/access", () => access);
+vi.mock("@/db", () => ({ getDb: () => ({ select: () => ({ from: () => ({ where: () => ({ limit: () => Promise.resolve([{ id: "a1" }]) }) }) }) }) }));
 vi.mock("@/lib/versions/service", () => versions);
 vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
 
-const { assertUsableFiles, attachFiles } = await import("./attach");
+const { assertUsableFiles, attachFiles, deleteOwnFile } = await import("./attach");
 
 const upload = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
 
@@ -59,5 +61,31 @@ describe("attachFiles", () => {
     store.attachFileRows.mockResolvedValue(1);
     await attachFiles("author", "a1", [upload], "person");
     expect(versions.recordArtifactChange).toHaveBeenCalledWith(expect.objectContaining({ harness: null }));
+  });
+});
+
+describe("deleteOwnFile", () => {
+  it("should record the agent's harness on the version a deletion from an artifact files", async () => {
+    store.getFileRow.mockResolvedValue({ id: upload, uploaderId: "author", artifactId: "a1" });
+    store.removeFiles.mockResolvedValue([upload]);
+    access.canEditRecord.mockReturnValue(true);
+    await deleteOwnFile("author", upload, "agent", () => Promise.resolve({ harness: "codex", label: null }));
+    expect(versions.recordArtifactChange).toHaveBeenCalledWith({ artifactId: "a1", editorId: "author", actor: "agent", harness: { harness: "codex", label: null } });
+  });
+
+  it("should record no harness when a person deletes a file in the browser", async () => {
+    store.getFileRow.mockResolvedValue({ id: upload, uploaderId: "author", artifactId: "a1" });
+    store.removeFiles.mockResolvedValue([upload]);
+    access.canEditRecord.mockReturnValue(true);
+    await deleteOwnFile("author", upload, "person");
+    expect(versions.recordArtifactChange).toHaveBeenCalledWith(expect.objectContaining({ harness: null }));
+  });
+
+  it("should not look the harness up when an unattached upload is deleted", async () => {
+    store.getFileRow.mockResolvedValue({ id: upload, uploaderId: "author", artifactId: null });
+    store.removeFiles.mockResolvedValue([upload]);
+    const harness = vi.fn(() => Promise.resolve(null));
+    await deleteOwnFile("author", upload, "agent", harness);
+    expect(harness).not.toHaveBeenCalled();
   });
 });

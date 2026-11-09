@@ -129,7 +129,7 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
   );
 }
 
-function registerAccessTools(server: ToolServer, userId: string) {
+function registerAccessTools(server: ToolServer, userId: string, harness: HarnessSource) {
   server.registerTool(
     "files_get_download_url",
     {
@@ -153,7 +153,7 @@ function registerAccessTools(server: ToolServer, userId: string) {
       inputSchema: { fileId: fileIdField },
     },
     ({ fileId }) => respond(async () => {
-      await deleteOwnFile(userId, fileId, "agent");
+      await deleteOwnFile(userId, fileId, "agent", harness);
       return { deleted: true, fileId };
     }),
   );
@@ -169,5 +169,5 @@ export function registerFileTools(server: McpServer, userId: string, access: Mcp
   const gated = gateTools(server, access);
   registerUploadTools(gated, userId);
   registerArtifactFileTools(gated, userId, harness);
-  registerAccessTools(gated, userId);
+  registerAccessTools(gated, userId, harness);
 }
