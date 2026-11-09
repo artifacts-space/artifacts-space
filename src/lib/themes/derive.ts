@@ -194,6 +194,7 @@ export function switchTokens(mode: PaletteMode, colors: ThemeColors): Record<str
   const ink = read(colors.foreground);
   const site = siteSwitch[mode];
   const siteThumb = read(site.onThumb);
+  // The hovered on track, as switch.tsx paints it: toward the ink in light, toward the page in dark (its dark: variant). Change both together.
   const deepen = (track: Oklch) => mixOklch(track, mode === "light" ? ink : read(colors.background), switchOnHover);
   // A switch sits on a card in settings and on the page inside an artifact, so the on track clears both.
   const surfaces = [card, read(colors.background)];

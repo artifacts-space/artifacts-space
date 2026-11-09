@@ -28,7 +28,7 @@ function Switch({
         // All in rem, so the thumb keeps its inset when the reader raises the default font size.
         "data-[size=default]:h-6 data-[size=default]:w-11 data-[size=default]:p-[0.1875rem] data-[size=sm]:h-[1.125rem] data-[size=sm]:w-8 data-[size=sm]:p-[0.125rem]",
         // Hover deepens the on track in both modes (toward the ink in light, toward the page in dark), so the white thumb never drops
-        // under 3:1. Themes derive their tokens with these tints in mind (src/lib/themes/derive.ts); keep the two in step.
+        // under 3:1. deepen() in src/lib/themes/derive.ts derives theme tokens with the same direction and tints; change both together.
         "data-checked:bg-switch-on data-checked:hover:not-data-disabled:bg-[color-mix(in_oklch,var(--switch-on),var(--foreground)_var(--switch-on-hover-tint))] dark:data-checked:hover:not-data-disabled:bg-[color-mix(in_oklch,var(--switch-on),var(--background)_var(--switch-on-hover-tint))]",
         "data-unchecked:bg-switch-off data-unchecked:inset-ring data-unchecked:inset-ring-input data-unchecked:hover:not-data-disabled:bg-[color-mix(in_oklch,var(--switch-off),var(--foreground)_var(--switch-off-hover-tint))]",
         "data-disabled:cursor-not-allowed data-disabled:opacity-50",
