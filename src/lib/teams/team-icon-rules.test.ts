@@ -142,6 +142,13 @@ describe("checkTeamIconBytes", () => {
     expect(checkTeamIconBytes(png(side, side)).ok).toBe(false);
   });
 
+  it("should accept a PNG of exactly the cap", () => {
+    const filler = TEAM_ICON_MAX_BYTES - png(256, 256).length - 12;
+    const exact = png(256, 256, { extra: chunk("tEXt", new Array<number>(filler).fill(0x20)) });
+    expect(exact.length).toBe(TEAM_ICON_MAX_BYTES);
+    expect(checkTeamIconBytes(exact).ok).toBe(true);
+  });
+
   it("should refuse an upload over 1 MB even when it starts like a PNG", () => {
     const big = new Uint8Array(TEAM_ICON_MAX_BYTES + 1);
     big.set(png(256, 256));

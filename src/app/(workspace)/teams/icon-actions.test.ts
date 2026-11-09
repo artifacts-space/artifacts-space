@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { defaultActor } from "@/lib/teams/capability-rules";
+import { TEAM_ICON_MAX_BYTES } from "@/lib/teams/team-icon-rules";
 import type { TeamMembership } from "@/lib/teams/queries";
 
 /*
@@ -90,10 +91,18 @@ describe("uploadTeamIconAction", () => {
     expect(mocks.saveTeamIcon).not.toHaveBeenCalled();
   });
 
+  it("should pass an upload of exactly the cap on to the byte checks", async () => {
+    actingAs({});
+    const data = new FormData();
+    data.set("icon", new File([new Uint8Array(TEAM_ICON_MAX_BYTES)], "big.png", { type: "image/png" }));
+    expect((await uploadTeamIconAction("team-1", data)).success).toBe(true);
+    expect(mocks.saveTeamIcon).toHaveBeenCalledOnce();
+  });
+
   it("should refuse an upload over 1 MB before reading it", async () => {
     actingAs({});
     const data = new FormData();
-    data.set("icon", new File([new Uint8Array(1_000_001)], "big.png", { type: "image/png" }));
+    data.set("icon", new File([new Uint8Array(TEAM_ICON_MAX_BYTES + 1)], "big.png", { type: "image/png" }));
     expect(await uploadTeamIconAction("team-1", data)).toEqual({ success: false, error: "The icon can be at most 1 MB." });
     expect(mocks.saveTeamIcon).not.toHaveBeenCalled();
   });
