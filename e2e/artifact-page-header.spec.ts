@@ -177,7 +177,13 @@ test("should tick Full width to match the page when the width changed after the 
 
   await page.keyboard.press("Escape");
   await moreActions(page).click();
-  await expect(page.getByRole("menuitemcheckbox", { name: "Full width" }), "the ⋯ shows the page's width, not the older copy's").toHaveAttribute("aria-checked", "true");
+  const toggle = page.getByRole("menuitemcheckbox", { name: "Full width" });
+  await expect(toggle, "the ⋯ shows the page's width, not the older copy's").toHaveAttribute("aria-checked", "true");
+
+  // Unticking saves the opposite of what the ⋯ shows, not of the older copy.
+  await toggle.click();
+  await expect(page.locator("main")).toHaveAttribute("data-full-width", "false");
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
 });
 
 test("should run the cover down to the middle of the page icon for editors and readers, at either width", async ({ page, browser }, testInfo) => {
