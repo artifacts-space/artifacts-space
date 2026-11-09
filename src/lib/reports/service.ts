@@ -81,7 +81,8 @@ async function notifyOperator(input: OperatorNotice) {
  * Files a report from a reader, signed in (`viewerId`) or not. Checks the
  * input, that the reader can see the artifact and that it is link or public,
  * and the per-artifact, per-network, and per-user limits (reportLimitChecks).
- * The operator's email never blocks or loses the report.
+ * The report is stored first, so a missing address or a failed operator email
+ * never loses it.
  */
 export async function submitReport(input: { publicId: string; viewerId: string | null; networkKey: string; report: unknown }) {
   const parsed = parseReportInput(input.report);

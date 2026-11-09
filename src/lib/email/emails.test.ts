@@ -74,6 +74,7 @@ describe("transactional emails", () => {
     expect(invitation.message.text).toContain("https://artifacts.space/invitations/inv1");
     expect(mention.message.text).toContain("https://artifacts.space/threads/pub1#comment-c1");
     expect(report.message.text).toContain("https://artifacts.space/artifact/pub1");
+    expect(report.message.text).toContain("https://artifacts.space/teams/acme");
   });
 
   it("should keep subjects, links, expiry copy, and idempotency keys when the layout changes", async () => {

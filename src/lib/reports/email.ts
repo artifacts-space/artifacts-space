@@ -4,6 +4,7 @@ import { reserveBudgetedEmail } from "@/lib/email/budget";
 import { emailLink, html, renderEmail, type SafeHtml } from "@/lib/email/layout";
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
 import { siteUrl } from "@/lib/site-origin";
+import { teamTabHref } from "@/lib/teams/team-tabs-rules";
 
 interface ReportEmail {
   reportId: string;
@@ -27,10 +28,18 @@ interface ReportEmailContent {
   artifactUrl: string;
 }
 
+/** The team line: a link to its reports tab, or "None" when the report has no team. */
+function teamLine(team: ReportEmail["team"]): { html: SafeHtml; text: string } {
+  if (!team) return { html: html`Team: None`, text: "Team: None" };
+  const label = `${team.name} (${team.slug})`;
+  const url = siteUrl(teamTabHref(team.slug, "artifacts", "reports"));
+  return { html: html`Team: ${emailLink(url, label)}`, text: `Team: ${label}\n${url}` };
+}
+
 /** The report email to the site operator, in the shared layout. Every value from users is escaped. */
 export function renderReportEmail({ reportId, team, artifactTitle, reasonLabel, details, artifactUrl }: ReportEmailContent) {
-  const teamLabel = team ? `${team.name} (${team.slug})` : "None";
-  const paragraphs: SafeHtml[] = [html`Artifact: ${emailLink(artifactUrl, artifactTitle)}`, html`Team: ${teamLabel}`, html`Reason: ${reasonLabel}`];
+  const teamInfo = teamLine(team);
+  const paragraphs: SafeHtml[] = [html`Artifact: ${emailLink(artifactUrl, artifactTitle)}`, teamInfo.html, html`Reason: ${reasonLabel}`];
   if (details) paragraphs.push(html`Details from the reader: ${details}`);
   const detailsText = details ? `\nDetails from the reader: ${details}\n` : "";
   return renderEmail({
@@ -39,9 +48,9 @@ export function renderReportEmail({ reportId, team, artifactTitle, reasonLabel, 
     heading: html`A reader reported an artifact`,
     paragraphs,
     action: { label: "Open the artifact", url: artifactUrl },
-    note: team ? html`Report ${reportId}. The team's owners and admins also see it on their team page.` : html`Report ${reportId}.`,
+    note: html`Report ${reportId}. In the app, only the team's owners and admins can resolve it or withdraw sharing. If the team itself is the problem, act outside the app.`,
     reason: "You get this email because this address receives abuse reports for this site.",
-    text: `A reader reported an artifact.\n\nArtifact: ${artifactTitle}\n${artifactUrl}\n\nTeam: ${teamLabel}\nReason: ${reasonLabel}\n${detailsText}\nReport ${reportId}`,
+    text: `A reader reported an artifact.\n\nArtifact: ${artifactTitle}\n${artifactUrl}\n\n${teamInfo.text}\nReason: ${reasonLabel}\n${detailsText}\nReport ${reportId}. In the app, only the team's owners and admins can resolve it or withdraw sharing. If the team itself is the problem, act outside the app.`,
   });
 }
 
