@@ -52,13 +52,15 @@ test("should send two links and refuse the rest, alike for known and unknown add
   expect(sentToMember.status).toBe(200);
   expect(sentToNobody).toEqual(sentToMember);
 
+  // Refused requests count too, so the wait may grow between the two; only the wait differs.
+  const withoutWait = (body: string) => body.replace(/Try again in [^."]+\./, "Try again in …");
   const refusedNobody = await ask(newEmail("nobody"));
   const refusedMember = await ask(member);
   expect(refusedNobody.status).toBe(429);
   expect(Number(refusedNobody.retryAfter)).toBeGreaterThan(0);
   expect(refusedNobody.body).toContain("Your network has asked for several sign-in links in the last minute. Try again in");
-  expect(refusedMember.body).toBe(refusedNobody.body);
   expect(refusedMember.status).toBe(429);
+  expect(withoutWait(refusedMember.body)).toBe(withoutWait(refusedNobody.body));
 });
 
 test("should tell the person to wait when they ask for a second link to one address within a minute", async ({ page }) => {
