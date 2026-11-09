@@ -187,6 +187,24 @@ test("should shrink the thumb while a switch is pressed and leave a disabled one
   }
 });
 
+test("should keep a disabled switch's track color when it is hovered", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "phone", "phones have no hover");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openSpecimen(page, "dark");
+  const specimen = page.locator('[data-switch-specimen="default"]');
+  for (const name of ["On, disabled", "Off, disabled"]) {
+    const control = specimen.getByRole("switch", { name, exact: true });
+    const rest = await control.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await control.hover({ force: true });
+    expect(await control.evaluate((element) => getComputedStyle(element).backgroundColor), `${name} while hovered`).toBe(rest);
+  }
+  // The same hover does tint an enabled switch, so the check above is not passing by accident.
+  const enabled = specimen.getByRole("switch", { name: "On", exact: true });
+  const enabledRest = await enabled.evaluate((element) => getComputedStyle(element).backgroundColor);
+  await enabled.hover();
+  expect(await enabled.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(enabledRest);
+});
+
 test("should not change a disabled switch when it is clicked", async ({ page }) => {
   await openSpecimen(page, "light");
   const disabled = page.locator('[data-switch-specimen="default"]').getByRole("switch", { name: "Off, disabled" });
