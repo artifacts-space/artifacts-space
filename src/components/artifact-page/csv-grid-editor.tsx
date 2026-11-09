@@ -246,6 +246,7 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
   );
 }
 
+/** A header cell in the editor: the name and its menu button. "Fit width to content" keeps room for them (headerControls in measure-text.ts). */
 function EditorHeader({ name, onMenu }: { name: string; onMenu: () => void }) {
   return (
     <div className="group/header flex h-full items-center">

@@ -1,6 +1,6 @@
 "use client";
 
-import { type PointerEvent as ReactPointerEvent, type RefObject, useRef, useState } from "react";
+import { type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useRef, useState } from "react";
 
 import { dropTarget, resizedWidth } from "@/lib/sheet-column-rules";
 import { rowNumberWidth } from "@/lib/sheet-grid-rules";
@@ -28,20 +28,28 @@ interface Handlers {
   onColumnResize?: ((column: number, width: number) => void) | undefined;
 }
 
-/** Runs `move` on every pointer move and `end` once on release or cancel. */
-function track(event: ReactPointerEvent, move: (event: PointerEvent) => void, end: (event: PointerEvent, cancelled: boolean) => void) {
+/**
+ * Runs `move` on every pointer move and `end` once on release or cancel.
+ * Returns a teardown that removes the listeners without calling `end`, for
+ * a grid that goes away mid-drag.
+ */
+function track(event: ReactPointerEvent, move: (event: PointerEvent) => void, end: (event: PointerEvent, cancelled: boolean) => void): () => void {
   const pointer = event.pointerId;
   const onMove = (next: PointerEvent) => { if (next.pointerId === pointer) move(next); };
-  const finish = (next: PointerEvent) => {
-    if (next.pointerId !== pointer) return;
+  const stop = () => {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", finish);
     window.removeEventListener("pointercancel", finish);
-    end(next, next.type === "pointercancel");
   };
+  function finish(next: PointerEvent) {
+    if (next.pointerId !== pointer) return;
+    stop();
+    end(next, next.type === "pointercancel");
+  }
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", finish);
   window.addEventListener("pointercancel", finish);
+  return stop;
 }
 
 /** Only a mouse or a pen drags columns; on touch screens a drag scrolls the grid. */
@@ -63,6 +71,19 @@ export function useColumnDrag(scrollerRef: RefObject<HTMLElement | null>, offset
   const [drag, setDrag] = useState<ColumnDrag | null>(null);
   const [resize, setResize] = useState<ColumnResize | null>(null);
   const swallowClick = useRef(false);
+  // The drag in progress, so its window listeners go when the grid does.
+  const stopTracking = useRef<(() => void) | null>(null);
+  useEffect(() => () => { stopTracking.current?.(); }, []);
+
+  /**
+   * Swallows the click that ends this drag. A drag released over the body
+   * sends its click to the grid, not the header, so the next click of any
+   * kind clears the latch instead: it never outlives its gesture.
+   */
+  function armSwallow() {
+    swallowClick.current = true;
+    window.addEventListener("click", () => { swallowClick.current = false; }, { once: true });
+  }
 
   const contentX = (clientX: number) => {
     const scroller = scrollerRef.current;
@@ -77,7 +98,7 @@ export function useColumnDrag(scrollerRef: RefObject<HTMLElement | null>, offset
     swallowClick.current = false;
     const startX = event.clientX;
     let current: ColumnDrag | null = null;
-    track(event, (move) => {
+    stopTracking.current = track(event, (move) => {
       if (current === null && Math.abs(move.clientX - startX) < dragThreshold) return;
       const scroller = scrollerRef.current;
       if (scroller) scrollAtEdge(scroller, move.clientX);
@@ -85,8 +106,9 @@ export function useColumnDrag(scrollerRef: RefObject<HTMLElement | null>, offset
       setDrag(current);
     }, (_end, cancelled) => {
       setDrag(null);
+      stopTracking.current = null;
       if (current === null || cancelled) return;
-      swallowClick.current = true;
+      armSwallow();
       if (current.to !== current.from) onColumnMove(current.from, current.to);
     });
   }
@@ -100,11 +122,12 @@ export function useColumnDrag(scrollerRef: RefObject<HTMLElement | null>, offset
     const startX = event.clientX;
     const startWidth = (offsets[column + 1] ?? 0) - (offsets[column] ?? 0);
     let width = startWidth;
-    track(event, (move) => {
+    stopTracking.current = track(event, (move) => {
       width = resizedWidth(startWidth, startX, move.clientX);
       setResize({ column, width });
     }, (_end, cancelled) => {
       setResize(null);
+      stopTracking.current = null;
       if (!cancelled && width !== startWidth) onColumnResize(column, width);
     });
   }

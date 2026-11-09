@@ -100,6 +100,23 @@ test.describe("with a mouse", () => {
     await expect(specimen(page).getByText("Only you see this order.")).toHaveCount(0);
   });
 
+  test("should open a column's menu on the next click when a header drag ends over the rows", async ({ page }) => {
+    const grid = await openGallerySheet(page);
+    const box = await header(grid, "col_02").boundingBox();
+    if (!box) throw new Error("No header to drag.");
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x - 60, box.y + box.height / 2, { steps: 4 });
+    // Released three rows down, over the body, not the header.
+    await page.mouse.move(box.x - 150, box.y + box.height * 4, { steps: 4 });
+    await page.mouse.up();
+    await expect.poll(() => headerNames(grid)).toEqual(["col_02", "col_01", "col_03"]);
+
+    await header(grid, "col_03").hover();
+    await grid.getByRole("button", { name: "Sort and filter col_03" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+  });
+
   test("should move a column in the file when an editor drags its header", async ({ page }) => {
     await page.goto("/dev/editor?kind=sheet");
     const grid = page.getByRole("grid", { name: "CSV grid editor" });
