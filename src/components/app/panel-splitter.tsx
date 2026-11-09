@@ -171,7 +171,8 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
         // The line: invisible at rest (the border shows), a quiet bar on hover and while dragging, the brand on focus.
         "after:absolute after:bg-transparent after:transition-colors hover:after:bg-foreground/20 data-[dragging]:after:bg-foreground/30 focus-visible:after:bg-brand",
         orientation === "vertical"
-          ? "cursor-col-resize after:inset-y-0 after:left-1/2 after:w-0.5 after:-translate-x-1/2"
+          // A vertical handle sits just past its panel's edge, so its line runs along the handle's start, on the border.
+          ? "cursor-col-resize after:inset-y-0 after:left-0 after:w-0.5"
           : "cursor-row-resize after:inset-x-0 after:top-1/2 after:h-0.5 after:-translate-y-1/2",
         className,
       )}

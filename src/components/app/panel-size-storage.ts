@@ -33,7 +33,14 @@ export function savePanelSize(panel: PanelSpec, size: number | null) {
   }
 }
 
-/** Applies every remembered size; for renders the before-paint script did not see, such as a client navigation. */
+/**
+ * Applies every remembered size; for renders the before-paint script did not
+ * see, such as a client navigation. A panel with nothing stored keeps what it
+ * has, so a size set while storage is blocked holds for the visit.
+ */
 export function applyStoredPanelSizes() {
-  for (const panel of rememberedPanels) applyPanelSize(panel, readPanelSize(panel));
+  for (const panel of rememberedPanels) {
+    const size = readPanelSize(panel);
+    if (size !== null) applyPanelSize(panel, size);
+  }
 }

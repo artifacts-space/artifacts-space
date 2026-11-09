@@ -43,7 +43,8 @@ export function SidebarSplitter({ shell, sidebar }: { shell: RefObject<HTMLEleme
       measure={measure}
       watch={() => [shell.current, sidebar.current]}
       initial={{ size: sidebarPanel.defaultSize, bounds: { min: sidebarPanel.min, max: sidebarPanel.max } }}
-      className="inset-y-0 -right-1 w-2"
+      // Just outside the sidebar, so the artifact list's scroll bar along its edge stays free.
+      className="inset-y-0 -right-2 w-2"
     />
   );
 }
