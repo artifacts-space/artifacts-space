@@ -4,14 +4,13 @@ import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "@/db";
 import { agent, artifact, user } from "@/db/schema";
 import { NEW_ACCOUNT_NOINDEX_DAYS } from "@/lib/access-rules";
-import { accountCreatedAt } from "@/lib/account-age";
-import { isPublicId } from "@/lib/public-id";
 
-import { isSearchIndexable, showsInSearch, SITEMAP_ARTIFACT_LIMIT, type SitemapCandidate } from "./search-rules";
+import { SITEMAP_ARTIFACT_LIMIT, type SitemapCandidate } from "./search-rules";
 
 /*
- * The database side of search engine visibility: the proxy's per-page check
- * and the sitemap's list. The decisions live in search-rules.ts.
+ * The database side of search engine visibility: the sitemap's list. The
+ * proxy's per-page check is src/lib/artifact-page-check.ts. The decisions
+ * live in search-rules.ts.
  */
 
 const owner = alias(user, "owner");
@@ -45,20 +44,4 @@ export function sitemapCandidatesQuery(db: Pick<ReturnType<typeof getDb>, "selec
 /** Artifacts the sitemap may list. The caller filters again with artifactSitemapPaths. */
 export async function sitemapCandidates(): Promise<SitemapCandidate[]> {
   return sitemapCandidatesQuery(getDb());
-}
-
-/**
- * Whether search engines may index the page at /artifact/<publicId>, for the
- * proxy's X-Robots-Tag header. One indexed lookup, plus the author's account
- * age only for artifacts whose setting counts. Unknown ids are never indexable.
- */
-export async function isPageSearchIndexable(publicId: string): Promise<boolean> {
-  if (!isPublicId(publicId)) return false;
-  const [row] = await getDb()
-    .select({ userId: artifact.userId, visibility: artifact.visibility, showInSearch: artifact.showInSearch })
-    .from(artifact)
-    .where(eq(artifact.publicId, publicId))
-    .limit(1);
-  if (!row || !showsInSearch(row)) return false;
-  return isSearchIndexable(row, await accountCreatedAt(row.userId));
 }
