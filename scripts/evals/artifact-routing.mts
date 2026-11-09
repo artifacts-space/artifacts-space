@@ -24,8 +24,9 @@
  *
  * Each prompt runs in a fresh temporary folder holding a tiny sample project,
  * with only the stub MCP server (`--strict-mcp-config`), no user or project
- * settings (`--setting-sources project,local` in an empty folder), and no
- * session saved. Variants:
+ * settings (`--setting-sources project,local` in an empty folder), file edits
+ * accepted inside that folder only (`--permission-mode acceptEdits`), and no
+ * session saved. The folder is removed after each run. Variants:
  * - mcp: no CLAUDE.md files and no skills. Measures the server's words alone.
  * - default-line: the folder's CLAUDE.md holds DEFAULT_INSTRUCTION_LINE from
  *   `src/lib/setup/default-routing.ts`. Your own ~/.claude/CLAUDE.md loads too.
@@ -133,7 +134,10 @@ export function readStubCalls(logPath: string): string[] {
 /** The `claude` arguments for one prompt. */
 export function claudeArgs(prompt: string, configPath: string, options: Pick<Options, "variant" | "model" | "maxTurns">): string[] {
   const args = ["-p", prompt, "--output-format", "stream-json", "--verbose", "--strict-mcp-config", "--mcp-config", configPath];
-  args.push("--allowedTools", "mcp__artifacts", "--setting-sources", "project,local", "--max-turns", String(options.maxTurns), "--no-session-persistence");
+  // acceptEdits lets file edits inside the throwaway workspace go through, as a person approving them would, so a
+  // near miss such as fixing a README can end in a real edit instead of a denial that pushes the agent elsewhere.
+  args.push("--allowedTools", "mcp__artifacts", "--permission-mode", "acceptEdits", "--setting-sources", "project,local");
+  args.push("--max-turns", String(options.maxTurns), "--no-session-persistence");
   if (options.variant !== "skill") args.push("--disable-slash-commands");
   if (options.model) args.push("--model", options.model);
   return args;
@@ -277,20 +281,31 @@ async function readOptions(): Promise<Options> {
   };
 }
 
-/** Stops every running `claude` and its stub on Ctrl+C and removes their workspaces, so nothing outlives the eval. */
+/** Stops every running `claude` and its stub on Ctrl+C or SIGTERM and removes their workspaces, so nothing outlives the eval. */
 function stopRunsOnInterrupt() {
-  process.once("SIGINT", () => {
+  const stop = (code: number) => () => {
     for (const child of activeRuns) signalGroup(child, "SIGKILL");
     for (const dir of activeWorkspaces) rmSync(dir, { recursive: true, force: true });
-    process.exit(130);
-  });
+    process.exit(code);
+  };
+  process.once("SIGINT", stop(130));
+  process.once("SIGTERM", stop(143));
+}
+
+/** The cases `--only` names. Throws on an id that does not exist, so a typo never runs an empty pass. */
+export function selectCases(cases: RoutingCase[], only: ReadonlySet<string>): RoutingCase[] {
+  if (only.size === 0) return cases;
+  const known = new Set(cases.map((testCase) => testCase.id));
+  const unknown = [...only].filter((id) => !known.has(id));
+  if (unknown.length > 0) throw new Error(`--only names unknown ids: ${unknown.join(", ")}. Ids are in scripts/evals/artifact-routing-cases.json.`);
+  return cases.filter((testCase) => only.has(testCase.id));
 }
 
 async function main() {
   const options = await readOptions();
   if (options.refresh) refreshToolsSnapshot();
   const { cases } = casesFileSchema.parse(JSON.parse(readFileSync(casesPath, "utf8")));
-  const selected = options.only.size > 0 ? cases.filter((testCase) => options.only.has(testCase.id)) : cases;
+  const selected = selectCases(cases, options.only);
   const startedAt = new Date().toISOString();
   stopRunsOnInterrupt();
   console.log(`Running ${selected.length} prompts, variant ${options.variant}. Each is a real Claude Code run on your login.`);

@@ -43,10 +43,10 @@ function DefaultRoutingDetails() {
       <CodeSnippet title=".cursor/rules/artifacts-space.mdc" language="markdown" code={cursorRuleMdc()} className="mt-4" />
       <Prose>
         <p>
-          To turn off Claude Code&apos;s own Artifact tool as well, add this to <code>~/.claude/settings.json</code>. The built-in tool stays off until you remove the rule.
+          To turn off Claude Code&apos;s own Artifact tool as well, add this rule to <code>~/.claude/settings.json</code>, next to the settings already there. If the file has a <code>permissions.deny</code> list, add <code>&quot;Artifact&quot;</code> to it. The built-in tool stays off until you remove the rule.
         </p>
       </Prose>
-      <CodeSnippet title="~/.claude/settings.json" language="json" code={CLAUDE_CODE_DENY_ARTIFACT_SETTINGS} className="mt-4" />
+      <CodeSnippet title="Add to ~/.claude/settings.json" language="json" code={CLAUDE_CODE_DENY_ARTIFACT_SETTINGS} className="mt-4" />
       <Prose>
         <p>
           Turning off <strong>Artifacts</strong> in Claude Code&apos;s <code>/config</code> does the same: it writes <code>&quot;enableArtifact&quot;: false</code> to that file.

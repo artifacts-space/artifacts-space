@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { casesFileSchema, firstRoute, gradeCase, parseTranscript, renderMarkdown, runError, summarize, toolSearches, type RoutingCase, type Transcript } from "./artifact-routing-grade.mts";
-import { claudeArgs, readStubCalls } from "./artifact-routing.mts";
+import { claudeArgs, readStubCalls, selectCases } from "./artifact-routing.mts";
 
 function streamLine(value: unknown) {
   return JSON.stringify(value);
@@ -163,11 +163,24 @@ describe("claudeArgs", () => {
   it("should load only the stub server and allow only its tools when it builds a run", () => {
     const args = claudeArgs("Write it up.", "/tmp/mcp.json", { variant: "mcp", model: "", maxTurns: 8 });
     expect(args).toEqual(expect.arrayContaining(["--strict-mcp-config", "--allowedTools", "mcp__artifacts", "--disable-slash-commands", "--no-session-persistence"]));
+    expect(args[args.indexOf("--permission-mode") + 1]).toBe("acceptEdits");
     expect(args).not.toContain("--model");
   });
 
   it("should keep skills on when the variant is skill", () => {
     expect(claudeArgs("x", "/tmp/mcp.json", { variant: "skill", model: "opus", maxTurns: 8 })).not.toContain("--disable-slash-commands");
+  });
+});
+
+describe("selectCases", () => {
+  const cases = [planCase, nearCase];
+
+  it("should run every case when --only is empty", () => {
+    expect(selectCases(cases, new Set())).toEqual(cases);
+  });
+
+  it("should throw and name the id when --only has a typo, so no empty pass runs", () => {
+    expect(() => selectCases(cases, new Set(["plan", "plna"]))).toThrow(/unknown ids: plna/);
   });
 });
 

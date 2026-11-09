@@ -1,11 +1,16 @@
 /**
  * The words an agent reads before it picks a tool: the MCP server's
- * instructions and the titles and descriptions of the artifact tools.
+ * instructions and the titles and descriptions of the artifact tools. A
+ * tool's `_meta` lives here too when it changes how a client finds the tool:
+ * `artifacts_create` carries Claude Code's load-up-front hint, which is why
+ * it is always visible.
  *
- * Kept here, with no imports, so two readers share one copy: the server
- * (`src/app/api/mcp/route.ts` and `artifact-tools.ts`) and the on-demand
- * routing eval (`scripts/evals/artifact-routing.mts`), which serves this same
- * text from a stub server to measure how often agents pick artifacts.space.
+ * Kept in one module, with no imports, so the words are easy to find and
+ * test. The server reads them in `src/app/api/mcp/route.ts` and
+ * `artifact-tools.ts`. The on-demand routing eval
+ * (`scripts/evals/artifact-routing.mts`) serves them, `_meta` included, from
+ * `scripts/evals/artifact-routing-tools.json`, a snapshot of the registered
+ * tools, to measure how often agents pick artifacts.space.
  */
 
 /** The instructions every connection gets. Read-only connections get `READ_ONLY_INSTRUCTIONS` after them. */
