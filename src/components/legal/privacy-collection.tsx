@@ -114,7 +114,7 @@ export function PrivacyCollection() {
         <p>If you are in the European Economic Area (EEA) or the United Kingdom, we rely on these legal bases:</p>
         <ul>
           <li><strong>Contract:</strong> to provide the service you signed up for, including your account, artifacts, teams, connected apps, and the emails the service needs.</li>
-          <li><strong>Legitimate interests:</strong> to keep the service secure, prevent abuse, enforce limits, keep logs, handle reports, let search engines index public artifacts whose authors chose that, and count views of public artifacts for their authors. Our interest is a safe, reliable service; we keep these uses narrow so they do not override your rights.</li>
+          <li><strong>Legitimate interests:</strong> to keep the service secure, prevent abuse, enforce limits, keep logs, handle reports, let search engines index public artifacts that someone who can share them chose to list, and count views of public artifacts for their authors. Our interest is a safe, reliable service; we keep these uses narrow so they do not override your rights.</li>
           <li><strong>Legal obligation:</strong> to answer lawful requests and keep records the law requires.</li>
           <li><strong>Consent:</strong> where we ask for it. You can withdraw consent at any time.</li>
         </ul>
@@ -126,7 +126,7 @@ export function PrivacyCollection() {
         <ul>
           <li><strong>Team:</strong> signed-in members of the artifact&apos;s team can read and edit it.</li>
           <li><strong>Link:</strong> anyone with the URL can read it, signed in or not. We tell search engines not to index link pages.</li>
-          <li><strong>Public:</strong> anyone can read it. We tell search engines not to index it unless its author turns on &quot;Show in search engines&quot;, and even then only once the author&apos;s account is at least {NEW_ACCOUNT_NOINDEX_DAYS} days old (an agent&apos;s work counts from its owner&apos;s account). We ask search engines not to follow links inside artifacts.</li>
+          <li><strong>Public:</strong> anyone can read it. We tell search engines not to index it unless someone who can share it turns on &quot;Show in search engines&quot;: its author, or the person who added the agent that wrote it while they are still in that agent&apos;s team. Even then, we wait until the author&apos;s account is at least {NEW_ACCOUNT_NOINDEX_DAYS} days old (an agent&apos;s work counts from its owner&apos;s account). We ask search engines not to follow links inside artifacts.</li>
         </ul>
         <p>
           A link or public page shows the artifact, your name or handle and avatar as its author, and a preview image with its title and a short synopsis when someone shares the link. Readers outside the team see the last approved version. Comments follow the artifact&apos;s comments setting, and signed-out readers never see comments. Your teammates see your name, handle, and email address in the team&apos;s member list, and the work you do in the team.
