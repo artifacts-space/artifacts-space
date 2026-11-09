@@ -9,6 +9,7 @@ import {
   customRoleOf,
   deleteTestTeams,
   demoteDirectly,
+  demoteEveryoneDirectly,
   demoteOwnersAtOnce,
   giveTestCustomRole,
   localDatabaseEnabled,
@@ -150,4 +151,13 @@ test("should refuse demoting a team's only owner in the database itself, and all
   seeded.teamIds.push(team.id);
   await expect(demoteDirectly(team.id, owner)).rejects.toThrow("A team always keeps at least one owner.");
   await setTeamRole(team.id, owner, "member");
+});
+
+test("should refuse demoting every owner in one statement", async () => {
+  const [first, second] = await Promise.all([createTestUser(), createTestUser()]);
+  seeded.userIds.push(first, second);
+  const team = await createTestTeam(first, "owner");
+  seeded.teamIds.push(team.id);
+  await addTestMember(team.id, second, "owner");
+  await expect(demoteEveryoneDirectly(team.id)).rejects.toThrow("A team always keeps at least one owner.");
 });

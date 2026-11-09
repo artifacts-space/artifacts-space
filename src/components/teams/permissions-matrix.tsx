@@ -8,14 +8,25 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { askFirstCapabilities, capabilityLabels } from "@/lib/teams/capability-labels";
-import { teamCapabilities, type TeamActor, type TeamCapability } from "@/lib/teams/capability-rules";
+import { can, teamCapabilities, type TeamActor, type TeamCapability } from "@/lib/teams/capability-rules";
 import { matrixCell, type MatrixCell, type MatrixRole } from "@/lib/teams/permission-matrix-rules";
 import { deleteRoleProblem } from "@/lib/teams/role-admin-rules";
 
 import { useTeamAction } from "./use-team-action";
 
-/** A cell nobody here can change: the state, with the reason in a tooltip when there is one. */
-function StaticCell({ cell, capability, roleName }: { cell: MatrixCell; capability: TeamCapability; roleName: string }) {
+/** Why a cell cannot change, as its accessible name says it. */
+function cellReason(cell: MatrixCell): string {
+  if (cell.locked) return ` Locked: ${cell.locked}`;
+  return cell.blocked ? ` ${cell.blocked}` : "";
+}
+
+/**
+ * A cell the viewer cannot change: the state, and why. Locked cells, and
+ * blocked cells for people who change roles, show the reason in a tooltip;
+ * for everyone else it is only in the accessible name, since the panel
+ * already says the matrix is read-only for them.
+ */
+function StaticCell({ cell, capability, roleName, explain }: { cell: MatrixCell; capability: TeamCapability; roleName: string; explain: boolean }) {
   const label = `${capabilityLabels[capability].label} for ${roleName}`;
   const state = cell.held ? "Yes" : askFirstCapabilities.has(capability) ? "Asks first" : "No";
   const icon = cell.held ? <IconCheck aria-hidden className="size-4" /> : askFirstCapabilities.has(capability) ? <IconUserQuestion aria-hidden className="size-4" /> : <IconMinus aria-hidden className="size-4" />;
@@ -23,14 +34,14 @@ function StaticCell({ cell, capability, roleName }: { cell: MatrixCell; capabili
     <span className="inline-flex items-center gap-0.5 text-muted-foreground" data-locked={cell.locked ? "true" : undefined}>
       {icon}
       {cell.locked ? <IconLock aria-hidden className="size-3" /> : null}
-      <span className="sr-only">{`${label}: ${state}${cell.locked ? ", locked" : ""}`}</span>
+      <span className="sr-only">{`${label}: ${state}.${cellReason(cell)}`}</span>
     </span>
   );
-  const reason = cell.locked ?? null;
+  const reason = cell.locked ?? (explain ? cell.blocked : null);
   if (!reason) return content;
   return (
     <Tooltip>
-      <TooltipTrigger render={<button type="button" className="rounded-md p-1 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none" aria-label={`${label}: ${state}. Locked: ${reason}`} />}>{content}</TooltipTrigger>
+      <TooltipTrigger render={<button type="button" className="rounded-md p-1 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none" aria-label={`${label}: ${state}.${cellReason(cell)}`} />}>{content}</TooltipTrigger>
       <TooltipContent>{reason}</TooltipContent>
     </Tooltip>
   );
@@ -76,6 +87,7 @@ function RoleHeader({ teamId, viewer, role }: { teamId: string; viewer: TeamActo
  */
 export function PermissionsMatrix({ teamId, viewer, roles }: { teamId: string; viewer: TeamActor | null; roles: readonly MatrixRole[] }) {
   const { pending, run } = useTeamAction();
+  const editor = viewer?.kind === "person" && can(viewer, "members.roles");
   const toggle = (key: string, action: () => ReturnType<typeof updateRoleCapabilityAction>) => void run(key, action, "Permissions saved.");
   return (
     // The table scrolls inside the card on narrow phones, never the page.
@@ -100,7 +112,7 @@ export function PermissionsMatrix({ teamId, viewer, roles }: { teamId: string; v
                 return (
                   <td key={role.key} className="px-2 py-2.5 text-center last:pr-5" data-role={role.key}>
                     <span className="inline-flex justify-center">
-                      {editable ? <EditableCell teamId={teamId} role={role} capability={capability} held={cell.held} busy={pending !== null} onToggle={toggle} /> : <StaticCell cell={cell} capability={capability} roleName={role.name} />}
+                      {editable ? <EditableCell teamId={teamId} role={role} capability={capability} held={cell.held} busy={pending !== null} onToggle={toggle} /> : <StaticCell cell={cell} capability={capability} roleName={role.name} explain={editor} />}
                     </span>
                   </td>
                 );

@@ -13,7 +13,7 @@ async function expectTooltip(page: Page, cell: string | RegExp, reason: string) 
   await expect(async () => {
     await page.mouse.move(0, 0);
     await matrix(page).getByRole("button", { name: cell }).hover();
-    await expect(page.getByText(reason)).toBeVisible({ timeout: 1500 });
+    await expect(page.getByText(reason, { exact: true })).toBeVisible({ timeout: 1500 });
   }).toPass({ timeout: 10_000 });
 }
 
@@ -39,6 +39,7 @@ test("should keep an admin to roles below Admin and to capabilities the admin ho
   await expect(matrix(page).getByRole("checkbox", { name: "Approve sharing for Member" })).toBeEnabled();
   await expect(matrix(page).getByRole("checkbox", { name: "Manage themes for Designer" })).toBeEnabled();
   await expect(matrix(page).getByRole("checkbox", { name: "Change the sharing rule for Member" })).toHaveCount(0);
+  await expectTooltip(page, /^Approve sharing for Admin: Yes\. You can only change roles below your own\./, "You can only change roles below your own.");
 });
 
 test("should show a member the matrix read-only, with no New role button", async ({ page }) => {

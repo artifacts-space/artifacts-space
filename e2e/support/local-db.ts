@@ -281,6 +281,11 @@ export async function demoteDirectly(teamId: string, userId: string): Promise<vo
   await db().query(`update team_member set role = 'member' where team_id = $1 and user_id = $2`, [teamId, userId]);
 }
 
+/** Demotes every member of a team in one statement, as a bulk script would. */
+export async function demoteEveryoneDirectly(teamId: string): Promise<void> {
+  await db().query(`update team_member set role = 'member' where team_id = $1`, [teamId]);
+}
+
 /**
  * Two owners demote each other at the same moment, each in its own
  * transaction, the way two requests would race. Returns which demotions the

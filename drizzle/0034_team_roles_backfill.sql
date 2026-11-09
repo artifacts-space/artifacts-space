@@ -1,7 +1,9 @@
 -- Backfill: every existing team gets the built-in roles with today's rules
 -- (src/lib/teams/capability-rules.ts, defaultRoleCapabilities), so nothing
--- anyone can do changes. Inserts only, safe to run again; a test checks that
--- these rows equal the defaults.
+-- anyone can do changes. Inserts only, so it never errors, but run it only
+-- before any team edits its roles: once a team has narrowed a built-in role,
+-- running it again would quietly put the default grants back, with no audit
+-- row. A test checks that these rows equal the defaults.
 INSERT INTO "team_role" ("id", "team_id", "key", "name", "built_in")
 SELECT gen_random_uuid()::text, "team"."id", "roles"."key", "roles"."name", true
 FROM "team"

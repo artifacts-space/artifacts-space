@@ -5,7 +5,7 @@ import { getDb } from "@/db";
 import { teamRole, teamRoleAssignment } from "@/db/roles-schema";
 import { agent, team, teamInvitation, teamMember, user } from "@/db/schema";
 
-import { loadTeamRoles, resolveActor, type TeamRoleView } from "./capabilities";
+import { effectiveRoleKey, loadTeamRoles, resolveActor, type TeamRoleView } from "./capabilities";
 import { builtInRoleNames, type ActorKind, type TeamActor, type TeamCapability } from "./capability-rules";
 import type { TeamHeadcount } from "./member-counts";
 import { parseTeamRole, type TeamRole } from "./roles";
@@ -179,7 +179,9 @@ export async function listTeamMembers(teamId: string): Promise<TeamMemberView[]>
     .orderBy(asc(teamMember.createdAt));
   return rows.map(({ customKey, customName, ...row }) => {
     const role = parseTeamRole(row.role);
-    return { ...row, role, roleKey: customKey ?? role, roleName: customName ?? builtInRoleNames[role], joinedAt: row.joinedAt.toISOString() };
+    // The same rule as resolveActor, so the table always shows the role `can` uses.
+    const roleKey = effectiveRoleKey({ role, isAgent: false, customKey });
+    return { ...row, role, roleKey, roleName: roleKey === customKey && customName ? customName : builtInRoleNames[role], joinedAt: row.joinedAt.toISOString() };
   });
 }
 
