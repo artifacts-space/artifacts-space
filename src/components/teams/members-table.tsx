@@ -1,7 +1,9 @@
 import type { TeamAgentView } from "@/lib/agents/queries";
-import { canEditMemberRow } from "@/lib/teams/member-row-rules";
-import type { PendingInvitationView, TeamMemberView } from "@/lib/teams/queries";
-import type { TeamRole } from "@/lib/teams/roles";
+import { can } from "@/lib/teams/capability-rules";
+import { memberRowControls, type RoleOption } from "@/lib/teams/member-row-rules";
+import type { PendingInvitationView, TeamMemberView, TeamMembership } from "@/lib/teams/queries";
+import { inviteProblem } from "@/lib/teams/role-admin-rules";
+import { assignableRoles, type AssignableRole } from "@/lib/teams/roles";
 
 import { AddAgentDialog } from "./add-agent-dialog";
 import { AgentMemberRow } from "./agent-member-row";
@@ -11,15 +13,13 @@ import { cell } from "./member-table-cells";
 import { Section } from "./section";
 
 export interface MembersTableProps {
-  teamId: string;
-  personal: boolean;
-  viewerId: string;
-  viewerRole: TeamRole;
-  /** The viewer is an owner or admin of a shared team. */
-  canManage: boolean;
+  /** The viewer's membership: their role and what it may do. */
+  viewer: TeamMembership;
   members: TeamMemberView[];
   agents: TeamAgentView[];
   invitations: PendingInvitationView[];
+  /** Every role in the team, for the role pickers. */
+  roles: readonly RoleOption[];
   origin: string;
 }
 
@@ -37,37 +37,49 @@ function Head() {
   );
 }
 
-function description(personal: boolean, canManage: boolean) {
+function description(personal: boolean, canInvite: boolean) {
   if (personal) return "Your personal team is only you. Create a team to share with others.";
-  return canManage ? "People and agents in this team. Invitations wait here until they are accepted." : "People and agents in this team.";
+  return canInvite ? "People and agents in this team. Invitations wait here until they are accepted." : "People and agents in this team.";
+}
+
+function HeaderActions({ teamId, inviteRoles, canAddAgents }: { teamId: string; inviteRoles: readonly AssignableRole[]; canAddAgents: boolean }) {
+  if (inviteRoles.length === 0 && !canAddAgents) return undefined;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {canAddAgents ? <AddAgentDialog teamId={teamId} /> : null}
+      {inviteRoles.length > 0 ? <InviteDialog teamId={teamId} roles={inviteRoles} /> : null}
+    </div>
+  );
 }
 
 /**
- * People, agent teammates, and open invitations in one table. Owners and
- * admins change roles, remove people, manage agents, and handle invitations;
- * "Invite people" and "Add agent" open dialogs from the card's header.
+ * People, agent teammates, and open invitations in one table. What the
+ * viewer may change comes from their role (member-row-rules.ts, which asks
+ * the same rules as the server). "Invite people" and "Add agent" open
+ * dialogs from the card's header.
  */
-export function MembersTable(props: MembersTableProps) {
-  const ownerCount = props.members.filter((member) => member.role === "owner").length;
-  const actions = props.canManage ? (
-    <div className="flex flex-wrap gap-2">
-      <AddAgentDialog teamId={props.teamId} />
-      <InviteDialog teamId={props.teamId} />
-    </div>
-  ) : undefined;
+export function MembersTable({ viewer, members, agents, invitations, roles, origin }: MembersTableProps) {
+  const ownerCount = members.filter((member) => member.roleKey === "owner").length;
+  const shared = !viewer.personal && viewer.kind === "person";
+  const canInvite = shared && can(viewer, "members.invite");
+  const canAddAgents = shared && can(viewer, "agents.manage");
+  const grantFor = (key: string) => roles.find((role) => role.key === key) ?? { key, capabilities: [] };
+  const inviteRoles = canInvite ? assignableRoles.filter((key) => inviteProblem(viewer, grantFor(key)) === null) : [];
   return (
-    <Section title="Members" description={description(props.personal, props.canManage)} action={actions}>
+    <Section title="Members" description={description(viewer.personal, canInvite)} action={HeaderActions({ teamId: viewer.id, inviteRoles, canAddAgents })}>
       {/* relative: the role picker's hidden input is absolutely placed and must stay inside the card. */}
       <div className="relative">
         <table className="w-full border-collapse text-sm" aria-label="Members">
           <Head />
           <tbody>
-            {props.members.map((member) => {
-              const editable = canEditMemberRow({ canManage: props.canManage, viewerId: props.viewerId, viewerRole: props.viewerRole, member, ownerCount });
-              return <PersonRow key={member.memberId} member={member} teamId={props.teamId} viewerRole={props.viewerRole} isViewer={member.userId === props.viewerId} editable={editable} />;
+            {members.map((member) => {
+              const controls = memberRowControls({ viewer, member, roles, ownerCount });
+              return <PersonRow key={member.memberId} member={member} teamId={viewer.id} isViewer={member.userId === viewer.userId} roleOptions={controls.roleOptions} canRemove={controls.canRemove} />;
             })}
-            {props.agents.map((agent) => <AgentMemberRow key={agent.userId} agent={agent} canManage={props.canManage} origin={props.origin} />)}
-            {props.invitations.map((invitation) => <InvitationRow key={invitation.id} invitation={invitation} teamId={props.teamId} />)}
+            {agents.map((agent) => <AgentMemberRow key={agent.userId} agent={agent} canManage={canAddAgents} origin={origin} />)}
+            {invitations.map((invitation) => (
+              <InvitationRow key={invitation.id} invitation={invitation} teamId={viewer.id} canResend={canInvite && inviteProblem(viewer, grantFor(invitation.role)) === null} />
+            ))}
           </tbody>
         </table>
       </div>

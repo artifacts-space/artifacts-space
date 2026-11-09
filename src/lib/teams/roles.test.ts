@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canEditTeamSettings, canManageTeam, parseTeamRole, roleLabel } from "./roles";
+import { parseTeamRole, roleLabel } from "./roles";
 
 describe("parseTeamRole", () => {
   it("should read a single known role", () => {
@@ -20,18 +20,7 @@ describe("parseTeamRole", () => {
   });
 });
 
-describe("role permissions", () => {
-  it("should let owners and admins manage the team", () => {
-    expect(canManageTeam("owner")).toBe(true);
-    expect(canManageTeam("admin")).toBe(true);
-    expect(canManageTeam("member")).toBe(false);
-  });
-
-  it("should let only owners edit team settings", () => {
-    expect(canEditTeamSettings("owner")).toBe(true);
-    expect(canEditTeamSettings("admin")).toBe(false);
-  });
-
+describe("roleLabel", () => {
   it("should label roles for the UI", () => {
     expect(roleLabel("admin")).toBe("Admin");
   });

@@ -1,45 +1,61 @@
 import { describe, expect, it } from "vitest";
 
-import { canEditMemberRow, resendableRole, rolesFor, type MemberRowInput } from "./member-row-rules";
+import { defaultActor, defaultRoleCapabilities } from "./capability-rules";
+import { memberRowControls, resendableRole, type MemberRowInput, type RoleOption } from "./member-row-rules";
 
-const base: MemberRowInput = {
-  canManage: true,
-  viewerId: "viewer",
-  viewerRole: "owner",
-  member: { userId: "other", role: "member" },
-  ownerCount: 1,
-};
+const roles: RoleOption[] = [
+  { key: "owner", name: "Owner", capabilities: defaultRoleCapabilities.owner },
+  { key: "admin", name: "Admin", capabilities: defaultRoleCapabilities.admin },
+  { key: "member", name: "Member", capabilities: defaultRoleCapabilities.member },
+  { key: "agent", name: "Agent", capabilities: defaultRoleCapabilities.agent },
+  { key: "designer", name: "Designer", capabilities: ["themes.manage", "analytics.view"] },
+];
 
-describe("canEditMemberRow", () => {
-  it("should let an owner change a member when the viewer manages the team", () => {
-    expect(canEditMemberRow(base)).toBe(true);
+function viewer(role: "owner" | "admin" | "member") {
+  return { ...defaultActor(role), userId: "viewer", personal: false };
+}
+
+const base: MemberRowInput = { viewer: viewer("owner"), member: { userId: "other", roleKey: "member" }, roles, ownerCount: 1 };
+const keys = (input: MemberRowInput) => memberRowControls(input).roleOptions.map((role) => role.key);
+
+describe("memberRowControls", () => {
+  it("should offer no role change and no Remove for an agent's row, whatever the viewer's role", () => {
+    expect(memberRowControls({ ...base, member: { userId: "agent-1", roleKey: "agent", isAgent: true } })).toEqual({ roleOptions: [], canRemove: false });
   });
 
-  it("should refuse when the viewer does not manage the team", () => {
-    expect(canEditMemberRow({ ...base, canManage: false })).toBe(false);
+  it("should offer every role but Agent, current first, when an owner changes a member", () => {
+    expect(keys(base)).toEqual(["member", "owner", "admin", "designer"]);
+    expect(memberRowControls(base).canRemove).toBe(true);
   });
 
-  it("should refuse when the row is the viewer", () => {
-    expect(canEditMemberRow({ ...base, member: { userId: "viewer", role: "owner" }, ownerCount: 3 })).toBe(false);
+  it("should never offer Owner when an admin changes a member", () => {
+    expect(keys({ ...base, viewer: viewer("admin") })).toEqual(["member", "admin", "designer"]);
   });
 
-  it("should refuse when an admin targets an owner", () => {
-    expect(canEditMemberRow({ ...base, viewerRole: "admin", member: { userId: "other", role: "owner" }, ownerCount: 2 })).toBe(false);
+  it("should offer nothing when the viewer is a plain member", () => {
+    expect(memberRowControls({ ...base, viewer: viewer("member") })).toEqual({ roleOptions: [], canRemove: false });
   });
 
-  it("should refuse when the owner is the team's last owner", () => {
-    expect(canEditMemberRow({ ...base, member: { userId: "other", role: "owner" }, ownerCount: 1 })).toBe(false);
+  it("should offer nothing when the row is the viewer", () => {
+    expect(memberRowControls({ ...base, member: { userId: "viewer", roleKey: "owner" }, ownerCount: 3 })).toEqual({ roleOptions: [], canRemove: false });
   });
 
-  it("should let an owner change another owner when the team has two owners", () => {
-    expect(canEditMemberRow({ ...base, member: { userId: "other", role: "owner" }, ownerCount: 2 })).toBe(true);
+  it("should never let an admin change or remove an owner", () => {
+    expect(memberRowControls({ ...base, viewer: viewer("admin"), member: { userId: "other", roleKey: "owner" }, ownerCount: 2 })).toEqual({ roleOptions: [], canRemove: false });
   });
-});
 
-describe("rolesFor", () => {
-  it("should offer the owner role only when the viewer is an owner", () => {
-    expect(rolesFor("owner")).toContain("owner");
-    expect(rolesFor("admin")).not.toContain("owner");
+  it("should keep the last owner an owner", () => {
+    expect(memberRowControls({ ...base, member: { userId: "other", roleKey: "owner" }, ownerCount: 1 })).toEqual({ roleOptions: [], canRemove: false });
+  });
+
+  it("should let an owner change another owner when the team has two", () => {
+    const controls = memberRowControls({ ...base, member: { userId: "other", roleKey: "owner" }, ownerCount: 2 });
+    expect(controls.canRemove).toBe(true);
+    expect(controls.roleOptions[0]?.key).toBe("owner");
+  });
+
+  it("should offer nothing in a personal team", () => {
+    expect(memberRowControls({ ...base, viewer: { ...viewer("owner"), personal: true } })).toEqual({ roleOptions: [], canRemove: false });
   });
 });
 

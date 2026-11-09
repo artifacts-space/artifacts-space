@@ -9,6 +9,7 @@ import { isPublicId } from "@/lib/public-id";
 import { getSession } from "@/lib/session";
 import { UserFacingError } from "@/lib/user-facing-error";
 
+import { canSeeViews } from "./view-access";
 import { loadViewStats } from "./view-stats";
 import { viewRangeSchema, type ViewStats } from "./view-stats-rules";
 
@@ -25,7 +26,7 @@ export async function getViewStatsAction(publicId: string, days: number): Promis
     if (!session) return { success: false, error: "Your session ended. Sign in again." };
     const range = viewRangeSchema.parse(days);
     const record = await getEditableArtifact(session.user.id, { publicId: publicIdSchema.parse(publicId) });
-    if (!record) throw new UserFacingError("Artifact not found.");
+    if (!record || !(await canSeeViews(session.user.id, record))) throw new UserFacingError("Artifact not found.");
     return { success: true, data: await loadViewStats(record, range) };
   } catch (error) {
     if (!(error instanceof UserFacingError) && !(error instanceof z.ZodError)) {

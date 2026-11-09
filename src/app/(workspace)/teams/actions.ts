@@ -2,39 +2,28 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult } from "@/lib/artifact-types";
 import { getAuth } from "@/lib/auth/server";
 import { cleanHandleInput } from "@/lib/handles";
-import { getSession } from "@/lib/session";
-import { getTeamMembershipById, type TeamMembership } from "@/lib/teams/queries";
-import { assignableRoles, canEditTeamSettings, canManageTeam } from "@/lib/teams/roles";
+import type { TeamRoleView } from "@/lib/teams/capabilities";
+import { can, type TeamCapability } from "@/lib/teams/capability-rules";
+import { assignRoleProblem, countOwners, inviteProblem, leaveProblem, removeMemberProblem } from "@/lib/teams/role-admin-rules";
+import { changeMemberRole } from "@/lib/teams/role-store";
+import { getInvitationTeamId, listTeamMemberActors, type TeamMemberActor, type TeamMembership } from "@/lib/teams/queries";
+import { assignableRoles, type TeamRole } from "@/lib/teams/roles";
+import { UserFacingError } from "@/lib/user-facing-error";
 
-const idSchema = z.string().trim().min(1).max(200);
+import { guardTeam, idSchema, requireUser } from "./team-guard";
 
-async function requireUser() {
-  const session = await getSession();
-  if (!session) redirect("/sign-in");
-  return session.user;
-}
+const roleKeySchema = z.string().trim().min(1).max(40);
 
-/** The viewer's membership in a team, or an error result when they are not a member. */
-async function requireMembership(teamId: string) {
-  const viewer = await requireUser();
-  const membership = await getTeamMembershipById(viewer.id, idSchema.parse(teamId));
-  return { viewer, membership };
-}
 
-type Guarded = { ok: true; membership: TeamMembership } | { ok: false; result: { success: false; error: string } };
-
-async function guard(teamId: string, allowed: (membership: TeamMembership) => boolean, denied: string): Promise<Guarded> {
-  const { membership } = await requireMembership(teamId);
-  if (!membership) return { ok: false, result: { success: false, error: "Team not found." } };
-  if (!allowed(membership)) return { ok: false, result: { success: false, error: denied } };
-  return { ok: true, membership };
+/** A person (never an agent's token) in a shared team who holds `capability`. */
+function holds(capability: TeamCapability) {
+  return (membership: TeamMembership) => membership.kind === "person" && !membership.personal && can(membership, capability);
 }
 
 const createTeamSchema = z.object({
@@ -64,12 +53,16 @@ const inviteSchema = z.object({
   role: z.enum(assignableRoles),
 });
 
-/** Invites someone by email. Owners and admins only; never to a personal team. */
+/** Invites someone by email, to a role that does no more than the inviter's. Never to a personal team. */
 export async function inviteMemberAction(teamId: string, input: z.input<typeof inviteSchema>): Promise<ActionResult<null>> {
   try {
-    const checked = await guard(teamId, (m) => canManageTeam(m.role) && !m.personal, "Only owners and admins can invite people.");
+    const checked = await guardTeam(teamId, holds("members.invite"), "You cannot invite people to this team.");
     if (!checked.ok) return checked.result;
     const { email, role } = inviteSchema.parse(input);
+    const grant = checked.roles.get(role);
+    if (!grant) return { success: false, error: "That role does not exist in this team." };
+    const problem = inviteProblem(checked.membership, { key: grant.key, capabilities: grant.capabilities });
+    if (problem) return { success: false, error: problem };
     await getAuth().api.createInvitation({
       body: { email, role, organizationId: checked.membership.id, resend: true },
       headers: await headers(),
@@ -81,12 +74,15 @@ export async function inviteMemberAction(teamId: string, input: z.input<typeof i
   }
 }
 
-/** Cancels an open invitation. */
+/** Cancels an open invitation. Needs "invite people". */
 export async function cancelInvitationAction(teamId: string, invitationId: string): Promise<ActionResult<null>> {
   try {
-    const checked = await guard(teamId, (m) => canManageTeam(m.role), "Only owners and admins can cancel invitations.");
+    const checked = await guardTeam(teamId, holds("members.invite"), "You cannot cancel invitations in this team.");
     if (!checked.ok) return checked.result;
-    await getAuth().api.cancelInvitation({ body: { invitationId: idSchema.parse(invitationId) }, headers: await headers() });
+    // The guard checked this team, so the invitation must belong to it.
+    const id = idSchema.parse(invitationId);
+    if ((await getInvitationTeamId(id)) !== checked.membership.id) return { success: false, error: "That invitation is not in this team." };
+    await getAuth().api.cancelInvitation({ body: { invitationId: id }, headers: await headers() });
     revalidatePath(`/teams/${checked.membership.slug}`);
     return { success: true, data: null };
   } catch (error) {
@@ -94,13 +90,25 @@ export async function cancelInvitationAction(teamId: string, invitationId: strin
   }
 }
 
-/** Removes a member. Their artifacts shared with the team move to the team. */
+/** The member being changed and how many owners the team has. Unknown members read as not found. */
+async function loadTarget(membership: TeamMembership, roles: ReadonlyMap<string, TeamRoleView>, memberId: string) {
+  const members = await listTeamMemberActors(membership.id, roles);
+  const target = members.find((member) => member.memberId === memberId);
+  if (!target) throw new UserFacingError("Member not found.");
+  return { target, ownerCount: countOwners(members), targetRole: { roleKey: target.actor.roleKey, capabilities: target.actor.capabilities, isAgent: target.isAgent, isSelf: target.userId === membership.userId } };
+}
+
+/** Removes a member below the viewer. Their artifacts shared with the team move to the team. */
 export async function removeMemberAction(teamId: string, memberId: string): Promise<ActionResult<null>> {
   try {
-    const checked = await guard(teamId, (m) => canManageTeam(m.role), "Only owners and admins can remove members.");
+    const checked = await guardTeam(teamId, holds("members.remove"), "You cannot remove people from this team.");
     if (!checked.ok) return checked.result;
+    const { target, targetRole, ownerCount } = await loadTarget(checked.membership, checked.roles, idSchema.parse(memberId));
+    const problem = removeMemberProblem(checked.membership, targetRole, ownerCount);
+    if (problem) return { success: false, error: problem };
+    // Remove exactly the member the checks above looked at, never the raw input.
     await getAuth().api.removeMember({
-      body: { memberIdOrEmail: idSchema.parse(memberId), organizationId: checked.membership.id },
+      body: { memberIdOrEmail: target.memberId, organizationId: checked.membership.id },
       headers: await headers(),
     });
     revalidatePath(`/teams/${checked.membership.slug}`);
@@ -110,29 +118,55 @@ export async function removeMemberAction(teamId: string, memberId: string): Prom
   }
 }
 
-const roleSchema = z.enum(["owner", "admin", "member"]);
+/** The role Better Auth stores for a role key: Owner or Admin itself, or Member, which every custom role sits on. */
+function storedRole(roleKey: string): TeamRole {
+  return roleKey === "owner" || roleKey === "admin" ? roleKey : "member";
+}
 
-/** Changes a member's role. Better Auth lets only owners grant or take away the owner role. */
-export async function updateMemberRoleAction(teamId: string, memberId: string, role: string): Promise<ActionResult<null>> {
+/**
+ * Stores a role change in one statement (changeMemberRole): the role on the
+ * membership, the custom role assignment, and the audit row land together or
+ * not at all, so a failure leaves nothing half applied. The membership row is
+ * written directly, not through Better Auth's updateMemberRole, because that
+ * call cannot join our statement. The checks Better Auth's route would run
+ * already ran here: guardTeam (a person holding "change roles" in a shared
+ * team) and assignRoleProblem (escalation, agents, the last owner), and the
+ * database refuses demoting the last owner.
+ */
+async function applyRole(input: { membership: TeamMembership; target: TeamMemberActor; next: TeamRoleView; previousName: string }) {
+  const { membership, target, next } = input;
+  const audit = { actorId: membership.userId, action: "member_role_changed" as const, subject: target.name, before: { role: input.previousName }, after: { role: next.name } };
+  await changeMemberRole({ teamId: membership.id, memberId: target.memberId, storedRole: storedRole(next.key), roleId: next.builtIn ? null : next.id, audit });
+}
+
+/** Gives a member another role, built-in or custom. Escalation and the last owner are refused (role-admin-rules.ts); every change is audited. */
+export async function updateMemberRoleAction(teamId: string, memberId: string, roleKey: string): Promise<ActionResult<null>> {
   try {
-    const checked = await guard(teamId, (m) => canManageTeam(m.role), "Only owners and admins can change roles.");
+    const checked = await guardTeam(teamId, holds("members.roles"), "You cannot change roles in this team.");
     if (!checked.ok) return checked.result;
-    await getAuth().api.updateMemberRole({
-      body: { memberId: idSchema.parse(memberId), role: roleSchema.parse(role), organizationId: checked.membership.id },
-      headers: await headers(),
-    });
-    revalidatePath(`/teams/${checked.membership.slug}`);
+    const { membership, roles } = checked;
+    const next = roles.get(roleKeySchema.parse(roleKey));
+    if (!next) return { success: false, error: "That role does not exist in this team." };
+    const { target, targetRole, ownerCount } = await loadTarget(membership, roles, idSchema.parse(memberId));
+    // Already in that role: nothing to store, and nothing to log.
+    if (next.key === target.actor.roleKey) return { success: true, data: null };
+    const problem = assignRoleProblem(membership, targetRole, { key: next.key, capabilities: next.capabilities }, ownerCount);
+    if (problem) return { success: false, error: problem };
+    await applyRole({ membership, target, next, previousName: roles.get(target.actor.roleKey)?.name ?? target.actor.roleKey });
+    revalidatePath(`/teams/${membership.slug}`);
     return { success: true, data: null };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The role could not be changed. Please try again.") };
   }
 }
 
-/** Leaves a team. Artifacts the viewer shared with it stay with the team. */
+/** Leaves a team. Artifacts the viewer shared with it stay with the team. The last owner cannot leave. */
 export async function leaveTeamAction(teamId: string): Promise<ActionResult<null>> {
   try {
-    const checked = await guard(teamId, (m) => !m.personal, "You cannot leave your personal team.");
+    const checked = await guardTeam(teamId, (m) => !m.personal, "You cannot leave your personal team.");
     if (!checked.ok) return checked.result;
+    const problem = leaveProblem(checked.membership, countOwners(await listTeamMemberActors(checked.membership.id, checked.roles)));
+    if (problem) return { success: false, error: problem };
     await getAuth().api.leaveOrganization({ body: { organizationId: checked.membership.id }, headers: await headers() });
     revalidatePath("/teams");
     return { success: true, data: null };
@@ -141,10 +175,10 @@ export async function leaveTeamAction(teamId: string): Promise<ActionResult<null
   }
 }
 
-/** Sets whether sharing with the team needs an admin's approval. Owners only. */
+/** Sets whether sharing with the team needs approval. Needs "change team settings" (owners by default). */
 export async function updateSharingRuleAction(teamId: string, teamSharingNeedsApproval: boolean): Promise<ActionResult<null>> {
   try {
-    const checked = await guard(teamId, (m) => canEditTeamSettings(m.role) && !m.personal, "Only team owners can change the sharing rule.");
+    const checked = await guardTeam(teamId, holds("settings.team"), "You cannot change the sharing rule in this team.");
     if (!checked.ok) return checked.result;
     await getAuth().api.updateOrganization({
       body: { organizationId: checked.membership.id, data: { teamSharingNeedsApproval: z.boolean().parse(teamSharingNeedsApproval) } },

@@ -5,7 +5,7 @@ import { withdrawSharingAction } from "@/app/(workspace)/app/sharing-actions";
 import { canEditArtifact } from "@/lib/access-rules";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { canSeeComments } from "@/lib/comments/setting-rules";
-import { canManageTeam } from "@/lib/teams/roles";
+import { can } from "@/lib/teams/capability-rules";
 
 import { useShareTeams } from "./share-teams-context";
 
@@ -32,7 +32,7 @@ export function useEditAccess(artifact: AccessFields | null, viewerId: string) {
   const seesComments = canSeeComments(artifact.comments, { canViewArtifact: true, isAuthor, isTeamMember: team !== undefined });
   // The author, or the person who added the agent that wrote it, shares and deletes it (canDeleteArtifact).
   const canShare = isAuthor || actsForAuthor;
-  return { team, isAuthor, canShare, canDelete: canShare, canEdit, canWithdraw: !canShare && team !== undefined && canManageTeam(team.role), seesComments };
+  return { team, isAuthor, canShare, canDelete: canShare, canEdit, canWithdraw: !canShare && team !== undefined && can(team, "artifacts.withdraw"), seesComments };
 }
 
 /** Makes a teammate's artifact private again, for the team's owners and admins. */

@@ -16,7 +16,7 @@ function HandedOverNote({ agent }: { agent: TeamAgentView }) {
   );
 }
 
-/** An agent's tokens in a dialog, opened from its row's menu. Owners and admins only. */
+/** An agent's tokens in a dialog, opened from its row's menu. People who may add and remove agents only. */
 export function AgentTokensDialog({ agent, origin, open, onOpenChange }: { agent: TeamAgentView; origin: string; open: boolean; onOpenChange: (open: boolean) => void }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

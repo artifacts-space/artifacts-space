@@ -22,6 +22,7 @@ import {
   type ArtifactThemeContext,
 } from "./team-preset-rules";
 import { markdownThemeLabel } from "./theme-privacy";
+import { defaultActor } from "@/lib/teams/capability-rules";
 
 function preset(id: string): Theme {
   const theme = presetTheme(id);
@@ -126,22 +127,22 @@ describe("resolveArtifactTheme", () => {
 describe("who manages team themes", () => {
   it("should offer Save as team preset only in teams where the viewer is an owner or admin", () => {
     const teams = [
-      { id: "t1", name: "Acme", role: "owner" },
-      { id: "t2", name: "Beta", role: "member" },
-      { id: "t3", name: "Gamma", role: "admin" },
+      { id: "t1", name: "Acme", personal: false, ...defaultActor("owner") },
+      { id: "t2", name: "Beta", personal: false, ...defaultActor("member") },
+      { id: "t3", name: "Gamma", personal: false, ...defaultActor("admin") },
     ];
     expect(manageableTeams(teams)).toEqual([{ teamId: "t1", teamName: "Acme" }, { teamId: "t3", teamName: "Gamma" }]);
-    expect(manageableTeams([{ id: "t2", name: "Beta", role: "member" }])).toEqual([]);
+    expect(manageableTeams([{ id: "t2", name: "Beta", personal: false, ...defaultActor("member") }])).toEqual([]);
   });
 
   it("should allow owners and admins of a shared team", () => {
-    expect(canManageTeamThemes({ role: "owner", personal: false })).toBe(true);
-    expect(canManageTeamThemes({ role: "admin", personal: false })).toBe(true);
+    expect(canManageTeamThemes({ ...defaultActor("owner"), personal: false })).toBe(true);
+    expect(canManageTeamThemes({ ...defaultActor("admin"), personal: false })).toBe(true);
   });
 
   it("should refuse plain members and personal teams", () => {
-    expect(canManageTeamThemes({ role: "member", personal: false })).toBe(false);
-    expect(canManageTeamThemes({ role: "owner", personal: true })).toBe(false);
+    expect(canManageTeamThemes({ ...defaultActor("member"), personal: false })).toBe(false);
+    expect(canManageTeamThemes({ ...defaultActor("owner"), personal: true })).toBe(false);
   });
 
   it("should stop adding presets at the runaway cap", () => {

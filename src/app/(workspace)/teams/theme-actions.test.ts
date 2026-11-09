@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TeamMembership } from "@/lib/teams/queries";
+import { defaultActor } from "@/lib/teams/capability-rules";
 
 /*
  * Team theme actions: only owners and admins of a shared team may change
@@ -44,7 +45,7 @@ vi.mock("@/lib/themes/theme-choices", () => ({ newArtifactThemeChoices: mocks.ne
 const actions = await import("./theme-actions");
 
 function membership(role: TeamMembership["role"], personal = false): TeamMembership {
-  return { id: "team-1", slug: "acme", name: "Acme", personal, teamSharingNeedsApproval: true, createdBy: "owner-1", role, memberId: "m-1" };
+  return { id: "team-1", slug: "acme", name: "Acme", personal, teamSharingNeedsApproval: true, createdBy: "owner-1", role, memberId: "m-1", userId: "viewer-1", ...defaultActor(role), roleName: role, capabilities: [...defaultActor(role).capabilities] };
 }
 
 const input = { name: "Brand", description: "", theme: { version: 1 } };

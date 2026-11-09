@@ -14,7 +14,7 @@ import { teamPresetLimits } from "./team-preset-limits";
  * (its name and theme) and per change of the team default (its id), written
  * on every change and on every restore, never rewritten. Only the newest
  * `maxRevisions` of each preset and of each team default are kept (a
- * runaway cap). Callers check the person is an owner or admin first
+ * runaway cap). Callers check the person may manage the team's themes first
  * (theme-actions.ts); every query here is scoped to the team. Nothing here
  * files artifact versions.
  */

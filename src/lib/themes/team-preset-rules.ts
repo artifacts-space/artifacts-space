@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { can, type TeamActor } from "@/lib/teams/capability-rules";
+
 import { artifactThemeLimits } from "./artifact-theme-limits";
 import { builtInPresets, resolveTheme, type ResolvedTheme } from "./resolve";
 import { parseTheme, type Theme, type ThemeIssue } from "./schema";
@@ -7,7 +9,7 @@ import { teamPresetLimits } from "./team-preset-limits";
 
 /**
  * Team theme presets: the rules, with no database. A team preset is a theme
- * a team's owners and admins keep in team settings. Artifacts and the team
+ * the people who may manage a team's themes keep in team settings. Artifacts and the team
  * default refer to it by a stable id, "team:<slug>", never by a copy, so an
  * edit to the preset changes every artifact that uses it (a live reference;
  * versions store the reference too). The slug is random-suffixed, unique
@@ -126,9 +128,9 @@ export function usableTeamPresets(presets: readonly StoredTeamPreset[], allowedT
   return usable;
 }
 
-/** Only owners and admins of a shared team manage its presets and default. Personal teams have none. */
-export function canManageTeamThemes(membership: { role: string; personal: boolean }): boolean {
-  return !membership.personal && (membership.role === "owner" || membership.role === "admin");
+/** Members of a shared team whose role holds "manage themes" (owners and admins by default) keep its presets and default. Personal teams have none. */
+export function canManageTeamThemes(membership: TeamActor & { personal: boolean }): boolean {
+  return !membership.personal && can(membership, "themes.manage");
 }
 
 /**
@@ -136,8 +138,8 @@ export function canManageTeamThemes(membership: { role: string; personal: boolea
  * presets, so the picker offers "Save as team preset" there: owners and
  * admins only.
  */
-export function manageableTeams(teams: readonly { id: string; name: string; role: string }[]): { teamId: string; teamName: string }[] {
-  return teams.filter((row) => canManageTeamThemes({ role: row.role, personal: false })).map((row) => ({ teamId: row.id, teamName: row.name }));
+export function manageableTeams(teams: readonly (TeamActor & { id: string; name: string; personal: boolean })[]): { teamId: string; teamName: string }[] {
+  return teams.filter((row) => canManageTeamThemes(row)).map((row) => ({ teamId: row.id, teamName: row.name }));
 }
 
 /** True when another preset may be added, under the runaway cap. */

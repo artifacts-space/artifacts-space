@@ -8,7 +8,8 @@ import { enforceRateLimits } from "@/lib/abuse/rate-limit";
 import { getArtifactAccess } from "@/lib/access";
 import type { ArtifactVisibility, ReportReason } from "@/lib/artifact-types";
 import { findPersonalTeam, getTeamMembershipById } from "@/lib/teams/queries";
-import { canManageTeam, parseTeamRole } from "@/lib/teams/roles";
+import { can } from "@/lib/teams/capability-rules";
+import { parseTeamRole } from "@/lib/teams/roles";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { sendReportEmail } from "./email";
@@ -38,6 +39,7 @@ async function notifyOwners(input: { reportId: string; teamId: string; title: st
     getDb().select({ name: team.name, slug: team.slug }).from(team).where(eq(team.id, input.teamId)).limit(1),
   ]);
   if (!teamRow) return;
+  // Owners only, on purpose: before custom roles, admins could already handle reports on the team page without this email, and every email spends the shared daily budget.
   const recipients = owners.filter((owner) => parseTeamRole(owner.role) === "owner");
   const results = await Promise.allSettled(
     recipients.map((owner) =>
@@ -101,7 +103,7 @@ export interface OpenReportView {
   reportedAt: string;
 }
 
-/** Open reports for a team, newest first. Callers must check the viewer is an owner or admin. */
+/** Open reports for a team, newest first. Callers must check the viewer may handle reports (`can(member, "reports.handle")`). */
 export async function listOpenReports(teamId: string, limit = 50): Promise<OpenReportView[]> {
   const rows = await getDb()
     .select({
@@ -123,12 +125,12 @@ export async function listOpenReports(teamId: string, limit = 50): Promise<OpenR
   return rows.map((row) => ({ ...row, reportedAt: row.reportedAt.toISOString() }));
 }
 
-/** The open report, checked against the viewer: an owner or admin of the report's team. */
+/** The open report, checked against the viewer: a person in the report's team who may handle reports. */
 export async function getManagedReport(reportId: string, viewerId: string) {
   const [report] = await getDb().select().from(artifactReport).where(and(eq(artifactReport.id, reportId), eq(artifactReport.status, "open"))).limit(1);
   if (!report?.teamId) throw new UserFacingError("This report is no longer open.");
   const membership = await getTeamMembershipById(viewerId, report.teamId);
-  if (!membership || !canManageTeam(membership.role)) throw new UserFacingError("Only team owners and admins can handle reports.");
+  if (!membership || !can(membership, "reports.handle")) throw new UserFacingError("You cannot handle reports in this team.");
   return { report, team: membership };
 }
 

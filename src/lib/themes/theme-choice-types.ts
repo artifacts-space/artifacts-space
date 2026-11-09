@@ -21,7 +21,7 @@ export interface ThemeChoiceGroup {
   presets: ThemeChoicePreset[];
 }
 
-/** A team whose presets the viewer manages (owner or admin), where this artifact could use a new preset. */
+/** A team whose presets the viewer manages ("manage themes"), where this artifact could use a new preset. */
 export interface ThemeChoiceTeam {
   teamId: string;
   teamName: string;

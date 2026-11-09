@@ -2,6 +2,7 @@
 
 import { createContext, use } from "react";
 
+import type { ActorKind, TeamCapability } from "@/lib/teams/capability-rules";
 import type { TeamRole } from "@/lib/teams/roles";
 
 /** A team the viewer can share with, as the share control needs it. */
@@ -11,6 +12,10 @@ export interface ShareTeam {
   name: string;
   personal: boolean;
   role: TeamRole;
+  /** The viewer's role and what it may do there (capability-rules.ts), so share controls say what will happen. The server decides again. */
+  roleKey: string;
+  kind: ActorKind;
+  capabilities: readonly TeamCapability[];
   teamSharingNeedsApproval: boolean;
 }
 

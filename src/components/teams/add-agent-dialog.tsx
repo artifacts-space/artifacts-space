@@ -50,7 +50,7 @@ function AddAgentForm({ teamId, onAdded }: { teamId: string; onAdded: () => void
   );
 }
 
-/** "Add agent": a button that opens the add-agent form. Owners and admins of shared teams only. */
+/** "Add agent": a button that opens the add-agent form. People who may add agents, in shared teams only. */
 export function AddAgentDialog({ teamId }: { teamId: string }) {
   const [open, setOpen] = useState(false);
   return (

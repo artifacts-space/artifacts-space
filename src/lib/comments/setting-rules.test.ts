@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { defaultActor } from "@/lib/teams/capability-rules";
+
 import {
   canChangeCommentSetting,
   canSeeComments,
@@ -99,36 +101,36 @@ describe("decideCommentSetting", () => {
   const base = { current: "team" as const, sameTeam: true, team: shared };
 
   it("should apply narrowing at once for anyone allowed to change it", () => {
-    expect(decideCommentSetting({ ...base, next: "off", role: "member", actor: "agent" })).toBe("apply");
-    expect(decideCommentSetting({ ...base, current: "signed_in", next: "team", role: "member", actor: "person" })).toBe("apply");
+    expect(decideCommentSetting({ ...base, next: "off", member: defaultActor("member"), actor: "agent" })).toBe("apply");
+    expect(decideCommentSetting({ ...base, current: "signed_in", next: "team", member: defaultActor("member"), actor: "person" })).toBe("apply");
   });
 
   it("should send widening to signed_in for approval when a member or an agent asks", () => {
-    expect(decideCommentSetting({ ...base, next: "signed_in", role: "member", actor: "person" })).toBe("pending");
-    expect(decideCommentSetting({ ...base, next: "signed_in", role: "owner", actor: "agent" })).toBe("pending");
+    expect(decideCommentSetting({ ...base, next: "signed_in", member: defaultActor("member"), actor: "person" })).toBe("pending");
+    expect(decideCommentSetting({ ...base, next: "signed_in", member: defaultActor("owner"), actor: "agent" })).toBe("pending");
   });
 
   it("should let an owner or admin open comments to anyone signed in at once", () => {
-    expect(decideCommentSetting({ ...base, next: "signed_in", role: "admin", actor: "person" })).toBe("apply");
+    expect(decideCommentSetting({ ...base, next: "signed_in", member: defaultActor("admin"), actor: "person" })).toBe("apply");
   });
 
   it("should apply signed_in at once in a personal team", () => {
-    expect(decideCommentSetting({ ...base, team: personal, next: "signed_in", role: "owner", actor: "agent" })).toBe("apply");
+    expect(decideCommentSetting({ ...base, team: personal, next: "signed_in", member: defaultActor("owner"), actor: "agent" })).toBe("apply");
   });
 });
 
 describe("canChangeCommentSetting", () => {
   it("should let the author change it", () => {
-    expect(canChangeCommentSetting({ viewerId: "a", authorId: "a", viewerRole: null, teamPersonal: null, actor: "agent" })).toBe(true);
+    expect(canChangeCommentSetting({ viewerId: "a", authorId: "a", member: null, teamPersonal: null, actor: "agent" })).toBe(true);
   });
 
   it("should let owners and admins of a shared team change it", () => {
-    expect(canChangeCommentSetting({ viewerId: "b", authorId: "a", viewerRole: "admin", teamPersonal: false, actor: "person" })).toBe(true);
+    expect(canChangeCommentSetting({ viewerId: "b", authorId: "a", member: defaultActor("admin"), teamPersonal: false, actor: "person" })).toBe(true);
   });
 
   it("should refuse members, agents, and anyone when the team is personal", () => {
-    expect(canChangeCommentSetting({ viewerId: "b", authorId: "a", viewerRole: "member", teamPersonal: false, actor: "person" })).toBe(false);
-    expect(canChangeCommentSetting({ viewerId: "b", authorId: "a", viewerRole: "owner", teamPersonal: false, actor: "agent" })).toBe(false);
-    expect(canChangeCommentSetting({ viewerId: "b", authorId: "a", viewerRole: "owner", teamPersonal: true, actor: "person" })).toBe(false);
+    expect(canChangeCommentSetting({ viewerId: "b", authorId: "a", member: defaultActor("member"), teamPersonal: false, actor: "person" })).toBe(false);
+    expect(canChangeCommentSetting({ viewerId: "b", authorId: "a", member: defaultActor("owner"), teamPersonal: false, actor: "agent" })).toBe(false);
+    expect(canChangeCommentSetting({ viewerId: "b", authorId: "a", member: defaultActor("owner"), teamPersonal: true, actor: "person" })).toBe(false);
   });
 });

@@ -7,6 +7,7 @@ import type { ArtifactDto } from "@/lib/artifact-types";
 import { presetTheme } from "@/lib/themes/resolve";
 import { unusableTeamPresetMessage } from "@/lib/themes/team-preset-access";
 import { UserFacingError } from "@/lib/user-facing-error";
+import { defaultActor } from "@/lib/teams/capability-rules";
 
 /*
  * Team presets over MCP, through the real server and client: themes_list
@@ -40,7 +41,7 @@ const ref = "team:acme-brand-abc234";
 const ocean = presetTheme("ocean");
 
 function team(id: string, slug: string, personal: boolean) {
-  return { id, slug, name: slug.toUpperCase(), personal, teamSharingNeedsApproval: true, createdBy: null, role: "member", memberId: `m-${id}` };
+  return { id, slug, name: slug.toUpperCase(), personal, teamSharingNeedsApproval: true, createdBy: null, role: "member" as const, memberId: `m-${id}`, ...defaultActor("member"), roleName: "Member" };
 }
 
 function dto(theme: ArtifactDto["theme"]): ArtifactDto {

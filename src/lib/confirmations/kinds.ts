@@ -21,6 +21,7 @@ export const confirmationActions = [
   "mergeProject",
   "deleteTeamPreset",
   "removePushDevice",
+  "deleteTeamRole",
 ] as const;
 
 export const confirmationActionSchema = z.enum(confirmationActions, { error: "Unknown confirmation." });

@@ -25,7 +25,7 @@ export interface PendingSharingView {
   requestedAt: string;
 }
 
-/** Open sharing and comments requests for a team. Callers must check the viewer is an owner or admin. */
+/** Open sharing and comments requests for a team. Callers must check the viewer may approve sharing (`can(member, "approve.sharing")`). */
 export async function listPendingSharing(teamId: string): Promise<PendingSharingView[]> {
   const rows = await getDb()
     .select({

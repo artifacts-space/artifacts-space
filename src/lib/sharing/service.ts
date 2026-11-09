@@ -186,7 +186,7 @@ export async function requestArtifactSharing(input: SharingRequestInput): Promis
   const sameTeam = record.teamId === team.id;
   const comments = commentsAfterSharing({ current: record.comments, requested: input.comments, sameTeam, next: { visibility: level, teamPersonal: team.personal } });
   await cancelPending(record.id, input.requesterId);
-  const outcome = decideSharing({ level, team, role: team.role, actor: input.actor });
+  const outcome = decideSharing({ level, team, member: team, actor: input.actor });
   if (outcome === "pending") {
     // The comments setting waits with the request; the approver approves both.
     await storeRequest(record, team, level, input.requesterId, comments);
@@ -202,7 +202,7 @@ export async function requestArtifactSharing(input: SharingRequestInput): Promis
  */
 async function applySharing(input: { record: ArtifactRecord; team: TeamMembership; level: SharingLevel; comments: CommentSetting; sameTeam: boolean; requesterId: string; actor: SharingActor }): Promise<SharingResult> {
   const { record, team, level, requesterId } = input;
-  const commentsOutcome = decideCommentSetting({ current: record.comments, next: input.comments, sameTeam: input.sameTeam, team, role: team.role, actor: input.actor });
+  const commentsOutcome = decideCommentSetting({ current: record.comments, next: input.comments, sameTeam: input.sameTeam, team, member: team, actor: input.actor });
   const fallback = input.sameTeam ? record.comments : defaultCommentSetting({ visibility: level, teamPersonal: team.personal });
   await cancelPendingComments(record.id, requesterId);
   await setVisibility(record.id, level, team.id, requesterId, commentsOutcome === "apply" ? input.comments : fallback);
@@ -247,14 +247,14 @@ async function approve(request: typeof sharingRequest.$inferSelect, deciderId: s
 }
 
 /**
- * Approves or denies an open sharing or edit request. Only owners and admins
+ * Approves or denies an open sharing or edit request. Only people whose role may approve it (owners and admins by default)
  * of the request's team, in the web app.
  */
 export async function decideSharingRequest(input: { deciderId: string; requestId: string; approve: boolean }) {
   const request = await openRequest(input.requestId);
   const membership = await getTeamMembershipById(input.deciderId, request.teamId);
-  if (!canDecideRequest({ viewerRole: membership?.role ?? null, actor: "person" })) {
-    throw new UserFacingError("Only team owners and admins can approve sharing.");
+  if (!canDecideRequest({ member: membership, actor: "person", kind: request.kind })) {
+    throw new UserFacingError(request.kind === "edit" ? "You cannot approve edits in this team." : "You cannot approve sharing in this team.");
   }
   await applyDecision(request, input);
   // Reads the stored outcome, so a request canceled instead of approved notifies nobody.
@@ -280,12 +280,12 @@ async function applyDecision(request: typeof sharingRequest.$inferSelect, input:
     .where(and(eq(sharingRequest.id, request.id), eq(sharingRequest.status, "pending")));
 }
 
-/** Makes an artifact private again. The author, or an owner or admin of its team, may do this at any time. */
+/** Makes an artifact private again. The author, or someone in its team who may withdraw others' sharing, may do this at any time. */
 export async function withdrawArtifactSharing(input: { viewerId: string; artifactId: string }) {
   const [record] = await getDb().select().from(artifact).where(eq(artifact.id, input.artifactId)).limit(1);
   if (!record) throw new UserFacingError("Artifact not found.");
   const membership = record.teamId ? await getTeamMembershipById(input.viewerId, record.teamId) : null;
-  if (!canWithdrawSharing({ viewerId: input.viewerId, authorId: record.userId, viewerRole: membership?.role ?? null })) {
+  if (!canWithdrawSharing({ viewerId: input.viewerId, authorId: record.userId, member: membership })) {
     throw new UserFacingError("Artifact not found.");
   }
   await cancelPending(record.id, input.viewerId);

@@ -126,9 +126,22 @@ export async function createTestTeam(userId: string, role: "owner" | "admin" | "
   return { id, slug };
 }
 
-/** Changes a member's role in a team. */
+/**
+ * Changes a member's role in a team. A team always keeps an owner (the
+ * team_member_keeps_an_owner trigger), so demoting the only owner first adds
+ * a stand-in owner, an @example.com user that deleteTestTeams removes.
+ */
 export async function setTeamRole(teamId: string, userId: string, role: "owner" | "admin" | "member"): Promise<void> {
+  if (role !== "owner") await ensureAnotherOwner(teamId, userId);
   await db().query(`update team_member set role = $3 where team_id = $1 and user_id = $2`, [teamId, userId, role]);
+}
+
+async function ensureAnotherOwner(teamId: string, userId: string): Promise<void> {
+  const others = await db().query(`select 1 from team_member where team_id = $1 and user_id <> $2 and role = 'owner'`, [teamId, userId]);
+  if (others.rowCount) return;
+  const standIn = randomUUID();
+  await db().query(`insert into "user" (id, name, email, email_verified) values ($1, 'Stand-in owner', $2, true)`, [standIn, `team-standin-${standIn.slice(0, 8)}@example.com`]);
+  await db().query(`insert into team_member (id, team_id, user_id, role) values ($1, $2, $3, 'owner')`, [randomUUID(), teamId, standIn]);
 }
 
 /** Inserts a team preset with theme JSON and returns its id ("team:<slug>"). */
@@ -210,7 +223,12 @@ export async function versionCount(publicId: string): Promise<number> {
 /** Deletes seeded teams (their members and presets cascade). */
 export async function deleteTestTeams(teamIds: readonly string[]): Promise<void> {
   if (!localDatabaseEnabled() || teamIds.length === 0) return;
+  const standIns = await db().query<{ id: string }>(
+    `select u.id from "user" u join team_member m on m.user_id = u.id where m.team_id = any($1) and u.email like 'team-standin-%@example.com'`,
+    [teamIds],
+  );
   await db().query(`delete from team where id = any($1) and slug like 'theme-e2e-%'`, [teamIds]);
+  await db().query(`delete from "user" where id = any($1) and email like 'team-standin-%@example.com'`, [standIns.rows.map((row) => row.id)]);
 }
 
 /** The dev user's id, with their username confirmed so workspace pages skip the first-run username step. */
@@ -235,7 +253,112 @@ export async function deleteSignInLinks(emails: readonly string[]): Promise<void
   await db().query(`delete from verification where value::jsonb ->> 'email' = any($1)`, [testEmails]);
 }
 
+/** Adds a user to a team at a built-in role. */
+export async function addTestMember(teamId: string, userId: string, role: "owner" | "admin" | "member"): Promise<void> {
+  await db().query(`insert into team_member (id, team_id, user_id, role) values ($1, $2, $3, $4)`, [randomUUID(), teamId, userId, role]);
+}
+
+/** Creates a custom role with `capabilities` in a team and gives it to a member, as the Members tab would. */
+export async function giveTestCustomRole(teamId: string, userId: string, name: string, capabilities: readonly string[]): Promise<void> {
+  const roleId = randomUUID();
+  await db().query(`insert into team_role (id, team_id, key, name, built_in) values ($1, $2, $3, $4, false)`, [roleId, teamId, name.toLowerCase(), name]);
+  await db().query(`insert into team_role_capability (role_id, capability) select $1, unnest($2::text[])`, [roleId, capabilities]);
+  await db().query(`update team_member set role = 'member' where team_id = $1 and user_id = $2`, [teamId, userId]);
+  await db().query(`insert into team_role_assignment (member_id, role_id) select id, $3 from team_member where team_id = $1 and user_id = $2`, [teamId, userId, roleId]);
+}
+
+/** The custom role a member holds in a team, or null. */
+export async function customRoleOf(teamId: string, userId: string): Promise<string | null> {
+  const result = await db().query<{ key: string }>(
+    `select r.key from team_role_assignment a join team_member m on m.id = a.member_id join team_role r on r.id = a.role_id where m.team_id = $1 and m.user_id = $2`,
+    [teamId, userId],
+  );
+  return result.rows[0]?.key ?? null;
+}
+
+/** Demotes a member to Member with no stand-in owner, as a raw request would. */
+export async function demoteDirectly(teamId: string, userId: string): Promise<void> {
+  await db().query(`update team_member set role = 'member' where team_id = $1 and user_id = $2`, [teamId, userId]);
+}
+
+/** Demotes every member of a team in one statement, as a bulk script would. */
+export async function demoteEveryoneDirectly(teamId: string): Promise<void> {
+  await db().query(`update team_member set role = 'member' where team_id = $1`, [teamId]);
+}
+
+/**
+ * Two owners demote each other at the same moment, each in its own
+ * transaction, the way two requests would race. Returns which demotions the
+ * database accepted.
+ */
+export async function demoteOwnersAtOnce(teamId: string, firstUserId: string, secondUserId: string): Promise<{ first: boolean; second: boolean }> {
+  const [first, second] = await Promise.all([db().connect(), db().connect()]);
+  const demote = `update team_member set role = 'member' where team_id = $1 and user_id = $2`;
+  try {
+    await first.query("begin");
+    await first.query(demote, [teamId, secondUserId]);
+    await second.query("begin");
+    const waiting = second.query(demote, [teamId, firstUserId]).then(() => true, () => false);
+    await first.query("commit");
+    const secondDone = await waiting;
+    await second.query(secondDone ? "commit" : "rollback");
+    return { first: true, second: secondDone };
+  } finally {
+    first.release();
+    second.release();
+  }
+}
+
+/** The audit actions written for a team, oldest first. */
+export async function permissionAuditActions(teamId: string): Promise<string[]> {
+  const result = await db().query<{ action: string }>(`select action from team_permission_audit where team_id = $1 order by created_at`, [teamId]);
+  return result.rows.map((row) => row.action);
+}
+
 /** Sets an artifact's "Full width" display setting, as the More menu would. */
 export async function setTestFullWidth(publicId: string, fullWidth: boolean): Promise<void> {
   await db().query(`update artifact set full_width = $2 where public_id = $1`, [publicId, fullWidth]);
+}
+
+/** A team's id by slug, and how many capabilities each of its stored built-in roles holds. */
+export async function seededRoles(slug: string): Promise<{ teamId: string; roles: Record<string, number> }> {
+  const team = await db().query<{ id: string }>(`select id from team where slug = $1`, [slug]);
+  const teamId = team.rows[0]?.id;
+  if (!teamId) throw new Error("No team with that slug.");
+  const result = await db().query<{ key: string; n: string }>(
+    `select r.key, count(c.capability) as n from team_role r left join team_role_capability c on c.role_id = r.id where r.team_id = $1 and r.built_in group by r.key`,
+    [teamId],
+  );
+  return { teamId, roles: Object.fromEntries(result.rows.map((row) => [row.key, Number(row.n)])) };
+}
+
+/** The capabilities a team's role holds, sorted. */
+export async function roleCapabilities(teamId: string, key: string): Promise<string[]> {
+  const result = await db().query<{ capability: string }>(
+    `select c.capability from team_role r join team_role_capability c on c.role_id = r.id where r.team_id = $1 and r.key = $2 order by c.capability`,
+    [teamId, key],
+  );
+  return result.rows.map((row) => row.capability);
+}
+
+/** A member's id and stored (Better Auth) role in a team. */
+export async function membershipOf(teamId: string, userId: string): Promise<{ memberId: string; role: string }> {
+  const result = await db().query<{ id: string; role: string }>(`select id, role from team_member where team_id = $1 and user_id = $2`, [teamId, userId]);
+  const row = result.rows[0];
+  if (!row) throw new Error("That user is not in the team.");
+  return { memberId: row.id, role: row.role };
+}
+
+/** Creates a custom role with `capabilities` in a team, given to nobody. Returns its id. */
+export async function createTestCustomRole(teamId: string, name: string, capabilities: readonly string[]): Promise<string> {
+  const roleId = randomUUID();
+  await db().query(`insert into team_role (id, team_id, key, name, built_in) values ($1, $2, $3, $4, false)`, [roleId, teamId, name.toLowerCase(), name]);
+  await db().query(`insert into team_role_capability (role_id, capability) select $1, unnest($2::text[])`, [roleId, capabilities]);
+  return roleId;
+}
+
+/** The keys of every role a team has stored, sorted. */
+export async function storedRoleKeys(teamId: string): Promise<string[]> {
+  const result = await db().query<{ key: string }>(`select key from team_role where team_id = $1 order by key`, [teamId]);
+  return result.rows.map((row) => row.key);
 }
