@@ -22,7 +22,8 @@ const accountCreated = sql<Date>`coalesce(${owner.createdAt}, ${user.createdAt})
 /**
  * The query behind sitemapCandidates: public artifacts for which someone who
  * can share them turned on "Show in search engines", from author accounts
- * past the new-account wait, newest first. Joins with an alias, so every column is qualified.
+ * past the new-account wait, newest first. Joins with an alias, so every
+ * column is qualified.
  */
 export function sitemapCandidatesQuery(db: Pick<ReturnType<typeof getDb>, "select">, limit: number = SITEMAP_ARTIFACT_LIMIT) {
   return db
