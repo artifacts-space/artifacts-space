@@ -6,7 +6,9 @@ import { cn } from "cn"
 /**
  * An on/off switch. On is a green track (--switch-on) with a white thumb on
  * the right; off is a quiet track near the card (--switch-off) with a hairline
- * edge and a muted grey thumb on the left. Focus keeps the --brand ring.
+ * edge and a muted grey thumb on the left. Focus is a solid --ring outline
+ * (the brand blue; artifact themes re-light it to 3:1, see ringTokens in
+ * src/lib/themes/derive.ts).
  * Sizes: default is a 44×24 pill with an 18px thumb, sm a 32×18 pill with a
  * 14px thumb.
  */
@@ -22,7 +24,7 @@ function Switch({
       data-slot="switch"
       data-size={size}
       className={cn(
-        // Focus is a solid --brand outline, offset from the pill: the track has no border to tint, and a
+        // Focus is a solid --ring outline (the brand blue, re-lit by themes), offset from the pill: the track has no border to tint, and a
         // translucent ring falls under 3:1 on a white card. An invalid switch gets a solid destructive ring.
         "peer group/switch relative inline-flex shrink-0 cursor-pointer items-center rounded-full transition-[background-color,box-shadow] duration-200 ease-out outline-none motion-reduce:transition-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring aria-invalid:ring-2 aria-invalid:ring-destructive",
         // All in rem, so the thumb keeps its inset when the reader raises the default font size.

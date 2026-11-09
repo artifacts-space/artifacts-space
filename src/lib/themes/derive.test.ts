@@ -76,6 +76,16 @@ describe("the themed focus ring", () => {
     }
   });
 
+  it("should re-light the ring for the page when the page, not the card, is the closer surface", () => {
+    // A white card on a page at the darkest light lightness: the site blue clears the card but not the page.
+    const colors = { ...defaultColors("light"), card: "oklch(0.99 0 0)", background: "oklch(0.7 0 0)" };
+    expect(contrastRatio(color(site.light ?? ""), color(colors.card))).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(color(site.light ?? ""), color(colors.background))).toBeLessThan(3);
+    const { card, page } = ringContrast("light", colors);
+    expect(card, "ring on the card").toBeGreaterThanOrEqual(3);
+    expect(page, "ring on the page").toBeGreaterThanOrEqual(3);
+  });
+
   it("should move the ring when the site blue falls under 3:1 on a theme's card", () => {
     // The site's light blue reads at about 2.4:1 on a 0.72 card, so the derived ring must differ from it.
     const colors = { ...defaultColors("light"), card: "oklch(0.72 0.05 262)", background: "oklch(0.72 0.05 262)" };

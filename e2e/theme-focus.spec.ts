@@ -16,9 +16,9 @@ async function openSpecimen(page: Page, theme: "light" | "dark") {
   await expect(page.getByRole("status").filter({ hasText: "Drawing diagram" })).toHaveCount(0, { timeout: 60_000 });
 }
 
-/** The painted outline color and the painted card behind the control, and their WCAG contrast. */
-function readOutline(control: Locator): Promise<{ outline: number[]; card: number[]; contrast: number }> {
-  return control.evaluate((element) => {
+/** The painted outline (or border) color and the painted card behind the control, and their WCAG contrast. */
+function readOutline(control: Locator, property: "outlineColor" | "borderTopColor" = "outlineColor"): Promise<{ outline: number[]; card: number[]; contrast: number }> {
+  return control.evaluate((element, colorProperty) => {
     const canvas = document.createElement("canvas");
     canvas.width = 1;
     canvas.height = 1;
@@ -33,7 +33,7 @@ function readOutline(control: Locator): Promise<{ outline: number[]; card: numbe
     for (let node: Element | null = element.parentElement; node; node = node.parentElement) chain.unshift(node);
     let card = paint("white");
     for (const node of chain) card = paint(getComputedStyle(node).backgroundColor);
-    const outline = paint(getComputedStyle(element).outlineColor);
+    const outline = paint(getComputedStyle(element)[colorProperty]);
     const luminance = (rgb: number[]) => {
       const [r = 0, g = 0, b = 0] = rgb.map((channel) => {
         const value = channel / 255;
@@ -43,7 +43,7 @@ function readOutline(control: Locator): Promise<{ outline: number[]; card: numbe
     };
     const [light = 0, dark = 0] = [luminance(outline), luminance(card)].sort((a, b) => b - a);
     return { outline, card, contrast: (light + 0.05) / (dark + 0.05) };
-  });
+  }, property);
 }
 
 /** The --ring an element sees, resolved to a color by the browser. */
@@ -76,3 +76,15 @@ for (const theme of ["light", "dark"] as const) {
     expect(await ringAt(specimen)).not.toBe(await ringAt(page.getByRole("heading", { name: "Component gallery" })));
   });
 }
+
+test("should draw a focused button's solid ring-colored border at 3:1 on a themed artifact's card", async ({ page }) => {
+  await openSpecimen(page, "light");
+  const button = page.locator("[data-focus-specimen]").getByRole("button", { name: "Save" });
+  await button.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(button).toBeFocused();
+  // Button pairs a solid 1px --ring border with a wider 50% --ring halo. The halo blends into the card and is decoration;
+  // the solid border is what must read at 3:1, and it uses the theme's derived ring.
+  await expect.poll(async () => (await readOutline(button, "borderTopColor")).contrast).toBeGreaterThanOrEqual(3);
+});

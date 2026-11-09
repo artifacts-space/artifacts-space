@@ -164,7 +164,9 @@
  * Two neutral palettes. Light is a warm paper; dark is a warm near-black.
  * The only chromatic token is --brand, taken from the logo mark, and it is
  * reserved for focus rings and text selection. The one deliberate accent in
- * the controls is the green of a switch that is on (--switch-on).
+ * the controls is the green of a switch that is on (--switch-on). Focus uses
+ * --ring, which equals --brand here; artifact themes re-light --ring until it
+ * reads at 3:1 on their card and page (ringTokens in src/lib/themes/derive.ts).
  *
  * `.theme-invert` takes the other palette: light inside a dark page, dark
  * inside a light page. Each palette is still written once. A `.light` or
