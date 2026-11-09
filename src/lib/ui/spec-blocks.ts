@@ -107,6 +107,13 @@ export function setProp(spec: RawSpec, key: string, name: string, value: unknown
   return withElement(spec, key, { ...element, props });
 }
 
+/** Replaces all props of an element, as the properties form does. */
+export function replaceProps(spec: RawSpec, key: string, props: Record<string, unknown>): RawSpec {
+  const element = spec.elements[key];
+  if (!element) return spec;
+  return withElement(spec, key, { ...element, props: { ...props } });
+}
+
 /** The paired-label prop of a Tabs or Accordion element, or null for every other type. */
 function pairedProp(spec: RawSpec, key: string): "tabs" | "items" | null {
   const type = spec.elements[key]?.type;
