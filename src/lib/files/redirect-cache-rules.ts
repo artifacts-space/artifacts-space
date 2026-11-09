@@ -26,7 +26,11 @@ import { fileLimits } from "./config";
 /** The shortest time a download URL keeps working after the route sends it, in seconds. */
 export const downloadUrlMinLifetimeSeconds = fileLimits.downloadUrlSeconds - fileLimits.downloadSigningWindowSeconds;
 
-/** How long the viewer's browser may reuse a file redirect, in seconds. Well under downloadUrlMinLifetimeSeconds. */
+/**
+ * How long the viewer's browser may reuse a file redirect, in seconds. Well under downloadUrlMinLifetimeSeconds,
+ * and chosen for exposure as much as margin: it is also how long someone who loses access can reload a file they
+ * just loaded, which the owner accepted at about 4 minutes.
+ */
 export const fileRedirectMaxAgeSeconds = 4 * 60;
 
 /** Headers that let only the viewer's own browser keep a file redirect, and only for the same cookie and token. */

@@ -23,8 +23,8 @@ const { GET } = await import("./route");
 const fileId = "7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a";
 const signedUrl = "https://acct.r2.cloudflarestorage.com/bucket/files/a/b.png?X-Amz-Signature=abc";
 
-function call() {
-  return GET(new Request(`http://localhost/api/files/${fileId}`), { params: Promise.resolve({ id: fileId }) });
+function call(query = "") {
+  return GET(new Request(`http://localhost/api/files/${fileId}${query}`), { params: Promise.resolve({ id: fileId }) });
 }
 
 beforeEach(() => {
@@ -44,7 +44,17 @@ describe("GET /api/files/[id]", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, max-age=240");
     expect(response.headers.get("Vary")).toBe("Cookie, Authorization");
     expect(response.headers.get("X-Robots-Tag")).toBe("noindex, nofollow");
+    expect(response.headers.get("Referrer-Policy")).toBe("no-referrer");
+    expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(mocks.file).toHaveBeenCalledWith(fileId, "user-1");
+    expect(mocks.sign).toHaveBeenCalledWith(expect.objectContaining({ id: fileId }), { download: false });
+  });
+
+  it("should sign a download link, kept under its own URL, when ?download=1 is set", async () => {
+    const response = await call("?download=1");
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Cache-Control")).toBe("private, max-age=240");
+    expect(mocks.sign).toHaveBeenCalledWith(expect.objectContaining({ id: fileId }), { download: true });
   });
 
   it("should look the file up as signed out when the bearer token is refused", async () => {
