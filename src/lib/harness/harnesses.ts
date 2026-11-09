@@ -78,6 +78,12 @@ export function isHarnessId(value: unknown): value is HarnessId {
   return typeof value === "string" && byId.has(value);
 }
 
+/** A harness's name inside a sentence ("via Codex", "Made with Codex"): an unknown client reads "an unknown agent", never "Other agent". */
+export function harnessPhrase(id: string): string {
+  const harness = harnessFor(id);
+  return harness.id === "other" ? "an unknown agent" : harness.name;
+}
+
 /** The harness for a stored id. An id this list no longer has reads as "Other agent". */
 export function harnessFor(id: string): Harness {
   return byId.get(id) ?? otherHarness;

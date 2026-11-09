@@ -16,7 +16,7 @@ import {
   stampOf,
   versionStamp,
 } from "./harness-rules";
-import { harnesses, harnessFor, harnessIds } from "./harnesses";
+import { harnesses, harnessFor, harnessIds, harnessPhrase } from "./harnesses";
 
 describe("matchHarness", () => {
   it.each([
@@ -195,16 +195,16 @@ describe("snapshots and unchanged saves", () => {
   });
 
   it("should restamp the latest version when another agent saves the same content", () => {
-    expect(restampTo({ harness: "claude-code", approved: false }, { harness: "cursor", label: null })).toBe("cursor");
+    expect(restampTo({ harness: "claude-code", locked: false }, { harness: "cursor", label: null })).toBe("cursor");
   });
 
-  it("should never restamp the approved version, whose byline readers outside the team see", () => {
-    expect(restampTo({ harness: "claude-code", approved: true }, { harness: "cursor", label: null })).toBeNull();
+  it("should never restamp a locked version: approved, named by a decision, or filed by another editor", () => {
+    expect(restampTo({ harness: "claude-code", locked: true }, { harness: "cursor", label: null })).toBeNull();
   });
 
   it("should leave the latest version alone when a web save or the same agent changes nothing", () => {
-    expect(restampTo({ harness: "claude-code", approved: false }, null)).toBeNull();
-    expect(restampTo({ harness: "claude-code", approved: false }, { harness: "claude-code", label: null })).toBeNull();
+    expect(restampTo({ harness: "claude-code", locked: false }, null)).toBeNull();
+    expect(restampTo({ harness: "claude-code", locked: false }, { harness: "claude-code", label: null })).toBeNull();
   });
 });
 
@@ -216,6 +216,14 @@ describe("approvedHarnessOf", () => {
 
   it("should show the artifact's own choice over what the approved version recorded", () => {
     expect(approvedHarnessOf({ harnessOverride: "codex", approvedHarness: "claude-code" })).toEqual({ id: "codex", stamped: "claude-code", overridden: true });
+  });
+});
+
+describe("harnessPhrase", () => {
+  it("should say an unknown agent in a sentence when no rule recognized the client", () => {
+    expect(harnessPhrase("other")).toBe("an unknown agent");
+    expect(harnessPhrase("retired-id")).toBe("an unknown agent");
+    expect(harnessPhrase("codex")).toBe("Codex");
   });
 });
 

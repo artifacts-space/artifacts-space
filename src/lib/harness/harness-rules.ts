@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { ArtifactHarnessDto } from "@/lib/artifact-types";
+
 import { harnessFor, isHarnessId, type HarnessId } from "./harnesses";
 import { harnessLimits } from "./limits";
 
@@ -211,7 +213,7 @@ export function resolveHarness(input: { artifactOverride?: string | null | undef
 }
 
 /** What an artifact row says about its harness, for its DTO: what it shows, what was stamped, and whether someone chose it. */
-export function artifactHarnessOf(row: { harness: string | null; harnessOverride: string | null }): { id: HarnessId; stamped: HarnessId | null; overridden: boolean } | null {
+export function artifactHarnessOf(row: { harness: string | null; harnessOverride: string | null }): ArtifactHarnessDto | null {
   const id = effectiveHarness(row.harnessOverride, row.harness);
   if (!id) return null;
   return { id, stamped: row.harness ? harnessFor(row.harness).id : null, overridden: overrideOf(row.harnessOverride) !== null };
@@ -250,7 +252,7 @@ export function stampOf(id: string | null | undefined): HarnessStamp | null {
  * choice wins, and applies at once without approval: like Full width it is
  * a label on the artifact, not content, so anyone who may edit it can set it.
  */
-export function approvedHarnessOf(input: { harnessOverride: string | null; approvedHarness: string | null }) {
+export function approvedHarnessOf(input: { harnessOverride: string | null; approvedHarness: string | null }): ArtifactHarnessDto | null {
   return artifactHarnessOf({ harness: input.approvedHarness, harnessOverride: input.harnessOverride });
 }
 
@@ -262,11 +264,11 @@ export function shownStamp(record: { harness: string | null; harnessOverride: st
 /**
  * The harness to write on the latest version when an agent save changed
  * nothing, so History agrees with the byline; null when nothing changes (a
- * web save, or the version already records it). Never on the approved
- * version: readers outside the team read its harness, and it changes only
- * through approval.
+ * web save, or the version already records it). Never on a locked version:
+ * the approved one (readers outside the team read its harness), one a
+ * sharing decision names, or one another editor filed.
  */
-export function restampTo(version: { harness: string | null; approved: boolean }, stamp: HarnessStamp | null | undefined): HarnessId | null {
-  if (version.approved || !stamp || stamp.harness === version.harness) return null;
+export function restampTo(version: { harness: string | null; locked: boolean }, stamp: HarnessStamp | null | undefined): HarnessId | null {
+  if (version.locked || !stamp || stamp.harness === version.harness) return null;
   return stamp.harness;
 }
