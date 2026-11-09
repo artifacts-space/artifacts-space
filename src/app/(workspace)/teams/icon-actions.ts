@@ -18,7 +18,7 @@ function iconFile(form: FormData): File | string {
   const file = form.get("icon");
   if (!(file instanceof File)) return "Pick an image to upload.";
   if (file.size === 0) return "That file is empty. Pick another image.";
-  if (file.size > TEAM_ICON_MAX_BYTES) return "The icon can be at most 2 MB.";
+  if (file.size > TEAM_ICON_MAX_BYTES) return "The icon can be at most 1 MB.";
   return file;
 }
 

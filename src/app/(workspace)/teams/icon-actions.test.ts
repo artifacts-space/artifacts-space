@@ -90,11 +90,11 @@ describe("uploadTeamIconAction", () => {
     expect(mocks.saveTeamIcon).not.toHaveBeenCalled();
   });
 
-  it("should refuse a file over 2 MB before reading it", async () => {
+  it("should refuse an upload over 1 MB before reading it", async () => {
     actingAs({});
     const data = new FormData();
-    data.set("icon", new File([new Uint8Array(2_097_153)], "big.png", { type: "image/png" }));
-    expect(await uploadTeamIconAction("team-1", data)).toEqual({ success: false, error: "The icon can be at most 2 MB." });
+    data.set("icon", new File([new Uint8Array(1_000_001)], "big.png", { type: "image/png" }));
+    expect(await uploadTeamIconAction("team-1", data)).toEqual({ success: false, error: "The icon can be at most 1 MB." });
     expect(mocks.saveTeamIcon).not.toHaveBeenCalled();
   });
 });
