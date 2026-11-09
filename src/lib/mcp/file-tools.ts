@@ -15,6 +15,7 @@ import { listTeamsForUser } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { toMcpArtifact } from "./artifact-view";
+import { noHarness, type HarnessSource } from "./harness-context";
 import { gateTools, type ToolServer } from "./tool-access";
 
 const fileIdField = z.uuid().describe("File id from files_request_upload");
@@ -88,7 +89,7 @@ function registerUploadTools(server: ToolServer, userId: string) {
   );
 }
 
-function registerArtifactFileTools(server: ToolServer, userId: string) {
+function registerArtifactFileTools(server: ToolServer, userId: string, harness: HarnessSource) {
   server.registerTool(
     "files_create_artifact",
     {
@@ -105,8 +106,8 @@ function registerArtifactFileTools(server: ToolServer, userId: string) {
     },
     ({ files, notes, ...input }) => respond(async () => {
       await assertUsableFiles(userId, null, files);
-      const created = await createArtifact(userId, { ...input, kind: "file", content: notes ?? "" });
-      await attachFiles(userId, created.id, files, "agent");
+      const created = await createArtifact(userId, { ...input, kind: "file", content: notes ?? "" }, { harness: await harness() });
+      await attachFiles(userId, created.id, files, "agent", harness);
       return artifactResult(userId, await ownArtifact(userId, created.publicId));
     }),
   );
@@ -120,13 +121,14 @@ function registerArtifactFileTools(server: ToolServer, userId: string) {
     },
     ({ artifact, files }) => respond(async () => {
       const record = await editableArtifact(userId, artifact);
-      await attachFiles(userId, record.id, files, "agent");
-      return artifactResult(userId, record);
+      await attachFiles(userId, record.id, files, "agent", harness);
+      // Read it again: the save stamped the harness and moved updatedAt.
+      return artifactResult(userId, await editableArtifact(userId, artifact));
     }),
   );
 }
 
-function registerAccessTools(server: ToolServer, userId: string) {
+function registerAccessTools(server: ToolServer, userId: string, harness: HarnessSource) {
   server.registerTool(
     "files_get_download_url",
     {
@@ -150,7 +152,7 @@ function registerAccessTools(server: ToolServer, userId: string) {
       inputSchema: { fileId: fileIdField },
     },
     ({ fileId }) => respond(async () => {
-      await deleteOwnFile(userId, fileId, "agent");
+      await deleteOwnFile(userId, fileId, "agent", harness);
       return { deleted: true, fileId };
     }),
   );
@@ -162,9 +164,9 @@ function registerAccessTools(server: ToolServer, userId: string) {
  * access check; writes need the edit check (the author, or a member of the
  * team the artifact is shared through), and are left out for read-only access.
  */
-export function registerFileTools(server: McpServer, userId: string, access: McpAccess) {
+export function registerFileTools(server: McpServer, userId: string, access: McpAccess, harness: HarnessSource = noHarness) {
   const gated = gateTools(server, access);
   registerUploadTools(gated, userId);
-  registerArtifactFileTools(gated, userId);
-  registerAccessTools(gated, userId);
+  registerArtifactFileTools(gated, userId, harness);
+  registerAccessTools(gated, userId, harness);
 }

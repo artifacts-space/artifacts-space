@@ -2,9 +2,10 @@
 
 import { IconAlertTriangle } from "@tabler/icons-react";
 
+import { HarnessByline } from "@/components/harness/harness-byline";
 import { editorName, LastEdited } from "@/components/history/last-edited";
 import { Button } from "@/components/ui/button";
-import type { ArtifactEditorDto } from "@/lib/artifact-types";
+import type { ArtifactEditorDto, ArtifactHarnessDto } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
 import type { AutosaveStatus } from "./use-autosave";
@@ -24,13 +25,15 @@ interface SaveStatusBarProps {
   length: number;
   updatedAt: string;
   updatedBy: ArtifactEditorDto | null;
+  /** The agent harness the artifact was made with, shown after who saved it last. */
+  harness?: ArtifactHarnessDto | null | undefined;
   onRetry: () => void;
   /** Extra classes from the surrounding layout, such as sticking in the /app shell. */
   className?: string;
 }
 
 /** Character count, save status, and who saved last, in the row above the content. */
-export function SaveStatusBar({ status, dirty, length, updatedAt, updatedBy, onRetry, className }: SaveStatusBarProps) {
+export function SaveStatusBar({ status, dirty, length, updatedAt, updatedBy, harness, onRetry, className }: SaveStatusBarProps) {
   const label = saveStatusLabel(status, dirty);
   const problem = status.kind === "held" || status.kind === "failed";
   return (
@@ -41,7 +44,10 @@ export function SaveStatusBar({ status, dirty, length, updatedAt, updatedBy, onR
         {label}
       </span>
       {status.kind === "failed" ? <Button variant="ghost" size="xs" onClick={onRetry}>Try again</Button> : null}
-      <LastEdited editor={updatedBy} at={updatedAt} className="ml-auto" />
+      <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1">
+        <LastEdited editor={updatedBy} at={updatedAt} />
+        <HarnessByline harness={harness} className="text-xs" />
+      </span>
     </div>
   );
 }

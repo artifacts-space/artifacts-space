@@ -44,7 +44,7 @@ export function isReportable(visibility: ArtifactVisibility): boolean {
 
 /**
  * The limits one report counts against, checked in this order: reports about
- * this artifact from this network (each report emails the team's owners),
+ * this artifact from this network (each report emails the site operator),
  * reports from this network (short window, then daily), and reports from
  * this signed-in reader.
  */

@@ -43,7 +43,7 @@ const publicId = "4fXkP9qR2sT7vW1yZ3aB5c";
 function dto(cover: ArtifactDto["cover"]): ArtifactDto {
   return {
     id: "internal-1", publicId, title: "Plan", icon: null, theme: null, cover, fullWidth: false, summary: "", content: "# Plan", kind: "markdown", language: "", project: null, tags: [], sessionId: "", source: "",
-    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null,
+    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null, harness: null,
     files: [], updatedBy: null, metadata: {}, createdAt: "2026-11-07T00:00:00.000Z", updatedAt: "2026-11-07T00:00:00.000Z",
   };
 }
@@ -83,7 +83,7 @@ describe("artifacts_create with cover", () => {
     data.createArtifact.mockResolvedValue(dto("mist"));
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", cover: "mist" });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ cover: "mist" }));
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ cover: "mist" }), { harness: null });
     expect(JSON.parse(result.text)).toMatchObject({ artifact: { cover: "mist", coverPosition: null } });
   });
 
@@ -91,7 +91,7 @@ describe("artifacts_create with cover", () => {
     data.createArtifact.mockResolvedValue(dto(`file:${fileId}@20`));
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", cover: `file:${fileId}`, coverPosition: 20 });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ cover: `file:${fileId}@20` }));
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ cover: `file:${fileId}@20` }), { harness: null });
     expect(JSON.parse(result.text)).toMatchObject({ artifact: { cover: `file:${fileId}`, coverPosition: 20 } });
   });
 
@@ -122,14 +122,14 @@ describe("artifacts_update with cover", () => {
     data.updateArtifact.mockResolvedValue(dto("dusk"));
     const result = await call("artifacts_update", { id: publicId, cover: "dusk" });
     expect(result.isError).toBe(false);
-    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { cover: "dusk" }, "agent");
+    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { cover: "dusk" }, "agent", { harness: null });
   });
 
   it.each([null, ""])("should remove the cover when the agent sends %j", async (cover) => {
     data.updateArtifact.mockResolvedValue(dto(null));
     const result = await call("artifacts_update", { id: publicId, cover });
     expect(result.isError).toBe(false);
-    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { cover: null }, "agent");
+    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { cover: null }, "agent", { harness: null });
   });
 
   it("should move the current image cover when only coverPosition is sent", async () => {
@@ -137,7 +137,7 @@ describe("artifacts_update with cover", () => {
     data.updateArtifact.mockResolvedValue(dto(`file:${fileId}@75`));
     const result = await call("artifacts_update", { id: publicId, coverPosition: 75 });
     expect(result.isError).toBe(false);
-    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { cover: `file:${fileId}@75` }, "agent");
+    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { cover: `file:${fileId}@75` }, "agent", { harness: null });
   });
 
   it("should refuse coverPosition alone when the artifact has a gradient cover", async () => {

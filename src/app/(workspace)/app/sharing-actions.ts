@@ -59,8 +59,9 @@ export async function setCommentsAction(artifactId: string, comments: string): P
 }
 
 /**
- * Turns "Show in search engines" on or off for the viewer's own public
- * artifact. Only its author, as a person in the web app; agents cannot.
+ * Turns "Show in search engines" on or off for a public artifact the viewer
+ * may share (src/lib/search/search-rules.ts), as a person in the web app;
+ * agents cannot.
  */
 export async function setShowInSearchAction(artifactId: string, on: boolean): Promise<ActionResult<ArtifactDto>> {
   try {

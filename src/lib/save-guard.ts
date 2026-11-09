@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { artifact } from "@/db/schema";
+import type { HarnessStamp } from "@/lib/harness/harness-rules";
 import { UserFacingError } from "@/lib/user-facing-error";
 import type { EditSessionStep } from "@/lib/versions/history-rules";
 
@@ -21,6 +22,8 @@ export interface SaveOptions {
   expectedUpdatedAt?: string | undefined;
   /** For a web editor autosave: where it sits in its editing session. One session files one version. */
   session?: EditSessionStep | undefined;
+  /** For a save over MCP: the harness of the connection it came through (src/lib/harness). Undefined for web saves. */
+  harness?: HarnessStamp | null | undefined;
 }
 
 /** The message when a save would overwrite someone else's newer save. */

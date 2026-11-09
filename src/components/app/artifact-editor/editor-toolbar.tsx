@@ -3,6 +3,8 @@
 import { IconArrowsHorizontal, IconCode, IconDots, IconLock, IconTrash } from "@tabler/icons-react";
 
 import { CopyButton } from "@/components/copy-button";
+import { HarnessMenu } from "@/components/harness/harness-menu";
+import type { HarnessControl } from "@/components/harness/use-artifact-harness";
 import { OpenPageButton } from "@/components/page-width/open-page-button";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,12 +31,13 @@ interface MoreMenuProps {
   source: SourceToggle;
   /** Null for a CSV, which is always full width. */
   fullWidth: FullWidthControl | null;
+  harness: HarnessControl;
   onRequestDelete: (() => void) | null;
   onWithdraw: (() => void) | null;
 }
 
-/** View source and Full width for every editor; Delete for the author; Withdraw sharing for a team owner or admin editing a teammate's artifact. */
-function MoreMenu({ source, fullWidth, onRequestDelete, onWithdraw }: MoreMenuProps) {
+/** View source, Full width, and Made with for every editor; Delete for the author; Withdraw sharing for a team owner or admin editing a teammate's artifact. */
+function MoreMenu({ source, fullWidth, harness, onRequestDelete, onWithdraw }: MoreMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="More actions" />}>
@@ -49,6 +52,7 @@ function MoreMenu({ source, fullWidth, onRequestDelete, onWithdraw }: MoreMenuPr
             <IconArrowsHorizontal /> {FULL_WIDTH_LABEL}
           </DropdownMenuCheckboxItem>
         ) : null}
+        <HarnessMenu control={harness} />
         {onWithdraw ? (
           <DropdownMenuItem onClick={onWithdraw} className="py-2">
             <IconLock /> Withdraw sharing
@@ -86,6 +90,8 @@ interface EditorToolbarProps {
   onWithdraw: (() => void) | null;
   /** The "Full width" setting, in the More menu. */
   fullWidth: FullWidthControl;
+  /** "Made with": the agent harness it shows, in the More menu. */
+  harness: HarnessControl;
 }
 
 /**
@@ -95,7 +101,7 @@ interface EditorToolbarProps {
  * the app header (h-14) to keep History in reach; from md up the /app shell
  * keeps it in place.
  */
-export function EditorToolbar({ id, publicId, kind, content, shareControl, history, comments, views, source, onRequestDelete, onWithdraw, fullWidth }: EditorToolbarProps) {
+export function EditorToolbar({ id, publicId, kind, content, shareControl, history, comments, views, source, onRequestDelete, onWithdraw, fullWidth, harness }: EditorToolbarProps) {
   const KindIcon = kindIcons[kind];
   return (
     <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5">
@@ -108,7 +114,7 @@ export function EditorToolbar({ id, publicId, kind, content, shareControl, histo
         {views}
         {comments}
         {shareControl}
-        <MoreMenu source={source} fullWidth={hasWidthSetting(kind) ? fullWidth : null} onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
+        <MoreMenu source={source} fullWidth={hasWidthSetting(kind) ? fullWidth : null} harness={harness} onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
       </div>
     </div>
   );

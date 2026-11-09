@@ -47,7 +47,7 @@ function team(id: string, slug: string, personal: boolean) {
 function dto(theme: ArtifactDto["theme"]): ArtifactDto {
   return {
     id: "internal-1", publicId, title: "Plan", icon: null, theme, cover: null, fullWidth: false, summary: "", content: "# Plan", kind: "markdown", language: "", project: null, tags: [], sessionId: "", source: "",
-    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null,
+    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null, harness: null,
     files: [], updatedBy: null, metadata: {}, createdAt: "2026-11-07T00:00:00.000Z", updatedAt: "2026-11-07T00:00:00.000Z",
   };
 }
@@ -109,11 +109,11 @@ describe("theme with a team preset id", () => {
   it("should pass a team preset id to the data layer on create and update", async () => {
     data.createArtifact.mockResolvedValue(dto(ref));
     expect((await call("artifacts_create", { title: "Plan", content: "# Plan", theme: ref })).isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ theme: ref }));
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ theme: ref }), { harness: null });
 
     data.updateArtifact.mockResolvedValue(dto(ref));
     expect((await call("artifacts_update", { id: publicId, theme: ref })).isError).toBe(false);
-    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { theme: ref }, "agent");
+    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { theme: ref }, "agent", { harness: null });
   });
 
   it("should surface the data layer's refusal when the artifact cannot use the team preset", async () => {

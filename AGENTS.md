@@ -168,9 +168,10 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
 
 ## Database
 
-- The schema is in `src/db/schema.ts`, `src/db/oauth-schema.ts`, and
-  `src/db/views-schema.ts`. Change it, then run `pnpm db:generate` and commit
-  the migration in `drizzle/`.
+- The schema is in `src/db/schema.ts`, `src/db/oauth-schema.ts`,
+  `src/db/views-schema.ts`, `src/db/notification-schema.ts`, and
+  `src/db/connection-schema.ts`. Change it, then run `pnpm db:generate` and
+  commit the migration in `drizzle/`.
 - Migrations apply automatically when a production deploy builds:
   `pnpm build` runs `scripts/migrate-on-deploy.mts` before `next build`, under
   an advisory lock. A failed migration fails the build, and the old deployment
@@ -299,3 +300,30 @@ deletes one only when it leaves every retained version (history pruning in
 `versions/history.ts` hands it the dropped versions' images) or with the
 artifact. Kept images never widen access: readers of the approved version get
 only that version's icon and cover (`served-images.ts`, `canReadFile`).
+
+### Agent harnesses
+
+An artifact records the agent harness it came through ("via Claude Code").
+People still own their artifacts: a harness is a label, never an account.
+The list of harnesses, with names and icons, is `src/lib/harness/harnesses.ts`
+(icons in `public/agent-icons/`, single-color `currentColor` marks drawn as a
+CSS mask by `HarnessIcon`); use it on every surface that names harnesses.
+Detection is pure (`src/lib/harness/harness-rules.ts`): the MCP `initialize`
+`clientInfo` (or the per-request `_meta` one), then the OAuth client's name or
+`software_id`; anything unknown is "Other agent". The MCP transport is
+stateless, so `mcp_connection` keeps what each OAuth app or API token said
+it was, and the person's override from the Connections page. Saves over MCP
+stamp `artifact.harness` and the version's `harness`; web saves stamp nothing.
+An artifact's own override (its More menu, for anyone who may edit it) wins
+over the connection's override, which wins over detection. The artifact's
+override is a label, not content: it applies at once, files no version, and
+needs no approval, so readers of the approved version see it too. That is
+deliberate: any team member who may edit the artifact can relabel it without
+review, because detection can be wrong and the byline names a tool, not an
+author. Versions record the agent that actually saved them, so History stays
+factual; the override is a label shown on top in bylines. clientInfo is
+untrusted: it is checked with zod, cleaned, capped, and shown only as plain
+text to the connection's owner. The byline is what the client claims, not a
+verified attribution: any client can name itself "Claude Code", and the
+byline's tooltip says so. Readers see the harness name and icon, never
+OAuth client ids or raw client names.

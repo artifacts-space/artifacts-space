@@ -43,7 +43,7 @@ const publicId = "4fXkP9qR2sT7vW1yZ3aB5c";
 function dto(theme: ArtifactDto["theme"]): ArtifactDto {
   return {
     id: "internal-1", publicId, title: "Plan", icon: null, theme, cover: null, fullWidth: false, summary: "", content: "# Plan", kind: "markdown", language: "", project: null, tags: [], sessionId: "", source: "",
-    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null,
+    visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "agent-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null, harness: null,
     files: [], updatedBy: null, metadata: {}, createdAt: "2026-11-07T00:00:00.000Z", updatedAt: "2026-11-07T00:00:00.000Z",
   };
 }
@@ -87,7 +87,7 @@ describe("artifacts_create with theme", () => {
     data.createArtifact.mockResolvedValue(dto("paper"));
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", theme: "paper" });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ theme: "paper" }));
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ theme: "paper" }), { harness: null });
     expect((JSON.parse(result.text) as { artifact: { theme: string } }).artifact.theme).toBe("paper");
   });
 
@@ -96,7 +96,7 @@ describe("artifacts_create with theme", () => {
     const theme = { version: 1, light: { ...ocean().light, accent: "#1d4ed8" }, dark: ocean().dark };
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", theme });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ theme }));
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ theme }), { harness: null });
   });
 
   it("should refuse an unknown preset with the list of real ones before anything is saved", async () => {
@@ -131,14 +131,14 @@ describe("artifacts_update with theme", () => {
     data.updateArtifact.mockResolvedValue(dto("ink"));
     const result = await call("artifacts_update", { id: publicId, theme: "ink" });
     expect(result.isError).toBe(false);
-    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { theme: "ink" }, "agent");
+    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { theme: "ink" }, "agent", { harness: null });
   });
 
   it.each([null, ""])("should pass %j through as a removal when the agent clears the theme", async (theme) => {
     data.updateArtifact.mockResolvedValue(dto(null));
     const result = await call("artifacts_update", { id: publicId, theme });
     expect(result.isError).toBe(false);
-    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { theme }, "agent");
+    expect(data.updateArtifact).toHaveBeenCalledWith("agent-1", "internal-1", { theme }, "agent", { harness: null });
   });
 
   it("should report a pending edit when a theme change on a shared artifact waits for approval", async () => {

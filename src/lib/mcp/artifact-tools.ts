@@ -34,6 +34,7 @@ import type { McpAccess } from "@/lib/oauth/scopes";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { toMcpArtifact, toMcpListItem, type McpViewContext } from "./artifact-view";
+import { noHarness, type HarnessSource } from "./harness-context";
 import { applyTagChangeFor, tagChangeFields, tagChangeFor, tagFilterField, tagFilterFor, tagsField } from "./tag-tools";
 import { artifactToolCopy } from "./routing-copy";
 import { gateTools, type ToolServer } from "./tool-access";
@@ -240,13 +241,13 @@ async function applyFullWidth(userId: string, artifactId: string, artifact: Arti
  * supplied none (only project, tags, full width, sharing, or comments), nothing is saved and
  * no version is filed.
  */
-async function saveFields(userId: string, artifactId: string, input: ArtifactUpdateInput): Promise<{ artifact: ArtifactDto; edit: "applied" | "pending" | "unchanged" }> {
+async function saveFields(userId: string, artifactId: string, input: ArtifactUpdateInput, harness: HarnessSource): Promise<{ artifact: ArtifactDto; edit: "applied" | "pending" | "unchanged" }> {
   if (!Object.values(input).some((value) => value !== undefined)) {
     const current = await getEditableArtifactDto(userId, artifactId);
     if (!current) throw new UserFacingError("Artifact not found, or you cannot edit it.");
     return { artifact: current, edit: "unchanged" };
   }
-  const updated = await updateArtifact(userId, artifactId, input, "agent");
+  const updated = await updateArtifact(userId, artifactId, input, "agent", { harness: await harness() });
   if (!updated) throw new UserFacingError("Artifact not found, or you cannot edit it.");
   return { artifact: updated, edit: updated.pendingEdit ? "pending" : "applied" };
 }
@@ -297,7 +298,7 @@ function registerReadTools(server: ToolServer, userId: string) {
   );
 }
 
-function registerWriteTools(server: ToolServer, userId: string) {
+function registerWriteTools(server: ToolServer, userId: string, harness: HarnessSource) {
   server.registerTool(
     "artifacts_create",
     {
@@ -308,7 +309,7 @@ function registerWriteTools(server: ToolServer, userId: string) {
       const { teams, view } = await loadContext(userId);
       if (team) teamBySlug(teams, team);
       assertTheme(input.theme);
-      const created = await createArtifact(userId, { ...input, cover: coverFor(cover, coverPosition, null) });
+      const created = await createArtifact(userId, { ...input, cover: coverFor(cover, coverPosition, null) }, { harness: await harness() });
       const result = await shareAfterSave(userId, created, teams, { visibility, team, comments });
       return { artifact: toMcpArtifact(result.artifact, view), sharing: result.sharing, comments: result.comments };
     }),
@@ -336,7 +337,7 @@ function registerWriteTools(server: ToolServer, userId: string) {
       if (team) teamBySlug(teams, team);
       assertTheme(input.theme);
       const tagChange = tagChangeFor({ tags, addTags, removeTags });
-      const saved = await saveFields(userId, record.id, { ...input, cover: coverFor(cover, coverPosition, record.cover) });
+      const saved = await saveFields(userId, record.id, { ...input, cover: coverFor(cover, coverPosition, record.cover) }, harness);
       // Project, tags, and full width change after the save, on their own: no version, no approval, and nothing if the save failed.
       const organized = await organize(userId, record.id, saved.artifact, project, tagChange);
       const artifact = await applyFullWidth(userId, record.id, organized, fullWidth);
@@ -367,9 +368,10 @@ function registerWriteTools(server: ToolServer, userId: string) {
  * the person who added the agent that wrote it, and
  * sharing goes through requestArtifactSharing as an agent, so it can wait for
  * approval but never approve. Write tools are left out for read-only access.
+ * Creates and updates stamp the connection's agent harness (`harness`).
  */
-export function registerArtifactTools(server: McpServer, userId: string, access: McpAccess) {
+export function registerArtifactTools(server: McpServer, userId: string, access: McpAccess, harness: HarnessSource = noHarness) {
   const gated = gateTools(server, access);
   registerReadTools(gated, userId);
-  registerWriteTools(gated, userId);
+  registerWriteTools(gated, userId, harness);
 }

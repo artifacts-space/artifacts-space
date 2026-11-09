@@ -29,5 +29,7 @@ export async function loadArtifactForViewer(publicId: string, viewerId: string):
   const tags = viewable.canEdit ? dto.tags : [];
   // A team preset id carries a name the team chose: outsiders read "custom" (theme-privacy.ts).
   const theme = storedThemeForReader(shown.theme, viewable.canEdit);
-  return { viewable, dto: { ...dto, ...shown, theme, project, tags, files, updatedBy, updatedAt: shown.updatedAt.toISOString() } };
+  // The harness of the version this viewer reads: never the agent of an edit that waits for approval.
+  const { harness } = viewable.served;
+  return { viewable, dto: { ...dto, ...shown, theme, project, tags, files, updatedBy, harness, updatedAt: shown.updatedAt.toISOString() } };
 }

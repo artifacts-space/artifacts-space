@@ -8,17 +8,18 @@ import type { ArtifactVisibility } from "@/lib/artifact-types";
  * database.
  *
  * Only the HTML page of a public artifact can ever be indexed, and only when
- * its author turned on "Show in search engines" and their account is past the
- * new-account wait (isIndexable in access-rules.ts). Private, team, and link
- * artifacts never are. The Markdown and raw versions, preview images, and
- * file downloads are never indexed: they repeat the page, and cached copies
- * would outlive the author turning the setting off.
+ * someone who can share it turned on "Show in search engines" and the
+ * author's account is past the new-account wait (isIndexable in
+ * access-rules.ts). Private, team, and link artifacts never are. The Markdown
+ * and raw versions, preview images, and file downloads are never indexed:
+ * they repeat the page, and cached copies would outlive the setting being
+ * turned off.
  */
 
 /** The fields of an artifact that decide whether search engines may list it. */
 export interface SearchSubject {
   visibility: ArtifactVisibility;
-  /** The author's "Show in search engines" setting. */
+  /** The "Show in search engines" setting, set by someone who can share it. */
   showInSearch: boolean;
 }
 
@@ -50,7 +51,8 @@ export function pageRobots(indexable: boolean): { index: boolean; follow: false 
 /**
  * The setting after a sharing change: kept while the artifact stays public,
  * cleared when it becomes link, team, or private, so making it public again
- * starts hidden from search engines until its author turns it back on.
+ * starts hidden from search engines until someone who can share it turns it
+ * back on.
  */
 export function showInSearchAfterSharing(current: boolean, nextVisibility: ArtifactVisibility): boolean {
   return current && nextVisibility === "public";
@@ -61,9 +63,10 @@ export type SearchActor = "person" | "agent";
 
 /**
  * Who may change "Show in search engines": the people who may share the
- * artifact (its author, or the person who added the agent that wrote it,
- * src/lib/agents/owner-access.ts), in the web app. Listing a page in search
- * engines is a person's decision, so agents cannot change it.
+ * artifact (its author, or the person who added the agent that wrote it while
+ * still in the agent's team, src/lib/agents/owner-access.ts), in the web
+ * app. Listing a page in search engines is a person's decision, so agents
+ * cannot change it.
  */
 export function canChangeShowInSearch(input: { actorId: string; authorId: string; actsForAuthor: boolean; actor: SearchActor }): boolean {
   if (input.actor !== "person") return false;
