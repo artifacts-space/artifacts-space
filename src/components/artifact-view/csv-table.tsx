@@ -197,7 +197,11 @@ interface ColumnHeaderProps {
   onMenu: () => void;
 }
 
-/** A header cell's sort button and menu button. Both stay out of the Tab order; the grid's keys reach them. */
+/**
+ * A header cell's sort button and menu button. Both stay out of the Tab
+ * order; the grid's keys reach them. "Fit width to content" keeps room for
+ * this padding and these buttons (headerControls in measure-text.ts).
+ */
 function ColumnHeader({ name, sort, filtered, onSort, onMenu }: ColumnHeaderProps) {
   const SortIcon = sort === "desc" ? IconArrowDown : IconArrowUp;
   return (

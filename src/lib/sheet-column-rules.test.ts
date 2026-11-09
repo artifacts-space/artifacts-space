@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   appliedWidths,
+  canStoreWidth,
   columnKeys,
   dropLineX,
   dropTarget,
@@ -110,6 +111,14 @@ describe("widths", () => {
     expect(columnKeys(["id", "", "id", "score"], 5)).toEqual(['="id"', "#1", '="id"#2', '="score"', "#4"]);
   });
 
+  it("should keep every key short enough to store when a column name is very long", () => {
+    const long = "x".repeat(5000);
+    const keys = columnKeys([long, `${long}y`, long], 3);
+    expect(keys.every((key) => canStoreWidth(key))).toBe(true);
+    expect(new Set(keys).size).toBe(3);
+    expect(columnKeys([long], 1)).toEqual(keys.slice(0, 1));
+  });
+
   it("should give every column its own key when a name looks like a repeat of another", () => {
     const keys = columnKeys(["a", "a", "a#2"], 3);
     expect(new Set(keys).size).toBe(3);
@@ -122,6 +131,14 @@ describe("widths", () => {
 });
 
 describe("sheet prefs storage", () => {
+  it("should keep the other widths and the order when one stored key is too long", () => {
+    const long = `=${JSON.stringify("x".repeat(250))}`;
+    const text = JSON.stringify({ widths: { [long]: 300, '="id"': 90 }, order: [1, 0] });
+    expect(parseSheetPrefs(text)).toEqual({ widths: { '="id"': 90 }, order: [1, 0] });
+    expect(canStoreWidth(long)).toBe(false);
+    expect(serializeSheetPrefs({ widths: { [long]: 300, '="id"': 90 }, order: null })).toBe(JSON.stringify({ widths: { '="id"': 90 } }));
+  });
+
   it("should read back what it stored when the text is valid", () => {
     const prefs = { widths: { "=id": 90 }, order: [1, 0] };
     expect(parseSheetPrefs(serializeSheetPrefs(prefs))).toEqual(prefs);

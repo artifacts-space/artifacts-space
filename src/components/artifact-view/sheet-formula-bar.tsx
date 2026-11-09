@@ -34,9 +34,9 @@ export function SheetFormulaBar({ place, value, onCommit, onDone }: SheetFormula
       </label>
       {/* A fresh field per cell and value, so the draft never carries over to another cell. */}
       {onCommit ? (
-        <EditableValue key={`${place}\u0000${value}`} id={id} value={value} onCommit={onCommit} onDone={onDone} />
+        <EditableValue key={`${place}\u0000${value}`} id={id} label={`Cell value, ${place}`} value={value} onCommit={onCommit} onDone={onDone} />
       ) : (
-        <textarea id={id} readOnly value={value} rows={1} spellCheck={false} aria-label="Cell value" onKeyDown={(event) => { backToGrid(event, onDone); }} className={fieldClass} />
+        <textarea id={id} readOnly value={value} rows={1} spellCheck={false} aria-label={`Cell value, ${place}`} onKeyDown={(event) => { backToGrid(event, onDone); }} className={fieldClass} />
       )}
     </div>
   );
@@ -63,7 +63,7 @@ function useSaveOnUnmount(pending: RefObject<string | null>, value: string, onCo
   }, [pending, value]);
 }
 
-function EditableValue({ id, value, onCommit, onDone }: { id: string; value: string; onCommit: (value: string) => void; onDone: () => void }) {
+function EditableValue({ id, label, value, onCommit, onDone }: { id: string; label: string; value: string; onCommit: (value: string) => void; onDone: () => void }) {
   const [draft, setDraft] = useState(value);
   // The draft not saved yet, or null once Enter, Escape, or a blur decided. A blur after Enter or Escape must not save again.
   const unsaved = useRef<string | null>(null);
@@ -97,7 +97,7 @@ function EditableValue({ id, value, onCommit, onDone }: { id: string; value: str
       value={draft}
       rows={1}
       spellCheck={false}
-      aria-label="Cell value"
+      aria-label={label}
       onChange={(event) => { change(event.target.value); }}
       onKeyDown={handleKeyDown}
       onBlur={save}

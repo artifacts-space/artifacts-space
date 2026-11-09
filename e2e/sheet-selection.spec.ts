@@ -162,6 +162,33 @@ test("should leave the grid with Escape then Tab when Tab moves between cells", 
   await expect(grid).not.toBeFocused();
 });
 
+test("should select a block when a reader drags across cells with a mouse", async ({ page, isMobile }) => {
+  test.skip(isMobile, "dragging to select needs a mouse; on a phone a drag scrolls");
+  const grid = await openViewer(page);
+  const from = await grid.getByRole("gridcell", { name: "r2c2", exact: true }).boundingBox();
+  const to = await grid.getByRole("gridcell", { name: "r4c3", exact: true }).boundingBox();
+  if (!from || !to) throw new Error("No cells to drag across.");
+  await page.mouse.move(from.x + 10, from.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(to.x + 10, to.y + 10, { steps: 6 });
+  await page.mouse.up();
+  await expect(grid.getByRole("gridcell", { name: "r3c3", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(grid.getByRole("gridcell", { name: "r5c3", exact: true })).toHaveAttribute("aria-selected", "false");
+  await expect(page.locator('[data-specimen="csv · Sheet at the size limit"] [data-formula-bar]')).toContainText("3 × 2");
+});
+
+test("should select a cell on the first click and edit it on the second when an editor clicks", async ({ page, isMobile }) => {
+  test.skip(isMobile, "a mouse click; phones tap");
+  await page.goto("/dev/editor?kind=sheet");
+  const grid = page.getByRole("grid", { name: "CSV grid editor" });
+  const cell = grid.getByRole("gridcell", { name: "r2c2", exact: true });
+  await cell.click();
+  await expect(grid).toHaveAttribute("aria-activedescendant", /-1-1$/);
+  await expect(page.getByRole("textbox", { name: /row 2$/ })).toHaveCount(0);
+  await cell.click();
+  await expect(page.getByRole("textbox", { name: /row 2$/ })).toBeFocused();
+});
+
 test("should select a cell on tap and never scroll the page sideways on a phone", async ({ page, isMobile }) => {
   test.skip(!isMobile, "phones only");
   const grid = await openViewer(page);

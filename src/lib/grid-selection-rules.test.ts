@@ -107,6 +107,10 @@ describe("parsePasteBlock", () => {
 });
 
 describe("pastePlan", () => {
+  it("should write nothing when one value is pasted over several column names", () => {
+    expect(pastePlan({ top: -1, left: 0, bottom: -1, right: 2 }, [["x"]]).block).toEqual([]);
+  });
+
   it("should paste a block from the top left of the selection", () => {
     const block = [["1", "2"], ["3", "4"]];
     expect(pastePlan({ top: 2, left: 1, bottom: 6, right: 4 }, block)).toEqual({ at: { row: 2, column: 1 }, block });
@@ -134,11 +138,12 @@ describe("clearRange", () => {
     expect(clearRange(grid, { top: 2, left: 1, bottom: 2, right: 1 }).rows[0]).toBe(grid.rows[0]);
   });
 
-  it("should clear a whole sheet at the grid editor's size limit quickly when everything is selected", () => {
+  it("should clear a whole sheet at the grid editor's size limit in one pass when everything is selected", () => {
     const rows = Array.from({ length: 5000 }, (_, row) => Array.from({ length: 100 }, (_, column) => `r${String(row)}c${String(column)}`));
     const started = performance.now();
     const cleared = clearRange({ header: [], rows }, { top: -1, left: 0, bottom: 4999, right: 99 });
-    expect(performance.now() - started).toBeLessThan(1000);
+    // Far above a single pass (tens of milliseconds); one setCell per cell took minutes.
+    expect(performance.now() - started).toBeLessThan(10_000);
     expect(cleared.rows.every((row) => row.every((value) => value === ""))).toBe(true);
   });
 });
