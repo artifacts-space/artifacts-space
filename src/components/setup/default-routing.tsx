@@ -47,6 +47,11 @@ function DefaultRoutingDetails() {
         </p>
       </Prose>
       <CodeSnippet title="~/.claude/settings.json" language="json" code={CLAUDE_CODE_DENY_ARTIFACT_SETTINGS} className="mt-4" />
+      <Prose>
+        <p>
+          Turning off <strong>Artifacts</strong> in Claude Code&apos;s <code>/config</code> does the same: it writes <code>&quot;enableArtifact&quot;: false</code> to that file.
+        </p>
+      </Prose>
     </>
   );
 }

@@ -143,7 +143,11 @@ It uses your own Claude Code login, and one pass counts against your plan's
 usage (about $3 to $4 of usage at Opus rates), so run it on demand, never on a
 schedule or in CI. The prompts are in
 `scripts/evals/artifact-routing-cases.json`; the options are in the header of
-`scripts/evals/artifact-routing.mts`. Reports go to `scripts/evals/results/`,
+`scripts/evals/artifact-routing.mts`. The stub serves
+`scripts/evals/artifact-routing-tools.json`, which the eval rebuilds from the
+code before each pass; `pnpm check` fails when it is stale, and
+`pnpm exec vitest run scripts/evals/artifact-routing-tools.test.ts --update`
+refreshes it. Reports go to `scripts/evals/results/`,
 which git ignores. One pass varies by a prompt or two between runs, so treat
 small differences as noise.
 

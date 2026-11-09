@@ -1,121 +1,83 @@
 /**
  * A stand-in artifacts.space MCP server for the routing eval
- * (`scripts/evals/artifact-routing.mts`). It speaks MCP over stdio, offers the
- * artifact tools under their real names with the real server instructions,
- * titles, and descriptions from `src/lib/mcp/routing-copy.ts`, and answers
- * every call with a canned result. Nothing is saved and nothing leaves the
- * machine: each call is only appended, as one JSON line, to the file named by
- * ARTIFACT_ROUTING_LOG.
+ * (`scripts/evals/artifact-routing.mts`). It speaks MCP over stdio and serves
+ * `artifact-routing-tools.json`: the server instructions and every tool a
+ * full-access connection lists, with the same names, titles, descriptions,
+ * input schemas, and `_meta`. A test keeps that file equal to what the server
+ * ships, and the runner refreshes it before each pass.
  *
- * Input schemas are simplified: tool search matches names and descriptions,
- * so the shapes only need to accept what an agent sends.
+ * Every call gets a canned result. Nothing is saved and nothing leaves the
+ * machine: each call is appended, as one JSON line, to the file named by
+ * ARTIFACT_ROUTING_LOG, and the runner reads it to count saves the transcript
+ * missed.
  *
  * The runner starts it; to try it by hand:
  *   ARTIFACT_ROUTING_LOG=/tmp/calls.jsonl node scripts/evals/artifact-routing-stub.mts
  */
-import { appendFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { appendFileSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
-const stubArtifactUrl = "https://artifacts.space/artifact/EvalStubArtifact000000";
+const toolsPath = fileURLToPath(new URL("./artifact-routing-tools.json", import.meta.url));
+const stubArtifactId = "EvalStubArtifact000000";
 
-const toolCopySchema = z.object({ title: z.string(), description: z.string(), _meta: z.record(z.string(), z.unknown()).optional() });
-/** A tool's copy as registerTool takes it: `_meta` only when the tool has one. */
-function toolConfig(copy: z.infer<typeof toolCopySchema>) {
-  const { title, description, _meta } = copy;
-  return _meta ? { title, description, _meta } : { title, description };
-}
-
-const copyModuleSchema = z.object({
-  SERVER_INSTRUCTIONS: z.string(),
-  artifactToolCopy: z.object({
-    artifacts_list: toolCopySchema,
-    artifacts_get: toolCopySchema,
-    teams_list: toolCopySchema,
-    artifacts_create: toolCopySchema,
-    artifacts_update: toolCopySchema,
-    artifacts_delete: toolCopySchema,
-  }),
+const toolSchema = z.object({
+  name: z.string(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  inputSchema: z.record(z.string(), z.unknown()),
+  _meta: z.record(z.string(), z.unknown()).optional(),
 });
+const toolsFileSchema = z.object({ instructions: z.string(), tools: z.array(toolSchema).min(1) });
 
-/**
- * Loads the server's own words from the working tree, so the eval always
- * measures the copy the code would ship. The path is computed at run time
- * because Node runs this file directly, without the app's `@/` alias.
- */
-async function loadCopy() {
-  const url = pathToFileURL(join(repoRoot, "src/lib/mcp/routing-copy.ts")).href;
-  const loaded: unknown = await import(url);
-  return copyModuleSchema.parse(loaded);
-}
+/** Tools whose result is the saved artifact. */
+const SAVE_TOOLS = new Set(["artifacts_create", "artifacts_update", "files_create_artifact", "artifacts_restore_version"]);
 
-/** Appends one call to the log, so the runner can count calls the transcript missed. */
+/** Appends one call to the log, so the runner can count saves the transcript missed. */
 function record(tool: string, args: unknown) {
   const logPath = process.env.ARTIFACT_ROUTING_LOG;
   if (!logPath) return;
   appendFileSync(logPath, `${JSON.stringify({ tool, args, at: new Date().toISOString() })}\n`);
 }
 
-/** A tool result carrying `value` as JSON text, as the real server returns it. */
-function reply(tool: string, args: unknown, value: unknown) {
-  record(tool, args);
-  return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
+const titleSchema = z.object({ title: z.string().optional(), kind: z.string().optional() });
+
+/** A plausible result for each tool, so the agent can finish as it would against the real server. */
+function cannedResult(tool: string, args: unknown): unknown {
+  if (SAVE_TOOLS.has(tool)) {
+    const { title, kind } = titleSchema.catch({}).parse(args);
+    const artifact = { id: stubArtifactId, url: `https://artifacts.space/artifact/${stubArtifactId}`, title: title ?? "Untitled", kind: kind ?? "markdown", visibility: "private" };
+    return { artifact, edit: "applied", sharing: null, comments: null, note: "Routing eval stub: nothing was saved." };
+  }
+  if (tool === "teams_list") return [{ slug: "acme", name: "Acme", role: "owner", personal: false, teamSharingNeedsApproval: false }];
+  if (tool === "artifacts_get") return { error: "Artifact not found." };
+  if (tool.endsWith("_list")) return [];
+  return { ok: true, note: "Routing eval stub: nothing was changed." };
 }
 
-function savedArtifact(args: { title?: string | undefined; kind?: string | undefined }) {
-  return {
-    id: "EvalStubArtifact000000",
-    url: stubArtifactUrl,
-    title: args.title ?? "Untitled",
-    kind: args.kind ?? "markdown",
-    visibility: "private",
-    note: "Routing eval stub: nothing was saved.",
-  };
+function registerTools(server: McpServer, tools: z.infer<typeof toolSchema>[]) {
+  for (const tool of tools) {
+    const config = {
+      ...(tool.title ? { title: tool.title } : {}),
+      ...(tool.description ? { description: tool.description } : {}),
+      ...(tool._meta ? { _meta: tool._meta } : {}),
+      inputSchema: z.fromJSONSchema(tool.inputSchema),
+    };
+    server.registerTool(tool.name, config, (args: unknown) => {
+      record(tool.name, args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(cannedResult(tool.name, args), null, 2) }] };
+    });
+  }
 }
 
-const writeShape = {
-  title: z.string().optional(),
-  content: z.string().optional(),
-  summary: z.string().optional(),
-  kind: z.string().optional(),
-  language: z.string().optional(),
-  icon: z.string().nullable().optional(),
-  project: z.string().nullable().optional(),
-  tags: z.array(z.string()).optional(),
-  sessionId: z.string().optional(),
-  source: z.string().optional(),
-  visibility: z.string().optional(),
-  team: z.string().optional(),
-  comments: z.string().optional(),
-};
-
-function registerTools(server: McpServer, copy: z.infer<typeof copyModuleSchema>["artifactToolCopy"]) {
-  server.registerTool(
-    "artifacts_list",
-    { ...toolConfig(copy.artifacts_list), inputSchema: { query: z.string().optional(), project: z.string().optional(), scope: z.string().optional(), limit: z.number().optional() } },
-    (args) => reply("artifacts_list", args, []),
-  );
-  server.registerTool("artifacts_get", { ...toolConfig(copy.artifacts_get), inputSchema: { id: z.string() } }, (args) => reply("artifacts_get", args, { error: "Artifact not found." }));
-  server.registerTool("teams_list", { ...toolConfig(copy.teams_list), inputSchema: {} }, (args) => reply("teams_list", args, [{ slug: "acme", name: "Acme", role: "owner", personal: false }]));
-  server.registerTool("artifacts_create", { ...toolConfig(copy.artifacts_create), inputSchema: writeShape }, (args) => reply("artifacts_create", args, { artifact: savedArtifact(args), sharing: null, comments: null }));
-  server.registerTool(
-    "artifacts_update",
-    { ...toolConfig(copy.artifacts_update), inputSchema: { id: z.string(), ...writeShape } },
-    (args) => reply("artifacts_update", args, { artifact: savedArtifact(args), edit: "applied", sharing: null, comments: null }),
-  );
-  server.registerTool("artifacts_delete", { ...toolConfig(copy.artifacts_delete), inputSchema: { id: z.string() } }, (args) => reply("artifacts_delete", args, { deleted: true, id: args.id }));
-}
-
-async function main() {
-  const copy = await loadCopy();
-  const server = new McpServer({ name: "artifacts.space", version: "eval-stub" }, { instructions: copy.SERVER_INSTRUCTIONS });
-  registerTools(server, copy.artifactToolCopy);
-  await server.connect(new StdioServerTransport());
+function main() {
+  const { instructions, tools } = toolsFileSchema.parse(JSON.parse(readFileSync(toolsPath, "utf8")));
+  const server = new McpServer({ name: "artifacts.space", version: "eval-stub" }, { instructions });
+  registerTools(server, tools);
+  return server.connect(new StdioServerTransport());
 }
 
 main().catch((error: unknown) => {

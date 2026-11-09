@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { artifactToolCopy, SERVER_INSTRUCTIONS } from "./routing-copy";
+import { READ_ONLY_INSTRUCTIONS } from "./tool-access";
 
 /*
  * Claude Code defers MCP tools behind a keyword search over their names and
@@ -18,6 +19,11 @@ const authorityClaims = /\b(ignore|disregard|override|supersede|system prompt|al
 describe("SERVER_INSTRUCTIONS", () => {
   it("should fit within Claude Code's instructions limit when it loads at session start", () => {
     expect(SERVER_INSTRUCTIONS.length).toBeLessThan(CLAUDE_CODE_INSTRUCTIONS_LIMIT);
+  });
+
+  it("should still fit when a read-only connection gets the read-only note after it", () => {
+    // src/app/api/mcp/route.ts sends exactly this string to read-only connections.
+    expect(`${SERVER_INSTRUCTIONS} ${READ_ONLY_INSTRUCTIONS}`.length).toBeLessThan(CLAUDE_CODE_INSTRUCTIONS_LIMIT);
   });
 
   it("should name the everyday words for artifacts in its first 600 characters when an agent decides what to search for", () => {

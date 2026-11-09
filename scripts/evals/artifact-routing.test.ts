@@ -1,8 +1,11 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { casesFileSchema, claudeArgs, firstRoute, gradeCase, parseTranscript, summarize, toolSearches, type RoutingCase, type Transcript } from "./artifact-routing.mjs";
+import { casesFileSchema, firstRoute, gradeCase, parseTranscript, renderMarkdown, runError, summarize, toolSearches, type RoutingCase, type Transcript } from "./artifact-routing-grade.mts";
+import { claudeArgs, readStubCalls } from "./artifact-routing.mts";
 
 function streamLine(value: unknown) {
   return JSON.stringify(value);
@@ -73,11 +76,56 @@ describe("gradeCase", () => {
   });
 
   it("should fail any run that errored, even when nothing was saved", () => {
-    expect(gradeCase(nearCase, transcriptOf(), "timed out").passed).toBe(false);
+    expect(gradeCase(nearCase, transcriptOf(), { error: "timed out" }).passed).toBe(false);
+  });
+
+  it("should count a save the stub recorded when the transcript missed it", () => {
+    const graded = gradeCase(planCase, transcriptOf(), { stubCalls: ["mcp__artifacts__artifacts_list", "mcp__artifacts__artifacts_create"] });
+    expect(graded.saved).toBe(true);
+    expect(graded.passed).toBe(true);
+  });
+});
+
+describe("runError", () => {
+  const failedRun = streamLine({ type: "result", subtype: "error_max_turns", is_error: true, result: "Reached the maximum number of turns (8)", total_cost_usd: 0.2 });
+
+  it("should give the reason and fail the case when Claude Code reports is_error", () => {
+    const transcript = parseTranscript([init, failedRun].join("\n"));
+    const graded = gradeCase(nearCase, transcript, { error: runError(transcript) });
+    expect(graded.error).not.toBe("");
+    expect(graded.error).toMatch(/error_max_turns/);
+    expect(graded.error).toMatch(/maximum number of turns/);
+    expect(graded.passed).toBe(false);
+  });
+
+  it("should say the stub did not connect, with stderr, when the init event lists it as failed", () => {
+    const transcript = parseTranscript(streamLine({ type: "system", subtype: "init", mcp_servers: [{ name: "artifacts", status: "failed" }] }));
+    expect(runError(transcript, "Cannot find module")).toBe("artifacts stub failed: Cannot find module");
+  });
+
+  it("should be empty when the run ended cleanly", () => {
+    expect(runError(transcriptOf())).toBe("");
   });
 });
 
 describe("summarize", () => {
+  it("should keep errored runs out of the routed count and list them with their reason", () => {
+    const saved = transcriptOf(assistant({ name: "mcp__artifacts__artifacts_create" }));
+    const summary = summarize([gradeCase(planCase, saved, { error: "claude ended with an error (error_max_turns)" })]);
+    expect(summary.routed).toBe(0);
+    expect(summary.misroutes).toEqual([]);
+    expect(summary.errors).toBe(1);
+    expect(renderMarkdown(summary, { variant: "mcp", model: "m", startedAt: "t" })).toMatch(/error_max_turns/);
+  });
+
+  it("should count a prompt as routed first only when it saved before writing a local file", () => {
+    const fileFirst = transcriptOf(assistant({ name: "Write" }), assistant({ name: "mcp__artifacts__artifacts_create" }));
+    const summary = summarize([gradeCase(planCase, fileFirst), gradeCase({ ...planCase, id: "plan-2" }, transcriptOf(assistant({ name: "mcp__artifacts__artifacts_create" })))]);
+    expect(summary.routed).toBe(2);
+    expect(summary.routedFirst).toBe(1);
+    expect(summary.fileFirstCases.map((item) => item.id)).toEqual(["plan"]);
+  });
+
   it("should count routed prompts and near-miss false positives separately", () => {
     const saved = transcriptOf(assistant({ name: "mcp__artifacts__artifacts_create" }));
     const summary = summarize([gradeCase(planCase, saved), gradeCase({ ...planCase, id: "plan-2" }, transcriptOf()), gradeCase(nearCase, saved)]);
@@ -105,6 +153,20 @@ describe("claudeArgs", () => {
 
   it("should keep skills on when the variant is skill", () => {
     expect(claudeArgs("x", "/tmp/mcp.json", { variant: "skill", model: "opus", maxTurns: 8 })).not.toContain("--disable-slash-commands");
+  });
+});
+
+describe("readStubCalls", () => {
+  it("should read the stub's log as full tool names and skip broken lines", () => {
+    const dir = mkdtempSync(join(tmpdir(), "routing-log-"));
+    try {
+      const logPath = join(dir, "calls.jsonl");
+      writeFileSync(logPath, `${JSON.stringify({ tool: "artifacts_create", args: {} })}\n{"tool":\n`);
+      expect(readStubCalls(logPath)).toEqual(["mcp__artifacts__artifacts_create"]);
+      expect(readStubCalls(join(dir, "missing.jsonl"))).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
