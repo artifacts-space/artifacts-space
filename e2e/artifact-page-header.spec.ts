@@ -146,7 +146,6 @@ test("should widen the page from Full width in the header's ⋯ and keep it afte
   await expect(page.getByRole("textbox", { name: "Title" }), "the page stays editable").toHaveValue(title);
   expect(await main.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(960);
 
-
   await page.reload();
   await expect(main).toHaveAttribute("data-full-width", "true");
   await moreActions(page).click();
