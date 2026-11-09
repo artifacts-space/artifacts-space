@@ -158,7 +158,8 @@ export function parsePasteBlock(text: string): string[][] {
  * Where a paste goes and what it writes: the pasted block from the top
  * left of the selection, or, when one value is pasted over a larger
  * selection, that value in every selected data cell, as a spreadsheet
- * fills it. A single value never renames columns this way.
+ * fills it. A single value never renames columns this way: over a block
+ * of column names only, it writes nothing.
  */
 export function pastePlan(range: CellRange, block: readonly (readonly string[])[]): { at: GridCell; block: readonly (readonly string[])[] } {
   const at = { row: range.top, column: range.left };
@@ -168,7 +169,7 @@ export function pastePlan(range: CellRange, block: readonly (readonly string[])[
   const value = block[0]?.[0] ?? "";
   const top = Math.max(0, range.top);
   const rows = range.bottom - top + 1;
-  if (rows <= 0) return { at, block };
+  if (rows <= 0) return { at, block: [] };
   return { at: { row: top, column: range.left }, block: Array.from({ length: rows }, () => Array.from({ length: size.columns }, () => value)) };
 }
 
