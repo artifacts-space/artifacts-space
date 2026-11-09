@@ -9,13 +9,13 @@ import * as schema from "@/db/schema";
 import { sessionHooks } from "@/lib/auth/agent-guards";
 import { sendMagicLinkEmail } from "@/lib/auth/magic-link-email";
 import { oauthPlugins } from "@/lib/auth/oauth-plugins";
+import { sessionConfig } from "@/lib/auth/session-config";
 import { teamDepartureHook } from "@/lib/auth/team-departure";
 import { closedTeamRoutesHook } from "@/lib/auth/closed-team-routes";
 import { teamRoutesClosedOverHttp, teamsPlugin } from "@/lib/auth/teams-plugin";
 import { userHooks } from "@/lib/auth/user-hooks";
 
 const tenMinutes = 60 * 10;
-const fiveMinutes = 60 * 5;
 
 /** Better Auth model names mapped to the app's tables. */
 const authSchema = {
@@ -56,15 +56,7 @@ function createAuth() {
     // Better Auth falls back to the request origin when this is unset.
     ...(process.env.BETTER_AUTH_URL ? { baseURL: process.env.BETTER_AUTH_URL } : {}),
     database: drizzleAdapter(getDb(), { provider: "pg", schema: authSchema }),
-    /*
-     * The session and user are kept in a signed cookie for 5 minutes, so most
-     * signed-in requests skip the session query. Trade-off: a session deleted
-     * on the server (not by signing out here) keeps working in that browser
-     * for up to 5 minutes, and user fields in the session can be up to 5
-     * minutes old; code that must be current reads the database (see
-     * loadWorkspaceViewer). Signing out clears the cookie at once.
-     */
-    session: { cookieCache: { enabled: true, maxAge: fiveMinutes } },
+    session: sessionConfig,
     // Sign-in is GitHub or an emailed link. There are no passwords.
     emailAndPassword: { enabled: false },
     socialProviders: githubProvider(),
