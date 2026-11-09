@@ -105,6 +105,22 @@ export function withKept(span: Span, keep: number): number[] {
   return list;
 }
 
+/**
+ * The active cell's row and column, which the grid always renders so the
+ * cell editor and aria-activedescendant stay valid while it scrolls out of
+ * view; -1 for both when there is no active cell to render (no columns, or
+ * a filter left fewer rows than the active row).
+ */
+export function keptCell(active: GridCell, rowCount: number, columnCount: number): GridCell {
+  if (columnCount === 0 || active.row >= rowCount || active.column >= columnCount) return { row: -1, column: -1 };
+  return active;
+}
+
+/** `index` when it is outside the span, else -1: what a row must add to the columns in view. */
+export function outsideSpan(span: Span, index: number): number {
+  return index >= span.start && index < span.end ? -1 : index;
+}
+
 /** The scroll box's position and size. */
 export interface ScrollBox {
   top: number;

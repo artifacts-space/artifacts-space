@@ -14,6 +14,8 @@ import {
   sheetFillMaxHeight,
   sheetHeaderHeight,
   sheetRowHeight,
+  keptCell,
+  outsideSpan,
   withKept,
 } from "./sheet-grid-rules";
 
@@ -122,5 +124,25 @@ describe("withKept", () => {
   it("should add the kept index in order when it is outside the span", () => {
     expect(withKept({ start: 2, end: 5 }, 0)).toEqual([0, 2, 3, 4]);
     expect(withKept({ start: 2, end: 5 }, 9)).toEqual([2, 3, 4, 9]);
+  });
+});
+
+describe("keptCell", () => {
+  it("should keep the active cell when it is in the sheet", () => {
+    expect(keptCell({ row: 4, column: 2 }, 10, 3)).toEqual({ row: 4, column: 2 });
+    expect(keptCell({ row: -1, column: 0 }, 0, 3)).toEqual({ row: -1, column: 0 });
+  });
+
+  it("should keep nothing when a filter left fewer rows than the active row or there are no columns", () => {
+    expect(keptCell({ row: 4, column: 0 }, 3, 3)).toEqual({ row: -1, column: -1 });
+    expect(keptCell({ row: 0, column: 0 }, 5, 0)).toEqual({ row: -1, column: -1 });
+  });
+});
+
+describe("outsideSpan", () => {
+  it("should add nothing when the index is already in view and the index when it is not", () => {
+    expect(outsideSpan({ start: 2, end: 6 }, 3)).toBe(-1);
+    expect(outsideSpan({ start: 2, end: 6 }, 9)).toBe(9);
+    expect(outsideSpan({ start: 2, end: 6 }, -1)).toBe(-1);
   });
 });

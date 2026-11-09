@@ -39,7 +39,7 @@ interface GridRowProps {
   numeric: readonly boolean[];
   /** The active column when the active cell is in this row, else -1. */
   activeColumn: number;
-  /** The column that is always rendered, so the active cell stays in the DOM while it scrolls out of view. */
+  /** The active column when it is outside `columns`, else -1, so the active cell stays in the DOM while it scrolls out of view. */
   keepColumn: number;
   /** The cell editor, only for the row that holds it. */
   activeContent: ReactNode;

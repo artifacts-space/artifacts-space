@@ -1,6 +1,6 @@
 "use client";
 
-import { type RefObject, useEffect, useState } from "react";
+import { type RefObject, useEffect, useMemo, useState } from "react";
 
 import { columnSpan, rowNumberWidth, rowSpan, type Span } from "@/lib/sheet-grid-rules";
 
@@ -56,14 +56,11 @@ export function useSheetViewport(scrollerRef: RefObject<HTMLElement | null>, row
 
   // Clamped, because a filter or a deleted column can shrink the sheet before the next measure.
   const columnCount = offsets.length - 1;
-  if (measured) {
-    return {
-      rows: { start: Math.min(measured.rows.start, rowCount), end: Math.min(measured.rows.end, rowCount) },
-      columns: { start: Math.min(measured.columns.start, columnCount), end: Math.min(measured.columns.end, columnCount) },
-    };
-  }
-  return {
-    rows: { start: 0, end: Math.min(rowCount, firstPaint.rows) },
-    columns: columnSpan(offsets, 0, firstPaint.width, 0),
-  };
+  const first = measured === null ? columnSpan(offsets, 0, firstPaint.width, 0) : null;
+  const rowStart = measured ? Math.min(measured.rows.start, rowCount) : 0;
+  const rowEnd = Math.min(measured ? measured.rows.end : firstPaint.rows, rowCount);
+  const columnStart = measured ? Math.min(measured.columns.start, columnCount) : 0;
+  const columnEnd = measured ? Math.min(measured.columns.end, columnCount) : (first?.end ?? 0);
+  // One object per window, so rows that take the spans can skip re-rendering.
+  return useMemo(() => ({ rows: { start: rowStart, end: rowEnd }, columns: { start: columnStart, end: columnEnd } }), [rowStart, rowEnd, columnStart, columnEnd]);
 }

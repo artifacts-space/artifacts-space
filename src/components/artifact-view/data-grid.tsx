@@ -4,7 +4,7 @@ import { type ClipboardEvent, type KeyboardEvent, type MouseEvent, type ReactNod
 
 import type { GridCell } from "@/lib/csv-edit-rules";
 import { type GridBounds, keyToMove, moveCell } from "@/lib/grid-navigation";
-import { columnOffsets, revealCell, rowNumberWidth, rowsPerPage, sheetHeaderHeight, sheetRowHeight, withKept } from "@/lib/sheet-grid-rules";
+import { columnOffsets, keptCell, outsideSpan, revealCell, rowNumberWidth, rowsPerPage, sheetHeaderHeight, sheetRowHeight, withKept } from "@/lib/sheet-grid-rules";
 import { cn } from "@/lib/utils";
 
 import { activeRing, columnPlace, gridCellId, GridRow, rowPlace } from "./data-grid-row";
@@ -59,12 +59,6 @@ function cellFromEvent(event: MouseEvent): GridCell | null {
 }
 
 const sameCell = (a: GridCell, b: GridCell) => a.row === b.row && a.column === b.column;
-
-/** The active cell's row and column, always rendered so it stays in the DOM; -1 for each when there is no active cell. */
-function keptCell(active: GridCell, rowCount: number, columnCount: number): GridCell {
-  if (columnCount === 0 || active.row >= rowCount) return { row: -1, column: -1 };
-  return active;
-}
 
 /** Where a key press moves the active cell, or null when the grid leaves the key alone. */
 function keyTarget(event: KeyboardEvent, active: GridCell, bounds: GridBounds, tabMoves: boolean): GridCell | null {
@@ -128,46 +122,49 @@ export function DataGrid(props: DataGridProps) {
   const rows = withKept(view.rows, kept.row);
 
   return (
-    <div
-      ref={scrollerRef}
-      role="grid"
-      tabIndex={0}
-      aria-label={props.label}
-      aria-describedby={props.describedBy}
-      aria-rowcount={rowCount + 1}
-      aria-colcount={columnCount + 1}
-      aria-activedescendant={kept.column === -1 ? undefined : gridCellId(gridId, active)}
-      onKeyDown={handleKeyDown}
-      onClick={handleClick}
-      onPaste={props.onPaste}
-      onCopy={props.onCopy}
-      style={fillHeight === null ? undefined : { maxHeight: fillHeight }}
-      // 70vh tall at most, unless it fills an artifact page; the /app shell lowers it with --data-grid-max-height to fit the pane.
-      className={cn("group/grid relative min-w-0 overflow-auto overscroll-x-contain border border-border/70 bg-card text-sm outline-none", fillHeight === null && "max-h-[var(--data-grid-max-height,70vh)]")}
-    >
-      <div role="presentation" className="relative" style={{ width: totalWidth, minWidth: "100%", height: sheetHeaderHeight + rowCount * sheetRowHeight }}>
-        <HeaderRow gridId={gridId} columns={columns} offsets={offsets} totalWidth={totalWidth} active={active} activeContent={props.activeContent} header={props.header} headerSort={props.headerSort} />
-        {rows.map((row) => {
-          const isActiveRow = row === active.row;
-          return (
-            <GridRow
-              key={row}
-              row={row}
-              gridId={gridId}
-              columns={view.columns}
-              offsets={offsets}
-              totalWidth={totalWidth}
-              cell={props.cell}
-              rowLabel={props.rowLabel}
-              numeric={props.numeric}
-              activeColumn={isActiveRow ? active.column : -1}
-              keepColumn={kept.column}
-              activeContent={isActiveRow ? props.activeContent : null}
-            />
-          );
-        })}
+    <div className="min-w-0">
+      <div
+        ref={scrollerRef}
+        role="grid"
+        tabIndex={0}
+        aria-label={props.label}
+        aria-describedby={props.describedBy}
+        aria-rowcount={rowCount + 1}
+        aria-colcount={columnCount + 1}
+        aria-activedescendant={kept.column === -1 ? undefined : gridCellId(gridId, active)}
+        onKeyDown={handleKeyDown}
+        onClick={handleClick}
+        onPaste={props.onPaste}
+        onCopy={props.onCopy}
+        style={fillHeight === null ? undefined : { maxHeight: fillHeight }}
+        // 70vh tall at most, unless it fills an artifact page; the /app shell lowers it with --data-grid-max-height to fit the pane.
+        className={cn("group/grid relative min-w-0 overflow-auto overscroll-x-contain border border-border/70 bg-card text-sm outline-none", fillHeight === null && "max-h-[var(--data-grid-max-height,70vh)]")}
+      >
+        <div role="presentation" className="relative" style={{ width: totalWidth, minWidth: "100%", height: sheetHeaderHeight + rowCount * sheetRowHeight }}>
+          <HeaderRow gridId={gridId} columns={columns} offsets={offsets} totalWidth={totalWidth} active={active} activeContent={props.activeContent} header={props.header} headerSort={props.headerSort} />
+          {rows.map((row) => {
+            const isActiveRow = row === active.row;
+            return (
+              <GridRow
+                key={row}
+                row={row}
+                gridId={gridId}
+                columns={view.columns}
+                offsets={offsets}
+                totalWidth={totalWidth}
+                cell={props.cell}
+                rowLabel={props.rowLabel}
+                numeric={props.numeric}
+                activeColumn={isActiveRow ? active.column : -1}
+                keepColumn={outsideSpan(view.columns, kept.column)}
+                activeContent={isActiveRow ? props.activeContent : null}
+              />
+            );
+          })}
+        </div>
       </div>
-      {rowCount === 0 && props.empty ? <div className="sticky left-0 px-4 py-6 text-center text-sm text-muted-foreground">{props.empty}</div> : null}
+      {/* Outside the grid, which holds only rows. */}
+      {rowCount === 0 && props.empty ? <p className="border-x border-b border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">{props.empty}</p> : null}
     </div>
   );
 }
