@@ -9,7 +9,9 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -58,12 +60,21 @@ interface MoreMenuProps {
   theme: Theme | null;
 }
 
-/** "Try saving again" at the top of the menu, only after a save failed. */
-function RetryItem({ retry }: { retry: (() => void) | null }) {
-  if (!retry) return null;
+/**
+ * Why the latest change is not saved, at the top of the menu, and "Try
+ * saving again" after a failed save. On phones the header shows only a
+ * warning icon and touch screens have no tooltips, so the reason is here.
+ */
+function SaveProblemItems({ save }: { save: SaveIndicatorState | undefined }) {
+  if (save?.tone !== "problem" || !save.label) return null;
   return (
     <>
-      <DropdownMenuItem onClick={retry} className="py-2"><IconRefresh /> Try saving again</DropdownMenuItem>
+      <DropdownMenuGroup>
+        <DropdownMenuLabel data-slot="save-problem" className="flex items-start gap-1.5 text-foreground">
+          <IconAlertTriangle aria-hidden className="mt-0.5 size-3.5 shrink-0 text-tone-warning" /> <span>{save.label}</span>
+        </DropdownMenuLabel>
+      </DropdownMenuGroup>
+      {save.onRetry ? <DropdownMenuItem onClick={save.onRetry} className="py-2"><IconRefresh /> Try saving again</DropdownMenuItem> : null}
       <DropdownMenuSeparator />
     </>
   );
@@ -79,7 +90,7 @@ function FullWidthItem({ control }: { control: FullWidthControl | undefined }) {
   );
 }
 
-/** The page header's "⋯": Try again after a failed save, Full width, History, and View source. Disabled until the editor is ready. */
+/** The page header's "⋯": why a change is not saved (and Try again after a failed save), Full width, History, and View source. Disabled until the editor is ready. */
 function MoreMenu({ chrome, onHistory, theme }: MoreMenuProps) {
   // Menus open in a layer above the page, so the popup takes the artifact theme's colors itself, like the header around its button.
   const popup = themeChromeProps(theme ?? siteDefaultTheme());
@@ -89,8 +100,8 @@ function MoreMenu({ chrome, onHistory, theme }: MoreMenuProps) {
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="More actions" disabled={!chrome} />}>
         <IconDots />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className={cn("w-52", popup.modeClass)} style={popup.style}>
-        <RetryItem retry={chrome?.save.onRetry ?? null} />
+      <DropdownMenuContent align="end" className={cn("w-60", popup.modeClass)} style={popup.style}>
+        <SaveProblemItems save={chrome?.save} />
         <FullWidthItem control={chrome?.fullWidth} />
         <DropdownMenuItem onClick={onHistory} className="py-2"><IconHistory /> History</DropdownMenuItem>
         <DropdownMenuItem onClick={source?.onToggle} disabled={!source} className="py-2">

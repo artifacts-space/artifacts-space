@@ -103,7 +103,9 @@ test("should give editors a header ⋯ with Full width, History, and View source
 
   await moreActions(page).click();
   await page.getByRole("menuitem", { name: "History" }).click();
-  await expect(page.getByRole("dialog", { name: `History of ${title}` })).toBeVisible();
+  const history = page.getByRole("dialog", { name: `History of ${title}` });
+  await expect(history).toBeVisible();
+  await expect(history.locator(":focus"), "focus moves into the dialog, not back to the ⋯ behind it").toHaveCount(1);
   await page.keyboard.press("Escape");
 
   const fit = await headerFit(page);
@@ -249,11 +251,12 @@ test("should offer Try saving again in the ⋯ after a save fails and save when 
   const status = header(page).locator("[data-slot=save-indicator]");
   await expect(status).toHaveText("Not saved. Check your connection.", { timeout: 12_000 });
   await expect(status).toHaveAttribute("data-tone", "problem");
-
   // Opening the menu leaves the title field, which saves at once: still offline, so it fails again.
   await moreActions(page).click();
   const retry = page.getByRole("menuitem", { name: "Try saving again" });
   await expect(retry).toBeVisible();
+  // The reason is readable in the menu too: on phones the header shows only a warning icon, and touch screens have no tooltips.
+  await expect(page.getByRole("menu").locator("[data-slot=save-problem]")).toHaveText("Not saved. Check your connection.");
   await expect(status).toHaveText("Not saved. Check your connection.", { timeout: 12_000 });
   connection.failing = false;
   await retry.click();
