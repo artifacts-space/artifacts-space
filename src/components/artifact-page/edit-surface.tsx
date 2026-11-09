@@ -58,5 +58,5 @@ export function EditSurface({ publicId, title, updatedAt, reviewed, fullWidth, f
   usePublishPageEditorChrome(!editor.artifact && error ? failed : null);
 
   // One frame for both states: the heading and body never remount when editing unlocks.
-  return <PageEditFrame editor={editor} reviewed={reviewed}>{children}</PageEditFrame>;
+  return <PageEditFrame editor={editor} reviewed={reviewed} pageFullWidth={fullWidth}>{children}</PageEditFrame>;
 }

@@ -35,12 +35,13 @@ async function readAll(page: Page): Promise<Map<Part, ColorReading>> {
   return readings;
 }
 
-async function pickTheme(page: Page, current: string, next: string) {
+async function pickTheme(page: Page, next: string) {
   const specimen = page.locator('[data-specimen="artifact page chrome"]');
   const group = page.getByRole("radiogroup", { name: "Artifact theme" });
   // A click that lands while the picker is still opening can miss, so open and pick again until the page shows it.
+  // A pick can also land after its check timed out: the button then names the new theme, so a retry finds it by its prefix.
   await expect(async () => {
-    if (!(await group.isVisible())) await specimen.getByRole("button", { name: `Page theme: ${current}` }).click({ timeout: 2_000 });
+    if (!(await group.isVisible())) await specimen.getByRole("button", { name: /^Page theme: / }).click({ timeout: 2_000 });
     await group.getByRole("radio", { name: new RegExp(`^${next}:`) }).click({ timeout: 2_000 });
     await expect(specimen.locator("[data-page-theme]")).toHaveAttribute("data-page-theme", next.toLowerCase(), { timeout: 2_000 });
   }).toPass({ timeout: 15_000 });
@@ -62,7 +63,7 @@ for (const mode of ["light", "dark"] as const) {
     await expect(parts(page).mention).toBeVisible();
     const unthemed = await readAll(page);
 
-    await pickTheme(page, "Default", "Ocean");
+    await pickTheme(page, "Ocean");
     const ocean = await readAll(page);
     for (const part of partNames) {
       const before = unthemed.get(part);
@@ -75,7 +76,7 @@ for (const mode of ["light", "dark"] as const) {
     }
 
     // Back to Default: the page looks exactly as it does with no theme.
-    await pickTheme(page, "Ocean", "Default");
+    await pickTheme(page, "Default");
     expect(await readAll(page)).toEqual(unthemed);
   });
 }

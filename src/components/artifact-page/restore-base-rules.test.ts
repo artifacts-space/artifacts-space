@@ -28,4 +28,9 @@ describe("ownSaveBase", () => {
   it("should end when an entry points back at itself", () => {
     expect(ownSaveBase(t0, new Map([[t0, t0]]))).toBe(t0);
   });
+
+  it("should end within one step per entry when two entries point back at each other", () => {
+    // The cap on steps is what stops this loop; without it the walk would never return.
+    expect(ownSaveBase(t0, new Map([[t0, t1], [t1, t0]]))).toBe(t0);
+  });
 });
