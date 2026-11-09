@@ -45,6 +45,7 @@ async function pickTheme(page: Page, next: string) {
     await group.getByRole("radio", { name: new RegExp(`^${next}:`) }).click({ timeout: 2_000 });
     await expect(specimen.locator("[data-page-theme]")).toHaveAttribute("data-page-theme", next.toLowerCase(), { timeout: 2_000 });
   }).toPass({ timeout: 15_000 });
+  await expect(specimen.getByRole("button", { name: `Page theme: ${next}`, exact: true }), "the picker names the theme in use").toBeVisible();
   // Links and buttons fade their colors; read them once every transition has finished.
   await page.evaluate(async () => {
     const transitions = document.getAnimations().filter((animation) => animation instanceof CSSTransition);
