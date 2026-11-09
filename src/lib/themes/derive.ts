@@ -147,7 +147,7 @@ const siteSwitch: Record<PaletteMode, { on: string; onThumb: string; offThumb: s
 const switchOffTint = 0.08;
 
 /** Non-text UI needs 3:1 (WCAG 1.4.11); the small margin keeps rounding from dipping under it. */
-const switchMinimum = 3.05;
+const nonTextMinimum = 3.05;
 
 /**
  * The hover tints, --switch-on-hover-tint and --switch-off-hover-tint in
@@ -178,7 +178,7 @@ function holdApart(color: Oklch, background: Oklch, passes: (candidate: Oklch) =
 }
 
 /** True when `thumb` reads at 3:1 on every one of `tracks`. */
-const readsOnAll = (tracks: Oklch[]) => (thumb: Oklch) => tracks.every((track) => contrastRatio(thumb, track) >= switchMinimum);
+const readsOnAll = (tracks: Oklch[]) => (thumb: Oklch) => tracks.every((track) => contrastRatio(thumb, track) >= nonTextMinimum);
 
 /**
  * Switch colors on the themed card: the site's green re-lit until the on
@@ -198,7 +198,7 @@ export function switchTokens(mode: PaletteMode, colors: ThemeColors): Record<str
   const deepen = (track: Oklch) => mixOklch(track, mode === "light" ? ink : read(colors.background), switchOnHover);
   // A switch sits on a card in settings and on the page inside an artifact, so the on track clears both.
   const surfaces = [card, read(colors.background)];
-  const clearsSurfaces = (track: Oklch) => [track, deepen(track)].every((state) => surfaces.every((surface) => contrastRatio(state, surface) >= switchMinimum));
+  const clearsSurfaces = (track: Oklch) => [track, deepen(track)].every((state) => surfaces.every((surface) => contrastRatio(state, surface) >= nonTextMinimum));
   const keepsWhite = (track: Oklch) => clearsSurfaces(track) && readsOnAll([track, deepen(track)])(siteThumb);
   const whiteTrack = holdApart(read(site.on), card, keepsWhite);
   const white = keepsWhite(whiteTrack);
@@ -213,7 +213,22 @@ export function switchTokens(mode: PaletteMode, colors: ThemeColors): Record<str
   };
 }
 
+/** The site's focus ring per mode, from globals.css: the brand blue (--ring equals --brand). */
+const siteRing: Record<PaletteMode, string> = { light: "oklch(0.5 0.22 262)", dark: "oklch(0.68 0.17 262)" };
+
+/**
+ * The focus ring on the themed card and page: the site's brand blue, re-lit
+ * until it reads at 3:1 on both, so a focused control inside a themed
+ * artifact is still easy to find. The theme's own colors never replace the
+ * blue; only its lightness moves, and only when the theme needs it.
+ */
+export function ringTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
+  const surfaces = [read(colors.card), read(colors.background)];
+  const ring = holdApart(read(siteRing[mode]), read(colors.card), (candidate) => surfaces.every((surface) => contrastRatio(candidate, surface) >= nonTextMinimum));
+  return { "--ring": formatOklch(ring) };
+}
+
 /** Every CSS token a palette sets, keyed by custom property name, with canonical color values. */
 export function paletteTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
-  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors), ...switchTokens(mode, colors) };
+  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors), ...switchTokens(mode, colors), ...ringTokens(mode, colors) };
 }
