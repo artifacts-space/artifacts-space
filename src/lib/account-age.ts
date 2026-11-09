@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { cache } from "react";
 
 import { getDb } from "@/db";
 import { agent, user } from "@/db/schema";
@@ -25,8 +26,8 @@ export function accountCreatedAtQuery(db: Pick<ReturnType<typeof getDb>, "select
     .limit(1);
 }
 
-/** When the author's account (the owner's, for an agent) was created, or null when it is gone. */
-export async function accountCreatedAt(authorId: string): Promise<Date | null> {
+/** When the author's account (the owner's, for an agent) was created, or null when it is gone. Deduplicated per request. */
+export const accountCreatedAt = cache(async (authorId: string): Promise<Date | null> => {
   const [row] = await accountCreatedAtQuery(getDb(), authorId);
   return row?.createdAt ?? null;
-}
+});

@@ -29,10 +29,10 @@ import { canSeeComments } from "@/lib/comments/setting-rules";
 import { filesForViewer } from "@/lib/files/download";
 import type { FileDto } from "@/lib/files/types";
 import { accountCreatedAt } from "@/lib/account-age";
+import { loadActor } from "@/lib/agents/queries";
 import { loadArtifactByline } from "@/lib/artifact-byline";
 import { iconTitlePrefix } from "@/lib/artifact-icons";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
-import { lastEditorsFor } from "@/lib/artifacts";
 import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
 import { pageColumnClass, readingMeasureClass } from "@/lib/page-width/rules";
 import { pageOrganizersFor } from "@/lib/projects/page-project";
@@ -53,9 +53,20 @@ export const instant = false;
 
 const notFoundMetadata: Metadata = { title: "Artifact not found", robots: { index: false, follow: false } };
 
-async function load(params: Promise<{ publicId: string }>) {
+/** The artifact's public id and the signed-in viewer's id (null when signed out). */
+async function readerOf(params: Promise<{ publicId: string }>) {
   const [{ publicId }, session] = await Promise.all([params, getSession()]);
-  return getViewableArtifact(publicId, session?.user.id ?? null);
+  return { publicId, viewerId: session?.user.id ?? null };
+}
+
+/**
+ * The artifact for this viewer. getViewableArtifact, the session, the team
+ * row, the author, and the account age are deduplicated per request (React
+ * cache), so the page and generateMetadata share one read of each.
+ */
+async function load(params: Promise<{ publicId: string }>) {
+  const { publicId, viewerId } = await readerOf(params);
+  return getViewableArtifact(publicId, viewerId);
 }
 
 /**
@@ -81,15 +92,18 @@ async function indexable(record: ViewableArtifact["record"]) {
  * cannot read the artifact.
  */
 export async function generateMetadata({ params }: PageProps<"/artifact/[publicId]">): Promise<Metadata> {
-  const viewable = await load(params);
+  const { publicId, viewerId } = await readerOf(params);
+  const viewable = await getViewableArtifact(publicId, viewerId);
   if (!viewable) return notFoundMetadata;
   const { record, view } = viewable;
+  // The preview tags are what a signed-out reader gets, decided from the row this request already loaded.
+  const [ogMetadata, searchIndexable] = await Promise.all([artifactOgMetadata(record.publicId, viewerId), indexable(record)]);
   return {
-    ...(await artifactOgMetadata(record.publicId)),
+    ...ogMetadata,
     title: `${iconTitlePrefix(view.icon)}${view.title}`,
     // Agents that read HTML find the Markdown version here (src/lib/markdown).
     alternates: { canonical: artifactPagePath(record.publicId), types: { "text/markdown": `/artifact/${record.publicId}.md` } },
-    robots: pageRobots(await indexable(record)),
+    robots: pageRobots(searchIndexable),
   };
 }
 
@@ -113,10 +127,11 @@ function ArtifactBody({ viewable, files }: { viewable: ViewableArtifact; files: 
   return <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} />;
 }
 
-/** Who saved the version this reader sees, or null when they are gone. */
+/** Who saved the version this reader sees, or null when they are gone. Shares the byline's lookup when it is the author (loadActor). */
 async function lastEditor(userId: string | null): Promise<ArtifactEditorDto | null> {
   if (!userId) return null;
-  return (await lastEditorsFor([{ updatedBy: userId }])).get(userId) ?? null;
+  const actor = await loadActor(userId);
+  return actor ? { id: userId, kind: actor.kind, handle: actor.handle, name: actor.name } : null;
 }
 
 /**
