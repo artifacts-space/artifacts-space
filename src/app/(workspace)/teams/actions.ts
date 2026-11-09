@@ -2,41 +2,24 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult } from "@/lib/artifact-types";
 import { getAuth } from "@/lib/auth/server";
 import { cleanHandleInput } from "@/lib/handles";
-import { getSession } from "@/lib/session";
 import type { TeamRoleView } from "@/lib/teams/capabilities";
 import { can, type TeamCapability } from "@/lib/teams/capability-rules";
 import { assignRoleProblem, inviteProblem, leaveProblem, removeMemberProblem } from "@/lib/teams/role-admin-rules";
 import { recordMemberRole } from "@/lib/teams/role-store";
-import { getTeamAccessById, listTeamMemberActors, type TeamMemberActor, type TeamMembership } from "@/lib/teams/queries";
+import { listTeamMemberActors, type TeamMemberActor, type TeamMembership } from "@/lib/teams/queries";
 import { assignableRoles, type TeamRole } from "@/lib/teams/roles";
 import { UserFacingError } from "@/lib/user-facing-error";
 
-const idSchema = z.string().trim().min(1).max(200);
+import { guardTeam, idSchema, requireUser } from "./team-guard";
+
 const roleKeySchema = z.string().trim().min(1).max(40);
 
-async function requireUser() {
-  const session = await getSession();
-  if (!session) redirect("/sign-in");
-  return session.user;
-}
-
-type Guarded = { ok: true; membership: TeamMembership; roles: ReadonlyMap<string, TeamRoleView> } | { ok: false; result: { success: false; error: string } };
-
-/** The viewer's membership and the team's roles, from one load, when `allowed` passes; every check goes through capability-rules.ts. */
-async function guard(teamId: string, allowed: (membership: TeamMembership) => boolean, denied: string): Promise<Guarded> {
-  const viewer = await requireUser();
-  const access = await getTeamAccessById(viewer.id, idSchema.parse(teamId));
-  if (!access) return { ok: false, result: { success: false, error: "Team not found." } };
-  if (!allowed(access.membership)) return { ok: false, result: { success: false, error: denied } };
-  return { ok: true, ...access };
-}
 
 /** A person (never an agent's token) in a shared team who holds `capability`. */
 function holds(capability: TeamCapability) {
@@ -73,7 +56,7 @@ const inviteSchema = z.object({
 /** Invites someone by email, to a role that does no more than the inviter's. Never to a personal team. */
 export async function inviteMemberAction(teamId: string, input: z.input<typeof inviteSchema>): Promise<ActionResult<null>> {
   try {
-    const checked = await guard(teamId, holds("members.invite"), "You cannot invite people to this team.");
+    const checked = await guardTeam(teamId, holds("members.invite"), "You cannot invite people to this team.");
     if (!checked.ok) return checked.result;
     const { email, role } = inviteSchema.parse(input);
     const grant = checked.roles.get(role);
@@ -93,7 +76,7 @@ export async function inviteMemberAction(teamId: string, input: z.input<typeof i
 /** Cancels an open invitation. Needs "invite people". */
 export async function cancelInvitationAction(teamId: string, invitationId: string): Promise<ActionResult<null>> {
   try {
-    const checked = await guard(teamId, holds("members.invite"), "You cannot cancel invitations in this team.");
+    const checked = await guardTeam(teamId, holds("members.invite"), "You cannot cancel invitations in this team.");
     if (!checked.ok) return checked.result;
     await getAuth().api.cancelInvitation({ body: { invitationId: idSchema.parse(invitationId) }, headers: await headers() });
     revalidatePath(`/teams/${checked.membership.slug}`);
@@ -119,7 +102,7 @@ async function loadTarget(membership: TeamMembership, roles: ReadonlyMap<string,
 /** Removes a member below the viewer. Their artifacts shared with the team move to the team. */
 export async function removeMemberAction(teamId: string, memberId: string): Promise<ActionResult<null>> {
   try {
-    const checked = await guard(teamId, holds("members.remove"), "You cannot remove people from this team.");
+    const checked = await guardTeam(teamId, holds("members.remove"), "You cannot remove people from this team.");
     if (!checked.ok) return checked.result;
     const { target, targetRole, ownerCount } = await loadTarget(checked.membership, checked.roles, idSchema.parse(memberId));
     const problem = removeMemberProblem(checked.membership, targetRole, ownerCount);
@@ -167,7 +150,7 @@ async function applyRole(input: { membership: TeamMembership; target: TeamMember
 /** Gives a member another role, built-in or custom. Escalation and the last owner are refused (role-admin-rules.ts); every change is audited. */
 export async function updateMemberRoleAction(teamId: string, memberId: string, roleKey: string): Promise<ActionResult<null>> {
   try {
-    const checked = await guard(teamId, holds("members.roles"), "You cannot change roles in this team.");
+    const checked = await guardTeam(teamId, holds("members.roles"), "You cannot change roles in this team.");
     if (!checked.ok) return checked.result;
     const { membership, roles } = checked;
     const next = roles.get(roleKeySchema.parse(roleKey));
@@ -186,7 +169,7 @@ export async function updateMemberRoleAction(teamId: string, memberId: string, r
 /** Leaves a team. Artifacts the viewer shared with it stay with the team. The last owner cannot leave. */
 export async function leaveTeamAction(teamId: string): Promise<ActionResult<null>> {
   try {
-    const checked = await guard(teamId, (m) => !m.personal, "You cannot leave your personal team.");
+    const checked = await guardTeam(teamId, (m) => !m.personal, "You cannot leave your personal team.");
     if (!checked.ok) return checked.result;
     const problem = leaveProblem(checked.membership, countOwners(await listTeamMemberActors(checked.membership.id, checked.roles)));
     if (problem) return { success: false, error: problem };
@@ -201,7 +184,7 @@ export async function leaveTeamAction(teamId: string): Promise<ActionResult<null
 /** Sets whether sharing with the team needs approval. Needs "change the sharing rule" (owners by default). */
 export async function updateSharingRuleAction(teamId: string, teamSharingNeedsApproval: boolean): Promise<ActionResult<null>> {
   try {
-    const checked = await guard(teamId, holds("settings.sharing"), "You cannot change the sharing rule in this team.");
+    const checked = await guardTeam(teamId, holds("settings.sharing"), "You cannot change the sharing rule in this team.");
     if (!checked.ok) return checked.result;
     await getAuth().api.updateOrganization({
       body: { organizationId: checked.membership.id, data: { teamSharingNeedsApproval: z.boolean().parse(teamSharingNeedsApproval) } },

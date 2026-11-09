@@ -1,18 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult } from "@/lib/artifact-types";
-import { getSession } from "@/lib/session";
-import type { TeamRoleView } from "@/lib/teams/capabilities";
 import { isTeamCapability } from "@/lib/teams/capability-rules";
 import { toggledCapabilities } from "@/lib/teams/permission-matrix-rules";
 import { capabilityChangeProblem, createRoleProblem, customRoleKey, customRoleNameProblem, deleteRoleProblem } from "@/lib/teams/role-admin-rules";
 import { cleanCapabilities, createCustomRole, deleteCustomRole, setRoleCapability } from "@/lib/teams/role-store";
-import { getTeamAccessById, type TeamMembership } from "@/lib/teams/queries";
+import type { TeamMembership } from "@/lib/teams/queries";
+
+import { guardTeam } from "./team-guard";
 
 /**
  * Editing a team's roles from the Permissions tab. Every action loads the
@@ -21,19 +20,12 @@ import { getTeamAccessById, type TeamMembership } from "@/lib/teams/queries";
  * their own. Every change writes an audit row.
  */
 
-const idSchema = z.string().trim().min(1).max(200);
 const roleKeySchema = z.string().trim().min(1).max(40);
 const capabilitiesSchema = z.array(z.string().max(40)).max(40);
 
-type Loaded = { ok: true; membership: TeamMembership; roles: ReadonlyMap<string, TeamRoleView> } | { ok: false; result: { success: false; error: string } };
-
-/** The viewer's membership in a shared team, with the team's roles from the same load. */
-async function loadEditor(teamId: string): Promise<Loaded> {
-  const session = await getSession();
-  if (!session) redirect("/sign-in");
-  const access = await getTeamAccessById(session.user.id, idSchema.parse(teamId));
-  if (!access || access.membership.personal) return { ok: false, result: { success: false, error: "Team not found." } };
-  return { ok: true, ...access };
+/** A person's membership in a shared team, with the team's roles. Each action then asks role-admin-rules.ts. */
+function loadEditor(teamId: string) {
+  return guardTeam(teamId, (membership) => !membership.personal, "Team not found.");
 }
 
 function refresh(membership: TeamMembership) {

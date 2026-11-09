@@ -94,6 +94,12 @@ describe("resolveActor", () => {
     expect(resolveActor({ role: "member", isAgent: true, customKey: null }, roles).kind).toBe("agent");
   });
 
+  it.each(["owner", "admin", "agent", "member"])("should never let a custom assignment keyed %s stand in for a built-in role", (key) => {
+    const owners = groupRoleRows([row(key, "members.roles", false)], ["team-1"]).get("team-1");
+    const actor = resolveActor({ role: "member", isAgent: false, customKey: key }, owners);
+    expect(actor.roleKey).toBe("member");
+  });
+
   it("should prefer a custom role over the stored built-in role", () => {
     expect(resolveActor({ role: "member", isAgent: false, customKey: "designer" }, roles)).toMatchObject({ roleKey: "designer", capabilities: ["themes.manage"], roleName: "designer" });
   });

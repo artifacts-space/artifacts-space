@@ -19,6 +19,10 @@ const base: MemberRowInput = { viewer: viewer("owner"), member: { userId: "other
 const keys = (input: MemberRowInput) => memberRowControls(input).roleOptions.map((role) => role.key);
 
 describe("memberRowControls", () => {
+  it("should offer no role change and no Remove for an agent's row, whatever the viewer's role", () => {
+    expect(memberRowControls({ ...base, member: { userId: "agent-1", roleKey: "agent", isAgent: true } })).toEqual({ roleOptions: [], canRemove: false });
+  });
+
   it("should offer every role but Agent, current first, when an owner changes a member", () => {
     expect(keys(base)).toEqual(["member", "owner", "admin", "designer"]);
     expect(memberRowControls(base).canRemove).toBe(true);

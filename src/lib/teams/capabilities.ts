@@ -7,6 +7,7 @@ import {
   builtInRoleKeys,
   builtInRoleNames,
   defaultRoleCapabilities,
+  isBuiltInRoleKey,
   isTeamCapability,
   type ActorKind,
   type TeamActor,
@@ -80,7 +81,9 @@ export interface StoredRole {
 /** The role that applies: Agent for agents, then a custom role, then the built-in role Better Auth stores. */
 export function effectiveRoleKey(stored: StoredRole): string {
   if (stored.isAgent) return "agent";
-  return stored.customKey ?? stored.role;
+  // A custom assignment never stands in for a built-in role: only Better Auth's own role makes an owner or admin.
+  if (stored.customKey && !isBuiltInRoleKey(stored.customKey)) return stored.customKey;
+  return stored.role;
 }
 
 /**

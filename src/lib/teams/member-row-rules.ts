@@ -17,7 +17,8 @@ export interface RoleOption extends RoleGrant {
 /** The viewer and one person row, as the Members table sees them. */
 export interface MemberRowInput {
   viewer: TeamActor & { userId: string; personal: boolean };
-  member: { userId: string; roleKey: string };
+  /** The row's member. Agent rows set `isAgent`, and get no role controls (agents keep the Agent role). */
+  member: { userId: string; roleKey: string; isAgent?: boolean };
   /** Every role in the team, built-in and custom. */
   roles: readonly RoleOption[];
   /** How many owners the team has. */
@@ -28,7 +29,7 @@ export interface MemberRowInput {
 export function memberRowControls(input: MemberRowInput): { roleOptions: RoleOption[]; canRemove: boolean } {
   const current = input.roles.find((role) => role.key === input.member.roleKey);
   if (input.viewer.personal || !current) return { roleOptions: [], canRemove: false };
-  const target = { roleKey: current.key, capabilities: current.capabilities, isAgent: false, isSelf: input.member.userId === input.viewer.userId };
+  const target = { roleKey: current.key, capabilities: current.capabilities, isAgent: input.member.isAgent ?? false, isSelf: input.member.userId === input.viewer.userId };
   const others = input.roles.filter((role) => role.key !== current.key && assignRoleProblem(input.viewer, target, role, input.ownerCount) === null);
   return {
     roleOptions: others.length > 0 ? [current, ...others] : [],

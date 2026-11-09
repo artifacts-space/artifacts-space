@@ -57,7 +57,7 @@ export default function SharingPage() {
         ]}
       />
       <Prose>
-        <p>These are the defaults. The <strong>Permissions</strong> tab on the team page shows what each role can do. People who can change roles turn capabilities on or off for roles below their own, and make <strong>custom roles</strong>, such as Designer, with <strong>New role</strong>; give a custom role to someone from the <strong>Members</strong> tab. Nobody can give a capability they do not have. Owners always can do everything, and a team always keeps at least one owner. Every change to a role, and every change to someone&apos;s role, is listed under <strong>Role changes</strong> with who made it.</p>
+        <p>These are the defaults. The <strong>Permissions</strong> tab on the team page shows what each role can do. People who can change roles turn capabilities on or off for roles below their own, and make <strong>custom roles</strong>, such as Designer, with <strong>New role</strong>; give a custom role to someone from the <strong>Members</strong> tab. Invitations offer Admin or Member; once the person joins, change their role to a custom one there. Nobody can give a capability they do not have. Owners always can do everything, and a team always keeps at least one owner. Every change to a role, and every change to someone&apos;s role, is listed under <strong>Role changes</strong> with who made it.</p>
       </Prose>
       <Prose>
         <p>When a member leaves or is removed, the artifacts they shared through the team move to the team&apos;s longest-standing owner, and the original author stays on record. Their private artifacts stay theirs, and their open requests for the team are canceled.</p>
