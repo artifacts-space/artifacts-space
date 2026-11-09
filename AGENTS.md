@@ -320,7 +320,8 @@ override is a label, not content: it applies at once, files no version, and
 needs no approval, so readers of the approved version see it too. That is
 deliberate: any team member who may edit the artifact can relabel it without
 review, because detection can be wrong and the byline names a tool, not an
-author (History keeps the person who saved each version; its harness follows the label). clientInfo is
+author. Versions record the agent that actually saved them, so History stays
+factual; the override is a label shown on top in bylines. clientInfo is
 untrusted: it is checked with zod, cleaned, capped, and shown only as plain
 text to the connection's owner. Readers see the harness name and icon, never
 OAuth client ids or raw client names.

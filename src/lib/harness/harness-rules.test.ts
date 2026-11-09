@@ -11,10 +11,8 @@ import {
   parseClientInfo,
   resolveHarness,
   restampTo,
-  shownStamp,
   stampColumns,
   stampOf,
-  versionStamp,
 } from "./harness-rules";
 import { harnesses, harnessFor, harnessIds, harnessPhrase } from "./harnesses";
 
@@ -170,13 +168,7 @@ describe("harness precedence", () => {
     expect(artifactHarnessOf({ harness: null, harnessOverride: null })).toBeNull();
   });
 
-  it("should record the artifact's override on a new version so History matches the byline", () => {
-    expect(versionStamp("cursor", detected)).toEqual({ harness: "cursor", label: null });
-    expect(versionStamp(null, detected)).toEqual(detected);
-  });
-
-  it("should record no harness on a version when the save came from the web app", () => {
-    expect(versionStamp("cursor", null)).toBeNull();
+  it("should write nothing on the artifact when the save came from the web app", () => {
     expect(stampColumns(null)).toEqual({});
   });
 
@@ -193,12 +185,6 @@ describe("harness precedence", () => {
 });
 
 describe("snapshots and unchanged saves", () => {
-  it("should snapshot the harness the artifact showed, its own choice first", () => {
-    expect(shownStamp({ harness: "codex", harnessOverride: "cursor" })).toEqual({ harness: "cursor", label: null });
-    expect(shownStamp({ harness: "codex", harnessOverride: null })).toEqual({ harness: "codex", label: null });
-    expect(shownStamp({ harness: null, harnessOverride: null })).toBeNull();
-  });
-
   it("should restamp the latest version when another agent saves the same content", () => {
     expect(restampTo({ harness: "claude-code", locked: false }, { harness: "cursor", label: null })).toBe("cursor");
   });

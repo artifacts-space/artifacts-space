@@ -106,9 +106,8 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
     },
     ({ files, notes, ...input }) => respond(async () => {
       await assertUsableFiles(userId, null, files);
-      const stamp = await harness();
-      const created = await createArtifact(userId, { ...input, kind: "file", content: notes ?? "" }, { harness: stamp });
-      await attachFiles(userId, created.id, files, "agent", stamp);
+      const created = await createArtifact(userId, { ...input, kind: "file", content: notes ?? "" }, { harness: await harness() });
+      await attachFiles(userId, created.id, files, "agent", harness);
       return artifactResult(userId, await ownArtifact(userId, created.publicId));
     }),
   );
@@ -122,7 +121,7 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
     },
     ({ artifact, files }) => respond(async () => {
       const record = await editableArtifact(userId, artifact);
-      await attachFiles(userId, record.id, files, "agent", await harness());
+      await attachFiles(userId, record.id, files, "agent", harness);
       // Read it again: the save stamped the harness and moved updatedAt.
       return artifactResult(userId, await editableArtifact(userId, artifact));
     }),

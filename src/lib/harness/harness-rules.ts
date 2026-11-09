@@ -235,17 +235,7 @@ export function stampColumns(stamp: HarnessStamp | null | undefined): { harness:
   return { harness: stamp.harness };
 }
 
-/**
- * The harness a new version records. A save in the web app records none,
- * even when the artifact has an override. An agent's save records the
- * artifact's override when it has one, else the save's stamp.
- */
-export function versionStamp(artifactOverride: string | null | undefined, stamp: HarnessStamp | null | undefined): HarnessStamp | null {
-  if (!stamp) return null;
-  return resolveHarness({ artifactOverride, detected: stamp });
-}
-
-/** A stored harness id as a stamp, for snapshots of what an artifact already showed. Null when it had none. */
+/** A stored harness id as a stamp, for a snapshot: the agent of the artifact's last agent save. Null when it had none. */
 export function stampOf(id: string | null | undefined): HarnessStamp | null {
   return id ? { harness: harnessFor(id).id, label: null } : null;
 }
@@ -259,24 +249,19 @@ export function stampOf(id: string | null | undefined): HarnessStamp | null {
  * a label on the artifact, not content, so anyone who may edit it can set it.
  * That is acceptable for link and public artifacts because detection can be
  * wrong and only editors can correct it, and the byline names a tool, not an
- * author: the person who saved each version stays in History, which no label
- * changes.
+ * author: History keeps the person and the agent that saved each version,
+ * which no label changes.
  */
 export function approvedHarnessOf(input: { harnessOverride: string | null; approvedHarness: string | null }): ArtifactHarnessDto | null {
   return artifactHarnessOf({ harness: input.approvedHarness, harnessOverride: input.harnessOverride });
 }
 
-/** What a snapshot records: the harness the artifact showed, its own choice first, so readers of it see the same byline. */
-export function shownStamp(record: { harness: string | null; harnessOverride: string | null }): HarnessStamp | null {
-  return stampOf(effectiveHarness(record.harnessOverride, record.harness));
-}
-
 /**
  * The harness to write on the latest version when an agent save changed
  * nothing, so History agrees with the byline; null when nothing changes (a
- * web save, or the version already records it). The stamp is the label the
- * artifact shows (versionStamp puts its own choice first), so History
- * follows the label, like the byline. Never on a locked version:
+ * web save, or the version already records it). Versions record the agent
+ * that saved, never the artifact's own choice, which is a label shown on
+ * top (artifactHarnessOf, approvedHarnessOf). Never on a locked version:
  * the approved one (readers outside the team read its harness), one a
  * sharing decision names, or one another editor filed.
  */

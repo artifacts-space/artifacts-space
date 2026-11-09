@@ -7,7 +7,7 @@ import { artifact, artifactVersion, sharingRequest, team, type ArtifactRecord, t
 import { canEditRecord } from "@/lib/access";
 import type { VersionSaveKind } from "@/lib/artifact-types";
 import { isUniqueViolation } from "@/lib/db-errors";
-import { stampColumns, versionStamp, type HarnessStamp } from "@/lib/harness/harness-rules";
+import { stampColumns, type HarnessStamp } from "@/lib/harness/harness-rules";
 import { notifySharingRequest } from "@/lib/notifications/create";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { getTeamMembershipById } from "@/lib/teams/queries";
@@ -195,7 +195,7 @@ export async function recordArtifactChange(input: { artifactId: string; editorId
     .where(eq(artifact.id, input.artifactId))
     .returning();
   if (!after) return "applied";
-  return recordArtifactSave({ before, after, editorId: input.editorId, actor: input.actor, saveKind: "files", harness: versionStamp(after.harnessOverride, input.harness) });
+  return recordArtifactSave({ before, after, editorId: input.editorId, actor: input.actor, saveKind: "files", harness: input.harness ?? null });
 }
 
 /**

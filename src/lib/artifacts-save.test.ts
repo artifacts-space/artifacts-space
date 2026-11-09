@@ -128,13 +128,13 @@ describe("updateArtifact agent harness", () => {
     expect(mocks.recordArtifactSave).toHaveBeenCalledWith(expect.objectContaining({ harness: null }));
   });
 
-  it("should record the artifact's own override on the version when someone chose one from its menu", async () => {
+  it("should record the agent that saved on the version, never the artifact's own choice of label", async () => {
     const overridden = { ...baseRecord, harness: "codex", harnessOverride: "cursor" };
     mocks.getEditableArtifact.mockResolvedValue(overridden);
     mocks.returned.mockImplementation((values: Record<string, unknown>) => [{ ...overridden, ...values }]);
     await updateArtifact("user-1", "artifact-1", { content: "# Plan v3" }, "agent", { harness: codex });
     expect(mocks.set).toHaveBeenCalledWith(expect.objectContaining({ harness: "codex" }));
     expect(mocks.set.mock.calls[0]?.[0]).not.toHaveProperty("harnessOverride");
-    expect(mocks.recordArtifactSave).toHaveBeenCalledWith(expect.objectContaining({ harness: { harness: "cursor", label: null } }));
+    expect(mocks.recordArtifactSave).toHaveBeenCalledWith(expect.objectContaining({ harness: codex }));
   });
 });

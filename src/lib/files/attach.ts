@@ -52,17 +52,20 @@ async function hasRoomFor(artifactId: string | null, adding: number): Promise<bo
   return existing - (await countHistoryOnlyImages(artifactId)) + adding <= fileLimits.maxFilesPerArtifact;
 }
 
+/** No harness: a change in the web app. An agent passes its harness, looked up only when the change files a version. */
+const noStamp = () => Promise.resolve(null);
+
 /**
  * Attaches the editor's files to an artifact they may edit, and files a
  * version. For a link or public artifact the change goes through edit review
  * (recordArtifactChange), so readers outside the team see new files only
  * once they are approved. Counts against the per-editor edit limit.
  */
-export async function attachFiles(editorId: string, artifactId: string, fileIds: readonly string[], actor: SharingActor, harness: HarnessStamp | null = null): Promise<void> {
+export async function attachFiles(editorId: string, artifactId: string, fileIds: readonly string[], actor: SharingActor, harness: () => Promise<HarnessStamp | null> = noStamp): Promise<void> {
   await assertUsableFiles(editorId, artifactId, fileIds);
   await enforceRateLimit("artifactUpdate", editorId);
   const attached = await attachFileRows(editorId, artifactId, fileIds);
-  if (attached > 0) await recordArtifactChange({ artifactId, editorId, actor, harness });
+  if (attached > 0) await recordArtifactChange({ artifactId, editorId, actor, harness: await harness() });
 }
 
 /**
@@ -74,9 +77,6 @@ export async function checkContentFiles(authorId: string, artifactId: string | n
   await assertUsableFiles(authorId, artifactId, ids);
   return ids;
 }
-
-/** No harness: a deletion in the web app. */
-const noStamp = () => Promise.resolve(null);
 
 async function mayEditArtifact(userId: string, artifactId: string) {
   const [record] = await getDb().select().from(artifact).where(eq(artifact.id, artifactId)).limit(1);

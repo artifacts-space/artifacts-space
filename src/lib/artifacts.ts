@@ -35,7 +35,7 @@ import { assertRoomForNewTags, parseNewTags } from "@/lib/tags/store";
 import { projectChoiceSchema } from "@/lib/projects/rules";
 import { findOrCreateProject } from "@/lib/projects/store";
 import { checkContentFiles } from "@/lib/files/attach";
-import { artifactHarnessOf, stampColumns, versionStamp, type HarnessStamp } from "@/lib/harness/harness-rules";
+import { artifactHarnessOf, stampColumns, type HarnessStamp } from "@/lib/harness/harness-rules";
 import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { checkIconFile, restorableIcon } from "@/lib/files/icon-file";
 import { checkCoverFile, restorableCover } from "@/lib/files/cover-file";
@@ -359,7 +359,7 @@ export async function createArtifact(userId: string, input: ArtifactInput, optio
 
   if (!record) throw new Error("The artifact could not be created.");
   await attachFileRows(userId, record.id, fileIds);
-  await recordArtifactSave({ before: null, after: record, editorId: userId, actor: "person", saveKind: "create", harness: versionStamp(null, options.harness) });
+  await recordArtifactSave({ before: null, after: record, editorId: userId, actor: "person", saveKind: "create", harness: options.harness ?? null });
   const [dto] = await toArtifactDtos([record], userId);
   return dto ?? toArtifactDto(record);
 }
@@ -416,7 +416,7 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
     if (context.options.expectedUpdatedAt) throw new StaleSaveError(before.publicId);
     return null;
   }
-  await recordArtifactSave({ before, after: record, editorId, actor: context.actor, ...saveKindOf(context), harness: versionStamp(record.harnessOverride, context.options.harness) });
+  await recordArtifactSave({ before, after: record, editorId, actor: context.actor, ...saveKindOf(context), harness: context.options.harness ?? null });
   // A replaced or removed image icon or cover goes with this save, unless something still shows it (see icon-cleanup.ts).
   if (imageChanged(before, record)) await pruneUnusedIconFilesQuietly(record.id, [before.icon, before.cover]);
   const [dto] = await toArtifactDtos([record], editorId);

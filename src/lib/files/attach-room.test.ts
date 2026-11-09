@@ -52,7 +52,7 @@ describe("attachFiles", () => {
   it("should record the agent's harness on the files save when an agent attaches files", async () => {
     store.countArtifactFiles.mockResolvedValue(0);
     store.attachFileRows.mockResolvedValue(1);
-    await attachFiles("author", "a1", [upload], "agent", { harness: "codex", label: null });
+    await attachFiles("author", "a1", [upload], "agent", () => Promise.resolve({ harness: "codex", label: null }));
     expect(versions.recordArtifactChange).toHaveBeenCalledWith({ artifactId: "a1", editorId: "author", actor: "agent", harness: { harness: "codex", label: null } });
   });
 
