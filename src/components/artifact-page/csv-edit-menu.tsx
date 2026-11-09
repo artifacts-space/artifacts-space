@@ -3,6 +3,7 @@
 import { IconColumnInsertLeft, IconColumnInsertRight, IconCursorText, IconTrash } from "@tabler/icons-react";
 import type { ReactNode, RefObject } from "react";
 
+import { type ColumnLayoutProps, ColumnLayoutOptions } from "@/components/artifact-view/column-layout-options";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTitle } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
@@ -15,10 +16,12 @@ interface CsvEditMenuProps {
   returnFocus: RefObject<HTMLElement | null>;
   name: string;
   onAction: (action: ColumnAction) => void;
+  /** Move and fit options; an editor's moves change the file for everyone. */
+  layout: ColumnLayoutProps;
 }
 
-/** A column's edit options in the grid editor: rename, add a column either side, or delete it. */
-export function CsvEditMenu({ onClose, anchor, returnFocus, name, onAction }: CsvEditMenuProps) {
+/** A column's edit options in the grid editor: rename, add a column either side, move it, fit its width, or delete it. */
+export function CsvEditMenu({ onClose, anchor, returnFocus, name, onAction, layout }: CsvEditMenuProps) {
   const run = (action: ColumnAction) => () => {
     onClose();
     onAction(action);
@@ -30,6 +33,8 @@ export function CsvEditMenu({ onClose, anchor, returnFocus, name, onAction }: Cs
         <MenuButton icon={<IconCursorText />} label="Rename column" onClick={run("rename")} />
         <MenuButton icon={<IconColumnInsertLeft />} label="Add column left" onClick={run("insertLeft")} />
         <MenuButton icon={<IconColumnInsertRight />} label="Add column right" onClick={run("insertRight")} />
+        <Separator className="my-1.5" />
+        <ColumnLayoutOptions {...layout} />
         <Separator className="my-1.5" />
         <MenuButton icon={<IconTrash />} label="Delete column" onClick={run("delete")} danger />
       </PopoverContent>

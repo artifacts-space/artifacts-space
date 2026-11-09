@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ArtifactFilesProvider } from "@/components/artifact-view/files-context";
 import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
+import { SheetKeyContext } from "@/components/artifact-view/use-sheet-prefs";
 import { AvatarGallery } from "@/components/dev/avatar-gallery";
 import { ArtifactHeaderSpecimen } from "@/components/dev/artifact-header-specimen";
 import { CoverSpecimen } from "@/components/dev/cover-specimen";
@@ -128,7 +129,10 @@ export function ComponentGallery() {
           {formatFixtures.map((fixture) => (
             <Specimen key={fixture.name} name={`${fixture.kind} · ${fixture.name}`}>
               <ArtifactFilesProvider files={fixtureFiles} urlFor={standInUrl}>
-                <ArtifactView kind={fixture.kind} content={fixture.content} language={fixture.language} title={fixture.name} />
+                {/* Sheets keep each viewer's column widths and order per artifact; here, per specimen. */}
+                <SheetKeyContext value={`gallery-${fixture.name}`}>
+                  <ArtifactView kind={fixture.kind} content={fixture.content} language={fixture.language} title={fixture.name} />
+                </SheetKeyContext>
               </ArtifactFilesProvider>
             </Specimen>
           ))}

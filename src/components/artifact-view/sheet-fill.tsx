@@ -4,6 +4,8 @@ import { createContext, type ReactNode, type RefObject, useContext, useLayoutEff
 
 import { sheetFillMaxHeight } from "@/lib/sheet-grid-rules";
 
+import { SheetKeyContext } from "./use-sheet-prefs";
+
 const SheetFillContext = createContext(false);
 
 /** Where the grid usually starts on an artifact page (header, padding, and heading), used until the browser measures it. */
@@ -12,10 +14,15 @@ const typicalTop = 360;
 /**
  * Marks the artifact's own page: a sheet grid inside fills the window down
  * to its bottom edge (sheetFillMaxHeight) instead of the fixed cap it has in
- * galleries and the /app pane.
+ * galleries and the /app pane. `artifactKey` keys each viewer's own column
+ * widths and order (use-sheet-prefs.ts).
  */
-export function SheetFill({ children }: { children: ReactNode }) {
-  return <SheetFillContext value>{children}</SheetFillContext>;
+export function SheetFill({ artifactKey, children }: { artifactKey: string; children: ReactNode }) {
+  return (
+    <SheetFillContext value>
+      <SheetKeyContext value={artifactKey}>{children}</SheetKeyContext>
+    </SheetFillContext>
+  );
 }
 
 /**

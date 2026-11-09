@@ -7,6 +7,7 @@ import { ShareControl } from "@/components/app/share-control";
 import type { ShareTeam } from "@/components/app/share-teams-context";
 import { useRenderTheme } from "@/components/app/use-render-theme";
 import { useLeaveGuard } from "@/components/artifact-page/use-leave-guard";
+import { SheetKeyContext } from "@/components/artifact-view/use-sheet-prefs";
 import { AttachedFiles } from "@/components/files/attached-files";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
@@ -152,19 +153,21 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           tabIndex={hasInlineField(draft.kind, sourceOpen) ? undefined : 0}
           className={detailBody}
         >
-          <InlineContent
-            kind={draft.kind}
-            content={draft.content}
-            language={draft.language}
-            title={draft.title}
-            files={artifact.files}
-            revision={revision}
-            sourceOpen={sourceOpen}
-            fullWidth={usesFullWidth(draft.kind, artifact.fullWidth)}
-            theme={theme}
-            onChange={(content) => { update("content", content); }}
-            onShowSource={() => { if (!sourceOpen) toggleSource(); }}
-          />
+          <SheetKeyContext value={artifact.publicId}>
+            <InlineContent
+              kind={draft.kind}
+              content={draft.content}
+              language={draft.language}
+              title={draft.title}
+              files={artifact.files}
+              revision={revision}
+              sourceOpen={sourceOpen}
+              fullWidth={usesFullWidth(draft.kind, artifact.fullWidth)}
+              theme={theme}
+              onChange={(content) => { update("content", content); }}
+              onShowSource={() => { if (!sourceOpen) toggleSource(); }}
+            />
+          </SheetKeyContext>
           {showsFiles(draft.kind, artifact.files.length) ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
           <MetaFields draft={draft} update={update} />
         </div>
