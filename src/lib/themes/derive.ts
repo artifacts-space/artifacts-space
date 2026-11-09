@@ -167,28 +167,35 @@ function holdApart(color: Oklch, background: Oklch, passes: (candidate: Oklch) =
   return candidate;
 }
 
+/** True when `thumb` reads at 3:1 on every one of `tracks`. */
+const readsOnAll = (tracks: Oklch[]) => (thumb: Oklch) => tracks.every((track) => contrastRatio(thumb, track) >= switchMinimum);
+
 /**
  * Switch colors on the themed card: the site's green re-lit until the on
  * track reads at 3:1 on the card, at rest and hovered; the off track a tint
- * of the card; and each thumb re-lit until it reads at 3:1 on its own track,
- * at rest and hovered.
+ * of the card; and each thumb at 3:1 on its own track, at rest and hovered.
+ * The on thumb stays the site's white whenever a green exists that serves
+ * both; on a dark card too light for that (around oklch 0.4), the thumb
+ * takes the card's own color instead, which the track already clears at 3:1.
  */
 export function switchTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
   const card = read(colors.card);
   const ink = read(colors.foreground);
   const site = siteSwitch[mode];
+  const siteThumb = read(site.onThumb);
   const deepen = (track: Oklch) => mixOklch(track, mode === "light" ? ink : read(colors.background), switchOnHover);
-  const on = holdApart(read(site.on), card, (track) => [track, deepen(track)].every((state) => contrastRatio(state, card) >= switchMinimum));
+  const clearsCard = (track: Oklch) => [track, deepen(track)].every((state) => contrastRatio(state, card) >= switchMinimum);
+  const keepsWhite = (track: Oklch) => clearsCard(track) && readsOnAll([track, deepen(track)])(siteThumb);
+  const whiteTrack = holdApart(read(site.on), card, keepsWhite);
+  const white = keepsWhite(whiteTrack);
+  const on = white ? whiteTrack : holdApart(read(site.on), card, clearsCard);
   const off = mixOklch(card, ink, switchOffTint);
-  const onTracks = [on, deepen(on)];
   const offHover = mixOklch(off, ink, switchOffHover);
-  const offTracks = [off, offHover];
-  const readsOn = (tracks: Oklch[]) => (thumb: Oklch) => tracks.every((track) => contrastRatio(thumb, track) >= switchMinimum);
   return {
     "--switch-on": formatOklch(on),
-    "--switch-on-thumb": formatOklch(holdApart(read(site.onThumb), on, readsOn(onTracks))),
+    "--switch-on-thumb": formatOklch(white ? siteThumb : holdApart(card, on, readsOnAll([on, deepen(on)]))),
     "--switch-off": formatOklch(off),
-    "--switch-off-thumb": formatOklch(holdApart(read(site.offThumb), offHover, readsOn(offTracks))),
+    "--switch-off-thumb": formatOklch(holdApart(read(site.offThumb), offHover, readsOnAll([off, offHover]))),
   };
 }
 

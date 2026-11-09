@@ -153,6 +153,10 @@ describe("theme presets", () => {
         for (const pair of switchPairs(mode, { ...siteDefaultColors(mode), card })) {
           expect(contrastRatio(pair.a, pair.b), `${label}: ${pair.name}`).toBeGreaterThanOrEqual(3);
         }
+        // The thumb is the site's white, or the card's own color on a dark card too light for white; never a grey in between.
+        const thumb = switchTokens(mode, { ...siteDefaultColors(mode), card })["--switch-on-thumb"];
+        expect([siteColor(mode, "--switch-on-thumb"), card], `${label}: on thumb`).toContain(thumb);
+        if (mode === "light" || card === "oklch(0.12 0 0)") expect(thumb, `${label}: on thumb`).toBe(siteColor(mode, "--switch-on-thumb"));
       }
     }
   });
