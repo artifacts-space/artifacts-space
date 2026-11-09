@@ -12,7 +12,7 @@ const dto: ArtifactDto = {
   theme: null,
   cover: null,
   fullWidth: false,
-  sheetFormat: { banding: null, align: {} },
+  sheetFormat: { banding: null, align: {} }, allowCsvDownload: false,
   summary: "",
   content: "# Plan",
   kind: "markdown",
@@ -42,22 +42,25 @@ const context = (viewerId: string, slugs: [string, string][] = [["team-1", "plat
   urlFor: (publicId: string) => `https://artifacts.space/artifact/${publicId}`,
 });
 
+/** A connection that may edit the artifact. */
+const editor = { canEdit: true };
+
 describe("toMcpArtifact", () => {
   it("should expose the public id and URL, never the internal id", () => {
-    const view = toMcpArtifact(dto, context("author"));
+    const view = toMcpArtifact(dto, context("author"), editor);
     expect(view.id).toBe(dto.publicId);
     expect(view.url).toBe(`https://artifacts.space/artifact/${dto.publicId}`);
     expect(JSON.stringify(view)).not.toContain("internal-uuid");
   });
 
   it("should show the pending request only to the author", () => {
-    expect(toMcpArtifact(dto, context("author")).pendingSharing).toEqual({ visibility: "public", team: "platform", comments: "signed_in", requestedAt: dto.createdAt });
-    expect(toMcpArtifact(dto, context("member")).pendingSharing).toBeNull();
+    expect(toMcpArtifact(dto, context("author"), editor).pendingSharing).toEqual({ visibility: "public", team: "platform", comments: "signed_in", requestedAt: dto.createdAt });
+    expect(toMcpArtifact(dto, context("member"), editor).pendingSharing).toBeNull();
   });
 
   it("should hide the team slug when the caller is not in the team", () => {
-    expect(toMcpArtifact(dto, context("member")).team).toBe("platform");
-    expect(toMcpArtifact(dto, context("outsider", [])).team).toBeNull();
+    expect(toMcpArtifact(dto, context("member"), editor).team).toBe("platform");
+    expect(toMcpArtifact(dto, context("outsider", []), editor).team).toBeNull();
   });
 
   it("should give a preview and no content when the artifact is listed", () => {
@@ -68,12 +71,33 @@ describe("toMcpArtifact", () => {
   });
 
   it("should return the icon when the artifact is read or listed", () => {
-    expect(toMcpArtifact(dto, context("author")).icon).toBe("🧭");
+    expect(toMcpArtifact(dto, context("author"), editor).icon).toBe("🧭");
     expect(toMcpListItem({ ...dto, icon: null, preview: "" }, context("author")).icon).toBeNull();
   });
 
   it("should name who saved it last by handle", () => {
-    expect(toMcpArtifact(dto, context("member")).updatedBy).toBe("@ann");
-    expect(toMcpArtifact({ ...dto, updatedBy: null }, context("member")).updatedBy).toBeNull();
+    expect(toMcpArtifact(dto, context("member"), editor).updatedBy).toBe("@ann");
+    expect(toMcpArtifact({ ...dto, updatedBy: null }, context("member"), editor).updatedBy).toBeNull();
+  });
+});
+
+describe("toMcpArtifact for a CSV whose owner turned downloads off", () => {
+  const sheet = { ...dto, kind: "csv" as const, content: "name,secret\nalpha,s3cr3t-row\n", allowCsvDownload: false };
+
+  it("should leave the content out for a non-member's connection, with a note", () => {
+    const view = toMcpArtifact(sheet, context("outsider", []), { canEdit: false });
+    expect(view.content).toBe("");
+    expect(view.contentWithheld).toContain("turned off downloads");
+    expect(JSON.stringify(view)).not.toContain("s3cr3t-row");
+    expect(view.allowCsvDownload).toBe(false);
+  });
+
+  it("should give a team member's or the author's connection the content", () => {
+    expect(toMcpArtifact(sheet, context("member"), editor).content).toContain("s3cr3t-row");
+    expect(toMcpArtifact(sheet, context("author"), editor).contentWithheld).toBeUndefined();
+  });
+
+  it("should give every connection the content when downloads are on", () => {
+    expect(toMcpArtifact({ ...sheet, allowCsvDownload: true }, context("outsider", []), { canEdit: false }).content).toContain("s3cr3t-row");
   });
 });

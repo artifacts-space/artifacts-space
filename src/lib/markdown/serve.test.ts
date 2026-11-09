@@ -41,16 +41,19 @@ interface FixtureOptions {
   comments?: CommentSetting;
   kind?: string;
   content?: string;
+  allowCsvDownload?: boolean;
+  canEdit?: boolean;
 }
 
 /** What getViewableArtifact returns. `record` holds the latest (possibly pending) fields; `view` what this reader may read. */
-function viewable(options: FixtureOptions = {}): ViewableArtifact {
+function viewable(input: FixtureOptions = {}): ViewableArtifact {
+  const options = { allowCsvDownload: false, canEdit: false, ...input };
   const source = options.source ?? "latest";
   const fixture = {
-    record: { id: "internal", publicId, userId: "author", teamId: "team", visibility: options.visibility ?? "public", comments: options.comments ?? "signed_in", title: "Pending title", icon: null },
+    record: { id: "internal", publicId, userId: "author", teamId: "team", visibility: options.visibility ?? "public", comments: options.comments ?? "signed_in", title: "Pending title", icon: null, allowCsvDownload: options.allowCsvDownload },
     version: source === "approved" ? { source, versionId: "v-approved" } : { source, versionId: null },
     served: { title: "Approved title", icon: null, updatedAt: savedAt, editedBy: "author" },
-    canEdit: false,
+    canEdit: options.canEdit,
     isTeamMember: false,
     editPending: null,
     view: {
@@ -238,7 +241,7 @@ describe("artifactMarkdownResponse", () => {
 
 describe("artifactRawResponse", () => {
   it("should serve CSV as text/csv and everything else as sandboxed plain text", async () => {
-    mocks.getViewableArtifact.mockResolvedValue(viewable({ kind: "csv", content: "a,b\n1,2" }));
+    mocks.getViewableArtifact.mockResolvedValue(viewable({ kind: "csv", content: "a,b\n1,2", allowCsvDownload: true }));
     const csv = await artifactRawResponse(request(`/artifact/${publicId}/raw`), publicId);
     expect(csv.headers.get("content-type")).toBe("text/csv; charset=utf-8");
     expect(await csv.text()).toBe("a,b\n1,2");
@@ -252,6 +255,52 @@ describe("artifactRawResponse", () => {
   it("should answer the Markdown 404 when the reader may not read the artifact", async () => {
     mocks.getViewableArtifact.mockResolvedValue(null);
     expect((await artifactRawResponse(request(`/artifact/${publicId}/raw`), publicId)).status).toBe(404);
+  });
+});
+
+describe("CSV downloads turned off by the owner", () => {
+  const rows = "name,secret\nalpha,s3cr3t-row\n";
+  const raw = () => artifactRawResponse(request(`/artifact/${publicId}/raw`), publicId);
+  const markdown = () => artifactMarkdownResponse(request(`/artifact/${publicId}.md?comments=1`), publicId);
+
+  it.each([
+    ["a signed-out link reader", "link"],
+    ["a public reader", "public"],
+  ] as const)("should give %s a 403 for the raw file and Markdown without the rows", async (_who, visibility) => {
+    mocks.getViewableArtifact.mockResolvedValue(viewable({ kind: "csv", content: rows, visibility }));
+    const file = await raw();
+    expect(file.status).toBe(403);
+    const fileText = await file.text();
+    expect(fileText).toContain("turned off downloads");
+    expect(fileText).not.toContain("s3cr3t-row");
+
+    const page = await markdown();
+    expect(page.status).toBe(200);
+    const text = await page.text();
+    expect(text).toContain("# 🧪 Pending title");
+    expect(text).toContain("turned off downloads");
+    expect(text).not.toContain("s3cr3t-row");
+    expect(text).not.toContain("name | secret");
+    expect(text).not.toContain("/raw");
+  });
+
+  it("should give an editor (the author, a teammate, or their agent) the file and the table", async () => {
+    mocks.getViewableArtifact.mockResolvedValue(viewable({ kind: "csv", content: rows, canEdit: true }));
+    const file = await raw();
+    expect(file.status).toBe(200);
+    expect(await file.text()).toBe(rows);
+    expect(await (await markdown()).text()).toContain("s3cr3t-row");
+  });
+
+  it("should give every reader the file and the table when downloads are on", async () => {
+    mocks.getViewableArtifact.mockResolvedValue(viewable({ kind: "csv", content: rows, allowCsvDownload: true }));
+    expect(await (await raw()).text()).toBe(rows);
+    expect(await (await markdown()).text()).toContain("s3cr3t-row");
+  });
+
+  it("should leave other formats alone", async () => {
+    mocks.getViewableArtifact.mockResolvedValue(viewable({ kind: "markdown", content: "# Open notes" }));
+    expect((await raw()).status).toBe(200);
   });
 });
 

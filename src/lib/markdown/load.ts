@@ -9,6 +9,7 @@ import { lastEditorsFor } from "@/lib/artifacts";
 import { listComments } from "@/lib/comments/service";
 import { filesForViewer } from "@/lib/files/download";
 import { fileUrl } from "@/lib/files/types";
+import { mayExportCsv } from "@/lib/csv-export/rules";
 import { siteUrl } from "@/lib/site-origin";
 import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
 import { markdownThemeLabel } from "@/lib/themes/theme-privacy";
@@ -98,6 +99,7 @@ export async function loadMarkdownInput(viewable: ViewableArtifact, userId: stri
     kind: view.kind,
     language: view.language,
     content: view.content,
+    exportable: mayExportCsv({ canEdit: viewable.canEdit }, { kind: view.kind, allowCsvDownload: record.allowCsvDownload }),
     url: siteUrl(`/artifact/${record.publicId}`),
     rawUrl: siteUrl(`/artifact/${record.publicId}/raw`),
     author: byline.author,

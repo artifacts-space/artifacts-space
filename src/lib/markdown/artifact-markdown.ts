@@ -1,6 +1,7 @@
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { csvColumnCap, csvRowCap } from "@/lib/csv-limits";
 import { parseCsv } from "@/lib/csv";
+import { csvDownloadOffNote } from "@/lib/csv-export/rules";
 import { fileTypeLabel } from "@/lib/files/config";
 import { prettyJson } from "@/lib/pretty-json";
 import { formatSize } from "@/lib/relative-time";
@@ -36,6 +37,13 @@ export interface ArtifactMarkdownInput {
   kind: ArtifactKind;
   language: string;
   content: string;
+  /**
+   * False when this reader may not take the data out (a CSV whose owner
+   * turned downloads off, read by someone who cannot edit it): the Markdown
+   * then has only the title, the summary, and a line that says so.
+   * Optional; left out means true.
+   */
+  exportable?: boolean;
   /** The canonical page URL. */
   url: string;
   /** The raw content URL (linked for CSV). */
@@ -126,8 +134,16 @@ export function filesToMarkdown(files: readonly MarkdownFile[], heading: string)
   return [`## ${heading}`, lines.join("\n"), note].join("\n\n");
 }
 
+/** The Markdown for a reader the owner turned downloads off for: the title, the summary, and why there is nothing else. */
+export function withheldMarkdown(input: Pick<ArtifactMarkdownInput, "title" | "emoji" | "summary">): string {
+  const title = `# ${input.emoji ? `${input.emoji} ` : ""}${inlineText(input.title) || "Untitled"}`;
+  const summary = inlineText(input.summary);
+  return `${[title, ...(summary ? [`> ${summary}`] : []), `_${csvDownloadOffNote}_`].join("\n\n")}\n`;
+}
+
 /** The whole Markdown version: header, content, files, and comments when asked for. */
 export function artifactToMarkdown(input: ArtifactMarkdownInput): string {
+  if (input.exportable === false) return withheldMarkdown(input);
   const body = contentToMarkdown(input).trim();
   const files = filesToMarkdown(input.files, input.kind === "file" ? "Files" : "Attached files");
   const empty = input.kind === "file" ? "" : "_No content._";

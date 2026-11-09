@@ -1,5 +1,6 @@
 import type { ArtifactDto, ArtifactListItemDto, ArtifactVisibility, CommentSetting, SharingLevel } from "@/lib/artifact-types";
 import { mcpCoverFields } from "@/lib/covers/cover";
+import { csvDownloadOffNote, mayExportCsv } from "@/lib/csv-export/rules";
 import { harnessFor } from "@/lib/harness/harnesses";
 import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
 
@@ -19,8 +20,12 @@ export interface McpArtifact {
   /** Whether the page shows the body full width (true) or at the reading width (false, the default). */
   fullWidth: boolean;
   summary: string;
-  /** The full content. Only artifacts_get and writes return it. */
+  /** The full content. Only artifacts_get and writes return it. "" when `contentWithheld` says why. */
   content?: string;
+  /** Set when the content is left out: a CSV whose owner turned downloads off, read by a connection that cannot edit it. */
+  contentWithheld?: string;
+  /** "Allow CSV download": whether readers who cannot edit a CSV may take its data out. Read-only for agents. */
+  allowCsvDownload: boolean;
   /** In lists: the first characters of text formats, "" for structured ones. Call artifacts_get for the content. */
   preview?: string;
   kind: string;
@@ -94,6 +99,7 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     theme: dto.theme,
     ...mcpCoverFields(dto.cover),
     fullWidth: dto.fullWidth,
+    allowCsvDownload: dto.allowCsvDownload,
     summary: dto.summary,
     kind: dto.kind,
     language: dto.language,
@@ -118,8 +124,15 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
   };
 }
 
-/** Maps a full DTO to the agent-facing shape, with its content. */
-export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext): McpArtifact {
+/**
+ * Maps a full DTO to the agent-facing shape, with its content. `reader`
+ * says whether the connection may edit it: a CSV whose owner turned
+ * downloads off comes without its content to one that cannot, as the
+ * Markdown and raw versions do (mayExportCsv). Writes pass canEdit: true,
+ * since only editors write.
+ */
+export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext, reader: { canEdit: boolean }): McpArtifact {
+  if (!mayExportCsv(reader, dto)) return { ...toMcpShape(dto, context), content: "", contentWithheld: csvDownloadOffNote };
   return { ...toMcpShape(dto, context), content: dto.content };
 }
 

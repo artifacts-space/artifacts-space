@@ -89,7 +89,7 @@ export function fixtureArtifact({ id, kind, title, content, publicId = "fixture0
     theme: null,
     cover: null,
     fullWidth: false,
-    sheetFormat: { banding: null, align: {} },
+    sheetFormat: { banding: null, align: {} }, allowCsvDownload: false,
     summary: "A long artifact for layout tests.",
     content,
     kind,

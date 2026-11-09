@@ -1,0 +1,1 @@
+ALTER TABLE "artifact" ADD COLUMN "allow_csv_download" boolean DEFAULT false NOT NULL;

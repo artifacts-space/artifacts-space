@@ -5,6 +5,7 @@ import { IconLoader2, IconLock } from "@tabler/icons-react";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { VisibilityBadge } from "@/components/artifact-page/visibility-badge";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { CsvExportContext } from "@/components/artifact-view/csv-export";
 import { ArtifactSheetFormat } from "@/components/artifact-view/sheet-format";
 import { SheetKeyContext } from "@/components/artifact-view/use-sheet-prefs";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { ViewsDialog } from "@/components/views/views-dialog";
 import { OpenPageButton } from "@/components/page-width/open-page-button";
 import type { ArtifactDto } from "@/lib/artifact-types";
+import { mayExportCsv } from "@/lib/csv-export/rules";
 import { usesFullWidth } from "@/lib/page-width/rules";
 import { artifactPageHref } from "@/lib/artifact-page-href";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
@@ -59,17 +61,24 @@ interface SharedArtifactPanelProps {
  * who may edit it see its history and can restore a version. Owners and
  * admins of that team can make it private again.
  */
+/** Copy, unless the owner turned downloads off for this reader. */
+function PanelCopy({ content, shown }: { content: string; shown: boolean }) {
+  return shown ? <CopyButton value={content} variant="ghost" size="icon" /> : null;
+}
+
 export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn }: SharedArtifactPanelProps) {
   const { team, canEdit, canWithdraw, seesComments } = useEditAccess(artifact, viewerId);
   const { withdrawing, withdraw } = useWithdrawSharing(artifact.id, onWithdrawn);
   const theme = useRenderTheme(artifact);
+  // A CSV whose owner turned downloads off: no Copy, and the grid copies nothing, for a reader who cannot edit it.
+  const exportable = mayExportCsv({ canEdit }, artifact);
 
   return (
     <section className={detailSection} aria-label={artifact.title}>
       <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5">
         <PanelStatus artifact={artifact} teamName={team?.name ?? null} canEdit={canEdit} />
         <div className="ml-auto flex items-center gap-1">
-          <CopyButton value={artifact.content} variant="ghost" size="icon" />
+          <PanelCopy content={artifact.content} shown={exportable} />
           {canEdit ? (
             <>
               <VersionHistory
@@ -109,9 +118,11 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
         <div data-slot="detail-body" role="region" aria-label="Content" tabIndex={0} className={detailBody}>
           <PreviewSurface theme={theme} fullWidth={usesFullWidth(artifact.kind, artifact.fullWidth)} className="py-6 sm:py-8">
             <SheetKeyContext value={artifact.publicId}>
-              <ArtifactSheetFormat artifactId={null} stored={artifact.sheetFormat}>
-                <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
-              </ArtifactSheetFormat>
+              <CsvExportContext value={exportable}>
+                <ArtifactSheetFormat artifactId={null} stored={artifact.sheetFormat}>
+                  <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
+                </ArtifactSheetFormat>
+              </CsvExportContext>
             </SheetKeyContext>
           </PreviewSurface>
         </div>

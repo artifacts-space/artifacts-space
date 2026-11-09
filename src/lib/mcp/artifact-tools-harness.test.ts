@@ -47,7 +47,7 @@ const codex: HarnessStamp = { harness: "codex", label: null };
 
 function dto(harness: ArtifactHarnessDto | null): ArtifactDto {
   return {
-    id: "internal-1", publicId, title: "Plan", icon: null, theme: null, cover: null, fullWidth: false, sheetFormat: { banding: null, align: {} }, summary: "", content: "# Plan", kind: "markdown", language: "", project: null, tags: [], sessionId: "", source: "",
+    id: "internal-1", publicId, title: "Plan", icon: null, theme: null, cover: null, fullWidth: false, sheetFormat: { banding: null, align: {} }, allowCsvDownload: false, summary: "", content: "# Plan", kind: "markdown", language: "", project: null, tags: [], sessionId: "", source: "",
     visibility: "private", comments: "team", showInSearch: false, teamId: null, authorId: "user-1", originalAuthorId: null, pendingSharing: null, pendingEdit: null, pendingComments: null, harness,
     files: [], updatedBy: null, metadata: {}, createdAt: "2026-11-08T00:00:00.000Z", updatedAt: "2026-11-08T00:00:00.000Z",
   };
