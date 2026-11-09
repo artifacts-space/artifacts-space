@@ -6,12 +6,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, u
 import type { SourceToggle } from "@/components/app/artifact-editor/editor-toolbar";
 import { ConflictNotice } from "@/components/app/artifact-editor/save-status";
 import type { AutosaveStatus } from "@/components/app/artifact-editor/use-autosave";
-import type { FullWidthControl } from "@/components/app/artifact-editor/use-full-width";
 import type { VersionHistoryProps } from "@/components/history/version-history";
 import type { FileDto } from "@/lib/files/types";
 
 import { ownSaveBase } from "./restore-base-rules";
 import { idleSave, saveProblem, type SaveIndicatorState } from "./save-indicator-rules";
+import type { PageFullWidthControl } from "./use-page-full-width";
 
 /** A conflict with someone else's newer save, and the two ways out of it. */
 export interface PageConflict {
@@ -30,8 +30,8 @@ export interface PageEditorChrome {
   history: Omit<VersionHistoryProps, "trigger" | "className">;
   /** View source; null while the editable copy loads. */
   source: SourceToggle | null;
-  /** The "Full width" setting; pending (so disabled) while the editable copy loads. */
-  fullWidth: FullWidthControl;
+  /** The "Full width" setting; pending (so disabled) while the editable copy loads, and busy only while that wait can end. */
+  fullWidth: PageFullWidthControl;
   save: SaveIndicatorState;
   /** Set only while a save conflicts with someone else's newer one. */
   conflict: PageConflict | null;
@@ -130,7 +130,8 @@ export function useWaitingChrome(input: WaitingChromeInput | null, error: string
     return {
       history: { publicId, title, updatedAt: ownSaveBase(updatedAt, ownSaves), reviewed, files, onRestored: refresh },
       source: null,
-      fullWidth: { checked: fullWidth, pending: true, onChange: unchangeable },
+      // A copy that failed to load is not on its way: the item is unavailable, not busy.
+      fullWidth: { checked: fullWidth, pending: true, busy: !error, onChange: unchangeable },
       save: error ? saveProblem(error) : idleSave,
       conflict: null,
     };

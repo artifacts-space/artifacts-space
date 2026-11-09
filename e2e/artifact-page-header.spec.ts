@@ -139,13 +139,8 @@ test("should widen the page from Full width in the header's ⋯ and keep it afte
   await expect(main).toHaveAttribute("data-full-width", "false");
 
   await expect(page.getByRole("textbox", { name: "Title" }), "the editor is ready").toBeVisible();
-  let release: () => void = () => undefined;
-  const held = new Promise<void>((resolve) => { release = resolve; });
   // Hold the width save so the menu can be read while it waits.
-  await page.route(`**/artifact/${publicId}`, async (route) => {
-    if (route.request().method() === "POST") await held;
-    await route.fallback();
-  });
+  const release = await holdActions(page, publicId);
   await moreActions(page).click();
   const toggle = page.getByRole("menuitemcheckbox", { name: "Full width" });
   await expect(toggle).toHaveAttribute("aria-checked", "false");
@@ -243,6 +238,17 @@ test("should give the header ⋯ menu the artifact theme's colors", async ({ pag
   expect(colors.page, "the artifact theme changes the menu color").not.toBe(colors.site);
 });
 
+/** Holds the page's server actions (load, save, Full width) until the returned function releases them. */
+async function holdActions(page: Page, publicId: string): Promise<() => void> {
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(`**/artifact/${publicId}`, async (route) => {
+    if (route.request().method() === "POST") await held;
+    await route.fallback();
+  });
+  return release;
+}
+
 /** Fails the page's server actions (load, save, Full width) while `state.failing` is true, as a dropped connection would. */
 async function failActionsWhile(page: Page, publicId: string, state: { failing: boolean }) {
   await page.route(`**/artifact/${publicId}`, async (route) => {
@@ -263,7 +269,10 @@ test("should say editing is not available and keep only History in the ⋯ when 
   await expect(page.getByRole("textbox", { name: "Title" }), "the page stays a read view").toHaveCount(0);
 
   await moreActions(page).click();
-  await expect(page.getByRole("menuitemcheckbox", { name: "Full width" })).toHaveAttribute("aria-disabled", "true");
+  const fullWidth = page.getByRole("menuitemcheckbox", { name: "Full width" });
+  await expect(fullWidth).toHaveAttribute("aria-disabled", "true");
+  await expect(fullWidth, "a copy that failed to load is not on its way").toHaveAccessibleName("Full width");
+  await expect(fullWidth).toHaveAttribute("aria-busy", "false");
   await expect(page.getByRole("menuitem", { name: "View source" })).toHaveAttribute("aria-disabled", "true");
   await expect(page.getByRole("menuitem", { name: "History" })).not.toHaveAttribute("aria-disabled", "true");
   await expect(page.getByRole("menuitem", { name: "Try saving again" })).toHaveCount(0);
@@ -338,13 +347,8 @@ test("should keep History open when editing unlocks while it is open", async ({ 
   await signIn(page);
   const title = `Header history unlock ${testInfo.project.name}`;
   const publicId = await seed(title);
-  let release: () => void = () => undefined;
-  const held = new Promise<void>((resolve) => { release = resolve; });
   // Hold the page's server actions (the editable copy among them) until History is open.
-  await page.route(`**/artifact/${publicId}`, async (route) => {
-    if (route.request().method() === "POST") await held;
-    await route.fallback();
-  });
+  const release = await holdActions(page, publicId);
   const loading = page.waitForRequest((request) => request.method() === "POST" && request.url().endsWith(`/artifact/${publicId}`));
   await page.goto(`/artifact/${publicId}`);
   await loading;
