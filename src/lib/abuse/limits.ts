@@ -33,6 +33,12 @@ export const rateLimits = {
    * its own bucket and never uses up artifact saves.
    */
   harnessChoice: { limit: 600, windowSeconds: hour },
+  /**
+   * MCP `initialize` requests whose clientInfo is stored, per user per hour.
+   * Over the limit the request still runs; only the clientInfo is not stored,
+   * so a client that renames itself on every connect cannot churn the row.
+   */
+  clientInfoRecord: { limit: 600, windowSeconds: hour },
   /** Reads (MCP read tools and opening artifacts in the workspace) per user per hour. */
   readByUser: { limit: 3600, windowSeconds: hour },
   /** MCP read tool calls per token per hour. */
@@ -120,6 +126,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   artifactUpdateByToken: "This connection has changed artifacts a lot in the last hour.",
   organize: "You have changed projects and tags a lot in the last hour.",
   harnessChoice: "You have changed agent labels a lot in the last hour.",
+  clientInfoRecord: "Your agents have connected a lot in the last hour.",
   readByUser: "You have read a lot of artifacts in the last hour.",
   readByToken: "This connection has read a lot in the last hour.",
   fileDownloadByNetwork: "Your network has opened a lot of files in the last hour.",

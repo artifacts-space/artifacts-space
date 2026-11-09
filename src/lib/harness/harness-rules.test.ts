@@ -216,9 +216,9 @@ describe("approvedHarnessOf", () => {
 });
 
 describe("harnessPhrase", () => {
-  it("should say an unknown agent in a sentence when no rule recognized the client", () => {
-    expect(harnessPhrase("other")).toBe("an unknown agent");
-    expect(harnessPhrase("retired-id")).toBe("an unknown agent");
+  it("should say another agent in a sentence for Other agent, chosen or detected", () => {
+    expect(harnessPhrase("other")).toBe("another agent");
+    expect(harnessPhrase("retired-id")).toBe("another agent");
     expect(harnessPhrase("codex")).toBe("Codex");
   });
 });

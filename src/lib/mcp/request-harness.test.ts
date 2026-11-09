@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * on its own, reads never do, and a failed write never fails the request.
  */
 
-const mocks = vi.hoisted(() => ({ recordClientInfo: vi.fn(), loadConnectionStamp: vi.fn() }));
+const mocks = vi.hoisted(() => ({ recordClientInfo: vi.fn(), loadConnectionStamp: vi.fn(), hitRateLimit: vi.fn() }));
+vi.mock("@/lib/abuse/rate-limit", () => ({ hitRateLimit: mocks.hitRateLimit }));
 vi.mock("@/lib/harness/connection-store", () => ({ recordClientInfo: mocks.recordClientInfo, loadConnectionStamp: mocks.loadConnectionStamp }));
 
 const { connectionHarness, recordRequestClientInfo } = await import("./request-harness");
@@ -15,6 +16,7 @@ const connection = { kind: "oauth", userId: "user-1", clientId: "app-1" } as con
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.recordClientInfo.mockResolvedValue(undefined);
+  mocks.hitRateLimit.mockResolvedValue({ allowed: true, retryAfterSeconds: 0 });
 });
 
 describe("recordRequestClientInfo", () => {
@@ -27,6 +29,13 @@ describe("recordRequestClientInfo", () => {
   it("should not write when a newer client names itself on an ordinary request", async () => {
     const info = await recordRequestClientInfo(connection, { method: "tools/call", params: { _meta: { "io.modelcontextprotocol/clientInfo": { name: "fx" } } } });
     expect(info).toEqual({ name: "fx", version: null });
+    expect(mocks.recordClientInfo).not.toHaveBeenCalled();
+  });
+
+  it("should answer but store nothing when the person's agents connect over the limit", async () => {
+    mocks.hitRateLimit.mockResolvedValue({ allowed: false, retryAfterSeconds: 60 });
+    await expect(recordRequestClientInfo(connection, { method: "initialize", params: { clientInfo: { name: "goose" } } })).resolves.toEqual({ name: "goose", version: null });
+    expect(mocks.hitRateLimit).toHaveBeenCalledWith("clientInfoRecord", "user-1");
     expect(mocks.recordClientInfo).not.toHaveBeenCalled();
   });
 
