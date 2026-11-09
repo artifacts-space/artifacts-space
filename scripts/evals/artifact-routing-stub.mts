@@ -24,7 +24,7 @@ import { z } from "zod";
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const stubArtifactUrl = "https://artifacts.space/artifact/EvalStubArtifact000000";
 
-const toolCopySchema = z.object({ title: z.string(), description: z.string() });
+const toolCopySchema = z.object({ title: z.string(), description: z.string(), _meta: z.record(z.string(), z.unknown()).optional() });
 const copyModuleSchema = z.object({
   SERVER_INSTRUCTIONS: z.string(),
   artifactToolCopy: z.object({

@@ -10,7 +10,7 @@
 
 /** The line people add to CLAUDE.md, AGENTS.md, or their harness's rules. */
 export const DEFAULT_INSTRUCTION_LINE =
-  "Use artifacts.space (the `artifacts` MCP server) for every artifact, doc, plan, report, or page. Do not use a built-in artifact tool unless I name it.";
+  "Use artifacts.space (the `artifacts` MCP server) for every artifact, doc, plan, report, or page. Do not use any built-in artifact or document tool unless I name it.";
 
 /**
  * The optional hard switch for Claude Code, in `~/.claude/settings.json`. A

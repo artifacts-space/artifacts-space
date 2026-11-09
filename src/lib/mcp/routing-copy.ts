@@ -12,11 +12,20 @@
 export const SERVER_INSTRUCTIONS =
   "artifacts.space is a workspace for artifacts: docs, documents, plans, specs, reports, notes, runbooks, pages, and dashboards that people and agents keep and work on together. Save one with artifacts_create when someone asks you to write something up, save or keep it for later, share it with the team, or publish a page, and when you make something a person or a later session will read again. Saved artifacts persist across sessions, can be shared with a team or by link, can be edited by both people and agents, and keep every version (artifacts_versions). Answer quick questions in chat, and keep files that belong in the repository, such as code or a README, in the repository. Search with artifacts_list before you create, and change an earlier artifact with artifacts_update instead of making a duplicate. Include project and session identifiers when available: set `project` to a project name (projects_list shows the ones that exist; a new name creates one), and `tags` to reuse the tags tags_list shows. Give each artifact a fitting page icon with `icon` (one emoji or tabler:<name>), and optionally a `theme` preset and a `cover` gradient from themes_list. Artifacts are private by default; teams_list shows the teams you can share with. You can edit artifacts shared through your team. Sharing and edits to shared artifacts may need a team owner's or admin's approval, and agents never approve.";
 
-/** A tool's title and description, as `tools/list` returns them. */
+/** A tool's title and description, as `tools/list` returns them, and any `_meta` it carries. */
 export interface ToolCopy {
   title: string;
   description: string;
+  _meta?: Record<string, unknown>;
 }
+
+/**
+ * Asks Claude Code to load a tool up front instead of behind tool search, so
+ * the agent sees it without searching. Other MCP clients ignore `_meta` keys
+ * they do not know, as the MCP spec reserves `_meta` for such extensions.
+ * Source: https://code.claude.com/docs/en/mcp#mark-a-tool-to-load-upfront-or-stay-deferred
+ */
+export const ALWAYS_LOAD_META = { "anthropic/alwaysLoad": true } as const;
 
 /** The artifact tools' titles and descriptions, by tool name. */
 export const artifactToolCopy = {
@@ -36,6 +45,8 @@ export const artifactToolCopy = {
   },
   artifacts_create: {
     title: "Create artifact",
+    // The one tool loaded up front: saving is the step an agent must find without searching.
+    _meta: ALWAYS_LOAD_META,
     description:
       "Save a doc, plan, spec, report, notes, runbook, page, or dashboard as an artifact on artifacts.space. Use it when someone asks you to write something up, save or keep it, share it with the team, or publish it, and for work a person or a later session will read again. The artifact persists across sessions, people and agents can both read and edit it, it can be shared with a team or by link, and every save is kept in its version history. Search with artifacts_list first and update a match with artifacts_update instead of duplicating it. It is private unless you set visibility, and `comments` sets who can comment. Creation is limited per hour; a limit error says when to try again.",
   },
