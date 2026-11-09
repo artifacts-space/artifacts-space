@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,14 +11,32 @@ import { changedFilesSince } from "./vercel-ignore-build-git.mts";
 /*
  * The git glue and the entry script against a throwaway repository: the
  * diff Vercel's ignored build step reads, and the exit code Vercel sees.
+ *
+ * Git hooks (such as Husky's pre-push, which runs these tests) export
+ * GIT_DIR and friends, which would point every git call here at the real
+ * repository. The tests drop them, pass identity with -c instead of
+ * writing config, and refuse to run unless git resolves to the temp repo.
  */
 
 const entryScript = join(dirname(fileURLToPath(import.meta.url)), "vercel-ignore-build.mts");
 let repo = "";
 const commits: Record<string, string> = {};
 
+/** The test's environment without the GIT_* variables a hook exports. */
+function envWithoutGit(): Record<string, string> {
+  return Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => !entry[0].startsWith("GIT_") && entry[1] !== undefined));
+}
+
 function git(...args: string[]): string {
-  return execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
+  return execFileSync("git", args, { cwd: repo, env: envWithoutGit(), encoding: "utf8" }).trim();
+}
+
+const identity = ["-c", "user.email=test@example.com", "-c", "user.name=Test", "-c", "commit.gpgsign=false"];
+
+function commitAll(name: string) {
+  git("add", "-A");
+  git(...identity, "commit", "-q", "-m", name);
+  commits[name] = git("rev-parse", "HEAD");
 }
 
 function commit(name: string, files: Record<string, string>) {
@@ -26,9 +44,7 @@ function commit(name: string, files: Record<string, string>) {
     mkdirSync(dirname(join(repo, path)), { recursive: true });
     writeFileSync(join(repo, path), content);
   }
-  git("add", "-A");
-  git("commit", "-q", "-m", name);
-  commits[name] = git("rev-parse", "HEAD");
+  commitAll(name);
 }
 
 function sha(name: string): string {
@@ -45,22 +61,23 @@ function runStep(head: string, env: Record<string, string>): number | null {
 }
 
 beforeAll(() => {
-  repo = mkdtempSync(join(tmpdir(), "vercel-ignore-build-"));
+  for (const name of Object.keys(process.env)) {
+    if (name.startsWith("GIT_")) vi.stubEnv(name, undefined);
+  }
+  repo = realpathSync(mkdtempSync(join(tmpdir(), "vercel-ignore-build-")));
   git("init", "-q");
-  git("config", "user.email", "test@example.com");
-  git("config", "user.name", "Test");
-  git("config", "commit.gpgsign", "false");
+  if (git("rev-parse", "--show-toplevel") !== repo) throw new Error("git does not resolve to the temporary repository; refusing to commit.");
   commit("base", { "README.md": "# App\n", "src/app/page.tsx": "export default 1;\n" });
   commit("docs", { "README.md": "# App, updated\n", ".github/workflows/ci.yml": "name: CI\n" });
   commit("code", { "src/app/page.tsx": "export default 2;\n" });
   mkdirSync(join(repo, "docs/images"), { recursive: true });
   git("mv", "src/app/page.tsx", "docs/images/page.tsx");
-  git("commit", "-q", "-m", "move");
-  commits.move = git("rev-parse", "HEAD");
+  commitAll("move");
 });
 
 afterAll(() => {
-  rmSync(repo, { recursive: true, force: true });
+  vi.unstubAllEnvs();
+  if (repo) rmSync(repo, { recursive: true, force: true });
 });
 
 beforeEach(() => {
