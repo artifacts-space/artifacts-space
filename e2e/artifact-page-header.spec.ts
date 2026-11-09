@@ -146,6 +146,14 @@ test("should widen the page from Full width in the header's ⋯ and keep it afte
   await expect(page.getByRole("textbox", { name: "Title" }), "the page stays editable").toHaveValue(title);
   expect(await main.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(960);
 
+  // An autosave hands the editor a new copy; the checkbox keeps following the page's width.
+  await page.keyboard.press("Escape");
+  await page.getByRole("textbox", { name: "Title" }).fill(`${title} saved`);
+  await expect(header(page).locator("[data-slot=save-indicator]")).toHaveAttribute("data-tone", "saved");
+  await moreActions(page).click();
+  await expect(page.getByRole("menuitemcheckbox", { name: "Full width" })).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
+
   await page.reload();
   await expect(main).toHaveAttribute("data-full-width", "true");
   await moreActions(page).click();
