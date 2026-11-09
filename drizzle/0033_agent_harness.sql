@@ -6,7 +6,7 @@ CREATE TABLE "mcp_connection" (
 	"client_name" text,
 	"client_version" text,
 	"harness_override" text,
-	"client_seen_at" timestamp with time zone,
+	"client_changed_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "mcp_connection_kind_check" CHECK (("mcp_connection"."oauth_client_id" is null) <> ("mcp_connection"."api_token_id" is null)),

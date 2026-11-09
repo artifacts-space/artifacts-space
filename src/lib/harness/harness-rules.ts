@@ -226,9 +226,9 @@ export function stampColumns(stamp: HarnessStamp | null | undefined): { harness:
 }
 
 /**
- * The harness a new version records: the artifact's own override when it has
- * one (so History agrees with the byline), else the save's stamp, else none
- * (a save in the web app).
+ * The harness a new version records. A save in the web app records none,
+ * even when the artifact has an override. An agent's save records the
+ * artifact's override when it has one, else the save's stamp.
  */
 export function versionStamp(artifactOverride: string | null | undefined, stamp: HarnessStamp | null | undefined): HarnessStamp | null {
   if (!stamp) return null;
@@ -241,12 +241,12 @@ export function stampOf(id: string | null | undefined): HarnessStamp | null {
 }
 
 /**
- * The harness a reader of the approved version is shown. Without a pending
- * edit the approved version is what the artifact shows, so it reads like the
- * team's view (the artifact's last agent stamp). With one, it is the approved
- * version's own harness, never the agent of the edit that waits. The
- * artifact's own choice wins either way.
+ * The harness a reader of the approved version is shown: the harness that
+ * version recorded, never the artifact's latest stamp. The latest stamp can
+ * belong to an edit that waits for approval or was denied, and readers must
+ * never see the agent of content they are not shown. The artifact's own
+ * choice wins.
  */
-export function approvedHarnessOf(input: { harness: string | null; harnessOverride: string | null; approvedHarness: string | null; pendingEdit: boolean }) {
-  return artifactHarnessOf({ harness: input.pendingEdit ? input.approvedHarness : input.harness, harnessOverride: input.harnessOverride });
+export function approvedHarnessOf(input: { harnessOverride: string | null; approvedHarness: string | null }) {
+  return artifactHarnessOf({ harness: input.approvedHarness, harnessOverride: input.harnessOverride });
 }

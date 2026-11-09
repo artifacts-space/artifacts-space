@@ -48,8 +48,6 @@ function row(visibility: "private" | "team" | "link" | "public", member: boolean
     approvedSavedAt: savedAt,
     approvedBy: author,
     approvedHarness: "claude-code" as string | null,
-    // The open edit request (Cursor's save) that waits for approval.
-    pendingEditId: "edit-1" as string | null,
   };
 }
 
@@ -156,10 +154,10 @@ describe("access decision and the version cache", () => {
     }
   });
 
-  it("should show readers outside the team the artifact's last agent when no edit waits for approval", async () => {
-    // Snapshots and file saves keep the approved version in step with the artifact, so its stamp is current.
-    mocks.rows = [[{ ...row("public", false), pendingEditId: null, approvedHarness: null }]];
-    expect((await getArtifactAccess(publicId, "outsider"))?.served.harness).toEqual({ id: "cursor", stamped: "cursor", overridden: false });
+  it("should never show readers outside the team the agent of a denied edit, even when the approved version recorded none", async () => {
+    // After a denial the artifact row keeps the denied draft (Cursor's) and no request is pending.
+    mocks.rows = [[{ ...row("link", false), approvedHarness: null }]];
+    expect((await getArtifactAccess(publicId, "outsider"))?.served.harness).toBeNull();
   });
 
   it("should show no agent to readers outside the team when the approved version was saved in the browser", async () => {

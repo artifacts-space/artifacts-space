@@ -10,7 +10,10 @@ const mocks = vi.hoisted(() => ({
   ownerRows: vi.fn<() => unknown[]>(() => []),
   inserted: vi.fn(),
   conflict: vi.fn(),
+  enforceRateLimit: vi.fn(),
 }));
+
+vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: mocks.enforceRateLimit }));
 
 vi.mock("@/db", () => ({
   getDb: () => ({
@@ -48,6 +51,14 @@ describe("setConnectionHarnessOverride", () => {
     await expect(setConnectionHarnessOverride({ kind: "oauth", userId: "user-1", clientId: "app-1" }, "claude-code")).resolves.toBe(true);
     expect(mocks.inserted).toHaveBeenCalledWith(expect.objectContaining({ userId: "user-1", oauthClientId: "app-1", apiTokenId: null, harnessOverride: "claude-code" }));
     expect(mocks.conflict).toHaveBeenCalledWith(expect.objectContaining({ set: expect.objectContaining({ harnessOverride: "claude-code" }) as unknown }));
+    expect(mocks.enforceRateLimit).toHaveBeenCalledWith("artifactUpdate", "user-1");
+  });
+
+  it("should write nothing when the person is over the rate limit", async () => {
+    mocks.ownerRows.mockReturnValue([{ id: "consent-1" }]);
+    mocks.enforceRateLimit.mockRejectedValueOnce(new Error("Too many changes"));
+    await expect(setConnectionHarnessOverride({ kind: "oauth", userId: "user-1", clientId: "app-1" }, "codex")).rejects.toThrow("Too many changes");
+    expect(mocks.inserted).not.toHaveBeenCalled();
   });
 
   it("should clear the override for the person's own token", async () => {

@@ -25,7 +25,8 @@ export const mcpConnection = pgTable(
     clientVersion: text("client_version"),
     // The harness id the person chose. Null uses what was detected.
     harnessOverride: text("harness_override"),
-    clientSeenAt: timestamp("client_seen_at", { withTimezone: true }),
+    // When the client last sent a new name or version (not every connect: an unchanged clientInfo writes nothing).
+    clientChangedAt: timestamp("client_changed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

@@ -172,7 +172,6 @@ export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publi
       approvedSavedAt: artifactVersion.savedAt,
       approvedBy: artifactVersion.createdBy,
       approvedHarness: artifactVersion.harness,
-      pendingEditId: sharingRequest.id,
     })
     .from(artifact)
     .leftJoin(team, eq(team.id, artifact.teamId))
@@ -180,8 +179,6 @@ export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publi
     .leftJoin(agent, ownedAgentOn)
     .leftJoin(ownerMember, ownerMemberOn)
     .leftJoin(artifactVersion, eq(artifactVersion.id, artifact.approvedVersionId))
-    // At most one open edit request per artifact (a unique index), so this adds no rows.
-    .leftJoin(sharingRequest, and(eq(sharingRequest.artifactId, artifact.id), eq(sharingRequest.kind, "edit"), eq(sharingRequest.status, "pending")))
     .where(eq(artifact.publicId, publicId))
     .limit(1);
 }
@@ -203,8 +200,7 @@ type Subject = NonNullable<Awaited<ReturnType<typeof loadSubject>>>;
 /** The approved version a reader outside the team gets, or null for the latest. */
 function approvedVersionFor(subject: Subject, versionId: string) {
   if (subject.approvedTitle === null || subject.approvedSavedAt === null) return null;
-  const { harness: rowHarness, harnessOverride } = subject.record;
-  const harness = approvedHarnessOf({ harness: rowHarness, harnessOverride, approvedHarness: subject.approvedHarness, pendingEdit: subject.pendingEditId !== null });
+  const harness = approvedHarnessOf({ harnessOverride: subject.record.harnessOverride, approvedHarness: subject.approvedHarness });
   return { versionId, served: { title: subject.approvedTitle, icon: subject.approvedIcon, theme: subject.approvedTheme, cover: subject.approvedCover, updatedAt: subject.approvedSavedAt, editedBy: subject.approvedBy, harness } };
 }
 

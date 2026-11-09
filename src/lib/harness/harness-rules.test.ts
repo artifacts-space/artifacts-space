@@ -180,21 +180,13 @@ describe("harness precedence", () => {
 });
 
 describe("approvedHarnessOf", () => {
-  const stored = { harness: "cursor", harnessOverride: null, approvedHarness: "claude-code" };
-
-  it("should show the approved version's harness, never the waiting edit's, when an edit waits for approval", () => {
-    expect(approvedHarnessOf({ ...stored, pendingEdit: true })).toEqual({ id: "claude-code", stamped: "claude-code", overridden: false });
-    expect(approvedHarnessOf({ ...stored, approvedHarness: null, pendingEdit: true })).toBeNull();
+  it("should show the approved version's own harness, never the artifact's latest stamp", () => {
+    expect(approvedHarnessOf({ harnessOverride: null, approvedHarness: "claude-code" })).toEqual({ id: "claude-code", stamped: "claude-code", overridden: false });
+    expect(approvedHarnessOf({ harnessOverride: null, approvedHarness: null })).toBeNull();
   });
 
-  it("should show the artifact's last agent when no edit waits, like its team sees it", () => {
-    expect(approvedHarnessOf({ ...stored, approvedHarness: null, pendingEdit: false })).toEqual({ id: "cursor", stamped: "cursor", overridden: false });
-  });
-
-  it("should show the artifact's own choice whether or not an edit waits", () => {
-    for (const pendingEdit of [true, false]) {
-      expect(approvedHarnessOf({ ...stored, harnessOverride: "codex", pendingEdit })?.id).toBe("codex");
-    }
+  it("should show the artifact's own choice over what the approved version recorded", () => {
+    expect(approvedHarnessOf({ harnessOverride: "codex", approvedHarness: "claude-code" })).toEqual({ id: "codex", stamped: "claude-code", overridden: true });
   });
 });
 

@@ -6,6 +6,7 @@ import { getDb } from "@/db";
 import { mcpConnection } from "@/db/connection-schema";
 import { oauthClient, oauthConsent } from "@/db/oauth-schema";
 import { apiToken } from "@/db/schema";
+import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 
 import type { McpConnectionRef } from "./connection-ref";
 import { connectionStamp, detectHarness, overrideOf, type ClientInfo, type HarnessStamp } from "./harness-rules";
@@ -31,10 +32,10 @@ export async function recordClientInfo(ref: McpConnectionRef, info: ClientInfo):
   const now = new Date();
   await getDb()
     .insert(mcpConnection)
-    .values({ id: randomUUID(), userId: ref.userId, ...key.values, clientName: info.name, clientVersion: info.version, clientSeenAt: now })
+    .values({ id: randomUUID(), userId: ref.userId, ...key.values, clientName: info.name, clientVersion: info.version, clientChangedAt: now })
     .onConflictDoUpdate({
       target: key.target,
-      set: { clientName: info.name, clientVersion: info.version, clientSeenAt: now, updatedAt: now },
+      set: { clientName: info.name, clientVersion: info.version, clientChangedAt: now, updatedAt: now },
       setWhere: sql`${mcpConnection.clientName} is distinct from excluded.client_name or ${mcpConnection.clientVersion} is distinct from excluded.client_version`,
     });
 }
@@ -111,6 +112,7 @@ async function ownsConnection(ref: McpConnectionRef): Promise<boolean> {
  */
 export async function setConnectionHarnessOverride(ref: McpConnectionRef, harness: HarnessId | null): Promise<boolean> {
   if (!(await ownsConnection(ref))) return false;
+  await enforceRateLimit("artifactUpdate", ref.userId);
   const key = keyOf(ref);
   const now = new Date();
   await getDb()
