@@ -156,7 +156,7 @@ export function CoverPicker({ value, onChange, trigger, disabled = false, allowU
       <PopoverContent align={align} sideOffset={8} className="w-[calc(100vw-2rem)] p-0 sm:w-[26rem]">
         <div className="border-b px-3 py-2.5">
           <PopoverTitle>Cover</PopoverTitle>
-          <p className="text-xs text-muted-foreground">A slim banner above the artifact. Gradients follow its theme in light and dark.</p>
+          <p className="text-xs text-muted-foreground">A banner above the artifact. Gradients follow its theme in light and dark.</p>
         </div>
         {open ? <GradientGrid selected={selected} onSelect={choose} /> : null}
         {allowUpload ? <CoverUpload onUploaded={(fileId) => { choose(`${FILE_PREFIX}${fileId}`); }} /> : null}

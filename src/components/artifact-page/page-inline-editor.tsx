@@ -1,77 +1,17 @@
 "use client";
 
-import { IconAlertTriangle, IconCode, IconDots } from "@tabler/icons-react";
 import { useCallback, useMemo, useState } from "react";
 
-import { ConflictNotice, saveStatusLabel } from "@/components/app/artifact-editor/save-status";
 import { useArtifactDraft, type ArtifactDraft } from "@/components/app/artifact-editor/use-artifact-draft";
-import { useAutosave, type AutosaveStatus, type SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
-import { VersionHistory } from "@/components/history/version-history";
-import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useAutosave, type SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import type { ArtifactDto } from "@/lib/artifact-types";
-import { cn } from "@/lib/utils";
 
-import { FullWidthToggle } from "./full-width-toggle";
 import { PageEditContext, type PageEdit } from "./page-edit-context";
+import { useOwnSaves, usePublishPageEditorChrome, type PageEditorChrome } from "./page-editor-chrome";
+import { ownSaveBase } from "./restore-base-rules";
+import { saveIndicatorFor } from "./save-indicator-rules";
+import { usePageFullWidth } from "./use-page-full-width";
 import { useLeaveGuard } from "./use-leave-guard";
-
-interface SaveLineProps {
-  status: AutosaveStatus;
-  dirty: boolean;
-  onRetry: () => void;
-}
-
-/** The quiet "Saving… / Saved" line, or why the latest change is not saved. */
-function SaveLine({ status, dirty, onRetry }: SaveLineProps) {
-  const label = saveStatusLabel(status, dirty);
-  const problem = status.kind === "held" || status.kind === "failed";
-  return (
-    <span className="mr-auto flex min-w-0 flex-1 items-center gap-2">
-      {/* One line, so a long reason never pushes the artifact down while typing; the full text is in the tooltip. */}
-      <span role="status" aria-live="polite" title={label ?? undefined} className={cn("flex min-w-0 items-center gap-1.5 text-xs", problem ? "text-foreground" : "text-muted-foreground")}>
-        {problem ? <IconAlertTriangle aria-hidden className="size-3.5 shrink-0 text-tone-warning" /> : null}
-        <span className="truncate">{label}</span>
-      </span>
-      {status.kind === "failed" ? <Button variant="ghost" size="xs" onClick={onRetry}>Try again</Button> : null}
-    </span>
-  );
-}
-
-interface PageEditBarProps {
-  /** History, with the restore check for the version the editor sees. */
-  history: React.ReactNode;
-  /** The save line; empty while the editable copy loads. */
-  status?: React.ReactNode;
-  source: { open: boolean; onToggle: () => void } | null;
-  /** The Full width switch; empty while the editable copy loads. */
-  width?: React.ReactNode;
-}
-
-/**
- * The row above an artifact its viewer may edit: the save status, Full
- * width, History, and More (View source). There is no Edit button and no Save button: the
- * artifact is editable where it reads, and changes save on their own.
- */
-export function PageEditBar({ history, status, source, width }: PageEditBarProps) {
-  return (
-    <div data-slot="editor-bar" className="mb-6 flex min-h-8 items-center justify-end gap-1">
-      {status ?? <span className="mr-auto" />}
-      {width ? <span className="mr-2 shrink-0">{width}</span> : null}
-      {history}
-      <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="More actions" disabled={!source} />}>
-          <IconDots />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem onClick={source?.onToggle} className="py-2">
-            <IconCode /> {source?.open ? "Hide source" : "View source"}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-}
 
 /**
  * An empty draft that only fills the draft state until the editable copy
@@ -135,31 +75,37 @@ interface PageEditControlsProps {
   save?: SaveArtifact | undefined;
 }
 
-/** The edit bar and conflict notice once the editable copy has loaded, with autosave. */
+/**
+ * Autosave and the editor's controls once the editable copy has loaded. It
+ * draws nothing here: it publishes the save status, Full width, History, and
+ * View source to the page header, and a conflicting save to the notice under
+ * the title (page-editor-chrome.tsx).
+ */
 function PageEditControls({ artifact, editor, reviewed, save }: PageEditControlsProps) {
   const autosave = useAutosave({ artifact, draft: editor.draft, replaceDraft: editor.replace, onUpdated: editor.onUpdated, save });
   useLeaveGuard(autosave.dirty || autosave.status.kind === "saving");
-  return (
-    <>
-      <PageEditBar
-        history={
-          <VersionHistory
-            publicId={artifact.publicId}
-            title={editor.draft.title}
-            updatedAt={artifact.updatedAt}
-            reviewed={reviewed}
-            files={artifact.files}
-            hasUnsavedChanges={autosave.dirty}
-            onRestored={editor.restored}
-          />
-        }
-        status={<SaveLine status={autosave.status} dirty={autosave.dirty} onRetry={autosave.retryNow} />}
-        source={{ open: editor.sourceOpen, onToggle: editor.toggleSource }}
-        width={<FullWidthToggle artifact={artifact} />}
-      />
-      <ConflictNotice status={autosave.status} onLoadTheirs={autosave.loadTheirs} onKeepMine={autosave.keepMine} className="mb-6 rounded-lg border sm:px-4" />
-    </>
-  );
+  const fullWidth = usePageFullWidth(artifact);
+  const { status, dirty, retryNow, loadTheirs, keepMine } = autosave;
+  const { draft, restored, sourceOpen, toggleSource } = editor;
+  const ownSaves = useOwnSaves();
+  const chrome = useMemo<PageEditorChrome>(() => ({
+    history: {
+      publicId: artifact.publicId,
+      title: draft.title,
+      // Cover, icon, and theme save through their own actions and leave the editor's copy at its older time; the restore check follows them.
+      updatedAt: ownSaveBase(artifact.updatedAt, ownSaves),
+      reviewed,
+      files: artifact.files,
+      hasUnsavedChanges: dirty,
+      onRestored: restored,
+    },
+    source: { open: sourceOpen, onToggle: toggleSource },
+    fullWidth,
+    save: saveIndicatorFor(status, dirty, retryNow),
+    conflict: status.kind === "conflict" ? { status, onLoadTheirs: loadTheirs, onKeepMine: keepMine } : null,
+  }), [artifact, draft.title, ownSaves, reviewed, dirty, restored, sourceOpen, toggleSource, fullWidth, status, retryNow, loadTheirs, keepMine]);
+  usePublishPageEditorChrome(chrome);
+  return null;
 }
 
 interface PageEditFrameProps {
@@ -168,22 +114,20 @@ interface PageEditFrameProps {
   reviewed: boolean;
   /** Sends a save; the dev fixture passes a stand-in. Defaults to the web save action. */
   save?: SaveArtifact | undefined;
-  /** The bar shown while the editable copy loads. */
-  loadingBar?: React.ReactNode;
   /** The page's heading and body, which read the edit state through PageEditContext. */
   children: React.ReactNode;
 }
 
 /**
- * The edit bar above the page's heading and body. The heading and body sit
- * in the same place whether or not the editable copy has loaded, so React
- * never remounts them (and the icon, theme, and cover pickers in the
+ * The edit state around the page's heading and body. The heading and body
+ * sit in the same place whether or not the editable copy has loaded, so
+ * React never remounts them (and the icon, theme, and cover pickers in the
  * heading never close) when editing unlocks.
  */
-export function PageEditFrame({ editor, reviewed, save, loadingBar, children }: PageEditFrameProps) {
+export function PageEditFrame({ editor, reviewed, save, children }: PageEditFrameProps) {
   return (
     <PageEditContext value={editor.value}>
-      {editor.artifact ? <PageEditControls artifact={editor.artifact} editor={editor} reviewed={reviewed} save={save} /> : loadingBar}
+      {editor.artifact ? <PageEditControls artifact={editor.artifact} editor={editor} reviewed={reviewed} save={save} /> : null}
       {children}
     </PageEditContext>
   );
@@ -207,8 +151,9 @@ interface PageInlineEditorProps {
  * title, summary, and content become editable in place (inline-fields.tsx)
  * and save on their own a second after typing stops, under the same rules
  * as the /app editor (use-autosave.ts): one version per editing session, and
- * a save never overwrites someone else's newer one. For an artifact already
- * loaded; the artifact page loads its copy through EditSurface.
+ * a save never overwrites someone else's newer one. The save status, Full
+ * width, History, and View source go to the page header. For an artifact
+ * already loaded; the artifact page loads its copy through EditSurface.
  */
 export function PageInlineEditor({ artifact, reviewed, onSaved, save, children }: PageInlineEditorProps) {
   const editor = usePageEditor(artifact, onSaved);

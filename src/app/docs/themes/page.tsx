@@ -162,7 +162,7 @@ export default function ThemesPage() {
 
       <DocsH page={page} id="covers" />
       <Prose>
-        <p>A cover is a slim banner across the top of the artifact page, like a book jacket: it makes an artifact easy to know at a glance. It is about 180 px tall on a computer and 120 px on a phone, so the content still starts near the top.</p>
+        <p>A cover is a banner across the top of the artifact page, like a book jacket: it makes an artifact easy to know at a glance. It is about 240 px tall on a computer and 160 px on a phone, and the artifact icon sits across its lower edge.</p>
         <p>A cover is a gradient id, such as <code>&quot;mist&quot;</code>, or an image you upload. Every format can have a cover. An artifact with no cover shows none.</p>
       </Prose>
 

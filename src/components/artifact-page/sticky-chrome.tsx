@@ -8,7 +8,7 @@ export const CHROME_HEIGHT_VAR = "--artifact-chrome-height";
 /**
  * Keeps the artifact page's header pinned to the top while
  * the reader scrolls. It publishes its height as a custom property on the
- * root element, so the editor bar sticks below it and anchor jumps land below
+ * root element, so sticky toolbars below it sit under it and anchor jumps land below
  * it instead of under it. Its background is the page's --background, so it
  * takes the artifact theme's colors from ArtifactPageTheme around it.
  */

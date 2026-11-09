@@ -1,6 +1,7 @@
 "use client";
 
 import { InlineContent } from "@/components/app/artifact-editor/inline-content";
+import { EditorLoadingFallback } from "@/components/editor/document-editor";
 
 import { usePageEdit } from "./page-edit-context";
 
@@ -58,17 +59,20 @@ export function InlineBody({ children }: { children: React.ReactNode }) {
   if (!edit) return children;
   const { artifact, draft, revision, sourceOpen, update, showSource } = edit;
   return (
-    <InlineContent
-      surface="page"
-      kind={draft.kind}
-      content={draft.content}
-      language={draft.language}
-      title={draft.title}
-      files={artifact.files}
-      revision={revision}
-      sourceOpen={sourceOpen}
-      onChange={(content) => { update("content", content); }}
-      onShowSource={showSource}
-    />
+    // While the rich editor's code loads, the read view stays in place.
+    <EditorLoadingFallback value={children}>
+      <InlineContent
+        surface="page"
+        kind={draft.kind}
+        content={draft.content}
+        language={draft.language}
+        title={draft.title}
+        files={artifact.files}
+        revision={revision}
+        sourceOpen={sourceOpen}
+        onChange={(content) => { update("content", content); }}
+        onShowSource={showSource}
+      />
+    </EditorLoadingFallback>
   );
 }
