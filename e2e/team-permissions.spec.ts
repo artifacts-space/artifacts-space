@@ -59,7 +59,7 @@ test("should check the name in the New role dialog before creating", async ({ pa
   await dialog.getByRole("button", { name: "Create role" }).click();
   await expect(dialog.getByText("Give the role a name.")).toBeVisible();
 
-  await dialog.getByLabel("Name").fill("Admin");
+  await dialog.getByLabel("Name", { exact: true }).fill("Admin");
   await dialog.getByRole("button", { name: "Create role" }).click();
   await expect(dialog.getByText("That name belongs to a built-in role.")).toBeVisible();
 });

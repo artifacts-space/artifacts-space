@@ -56,7 +56,7 @@ test("should let an owner create, edit, and give a custom role, and log each cha
   await page.goto(`/teams/${team.slug}?tab=permissions`);
   await page.getByRole("button", { name: "New role" }).click();
   const dialog = page.getByRole("dialog", { name: "New role" });
-  await dialog.getByLabel("Name").fill("Reviewer");
+  await dialog.getByLabel("Name", { exact: true }).fill("Reviewer");
   await dialog.getByText("Approve sharing", { exact: true }).click();
   await dialog.getByRole("button", { name: "Create role" }).click();
   await expect(dialog).toHaveCount(0);
@@ -181,7 +181,7 @@ test("should give a new team its built-in roles with today's rules", async ({ pa
   await readyDevUser();
   const slug = `theme-e2e-new-${String(Date.now()).slice(-8)}`;
   await page.goto("/teams/new");
-  await page.getByLabel("Name").fill("Seeded roles");
+  await page.getByLabel("Name", { exact: true }).fill("Seeded roles");
   await page.getByLabel("Team URL").fill(slug);
   await page.getByRole("button", { name: "Create team" }).click();
   await expect.poll(async () => (await seededRoles(slug).catch(() => null))?.roles ?? null).toEqual({ owner: 14, admin: 13, member: 1, agent: 1 });
