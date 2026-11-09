@@ -138,8 +138,14 @@ test.describe("desktop", () => {
       const fit = await value.evaluate((element) => element.scrollWidth <= element.clientWidth);
       expect(fit, `${name} shows its whole label`).toBe(true);
     }
+    // Titles are the viewer's own text and truncate, so measure the room: about 20 characters, with the date beside it in full.
     const title = list(page).getByRole("heading", { name: "Long markdown fixture" });
-    expect(await title.evaluate((element) => element.scrollWidth <= element.clientWidth), "a card title fits").toBe(true);
+    const room = await title.evaluate((element) => {
+      const date = element.nextElementSibling;
+      return { title: element.clientWidth, dateFits: date !== null && date.scrollWidth <= date.clientWidth };
+    });
+    expect(room.title, "a card title keeps room for about 20 characters").toBeGreaterThanOrEqual(150);
+    expect(room.dateFits, "the date beside it shows in full").toBe(true);
   });
 
   test("should trade height between the Projects rows and the list within their bounds", async ({ page }) => {
