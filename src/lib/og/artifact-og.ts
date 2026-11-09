@@ -6,6 +6,7 @@ import type { ArtifactKind } from "@/lib/artifact-types";
 import { mayExportCsv } from "@/lib/csv-export/rules";
 import { filesForViewer } from "@/lib/files/download";
 import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
+import type { Theme } from "@/lib/themes/schema";
 import { cachedVersionView } from "@/lib/versions/cache";
 import { isReviewedLevel } from "@/lib/versions/rules";
 import { OG_DESCRIPTION, OG_WORDMARK } from "@/lib/site-copy";
@@ -71,12 +72,28 @@ export function artifactPagePath(publicId: string): string {
 
 type VersionView = NonNullable<Awaited<ReturnType<typeof cachedVersionView>>>;
 
+/**
+ * What the description and the card may draw from. Both are read signed
+ * out, so a sheet whose downloads are off gives them no cell values
+ * (mayExportCsv): the description keeps the summary, the card the generic
+ * CSV glyph, like the Markdown version and `/raw`.
+ */
+function cardContent(access: ArtifactAccess, view: Pick<VersionView, "kind" | "content">): string {
+  return mayExportCsv({ canEdit: false }, { kind: view.kind, allowCsvDownload: access.record.allowCsvDownload }) ? view.content : "";
+}
+
+/** The card key for this theme: the theme's own, with a variant when the card withholds a sheet's cells, so turning downloads on or off gives the picture a fresh URL. */
+function cardKey(theme: Theme, access: ArtifactAccess, view: Pick<VersionView, "kind" | "content"> | null | undefined): string {
+  const withheld = view?.kind === "csv" && cardContent(access, view) === "";
+  return ogThemeKey(theme, withheld ? "csv-off" : null);
+}
+
 /** The description of the approved version a signed-out reader sees. Files are listed only when a file artifact has no notes. */
 async function shareableDescription(access: ArtifactAccess, view: VersionView | null): Promise<string | null> {
   if (!view) return null;
   const needsFiles = view.kind === "file" && !view.summary.trim() && !view.content.trim();
   const files = needsFiles ? await filesForViewer(access) : [];
-  return artifactDescription({ kind: view.kind, summary: view.summary, content: view.content, language: view.language, files });
+  return artifactDescription({ kind: view.kind, summary: view.summary, content: cardContent(access, view), language: view.language, files });
 }
 
 /**
@@ -84,8 +101,9 @@ async function shareableDescription(access: ArtifactAccess, view: VersionView | 
  * signed-out reader would get them: its approved title (with its emoji, as
  * in the tab title), a description of its approved version (its summary, or
  * an excerpt of its content), and the preview of that version, whose URL
- * holds the version id and the resolved theme's key, so it changes with
- * every approval and every theme change and can be cached for a year. Empty (the page keeps the site's description, tags, and image)
+ * holds the version id and the resolved theme's key (marked when a sheet's
+ * downloads are off), so it changes with every approval, every theme
+ * change, and every download toggle, and can be cached for a year. Empty (the page keeps the site's description, tags, and image)
  * when the artifact may not be previewed or the lookup fails, so private,
  * team, and unapproved text never reaches these tags. `loadedFor` is the
  * page's viewer (null when signed out), only to reuse the row the page loaded.
@@ -98,7 +116,7 @@ export async function artifactOgMetadata(publicId: string, loadedFor: string | n
     const view = await cachedVersionView(shareable.versionId, shareable.savedAt);
     const [description, resolved] = await Promise.all([shareableDescription(access, view), resolveThemeFor(access.record, view?.theme ?? null)]);
     const title = `${iconTitlePrefix(access.served.icon)}${access.served.title}`;
-    const image = { url: artifactImagePath(publicId, shareable.versionId, ogThemeKey(resolved.theme)), alt: `${access.served.title} on ${OG_WORDMARK}`, width: OG_SIZE.width, height: OG_SIZE.height, type: "image/png" };
+    const image = { url: artifactImagePath(publicId, shareable.versionId, cardKey(resolved.theme, access, view)), alt: `${access.served.title} on ${OG_WORDMARK}`, width: OG_SIZE.width, height: OG_SIZE.height, type: "image/png" };
     return {
       description: description ?? OG_DESCRIPTION,
       openGraph: { title, description: description ?? OG_DESCRIPTION, url: artifactPagePath(publicId), type: "article", siteName: OG_WORDMARK, images: [image] },
@@ -129,15 +147,6 @@ export interface ArtifactOg {
 }
 
 /**
- * What the card may draw from. A card request is always anonymous, so a
- * sheet whose downloads are off gives it no cell values (mayExportCsv), only
- * the generic CSV glyph, like the Markdown version and `/raw`.
- */
-function cardContent(access: ArtifactAccess, view: Pick<VersionView, "kind" | "content">): string {
-  return mayExportCsv({ canEdit: false }, { kind: view.kind, allowCsvDownload: access.record.allowCsvDownload }) ? view.content : "";
-}
-
-/**
  * The preview for `publicId` at image path segment `segment` (the version
  * id, then the theme key; theme-key.ts), or null when the preview must be
  * the generic site image: the artifact is not readable signed out, or the
@@ -163,6 +172,6 @@ export async function loadArtifactOg(publicId: string, segment: string): Promise
     palette: ogCardPalette(theme),
     cover: cover.cover,
     coverDegraded: cover.degraded,
-    themeCurrent: themeKey === ogThemeKey(theme),
+    themeCurrent: themeKey === cardKey(theme, access, view),
   };
 }

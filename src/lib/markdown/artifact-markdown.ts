@@ -135,10 +135,10 @@ export function filesToMarkdown(files: readonly MarkdownFile[], heading: string)
 }
 
 /** The Markdown for a reader the owner turned downloads off for: the title, the summary, and why there is nothing else. */
-export function withheldMarkdown(input: Pick<ArtifactMarkdownInput, "title" | "emoji" | "summary">): string {
+export function withheldMarkdown(input: Pick<ArtifactMarkdownInput, "title" | "emoji" | "summary" | "url">): string {
   const title = `# ${input.emoji ? `${input.emoji} ` : ""}${inlineText(input.title) || "Untitled"}`;
   const summary = inlineText(input.summary);
-  return `${[title, ...(summary ? [`> ${summary}`] : []), `_${csvDownloadOffNote}_`].join("\n\n")}\n`;
+  return `${[title, ...(summary ? [`> ${summary}`] : []), `_${csvDownloadOffNote} Read it on its page: ${input.url}_`].join("\n\n")}\n`;
 }
 
 /** The whole Markdown version: header, content, files, and comments when asked for. */

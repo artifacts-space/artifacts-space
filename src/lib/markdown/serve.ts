@@ -100,7 +100,10 @@ async function loadForViewer(request: Request, publicId: string, credentialed: b
 /**
  * The Markdown version of an artifact: a header block, the content by
  * format, its files, and with `?comments=1` the comment thread (labelled as
- * untrusted) when the comments setting lets this reader see it.
+ * untrusted) when the comments setting lets this reader see it. A sheet
+ * whose downloads are off gives readers who may not edit it only the title,
+ * the summary, and a note that points at the page: no table, no files, and
+ * no comments, since a comment may quote rows.
  */
 export async function artifactMarkdownResponse(request: Request, publicId: string): Promise<Response> {
   const credentialed = hasCredentials(request);

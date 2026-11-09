@@ -26,9 +26,17 @@ function canonical(value: unknown): unknown {
   return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
 }
 
-/** A short, URL-safe key of a resolved theme: the same theme gives the same key, and any change to a color, font, radius, or mode gives a new one. */
-export function ogThemeKey(theme: Theme): string {
-  return createHash("sha256").update(JSON.stringify(canonical(theme))).digest("base64url").slice(0, 10);
+/**
+ * A short, URL-safe key of a resolved theme: the same theme gives the same
+ * key, and any change to a color, font, radius, or mode gives a new one.
+ * `variant` names a way the card is drawn apart from the theme (a sheet
+ * whose downloads are off); it changes the key too, so the picture gets a
+ * fresh URL when that changes. Without one, the key is the theme's alone.
+ */
+export function ogThemeKey(theme: Theme, variant: string | null = null): string {
+  const hash = createHash("sha256").update(JSON.stringify(canonical(theme)));
+  if (variant !== null) hash.update(`|${variant}`);
+  return hash.digest("base64url").slice(0, 10);
 }
 
 /** The image path segment for one version drawn with one theme. */

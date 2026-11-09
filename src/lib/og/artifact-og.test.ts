@@ -108,6 +108,25 @@ describe("artifactOgMetadata", () => {
     expect(JSON.stringify(tags)).not.toContain(pendingTitle);
   });
 
+  it("should give the picture a fresh URL and keep cells out of the description when a sheet's downloads are turned off", async () => {
+    const sheet = { ...approvedView, kind: "csv", content: "name,secret\nAda,s3cret\n" };
+    mocks.cachedVersionView.mockResolvedValue(sheet);
+    mocks.getSignedOutAccess.mockResolvedValue(access("public", "approved", true));
+    const on = await artifactOgMetadata("abc");
+    expect(on.description).toContain("columns name, secret");
+    const onUrl = on.openGraph?.images;
+
+    mocks.getSignedOutAccess.mockResolvedValue(access("public", "approved", false));
+    const off = await artifactOgMetadata("abc");
+    expect(off.description, "no column names or cells").toBe("CSV on artifacts.space");
+    expect(JSON.stringify(off)).not.toContain("secret");
+    expect(off.openGraph?.images, "a toggle changes the image URL, as a theme change does").not.toEqual(onUrl);
+    expect(JSON.stringify(off.openGraph?.images)).not.toContain(`${approvedId}.${siteKey}`);
+    // The withheld card's own URL is current, so it caches for a year like any other.
+    const segment = /og\/([^"]+)"/.exec(JSON.stringify(off.openGraph?.images))?.[1] ?? "";
+    expect((await loadArtifactOg("abc", segment))?.themeCurrent).toBe(true);
+  });
+
   it("should add no tags, keeping the site image, when the artifact is private, team, missing, or has no approved version", async () => {
     for (const result of [null, access("team"), access("private"), access("link", "latest")]) {
       mocks.getSignedOutAccess.mockResolvedValue(result);
