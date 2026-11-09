@@ -11,8 +11,8 @@ import * as viewsSchema from "@/db/views-schema";
 import type * as VersionCache from "@/lib/versions/cache";
 
 /*
- * Pins how many database queries one anonymous view of a public artifact
- * page costs, so duplicate reads cannot creep back. The proxy (its own
+ * Pins how many database queries one view of a public artifact page costs,
+ * anonymous and as a team member, so duplicate reads cannot creep back. The proxy (its own
  * invocation) and the page (generateMetadata and the page body, one request)
  * run against a database driver that records every statement. React's
  * per-request cache is simulated: memoized within one request, fresh for the
@@ -21,13 +21,16 @@ import type * as VersionCache from "@/lib/versions/cache";
  *
  * Child components are not rendered; on an anonymous view of an approved
  * version they read nothing from the database (ApprovedArticle renders from
- * the version cache).
+ * the version cache). For editors, the editor island's own reads are not
+ * counted here.
  */
 
 const mocks = vi.hoisted(() => ({
   statements: [] as { sql: string; params: unknown[] }[],
   scope: new WeakMap<object, Map<string, unknown>>(),
   getAuth: vi.fn(),
+  /** The signed-in viewer's session, or null when signed out. */
+  session: null as { user: { id: string } } | null,
 }));
 
 /** React.cache as the server sees it: one memo per request (newRequest() starts the next). */
@@ -60,6 +63,7 @@ const columns: Record<string, unknown> = {
   "artifact.show_in_search": true,
   "artifact.approved_version_id": "version-1",
   "artifact.title": "Plan",
+  "artifact.content": "# Plan",
   "artifact.summary": "",
   "artifact.kind": "markdown",
   "artifact.language": "",
@@ -72,7 +76,13 @@ const columns: Record<string, unknown> = {
   "artifact.full_width": false,
   "artifact.created_at": "2026-10-01T00:00:00Z",
   "artifact.updated_at": "2026-10-02T00:00:00Z",
+  "team.id": "team-1",
+  "team.name": "Perf team",
+  "team.slug": "perf-team",
   "team.personal": false,
+  "team_member.role": "member",
+  "team_member.user_id": "member-1",
+  "team_member.team_id": "team-1",
   "artifact_version.title": "Plan",
   "artifact_version.saved_at": "2026-10-02T00:00:00Z",
   "artifact_version.created_by": author,
@@ -103,10 +113,12 @@ function selectedKeys(statement: string): string[] {
   });
 }
 
-/** One row for reads of the artifact itself (the page check, the read decision) and of the account age, none for anything else. */
+/** One row for reads of the artifact itself (the page check, the read decision), its team and memberships, and the account age, none for anything else. */
 function answer(statement: string): unknown[][] {
-  if (!statement.startsWith("select ") || !/ from "artifact"|^select coalesce\(/.test(statement)) return [];
-  return [selectedKeys(statement).map((key) => (key.startsWith("coalesce(") ? "2020-01-01T00:00:00Z" : columns[key] ?? null))];
+  if (!statement.startsWith("select ") || !/ from "artifact"| from "team" | from "team_member" |^select coalesce\(/.test(statement)) return [];
+  // A signed-in viewer is a member of the artifact's team (the read decision joins their membership).
+  const answers: Record<string, unknown> = { ...columns, "team_member.id": mocks.session ? "member-row" : null };
+  return [selectedKeys(statement).map((key) => (key.startsWith("coalesce(") ? "2020-01-01T00:00:00Z" : answers[key] ?? null))];
 }
 
 const fakeDb = drizzle(
@@ -119,7 +131,7 @@ const fakeDb = drizzle(
 );
 
 vi.mock("@/db", () => ({ getDb: () => fakeDb }));
-vi.mock("@/lib/session", () => ({ getSession: () => Promise.resolve(null) }));
+vi.mock("@/lib/session", () => ({ getSession: () => Promise.resolve(mocks.session) }));
 vi.mock("@/lib/auth/server", () => ({ getAuth: mocks.getAuth }));
 vi.mock("@/lib/versions/cache", async (importOriginal) => ({
   ...(await importOriginal<typeof VersionCache>()),
@@ -151,12 +163,21 @@ async function viewPage() {
   return { metadata, statements: statements() };
 }
 
+/** Queries for a team member's view of the page body and metadata; editors also load the theme picker's choices. */
+const SIGNED_IN_PAGE_QUERIES = 10;
+
 function distinct(statements: { sql: string; params: unknown[] }[]) {
   return new Set(statements.map((statement) => `${statement.sql} ${JSON.stringify(statement.params)}`)).size;
 }
 
+/** The read decision's query: the artifact joined with the viewer's membership and the approved version. */
+function isAccessRead(statement: { sql: string }) {
+  return statement.sql.includes(' from "artifact"') && statement.sql.includes('left join "artifact_version"');
+}
+
 describe("anonymous public artifact page queries", () => {
   beforeEach(() => {
+    mocks.session = null;
     mocks.statements = [];
     mocks.getAuth.mockReset();
     vi.stubEnv("BETTER_AUTH_SECRET", "test-network-key-secret");
@@ -199,5 +220,32 @@ describe("anonymous public artifact page queries", () => {
     const first = await viewPage();
     const second = await viewPage();
     expect(second.statements).toHaveLength(first.statements.length);
+  });
+});
+
+describe("signed-in public artifact page queries", () => {
+  beforeEach(() => {
+    // A member of the artifact's team, who may edit it and so reads the latest version.
+    mocks.session = { user: { id: "member-1" } };
+    mocks.statements = [];
+  });
+
+  afterEach(() => {
+    mocks.session = null;
+  });
+
+  it("should read the access row once, for the page and the signed-out link preview tags alike, when a team member opens a public page", async () => {
+    const { metadata, statements } = await viewPage();
+    expect(metadata.robots).toEqual({ index: true, follow: false });
+    // The preview tags decide as a signed-out reader from the member's row (getSignedOutAccess), not a second read.
+    expect(statements.filter(isAccessRead)).toHaveLength(1);
+    expect(statements.filter((statement) => statement.sql.includes(' from "team" '))).toHaveLength(1);
+    expect(distinct(statements)).toBe(statements.length);
+  });
+
+  it("should cost a fixed number of queries when a team member opens a public page", async () => {
+    const { statements } = await viewPage();
+    // Access, latest content, pending edit, account age, team, author, files, then the theme picker's teams, roles, and presets.
+    expect(statements).toHaveLength(SIGNED_IN_PAGE_QUERIES);
   });
 });

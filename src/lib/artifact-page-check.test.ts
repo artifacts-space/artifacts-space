@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
  * The proxy's artifact page check: one query answers who may read the page
@@ -15,7 +15,9 @@ const mocks = vi.hoisted(() => ({ rows: [] as unknown[][], queries: 0 }));
 function chain(): unknown {
   const next = () => {
     mocks.queries += 1;
-    return Promise.resolve(mocks.rows.shift() ?? []);
+    // Every query must have a stubbed answer: an unexpected lookup fails the test instead of reading as "no row".
+    const rows = mocks.rows.shift();
+    return rows ? Promise.resolve(rows) : Promise.reject(new Error(`Unexpected query ${String(mocks.queries)}`));
   };
   const builder: Record<string, unknown> = {};
   for (const name of ["select", "from", "where", "innerJoin", "leftJoin"]) builder[name] = () => builder;
@@ -44,6 +46,11 @@ describe("checkArtifactPage", () => {
   beforeEach(() => {
     mocks.rows = [];
     mocks.queries = 0;
+  });
+
+  afterEach(() => {
+    // Every stubbed answer was used: no expected lookup was skipped.
+    expect(mocks.rows).toEqual([]);
   });
 
   it("should refuse a private artifact when the visitor is signed out", async () => {
