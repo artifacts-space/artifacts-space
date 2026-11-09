@@ -7,7 +7,8 @@ import { expect, test, type Page } from "@playwright/test";
  * the spec: the form says why and the block keeps its last valid data.
  */
 
-const editorBar = (page: Page) => page.locator("[data-slot=editor-bar]");
+/** The page header, where the save status and the More menu live. */
+const pageHeader = (page: Page) => page.getByRole("banner");
 const editor = (page: Page) => page.locator("[data-slot=ui-block-editor]");
 
 async function openData(page: Page) {
@@ -17,10 +18,10 @@ async function openData(page: Page) {
 
 /** The spec as saved, read from View source, then back to the page. */
 async function savedProps(page: Page, key: string): Promise<Record<string, unknown>> {
-  await editorBar(page).getByRole("button", { name: "More actions" }).click();
+  await pageHeader(page).getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: "View source" }).click();
   const source = await page.getByRole("textbox", { name: "Artifact source" }).inputValue();
-  await editorBar(page).getByRole("button", { name: "More actions" }).click();
+  await pageHeader(page).getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: "Hide source" }).click();
   const spec = JSON.parse(source) as { elements: Record<string, { props?: Record<string, unknown> }> };
   return spec.elements[key]?.props ?? {};

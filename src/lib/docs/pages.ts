@@ -64,6 +64,7 @@ export const docsPages = [
       h2("connect", "Connect your agent"),
       h2("tokens", "Tokens for CI and headless agents"),
       h2("skill", "Add the agent skill"),
+      h2("default", "Make it the default"),
       h2("first-artifact", "Save your first artifact"),
       h2("first-ui", "Make a rich page"),
       h2("troubleshooting", "Troubleshooting"),
@@ -86,6 +87,7 @@ export const docsPages = [
       h2("fx", "fx"),
       h2("other-clients", "Other clients"),
       h2("headless", "Headless and CI"),
+      h2("default", "Make it the default"),
     ],
   },
   {
@@ -128,7 +130,7 @@ export const docsPages = [
   {
     slug: "themes",
     title: "Themes",
-    description: "Give an artifact its own colors, fonts, and a slim cover, in the web app or over MCP. Every theme passes contrast checks, so every reader can read it.",
+    description: "Give an artifact its own colors, fonts, and a cover, in the web app or over MCP. Every theme passes contrast checks, so every reader can read it.",
     section: "Reference",
     source: app("themes/"),
     headings: [

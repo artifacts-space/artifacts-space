@@ -25,6 +25,8 @@ test.afterAll(async () => {
 });
 
 const saveStatus = (page: Page) => page.locator("[data-slot=save-status]").getByRole("status");
+/** On the artifact's own page, the save status sits in the page header beside its More menu. */
+const pageSaveStatus = (page: Page) => page.getByRole("banner").locator("[data-slot=save-indicator]");
 
 /** Signs in, seeds a Markdown artifact, and opens it in /app. Returns its public id. */
 async function openSeeded(page: Page, title: string, content: string) {
@@ -105,7 +107,7 @@ test("should unlock Markdown in place on the artifact's own page and save it on 
   const content = page.getByRole("textbox", { name: "Artifact content" });
   await expect(content).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
-  const status = page.locator("[data-slot=editor-bar]").getByRole("status");
+  const status = pageSaveStatus(page);
 
   await content.getByText("Read here.").click();
   await page.keyboard.press("End");
@@ -130,11 +132,83 @@ test("should save a heading typed into an interface, keep it after a reload, and
   await page.keyboard.press("End");
   await page.keyboard.type(" for Friday");
   await page.keyboard.type(" and Monday");
-  await expect(page.locator("[data-slot=editor-bar]").getByRole("status")).toHaveText("Saved", savedWithin);
+  await expect(pageSaveStatus(page)).toHaveText("Saved", savedWithin);
 
   await page.reload();
   await expect(page.locator("[data-slot=ui-block-editor]").getByRole("textbox", { name: "Heading" })).toHaveText("Launch plan for Friday and Monday");
   expect(await versionKinds(publicId)).toEqual(["snapshot", "edit"]);
-  await page.locator("[data-slot=editor-bar]").getByRole("button", { name: "History" }).click();
+  await page.getByRole("banner").getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "History" }).click();
   await expect(page.getByRole("list", { name: "Versions" }).getByRole("listitem")).toHaveCount(2);
+});
+
+/**
+ * Opens the artifact page with its server actions (the editable copy among
+ * them) held back. Resolves once the page has hydrated and asked for its
+ * copy, so clicks land; the returned function lets the copy load.
+ */
+async function openWithEditableCopyHeld(page: Page, publicId: string): Promise<() => void> {
+  await page.unrouteAll({ behavior: "wait" });
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(`**/artifact/${publicId}`, async (route) => {
+    if (route.request().method() === "POST") await held;
+    await route.fallback();
+  });
+  const loading = page.waitForRequest((request) => request.method() === "POST" && request.url().endsWith(`/artifact/${publicId}`));
+  await page.goto(`/artifact/${publicId}`);
+  await loading;
+  return release;
+}
+
+/** The pickers in the artifact's heading: how to open each, and something inside it while it is open. */
+const headingPickers = [
+  {
+    name: "theme",
+    open: (page: Page) => page.getByRole("button", { name: "Choose a theme" }).click(),
+    inside: (page: Page) => page.getByRole("radiogroup", { name: "Artifact theme" }),
+  },
+  {
+    name: "icon",
+    open: (page: Page) => page.getByRole("button", { name: "Add icon" }).click(),
+    inside: (page: Page) => page.getByRole("tab", { name: "Upload" }),
+  },
+  {
+    name: "cover",
+    open: async (page: Page) => {
+      await page.locator("[data-artifact-cover]").hover();
+      await page.getByRole("button", { name: "Change cover" }).click();
+    },
+    inside: (page: Page) => page.getByRole("radio", { name: "Dusk" }),
+  },
+] as const;
+
+test("should keep the theme, icon, and cover pickers open on the artifact page when editing unlocks", async ({ page }, testInfo) => {
+  const title = `Inline unlock ${testInfo.project.name} ${String(Date.now())}`;
+  await page.goto("/api/dev/sign-in");
+  await page.waitForURL(/\/app/);
+  const publicId = await createTestArtifact({ userId: await readyDevUser(), title, content: "# Notes\n\nOpen a picker first.", visibility: "private", theme: null, cover: "mist" });
+  created.push(publicId);
+  const content = page.getByRole("textbox", { name: "Artifact content" });
+
+  for (const picker of headingPickers) {
+    const release = await openWithEditableCopyHeld(page, publicId);
+    await picker.open(page);
+    await expect(picker.inside(page), `${picker.name} picker opens`).toBeVisible();
+    await expect(content).toHaveCount(0);
+
+    release();
+    await expect(content).toBeVisible();
+    // The heading and its pickers keep their place when the read view turns editable.
+    await expect(picker.inside(page), `${picker.name} picker stays open`).toBeVisible();
+    await page.keyboard.press("Escape");
+  }
+
+  // The picker still works after the switch.
+  const release = await openWithEditableCopyHeld(page, publicId);
+  await page.getByRole("button", { name: "Choose a theme" }).click();
+  release();
+  await expect(content).toBeVisible();
+  await page.getByRole("radiogroup", { name: "Artifact theme" }).getByRole("radio", { name: /^Paper:/ }).click();
+  await expect(page.getByRole("button", { name: "Theme: Paper. Change theme" })).toBeVisible();
 });

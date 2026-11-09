@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { useNoteOwnSave } from "@/components/artifact-page/page-editor-chrome";
 import { setArtifactIconAction } from "@/app/artifact/[publicId]/edit-actions";
+import { cn } from "@/lib/utils";
 
 import { IconPicker } from "./icon-picker";
 import { addIconTrigger, changeIconTrigger } from "./icon-triggers";
@@ -13,6 +15,8 @@ interface TitleIconProps {
   publicId: string;
   /** The latest saved icon. */
   icon: string | null;
+  /** Classes for its wrapper, such as centring it across a cover's lower edge. */
+  className?: string;
 }
 
 const PENDING_MESSAGE = "Icon saved. Readers outside the team see it once a team owner or admin approves it.";
@@ -23,8 +27,9 @@ const PENDING_MESSAGE = "Icon saved. Readers outside the team see it once a team
  * screens). Clicking the icon opens the picker to change or remove it.
  * Saves go through the same edit path and approval rule as a title change.
  */
-export function TitleIcon({ publicId, icon }: TitleIconProps) {
+export function TitleIcon({ publicId, icon, className }: TitleIconProps) {
   const router = useRouter();
+  const noteOwnSave = useNoteOwnSave();
   const [value, setValue] = useState(icon);
   const [saving, setSaving] = useState(false);
   const [, startRefresh] = useTransition();
@@ -41,6 +46,7 @@ export function TitleIcon({ publicId, icon }: TitleIconProps) {
         return;
       }
       setValue(result.data.icon);
+      noteOwnSave(result.data);
       if (result.data.pending) toast.success(PENDING_MESSAGE);
       startRefresh(() => { router.refresh(); });
     } catch {
@@ -54,7 +60,7 @@ export function TitleIcon({ publicId, icon }: TitleIconProps) {
   const trigger = value ? changeIconTrigger(value, "page", saving) : addIconTrigger;
 
   return (
-    <div className={value ? "mb-2" : "mb-1"}>
+    <div className={cn(value ? "mb-2" : "mb-1", className)}>
       <IconPicker value={value} onChange={(next) => void save(next)} trigger={trigger} disabled={saving} />
     </div>
   );
