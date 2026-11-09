@@ -138,3 +138,34 @@ test("should save a heading typed into an interface, keep it after a reload, and
   await page.locator("[data-slot=editor-bar]").getByRole("button", { name: "History" }).click();
   await expect(page.getByRole("list", { name: "Versions" }).getByRole("listitem")).toHaveCount(2);
 });
+
+test("should keep a picker open on the artifact page when editing unlocks", async ({ page }, testInfo) => {
+  const title = `Inline unlock ${testInfo.project.name} ${String(Date.now())}`;
+  await page.goto("/api/dev/sign-in");
+  await page.waitForURL(/\/app/);
+  const publicId = await createTestArtifact({ userId: await readyDevUser(), title, content: "# Notes\n\nOpen a picker first.", visibility: "private", theme: null });
+  created.push(publicId);
+
+  // Hold the page's server actions (the editable copy among them) until a picker is open.
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(`**/artifact/${publicId}`, async (route) => {
+    if (route.request().method() === "POST") await held;
+    await route.fallback();
+  });
+  const loading = page.waitForRequest((request) => request.method() === "POST" && request.url().endsWith(`/artifact/${publicId}`));
+  await page.goto(`/artifact/${publicId}`);
+  // The request goes out once the page has hydrated, so the click below lands.
+  await loading;
+  await page.getByRole("button", { name: "Choose a theme" }).click();
+  const themes = page.getByRole("radiogroup", { name: "Artifact theme" });
+  await expect(themes).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Artifact content" })).toHaveCount(0);
+
+  release();
+  await expect(page.getByRole("textbox", { name: "Artifact content" })).toBeVisible();
+  // The heading and its pickers keep their place when the read view turns editable.
+  await expect(themes).toBeVisible();
+  await themes.getByRole("radio", { name: /^Paper:/ }).click();
+  await expect(page.getByRole("button", { name: "Theme: Paper. Change theme" })).toBeVisible();
+});
