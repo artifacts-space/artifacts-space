@@ -27,3 +27,11 @@ test("should list the site's pages and no artifacts in the sitemap when the data
   expect(body).toContain("/docs");
   expect(body).not.toContain("/artifact/");
 });
+
+test("should serve the sitemap from the cache instead of building it per request", async ({ request }) => {
+  const response = await request.get("/sitemap.xml");
+  // HIT or STALE: served from the prerendered cache. A per-request route sends no x-nextjs-cache header.
+  // `next start` sends no s-maxage for this route (on Vercel the prerender's expiry drives the CDN), so this is the signal.
+  const cacheState = response.headers()["x-nextjs-cache"] ?? "no x-nextjs-cache header (built per request)";
+  expect(cacheState, `x-nextjs-cache was ${cacheState}`).toMatch(/^(HIT|STALE)$/);
+});
