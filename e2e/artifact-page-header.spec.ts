@@ -148,6 +148,7 @@ test("should widen the page from Full width in the header's ⋯ and keep it afte
   await expect(toggle, "the item shows it is saving").toHaveAttribute("aria-busy", "true");
   await expect(toggle, "screen readers hear it is busy").toHaveAccessibleName("Full width, please wait");
   await expect(toggle, "the tick waits for the page").toHaveAttribute("aria-checked", "false");
+  await expect(main, "the page has not changed yet").toHaveAttribute("data-full-width", "false");
   release();
   await expect(main).toHaveAttribute("data-full-width", "true");
   await expect(toggle).toHaveAttribute("aria-busy", "false");
@@ -165,7 +166,8 @@ test("should tick Full width to match the page when the width changed after the 
   await signIn(page);
   const publicId = await seed(`Header width elsewhere ${testInfo.project.name}`);
   await page.goto(`/artifact/${publicId}`);
-  await expect(page.getByRole("textbox", { name: "Title" }), "the editor's copy has loaded, contained").toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Title" }), "the editor's copy has loaded").toBeVisible();
+  await expect(page.locator("main"), "the page starts contained").toHaveAttribute("data-full-width", "false");
 
   // Someone turns Full width on elsewhere; a theme change then refreshes the page but hands the editor no new copy.
   await setTestFullWidth(publicId, true);

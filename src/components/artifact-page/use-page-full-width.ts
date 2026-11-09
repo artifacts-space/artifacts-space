@@ -40,8 +40,8 @@ export function usePageFullWidth(artifact: ArtifactDto, pageFullWidth?: boolean)
   }, [router]);
   const control = useFullWidth(current, onUpdated);
   const checked = shownFullWidth({ page: pageFullWidth, followed: control.checked });
-  // Next never leaves a failed refresh hanging quietly: after a network error it retries when the
-  // connection returns (the item stays busy), and after any other error it reloads the whole page.
+  // Next never leaves a failed refresh hanging quietly (checked on 16.4, router-reducer/fetch-server-response.js): after a
+  // network error it retries when the connection returns (the item stays busy), and after any other error it reloads the page.
   const pending = control.pending || refreshing;
   return useMemo(() => ({ ...control, checked, pending, busy: pending }), [control, checked, pending]);
 }
