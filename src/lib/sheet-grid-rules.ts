@@ -80,8 +80,11 @@ export function columnSpan(offsets: readonly number[], scrollLeft: number, viewp
 
 /**
  * The rows to render for a vertical scroll position: those on screen plus
- * `overscan` either side. `scrollTop` is the scroll box's own; the frozen
- * header is taken off here.
+ * `overscan` either side. `scrollTop` is the scroll box's own. Row r sits at
+ * header + r × rowHeight in the content, and the frozen header covers the
+ * top `header` pixels of the box, so the first row in view (even partly) is
+ * floor(scrollTop / rowHeight), and the header's height comes off the
+ * height that rows can fill.
  */
 export function rowSpan(scrollTop: number, viewportHeight: number, count: number, overscan: number): Span {
   if (count <= 0) return { start: 0, end: 0 };

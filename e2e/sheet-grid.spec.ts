@@ -116,6 +116,19 @@ test("should keep the active cell in view when the keyboard moves it past the ed
   await expect(page.locator(`[id="${active ?? ""}"]`)).toBeInViewport();
 });
 
+test("should scroll to the next cell when an editor saves a cell that scrolled out of view", async ({ page }) => {
+  await page.goto("/dev/editor?kind=sheet");
+  const grid = page.getByRole("grid", { name: "CSV grid editor" });
+  await expect(grid.getByRole("gridcell", { name: "r1c1", exact: true })).toBeVisible();
+  await grid.focus();
+  // Typing starts editing the active cell (r1c1); then the sheet scrolls far away from it.
+  await page.keyboard.type("x");
+  await expect(page.getByRole("textbox", { name: /row 1$/ })).toBeVisible();
+  await scrollGridTo(grid, { top: 40_000 }, grid.getByRole("gridcell", { name: "r1000c1", exact: true }));
+  await page.keyboard.press("Enter");
+  await expect(grid.getByRole("gridcell", { name: "r2c1", exact: true })).toBeInViewport();
+});
+
 test("should slide the sheet's frozen header under the page header when the page scrolls", async ({ page }) => {
   await page.goto("/dev/editor?kind=sheet");
   const grid = page.getByRole("grid", { name: "CSV grid editor" });
