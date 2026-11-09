@@ -25,6 +25,12 @@ const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const stubArtifactUrl = "https://artifacts.space/artifact/EvalStubArtifact000000";
 
 const toolCopySchema = z.object({ title: z.string(), description: z.string(), _meta: z.record(z.string(), z.unknown()).optional() });
+/** A tool's copy as registerTool takes it: `_meta` only when the tool has one. */
+function toolConfig(copy: z.infer<typeof toolCopySchema>) {
+  const { title, description, _meta } = copy;
+  return _meta ? { title, description, _meta } : { title, description };
+}
+
 const copyModuleSchema = z.object({
   SERVER_INSTRUCTIONS: z.string(),
   artifactToolCopy: z.object({
@@ -91,18 +97,18 @@ const writeShape = {
 function registerTools(server: McpServer, copy: z.infer<typeof copyModuleSchema>["artifactToolCopy"]) {
   server.registerTool(
     "artifacts_list",
-    { ...copy.artifacts_list, inputSchema: { query: z.string().optional(), project: z.string().optional(), scope: z.string().optional(), limit: z.number().optional() } },
+    { ...toolConfig(copy.artifacts_list), inputSchema: { query: z.string().optional(), project: z.string().optional(), scope: z.string().optional(), limit: z.number().optional() } },
     (args) => reply("artifacts_list", args, []),
   );
-  server.registerTool("artifacts_get", { ...copy.artifacts_get, inputSchema: { id: z.string() } }, (args) => reply("artifacts_get", args, { error: "Artifact not found." }));
-  server.registerTool("teams_list", { ...copy.teams_list, inputSchema: {} }, (args) => reply("teams_list", args, [{ slug: "acme", name: "Acme", role: "owner", personal: false }]));
-  server.registerTool("artifacts_create", { ...copy.artifacts_create, inputSchema: writeShape }, (args) => reply("artifacts_create", args, { artifact: savedArtifact(args), sharing: null, comments: null }));
+  server.registerTool("artifacts_get", { ...toolConfig(copy.artifacts_get), inputSchema: { id: z.string() } }, (args) => reply("artifacts_get", args, { error: "Artifact not found." }));
+  server.registerTool("teams_list", { ...toolConfig(copy.teams_list), inputSchema: {} }, (args) => reply("teams_list", args, [{ slug: "acme", name: "Acme", role: "owner", personal: false }]));
+  server.registerTool("artifacts_create", { ...toolConfig(copy.artifacts_create), inputSchema: writeShape }, (args) => reply("artifacts_create", args, { artifact: savedArtifact(args), sharing: null, comments: null }));
   server.registerTool(
     "artifacts_update",
-    { ...copy.artifacts_update, inputSchema: { id: z.string(), ...writeShape } },
+    { ...toolConfig(copy.artifacts_update), inputSchema: { id: z.string(), ...writeShape } },
     (args) => reply("artifacts_update", args, { artifact: savedArtifact(args), edit: "applied", sharing: null, comments: null }),
   );
-  server.registerTool("artifacts_delete", { ...copy.artifacts_delete, inputSchema: { id: z.string() } }, (args) => reply("artifacts_delete", args, { deleted: true, id: args.id }));
+  server.registerTool("artifacts_delete", { ...toolConfig(copy.artifacts_delete), inputSchema: { id: z.string() } }, (args) => reply("artifacts_delete", args, { deleted: true, id: args.id }));
 }
 
 async function main() {
