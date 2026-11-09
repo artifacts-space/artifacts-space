@@ -15,7 +15,7 @@ import { useTeamAction } from "./use-team-action";
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });
 
-/** An agent's tokens: create one (shown once), or revoke one. Owners and admins only. */
+/** An agent's tokens: create one (shown once), or revoke one. People who may add and remove agents only. */
 export function AgentTokens({ agent, origin }: { agent: TeamAgentView; origin: string }) {
   const [name, setName] = useState("");
   const [error, setError] = useState("");

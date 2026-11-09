@@ -9,7 +9,7 @@ import { teamPresetLimits } from "./team-preset-limits";
 
 /**
  * Team theme presets: the rules, with no database. A team preset is a theme
- * a team's owners and admins keep in team settings. Artifacts and the team
+ * the people who may manage a team's themes keep in team settings. Artifacts and the team
  * default refer to it by a stable id, "team:<slug>", never by a copy, so an
  * edit to the preset changes every artifact that uses it (a live reference;
  * versions store the reference too). The slug is random-suffixed, unique
@@ -128,7 +128,7 @@ export function usableTeamPresets(presets: readonly StoredTeamPreset[], allowedT
   return usable;
 }
 
-/** Members of a shared team who may manage themes (owners and admins by default) keep its presets and default. Personal teams have none. */
+/** Members of a shared team whose role holds "manage themes" (owners and admins by default) keep its presets and default. Personal teams have none. */
 export function canManageTeamThemes(membership: TeamActor & { personal: boolean }): boolean {
   return !membership.personal && can(membership, "themes.manage");
 }

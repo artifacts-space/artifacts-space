@@ -8,12 +8,15 @@ import {
   createTestUser,
   customRoleOf,
   deleteTestTeams,
+  demoteDirectly,
+  demoteOwnersAtOnce,
   giveTestCustomRole,
   localDatabaseEnabled,
   localDatabaseSkipReason,
   permissionAuditActions,
   readyDevUser,
   requestTestSharing,
+  setTeamRole,
 } from "./support/local-db";
 
 /**
@@ -112,4 +115,24 @@ test("should show the approval queue only to a custom role that may approve", as
   await expect(page.getByText("Waiting brief")).toBeVisible();
   await expect(page.getByText(/You are approver/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Invite people" })).toHaveCount(0);
+});
+
+test("should keep one owner when two owners demote each other at the same moment", async () => {
+  const [first, second] = await Promise.all([createTestUser(), createTestUser()]);
+  seeded.userIds.push(first, second);
+  const team = await createTestTeam(first, "owner");
+  seeded.teamIds.push(team.id);
+  await addTestMember(team.id, second, "owner");
+
+  const outcome = await demoteOwnersAtOnce(team.id, first, second);
+  expect(outcome).toEqual({ first: true, second: false });
+});
+
+test("should refuse demoting a team's only owner in the database itself, and allow it once another owner stays", async () => {
+  const owner = await createTestUser();
+  seeded.userIds.push(owner);
+  const team = await createTestTeam(owner, "owner");
+  seeded.teamIds.push(team.id);
+  await expect(demoteDirectly(team.id, owner)).rejects.toThrow("A team always keeps at least one owner.");
+  await setTeamRole(team.id, owner, "member");
 });

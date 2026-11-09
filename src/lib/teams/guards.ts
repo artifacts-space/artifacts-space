@@ -51,15 +51,17 @@ export async function prepareNewTeam(data: { name?: unknown; slug?: unknown }, u
 
 /**
  * Only people who may change the sharing rule (owners by default) change it,
- * slugs never change, and personal teams stay as they are.
+ * slugs never change, and personal teams stay as they are. Returns the
+ * cleaned values to store: a new name, trimmed and length-checked.
  */
-export async function assertTeamUpdateAllowed(update: Record<string, unknown>, member: { organizationId: string; userId: string }) {
+export async function assertTeamUpdateAllowed(update: Record<string, unknown>, member: { organizationId: string; userId: string }): Promise<{ name?: string }> {
   const [current] = await getDb().select({ personal: team.personal }).from(team).where(eq(team.id, member.organizationId)).limit(1);
   if (!current) reject("Team not found.");
   if (current.personal) reject("Personal team settings cannot change.");
   if ("slug" in update && update.slug !== undefined) reject("A team's URL cannot change.");
   if ("teamSharingNeedsApproval" in update) await assertTeamCapability(member.userId, member.organizationId, "settings.sharing");
-  if ("name" in update && update.name !== undefined) cleanTeamName(update.name);
+  if ("name" in update && update.name !== undefined) return { name: cleanTeamName(update.name) };
+  return {};
 }
 
 /** Refuses a Better Auth call unless the acting user is a person in the team who holds `capability`. Fails closed. */

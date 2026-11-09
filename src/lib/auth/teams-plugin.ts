@@ -87,7 +87,8 @@ export function teamsPlugin() {
         });
       },
       beforeUpdateOrganization: async ({ organization: update, member }) => {
-        await assertTeamUpdateAllowed(update, member);
+        // The guard returns the cleaned values (a trimmed name), which replace what was sent.
+        return { data: { ...update, ...(await assertTeamUpdateAllowed(update, member)) } };
       },
       beforeAddMember: async ({ organization: team, member }) => {
         assertNotPersonal(team, "add members");

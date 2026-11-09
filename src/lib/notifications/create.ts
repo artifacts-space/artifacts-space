@@ -204,7 +204,7 @@ async function requestNotifications(requestId: string) {
   await deliver(drafts, { artifactId: request.artifactId, publicId, latestTitle, actorId: request.requestedBy, requestId, managers: managerIds, commentBody: null, requestKind: request.kind, teamSlug });
 }
 
-/** Tells a team's owners and admins that a request waits for them, after the response. */
+/** Tells the people in a team who may decide a request (owners and admins by default) that it waits for them, after the response. */
 export function notifySharingRequest(requestId: string): void {
   afterResponse("Request notifications", () => requestNotifications(requestId));
 }

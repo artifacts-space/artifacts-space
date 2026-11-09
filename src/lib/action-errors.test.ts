@@ -33,3 +33,16 @@ describe("actionErrorMessage with UserFacingError", () => {
     expect(actionErrorMessage(new UserFacingError("Choose a team."), "fallback")).toBe("Choose a team.");
   });
 });
+
+describe("actionErrorMessage with the last-owner trigger", () => {
+  it("should say the team keeps an owner when the database refused, even when the error is wrapped", () => {
+    const database = new Error("A team always keeps at least one owner.");
+    const wrapped = new Error("Failed query: update team_member", { cause: database });
+    expect(actionErrorMessage(wrapped, "fallback")).toBe("A team always keeps at least one owner.");
+  });
+
+  it("should keep other database errors behind the fallback", () => {
+    const wrapped = new Error("Failed query", { cause: new Error("duplicate key value violates unique constraint") });
+    expect(actionErrorMessage(wrapped, "fallback")).toBe("fallback");
+  });
+});

@@ -126,9 +126,22 @@ export async function createTestTeam(userId: string, role: "owner" | "admin" | "
   return { id, slug };
 }
 
-/** Changes a member's role in a team. */
+/**
+ * Changes a member's role in a team. A team always keeps an owner (the
+ * team_member_keeps_an_owner trigger), so demoting the only owner first adds
+ * a stand-in owner, an @example.com user that deleteTestTeams removes.
+ */
 export async function setTeamRole(teamId: string, userId: string, role: "owner" | "admin" | "member"): Promise<void> {
+  if (role !== "owner") await ensureAnotherOwner(teamId, userId);
   await db().query(`update team_member set role = $3 where team_id = $1 and user_id = $2`, [teamId, userId, role]);
+}
+
+async function ensureAnotherOwner(teamId: string, userId: string): Promise<void> {
+  const others = await db().query(`select 1 from team_member where team_id = $1 and user_id <> $2 and role = 'owner'`, [teamId, userId]);
+  if (others.rowCount) return;
+  const standIn = randomUUID();
+  await db().query(`insert into "user" (id, name, email, email_verified) values ($1, 'Stand-in owner', $2, true)`, [standIn, `team-standin-${standIn.slice(0, 8)}@example.com`]);
+  await db().query(`insert into team_member (id, team_id, user_id, role) values ($1, $2, $3, 'owner')`, [randomUUID(), teamId, standIn]);
 }
 
 /** Inserts a team preset with theme JSON and returns its id ("team:<slug>"). */
@@ -210,7 +223,12 @@ export async function versionCount(publicId: string): Promise<number> {
 /** Deletes seeded teams (their members and presets cascade). */
 export async function deleteTestTeams(teamIds: readonly string[]): Promise<void> {
   if (!localDatabaseEnabled() || teamIds.length === 0) return;
+  const standIns = await db().query<{ id: string }>(
+    `select u.id from "user" u join team_member m on m.user_id = u.id where m.team_id = any($1) and u.email like 'team-standin-%@example.com'`,
+    [teamIds],
+  );
   await db().query(`delete from team where id = any($1) and slug like 'theme-e2e-%'`, [teamIds]);
+  await db().query(`delete from "user" where id = any($1) and email like 'team-standin-%@example.com'`, [standIns.rows.map((row) => row.id)]);
 }
 
 /** The dev user's id, with their username confirmed so workspace pages skip the first-run username step. */
@@ -256,6 +274,34 @@ export async function customRoleOf(teamId: string, userId: string): Promise<stri
     [teamId, userId],
   );
   return result.rows[0]?.key ?? null;
+}
+
+/** Demotes a member to Member with no stand-in owner, as a raw request would. */
+export async function demoteDirectly(teamId: string, userId: string): Promise<void> {
+  await db().query(`update team_member set role = 'member' where team_id = $1 and user_id = $2`, [teamId, userId]);
+}
+
+/**
+ * Two owners demote each other at the same moment, each in its own
+ * transaction, the way two requests would race. Returns which demotions the
+ * database accepted.
+ */
+export async function demoteOwnersAtOnce(teamId: string, firstUserId: string, secondUserId: string): Promise<{ first: boolean; second: boolean }> {
+  const [first, second] = await Promise.all([db().connect(), db().connect()]);
+  const demote = `update team_member set role = 'member' where team_id = $1 and user_id = $2`;
+  try {
+    await first.query("begin");
+    await first.query(demote, [teamId, secondUserId]);
+    await second.query("begin");
+    const waiting = second.query(demote, [teamId, firstUserId]).then(() => true, () => false);
+    await first.query("commit");
+    const secondDone = await waiting;
+    await second.query(secondDone ? "commit" : "rollback");
+    return { first: true, second: secondDone };
+  } finally {
+    first.release();
+    second.release();
+  }
 }
 
 /** The audit actions written for a team, oldest first. */

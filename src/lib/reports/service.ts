@@ -102,7 +102,7 @@ export interface OpenReportView {
   reportedAt: string;
 }
 
-/** Open reports for a team, newest first. Callers must check the viewer is an owner or admin. */
+/** Open reports for a team, newest first. Callers must check the viewer may handle reports (`can(member, "reports.handle")`). */
 export async function listOpenReports(teamId: string, limit = 50): Promise<OpenReportView[]> {
   const rows = await getDb()
     .select({
@@ -124,7 +124,7 @@ export async function listOpenReports(teamId: string, limit = 50): Promise<OpenR
   return rows.map((row) => ({ ...row, reportedAt: row.reportedAt.toISOString() }));
 }
 
-/** The open report, checked against the viewer: an owner or admin of the report's team. */
+/** The open report, checked against the viewer: a person in the report's team who may handle reports. */
 export async function getManagedReport(reportId: string, viewerId: string) {
   const [report] = await getDb().select().from(artifactReport).where(and(eq(artifactReport.id, reportId), eq(artifactReport.status, "open"))).limit(1);
   if (!report?.teamId) throw new UserFacingError("This report is no longer open.");

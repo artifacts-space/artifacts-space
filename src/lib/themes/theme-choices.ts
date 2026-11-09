@@ -49,7 +49,7 @@ async function teamPersonal(teamId: string | null): Promise<boolean | null> {
  * Choices for an artifact the viewer may edit: its theme team's presets (when
  * the viewer belongs to that team) and its team default; or, with no theme
  * team, the presets of the author's shared teams, offered only to the author.
- * `manageable` lists the same teams where the viewer is an owner or admin.
+ * `manageable` lists the same teams where the viewer may manage themes.
  */
 export async function artifactThemeChoices(viewerId: string, subject: ThemeSubject): Promise<ThemeChoices> {
   const themeTeam = themeTeamId(subject, await teamPersonal(subject.visibility === "private" ? null : subject.teamId));

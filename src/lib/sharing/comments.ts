@@ -53,7 +53,7 @@ export async function setArtifactComments(input: { actorId: string; artifactId: 
   if (!record) throw new UserFacingError("Artifact not found.");
   const { rule, member } = await teamContext(input.actorId, record.teamId);
   const allowed = canChangeCommentSetting({ viewerId: input.actorId, authorId: record.userId, member, teamPersonal: rule?.personal ?? null, actor: input.actor });
-  if (!allowed) throw new UserFacingError("Artifact not found, or you cannot change its comments. Its author and the team's owners and admins can.");
+  if (!allowed) throw new UserFacingError("Artifact not found, or you cannot change its comments. Its author and the team's approvers can.");
   if (next !== "off") await enforceRateLimit("sharingRequest", input.actorId);
 
   const outcome = decideCommentSetting({ current: record.comments, next, sameTeam: true, team: rule, member, actor: input.actor });

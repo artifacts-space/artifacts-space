@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, notExists, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, notExists, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { getDb } from "@/db";
@@ -49,11 +49,14 @@ const membershipColumns = {
 type MembershipRow = Omit<TeamMembership, "role" | "roleKey" | "roleName" | "kind" | "capabilities"> & { role: string; agentId: string | null; customKey: string | null };
 
 /**
- * Membership rows joined to the team, the member's agent row (agents act as
- * the Agent role), and their custom role in the same team. Joins only, never
- * correlated subqueries (see AGENTS.md). Exported for its `.toSQL()` test.
+ * The user's membership rows joined to the team, the member's agent row
+ * (agents act as the Agent role), and their custom role in the same team,
+ * narrowed by `only` when given. The user filter is always part of the
+ * WHERE clause, and the builder is not dynamic, so a caller cannot replace
+ * it with a second `.where()`. Joins only, never correlated subqueries (see
+ * AGENTS.md). Exported for its `.toSQL()` test.
  */
-export function membershipQuery(db: Pick<ReturnType<typeof getDb>, "select">, userId: string) {
+export function membershipQuery(db: Pick<ReturnType<typeof getDb>, "select">, userId: string, only?: SQL) {
   return db
     .select(membershipColumns)
     .from(teamMember)
@@ -61,8 +64,7 @@ export function membershipQuery(db: Pick<ReturnType<typeof getDb>, "select">, us
     .leftJoin(agent, eq(agent.userId, teamMember.userId))
     .leftJoin(teamRoleAssignment, eq(teamRoleAssignment.memberId, teamMember.id))
     .leftJoin(assignedRole, and(eq(assignedRole.id, teamRoleAssignment.roleId), eq(assignedRole.teamId, teamMember.teamId)))
-    .where(eq(teamMember.userId, userId))
-    .$dynamic();
+    .where(and(eq(teamMember.userId, userId), only));
 }
 
 /** One membership with its role and capabilities, from its team's roles. */
@@ -108,24 +110,24 @@ export async function listTeamIdsForUser(userId: string): Promise<Set<string>> {
  * exist or the user is not a member, so callers never reveal other teams.
  */
 export async function getTeamForMember(userId: string, slug: string): Promise<TeamMembership | null> {
-  const rows = await membershipQuery(getDb(), userId).where(and(eq(teamMember.userId, userId), eq(team.slug, slug))).limit(1);
+  const rows = await membershipQuery(getDb(), userId, eq(team.slug, slug)).limit(1);
   const [membership] = await toMemberships(rows);
   return membership ?? null;
 }
 
 /** Same as getTeamForMember, with the team's roles. */
 export async function getTeamAccessForMember(userId: string, slug: string): Promise<TeamAccess | null> {
-  return toAccess(await membershipQuery(getDb(), userId).where(and(eq(teamMember.userId, userId), eq(team.slug, slug))).limit(1));
+  return toAccess(await membershipQuery(getDb(), userId, eq(team.slug, slug)).limit(1));
 }
 
 /** Same as getTeamMembershipById, with the team's roles. */
 export async function getTeamAccessById(userId: string, teamId: string): Promise<TeamAccess | null> {
-  return toAccess(await membershipQuery(getDb(), userId).where(and(eq(teamMember.userId, userId), eq(team.id, teamId))).limit(1));
+  return toAccess(await membershipQuery(getDb(), userId, eq(team.id, teamId)).limit(1));
 }
 
 /** Same as getTeamForMember, by team id. */
 export async function getTeamMembershipById(userId: string, teamId: string): Promise<TeamMembership | null> {
-  const rows = await membershipQuery(getDb(), userId).where(and(eq(teamMember.userId, userId), eq(team.id, teamId))).limit(1);
+  const rows = await membershipQuery(getDb(), userId, eq(team.id, teamId)).limit(1);
   const [membership] = await toMemberships(rows);
   return membership ?? null;
 }
@@ -189,7 +191,7 @@ export interface PendingInvitationView {
   expiresAt: string;
 }
 
-/** Open invitations for a team. Callers must check the viewer is an owner or admin. */
+/** Open invitations for a team. Callers must check the viewer may invite people (`can(member, "members.invite")`). */
 export async function listPendingInvitations(teamId: string): Promise<PendingInvitationView[]> {
   const rows = await getDb()
     .select({ id: teamInvitation.id, email: teamInvitation.email, role: teamInvitation.role, expiresAt: teamInvitation.expiresAt })

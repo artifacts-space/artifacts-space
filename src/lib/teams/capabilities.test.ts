@@ -1,6 +1,9 @@
 import { neon } from "@neondatabase/serverless";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
+
+import { team } from "@/db/schema";
 
 import { effectiveRoleKey, groupRoleRows, resolveActor, teamRolesQuery } from "./capabilities";
 import { defaultRoleCapabilities } from "./capability-rules";
@@ -39,6 +42,12 @@ describe("membershipQuery", () => {
     const { sql, params } = membershipQuery(db, "user-1").toSQL();
     expect(sql).toMatch(/where "team_member"\."user_id" = \$\d+/);
     expect(params).toContain("user-1");
+  });
+
+  it("should keep the user filter when a caller narrows to one team", () => {
+    const { sql, params } = membershipQuery(db, "user-1", eq(team.id, "team-1")).toSQL();
+    expect(sql).toMatch(/where \("team_member"\."user_id" = \$\d+ and "team"\."id" = \$\d+\)/);
+    expect(params).toEqual(expect.arrayContaining(["user-1", "team-1"]));
   });
 });
 

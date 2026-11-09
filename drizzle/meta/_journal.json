@@ -246,6 +246,13 @@
       "when": 1794189592491,
       "tag": "0034_team_roles_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794192910166,
+      "tag": "0035_team_keeps_an_owner",
+      "breakpoints": true
     }
   ]
 }

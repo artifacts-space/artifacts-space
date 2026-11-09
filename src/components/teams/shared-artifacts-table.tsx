@@ -23,7 +23,7 @@ function sharedWhen(item: TeamSharedView) {
 
 /**
  * Artifacts shared through the team, with author, visibility, and date.
- * Owners and admins can make any of them private again with Withdraw.
+ * People who may withdraw others' sharing can make any of them private again with Withdraw.
  */
 export function SharedArtifactsTable({ artifacts, canWithdraw }: { artifacts: TeamSharedView[]; canWithdraw: boolean }) {
   const { pending, run } = useTeamAction();

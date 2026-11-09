@@ -34,7 +34,7 @@ function fields(row: typeof artifactVersion.$inferSelect): ReviewedFields {
   return { title, icon, theme, cover, summary, content, kind, language, source, metadata };
 }
 
-/** Open edit requests for a team, newest first. Callers must check the viewer is an owner or admin. */
+/** Open edit requests for a team, newest first. Callers must check the viewer may approve edits (`can(member, "approve.edits")`). */
 export async function listPendingEdits(teamId: string, limit = 25): Promise<PendingEditView[]> {
   const rows = await getDb()
     .select({ request: sharingRequest, artifact, requester: { id: user.id, name: user.name, username: user.username }, requesterAgentId: agent.userId, approved, proposed })

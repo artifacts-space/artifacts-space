@@ -82,7 +82,7 @@ export function TeamDefaultTheme({ teamId, settings, canManage }: { teamId: stri
         </SelectContent>
       </Select>
       {audit || !canManage ? (
-        <p className="text-xs text-muted-foreground">{[audit, canManage ? null : "Only owners and admins can change it."].filter(Boolean).join(" ")}</p>
+        <p className="text-xs text-muted-foreground">{[audit, canManage ? null : "Only people who can manage themes can change it."].filter(Boolean).join(" ")}</p>
       ) : null}
       {canManage ? (
         <HistoryPanel

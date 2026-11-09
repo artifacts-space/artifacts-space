@@ -247,7 +247,7 @@ async function approve(request: typeof sharingRequest.$inferSelect, deciderId: s
 }
 
 /**
- * Approves or denies an open sharing or edit request. Only owners and admins
+ * Approves or denies an open sharing or edit request. Only people whose role may approve it (owners and admins by default)
  * of the request's team, in the web app.
  */
 export async function decideSharingRequest(input: { deciderId: string; requestId: string; approve: boolean }) {
@@ -280,7 +280,7 @@ async function applyDecision(request: typeof sharingRequest.$inferSelect, input:
     .where(and(eq(sharingRequest.id, request.id), eq(sharingRequest.status, "pending")));
 }
 
-/** Makes an artifact private again. The author, or an owner or admin of its team, may do this at any time. */
+/** Makes an artifact private again. The author, or someone in its team who may withdraw others' sharing, may do this at any time. */
 export async function withdrawArtifactSharing(input: { viewerId: string; artifactId: string }) {
   const [record] = await getDb().select().from(artifact).where(eq(artifact.id, input.artifactId)).limit(1);
   if (!record) throw new UserFacingError("Artifact not found.");
