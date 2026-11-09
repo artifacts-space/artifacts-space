@@ -97,14 +97,20 @@ export interface RequestClientInfo {
   initialize: boolean;
 }
 
-/** Finds the clientInfo in an MCP request body (one message or a batch). Null when none is there. */
+/**
+ * Finds the clientInfo in an MCP request body (one message or a batch). In a
+ * batch an `initialize` wins over a per-request `_meta` one, so the
+ * connection is always recorded. Null when none is there.
+ */
 export function clientInfoFromBody(body: unknown): RequestClientInfo | null {
   const messages: unknown[] = Array.isArray(body) ? body : [body];
+  let first: RequestClientInfo | null = null;
   for (const message of messages) {
     const found = clientInfoOfMessage(message);
-    if (found) return found;
+    if (found?.initialize) return found;
+    first ??= found;
   }
-  return null;
+  return first;
 }
 
 /** Lowercase words only: "Visual Studio Code - Insiders" becomes "visual studio code insiders". */
@@ -253,7 +259,8 @@ export function stampOf(id: string | null | undefined): HarnessStamp | null {
  * a label on the artifact, not content, so anyone who may edit it can set it.
  * That is acceptable for link and public artifacts because detection can be
  * wrong and only editors can correct it, and the byline names a tool, not an
- * author: who saved each version stays in History, which no label changes.
+ * author: the person who saved each version stays in History, which no label
+ * changes.
  */
 export function approvedHarnessOf(input: { harnessOverride: string | null; approvedHarness: string | null }): ArtifactHarnessDto | null {
   return artifactHarnessOf({ harness: input.approvedHarness, harnessOverride: input.harnessOverride });
@@ -267,7 +274,9 @@ export function shownStamp(record: { harness: string | null; harnessOverride: st
 /**
  * The harness to write on the latest version when an agent save changed
  * nothing, so History agrees with the byline; null when nothing changes (a
- * web save, or the version already records it). Never on a locked version:
+ * web save, or the version already records it). The stamp is the label the
+ * artifact shows (versionStamp puts its own choice first), so History
+ * follows the label, like the byline. Never on a locked version:
  * the approved one (readers outside the team read its harness), one a
  * sharing decision names, or one another editor filed.
  */

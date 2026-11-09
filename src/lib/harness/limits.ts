@@ -7,6 +7,6 @@ export const harnessLimits = {
   maxIdChars: 32,
   /** A client's own name, kept for "Other agent". */
   maxLabelChars: 64,
-  /** A client's version string. */
-  maxVersionChars: 32,
+  /** A client's version string; long enough for build strings such as "2.0.14 (Claude Code 1.0.88, node 22.11.0)". */
+  maxVersionChars: 64,
 } as const;

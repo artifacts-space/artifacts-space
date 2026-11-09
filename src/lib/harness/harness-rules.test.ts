@@ -121,6 +121,11 @@ describe("clientInfoFromBody", () => {
     expect(clientInfoFromBody(body)).toEqual({ info: { name: "fx", version: "1.0.0" }, initialize: false });
   });
 
+  it("should prefer the initialize clientInfo in a batch so the connection is recorded", () => {
+    const meta = { method: "tools/call", params: { _meta: { "io.modelcontextprotocol/clientInfo": { name: "fx" } } } };
+    expect(clientInfoFromBody([meta, { method: "initialize", params: { clientInfo: { name: "goose" } } }])).toEqual({ info: { name: "goose", version: null }, initialize: true });
+  });
+
   it("should look through a batch when one message carries it", () => {
     expect(clientInfoFromBody([{ method: "ping" }, { method: "initialize", params: { clientInfo: { name: "goose" } } }])?.info.name).toBe("goose");
   });

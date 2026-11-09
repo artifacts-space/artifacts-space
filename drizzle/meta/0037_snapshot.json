@@ -1,5 +1,5 @@
 {
-  "id": "4e94a483-4612-4977-8b7b-4c3b264f36cc",
+  "id": "dcd68610-d9f4-46dc-b359-40c554f223d2",
   "prevId": "67fd5977-8368-4244-b399-21b20a42fc55",
   "version": "7",
   "dialect": "postgresql",
@@ -5483,7 +5483,7 @@
         },
         "mcp_connection_client_version_check": {
           "name": "mcp_connection_client_version_check",
-          "value": "char_length(\"mcp_connection\".\"client_version\") <= 32"
+          "value": "char_length(\"mcp_connection\".\"client_version\") <= 64"
         },
         "mcp_connection_override_check": {
           "name": "mcp_connection_override_check",

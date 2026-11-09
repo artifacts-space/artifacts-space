@@ -11,7 +11,7 @@ CREATE TABLE "mcp_connection" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "mcp_connection_kind_check" CHECK (("mcp_connection"."oauth_client_id" is null) <> ("mcp_connection"."api_token_id" is null)),
 	CONSTRAINT "mcp_connection_client_name_check" CHECK (char_length("mcp_connection"."client_name") <= 64),
-	CONSTRAINT "mcp_connection_client_version_check" CHECK (char_length("mcp_connection"."client_version") <= 32),
+	CONSTRAINT "mcp_connection_client_version_check" CHECK (char_length("mcp_connection"."client_version") <= 64),
 	CONSTRAINT "mcp_connection_override_check" CHECK (char_length("mcp_connection"."harness_override") <= 32)
 );
 --> statement-breakpoint
