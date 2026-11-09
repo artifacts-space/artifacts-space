@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isReportable, parseAbuseReportEmail, parseReportInput, REPORT_DETAILS_MAX_LENGTH, reportLimitChecks } from "./rules";
+import { isReportable, parseReportInput, REPORT_DETAILS_MAX_LENGTH, reportLimitChecks } from "./rules";
 
 describe("parseReportInput", () => {
   it("should accept a reason without details when details are left out", () => {
@@ -56,21 +56,5 @@ describe("reportLimitChecks", () => {
     const [first] = reportLimitChecks({ networkKey: "net", artifactId: "art-1", viewerId: null });
     const [second] = reportLimitChecks({ networkKey: "net", artifactId: "art-2", viewerId: null });
     expect(first?.subject).not.toBe(second?.subject);
-  });
-});
-
-describe("parseAbuseReportEmail", () => {
-  it("should return the address when ABUSE_REPORT_EMAIL is one email address", () => {
-    expect(parseAbuseReportEmail(" operator@example.com ")).toEqual({ ok: true, email: "operator@example.com" });
-  });
-
-  it("should report unset when ABUSE_REPORT_EMAIL is missing or blank", () => {
-    expect(parseAbuseReportEmail(undefined)).toEqual({ ok: false, problem: "unset" });
-    expect(parseAbuseReportEmail("   ")).toEqual({ ok: false, problem: "unset" });
-  });
-
-  it("should refuse the value when ABUSE_REPORT_EMAIL is not one email address", () => {
-    expect(parseAbuseReportEmail("operator")).toEqual({ ok: false, problem: "invalid" });
-    expect(parseAbuseReportEmail("a@example.com, b@example.com")).toEqual({ ok: false, problem: "invalid" });
   });
 });

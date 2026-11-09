@@ -12,7 +12,8 @@ import { can } from "@/lib/teams/capability-rules";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { sendReportEmail } from "./email";
-import { isReportable, parseAbuseReportEmail, parseReportInput, reportLimitChecks, reportReasonLabels } from "./rules";
+import { parseAbuseReportEmail } from "./operator-address";
+import { isReportable, parseReportInput, reportLimitChecks, reportReasonLabels } from "./rules";
 
 /**
  * Reader reports about link and public artifacts. A report lands with the
@@ -56,6 +57,7 @@ async function reportTeam(teamId: string | null) {
 async function notifyOperator(input: OperatorNotice) {
   const address = parseAbuseReportEmail(process.env.ABUSE_REPORT_EMAIL);
   if (!address.ok) {
+    // Deliberate: no fallback recipient. Any other address could be the reported team's, so an unset or invalid value emails nobody.
     const why = address.problem === "unset" ? "is not set" : "is not a valid email address";
     console.warn(`[reports] ABUSE_REPORT_EMAIL ${why}, so no one was emailed about report ${input.reportId}. The report is stored.`);
     return;

@@ -40,7 +40,7 @@ export function renderReportEmail({ reportId, team, artifactTitle, reasonLabel, 
     paragraphs,
     action: { label: "Open the artifact", url: artifactUrl },
     note: team ? html`Report ${reportId}. The team's owners and admins also see it on their team page.` : html`Report ${reportId}.`,
-    reason: "You get this email because this address receives abuse reports for this artifacts.space site.",
+    reason: "You get this email because this address receives abuse reports for this site.",
     text: `A reader reported an artifact.\n\nArtifact: ${artifactTitle}\n${artifactUrl}\n\nTeam: ${teamLabel}\nReason: ${reasonLabel}\n${detailsText}\nReport ${reportId}`,
   });
 }
