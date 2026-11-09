@@ -10,6 +10,7 @@ import { ArtifactHeaderSpecimen } from "@/components/dev/artifact-header-specime
 import { CoverSpecimen } from "@/components/dev/cover-specimen";
 import { NotificationsSpecimen } from "@/components/dev/notifications-specimen";
 import { SwitchSpecimen } from "@/components/dev/switch-specimen";
+import { ThemeFocusSpecimen } from "@/components/dev/theme-focus-specimen";
 import { ThemePickerSpecimen } from "@/components/dev/theme-picker-specimen";
 import { ViewsSpecimen } from "@/components/dev/views-specimen";
 import { UiView } from "@/components/artifact-view/ui-view";
@@ -132,6 +133,9 @@ export function ComponentGallery() {
         </Group>
         <Group id="themes" title="Themes">
           {themeFixtureIds.map((id) => <ThemedSpecimen key={id} id={id} />)}
+          <Specimen name="theme · focus ring">
+            <ThemeFocusSpecimen />
+          </Specimen>
           <Specimen name="theme picker">
             <ThemePickerSpecimen />
           </Specimen>
