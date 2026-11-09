@@ -40,7 +40,7 @@ function sha(name: string): string {
 /** Runs the entry script in the repository at `head` and returns its exit code. */
 function runStep(head: string, env: Record<string, string>): number | null {
   git("checkout", "-q", "--detach", head);
-  const result = spawnSync(process.execPath, [entryScript], { cwd: repo, env: { PATH: process.env.PATH ?? "", ...env }, encoding: "utf8" });
+  const result = spawnSync(process.execPath, [entryScript], { cwd: repo, env: { NODE_ENV: "test", PATH: process.env.PATH ?? "", ...env }, encoding: "utf8" });
   return result.status;
 }
 
