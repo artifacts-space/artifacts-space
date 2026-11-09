@@ -60,7 +60,8 @@ export async function inviteMemberAction(teamId: string, input: z.input<typeof i
     if (!checked.ok) return checked.result;
     const { email, role } = inviteSchema.parse(input);
     const grant = checked.roles.get(role);
-    const problem = inviteProblem(checked.membership, { key: role, capabilities: grant?.capabilities ?? [] });
+    if (!grant) return { success: false, error: "That role does not exist in this team." };
+    const problem = inviteProblem(checked.membership, { key: grant.key, capabilities: grant.capabilities });
     if (problem) return { success: false, error: problem };
     await getAuth().api.createInvitation({
       body: { email, role, organizationId: checked.membership.id, resend: true },

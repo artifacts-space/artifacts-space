@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, notExists, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { getDb } from "@/db";
@@ -157,9 +157,13 @@ export interface TeamMemberView {
   joinedAt: string;
 }
 
-/** People in a team (agents are listed separately). Callers must check the viewer's membership first. */
-export async function listTeamMembers(teamId: string): Promise<TeamMemberView[]> {
-  const rows = await getDb()
+/**
+ * The query behind listTeamMembers: people in one team, with their custom
+ * role in the same team. Agents are left out with a join and `is null`, not
+ * a correlated subquery (AGENTS.md tripwire). Exported for its `.toSQL()` test.
+ */
+export function listTeamMembersQuery(db: Pick<ReturnType<typeof getDb>, "select">, teamId: string) {
+  return db
     .select({
       memberId: teamMember.id,
       userId: teamMember.userId,
@@ -173,10 +177,16 @@ export async function listTeamMembers(teamId: string): Promise<TeamMemberView[]>
     })
     .from(teamMember)
     .innerJoin(user, eq(user.id, teamMember.userId))
+    .leftJoin(agent, eq(agent.userId, teamMember.userId))
     .leftJoin(teamRoleAssignment, eq(teamRoleAssignment.memberId, teamMember.id))
     .leftJoin(assignedRole, and(eq(assignedRole.id, teamRoleAssignment.roleId), eq(assignedRole.teamId, teamMember.teamId)))
-    .where(and(eq(teamMember.teamId, teamId), notExists(getDb().select({ id: agent.userId }).from(agent).where(eq(agent.userId, teamMember.userId)))))
+    .where(and(eq(teamMember.teamId, teamId), isNull(agent.userId)))
     .orderBy(asc(teamMember.createdAt));
+}
+
+/** People in a team (agents are listed separately). Callers must check the viewer's membership first. */
+export async function listTeamMembers(teamId: string): Promise<TeamMemberView[]> {
+  const rows = await listTeamMembersQuery(getDb(), teamId);
   return rows.map(({ customKey, customName, ...row }) => {
     const role = parseTeamRole(row.role);
     // The same rule as resolveActor, so the table always shows the role `can` uses.

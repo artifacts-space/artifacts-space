@@ -7,7 +7,7 @@ import { team } from "@/db/schema";
 
 import { effectiveRoleKey, groupRoleRows, resolveActor, teamRolesQuery } from "./capabilities";
 import { defaultRoleCapabilities } from "./capability-rules";
-import { listTeamMemberActorsQuery, membershipQuery } from "./queries";
+import { listTeamMemberActorsQuery, listTeamMembersQuery, membershipQuery } from "./queries";
 
 /*
  * Role lookups decide what people may do, so these tests read the SQL itself
@@ -48,6 +48,18 @@ describe("membershipQuery", () => {
     const { sql, params } = membershipQuery(db, "user-1", eq(team.id, "team-1")).toSQL();
     expect(sql).toMatch(/where \("team_member"\."user_id" = \$\d+ and "team"\."id" = \$\d+\)/);
     expect(params).toEqual(expect.arrayContaining(["user-1", "team-1"]));
+  });
+});
+
+describe("listTeamMembersQuery", () => {
+  it("should leave agents out with a join, never a subquery that compares a column with itself", () => {
+    const { sql, params } = listTeamMembersQuery(db, "team-1").toSQL();
+    expect(sql).toContain('left join "agent" on "agent"."user_id" = "team_member"."user_id"');
+    expect(sql).toMatch(/where \("team_member"\."team_id" = \$\d+ and "agent"\."user_id" is null\)/);
+    expect(sql).toContain('"assigned_role"."team_id" = "team_member"."team_id"');
+    expect(sql).not.toMatch(/exists/i);
+    expect(sql).not.toMatch(/"user_id" = "user_id"/);
+    expect(params).toContain("team-1");
   });
 });
 
