@@ -23,8 +23,9 @@ let repo = "";
 const commits: Record<string, string> = {};
 
 /** The test's environment without the GIT_* variables a hook exports. */
-function envWithoutGit(): Record<string, string> {
-  return Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => !entry[0].startsWith("GIT_") && entry[1] !== undefined));
+function envWithoutGit(): NodeJS.ProcessEnv {
+  const kept = Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_"));
+  return { ...Object.fromEntries(kept), NODE_ENV: "test" };
 }
 
 function git(...args: string[]): string {
