@@ -21,6 +21,7 @@ describe("decimalMegabytes", () => {
   it("should round down, so a printed cap is never larger than the real one", () => {
     expect(decimalMegabytes(999_999)).toBe("0.9 MB");
     expect(binaryMegabytes(1_000_000)).toBe("0.9 MB");
+    expect(binaryMegabytes(1_500_000)).toBe("1.4 MB");
   });
 
   it("should keep one decimal for a part", () => {

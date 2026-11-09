@@ -4,7 +4,8 @@
  * (1 MB = 1,000,000 bytes, used where a cap must stay under a framework
  * limit with room to spare). Format each cap in its own unit, so the label
  * matches the rule it states. Labels round down to one decimal, so a printed
- * cap is never larger than the real one. Pure and client-safe.
+ * cap is never larger than the real one. Meant for caps of 100 KB and up:
+ * anything smaller prints "0 MB". Pure and client-safe.
  */
 
 function roundedDown(value: number): string {

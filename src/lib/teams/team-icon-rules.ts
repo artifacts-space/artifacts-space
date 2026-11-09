@@ -4,8 +4,9 @@ import { can, type TeamActor } from "./capability-rules";
 
 /**
  * Rules for a team's icon: who may change it, which pictures it accepts,
- * and where it is stored. Pure and client-safe, so the browser checks a
- * picked file with the same rules the server uses on the upload.
+ * and where it is stored. Pure and client-safe: the browser applies the
+ * picked-file rules (type, and 2 MB before it shrinks the image), and the
+ * server re-checks the uploaded bytes (PNG or WebP, square, size, 1 MB).
  */
 
 /** Largest image a person may pick, in binary bytes (2 MB). The browser shrinks it before upload. */
