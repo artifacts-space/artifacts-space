@@ -20,7 +20,8 @@ env:
   NEXT_TELEMETRY_DISABLED: "1"
 
 # The job names are the ruleset's required status checks. Rename them only
-# together with the ruleset.
+# together with the ruleset. "Database tests" is not required yet: until the
+# owner adds it to the ruleset, a red run there blocks nothing at merge.
 jobs:
   static:
     name: Lint and typecheck
