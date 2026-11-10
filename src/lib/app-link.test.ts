@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { artifactLinkHref, parseArtifactLink, withoutArtifactLink } from "./app-link";
+import { artifactLinkHref, parseArtifactLink, parseArtifactLinkSearch, withoutArtifactLink } from "./app-link";
 
 describe("parseArtifactLink", () => {
   it("should read the artifact and the comments flag when both are set", () => {
@@ -31,5 +31,16 @@ describe("withoutArtifactLink", () => {
   it("should drop only the link params when other filters are set", () => {
     expect(withoutArtifactLink("?team=core&artifact=abc&comments=1")).toBe("?team=core");
     expect(withoutArtifactLink("?artifact=abc")).toBe("");
+  });
+});
+
+describe("parseArtifactLinkSearch", () => {
+  it("should read the link from a query string when it has one", () => {
+    expect(parseArtifactLinkSearch(new URLSearchParams("?team=core&artifact=abc&comments=1"))).toEqual({ publicId: "abc", comments: true });
+  });
+
+  it("should find no link when the query string has none or repeats it", () => {
+    expect(parseArtifactLinkSearch(new URLSearchParams("?team=core"))).toBeNull();
+    expect(parseArtifactLinkSearch(new URLSearchParams("?artifact=abc&artifact=def"))).toBeNull();
   });
 });

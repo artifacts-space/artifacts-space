@@ -24,6 +24,15 @@ export function parseArtifactLink(params: Record<string, string | string[] | und
   return { publicId, comments: single(params.comments) === "1" };
 }
 
+/** The artifact link in a URL's query string (the browser's), read by the same rules as the page's search params. */
+export function parseArtifactLinkSearch(search: URLSearchParams): ArtifactLink | null {
+  const values = (name: string) => {
+    const all = search.getAll(name);
+    return all.length > 1 ? all : all[0];
+  };
+  return parseArtifactLink({ artifact: values("artifact"), comments: values("comments") });
+}
+
 /** The /app URL that opens an artifact, with its comments when asked. */
 export function artifactLinkHref(link: ArtifactLink): string {
   const base = `/app?artifact=${encodeURIComponent(link.publicId)}`;
