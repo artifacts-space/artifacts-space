@@ -114,7 +114,11 @@ test("should not jump back to the linked artifact when the page refreshes after 
   await expect(editor(page, "Long ui fixture")).toBeVisible();
 
   // A save on /app revalidates the page, and the router refreshes its own URL: that URL must have lost the link too.
-  const refreshed = page.waitForResponse((response) => response.request().headers().rsc === "1");
+  // Only the refresh itself: an RSC request for this page that is not a prefetch of a bell row's link.
+  const refreshed = page.waitForResponse((response) => {
+    const headers = response.request().headers();
+    return headers.rsc === "1" && headers["next-router-prefetch"] === undefined && new URL(response.url()).pathname === "/dev/workspace";
+  });
   await page.evaluate(() => { window.fixtureRefresh?.(); });
   expect((await refreshed).url()).not.toContain("artifact=");
   await expect(selectedCard(page)).toContainText("Long ui fixture");
