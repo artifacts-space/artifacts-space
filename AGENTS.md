@@ -198,6 +198,23 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
   `drizzle/` has a journal entry. A migration that is safe anyway starts with
   `-- migration-guard: allow <reason>`. Never edit an applied migration.
 - Keep test rows' emails under `@example.com` and delete them afterwards.
+- `.env.local` names the shared database, and three guards keep local tools
+  off it (`src/lib/db/database-url-rules.ts`, tested in its `.test.ts`):
+  - `drizzle.config.ts` reads `.env.local` but lets a URL set for the run
+    win, and `DATABASE_URL` set alone serves for both connections. So
+    `DATABASE_URL=<throwaway> pnpm db:migrate` migrates the throwaway
+    database. Editing only `DATABASE_URL` in `.env.local` does not: there the
+    file's `DATABASE_URL_UNPOOLED` still comes first.
+  - `pnpm db:migrate` and `pnpm drizzle-kit push` stop before they connect
+    unless the database is on localhost or 127.0.0.1. Set
+    `ALLOW_SHARED_MIGRATE=1` for one run only when the owner asks you to change
+    a shared database. Production deploys migrate through
+    `scripts/migrate-on-deploy.mts`, which never loads `drizzle.config.ts`.
+  - The e2e dev server always gets both URLs from `playwright.config.ts`:
+    empty, so `next dev` cannot fill them from `.env.local` and the fixture
+    pages reach no database, or the local test database with
+    `E2E_LOCAL_DB=1`. Playwright starts its own server, never reusing one.
+    Never run `next dev` for e2e against `.env.local`'s database yourself.
 
 ### Tripwire: no correlated subqueries in single-table selects
 

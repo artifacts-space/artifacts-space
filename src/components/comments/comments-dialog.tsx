@@ -23,11 +23,18 @@ interface CommentsDialogProps {
  * The Comments button and dialog in the /app workspace, beside History: the
  * artifact's thread and composer in one scrolling dialog, so the content pane
  * holds only the artifact. The thread loads when the dialog opens. A link
- * such as /app?artifact=<id>&comments=1 opens it once for that artifact.
+ * such as /app?artifact=<id>&comments=1 opens it once for that artifact,
+ * after the artifact itself has opened.
  */
 export function CommentsDialog({ publicId, title, seesComments, offNotice, className }: CommentsDialogProps) {
   const { linked, consume } = useLinkedComments(publicId);
   const [open, setOpen] = useState(linked);
+  // A later link to this artifact, while it is already open, opens the dialog again.
+  const [wasLinked, setWasLinked] = useState(linked);
+  if (linked !== wasLinked) {
+    setWasLinked(linked);
+    if (linked) setOpen(true);
+  }
   useEffect(() => {
     if (linked) consume();
   }, [linked, consume]);
