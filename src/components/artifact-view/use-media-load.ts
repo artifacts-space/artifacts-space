@@ -6,9 +6,10 @@ import type { MediaKind } from "@/lib/files/media-rules";
 
 /**
  * Whether an image or player in a media block loaded, for media-block.tsx.
- * `interrupted` is a player that played and then failed (a dropped
- * connection, or a refused seek): it stays on the page where it stopped, and
- * resume picks up at the same moment instead of starting the file again.
+ * `interrupted` is a player that loaded (at least its metadata) and then
+ * failed, whether or not anyone pressed play: a dropped connection, or a
+ * refused seek. It stays on the page where it stopped, and resume picks up at
+ * the same moment instead of starting the file again.
  */
 export type MediaLoadState = "loading" | "ready" | "failed" | "interrupted";
 
@@ -33,7 +34,7 @@ function stateOf(element: LoadableElement): MediaLoadState | null {
   return element.readyState >= HTMLMediaElement.HAVE_METADATA ? "ready" : null;
 }
 
-/** Where a failure leaves a block: a player that was playing stays, interrupted; anything else failed to load. */
+/** Where a failure leaves a block: a player that had loaded stays, interrupted; anything else failed to load. */
 function afterError(current: MediaLoadState, kind: MediaKind): MediaLoadState {
   const playing = current === "ready" || current === "interrupted";
   return playing && (kind === "video" || kind === "audio") ? "interrupted" : "failed";

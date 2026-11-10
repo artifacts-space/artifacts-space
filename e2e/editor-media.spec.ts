@@ -159,40 +159,50 @@ test("should ask for a file again when Try again is chosen after it failed to lo
   await expect(editor(page).getByText("This image could not be loaded.")).toHaveCount(0);
 });
 
-/** A one-second WebM recorded from a canvas in the browser, as a screen recording would be. */
-async function shortWebm(page: Page): Promise<number[]> {
-  return page.evaluate(async () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 160;
-    canvas.height = 90;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("No canvas");
-    const recorder = new MediaRecorder(canvas.captureStream(15), { mimeType: "video/webm" });
-    const chunks: Blob[] = [];
-    recorder.ondataavailable = (event) => { chunks.push(event.data); };
-    const stopped = new Promise<void>((resolve) => { recorder.onstop = () => { resolve(); }; });
-    recorder.start();
-    const timer = setInterval(() => { context.fillRect(Math.random() * 140, Math.random() * 70, 20, 20); }, 50);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    clearInterval(timer);
-    recorder.stop();
-    await stopped;
-    return [...new Uint8Array(await new Blob(chunks, { type: "video/webm" }).arrayBuffer())];
-  });
+/** Two seconds of quiet 8 kHz WAV: a known duration, so a player can seek it. */
+function shortWav(): number[] {
+  const rate = 8000;
+  const samples = rate * 2;
+  const data = Buffer.alloc(44 + samples * 2);
+  data.write("RIFF", 0);
+  data.writeUInt32LE(36 + samples * 2, 4);
+  data.write("WAVEfmt ", 8);
+  data.writeUInt32LE(16, 16);
+  data.writeUInt16LE(1, 20);
+  data.writeUInt16LE(1, 22);
+  data.writeUInt32LE(rate, 24);
+  data.writeUInt32LE(rate * 2, 28);
+  data.writeUInt16LE(2, 32);
+  data.writeUInt16LE(16, 34);
+  data.write("data", 36);
+  data.writeUInt32LE(samples * 2, 40);
+  for (let index = 0; index < samples; index += 1) data.writeInt16LE(Math.round(Math.sin(index / 8) * 2000), 44 + index * 2);
+  return [...data];
 }
 
-test("should keep a video on the page and pick it up again when playback fails partway", async ({ page }) => {
+test("should keep a recording on the page and pick it up where it stopped when playback fails partway", async ({ page }) => {
   await openFixture(page);
-  await dropFile(page, "Intro paragraph.", await shortWebm(page), "walkthrough.webm", "video/webm");
-  const block = editor(page).locator('[data-media-block="video"]');
-  await expect(block.locator('[data-media-state="ready"] video')).toBeVisible();
+  await dropFile(page, "Intro paragraph.", shortWav(), "interview.wav", "audio/wav");
+  const block = editor(page).locator('[data-media-block="audio"]');
+  const player = block.locator("audio");
+  await expect(block.locator('[data-media-state="ready"] audio')).toHaveCount(1);
+  await player.evaluate((element: HTMLAudioElement) => new Promise<void>((resolve) => {
+    element.addEventListener("seeked", () => { resolve(); }, { once: true });
+    element.currentTime = 1.2;
+  }));
+  // Count the player's real loads from here on.
+  await player.evaluate((element: HTMLAudioElement) => {
+    element.dataset.loads = "0";
+    element.addEventListener("loadedmetadata", () => { element.dataset.loads = String(Number(element.dataset.loads) + 1); });
+  });
 
   // A dropped connection or a refused seek, after the player had loaded.
-  await block.locator("video").dispatchEvent("error");
-  await expect(block.getByText("The rest of this video could not be loaded.")).toBeVisible();
-  await expect(block.locator("video")).toBeVisible();
+  await player.dispatchEvent("error");
+  await expect(block.getByText("This recording stopped loading.")).toBeVisible();
+  await expect(player).toHaveCount(1);
 
   await block.getByRole("button", { name: "Try again" }).click();
-  await expect(block.getByText("The rest of this video could not be loaded.")).toHaveCount(0);
-  await expect(block.locator('[data-media-state="ready"] video')).toBeVisible();
+  await expect(player).toHaveAttribute("data-loads", "1");
+  await expect.poll(() => player.evaluate((element: HTMLAudioElement) => element.currentTime)).toBeCloseTo(1.2, 1);
+  await expect(block.getByText("This recording stopped loading.")).toHaveCount(0);
 });

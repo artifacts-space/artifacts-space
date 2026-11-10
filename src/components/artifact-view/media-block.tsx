@@ -46,8 +46,8 @@ function widthStyle(kind: MediaKind, width: number | null): CSSProperties | unde
 }
 
 const interruptedCopy: Partial<Record<MediaKind, string>> = {
-  video: "The rest of this video could not be loaded.",
-  audio: "The rest of this recording could not be loaded.",
+  video: "This video stopped loading.",
+  audio: "This recording stopped loading.",
 };
 
 const failedCopy: Record<MediaKind, string> = {
