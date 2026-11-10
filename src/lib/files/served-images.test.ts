@@ -83,7 +83,7 @@ describe("hiddenImagesFor", () => {
 
 describe("fileHiddenFor", () => {
   const inline = "9b2a4f43-6a7b-4a2e-8f61-3c1a9d2e7b10";
-  const embedded = { id: inline, namedInContent: true };
+  const embedded = { id: inline, namedInContentAt: new Date(servedAt.getTime() - 60_000) };
 
   it("should hide a file the content once named, with no version left naming it, when the approved version does not show it", async () => {
     // No versions are read but the approved one: the flag outlives pruned history.
@@ -98,17 +98,23 @@ describe("fileHiddenFor", () => {
 
   it("should not hide a plain attachment no version showed as an icon or cover or named", async () => {
     stage([[]]);
-    await expect(fileHiddenFor(approvedReader({ icon: null, cover: `file:${newCover}` }), { id: inline, namedInContent: false })).resolves.toBe(false);
+    await expect(fileHiddenFor(approvedReader({ icon: null, cover: `file:${newCover}` }), { id: inline, namedInContentAt: null })).resolves.toBe(false);
+  });
+
+  it("should not hide a plain attachment that only a draft after the approved version embeds", async () => {
+    stage([[]]);
+    const embeddedLater = { id: inline, namedInContentAt: new Date(servedAt.getTime() + 60_000) };
+    await expect(fileHiddenFor(approvedReader({ icon: null, cover: `file:${newCover}` }), embeddedLater)).resolves.toBe(false);
   });
 
   it("should hide an old cover the approved version does not show", async () => {
     stage([[{ id: "v-old" }], [{ kind: "markdown", content: "# Plan" }]]);
-    await expect(fileHiddenFor(approvedReader({ icon: null, cover: null }), { id: oldCover, namedInContent: false })).resolves.toBe(true);
+    await expect(fileHiddenFor(approvedReader({ icon: null, cover: null }), { id: oldCover, namedInContentAt: null })).resolves.toBe(true);
   });
 
   it("should not hide the approved version's own cover, and read nothing for it", async () => {
     state.db = createTableQueueDb(new Map());
-    await expect(fileHiddenFor(approvedReader({ icon: null, cover: `file:${oldCover}@20` }), { id: oldCover, namedInContent: true })).resolves.toBe(false);
+    await expect(fileHiddenFor(approvedReader({ icon: null, cover: `file:${oldCover}@20` }), { id: oldCover, namedInContentAt: servedAt })).resolves.toBe(false);
   });
 
   it("should hide nothing and read nothing for readers of the latest version", async () => {

@@ -12,8 +12,8 @@ import { recordArtifactChange } from "@/lib/versions/service";
 
 import { canUseFileInArtifact } from "./access-rules";
 import { fileLimits } from "./config";
-import { countHistoryOnlyImages } from "./icon-cleanup";
-import { fileRefsInContent, maxFileRefs } from "./refs";
+import { countHistoryOnlyFiles } from "./icon-cleanup";
+import { fileRefsInContent, maxFileRefs, maxMarkdownRefLookup } from "./refs";
 import { attachFileRows, clearIconForFile, countArtifactFiles, getFileRow, getFileRows, removeFiles } from "./store";
 
 /**
@@ -44,12 +44,12 @@ export async function assertUsableFiles(authorId: string, artifactId: string | n
   }
 }
 
-/** Whether the artifact (null on create) can take `adding` more files. Old icon and cover images kept only for Restore do not count (see countHistoryOnlyImages). */
+/** Whether the artifact (null on create) can take `adding` more files. Old icon and cover images, and removed media, kept only for Restore do not count (see countHistoryOnlyFiles). */
 async function hasRoomFor(artifactId: string | null, adding: number): Promise<boolean> {
   if (!artifactId) return adding <= fileLimits.maxFilesPerArtifact;
   const existing = await countArtifactFiles(artifactId);
   if (existing + adding <= fileLimits.maxFilesPerArtifact) return true;
-  return existing - (await countHistoryOnlyImages(artifactId)) + adding <= fileLimits.maxFilesPerArtifact;
+  return existing - (await countHistoryOnlyFiles(artifactId)) + adding <= fileLimits.maxFilesPerArtifact;
 }
 
 /** No harness: a change in the web app. An agent passes its harness, looked up only when the change files a version. */
@@ -85,11 +85,13 @@ export async function checkContentFiles(authorId: string, artifactId: string | n
  * use (another artifact's, a deleted one, or text from a restored version);
  * those stay plain links that load only for people who can read the file,
  * so a save or a Restore never fails over them and never widens access.
+ * Only the first maxMarkdownRefLookup ids are looked up, and the file cap
+ * applies to the usable ones, so many links never fail a save either.
  */
 async function attachableMarkdownFiles(authorId: string, artifactId: string | null, fileIds: readonly string[]): Promise<string[]> {
   if (fileIds.length === 0) return [];
-  if (fileIds.length > maxFileRefs) throw new UserFacingError(`An artifact can use at most ${String(maxFileRefs)} files.`);
-  const usable = (await getFileRows(fileIds)).filter((row) => canUseFileInArtifact(row, authorId, artifactId));
+  const usable = (await getFileRows(fileIds.slice(0, maxMarkdownRefLookup))).filter((row) => canUseFileInArtifact(row, authorId, artifactId));
+  if (usable.length > maxFileRefs) throw new UserFacingError(`An artifact can use at most ${String(maxFileRefs)} files.`);
   const adding = usable.filter((row) => row.artifactId === null).length;
   if (adding > 0 && !(await hasRoomFor(artifactId, adding))) {
     throw new UserFacingError(`An artifact holds at most ${String(fileLimits.maxFilesPerArtifact)} files. Remove some first.`);

@@ -16,7 +16,7 @@ const databaseUrl = process.env.TEST_DATABASE_URL;
 if (databaseUrl) process.env.DATABASE_URL = databaseUrl;
 
 describe.runIf(Boolean(databaseUrl))("inline media access with a database", async () => {
-  const { eq, inArray } = await import("drizzle-orm");
+  const { eq, inArray, sql } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
   const { artifact, artifactFile, artifactVersion, user } = await import("@/db/schema");
   const { generatePublicId } = await import("@/lib/public-id");
@@ -65,18 +65,33 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
     ]);
     // Attached after a version names it, the way a save attaches its uploads; then back-dated before the approved versions.
     await attachFileRows(ids.author, ids.doc, [image, lateImage]);
-    await db.update(artifactFile).set({ attachedAt: at(10) }).where(inArray(artifactFile.id, [image, lateImage]));
+    await db
+      .update(artifactFile)
+      .set({ attachedAt: at(10), namedInContentAt: sql`case when ${artifactFile.namedInContentAt} is null then null else ${at(20)}::timestamptz end` })
+      .where(inArray(artifactFile.id, [image, lateImage]));
   });
 
-  async function namedInContent(fileId: string) {
-    const [row] = await getDb().select({ named: artifactFile.namedInContent }).from(artifactFile).where(eq(artifactFile.id, fileId));
-    return row?.named;
+  async function namedInContentAt(fileId: string) {
+    const [row] = await getDb().select({ named: artifactFile.namedInContentAt }).from(artifactFile).where(eq(artifactFile.id, fileId));
+    return row?.named ?? null;
+  }
+
+  async function reviseTo(content: string, minute: number) {
+    await getDb().update(artifact).set({ content }).where(eq(artifact.id, ids.doc));
+    const [record] = await getDb().select().from(artifact).where(eq(artifact.id, ids.doc));
+    if (!record) throw new Error("No artifact.");
+    return insertVersion(record, { createdBy: ids.author, saveKind: "edit", at: at(minute) });
   }
 
   async function publicFileIds() {
     const [record] = await getDb().select({ publicId: artifact.publicId }).from(artifact).where(eq(artifact.id, ids.doc));
     const viewable = record ? await getArtifactAccess(record.publicId, null) : null;
     return viewable ? (await filesForViewer(viewable)).map((file) => file.id) : [];
+  }
+
+  async function versionsNaming(fileId: string) {
+    const rows = await getDb().select({ id: artifactVersion.id, content: artifactVersion.content }).from(artifactVersion).where(eq(artifactVersion.artifactId, ids.doc));
+    return rows.filter((row) => row.content.includes(fileId) && row.id !== versions.shows).map((row) => row.id);
   }
 
   afterAll(cleanUp);
@@ -107,25 +122,31 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
     expect((await findReadableFile(image, ids.author))?.id).toBe(image);
   });
 
+  it("should keep a plain attachment readable for approved readers when only a draft after their version embeds it", async () => {
+    await serve(versions.after);
+    const draft = await reviseTo(`# Plan\n\n![Late](/api/files/${lateImage})\n`, 40);
+    expect(await namedInContentAt(lateImage)).toEqual(at(40));
+    expect((await findReadableFile(lateImage, null))?.id).toBe(lateImage);
+    expect(await publicFileIds()).toContain(lateImage);
+    await getDb().delete(artifactVersion).where(eq(artifactVersion.id, draft));
+    await getDb().update(artifactFile).set({ namedInContentAt: null }).where(eq(artifactFile.id, lateImage));
+  });
+
   it("should mark a file as embedded when it is attached after a version names it, and when a version names it after it is attached", async () => {
-    expect(await namedInContent(image)).toBe(true);
-    expect(await namedInContent(lateImage)).toBe(false);
-    const content = `# Plan\n\n![Late](/api/files/${lateImage})\n`;
-    await getDb().update(artifact).set({ content }).where(eq(artifact.id, ids.doc));
-    const [record] = await getDb().select().from(artifact).where(eq(artifact.id, ids.doc));
-    if (!record) throw new Error("No artifact.");
-    const versionId = await insertVersion(record, { createdBy: ids.author, saveKind: "edit", at: at(40) });
-    expect(await namedInContent(lateImage)).toBe(true);
-    await getDb().delete(artifactVersion).where(eq(artifactVersion.id, versionId));
+    expect(await namedInContentAt(image)).toEqual(at(20));
+    expect(await namedInContentAt(lateImage)).toBeNull();
+    // Named by a version before the approved one (minute 30), so it is content for that version's readers.
+    await reviseTo(`# Plan\n\n![Late](/api/files/${lateImage})\n`, 25);
+    expect(await namedInContentAt(lateImage)).toEqual(at(25));
   });
 
   it("should keep refusing removed images, and leave them out of the file list, after pruning deleted every version that showed them, in both orders of attach and save", async () => {
     await serve(versions.after);
-    await getDb().delete(artifactVersion).where(eq(artifactVersion.id, versions.shows));
-    // Attached after the version that named it: only attachFileRows (namedByAnyVersion) set its flag.
+    await getDb().delete(artifactVersion).where(inArray(artifactVersion.id, [versions.shows, ...(await versionsNaming(lateImage))]));
+    // Attached after the version that named it: only attachFileRows (namedAtAttach) set its time.
     await expect(findReadableFile(image, ids.stranger)).resolves.toBeNull();
     await expect(findReadableFile(image, null)).resolves.toBeNull();
-    // Attached before a version named it: only markNamedInContent set its flag, and that version is gone too.
+    // Attached before a version named it: only markNamedInContent set its time, and that version is gone too.
     await expect(findReadableFile(lateImage, null)).resolves.toBeNull();
     expect(await publicFileIds()).toEqual([]);
     expect((await findReadableFile(image, ids.author))?.id).toBe(image);

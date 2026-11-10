@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fileLimits } from "./config";
+import { maxMarkdownRefLookup } from "./refs";
 
 /*
  * The per-artifact file limit, with the file rows and the history count
@@ -9,7 +10,7 @@ import { fileLimits } from "./config";
 
 const versions = vi.hoisted(() => ({ recordArtifactChange: vi.fn() }));
 const store = vi.hoisted(() => ({ getFileRows: vi.fn(), countArtifactFiles: vi.fn(), attachFileRows: vi.fn(), clearIconForFile: vi.fn(), getFileRow: vi.fn(), removeFiles: vi.fn() }));
-const cleanup = vi.hoisted(() => ({ countHistoryOnlyImages: vi.fn() }));
+const cleanup = vi.hoisted(() => ({ countHistoryOnlyFiles: vi.fn() }));
 
 vi.mock("./store", () => store);
 vi.mock("./icon-cleanup", () => cleanup);
@@ -31,20 +32,20 @@ beforeEach(() => {
 describe("assertUsableFiles", () => {
   it("should accept a new cover upload when the artifact is full only of images kept for Restore", async () => {
     store.countArtifactFiles.mockResolvedValue(fileLimits.maxFilesPerArtifact);
-    cleanup.countHistoryOnlyImages.mockResolvedValue(3);
+    cleanup.countHistoryOnlyFiles.mockResolvedValue(3);
     await expect(assertUsableFiles("author", "a1", [upload])).resolves.toBeUndefined();
   });
 
   it("should refuse a new file when the artifact is full of files it still shows", async () => {
     store.countArtifactFiles.mockResolvedValue(fileLimits.maxFilesPerArtifact);
-    cleanup.countHistoryOnlyImages.mockResolvedValue(0);
+    cleanup.countHistoryOnlyFiles.mockResolvedValue(0);
     await expect(assertUsableFiles("author", "a1", [upload])).rejects.toThrow(/at most 20 files/);
   });
 
   it("should not count history images when there is room anyway", async () => {
     store.countArtifactFiles.mockResolvedValue(2);
     await expect(assertUsableFiles("author", "a1", [upload])).resolves.toBeUndefined();
-    expect(cleanup.countHistoryOnlyImages).not.toHaveBeenCalled();
+    expect(cleanup.countHistoryOnlyFiles).not.toHaveBeenCalled();
   });
 });
 
@@ -70,8 +71,23 @@ describe("checkContentFiles for Markdown", () => {
 
   it("should refuse the save when new uploads would go over the file limit", async () => {
     store.countArtifactFiles.mockResolvedValue(fileLimits.maxFilesPerArtifact);
-    cleanup.countHistoryOnlyImages.mockResolvedValue(0);
+    cleanup.countHistoryOnlyFiles.mockResolvedValue(0);
     await expect(checkContentFiles("author", "a1", "markdown", markdown)).rejects.toThrow(/at most 20 files/);
+  });
+
+  it("should save Markdown that links more than 50 files it cannot use, attaching only its own upload", async () => {
+    const others = Array.from({ length: 60 }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`);
+    const linked = [...others.map((id) => `[file](/api/files/${id})`), `![Shot](/api/files/${upload})`].join("\n\n");
+    store.getFileRows.mockImplementation((ids: string[]) => Promise.resolve(ids.map((id) => (id === upload ? { id, status: "ready", uploaderId: "author", artifactId: null } : { id, status: "ready", uploaderId: "someone-else", artifactId: "another-artifact" }))));
+    store.countArtifactFiles.mockResolvedValue(0);
+    await expect(checkContentFiles("author", "a1", "markdown", linked)).resolves.toEqual([upload]);
+  });
+
+  it("should look up a bounded number of ids however many files Markdown links", async () => {
+    const many = Array.from({ length: maxMarkdownRefLookup + 40 }, (_, index) => `[f](/api/files/00000000-0000-4000-8000-${String(index).padStart(12, "0")})`).join("\n");
+    store.getFileRows.mockResolvedValue([]);
+    await expect(checkContentFiles("author", "a1", "markdown", many)).resolves.toEqual([]);
+    expect(store.getFileRows.mock.calls[0]?.[0]).toHaveLength(maxMarkdownRefLookup);
   });
 
   it("should still refuse unknown files when the content is a ui spec", async () => {

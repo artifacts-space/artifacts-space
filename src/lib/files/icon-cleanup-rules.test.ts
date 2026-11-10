@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dropsShownImage, hiddenImageFiles, imageFileIdOf, imageFileIdsOf, unusedIconFiles, type IconUseState } from "./icon-cleanup-rules";
+import { droppedContentRefs, dropsShownImage, hiddenImageFiles, imageFileIdOf, imageFileIdsOf, type IconUseState, unusedIconFiles } from "./icon-cleanup-rules";
 
 const oldFile = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const newFile = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
@@ -109,5 +109,20 @@ describe("dropsShownImage", () => {
   it("should be true when a ui save drops an Image element's file", () => {
     expect(dropsShownImage(uiUsing(oldFile), uiUsing(newFile))).toBe(true);
     expect(dropsShownImage(uiUsing(oldFile), uiUsing(oldFile))).toBe(false);
+  });
+});
+
+describe("droppedContentRefs", () => {
+  const shot = "3b241101-e2bb-4255-8caf-4136c566a962";
+  const kept = "9b2a4f43-6a7b-4a2e-8f61-3c1a9d2e7b10";
+
+  it("should name the media a save stopped embedding", () => {
+    const before = { kind: "markdown", content: `![A](/api/files/${shot})\n\n![B](/api/files/${kept})` };
+    expect(droppedContentRefs(before, { kind: "markdown", content: `![B](/api/files/${kept})` })).toEqual([shot]);
+  });
+
+  it("should name nothing when the content did not change", () => {
+    const same = { kind: "markdown", content: `![A](/api/files/${shot})` };
+    expect(droppedContentRefs(same, same)).toEqual([]);
   });
 });

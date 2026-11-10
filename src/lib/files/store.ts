@@ -5,7 +5,7 @@ import { artifact, artifactFile, type ArtifactFileRecord } from "@/db/schema";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 
 import { fileLimits } from "./config";
-import { namedByAnyVersion } from "./content-files";
+import { namedAtAttach } from "./content-files";
 import { deleteObject, r2ConfigFromEnv } from "./r2";
 import type { FileDto } from "./types";
 
@@ -93,7 +93,7 @@ export async function attachFileRows(uploaderId: string, artifactId: string, fil
   if (fileIds.length === 0) return 0;
   const rows = await getDb()
     .update(artifactFile)
-    .set({ artifactId, attachedAt: sql`now()`, namedInContent: namedByAnyVersion(artifactId) })
+    .set({ artifactId, attachedAt: sql`now()`, namedInContentAt: namedAtAttach(artifactId) })
     .where(and(inArray(artifactFile.id, [...fileIds]), eq(artifactFile.uploaderId, uploaderId), eq(artifactFile.status, "ready"), isNull(artifactFile.artifactId)))
     .returning();
   return rows.length;

@@ -5,7 +5,7 @@ import { artifactVersion, type ArtifactFileRecord } from "@/db/schema";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 import type { ArtifactAccess } from "@/lib/access";
 
-import { filesNamedInContent } from "./content-files";
+import { filesNamedInContent, namedBy } from "./content-files";
 import { hiddenImageFiles, imageFileIdsOf } from "./icon-cleanup-rules";
 import { fileRefsInContent } from "./refs";
 
@@ -16,10 +16,13 @@ import { fileRefsInContent } from "./refs";
  * still see only that version's images and media; this finds the ones to
  * hide from them.
  *
- * "Once embedded" is the file row's `named_in_content` flag
- * (content-files.ts), not a scan of the versions kept today: pruning drops
- * old versions, and a file removed from the document must stay hidden after
- * the versions that showed it are gone.
+ * "Once embedded" is the file row's `named_in_content_at` (content-files.ts),
+ * not a scan of the versions kept today: pruning drops old versions, and a
+ * file removed from the document must stay hidden after the versions that
+ * showed it are gone. It counts only when content named the file by the
+ * time of the approved version: a plain attachment that a later draft
+ * embeds stays readable as an attachment until a version that drops it is
+ * approved.
  */
 
 type ServedViewer = Pick<ArtifactAccess, "record" | "version" | "served">;
@@ -77,7 +80,7 @@ async function notServed(viewable: ServedViewer, versionId: string, shown: Reado
 export async function hiddenImagesFor(viewable: ServedViewer): Promise<ReadonlySet<string>> {
   const versionId = approvedVersionToCheck(viewable);
   if (versionId === null) return new Set();
-  const [images, contentFiles] = await Promise.all([imagesEverShown(viewable), filesNamedInContent(viewable.record.id)]);
+  const [images, contentFiles] = await Promise.all([imagesEverShown(viewable), filesNamedInContent(viewable.record.id, viewable.served.updatedAt)]);
   return notServed(viewable, versionId, new Set([...images, ...contentFiles]));
 }
 
@@ -86,10 +89,10 @@ export async function hiddenImagesFor(viewable: ServedViewer): Promise<ReadonlyS
  * rule as hiddenImagesFor, at the cost of one small query or two: the file
  * row already says whether content named it, so no version is scanned.
  */
-export async function fileHiddenFor(viewable: ServedViewer, file: Pick<ArtifactFileRecord, "id" | "namedInContent">): Promise<boolean> {
+export async function fileHiddenFor(viewable: ServedViewer, file: Pick<ArtifactFileRecord, "id" | "namedInContentAt">): Promise<boolean> {
   const versionId = approvedVersionToCheck(viewable);
   if (versionId === null) return false;
-  const kept = file.namedInContent || (await shownAsImage(viewable, file.id));
+  const kept = namedBy(file, viewable.served.updatedAt) || (await shownAsImage(viewable, file.id));
   if (!kept) return false;
   return (await notServed(viewable, versionId, new Set([file.id]))).has(file.id);
 }

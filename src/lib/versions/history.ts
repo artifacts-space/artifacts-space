@@ -7,7 +7,7 @@ import { artifact, artifactVersion, sharingRequest, type ArtifactRecord, type Ar
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 import type { VersionSaveKind } from "@/lib/artifact-types";
 import { markNamedInContent } from "@/lib/files/content-files";
-import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
+import { pruneUnusedContentFilesQuietly, pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { dropsShownImage } from "@/lib/files/icon-cleanup-rules";
 import { restampTo, stampColumns, stampOf, type HarnessStamp } from "@/lib/harness/harness-rules";
 
@@ -38,7 +38,7 @@ export async function insertVersion(
   const id = randomUUID();
   const at = options.at ? { createdAt: options.at, savedAt: options.at } : {};
   // Flag first: the flag errs on hiding, so a failure after it leaves no file readable that should not be.
-  await markNamedInContent(record.id, record.kind, record.content);
+  await markNamedInContent(record.id, record.kind, record.content, options.at);
   await getDb()
     .insert(artifactVersion)
     .values({ id, artifactId: record.id, ...copiedFields(record), ...stampColumns(options.harness), createdBy: options.createdBy, saveKind: options.saveKind, restoredFromId: options.restoredFromId ?? null, ...at });
@@ -174,7 +174,8 @@ function droppedImages(rows: readonly { icon: string | null; cover: string | nul
 
 /**
  * Deletes the versions of one artifact that retention lets go, then the icon
- * and cover images only those versions showed. Returns how many versions went.
+ * and cover images, and the removed media, only those versions showed.
+ * Returns how many versions went.
  */
 export async function pruneArtifactVersions(artifactId: string, now: Date = new Date()): Promise<number> {
   const [owner] = await getDb().select({ approvedVersionId: artifact.approvedVersionId }).from(artifact).where(eq(artifact.id, artifactId)).limit(1);
@@ -193,19 +194,21 @@ export async function pruneArtifactVersions(artifactId: string, now: Date = new 
   const dropped = new Set(prunable);
   const images = droppedImages(versions.filter((version) => dropped.has(version.id)));
   if (images.length > 0) await pruneUnusedIconFilesQuietly(artifactId, images);
+  await pruneUnusedContentFilesQuietly(artifactId);
   return prunable.length;
 }
 
 /** The most versions one cleanup run deletes. The next run continues. */
 export const versionCleanupBatchSize = 1000;
 
-/** Removes the icon and cover images that only the dropped versions showed, one artifact at a time. */
-async function pruneDroppedImages(rows: readonly { artifact_id: string; icon: string | null; cover: string | null }[]): Promise<void> {
+/** Removes the icon and cover images, and the removed media, that only the dropped versions showed, one artifact at a time. */
+async function pruneDroppedFiles(rows: readonly { artifact_id: string; icon: string | null; cover: string | null }[]): Promise<void> {
   const byArtifact = new Map<string, { icon: string | null; cover: string | null }[]>();
   for (const row of rows) byArtifact.set(row.artifact_id, [...(byArtifact.get(row.artifact_id) ?? []), row]);
   for (const [artifactId, dropped] of byArtifact) {
     const images = droppedImages(dropped);
     if (images.length > 0) await pruneUnusedIconFilesQuietly(artifactId, images);
+    await pruneUnusedContentFilesQuietly(artifactId);
   }
 }
 
@@ -213,7 +216,8 @@ async function pruneDroppedImages(rows: readonly { artifact_id: string; icon: st
  * The cleanup job's pass over every artifact, with the same rule as
  * selectPrunableVersions: past the newest 100, or older than a year, but
  * never the newest version, the approved version, or one waiting for approval.
- * Icon and cover images only the dropped versions showed go with them.
+ * Icon and cover images, and removed media, only the dropped versions
+ * showed go with them.
  */
 export async function pruneAllVersions(): Promise<{ removed: number; remaining: boolean }> {
   const maxAgeDays = Math.round(versionRetention.maxAgeMs / 86_400_000);
@@ -233,7 +237,7 @@ export async function pruneAllVersions(): Promise<{ removed: number; remaining: 
     )
     returning id, artifact_id, icon, cover
   `);
-  await pruneDroppedImages(result.rows);
+  await pruneDroppedFiles(result.rows);
   const removed = result.rows.length;
   return { removed, remaining: removed === versionCleanupBatchSize };
 }

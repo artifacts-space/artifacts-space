@@ -63,11 +63,15 @@ after it.
 - **The URL** is the site-relative path `/api/files/<file id>`, where the id
   is the file's UUID. That route checks access on every request, so a media
   block never shows a file to someone who may not read it. Write it
-  relative: the Markdown version makes it absolute for readers outside the
-  site.
+  relative: the Markdown version makes link, image, and reference-definition
+  targets absolute for readers outside the site (code blocks and inline code
+  stay as written), and a save turns this site's own absolute file URLs back
+  into the relative form (`absoluteFileLinks` and `relativeFileLinks`).
 - **Options** follow `#`, joined with `&`, each at most once:
   - the kind: `video`, `audio`, `pdf`, or `file`. Leave it out for an image;
-    `#image` reads as an image too, but is not written.
+    `#image` reads as an image too, but is not written. When a URL names no
+    kind, the read view shows the file as its type calls for (a video plays,
+    a PDF opens; `shownMediaKind`).
   - `width=<10–100>`: a whole percent of the text column. Images and video
     only. Phones always use the full column. Without it, an image shows at its
     own size, never wider than the column.
@@ -90,16 +94,32 @@ after it.
   uploads attaches them to the artifact (`checkContentFiles` in
   `src/lib/files/attach.ts`); links to files you cannot use stay plain links
   that load only for people who may read those files. Every `/api/files/<id>`
-  in the text counts, media and plain links alike (`markdownFileRefs`).
+  in the text counts, media and plain links alike (`markdownFileRefs`); only
+  the first 500 ids are looked up, and the 50-file cap applies to the files
+  the save can use, so many links never fail a save or a Restore.
+- **Only documents hold media.** A ui artifact's Markdown block is text only:
+  no media in its slash menu, and a pasted or dropped file is refused with a
+  note, because ui saves attach only Image and File block files. Media
+  already written in such a block stays as written. Full media in ui Markdown
+  blocks is a later phase.
 - **Access follows the artifact.** People who can read the artifact can load
   its media. Readers of the approved version (outside the team) load only
   files attached by that version's time, and never a file that some version
   embedded but the approved version does not (`served-images.ts`). "Some
-  version embedded it" is kept on the file row (`named_in_content`, set in
-  `src/lib/files/content-files.ts`), so it holds after pruning deletes those
-  versions. A save that drops an embedded file always files its own version,
-  so Restore brings it back (`dropsShownImage`). Embedded files are never deleted on their own;
-  removing them from the artifact's files deletes them.
+  version embedded it" is kept on the file row as the time content first
+  named it (`named_in_content_at`, set in `src/lib/files/content-files.ts`),
+  so it holds after pruning deletes those versions. It counts only when it
+  is no later than the approved version: a plain attachment that a later
+  draft embeds stays readable as an attachment until a version that drops it
+  is approved. Files attached before this column existed have no time and
+  behave as plain attachments until a save names them.
+- **Removed media is kept for Restore, then deleted.** A save that drops an
+  embedded file always files its own version, so Restore brings it back
+  (`dropsShownImage`). While only older versions name it, it does not count
+  toward the 20-file limit (`countHistoryOnlyFiles`); once no version names
+  it (a merged save, or history pruning), it is deleted
+  (`pruneUnusedContentFiles` in `src/lib/files/icon-cleanup.ts`). A file
+  content never named, a plain attachment, is never deleted this way.
 
 The rules are in `src/lib/files/media-rules.ts` (URL form, kinds, widths) and
 `media-markdown.ts` (the block both ways).

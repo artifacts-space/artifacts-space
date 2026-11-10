@@ -91,3 +91,10 @@ export function hiddenImageFiles(imageIds: Iterable<string>, served: ServedImage
   const shown = new Set([...imageFileIdsOf(served), ...served.contentRefs]);
   return new Set([...imageIds].filter((fileId) => !shown.has(fileId)));
 }
+
+/** The files `before`'s content names that `after`'s no longer does: what a save may have just stopped keeping. */
+export function droppedContentRefs(before: { kind: string; content: string }, after: { kind: string; content: string }): string[] {
+  if (before.kind === after.kind && before.content === after.content) return [];
+  const kept = new Set(fileRefsInContent(after.kind, after.content));
+  return fileRefsInContent(before.kind, before.content).filter((fileId) => !kept.has(fileId));
+}

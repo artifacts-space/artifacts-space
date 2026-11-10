@@ -35,8 +35,10 @@ import { assertRoomForNewTags, parseNewTags } from "@/lib/tags/store";
 import { projectChoiceSchema } from "@/lib/projects/rules";
 import { findOrCreateProject } from "@/lib/projects/store";
 import { checkContentFiles } from "@/lib/files/attach";
+import { withRelativeFileLinks } from "@/lib/files/own-file-links";
 import { artifactHarnessOf, stampColumns, type HarnessStamp } from "@/lib/harness/harness-rules";
-import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
+import { pruneUnusedContentFilesQuietly, pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
+import { droppedContentRefs } from "@/lib/files/icon-cleanup-rules";
 import { checkIconFile, restorableIcon } from "@/lib/files/icon-file";
 import { checkCoverFile, restorableCover } from "@/lib/files/cover-file";
 import { attachFileRows, deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
@@ -328,7 +330,8 @@ export async function findPublicIdByShareId(shareId: string) {
  * connection that created it; leave it out for the web app.
  */
 export async function createArtifact(userId: string, input: ArtifactInput, options: { harness?: HarnessStamp | null } = {}) {
-  const { project: projectName, tags: tagInput, ...parsed } = artifactInputSchema.parse(input);
+  const { project: projectName, tags: tagInput, ...sent } = artifactInputSchema.parse(input);
+  const parsed = withRelativeFileLinks(sent.kind, sent);
   const tags = parseNewTags(tagInput);
   assertArtifactSize(parsed);
   assertValidArtifactContent(parsed.kind, parsed.content);
@@ -422,6 +425,8 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
   await recordArtifactSave({ before, after: record, editorId, actor: context.actor, ...saveKindOf(context), harness: context.options.harness ?? null });
   // A replaced or removed image icon or cover goes with this save, unless something still shows it (see icon-cleanup.ts).
   if (imageChanged(before, record)) await pruneUnusedIconFilesQuietly(record.id, [before.icon, before.cover]);
+  // So does media the content stopped embedding, once no version names it (a merged save can drop the only one).
+  await pruneUnusedContentFilesQuietly(record.id, droppedContentRefs(before, record));
   const [dto] = await toArtifactDtos([record], editorId);
   return dto ?? null;
 }
@@ -434,11 +439,11 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
  * approved version. `actor` is "agent" for MCP calls, which never approve.
  */
 export async function updateArtifact(userId: string, id: string, input: ArtifactUpdateInput, actor: SharingActor = "person", options: SaveOptions = {}) {
-  const parsed = artifactUpdateSchema.parse(input);
-  assertArtifactSize(parsed);
+  const sent = artifactUpdateSchema.parse(input);
+  assertArtifactSize(sent);
   const before = await getEditableArtifact(userId, { id });
   if (!before) return null;
-  return saveChanges(parsed, { editorId: userId, before, actor, options });
+  return saveChanges(withRelativeFileLinks(sent.kind ?? before.kind, sent), { editorId: userId, before, actor, options });
 }
 
 /**
