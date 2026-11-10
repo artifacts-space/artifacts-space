@@ -105,11 +105,14 @@ export function useBlankUploads({ options, artifact, draftRef, replace, onUpdate
   const api = options?.api;
   const uploads = useFileUploads({ send: api?.send });
   const standingRef = useRef<CreateStanding>({ state: "none", mounted: true, attempts: 0 });
+  /** Counts creates that came back, so the page can settle what waited for them. */
+  const [settled, setSettled] = useState(0);
   const tracker = useMemo<CreateTracker>(() => ({
     read: () => standingRef.current,
     set: (state) => {
       standingRef.current.state = state;
       if (state === "inFlight") standingRef.current.attempts += 1;
+      else setSettled((count) => count + 1);
     },
   }), []);
   /** Files handed to the create, which attaches them on the server. */
@@ -154,14 +157,15 @@ export function useBlankUploads({ options, artifact, draftRef, replace, onUpdate
   }, [api, stored, artifact.id, uploads.busy, readyKey, attachedKey, attach, draftRef, replace]);
 
   // Every file removed before the create: the page is blank again, not an empty Files artifact.
+  // Not while a create is on its way: it may still store the Files page, and the draft must match what comes back.
   useEffect(() => {
     const auto = filesDraftRef.current;
-    if (stored || itemCount > 0 || !auto) return;
+    if (stored || itemCount > 0 || !auto || standingRef.current.state === "inFlight") return;
     filesDraftRef.current = null;
     const draft = draftRef.current;
     if (draft.kind !== "file" || draft.content !== "") return;
     replace({ ...draft, kind: "markdown", title: draft.title === auto.title ? "" : draft.title }, true);
-  }, [stored, itemCount, draftRef, replace]);
+  }, [stored, itemCount, settled, draftRef, replace]);
 
   /** Removes a file from the page and from the create; its upload goes unless a create on its way may carry it. */
   const removeUpload = useCallback((key: string) => {

@@ -58,10 +58,25 @@ function stillDetected(detected: DetectedFormat | null, draft: ArtifactDraft): D
 }
 
 /**
+ * After a create refused once the page is gone, deletes the files it carried,
+ * unless another create started: the editor's last save, queued while this
+ * one was on its way, runs right after this answer and carries the same files.
+ * That retry deletes them itself if it is refused too.
+ */
+function discardAfterRefusal(api: NewArtifactApi, tracker: CreateTracker, fileIds: readonly string[]) {
+  const attempts = tracker.read().attempts;
+  window.setTimeout(() => {
+    const standing = tracker.read();
+    if (standing.state !== "failed" || standing.attempts !== attempts) return;
+    for (const id of fileIds) void api.discard(id).catch(() => undefined);
+  }, 0);
+}
+
+/**
  * The page's create, keeping `tracker` up to date: what may be deleted when
  * the page goes depends on it (uploadsToDiscard). A create refused after the
- * page is gone (the editor's last save) deletes the files it carried, since
- * nothing will try again; a lost answer keeps them for the cleanup job.
+ * page is gone deletes the files it carried once no retry follows
+ * (discardAfterRefusal); a lost answer keeps them for the cleanup job.
  */
 function trackedCreate(api: NewArtifactApi, tracker: CreateTracker): NewArtifactApi["create"] {
   return (input, fileIds, requestId) => {
@@ -69,7 +84,7 @@ function trackedCreate(api: NewArtifactApi, tracker: CreateTracker): NewArtifact
     return api.create(input, fileIds, requestId).then(
       (result) => {
         tracker.set(result.success ? "stored" : "failed");
-        if (!result.success && !tracker.read().mounted) for (const id of fileIds) void api.discard(id).catch(() => undefined);
+        if (!result.success && !tracker.read().mounted) discardAfterRefusal(api, tracker, fileIds);
         return result;
       },
       (error: unknown) => {
