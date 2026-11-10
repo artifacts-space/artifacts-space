@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { Pool } from "pg";
 
+import { isLocalDatabaseUrl } from "../../src/lib/db/database-url-rules";
+
 /**
  * Seeding for the e2e checks that need artifacts in a database. They run
  * only with E2E_LOCAL_DB=1 and a DATABASE_URL on localhost (a throwaway
@@ -11,10 +13,7 @@ import { Pool } from "pg";
 
 /** True when the database-backed specs may run. */
 export function localDatabaseEnabled(): boolean {
-  const url = process.env.DATABASE_URL;
-  if (process.env.E2E_LOCAL_DB !== "1" || !url) return false;
-  const host = new URL(url).hostname;
-  return host === "localhost" || host === "127.0.0.1";
+  return process.env.E2E_LOCAL_DB === "1" && isLocalDatabaseUrl(process.env.DATABASE_URL);
 }
 
 export const localDatabaseSkipReason = "Set E2E_LOCAL_DB=1 and DATABASE_URL to a local throwaway Postgres with every migration applied.";
