@@ -207,3 +207,62 @@ test("should switch a page stored with only a title to Files and back to Markdow
   expect((await storedNew(page))[0]?.content).toBe("");
   expect(await creates(page)).toBe(1);
 });
+
+/** Waits until the fixture holds a create, so the test can act while it is on its way. */
+async function createOnItsWay(page: Page) {
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem("fixture:hold-create:waiting")), { timeout: 15_000 }).toBe("1");
+}
+
+/** Lets held creates go: later ones run at once. */
+async function releaseCreates(page: Page) {
+  await page.evaluate(() => {
+    window.sessionStorage.removeItem("fixture:hold-create");
+    window.dispatchEvent(new Event("fixture:release-create"));
+  });
+}
+
+test("should store the page with its file when it is left during a create that is then refused once", async ({ page }) => {
+  await openNewArtifact(page);
+  await setFlag(page, "fixture:hold-create", "1");
+  await setFlag(page, "fixture:fail-next-create", "1");
+  await dropFiles(body(page), ["Contract.pdf"]);
+  await createOnItsWay(page);
+  // Leaving queues the editor's last save behind the create on its way; that save is the retry.
+  await cards(page, "Long ui fixture").click();
+  await expect(page.getByRole("region", { name: "Edit Long ui fixture" })).toBeVisible();
+  await releaseCreates(page);
+  await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(1);
+  expect((await storedNew(page))[0]?.title).toBe("Contract");
+  expect(await discarded(page)).toEqual([]);
+  expect(await creates(page)).toBe(1);
+});
+
+test("should show the stored Files page, not a false failure, when its only file is removed while the create is on its way", async ({ page }) => {
+  await openNewArtifact(page);
+  await setFlag(page, "fixture:hold-create", "1");
+  await dropFiles(body(page), ["Only.pdf"]);
+  await createOnItsWay(page);
+  await page.getByRole("button", { name: "Remove Only.pdf" }).click();
+  await releaseCreates(page);
+  await expect(page.getByRole("region", { name: "Edit Only" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("status").filter({ hasText: /Not saved|Add a title|Add some content/ })).toHaveCount(0);
+  expect((await storedNew(page))[0]?.kind).toBe("file");
+  expect(await creates(page)).toBe(1);
+});
+
+test("should let an empty page become Code and store it once something is written", async ({ page }) => {
+  await openNewArtifact(page);
+  await blankPage(page).getByRole("button", { name: "Format" }).click();
+  const dialog = page.getByRole("dialog", { name: "Format and language" });
+  await dialog.getByRole("combobox", { name: "Format" }).click();
+  await page.getByRole("option", { name: "Code", exact: true }).click();
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(dialog).toBeHidden();
+  expect(await creates(page), "nothing is stored for an empty page").toBe(0);
+  await body(page).locator('[contenteditable="true"], textarea, .cm-content').first().click();
+  await page.keyboard.type("const answer = 42;");
+  await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe("code");
+  expect((await storedNew(page))[0]?.content).toBe("const answer = 42;");
+  expect(await creates(page)).toBe(1);
+});
