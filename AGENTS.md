@@ -202,8 +202,9 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
   before `DATABASE_URL`. When only `DATABASE_URL` names the throwaway
   database, whether exported (`DATABASE_URL=<throwaway> pnpm db:migrate`) or
   edited in `.env.local`, the shared `DATABASE_URL_UNPOOLED` from `.env.local`
-  still wins, so `db:migrate`, `db:studio`, and every `drizzle-kit` command
-  reach the shared database. For a throwaway database, set both
+  still wins, so `db:migrate`, `db:studio`, and any other `drizzle-kit`
+  command that connects (such as `push`) reach the shared database.
+  `db:generate` never connects. For a throwaway database, set both
   `DATABASE_URL` and `DATABASE_URL_UNPOOLED` to it.
 
 ### Tripwire: no correlated subqueries in single-table selects
