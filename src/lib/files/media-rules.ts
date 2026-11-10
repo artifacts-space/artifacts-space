@@ -244,19 +244,25 @@ function scanLine(line: string, state: ScanState): boolean {
   state.indentedCode = false;
   // Out of the list: a line less indented than the item's content, after a blank line.
   if (state.listIndent !== null && afterBlank && indent < state.listIndent) state.listIndent = null;
-  startsListItem(line, state);
-  state.fence = fenceOpen.exec(relativeTo(line, state))?.[1] ?? null;
+  // A fence can open on the list marker's own line (`- ```bash`): test the item's content, after the marker.
+  const content = startsListItem(line, state) ?? relativeTo(line, state);
+  state.fence = fenceOpen.exec(content)?.[1] ?? null;
   return state.fence !== null;
 }
 
-/** Starts a list item (or a nested one) when `line` begins with a list marker, setting where its content starts. */
-function startsListItem(line: string, state: ScanState) {
+/**
+ * Starts a list item (or a nested one) when `line` begins with a list
+ * marker, setting where its content starts, and returns that content; null
+ * when the line starts no item.
+ */
+function startsListItem(line: string, state: ScanState): string | null {
   const { text, indent } = leadingSpaces(line);
-  if (indent > (state.listIndent ?? 0) + 3) return;
+  if (indent > (state.listIndent ?? 0) + 3) return null;
   const marker = listMarker.exec(text.slice(indent));
-  if (!marker) return;
+  if (!marker) return null;
   const gap = marker[2]?.replace(/\r?\n/u, "").length ?? 0;
   state.listIndent = indent + (marker[1]?.length ?? 1) + (gap >= 1 && gap <= 4 ? gap : 1);
+  return text.slice(state.listIndent);
 }
 
 /**

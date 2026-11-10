@@ -183,6 +183,14 @@ describe("absoluteFileLinks", () => {
     expect(out).toContain(`> [quoted fence](/api/files/${id})`);
   });
 
+  it("should leave a fence that opens on a list marker's line as written, and rewrite the text after it", () => {
+    const markdown = ["- ```bash", `  curl /api/files/${id}`, "  ```", "", `See [d](/api/files/${other})`, "", "> - ```", `>   [quoted](/api/files/${id})`, ">   ```"].join("\n");
+    const out = absoluteFileLinks(markdown, "https://artifacts.space");
+    expect(out).toContain(`  curl /api/files/${id}`);
+    expect(out).toContain(`See [d](https://artifacts.space/api/files/${other})`);
+    expect(out).toContain(`>   [quoted](/api/files/${id})`);
+  });
+
   it("should leave this site's absolute links in list and quote code as written when a save takes them back", () => {
     const markdown = `- item\n\n      [code](https://artifacts.space/api/files/${id})\n\n>     [quoted code](https://artifacts.space/api/files/${id})`;
     expect(relativeFileLinks(markdown, "https://artifacts.space")).toBe(markdown);
