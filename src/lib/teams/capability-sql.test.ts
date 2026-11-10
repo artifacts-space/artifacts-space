@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
 
+import { agentLockedCapabilities, agentLockedCapabilityList, teamCapabilities } from "./capability-rules";
 import { capabilityHolderTeamQuery } from "./capability-sql";
 
 /*
@@ -48,5 +49,21 @@ describe("capabilityHolderTeamQuery", () => {
     const { sql } = query();
     expect(sql).not.toMatch(/(^|[^."])"(user_id|team_id|id|role_id|key)" = "\2"/);
     expect(sql).not.toMatch(/[\s(]"(user_id|team_id|role|key|personal)"(?!\.)/);
+  });
+
+  it("should build the check for every capability agents can never hold", () => {
+    for (const capability of agentLockedCapabilityList) {
+      expect(capabilityHolderTeamQuery(db, "person-1", "team-1", capability).toSQL().params).toContain(capability);
+    }
+  });
+
+  it("should throw when asked about a capability agents may hold", () => {
+    // Excluding agents would refuse analytics.view where can() allows it, so the type rejects it and so does the query.
+    // @ts-expect-error -- analytics.view is not an agent-locked capability
+    expect(() => capabilityHolderTeamQuery(db, "person-1", "team-1", "analytics.view")).toThrow(/agents can never hold/);
+  });
+
+  it("should leave only analytics.view outside the capabilities it accepts", () => {
+    expect(teamCapabilities.filter((capability) => !agentLockedCapabilities.has(capability))).toEqual(["analytics.view"]);
   });
 });

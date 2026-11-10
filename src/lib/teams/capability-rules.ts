@@ -4,6 +4,8 @@
  * capability)`; the database loader (capabilities.ts) only fills in the
  * member's role and its capabilities. Pure and client-safe, and it fails
  * closed: no member, an unknown capability, or a missing grant means no.
+ * One copy of the decision lives elsewhere: capability-sql.ts repeats it as
+ * SQL so a write can re-check it in its own statement. Change both together.
  */
 
 export const teamCapabilities = [
@@ -42,7 +44,7 @@ export interface TeamActor {
  * approve, invite, change roles, or manage the team. Sharing at once would
  * approve their own request, so they always ask first.
  */
-export const agentLockedCapabilities: ReadonlySet<TeamCapability> = new Set<TeamCapability>([
+export const agentLockedCapabilityList = [
   "share.team",
   "share.link",
   "share.public",
@@ -56,7 +58,14 @@ export const agentLockedCapabilities: ReadonlySet<TeamCapability> = new Set<Team
   "artifacts.withdraw",
   "reports.handle",
   "settings.team",
-]);
+] as const satisfies readonly TeamCapability[];
+export type AgentLockedCapability = (typeof agentLockedCapabilityList)[number];
+export const agentLockedCapabilities: ReadonlySet<TeamCapability> = new Set<TeamCapability>(agentLockedCapabilityList);
+
+/** Narrows a capability to one agents can never hold. */
+export function isAgentLockedCapability(capability: TeamCapability): capability is AgentLockedCapability {
+  return agentLockedCapabilities.has(capability);
+}
 
 const allCapabilities: readonly TeamCapability[] = teamCapabilities;
 
@@ -88,6 +97,8 @@ export function isBuiltInRoleKey(value: unknown): value is BuiltInRoleKey {
  * Whether a team member may do something. Agents never hold the locked
  * capabilities; owners (people) hold every capability; everyone else holds
  * exactly what their role grants.
+ * capability-sql.ts (capabilityHolderTeamQuery) repeats this decision as SQL
+ * for write-time re-checks: change both together.
  */
 export function can(actor: TeamActor | null | undefined, capability: TeamCapability): boolean {
   if (!actor || !isTeamCapability(capability)) return false;

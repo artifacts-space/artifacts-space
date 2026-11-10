@@ -5,7 +5,7 @@ import type { getDb } from "@/db";
 import { teamRole, teamRoleAssignment, teamRoleCapability } from "@/db/roles-schema";
 import { agent, team, teamMember } from "@/db/schema";
 
-import { builtInRoleKeys, defaultRoleCapabilities, type TeamCapability } from "./capability-rules";
+import { builtInRoleKeys, defaultRoleCapabilities, isAgentLockedCapability, type AgentLockedCapability } from "./capability-rules";
 
 /*
  * `can(member, capability)` (capability-rules.ts) for one person in one
@@ -13,9 +13,10 @@ import { builtInRoleKeys, defaultRoleCapabilities, type TeamCapability } from ".
  * clause instead of trusting a read made a moment earlier. It follows the
  * same steps as the loader (queries.ts, capabilities.ts) and the rule:
  *
- * - it answers for people only: an agent member never matches (agents never
- *   hold the approving capabilities, agentLockedCapabilities), and a
- *   personal team never grants anything here;
+ * - it answers for people only: an agent member never matches, and a
+ *   personal team never grants anything here. That equals can() only for
+ *   capabilities agents can never hold (agentLockedCapabilities), so it
+ *   accepts only those: for `analytics.view` it would wrongly refuse agents;
  * - the role that applies is a custom role assigned in the same team, else
  *   the highest built-in role Better Auth stores (parseTeamRole);
  * - owners hold every capability;
@@ -44,12 +45,15 @@ function roleKeySql() {
 /**
  * The team id, as a one-column select, when `userId` is a person (never an
  * agent) in the shared team `teamId` whose role holds `capability`; no row
- * otherwise.
+ * otherwise. Only capabilities agents can never hold are accepted, and any
+ * other throws, since excluding agents would refuse what can() allows them.
  * Joins only, every column qualified, and nothing correlated with an outer
  * query, so it is safe as an `in (...)` subquery in a single-table update
  * (see the tripwire in AGENTS.md). Exported for its `.toSQL()` test.
  */
-export function capabilityHolderTeamQuery(db: Db, userId: string, teamId: string, capability: TeamCapability) {
+export function capabilityHolderTeamQuery(db: Db, userId: string, teamId: string, capability: AgentLockedCapability) {
+  // The type already says so; this guards callers that widen it.
+  if (!isAgentLockedCapability(capability)) throw new Error(`capabilityHolderTeamQuery only checks capabilities agents can never hold, not ${String(capability)}`);
   const roleKey = roleKeySql();
   const defaultHolders = builtInRoleKeys.filter((key) => defaultRoleCapabilities[key].includes(capability));
   const holds = or(

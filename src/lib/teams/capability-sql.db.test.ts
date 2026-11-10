@@ -19,7 +19,7 @@ describe.runIf(Boolean(databaseUrl))("capabilityHolderTeamQuery with a database"
   const { teamRole, teamRoleAssignment, teamRoleCapability } = await import("@/db/roles-schema");
   const { agent, team, teamMember, user } = await import("@/db/schema");
   const { capabilityHolderTeamQuery } = await import("./capability-sql");
-  const { actingAs, can } = await import("./capability-rules");
+  const { actingAs, agentLockedCapabilityList, can } = await import("./capability-rules");
   const { getTeamMembershipById } = await import("./queries");
 
   const tag = randomUUID().slice(0, 8);
@@ -84,6 +84,16 @@ describe.runIf(Boolean(databaseUrl))("capabilityHolderTeamQuery with a database"
     const expected = Boolean(membership && !membership.personal && can(actingAs(membership, "person"), "approve.sharing") && membership.kind === "person");
     const rows = await capabilityHolderTeamQuery(getDb(), id(name), teamId, "approve.sharing");
     expect(rows.length > 0).toBe(expected);
+  });
+
+  it.each(agentLockedCapabilityList)("should agree with can() for every member on %s", async (capability) => {
+    const db = getDb();
+    for (const [name, teamId] of cases) {
+      const membership = await getTeamMembershipById(id(name), teamId);
+      const expected = Boolean(membership && !membership.personal && can(actingAs(membership, "person"), capability));
+      const rows = await capabilityHolderTeamQuery(db, id(name), teamId, capability);
+      expect({ name, granted: rows.length > 0 }).toEqual({ name, granted: expected });
+    }
   });
 
   it("should grant through each kind of role and refuse the rest", async () => {
