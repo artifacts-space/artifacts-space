@@ -23,7 +23,7 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { uiComponentNames } from "@/lib/ui/catalog";
 import { componentFixtures, fixtureFiles, fixtureSpec } from "@/lib/ui/fixtures/components";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
-import { formatFixtures } from "@/lib/ui/fixtures/formats";
+import { formatFixtures, mediaFormatFixtures, type FormatFixture } from "@/lib/ui/fixtures/formats";
 import { deepSpec, invalidPropsSpec, javascriptLinkSpec, manyElementsSpec, repeatSpec, unknownTypeSpec } from "@/lib/ui/fixtures/specs";
 import { mcpClients } from "@/lib/setup/client-installs";
 import { presetTheme } from "@/lib/themes/resolve";
@@ -46,6 +46,22 @@ const specFixtures: { name: string; spec: unknown }[] = [
  * would be blocked, while the real viewer frames /api/files, which allows it.
  */
 const standInUrl = () => "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 3'%3E%3Crect width='4' height='3' fill-opacity='.08'/%3E%3C/svg%3E";
+
+/** One format viewer specimen, with the gallery's stand-in files. */
+function FormatSpecimen({ fixture }: { fixture: FormatFixture }) {
+  return (
+    <Specimen name={`${fixture.kind} · ${fixture.name}`}>
+      <ArtifactFilesProvider files={fixtureFiles} urlFor={standInUrl}>
+        {/* Sheets keep each viewer's column widths and order per artifact; here, per specimen. */}
+        <SheetKeyContext value={`gallery-${fixture.name}`}>
+          <SheetFormatProvider stored={fixture.sheetFormat ?? plainSheetFormat} save={null}>
+            <ArtifactView kind={fixture.kind} content={fixture.content} language={fixture.language} title={fixture.name} />
+          </SheetFormatProvider>
+        </SheetKeyContext>
+      </ArtifactFilesProvider>
+    </Specimen>
+  );
+}
 
 function Specimen({ name, children }: { name: string; children: ReactNode }) {
   return (
@@ -128,18 +144,7 @@ export function ComponentGallery() {
           ))}
         </Group>
         <Group id="formats" title="Format viewers">
-          {formatFixtures.map((fixture) => (
-            <Specimen key={fixture.name} name={`${fixture.kind} · ${fixture.name}`}>
-              <ArtifactFilesProvider files={fixtureFiles} urlFor={standInUrl}>
-                {/* Sheets keep each viewer's column widths and order per artifact; here, per specimen. */}
-                <SheetKeyContext value={`gallery-${fixture.name}`}>
-                  <SheetFormatProvider stored={fixture.sheetFormat ?? plainSheetFormat} save={null}>
-                    <ArtifactView kind={fixture.kind} content={fixture.content} language={fixture.language} title={fixture.name} />
-                  </SheetFormatProvider>
-                </SheetKeyContext>
-              </ArtifactFilesProvider>
-            </Specimen>
-          ))}
+          {formatFixtures.map((fixture) => <FormatSpecimen key={fixture.name} fixture={fixture} />)}
         </Group>
         <Group id="themes" title="Themes">
           {themeFixtureIds.map((id) => <ThemedSpecimen key={id} id={id} />)}
@@ -186,6 +191,10 @@ export function ComponentGallery() {
         </Group>
         <Group id="harnesses" title="Agent harnesses">
           <HarnessSpecimen />
+        </Group>
+        {/* Last: media change height as they load, which would move any group under them. */}
+        <Group id="media" title="Media blocks">
+          {mediaFormatFixtures.map((fixture) => <FormatSpecimen key={fixture.name} fixture={fixture} />)}
         </Group>
       </div>
     </div>

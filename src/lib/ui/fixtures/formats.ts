@@ -44,7 +44,14 @@ export const formatFixtures: FormatFixture[] = [
   { name: "Empty", kind: "markdown", content: "   " },
   { name: "Files", kind: "file", content: "Notes for the **2.4** release: the diagram, the report, and the spec." },
   { name: "Files, no notes", kind: "file", content: "" },
-  // Last: its media load lazily and change height, which would move the specimens under it while a test uses them.
+];
+
+/**
+ * Media blocks from uploads, by kind. Their images and frames load lazily and
+ * change height when they do, so the gallery draws them in its last group,
+ * where nothing under them can move while a test uses it.
+ */
+export const mediaFormatFixtures: FormatFixture[] = [
   {
     name: "Markdown, media",
     kind: "markdown",
