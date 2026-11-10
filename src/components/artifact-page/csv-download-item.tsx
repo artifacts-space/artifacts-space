@@ -23,7 +23,13 @@ export interface CsvDownloadSetting {
 export function CsvDownloadItem({ setting }: { setting: CsvDownloadSetting | null }) {
   const router = useRouter();
   const [on, setOn] = useState(setting?.on ?? false);
+  const [seen, setSeen] = useState(setting);
   const [pending, setPending] = useState(false);
+  // The page's value wins whenever it changes: another sheet on the same route, or a refresh that brings another owner's change.
+  if (setting && (setting.artifactId !== seen?.artifactId || setting.on !== seen.on)) {
+    setSeen(setting);
+    setOn(setting.on);
+  }
   if (!setting) return null;
 
   async function change(next: boolean) {

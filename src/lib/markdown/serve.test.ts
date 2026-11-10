@@ -282,6 +282,9 @@ describe("CSV downloads turned off by the owner", () => {
     expect(text).not.toContain("s3cr3t-row");
     expect(text).not.toContain("name | secret");
     expect(text).not.toContain("/raw");
+    // The withheld version shows only a note, so the files and the thread it would drop are never loaded.
+    expect(mocks.filesForViewer).not.toHaveBeenCalled();
+    expect(mocks.listComments).not.toHaveBeenCalled();
   });
 
   it("should give an editor (the author, a teammate, or their agent) the file and the table", async () => {

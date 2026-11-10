@@ -51,7 +51,8 @@ test("should keep a sheet's data from a signed-out reader while downloads are of
   await grid.getByRole("gridcell", { name: "s3cr3t-row", exact: true }).click();
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.press("ControlOrMeta+c");
-  await expect(page.getByText("Copying is off")).toBeVisible();
+  // The toast, not the grid's screen-reader hint, which also says copying is off.
+  await expect(page.getByText("Copying is off: the owner turned off downloads")).toBeVisible();
   expect(await clipboard()).not.toContain("s3cr3t-row");
 });
 
