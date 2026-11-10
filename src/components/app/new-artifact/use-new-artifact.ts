@@ -79,6 +79,12 @@ export function useNewArtifact({ setArtifacts, setSelectedId, clearFilters }: Ne
     setSelectedId(id);
   }, [setSelectedId]);
 
+  /** Closes the page without opening another artifact: the link that arrived already selected one. */
+  const leave = useCallback(() => {
+    sessionRef.current = null;
+    setSession(null);
+  }, []);
+
   /** The page's artifact was deleted. */
   const deleted = useCallback((id: string) => {
     if (sessionRef.current?.createdId === id) setSession(null);
@@ -87,5 +93,5 @@ export function useNewArtifact({ setArtifacts, setSelectedId, clearFilters }: Ne
   /** Full artifacts already in hand for the artifact pane: the page's own, plus those the blank pages became. */
   const withStored = useCallback((initial: readonly ArtifactDto[] | undefined) => [...(initial ?? []), ...stored], [stored]);
 
-  return { session, withStored, start, saved, select, deleted };
+  return { session, withStored, start, saved, select, leave, deleted };
 }

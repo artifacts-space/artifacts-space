@@ -1,6 +1,6 @@
 "use client";
 
-import { IconLoader2, IconPlus, IconSearch } from "@tabler/icons-react";
+import { IconInfoCircle, IconLoader2, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
@@ -13,12 +13,13 @@ import { serverProjectsApi, type ProjectsApi } from "@/components/app/projects-a
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
 import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
 import { useEditAccess, useWithdrawSharing } from "@/components/app/use-edit-access";
-import { useFullArtifact } from "@/components/app/use-full-artifact";
+import { useArtifactLink } from "@/components/app/use-artifact-link";
+import { useFullArtifact, type ArtifactLoader } from "@/components/app/use-full-artifact";
 import { useServerSearch } from "@/components/app/use-server-search";
 import { useDashboardProjects } from "@/components/app/use-dashboard-projects";
 import { serverNewArtifactApi, type NewArtifactApi } from "@/components/app/new-artifact/new-artifact-api";
 import { NewArtifactPane } from "@/components/app/new-artifact/new-artifact-pane";
-import { filteredProjectName, useNewArtifact } from "@/components/app/new-artifact/use-new-artifact";
+import { filteredProjectName, useNewArtifact, type NewArtifactSession } from "@/components/app/new-artifact/use-new-artifact";
 import { PanelSizesBeforePaint, SidebarSplitter, sidebarPanelId } from "@/components/app/workspace-splitters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { LinkedCommentsProvider } from "@/components/comments/linked-comments";
 import { SidebarProjects } from "@/components/projects/sidebar-projects";
-import { withoutArtifactLink, type ArtifactLink } from "@/lib/app-link";
+import type { LinkNotice } from "@/lib/app-link-rules";
 import { kinds } from "@/lib/artifact-kinds";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
@@ -50,6 +51,7 @@ interface DetailPaneProps {
   onDeleted: (id: string) => void;
   onCreate: () => void;
   initialFull: readonly ArtifactDto[] | undefined;
+  loadArtifact: ArtifactLoader | undefined;
 }
 
 /** Shown while the selected artifact's content loads, or when it could not. */
@@ -75,8 +77,8 @@ function withListProject(full: ArtifactDto | null, selected: ArtifactListItemDto
 }
 
 /** The editor for an artifact the viewer may edit, a read-only view for a teammate's, or the empty state. */
-function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull }: DetailPaneProps) {
-  const { full: loaded, failure, remember, retry } = useFullArtifact(selected, initialFull);
+function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull, loadArtifact }: DetailPaneProps) {
+  const { full: loaded, failure, remember, retry } = useFullArtifact(selected, initialFull, loadArtifact);
   const full = withListProject(loaded, selected);
   const access = useEditAccess(full, viewerId);
   const withdrawal = useWithdrawSharing(full?.id ?? "", onDeleted);
@@ -138,6 +140,22 @@ function WorkspaceBar({ teams, scopeTeam, onCreate }: { teams: readonly ShareTea
   );
 }
 
+const linkNoticeText: Record<LinkNotice, string> = {
+  gone: "This artifact is no longer available.",
+  failed: "This artifact could not be opened just now. Try the link again in a moment.",
+};
+
+/** Shown when a link (from a notification, say) points to an artifact that is gone or no longer shared with the viewer, or could not be checked. */
+function LinkNoticeBar({ notice, onDismiss }: { notice: LinkNotice; onDismiss: () => void }) {
+  return (
+    <div role="status" className="mb-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+      <IconInfoCircle aria-hidden className="size-4 shrink-0" />
+      <p className="min-w-0 flex-1">{linkNoticeText[notice]}</p>
+      <Button variant="ghost" size="icon-sm" aria-label="Dismiss" title="Dismiss" onClick={onDismiss}><IconX /></Button>
+    </div>
+  );
+}
+
 /** The selected item, from the list or from server search results; else the first shown. */
 function pickSelected(artifacts: ArtifactListItemDto[], filtered: ArtifactListItemDto[], selectedId: string) {
   return artifacts.find((artifact) => artifact.id === selectedId) ?? filtered.find((artifact) => artifact.id === selectedId) ?? filtered[0] ?? null;
@@ -161,49 +179,73 @@ interface DashboardProps {
   tagFacets: TagFacet[];
   /** The tags in the URL; the list is already filtered by them. */
   tagFilter: string[];
-  /** Full artifacts already in hand, so they open without a load (the /dev/workspace fixture). */
+  /** Full artifacts already in hand, so they open without a load: one a link opened from outside the list, which the server loaded for the URL, or the /dev/workspace fixture's seed. */
   initialFull?: readonly ArtifactDto[];
   /** Where project changes go: the server actions, or the fixture's stand-in. */
   projectsApi?: ProjectsApi;
   /** The list's path, for filter links: /app, or the fixture's page. */
   listPath?: string;
-  /** The artifact the URL asked to open (`?artifact=<id>`), and whether to open its comments. */
-  link?: ArtifactLink | null;
+  /** What the server found for the URL's link (`?artifact=<id>`), in the list or not, or null when it is missing or not the viewer's to read. */
+  linkTarget?: ArtifactListItemDto | null;
+  /** The server could not check the link just now (a read limit, or a database error). */
+  linkFailed?: boolean;
+  /** How an artifact's content loads when it is opened: the server action, or the fixture's stand-in. */
+  loadArtifact?: ArtifactLoader | undefined;
+  /** Called each time a link in the address bar is acted on (the fixture counts them for its tests). */
+  onLinkHandled?: () => void;
   /** Where New artifact stores the blank page: the server actions, or the fixture's stand-in. */
   newArtifactApi?: NewArtifactApi;
 }
 
-/** The artifact to select first: the linked one when it is in the list, else the first. */
-function firstSelection(artifacts: ArtifactListItemDto[], link: ArtifactLink | null | undefined) {
-  const linked = link ? artifacts.find((artifact) => artifact.publicId === link.publicId) : undefined;
-  return linked?.id ?? artifacts[0]?.id ?? "";
+interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate"> {
+  fresh: ReturnType<typeof useNewArtifact>;
+  api: NewArtifactApi;
+  /** The project the list is filtered to, for a new artifact. */
+  project: string | null;
 }
 
-/** Once the link has opened its artifact, drops it from the address bar so a reload or a later pick does not jump back. */
-function useForgetArtifactLink(link: ArtifactLink | null | undefined) {
-  useEffect(() => {
-    if (!link) return;
-    const { pathname, search, hash } = window.location;
-    window.history.replaceState(window.history.state, "", `${pathname}${withoutArtifactLink(search)}${hash}`);
-  }, [link]);
+/** The artifact pane: the blank page while New artifact has one open, else the selected artifact. */
+function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpdated, onDeleted, initialFull, loadArtifact }: WorkspacePaneProps) {
+  if (fresh.session) {
+    return (
+      <NewArtifactPane
+        key={fresh.session.key}
+        viewerId={viewerId}
+        origin={origin}
+        api={api}
+        project={project}
+        sessionKey={fresh.session.key}
+        focusRequest={fresh.session.focusRequest}
+        onSaved={fresh.saved}
+        onDeleted={onDeleted}
+      />
+    );
+  }
+  return <DetailPane selected={selected} viewerId={viewerId} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} onCreate={fresh.start} initialFull={fresh.withStored(initialFull)} loadArtifact={loadArtifact} />;
 }
 
-/** The artifact whose comments the link asked to open, if any. */
-function linkedCommentsId(link: ArtifactLink | null | undefined): string | null {
-  return link?.comments ? link.publicId : null;
+/** The card marked as open: the blank page's artifact once stored (none before), else the selected one. */
+function listSelection(session: NewArtifactSession | null, selected: ArtifactListItemDto | null): string | null {
+  if (session) return session.createdId;
+  return selected?.id ?? null;
 }
 
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", link, newArtifactApi = serverNewArtifactApi }: DashboardProps) {
-  const [artifacts, setArtifacts] = useState(initialArtifacts);
-  const [selectedId, setSelectedId] = useState(() => firstSelection(initialArtifacts, link));
-  useForgetArtifactLink(link);
+/** A link that opens an artifact (a notification, a pasted URL) closes the blank page, so the pane shows what was asked for. */
+function useLinkLeavesNewArtifact(opened: unknown, leave: () => void) {
+  useEffect(() => { if (opened) leave(); }, [opened, leave]);
+}
+
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", linkTarget, linkFailed, loadArtifact, onLinkHandled, newArtifactApi = serverNewArtifactApi }: DashboardProps) {
+  const shellRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
+  const { artifacts, setArtifacts, selectedId, setSelectedId, notice, dismissNotice, opened } = useArtifactLink({ initialArtifacts, target: linkTarget, failed: linkFailed, onHandled: onLinkHandled, list: listRef, detail: detailRef });
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
   const clearFilters = useCallback(() => { setQuery(""); setKind("all"); }, []);
   const fresh = useNewArtifact({ setArtifacts, setSelectedId, clearFilters });
-  const shellRef = useRef<HTMLDivElement>(null);
-  const sidebarRef = useRef<HTMLElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+  useLinkLeavesNewArtifact(opened, fresh.leave);
   const sidebar = useDashboardProjects({ artifacts, setArtifacts, rows: projectRows, facets, api: projectsApi, teams, scopeTeam, tagFilter, listPath, viewerId });
 
   const serverMatches = useServerSearch(query, scopeTeam?.id ?? null, projectFilter, tagFilter);
@@ -228,10 +270,11 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
 
   return (
     <ShareTeamsProvider teams={teams}>
-      <LinkedCommentsProvider publicId={linkedCommentsId(link)}>
+      <LinkedCommentsProvider link={opened} selectedPublicId={selected?.publicId ?? null}>
       {/* An app shell from md up: the frame is the viewport (workspace-frame), and only the list and the artifact scroll. */}
       <main data-app-shell className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col px-4 pb-4 sm:px-6 sm:pb-6 md:min-h-0 md:flex-1">
         <WorkspaceBar teams={teams} scopeTeam={scopeTeam} onCreate={fresh.start} />
+        {notice ? <LinkNoticeBar notice={notice} onDismiss={dismissNotice} /> : null}
 
         <PanelSizesBeforePaint />
         {/* overflow-clip, not hidden: it rounds the corners without becoming a scroll box, so the artifact's toolbar can stick on phones. */}
@@ -277,7 +320,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
               <ArtifactList
                 state={artifactListState({ total: artifacts.length, shown: filtered.length })}
                 artifacts={filtered}
-                selectedId={fresh.session ? fresh.session.createdId : (selected?.id ?? null)}
+                selectedId={listSelection(fresh.session, selected)}
                 onSelect={fresh.select}
                 onClearFilters={clearFilters}
                 moves={sidebar.moves}
@@ -289,29 +332,21 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
           </aside>
           <SidebarSplitter shell={shellRef} sidebar={sidebarRef} />
 
-          {fresh.session ? (
-            <NewArtifactPane
-              key={fresh.session.key}
-              viewerId={viewerId}
-              origin={origin}
-              api={newArtifactApi}
-              project={filteredProjectName(projectFilter, facets)}
-              sessionKey={fresh.session.key}
-              focusRequest={fresh.session.focusRequest}
-              onSaved={fresh.saved}
-              onDeleted={deleted}
-            />
-          ) : (
-            <DetailPane
-              selected={selected}
-              viewerId={viewerId}
-              origin={origin}
-              onUpdated={updated}
-              onDeleted={deleted}
-              onCreate={fresh.start}
-              initialFull={fresh.withStored(initialFull)}
-            />
-          )}
+          {/* `contents` keeps the pane a grid item; the ref lets a link bring it into view on phones. */}
+          <div ref={detailRef} data-slot="workspace-detail" className="contents">
+          <WorkspacePane
+            fresh={fresh}
+            api={newArtifactApi}
+            project={filteredProjectName(projectFilter, facets)}
+            selected={selected}
+            viewerId={viewerId}
+            origin={origin}
+            onUpdated={updated}
+            onDeleted={deleted}
+            initialFull={initialFull}
+            loadArtifact={loadArtifact}
+          />
+          </div>
         </div>
       </main>
       </LinkedCommentsProvider>

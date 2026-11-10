@@ -321,3 +321,14 @@ test("should move Format and language into the More menu of a stored artifact", 
   await page.getByRole("menuitem", { name: "Format and language" }).click();
   await expect(page.getByRole("dialog", { name: "Format and language" })).toBeVisible();
 });
+
+test("should leave an untouched blank page for the artifact a notification opens", async ({ page }) => {
+  await openNewArtifact(page);
+  await page.getByRole("button", { name: /^Notifications/ }).click();
+  await page.getByRole("dialog").getByRole("link").filter({ hasText: "mentioned you on Long markdown fixture" }).click();
+  await expect(page.getByRole("heading", { name: "Comments on Long markdown fixture" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("region", { name: "Edit Long markdown fixture" })).toBeVisible();
+  await expect(blankPage(page)).toHaveCount(0);
+  expect(await creates(page), "the untouched page stored nothing").toBe(0);
+});

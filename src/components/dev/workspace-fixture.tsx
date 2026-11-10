@@ -17,7 +17,8 @@ import { matchesProjectFilter } from "@/lib/projects/sidebar-rules";
 import { fixtureArtifact, longCsv, longJson, longMarkdown, longUi } from "./fixture-content";
 import { fixtureNewArtifactApi, storedFixtureArtifacts } from "./fixture-new-artifacts";
 import { createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, withProjects } from "./fixture-projects";
-import { fixtureNotifications } from "./notification-fixture";
+import { useFixtureControls } from "./fixture-controls";
+import { fixtureNotifications, LINK_ONLY_PUBLIC_ID } from "./notification-fixture";
 
 /** The viewer's personal team, so the Share dialog can offer link and public sharing. It adds no scope tab. */
 const fixtureTeams: ShareTeam[] = [{ id: "fixture-team", slug: "fixture", name: "Fixture", personal: true, role: "owner", roleKey: "owner", kind: "person", capabilities: [...defaultRoleCapabilities.owner], teamSharingNeedsApproval: false }];
@@ -56,6 +57,13 @@ function useInBrowser(): boolean {
   return useSyncExternalStore(subscribeNever, () => true, () => false);
 }
 
+/** Someone else's artifact shared by link: outside the list, so only a link (n6 in the bell) opens it, pinned to the top. */
+const linkOnlyArtifact: ArtifactDto = fixtureArtifact({ id: "fixture-link-only", kind: "text", title: "Shared by link fixture", content: "Opened from a link.", publicId: LINK_ONLY_PUBLIC_ID });
+
+/** The artifact `slowLoad` leaves to load on open: the one the bell's comment rows link to. */
+const SLOW_ARTIFACT_ID = "fixture-markdown";
+const slowPublicIds: ReadonlySet<string> = new Set(["fixtureworkspace000md"]);
+
 /** The fixture's projects in memory, and a stand-in for the project server actions over them. */
 function useFixtureProjects(artifacts: readonly ArtifactDto[]) {
   const [store] = useState(() => createFixtureProjectsStore(new Map(artifacts.map((artifact) => [artifact.id, artifact.title]))));
@@ -69,9 +77,12 @@ function useFixtureProjects(artifacts: readonly ArtifactDto[]) {
  * artifact is handed in full, so none loads. Project changes stay in
  * memory. The app shell and sidebar projects e2e tests use it. With
  * `scopes`, the viewer is also in shared teams, so the scope tabs show, and
- * `team` opens one of them as the scope.
+ * `team` opens one of them as the scope. `linkFailed` stands in for a link
+ * the server could not check (a read limit, or a database error). With
+ * `slowLoad`, the Long markdown fixture is not handed in full: it loads when
+ * opened, and the load waits until a test releases it (`window.fixture`).
  */
-export function WorkspaceFixture({ projectFilter, link = null, scopes = false, team = null }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null; scopes?: boolean; team?: string | null }) {
+export function WorkspaceFixture({ projectFilter, link = null, linkFailed = false, slowLoad = false, scopes = false, team = null }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null; linkFailed?: boolean; slowLoad?: boolean; scopes?: boolean; team?: string | null }) {
   const inBrowser = useInBrowser();
   // Artifacts New artifact stored in this tab come first, as the server would list them after a reload.
   const stored = useMemo(() => (inBrowser ? storedFixtureArtifacts() : []), [inBrowser]);
@@ -81,6 +92,16 @@ export function WorkspaceFixture({ projectFilter, link = null, scopes = false, t
   const items = useMemo(() => artifacts.filter((artifact) => matchesProjectFilter(artifact.project, projectFilter)).map(toArtifactListItem), [artifacts, projectFilter]);
   const facets = useMemo(() => fixtureFacets(artifacts), [artifacts]);
   const notifications = useMemo(() => fixtureNotifications(), []);
+  // As on /app: what the link finds, in the list or not (the workspace pins it to the top), or null when it is gone.
+  const full = useMemo(() => [...artifacts, linkOnlyArtifact], [artifacts]);
+  // Kept from the first load: a bell link drops `?slowload=1` from the URL, and the slow artifact must stay slow.
+  const [slow] = useState(slowLoad);
+  const controls = useFixtureControls(slow, full, slowPublicIds);
+  const seeded = useMemo(() => (slow ? full.filter((artifact) => artifact.id !== SLOW_ARTIFACT_ID) : full), [full, slow]);
+  const linkTarget = useMemo(() => {
+    const found = link && !linkFailed ? full.find((artifact) => artifact.publicId === link.publicId) : undefined;
+    return found ? toArtifactListItem(found) : null;
+  }, [full, link, linkFailed]);
   return (
     <ConfirmationsProvider initial={[]}>
       <div className="workspace-frame">
@@ -89,7 +110,9 @@ export function WorkspaceFixture({ projectFilter, link = null, scopes = false, t
           // The list is read once, so it remounts when the tab has stored artifacts; with none, nothing remounts after hydration.
           key={`${projectFilterId(projectFilter)}:${String(stored.length > 0)}`}
           initialArtifacts={items}
-          initialFull={artifacts}
+          initialFull={seeded}
+          loadArtifact={controls.loadArtifact}
+          onLinkHandled={controls.onLinkHandled}
           origin="http://localhost"
           viewerId="fixture"
           teams={scopes ? [...fixtureTeams, ...fixtureSharedTeams] : fixtureTeams}
@@ -101,7 +124,8 @@ export function WorkspaceFixture({ projectFilter, link = null, scopes = false, t
           tagFilter={[]}
           projectsApi={api}
           listPath="/dev/workspace"
-          link={link}
+          linkTarget={linkTarget}
+          linkFailed={linkFailed}
           newArtifactApi={fixtureNewArtifactApi}
         />
       </div>
