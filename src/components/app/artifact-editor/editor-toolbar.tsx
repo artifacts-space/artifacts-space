@@ -104,12 +104,16 @@ interface EditorToolbarProps {
 }
 
 /** The toolbar of a new artifact before it is stored: there is nothing to copy, share, or look back on yet. */
-export function BlankToolbar({ notice }: { notice?: React.ReactNode }) {
+export function BlankToolbar({ notice, onChangeFormat }: { notice?: React.ReactNode; onChangeFormat: () => void }) {
   return (
     <div className={toolbarClass}>
       <KindMark kind="markdown" />
       <span className="text-xs text-muted-foreground">New artifact</span>
       {notice}
+      {/* Start a table, an interface, a diagram, or code directly: the format's starter fills the empty page. */}
+      <Button type="button" variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={onChangeFormat}>
+        <IconTransform aria-hidden /> Format
+      </Button>
     </div>
   );
 }

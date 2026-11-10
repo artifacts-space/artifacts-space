@@ -162,7 +162,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
 
   return (
     <section ref={sectionRef} className={detailSection} aria-label={page.label}>
-      {page.blank ? <BlankToolbar notice={notice} /> : (
+      {page.blank ? <BlankToolbar notice={notice} onChangeFormat={() => { setFormatOpen(true); }} /> : (
         <ArtifactToolbar
           artifact={artifact}
           kind={draft.kind}
@@ -232,10 +232,10 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
         kind={draft.kind}
         language={draft.language}
         content={draft.content}
-        onApply={(kind, language) => {
+        onApply={(kind, language, content) => {
           dismissDetected();
           // A new format draws the content with another editor, so it remounts.
-          replace({ ...draft, kind, language }, kind !== draft.kind);
+          replace({ ...draft, kind, language, content }, kind !== draft.kind || content !== draft.content);
         }}
       />
       <ConfirmDialog

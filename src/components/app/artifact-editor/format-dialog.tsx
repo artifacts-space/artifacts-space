@@ -25,7 +25,7 @@ import { formatInfo } from "@/lib/artifact-formats";
 import { kinds } from "@/lib/artifact-kinds";
 import type { ArtifactKind } from "@/lib/artifact-types";
 
-import { formatSwitchProblem } from "./format-choice-rules";
+import { contentForSwitch, formatSwitchProblem } from "./format-choice-rules";
 
 interface FormatDialogProps {
   open: boolean;
@@ -34,7 +34,8 @@ interface FormatDialogProps {
   language: string;
   content: string;
   /** Saves the choice through the editor's draft, so it goes out with the next autosave. */
-  onApply: (kind: ArtifactKind, language: string) => void;
+  /** The chosen format and language, and the content: an empty page gets the format's starter (contentForSwitch). */
+  onApply: (kind: ArtifactKind, language: string, content: string) => void;
 }
 
 /** The form inside the dialog. Mounted per opening, so it starts from the artifact's current format. */
@@ -45,12 +46,13 @@ function FormatForm({ kind, language, content, onApply, onClose }: Omit<FormatDi
 
   function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    const refused = nextKind === kind ? null : formatSwitchProblem(nextKind, content);
+    const nextContent = nextKind === kind ? content : contentForSwitch(nextKind, content);
+    const refused = nextKind === kind ? null : formatSwitchProblem(nextKind, nextContent);
     if (refused) {
       setProblem(refused);
       return;
     }
-    onApply(nextKind, nextLanguage.trim());
+    onApply(nextKind, nextLanguage.trim(), nextContent);
     onClose();
   }
 
@@ -58,7 +60,7 @@ function FormatForm({ kind, language, content, onApply, onClose }: Omit<FormatDi
     <form onSubmit={submit} noValidate className="grid gap-4">
       <DialogHeader>
         <DialogTitle className="text-lg">Format and language</DialogTitle>
-        <DialogDescription>Pick how this artifact shows its content. The content stays as it is.</DialogDescription>
+        <DialogDescription>Pick how this artifact shows its content. What you wrote stays as it is; an empty page gets a small start in the new format.</DialogDescription>
       </DialogHeader>
       <div className="flex flex-col gap-2">
         <Label id="format-choice-label">Format</Label>
