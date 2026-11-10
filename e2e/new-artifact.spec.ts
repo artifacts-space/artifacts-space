@@ -181,6 +181,15 @@ test("should make a Files artifact when a file is dropped on the blank page", as
   expect(await creates(page)).toBe(1);
 });
 
+/** Holds a file over an element, as a person dragging it from the desktop would. */
+async function dragOver(target: ReturnType<Page["locator"]>) {
+  await target.evaluate((element) => {
+    const data = new DataTransfer();
+    data.items.add(new File(["%PDF-1.4"], "Held.pdf", { type: "application/pdf" }));
+    element.dispatchEvent(new DragEvent("dragover", { dataTransfer: data, bubbles: true, cancelable: true }));
+  });
+}
+
 /** Drops files onto an element, as a person dragging them from the desktop would. */
 async function dropFiles(target: ReturnType<Page["locator"]>, names: readonly string[]) {
   await target.evaluate((element, files) => {
@@ -219,7 +228,14 @@ test("should take a drop on the blank page's own drop box while files upload", a
   await openNewArtifact(page);
   await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-uploads", "1"); });
   await dropFiles(body(page), ["First.pdf"]);
-  await dropFiles(blankPage(page).getByText("Drop files here, or"), ["Second.pdf"]);
+  const box = blankPage(page).getByText("Drop files here, or");
+  // Held over the pane, the page shows its hint; over the box, the box takes over, and the hint goes.
+  await dragOver(body(page));
+  await expect(page.locator("[data-slot=drop-hint]")).toHaveCount(1);
+  await dragOver(box);
+  await expect(page.locator("[data-slot=drop-hint]")).toHaveCount(0);
+  await dropFiles(box, ["Second.pdf"]);
+  await expect(page.locator("[data-slot=drop-hint]")).toHaveCount(0);
   await expect(page.getByRole("list", { name: "Uploads" }).getByRole("listitem")).toHaveCount(2);
   await page.evaluate(() => { window.sessionStorage.removeItem("fixture:hold-uploads"); window.dispatchEvent(new Event("fixture:release-uploads")); });
   await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(2);

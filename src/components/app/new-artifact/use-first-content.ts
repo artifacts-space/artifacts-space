@@ -15,7 +15,7 @@ interface FirstContentOptions {
   onContent: (content: FirstContent) => void;
 }
 
-/** What this page takes right now: text over the body, and files anywhere. */
+/** What this page takes right now: text over the body, and files anywhere but a drop box. */
 interface Takes {
   text: boolean;
   files: boolean;
@@ -43,7 +43,8 @@ function carriesContent(event: DragEvent, takes: Takes): boolean {
 
 /**
  * Catches the first content of a new artifact before the editor sees it: a
- * paste or drop into the empty body, or files dropped anywhere on the page.
+ * paste or drop into the empty body, or files dropped anywhere on the page
+ * except a drop box (FileUploader), which takes its own drops.
  * The listeners run in the capture phase on an ancestor, so the rich editor
  * never pastes it a second time, and the content arrives exactly as it was
  * copied. `dragging` is true while files or text are held over the page.
@@ -67,9 +68,11 @@ export function useFirstContent({ page, body, text, files, onContent }: FirstCon
       onContentRef.current(content);
     };
     const paste = (event: ClipboardEvent) => { take(event, contentOf(event.clipboardData, takes(event.target))); };
-    const drop = (event: DragEvent) => { take(event, contentOf(event.dataTransfer, takes(event.target))); };
+    // Any drop ends the drag, also one a drop box takes, so the page's hint never stays behind.
+    const drop = (event: DragEvent) => { setDragging(false); take(event, contentOf(event.dataTransfer, takes(event.target))); };
     const over = (event: DragEvent) => {
-      if (!carriesContent(event, takes(event.target))) return;
+      // Over a drop box, or carrying nothing the page takes: the box shows its own highlight, not the page's hint.
+      if (!carriesContent(event, takes(event.target))) { setDragging(false); return; }
       event.preventDefault();
       setDragging(true);
     };
