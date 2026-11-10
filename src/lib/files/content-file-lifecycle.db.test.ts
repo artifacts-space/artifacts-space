@@ -46,6 +46,11 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
   const shots = Array.from({ length: 25 }, () => randomUUID());
   const embed = (fileId: string) => `# Weekly report\n\n![Screenshot](/api/files/${fileId})\n`;
 
+  /** Back-dates every attach, as if the saves were longer ago than the prune's grace period. */
+  async function attachedLongAgo() {
+    await getDb().update(artifactFile).set({ attachedAt: new Date(Date.now() - 3_600_000) }).where(inArray(artifactFile.id, [...shots, report]));
+  }
+
   async function attachedIds(artifactId = doc) {
     const rows = await getDb().select({ id: artifactFile.id }).from(artifactFile).where(eq(artifactFile.artifactId, artifactId));
     return rows.map((row) => row.id);
@@ -134,6 +139,7 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
     await updateArtifact(author, doc, { content: embed(first ?? "") });
     // As if history pruning already dropped the version that showed it.
     await getDb().update(artifactVersion).set({ content: "# Weekly report\n" }).where(eq(artifactVersion.artifactId, doc));
+    await attachedLongAgo();
     await updateArtifact(author, doc, { content: embed(second ?? "") });
     expect(r2.deleted).toEqual([`files/${first ?? ""}/shot.png`]);
     expect(await attachedIds()).toEqual([second]);
@@ -142,6 +148,7 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
   it("should delete removed screenshots once history pruning drops the last version that showed them", async () => {
     await swapEveryScreenshot();
     const current = shots[24] ?? "";
+    await attachedLongAgo();
     // Two years on, retention keeps only the newest version, and the rest go with the versions that showed them.
     await pruneArtifactVersions(doc, twoYearsOn());
     expect(await attachedIds()).toEqual([current]);
@@ -152,6 +159,7 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
     await attachFiles(author, doc, [report], "agent");
     await updateArtifact(author, doc, { content: `# Weekly report\n\nSee [the report](/api/files/${report}).\n` });
     await updateArtifact(author, doc, { content: "# Weekly report\n\nNo report this week.\n" });
+    await attachedLongAgo();
     await pruneArtifactVersions(doc, twoYearsOn());
     expect(await attachedIds()).toEqual([report]);
     expect(r2.deleted).toEqual([]);
@@ -161,6 +169,7 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
     await attachFiles(author, board, [report], "person");
     await updateArtifact(author, board, { content: uiWithFile(report) });
     await updateArtifact(author, board, { content: uiWithFile(null) });
+    await attachedLongAgo();
     await pruneArtifactVersions(board, twoYearsOn());
     expect(await attachedIds(board)).toEqual([report]);
     expect(r2.deleted).toEqual([]);
@@ -170,9 +179,19 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
     const [shot] = shots;
     await updateArtifact(author, doc, { content: embed(shot ?? "") });
     await updateArtifact(author, doc, { content: "# Weekly report\n\nScreenshot removed.\n" });
+    await attachedLongAgo();
     await pruneArtifactVersions(doc, twoYearsOn());
     expect(await attachedIds()).toEqual([]);
     expect(r2.deleted).toEqual([`files/${shot ?? ""}/shot.png`]);
+  });
+
+  it("should never delete an upload a save attached moments ago, before that save writes the content naming it", async () => {
+    const [shot] = shots;
+    // The save has attached the upload; the artifact still holds the old content, and no version names it.
+    await getDb().update(artifactFile).set({ artifactId: doc, attachedAt: new Date(), attachedByContent: true }).where(eq(artifactFile.id, shot ?? ""));
+    await expect(pruneUnusedContentFiles(doc)).resolves.toBe(0);
+    expect(await attachedIds()).toEqual([shot]);
+    expect(r2.deleted).toEqual([]);
   });
 
   it("should keep a file when a save has already written content naming it, even with no version naming it yet", async () => {
@@ -180,6 +199,7 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
     await updateArtifact(author, doc, { content: embed(shot ?? "") });
     // A Restore between its file check and its version write: the artifact names the file, no version does.
     await getDb().delete(artifactVersion).where(eq(artifactVersion.artifactId, doc));
+    await attachedLongAgo();
     await expect(deleteUnnamedContentFiles(doc, [shot ?? ""])).resolves.toEqual([]);
     expect(await attachedIds()).toEqual([shot]);
   });

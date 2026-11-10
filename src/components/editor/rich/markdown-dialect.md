@@ -124,7 +124,9 @@ after it.
   version names it, history pruning deletes it (`pruneUnusedContentFiles` in
   `src/lib/files/icon-cleanup.ts`). The row is deleted in one statement that
   checks the artifact's current content and every version again, so a save
-  that has just written content naming it keeps it; then its R2 object goes. Plain
+  that has just written content naming it keeps it; then its R2 object goes.
+  A file attached in the last five minutes is never deleted, because a save
+  attaches its uploads just before it writes the content that names them. Plain
   attachments are never deleted this way.
 
 The rules are in `src/lib/files/media-rules.ts` (URL form, kinds, widths) and

@@ -1,4 +1,4 @@
-import { and, eq, inArray, like, or, sql } from "drizzle-orm";
+import { and, eq, inArray, like, lt, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, artifactFile, artifactVersion } from "@/db/schema";
@@ -104,6 +104,9 @@ async function contentFilesNotShown(artifactId: string, current: IconUseState): 
 }
 
 
+/** How long after a save attaches an upload before pruning may delete it: longer than any save takes to write its content. */
+export const contentPruneGraceMinutes = 5;
+
 /**
  * Deletes the rows of the content media among `fileIds` in one statement,
  * checking at that moment that neither the artifact's current content nor
@@ -111,12 +114,22 @@ async function contentFilesNotShown(artifactId: string, current: IconUseState): 
  * because the production driver (neon-http) has no interactive
  * transactions or row locks: a save that wrote content naming the file
  * before this runs keeps it, and no window opens in which the file could be
- * attached again and then deleted.
+ * attached again and then deleted. A file attached in the last few minutes
+ * is never deleted: a save attaches its uploads before it writes the
+ * content naming them, and in between nothing names them yet.
  */
 export function deleteUnnamedContentFiles(artifactId: string, fileIds: readonly string[]) {
   return getDb()
     .delete(artifactFile)
-    .where(and(inArray(artifactFile.id, [...fileIds]), eq(artifactFile.artifactId, artifactId), eq(artifactFile.attachedByContent, true), notNamedByArtifact(artifactId)))
+    .where(
+      and(
+        inArray(artifactFile.id, [...fileIds]),
+        eq(artifactFile.artifactId, artifactId),
+        eq(artifactFile.attachedByContent, true),
+        lt(artifactFile.attachedAt, sql`now() - make_interval(mins => ${contentPruneGraceMinutes})`),
+        notNamedByArtifact(artifactId),
+      ),
+    )
     .returning();
 }
 
