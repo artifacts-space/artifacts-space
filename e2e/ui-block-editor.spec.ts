@@ -116,5 +116,7 @@ test("should refuse a pasted file and offer no media blocks when typing in an in
   await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
   const spec = await savedSpec(page);
   const block = Object.values(spec.elements).find((element) => element.type === "Markdown");
-  expect(block?.props?.content).toBe("Notes /image");
+  // The new block's starter text, then what was typed: no media, no file link.
+  expect(block?.props?.content).toMatch(/Notes \/image$/u);
+  expect(block?.props?.content).not.toContain("/api/files/");
 });
