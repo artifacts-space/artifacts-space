@@ -184,11 +184,20 @@ describe("absoluteFileLinks", () => {
   });
 
   it("should leave a fence that opens on a list marker's line as written, and rewrite the text after it", () => {
-    const markdown = ["- ```bash", `  curl /api/files/${id}`, "  ```", "", `See [d](/api/files/${other})`, "", "> - ```", `>   [quoted](/api/files/${id})`, ">   ```"].join("\n");
+    const markdown = ["- ```bash", `  [sample](/api/files/${id})`, "  ```", "", `See [d](/api/files/${other})`, "", "> - ```", `>   [quoted](/api/files/${id})`, ">   ```"].join("\n");
     const out = absoluteFileLinks(markdown, "https://artifacts.space");
-    expect(out).toContain(`  curl /api/files/${id}`);
+    expect(out).toContain(`  [sample](/api/files/${id})`);
     expect(out).toContain(`See [d](https://artifacts.space/api/files/${other})`);
     expect(out).toContain(`>   [quoted](/api/files/${id})`);
+  });
+
+  it("should leave an indented code block right after a heading or a thematic break as written", () => {
+    const markdown = ["## Usage", `    [example](/api/files/${id})`, "", "##", `    [bare](/api/files/${id})`, "", "***", `    [rule](/api/files/${id})`, "", "Some text", `    [lazy](/api/files/${other})`].join("\n");
+    const out = absoluteFileLinks(markdown, "https://artifacts.space");
+    expect(out).toContain(`    [example](/api/files/${id})`);
+    expect(out).toContain(`    [bare](/api/files/${id})`);
+    expect(out).toContain(`    [rule](/api/files/${id})`);
+    expect(out).toContain(`    [lazy](https://artifacts.space/api/files/${other})`);
   });
 
   it("should leave this site's absolute links in list and quote code as written when a save takes them back", () => {
