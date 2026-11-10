@@ -1,25 +1,11 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import { useEffect, useState, type RefObject } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
 import { parseArtifactLinkSearch, withoutArtifactLink, type ArtifactLink } from "@/lib/app-link";
-import { linkedStart, openArtifactLink } from "@/lib/app-link-rules";
+import { linkedStart, linkNotice, openArtifactLink } from "@/lib/app-link-rules";
 import type { ArtifactListItemDto } from "@/lib/artifact-types";
-
-/**
- * Drops the link from the address bar and from the router once it has
- * opened, so a reload, Back, or a refresh after a save does not hand it back.
- * The state must not be Next's own (`window.history.state`): Next then skips
- * its router, which keeps the link in the URL it refreshes.
- */
-function useForgetArtifactLink(search: string) {
-  useEffect(() => {
-    const { pathname, search: current, hash } = window.location;
-    const rest = withoutArtifactLink(current);
-    if (rest !== current) window.history.replaceState(null, "", `${pathname}${rest}${hash}`);
-  }, [search]);
-}
 
 /** Phones (below md) scroll the page, and the list sits above the artifact there. */
 const phoneLayout = "(width < 48rem)";
@@ -39,14 +25,6 @@ function useRevealOpened(opened: ArtifactLink | null, list: RefObject<HTMLElemen
   }, [opened, list, detail]);
 }
 
-/** What the workspace says about a link that did not open: its artifact is gone, or it could not be checked just now. */
-export type LinkNotice = "gone" | "failed";
-
-function linkNotice(unavailable: boolean, failed: boolean): LinkNotice | null {
-  if (!unavailable) return null;
-  return failed ? "failed" : "gone";
-}
-
 interface ArtifactLinkOptions {
   initialArtifacts: ArtifactListItemDto[];
   /** What the server found for the URL's link through the access check, or null when it is missing or not readable. */
@@ -57,14 +35,22 @@ interface ArtifactLinkOptions {
   detail: RefObject<HTMLElement | null>;
 }
 
+/** The current URL without the link: the address bar is the record of what is handled, so a link still there has not been acted on. */
+function cleanLocation(): string {
+  const { pathname, search, hash } = window.location;
+  return `${pathname}${withoutArtifactLink(search)}${hash}`;
+}
+
 /**
  * The workspace's list and selection, driven by links as well as clicks.
  *
- * A link arrives when the URL's query string holds one (`?artifact=<id>`):
- * on the first load, and on each navigation to it while the workspace is
- * open, even to the same link twice, since the link leaves the URL as soon
- * as it opens. The URL, not the page's props, is the signal: Next can hand a
- * repeated navigation the same props, and Back restores an earlier page's.
+ * A link arrives when the address bar holds one (`?artifact=<id>`): on the
+ * first load, and after each navigation to it while the workspace is open,
+ * even to the same link twice, since the link leaves the address bar as soon
+ * as it is acted on. The address bar, not the router's state or the page's
+ * props, decides: Next can keep showing a link it has not caught up on, hand
+ * a repeated navigation the same props, and restore an earlier page's props
+ * on Back.
  *
  * Each link selects its artifact (pinning it to the top when it is not in
  * the list) without remounting the workspace, so search, filters, and panel
@@ -73,6 +59,7 @@ interface ArtifactLinkOptions {
  * that opened its artifact, for its comments.
  */
 export function useArtifactLink({ initialArtifacts, target = null, failed = false, list, detail }: ArtifactLinkOptions) {
+  const router = useRouter();
   const params = useSearchParams();
   const search = params.toString();
   const [start] = useState(() => linkedStart(initialArtifacts, parseArtifactLinkSearch(params), target));
@@ -80,22 +67,35 @@ export function useArtifactLink({ initialArtifacts, target = null, failed = fals
   const [selectedId, setSelectedId] = useState(start.selectedId);
   const [notice, setNotice] = useState(() => linkNotice(start.unavailable, failed));
   const [opened, setOpened] = useState(start.opened);
-  const [seenSearch, setSeenSearch] = useState(search);
+  // The first load's link is already in the state above; it only needs forgetting.
+  const startLink = useRef(parseArtifactLinkSearch(params) !== null);
 
-  // A new link while the workspace is open (a soft navigation): act on it during render, as React advises for changing inputs.
-  const fresh = search === seenSearch ? null : parseArtifactLinkSearch(params);
-  if (search !== seenSearch) setSeenSearch(search);
-  if (fresh) {
-    const outcome = openArtifactLink(artifacts, fresh, target);
+  const arrive = useEffectEvent((link: ArtifactLink) => {
+    const outcome = openArtifactLink(artifacts, link, target);
     setNotice(linkNotice(outcome.kind === "unavailable", failed));
     if (outcome.kind === "open") {
       setArtifacts(outcome.artifacts);
       setSelectedId(outcome.selectedId);
-      setOpened(fresh);
+      setOpened(link);
     }
-  }
+  });
+  // Drops the link from the address bar at once, and from the router's own URL with a replace, so a reload,
+  // Back, or a refresh after a save never hands it back. Next's own state keeps Next's router out of the first step.
+  const forget = useEffectEvent(() => {
+    const clean = cleanLocation();
+    window.history.replaceState(window.history.state, "", clean);
+    router.replace(clean, { scroll: false });
+  });
 
-  useForgetArtifactLink(search);
+  // Runs after each navigation commits: the search or the server's answer for it changes.
+  useEffect(() => {
+    const link = parseArtifactLinkSearch(new URLSearchParams(window.location.search));
+    if (!link) return;
+    if (startLink.current) startLink.current = false;
+    else arrive(link);
+    forget();
+  }, [search, target, failed]);
+
   useRevealOpened(opened, list, detail);
 
   return { artifacts, setArtifacts, selectedId, setSelectedId, notice, dismissNotice: () => { setNotice(null); }, opened };

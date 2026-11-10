@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { fixtureArtifact } from "@/components/dev/fixture-content";
 
-import { linkedStart, openArtifactLink } from "./app-link-rules";
+import { linkedStart, linkNotice, openArtifactLink } from "./app-link-rules";
 import { toArtifactListItem } from "./artifact-preview";
 
 const item = (id: string) => toArtifactListItem(fixtureArtifact({ id, kind: "text", title: id, content: id, publicId: `pub${id}` }));
@@ -50,5 +50,20 @@ describe("linkedStart", () => {
 
   it("should start empty when the list is empty and the link finds nothing", () => {
     expect(linkedStart([], { publicId: "pubgone", comments: false }, null).selectedId).toBe("");
+  });
+});
+
+describe("linkNotice", () => {
+  it("should say nothing when the link opened its artifact", () => {
+    expect(linkNotice(false, false)).toBeNull();
+    expect(linkNotice(false, true)).toBeNull();
+  });
+
+  it("should call the artifact gone when the server checked and found nothing", () => {
+    expect(linkNotice(true, false)).toBe("gone");
+  });
+
+  it("should not call the artifact gone when the server could not check it", () => {
+    expect(linkNotice(true, true)).toBe("failed");
   });
 });

@@ -14,7 +14,7 @@ import { serverProjectsApi, type ProjectsApi } from "@/components/app/projects-a
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
 import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
 import { useEditAccess, useWithdrawSharing } from "@/components/app/use-edit-access";
-import { useArtifactLink, type LinkNotice } from "@/components/app/use-artifact-link";
+import { useArtifactLink } from "@/components/app/use-artifact-link";
 import { useFullArtifact } from "@/components/app/use-full-artifact";
 import { useServerSearch } from "@/components/app/use-server-search";
 import { useDashboardProjects } from "@/components/app/use-dashboard-projects";
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { LinkedCommentsProvider } from "@/components/comments/linked-comments";
 import { SidebarProjects } from "@/components/projects/sidebar-projects";
+import type { LinkNotice } from "@/lib/app-link-rules";
 import { kinds } from "@/lib/artifact-kinds";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
@@ -175,7 +176,7 @@ interface DashboardProps {
   tagFacets: TagFacet[];
   /** The tags in the URL; the list is already filtered by them. */
   tagFilter: string[];
-  /** Full artifacts already in hand, so they open without a load (the /dev/workspace fixture). */
+  /** Full artifacts already in hand, so they open without a load: one a link opened from outside the list, which the server loaded for the URL, or the /dev/workspace fixture's seed. */
   initialFull?: readonly ArtifactDto[];
   /** Where project changes go: the server actions, or the fixture's stand-in. */
   projectsApi?: ProjectsApi;

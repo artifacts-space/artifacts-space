@@ -81,9 +81,10 @@ function useFixtureProjects(artifacts: readonly ArtifactDto[]) {
  * artifact is handed in full, so none loads. Project changes stay in
  * memory. The app shell and sidebar projects e2e tests use it. With
  * `scopes`, the viewer is also in shared teams, so the scope tabs show, and
- * `team` opens one of them as the scope.
+ * `team` opens one of them as the scope. `linkFailed` stands in for a link
+ * the server could not check (a read limit, or a database error).
  */
-export function WorkspaceFixture({ projectFilter, link = null, scopes = false, team = null }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null; scopes?: boolean; team?: string | null }) {
+export function WorkspaceFixture({ projectFilter, link = null, linkFailed = false, scopes = false, team = null }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null; linkFailed?: boolean; scopes?: boolean; team?: string | null }) {
   const base = useMemo(() => fixtureArtifacts(), []);
   const { state, api } = useFixtureProjects(base);
   const artifacts = useMemo(() => withProjects(base, state), [base, state]);
@@ -94,9 +95,9 @@ export function WorkspaceFixture({ projectFilter, link = null, scopes = false, t
   // As on /app: what the link finds, in the list or not (the workspace pins it to the top), or null when it is gone.
   const full = useMemo(() => [...artifacts, linkOnlyArtifact], [artifacts]);
   const linkTarget = useMemo(() => {
-    const found = link ? full.find((artifact) => artifact.publicId === link.publicId) : undefined;
+    const found = link && !linkFailed ? full.find((artifact) => artifact.publicId === link.publicId) : undefined;
     return found ? toArtifactListItem(found) : null;
-  }, [full, link]);
+  }, [full, link, linkFailed]);
   return (
     <ConfirmationsProvider initial={[]}>
       <div className="workspace-frame">
@@ -117,6 +118,7 @@ export function WorkspaceFixture({ projectFilter, link = null, scopes = false, t
           projectsApi={api}
           listPath="/dev/workspace"
           linkTarget={linkTarget}
+          linkFailed={linkFailed}
         />
       </div>
     </ConfirmationsProvider>

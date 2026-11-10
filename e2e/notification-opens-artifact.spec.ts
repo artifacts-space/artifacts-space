@@ -98,6 +98,13 @@ test("should say the artifact is no longer available when a link to a missing ar
   await expect(editor(page, "Long ui fixture")).toBeVisible();
 });
 
+test("should say the artifact could not be opened, not that it is gone, when the server could not check the link", async ({ page }) => {
+  await page.goto("/dev/workspace?artifact=fixtureworkspacelinked&linkcheck=failed");
+  await expect(page.getByText("This artifact could not be opened just now. Try the link again in a moment.")).toBeVisible();
+  await expect(page.getByText("This artifact is no longer available.")).toHaveCount(0);
+  await expect(editor(page, "Long ui fixture")).toBeVisible();
+});
+
 test("should not jump back to the linked artifact when the page refreshes after a save", async ({ page }) => {
   await page.goto("/dev/workspace");
   await chooseNotification(page, "mentioned you on Long markdown fixture");

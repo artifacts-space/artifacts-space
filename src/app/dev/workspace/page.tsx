@@ -18,10 +18,11 @@ export const metadata: Metadata = {
  * long artifacts, a long list, and projects, without a database. The
  * project filter in the URL works as on /app, and so does the
  * `?artifact=<id>&comments=1` link. `?scopes=1` adds shared teams, so the
- * scope tabs show, and `&team=<slug>` opens one as the scope. Returns 404 in every other environment.
+ * scope tabs show, and `&team=<slug>` opens one as the scope. `?linkcheck=failed`
+ * acts as if the server could not check the link. Returns 404 in every other environment.
  */
 export default async function WorkspaceFixturePage({ searchParams }: PageProps<"/dev/workspace">) {
   if (process.env.NODE_ENV !== "development") notFound();
   const params = await searchParams;
-  return <WorkspaceFixture projectFilter={parseProjectFilter(params)} link={parseArtifactLink(params)} scopes={params.scopes === "1"} team={typeof params.team === "string" ? params.team : null} />;
+  return <WorkspaceFixture projectFilter={parseProjectFilter(params)} link={parseArtifactLink(params)} linkFailed={params.linkcheck === "failed"} scopes={params.scopes === "1"} team={typeof params.team === "string" ? params.team : null} />;
 }

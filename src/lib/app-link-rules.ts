@@ -30,3 +30,12 @@ export function linkedStart(artifacts: ArtifactListItemDto[], link: ArtifactLink
   if (outcome?.kind === "open") return { artifacts: outcome.artifacts, selectedId: outcome.selectedId, unavailable: false, opened: link };
   return { artifacts, selectedId: artifacts[0]?.id ?? "", unavailable: outcome !== null, opened: null };
 }
+
+/** What the workspace says about a link that did not open: its artifact is gone, or it could not be checked just now. */
+export type LinkNotice = "gone" | "failed";
+
+/** The notice for a link: none when it opened, "failed" when the server could not check it (it may still be there), else "gone". */
+export function linkNotice(unavailable: boolean, failed: boolean): LinkNotice | null {
+  if (!unavailable) return null;
+  return failed ? "failed" : "gone";
+}
