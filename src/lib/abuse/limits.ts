@@ -46,11 +46,12 @@ export const rateLimits = {
   /** File views and downloads (/api/files) per network address per hour. */
   fileDownloadByNetwork: { limit: 3600, windowSeconds: hour },
   /**
-   * Video and audio playback follow-ups (/api/files requests with a Range
-   * that starts past the first byte: seeks and later parts) per network
-   * address per hour, apart from views (download-limit-rules.ts).
+   * Every /api/files request per network address per hour: views and
+   * downloads, and video and audio playback follow-ups (a Range that starts
+   * past the first byte: seeks and later parts), which skip the view limit
+   * above (download-limit-rules.ts). The total no Range header can get past.
    */
-  fileRangeByNetwork: { limit: 7200, windowSeconds: hour },
+  fileRequestByNetwork: { limit: 7200, windowSeconds: hour },
   /** The same follow-ups for one file, per network address per hour: the header is the client's to send, so no one file gets the whole budget. */
   fileRangeByNetworkFile: { limit: 1800, windowSeconds: hour },
   /**
@@ -159,7 +160,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   readByUser: "You have read a lot of artifacts in the last hour.",
   readByToken: "This connection has read a lot in the last hour.",
   fileDownloadByNetwork: "Your network has opened a lot of files in the last hour.",
-  fileRangeByNetwork: "Your network has played a lot of video and audio in the last hour.",
+  fileRequestByNetwork: "Your network has opened or played a lot of files in the last hour.",
   fileRangeByNetworkFile: "Your network has played this file a lot in the last hour.",
   teamIconByUser: "You have loaded a lot of team icons in the last hour.",
   teamIconByNetwork: "Your network has loaded a lot of team icons in the last hour.",

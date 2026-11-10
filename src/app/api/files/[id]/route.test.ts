@@ -86,13 +86,13 @@ describe("GET /api/files/[id]", () => {
   it("should count a video seek against the playback budgets, and still check access, when the range starts past the first byte", async () => {
     mocks.file.mockResolvedValue(null);
     const response = await call("", { Range: "bytes=5242880-" });
-    expect(mocks.limits).toHaveBeenCalledWith([{ name: "fileRangeByNetwork", subject: "network-1" }, { name: "fileRangeByNetworkFile", subject: `network-1:${fileId}` }]);
+    expect(mocks.limits).toHaveBeenCalledWith([{ name: "fileRequestByNetwork", subject: "network-1" }, { name: "fileRangeByNetworkFile", subject: `network-1:${fileId}` }]);
     expect(response.status).toBe(404);
   });
 
   it("should count a player's first request as a file view", async () => {
     await call("", { Range: "bytes=0-" });
-    expect(mocks.limits).toHaveBeenCalledWith([{ name: "fileDownloadByNetwork", subject: "network-1" }]);
+    expect(mocks.limits).toHaveBeenCalledWith([{ name: "fileDownloadByNetwork", subject: "network-1" }, { name: "fileRequestByNetwork", subject: "network-1" }]);
   });
 
   it("should answer an uncached 500 when signing fails", async () => {
