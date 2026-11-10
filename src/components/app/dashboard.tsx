@@ -206,6 +206,9 @@ interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate"> {
 
 /** The artifact pane: the blank page while New artifact has one open, else the selected artifact. */
 function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpdated, onDeleted, initialFull, loadArtifact }: WorkspacePaneProps) {
+  // Kept as one array between renders: the pane compares it by identity, and a new one each time would render it twice.
+  const { withStored } = fresh;
+  const full = useMemo(() => withStored(initialFull), [withStored, initialFull]);
   if (fresh.session) {
     return (
       <NewArtifactPane
@@ -221,7 +224,7 @@ function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpda
       />
     );
   }
-  return <DetailPane selected={selected} viewerId={viewerId} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} onCreate={fresh.start} initialFull={fresh.withStored(initialFull)} loadArtifact={loadArtifact} />;
+  return <DetailPane selected={selected} viewerId={viewerId} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} onCreate={fresh.start} initialFull={full} loadArtifact={loadArtifact} />;
 }
 
 /** The card marked as open: the blank page's artifact once stored (none before), else the selected one. */

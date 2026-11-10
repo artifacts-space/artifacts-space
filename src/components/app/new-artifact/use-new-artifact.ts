@@ -30,6 +30,11 @@ export function upsertListItem(list: readonly ArtifactListItemDto[], artifact: A
   return list.map((entry) => (entry.id === artifact.id ? item : entry));
 }
 
+/** The pane's full artifacts plus those blank pages became; the same array when there are none, so the pane does not render twice. */
+export function withStoredArtifacts(initial: readonly ArtifactDto[] | undefined, stored: readonly ArtifactDto[]): readonly ArtifactDto[] | undefined {
+  return stored.length === 0 ? initial : [...(initial ?? []), ...stored];
+}
+
 /** The name of the project the list is filtered to, for a new artifact; null for "No project" or no filter. */
 export function filteredProjectName(filter: ProjectFilter | null, facets: ProjectFacets): string | null {
   if (!filter || "none" in filter) return null;
@@ -91,7 +96,7 @@ export function useNewArtifact({ setArtifacts, setSelectedId, clearFilters }: Ne
   }, []);
 
   /** Full artifacts already in hand for the artifact pane: the page's own, plus those the blank pages became. */
-  const withStored = useCallback((initial: readonly ArtifactDto[] | undefined) => [...(initial ?? []), ...stored], [stored]);
+  const withStored = useCallback((initial: readonly ArtifactDto[] | undefined) => withStoredArtifacts(initial, stored), [stored]);
 
   return { session, withStored, start, saved, select, leave, deleted };
 }

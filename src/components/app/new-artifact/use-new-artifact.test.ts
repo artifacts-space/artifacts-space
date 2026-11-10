@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { fixtureArtifact } from "@/components/dev/fixture-content";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 
-import { filteredProjectName, upsertListItem } from "./use-new-artifact";
+import { filteredProjectName, upsertListItem, withStoredArtifacts } from "./use-new-artifact";
 
 const note = (id: string, title: string) => fixtureArtifact({ id, kind: "markdown", title, content: "x" });
 
@@ -31,5 +31,16 @@ describe("filteredProjectName", () => {
     expect(filteredProjectName(null, facets)).toBeNull();
     expect(filteredProjectName({ none: true }, facets)).toBeNull();
     expect(filteredProjectName({ key: "gone" }, facets)).toBeNull();
+  });
+});
+
+describe("withStoredArtifacts", () => {
+  it("should hand back the same array when no blank page became an artifact", () => {
+    const initial = [note("a", "One")];
+    expect(withStoredArtifacts(initial, [])).toBe(initial);
+  });
+
+  it("should add the stored artifacts after the pane's own when blank pages became some", () => {
+    expect(withStoredArtifacts([note("a", "One")], [note("b", "Two")])?.map((item) => item.id)).toEqual(["a", "b"]);
   });
 });
