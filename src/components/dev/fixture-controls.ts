@@ -10,8 +10,9 @@ import type { ArtifactDto } from "@/lib/artifact-types";
 interface FixtureControls {
   /** A router refresh, as after a save that revalidates /app; the fixture has no server actions to do it. */
   refresh: () => void;
-  /** Loads held back so far (`?slowload=1`), and the call that lets them finish. */
+  /** How many loads are waiting for `releaseLoads` right now (`?slowload=1`); it drops to 0 on release, so it is not a running total. */
   heldLoads: () => number;
+  /** Finishes every waiting load at once. */
   releaseLoads: () => void;
   /** How many links in the address bar the workspace has acted on. */
   linksHandled: () => number;
