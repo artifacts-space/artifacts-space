@@ -163,29 +163,68 @@ function outsideInlineCode(line: string, rewrite: (text: string, lineStart: bool
   return out + rewrite(line.slice(last), last === 0);
 }
 
+const blankLine = /^[ \t]*\r?\n?$/;
+const indentedLine = /^(?: {4}|\t)/;
+const listItemLine = /^ {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]/;
+
+/** Where the line scan is: inside a fence, an indented code block, or a list, and whether the last line was blank. */
+interface ScanState {
+  fence: string | null;
+  indentedCode: boolean;
+  inList: boolean;
+  afterBlank: boolean;
+}
+
+/** True when `line` closes the open fence. */
+function closesFence(line: string, fence: string): boolean {
+  const close = fenceClose.exec(line)?.[1];
+  return close?.startsWith(fence.charAt(0)) === true && close.length >= fence.length;
+}
+
 /**
- * Runs `rewrite` on the Markdown's text outside fenced code blocks and
- * inline code, so a code sample that shows a file path stays exactly as
- * written. `lineStart` says the text starts its line, where a reference
- * definition can begin.
+ * Whether `line` is code (in a fence or an indented code block), moving the
+ * scan on. An indented line is code only where CommonMark starts or
+ * continues an indented code block: after a blank line outside a list, or
+ * right after more of the block. Indented lines in a list are its content.
+ */
+function isCodeLine(line: string, state: ScanState): boolean {
+  if (state.fence !== null) {
+    if (closesFence(line, state.fence)) state.fence = null;
+    return true;
+  }
+  if (blankLine.test(line)) {
+    state.afterBlank = true;
+    return false;
+  }
+  const afterBlank = state.afterBlank;
+  state.afterBlank = false;
+  if (indentedLine.test(line)) {
+    state.indentedCode = state.indentedCode || (afterBlank && !state.inList);
+    return state.indentedCode;
+  }
+  return startsBlock(line, state, afterBlank);
+}
+
+/** A line at the left margin: it ends an indented code block, may open a fence, and starts or ends a list. */
+function startsBlock(line: string, state: ScanState, afterBlank: boolean): boolean {
+  state.indentedCode = false;
+  state.fence = fenceOpen.exec(line)?.[1] ?? null;
+  if (listItemLine.test(line)) state.inList = true;
+  else if (afterBlank) state.inList = false;
+  return state.fence !== null;
+}
+
+/**
+ * Runs `rewrite` on the Markdown's text outside code (fenced and indented
+ * blocks, and inline code), so a code sample that shows a file path stays
+ * exactly as written. `lineStart` says the text starts its line, where a
+ * reference definition can begin.
  */
 function rewriteOutsideCode(markdown: string, rewrite: (text: string, lineStart: boolean) => string): string {
-  let fence: string | null = null;
+  const state: ScanState = { fence: null, indentedCode: false, inList: false, afterBlank: true };
   return markdown
     .split(/(?<=\n)/)
-    .map((line) => {
-      if (fence !== null) {
-        const close = fenceClose.exec(line)?.[1];
-        if (close?.startsWith(fence.charAt(0)) === true && close.length >= fence.length) fence = null;
-        return line;
-      }
-      const open = fenceOpen.exec(line)?.[1];
-      if (open) {
-        fence = open;
-        return line;
-      }
-      return outsideInlineCode(line, rewrite);
-    })
+    .map((line) => (isCodeLine(line, state) ? line : outsideInlineCode(line, rewrite)))
     .join("");
 }
 

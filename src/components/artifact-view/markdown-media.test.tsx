@@ -34,6 +34,7 @@ describe("Markdown media in the read view", () => {
     const html = render(`![Demo](/api/files/${video}#video)\n\n![Report](/api/files/${report}#pdf)\n`);
     expect(html).toContain(`<video src="/api/files/${video}"`);
     expect(html).toContain(`<iframe src="/api/files/${report}"`);
+    expect(html).toMatch(/<iframe[^>]*referrerPolicy="no-referrer"/u);
     expect(html).toContain(`href="/api/files/${report}?download=1"`);
   });
 

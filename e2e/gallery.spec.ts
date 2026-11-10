@@ -45,7 +45,9 @@ test("should show the gallery's video and recording ready to play in the read vi
   await page.goto("/dev/components#media");
   const specimen = page.locator('[data-specimen="markdown · Markdown, media"]');
   await specimen.scrollIntoViewIfNeeded();
-  await expect(specimen.locator('[data-media-kind="video"] [data-media-state="ready"] video')).toBeVisible();
-  await expect(specimen.locator('[data-media-kind="audio"] [data-media-state="ready"] audio')).toHaveCount(1);
+  // The players read their stand-ins' metadata after the page settles; late in a full CI run that can take a few seconds.
+  const loaded = { timeout: 20_000 };
+  await expect(specimen.locator('[data-media-kind="video"] [data-media-state="ready"] video')).toBeVisible(loaded);
+  await expect(specimen.locator('[data-media-kind="audio"] [data-media-state="ready"] audio')).toHaveCount(1, loaded);
   await expect(specimen.locator("figcaption", { hasText: "Two minutes, start to finish." })).toBeVisible();
 });

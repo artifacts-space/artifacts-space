@@ -131,6 +131,34 @@ describe("absoluteFileLinks", () => {
     expect(absoluteFileLinks(markdown, "https://artifacts.space")).toBe(expected);
   });
 
+  it("should leave indented code blocks as written, but still rewrite indented list content and paragraph lines", () => {
+    const markdown = [
+      `Intro [a](/api/files/${id})`,
+      `    continues [b](/api/files/${id})`,
+      "",
+      `    ![code](/api/files/${id})`,
+      "",
+      `    [more code](/api/files/${other})`,
+      `Back to text [c](/api/files/${other})`,
+      "",
+      "- item",
+      "",
+      `    [in the list](/api/files/${id})`,
+    ].join("\n");
+    const out = absoluteFileLinks(markdown, "https://artifacts.space");
+    expect(out).toContain(`Intro [a](https://artifacts.space/api/files/${id})`);
+    expect(out).toContain(`    continues [b](https://artifacts.space/api/files/${id})`);
+    expect(out).toContain(`    ![code](/api/files/${id})`);
+    expect(out).toContain(`    [more code](/api/files/${other})`);
+    expect(out).toContain(`Back to text [c](https://artifacts.space/api/files/${other})`);
+    expect(out).toContain(`    [in the list](https://artifacts.space/api/files/${id})`);
+  });
+
+  it("should treat an indented first line as code", () => {
+    const markdown = `    [code](/api/files/${id})`;
+    expect(absoluteFileLinks(markdown, "https://artifacts.space")).toBe(markdown);
+  });
+
   it("should point reference-style definitions at the site", () => {
     const markdown = `See [the report][r] and ![chart][c].\n\n[r]: /api/files/${id}?download=1\n  [c]: </api/files/${other}#width=50> "Chart"`;
     expect(absoluteFileLinks(markdown, "https://artifacts.space")).toBe(

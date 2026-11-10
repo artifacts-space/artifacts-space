@@ -144,7 +144,7 @@ function MediaBody(props: MediaBlockProps) {
         "", allow-scripts, allow-same-origin, and both), so a sandbox would blank every PDF. The frame
         loads a short-lived R2 URL on another origin, which already keeps it away from this page.
       */}
-      <iframe src={url} title={name} loading="lazy" className="h-[70vh] w-full rounded-lg border bg-muted shadow-xs" />
+      <iframe src={url} title={name} loading="lazy" referrerPolicy="no-referrer" className="h-[70vh] w-full rounded-lg border bg-muted shadow-xs" />
       {card}
     </div>
   );
