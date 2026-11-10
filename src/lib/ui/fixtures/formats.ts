@@ -60,6 +60,8 @@ export const mediaFormatFixtures: FormatFixture[] = [
       '![Architecture diagram](/api/files/00000000-0000-4000-8000-000000000001#width=60 "How agents reach the API.")',
       "![Quarterly report](/api/files/00000000-0000-4000-8000-000000000002#pdf)",
       "![quarterly-report-final-v3.pdf](/api/files/00000000-0000-4000-8000-000000000002#file)",
+      '![Product walkthrough](/api/files/00000000-0000-4000-8000-000000000004#video&width=80 "Two minutes, start to finish.")',
+      "![Customer interview](/api/files/00000000-0000-4000-8000-000000000005#audio)",
       "![Not attached](/api/files/00000000-0000-4000-8000-0000000000ff)",
       "![External image, never loaded](https://example.com/p.png)",
       "See [the report](/api/files/00000000-0000-4000-8000-000000000002?download=1) for details.",

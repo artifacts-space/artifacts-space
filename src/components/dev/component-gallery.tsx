@@ -12,6 +12,7 @@ import { AvatarGallery } from "@/components/dev/avatar-gallery";
 import { ArtifactHeaderSpecimen } from "@/components/dev/artifact-header-specimen";
 import { CoverSpecimen } from "@/components/dev/cover-specimen";
 import { HarnessSpecimen } from "@/components/dev/harness-specimen";
+import { mediaFixtureFiles, mediaStandInUrl } from "@/components/dev/media-stand-ins";
 import { NotificationsSpecimen } from "@/components/dev/notifications-specimen";
 import { SwitchSpecimen } from "@/components/dev/switch-specimen";
 import { ThemeFocusSpecimen } from "@/components/dev/theme-focus-specimen";
@@ -47,11 +48,11 @@ const specFixtures: { name: string; spec: unknown }[] = [
  */
 const standInUrl = () => "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 3'%3E%3Crect width='4' height='3' fill-opacity='.08'/%3E%3C/svg%3E";
 
-/** One format viewer specimen, with the gallery's stand-in files. */
-function FormatSpecimen({ fixture }: { fixture: FormatFixture }) {
+/** One format viewer specimen, with the gallery's stand-in files (or the media group's, which add a video and a recording). */
+function FormatSpecimen({ fixture, media = false }: { fixture: FormatFixture; media?: boolean }) {
   return (
     <Specimen name={`${fixture.kind} · ${fixture.name}`}>
-      <ArtifactFilesProvider files={fixtureFiles} urlFor={standInUrl}>
+      <ArtifactFilesProvider files={media ? mediaFixtureFiles : fixtureFiles} urlFor={media ? mediaStandInUrl : standInUrl}>
         {/* Sheets keep each viewer's column widths and order per artifact; here, per specimen. */}
         <SheetKeyContext value={`gallery-${fixture.name}`}>
           <SheetFormatProvider stored={fixture.sheetFormat ?? plainSheetFormat} save={null}>
@@ -195,7 +196,7 @@ export function ComponentGallery() {
         </Group>
         {/* Last: media blocks change height as they load, which would move any group under them. */}
         <Group id="media" title="Media blocks">
-          {mediaFormatFixtures.map((fixture) => <FormatSpecimen key={fixture.name} fixture={fixture} />)}
+          {mediaFormatFixtures.map((fixture) => <FormatSpecimen key={fixture.name} fixture={fixture} media />)}
         </Group>
       </div>
     </div>
