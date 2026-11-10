@@ -895,7 +895,8 @@
   /* Same surface as the read-side code block (the --code tokens); plain text while editing. */
   .rich-editor-content .rich-code-block pre {
     margin-top: 0;
-    padding-right: 7.5rem;
+    /* The read-side block's px-4 py-3.5, plus room on the right for the language picker. */
+    padding: 0.875rem 7.5rem 0.875rem 1rem;
     border-color: var(--code-border);
     border-radius: var(--radius-lg);
     background: var(--code);
