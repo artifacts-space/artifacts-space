@@ -42,7 +42,15 @@ export function useBlankEditor({ blankPage, artifact, draft, replace, onUpdated,
   useFocusTitle(titleRef, sectionRef, focusRequest ?? 0, page.blank);
   const focusBody = useCallback(() => { focusContent(body.current); }, [body]);
   const label = page.blank ? "New artifact" : `Edit ${artifact.title}`;
-  // Files added later through the artifact's Files section go through the same store (the fixture's stand-in on /dev/workspace).
-  // The blank page's create-once save while it has one, else the workspace's (or the editor's default, the server action).
-  return { page: { ...page, label }, sectionRef, titleRef, dragging: first.dragging, focusBody, filesApi: blankPage?.api, saveWith: page.save ?? save };
+  return {
+    page: { ...page, label },
+    sectionRef,
+    titleRef,
+    dragging: first.dragging,
+    focusBody,
+    // Files added later through the artifact's Files section go through the same store (the fixture's stand-in on /dev/workspace).
+    filesApi: blankPage?.api,
+    // The blank page's create-once save while it has one, else the workspace's (or the editor's default, the server action).
+    saveWith: page.save ?? save,
+  };
 }

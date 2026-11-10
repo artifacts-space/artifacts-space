@@ -15,8 +15,16 @@ describe("formatSwitchProblem", () => {
     for (const kind of ["markdown", "text", "code"] as const) expect(formatSwitchProblem(kind, "a,b\n1,2")).toBeNull();
   });
 
-  it("should refuse Markdown when the content is empty", () => {
+  it("should refuse Markdown when a stored artifact's content is empty", () => {
     expect(formatSwitchProblem("markdown", "")).toMatch(/^This content can’t be Markdown yet/);
+  });
+
+  it("should allow Markdown when the content is empty on a page not stored yet", () => {
+    expect(formatSwitchProblem("markdown", "", { blank: true })).toBeNull();
+  });
+
+  it("should still refuse an empty Text or Code page that is not stored yet", () => {
+    for (const kind of ["text", "code"] as const) expect(formatSwitchProblem(kind, "", { blank: true }), kind).toMatch(/can’t be/);
   });
 
   it("should allow Files when the content is empty", () => {

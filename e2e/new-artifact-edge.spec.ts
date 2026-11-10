@@ -171,3 +171,20 @@ test("should start a table directly when an empty page is switched to CSV", asyn
   await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe("csv");
   expect(await creates(page)).toBe(1);
 });
+
+test("should switch an empty page to Files and back to Markdown before it is stored", async ({ page }) => {
+  await openNewArtifact(page);
+  const toolbar = blankPage(page).getByRole("button", { name: "Format" });
+  const dialog = page.getByRole("dialog", { name: "Format and language" });
+  for (const format of ["Files", "Markdown"]) {
+    await toolbar.click();
+    await dialog.getByRole("combobox", { name: "Format" }).click();
+    await page.getByRole("option", { name: format, exact: true }).click();
+    await dialog.getByRole("button", { name: "Apply" }).click();
+    await expect(dialog).toBeHidden();
+  }
+  await expect(body(page).locator('[contenteditable="true"]')).toBeVisible();
+  await page.getByRole("textbox", { name: "Artifact title" }).fill("Back to writing");
+  await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe("markdown");
+  expect(await creates(page)).toBe(1);
+});

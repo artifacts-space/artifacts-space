@@ -5,10 +5,12 @@ import type { ArtifactKind } from "@/lib/artifact-types";
 /**
  * Why the artifact's content cannot switch to `kind`, or null when it can.
  * The same check every save runs (validateArtifactContent), so a switch the
- * server would refuse is refused here first, with its reason.
+ * server would refuse is refused here first, with its reason. `blank` is a
+ * page not stored yet: its create may start with an empty Markdown body, so
+ * it can always go back to Markdown.
  */
-export function formatSwitchProblem(kind: ArtifactKind, content: string): string | null {
-  const check = validateArtifactContent(kind, content);
+export function formatSwitchProblem(kind: ArtifactKind, content: string, options: { blank?: boolean } = {}): string | null {
+  const check = validateArtifactContent(kind, content, { emptyMarkdown: options.blank === true });
   const firstError = check.issues.find((issue) => issue.severity === "error");
   if (!firstError) return null;
   return `This content can’t be ${formatInfo[kind].label} yet. ${firstError.message}`;
