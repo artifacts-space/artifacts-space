@@ -8,24 +8,32 @@ interface FirstContentOptions {
   page: RefObject<HTMLElement | null>;
   /** The body: text pasted or dropped here counts; the title and summary fields keep their own paste. */
   body: RefObject<HTMLElement | null>;
-  /** Listen only while the page is a new artifact with an empty body. */
-  enabled: boolean;
+  /** Take pasted or dropped text: only while the page is a new artifact with an empty body. */
+  text: boolean;
+  /** Take dropped or pasted files: while the body is empty, and while dropped files are still uploading. */
+  files: boolean;
   onContent: (content: FirstContent) => void;
 }
 
-/** The files or text a paste or drop carries; null when it carries neither. */
-function contentOf(data: DataTransfer | null, inBody: boolean): FirstContent | null {
-  if (!data) return null;
-  const files = Array.from(data.files);
-  if (files.length > 0) return { files };
-  const text = data.getData("text/plain");
-  return inBody && text.trim() !== "" ? { text } : null;
+/** What this page takes right now: text over the body, and files anywhere. */
+interface Takes {
+  text: boolean;
+  files: boolean;
 }
 
-/** True when the transfer is files, or text over the body. */
-function carriesContent(event: DragEvent, inBody: boolean): boolean {
+/** The files or text a paste or drop carries that the page takes; null when it takes neither. */
+function contentOf(data: DataTransfer | null, takes: Takes): FirstContent | null {
+  if (!data) return null;
+  const files = Array.from(data.files);
+  if (files.length > 0) return takes.files ? { files } : null;
+  const text = data.getData("text/plain");
+  return takes.text && text.trim() !== "" ? { text } : null;
+}
+
+/** True when the transfer is files the page takes, or text over the body it takes. */
+function carriesContent(event: DragEvent, takes: Takes): boolean {
   const types = Array.from(event.dataTransfer?.types ?? []);
-  return types.includes("Files") || (inBody && types.includes("text/plain"));
+  return (takes.files && types.includes("Files")) || (takes.text && types.includes("text/plain"));
 }
 
 /**
@@ -35,7 +43,8 @@ function carriesContent(event: DragEvent, inBody: boolean): boolean {
  * never pastes it a second time, and the content arrives exactly as it was
  * copied. `dragging` is true while files or text are held over the page.
  */
-export function useFirstContent({ page, body, enabled, onContent }: FirstContentOptions) {
+export function useFirstContent({ page, body, text, files, onContent }: FirstContentOptions) {
+  const enabled = text || files;
   const [dragging, setDragging] = useState(false);
   const onContentRef = useRef(onContent);
   useEffect(() => { onContentRef.current = onContent; }, [onContent]);
@@ -43,7 +52,7 @@ export function useFirstContent({ page, body, enabled, onContent }: FirstContent
   useEffect(() => {
     const root = page.current;
     if (!enabled || !root) return;
-    const inBody = (target: EventTarget | null) => target instanceof Node && body.current?.contains(target) === true;
+    const takes = (target: EventTarget | null): Takes => ({ text: text && target instanceof Node && body.current?.contains(target) === true, files });
     const take = (event: ClipboardEvent | DragEvent, content: FirstContent | null) => {
       if (!content) return;
       event.preventDefault();
@@ -51,10 +60,10 @@ export function useFirstContent({ page, body, enabled, onContent }: FirstContent
       setDragging(false);
       onContentRef.current(content);
     };
-    const paste = (event: ClipboardEvent) => { take(event, contentOf(event.clipboardData, inBody(event.target))); };
-    const drop = (event: DragEvent) => { take(event, contentOf(event.dataTransfer, inBody(event.target))); };
+    const paste = (event: ClipboardEvent) => { take(event, contentOf(event.clipboardData, takes(event.target))); };
+    const drop = (event: DragEvent) => { take(event, contentOf(event.dataTransfer, takes(event.target))); };
     const over = (event: DragEvent) => {
-      if (!carriesContent(event, inBody(event.target))) return;
+      if (!carriesContent(event, takes(event.target))) return;
       event.preventDefault();
       setDragging(true);
     };
@@ -70,7 +79,7 @@ export function useFirstContent({ page, body, enabled, onContent }: FirstContent
       root.removeEventListener("dragleave", leave, true);
       setDragging(false);
     };
-  }, [body, enabled, page]);
+  }, [body, enabled, files, page, text]);
 
   return { dragging: enabled && dragging };
 }

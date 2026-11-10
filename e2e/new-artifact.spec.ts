@@ -219,6 +219,30 @@ test("should attach a file dropped after a title was already stored", async ({ p
   expect(await creates(page)).toBe(1);
 });
 
+test("should upload a code file dropped while files are on their way, and keep what was typed", async ({ page }) => {
+  await openNewArtifact(page);
+  await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-uploads", "1"); });
+  await dropFiles(body(page), ["First.pdf"]);
+  await expect(page.getByText("First.pdf")).toBeVisible();
+  const field = body(page).locator('[contenteditable="true"]');
+  await field.click();
+  await page.keyboard.type("Typed while it uploads");
+  await body(page).evaluate((element) => {
+    const data = new DataTransfer();
+    data.items.add(new File(["const a = 1;"], "notes.ts", { type: "text/plain" }));
+    element.dispatchEvent(new DragEvent("drop", { dataTransfer: data, bubbles: true, cancelable: true }));
+  });
+  await expect(page.getByText("notes.ts")).toBeVisible();
+  await expect(field).toContainText("Typed while it uploads");
+  await page.evaluate(() => { window.sessionStorage.removeItem("fixture:hold-uploads"); window.dispatchEvent(new Event("fixture:release-uploads")); });
+
+  await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(2);
+  const [stored] = await storedNew(page);
+  expect(stored?.kind, "typed writing keeps the page a document").toBe("markdown");
+  expect(stored?.content).toContain("Typed while it uploads");
+  expect(await creates(page)).toBe(1);
+});
+
 test("should move Format and language into the More menu of a stored artifact", async ({ page }) => {
   await page.goto("/dev/workspace");
   await cards(page, "Note 2").click();

@@ -154,5 +154,20 @@ export function uploadStep({ stored, busy, readyIds, attachedIds, handedIds }: U
   if (pending.length === 0) return { step: "done" };
   if (stored) return { step: "attach", ids: pending };
   const handed = new Set(handedIds);
-  return pending.every((id) => handed.has(id)) ? { step: "wait" } : { step: "create", ids: pending };
+  const fresh = pending.filter((id) => !handed.has(id));
+  return fresh.length === 0 ? { step: "wait" } : { step: "create", ids: fresh };
+}
+
+/** What the blank page does with a paste or drop: read it as first content, add the files as uploads, or leave it to the editor. */
+export type ContentRoute = "first" | "upload" | "ignore";
+
+/**
+ * Routes content on the blank page. Only an empty body takes first content
+ * (text or files that may pick the format). While dropped files are still on
+ * their way, more files join them as uploads and are never read into the
+ * body, so writing typed in the meantime is never replaced.
+ */
+export function contentRoute(isText: boolean, { firstContent, addingFiles }: { firstContent: boolean; addingFiles: boolean }): ContentRoute {
+  if (firstContent) return "first";
+  return !isText && addingFiles ? "upload" : "ignore";
 }

@@ -64,9 +64,10 @@ export function useBlankUploads({ options, artifact, draftRef, replace, onUpdate
       return;
     }
     if (step.step === "create") {
-      fileIdsRef.current = [...fileIdsRef.current, ...step.ids];
+      fileIdsRef.current = [...new Set([...fileIdsRef.current, ...step.ids])];
+      // No remount: the empty body has no content editor to reload, and the title keeps its caret.
       const next = asFiles(draftRef.current, names);
-      if (next) replace(next, true);
+      if (next) replace(next, false);
       return;
     }
     if (step.step !== "attach" || attachingRef.current) return;
@@ -85,7 +86,7 @@ export function useBlankUploads({ options, artifact, draftRef, replace, onUpdate
         setProblem(null);
         onUpdated(result.data);
         const next = asFiles(draftRef.current, names);
-        if (next) replace(next, true);
+        if (next) replace(next, false);
       })
       .catch(failed)
       .finally(() => { attachingRef.current = false; });

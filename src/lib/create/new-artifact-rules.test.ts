@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ActionResult, ArtifactDto, ArtifactInput } from "@/lib/artifact-types";
 
-import { BLANK_ARTIFACT_ID, blankDraftProblem, createInputFor, isUntouched, isWebCreateSessionId, persistOnce, UNTITLED, uploadStep, webCreateSessionId, type BlankDraft } from "./new-artifact-rules";
+import { BLANK_ARTIFACT_ID, blankDraftProblem, contentRoute, createInputFor, isUntouched, isWebCreateSessionId, persistOnce, UNTITLED, uploadStep, webCreateSessionId, type BlankDraft } from "./new-artifact-rules";
 
 const blank: BlankDraft = { title: "", icon: null, summary: "", content: "", language: "", kind: "markdown" };
 const requestId = "0b6f6d43-8a8f-4b52-9f44-2f8c1a6d3e10";
@@ -154,6 +154,10 @@ describe("uploadStep", () => {
     expect(uploadStep({ ...state, handedIds: ["f-1"] })).toEqual({ step: "wait" });
   });
 
+  it("should hand only the files the create does not have yet when another file finishes before it starts", () => {
+    expect(uploadStep({ ...state, readyIds: ["f-1", "f-2"], handedIds: ["f-1"] })).toEqual({ step: "create", ids: ["f-2"] });
+  });
+
   it("should attach files the stored artifact does not have when it was stored first", () => {
     expect(uploadStep({ ...state, stored: true })).toEqual({ step: "attach", ids: ["f-1"] });
   });
@@ -174,5 +178,25 @@ describe("isWebCreateSessionId", () => {
 
   it("should refuse agent session ids and anything else", () => {
     for (const value of [undefined, "", "claude-session-1", "web:", "web:not-a-uuid", `web:${requestId} `]) expect(isWebCreateSessionId(value)).toBe(false);
+  });
+});
+
+describe("contentRoute", () => {
+  it("should read text or files as first content when the body is empty", () => {
+    expect(contentRoute(true, { firstContent: true, addingFiles: false })).toBe("first");
+    expect(contentRoute(false, { firstContent: true, addingFiles: false })).toBe("first");
+  });
+
+  it("should add files as uploads, never read them into the body, when files are already on their way", () => {
+    expect(contentRoute(false, { firstContent: false, addingFiles: true })).toBe("upload");
+  });
+
+  it("should leave text to the editor when the body is no longer first content", () => {
+    expect(contentRoute(true, { firstContent: false, addingFiles: true })).toBe("ignore");
+    expect(contentRoute(true, { firstContent: false, addingFiles: false })).toBe("ignore");
+  });
+
+  it("should leave files to the artifact's own Files section when nothing is uploading", () => {
+    expect(contentRoute(false, { firstContent: false, addingFiles: false })).toBe("ignore");
   });
 });

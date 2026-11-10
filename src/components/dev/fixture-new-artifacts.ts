@@ -17,6 +17,21 @@ const createsKey = "fixture:new-artifact-creates";
 /** Set to "1" by a test to make the next create fail, as a lost connection or a rate limit would. */
 const failNextKey = "fixture:fail-next-create";
 
+/** Set to "1" by a test to hold every upload until it dispatches `fixture:release-uploads` on window, so it can act while files are on their way. */
+const holdUploadsKey = "fixture:hold-uploads";
+
+/** Resolves at once, or when the test releases held uploads. */
+function uploadGate(): Promise<void> {
+  let held = false;
+  try {
+    held = window.sessionStorage.getItem(holdUploadsKey) === "1";
+  } catch {
+    held = false;
+  }
+  if (!held) return Promise.resolve();
+  return new Promise((resolve) => { window.addEventListener("fixture:release-uploads", () => { resolve(); }, { once: true }); });
+}
+
 function takeFailure(): boolean {
   try {
     if (window.sessionStorage.getItem(failNextKey) !== "1") return false;
@@ -96,12 +111,13 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     if (problem) return Promise.resolve({ success: false, error: problem });
     return Promise.resolve(save(next));
   },
-  send: (file, report) => {
+  send: async (file, report) => {
+    await uploadGate();
     report.progress(100);
     report.checking();
     const dto: FileDto = { id: crypto.randomUUID(), filename: file.name, contentType: file.type || "application/octet-stream", size: file.size, createdAt: new Date().toISOString() };
     uploaded.set(dto.id, dto);
-    return Promise.resolve({ success: true, data: dto });
+    return { success: true, data: dto };
   },
   attach: (artifactId, fileIds) => {
     const current = readStored().find((entry) => entry.id === artifactId);

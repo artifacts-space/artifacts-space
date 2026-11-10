@@ -5,7 +5,7 @@ import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave
 import type { ArtifactDraft } from "@/components/app/artifact-editor/use-artifact-draft";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { detectFileText, detectTextKind, filePlan, type Detection } from "@/lib/create/detect-kind-rules";
-import { BLANK_ARTIFACT_ID, blankDraftProblem, isUntouched, persistOnce } from "@/lib/create/new-artifact-rules";
+import { BLANK_ARTIFACT_ID, blankDraftProblem, contentRoute, isUntouched, persistOnce } from "@/lib/create/new-artifact-rules";
 
 import type { NewArtifactApi } from "./new-artifact-api";
 import { useBlankUploads } from "./use-blank-uploads";
@@ -111,21 +111,27 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
     setDetected(detection.kind === "markdown" ? null : { kind: detection.kind, language: detection.language, content: detection.content });
   }, [replace]);
 
-  // Read when content arrives: text only while the body is empty; files also while dropped files are still on their way.
+  // First content only while the body is empty; while dropped files are on their way, more files join them (contentRoute).
   const eligible = takesFirstContent(active, draft, uploads.items.length);
-  const acceptsRef = useRef({ text: eligible, files: eligible });
-  useEffect(() => { acceptsRef.current = { text: eligible, files: eligible || uploads.items.length > 0 }; }, [eligible, uploads.items.length]);
+  const addingFiles = active && uploads.items.length > 0;
+  const routeRef = useRef({ firstContent: eligible, addingFiles });
+  useEffect(() => { routeRef.current = { firstContent: eligible, addingFiles }; }, [eligible, addingFiles]);
 
   const onContent = useCallback((content: FirstContent) => {
-    const accepts = acceptsRef.current;
-    if ("text" in content ? !accepts.text : !accepts.files) return;
+    const route = contentRoute("text" in content, routeRef.current);
+    if (route === "ignore") return;
     setReadFailed(null);
     if ("text" in content) {
       apply(detectTextKind(content.text));
       return;
     }
+    if (route === "upload") {
+      uploads.addFiles(content.files);
+      return;
+    }
     readAsText(content.files)
-      .then((detection) => { if (detection) apply(detection); else uploads.addFiles(content.files); })
+      // Typed into while the file was read: the writing stays, and the file uploads instead.
+      .then((detection) => { if (detection && routeRef.current.firstContent) apply(detection); else uploads.addFiles(content.files); })
       .catch(() => { setReadFailed("That file could not be read. Try again, or upload it."); });
   }, [apply, uploads]);
 
@@ -138,6 +144,7 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
     idle,
     onContent,
     eligible,
+    addingFiles,
     uploads,
     readFailed: readFailed ?? uploadProblem,
     detected: stillDetected(detected, draft),

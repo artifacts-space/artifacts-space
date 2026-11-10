@@ -35,7 +35,7 @@ export function useBlankEditor({ blankPage, artifact, draft, replace, onUpdated,
     // Pasted writing stays a document: the cursor goes to its end, where typing goes on.
     if ("text" in content) focusContent(body.current, "end");
   }, [onContent, body]);
-  const first = useFirstContent({ page: sectionRef, body, enabled: page.eligible && !sourceOpen, onContent: take });
+  const first = useFirstContent({ page: sectionRef, body, text: page.eligible && !sourceOpen, files: (page.eligible || page.addingFiles) && !sourceOpen, onContent: take });
   useFocusTitle(titleRef, sectionRef, focusRequest ?? 0, page.blank);
   const focusBody = useCallback(() => { focusContent(body.current); }, [body]);
   const label = page.blank ? "New artifact" : `Edit ${artifact.title}`;
