@@ -162,6 +162,16 @@ test("should leave the grid with Escape then Tab when Tab moves between cells", 
   await expect(grid).not.toBeFocused();
 });
 
+test("should still leave with Escape then Tab when React replays the focus it queued while hydrating", async ({ page }) => {
+  const grid = await openViewer(page);
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Escape");
+  // A focus that lands before React hydrates the grid is queued and dispatched again after hydration, as a clone from nowhere that can arrive after keys pressed since.
+  await grid.evaluate((element) => { element.dispatchEvent(new FocusEvent("focusin", { bubbles: true, relatedTarget: null })); });
+  await page.keyboard.press("Tab");
+  await expect(grid).not.toBeFocused();
+});
+
 test("should select a block when a reader drags across cells with a mouse", async ({ page, isMobile }) => {
   test.skip(isMobile, "dragging to select needs a mouse; on a phone a drag scrolls");
   const grid = await openViewer(page);
