@@ -1,7 +1,7 @@
-import { and, eq, inArray, isNotNull, like, or, sql } from "drizzle-orm";
+import { and, eq, inArray, like, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { artifact, artifactFile, artifactVersion, type ArtifactFileRecord } from "@/db/schema";
+import { artifact, artifactFile, artifactVersion } from "@/db/schema";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 
 import { imageFileIdOf, imageFileIdsOf, unusedIconFiles, type IconUseState } from "./icon-cleanup-rules";
@@ -16,11 +16,12 @@ import { getFileRows, removeFiles } from "./store";
  * save merges into the newest version and replaces what it showed), or the
  * images of versions history pruning just dropped.
  *
- * Files the content once embedded or linked (`named_in_content_at`) follow
- * the same rule: kept while the artifact or any version still names them,
- * deleted with the last one that did, and not counted toward the file limit
- * while only older versions name them. Plain attachments, which no content
- * ever named, are never removed here.
+ * Content media (files a content save attached, `attached_by_content`)
+ * follows the same rule: kept while the artifact or any version still
+ * names it, removed with the last one that did, and not counted toward the
+ * file limit while only older versions name it. A file attached any other
+ * way (files_attach, the Files panel) is never removed here, even after
+ * content linked it and stopped.
  */
 
 /** The icons and covers every version of the artifact shows that point at an uploaded image. */
@@ -57,19 +58,11 @@ async function currentState(artifactId: string): Promise<IconUseState | null> {
   return record ?? null;
 }
 
-/**
- * Deletes the files among `fileIds` that neither the artifact nor any
- * version in its history shows (as the icon or cover, or in its content),
- * and that `removable` allows. Only files attached to this artifact are ever
- * removed. Returns how many went.
- */
-async function removeUnused(artifactId: string, fileIds: readonly string[], current: IconUseState, removable: (row: ArtifactFileRecord) => boolean): Promise<number> {
-  if (fileIds.length === 0) return 0;
+/** The files among `fileIds` that neither the artifact nor any version in its history shows, as the icon or cover or in its content. */
+async function unusedFiles(artifactId: string, fileIds: readonly string[], current: IconUseState): Promise<string[]> {
+  if (fileIds.length === 0) return [];
   const unreferenced = unusedIconFiles(fileIds, current, await retainedImageRefs(artifactId));
-  const unused = unreferenced.length > 0 ? await notNamedInContent(artifactId, unreferenced) : [];
-  if (unused.length === 0) return 0;
-  const rows = (await getFileRows(unused)).filter((row) => row.artifactId === artifactId && removable(row));
-  return (await removeFiles(rows)).length;
+  return unreferenced.length > 0 ? notNamedInContent(artifactId, unreferenced) : [];
 }
 
 /**
@@ -84,39 +77,79 @@ export async function pruneUnusedIconFiles(artifactId: string, candidates: reado
   });
   if (fileIds.length === 0) return 0;
   const current = await currentState(artifactId);
-  return current ? removeUnused(artifactId, fileIds, current, () => true) : 0;
+  if (!current) return 0;
+  const unused = await unusedFiles(artifactId, fileIds, current);
+  if (unused.length === 0) return 0;
+  const rows = (await getFileRows(unused)).filter((row) => row.artifactId === artifactId);
+  return (await removeFiles(rows)).length;
 }
 
-/** The artifact's attached files that content once named and its current state does not show. */
+/** The artifact's content media that its current state does not show. */
 async function contentFilesNotShown(artifactId: string, current: IconUseState): Promise<string[]> {
   const rows = await getDb()
     .select({ id: artifactFile.id })
     .from(artifactFile)
-    .where(and(eq(artifactFile.artifactId, artifactId), isNotNull(artifactFile.namedInContentAt)));
+    .where(and(eq(artifactFile.artifactId, artifactId), eq(artifactFile.attachedByContent, true)));
   if (rows.length === 0) return [];
   const shown = new Set([...fileRefsInContent(current.kind, current.content), ...imageFileIdsOf(current)]);
   return rows.map((row) => row.id).filter((fileId) => !shown.has(fileId));
 }
 
+/** For an `artifact_file` row: neither the artifact's current content nor any of its versions names it. */
+export function notNamedByArtifact(artifactId: string) {
+  return sql`not exists (select 1 from ${artifact} a where a.id = ${artifactId} and strpos(lower(a.content), "artifact_file"."id") > 0) and not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and strpos(lower(v.content), "artifact_file"."id") > 0)`;
+}
+
 /**
- * Deletes files the content once named that neither the artifact nor any
- * version in its history names any more: the media a removed embed left,
- * once a merged save or history pruning dropped the last version with it.
- * `candidates` narrows the check (the files a save stopped naming); without
- * it, every such file of the artifact is checked. Returns how many went.
+ * Detaches the content media among `fileIds` in one statement, checking at
+ * that moment that neither the artifact's current content nor any version
+ * names them, and returns the rows it detached. Done as one statement
+ * because the production driver (neon-http) has no interactive
+ * transactions or row locks: a save that wrote content naming the file
+ * before this runs keeps it. The file rows are written out as
+ * "artifact_file"."id", never a bare `id` (the correlated-subquery tripwire
+ * in AGENTS.md).
+ */
+export function detachUnnamedContentFiles(artifactId: string, fileIds: readonly string[]) {
+  return getDb()
+    .update(artifactFile)
+    .set({ artifactId: null, attachedAt: null })
+    .where(
+      and(
+        inArray(artifactFile.id, [...fileIds]),
+        eq(artifactFile.artifactId, artifactId),
+        eq(artifactFile.attachedByContent, true),
+        notNamedByArtifact(artifactId),
+      ),
+    )
+    .returning();
+}
+
+/**
+ * Deletes content media that neither the artifact nor any version in its
+ * history names any more: the media a removed embed left, once history
+ * pruning dropped the last version with it. `candidates` narrows the check
+ * (the files a save stopped naming); without it, every content file of the
+ * artifact the current state does not show is checked. Plain attachments
+ * are never removed. Each file is detached first, with a last check against
+ * the artifact's current content (detachUnnamedContentFiles), then deleted;
+ * if R2 refuses the delete, the cleanup job finishes it as an unattached
+ * file. Returns how many went.
  */
 export async function pruneUnusedContentFiles(artifactId: string, candidates?: readonly string[]): Promise<number> {
   if (candidates?.length === 0) return 0;
   const current = await currentState(artifactId);
   if (!current) return 0;
-  const fileIds = candidates ?? (await contentFilesNotShown(artifactId, current));
-  return removeUnused(artifactId, fileIds, current, (row) => row.namedInContentAt !== null);
+  const unused = await unusedFiles(artifactId, candidates ?? (await contentFilesNotShown(artifactId, current)), current);
+  if (unused.length === 0) return 0;
+  const detached = await detachUnnamedContentFiles(artifactId, unused);
+  return (await removeFiles(detached)).length;
 }
 
 /**
  * How many of the artifact's attached files only older versions show, kept
- * so Restore can bring them back: icon or cover images, and files the
- * content once named that the artifact no longer shows. They do not count
+ * so Restore can bring them back: icon or cover images, and content media
+ * the artifact no longer shows. They do not count
  * toward the per-artifact file limit, so changing a cover or swapping
  * screenshots many times never blocks the next upload; history retention
  * (and the account's storage quota) bounds them instead.

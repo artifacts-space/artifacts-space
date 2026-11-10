@@ -337,7 +337,6 @@ export async function createArtifact(userId: string, input: ArtifactInput, optio
   assertValidArtifactContent(parsed.kind, parsed.content);
   const contentFileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
   const imageFileIds = [...(await checkIconFile(userId, null, parsed.icon)), ...(await checkCoverFile(userId, null, parsed.cover))];
-  const fileIds = [...new Set([...contentFileIds, ...imageFileIds])];
   // New artifacts are private: a team preset must be one of the author's teams'.
   await assertTeamPresetUsable(userId, { userId, visibility: "private", teamId: null }, parsed.theme);
   await enforceRateLimit("artifactCreate", userId);
@@ -364,7 +363,7 @@ export async function createArtifact(userId: string, input: ArtifactInput, optio
     .returning();
 
   if (!record) throw new Error("The artifact could not be created.");
-  await attachFileRows(userId, record.id, fileIds);
+  await attachContentAndImageFiles(userId, record.id, contentFileIds, imageFileIds);
   await recordArtifactSave({ before: null, after: record, editorId: userId, actor: "person", saveKind: "create", harness: options.harness ?? null });
   const [dto] = await toArtifactDtos([record], userId);
   return dto ?? toArtifactDto(record);
@@ -473,7 +472,13 @@ async function attachUpdatedContentFiles(userId: string, current: ArtifactRecord
   const iconFileIds = [...(await checkIconFile(userId, current.id, update.icon)), ...(await checkCoverFile(userId, current.id, update.cover))];
   const contentChanged = update.kind !== undefined || update.content !== undefined;
   const contentFileIds = contentChanged ? await checkContentFiles(userId, current.id, update.kind ?? current.kind, update.content ?? current.content) : [];
-  await attachFileRows(userId, current.id, [...new Set([...contentFileIds, ...iconFileIds])]);
+  await attachContentAndImageFiles(userId, current.id, contentFileIds, iconFileIds);
+}
+
+/** Attaches a save's uploads: the ones its content names as content media first, then its icon and cover images as plain files. */
+async function attachContentAndImageFiles(userId: string, artifactId: string, contentFileIds: readonly string[], imageFileIds: readonly string[]) {
+  await attachFileRows(userId, artifactId, contentFileIds, { byContent: true });
+  await attachFileRows(userId, artifactId, imageFileIds);
 }
 
 /** Deletes an artifact and its files, for its author or the person who added the agent that wrote it. */

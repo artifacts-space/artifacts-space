@@ -6,7 +6,6 @@ import { getDb } from "@/db";
 import { artifact, artifactVersion, sharingRequest, type ArtifactRecord, type ArtifactVersionRecord } from "@/db/schema";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 import type { VersionSaveKind } from "@/lib/artifact-types";
-import { markNamedInContent } from "@/lib/files/content-files";
 import { pruneUnusedContentFilesQuietly, pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { dropsShownImage } from "@/lib/files/icon-cleanup-rules";
 import { restampTo, stampColumns, stampOf, type HarnessStamp } from "@/lib/harness/harness-rules";
@@ -26,19 +25,13 @@ function copiedFields(record: ArtifactRecord) {
   return { title, icon, theme, cover, summary, content, kind, language, project, source, metadata, bytes: versionBytes(record) };
 }
 
-/**
- * Inserts a version of `record` and returns its id. `at` back-dates it, for a
- * snapshot of an older save. First marks the files its content names
- * (content-files.ts), so no failure leaves content naming an unmarked file.
- */
+/** Inserts a version of `record` and returns its id. `at` back-dates it, for a snapshot of an older save. */
 export async function insertVersion(
   record: ArtifactRecord,
   options: { createdBy: string | null; saveKind: VersionSaveKind; restoredFromId?: string | null; at?: Date; harness?: HarnessStamp | null | undefined },
 ): Promise<string> {
   const id = randomUUID();
   const at = options.at ? { createdAt: options.at, savedAt: options.at } : {};
-  // Flag first: the flag errs on hiding, so a failure after it leaves no file readable that should not be.
-  await markNamedInContent(record.id, record.kind, record.content, options.at);
   await getDb()
     .insert(artifactVersion)
     .values({ id, artifactId: record.id, ...copiedFields(record), ...stampColumns(options.harness), createdBy: options.createdBy, saveKind: options.saveKind, restoredFromId: options.restoredFromId ?? null, ...at });
@@ -106,9 +99,8 @@ async function restampVersion(latest: ArtifactVersionRecord, record: ArtifactRec
   await getDb().update(artifactVersion).set({ harness: next }).where(eq(artifactVersion.id, latest.id));
 }
 
-/** Folds a save into a version, and marks the files its content names. A save from the web app keeps the harness an agent save already recorded there. */
+/** Folds a save into a version. A save from the web app keeps the harness an agent save already recorded there. */
 async function mergeInto(versionId: string, record: ArtifactRecord, harness: HarnessStamp | null | undefined) {
-  await markNamedInContent(record.id, record.kind, record.content);
   await getDb()
     .update(artifactVersion)
     .set({ ...copiedFields(record), ...stampColumns(harness), savedAt: sql`now()` })

@@ -64,8 +64,8 @@ after it.
   is the file's UUID. That route checks access on every request, so a media
   block never shows a file to someone who may not read it. Write it
   relative: the Markdown version makes link, image, and reference-definition
-  targets absolute for readers outside the site (code blocks and inline code
-  stay as written), and a save turns this site's own absolute file URLs back
+  targets absolute for readers outside the site (fenced and indented code
+  blocks, and inline code, stay as written), and a save turns this site's own absolute file URLs back
   into the relative form (`absoluteFileLinks` and `relativeFileLinks`).
 - **Options** follow `#`, joined with `&`, each at most once:
   - the kind: `video`, `audio`, `pdf`, or `file`. Leave it out for an image;
@@ -94,32 +94,38 @@ after it.
   uploads attaches them to the artifact (`checkContentFiles` in
   `src/lib/files/attach.ts`); links to files you cannot use stay plain links
   that load only for people who may read those files. Every `/api/files/<id>`
-  in the text counts, media and plain links alike (`markdownFileRefs`); only
-  the first 500 ids are looked up, and the 50-file cap applies to the files
-  the save can use, so many links never fail a save or a Restore.
+  in the text counts, media and plain links alike (`markdownFileRefs`). The
+  save reads the files the author may use, not the linked ids, so the
+  author's own uploads are always found however many links come first, and
+  the 50-file cap applies only to usable files, so many links never fail a
+  save or a Restore.
 - **Only documents hold media.** A ui artifact's Markdown block is text only:
   no media in its slash menu, and a pasted or dropped file is refused with a
   note, because ui saves attach only Image and File block files. Media
   already written in such a block stays as written. Full media in ui Markdown
   blocks is a later phase.
+- **Content media and plain attachments.** A file a content save attached
+  (the save named the editor's own upload, so the save attached it) is
+  content media: `artifact_file.attached_by_content` (set by
+  `attachFileRows`; see `src/lib/files/content-files.ts`). A file attached any
+  other way (`files_attach`, the Files panel) is a plain attachment, even if
+  content links it later. So is every file attached before the column
+  existed: nothing records how those came in.
 - **Access follows the artifact.** People who can read the artifact can load
   its media. Readers of the approved version (outside the team) load only
-  files attached by that version's time, and never a file that some version
-  embedded but the approved version does not (`served-images.ts`). "Some
-  version embedded it" is kept on the file row as the time content first
-  named it (`named_in_content_at`, set in `src/lib/files/content-files.ts`),
-  so it holds after pruning deletes those versions. It counts only when it
-  is no later than the approved version: a plain attachment that a later
-  draft embeds stays readable as an attachment until a version that drops it
-  is approved. Files attached before this column existed have no time and
-  behave as plain attachments until a save names them.
+  files attached by that version's time, and never content media the
+  approved version does not show (`served-images.ts`). Being content media
+  is kept on the file row, so it holds after pruning deletes the versions
+  that showed it. Plain attachments are never hidden this way.
 - **Removed media is kept for Restore, then deleted.** A save that drops an
   embedded file always files its own version, so Restore brings it back
-  (`dropsShownImage`). While only older versions name it, it does not count
-  toward the 20-file limit (`countHistoryOnlyFiles`); once no version names
-  it (a merged save, or history pruning), it is deleted
-  (`pruneUnusedContentFiles` in `src/lib/files/icon-cleanup.ts`). A file
-  content never named, a plain attachment, is never deleted this way.
+  (`dropsShownImage`). While only older versions name content media, it does
+  not count toward the 20-file limit (`countHistoryOnlyFiles`); once no
+  version names it, history pruning deletes it (`pruneUnusedContentFiles` in
+  `src/lib/files/icon-cleanup.ts`). The delete first detaches the file in one
+  statement that checks the artifact's current content and every version
+  again, so a save that has just written content naming it keeps it. Plain
+  attachments are never deleted this way.
 
 The rules are in `src/lib/files/media-rules.ts` (URL form, kinds, widths) and
 `media-markdown.ts` (the block both ways).

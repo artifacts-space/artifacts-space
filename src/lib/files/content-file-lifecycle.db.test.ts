@@ -32,16 +32,22 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
   const { generatePublicId } = await import("@/lib/public-id");
   const { restoreArtifactVersion, updateArtifact } = await import("@/lib/artifacts");
   const { pruneArtifactVersions } = await import("@/lib/versions/history");
-  const { pruneUnusedContentFiles } = await import("./icon-cleanup");
+  const { attachFiles } = await import("./attach");
+  const { detachUnnamedContentFiles, pruneUnusedContentFiles } = await import("./icon-cleanup");
 
   const tag = randomUUID().slice(0, 8);
   const author = `lifecycle-${tag}-author`;
   const doc = `lifecycle-${tag}-doc`;
+  const board = `lifecycle-${tag}-ui`;
+  const report = randomUUID();
+  const twoYearsOn = () => new Date(Date.now() + 2 * 365 * 86_400_000);
+  const uiWithFile = (fileId: string | null) =>
+    JSON.stringify({ root: "page", elements: { page: { type: "Stack", props: {}, children: fileId ? ["intro", "file"] : ["intro"] }, intro: { type: "Text", props: { text: "Board pack" } }, ...(fileId ? { file: { type: "File", props: { file: fileId } } } : {}) } });
   const shots = Array.from({ length: 25 }, () => randomUUID());
   const embed = (fileId: string) => `# Weekly report\n\n![Screenshot](/api/files/${fileId})\n`;
 
-  async function attachedIds() {
-    const rows = await getDb().select({ id: artifactFile.id }).from(artifactFile).where(eq(artifactFile.artifactId, doc));
+  async function attachedIds(artifactId = doc) {
+    const rows = await getDb().select({ id: artifactFile.id }).from(artifactFile).where(eq(artifactFile.artifactId, artifactId));
     return rows.map((row) => row.id);
   }
 
@@ -59,28 +65,36 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
 
   async function clearCase() {
     const db = getDb();
-    await db.delete(artifactFile).where(inArray(artifactFile.id, shots));
-    await db.delete(artifactVersion).where(eq(artifactVersion.artifactId, doc));
+    await db.delete(artifactFile).where(inArray(artifactFile.id, [...shots, report]));
+    await db.delete(artifactVersion).where(inArray(artifactVersion.artifactId, [doc, board]));
     await db.delete(rateLimitBucket).where(like(rateLimitBucket.key, `%${author}%`));
   }
 
   beforeAll(async () => {
     const db = getDb();
     await db.insert(user).values({ id: author, name: author, email: `${author}@example.com` });
-    await db.insert(artifact).values({ id: doc, userId: author, updatedBy: author, kind: "markdown", title: "Weekly report", content: "# Weekly report\n", visibility: "private", shareId: randomUUID().replaceAll("-", ""), publicId: generatePublicId() });
+    const base = { userId: author, updatedBy: author, visibility: "private" as const };
+    await db.insert(artifact).values([
+      { ...base, id: doc, kind: "markdown", title: "Weekly report", content: "# Weekly report\n", shareId: randomUUID().replaceAll("-", ""), publicId: generatePublicId() },
+      { ...base, id: board, kind: "ui", title: "Board pack", content: uiWithFile(null), shareId: randomUUID().replaceAll("-", ""), publicId: generatePublicId() },
+    ]);
   });
 
   beforeEach(async () => {
     await clearCase();
     await getDb().update(artifact).set({ content: "# Weekly report\n" }).where(eq(artifact.id, doc));
-    await getDb().insert(artifactFile).values(shots.map((id) => ({ id, uploaderId: author, key: `files/${id}/shot.png`, filename: "shot.png", contentType: "image/png", size: 10, status: "ready" as const })));
+    await getDb().update(artifact).set({ content: uiWithFile(null) }).where(eq(artifact.id, board));
+    await getDb().insert(artifactFile).values([
+      ...shots.map((id) => ({ id, uploaderId: author, key: `files/${id}/shot.png`, filename: "shot.png", contentType: "image/png", size: 10, status: "ready" as const })),
+      { id: report, uploaderId: author, key: `files/${report}/report.pdf`, filename: "report.pdf", contentType: "application/pdf", size: 10, status: "ready" as const },
+    ]);
     r2.deleted.length = 0;
   });
 
   afterAll(async () => {
     const db = getDb();
     await clearCase();
-    await db.delete(artifact).where(eq(artifact.id, doc));
+    await db.delete(artifact).where(inArray(artifact.id, [doc, board]));
     await db.delete(user).where(eq(user.id, author));
   });
 
@@ -129,8 +143,44 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
     await swapEveryScreenshot();
     const current = shots[24] ?? "";
     // Two years on, retention keeps only the newest version, and the rest go with the versions that showed them.
-    await pruneArtifactVersions(doc, new Date(Date.now() + 2 * 365 * 86_400_000));
+    await pruneArtifactVersions(doc, twoYearsOn());
     expect(await attachedIds()).toEqual([current]);
     expect(r2.deleted).toHaveLength(shots.length - 1);
+  });
+
+  it("should never delete a file attached with files_attach after the document linked it and then dropped the link", async () => {
+    await attachFiles(author, doc, [report], "agent");
+    await updateArtifact(author, doc, { content: `# Weekly report\n\nSee [the report](/api/files/${report}).\n` });
+    await updateArtifact(author, doc, { content: "# Weekly report\n\nNo report this week.\n" });
+    await pruneArtifactVersions(doc, twoYearsOn());
+    expect(await attachedIds()).toEqual([report]);
+    expect(r2.deleted).toEqual([]);
+  });
+
+  it("should never delete a file attached with files_attach after a ui File block used it and was removed", async () => {
+    await attachFiles(author, board, [report], "person");
+    await updateArtifact(author, board, { content: uiWithFile(report) });
+    await updateArtifact(author, board, { content: uiWithFile(null) });
+    await pruneArtifactVersions(board, twoYearsOn());
+    expect(await attachedIds(board)).toEqual([report]);
+    expect(r2.deleted).toEqual([]);
+  });
+
+  it("should still delete an editor upload the document brought in, once it is removed and pruned", async () => {
+    const [shot] = shots;
+    await updateArtifact(author, doc, { content: embed(shot ?? "") });
+    await updateArtifact(author, doc, { content: "# Weekly report\n\nScreenshot removed.\n" });
+    await pruneArtifactVersions(doc, twoYearsOn());
+    expect(await attachedIds()).toEqual([]);
+    expect(r2.deleted).toEqual([`files/${shot ?? ""}/shot.png`]);
+  });
+
+  it("should keep a file when a save has already written content naming it, even with no version naming it yet", async () => {
+    const [shot] = shots;
+    await updateArtifact(author, doc, { content: embed(shot ?? "") });
+    // A Restore between its file check and its version write: the artifact names the file, no version does.
+    await getDb().delete(artifactVersion).where(eq(artifactVersion.artifactId, doc));
+    await expect(detachUnnamedContentFiles(doc, [shot ?? ""])).resolves.toEqual([]);
+    expect(await attachedIds()).toEqual([shot]);
   });
 });

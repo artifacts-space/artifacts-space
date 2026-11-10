@@ -8,14 +8,6 @@ export const fileComponentTypes: ReadonlySet<string> = new Set(["Image", "File"]
 /** Most distinct files one artifact's content may use (ui Image and File elements, or files a Markdown save attaches). */
 export const maxFileRefs = 50;
 
-/**
- * Most distinct `/api/files/` ids a Markdown save looks up, in order of
- * appearance. Markdown may link any number of files (code samples, other
- * artifacts' files); the rest stay plain links, so a save never fails over
- * them and the query stays bounded.
- */
-export const maxMarkdownRefLookup = 500;
-
 function refsInElements(elements: unknown): string[] {
   if (!isPlainObject(elements)) return [];
   const ids: string[] = [];

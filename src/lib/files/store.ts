@@ -5,7 +5,6 @@ import { artifact, artifactFile, type ArtifactFileRecord } from "@/db/schema";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 
 import { fileLimits } from "./config";
-import { namedAtAttach } from "./content-files";
 import { deleteObject, r2ConfigFromEnv } from "./r2";
 import type { FileDto } from "./types";
 
@@ -84,16 +83,32 @@ export async function countPendingUploads(uploaderId: string, now: Date = new Da
 
 /**
  * Attaches the uploader's own ready, unattached files to an artifact. Files
- * already attached anywhere are left alone. Returns how many changed.
+ * already attached anywhere are left alone. `byContent` marks them as
+ * content media: true only when a content save attaches the uploads its
+ * content names (content-files.ts). Returns how many changed.
  */
-export async function attachFileRows(uploaderId: string, artifactId: string, fileIds: readonly string[]): Promise<number> {
+export async function attachFileRows(uploaderId: string, artifactId: string, fileIds: readonly string[], options: { byContent?: boolean } = {}): Promise<number> {
   if (fileIds.length === 0) return 0;
   const rows = await getDb()
     .update(artifactFile)
-    .set({ artifactId, attachedAt: sql`now()`, namedInContentAt: namedAtAttach(artifactId) })
+    .set({ artifactId, attachedAt: sql`now()`, attachedByContent: options.byContent ?? false })
     .where(and(inArray(artifactFile.id, [...fileIds]), eq(artifactFile.uploaderId, uploaderId), eq(artifactFile.status, "ready"), isNull(artifactFile.artifactId)))
     .returning();
   return rows.length;
+}
+
+/**
+ * The ready files `authorId` may use in an artifact (null on create): the
+ * artifact's own files and the author's unattached uploads. Read without an
+ * id list, so a save that links any number of files never sends a huge
+ * query and never misses the author's own uploads (canUseFileInArtifact).
+ */
+export async function usableFileRows(authorId: string, artifactId: string | null): Promise<ArtifactFileRecord[]> {
+  const own = and(isNull(artifactFile.artifactId), eq(artifactFile.uploaderId, authorId));
+  return getDb()
+    .select()
+    .from(artifactFile)
+    .where(and(eq(artifactFile.status, "ready"), artifactId ? or(eq(artifactFile.artifactId, artifactId), own) : own));
 }
 
 /**

@@ -13,8 +13,8 @@ import { recordArtifactChange } from "@/lib/versions/service";
 import { canUseFileInArtifact } from "./access-rules";
 import { fileLimits } from "./config";
 import { countHistoryOnlyFiles } from "./icon-cleanup";
-import { fileRefsInContent, maxFileRefs, maxMarkdownRefLookup } from "./refs";
-import { attachFileRows, clearIconForFile, countArtifactFiles, getFileRow, getFileRows, removeFiles } from "./store";
+import { fileRefsInContent, maxFileRefs } from "./refs";
+import { attachFileRows, clearIconForFile, countArtifactFiles, getFileRow, getFileRows, removeFiles, usableFileRows } from "./store";
 
 /**
  * Putting files into artifacts. A file belongs to one artifact. An editor
@@ -70,7 +70,8 @@ export async function attachFiles(editorId: string, artifactId: string, fileIds:
 
 /**
  * The files a save points at, checked before anything is written. Returns
- * the ids to attach once the artifact exists. `artifactId` is null on create.
+ * the ids to attach once the artifact exists, as content media
+ * (`attachFileRows(…, { byContent: true })`). `artifactId` is null on create.
  */
 export async function checkContentFiles(authorId: string, artifactId: string | null, kind: string, content: string): Promise<string[]> {
   const ids = fileRefsInContent(kind, content);
@@ -85,12 +86,14 @@ export async function checkContentFiles(authorId: string, artifactId: string | n
  * use (another artifact's, a deleted one, or text from a restored version);
  * those stay plain links that load only for people who can read the file,
  * so a save or a Restore never fails over them and never widens access.
- * Only the first maxMarkdownRefLookup ids are looked up, and the file cap
- * applies to the usable ones, so many links never fail a save either.
+ * The lookup reads the files the author may use (usableFileRows), not the
+ * linked ids, and the file cap applies to the usable ones, so any number of
+ * links never fails a save and the author's own uploads are always found.
  */
 async function attachableMarkdownFiles(authorId: string, artifactId: string | null, fileIds: readonly string[]): Promise<string[]> {
   if (fileIds.length === 0) return [];
-  const usable = (await getFileRows(fileIds.slice(0, maxMarkdownRefLookup))).filter((row) => canUseFileInArtifact(row, authorId, artifactId));
+  const named = new Set(fileIds);
+  const usable = (await usableFileRows(authorId, artifactId)).filter((row) => named.has(row.id) && canUseFileInArtifact(row, authorId, artifactId));
   if (usable.length > maxFileRefs) throw new UserFacingError(`An artifact can use at most ${String(maxFileRefs)} files.`);
   const adding = usable.filter((row) => row.artifactId === null).length;
   if (adding > 0 && !(await hasRoomFor(artifactId, adding))) {

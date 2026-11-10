@@ -352,9 +352,10 @@ export const artifactFile = pgTable(
     status: text("status", { enum: fileStatuses }).notNull().default("pending"),
     // When it joined its artifact. Readers of an approved version see files attached before it.
     attachedAt: timestamp("attached_at", { withTimezone: true }),
-    // When a version of its artifact first named it in its content (ui or Markdown); null for a plain attachment.
-    // Never cleared: pruning old versions must not make a file the approved version stopped showing readable again (served-images.ts).
-    namedInContentAt: timestamp("named_in_content_at", { withTimezone: true }),
+    // True when a content save attached it (an upload its Markdown or ui content named): content media, hidden from readers of a
+    // version that does not show it and removed once no version names it (served-images.ts, icon-cleanup.ts). False for files attached
+    // any other way (files_attach, the Files panel), which pruning never removes, and for every file attached before this column.
+    attachedByContent: boolean("attached_by_content").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

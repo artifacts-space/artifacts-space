@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fileLimits } from "./config";
-import { maxMarkdownRefLookup } from "./refs";
 
 /*
  * The per-artifact file limit, with the file rows and the history count
@@ -9,7 +8,7 @@ import { maxMarkdownRefLookup } from "./refs";
  */
 
 const versions = vi.hoisted(() => ({ recordArtifactChange: vi.fn() }));
-const store = vi.hoisted(() => ({ getFileRows: vi.fn(), countArtifactFiles: vi.fn(), attachFileRows: vi.fn(), clearIconForFile: vi.fn(), getFileRow: vi.fn(), removeFiles: vi.fn() }));
+const store = vi.hoisted(() => ({ usableFileRows: vi.fn(), getFileRows: vi.fn(), countArtifactFiles: vi.fn(), attachFileRows: vi.fn(), clearIconForFile: vi.fn(), getFileRow: vi.fn(), removeFiles: vi.fn() }));
 const cleanup = vi.hoisted(() => ({ countHistoryOnlyFiles: vi.fn() }));
 
 vi.mock("./store", () => store);
@@ -27,6 +26,7 @@ const upload = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
 beforeEach(() => {
   vi.resetAllMocks();
   store.getFileRows.mockResolvedValue([{ id: upload, status: "ready", uploaderId: "author", artifactId: null }]);
+  store.usableFileRows.mockResolvedValue([{ id: upload, status: "ready", uploaderId: "author", artifactId: null }]);
 });
 
 describe("assertUsableFiles", () => {
@@ -55,17 +55,18 @@ describe("checkContentFiles for Markdown", () => {
   const markdown = `![Plan](/api/files/${upload})\n\n![Theirs](/api/files/${otherUpload})\n\n[Old](/api/files/${elsewhere})`;
 
   it("should attach only the editor's own uploads and the artifact's files when Markdown names other files", async () => {
-    store.getFileRows.mockResolvedValue([
+    // The store answers with what the author may use; a file of theirs that the Markdown does not name is left out.
+    store.usableFileRows.mockResolvedValue([
       { id: upload, status: "ready", uploaderId: "author", artifactId: null },
-      { id: otherUpload, status: "ready", uploaderId: "someone-else", artifactId: null },
-      { id: elsewhere, status: "ready", uploaderId: "author", artifactId: "another-artifact" },
+      { id: otherUpload, status: "ready", uploaderId: "author", artifactId: "another-artifact" },
+      { id: "3b241101-e2bb-4255-8caf-4136c566a962", status: "ready", uploaderId: "author", artifactId: null },
     ]);
     store.countArtifactFiles.mockResolvedValue(0);
     await expect(checkContentFiles("author", "a1", "markdown", markdown)).resolves.toEqual([upload]);
   });
 
   it("should never attach a file still uploading when Markdown names it", async () => {
-    store.getFileRows.mockResolvedValue([{ id: upload, status: "pending", uploaderId: "author", artifactId: null }]);
+    store.usableFileRows.mockResolvedValue([{ id: upload, status: "pending", uploaderId: "author", artifactId: null }]);
     await expect(checkContentFiles("author", "a1", "markdown", markdown)).resolves.toEqual([]);
   });
 
@@ -78,16 +79,17 @@ describe("checkContentFiles for Markdown", () => {
   it("should save Markdown that links more than 50 files it cannot use, attaching only its own upload", async () => {
     const others = Array.from({ length: 60 }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`);
     const linked = [...others.map((id) => `[file](/api/files/${id})`), `![Shot](/api/files/${upload})`].join("\n\n");
-    store.getFileRows.mockImplementation((ids: string[]) => Promise.resolve(ids.map((id) => (id === upload ? { id, status: "ready", uploaderId: "author", artifactId: null } : { id, status: "ready", uploaderId: "someone-else", artifactId: "another-artifact" }))));
     store.countArtifactFiles.mockResolvedValue(0);
     await expect(checkContentFiles("author", "a1", "markdown", linked)).resolves.toEqual([upload]);
   });
 
-  it("should look up a bounded number of ids however many files Markdown links", async () => {
-    const many = Array.from({ length: maxMarkdownRefLookup + 40 }, (_, index) => `[f](/api/files/00000000-0000-4000-8000-${String(index).padStart(12, "0")})`).join("\n");
-    store.getFileRows.mockResolvedValue([]);
-    await expect(checkContentFiles("author", "a1", "markdown", many)).resolves.toEqual([]);
-    expect(store.getFileRows.mock.calls[0]?.[0]).toHaveLength(maxMarkdownRefLookup);
+  it("should attach the editor's own upload however many links come before it", async () => {
+    const many = Array.from({ length: 2000 }, (_, index) => `[f](/api/files/00000000-0000-4000-8000-${String(index).padStart(12, "0")})`).join("\n");
+    store.countArtifactFiles.mockResolvedValue(0);
+    await expect(checkContentFiles("author", "a1", "markdown", `${many}\n\n![Shot](/api/files/${upload})`)).resolves.toEqual([upload]);
+    // The lookup reads the files the author may use, never the linked ids.
+    expect(store.usableFileRows).toHaveBeenCalledWith("author", "a1");
+    expect(store.getFileRows).not.toHaveBeenCalled();
   });
 
   it("should still refuse unknown files when the content is a ui spec", async () => {

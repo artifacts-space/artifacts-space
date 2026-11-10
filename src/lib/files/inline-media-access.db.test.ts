@@ -18,7 +18,7 @@ const databaseUrl = process.env.TEST_DATABASE_URL;
 if (databaseUrl) process.env.DATABASE_URL = databaseUrl;
 
 describe.runIf(Boolean(databaseUrl))("inline media access with a database", async () => {
-  const { eq, inArray, sql } = await import("drizzle-orm");
+  const { eq, inArray } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
   const { artifact, artifactFile, artifactVersion, user } = await import("@/db/schema");
   const { generatePublicId } = await import("@/lib/public-id");
@@ -41,9 +41,9 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
     await getDb().update(artifact).set({ approvedVersionId: versionId }).where(eq(artifact.id, ids.doc));
   }
 
-  async function namedInContentAt(fileId: string) {
-    const [row] = await getDb().select({ named: artifactFile.namedInContentAt }).from(artifactFile).where(eq(artifactFile.id, fileId));
-    return row?.named ?? null;
+  async function attachedByContent(fileId: string) {
+    const [row] = await getDb().select({ byContent: artifactFile.attachedByContent }).from(artifactFile).where(eq(artifactFile.id, fileId));
+    return row?.byContent;
   }
 
   /** Saves `content` as the artifact and files a version of it, back-dated to `minute`. */
@@ -79,11 +79,8 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
 
   /*
    * Each case starts from versions at minutes 0 (no image), 20 (embeds `image`), and 30 (image
-   * removed). Both files are attached after those versions are written, so `image`'s time is set
-   * by attachFileRows (namedAtAttach), because a version already names it; `lateImage` is a plain
-   * attachment no version names yet, and only markNamedInContent can give it a time. The stored
-   * times are then set by hand (attached at 10, `image` named at 20), so the two pruning cases
-   * differ in which writer set the time, not in the order their timestamps record.
+   * removed). `image` was attached by a content save (content media); `lateImage` through
+   * files_attach (a plain attachment no version names yet). Both are back-dated to minute 10.
    */
   beforeEach(async () => {
     await clearCase();
@@ -96,11 +93,9 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
       { ...file, id: lateImage, key: `files/${lateImage}/chart.png` },
       { ...file, id: privateImage, key: `files/${privateImage}/chart.png`, artifactId: ids.privateDoc, attachedAt: at(10) },
     ]);
-    await attachFileRows(ids.author, ids.doc, [image, lateImage]);
-    await db
-      .update(artifactFile)
-      .set({ attachedAt: at(10), namedInContentAt: sql`case when ${artifactFile.namedInContentAt} is null then null else ${at(20)}::timestamptz end` })
-      .where(inArray(artifactFile.id, [image, lateImage]));
+    await attachFileRows(ids.author, ids.doc, [image], { byContent: true });
+    await attachFileRows(ids.author, ids.doc, [lateImage]);
+    await db.update(artifactFile).set({ attachedAt: at(10) }).where(inArray(artifactFile.id, [image, lateImage]));
   });
 
   afterAll(async () => {
@@ -140,36 +135,32 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
   it("should keep a plain attachment readable for approved readers when only a draft after their version embeds it", async () => {
     await serve(versions.after);
     await reviseTo(lateEmbed, 40);
-    expect(await namedInContentAt(lateImage)).toEqual(at(40));
     expect((await findReadableFile(lateImage, null))?.id).toBe(lateImage);
     expect(await publicFileIds()).toEqual([lateImage]);
   });
 
-  it("should mark a file as embedded when it is attached after a version names it, and when a version names it after it is attached", async () => {
-    expect(await namedInContentAt(image)).toEqual(at(20));
-    expect(await namedInContentAt(lateImage)).toBeNull();
+  it("should mark only files a content save attached as content media, never a plain attachment content links later", async () => {
+    expect(await attachedByContent(image)).toBe(true);
+    expect(await attachedByContent(lateImage)).toBe(false);
     await reviseTo(lateEmbed, 25);
-    expect(await namedInContentAt(lateImage)).toEqual(at(25));
+    expect(await attachedByContent(lateImage)).toBe(false);
   });
 
-  it("should keep refusing a removed image after pruning deleted every version that showed it, when attachFileRows set its time", async () => {
+  it("should keep refusing removed content media after pruning deleted every version that showed it", async () => {
     await serve(versions.after);
     await getDb().delete(artifactVersion).where(eq(artifactVersion.id, versions.shows));
-    // Only attachFileRows (namedAtAttach) set its time.
     await expect(findReadableFile(image, ids.stranger)).resolves.toBeNull();
     await expect(findReadableFile(image, null)).resolves.toBeNull();
-    expect(await publicFileIds()).not.toContain(image);
+    expect(await publicFileIds()).toEqual([lateImage]);
     expect((await findReadableFile(image, ids.author))?.id).toBe(image);
   });
 
-  it("should keep refusing a removed image after pruning deleted every version that showed it, when markNamedInContent set its time", async () => {
-    // Named at minute 25, before the approved version at 30 drops it (here, by the text that version holds).
-    const named = await reviseTo(lateEmbed, 25);
+  it("should keep a plain attachment readable after a version linked it and pruning deleted that version", async () => {
+    const linked = await reviseTo(lateEmbed, 25);
     await serve(versions.after);
-    await getDb().delete(artifactVersion).where(eq(artifactVersion.id, named));
-    // Only markNamedInContent set its time, and that version is gone.
-    await expect(findReadableFile(lateImage, ids.stranger)).resolves.toBeNull();
-    await expect(findReadableFile(lateImage, null)).resolves.toBeNull();
-    expect(await publicFileIds()).toEqual([]);
+    await getDb().delete(artifactVersion).where(eq(artifactVersion.id, linked));
+    expect((await findReadableFile(lateImage, ids.stranger))?.id).toBe(lateImage);
+    expect((await findReadableFile(lateImage, null))?.id).toBe(lateImage);
+    expect(await publicFileIds()).toEqual([lateImage]);
   });
 });

@@ -100,26 +100,25 @@ describe("countHistoryOnlyFiles", () => {
 });
 
 describe("pruneUnusedContentFiles", () => {
-  const removed = (ids: string[]) => ids.map((id) => ({ id, artifactId: "a1", key: `files/${id}/shot.png`, namedInContentAt: new Date() }));
+  const detached = [{ id: cover, key: `files/${cover}/shot.png` }];
 
-  it("should delete removed media once no version names it", async () => {
-    stage([[artifact, [[record]]], [artifactFile, [[{ id: cover }]]], [artifactVersion, [[], []]]]);
-    store.getFileRows.mockImplementation((ids: string[]) => Promise.resolve(removed(ids)));
+  it("should delete removed media once no version names it, after detaching it with a last check", async () => {
+    // The artifact, its content media, the retained icons, the version check, then the detach.
+    stage([[artifact, [[record]]], [artifactFile, [[{ id: cover }], detached]], [artifactVersion, [[], []]]]);
     await expect(pruneUnusedContentFiles("a1")).resolves.toBe(1);
-    expect(store.removeFiles).toHaveBeenCalledWith(removed([cover]));
+    expect(store.removeFiles).toHaveBeenCalledWith(detached);
+  });
+
+  it("should delete nothing when the last check finds content naming the file again", async () => {
+    stage([[artifact, [[record]]], [artifactFile, [[]]], [artifactVersion, [[], []]]]);
+    await expect(pruneUnusedContentFiles("a1", [cover])).resolves.toBe(0);
+    expect(store.removeFiles).toHaveBeenCalledWith([]);
   });
 
   it("should keep removed media while an older version still embeds it, so Restore brings it back", async () => {
     stage([[artifact, [[record]]], [artifactVersion, [[], [{ id: "v1" }]]]]);
     await expect(pruneUnusedContentFiles("a1", [cover])).resolves.toBe(0);
-    expect(store.getFileRows).not.toHaveBeenCalled();
-  });
-
-  it("should never delete a plain attachment that no content named", async () => {
-    stage([[artifact, [[record]]], [artifactVersion, [[], []]]]);
-    store.getFileRows.mockResolvedValue([{ id: cover, artifactId: "a1", key: "files/x", namedInContentAt: null }]);
-    await expect(pruneUnusedContentFiles("a1", [cover])).resolves.toBe(0);
-    expect(store.removeFiles).toHaveBeenCalledWith([]);
+    expect(store.removeFiles).not.toHaveBeenCalled();
   });
 
   it("should read nothing when a save stopped naming no file", async () => {

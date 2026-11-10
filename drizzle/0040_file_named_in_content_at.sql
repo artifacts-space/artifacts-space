@@ -1,1 +1,0 @@
-ALTER TABLE "artifact_file" ADD COLUMN "named_in_content_at" timestamp with time zone;
