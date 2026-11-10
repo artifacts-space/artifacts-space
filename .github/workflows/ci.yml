@@ -57,6 +57,55 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
+  # The *.db.test.ts files check SQL against a real Postgres, for example that
+  # the SQL capability check (capability-sql.ts) still agrees with can(). Unit
+  # tests skip them because TEST_DATABASE_URL is unset there. This job gives
+  # them a throwaway database in a service container, applies the migrations,
+  # and fails if any of them is skipped.
+  db-test:
+    name: Database tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.11-alpine@sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac # 17.11-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: artifacts_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d artifacts_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      # A throwaway database that lives only for this job; not a secret.
+      TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/artifacts_test
+      DATABASE_URL: postgres://ci:ci@localhost:5432/artifacts_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - run: pnpm exec vitest run .db.test.ts --reporter=default --reporter=json --outputFile.json=db-test-results.json
+      # describe.runIf skips silently without a database, so prove every test ran.
+      - name: Check that no database test was skipped
+        run: |
+          jq -e '.numTotalTests > 0 and .numPendingTests == 0 and .numTodoTests == 0' db-test-results.json > /dev/null || {
+            echo "::error::Database tests were skipped or none ran"
+            jq '{numTotalTests, numPassedTests, numPendingTests, numTodoTests}' db-test-results.json
+            exit 1
+          }
+          jq -r '.testResults[] | "\(.name | sub(".*/src/"; "src/")): \(.assertionResults | length) tests"' db-test-results.json
+
   # The build reads no secrets: the database, auth, email, and R2 clients are
   # created on first request, never at build time. Keep it that way. Outside a
   # Vercel production deploy, `pnpm build` skips its migration step.

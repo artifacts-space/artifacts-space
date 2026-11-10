@@ -255,6 +255,10 @@ catch this, so test the generated SQL with `.toSQL()`, as
 - Security checks (access, sharing, tokens, rate limits) need a test that
   fails when access is wrongly granted, not only one that passes when it is
   correctly granted.
+- `*.db.test.ts` files run SQL against a real Postgres. They run only when
+  `TEST_DATABASE_URL` names a throwaway database with the migrations applied,
+  so `pnpm test` skips them; the CI **Database tests** job runs them against a
+  service container and fails if any is skipped.
 - `pnpm test:e2e` renders the component gallery at `/dev/components` on a
   phone and a desktop viewport. It also builds and starts production on
   `PLAYWRIGHT_PORT + 1000` for the `*.prod.spec.ts` checks, which need real
