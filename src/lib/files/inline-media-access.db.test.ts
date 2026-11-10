@@ -7,8 +7,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * Postgres: the same findReadableFile the /api/files route calls. Media
  * access follows the artifact. Its readers (and readers of the approved
  * version) load what that version shows; nobody else loads anything, and a
- * kept image never reaches readers of a version that does not show it. It
- * runs only when TEST_DATABASE_URL names a throwaway local database with the
+ * kept image never reaches readers of a version that does not show it, even
+ * after pruning deleted every version that showed it. It runs only when TEST_DATABASE_URL names a throwaway local database with the
  * migrations applied (`pnpm db:migrate`); never point it at a shared one.
  */
 
@@ -20,12 +20,16 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
   const { getDb } = await import("@/db");
   const { artifact, artifactFile, artifactVersion, user } = await import("@/db/schema");
   const { generatePublicId } = await import("@/lib/public-id");
-  const { findReadableFile } = await import("./download");
+  const { getArtifactAccess } = await import("@/lib/access");
+  const { insertVersion } = await import("@/lib/versions/history");
+  const { filesForViewer, findReadableFile } = await import("./download");
+  const { attachFileRows } = await import("./store");
 
   const tag = randomUUID().slice(0, 8);
   const ids = { author: `media-${tag}-author`, stranger: `media-${tag}-stranger`, doc: `media-${tag}-doc`, privateDoc: `media-${tag}-private` };
   const image = randomUUID();
   const privateImage = randomUUID();
+  const lateImage = randomUUID();
   const versions = { before: randomUUID(), shows: randomUUID(), after: randomUUID() };
   const at = (minute: number) => new Date(Date.UTC(2026, 10, 10, 12, minute));
   const embed = `# Plan\n\n![Chart](/api/files/${image}#width=60 "Q3")\n`;
@@ -36,7 +40,7 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
 
   async function cleanUp() {
     const db = getDb();
-    await db.delete(artifactFile).where(inArray(artifactFile.id, [image, privateImage]));
+    await db.delete(artifactFile).where(inArray(artifactFile.id, [image, privateImage, lateImage]));
     await db.update(artifact).set({ approvedVersionId: null }).where(eq(artifact.id, ids.doc));
     await db.delete(artifactVersion).where(inArray(artifactVersion.artifactId, [ids.doc, ids.privateDoc]));
     await db.delete(artifact).where(inArray(artifact.id, [ids.doc, ids.privateDoc]));
@@ -55,10 +59,25 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
     await db.insert(artifactVersion).values([version(versions.before, 0, "# Plan\n"), version(versions.shows, 20, embed), version(versions.after, 30, "# Plan, chart removed\n")]);
     const file = { uploaderId: ids.author, filename: "chart.png", contentType: "image/png", size: 10, status: "ready" as const };
     await db.insert(artifactFile).values([
-      { ...file, id: image, key: `files/${image}/chart.png`, artifactId: ids.doc, attachedAt: at(10) },
+      { ...file, id: image, key: `files/${image}/chart.png` },
+      { ...file, id: lateImage, key: `files/${lateImage}/chart.png` },
       { ...file, id: privateImage, key: `files/${privateImage}/chart.png`, artifactId: ids.privateDoc, attachedAt: at(10) },
     ]);
+    // Attached after a version names it, the way a save attaches its uploads; then back-dated before the approved versions.
+    await attachFileRows(ids.author, ids.doc, [image, lateImage]);
+    await db.update(artifactFile).set({ attachedAt: at(10) }).where(inArray(artifactFile.id, [image, lateImage]));
   });
+
+  async function namedInContent(fileId: string) {
+    const [row] = await getDb().select({ named: artifactFile.namedInContent }).from(artifactFile).where(eq(artifactFile.id, fileId));
+    return row?.named;
+  }
+
+  async function publicFileIds() {
+    const [record] = await getDb().select({ publicId: artifact.publicId }).from(artifact).where(eq(artifact.id, ids.doc));
+    const viewable = record ? await getArtifactAccess(record.publicId, null) : null;
+    return viewable ? (await filesForViewer(viewable)).map((file) => file.id) : [];
+  }
 
   afterAll(cleanUp);
 
@@ -85,6 +104,28 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
     await serve(versions.after);
     await expect(findReadableFile(image, ids.stranger)).resolves.toBeNull();
     await expect(findReadableFile(image, null)).resolves.toBeNull();
+    expect((await findReadableFile(image, ids.author))?.id).toBe(image);
+  });
+
+  it("should mark a file as embedded when it is attached after a version names it, and when a version names it after it is attached", async () => {
+    expect(await namedInContent(image)).toBe(true);
+    expect(await namedInContent(lateImage)).toBe(false);
+    const content = `# Plan\n\n![Late](/api/files/${lateImage})\n`;
+    await getDb().update(artifact).set({ content }).where(eq(artifact.id, ids.doc));
+    const [record] = await getDb().select().from(artifact).where(eq(artifact.id, ids.doc));
+    if (!record) throw new Error("No artifact.");
+    const versionId = await insertVersion(record, { createdBy: ids.author, saveKind: "edit", at: at(40) });
+    expect(await namedInContent(lateImage)).toBe(true);
+    await getDb().delete(artifactVersion).where(eq(artifactVersion.id, versionId));
+  });
+
+  it("should keep refusing a removed image, and leave it out of the file list, after pruning deleted every version that showed it", async () => {
+    await serve(versions.after);
+    await getDb().delete(artifactVersion).where(eq(artifactVersion.id, versions.shows));
+    await expect(findReadableFile(image, ids.stranger)).resolves.toBeNull();
+    await expect(findReadableFile(image, null)).resolves.toBeNull();
+    await expect(findReadableFile(lateImage, null)).resolves.toBeNull();
+    expect(await publicFileIds()).toEqual([]);
     expect((await findReadableFile(image, ids.author))?.id).toBe(image);
   });
 });

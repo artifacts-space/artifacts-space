@@ -24,19 +24,6 @@ export function sheetAtLimit(): string {
 /** Normal and extreme samples for every artifact format. */
 export const formatFixtures: FormatFixture[] = [
   { name: "Markdown", kind: "markdown", content: "# Release plan\n\nShip **2.4** on Friday. See [the board](https://example.com).\n\n## Steps\n\n1. Freeze main\n2. Tag\n\n- [x] Notes written\n- [ ] Announce\n\n> Keep it small.\n\n```ts\nconst ok = true;\n```\n\n| Owner | Task |\n|---|---|\n| Ada | Tag |\n\n<script>alert('raw html is skipped')</script>\n\n[javascript link](javascript:alert(1)) ![tracking pixel](https://example.com/p.gif)" },
-  {
-    name: "Markdown, media",
-    kind: "markdown",
-    content: [
-      "Media blocks from uploads, by kind.",
-      '![Architecture diagram](/api/files/00000000-0000-4000-8000-000000000001#width=60 "How agents reach the API.")',
-      "![Quarterly report](/api/files/00000000-0000-4000-8000-000000000002#pdf)",
-      "![quarterly-report-final-v3.pdf](/api/files/00000000-0000-4000-8000-000000000002#file)",
-      "![Not attached](/api/files/00000000-0000-4000-8000-0000000000ff)",
-      "![External image, never loaded](https://example.com/p.png)",
-      "See [the report](/api/files/00000000-0000-4000-8000-000000000002?download=1) for details.",
-    ].join("\n\n"),
-  },
   { name: "Markdown, long", kind: "markdown", content: `${longText(4000)}\n\n${"x".repeat(400)}` },
   { name: "Code", kind: "code", language: "typescript", content: "export function greet(name: string) {\n  return `Hello, ${name}`;\n}\n" },
   { name: "Text", kind: "text", content: `Plain text keeps\n  its spacing.\n\n${longText(600)}` },
@@ -57,4 +44,18 @@ export const formatFixtures: FormatFixture[] = [
   { name: "Empty", kind: "markdown", content: "   " },
   { name: "Files", kind: "file", content: "Notes for the **2.4** release: the diagram, the report, and the spec." },
   { name: "Files, no notes", kind: "file", content: "" },
+  // Last: its media load lazily and change height, which would move the specimens under it while a test uses them.
+  {
+    name: "Markdown, media",
+    kind: "markdown",
+    content: [
+      "Media blocks from uploads, by kind.",
+      '![Architecture diagram](/api/files/00000000-0000-4000-8000-000000000001#width=60 "How agents reach the API.")',
+      "![Quarterly report](/api/files/00000000-0000-4000-8000-000000000002#pdf)",
+      "![quarterly-report-final-v3.pdf](/api/files/00000000-0000-4000-8000-000000000002#file)",
+      "![Not attached](/api/files/00000000-0000-4000-8000-0000000000ff)",
+      "![External image, never loaded](https://example.com/p.png)",
+      "See [the report](/api/files/00000000-0000-4000-8000-000000000002?download=1) for details.",
+    ].join("\n\n"),
+  },
 ];

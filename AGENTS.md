@@ -198,10 +198,6 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
   `drizzle/` has a journal entry. A migration that is safe anyway starts with
   `-- migration-guard: allow <reason>`. Never edit an applied migration.
 - Keep test rows' emails under `@example.com` and delete them afterwards.
-- `drizzle.config.ts` loads `.env.local` and prefers `DATABASE_URL_UNPOOLED`,
-  so `DATABASE_URL=<throwaway> pnpm db:migrate` alone still reaches the shared
-  database. For a throwaway database, set both `DATABASE_URL` and
-  `DATABASE_URL_UNPOOLED` to it.
 
 ### Tripwire: no correlated subqueries in single-table selects
 
@@ -341,7 +337,10 @@ block's Markdown form and the block node conventions, is
 rules above: a save attaches the editor's own uploads it names, a save that
 drops one files its own version so Restore brings it back, and readers of the
 approved version never load a file that version does not show
-(`served-images.ts`). Images from other sites never load. Add each new block
+(`served-images.ts`). Whether content ever named a file is the
+`artifact_file.named_in_content` flag, set on every version write and attach
+(`src/lib/files/content-files.ts`) and never cleared, so pruning history never
+makes a removed file readable again. Images from other sites never load. Add each new block
 to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
 
 ### Agent harnesses

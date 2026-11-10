@@ -23,8 +23,8 @@ const { GET } = await import("./route");
 const fileId = "7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a";
 const signedUrl = "https://acct.r2.cloudflarestorage.com/bucket/files/a/b.png?X-Amz-Signature=abc";
 
-function call(query = "") {
-  return GET(new Request(`http://localhost/api/files/${fileId}${query}`), { params: Promise.resolve({ id: fileId }) });
+function call(query = "", headers: Record<string, string> = {}) {
+  return GET(new Request(`http://localhost/api/files/${fileId}${query}`, { headers }), { params: Promise.resolve({ id: fileId }) });
 }
 
 beforeEach(() => {
@@ -81,6 +81,18 @@ describe("GET /api/files/[id]", () => {
     expect(response.status).toBe(429);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(mocks.file).not.toHaveBeenCalled();
+  });
+
+  it("should count a video seek against the playback budget, and still check access, when the range starts past the first byte", async () => {
+    mocks.file.mockResolvedValue(null);
+    const response = await call("", { Range: "bytes=5242880-" });
+    expect(mocks.limits).toHaveBeenCalledWith([{ name: "fileRangeByNetwork", subject: "network-1" }]);
+    expect(response.status).toBe(404);
+  });
+
+  it("should count a player's first request as a file view", async () => {
+    await call("", { Range: "bytes=0-" });
+    expect(mocks.limits).toHaveBeenCalledWith([{ name: "fileDownloadByNetwork", subject: "network-1" }]);
   });
 
   it("should answer an uncached 500 when signing fails", async () => {

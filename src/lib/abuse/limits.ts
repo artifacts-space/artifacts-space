@@ -46,6 +46,12 @@ export const rateLimits = {
   /** File views and downloads (/api/files) per network address per hour. */
   fileDownloadByNetwork: { limit: 3600, windowSeconds: hour },
   /**
+   * Video and audio playback follow-ups (/api/files requests with a Range
+   * that starts past the first byte: seeks and later parts) per network
+   * address per hour, apart from views (download-limit-rules.ts).
+   */
+  fileRangeByNetwork: { limit: 7200, windowSeconds: hour },
+  /**
    * Team icon views (/api/teams/<id>/icon) per signed-in member per hour.
    * Only members can load an icon, so each person gets their own budget and
    * an office behind one address never shares one. Browsers keep each icon
@@ -151,6 +157,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   readByUser: "You have read a lot of artifacts in the last hour.",
   readByToken: "This connection has read a lot in the last hour.",
   fileDownloadByNetwork: "Your network has opened a lot of files in the last hour.",
+  fileRangeByNetwork: "Your network has played a lot of video and audio in the last hour.",
   teamIconByUser: "You have loaded a lot of team icons in the last hour.",
   teamIconByNetwork: "Your network has loaded a lot of team icons in the last hour.",
   artifactPageByNetwork: "Your network has opened a lot of artifact pages in the last hour.",

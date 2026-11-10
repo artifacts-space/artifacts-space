@@ -9,7 +9,7 @@ import { canReadFile, type FileArtifactAccess } from "./access-rules";
 import { fileLimits, isInlineType } from "./config";
 import { contentDisposition } from "./names";
 import { presignDownload, r2ConfigFromEnv } from "./r2";
-import { hiddenImagesFor } from "./served-images";
+import { fileHiddenFor, hiddenImagesFor } from "./served-images";
 import { listArtifactFiles } from "./store";
 import type { FileDto } from "./types";
 
@@ -47,12 +47,12 @@ export async function filesForViewer(viewable: Pick<ArtifactAccess, "record" | "
   return hidden.size === 0 ? files : files.filter((file) => !hidden.has(file.id));
 }
 
-async function artifactAccess(fileId: string, publicId: string | null, viewerId: string | null): Promise<FileArtifactAccess | null> {
+/** One file request: asks only about this file, so a page with many media does not recompute the artifact's hidden set per file. */
+async function artifactAccess(file: ArtifactFileRecord, publicId: string | null, viewerId: string | null): Promise<FileArtifactAccess | null> {
   if (!publicId) return null;
   const viewable = await getArtifactAccess(publicId, viewerId);
   if (!viewable) return { viewable: false, servedVersionAt: null, hiddenImage: false };
-  const hidden = await hiddenImagesFor(viewable);
-  return { viewable: true, servedVersionAt: servedVersionTime(viewable), hiddenImage: hidden.has(fileId) };
+  return { viewable: true, servedVersionAt: servedVersionTime(viewable), hiddenImage: await fileHiddenFor(viewable, file) };
 }
 
 /**
@@ -64,7 +64,7 @@ export async function findReadableFile(fileId: string, viewerId: string | null):
   if (!z.uuid().safeParse(fileId).success) return null;
   const row = await loadWithArtifact(fileId.toLowerCase());
   if (!row) return null;
-  const access = await artifactAccess(row.file.id, row.publicId, viewerId);
+  const access = await artifactAccess(row.file, row.publicId, viewerId);
   return canReadFile(row.file, viewerId, access) ? row.file : null;
 }
 

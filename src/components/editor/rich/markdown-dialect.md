@@ -94,9 +94,11 @@ after it.
 - **Access follows the artifact.** People who can read the artifact can load
   its media. Readers of the approved version (outside the team) load only
   files attached by that version's time, and never a file that some version
-  embedded but the approved version does not (`served-images.ts`). A save
-  that drops an embedded file always files its own version, so Restore brings
-  it back (`dropsShownImage`). Embedded files are never deleted on their own;
+  embedded but the approved version does not (`served-images.ts`). "Some
+  version embedded it" is kept on the file row (`named_in_content`, set in
+  `src/lib/files/content-files.ts`), so it holds after pruning deletes those
+  versions. A save that drops an embedded file always files its own version,
+  so Restore brings it back (`dropsShownImage`). Embedded files are never deleted on their own;
   removing them from the artifact's files deletes them.
 
 The rules are in `src/lib/files/media-rules.ts` (URL form, kinds, widths) and

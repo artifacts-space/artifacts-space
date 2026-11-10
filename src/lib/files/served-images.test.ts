@@ -1,7 +1,6 @@
-import { PgDialect } from "drizzle-orm/pg-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { artifactVersion } from "@/db/schema";
+import { artifactFile, artifactVersion } from "@/db/schema";
 
 import { createTableQueueDb } from "./table-queue-db";
 
@@ -14,7 +13,7 @@ const state = vi.hoisted((): { db: unknown } => ({ db: null }));
 
 vi.mock("@/db", () => ({ getDb: () => state.db }));
 
-const { contentFilesQuery, hiddenImagesFor } = await import("./served-images");
+const { fileHiddenFor, hiddenImagesFor } = await import("./served-images");
 
 const oldCover = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const newCover = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
@@ -29,9 +28,9 @@ function approvedReader(served: { icon: string | null; cover: string | null }, k
   } as unknown as Parameters<typeof hiddenImagesFor>[0];
 }
 
-/** Queues the version queries' rows, and the ids the content-files query finds. */
+/** Queues the version queries' rows, and the files marked as named in content. */
 function stage(versionResults: unknown[], contentFiles: string[] = []) {
-  state.db = createTableQueueDb(new Map([[artifactVersion, versionResults]]), [{ rows: contentFiles.map((id) => ({ id })) }]);
+  state.db = createTableQueueDb(new Map<unknown, unknown[]>([[artifactVersion, versionResults], [artifactFile, [contentFiles.map((id) => ({ id }))]]]));
 }
 
 beforeEach(() => {
@@ -82,14 +81,39 @@ describe("hiddenImagesFor", () => {
   });
 });
 
-describe("contentFilesQuery", () => {
-  it("should qualify every column so the subqueries compare the file with its own artifact's versions", () => {
-    const { sql: text, params } = new PgDialect().sqlToQuery(contentFilesQuery("a1"));
-    const compact = text.replace(/\s+/g, " ");
-    expect(params).toEqual(["a1", "ui", "markdown"]);
-    expect(compact).toContain('from "artifact_file" f where f.artifact_id = $1');
-    expect(compact).toContain("v.artifact_id = f.artifact_id");
-    expect(compact).toContain("strpos(v.content, f.id) > 0");
-    expect(compact).not.toMatch(/[^.]\b(artifact_id|content) = /);
+describe("fileHiddenFor", () => {
+  const inline = "9b2a4f43-6a7b-4a2e-8f61-3c1a9d2e7b10";
+  const embedded = { id: inline, namedInContent: true };
+
+  it("should hide a file the content once named, with no version left naming it, when the approved version does not show it", async () => {
+    // No versions are read but the approved one: the flag outlives pruned history.
+    stage([[{ kind: "markdown", content: "# Plan, chart removed" }]]);
+    await expect(fileHiddenFor(approvedReader({ icon: null, cover: `file:${newCover}` }), embedded)).resolves.toBe(true);
+  });
+
+  it("should not hide a file the approved version embeds", async () => {
+    stage([[{ kind: "markdown", content: `![Chart](/api/files/${inline}#width=50)` }]]);
+    await expect(fileHiddenFor(approvedReader({ icon: null, cover: `file:${newCover}` }), embedded)).resolves.toBe(false);
+  });
+
+  it("should not hide a plain attachment no version showed as an icon or cover or named", async () => {
+    stage([[]]);
+    await expect(fileHiddenFor(approvedReader({ icon: null, cover: `file:${newCover}` }), { id: inline, namedInContent: false })).resolves.toBe(false);
+  });
+
+  it("should hide an old cover the approved version does not show", async () => {
+    stage([[{ id: "v-old" }], [{ kind: "markdown", content: "# Plan" }]]);
+    await expect(fileHiddenFor(approvedReader({ icon: null, cover: null }), { id: oldCover, namedInContent: false })).resolves.toBe(true);
+  });
+
+  it("should not hide the approved version's own cover, and read nothing for it", async () => {
+    state.db = createTableQueueDb(new Map());
+    await expect(fileHiddenFor(approvedReader({ icon: null, cover: `file:${oldCover}@20` }), { id: oldCover, namedInContent: true })).resolves.toBe(false);
+  });
+
+  it("should hide nothing and read nothing for readers of the latest version", async () => {
+    state.db = createTableQueueDb(new Map());
+    const latest = { ...approvedReader({ icon: null, cover: null }), version: { source: "latest" as const, versionId: null } };
+    await expect(fileHiddenFor(latest, embedded)).resolves.toBe(false);
   });
 });
