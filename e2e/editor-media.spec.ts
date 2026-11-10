@@ -158,3 +158,41 @@ test("should ask for a file again when Try again is chosen after it failed to lo
   await expect(editor(page).getByRole("img", { name: "Gone" })).toBeVisible();
   await expect(editor(page).getByText("This image could not be loaded.")).toHaveCount(0);
 });
+
+/** A one-second WebM recorded from a canvas in the browser, as a screen recording would be. */
+async function shortWebm(page: Page): Promise<number[]> {
+  return page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 160;
+    canvas.height = 90;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("No canvas");
+    const recorder = new MediaRecorder(canvas.captureStream(15), { mimeType: "video/webm" });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (event) => { chunks.push(event.data); };
+    const stopped = new Promise<void>((resolve) => { recorder.onstop = () => { resolve(); }; });
+    recorder.start();
+    const timer = setInterval(() => { context.fillRect(Math.random() * 140, Math.random() * 70, 20, 20); }, 50);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    clearInterval(timer);
+    recorder.stop();
+    await stopped;
+    return [...new Uint8Array(await new Blob(chunks, { type: "video/webm" }).arrayBuffer())];
+  });
+}
+
+test("should keep a video on the page and pick it up again when playback fails partway", async ({ page }) => {
+  await openFixture(page);
+  await dropFile(page, "Intro paragraph.", await shortWebm(page), "walkthrough.webm", "video/webm");
+  const block = editor(page).locator('[data-media-block="video"]');
+  await expect(block.locator('[data-media-state="ready"] video')).toBeVisible();
+
+  // A dropped connection or a refused seek, after the player had loaded.
+  await block.locator("video").dispatchEvent("error");
+  await expect(block.getByText("The rest of this video could not be loaded.")).toBeVisible();
+  await expect(block.locator("video")).toBeVisible();
+
+  await block.getByRole("button", { name: "Try again" }).click();
+  await expect(block.getByText("The rest of this video could not be loaded.")).toHaveCount(0);
+  await expect(block.locator('[data-media-state="ready"] video')).toBeVisible();
+});

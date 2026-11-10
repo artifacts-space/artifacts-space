@@ -1,7 +1,7 @@
 "use client";
 
 import { IconFileOff, IconPhotoOff } from "@tabler/icons-react";
-import { useCallback, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { fileTypeLabel } from "@/lib/files/config";
@@ -10,6 +10,7 @@ import type { FileDto } from "@/lib/files/types";
 import { cn } from "@/lib/utils";
 
 import { FileCard } from "./file-card";
+import { useMediaLoad, type MediaLoadHandlers } from "./use-media-load";
 
 /**
  * One media block, drawn the same in the read view and the editor: an image,
@@ -39,43 +40,15 @@ export interface MediaBlockProps {
   className?: string;
 }
 
-type LoadState = "loading" | "ready" | "failed";
-
-/** The handlers that report whether an image or player loaded. */
-interface LoadHandlers {
-  /** Reads the element's own state once it mounts: a server-rendered element may finish, or fail, before React attaches its handlers. */
-  attach: (element: HTMLImageElement | HTMLMediaElement | null) => void;
-  onLoad: () => void;
-  onError: () => void;
-  /** Starts over: the element mounts again and asks for the file again. */
-  retry: () => void;
-}
-
-/** Tracks whether an image or player loaded, and how many times it was asked for. PDFs and file cards always count as ready. */
-function useLoadState(kind: MediaKind): [LoadState, LoadHandlers, number] {
-  const [state, setState] = useState<LoadState>("loading");
-  const [attempt, setAttempt] = useState(0);
-  const attach = useCallback((element: HTMLImageElement | HTMLMediaElement | null) => {
-    if (element instanceof HTMLImageElement && element.complete) setState(element.naturalWidth > 0 ? "ready" : "failed");
-    if (element instanceof HTMLMediaElement && element.error) setState("failed");
-  }, []);
-  const handlers = useMemo<LoadHandlers>(() => ({
-    attach,
-    onLoad: () => { setState("ready"); },
-    onError: () => { setState("failed"); },
-    retry: () => {
-      setState("loading");
-      setAttempt((count) => count + 1);
-    },
-  }), [attach]);
-  const tracked = kind === "image" || kind === "video" || kind === "audio";
-  return [tracked ? state : "ready", handlers, attempt];
-}
-
 function widthStyle(kind: MediaKind, width: number | null): CSSProperties | undefined {
   if (width === null || !hasAdjustableWidth(kind)) return undefined;
   return { "--media-width": `${String(width)}%` } as CSSProperties;
 }
+
+const interruptedCopy: Partial<Record<MediaKind, string>> = {
+  video: "The rest of this video could not be loaded.",
+  audio: "The rest of this recording could not be loaded.",
+};
 
 const failedCopy: Record<MediaKind, string> = {
   image: "This image could not be loaded.",
@@ -104,7 +77,7 @@ interface ElementProps {
   alt: string;
   sized: boolean;
   loading: boolean;
-  handlers: LoadHandlers;
+  handlers: MediaLoadHandlers;
 }
 
 function MediaElement({ kind, url, alt, sized, loading, handlers }: ElementProps) {
@@ -127,16 +100,24 @@ function wrapperClass(kind: MediaKind, sized: boolean): string {
 }
 
 function PlayableMedia({ kind, url, alt, width, overlay }: Pick<MediaBlockProps, "kind" | "url" | "alt" | "width" | "overlay">) {
-  const [state, handlers, attempt] = useLoadState(kind);
+  const [state, handlers, attempt] = useMediaLoad(kind);
   if (state === "failed") return <MediaNotice kind={kind} href={url} onRetry={handlers.retry}>{failedCopy[kind]}</MediaNotice>;
   const sized = width !== null && hasAdjustableWidth(kind);
   const loading = state === "loading";
-  return (
+  const player = (
     <div className={wrapperClass(kind, sized)} style={widthStyle(kind, width)} data-media-state={state}>
       {loading ? <div aria-hidden className={cn("w-full animate-pulse rounded-lg bg-muted", kind === "audio" ? "h-12" : "aspect-video min-w-60")} /> : null}
       <MediaElement key={attempt} kind={kind} url={url} alt={alt} sized={sized} loading={loading} handlers={handlers} />
       {overlay}
     </div>
+  );
+  if (state !== "interrupted") return player;
+  // The player stays where it stopped; Try again picks up from there.
+  return (
+    <>
+      {player}
+      <MediaNotice kind={kind} href={url} onRetry={handlers.resume}>{interruptedCopy[kind] ?? failedCopy[kind]}</MediaNotice>
+    </>
   );
 }
 
