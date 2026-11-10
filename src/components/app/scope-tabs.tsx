@@ -20,8 +20,11 @@ export function ScopeTabs({ teams, activeSlug }: { teams: readonly ShareTeam[]; 
     const row = active?.parentElement;
     if (!active || !row) return;
     // Only the row scrolls; scrollIntoView could move the page as well.
-    const overflow = active.offsetLeft + active.offsetWidth - row.clientWidth;
-    if (overflow > 0) row.scrollLeft = overflow + 8;
+    // A client-side scope change keeps the row's scroll, so check both edges.
+    const start = active.offsetLeft;
+    const end = start + active.offsetWidth;
+    if (start < row.scrollLeft) row.scrollLeft = Math.max(0, start - 8);
+    else if (end > row.scrollLeft + row.clientWidth) row.scrollLeft = end - row.clientWidth + 8;
   }, [activeSlug]);
 
   const tabs = [{ key: "mine", label: "Mine", href: "/app", active: activeSlug === null }].concat(
