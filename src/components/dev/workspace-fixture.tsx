@@ -54,6 +54,7 @@ const linkOnlyArtifact: ArtifactDto = fixtureArtifact({ id: "fixture-link-only",
 
 /** The artifact `slowLoad` leaves to load on open: the one the bell's comment rows link to. */
 const SLOW_ARTIFACT_ID = "fixture-markdown";
+const slowPublicIds: ReadonlySet<string> = new Set(["fixtureworkspace000md"]);
 
 /** The fixture's projects in memory, and a stand-in for the project server actions over them. */
 function useFixtureProjects(artifacts: readonly ArtifactDto[]) {
@@ -84,7 +85,7 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
   const full = useMemo(() => [...artifacts, linkOnlyArtifact], [artifacts]);
   // Kept from the first load: a bell link drops `?slowload=1` from the URL, and the slow artifact must stay slow.
   const [slow] = useState(slowLoad);
-  const controls = useFixtureControls(slow, full);
+  const controls = useFixtureControls(slow, full, slowPublicIds);
   const seeded = useMemo(() => (slow ? full.filter((artifact) => artifact.id !== SLOW_ARTIFACT_ID) : full), [full, slow]);
   const linkTarget = useMemo(() => {
     const found = link && !linkFailed ? full.find((artifact) => artifact.publicId === link.publicId) : undefined;

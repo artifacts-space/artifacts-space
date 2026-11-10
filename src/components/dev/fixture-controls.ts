@@ -25,19 +25,22 @@ declare global {
 
 /**
  * The fixture's test hooks in memory: a stand-in for the load server action
- * that holds each load until the test releases it, so a test can act while an
- * artifact is still opening (it answers from the latest `setArtifacts`, or
- * "not found"), and a count of the links the workspace acted on.
+ * that holds the loads of the artifacts in `held` until the test releases
+ * them, so a test can act while one is still opening, and answers any other
+ * load at once (from the latest `setArtifacts`, or "not found"); and a count
+ * of the links the workspace acted on.
  */
-export function createFixtureStore() {
+export function createFixtureStore(held: ReadonlySet<string> = new Set()) {
   let artifacts: readonly ArtifactDto[] = [];
   let handled = 0;
   const waiting: (() => void)[] = [];
   const load: ArtifactLoader = (publicId) => new Promise((resolve) => {
-    waiting.push(() => {
+    const finish = () => {
       const found = artifacts.find((artifact) => artifact.publicId === publicId);
       resolve(found ? { success: true, data: found } : { success: false, error: "Artifact not found." });
-    });
+    };
+    if (held.has(publicId)) waiting.push(finish);
+    else finish();
   });
   return {
     load,
@@ -52,11 +55,12 @@ export function createFixtureStore() {
 /**
  * Wires the fixture's controls onto `window.fixture`: a refresh, the held
  * loads, and a count of the links handled. Returns the loader to hand the
- * workspace (held only with `slowLoad`) and the callback that counts links.
+ * workspace (only with `slowLoad`; it holds the artifacts in `held`) and the
+ * callback that counts links.
  */
-export function useFixtureControls(slowLoad: boolean, artifacts: readonly ArtifactDto[]) {
+export function useFixtureControls(slowLoad: boolean, artifacts: readonly ArtifactDto[], held: ReadonlySet<string>) {
   const router = useRouter();
-  const [store] = useState(createFixtureStore);
+  const [store] = useState(() => createFixtureStore(held));
   useEffect(() => { store.setArtifacts(artifacts); }, [store, artifacts]);
   useEffect(() => {
     window.fixture = {

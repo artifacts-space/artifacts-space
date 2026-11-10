@@ -7,7 +7,7 @@ const note = fixtureArtifact({ id: "held", kind: "text", title: "Held", content:
 
 describe("createFixtureStore", () => {
   it("should hold a load until it is released and then answer with the artifact", async () => {
-    const store = createFixtureStore();
+    const store = createFixtureStore(new Set(["fixtureheld"]));
     store.setArtifacts([note]);
     let settled = false;
     const result = store.load("fixtureheld").then((value) => { settled = true; return value; });
@@ -21,10 +21,17 @@ describe("createFixtureStore", () => {
   });
 
   it("should answer not found when the released load asks for an artifact it does not hold", async () => {
-    const store = createFixtureStore();
+    const store = createFixtureStore(new Set(["missing"]));
     const result = store.load("missing");
     store.release();
     await expect(result).resolves.toEqual({ success: false, error: "Artifact not found." });
+  });
+
+  it("should answer at once when the artifact is not one it holds back", async () => {
+    const store = createFixtureStore(new Set(["other"]));
+    store.setArtifacts([note]);
+    await expect(store.load("fixtureheld")).resolves.toEqual({ success: true, data: note });
+    expect(store.held()).toBe(0);
   });
 
   it("should count each link the workspace acts on", () => {

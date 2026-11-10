@@ -158,9 +158,10 @@ test("should not reopen an earlier link when the person goes back or reloads", a
   await expect(selectedCard(page)).toContainText("Long markdown fixture");
   expect(await linksHandled(page)).toBe(2);
   await expect(commentsHeading(page, "Note 2")).toHaveCount(0);
-  // Back fetched nothing and handed no link back: the only page request is the refresh, without the link.
-  expect(requests).toHaveLength(1);
-  expect(requests[0]).not.toContain("artifact=");
+  // No request after Back asked for the link again. Back itself may fetch the page when Next no longer holds that
+  // entry's content (seen in CI), so the count is not fixed: the refresh is there, and none of them carries the link.
+  expect(requests.length).toBeGreaterThan(0);
+  expect(requests.filter((url) => url.includes("artifact="))).toEqual([]);
 
   await page.reload();
   await expect(editor(page, "Long ui fixture")).toBeVisible();
