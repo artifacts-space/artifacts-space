@@ -1,4 +1,4 @@
-import { validateArtifactContent } from "@/lib/artifact-content";
+import { updateCheckOptions, validateArtifactContent, type ContentCheckOptions } from "@/lib/artifact-content";
 import { EDIT_SESSION_IDLE_MS, type EditSessionStep } from "@/lib/versions/history-rules";
 
 import { draftKeys, type ArtifactDraft } from "./use-artifact-draft";
@@ -76,19 +76,27 @@ export function hasChanges(base: ArtifactDraft, draft: ArtifactDraft): boolean {
   return draftKeys.some((key) => draft[key] !== base[key]);
 }
 
+/** True when the draft's empty body cannot be saved: files may be empty, and Markdown may stay empty when the stored body already is (updateCheckOptions). */
+function needsContent(draft: ArtifactDraft, options: ContentCheckOptions): boolean {
+  if (draft.kind === "file" || draft.content.trim() !== "") return false;
+  return !(draft.kind === "markdown" && draft.content === "" && options.emptyMarkdown === true);
+}
+
 /**
  * Why the draft cannot be saved yet, or null when it can. Content is checked
  * against its format the same way agents' content is (validateArtifactContent),
  * so autosave never stores an invalid ui spec, JSON, CSV, SVG, or diagram.
  * With `base`, the saved version, a save that changes neither the content nor
  * the format is not held for the content, as the server does not check it
- * then either: a title typed on a new page with no body yet still saves.
+ * then either: a title typed on a new page with no body yet still saves. A
+ * body may go back to empty Markdown only when the saved one is empty too.
  */
 export function draftProblem(draft: ArtifactDraft, base?: ArtifactDraft): string | null {
   if (!draft.title.trim()) return "Add a title to save.";
   if (base?.content === draft.content && base.kind === draft.kind) return null;
-  if (draft.kind !== "file" && !draft.content.trim()) return "Add some content to save.";
-  const check = validateArtifactContent(draft.kind, draft.content);
+  const options = base ? updateCheckOptions(base.content) : {};
+  if (needsContent(draft, options)) return "Add some content to save.";
+  const check = validateArtifactContent(draft.kind, draft.content, options);
   const firstError = check.issues.find((issue) => issue.severity === "error");
   return firstError ? `Not saved yet: ${firstError.message}` : null;
 }

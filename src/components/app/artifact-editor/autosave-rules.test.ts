@@ -43,6 +43,17 @@ describe("draftProblem", () => {
     expect(draftProblem(edited({ kind: "file", content: "" }))).toBeNull();
   });
 
+  it("should let a page whose stored body is empty go back to empty Markdown", () => {
+    const storedEmpty = edited({ kind: "file", content: "" });
+    expect(draftProblem(edited({ content: "" }), storedEmpty)).toBeNull();
+  });
+
+  it("should hold the save when a body with content is emptied", () => {
+    expect(draftProblem(edited({ content: "" }), base)).toBe("Add some content to save.");
+    expect(draftProblem(edited({ kind: "file", content: "" }), edited({ kind: "file", content: "Notes" }))).toBeNull();
+    expect(draftProblem(edited({ content: "" }), edited({ kind: "file", content: "Notes" }))).toBe("Add some content to save.");
+  });
+
   it("should hold the save when a ui spec does not pass the same check agents' specs do", () => {
     expect(draftProblem(edited({ kind: "ui", content: "{\"root\":\"a\",\"elements\":{}}" }))).toMatch(/^Not saved yet: /);
   });

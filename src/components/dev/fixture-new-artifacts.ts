@@ -1,6 +1,6 @@
 import { updateArtifactAction } from "@/app/(workspace)/app/actions";
 import type { NewArtifactApi } from "@/components/app/new-artifact/new-artifact-api";
-import { validateArtifactContent } from "@/lib/artifact-content";
+import { updateCheckOptions, validateArtifactContent } from "@/lib/artifact-content";
 import type { ActionResult, ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { unusableFilesForPeople } from "@/lib/files/person-messages";
 import type { FileDto } from "@/lib/files/types";
@@ -91,8 +91,8 @@ export function storedFixtureArtifacts(): ArtifactDto[] {
   return readStored();
 }
 
-function contentProblem(kind: ArtifactKind, content: string, emptyMarkdown: boolean): string | null {
-  const check = validateArtifactContent(kind, content, { emptyMarkdown });
+function contentProblem(kind: ArtifactKind, content: string, options: { emptyMarkdown?: boolean }): string | null {
+  const check = validateArtifactContent(kind, content, options);
   return check.valid ? null : check.message;
 }
 
@@ -118,7 +118,7 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     const earlier = readStored().find((entry) => entry.id === createdByRequest.get(requestId));
     if (earlier) return Promise.resolve({ success: true, data: earlier });
     const kind = input.kind ?? "markdown";
-    const problem = contentProblem(kind, input.content, true);
+    const problem = contentProblem(kind, input.content, { emptyMarkdown: true });
     if (problem) return Promise.resolve({ success: false, error: problem });
     // As the server does (assertUsableFiles): a file that is gone, or in another artifact, refuses the create.
     if (fileIds.some((fileId) => !uploaded.has(fileId) || attachedIds().has(fileId))) return Promise.resolve({ success: false, error: unusableFilesForPeople });
@@ -138,7 +138,7 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     if (!current) return updateArtifactAction(id, changes, options);
     const next = { ...current, ...changes, updatedAt: new Date().toISOString() };
     const touchesContent = changes.content !== undefined || changes.kind !== undefined;
-    const problem = touchesContent ? contentProblem(next.kind, next.content, false) : null;
+    const problem = touchesContent ? contentProblem(next.kind, next.content, updateCheckOptions(current.content)) : null;
     if (problem) return Promise.resolve({ success: false, error: problem });
     return Promise.resolve(save(next));
   },

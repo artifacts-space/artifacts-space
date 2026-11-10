@@ -5,7 +5,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 /*
  * createArtifactOnce against a real Postgres, for what mocks cannot show:
  * two creates racing with one create id store one artifact (the partial
- * unique index), and a create id is scoped to its user. It runs only when
+ * unique index), and a create id is scoped to its user. A title-only page
+ * can go to Files and back to empty Markdown, and no update can empty a body
+ * that has content (updateCheckOptions). It runs only when
  * TEST_DATABASE_URL names a throwaway local database with the migrations
  * applied; never point it at a shared one.
  */
@@ -18,6 +20,8 @@ describe.runIf(Boolean(databaseUrl))("createArtifactOnce with a database", async
   const { getDb } = await import("@/db");
   const { artifact, rateLimitBucket, user } = await import("@/db/schema");
   const { createArtifactOnce } = await import("./create-once");
+  const { updateArtifact } = await import("@/lib/artifacts");
+  const { ArtifactContentError } = await import("@/lib/artifact-content");
 
   const tag = randomUUID().slice(0, 8);
   const users = { ada: `createdb-${tag}-ada`, bo: `createdb-${tag}-bo` };
@@ -58,5 +62,24 @@ describe.runIf(Boolean(databaseUrl))("createArtifactOnce with a database", async
     const bo = await createArtifactOnce(users.bo, input, [], requestId);
     expect(bo.created).toBe(true);
     expect(bo.id).not.toBe(ada.id);
+  });
+
+  it("should let a title-only page go to Files and back to empty Markdown", async () => {
+    const page = await createArtifactOnce(users.ada, input, [], randomUUID());
+    expect((await updateArtifact(users.ada, page.id, { kind: "file" }))?.kind).toBe("file");
+    const back = await updateArtifact(users.ada, page.id, { kind: "markdown", content: "" });
+    expect(back?.kind).toBe("markdown");
+    expect(back?.content).toBe("");
+  });
+
+  it("should refuse an update that empties a body that has content", async () => {
+    const page = await createArtifactOnce(users.ada, input, [], randomUUID());
+    await updateArtifact(users.ada, page.id, { content: "# Notes" });
+    await expect(updateArtifact(users.ada, page.id, { content: "" })).rejects.toThrow(ArtifactContentError);
+    await expect(updateArtifact(users.ada, page.id, { kind: "markdown", content: "" })).rejects.toThrow(ArtifactContentError);
+    await updateArtifact(users.ada, page.id, { kind: "file" });
+    await expect(updateArtifact(users.ada, page.id, { kind: "markdown", content: "" }), "a Files page with notes keeps them").rejects.toThrow(ArtifactContentError);
+    const [row] = await getDb().select({ content: artifact.content }).from(artifact).where(eq(artifact.id, page.id));
+    expect(row?.content).toBe("# Notes");
   });
 });

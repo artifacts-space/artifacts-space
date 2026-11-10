@@ -232,7 +232,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
         kind={draft.kind}
         language={draft.language}
         content={draft.content}
-        blank={page.blank}
+        storedContent={artifact.content}
         onApply={(kind, language, content) => {
           dismissDetected();
           // A new format draws the content with another editor, so it remounts.

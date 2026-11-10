@@ -188,3 +188,22 @@ test("should switch an empty page to Files and back to Markdown before it is sto
   await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe("markdown");
   expect(await creates(page)).toBe(1);
 });
+
+test("should switch a page stored with only a title to Files and back to Markdown", async ({ page }) => {
+  await openNewArtifact(page);
+  await storeWithTitle(page, "Title only");
+  const editor = page.getByRole("region", { name: "Edit Title only" });
+  const dialog = page.getByRole("dialog", { name: "Format and language" });
+  for (const format of ["Files", "Markdown"]) {
+    await editor.getByRole("button", { name: "More actions" }).click();
+    await page.getByRole("menuitem", { name: "Format and language" }).click();
+    await dialog.getByRole("combobox", { name: "Format" }).click();
+    await page.getByRole("option", { name: format, exact: true }).click();
+    await dialog.getByRole("button", { name: "Apply" }).click();
+    await expect(dialog).toBeHidden();
+    await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe(format === "Files" ? "file" : "markdown");
+  }
+  await expect(page.getByRole("status").filter({ hasText: "Not saved" })).toHaveCount(0);
+  expect((await storedNew(page))[0]?.content).toBe("");
+  expect(await creates(page)).toBe(1);
+});

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
-import { ArtifactContentError, assertValidArtifactContent, assertValidArtifactUpdate, validateArtifactContent } from "./artifact-content";
+import { ArtifactContentError, assertValidArtifactContent, assertValidArtifactUpdate, updateCheckOptions, validateArtifactContent } from "./artifact-content";
 import { exampleUiSpec } from "./ui/fixtures/example";
 
 describe("validateArtifactContent", () => {
@@ -79,5 +79,33 @@ describe("assertValidArtifactUpdate", () => {
     const load = vi.fn(() => Promise.resolve(null));
     await assertValidArtifactUpdate({}, load);
     expect(load).not.toHaveBeenCalled();
+  });
+
+  it("should let an artifact whose stored body is empty switch back to empty Markdown", async () => {
+    const storedEmpty = () => Promise.resolve({ kind: "file", content: "" });
+    await expect(assertValidArtifactUpdate({ kind: "markdown", content: "" }, storedEmpty)).resolves.toBeUndefined();
+    await expect(assertValidArtifactUpdate({ kind: "markdown" }, storedEmpty)).resolves.toBeUndefined();
+  });
+
+  it("should refuse an update that empties a Markdown body that has content", async () => {
+    const storedNotes = () => Promise.resolve({ kind: "markdown", content: "# Notes" });
+    await expect(assertValidArtifactUpdate({ content: "" }, storedNotes)).rejects.toThrow(ArtifactContentError);
+    await expect(assertValidArtifactUpdate({ kind: "markdown", content: "" }, storedNotes)).rejects.toThrow(ArtifactContentError);
+  });
+
+  it("should refuse empty Markdown when the stored artifact cannot be found", async () => {
+    await expect(assertValidArtifactUpdate({ kind: "markdown", content: "" }, () => Promise.resolve(null))).rejects.toThrow(ArtifactContentError);
+  });
+
+  it("should still refuse an empty Text or Code body when the stored body is empty", async () => {
+    await expect(assertValidArtifactUpdate({ kind: "text", content: "" }, () => Promise.resolve({ kind: "file", content: "" }))).rejects.toThrow(ArtifactContentError);
+  });
+});
+
+describe("updateCheckOptions", () => {
+  it("should allow empty Markdown only when the stored body is empty", () => {
+    expect(updateCheckOptions("")).toEqual({ emptyMarkdown: true });
+    expect(updateCheckOptions("Notes")).toEqual({ emptyMarkdown: false });
+    expect(updateCheckOptions(" ")).toEqual({ emptyMarkdown: false });
   });
 });
