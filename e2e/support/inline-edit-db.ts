@@ -34,6 +34,22 @@ export async function storedText(publicId: string): Promise<{ title: string; con
   return row;
 }
 
+/** The stored sheet formatting of an artifact (null when plain), and how many versions it has. */
+export async function storedSheetFormat(publicId: string): Promise<{ format: unknown; versions: number }> {
+  const result = await db().query<{ sheet_format: unknown; versions: string }>(
+    `select a.sheet_format, (select count(*) from artifact_version v where v.artifact_id = a.id) as versions from artifact a where a.public_id = $1`,
+    [publicId],
+  );
+  const row = result.rows[0];
+  if (!row) throw new Error("No such artifact.");
+  return { format: row.sheet_format, versions: Number(row.versions) };
+}
+
+/** Sets an artifact's sheet formatting directly, as an editor's earlier save would have. */
+export async function setStoredSheetFormat(publicId: string, format: unknown): Promise<void> {
+  await db().query(`update artifact set sheet_format = $2 where public_id = $1`, [publicId, JSON.stringify(format)]);
+}
+
 /** Saves fields of an artifact as someone else would: the row changes and its updatedAt moves on. */
 export async function saveAsSomeoneElse(publicId: string, changes: { title?: string; content?: string }): Promise<void> {
   await db().query(

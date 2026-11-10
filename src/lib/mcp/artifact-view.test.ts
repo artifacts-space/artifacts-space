@@ -12,6 +12,7 @@ const dto: ArtifactDto = {
   theme: null,
   cover: null,
   fullWidth: false,
+  sheetFormat: { banding: null, align: {} },
   summary: "",
   content: "# Plan",
   kind: "markdown",

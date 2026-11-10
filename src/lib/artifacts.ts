@@ -46,6 +46,7 @@ import { assertContentFits } from "@/lib/quota/usage";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { StaleSaveError, unchangedSince, type SaveOptions } from "@/lib/save-guard";
 import { showsInSearch } from "@/lib/search/search-rules";
+import { readSheetFormat } from "@/lib/sheet-format/rules";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { forgetArtifactCache } from "@/lib/versions/cache";
 import { getVersionOf } from "@/lib/versions/history";
@@ -133,6 +134,7 @@ function toArtifactMeta(record: ArtifactMetaRecord, { pending, files, updatedBy,
     theme: record.theme,
     cover: record.cover,
     fullWidth: record.fullWidth,
+    sheetFormat: readSheetFormat(record.sheetFormat),
     summary: record.summary,
     kind: record.kind,
     language: record.language,

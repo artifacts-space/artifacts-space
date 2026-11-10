@@ -20,6 +20,7 @@ import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { SheetFill } from "@/components/artifact-view/sheet-fill";
+import { ArtifactSheetFormat } from "@/components/artifact-view/sheet-format";
 import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
 import { PageOrganizers } from "@/components/projects/page-organizers";
 import { CommentThread } from "@/components/comments/comment-thread";
@@ -277,6 +278,13 @@ function BodyReadView({ viewable, files }: { viewable: ViewableArtifact; files: 
   return body;
 }
 
+/** A CSV's formatting (a display setting on the row, like Full width): editors may change it, readers see it. */
+function SheetFormatFor({ viewable, children }: { viewable: ViewableArtifact; children: React.ReactNode }) {
+  if (viewable.view.kind !== "csv") return children;
+  const { record } = viewable;
+  return <ArtifactSheetFormat artifactId={viewable.canEdit ? record.id : null} stored={record.sheetFormat}>{children}</ArtifactSheetFormat>;
+}
+
 /** The space above the heading: less under a cover, and none when the icon sits across the cover's edge (HeadingIcon pulls it up). */
 function mainTopClass(view: ViewableArtifact["view"]) {
   if (!view.cover) return null;
@@ -335,9 +343,12 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
                   <article className="mt-10">
                     {/* A CSV's grid fills the window under the header, as a sheet does. */}
                     <SheetFill artifactKey={record.publicId}>
-                      <InlineBody>
-                        <BodyReadView viewable={viewable} files={files} />
-                      </InlineBody>
+                      {/* Banding and column alignment, the same for every reader; editors change them from the grid. */}
+                      <SheetFormatFor viewable={viewable}>
+                        <InlineBody>
+                          <BodyReadView viewable={viewable} files={files} />
+                        </InlineBody>
+                      </SheetFormatFor>
                     </SheetFill>
                   </article>
                 </ThemeScope>

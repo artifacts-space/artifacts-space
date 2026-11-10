@@ -18,8 +18,8 @@ function isFixtureKind(value: unknown): value is EditorFixtureKind {
 }
 
 async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/editor">["searchParams"] }) {
-  const { kind } = await searchParams;
-  return <EditorFixture kind={isFixtureKind(kind) ? kind : "ui"} />;
+  const { kind, save } = await searchParams;
+  return <EditorFixture kind={isFixtureKind(kind) ? kind : "ui"} failingSaves={save === "fail"} />;
 }
 
 /**

@@ -27,6 +27,8 @@ import {
 } from "../lib/artifact-types";
 import { artifactIconLimits } from "../lib/artifact-icon-limits";
 import type { StoredArtifactTheme } from "../lib/themes/artifact-theme";
+import { sheetFormatLimits } from "../lib/sheet-format/limits";
+import type { SheetFormat } from "../lib/sheet-format/rules";
 import { artifactThemeLimits } from "../lib/themes/artifact-theme-limits";
 import type { Theme } from "../lib/themes/schema";
 import { teamPresetLimits } from "../lib/themes/team-preset-limits";
@@ -56,6 +58,8 @@ export const artifact = pgTable(
     cover: text("cover"),
     // Show the body across the whole width instead of the reading width. A display setting: not versioned, no approval.
     fullWidth: boolean("full_width").notNull().default(false),
+    // A CSV's sheet formatting: banded rows and column alignment (src/lib/sheet-format). Null is plain. A display setting: not versioned, no approval.
+    sheetFormat: jsonb("sheet_format").$type<SheetFormat>(),
     summary: text("summary").notNull().default(""),
     content: text("content").notNull(),
     kind: text("kind", { enum: artifactKinds }).notNull().default("markdown"),
@@ -113,6 +117,7 @@ export const artifact = pgTable(
     check("artifact_icon_length_check", sql`char_length(${table.icon}) <= ${sql.raw(String(artifactIconLimits.maxStoredChars))}`),
     check("artifact_harness_length_check", sql`char_length(${table.harness}) <= ${sql.raw(String(harnessLimits.maxIdChars))} and char_length(${table.harnessOverride}) <= ${sql.raw(String(harnessLimits.maxIdChars))}`),
     check("artifact_cover_length_check", sql`char_length(${table.cover}) <= ${sql.raw(String(artifactCoverLimits.maxStoredChars))}`),
+    check("artifact_sheet_format_size_check", sql`octet_length(${table.sheetFormat}::text) <= ${sql.raw(String(sheetFormatLimits.maxStoredBytes))}`),
     check("artifact_theme_size_check", sql`octet_length(${table.theme}::text) <= ${sql.raw(String(artifactThemeLimits.maxStoredBytes))}`),
     check("artifact_content_size_check", sql`octet_length(${table.content}) <= ${sql.raw(String(artifactSizeLimits.maxContentBytes))}`),
     // jsonb prints with extra spaces, so the backstop allows twice the app's limit.

@@ -5,11 +5,15 @@ import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 
+import { type ColumnAlignControl, ColumnAlignOptions } from "./sheet-format";
+
 export interface ColumnLayoutProps {
   /** Moves the column one place; null when it cannot move that way. */
   onMoveLeft: (() => void) | null;
   onMoveRight: (() => void) | null;
   onFit: () => void;
+  /** The column's alignment, saved for everyone; null for readers. */
+  align: ColumnAlignControl | null;
 }
 
 function Option({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: (() => void) | null }) {
@@ -23,11 +27,13 @@ function Option({ icon, label, onClick }: { icon: ReactNode; label: string; onCl
 
 /**
  * Move a column one place either way, or fit its width to the content: the
- * keyboard's way to do what dragging a header or its edge does.
+ * keyboard's way to do what dragging a header or its edge does. Editors
+ * also set the column's alignment here.
  */
-export function ColumnLayoutOptions({ onMoveLeft, onMoveRight, onFit }: ColumnLayoutProps) {
+export function ColumnLayoutOptions({ onMoveLeft, onMoveRight, onFit, align }: ColumnLayoutProps) {
   return (
     <>
+      {align ? <ColumnAlignOptions {...align} /> : null}
       <Option icon={<IconArrowLeft />} label="Move column left" onClick={onMoveLeft} />
       <Option icon={<IconArrowRight />} label="Move column right" onClick={onMoveRight} />
       <Option icon={<IconArrowAutofitWidth />} label="Fit width to content" onClick={onFit} />

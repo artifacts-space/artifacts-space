@@ -3,7 +3,9 @@
 import { type ClipboardEvent, type FocusEvent, type KeyboardEvent, type MouseEvent, type ReactNode, useEffect, useId, useMemo, useRef } from "react";
 
 import type { GridCell } from "@/lib/csv-edit-rules";
+import { exitAfterFocus, exitAfterKey, type FocusOrigin, noExit, type TabExit, tabLeaves } from "@/lib/grid-focus-rules";
 import { type CellRange, type GridSelection, isSingleCell, sameCell, selectionAfterKey, selectionRange } from "@/lib/grid-selection-rules";
+import { bandClass, type SheetAlignment, type SheetBanding } from "@/lib/sheet-format/rules";
 import { columnOffsets, keptCell, outsideSpan, revealCell, rowNumberWidth, rowsPerPage, sheetHeaderHeight, sheetRowHeight, withKept } from "@/lib/sheet-grid-rules";
 import { cn } from "@/lib/utils";
 
@@ -27,8 +29,12 @@ export interface DataGridProps {
   rowCount: number;
   /** Column widths in pixels (sheet-grid-rules.ts). */
   widths: readonly number[];
-  /** Columns shown right-aligned in tabular figures. */
+  /** Columns shown in tabular figures. */
   numeric: readonly boolean[];
+  /** How each column's cells line up; numbers right and text left when left out. */
+  align?: readonly SheetAlignment[] | undefined;
+  /** Every other row tinted from a theme token, or null for none. */
+  banding?: SheetBanding | null | undefined;
   /** The content of a column header. */
   header: (column: number) => ReactNode;
   headerSort?: ((column: number) => "ascending" | "descending" | "none") | undefined;
@@ -59,6 +65,12 @@ export interface DataGridProps {
   onColumnFit?: ((column: number) => void) | undefined;
 }
 
+/** Each column's alignment (numbers right and text left by default) and the banding fill. Stable unless they change, so rows keep skipping re-renders. */
+function useRowLook({ numeric, align, banding }: Pick<DataGridProps, "numeric" | "align" | "banding">) {
+  const autoAlign = useMemo(() => numeric.map((isNumber): SheetAlignment => (isNumber ? "right" : "left")), [numeric]);
+  return { align: align ?? autoAlign, band: bandClass(banding ?? null) };
+}
+
 /** What the header row needs to move and resize columns, leaving out what the caller does not allow. */
 function headerDragProps(props: DataGridProps, dragging: ReturnType<typeof useColumnDrag>) {
   return {
@@ -87,31 +99,23 @@ function showClippedTitle(event: MouseEvent) {
   else cell.removeAttribute("title");
 }
 
-/** Which way a Tab press leaves the grid instead of moving the selection. */
-interface TabExit {
-  forward: boolean;
-  backward: boolean;
-}
-
-const noExit: TabExit = { forward: false, backward: false };
-const anyExit: TabExit = { forward: true, backward: true };
-
-function tabLeaves(exit: TabExit, event: KeyboardEvent): boolean {
-  if (event.key !== "Tab") return false;
-  return event.shiftKey ? exit.backward : exit.forward;
-}
-
 /** Whether an event comes from a text field inside the grid (a cell or name being edited), whose own copy must work as usual. */
 function fromField(event: { target: EventTarget }): boolean {
   return event.target instanceof Element && event.target.closest("textarea, input") !== null;
 }
 
-/** When focus comes into the grid from outside, the first Tab back toward where it came from leaves again. */
-function exitOnFocus(event: FocusEvent<HTMLDivElement>): TabExit {
+/**
+ * Where a focus event on the grid came from (grid-focus-rules.ts). A focus
+ * the browser did not send is React replaying one it queued while the grid
+ * was still hydrating: a stale clone, not a move.
+ */
+function focusOrigin(event: FocusEvent<HTMLDivElement>, pointer: boolean): FocusOrigin {
+  if (!event.nativeEvent.isTrusted) return "replay";
+  if (pointer) return "pointer";
   const from = event.relatedTarget;
-  if (event.target !== event.currentTarget || !(from instanceof Node) || event.currentTarget.contains(from)) return noExit;
+  if (event.target !== event.currentTarget || !(from instanceof Node) || event.currentTarget.contains(from)) return "inside";
   const after = (event.currentTarget.compareDocumentPosition(from) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-  return { forward: after, backward: !after };
+  return after ? "after" : "before";
 }
 
 /** The selected columns in a row, or -1 for both when the row has none selected (or one cell is selected). */
@@ -149,6 +153,7 @@ export function DataGrid(props: DataGridProps) {
   const view = useSheetViewport(scrollerRef, rowCount, offsets);
   const fillHeight = useSheetFillHeight(scrollerRef);
   const totalWidth = rowNumberWidth + (offsets[columnCount] ?? 0);
+  const { align, band } = useRowLook(props);
   const kept = keptCell(active, rowCount, columnCount);
 
   useEffect(() => {
@@ -178,8 +183,8 @@ export function DataGrid(props: DataGridProps) {
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (props.onGridKeyDown?.(event) || event.defaultPrevented) return;
-    const leaving = tabLeaves(leaveRef.current, event);
-    leaveRef.current = event.key === "Escape" ? anyExit : noExit;
+    const leaving = tabLeaves(leaveRef.current, event.key, event.shiftKey);
+    leaveRef.current = exitAfterKey(event.key);
     if (leaving) return;
     const page = rowsPerPage(scrollerRef.current?.clientHeight ?? 0);
     const next = selectionAfterKey(event, selection, { rows: rowCount, columns: columnCount, page }, isBlank, props.tabMoves ?? false);
@@ -209,7 +214,7 @@ export function DataGrid(props: DataGridProps) {
         // A click into the grid is not a Tab into it, so Shift+Tab then moves left instead of leaving.
         onPointerDownCapture={() => { pointerFocus.current = true; }}
         onPointerUpCapture={() => { pointerFocus.current = false; }}
-        onFocus={(event) => { leaveRef.current = pointerFocus.current ? noExit : exitOnFocus(event); }}
+        onFocus={(event) => { leaveRef.current = exitAfterFocus(leaveRef.current, focusOrigin(event, pointerFocus.current)); }}
         onPointerDown={pointer.onPointerDown}
         onClick={pointer.onClick}
         onPaste={props.onPaste}
@@ -245,6 +250,8 @@ export function DataGrid(props: DataGridProps) {
                 cell={props.cell}
                 rowLabel={props.rowLabel}
                 numeric={props.numeric}
+                align={align}
+                band={row % 2 === 1 ? band : ""}
                 activeColumn={isActiveRow ? active.column : -1}
                 {...rowRange(range, row)}
                 keepColumn={outsideSpan(view.columns, kept.column)}

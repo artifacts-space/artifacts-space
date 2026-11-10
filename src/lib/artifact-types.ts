@@ -1,5 +1,6 @@
 import type { FileDto } from "./files/types";
 import type { HarnessId } from "./harness/harnesses";
+import type { SheetFormat } from "./sheet-format/rules";
 import type { StoredArtifactTheme } from "./themes/artifact-theme";
 import type { Theme } from "./themes/schema";
 
@@ -104,6 +105,8 @@ export interface ArtifactDto {
   cover: string | null;
   /** Show the body across the whole width instead of the reading width. A display setting: not versioned. */
   fullWidth: boolean;
+  /** A CSV's banded rows and column alignment. Plain for other formats. A display setting: not versioned. */
+  sheetFormat: SheetFormat;
   summary: string;
   content: string;
   kind: ArtifactKind;

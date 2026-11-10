@@ -7,6 +7,7 @@ import { ShareControl } from "@/components/app/share-control";
 import type { ShareTeam } from "@/components/app/share-teams-context";
 import { useRenderTheme } from "@/components/app/use-render-theme";
 import { useLeaveGuard } from "@/components/artifact-page/use-leave-guard";
+import { ArtifactSheetFormat } from "@/components/artifact-view/sheet-format";
 import { SheetKeyContext } from "@/components/artifact-view/use-sheet-prefs";
 import { AttachedFiles } from "@/components/files/attached-files";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
@@ -154,6 +155,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           className={detailBody}
         >
           <SheetKeyContext value={artifact.publicId}>
+            <ArtifactSheetFormat artifactId={draft.kind === "csv" ? artifact.id : null} stored={artifact.sheetFormat}>
             <InlineContent
               kind={draft.kind}
               content={draft.content}
@@ -167,6 +169,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
               onChange={(content) => { update("content", content); }}
               onShowSource={() => { if (!sourceOpen) toggleSource(); }}
             />
+            </ArtifactSheetFormat>
           </SheetKeyContext>
           {showsFiles(draft.kind, artifact.files.length) ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
           <MetaFields draft={draft} update={update} />

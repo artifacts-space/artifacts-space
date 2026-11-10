@@ -1,0 +1,2 @@
+ALTER TABLE "artifact" ADD COLUMN "sheet_format" jsonb;--> statement-breakpoint
+ALTER TABLE "artifact" ADD CONSTRAINT "artifact_sheet_format_size_check" CHECK (octet_length("artifact"."sheet_format"::text) <= 48000);
