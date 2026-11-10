@@ -123,6 +123,7 @@ export function ComponentGallery() {
         <a href="#notifications" className="hover:text-foreground">Notifications</a>
         <a href="#clients" className="hover:text-foreground">Clients</a>
         <a href="#harnesses" className="hover:text-foreground">Agents</a>
+        <a href="#media" className="hover:text-foreground">Media</a>
       </nav>
       <div className="space-y-12">
         {uiComponentNames.map((name) => (
@@ -192,7 +193,7 @@ export function ComponentGallery() {
         <Group id="harnesses" title="Agent harnesses">
           <HarnessSpecimen />
         </Group>
-        {/* Last: media change height as they load, which would move any group under them. */}
+        {/* Last: media blocks change height as they load, which would move any group under them. */}
         <Group id="media" title="Media blocks">
           {mediaFormatFixtures.map((fixture) => <FormatSpecimen key={fixture.name} fixture={fixture} />)}
         </Group>
