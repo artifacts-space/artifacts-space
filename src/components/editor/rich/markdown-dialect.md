@@ -122,9 +122,9 @@ after it.
   (`dropsShownImage`). While only older versions name content media, it does
   not count toward the 20-file limit (`countHistoryOnlyFiles`); once no
   version names it, history pruning deletes it (`pruneUnusedContentFiles` in
-  `src/lib/files/icon-cleanup.ts`). The delete first detaches the file in one
-  statement that checks the artifact's current content and every version
-  again, so a save that has just written content naming it keeps it. Plain
+  `src/lib/files/icon-cleanup.ts`). The row is deleted in one statement that
+  checks the artifact's current content and every version again, so a save
+  that has just written content naming it keeps it; then its R2 object goes. Plain
   attachments are never deleted this way.
 
 The rules are in `src/lib/files/media-rules.ts` (URL form, kinds, widths) and

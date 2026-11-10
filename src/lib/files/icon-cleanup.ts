@@ -6,7 +6,7 @@ import { FILE_PREFIX } from "@/lib/artifact-icons";
 
 import { imageFileIdOf, imageFileIdsOf, unusedIconFiles, type IconUseState } from "./icon-cleanup-rules";
 import { fileRefsInContent } from "./refs";
-import { getFileRows, removeFiles } from "./store";
+import { deleteStoredObjects, getFileRows, removeFiles } from "./store";
 
 /**
  * Deletes icon and cover images an artifact no longer keeps. An image stays
@@ -32,20 +32,28 @@ function retainedImageRefs(artifactId: string) {
     .where(and(eq(artifactVersion.artifactId, artifactId), or(like(artifactVersion.icon, `${FILE_PREFIX}%`), like(artifactVersion.cover, `${FILE_PREFIX}%`))));
 }
 
-/** Whether any ui or Markdown version of the artifact still names this file in its content (an Image or File element, or a media embed or link). A plain text match, case-insensitive like every other content match (content-files.ts), so it errs on keeping. */
-async function namedInVersionContent(artifactId: string, fileId: string): Promise<boolean> {
-  const [row] = await getDb()
-    .select({ id: artifactVersion.id })
-    .from(artifactVersion)
-    .where(and(eq(artifactVersion.artifactId, artifactId), inArray(artifactVersion.kind, ["ui", "markdown"]), sql`strpos(lower(${artifactVersion.content}), ${fileId.toLowerCase()}) > 0`))
-    .limit(1);
-  return row !== undefined;
+/** For an `artifact_file` row: no ui or Markdown version of the artifact names it in its content (a case-insensitive text match, so it errs on keeping). */
+function notNamedByVersions(artifactId: string) {
+  return sql`not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and v.kind in ('ui', 'markdown') and strpos(lower(v.content), "artifact_file"."id") > 0)`;
 }
 
-/** The files no ui or Markdown version of the artifact names in its content. */
+/**
+ * For an `artifact_file` row: neither the artifact's current content nor any
+ * of its versions names it. The row is written out as "artifact_file"."id",
+ * never a bare `id`, which inside a subquery would mean that table's own id
+ * (the correlated-subquery tripwire in AGENTS.md).
+ */
+export function notNamedByArtifact(artifactId: string) {
+  return sql`not exists (select 1 from ${artifact} a where a.id = ${artifactId} and strpos(lower(a.content), "artifact_file"."id") > 0) and ${notNamedByVersions(artifactId)}`;
+}
+
+/** The files among `fileIds` that no ui or Markdown version of the artifact names in its content, in one query however many there are. */
 async function notNamedInContent(artifactId: string, fileIds: readonly string[]): Promise<string[]> {
-  const named = await Promise.all(fileIds.map((fileId) => namedInVersionContent(artifactId, fileId)));
-  return fileIds.filter((_, index) => named[index] === false);
+  const rows = await getDb()
+    .select({ id: artifactFile.id })
+    .from(artifactFile)
+    .where(and(inArray(artifactFile.id, [...fileIds]), notNamedByVersions(artifactId)));
+  return rows.map((row) => row.id);
 }
 
 /** The artifact's state that decides what it still shows, or null when it is gone. */
@@ -95,33 +103,20 @@ async function contentFilesNotShown(artifactId: string, current: IconUseState): 
   return rows.map((row) => row.id).filter((fileId) => !shown.has(fileId));
 }
 
-/** For an `artifact_file` row: neither the artifact's current content nor any of its versions names it. */
-export function notNamedByArtifact(artifactId: string) {
-  return sql`not exists (select 1 from ${artifact} a where a.id = ${artifactId} and strpos(lower(a.content), "artifact_file"."id") > 0) and not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and strpos(lower(v.content), "artifact_file"."id") > 0)`;
-}
 
 /**
- * Detaches the content media among `fileIds` in one statement, checking at
- * that moment that neither the artifact's current content nor any version
- * names them, and returns the rows it detached. Done as one statement
+ * Deletes the rows of the content media among `fileIds` in one statement,
+ * checking at that moment that neither the artifact's current content nor
+ * any version names them, and returns the rows it deleted. One statement,
  * because the production driver (neon-http) has no interactive
  * transactions or row locks: a save that wrote content naming the file
- * before this runs keeps it. The file rows are written out as
- * "artifact_file"."id", never a bare `id` (the correlated-subquery tripwire
- * in AGENTS.md).
+ * before this runs keeps it, and no window opens in which the file could be
+ * attached again and then deleted.
  */
-export function detachUnnamedContentFiles(artifactId: string, fileIds: readonly string[]) {
+export function deleteUnnamedContentFiles(artifactId: string, fileIds: readonly string[]) {
   return getDb()
-    .update(artifactFile)
-    .set({ artifactId: null, attachedAt: null })
-    .where(
-      and(
-        inArray(artifactFile.id, [...fileIds]),
-        eq(artifactFile.artifactId, artifactId),
-        eq(artifactFile.attachedByContent, true),
-        notNamedByArtifact(artifactId),
-      ),
-    )
+    .delete(artifactFile)
+    .where(and(inArray(artifactFile.id, [...fileIds]), eq(artifactFile.artifactId, artifactId), eq(artifactFile.attachedByContent, true), notNamedByArtifact(artifactId)))
     .returning();
 }
 
@@ -131,19 +126,21 @@ export function detachUnnamedContentFiles(artifactId: string, fileIds: readonly 
  * pruning dropped the last version with it. `candidates` narrows the check
  * (the files a save stopped naming); without it, every content file of the
  * artifact the current state does not show is checked. Plain attachments
- * are never removed. Each file is detached first, with a last check against
- * the artifact's current content (detachUnnamedContentFiles), then deleted;
- * if R2 refuses the delete, the cleanup job finishes it as an unattached
- * file. Returns how many went.
+ * are never removed. The rows go in one checked statement
+ * (deleteUnnamedContentFiles), then their R2 objects. Three queries however
+ * many files the artifact keeps. Returns how many went.
  */
 export async function pruneUnusedContentFiles(artifactId: string, candidates?: readonly string[]): Promise<number> {
   if (candidates?.length === 0) return 0;
   const current = await currentState(artifactId);
   if (!current) return 0;
-  const unused = await unusedFiles(artifactId, candidates ?? (await contentFilesNotShown(artifactId, current)), current);
-  if (unused.length === 0) return 0;
-  const detached = await detachUnnamedContentFiles(artifactId, unused);
-  return (await removeFiles(detached)).length;
+  const fileIds = candidates ?? (await contentFilesNotShown(artifactId, current));
+  if (fileIds.length === 0) return 0;
+  const unreferenced = unusedIconFiles(fileIds, current, await retainedImageRefs(artifactId));
+  if (unreferenced.length === 0) return 0;
+  const deleted = await deleteUnnamedContentFiles(artifactId, unreferenced);
+  await deleteStoredObjects(deleted);
+  return deleted.length;
 }
 
 /**

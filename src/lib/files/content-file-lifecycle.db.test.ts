@@ -33,7 +33,7 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
   const { restoreArtifactVersion, updateArtifact } = await import("@/lib/artifacts");
   const { pruneArtifactVersions } = await import("@/lib/versions/history");
   const { attachFiles } = await import("./attach");
-  const { detachUnnamedContentFiles, pruneUnusedContentFiles } = await import("./icon-cleanup");
+  const { deleteUnnamedContentFiles, pruneUnusedContentFiles } = await import("./icon-cleanup");
 
   const tag = randomUUID().slice(0, 8);
   const author = `lifecycle-${tag}-author`;
@@ -180,7 +180,7 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
     await updateArtifact(author, doc, { content: embed(shot ?? "") });
     // A Restore between its file check and its version write: the artifact names the file, no version does.
     await getDb().delete(artifactVersion).where(eq(artifactVersion.artifactId, doc));
-    await expect(detachUnnamedContentFiles(doc, [shot ?? ""])).resolves.toEqual([]);
+    await expect(deleteUnnamedContentFiles(doc, [shot ?? ""])).resolves.toEqual([]);
     expect(await attachedIds()).toEqual([shot]);
   });
 });

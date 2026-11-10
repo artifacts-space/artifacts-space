@@ -14,7 +14,7 @@ describe("notNamedByArtifact", () => {
     const compact = text.replace(/\s+/g, " ");
     expect(params).toEqual(["a1", "a1"]);
     expect(compact).toContain('from "artifact" a where a.id = $1 and strpos(lower(a.content), "artifact_file"."id") > 0');
-    expect(compact).toContain('from "artifact_version" v where v.artifact_id = $2 and strpos(lower(v.content), "artifact_file"."id") > 0');
+    expect(compact).toContain(`from "artifact_version" v where v.artifact_id = $2 and v.kind in ('ui', 'markdown') and strpos(lower(v.content), "artifact_file"."id") > 0`);
     const subqueries = compact.slice(compact.indexOf("not exists")).replaceAll('"artifact_file"."id"', "").replace(/\b[av]\.\w+/gu, "");
     expect(subqueries).not.toMatch(/\b(id|artifact_id|content)\b/u);
   });

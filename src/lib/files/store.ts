@@ -112,6 +112,20 @@ export async function usableFileRows(authorId: string, artifactId: string | null
 }
 
 /**
+ * Deletes the R2 objects of file rows already deleted, for callers that
+ * must delete the row first, under a check, in one statement. An object R2
+ * refuses to delete is left behind and logged by key; with no row, no one
+ * can open it.
+ */
+export async function deleteStoredObjects(rows: readonly Pick<ArtifactFileRecord, "key">[]): Promise<void> {
+  if (rows.length === 0) return;
+  const config = r2ConfigFromEnv();
+  const results = await Promise.allSettled(rows.map((row) => deleteObject(config, row.key)));
+  const failed = rows.filter((_, index) => results[index]?.status === "rejected").map((row) => row.key);
+  if (failed.length > 0) console.error(`[files] ${String(failed.length)} R2 objects of deleted files could not be deleted`, failed);
+}
+
+/**
  * Deletes files from R2 and then their rows. A row stays when its object
  * could not be deleted, so the cleanup job tries again. Returns the ids removed.
  */
