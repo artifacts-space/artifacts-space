@@ -65,6 +65,8 @@ export function SheetFormatProvider({ stored, save, children }: ProviderProps) {
   // Formatting changed elsewhere (another editor, or a restore) replaces what is shown and is what a failed
   // save rolls back to. A new object with the same content, as a content save's refresh brings while a
   // formatting save is still in flight, changes nothing, so the optimistic value never flips back.
+  // Resetting the queue here, in render, is safe: it only replaces the rollback baseline with `stored`,
+  // so a discarded render (concurrent, or StrictMode's double render) and the committed one do the same.
   if (!sameSheetFormat(seen, stored)) {
     setSeen(stored);
     setShown(stored);
@@ -157,7 +159,8 @@ export function ColumnAlignOptions({ value, onChange }: ColumnAlignControl) {
           aria-pressed={value === choice}
           aria-label={choice === "auto" ? "Align automatically" : `Align ${alignmentLabels[choice].toLowerCase()}`}
           title={alignmentLabels[choice]}
-          onClick={() => { onChange(choice); }}
+          // A click on the alignment already in place saves nothing.
+          onClick={() => { if (choice !== value) onChange(choice); }}
         >
           {alignIcons[choice]}
         </Button>
