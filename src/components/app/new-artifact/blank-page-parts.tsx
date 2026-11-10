@@ -66,13 +66,13 @@ interface BlankPageFilesProps {
   /** Shown before anything was added: the quiet "Upload files" button. */
   showUpload: boolean;
   dragging: boolean;
-  readFailed: string | null;
+  filesProblem: string | null;
 }
 
 /** The blank page's files section, when the page is a new artifact and there is something to show. */
-export function BlankPageFilesSlot({ page, dragging }: { page: { active: boolean; eligible: boolean; readFailed: string | null; uploads: { items: readonly UploadItem[]; remove: (key: string) => void }; onContent: (content: { files: File[] }) => void }; dragging: boolean }) {
-  const { active, eligible, readFailed, uploads, onContent } = page;
-  if (!active || (!eligible && uploads.items.length === 0 && !readFailed)) return null;
+export function BlankPageFilesSlot({ page, dragging }: { page: { active: boolean; eligible: boolean; filesProblem: string | null; uploads: { items: readonly UploadItem[]; remove: (key: string) => void }; onContent: (content: { files: File[] }) => void }; dragging: boolean }) {
+  const { active, eligible, filesProblem, uploads, onContent } = page;
+  if (!active || (!eligible && uploads.items.length === 0 && !filesProblem)) return null;
   return (
     <BlankPageFiles
       items={uploads.items}
@@ -80,7 +80,7 @@ export function BlankPageFilesSlot({ page, dragging }: { page: { active: boolean
       onRemove={(key) => { uploads.remove(key); }}
       showUpload={eligible}
       dragging={dragging}
-      readFailed={readFailed}
+      filesProblem={filesProblem}
     />
   );
 }
@@ -90,7 +90,7 @@ export function BlankPageFilesSlot({ page, dragging }: { page: { active: boolean
  * empty, the uploads' progress and errors once files were dropped or picked,
  * and a hint while something is held over the page.
  */
-export function BlankPageFiles({ items, onFiles, onRemove, showUpload, dragging, readFailed }: BlankPageFilesProps) {
+export function BlankPageFiles({ items, onFiles, onRemove, showUpload, dragging, filesProblem }: BlankPageFilesProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="flex flex-col gap-3 px-5 pb-4 sm:px-7">
@@ -117,7 +117,7 @@ export function BlankPageFiles({ items, onFiles, onRemove, showUpload, dragging,
           />
         </div>
       ) : null}
-      {readFailed ? <p role="alert" className="text-sm text-tone-danger">{readFailed}</p> : null}
+      {filesProblem ? <p role="alert" className="text-sm text-tone-danger">{filesProblem}</p> : null}
       {items.length > 0 ? <FileUploader items={items} onFiles={onFiles} onRemove={onRemove} /> : null}
     </div>
   );

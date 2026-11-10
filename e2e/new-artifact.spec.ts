@@ -199,7 +199,12 @@ test("should add later files through the artifact's Files section once a drop ma
   await expect(page.getByText("Drop files here, or")).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Upload files" })).toHaveCount(0);
 
+  // Held while it uploads: the Files section shows it, and the blank page's own uploader stays gone.
+  await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-uploads", "1"); });
   await dropFiles(files.getByText("Drop files here, or"), ["Second.pdf"]);
+  await expect(files.getByText("Second.pdf")).toBeVisible();
+  await expect(page.getByText("Drop files here, or")).toHaveCount(1);
+  await page.evaluate(() => { window.sessionStorage.removeItem("fixture:hold-uploads"); window.dispatchEvent(new Event("fixture:release-uploads")); });
   await expect(files).toContainText("2 attached");
   await expect.poll(async () => (await storedNew(page))[0]?.files.length).toBe(2);
   expect((await storedNew(page))[0]?.kind).toBe("file");

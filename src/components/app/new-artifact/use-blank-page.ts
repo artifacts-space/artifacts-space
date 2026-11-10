@@ -141,7 +141,7 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
     eligible,
     takesFiles: active,
     uploads,
-    readFailed: uploadProblem,
+    filesProblem: uploadProblem,
     detected: stillDetected(detected, draft),
     dismissDetected,
   };
