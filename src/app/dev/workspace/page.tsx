@@ -17,10 +17,11 @@ export const metadata: Metadata = {
  * Development-only page for the app shell e2e test: the /app workspace with
  * long artifacts, a long list, and projects, without a database. The
  * project filter in the URL works as on /app, and so does the
- * `?artifact=<id>&comments=1` link. Returns 404 in every other environment.
+ * `?artifact=<id>&comments=1` link. `?scopes=1` adds shared teams, so the
+ * scope tabs show. Returns 404 in every other environment.
  */
 export default async function WorkspaceFixturePage({ searchParams }: PageProps<"/dev/workspace">) {
   if (process.env.NODE_ENV !== "development") notFound();
   const params = await searchParams;
-  return <WorkspaceFixture projectFilter={parseProjectFilter(params)} link={parseArtifactLink(params)} />;
+  return <WorkspaceFixture projectFilter={parseProjectFilter(params)} link={parseArtifactLink(params)} scopes={params.scopes === "1"} />;
 }

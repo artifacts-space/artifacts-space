@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 import type { ShareTeam } from "./share-teams-context";
 
-/** Mine, then one tab per shared team. The active scope comes from the URL. */
+/** Mine, then one tab per shared team, in one row that scrolls sideways when it runs out of room. The active scope comes from the URL. */
 export function ScopeTabs({ teams, activeSlug }: { teams: readonly ShareTeam[]; activeSlug: string | null }) {
   const tabs = [{ key: "mine", label: "Mine", href: "/app", active: activeSlug === null }].concat(
     teams
@@ -13,14 +13,14 @@ export function ScopeTabs({ teams, activeSlug }: { teams: readonly ShareTeam[]; 
   );
   if (tabs.length === 1) return null;
   return (
-    <nav aria-label="Artifact scope" className="mb-4 flex flex-wrap gap-1">
+    <nav aria-label="Artifact scope" className="-m-0.5 flex min-w-0 gap-1 overflow-x-auto p-0.5 [scrollbar-width:none]">
       {tabs.map((tab) => (
         <Link
           key={tab.key}
           href={tab.href}
           aria-current={tab.active ? "page" : undefined}
           className={cn(
-            "rounded-sm px-2.5 py-1 text-sm transition-colors",
+            "shrink-0 rounded-sm px-2.5 py-1 text-sm whitespace-nowrap transition-colors",
             tab.active ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
           )}
         >

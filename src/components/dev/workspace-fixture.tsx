@@ -21,6 +21,11 @@ import { fixtureNotifications } from "./notification-fixture";
 /** The viewer's personal team, so the Share dialog can offer link and public sharing. It adds no scope tab. */
 const fixtureTeams: ShareTeam[] = [{ id: "fixture-team", slug: "fixture", name: "Fixture", personal: true, role: "owner", roleKey: "owner", kind: "person", capabilities: [...defaultRoleCapabilities.owner], teamSharingNeedsApproval: false }];
 
+/** Shared teams for `?scopes=1`, with names long enough that the scope tabs run out of room on a phone. */
+const fixtureSharedTeams: ShareTeam[] = ["Design", "Platform engineering", "Customer research"].map((name, index) => ({
+  id: `fixture-shared-${String(index)}`, slug: `fixture-shared-${String(index)}`, name, personal: false, role: "member", roleKey: "member", kind: "person", capabilities: [...defaultRoleCapabilities.member], teamSharingNeedsApproval: false,
+}));
+
 /** Four long artifacts first, then enough short ones that the list scrolls. Note 2 has comments on; Note 9 has a theme. */
 function fixtureArtifacts(): ArtifactDto[] {
   const long = [
@@ -54,9 +59,10 @@ function useFixtureProjects(artifacts: readonly ArtifactDto[]) {
  * Development only: the real /app workspace (frame, header, list, editor)
  * with long artifacts, a long list, and projects, and no database. Every
  * artifact is handed in full, so none loads. Project changes stay in
- * memory. The app shell and sidebar projects e2e tests use it.
+ * memory. The app shell and sidebar projects e2e tests use it. With
+ * `scopes`, the viewer is also in shared teams, so the scope tabs show.
  */
-export function WorkspaceFixture({ projectFilter, link = null }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null }) {
+export function WorkspaceFixture({ projectFilter, link = null, scopes = false }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null; scopes?: boolean }) {
   const base = useMemo(() => fixtureArtifacts(), []);
   const { state, api } = useFixtureProjects(base);
   const artifacts = useMemo(() => withProjects(base, state), [base, state]);
@@ -73,7 +79,7 @@ export function WorkspaceFixture({ projectFilter, link = null }: { projectFilter
           initialFull={artifacts}
           origin="http://localhost"
           viewerId="fixture"
-          teams={fixtureTeams}
+          teams={scopes ? [...fixtureTeams, ...fixtureSharedTeams] : fixtureTeams}
           scopeTeam={null}
           facets={facets}
           projectRows={state.rows}

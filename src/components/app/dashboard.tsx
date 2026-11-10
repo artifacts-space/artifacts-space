@@ -114,24 +114,25 @@ function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate
   );
 }
 
-/** Title, counts (every artifact in scope and the projects they use), and the create button. Team scopes list others' work, so they have no create button. */
-function DashboardHeading({ facets, scopeTeam, onCreate }: { facets: ProjectFacets; scopeTeam: ShareTeam | null; onCreate: () => void }) {
-  const total = facets.total;
-  const projects = facets.projects.length;
+/**
+ * The slim bar right under the app header: scope tabs on the left, the create
+ * button on the right, so the workspace below gets the height. The page's h1
+ * stays for screen readers only. Team scopes list others' work, so they have
+ * no create button. On phones the button shows only its icon and keeps its name.
+ */
+function WorkspaceBar({ teams, scopeTeam, onCreate }: { teams: readonly ShareTeam[]; scopeTeam: ShareTeam | null; onCreate: () => void }) {
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="text-xl font-medium tracking-[-0.01em]">{scopeTeam ? `Shared with ${scopeTeam.name}` : "Artifacts"}</h1>
-        <p className="mt-1 text-md text-muted-foreground">
-          {total} {total === 1 ? "artifact" : "artifacts"} across {projects} {projects === 1 ? "project" : "projects"}
-        </p>
+    <>
+      <h1 className="sr-only">{scopeTeam ? `Shared with ${scopeTeam.name}` : "Artifacts"}</h1>
+      <div data-slot="workspace-bar" className="flex min-h-11 shrink-0 items-center gap-3 py-2">
+        <ScopeTabs teams={teams} activeSlug={scopeTeam?.slug ?? null} />
+        {scopeTeam ? null : (
+          <Button size="sm" onClick={onCreate} className="ml-auto shrink-0 max-sm:size-7 max-sm:px-0">
+            <IconPlus /><span className="max-sm:sr-only">New artifact</span>
+          </Button>
+        )}
       </div>
-      {scopeTeam ? null : (
-        <Button onClick={onCreate} className="px-3">
-          <IconPlus /> New artifact
-        </Button>
-      )}
-    </div>
+    </>
   );
 }
 
@@ -230,9 +231,8 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
     <ShareTeamsProvider teams={teams}>
       <LinkedCommentsProvider publicId={linkedCommentsId(link)}>
       {/* An app shell from md up: the frame is the viewport (workspace-frame), and only the list and the artifact scroll. */}
-      <main data-app-shell className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col p-4 sm:p-6 md:min-h-0 md:flex-1">
-        <ScopeTabs teams={teams} activeSlug={scopeTeam?.slug ?? null} />
-        <DashboardHeading facets={facets} scopeTeam={scopeTeam} onCreate={() => { setCreateOpen(true); }} />
+      <main data-app-shell className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col px-4 pb-4 sm:px-6 sm:pb-6 md:min-h-0 md:flex-1">
+        <WorkspaceBar teams={teams} scopeTeam={scopeTeam} onCreate={() => { setCreateOpen(true); }} />
 
         <PanelSizesBeforePaint />
         {/* overflow-clip, not hidden: it rounds the corners without becoming a scroll box, so the artifact's toolbar can stick on phones. */}
