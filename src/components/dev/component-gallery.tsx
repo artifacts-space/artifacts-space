@@ -12,7 +12,7 @@ import { AvatarGallery } from "@/components/dev/avatar-gallery";
 import { ArtifactHeaderSpecimen } from "@/components/dev/artifact-header-specimen";
 import { CoverSpecimen } from "@/components/dev/cover-specimen";
 import { HarnessSpecimen } from "@/components/dev/harness-specimen";
-import { mediaFixtureFiles, mediaStandInUrl } from "@/components/dev/media-stand-ins";
+import { imageStandIn, mediaFixtureFiles, mediaStandInUrl } from "@/components/dev/media-stand-ins";
 import { NotificationsSpecimen } from "@/components/dev/notifications-specimen";
 import { SwitchSpecimen } from "@/components/dev/switch-specimen";
 import { ThemeFocusSpecimen } from "@/components/dev/theme-focus-specimen";
@@ -39,14 +39,8 @@ const specFixtures: { name: string; spec: unknown }[] = [
   { name: "Too deep (21)", spec: deepSpec(21) },
 ];
 
-/** Gallery files are not uploaded: every one shows a local stand-in image instead. */
-/**
- * Every fixture file (image, PDF, video) shows this stand-in. It is an inline
- * data URL, not a file on this site: the site sends frame-ancestors 'none'
- * (src/lib/security-header-rules.ts), so a PDF iframe pointed at a site path
- * would be blocked, while the real viewer frames /api/files, which allows it.
- */
-const standInUrl = () => "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 3'%3E%3Crect width='4' height='3' fill-opacity='.08'/%3E%3C/svg%3E";
+/** Gallery files are not uploaded: outside the media group, every one (image or PDF) shows the SVG stand-in (media-stand-ins.ts). */
+const standInUrl = () => imageStandIn;
 
 /** One format viewer specimen, with the gallery's stand-in files (or the media group's, which add a video and a recording). */
 function FormatSpecimen({ fixture, media = false }: { fixture: FormatFixture; media?: boolean }) {
