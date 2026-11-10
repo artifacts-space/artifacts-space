@@ -15,7 +15,7 @@ describe("formatSwitchProblem", () => {
     for (const kind of ["markdown", "text", "code"] as const) expect(formatSwitchProblem(kind, "a,b\n1,2")).toBeNull();
   });
 
-  it("should refuse Markdown when a stored artifact's content is empty", () => {
+  it("should refuse empty Markdown when no stored body is given", () => {
     expect(formatSwitchProblem("markdown", "")).toMatch(/^This content can’t be Markdown yet/);
   });
 
