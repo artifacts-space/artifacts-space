@@ -168,14 +168,13 @@ const quotePrefix = /^ {0,3}> ?/;
 const listMarker = /^([-*+]|\d{1,9}[.)])([ \t]+|\r?\n?$)/;
 
 /**
- * Where the line scan is: inside a fence or an indented code block, inside
- * a list item (and how far its content is indented), inside a block quote
- * (with its own scan of the quoted lines), and whether the last line was
- * blank.
+ * Where the line scan is: inside a fence, inside a list item (and how far
+ * its content is indented), inside a block quote (with its own scan of the
+ * quoted lines), whether the last line was blank, and whether a paragraph
+ * is open.
  */
 interface ScanState {
   fence: string | null;
-  indentedCode: boolean;
   listIndent: number | null;
   afterBlank: boolean;
   /** A paragraph is open, so an indented line continues it rather than starting code. */
@@ -187,7 +186,7 @@ interface ScanState {
 const closesParagraph = /^ {0,3}(?:#{1,6}(?:[ \t]|\r?\n?$)|([-*_])(?:[ \t]*\1){2,}[ \t]*\r?\n?$|(?:=+|-+)[ \t]*\r?\n?$)/u;
 
 function freshScan(): ScanState {
-  return { fence: null, indentedCode: false, listIndent: null, afterBlank: true, paragraph: false, quote: null };
+  return { fence: null, listIndent: null, afterBlank: true, paragraph: false, quote: null };
 }
 
 /** True when `line` closes the open fence. */
@@ -220,11 +219,12 @@ function isCodeLine(line: string, state: ScanState): boolean {
   }
   const quote = quotePrefix.exec(line);
   if (quote) {
-    state.quote ??= freshScan();
+    const inner = (state.quote ??= freshScan());
     state.afterBlank = false;
-    // A line after the quote may be a lazy continuation of its paragraph, so it is never code.
-    state.paragraph = true;
-    return isCodeLine(line.slice(quote[0].length), state.quote);
+    const code = isCodeLine(line.slice(quote[0].length), inner);
+    // A line after the quote is a lazy continuation, never code, only while the quote's paragraph is open.
+    state.paragraph = inner.paragraph;
+    return code;
   }
   state.quote = null;
   if (blankLine.test(line)) {
@@ -246,19 +246,29 @@ function scanLine(line: string, state: ScanState): boolean {
   const afterBlank = state.afterBlank;
   state.afterBlank = false;
   const { indent } = leadingSpaces(line);
-  const base = state.listIndent ?? 0;
-  if (indent >= base + 4) {
-    state.indentedCode = !state.paragraph;
-    return state.indentedCode;
-  }
-  state.indentedCode = false;
+  if (indent >= (state.listIndent ?? 0) + 4) return !state.paragraph;
   // Out of the list: a line less indented than the item's content, after a blank line.
   if (state.listIndent !== null && afterBlank && indent < state.listIndent) state.listIndent = null;
-  // A fence can open on the list marker's own line (`- ```bash`): test the item's content, after the marker.
-  const content = startsListItem(line, state) ?? relativeTo(line, state);
+  const itemContent = startsListItem(line, state);
+  const content = itemContent ?? relativeTo(line, state);
+  const code = (itemContent !== null && startsIndentedCode(itemContent)) || opensFence(content, state);
+  state.paragraph = !code && leavesParagraphOpen(content);
+  return code;
+}
+
+/**
+ * Opens a fence when `content` starts one. A fence can open on the list
+ * marker's own line (`- ```bash`), so for an item's first line this is the
+ * content after the marker.
+ */
+function opensFence(content: string, state: ScanState): boolean {
   state.fence = fenceOpen.exec(content)?.[1] ?? null;
-  state.paragraph = state.fence === null && leavesParagraphOpen(content);
   return state.fence !== null;
+}
+
+/** A list item whose content starts four or more spaces past the marker's gap starts with an indented code block. */
+function startsIndentedCode(itemContent: string): boolean {
+  return !blankLine.test(itemContent) && leadingSpaces(itemContent).indent >= 4;
 }
 
 /** Whether a line of text (not code) leaves a paragraph open after it. */

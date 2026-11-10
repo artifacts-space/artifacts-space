@@ -200,6 +200,14 @@ describe("absoluteFileLinks", () => {
     expect(out).toContain(`    [lazy](https://artifacts.space/api/files/${other})`);
   });
 
+  it("should leave indented code after a quote's blank line, or at a list item's start, as written", () => {
+    const markdown = ["> quote", ">", `    ![x](/api/files/${id})`, "", `-     [item](/api/files/${id})`, "", "> lazy", `    [cont](/api/files/${other})`].join("\n");
+    const out = absoluteFileLinks(markdown, "https://artifacts.space");
+    expect(out).toContain(`    ![x](/api/files/${id})`);
+    expect(out).toContain(`-     [item](/api/files/${id})`);
+    expect(out).toContain(`    [cont](https://artifacts.space/api/files/${other})`);
+  });
+
   it("should leave this site's absolute links in list and quote code as written when a save takes them back", () => {
     const markdown = `- item\n\n      [code](https://artifacts.space/api/files/${id})\n\n>     [quoted code](https://artifacts.space/api/files/${id})`;
     expect(relativeFileLinks(markdown, "https://artifacts.space")).toBe(markdown);
