@@ -150,8 +150,15 @@ function isDiagramHeader(line: string, keyword: string): boolean {
   return true;
 }
 
-/** A line of diagram source: a sub-keyword, an arrow or link, a label, or a node shape. Prose lines have none of these. */
-const diagramLine = /^\s*(?:title|section|dateFormat|axisFormat|excludes|todayMarker|x-axis|y-axis|accTitle|accDescr)\b|-->|---|==>|-\.->|:\s*\S|[[\](){}|]/;
+/** A diagram line's sub-keyword, label, or node shape. */
+const diagramSyntax = /^\s*(?:title|section|dateFormat|axisFormat|excludes|todayMarker|x-axis|y-axis|accTitle|accDescr)\b|:\s*\S|[[\](){}|]/;
+/** Mermaid's arrows and links, matched as plain text. */
+const diagramArrows = ["-->", "---", "==>", "-.->"] as const;
+
+/** True for a line of diagram source: a sub-keyword, an arrow or link, a label, or a node shape. Prose lines have none of these. */
+function isDiagramLine(line: string): boolean {
+  return diagramSyntax.test(line) || diagramArrows.some((arrow) => line.includes(arrow));
+}
 
 /**
  * True when the lines under the header read as a diagram. A keyword that is
@@ -161,7 +168,7 @@ const diagramLine = /^\s*(?:title|section|dateFormat|axisFormat|excludes|todayMa
 function hasDiagramBody(header: string, keyword: string, body: readonly string[]): boolean {
   const bare = header.trim().slice(keyword.length).trim().replace(/;$/, "") === "";
   if (!wordKeywords.has(keyword) || !bare) return body.length > 0;
-  return body.length > 0 && body.every((line) => diagramLine.test(line));
+  return body.length > 0 && body.every(isDiagramLine);
 }
 
 function detectMermaid(text: string): Detection | null {
