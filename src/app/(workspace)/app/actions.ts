@@ -9,7 +9,6 @@ import { actionErrorMessage } from "@/lib/action-errors";
 import { loadArtifactForViewer } from "@/lib/artifact-read";
 import { getSession } from "@/lib/session";
 import {
-  createArtifact,
   deleteArtifact,
   listArtifacts,
   updateArtifact,
@@ -18,7 +17,6 @@ import {
 import type {
   ActionResult,
   ArtifactDto,
-  ArtifactInput,
   ArtifactListItemDto,
   SaveArtifactResult,
 } from "@/lib/artifact-types";
@@ -51,19 +49,6 @@ async function requireUserId() {
 
 function errorMessage(error: unknown) {
   return actionErrorMessage(error, "The artifact could not be saved. Please try again.");
-}
-
-export async function createArtifactAction(
-  input: ArtifactInput,
-): Promise<ActionResult<ArtifactDto>> {
-  try {
-    const userId = await requireUserId();
-    const created = await createArtifact(userId, { ...input, source: input.source || "web" });
-    revalidatePath("/app");
-    return { success: true, data: created };
-  } catch (error) {
-    return { success: false, error: errorMessage(error) };
-  }
 }
 
 /** The newest version of an artifact the viewer may read, for a refused save; undefined when it cannot load. */
