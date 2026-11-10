@@ -5,7 +5,7 @@ import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave
 import type { ArtifactDraft } from "@/components/app/artifact-editor/use-artifact-draft";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { detectFileText, detectTextKind, filePlan, type Detection } from "@/lib/create/detect-kind-rules";
-import { BLANK_ARTIFACT_ID, blankDraftProblem, contentRoute, isUntouched, persistOnce } from "@/lib/create/new-artifact-rules";
+import { BLANK_ARTIFACT_ID, blankDraftProblem, contentRoute, isUntouched, persistOnce, takesFirstContent, type PageForContent } from "@/lib/create/new-artifact-rules";
 
 import type { NewArtifactApi } from "./new-artifact-api";
 import { useBlankUploads } from "./use-blank-uploads";
@@ -51,10 +51,6 @@ async function readAsText(files: readonly File[]): Promise<Detection | null> {
   return detectFileText(file.name, await file.text(), plan);
 }
 
-/** True while the empty body still takes first content: files already dropped make it a Files artifact, so later pastes go to the editor as usual. */
-function takesFirstContent(active: boolean, draft: ArtifactDraft, uploadCount: number): boolean {
-  return active && draft.kind === "markdown" && draft.content.trim() === "" && uploadCount === 0;
-}
 
 /** The chip while the content is still as detected: any edit after detection, or a format change, hides it. */
 function stillDetected(detected: DetectedFormat | null, draft: ArtifactDraft): DetectedFormat | null {
@@ -88,7 +84,6 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
   const blank = options !== undefined && artifact.id === BLANK_ARTIFACT_ID;
   const draftRef = useRef(draft);
   const [detected, setDetected] = useState<DetectedFormat | null>(null);
-  const [readFailed, setReadFailed] = useState<string | null>(null);
   useEffect(() => { draftRef.current = draft; }, [draft]);
 
   const active = options !== undefined;
@@ -111,16 +106,15 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
     setDetected(detection.kind === "markdown" ? null : { kind: detection.kind, language: detection.language, content: detection.content });
   }, [replace]);
 
-  // First content only while the body is empty; while dropped files are on their way, more files join them (contentRoute).
-  const eligible = takesFirstContent(active, draft, uploads.items.length);
-  const addingFiles = active && uploads.items.length > 0;
-  const routeRef = useRef({ firstContent: eligible, addingFiles });
-  useEffect(() => { routeRef.current = { firstContent: eligible, addingFiles }; }, [eligible, addingFiles]);
+  // First content only while the body is empty; any other file dropped on this page uploads and is attached (contentRoute, uploadStep).
+  const uploadCount = uploads.items.length;
+  const eligible = takesFirstContent({ active, kind: draft.kind, content: draft.content, uploadCount });
+  const routeRef = useRef<PageForContent>({ active, kind: draft.kind, content: draft.content, uploadCount });
+  useEffect(() => { routeRef.current = { active, kind: draft.kind, content: draft.content, uploadCount }; }, [active, draft.kind, draft.content, uploadCount]);
 
   const onContent = useCallback((content: FirstContent) => {
     const route = contentRoute("text" in content, routeRef.current);
     if (route === "ignore") return;
-    setReadFailed(null);
     if ("text" in content) {
       apply(detectTextKind(content.text));
       return;
@@ -131,8 +125,9 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
     }
     readAsText(content.files)
       // Typed into while the file was read: the writing stays, and the file uploads instead.
-      .then((detection) => { if (detection && routeRef.current.firstContent) apply(detection); else uploads.addFiles(content.files); })
-      .catch(() => { setReadFailed("That file could not be read. Try again, or upload it."); });
+      .then((detection) => { if (detection && takesFirstContent(routeRef.current)) apply(detection); else uploads.addFiles(content.files); })
+      // Not readable as text: it still uploads, as any other file would.
+      .catch(() => { uploads.addFiles(content.files); });
   }, [apply, uploads]);
 
   const dismissDetected = useCallback(() => { setDetected(null); }, []);
@@ -144,9 +139,9 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
     idle,
     onContent,
     eligible,
-    addingFiles,
+    takesFiles: active,
     uploads,
-    readFailed: readFailed ?? uploadProblem,
+    readFailed: uploadProblem,
     detected: stillDetected(detected, draft),
     dismissDetected,
   };

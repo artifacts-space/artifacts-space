@@ -158,16 +158,33 @@ export function uploadStep({ stored, busy, readyIds, attachedIds, handedIds }: U
   return fresh.length === 0 ? { step: "wait" } : { step: "create", ids: fresh };
 }
 
-/** What the blank page does with a paste or drop: read it as first content, add the files as uploads, or leave it to the editor. */
+/** The new artifact's page, as far as a paste or drop needs to know. */
+export interface PageForContent {
+  /** The editor shows the New artifact pane (before and after the create). */
+  active: boolean;
+  kind: string;
+  content: string;
+  /** Files dropped on the page that have not reached the artifact yet. */
+  uploadCount: number;
+}
+
+/** True while the empty body still takes first content: an empty Markdown body, with no dropped files on their way. */
+export function takesFirstContent({ active, kind, content, uploadCount }: PageForContent): boolean {
+  return active && kind === "markdown" && content.trim() === "" && uploadCount === 0;
+}
+
+/** What the page does with a paste or drop: read it as first content, upload and attach the files, or leave it to the editor. */
 export type ContentRoute = "first" | "upload" | "ignore";
 
 /**
- * Routes content on the blank page. Only an empty body takes first content
- * (text or files that may pick the format). While dropped files are still on
- * their way, more files join them as uploads and are never read into the
- * body, so writing typed in the meantime is never replaced.
+ * Routes a paste or drop on the New artifact pane. Only an empty Markdown
+ * body takes first content, which may pick the format. Any other file
+ * dropped there uploads and is attached to the artifact (uploadStep), in
+ * every format, created first when it is not stored yet; it is never read
+ * into the body, so writing is never replaced. Other text is an ordinary
+ * paste for the editor.
  */
-export function contentRoute(isText: boolean, { firstContent, addingFiles }: { firstContent: boolean; addingFiles: boolean }): ContentRoute {
-  if (firstContent) return "first";
-  return !isText && addingFiles ? "upload" : "ignore";
+export function contentRoute(isText: boolean, page: PageForContent): ContentRoute {
+  if (takesFirstContent(page)) return "first";
+  return !isText && page.active ? "upload" : "ignore";
 }

@@ -10,7 +10,7 @@ interface FirstContentOptions {
   body: RefObject<HTMLElement | null>;
   /** Take pasted or dropped text: only while the page is a new artifact with an empty body. */
   text: boolean;
-  /** Take dropped or pasted files: while the body is empty, and while dropped files are still uploading. */
+  /** Take dropped or pasted files: anywhere on the new artifact's page. */
   files: boolean;
   onContent: (content: FirstContent) => void;
 }

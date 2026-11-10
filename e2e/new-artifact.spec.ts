@@ -243,6 +243,35 @@ test("should upload a code file dropped while files are on their way, and keep w
   expect(await creates(page)).toBe(1);
 });
 
+test("should attach a file dropped on a page that already has writing, and keep the writing", async ({ page }) => {
+  await openNewArtifact(page);
+  await page.keyboard.type("Notes");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Written first");
+  await expect(cards(page, "Notes")).toHaveCount(1);
+  await dropFiles(body(page), ["Screenshot.pdf"]);
+  await expect(page.getByRole("region", { name: "Files" })).toContainText("1 attached");
+  await expect(body(page)).toContainText("Written first");
+  await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(1);
+  await expect.poll(async () => (await storedNew(page))[0]?.content, { timeout: 15_000 }).toContain("Written first");
+  const [stored] = await storedNew(page);
+  expect(stored?.kind).toBe("markdown");
+  expect(await creates(page)).toBe(1);
+});
+
+test("should attach a file dropped on a page whose format is not Markdown, and keep its content", async ({ page }) => {
+  await openNewArtifact(page);
+  await pasteIntoBody(page, "name,value\nAda,1\nBo,2");
+  await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe("csv");
+  await dropFiles(body(page), ["Source.pdf"]);
+  await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(1);
+  await expect(page.getByRole("region", { name: "Files" })).toContainText("1 attached");
+  const [stored] = await storedNew(page);
+  expect(stored?.kind).toBe("csv");
+  expect(stored?.content).toBe("name,value\nAda,1\nBo,2");
+  expect(await creates(page)).toBe(1);
+});
+
 test("should move Format and language into the More menu of a stored artifact", async ({ page }) => {
   await page.goto("/dev/workspace");
   await cards(page, "Note 2").click();

@@ -182,21 +182,42 @@ describe("isWebCreateSessionId", () => {
 });
 
 describe("contentRoute", () => {
+  const empty = { active: true, kind: "markdown", content: "", uploadCount: 0 };
+
   it("should read text or files as first content when the body is empty", () => {
-    expect(contentRoute(true, { firstContent: true, addingFiles: false })).toBe("first");
-    expect(contentRoute(false, { firstContent: true, addingFiles: false })).toBe("first");
+    expect(contentRoute(true, empty)).toBe("first");
+    expect(contentRoute(false, empty)).toBe("first");
   });
 
-  it("should add files as uploads, never read them into the body, when files are already on their way", () => {
-    expect(contentRoute(false, { firstContent: false, addingFiles: true })).toBe("upload");
+  it("should upload and attach a file, never read it into the body, when someone typed first", () => {
+    const typed = { ...empty, content: "Written first" };
+    expect(contentRoute(false, typed)).toBe("upload");
+    expect(contentRoute(true, typed), "a paste is the editor's").toBe("ignore");
   });
 
-  it("should leave text to the editor when the body is no longer first content", () => {
-    expect(contentRoute(true, { firstContent: false, addingFiles: true })).toBe("ignore");
-    expect(contentRoute(true, { firstContent: false, addingFiles: false })).toBe("ignore");
+  it("should upload and attach a file when the page's format is not Markdown", () => {
+    expect(contentRoute(false, { ...empty, kind: "csv", content: "a,b\n1,2" })).toBe("upload");
+    expect(contentRoute(false, { ...empty, kind: "code", content: "" })).toBe("upload");
   });
 
-  it("should leave files to the artifact's own Files section when nothing is uploading", () => {
-    expect(contentRoute(false, { firstContent: false, addingFiles: false })).toBe("ignore");
+  it("should add files dropped during an upload to the uploads, not read them, when the body is still empty", () => {
+    const uploading = { ...empty, uploadCount: 1 };
+    expect(contentRoute(false, uploading)).toBe("upload");
+    expect(contentRoute(true, uploading)).toBe("ignore");
+  });
+
+  it("should leave everything to the editor when the page is not a new artifact", () => {
+    expect(contentRoute(false, { ...empty, active: false })).toBe("ignore");
+    expect(contentRoute(true, { ...empty, active: false })).toBe("ignore");
+  });
+});
+
+describe("uploadStep for a page with content", () => {
+  it("should hand the files to the create when the page has writing but is not stored yet", () => {
+    expect(uploadStep({ stored: false, busy: false, readyIds: ["f-1"], attachedIds: [], handedIds: [] })).toEqual({ step: "create", ids: ["f-1"] });
+  });
+
+  it("should attach the files when the page with writing is already stored", () => {
+    expect(uploadStep({ stored: true, busy: false, readyIds: ["f-1"], attachedIds: [], handedIds: [] })).toEqual({ step: "attach", ids: ["f-1"] });
   });
 });
