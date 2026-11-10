@@ -88,3 +88,33 @@ test("should move a block by dragging its handle onto another block", async ({ p
   await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
   expect(await rootChildren(page)).toEqual(["Heading", "Tabs", "Text", "Callout"]);
 });
+
+test("should refuse a pasted file and offer no media blocks when typing in an interface's Markdown block", async ({ page }) => {
+  await openBlocks(page);
+  await editor(page).getByRole("button", { name: "Add a block", exact: true }).last().click();
+  await page.getByRole("combobox", { name: "Search blocks" }).fill("markdown");
+  await page.keyboard.press("Enter");
+  const markdown = editor(page).getByRole("textbox", { name: "Markdown" });
+  await expect(markdown).toBeVisible();
+  await markdown.click();
+  await page.keyboard.type("Notes ");
+
+  // A pasted screenshot would never attach to a ui artifact, so the block says so and keeps only the text.
+  await markdown.evaluate((element) => {
+    const data = new DataTransfer();
+    data.items.add(new File([new Uint8Array([137, 80, 78, 71])], "Screenshot.png", { type: "image/png" }));
+    element.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(editor(page).getByRole("status").filter({ hasText: "Files can’t go in a Markdown block." })).toBeVisible();
+  await expect(markdown.locator("[data-media-block]")).toHaveCount(0);
+
+  // The slash menu offers text blocks only.
+  await page.keyboard.type("/image");
+  await expect(page.getByText("No blocks match.")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
+  const spec = await savedSpec(page);
+  const block = Object.values(spec.elements).find((element) => element.type === "Markdown");
+  expect(block?.props?.content).toBe("Notes /image");
+});

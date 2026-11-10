@@ -1,1 +1,0 @@
-ALTER TABLE "artifact_file" ADD COLUMN "named_in_content" boolean DEFAULT false NOT NULL;

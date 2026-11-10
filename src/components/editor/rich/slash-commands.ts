@@ -56,6 +56,16 @@ export const slashCommands: readonly SlashCommand[] = [
   { id: "file", title: "File", hint: "#file", keywords: ["file", "attachment", "upload", "download"], icon: IconFile, apply: (chain) => insertMedia(chain, "file") },
 ];
 
+const mediaCommandIds = new Set(["image", "video", "audio", "pdf", "file"]);
+
+/** The text blocks only, for editors that can't hold media (a ui artifact's Markdown block). */
+export const textSlashCommands: readonly SlashCommand[] = slashCommands.filter((command) => !mediaCommandIds.has(command.id));
+
+/** The commands an editor offers: every block, or text blocks only when `media` is false. */
+export function slashCommandsFor(media: boolean): readonly SlashCommand[] {
+  return media ? slashCommands : textSlashCommands;
+}
+
 /**
  * The commands that match what was typed after the slash, by title,
  * keyword, or Markdown hint. An empty query matches everything.

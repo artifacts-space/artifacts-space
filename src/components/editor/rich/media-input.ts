@@ -1,10 +1,12 @@
 import { Extension, type Editor, type JSONContent } from "@tiptap/core";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
+import type { Fragment } from "@tiptap/pm/model";
+import { Plugin, PluginKey, type Transaction } from "@tiptap/pm/state";
+import { ReplaceAroundStep, ReplaceStep } from "@tiptap/pm/transform";
 import type { EditorView } from "@tiptap/pm/view";
 
 import { emptyMediaAttrs, MEDIA_NODE } from "./media-markdown";
 import { defaultMediaLabel, insertableFiles, pasteIsFiles, uploadMediaKind } from "./media-upload-rules";
-import { queueUpload } from "./media-uploads";
+import { forgetUpload, queueUpload } from "./media-uploads";
 
 /** A media block that waits for `file` to upload. */
 export function uploadingMediaNode(file: File): JSONContent {
@@ -39,11 +41,60 @@ function dropPosition(view: EditorView, event: DragEvent): number | undefined {
   return view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
 }
 
+function uploadIdsIn(content: Fragment, into: Set<string>) {
+  content.descendants((node) => {
+    const uploadId: unknown = node.attrs.uploadId;
+    if (node.type.name === MEDIA_NODE && typeof uploadId === "string" && uploadId) into.add(uploadId);
+  });
+}
+
+/** The upload ids of media blocks a change put into the document (inserted, pasted, or given a new upload). */
+export function uploadIdsAdded(tr: Transaction): string[] {
+  const ids = new Set<string>();
+  for (const step of tr.steps) {
+    if (step instanceof ReplaceStep || step instanceof ReplaceAroundStep) uploadIdsIn(step.slice.content, ids);
+  }
+  return [...ids];
+}
+
+const uploadCleanupKey = new PluginKey<Set<string>>("mediaUploadCleanup");
+
+/**
+ * Remembers every upload a media block in this editor waited for, and
+ * forgets them all (the picked File and its preview URL) when the editor
+ * closes. A block removed with the keyboard leaves its upload behind until
+ * then, so Undo still brings back a block that uploads; without this, each
+ * such upload stayed in memory for the life of the tab.
+ */
+export function uploadCleanupPlugin(): Plugin<Set<string>> {
+  return new Plugin<Set<string>>({
+    key: uploadCleanupKey,
+    state: {
+      init: (_config, state) => {
+        const ids = new Set<string>();
+        uploadIdsIn(state.doc.content, ids);
+        return ids;
+      },
+      apply: (tr, ids) => {
+        if (!tr.docChanged) return ids;
+        for (const uploadId of uploadIdsAdded(tr)) ids.add(uploadId);
+        return ids;
+      },
+    },
+    view: (view) => ({
+      destroy: () => {
+        for (const uploadId of uploadCleanupKey.getState(view.state) ?? []) forgetUpload(uploadId);
+      },
+    }),
+  });
+}
+
 /**
  * Pasting or dropping files into a document makes a media block for each:
  * images, video, audio, PDFs, and other files the store takes. Each block
  * uploads its file and shows progress (media-view.tsx). Text pastes, drags
- * inside the editor, and anything in a code block are left alone.
+ * inside the editor, and anything in a code block are left alone. Uploads
+ * are forgotten when the editor closes (uploadCleanupPlugin).
  */
 export const MediaInput = Extension.create({
   name: "mediaInput",
@@ -51,6 +102,7 @@ export const MediaInput = Extension.create({
   addProseMirrorPlugins() {
     const editor = this.editor;
     return [
+      uploadCleanupPlugin(),
       new Plugin({
         key: new PluginKey("mediaInput"),
         props: {
@@ -66,6 +118,43 @@ export const MediaInput = Extension.create({
             if (moved || files.length === 0) return false;
             event.preventDefault();
             return insertFiles(editor, files, dropPosition(view, event));
+          },
+        },
+      }),
+    ];
+  },
+});
+
+/**
+ * For editors that can't hold media, such as a ui artifact's Markdown
+ * block: file pastes and drops are consumed, so nothing uploads and no file
+ * name or image lands as text, and `onRefuse` says why. Text pastes and
+ * drags inside the editor are left alone.
+ */
+export const MediaRefusal = Extension.create<{ onRefuse: () => void }>({
+  name: "mediaRefusal",
+
+  addOptions() {
+    return { onRefuse: () => undefined };
+  },
+
+  addProseMirrorPlugins() {
+    const { onRefuse } = this.options;
+    return [
+      new Plugin({
+        key: new PluginKey("mediaRefusal"),
+        props: {
+          handlePaste: (_view, event) => {
+            if (pastedFiles(event).length === 0) return false;
+            event.preventDefault();
+            onRefuse();
+            return true;
+          },
+          handleDrop: (_view, event, _slice, moved) => {
+            if (moved || (event.dataTransfer?.files.length ?? 0) === 0) return false;
+            event.preventDefault();
+            onRefuse();
+            return true;
           },
         },
       }),

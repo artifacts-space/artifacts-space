@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { languageOptions } from "./code-block-view";
-import { placeholderFor } from "./editor-extensions";
+import { placeholderFor, richEditorExtensions } from "./editor-extensions";
 import { needsRawBlock, splitBlocks } from "./markdown-blocks";
 import { looksLikeMarkdown, shouldPasteAsMarkdown } from "./markdown-paste";
 import { codeFence, isAllowedEditorUri } from "./markdown-schema";
-import { filterSlashCommands } from "./slash-commands";
+import { filterSlashCommands, slashCommandsFor } from "./slash-commands";
 
 describe("filterSlashCommands", () => {
   it("should offer every block when nothing is typed after the slash", () => {
@@ -28,6 +28,29 @@ describe("filterSlashCommands", () => {
 
   it("should match nothing when no block fits", () => {
     expect(filterSlashCommands("zzz")).toEqual([]);
+  });
+});
+
+describe("editors without media", () => {
+  const onLinkShortcut = () => false;
+  const names = (media: boolean) => richEditorExtensions({ onLinkShortcut, media }).map((extension) => extension.name);
+
+  it("should offer text blocks only when media is off", () => {
+    const ids = slashCommandsFor(false).map((command) => command.id);
+    expect(ids).toEqual(["h1", "h2", "h3", "bullet", "ordered", "task", "quote", "code", "table", "divider"]);
+    expect(filterSlashCommands("image", slashCommandsFor(false))).toEqual([]);
+    expect(filterSlashCommands("upload", slashCommandsFor(false))).toEqual([]);
+  });
+
+  it("should refuse file paste and drop instead of uploading when media is off", () => {
+    expect(names(false)).toContain("mediaRefusal");
+    expect(names(false)).not.toContain("mediaInput");
+    expect(names(true)).toContain("mediaInput");
+    expect(names(true)).not.toContain("mediaRefusal");
+  });
+
+  it("should keep the media node when media is off, so media already in the Markdown saves as written", () => {
+    expect(names(false)).toContain("media");
   });
 });
 
