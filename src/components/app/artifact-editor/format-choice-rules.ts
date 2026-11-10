@@ -8,14 +8,20 @@ import type { ArtifactKind } from "@/lib/artifact-types";
  * server would refuse is refused here first, with its reason.
  * `storedContent` is the body as stored: when it is empty (a page not stored
  * yet, or one stored with only a title), the page may go back to an empty
- * Markdown body (updateCheckOptions).
+ * Markdown body (updateCheckOptions). On a `blank` page, not stored yet,
+ * Text and Code may start empty too: nothing is stored until something is
+ * written in them.
  */
-export function formatSwitchProblem(kind: ArtifactKind, content: string, storedContent?: string): string | null {
-  const check = validateArtifactContent(kind, content, storedContent === undefined ? {} : updateCheckOptions(storedContent));
+export function formatSwitchProblem(kind: ArtifactKind, content: string, page: { storedContent?: string; blank?: boolean } = {}): string | null {
+  if (page.blank === true && content === "" && startsEmptyOnBlank.has(kind)) return null;
+  const check = validateArtifactContent(kind, content, page.storedContent === undefined ? {} : updateCheckOptions(page.storedContent));
   const firstError = check.issues.find((issue) => issue.severity === "error");
   if (!firstError) return null;
   return `This content can’t be ${formatInfo[kind].label} yet. ${firstError.message}`;
 }
+
+/** Formats a blank page may switch to with nothing in it: they take any text, so the first words typed make them valid. */
+const startsEmptyOnBlank: ReadonlySet<ArtifactKind> = new Set(["text", "code"]);
 
 /** A small valid start for formats that cannot begin empty, so an empty page can become a table, an interface, or a diagram. */
 const starters: Partial<Record<ArtifactKind, string>> = {

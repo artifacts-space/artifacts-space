@@ -35,6 +35,8 @@ interface FormatDialogProps {
   content: string;
   /** The body as stored: when it is empty, the page may go back to empty Markdown (formatSwitchProblem). */
   storedContent: string;
+  /** True on a new artifact not stored yet: Text and Code may start empty there (formatSwitchProblem). */
+  blank: boolean;
   /**
    * Takes the chosen format and language, and the content (an empty page gets
    * the format's starter, contentForSwitch), into the editor's draft, so they
@@ -44,7 +46,7 @@ interface FormatDialogProps {
 }
 
 /** The form inside the dialog. Mounted per opening, so it starts from the artifact's current format. */
-function FormatForm({ kind, language, content, storedContent, onApply, onClose }: Omit<FormatDialogProps, "open" | "onOpenChange"> & { onClose: () => void }) {
+function FormatForm({ kind, language, content, storedContent, blank, onApply, onClose }: Omit<FormatDialogProps, "open" | "onOpenChange"> & { onClose: () => void }) {
   const [nextKind, setNextKind] = useState<ArtifactKind>(kind);
   const [nextLanguage, setNextLanguage] = useState(language);
   const [problem, setProblem] = useState<string | null>(null);
@@ -52,7 +54,7 @@ function FormatForm({ kind, language, content, storedContent, onApply, onClose }
   function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextContent = nextKind === kind ? content : contentForSwitch(nextKind, content);
-    const refused = nextKind === kind ? null : formatSwitchProblem(nextKind, nextContent, storedContent);
+    const refused = nextKind === kind ? null : formatSwitchProblem(nextKind, nextContent, { storedContent, blank });
     if (refused) {
       setProblem(refused);
       return;
