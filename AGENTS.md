@@ -198,6 +198,10 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
   `drizzle/` has a journal entry. A migration that is safe anyway starts with
   `-- migration-guard: allow <reason>`. Never edit an applied migration.
 - Keep test rows' emails under `@example.com` and delete them afterwards.
+- `drizzle.config.ts` loads `.env.local` and prefers `DATABASE_URL_UNPOOLED`,
+  so `DATABASE_URL=<throwaway> pnpm db:migrate` alone still reaches the shared
+  database. For a throwaway database, set both `DATABASE_URL` and
+  `DATABASE_URL_UNPOOLED` to it.
 
 ### Tripwire: no correlated subqueries in single-table selects
 
