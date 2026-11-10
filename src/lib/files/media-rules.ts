@@ -164,15 +164,25 @@ function outsideInlineCode(line: string, rewrite: (text: string, lineStart: bool
 }
 
 const blankLine = /^[ \t]*\r?\n?$/;
-const indentedLine = /^(?: {4}|\t)/;
-const listItemLine = /^ {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]/;
+const quotePrefix = /^ {0,3}> ?/;
+const listMarker = /^([-*+]|\d{1,9}[.)])([ \t]+|\r?\n?$)/;
 
-/** Where the line scan is: inside a fence, an indented code block, or a list, and whether the last line was blank. */
+/**
+ * Where the line scan is: inside a fence or an indented code block, inside
+ * a list item (and how far its content is indented), inside a block quote
+ * (with its own scan of the quoted lines), and whether the last line was
+ * blank.
+ */
 interface ScanState {
   fence: string | null;
   indentedCode: boolean;
-  inList: boolean;
+  listIndent: number | null;
   afterBlank: boolean;
+  quote: ScanState | null;
+}
+
+function freshScan(): ScanState {
+  return { fence: null, indentedCode: false, listIndent: null, afterBlank: true, quote: null };
 }
 
 /** True when `line` closes the open fence. */
@@ -181,37 +191,72 @@ function closesFence(line: string, fence: string): boolean {
   return close?.startsWith(fence.charAt(0)) === true && close.length >= fence.length;
 }
 
+/** The line with tabs at its start counted as four spaces, and how many spaces it starts with. */
+function leadingSpaces(line: string): { text: string; indent: number } {
+  const text = line.replace(/^[ \t]+/u, (space) => space.replaceAll("\t", "    "));
+  return { text, indent: text.length - text.trimStart().length };
+}
+
 /**
  * Whether `line` is code (in a fence or an indented code block), moving the
- * scan on. An indented line is code only where CommonMark starts or
- * continues an indented code block: after a blank line outside a list, or
- * right after more of the block. Indented lines in a list are its content.
+ * scan on. Block quotes are scanned on their own, without the `>`. In a list
+ * item, indentation counts from where the item's content starts, so an
+ * indented code block or fence inside a list item is code and the item's
+ * own paragraphs are not. An indented line is code only where CommonMark
+ * starts or continues an indented code block: after a blank line, or right
+ * after more of the block.
  */
 function isCodeLine(line: string, state: ScanState): boolean {
   if (state.fence !== null) {
-    if (closesFence(line, state.fence)) state.fence = null;
+    if (closesFence(relativeTo(line, state), state.fence)) state.fence = null;
     return true;
   }
+  const quote = quotePrefix.exec(line);
+  if (quote) {
+    state.quote ??= freshScan();
+    state.afterBlank = false;
+    return isCodeLine(line.slice(quote[0].length), state.quote);
+  }
+  state.quote = null;
   if (blankLine.test(line)) {
     state.afterBlank = true;
     return false;
   }
-  const afterBlank = state.afterBlank;
-  state.afterBlank = false;
-  if (indentedLine.test(line)) {
-    state.indentedCode = state.indentedCode || (afterBlank && !state.inList);
-    return state.indentedCode;
-  }
-  return startsBlock(line, state, afterBlank);
+  return scanLine(line, state);
 }
 
-/** A line at the left margin: it ends an indented code block, may open a fence, and starts or ends a list. */
-function startsBlock(line: string, state: ScanState, afterBlank: boolean): boolean {
+/** The line as its list item's content sees it: without the item's content indent. */
+function relativeTo(line: string, state: ScanState): string {
+  const { text, indent } = leadingSpaces(line);
+  return state.listIndent !== null && indent >= state.listIndent ? text.slice(state.listIndent) : text;
+}
+
+/** A non-blank line outside a fence and outside a quote. */
+function scanLine(line: string, state: ScanState): boolean {
+  const afterBlank = state.afterBlank;
+  state.afterBlank = false;
+  const { indent } = leadingSpaces(line);
+  const base = state.listIndent ?? 0;
+  if (indent >= base + 4) {
+    state.indentedCode = state.indentedCode || afterBlank;
+    return state.indentedCode;
+  }
   state.indentedCode = false;
-  state.fence = fenceOpen.exec(line)?.[1] ?? null;
-  if (listItemLine.test(line)) state.inList = true;
-  else if (afterBlank) state.inList = false;
+  // Out of the list: a line less indented than the item's content, after a blank line.
+  if (state.listIndent !== null && afterBlank && indent < state.listIndent) state.listIndent = null;
+  startsListItem(line, state);
+  state.fence = fenceOpen.exec(relativeTo(line, state))?.[1] ?? null;
   return state.fence !== null;
+}
+
+/** Starts a list item (or a nested one) when `line` begins with a list marker, setting where its content starts. */
+function startsListItem(line: string, state: ScanState) {
+  const { text, indent } = leadingSpaces(line);
+  if (indent > (state.listIndent ?? 0) + 3) return;
+  const marker = listMarker.exec(text.slice(indent));
+  if (!marker) return;
+  const gap = marker[2]?.replace(/\r?\n/u, "").length ?? 0;
+  state.listIndent = indent + (marker[1]?.length ?? 1) + (gap >= 1 && gap <= 4 ? gap : 1);
 }
 
 /**
@@ -221,7 +266,7 @@ function startsBlock(line: string, state: ScanState, afterBlank: boolean): boole
  * reference definition can begin.
  */
 function rewriteOutsideCode(markdown: string, rewrite: (text: string, lineStart: boolean) => string): string {
-  const state: ScanState = { fence: null, indentedCode: false, inList: false, afterBlank: true };
+  const state = freshScan();
   return markdown
     .split(/(?<=\n)/)
     .map((line) => (isCodeLine(line, state) ? line : outsideInlineCode(line, rewrite)))

@@ -19,9 +19,8 @@ env:
   HUSKY: "0"
   NEXT_TELEMETRY_DISABLED: "1"
 
-# The job names are the ruleset's required status checks. Rename them only
-# together with the ruleset. "Database tests" is not required yet: until the
-# owner adds it to the ruleset, a red run there blocks nothing at merge.
+# The job names are the ruleset's required status checks, "Database tests"
+# included. Rename them only together with the ruleset.
 jobs:
   static:
     name: Lint and typecheck

@@ -35,7 +35,7 @@ import { assertRoomForNewTags, parseNewTags } from "@/lib/tags/store";
 import { projectChoiceSchema } from "@/lib/projects/rules";
 import { findOrCreateProject } from "@/lib/projects/store";
 import { checkContentFiles } from "@/lib/files/attach";
-import { withRelativeFileLinks } from "@/lib/files/own-file-links";
+import { contentForSave } from "@/lib/files/content-on-save";
 import { artifactHarnessOf, stampColumns, type HarnessStamp } from "@/lib/harness/harness-rules";
 import { pruneUnusedContentFilesQuietly, pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { droppedContentRefs } from "@/lib/files/icon-cleanup-rules";
@@ -331,7 +331,7 @@ export async function findPublicIdByShareId(shareId: string) {
  */
 export async function createArtifact(userId: string, input: ArtifactInput, options: { harness?: HarnessStamp | null } = {}) {
   const { project: projectName, tags: tagInput, ...sent } = artifactInputSchema.parse(input);
-  const parsed = withRelativeFileLinks(sent.kind, sent);
+  const parsed = contentForSave(sent.kind, sent);
   const tags = parseNewTags(tagInput);
   assertArtifactSize(parsed);
   assertValidArtifactContent(parsed.kind, parsed.content);
@@ -439,10 +439,11 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
  */
 export async function updateArtifact(userId: string, id: string, input: ArtifactUpdateInput, actor: SharingActor = "person", options: SaveOptions = {}) {
   const sent = artifactUpdateSchema.parse(input);
-  assertArtifactSize(sent);
   const before = await getEditableArtifact(userId, { id });
   if (!before) return null;
-  return saveChanges(withRelativeFileLinks(sent.kind ?? before.kind, sent), { editorId: userId, before, actor, options });
+  const parsed = contentForSave(sent.kind ?? before.kind, sent);
+  assertArtifactSize(parsed);
+  return saveChanges(parsed, { editorId: userId, before, actor, options });
 }
 
 /**
@@ -459,7 +460,7 @@ export async function restoreArtifactVersion(userId: string, id: string, version
   // The project is not versioned: a restore keeps the artifact in its current project.
   const { title, theme, summary, content, kind, language, source, metadata } = version;
   const [icon, cover] = await Promise.all([restorableIcon(userId, before.id, version.icon), restorableCover(userId, before.id, version.cover)]);
-  const changes = artifactUpdateSchema.parse({ title, icon, theme, cover, summary, content, kind, language, source, metadata });
+  const changes = contentForSave(kind, artifactUpdateSchema.parse({ title, icon, theme, cover, summary, content, kind, language, source, metadata }));
   assertArtifactSize(changes);
   return saveChanges(changes, { editorId: userId, before, actor, options, restoredFromId: version.id });
 }

@@ -65,7 +65,8 @@ after it.
   block never shows a file to someone who may not read it. Write it
   relative: the Markdown version makes link, image, and reference-definition
   targets absolute for readers outside the site (fenced and indented code
-  blocks, and inline code, stay as written), and a save turns this site's own absolute file URLs back
+  blocks, also inside list items and quotes, and inline code, stay as
+  written), and a save turns this site's own absolute file URLs back
   into the relative form (`absoluteFileLinks` and `relativeFileLinks`).
 - **Options** follow `#`, joined with `&`, each at most once:
   - the kind: `video`, `audio`, `pdf`, or `file`. Leave it out for an image;
@@ -123,7 +124,8 @@ after it.
   not count toward the 20-file limit (`countHistoryOnlyFiles`); once no
   version names it, history pruning deletes it (`pruneUnusedContentFiles` in
   `src/lib/files/icon-cleanup.ts`). The row is deleted in one statement that
-  checks the artifact's current content and every version again, so a save
+  checks the artifact's current content, icon, and cover, and every
+  version's, again, so a save
   that has just written content naming it keeps it; then its R2 object goes.
   A file attached in the last five minutes is never deleted, because a save
   attaches its uploads just before it writes the content that names them. Plain

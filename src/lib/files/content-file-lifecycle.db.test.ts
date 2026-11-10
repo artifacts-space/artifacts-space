@@ -87,7 +87,7 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
 
   beforeEach(async () => {
     await clearCase();
-    await getDb().update(artifact).set({ content: "# Weekly report\n" }).where(eq(artifact.id, doc));
+    await getDb().update(artifact).set({ content: "# Weekly report\n", cover: null }).where(eq(artifact.id, doc));
     await getDb().update(artifact).set({ content: uiWithFile(null) }).where(eq(artifact.id, board));
     await getDb().insert(artifactFile).values([
       ...shots.map((id) => ({ id, uploaderId: author, key: `files/${id}/shot.png`, filename: "shot.png", contentType: "image/png", size: 10, status: "ready" as const })),
@@ -199,6 +199,39 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
     await updateArtifact(author, doc, { content: embed(shot ?? "") });
     // A Restore between its file check and its version write: the artifact names the file, no version does.
     await getDb().delete(artifactVersion).where(eq(artifactVersion.artifactId, doc));
+    await attachedLongAgo();
+    await expect(deleteUnnamedContentFiles(doc, [shot ?? ""])).resolves.toEqual([]);
+    expect(await attachedIds()).toEqual([shot]);
+  });
+
+  it("should keep an aged plain attachment no content names when a save asks for it to be pruned", async () => {
+    await attachFiles(author, doc, [report], "agent");
+    await attachedLongAgo();
+    await expect(pruneUnusedContentFiles(doc, [report])).resolves.toBe(0);
+    expect(await attachedIds()).toEqual([report]);
+    expect(r2.deleted).toEqual([]);
+  });
+
+  it("should keep media a ui version names with an escaped id, as the spec reads it", async () => {
+    const [shot] = shots;
+    const id = shot ?? "";
+    // JSON reads "\\u00xx" as the character; the save writes the id plainly so text checks agree with the spec.
+    // Escape the first letter: an escaped digit would end in that same digit and still spell the id.
+    const at = id.search(/[a-f]/u);
+    const escaped = uiWithFile(id).replace(`"${id}"`, `"${id.slice(0, at)}\\u00${id.charCodeAt(at).toString(16)}${id.slice(at + 1)}"`);
+    expect(escaped).not.toContain(id);
+    await updateArtifact(author, board, { content: escaped });
+    await updateArtifact(author, board, { content: uiWithFile(null) });
+    await attachedLongAgo();
+    await expect(pruneUnusedContentFiles(board, [id])).resolves.toBe(0);
+    expect(await attachedIds(board)).toEqual([id]);
+  });
+
+  it("should keep content media a save has just made the artifact's cover", async () => {
+    const [shot] = shots;
+    await updateArtifact(author, doc, { content: embed(shot ?? "") });
+    await getDb().delete(artifactVersion).where(eq(artifactVersion.artifactId, doc));
+    await getDb().update(artifact).set({ content: "# Weekly report\n", cover: `file:${shot ?? ""}` }).where(eq(artifact.id, doc));
     await attachedLongAgo();
     await expect(deleteUnnamedContentFiles(doc, [shot ?? ""])).resolves.toEqual([]);
     expect(await attachedIds()).toEqual([shot]);

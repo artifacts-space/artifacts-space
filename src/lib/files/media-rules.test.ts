@@ -154,6 +154,40 @@ describe("absoluteFileLinks", () => {
     expect(out).toContain(`    [in the list](https://artifacts.space/api/files/${id})`);
   });
 
+  it("should leave code inside list items and block quotes as written, and rewrite their text", () => {
+    const markdown = [
+      `- item [a](/api/files/${id})`,
+      "",
+      `      [code in the item](/api/files/${id})`,
+      "",
+      "  ```",
+      `  [fenced in the item](/api/files/${other})`,
+      "  ```",
+      "",
+      `  [item text](/api/files/${other})`,
+      "",
+      `> Quoted [q](/api/files/${id})`,
+      ">",
+      `>     [quoted code](/api/files/${other})`,
+      "> ```",
+      `> [quoted fence](/api/files/${id})`,
+      "> ```",
+    ].join("\n");
+    const out = absoluteFileLinks(markdown, "https://artifacts.space");
+    expect(out).toContain(`- item [a](https://artifacts.space/api/files/${id})`);
+    expect(out).toContain(`      [code in the item](/api/files/${id})`);
+    expect(out).toContain(`  [fenced in the item](/api/files/${other})`);
+    expect(out).toContain(`  [item text](https://artifacts.space/api/files/${other})`);
+    expect(out).toContain(`> Quoted [q](https://artifacts.space/api/files/${id})`);
+    expect(out).toContain(`>     [quoted code](/api/files/${other})`);
+    expect(out).toContain(`> [quoted fence](/api/files/${id})`);
+  });
+
+  it("should leave this site's absolute links in list and quote code as written when a save takes them back", () => {
+    const markdown = `- item\n\n      [code](https://artifacts.space/api/files/${id})\n\n>     [quoted code](https://artifacts.space/api/files/${id})`;
+    expect(relativeFileLinks(markdown, "https://artifacts.space")).toBe(markdown);
+  });
+
   it("should treat an indented first line as code", () => {
     const markdown = `    [code](/api/files/${id})`;
     expect(absoluteFileLinks(markdown, "https://artifacts.space")).toBe(markdown);

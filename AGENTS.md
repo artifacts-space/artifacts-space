@@ -64,9 +64,8 @@ becomes the commit on `main` and must be a conventional commit message.
 
 CI (`.github/workflows/ci.yml`) runs on pull requests, in the merge queue, and
 on `main`. The required checks are the job names: **Lint and typecheck**,
-**Unit tests**, **Build**, **Component gallery**, and **Dependency review**.
-**Database tests** also runs on every pull request but is not required yet:
-until the owner adds it to the ruleset, a red run blocks nothing at merge.
+**Unit tests**, **Build**, **Database tests**, **Component gallery**, and
+**Dependency review**.
 The build needs no secrets; keep it that way, and create database, auth,
 email, and R2 clients on first request, never at import time. CodeQL scans
 the code and the workflows. Dependabot opens grouped weekly updates and waits

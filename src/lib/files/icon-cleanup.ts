@@ -38,13 +38,14 @@ function notNamedByVersions(artifactId: string) {
 }
 
 /**
- * For an `artifact_file` row: neither the artifact's current content nor any
- * of its versions names it. The row is written out as "artifact_file"."id",
+ * For an `artifact_file` row: neither the artifact nor any of its versions
+ * names it, in its content or as its icon or cover. Checked at delete time,
+ * so a save that has just made the file its cover keeps it. The row is written out as "artifact_file"."id",
  * never a bare `id`, which inside a subquery would mean that table's own id
  * (the correlated-subquery tripwire in AGENTS.md).
  */
 export function notNamedByArtifact(artifactId: string) {
-  return sql`not exists (select 1 from ${artifact} a where a.id = ${artifactId} and strpos(lower(a.content), "artifact_file"."id") > 0) and ${notNamedByVersions(artifactId)}`;
+  return sql`not exists (select 1 from ${artifact} a where a.id = ${artifactId} and (strpos(lower(a.content), "artifact_file"."id") > 0 or strpos(lower(concat_ws(' ', a.icon, a.cover)), "artifact_file"."id") > 0)) and not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and ((v.kind in ('ui', 'markdown') and strpos(lower(v.content), "artifact_file"."id") > 0) or strpos(lower(concat_ws(' ', v.icon, v.cover)), "artifact_file"."id") > 0))`;
 }
 
 /** The files among `fileIds` that no ui or Markdown version of the artifact names in its content, in one query however many there are. */
