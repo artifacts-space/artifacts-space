@@ -17,7 +17,8 @@ import type { TeamRole } from "./roles";
 
 /**
  * The thin database side of team permissions: which roles a team has and
- * what each may do. Decisions stay in capability-rules.ts (`can`).
+ * what each may do. Decisions stay in capability-rules.ts (`can`), with a
+ * SQL copy for write-time re-checks in capability-sql.ts.
  */
 
 /** A role as the team page and the rule see it. */
@@ -42,7 +43,10 @@ export function teamRolesQuery(db: Db, teamIds: readonly string[]) {
 
 type RoleRow = Awaited<ReturnType<typeof teamRolesQuery>>[number];
 
-/** Built-in roles a team has no row for keep today's rules, so a team made before its roles were seeded works as before. */
+/**
+ * Built-in roles a team has no row for keep today's rules, so a team made before its roles were seeded works as before.
+ * capability-sql.ts repeats this fallback for write-time re-checks: change both together.
+ */
 function withBuiltIns(roles: Map<string, TeamRoleView>) {
   for (const key of builtInRoleKeys) {
     if (!roles.has(key)) roles.set(key, { id: null, key, name: builtInRoleNames[key], builtIn: true, capabilities: [...defaultRoleCapabilities[key]] });
@@ -78,7 +82,10 @@ export interface StoredRole {
   customKey: string | null;
 }
 
-/** The role that applies: Agent for agents, then a custom role, then the built-in role Better Auth stores. */
+/**
+ * The role that applies: Agent for agents, then a custom role, then the built-in role Better Auth stores.
+ * capability-sql.ts repeats this choice for write-time re-checks: change both together.
+ */
 export function effectiveRoleKey(stored: StoredRole): string {
   if (stored.isAgent) return "agent";
   // A custom assignment never stands in for a built-in role: only Better Auth's own role makes an owner or admin.

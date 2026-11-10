@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
@@ -9,6 +9,7 @@ import { getTeamMembershipById } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { canChangeCsvDownload } from "./rules";
+import { csvDownloadWriteCondition } from "./write-condition";
 
 /*
  * Turns "Allow CSV download" on or off for one CSV artifact. Only its
@@ -46,24 +47,32 @@ export interface SavedCsvDownload {
 }
 
 /**
- * Sets "Allow CSV download". Throws "not found" for anyone who may not
- * change it and for artifacts that are not CSV. The write repeats the
- * author check, so an ownership move racing this one cannot slip through.
+ * Sets "Allow CSV download". Every call counts against the caller's
+ * artifact update limit first, refused ones too, so nobody can probe ids
+ * or permissions without limit. Throws "not found" for anyone who may not
+ * change it and for artifacts that are not CSV. The write re-checks the
+ * whole permission in its own WHERE clause (csvDownloadWriteCondition):
+ * the same CSV artifact, author, and team, and that the caller is still
+ * its author, still acts for the agent that wrote it, or still holds a
+ * role in that team that may approve sharing. So an ownership move, a team
+ * move, a role change, or leaving the team that races this call writes
+ * nothing.
  */
 export async function setCsvDownload(input: { actorId: string; artifactId: string; on: boolean; actor: "person" | "agent" }): Promise<SavedCsvDownload> {
   const { actorId, artifactId, on, actor } = inputSchema.parse(input);
+  await enforceRateLimit("artifactUpdate", actorId);
   if (actor !== "person") throw new UserFacingError(notFoundMessage);
-  const [record] = await getDb()
+  const db = getDb();
+  const [record] = await db
     .select({ userId: artifact.userId, teamId: artifact.teamId, kind: artifact.kind, publicId: artifact.publicId })
     .from(artifact)
     .where(eq(artifact.id, artifactId))
     .limit(1);
   if (record?.kind !== "csv" || !(await mayChange(actorId, record, actor))) throw new UserFacingError(notFoundMessage);
-  await enforceRateLimit("artifactUpdate", actorId);
-  const [updated] = await getDb()
+  const [updated] = await db
     .update(artifact)
     .set({ allowCsvDownload: on })
-    .where(and(eq(artifact.id, artifactId), eq(artifact.userId, record.userId)))
+    .where(csvDownloadWriteCondition(db, { actorId, artifactId, record }))
     // The whole row: getDb() is a union of two clients, on which the column-list overload of returning() does not type.
     .returning();
   if (!updated) throw new UserFacingError(notFoundMessage);
