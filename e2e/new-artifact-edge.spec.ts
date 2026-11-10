@@ -18,6 +18,7 @@ const blankPage = (page: Page) => page.getByRole("region", { name: "New artifact
 const body = (page: Page) => page.getByRole("region", { name: "Content" });
 const notSaved = (page: Page) => page.getByRole("status").filter({ hasText: "Not saved." });
 const attachProblem = "The files could not be added. Drop them again to try once more.";
+const attachUnknown = "We could not confirm the files were added. Check the Files section before adding them again.";
 
 async function openNewArtifact(page: Page) {
   await page.goto("/dev/workspace");
@@ -83,16 +84,50 @@ test("should keep a file whose attach is still on its way when the page is left"
   expect(await discarded(page)).toEqual([]);
 });
 
-test("should keep a file whose attach answer was lost, even after leaving the page", async ({ page }) => {
+test("should show the file once when an attach answer is lost and the check finds it attached", async ({ page }) => {
   await openNewArtifact(page);
   await storeWithTitle(page, "Lost answer");
   await setFlag(page, "fixture:next-attach", "lose");
   await dropFiles(body(page), ["Maybe.pdf"]);
-  await expect(page.getByText(attachProblem, { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Files" })).toContainText("1 attached");
+  await expect(page.getByText(attachProblem, { exact: true })).toHaveCount(0);
+  await expect(page.getByText(attachUnknown, { exact: true })).toHaveCount(0);
+  expect((await storedNew(page))[0]?.files, "the check adds no second copy").toHaveLength(1);
+  expect(await discarded(page)).toEqual([]);
+});
+
+test("should say the outcome is unknown, and keep the file, when every attach answer is lost", async ({ page }) => {
+  await openNewArtifact(page);
+  await storeWithTitle(page, "Lost twice");
+  await setFlag(page, "fixture:next-attach", "lose-always");
+  await dropFiles(body(page), ["Maybe.pdf"]);
+  await expect(page.getByText(attachUnknown, { exact: true })).toBeVisible();
+  await expect(page.getByText(attachProblem, { exact: true }), "not told to drop it again").toHaveCount(0);
   await cards(page, "Long ui fixture").click();
   await expect(page.getByRole("region", { name: "Edit Long ui fixture" })).toBeVisible();
   expect((await storedNew(page))[0]?.files).toHaveLength(1);
   expect(await discarded(page)).toEqual([]);
+});
+
+test("should keep a CSV page's formatting read-only until the page is stored", async ({ page }) => {
+  await openNewArtifact(page);
+  await setFlag(page, "fixture:hold-create", "1");
+  const field = body(page).locator('[contenteditable="true"]');
+  await field.click();
+  await field.evaluate((element) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "name,orders\nNorth,12\nSouth,9");
+    element.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(body(page).getByRole("grid")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem("fixture:hold-create:waiting")), { timeout: 15_000 }).toBe("1");
+  await expect(page.getByRole("button", { name: "Banding" }), "nothing to save formatting to yet").toHaveCount(0);
+  await page.evaluate(() => {
+    window.sessionStorage.removeItem("fixture:hold-create");
+    window.dispatchEvent(new Event("fixture:release-create"));
+  });
+  await expect(page.getByRole("button", { name: "Banding" })).toBeVisible({ timeout: 15_000 });
+  expect((await storedNew(page))[0]?.kind).toBe("csv");
 });
 
 test("should delete a file whose attach was refused, and say so", async ({ page }) => {

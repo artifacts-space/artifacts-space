@@ -46,6 +46,8 @@ function asFiles(draft: ArtifactDraft, names: readonly string[]): ArtifactDraft 
 }
 
 const attachFailed = "The files could not be added. Drop them again to try once more.";
+/** When the answer was lost twice: the files may be in the artifact, so adding them again could make copies. */
+const attachUnknown = "We could not confirm the files were added. Check the Files section before adding them again.";
 
 type Uploads = ReturnType<typeof useFileUploads>;
 type Api = BlankPageOptions["api"];
@@ -55,7 +57,27 @@ function discardAll(api: Api | undefined, ids: readonly string[]) {
   for (const id of ids) void api?.discard(id).catch(() => undefined);
 }
 
-/** Attaches finished files to the stored artifact. A refusal deletes them; a lost answer keeps them, since they may be in the artifact. */
+type AttachResult = Awaited<ReturnType<Api["attach"]>>;
+
+/**
+ * Attaches once and, when the answer is lost, asks once more: attaching files
+ * already in the artifact changes nothing and answers with the artifact, so
+ * the second answer says what happened. Null when both answers were lost.
+ */
+async function attachWithRecheck(api: Api, artifactId: string, ids: readonly string[]): Promise<AttachResult | null> {
+  try {
+    return await api.attach(artifactId, [...ids]);
+  } catch {
+    return api.attach(artifactId, [...ids]).catch(() => null);
+  }
+}
+
+/**
+ * Attaches finished files to the stored artifact. A refusal deletes them
+ * (they are in no artifact); a lost answer is checked once more
+ * (attachWithRecheck), and if it stays unknown the files are kept, never
+ * deleted, and the person is told to check before adding them again.
+ */
 function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, holdRef: React.RefObject<Set<string>>, onAttached: (artifact: ArtifactDto) => void) {
   const [problem, setProblem] = useState<string | null>(null);
   const attachingRef = useRef(false);
@@ -66,24 +88,24 @@ function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, h
     const dropFromList = () => {
       for (const item of uploadsRef.current.items) if (item.file && ids.includes(item.file.id)) uploadsRef.current.remove(item.key, { deleteUpload: false });
     };
-    api.attach(artifactId, [...ids])
+    void attachWithRecheck(api, artifactId, ids)
       .then((result) => {
-        if (!result.success) {
-          // Refused: the files are in no artifact, so they go.
-          for (const id of ids) holdRef.current.delete(id);
-          setProblem(attachFailed);
+        if (!result) {
+          // Still unknown: the files may be in the artifact, so they stay held and are never deleted from here.
+          setProblem(attachUnknown);
           dropFromList();
-          discardAll(api, ids);
           return;
         }
         for (const id of ids) holdRef.current.delete(id);
-        setProblem(null);
-        onAttached(result.data);
-      })
-      .catch(() => {
-        // The answer was lost: the files may be in the artifact, so they stay held and are never deleted from here.
+        if (result.success) {
+          setProblem(null);
+          onAttached(result.data);
+          return;
+        }
+        // Refused: the files are in no artifact, so they go.
         setProblem(attachFailed);
         dropFromList();
+        discardAll(api, ids);
       })
       .finally(() => { attachingRef.current = false; });
   }, [api, holdRef, onAttached, uploadsRef]);

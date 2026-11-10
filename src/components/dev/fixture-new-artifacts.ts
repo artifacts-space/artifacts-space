@@ -24,7 +24,7 @@ const holdUploadsKey = "fixture:hold-uploads";
 const holdCreateKey = "fixture:hold-create";
 /** Set to "1" by a test to hold attaches until it dispatches `fixture:release-attach`. */
 const holdAttachKey = "fixture:hold-attach";
-/** Set by a test for the next attach: "refuse" answers no; "lose" attaches the files and then loses the answer. */
+/** Set by a test for the next attach: "refuse" answers no; "lose" attaches the files and then loses the answer; "lose-always" loses every answer. */
 const nextAttachKey = "fixture:next-attach";
 /** The uploads deleted so far, so a test can check that none it kept was deleted. */
 const discardedKey = "fixture:discarded";
@@ -52,7 +52,7 @@ function gate(key: string, release: string): Promise<void> {
 /** Reads a one-time flag and clears it. */
 function takeFlag(key: string): string | null {
   const value = readFlag(key);
-  if (value !== null && value !== "always") window.sessionStorage.removeItem(key);
+  if (value !== null && !value.endsWith("always")) window.sessionStorage.removeItem(key);
   return value;
 }
 
@@ -165,9 +165,11 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     if (next === "refuse") return { success: false, error: "The files could not be added. Try again." };
     const current = readStored().find((entry) => entry.id === artifactId);
     if (!current) return { success: false, error: "Artifact not found." };
-    const files = [...current.files, ...fileIds.flatMap((fileId) => uploaded.get(fileId) ?? [])];
+    // As the server does: a file already in this artifact is not added twice.
+    const have = new Set(current.files.map((file) => file.id));
+    const files = [...current.files, ...fileIds.flatMap((fileId) => (have.has(fileId) ? [] : (uploaded.get(fileId) ?? [])))];
     const result = save({ ...current, files, updatedAt: new Date().toISOString() });
-    if (next === "lose") throw new Error("The answer was lost.");
+    if (next === "lose" || next === "lose-always") throw new Error("The answer was lost.");
     return result;
   },
   discard: (fileId) => {
