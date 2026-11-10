@@ -180,7 +180,7 @@ function shortWav(): number[] {
   return [...data];
 }
 
-test("should keep a recording on the page and pick it up where it stopped when playback fails partway", async ({ page }) => {
+test("should keep a recording on the page and return to the same position when it fails after a seek", async ({ page }) => {
   await openFixture(page);
   await dropFile(page, "Intro paragraph.", shortWav(), "interview.wav", "audio/wav");
   const block = editor(page).locator('[data-media-block="audio"]');
@@ -229,7 +229,7 @@ async function shortWebm(page: Page): Promise<number[]> {
   });
 }
 
-test("should keep a video on the page and load it again when playback fails partway", async ({ page }) => {
+test("should keep a video on the page and load it again when it fails after it loaded", async ({ page }) => {
   await openFixture(page);
   await dropFile(page, "Intro paragraph.", await shortWebm(page), "walkthrough.webm", "video/webm");
   const block = editor(page).locator('[data-media-block="video"]');
