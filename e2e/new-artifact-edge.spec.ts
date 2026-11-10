@@ -19,6 +19,7 @@ const body = (page: Page) => page.getByRole("region", { name: "Content" });
 const notSaved = (page: Page) => page.getByRole("status").filter({ hasText: "Not saved." });
 const attachProblem = "The files could not be added. Drop them again to try once more.";
 const attachUnknown = "We could not confirm the files were added. Check the Files section before adding them again.";
+const attachUnknownStale = "We could not confirm the files were added. Reload the page and check Files before adding them again.";
 
 async function openNewArtifact(page: Page) {
   await page.goto("/dev/workspace");
@@ -96,15 +97,40 @@ test("should show the file once when an attach answer is lost and the check find
   expect(await discarded(page)).toEqual([]);
 });
 
-test("should say the outcome is unknown, and keep the file, when every attach answer is lost", async ({ page }) => {
+test("should load the artifact again when every attach answer is lost, and show the file it has", async ({ page }) => {
   await openNewArtifact(page);
   await storeWithTitle(page, "Lost twice");
   await setFlag(page, "fixture:next-attach", "lose-always");
   await dropFiles(body(page), ["Maybe.pdf"]);
-  await expect(page.getByText(attachUnknown, { exact: true })).toBeVisible();
+  // The answers were lost, but the artifact loaded again has the file: the Files section shows it, and nothing more needs saying.
+  await expect(page.getByRole("region", { name: "Files" })).toContainText("1 attached");
+  await expect(page.getByRole("region", { name: "Files" })).toContainText("Maybe.pdf");
   await expect(page.getByText(attachProblem, { exact: true }), "not told to drop it again").toHaveCount(0);
+  await expect(page.getByText(attachUnknown, { exact: true })).toHaveCount(0);
   await cards(page, "Long ui fixture").click();
   await expect(page.getByRole("region", { name: "Edit Long ui fixture" })).toBeVisible();
+  expect((await storedNew(page))[0]?.files).toHaveLength(1);
+  expect(await discarded(page)).toEqual([]);
+});
+
+test("should point at the fresh Files section when the answers are lost and the artifact does not have the file", async ({ page }) => {
+  await openNewArtifact(page);
+  await storeWithTitle(page, "Not there");
+  await setFlag(page, "fixture:next-attach", "vanish-always");
+  await dropFiles(body(page), ["Missing.pdf"]);
+  await expect(page.getByText(attachUnknown, { exact: true })).toBeVisible();
+  await expect(page.getByText(attachProblem, { exact: true })).toHaveCount(0);
+  expect(await discarded(page), "an unknown outcome never deletes").toEqual([]);
+});
+
+test("should ask for a reload when the answers are lost and the artifact cannot be loaded either", async ({ page }) => {
+  await openNewArtifact(page);
+  await storeWithTitle(page, "Offline");
+  await setFlag(page, "fixture:next-attach", "lose-always");
+  await setFlag(page, "fixture:fail-load", "1");
+  await dropFiles(body(page), ["Maybe.pdf"]);
+  await expect(page.getByText(attachUnknownStale, { exact: true })).toBeVisible();
+  await expect(page.getByText(attachUnknown, { exact: true })).toHaveCount(0);
   expect((await storedNew(page))[0]?.files).toHaveLength(1);
   expect(await discarded(page)).toEqual([]);
 });

@@ -1,4 +1,4 @@
-import { updateArtifactAction } from "@/app/(workspace)/app/actions";
+import { loadArtifactAction, updateArtifactAction } from "@/app/(workspace)/app/actions";
 import { attachFilesAction, createArtifactWithFilesAction, discardUploadAction } from "@/app/(workspace)/app/file-actions";
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import { sendToServer, type SendFile } from "@/components/files/use-file-uploads";
@@ -20,6 +20,8 @@ export interface NewArtifactApi {
   attach: (artifactId: string, fileIds: string[]) => Promise<ActionResult<ArtifactDto>>;
   /** Deletes an upload that never reached an artifact; one already in an artifact is left alone. */
   discard: (fileId: string) => Promise<unknown>;
+  /** The stored artifact as it is now, by public id: the workspace's own loader (loadArtifactAction), used when an answer was lost. */
+  load: (publicId: string) => Promise<ActionResult<ArtifactDto>>;
 }
 
 /** The server actions behind the blank page. */
@@ -29,4 +31,5 @@ export const serverNewArtifactApi: NewArtifactApi = {
   send: sendToServer,
   attach: (artifactId, fileIds) => attachFilesAction(artifactId, fileIds),
   discard: (fileId) => discardUploadAction(fileId),
+  load: (publicId) => loadArtifactAction(publicId),
 };

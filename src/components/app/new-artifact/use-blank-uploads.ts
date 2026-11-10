@@ -46,8 +46,10 @@ function asFiles(draft: ArtifactDraft, names: readonly string[]): ArtifactDraft 
 }
 
 const attachFailed = "The files could not be added. Drop them again to try once more.";
-/** When the answer was lost twice: the files may be in the artifact, so adding them again could make copies. */
+/** The answer was lost twice and the artifact, loaded again, does not have them all: the Files section shows it as it is now. */
 const attachUnknown = "We could not confirm the files were added. Check the Files section before adding them again.";
+/** As above, but the artifact could not be loaded either, so the Files section may be out of date. */
+const attachUnknownStale = "We could not confirm the files were added. Reload the page and check Files before adding them again.";
 
 type Uploads = ReturnType<typeof useFileUploads>;
 type Api = BlankPageOptions["api"];
@@ -73,27 +75,40 @@ async function attachWithRecheck(api: Api, artifactId: string, ids: readonly str
 }
 
 /**
+ * After every attach answer was lost: loads the artifact as it is now, so its
+ * Files section shows the truth, and says what is still unknown. Null when
+ * the artifact has every file (nothing to say).
+ */
+async function settleUnknownAttach(api: Api, publicId: string, ids: readonly string[], onLoaded: (artifact: ArtifactDto) => void): Promise<string | null> {
+  const loaded = await api.load(publicId).catch(() => null);
+  if (!loaded?.success) return attachUnknownStale;
+  onLoaded(loaded.data);
+  const have = new Set(loaded.data.files.map((file) => file.id));
+  return ids.every((id) => have.has(id)) ? null : attachUnknown;
+}
+
+/**
  * Attaches finished files to the stored artifact. A refusal deletes them
  * (they are in no artifact); a lost answer is checked once more
- * (attachWithRecheck), and if it stays unknown the files are kept, never
- * deleted, and the person is told to check before adding them again.
+ * (attachWithRecheck), and if it stays unknown the artifact is loaded again
+ * (settleUnknownAttach). Files whose outcome is unknown are kept, never
+ * deleted from here.
  */
 function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, holdRef: React.RefObject<Set<string>>, onAttached: (artifact: ArtifactDto) => void) {
   const [problem, setProblem] = useState<string | null>(null);
   const attachingRef = useRef(false);
-  const attach = useCallback((artifactId: string, ids: readonly string[]) => {
+  const attach = useCallback((stored: { id: string; publicId: string }, ids: readonly string[]) => {
     if (!api || attachingRef.current) return;
     attachingRef.current = true;
     for (const id of ids) holdRef.current.add(id);
     const dropFromList = () => {
       for (const item of uploadsRef.current.items) if (item.file && ids.includes(item.file.id)) uploadsRef.current.remove(item.key, { deleteUpload: false });
     };
-    void attachWithRecheck(api, artifactId, ids)
-      .then((result) => {
+    void attachWithRecheck(api, stored.id, ids)
+      .then(async (result) => {
         if (!result) {
-          // Still unknown: the files may be in the artifact, so they stay held and are never deleted from here.
-          setProblem(attachUnknown);
           dropFromList();
+          setProblem(await settleUnknownAttach(api, stored.publicId, ids, onAttached));
           return;
         }
         for (const id of ids) holdRef.current.delete(id);
@@ -166,7 +181,7 @@ export function useBlankUploads({ options, artifact, draftRef, replace, onUpdate
       return;
     }
     if (step.step === "attach") {
-      attach(artifact.id, step.ids);
+      attach({ id: artifact.id, publicId: artifact.publicId }, step.ids);
       return;
     }
     if (step.step !== "create") return;
@@ -176,7 +191,7 @@ export function useBlankUploads({ options, artifact, draftRef, replace, onUpdate
     if (!next) return;
     filesDraftRef.current = next;
     replace(next, false);
-  }, [api, stored, artifact.id, uploads.busy, readyKey, attachedKey, attach, draftRef, replace]);
+  }, [api, stored, artifact.id, artifact.publicId, uploads.busy, readyKey, attachedKey, attach, draftRef, replace]);
 
   // Every file removed before the create: the page is blank again, not an empty Files artifact.
   // Not while a create is on its way: it may still store the Files page, and the draft must match what comes back.

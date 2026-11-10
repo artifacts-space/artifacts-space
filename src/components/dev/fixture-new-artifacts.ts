@@ -24,10 +24,12 @@ const holdUploadsKey = "fixture:hold-uploads";
 const holdCreateKey = "fixture:hold-create";
 /** Set to "1" by a test to hold attaches until it dispatches `fixture:release-attach`. */
 const holdAttachKey = "fixture:hold-attach";
-/** Set by a test for the next attach: "refuse" answers no; "lose" attaches the files and then loses the answer; "lose-always" loses every answer. */
+/** Set by a test for the next attach: "refuse" answers no; "lose" attaches the files and then loses the answer; "lose-always" loses every answer; "vanish-always" loses every answer without attaching. */
 const nextAttachKey = "fixture:next-attach";
 /** The uploads deleted so far, so a test can check that none it kept was deleted. */
 const discardedKey = "fixture:discarded";
+/** Set by a test to make the next load fail ("always" for every one). */
+const failLoadKey = "fixture:fail-load";
 
 function readFlag(key: string): string | null {
   try {
@@ -163,6 +165,7 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     await gate(holdAttachKey, "fixture:release-attach");
     const next = takeFlag(nextAttachKey);
     if (next === "refuse") return { success: false, error: "The files could not be added. Try again." };
+    if (next === "vanish-always") throw new Error("The answer was lost.");
     const current = readStored().find((entry) => entry.id === artifactId);
     if (!current) return { success: false, error: "Artifact not found." };
     // As the server does: a file already in this artifact is not added twice.
@@ -178,5 +181,11 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     uploaded.delete(fileId);
     recordDiscard(fileId);
     return Promise.resolve();
+  },
+  load: (publicId) => {
+    // Set by a test so the check after a lost answer fails too.
+    if (takeFlag(failLoadKey) !== null) return Promise.reject(new Error("The artifact could not be loaded."));
+    const found = readStored().find((entry) => entry.publicId === publicId);
+    return Promise.resolve(found ? { success: true, data: found } : { success: false, error: "Artifact not found." });
   },
 };
