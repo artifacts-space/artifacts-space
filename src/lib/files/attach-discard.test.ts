@@ -11,7 +11,7 @@ import { unusableFilesForPeople } from "./person-messages";
  * at the store boundary.
  */
 
-const store = vi.hoisted(() => ({ getFileRows: vi.fn(), countArtifactFiles: vi.fn(), attachFileRows: vi.fn(), clearIconForFile: vi.fn(), getFileRow: vi.fn(), removeFiles: vi.fn() }));
+const store = vi.hoisted(() => ({ getFileRows: vi.fn(), countArtifactFiles: vi.fn(), attachFileRows: vi.fn(), clearIconForFile: vi.fn(), getFileRow: vi.fn(), removeFiles: vi.fn(), removeUnattachedUpload: vi.fn() }));
 vi.mock("./store", () => store);
 vi.mock("./icon-cleanup", () => ({ countHistoryOnlyImages: vi.fn() }));
 vi.mock("@/lib/access", () => ({ canEditRecord: vi.fn() }));
@@ -28,27 +28,11 @@ beforeEach(() => {
 });
 
 describe("discardUnattachedUpload", () => {
-  it("should delete the uploader's own file when it is in no artifact", async () => {
-    store.getFileRow.mockResolvedValue({ id: upload, uploaderId: "author", artifactId: null });
-    await discardUnattachedUpload("author", upload);
-    expect(store.removeFiles).toHaveBeenCalledWith([expect.objectContaining({ id: upload })]);
-  });
-
-  it("should leave a file alone when it is already in an artifact, as after a lost answer", async () => {
-    store.getFileRow.mockResolvedValue({ id: upload, uploaderId: "author", artifactId: "artifact-1" });
-    await discardUnattachedUpload("author", upload);
-    expect(store.removeFiles).not.toHaveBeenCalled();
-  });
-
-  it("should leave someone else's upload alone", async () => {
-    store.getFileRow.mockResolvedValue({ id: upload, uploaderId: "someone-else", artifactId: null });
-    await discardUnattachedUpload("author", upload);
-    expect(store.removeFiles).not.toHaveBeenCalled();
-  });
-
-  it("should do nothing when the file is gone", async () => {
-    store.getFileRow.mockResolvedValue(null);
-    await discardUnattachedUpload("author", upload);
+  it("should hand the store one guarded delete for the uploader's own file", async () => {
+    store.removeUnattachedUpload.mockResolvedValue(true);
+    await discardUnattachedUpload("author", upload.toUpperCase());
+    expect(store.removeUnattachedUpload).toHaveBeenCalledWith(upload, "author");
+    expect(store.getFileRow, "no separate check before the delete").not.toHaveBeenCalled();
     expect(store.removeFiles).not.toHaveBeenCalled();
   });
 });

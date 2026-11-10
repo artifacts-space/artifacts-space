@@ -15,7 +15,7 @@ import { fileLimits } from "./config";
 import { unusableFilesForPeople } from "./person-messages";
 import { countHistoryOnlyImages } from "./icon-cleanup";
 import { fileRefsInContent, maxFileRefs } from "./refs";
-import { attachFileRows, clearIconForFile, countArtifactFiles, getFileRow, getFileRows, removeFiles } from "./store";
+import { attachFileRows, clearIconForFile, countArtifactFiles, getFileRow, getFileRows, removeFiles, removeUnattachedUpload } from "./store";
 
 /**
  * Putting files into artifacts. A file belongs to one artifact. An editor
@@ -109,10 +109,9 @@ export async function deleteOwnFile(userId: string, fileId: string, actor: Shari
  * Deletes the uploader's own upload while it belongs to no artifact; does
  * nothing for a file in an artifact or someone else's. A blank page sends
  * it for uploads that never reached an artifact, so a lost answer can never
- * turn into removing a file from one.
+ * turn into removing a file from one. The check and the delete are one
+ * statement (removeUnattachedUpload).
  */
 export async function discardUnattachedUpload(userId: string, fileId: string): Promise<void> {
-  const row = await getFileRow(fileId.toLowerCase());
-  if (row?.artifactId !== null || row.uploaderId !== userId) return;
-  await removeFiles([row]);
+  await removeUnattachedUpload(fileId.toLowerCase(), userId);
 }
