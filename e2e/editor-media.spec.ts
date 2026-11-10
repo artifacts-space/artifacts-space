@@ -206,3 +206,47 @@ test("should keep a recording on the page and pick it up where it stopped when p
   await expect.poll(() => player.evaluate((element: HTMLAudioElement) => element.currentTime)).toBeCloseTo(1.2, 1);
   await expect(block.getByText("This recording stopped loading.")).toHaveCount(0);
 });
+
+/** A one-second WebM recorded from a canvas in the browser, as a screen recording would be. */
+async function shortWebm(page: Page): Promise<number[]> {
+  return page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 160;
+    canvas.height = 90;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("No canvas");
+    const recorder = new MediaRecorder(canvas.captureStream(15), { mimeType: "video/webm" });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (event) => { chunks.push(event.data); };
+    const stopped = new Promise<void>((resolve) => { recorder.onstop = () => { resolve(); }; });
+    recorder.start();
+    const timer = setInterval(() => { context.fillRect(Math.random() * 140, Math.random() * 70, 20, 20); }, 50);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    clearInterval(timer);
+    recorder.stop();
+    await stopped;
+    return [...new Uint8Array(await new Blob(chunks, { type: "video/webm" }).arrayBuffer())];
+  });
+}
+
+test("should keep a video on the page and load it again when playback fails partway", async ({ page }) => {
+  await openFixture(page);
+  await dropFile(page, "Intro paragraph.", await shortWebm(page), "walkthrough.webm", "video/webm");
+  const block = editor(page).locator('[data-media-block="video"]');
+  const player = block.locator("video");
+  await expect(block.locator('[data-media-state="ready"] video')).toBeVisible();
+  // A recorded WebM has no known duration, so this checks the reload, not the seek (the recording test does).
+  await player.evaluate((element: HTMLVideoElement) => {
+    element.dataset.loads = "0";
+    element.addEventListener("loadedmetadata", () => { element.dataset.loads = String(Number(element.dataset.loads) + 1); });
+  });
+
+  await player.dispatchEvent("error");
+  await expect(block.getByText("This video stopped loading.")).toBeVisible();
+  await expect(player).toBeVisible();
+
+  await block.getByRole("button", { name: "Try again" }).click();
+  await expect(player).toHaveAttribute("data-loads", "1");
+  await expect(block.getByText("This video stopped loading.")).toHaveCount(0);
+  await expect(player).toBeVisible();
+});
