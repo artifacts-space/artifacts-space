@@ -83,10 +83,10 @@ describe("GET /api/files/[id]", () => {
     expect(mocks.file).not.toHaveBeenCalled();
   });
 
-  it("should count a video seek against the playback budget, and still check access, when the range starts past the first byte", async () => {
+  it("should count a video seek against the playback budgets, and still check access, when the range starts past the first byte", async () => {
     mocks.file.mockResolvedValue(null);
     const response = await call("", { Range: "bytes=5242880-" });
-    expect(mocks.limits).toHaveBeenCalledWith([{ name: "fileRangeByNetwork", subject: "network-1" }]);
+    expect(mocks.limits).toHaveBeenCalledWith([{ name: "fileRangeByNetwork", subject: "network-1" }, { name: "fileRangeByNetworkFile", subject: `network-1:${fileId}` }]);
     expect(response.status).toBe(404);
   });
 

@@ -28,7 +28,8 @@ function copiedFields(record: ArtifactRecord) {
 
 /**
  * Inserts a version of `record` and returns its id. `at` back-dates it, for a
- * snapshot of an older save. Marks the files its content names (content-files.ts).
+ * snapshot of an older save. First marks the files its content names
+ * (content-files.ts), so no failure leaves content naming an unmarked file.
  */
 export async function insertVersion(
   record: ArtifactRecord,
@@ -36,10 +37,11 @@ export async function insertVersion(
 ): Promise<string> {
   const id = randomUUID();
   const at = options.at ? { createdAt: options.at, savedAt: options.at } : {};
+  // Flag first: the flag errs on hiding, so a failure after it leaves no file readable that should not be.
+  await markNamedInContent(record.id, record.kind, record.content);
   await getDb()
     .insert(artifactVersion)
     .values({ id, artifactId: record.id, ...copiedFields(record), ...stampColumns(options.harness), createdBy: options.createdBy, saveKind: options.saveKind, restoredFromId: options.restoredFromId ?? null, ...at });
-  await markNamedInContent(record.id, record.kind, record.content);
   return id;
 }
 
@@ -106,11 +108,11 @@ async function restampVersion(latest: ArtifactVersionRecord, record: ArtifactRec
 
 /** Folds a save into a version, and marks the files its content names. A save from the web app keeps the harness an agent save already recorded there. */
 async function mergeInto(versionId: string, record: ArtifactRecord, harness: HarnessStamp | null | undefined) {
+  await markNamedInContent(record.id, record.kind, record.content);
   await getDb()
     .update(artifactVersion)
     .set({ ...copiedFields(record), ...stampColumns(harness), savedAt: sql`now()` })
     .where(eq(artifactVersion.id, versionId));
-  await markNamedInContent(record.id, record.kind, record.content);
 }
 
 /**

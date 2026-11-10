@@ -119,11 +119,13 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
     await getDb().delete(artifactVersion).where(eq(artifactVersion.id, versionId));
   });
 
-  it("should keep refusing a removed image, and leave it out of the file list, after pruning deleted every version that showed it", async () => {
+  it("should keep refusing removed images, and leave them out of the file list, after pruning deleted every version that showed them, in both orders of attach and save", async () => {
     await serve(versions.after);
     await getDb().delete(artifactVersion).where(eq(artifactVersion.id, versions.shows));
+    // Attached after the version that named it: only attachFileRows (namedByAnyVersion) set its flag.
     await expect(findReadableFile(image, ids.stranger)).resolves.toBeNull();
     await expect(findReadableFile(image, null)).resolves.toBeNull();
+    // Attached before a version named it: only markNamedInContent set its flag, and that version is gone too.
     await expect(findReadableFile(lateImage, null)).resolves.toBeNull();
     expect(await publicFileIds()).toEqual([]);
     expect((await findReadableFile(image, ids.author))?.id).toBe(image);

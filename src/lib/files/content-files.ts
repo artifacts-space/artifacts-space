@@ -21,9 +21,11 @@ import { contentRefKinds, fileRefsInContent } from "./refs";
 const refKindsSql = sql.join(contentRefKinds.map((kind) => sql`${kind}`), sql`, `);
 
 /**
- * Marks the artifact's attached files that `content` names. Call it with
- * every version written (insert or merge). Files of other artifacts are
- * never touched.
+ * Marks the artifact's attached files that `content` names. Call it before
+ * every version write (insert or merge): the production driver (neon-http)
+ * has no interactive transactions, and in this order a failure between the
+ * two writes leaves a file marked that no version names yet, which only errs
+ * on hiding. Files of other artifacts are never touched.
  */
 export async function markNamedInContent(artifactId: string, kind: string, content: string): Promise<void> {
   const refs = fileRefsInContent(kind, content);

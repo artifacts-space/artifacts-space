@@ -3,6 +3,7 @@
 import { IconFileOff, IconPhotoOff } from "@tabler/icons-react";
 import { useCallback, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
+import { Button } from "@/components/ui/button";
 import { fileTypeLabel } from "@/lib/files/config";
 import { hasAdjustableWidth, type MediaKind } from "@/lib/files/media-rules";
 import type { FileDto } from "@/lib/files/types";
@@ -16,7 +17,9 @@ import { FileCard } from "./file-card";
  * with a caption under it. Every URL is the access-checked /api/files route,
  * so a reader who may not open the file sees the failed state, never the
  * file. Images and players show a quiet stand-in while they load and a
- * notice with a link to the file when they fail.
+ * notice with a link to the file when they fail, with Try again: a refusal
+ * such as a rate limit looks like any failure to the element, and failed
+ * answers are never cached, so asking again can work.
  */
 
 export interface MediaBlockProps {
@@ -44,18 +47,29 @@ interface LoadHandlers {
   attach: (element: HTMLImageElement | HTMLMediaElement | null) => void;
   onLoad: () => void;
   onError: () => void;
+  /** Starts over: the element mounts again and asks for the file again. */
+  retry: () => void;
 }
 
-/** Tracks whether an image or player loaded. PDFs and file cards always count as ready. */
-function useLoadState(kind: MediaKind): [LoadState, LoadHandlers] {
+/** Tracks whether an image or player loaded, and how many times it was asked for. PDFs and file cards always count as ready. */
+function useLoadState(kind: MediaKind): [LoadState, LoadHandlers, number] {
   const [state, setState] = useState<LoadState>("loading");
+  const [attempt, setAttempt] = useState(0);
   const attach = useCallback((element: HTMLImageElement | HTMLMediaElement | null) => {
     if (element instanceof HTMLImageElement && element.complete) setState(element.naturalWidth > 0 ? "ready" : "failed");
     if (element instanceof HTMLMediaElement && element.error) setState("failed");
   }, []);
-  const handlers = useMemo<LoadHandlers>(() => ({ attach, onLoad: () => { setState("ready"); }, onError: () => { setState("failed"); } }), [attach]);
+  const handlers = useMemo<LoadHandlers>(() => ({
+    attach,
+    onLoad: () => { setState("ready"); },
+    onError: () => { setState("failed"); },
+    retry: () => {
+      setState("loading");
+      setAttempt((count) => count + 1);
+    },
+  }), [attach]);
   const tracked = kind === "image" || kind === "video" || kind === "audio";
-  return [tracked ? state : "ready", handlers];
+  return [tracked ? state : "ready", handlers, attempt];
 }
 
 function widthStyle(kind: MediaKind, width: number | null): CSSProperties | undefined {
@@ -71,13 +85,14 @@ const failedCopy: Record<MediaKind, string> = {
   file: "This file could not be loaded.",
 };
 
-/** What shows when a file is missing, removed, or not readable by this reader. */
-export function MediaNotice({ kind, children, href }: { kind: MediaKind; children: ReactNode; href?: string | undefined }) {
+/** What shows when a file is missing, removed, or not readable by this reader. `onRetry` adds Try again. */
+export function MediaNotice({ kind, children, href, onRetry }: { kind: MediaKind; children: ReactNode; href?: string | undefined; onRetry?: (() => void) | undefined }) {
   const Icon = kind === "image" ? IconPhotoOff : IconFileOff;
   return (
     <div role="note" className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-dashed bg-muted/50 px-3 py-2.5 text-sm text-muted-foreground">
       <Icon aria-hidden className="size-4 shrink-0" />
       <span className="min-w-0">{children}</span>
+      {onRetry ? <Button type="button" variant="link" size="sm" className="h-auto px-0 text-foreground" onClick={onRetry}>Try again</Button> : null}
       {href ? <a href={href} target="_blank" rel="noopener" className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground">Open the file</a> : null}
     </div>
   );
@@ -112,14 +127,14 @@ function wrapperClass(kind: MediaKind, sized: boolean): string {
 }
 
 function PlayableMedia({ kind, url, alt, width, overlay }: Pick<MediaBlockProps, "kind" | "url" | "alt" | "width" | "overlay">) {
-  const [state, handlers] = useLoadState(kind);
-  if (state === "failed") return <MediaNotice kind={kind} href={url}>{failedCopy[kind]}</MediaNotice>;
+  const [state, handlers, attempt] = useLoadState(kind);
+  if (state === "failed") return <MediaNotice kind={kind} href={url} onRetry={handlers.retry}>{failedCopy[kind]}</MediaNotice>;
   const sized = width !== null && hasAdjustableWidth(kind);
   const loading = state === "loading";
   return (
     <div className={wrapperClass(kind, sized)} style={widthStyle(kind, width)} data-media-state={state}>
       {loading ? <div aria-hidden className={cn("w-full animate-pulse rounded-lg bg-muted", kind === "audio" ? "h-12" : "aspect-video min-w-60")} /> : null}
-      <MediaElement kind={kind} url={url} alt={alt} sized={sized} loading={loading} handlers={handlers} />
+      <MediaElement key={attempt} kind={kind} url={url} alt={alt} sized={sized} loading={loading} handlers={handlers} />
       {overlay}
     </div>
   );

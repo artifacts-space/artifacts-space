@@ -33,6 +33,7 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   fileUpload: { per: "user", where: "files_request_upload and web uploads", refusal: "tool-error", group: "Files and pages" },
   fileDownloadByNetwork: { per: "network", where: "/api/files views and downloads", refusal: "http-429", group: "Files and pages" },
   fileRangeByNetwork: { per: "network", where: "/api/files video and audio playback: seeks and later parts (a Range past the first byte)", refusal: "http-429", group: "Files and pages" },
+  fileRangeByNetworkFile: { per: "network", where: "/api/files playback of one file: seeks and later parts", refusal: "http-429", group: "Files and pages" },
   teamIconByUser: { per: "user", where: "/api/teams/<id>/icon team icon views (browsers keep each icon for a day)", refusal: "http-429", group: "Files and pages" },
   teamIconByNetwork: { per: "network", where: "/api/teams/<id>/icon team icon views", refusal: "http-429", group: "Files and pages" },
   artifactPageByNetwork: { per: "network", where: "/artifact/<id> pages", refusal: "http-429", group: "Files and pages" },

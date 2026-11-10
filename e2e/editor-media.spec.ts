@@ -149,3 +149,12 @@ test("should refuse a file type the store does not take and say why", async ({ p
   await expect(editor(page).getByRole("alert")).toHaveCount(0);
   await expect(savedMarkdown(page)).not.toContainText("logo.svg");
 });
+
+test("should ask for a file again when Try again is chosen after it failed to load", async ({ page }) => {
+  await openFixture(page);
+  // The file starts answering, as after a rate limit ends.
+  await page.route("**/dev/missing-file/**", (route) => route.fulfill({ path: "public/hero-dusk.webp", contentType: "image/webp" }));
+  await editor(page).getByRole("button", { name: "Try again" }).click();
+  await expect(editor(page).getByRole("img", { name: "Gone" })).toBeVisible();
+  await expect(editor(page).getByText("This image could not be loaded.")).toHaveCount(0);
+});
