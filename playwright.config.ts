@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
-/** Dev server port. Each agent worktree runs its own; set PLAYWRIGHT_PORT to match. */
+import { e2eDevServerDatabaseEnv, isLocalDatabaseUrl } from "./src/lib/db/database-url-rules";
+
+/** Dev server port. Playwright starts its own dev server here; give each worktree a free one with PLAYWRIGHT_PORT. */
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 3000);
 /**
  * Production server port, for the `*.prod.spec.ts` checks that need real
@@ -11,18 +13,6 @@ const port = Number(process.env.PLAYWRIGHT_PORT ?? 3000);
 const prodPort = Number(process.env.PLAYWRIGHT_PROD_PORT ?? port + 1000);
 
 const prodSpecs = /\.prod\.spec\.ts$/;
-
-/** True when `url` is a database on this machine (the E2E_LOCAL_DB specs seed one). */
-function isLocalDatabase(url: string | undefined): url is string {
-  if (!url) return false;
-  try {
-    const host = new URL(url).hostname;
-    return host === "localhost" || host === "127.0.0.1";
-  } catch {
-    // A malformed URL is not a local database; the placeholder is used instead.
-    return false;
-  }
-}
 
 /**
  * The production checks run with no reachable database, as in CI. Better Auth
@@ -36,7 +26,7 @@ function isLocalDatabase(url: string | undefined): url is string {
 const productionTestEnv = {
   BETTER_AUTH_URL: `http://localhost:${String(prodPort)}`,
   BETTER_AUTH_SECRET: "e2e-only-secret-not-used-anywhere-else-0123456789",
-  DATABASE_URL: isLocalDatabase(process.env.DATABASE_URL) ? process.env.DATABASE_URL : "postgres://e2e@127.0.0.1:9/none",
+  DATABASE_URL: isLocalDatabaseUrl(process.env.DATABASE_URL) ? process.env.DATABASE_URL : "postgres://e2e@127.0.0.1:9/none",
 };
 
 export default defineConfig({
@@ -61,8 +51,12 @@ export default defineConfig({
     {
       command: `pnpm exec next dev -p ${String(port)}`,
       url: `http://localhost:${String(port)}/dev/components`,
-      reuseExistingServer: true,
+      // Never a server started elsewhere: it could have read the shared database from .env.local.
+      reuseExistingServer: false,
       timeout: 120_000,
+      // Both database URLs are always set, so next dev never fills them from .env.local:
+      // empty for the fixture pages, or the local test database with E2E_LOCAL_DB=1.
+      env: e2eDevServerDatabaseEnv(process.env),
     },
     {
       // `next build` writes .next/ and `next dev` writes .next/dev/, so both can run at once.

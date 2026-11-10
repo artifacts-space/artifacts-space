@@ -28,7 +28,7 @@ const localSteps = `git clone ${DOCS_REPOSITORY}.git
 cd artifacts-space
 pnpm install
 cp .env.example .env.local     # fill in DATABASE_URL, BETTER_AUTH_SECRET, CRON_SECRET
-pnpm db:migrate
+pnpm db:migrate                # a database not on localhost: ALLOW_SHARED_MIGRATE=1 pnpm db:migrate
 pnpm dev`;
 
 /** Running your own artifacts.space, from the code's own configuration. */
@@ -62,7 +62,7 @@ export default function SelfHostingPage() {
       </Prose>
       <CommandSnippet command="pnpm db:migrate" />
       <Prose>
-        <p>Migrations use <code>DATABASE_URL_UNPOOLED</code> (the direct connection), and the app uses <code>DATABASE_URL</code>. On Neon, the Vercel integration sets both. drizzle-kit reads <code>.env.local</code> itself. Only the <code>public</code> schema is managed.</p>
+        <p>Migrations use <code>DATABASE_URL_UNPOOLED</code> (the direct connection), and the app uses <code>DATABASE_URL</code>. On Neon, the Vercel integration sets both. drizzle-kit reads <code>.env.local</code> itself, and a URL you set for the command wins over it (<code>DATABASE_URL</code> alone serves for both). <code>pnpm db:migrate</code> changes only a database on <code>localhost</code> unless you set <code>ALLOW_SHARED_MIGRATE=1</code> for that run, so a test run never migrates your production database by mistake. Only the <code>public</code> schema is managed.</p>
         <p>The old code keeps serving while a deploy migrates, so migrations stay additive: add columns and tables, backfill, then switch the code. <code>pnpm check</code> rejects drops, renames, type changes, and new required columns without a default.</p>
       </Prose>
 

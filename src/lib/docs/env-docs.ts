@@ -10,7 +10,9 @@ export interface EnvDoc {
 
 export const envDocs: readonly EnvDoc[] = [
   { name: "DATABASE_URL", need: "required", what: "Postgres connection string. Neon's pooled URL in production; a localhost URL uses a plain pg pool." },
-  { name: "DATABASE_URL_UNPOOLED", need: "optional", what: "Direct (unpooled) connection for migrations. Vercel production builds need it to apply migrations; pnpm db:migrate falls back to DATABASE_URL." },
+  { name: "DATABASE_URL_UNPOOLED", need: "optional", what: "Direct (unpooled) connection for migrations. Vercel production builds need it to apply migrations; pnpm db:migrate falls back to DATABASE_URL. A value set for the command wins over .env.local, and DATABASE_URL set alone serves for both." },
+  { name: "E2E_LOCAL_DB", need: "optional", what: "Development only. Set to 1, with DATABASE_URL on localhost, to run the end-to-end checks that seed a throwaway database. Otherwise the end-to-end dev server gets no database at all." },
+  { name: "ALLOW_SHARED_MIGRATE", need: "optional", what: "Set to 1 for one run to let pnpm db:migrate (or drizzle-kit push) change a database that is not on localhost, such as yours when you migrate by hand. Without it, they stop before they connect. Vercel production builds migrate on their own and never need it." },
   { name: "BETTER_AUTH_SECRET", need: "required", what: "Signs sessions. At least 32 characters: openssl rand -base64 32." },
   { name: "BETTER_AUTH_URL", need: "required", what: "This site's origin, such as https://artifacts.example.com. Every absolute link, the OAuth issuer, and the MCP resource come from it." },
   { name: "GITHUB_CLIENT_ID", need: "optional", what: "GitHub OAuth app. Without both GitHub values, GitHub sign-in is off and email links remain." },

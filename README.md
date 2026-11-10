@@ -156,7 +156,7 @@ in `.nvmrc`), pnpm 10, a Postgres database (Neon works out of the box), a GitHub
 ```bash
 pnpm install
 cp .env.example .env.local   # then fill it in
-pnpm db:migrate
+pnpm db:migrate              # a database not on localhost: ALLOW_SHARED_MIGRATE=1 pnpm db:migrate
 pnpm dev
 ```
 
@@ -169,7 +169,8 @@ dev user.
 | Variable | Required | What it is |
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Postgres connection string. Vercel's Neon integration sets it. |
-| `DATABASE_URL_UNPOOLED` | For migrations | Direct (unpooled) connection string. Vercel production builds and `pnpm db:migrate` use it. |
+| `DATABASE_URL_UNPOOLED` | For migrations | Direct (unpooled) connection string. Vercel production builds and `pnpm db:migrate` use it. A value set for the command wins over `.env.local`. |
+| `ALLOW_SHARED_MIGRATE` | No | Set to `1` for one run to let `pnpm db:migrate` change a database that is not on localhost. |
 | `BETTER_AUTH_SECRET` | Yes | At least 32 characters, for example from `openssl rand -base64 32`. |
 | `BETTER_AUTH_URL` | Yes | This site's origin, such as `http://localhost:3000` or `https://your-domain`. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | For GitHub sign-in | From a GitHub OAuth app. GitHub sign-in stays off while the id is empty. |

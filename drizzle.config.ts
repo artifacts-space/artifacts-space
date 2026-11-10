@@ -1,9 +1,20 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { parseEnv } from "node:util";
 
 import { defineConfig } from "drizzle-kit";
 
-// drizzle-kit does not read .env.local on its own.
-if (existsSync(".env.local")) process.loadEnvFile(".env.local");
+import { drizzleDatabaseUrl, drizzleKitCommand, sharedMigrateRefusal } from "./src/lib/db/database-url-rules";
+
+// drizzle-kit does not read .env.local on its own. It is read here without
+// touching process.env, so a URL set for this run always wins over it
+// (drizzleDatabaseUrl). Production deploys never load this file: they migrate
+// through scripts/migrate-on-deploy.mts.
+const envFile = existsSync(".env.local") ? parseEnv(readFileSync(".env.local", "utf8")) : {};
+const url = drizzleDatabaseUrl(process.env, envFile);
+
+// migrate and push reach only a database on this machine, unless ALLOW_SHARED_MIGRATE=1.
+const refusal = sharedMigrateRefusal({ command: drizzleKitCommand(process.argv), url, env: process.env });
+if (refusal) throw new Error(refusal);
 
 export default defineConfig({
   dialect: "postgresql",
@@ -14,7 +25,7 @@ export default defineConfig({
   schemaFilter: ["public"],
   dbCredentials: {
     // Migrations use the direct connection, not the pooler.
-    url: process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL ?? "",
+    url,
   },
   strict: true,
   verbose: true,
