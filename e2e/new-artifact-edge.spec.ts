@@ -9,7 +9,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
  */
 
 const creates = (page: Page) => page.evaluate(() => Number(window.sessionStorage.getItem("fixture:new-artifact-creates") ?? "0"));
-const storedNew = (page: Page) => page.evaluate(() => JSON.parse(window.sessionStorage.getItem("fixture:new-artifacts") ?? "[]") as { title: string; kind: string; content: string; files: { id: string }[] }[]);
+const storedNew = (page: Page) => page.evaluate(() => JSON.parse(window.sessionStorage.getItem("fixture:new-artifacts") ?? "[]") as { title: string; kind: string; content: string; files: { id: string; filename: string }[] }[]);
 const discarded = (page: Page) => page.evaluate(() => JSON.parse(window.sessionStorage.getItem("fixture:discarded") ?? "[]") as string[]);
 const setFlag = (page: Page, key: string, value: string) => page.evaluate(([name, flag]) => { window.sessionStorage.setItem(name, flag); }, [key, value] as const);
 const fire = (page: Page, name: string) => page.evaluate((event) => { window.dispatchEvent(new Event(event)); }, name);
@@ -113,14 +113,47 @@ test("should load the artifact again when every attach answer is lost, and show 
   expect(await discarded(page)).toEqual([]);
 });
 
-test("should point at the fresh Files section when the answers are lost and the artifact does not have the file", async ({ page }) => {
+test("should keep a title-only page as Markdown when the answers are lost and the artifact does not have the file", async ({ page }) => {
   await openNewArtifact(page);
   await storeWithTitle(page, "Not there");
   await setFlag(page, "fixture:next-attach", "vanish-always");
   await dropFiles(body(page), ["Missing.pdf"]);
-  await expect(page.getByText(attachUnknown, { exact: true })).toBeVisible();
-  await expect(page.getByText(attachProblem, { exact: true })).toHaveCount(0);
+  await expect(page.getByText(attachProblem, { exact: true })).toBeVisible();
+  await expect(page.getByText(attachUnknown, { exact: true }), "no Files section to point at").toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Files" })).toHaveCount(0);
+  // Typing saves the page: it stays Markdown, never an empty Files artifact.
+  await body(page).locator('[contenteditable="true"]').click();
+  await page.keyboard.type("Still writing");
+  await expect.poll(async () => (await storedNew(page))[0]?.content, { timeout: 15_000 }).toBe("Still writing");
+  const [stored] = await storedNew(page);
+  expect(stored?.kind).toBe("markdown");
+  expect(stored?.files).toHaveLength(0);
   expect(await discarded(page), "an unknown outcome never deletes").toEqual([]);
+});
+
+test("should show a file as Checking while a lost answer is checked, and queue a drop made meanwhile", async ({ page }) => {
+  await openNewArtifact(page);
+  await storeWithTitle(page, "Checking");
+  await setFlag(page, "fixture:next-attach", "lose-always");
+  await setFlag(page, "fixture:hold-load", "1");
+  await dropFiles(body(page), ["First.pdf"]);
+  const uploadsList = page.getByRole("list", { name: "Uploads" });
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem("fixture:hold-load:waiting")), { timeout: 15_000 }).toBe("1");
+  await expect(uploadsList.getByRole("listitem").filter({ hasText: "First.pdf" })).toContainText("Checking…");
+  // A drop while the check runs waits for it: nothing is attached until the outcome is known.
+  await dropFiles(body(page), ["Second.pdf"]);
+  await expect(uploadsList.getByRole("listitem")).toHaveCount(2);
+  await expect(uploadsList.getByRole("listitem").filter({ hasText: "Second.pdf" })).not.toContainText("Uploading");
+  expect((await storedNew(page))[0]?.files.map((file) => file.filename)).toEqual(["First.pdf"]);
+  await page.evaluate(() => {
+    window.sessionStorage.removeItem("fixture:next-attach");
+    window.sessionStorage.removeItem("fixture:hold-load");
+    window.dispatchEvent(new Event("fixture:release-load"));
+  });
+  await expect(page.getByRole("region", { name: "Files" })).toContainText("2 attached", { timeout: 15_000 });
+  expect((await storedNew(page))[0]?.files.map((file) => file.filename).sort()).toEqual(["First.pdf", "Second.pdf"]);
+  await expect(page.getByText(attachUnknown, { exact: true })).toHaveCount(0);
+  expect(await discarded(page)).toEqual([]);
 });
 
 test("should ask for a reload when the answers are lost and the artifact cannot be loaded either", async ({ page }) => {
@@ -326,4 +359,22 @@ test("should let an empty page become Code and store it once something is writte
   await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe("code");
   expect((await storedNew(page))[0]?.content).toBe("const answer = 42;");
   expect(await creates(page)).toBe(1);
+});
+
+test("should still attach a file dropped while an earlier attach was on its way and then refused", async ({ page }) => {
+  await openNewArtifact(page);
+  await storeWithTitle(page, "Queued drop");
+  await setFlag(page, "fixture:hold-attach", "1");
+  await setFlag(page, "fixture:next-attach", "refuse");
+  await dropFiles(body(page), ["Refused.pdf"]);
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem("fixture:hold-attach:waiting")), { timeout: 15_000 }).toBe("1");
+  await dropFiles(body(page), ["Later.pdf"]);
+  await expect(page.getByRole("list", { name: "Uploads" }).getByRole("listitem")).toHaveCount(2);
+  await page.evaluate(() => {
+    window.sessionStorage.removeItem("fixture:hold-attach");
+    window.dispatchEvent(new Event("fixture:release-attach"));
+  });
+  await expect(page.getByText(attachProblem, { exact: true })).toBeVisible();
+  await expect.poll(async () => (await storedNew(page))[0]?.files.map((file) => file.filename), { timeout: 15_000 }).toEqual(["Later.pdf"]);
+  expect(await discarded(page)).toHaveLength(1);
 });

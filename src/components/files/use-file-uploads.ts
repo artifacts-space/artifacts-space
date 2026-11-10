@@ -95,7 +95,12 @@ export function useFileUploads(options: { onReady?: (file: FileDto, key: string)
     setItems([]);
   }, [items]);
 
+  /** Shows finished files as being checked again (an answer about them was lost); they count as busy until removed. */
+  const markChecking = useCallback((fileIds: readonly string[]) => {
+    setItems((current) => current.map((item) => (item.file && fileIds.includes(item.file.id) ? { ...item, status: "checking" } : item)));
+  }, []);
+
   const readyFiles = items.flatMap((item) => (item.status === "ready" && item.file ? [item.file] : []));
   const busy = items.some((item) => item.status === "uploading" || item.status === "checking");
-  return { items, addFiles, remove, reset, readyFiles, busy };
+  return { items, addFiles, remove, reset, markChecking, readyFiles, busy };
 }

@@ -30,6 +30,8 @@ const nextAttachKey = "fixture:next-attach";
 const discardedKey = "fixture:discarded";
 /** Set by a test to make the next load fail ("always" for every one). */
 const failLoadKey = "fixture:fail-load";
+/** Set to "1" by a test to hold loads until it dispatches `fixture:release-load`. */
+const holdLoadKey = "fixture:hold-load";
 
 function readFlag(key: string): string | null {
   try {
@@ -182,10 +184,11 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     recordDiscard(fileId);
     return Promise.resolve();
   },
-  load: (publicId) => {
+  load: async (publicId) => {
+    await gate(holdLoadKey, "fixture:release-load");
     // Set by a test so the check after a lost answer fails too.
-    if (takeFlag(failLoadKey) !== null) return Promise.reject(new Error("The artifact could not be loaded."));
+    if (takeFlag(failLoadKey) !== null) throw new Error("The artifact could not be loaded.");
     const found = readStored().find((entry) => entry.publicId === publicId);
-    return Promise.resolve(found ? { success: true, data: found } : { success: false, error: "Artifact not found." });
+    return found ? { success: true, data: found } : { success: false, error: "Artifact not found." };
   },
 };
