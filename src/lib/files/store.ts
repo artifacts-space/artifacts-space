@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, isNull, like, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, like, lt, lte, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, artifactFile, type ArtifactFileRecord } from "@/db/schema";
@@ -31,14 +31,19 @@ export async function getFileRows(fileIds: readonly string[]): Promise<ArtifactF
   return getDb().select().from(artifactFile).where(inArray(artifactFile.id, [...fileIds]));
 }
 
-/** Ready files of these artifacts, in the order they were attached, by artifact id. */
-export async function listFilesForArtifacts(artifactIds: readonly string[]): Promise<Map<string, FileDto[]>> {
+/**
+ * Ready files of these artifacts, in the order they were attached, by
+ * artifact id. With `attachedBy`, only files attached at or before that
+ * time: what readers of an approved version may see.
+ */
+export async function listFilesForArtifacts(artifactIds: readonly string[], options: { attachedBy?: Date | null } = {}): Promise<Map<string, FileDto[]>> {
   const files = new Map<string, FileDto[]>();
   if (artifactIds.length === 0) return files;
+  const cutoff = options.attachedBy ? lte(artifactFile.attachedAt, options.attachedBy) : undefined;
   const rows = await getDb()
     .select()
     .from(artifactFile)
-    .where(and(inArray(artifactFile.artifactId, [...artifactIds]), eq(artifactFile.status, "ready")))
+    .where(and(inArray(artifactFile.artifactId, [...artifactIds]), eq(artifactFile.status, "ready"), cutoff))
     .orderBy(asc(artifactFile.attachedAt), asc(artifactFile.createdAt));
   for (const row of rows) {
     if (!row.artifactId) continue;
@@ -49,17 +54,9 @@ export async function listFilesForArtifacts(artifactIds: readonly string[]): Pro
   return files;
 }
 
-/**
- * Ready files of one artifact. With `attachedBy`, only files attached at or
- * before that time: what readers of an approved version may see.
- */
+/** Ready files of one artifact, in one query; `attachedBy` as for listFilesForArtifacts. */
 export async function listArtifactFiles(artifactId: string, options: { attachedBy?: Date | null } = {}): Promise<FileDto[]> {
-  const files = (await listFilesForArtifacts([artifactId])).get(artifactId) ?? [];
-  const cutoff = options.attachedBy;
-  if (!cutoff) return files;
-  const rows = await getFileRows(files.map((file) => file.id));
-  const allowed = new Set(rows.filter((row) => row.attachedAt !== null && row.attachedAt <= cutoff).map((row) => row.id));
-  return files.filter((file) => allowed.has(file.id));
+  return (await listFilesForArtifacts([artifactId], options)).get(artifactId) ?? [];
 }
 
 /** Removes an icon or cover that points at a file being deleted from its artifact. Call before the change is recorded. */
