@@ -16,7 +16,7 @@ import { matchesProjectFilter } from "@/lib/projects/sidebar-rules";
 
 import { fixtureArtifact, longCsv, longJson, longMarkdown, longUi } from "./fixture-content";
 import { createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, withProjects } from "./fixture-projects";
-import { fixtureNotifications } from "./notification-fixture";
+import { fixtureNotifications, LINK_ONLY_PUBLIC_ID } from "./notification-fixture";
 
 /** The viewer's personal team, so the Share dialog can offer link and public sharing. It adds no scope tab. */
 const fixtureTeams: ShareTeam[] = [{ id: "fixture-team", slug: "fixture", name: "Fixture", personal: true, role: "owner", roleKey: "owner", kind: "person", capabilities: [...defaultRoleCapabilities.owner], teamSharingNeedsApproval: false }];
@@ -48,6 +48,9 @@ function fixtureArtifacts(): ArtifactDto[] {
   })];
 }
 
+/** Someone else's artifact shared by link: outside the list, so only a link (n6 in the bell) opens it, pinned to the top. */
+const linkOnlyArtifact: ArtifactDto = fixtureArtifact({ id: "fixture-link-only", kind: "text", title: "Shared by link fixture", content: "Opened from a link.", publicId: LINK_ONLY_PUBLIC_ID });
+
 /** The fixture's projects in memory, and a stand-in for the project server actions over them. */
 function useFixtureProjects(artifacts: readonly ArtifactDto[]) {
   const [store] = useState(() => createFixtureProjectsStore(new Map(artifacts.map((artifact) => [artifact.id, artifact.title]))));
@@ -70,6 +73,12 @@ export function WorkspaceFixture({ projectFilter, link = null, scopes = false, t
   const items = useMemo(() => artifacts.filter((artifact) => matchesProjectFilter(artifact.project, projectFilter)).map(toArtifactListItem), [artifacts, projectFilter]);
   const facets = useMemo(() => fixtureFacets(artifacts), [artifacts]);
   const notifications = useMemo(() => fixtureNotifications(), []);
+  // As on /app: what the link finds, in the list or not (the workspace pins it to the top), or null when it is gone.
+  const full = useMemo(() => [...artifacts, linkOnlyArtifact], [artifacts]);
+  const linkTarget = useMemo(() => {
+    const found = link ? full.find((artifact) => artifact.publicId === link.publicId) : undefined;
+    return found ? toArtifactListItem(found) : null;
+  }, [full, link]);
   return (
     <ConfirmationsProvider initial={[]}>
       <div className="workspace-frame">
@@ -77,7 +86,7 @@ export function WorkspaceFixture({ projectFilter, link = null, scopes = false, t
         <Dashboard
           key={projectFilterId(projectFilter)}
           initialArtifacts={items}
-          initialFull={artifacts}
+          initialFull={full}
           origin="http://localhost"
           viewerId="fixture"
           teams={scopes ? [...fixtureTeams, ...fixtureSharedTeams] : fixtureTeams}
@@ -90,6 +99,7 @@ export function WorkspaceFixture({ projectFilter, link = null, scopes = false, t
           projectsApi={api}
           listPath="/dev/workspace"
           link={link}
+          linkTarget={linkTarget}
         />
       </div>
     </ConfirmationsProvider>

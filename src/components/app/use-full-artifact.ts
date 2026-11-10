@@ -9,15 +9,39 @@ function byId(artifacts: readonly ArtifactDto[] | undefined): ReadonlyMap<string
   return new Map(artifacts?.map((artifact) => [artifact.id, artifact]));
 }
 
+/** Adds the artifacts not held yet; what is held already (perhaps just saved) stays. */
+function withMissing(current: ReadonlyMap<string, ArtifactDto>, artifacts: readonly ArtifactDto[]): ReadonlyMap<string, ArtifactDto> {
+  const missing = artifacts.filter((artifact) => !current.has(artifact.id));
+  if (missing.length === 0) return current;
+  const next = new Map(current);
+  for (const artifact of missing) next.set(artifact.id, artifact);
+  return next;
+}
+
+/** The artifacts held so far, seeded from `initial` and taking new ones each time `initial` changes. */
+function useLoaded(initial: readonly ArtifactDto[] | undefined) {
+  const [loaded, setLoaded] = useState(() => byId(initial));
+  const [seenInitial, setSeenInitial] = useState(initial);
+  if (initial !== seenInitial) {
+    setSeenInitial(initial);
+    if (initial) setLoaded((current) => withMissing(current, initial));
+  }
+  const add = useCallback((artifact: ArtifactDto) => {
+    setLoaded((current) => new Map(current).set(artifact.id, artifact));
+  }, []);
+  return { loaded, add };
+}
+
 /**
  * The full artifact behind the selected list item. Lists carry previews
  * only, so content loads when an artifact is opened and is kept for the rest
  * of the visit. Saves and shares hand back the full artifact; `remember`
  * keeps it, so the editor never reloads what it just saved. `initial` seeds
- * artifacts already in hand.
+ * artifacts already in hand, including ones a later link hands over (an
+ * artifact outside the list, loaded by the server for that link).
  */
 export function useFullArtifact(selected: ArtifactListItemDto | null, initial?: readonly ArtifactDto[]) {
-  const [loaded, setLoaded] = useState(() => byId(initial));
+  const { loaded, add } = useLoaded(initial);
   const [failure, setFailure] = useState<{ id: string; message: string } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const selectedId = selected?.id ?? null;
@@ -30,7 +54,7 @@ export function useFullArtifact(selected: ArtifactListItemDto | null, initial?: 
     loadArtifactAction(selectedPublicId)
       .then((result) => {
         if (!active) return;
-        if (result.success) setLoaded((current) => new Map(current).set(result.data.id, result.data));
+        if (result.success) add(result.data);
         else setFailure({ id: selectedId, message: result.error });
       })
       .catch(() => {
@@ -39,11 +63,7 @@ export function useFullArtifact(selected: ArtifactListItemDto | null, initial?: 
     return () => {
       active = false;
     };
-  }, [selectedId, selectedPublicId, isLoaded, attempt]);
-
-  const remember = useCallback((artifact: ArtifactDto) => {
-    setLoaded((current) => new Map(current).set(artifact.id, artifact));
-  }, []);
+  }, [selectedId, selectedPublicId, isLoaded, attempt, add]);
 
   const retry = useCallback(() => {
     setFailure(null);
@@ -53,7 +73,7 @@ export function useFullArtifact(selected: ArtifactListItemDto | null, initial?: 
   return {
     full: selectedId ? loaded.get(selectedId) ?? null : null,
     failure: failure !== null && failure.id === selectedId ? failure.message : null,
-    remember,
+    remember: add,
     retry,
   };
 }

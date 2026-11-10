@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
+import type { ArtifactLink } from "@/lib/app-link";
+
 interface LinkedComments {
   /** The artifact whose comments a link asked to open, until they open. */
   pending: string | null;
@@ -10,13 +12,24 @@ interface LinkedComments {
 
 const LinkedCommentsContext = createContext<LinkedComments>({ pending: null, consume: () => undefined });
 
+function pendingFor(link: ArtifactLink | null): string | null {
+  return link?.comments ? link.publicId : null;
+}
+
 /**
  * Holds the artifact whose comments the URL asked to open
  * (`/app?artifact=<id>&comments=1`), so the comments open once for that
- * artifact and not again after the person moves on.
+ * artifact and not again after the person moves on. `link` is the last link
+ * that opened its artifact; each new one (even for the same artifact) asks
+ * again, so a second click on a notification opens the comments again.
  */
-export function LinkedCommentsProvider({ publicId, children }: { publicId: string | null; children: React.ReactNode }) {
-  const [pending, setPending] = useState(publicId);
+export function LinkedCommentsProvider({ link, children }: { link: ArtifactLink | null; children: React.ReactNode }) {
+  const [pending, setPending] = useState(() => pendingFor(link));
+  const [seen, setSeen] = useState(link);
+  if (link !== seen) {
+    setSeen(link);
+    setPending(pendingFor(link));
+  }
   const consume = useCallback(() => { setPending(null); }, []);
   const value = useMemo(() => ({ pending, consume }), [pending, consume]);
   return <LinkedCommentsContext.Provider value={value}>{children}</LinkedCommentsContext.Provider>;

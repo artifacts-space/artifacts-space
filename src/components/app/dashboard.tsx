@@ -1,7 +1,7 @@
 "use client";
 
-import { IconLoader2, IconPlus, IconSearch } from "@tabler/icons-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { IconInfoCircle, IconLoader2, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
+import { useMemo, useRef, useState } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
 import { ArtifactList } from "@/components/app/artifact-list";
@@ -14,6 +14,7 @@ import { serverProjectsApi, type ProjectsApi } from "@/components/app/projects-a
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
 import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
 import { useEditAccess, useWithdrawSharing } from "@/components/app/use-edit-access";
+import { useArtifactLink } from "@/components/app/use-artifact-link";
 import { useFullArtifact } from "@/components/app/use-full-artifact";
 import { useServerSearch } from "@/components/app/use-server-search";
 import { useDashboardProjects } from "@/components/app/use-dashboard-projects";
@@ -29,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import { LinkedCommentsProvider } from "@/components/comments/linked-comments";
 import { SidebarProjects } from "@/components/projects/sidebar-projects";
-import { withoutArtifactLink, type ArtifactLink } from "@/lib/app-link";
+import type { ArtifactLink } from "@/lib/app-link";
 import { kinds } from "@/lib/artifact-kinds";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
@@ -136,6 +137,17 @@ function WorkspaceBar({ teams, scopeTeam, onCreate }: { teams: readonly ShareTea
   );
 }
 
+/** Shown when a link (from a notification, say) points to an artifact that is gone or no longer shared with the viewer. */
+function UnavailableNotice({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div role="status" className="mb-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+      <IconInfoCircle aria-hidden className="size-4 shrink-0" />
+      <p className="min-w-0 flex-1">This artifact is no longer available.</p>
+      <Button variant="ghost" size="icon-sm" aria-label="Dismiss" title="Dismiss" onClick={onDismiss}><IconX /></Button>
+    </div>
+  );
+}
+
 /** The selected item, from the list or from server search results; else the first shown. */
 function pickSelected(artifacts: ArtifactListItemDto[], filtered: ArtifactListItemDto[], selectedId: string) {
   return artifacts.find((artifact) => artifact.id === selectedId) ?? filtered.find((artifact) => artifact.id === selectedId) ?? filtered[0] ?? null;
@@ -167,38 +179,19 @@ interface DashboardProps {
   listPath?: string;
   /** The artifact the URL asked to open (`?artifact=<id>`), and whether to open its comments. */
   link?: ArtifactLink | null;
+  /** What the server found for the link (in the list or not), or null when it is missing or not the viewer's to read. */
+  linkTarget?: ArtifactListItemDto | null;
 }
 
-/** The artifact to select first: the linked one when it is in the list, else the first. */
-function firstSelection(artifacts: ArtifactListItemDto[], link: ArtifactLink | null | undefined) {
-  const linked = link ? artifacts.find((artifact) => artifact.publicId === link.publicId) : undefined;
-  return linked?.id ?? artifacts[0]?.id ?? "";
-}
-
-/** Once the link has opened its artifact, drops it from the address bar so a reload or a later pick does not jump back. */
-function useForgetArtifactLink(link: ArtifactLink | null | undefined) {
-  useEffect(() => {
-    if (!link) return;
-    const { pathname, search, hash } = window.location;
-    window.history.replaceState(window.history.state, "", `${pathname}${withoutArtifactLink(search)}${hash}`);
-  }, [link]);
-}
-
-/** The artifact whose comments the link asked to open, if any. */
-function linkedCommentsId(link: ArtifactLink | null | undefined): string | null {
-  return link?.comments ? link.publicId : null;
-}
-
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", link }: DashboardProps) {
-  const [artifacts, setArtifacts] = useState(initialArtifacts);
-  const [selectedId, setSelectedId] = useState(() => firstSelection(initialArtifacts, link));
-  useForgetArtifactLink(link);
-  const [query, setQuery] = useState("");
-  const [kind, setKind] = useState("all");
-  const [createOpen, setCreateOpen] = useState(false);
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", link = null, linkTarget = null }: DashboardProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
+  const { artifacts, setArtifacts, selectedId, setSelectedId, unavailable, dismissUnavailable, opened } = useArtifactLink({ initialArtifacts, link, target: linkTarget, list: listRef, detail: detailRef });
+  const [query, setQuery] = useState("");
+  const [kind, setKind] = useState("all");
+  const [createOpen, setCreateOpen] = useState(false);
   const sidebar = useDashboardProjects({ artifacts, setArtifacts, rows: projectRows, facets, api: projectsApi, teams, scopeTeam, tagFilter, listPath, viewerId });
 
   const serverMatches = useServerSearch(query, scopeTeam?.id ?? null, projectFilter, tagFilter);
@@ -229,10 +222,11 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
 
   return (
     <ShareTeamsProvider teams={teams}>
-      <LinkedCommentsProvider publicId={linkedCommentsId(link)}>
+      <LinkedCommentsProvider link={opened}>
       {/* An app shell from md up: the frame is the viewport (workspace-frame), and only the list and the artifact scroll. */}
       <main data-app-shell className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col px-4 pb-4 sm:px-6 sm:pb-6 md:min-h-0 md:flex-1">
         <WorkspaceBar teams={teams} scopeTeam={scopeTeam} onCreate={() => { setCreateOpen(true); }} />
+        {unavailable ? <UnavailableNotice onDismiss={dismissUnavailable} /> : null}
 
         <PanelSizesBeforePaint />
         {/* overflow-clip, not hidden: it rounds the corners without becoming a scroll box, so the artifact's toolbar can stick on phones. */}
@@ -290,6 +284,8 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
           </aside>
           <SidebarSplitter shell={shellRef} sidebar={sidebarRef} />
 
+          {/* `contents` keeps the pane a grid item; the ref lets a link bring it into view on phones. */}
+          <div ref={detailRef} data-slot="workspace-detail" className="contents">
           <DetailPane
             selected={selected}
             viewerId={viewerId}
@@ -299,6 +295,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
             onCreate={() => { setCreateOpen(true); }}
             initialFull={initialFull}
           />
+          </div>
         </div>
 
         <CreateArtifactDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={created} />

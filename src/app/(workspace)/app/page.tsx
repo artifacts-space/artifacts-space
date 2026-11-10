@@ -62,9 +62,11 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
     listTagFacets(session.user.id, scope),
     listSidebarProjects(session.user.id, scope),
   ]);
-  // A link (from a notification, say) opens its artifact even when the list does not hold it: it joins the top.
+  // A link (from a notification, say) opens its artifact even when the list does not hold it: the workspace pins it to the top.
   const link = parseArtifactLink(params);
   const linked = await linkedOutsideList(link, artifacts, session.user.id);
+  // Null for a link to an artifact that is gone or not readable: the workspace says so.
+  const linkTarget = link ? (artifacts.find((item) => item.publicId === link.publicId) ?? (linked ? toArtifactListItem(linked) : null)) : null;
 
   return (
     <Dashboard
@@ -74,9 +76,10 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
       projectFilter={projectFilter}
       tagFilter={tagFilter}
       tagFacets={tagFacets}
-      initialArtifacts={linked ? [toArtifactListItem(linked), ...artifacts] : artifacts}
+      initialArtifacts={artifacts}
       {...(linked ? { initialFull: [linked] } : {})}
       link={link}
+      linkTarget={linkTarget}
       origin={siteOrigin()}
       viewerId={session.user.id}
       teams={teams}
