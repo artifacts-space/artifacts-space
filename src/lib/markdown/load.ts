@@ -9,6 +9,7 @@ import { lastEditorsFor } from "@/lib/artifacts";
 import { listComments } from "@/lib/comments/service";
 import { filesForViewer } from "@/lib/files/download";
 import { fileUrl } from "@/lib/files/types";
+import { mayExportCsv } from "@/lib/csv-export/rules";
 import { siteUrl } from "@/lib/site-origin";
 import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
 import { markdownThemeLabel } from "@/lib/themes/theme-privacy";
@@ -80,12 +81,14 @@ function emojiOf(icon: string | null): string | null {
 /** Loads everything the Markdown version shows. `withComments` adds the thread (?comments=1). */
 export async function loadMarkdownInput(viewable: ViewableArtifact, userId: string | null, withComments: boolean): Promise<ArtifactMarkdownInput> {
   const { record, view } = viewable;
+  // A sheet whose downloads are off shows this reader only a note (withheldMarkdown), so its files and comments are not loaded.
+  const exportable = mayExportCsv({ canEdit: viewable.canEdit }, { kind: view.kind, allowCsvDownload: record.allowCsvDownload });
   const [files, byline, updatedBy, version, comments, resolvedTheme] = await Promise.all([
-    filesForViewer(viewable),
+    exportable ? filesForViewer(viewable) : Promise.resolve([]),
     loadArtifactByline(record, viewable.isTeamMember),
     editorLabel(view.editedBy),
     versionNumber(viewable),
-    withComments ? commentsFor(userId, record.publicId) : Promise.resolve(null),
+    withComments && exportable ? commentsFor(userId, record.publicId) : Promise.resolve(null),
     resolveThemeFor(record, view.theme),
   ]);
   return {
@@ -98,6 +101,7 @@ export async function loadMarkdownInput(viewable: ViewableArtifact, userId: stri
     kind: view.kind,
     language: view.language,
     content: view.content,
+    exportable,
     url: siteUrl(`/artifact/${record.publicId}`),
     rawUrl: siteUrl(`/artifact/${record.publicId}/raw`),
     author: byline.author,

@@ -281,7 +281,8 @@ function registerReadTools(server: ToolServer, userId: string) {
     ({ id }) => respond(async () => {
       const [loaded, { view }] = await Promise.all([loadArtifactForViewer(id, userId), loadContext(userId)]);
       if (!loaded) throw new UserFacingError("Artifact not found.");
-      return { ...toMcpArtifact(loaded.dto, view), version: loaded.viewable.version.source, editPending: loaded.viewable.editPending };
+      // A connection that cannot edit a CSV whose owner turned downloads off gets it without its content.
+      return { ...toMcpArtifact(loaded.dto, view, { canEdit: loaded.viewable.canEdit }), version: loaded.viewable.version.source, editPending: loaded.viewable.editPending };
     }),
   );
 
@@ -311,7 +312,7 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
       assertTheme(input.theme);
       const created = await createArtifact(userId, { ...input, cover: coverFor(cover, coverPosition, null) }, { harness: await harness() });
       const result = await shareAfterSave(userId, created, teams, { visibility, team, comments });
-      return { artifact: toMcpArtifact(result.artifact, view), sharing: result.sharing, comments: result.comments };
+      return { artifact: toMcpArtifact(result.artifact, view, { canEdit: true }), sharing: result.sharing, comments: result.comments };
     }),
   );
 
@@ -342,7 +343,7 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
       const organized = await organize(userId, record.id, saved.artifact, project, tagChange);
       const artifact = await applyFullWidth(userId, record.id, organized, fullWidth);
       const result = await shareAfterSave(userId, artifact, teams, { visibility, team, comments });
-      return { artifact: toMcpArtifact(result.artifact, view), edit: saved.edit, sharing: result.sharing, comments: result.comments };
+      return { artifact: toMcpArtifact(result.artifact, view, { canEdit: true }), edit: saved.edit, sharing: result.sharing, comments: result.comments };
     }),
   );
 

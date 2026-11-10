@@ -46,7 +46,7 @@ vi.mock("@/lib/agents/owner-access", () => ({ ownedAgentIds: () => Promise.resol
 const baseRecord = {
   id: "artifact-1", publicId: "4fXkP9qR2sT7vW1yZ3aB5c", userId: "user-1", title: "Plan", icon: null, theme: null, cover: null, summary: "", content: "# Plan",
   kind: "markdown", language: "", project: "", projectId: null, tags: [], sessionId: "", source: "", harness: null, harnessOverride: null, visibility: "private", comments: "team", shareId: "s", teamId: null,
-  originalAuthorId: null, metadata: {}, approvedVersionId: null, fullWidth: false, sheetFormat: null, showInSearch: false, updatedBy: "user-1", createdAt: new Date(), updatedAt: new Date("2026-11-08T10:00:00.000Z"),
+  originalAuthorId: null, metadata: {}, approvedVersionId: null, fullWidth: false, sheetFormat: null, allowCsvDownload: false, showInSearch: false, updatedBy: "user-1", createdAt: new Date(), updatedAt: new Date("2026-11-08T10:00:00.000Z"),
 } satisfies ArtifactRecord;
 
 const { updateArtifact } = await import("./artifacts");

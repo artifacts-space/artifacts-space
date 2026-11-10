@@ -42,7 +42,7 @@ export const artifactToolCopy = {
   artifacts_get: {
     title: "Get artifact",
     description:
-      "Read a saved artifact (a doc, plan, spec, report, page, or dashboard) in full, by its id. `version` says whether you got the latest version or the approved version that readers outside the team see; `editPending` says whether newer changes wait for approval.",
+      "Read a saved artifact (a doc, plan, spec, report, page, or dashboard) in full, by its id. `version` says whether you got the latest version or the approved version that readers outside the team see; `editPending` says whether newer changes wait for approval. A CSV whose owner turned off downloads (`allowCsvDownload` false) comes without its content unless you can edit it; `contentWithheld` says so.",
   },
   teams_list: {
     title: "List teams",

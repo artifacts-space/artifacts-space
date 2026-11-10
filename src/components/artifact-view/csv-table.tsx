@@ -25,6 +25,7 @@ import {
 import { pixelWidth } from "@/lib/sheet-grid-rules";
 
 import { CsvColumnMenu } from "./csv-column-menu";
+import { refuseCopy, useCsvExportAllowed } from "./csv-export";
 import { DataGrid, gridCellId } from "./data-grid";
 import { type SheetBandingControl, SheetFormatMenu } from "./sheet-format";
 import { SheetFormulaBar } from "./sheet-formula-bar";
@@ -72,6 +73,7 @@ export function CsvTable({ content }: { content: string }) {
   const cellText = useCallback((row: number, column: number) => parsed.rows[shown[row] ?? -1]?.[dataColumn(column)] ?? "", [parsed.rows, shown, dataColumn]);
   const rowLabel = useCallback((row: number) => String((shown[row] ?? 0) + 1), [shown]);
   const { selection, active, setSelection, setActive } = useSheetSelection({ rows: shown.length, columns });
+  const exportAllowed = useCsvExportAllowed();
 
   if (parsed.header.length === 0) return <ViewNotice title="This CSV has no rows yet." />;
   const notes = csvNotes(parsed);
@@ -148,8 +150,9 @@ export function CsvTable({ content }: { content: string }) {
         onResetOrder={sheet.customOrder ? sheet.resetOrder : null}
         banding={sheet.bandingControl}
       />
-      <p id={hintId} className="sr-only">Use the arrow keys, Tab, and Enter to move between cells, and Shift with the arrows to select a block. Copy copies the selection. On a column header, press Enter to sort, or Alt and Down Arrow for filters. To leave the grid, press Escape, then Tab.</p>
-      <div className="min-w-0">
+      <p id={hintId} className="sr-only">Use the arrow keys, Tab, and Enter to move between cells, and Shift with the arrows to select a block. {exportAllowed ? "Copy copies the selection." : "Copying is off for this sheet."} On a column header, press Enter to sort, or Alt and Down Arrow for filters. To leave the grid, press Escape, then Tab.</p>
+      {/* While the owner keeps downloads off, the grid and the formula bar copy nothing for this reader. */}
+      <div className="min-w-0" onCopyCapture={exportAllowed ? undefined : refuseCopy}>
       <SheetFormulaBar cell={`${String(active.row)}:${String(active.column)}`} place={selectionLabel(selection, (column) => name(dataColumn(column)), rowLabel)} value={valueAt(active)} onCommit={null} onDone={() => { gridOf(0)?.focus(); }} />
       <DataGrid
         gridId={gridId}

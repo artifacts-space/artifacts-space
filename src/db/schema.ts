@@ -60,6 +60,8 @@ export const artifact = pgTable(
     fullWidth: boolean("full_width").notNull().default(false),
     // A CSV's sheet formatting: banded rows and column alignment (src/lib/sheet-format). Null is plain. A display setting: not versioned, no approval.
     sheetFormat: jsonb("sheet_format").$type<SheetFormat>(),
+    // "Allow CSV download" (src/lib/csv-export): off by default. While off, readers who cannot edit get no download, raw file, Markdown table, copy, or MCP content.
+    allowCsvDownload: boolean("allow_csv_download").notNull().default(false),
     summary: text("summary").notNull().default(""),
     content: text("content").notNull(),
     kind: text("kind", { enum: artifactKinds }).notNull().default("markdown"),

@@ -39,7 +39,7 @@ async function respond(run: () => Promise<unknown>) {
 async function artifactResult(userId: string, record: ArtifactRecord) {
   const [[dto], teams] = await Promise.all([toArtifactDtos([record], userId), listTeamsForUser(userId)]);
   if (!dto) throw new UserFacingError("Artifact not found.");
-  return toMcpArtifact(dto, { viewerId: userId, teamSlugs: new Map(teams.map((team) => [team.id, team.slug])), urlFor: (publicId) => siteUrl(`/artifact/${publicId}`) });
+  return toMcpArtifact(dto, { viewerId: userId, teamSlugs: new Map(teams.map((team) => [team.id, team.slug])), urlFor: (publicId) => siteUrl(`/artifact/${publicId}`) }, { canEdit: true });
 }
 
 async function ownArtifact(userId: string, publicId: string) {

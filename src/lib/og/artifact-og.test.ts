@@ -39,9 +39,9 @@ const approvedId = "11111111-1111-4111-8111-111111111111";
 const pendingTitle = "Pending edit title";
 const savedAt = new Date("2026-11-01T00:00:00Z");
 
-function access(visibility: ArtifactVisibility, source: "approved" | "latest" = "approved"): ArtifactAccess {
+function access(visibility: ArtifactVisibility, source: "approved" | "latest" = "approved", allowCsvDownload = false): ArtifactAccess {
   const fixture = {
-    record: { id: "internal", visibility, title: pendingTitle },
+    record: { id: "internal", visibility, title: pendingTitle, allowCsvDownload },
     version: source === "approved" ? { source, versionId: approvedId } : { source, versionId: null },
     served: { title: source === "approved" ? "Approved title" : pendingTitle, icon: null, updatedAt: savedAt, editedBy: null },
     canEdit: false,
@@ -106,6 +106,25 @@ describe("artifactOgMetadata", () => {
     expect(tags.openGraph).toMatchObject({ title: "Approved title", images: [image] });
     expect(tags.twitter).toMatchObject({ card: "summary_large_image", title: "Approved title", images: [image] });
     expect(JSON.stringify(tags)).not.toContain(pendingTitle);
+  });
+
+  it("should give the picture a fresh URL and keep cells out of the description when a sheet's downloads are turned off", async () => {
+    const sheet = { ...approvedView, kind: "csv", content: "name,secret\nAda,s3cret\n" };
+    mocks.cachedVersionView.mockResolvedValue(sheet);
+    mocks.getSignedOutAccess.mockResolvedValue(access("public", "approved", true));
+    const on = await artifactOgMetadata("abc");
+    expect(on.description).toContain("columns name, secret");
+    const onUrl = on.openGraph?.images;
+
+    mocks.getSignedOutAccess.mockResolvedValue(access("public", "approved", false));
+    const off = await artifactOgMetadata("abc");
+    expect(off.description, "no column names or cells").toBe("CSV on artifacts.space");
+    expect(JSON.stringify(off)).not.toContain("secret");
+    expect(off.openGraph?.images, "a toggle changes the image URL, as a theme change does").not.toEqual(onUrl);
+    expect(JSON.stringify(off.openGraph?.images)).not.toContain(`${approvedId}.${siteKey}`);
+    // The withheld card's own URL is current, so it caches for a year like any other.
+    const segment = /og\/([^"]+)"/.exec(JSON.stringify(off.openGraph?.images))?.[1] ?? "";
+    expect((await loadArtifactOg("abc", segment))?.themeCurrent).toBe(true);
   });
 
   it("should add no tags, keeping the site image, when the artifact is private, team, missing, or has no approved version", async () => {
@@ -281,6 +300,18 @@ describe("loadArtifactOg", () => {
     expect(mocks.cachedVersionView).toHaveBeenCalledWith(approvedId, savedAt.toISOString());
     expect(og).toMatchObject({ title: "Approved title", kindLabel: "Markdown", synopsis: { type: "prose", heading: "Approved heading" } });
     expect(JSON.stringify(og)).not.toContain(pendingTitle);
+  });
+
+  it("should draw no cell values on the card when a sheet's downloads are off, and the table when they are on", async () => {
+    const sheet = { ...approvedView, kind: "csv", content: "name,secret\nAda,s3cret\n" };
+    mocks.cachedVersionView.mockResolvedValue(sheet);
+    mocks.getSignedOutAccess.mockResolvedValue(access("public", "approved", false));
+    const withheld = await loadArtifactOg("abc", approvedId);
+    expect(withheld?.synopsis).toEqual({ type: "glyph", glyph: "page", label: "CSV", detail: null });
+    expect(JSON.stringify(withheld)).not.toContain("s3cret");
+
+    mocks.getSignedOutAccess.mockResolvedValue(access("public", "approved", true));
+    expect((await loadArtifactOg("abc", approvedId))?.synopsis).toEqual({ type: "table", header: ["name", "secret"], rows: [["Ada", "s3cret"]] });
   });
 
   it("should draw the approved version's icon, never a pending one, when the preview renders", async () => {

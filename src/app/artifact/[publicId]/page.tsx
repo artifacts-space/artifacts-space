@@ -13,6 +13,7 @@ import { ArtifactHeader } from "@/components/artifact-page/artifact-header";
 import { ArtifactPageFooter } from "@/components/artifact-page/artifact-page-footer";
 import { ArtifactPageTheme } from "@/components/artifact-page/artifact-page-theme";
 import { ArtifactHeaderMenu } from "@/components/artifact-page/artifact-header-menu";
+import type { CsvDownloadSetting } from "@/components/artifact-page/csv-download-item";
 import { EditorIsland } from "@/components/artifact-page/editor-island";
 import { InlineBody, InlineSummary, InlineTitle } from "@/components/artifact-page/inline-fields";
 import { PageConflictNotice, PageEditorChromeProvider } from "@/components/artifact-page/page-editor-chrome";
@@ -20,6 +21,7 @@ import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { SheetFill } from "@/components/artifact-view/sheet-fill";
+import { CsvExportContext } from "@/components/artifact-view/csv-export";
 import { ArtifactSheetFormat } from "@/components/artifact-view/sheet-format";
 import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
 import { PageOrganizers } from "@/components/projects/page-organizers";
@@ -30,6 +32,8 @@ import { ViewBeacon } from "@/components/views/view-beacon";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
 import { canSeeComments } from "@/lib/comments/setting-rules";
 import { filesForViewer } from "@/lib/files/download";
+import { csvFileName, mayExportCsv } from "@/lib/csv-export/rules";
+import { canChangeCsvDownloadFor } from "@/lib/csv-export/store";
 import type { FileDto } from "@/lib/files/types";
 import { accountCreatedAt } from "@/lib/account-age";
 import { loadActor } from "@/lib/agents/queries";
@@ -278,11 +282,39 @@ function BodyReadView({ viewable, files }: { viewable: ViewableArtifact; files: 
   return body;
 }
 
-/** A CSV's formatting (a display setting on the row, like Full width): editors may change it, readers see it. */
+/** Whether this reader may take a CSV's data out: editors always; everyone else while "Allow CSV download" is on. */
+function exportsCsv(viewable: ViewableArtifact): boolean {
+  return mayExportCsv({ canEdit: viewable.canEdit }, { kind: viewable.view.kind, allowCsvDownload: viewable.record.allowCsvDownload });
+}
+
+/** The header's Copy and Download CSV: both only for a reader who may take the data out; Download only for a CSV. */
+function exportControls(viewable: ViewableArtifact) {
+  if (!exportsCsv(viewable)) return { content: null, download: null };
+  const { view, record } = viewable;
+  const download = view.kind === "csv" ? { href: `/artifact/${record.publicId}/raw`, filename: csvFileName(view.title) } : null;
+  return { content: view.content, download };
+}
+
+/** "Allow CSV download" for the More menu, only for someone who may change it (the author, or a team owner or admin). */
+async function csvDownloadSetting(viewable: ViewableArtifact, viewerId: string | null): Promise<CsvDownloadSetting | null> {
+  const { record } = viewable;
+  if (!viewable.canEdit || viewable.view.kind !== "csv") return null;
+  return (await canChangeCsvDownloadFor(viewerId, record)) ? { artifactId: record.id, on: record.allowCsvDownload } : null;
+}
+
+/**
+ * A CSV's formatting (a display setting on the row, like Full width):
+ * editors may change it, readers see it. While the owner keeps downloads
+ * off, the grid copies nothing for readers who cannot edit.
+ */
 function SheetFormatFor({ viewable, children }: { viewable: ViewableArtifact; children: React.ReactNode }) {
   if (viewable.view.kind !== "csv") return children;
   const { record } = viewable;
-  return <ArtifactSheetFormat artifactId={viewable.canEdit ? record.id : null} stored={record.sheetFormat}>{children}</ArtifactSheetFormat>;
+  return (
+    <CsvExportContext value={exportsCsv(viewable)}>
+      <ArtifactSheetFormat artifactId={viewable.canEdit ? record.id : null} stored={record.sheetFormat}>{children}</ArtifactSheetFormat>
+    </CsvExportContext>
+  );
 }
 
 /** The space above the heading: less under a cover, and none when the icon sits across the cover's edge (HeadingIcon pulls it up). */
@@ -296,7 +328,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   if (!viewable) notFound();
   const { record, view } = viewable;
   // getSession is deduplicated per request, so these reuse load()'s lookup.
-  const [byline, files, session, editor, organizers, resolved, themeChoices] = await Promise.all([
+  const [byline, files, session, editor, organizers, resolved, themeChoices, csvDownload] = await Promise.all([
     loadArtifactByline(record, viewable.isTeamMember),
     filesForViewer(viewable),
     getSession(),
@@ -305,6 +337,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
     // The artifact's own theme, then its team's default, then the site default: the same for every reader.
     resolveThemeFor(record, view.theme),
     getSession().then((session) => loadThemeChoices(viewable, session?.user.id ?? null)),
+    getSession().then((session) => csvDownloadSetting(viewable, session?.user.id ?? null)),
   ]);
   const copy = visibilityCopy(record.visibility);
   const { theme, presetId, source } = resolved;
@@ -322,8 +355,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
             column={column}
             visibility={record.visibility}
             sentence={visibilitySentence(copy, byline)}
-            content={view.content}
-            menu={viewable.canEdit ? <ArtifactHeaderMenu theme={theme} widthSetting={hasWidthSetting(view.kind)} waiting={{ publicId: record.publicId, title: record.title, updatedAt: record.updatedAt.toISOString(), reviewed: isReviewedLevel(record.visibility), fullWidth: record.fullWidth, files }} /> : null}
+            {...exportControls(viewable)}
+            menu={viewable.canEdit ? <ArtifactHeaderMenu theme={theme} widthSetting={hasWidthSetting(view.kind)} csvDownload={csvDownload} waiting={{ publicId: record.publicId, title: record.title, updatedAt: record.updatedAt.toISOString(), reviewed: isReviewedLevel(record.visibility), fullWidth: record.fullWidth, files }} /> : null}
           />
         </StickyChrome>
         {/* A theme that locks light or dark sets that mode on the backdrop too, so comments and controls on it stay readable. */}

@@ -6,6 +6,7 @@ import { AGENT_EMAIL_DOMAIN } from "@/lib/agents/identity";
 import { NEW_ACCOUNT_NOINDEX_DAYS } from "@/lib/access-rules";
 import { AGENT_LOOP_LIMIT, COMMENT_MAX_LENGTH, INBOX_CONTEXT_COMMENTS, MAX_MENTIONS_PER_COMMENT } from "@/lib/comments/config";
 import { refusalMessage } from "@/lib/comments/rules";
+import { CSV_DOWNLOAD_LABEL } from "@/lib/csv-export/rules";
 import { docsMetadata } from "@/lib/docs/metadata";
 import { docsHref } from "@/lib/docs/pages";
 import { HANDLE_MAX_LENGTH, HANDLE_MIN_LENGTH } from "@/lib/handles";
@@ -39,6 +40,19 @@ export default function SharingPage() {
       <Prose>
         <p>Public artifacts stay out of search engines until someone who can share them turns on <strong>Show in search engines</strong> in the Share dialog. Only the people who can share the artifact can turn it on: its author, or, while they are still in that agent&apos;s team, the person who added the agent that wrote it. Agents cannot. Making the artifact link, team, or private turns it off again. Only the page itself is listed: its Markdown version, raw content, files, and preview images never are.</p>
       </Prose>
+      <Prose>
+        <p><strong>CSV downloads</strong> are off for every CSV artifact until its author, or an owner or admin of its team, turns on <strong>{CSV_DOWNLOAD_LABEL}</strong> in the page&apos;s ⋯ menu. Agents cannot turn it on. While it is off, readers who cannot edit the sheet still see it on its page, but they get:</p>
+        <ul>
+          <li>no <strong>Download CSV</strong> or <strong>Copy</strong> button, and a grid and formula bar that copy nothing;</li>
+          <li>a 403 from <code>/artifact/&lt;id&gt;/raw</code>;</li>
+          <li>a Markdown version with only the title, the summary, and a line that says downloads are off;</li>
+          <li>no content from <Link href={`${docsHref("mcp")}#artifacts_get`}><code>artifacts_get</code></Link>, with a <code>contentWithheld</code> note instead.</li>
+        </ul>
+        <p>The author and the team, with their agents, always can. When the setting is on, every reader can.</p>
+      </Prose>
+      <Note title="A deterrent, not DRM">
+        This works like turning off download, print, and copy for viewers in Google Sheets. Anyone who can see the sheet can still read it off the screen, and the page has to send the rows to the browser to show them. Use team or private sharing for data that must not leave the team.
+      </Note>
       <Prose>
         <p>Link and public pages carry a <strong>Report</strong> button. Readers pick one of {reasons.length} reasons ({reasons.join(", ").toLowerCase()}), the site operator gets an email, and the team&apos;s owners and admins see the report on the team page. The author, or an owner or admin of the artifact&apos;s team, can always make an artifact private again, with no approval and no limit.</p>
       </Prose>

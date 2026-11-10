@@ -34,6 +34,13 @@ describe("ogThemeKey", () => {
 });
 
 describe("image path segments", () => {
+  it("should change the key with a variant, and keep the theme's own key without one", () => {
+    const theme = preset("default");
+    expect(ogThemeKey(theme, null)).toBe(ogThemeKey(theme));
+    expect(ogThemeKey(theme, "csv-off")).not.toBe(ogThemeKey(theme));
+    expect(ogThemeKey(theme, "csv-off")).toMatch(/^[A-Za-z0-9_-]{10}$/);
+  });
+
   it("should read back the version and key it wrote", () => {
     const key = ogThemeKey(preset("paper"));
     expect(parseOgImageSegment(ogImageSegment(versionId, key))).toEqual({ versionId, themeKey: key });

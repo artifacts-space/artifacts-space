@@ -4,6 +4,7 @@ import { networkKey } from "@/lib/abuse/network-key";
 import { hitRateLimits, type RateLimitCheck } from "@/lib/abuse/rate-limit";
 import { tooManyRequests } from "@/lib/abuse/responses";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
+import { csvDownloadOffNote, mayExportCsv } from "@/lib/csv-export/rules";
 import { bearerToken } from "@/lib/mcp/authenticate";
 import { resolveRequestViewer, viewerUserId, type RequestViewer } from "@/lib/request-viewer";
 import { noindexHeader } from "@/lib/search/search-rules";
@@ -99,7 +100,10 @@ async function loadForViewer(request: Request, publicId: string, credentialed: b
 /**
  * The Markdown version of an artifact: a header block, the content by
  * format, its files, and with `?comments=1` the comment thread (labelled as
- * untrusted) when the comments setting lets this reader see it.
+ * untrusted) when the comments setting lets this reader see it. A sheet
+ * whose downloads are off gives readers who may not edit it only the title,
+ * the summary, and a note that points at the page: no table, no files, and
+ * no comments, since a comment may quote rows.
  */
 export async function artifactMarkdownResponse(request: Request, publicId: string): Promise<Response> {
   const credentialed = hasCredentials(request);
@@ -118,13 +122,18 @@ export async function artifactMarkdownResponse(request: Request, publicId: strin
 /**
  * The artifact's content exactly as saved, under the same access check and
  * limits: text/csv for CSV, plain text for everything else (never HTML or
- * SVG, so nothing in it can run on this site).
+ * SVG, so nothing in it can run on this site). A CSV whose owner turned
+ * downloads off answers 403 to anyone who cannot edit it (mayExportCsv).
  */
 export async function artifactRawResponse(request: Request, publicId: string): Promise<Response> {
   const credentialed = hasCredentials(request);
   const loaded = await loadForViewer(request, publicId, credentialed);
   if (loaded instanceof Response) return loaded;
-  const { view } = loaded.viewable;
+  const { view, record, canEdit } = loaded.viewable;
+  // While "Allow CSV download" is off, only editors get the file; everyone else gets a clear 403, never the rows.
+  if (!mayExportCsv({ canEdit }, { kind: view.kind, allowCsvDownload: record.allowCsvDownload })) {
+    return new Response(`${csvDownloadOffNote} Open the sheet's page to read it.\n`, { status: 403, headers: markdownHeaders(credentialed, "text/plain; charset=utf-8") });
+  }
   const type = view.kind === "csv" ? "text/csv; charset=utf-8" : "text/plain; charset=utf-8";
   const headers = { ...markdownHeaders(credentialed, type), "Content-Security-Policy": rawContentPolicy };
   return new Response(view.content, { status: 200, headers });

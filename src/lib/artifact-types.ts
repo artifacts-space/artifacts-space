@@ -107,6 +107,8 @@ export interface ArtifactDto {
   fullWidth: boolean;
   /** A CSV's banded rows and column alignment. Plain for other formats. A display setting: not versioned. */
   sheetFormat: SheetFormat;
+  /** "Allow CSV download": whether readers who cannot edit may take a CSV's data out. Only the author and team owners and admins change it, never agents. */
+  allowCsvDownload: boolean;
   summary: string;
   content: string;
   kind: ArtifactKind;
