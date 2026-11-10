@@ -376,6 +376,17 @@ test.describe("phone", () => {
     expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.clientWidth + 1);
   });
 
+  test("should scroll the active team's tab into view and name the team in the page heading", async ({ page }) => {
+    await page.goto("/dev/workspace?scopes=1&team=fixture-shared-2");
+    await expect(page.getByText("Checkout v2 rollout").first()).toBeVisible();
+    const active = page.getByRole("navigation", { name: "Artifact scope" }).getByRole("link", { name: "Customer research" });
+    await expect(active).toHaveAttribute("aria-current", "page");
+    await expect(active).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole("heading", { level: 1, name: "Shared with Customer research" })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "New artifact" }), "team scopes list others' work").toHaveCount(0);
+    expect((await pageScroll(page)).scrollY, "only the tabs scrolled").toBe(0);
+  });
+
   test("should show Open as an icon with its name kept for screen readers", async ({ page }) => {
     await page.goto("/dev/workspace");
     const open = page.getByRole("link", { name: "Open the artifact page in a new tab" });

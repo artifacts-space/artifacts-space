@@ -60,9 +60,10 @@ function useFixtureProjects(artifacts: readonly ArtifactDto[]) {
  * with long artifacts, a long list, and projects, and no database. Every
  * artifact is handed in full, so none loads. Project changes stay in
  * memory. The app shell and sidebar projects e2e tests use it. With
- * `scopes`, the viewer is also in shared teams, so the scope tabs show.
+ * `scopes`, the viewer is also in shared teams, so the scope tabs show, and
+ * `team` opens one of them as the scope.
  */
-export function WorkspaceFixture({ projectFilter, link = null, scopes = false }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null; scopes?: boolean }) {
+export function WorkspaceFixture({ projectFilter, link = null, scopes = false, team = null }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null; scopes?: boolean; team?: string | null }) {
   const base = useMemo(() => fixtureArtifacts(), []);
   const { state, api } = useFixtureProjects(base);
   const artifacts = useMemo(() => withProjects(base, state), [base, state]);
@@ -80,7 +81,7 @@ export function WorkspaceFixture({ projectFilter, link = null, scopes = false }:
           origin="http://localhost"
           viewerId="fixture"
           teams={scopes ? [...fixtureTeams, ...fixtureSharedTeams] : fixtureTeams}
-          scopeTeam={null}
+          scopeTeam={scopes ? (fixtureSharedTeams.find((item) => item.slug === team) ?? null) : null}
           facets={facets}
           projectRows={state.rows}
           projectFilter={projectFilter}

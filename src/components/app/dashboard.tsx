@@ -127,7 +127,7 @@ function WorkspaceBar({ teams, scopeTeam, onCreate }: { teams: readonly ShareTea
       <div data-slot="workspace-bar" className="flex min-h-11 shrink-0 items-center gap-3 py-2">
         <ScopeTabs teams={teams} activeSlug={scopeTeam?.slug ?? null} />
         {scopeTeam ? null : (
-          <Button size="sm" onClick={onCreate} className="ml-auto shrink-0 max-sm:size-7 max-sm:px-0">
+          <Button size="sm" onClick={onCreate} title="New artifact" className="ml-auto shrink-0 max-sm:size-7 max-sm:px-0">
             <IconPlus /><span className="max-sm:sr-only">New artifact</span>
           </Button>
         )}
