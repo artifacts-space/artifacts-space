@@ -327,11 +327,11 @@ export async function findPublicIdByShareId(shareId: string) {
  * and the account's storage quota. `harness` is the agent harness of the MCP
  * connection that created it; leave it out for the web app.
  */
-export async function createArtifact(userId: string, input: ArtifactInput, options: { harness?: HarnessStamp | null } = {}) {
+export async function createArtifact(userId: string, input: ArtifactInput, options: { harness?: HarnessStamp | null; emptyMarkdown?: boolean } = {}) {
   const { project: projectName, tags: tagInput, ...parsed } = artifactInputSchema.parse(input);
   const tags = parseNewTags(tagInput);
   assertArtifactSize(parsed);
-  assertValidArtifactContent(parsed.kind, parsed.content);
+  assertValidArtifactContent(parsed.kind, parsed.content, { emptyMarkdown: options.emptyMarkdown === true });
   const contentFileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
   const imageFileIds = [...(await checkIconFile(userId, null, parsed.icon)), ...(await checkCoverFile(userId, null, parsed.cover))];
   const fileIds = [...new Set([...contentFileIds, ...imageFileIds])];

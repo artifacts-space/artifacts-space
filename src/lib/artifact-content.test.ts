@@ -24,6 +24,13 @@ describe("validateArtifactContent", () => {
     expect(validateArtifactContent("file", "Some *notes*").valid).toBe(true);
   });
 
+  it("should allow an empty body only for markdown when the blank page asks for it", () => {
+    expect(validateArtifactContent("markdown", "", { emptyMarkdown: true }).valid).toBe(true);
+    expect(validateArtifactContent("json", "", { emptyMarkdown: true }).valid).toBe(false);
+    expect(validateArtifactContent("text", "", { emptyMarkdown: true }).valid).toBe(false);
+    expect(validateArtifactContent("markdown", "", { emptyMarkdown: false }).valid).toBe(false);
+  });
+
   it("should check csv, svg, and mermaid when those kinds are used", () => {
     expect(validateArtifactContent("csv", "a,b\n1,2").valid).toBe(true);
     expect(validateArtifactContent("csv", "").valid).toBe(false);

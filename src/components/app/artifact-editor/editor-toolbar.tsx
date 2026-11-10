@@ -1,6 +1,6 @@
 "use client";
 
-import { IconArrowsHorizontal, IconCode, IconDots, IconLock, IconTrash } from "@tabler/icons-react";
+import { IconArrowsHorizontal, IconCode, IconDots, IconLock, IconTransform, IconTrash } from "@tabler/icons-react";
 
 import { CopyButton } from "@/components/copy-button";
 import { HarnessMenu } from "@/components/harness/harness-menu";
@@ -29,6 +29,8 @@ export interface SourceToggle {
 
 interface MoreMenuProps {
   source: SourceToggle;
+  /** Opens the Format and language dialog. */
+  onChangeFormat: () => void;
   /** Null for a CSV, which is always full width. */
   fullWidth: FullWidthControl | null;
   harness: HarnessControl;
@@ -36,8 +38,8 @@ interface MoreMenuProps {
   onWithdraw: (() => void) | null;
 }
 
-/** View source, Full width, and Made with for every editor; Delete for the author; Withdraw sharing for a team owner or admin editing a teammate's artifact. */
-function MoreMenu({ source, fullWidth, harness, onRequestDelete, onWithdraw }: MoreMenuProps) {
+/** View source, Format and language, Full width, and Made with for every editor; Delete for the author; Withdraw sharing for a team owner or admin editing a teammate's artifact. */
+function MoreMenu({ source, onChangeFormat, fullWidth, harness, onRequestDelete, onWithdraw }: MoreMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="More actions" />}>
@@ -46,6 +48,9 @@ function MoreMenu({ source, fullWidth, harness, onRequestDelete, onWithdraw }: M
       <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuItem onClick={source.onToggle} className="py-2">
           <IconCode /> {source.open ? "Hide source" : "View source"}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onChangeFormat} className="py-2">
+          <IconTransform /> Format and language
         </DropdownMenuItem>
         {fullWidth ? (
           <DropdownMenuCheckboxItem checked={fullWidth.checked} disabled={fullWidth.pending} onCheckedChange={fullWidth.onChange} className="py-2">
@@ -92,6 +97,28 @@ interface EditorToolbarProps {
   fullWidth: FullWidthControl;
   /** "Made with": the agent harness it shows, in the More menu. */
   harness: HarnessControl;
+  /** Format and language, in the More menu. */
+  onChangeFormat: () => void;
+  /** Shown beside the format icon, such as the "Detected CSV · Change" chip. */
+  notice?: React.ReactNode;
+}
+
+/** The toolbar of a new artifact before it is stored: there is nothing to copy, share, or look back on yet. */
+export function BlankToolbar({ notice }: { notice?: React.ReactNode }) {
+  return (
+    <div className={toolbarClass}>
+      <KindMark kind="markdown" />
+      <span className="text-xs text-muted-foreground">New artifact</span>
+      {notice}
+    </div>
+  );
+}
+
+const toolbarClass = "flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5";
+
+function KindMark({ kind }: { kind: ArtifactKind }) {
+  const KindIcon = kindIcons[kind];
+  return <KindIcon className={cn("size-4 shrink-0", kindColors[kind])} />;
 }
 
 /**
@@ -101,12 +128,12 @@ interface EditorToolbarProps {
  * the app header (h-14) to keep History in reach; from md up the /app shell
  * keeps it in place.
  */
-export function EditorToolbar({ id, publicId, kind, content, shareControl, history, comments, views, source, onRequestDelete, onWithdraw, fullWidth, harness }: EditorToolbarProps) {
-  const KindIcon = kindIcons[kind];
+export function EditorToolbar({ id, publicId, kind, content, shareControl, history, comments, views, source, onRequestDelete, onWithdraw, fullWidth, harness, onChangeFormat, notice }: EditorToolbarProps) {
   return (
-    <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5">
-      <KindIcon className={cn("size-4 shrink-0", kindColors[kind])} />
+    <div className={toolbarClass}>
+      <KindMark kind={kind} />
       <span className="font-mono text-xs text-muted-foreground">{id.slice(0, 8)}</span>
+      {notice}
       <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
         <CopyButton value={content} variant="ghost" size="icon" />
         <OpenPageButton publicId={publicId} />
@@ -114,7 +141,7 @@ export function EditorToolbar({ id, publicId, kind, content, shareControl, histo
         {views}
         {comments}
         {shareControl}
-        <MoreMenu source={source} fullWidth={hasWidthSetting(kind) ? fullWidth : null} harness={harness} onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
+        <MoreMenu source={source} onChangeFormat={onChangeFormat} fullWidth={hasWidthSetting(kind) ? fullWidth : null} harness={harness} onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
       </div>
     </div>
   );

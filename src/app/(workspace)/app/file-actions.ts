@@ -78,12 +78,16 @@ export async function attachFilesAction(artifactId: string, fileIds: string[]): 
   });
 }
 
-/** Creates an artifact and attaches finished uploads to it. The files are checked first. */
+/**
+ * Creates an artifact and attaches finished uploads to it. The files are
+ * checked first. This is the blank page's create: a Markdown artifact may
+ * start with a title and no body yet.
+ */
 export async function createArtifactWithFilesAction(input: ArtifactInput, fileIds: string[]): Promise<ActionResult<ArtifactDto>> {
   return run("The artifact could not be saved. Please try again.", async (userId) => {
     const ids = fileIdsSchema.parse(fileIds);
     await assertUsableFiles(userId, null, ids);
-    const created = await createArtifact(userId, { ...input, source: input.source || "web" });
+    const created = await createArtifact(userId, { ...input, source: input.source || "web" }, { emptyMarkdown: true });
     if (ids.length > 0) await attachFiles(userId, created.id, ids, "person");
     revalidatePath("/app");
     return editableArtifactDto(userId, created.id);

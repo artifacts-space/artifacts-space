@@ -15,19 +15,24 @@ import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { VersionHistory } from "@/components/history/version-history";
 import { ViewsDialog } from "@/components/views/views-dialog";
 import { ArtifactOrganizers } from "@/components/projects/artifact-organizers";
-import { useArtifactHarness } from "@/components/harness/use-artifact-harness";
+import { useArtifactHarness, type HarnessControl } from "@/components/harness/use-artifact-harness";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { usesFullWidth } from "@/lib/page-width/rules";
+import { BlankPageFilesSlot } from "@/components/app/new-artifact/blank-page-parts";
+import type { BlankPageOptions } from "@/components/app/new-artifact/use-blank-page";
+import { useBlankEditor } from "@/components/app/new-artifact/use-blank-editor";
 
+import { DetectedNotice } from "./detected-format-chip";
 import { detailBody, detailOuter, detailSection, stickyModeBar, useScrollPlace } from "./detail-scroll";
-import { MetaFields, ShareBanner, TitleFields } from "./editor-sections";
-import { EditorToolbar } from "./editor-toolbar";
+import { ShareBanner, TitleFields } from "./editor-sections";
+import { BlankToolbar, EditorToolbar, type SourceToggle } from "./editor-toolbar";
+import { FormatDialog } from "./format-dialog";
 import { hasInlineField, InlineContent } from "./inline-content";
 import { ConflictNotice, SaveStatusBar } from "./save-status";
 import { useArtifactActions } from "./use-artifact-actions";
 import { useArtifactDraft } from "./use-artifact-draft";
 import { useAutosave } from "./use-autosave";
-import { useFullWidth } from "./use-full-width";
+import { useFullWidth, type FullWidthControl } from "./use-full-width";
 
 interface ArtifactEditorProps {
   artifact: ArtifactDto;
@@ -44,6 +49,10 @@ interface ArtifactEditorProps {
   onWithdraw: (() => void) | null;
   onUpdated: (artifact: ArtifactDto) => void;
   onDeleted: (id: string) => void;
+  /** Set for the blank page New artifact opens: nothing is stored until something is put in it (use-blank-page.ts). */
+  blankPage?: BlankPageOptions | undefined;
+  /** Changes each time New artifact is pressed, to bring the blank page back into view with the cursor in its title. */
+  focusRequest?: number;
 }
 
 interface SharingSlotProps {
@@ -67,6 +76,54 @@ function showsFiles(kind: ArtifactDto["kind"], fileCount: number) {
   return kind === "file" || kind === "ui" || fileCount > 0;
 }
 
+interface ArtifactToolbarProps {
+  artifact: ArtifactDto;
+  kind: ArtifactDto["kind"];
+  shareUrl: string;
+  shared: boolean;
+  access: Pick<ArtifactEditorProps, "canShare" | "canDelete" | "team" | "seesComments" | "onWithdraw">;
+  dirty: boolean;
+  source: SourceToggle;
+  onRequestDelete: () => void;
+  onRestored: (artifact: ArtifactDto) => void;
+  onUpdated: (artifact: ArtifactDto) => void;
+  fullWidth: FullWidthControl;
+  harness: HarnessControl;
+  onChangeFormat: () => void;
+  notice: React.ReactNode;
+}
+
+/** The toolbar of a stored artifact: copy, open, history, views, comments, share, and the More menu. */
+function ArtifactToolbar({ artifact, kind, shareUrl, shared, access, dirty, source, onRequestDelete, onRestored, onUpdated, fullWidth, harness, onChangeFormat, notice }: ArtifactToolbarProps) {
+  const { canShare, canDelete, team, seesComments, onWithdraw } = access;
+  return (
+    <EditorToolbar
+      id={artifact.id}
+      publicId={artifact.publicId}
+      kind={kind}
+      content={artifact.content}
+      shareControl={<SharingSlot artifact={artifact} shareUrl={shareUrl} canShare={canShare} manager={onWithdraw !== null} team={team} onUpdated={onUpdated} />}
+      history={<VersionHistory publicId={artifact.publicId} title={artifact.title} updatedAt={artifact.updatedAt} reviewed={shared} files={artifact.files} hasUnsavedChanges={dirty} onRestored={onRestored} />}
+      comments={
+        <CommentsDialog
+          publicId={artifact.publicId}
+          title={artifact.title}
+          seesComments={seesComments}
+          offNotice={`Comments are off for this artifact.${canShare ? " Change who can comment in Share." : ""}`}
+        />
+      }
+      views={<ViewsDialog publicId={artifact.publicId} title={artifact.title} />}
+      source={source}
+      onRequestDelete={canDelete ? onRequestDelete : null}
+      onWithdraw={onWithdraw}
+      fullWidth={fullWidth}
+      harness={harness}
+      onChangeFormat={onChangeFormat}
+      notice={notice}
+    />
+  );
+}
+
 /**
  * Edit one artifact in place and read its history. The artifact renders as
  * itself and is editable where it reads; changes save on their own a moment
@@ -74,17 +131,21 @@ function showsFiles(kind: ArtifactDto["kind"], fileCount: number) {
  * shows the raw content. The author (or the person who added the agent that
  * wrote it) also shares and deletes it.
  */
-export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, seesComments, onWithdraw, onUpdated, onDeleted }: ArtifactEditorProps) {
+export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, seesComments, onWithdraw, onUpdated, onDeleted, blankPage, focusRequest }: ArtifactEditorProps) {
   const { draft, update, replace, reset, remount, revision } = useArtifactDraft(artifact);
-  const autosave = useAutosave({ artifact, draft, replaceDraft: replace, onUpdated });
-  const { deleting, remove } = useArtifactActions({ artifact, onDeleted });
   const [sourceOpen, setSourceOpen] = useState(false);
+  const { outerRef, bodyRef, remember } = useScrollPlace(sourceOpen ? "source" : "page");
+  const { page, sectionRef, titleRef, dragging, focusBody } = useBlankEditor({ blankPage, artifact, draft, replace, onUpdated, body: bodyRef, sourceOpen, focusRequest });
+  const autosave = useAutosave({ artifact, draft, replaceDraft: replace, onUpdated, save: page.save, problem: page.problem, idle: page.idle });
+  const [formatOpen, setFormatOpen] = useState(false);
+  const { deleting, remove } = useArtifactActions({ artifact, onDeleted });
   const fullWidth = useFullWidth(artifact, onUpdated);
   const harness = useArtifactHarness(artifact, onUpdated);
   const confirmDelete = useConfirm("deleteArtifact");
   const shareUrl = `${origin}/artifact/${artifact.publicId}`;
   const shared = artifact.visibility === "link" || artifact.visibility === "public";
-  const { outerRef, bodyRef, remember } = useScrollPlace(sourceOpen ? "source" : "page");
+  const { dismissDetected } = page;
+  const notice = <DetectedNotice detected={page.detected} onChange={() => { setFormatOpen(true); }} onDismiss={dismissDetected} />;
   const theme = useRenderTheme(artifact);
   const saving = autosave.status.kind === "saving";
   useLeaveGuard(autosave.dirty || saving);
@@ -97,43 +158,29 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   };
 
   return (
-    <section className={detailSection} aria-label={`Edit ${artifact.title}`}>
-      <EditorToolbar
-        id={artifact.id}
-        publicId={artifact.publicId}
-        kind={draft.kind}
-        content={artifact.content}
-        shareControl={<SharingSlot artifact={artifact} shareUrl={shareUrl} canShare={canShare} manager={onWithdraw !== null} team={team} onUpdated={onUpdated} />}
-        history={
-          <VersionHistory
-            publicId={artifact.publicId}
-            title={artifact.title}
-            updatedAt={artifact.updatedAt}
-            reviewed={shared}
-            files={artifact.files}
-            hasUnsavedChanges={autosave.dirty}
-            onRestored={(restored) => { reset(restored); onUpdated(restored); }}
-          />
-        }
-        comments={
-          <CommentsDialog
-            publicId={artifact.publicId}
-            title={artifact.title}
-            seesComments={seesComments}
-            offNotice={`Comments are off for this artifact.${canShare ? " Change who can comment in Share." : ""}`}
-          />
-        }
-        views={<ViewsDialog publicId={artifact.publicId} title={artifact.title} />}
-        source={{ open: sourceOpen, onToggle: toggleSource }}
-        onRequestDelete={canDelete ? () => { if (!deleting) confirmDelete.request(remove); } : null}
-        onWithdraw={onWithdraw}
-        fullWidth={fullWidth}
-        harness={harness}
-      />
+    <section ref={sectionRef} className={detailSection} aria-label={page.label}>
+      {page.blank ? <BlankToolbar notice={notice} /> : (
+        <ArtifactToolbar
+          artifact={artifact}
+          kind={draft.kind}
+          shareUrl={shareUrl}
+          shared={shared}
+          access={{ canShare, canDelete, team, seesComments, onWithdraw }}
+          dirty={autosave.dirty}
+          source={{ open: sourceOpen, onToggle: toggleSource }}
+          onRequestDelete={() => { if (!deleting) confirmDelete.request(remove); }}
+          onRestored={(restored) => { reset(restored); onUpdated(restored); }}
+          onUpdated={onUpdated}
+          fullWidth={fullWidth}
+          harness={harness}
+          onChangeFormat={() => { setFormatOpen(true); }}
+          notice={notice}
+        />
+      )}
       <div ref={outerRef} data-slot="detail-outer" className={detailOuter}>
         {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
-        <TitleFields title={draft.title} icon={draft.icon} summary={draft.summary} update={update} />
-        <ArtifactOrganizers artifact={artifact} onUpdated={onUpdated} />
+        <TitleFields title={draft.title} icon={draft.icon} summary={draft.summary} update={update} titleRef={titleRef} onEnter={focusBody} />
+        <ArtifactOrganizers artifact={artifact} onUpdated={onUpdated} hidden={page.blank} />
         <SaveStatusBar
           status={autosave.status}
           dirty={autosave.dirty}
@@ -141,6 +188,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           updatedAt={artifact.updatedAt}
           updatedBy={artifact.updatedBy}
           harness={artifact.harness}
+          stored={!page.blank}
           onRetry={autosave.retryNow}
           className={stickyModeBar}
         />
@@ -171,10 +219,22 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
             />
             </ArtifactSheetFormat>
           </SheetKeyContext>
-          {showsFiles(draft.kind, artifact.files.length) ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
-          <MetaFields draft={draft} update={update} />
+          <BlankPageFilesSlot page={page} dragging={dragging} />
+          {!page.blank && showsFiles(draft.kind, artifact.files.length) ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
         </div>
       </div>
+      <FormatDialog
+        open={formatOpen}
+        onOpenChange={setFormatOpen}
+        kind={draft.kind}
+        language={draft.language}
+        content={draft.content}
+        onApply={(kind, language) => {
+          dismissDetected();
+          // A new format draws the content with another editor, so it remounts.
+          replace({ ...draft, kind, language }, kind !== draft.kind);
+        }}
+      />
       <ConfirmDialog
         state={confirmDelete.dialog}
         title="Delete this artifact?"

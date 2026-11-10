@@ -7,8 +7,6 @@ import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult } from "@/lib/artifact-types";
 import { getSession } from "@/lib/session";
 import { getTeamMembershipById, type TeamMembership } from "@/lib/teams/queries";
-import { noThemeChoices, type ThemeChoices } from "@/lib/themes/theme-choice-types";
-import { newArtifactThemeChoices } from "@/lib/themes/theme-choices";
 import { canManageTeamThemes } from "@/lib/themes/team-preset-rules";
 import {
   countArtifactsUsingPreset,
@@ -132,15 +130,4 @@ export async function restorePresetRevisionAction(teamId: string, presetId: stri
 /** Restores an earlier team default as a new change. */
 export async function restoreDefaultRevisionAction(teamId: string, revisionId: string): Promise<ActionResult<string | null>> {
   return managed(teamId, "The team default could not be restored. Try again.", ({ membership, userId }) => restoreDefaultRevision(membership.id, idSchema.parse(revisionId), userId));
-}
-
-/** The team presets the signed-in person may use on a new (private) artifact. */
-export async function newArtifactThemeChoicesAction(): Promise<ActionResult<ThemeChoices>> {
-  try {
-    const session = await getSession();
-    if (!session) return { success: true, data: noThemeChoices };
-    return { success: true, data: await newArtifactThemeChoices(session.user.id) };
-  } catch (error) {
-    return { success: false, error: actionErrorMessage(error, "Team presets could not load.") };
-  }
 }

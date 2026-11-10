@@ -80,9 +80,13 @@ export function hasChanges(base: ArtifactDraft, draft: ArtifactDraft): boolean {
  * Why the draft cannot be saved yet, or null when it can. Content is checked
  * against its format the same way agents' content is (validateArtifactContent),
  * so autosave never stores an invalid ui spec, JSON, CSV, SVG, or diagram.
+ * With `base`, the saved version, a save that changes neither the content nor
+ * the format is not held for the content, as the server does not check it
+ * then either: a title typed on a new page with no body yet still saves.
  */
-export function draftProblem(draft: ArtifactDraft): string | null {
+export function draftProblem(draft: ArtifactDraft, base?: ArtifactDraft): string | null {
   if (!draft.title.trim()) return "Add a title to save.";
+  if (base?.content === draft.content && base.kind === draft.kind) return null;
   if (draft.kind !== "file" && !draft.content.trim()) return "Add some content to save.";
   const check = validateArtifactContent(draft.kind, draft.content);
   const firstError = check.issues.find((issue) => issue.severity === "error");

@@ -71,7 +71,7 @@ export const projectNameSchema = z
   .pipe(z.string().min(1, NAME_MESSAGE).max(projectLimits.maxNameChars, NAME_MESSAGE));
 
 /**
- * A project chosen by name, as agents and the New artifact dialog send it:
+ * A project chosen by name, as agents and the blank page New artifact opens send it:
  * a name, or "" / null for no project. Outputs the normalized name or null.
  */
 export const projectChoiceSchema = z

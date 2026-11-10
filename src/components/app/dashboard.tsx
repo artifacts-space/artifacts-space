@@ -1,12 +1,11 @@
 "use client";
 
 import { IconLoader2, IconPlus, IconSearch } from "@tabler/icons-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
 import { ArtifactList } from "@/components/app/artifact-list";
 import { artifactListState, filterArtifactList } from "@/components/app/artifact-list-state";
-import { CreateArtifactDialog } from "@/components/app/create-artifact-dialog";
 import { ProjectFilter } from "@/components/app/project-filter";
 import { TagFilter } from "@/components/app/tag-filter";
 import { ScopeTabs } from "@/components/app/scope-tabs";
@@ -17,6 +16,9 @@ import { useEditAccess, useWithdrawSharing } from "@/components/app/use-edit-acc
 import { useFullArtifact } from "@/components/app/use-full-artifact";
 import { useServerSearch } from "@/components/app/use-server-search";
 import { useDashboardProjects } from "@/components/app/use-dashboard-projects";
+import { serverNewArtifactApi, type NewArtifactApi } from "@/components/app/new-artifact/new-artifact-api";
+import { NewArtifactPane } from "@/components/app/new-artifact/new-artifact-pane";
+import { filteredProjectName, useNewArtifact } from "@/components/app/new-artifact/use-new-artifact";
 import { PanelSizesBeforePaint, SidebarSplitter, sidebarPanelId } from "@/components/app/workspace-splitters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,6 +169,8 @@ interface DashboardProps {
   listPath?: string;
   /** The artifact the URL asked to open (`?artifact=<id>`), and whether to open its comments. */
   link?: ArtifactLink | null;
+  /** Where New artifact stores the blank page: the server actions, or the fixture's stand-in. */
+  newArtifactApi?: NewArtifactApi;
 }
 
 /** The artifact to select first: the linked one when it is in the list, else the first. */
@@ -189,13 +193,14 @@ function linkedCommentsId(link: ArtifactLink | null | undefined): string | null 
   return link?.comments ? link.publicId : null;
 }
 
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", link }: DashboardProps) {
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", link, newArtifactApi = serverNewArtifactApi }: DashboardProps) {
   const [artifacts, setArtifacts] = useState(initialArtifacts);
   const [selectedId, setSelectedId] = useState(() => firstSelection(initialArtifacts, link));
   useForgetArtifactLink(link);
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
-  const [createOpen, setCreateOpen] = useState(false);
+  const clearFilters = useCallback(() => { setQuery(""); setKind("all"); }, []);
+  const fresh = useNewArtifact({ setArtifacts, setSelectedId, clearFilters });
   const shellRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -208,18 +213,12 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
 
   const selected = pickSelected(artifacts, filtered, selectedId);
 
-  function created(artifact: ArtifactDto) {
-    setArtifacts((current) => [toArtifactListItem(artifact), ...current]);
-    setSelectedId(artifact.id);
-    setQuery("");
-    setKind("all");
-  }
-
   function updated(artifact: ArtifactDto) {
     setArtifacts((current) => current.map((item) => (item.id === artifact.id ? toArtifactListItem(artifact) : item)));
   }
 
   function deleted(id: string) {
+    fresh.deleted(id);
     setArtifacts((current) => {
       const next = current.filter((artifact) => artifact.id !== id);
       setSelectedId(next[0]?.id ?? "");
@@ -232,7 +231,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
       <LinkedCommentsProvider publicId={linkedCommentsId(link)}>
       {/* An app shell from md up: the frame is the viewport (workspace-frame), and only the list and the artifact scroll. */}
       <main data-app-shell className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col px-4 pb-4 sm:px-6 sm:pb-6 md:min-h-0 md:flex-1">
-        <WorkspaceBar teams={teams} scopeTeam={scopeTeam} onCreate={() => { setCreateOpen(true); }} />
+        <WorkspaceBar teams={teams} scopeTeam={scopeTeam} onCreate={fresh.start} />
 
         <PanelSizesBeforePaint />
         {/* overflow-clip, not hidden: it rounds the corners without becoming a scroll box, so the artifact's toolbar can stick on phones. */}
@@ -278,9 +277,9 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
               <ArtifactList
                 state={artifactListState({ total: artifacts.length, shown: filtered.length })}
                 artifacts={filtered}
-                selectedId={selected?.id ?? null}
-                onSelect={setSelectedId}
-                onClearFilters={() => { setQuery(""); setKind("all"); }}
+                selectedId={fresh.session ? fresh.session.createdId : (selected?.id ?? null)}
+                onSelect={fresh.select}
+                onClearFilters={clearFilters}
                 moves={sidebar.moves}
               />
             </div>
@@ -290,18 +289,30 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
           </aside>
           <SidebarSplitter shell={shellRef} sidebar={sidebarRef} />
 
-          <DetailPane
-            selected={selected}
-            viewerId={viewerId}
-            origin={origin}
-            onUpdated={updated}
-            onDeleted={deleted}
-            onCreate={() => { setCreateOpen(true); }}
-            initialFull={initialFull}
-          />
+          {fresh.session ? (
+            <NewArtifactPane
+              key={fresh.session.key}
+              viewerId={viewerId}
+              origin={origin}
+              api={newArtifactApi}
+              project={filteredProjectName(projectFilter, facets)}
+              sessionKey={fresh.session.key}
+              focusRequest={fresh.session.focusRequest}
+              onSaved={fresh.saved}
+              onDeleted={deleted}
+            />
+          ) : (
+            <DetailPane
+              selected={selected}
+              viewerId={viewerId}
+              origin={origin}
+              onUpdated={updated}
+              onDeleted={deleted}
+              onCreate={fresh.start}
+              initialFull={fresh.withStored(initialFull)}
+            />
+          )}
         </div>
-
-        <CreateArtifactDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={created} />
       </main>
       </LinkedCommentsProvider>
     </ShareTeamsProvider>

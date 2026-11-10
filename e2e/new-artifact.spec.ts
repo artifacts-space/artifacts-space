@@ -1,0 +1,190 @@
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * New artifact opens a blank page in the pane, like a new document: no form
+ * first. Nothing is stored until something is put in it; then it is created
+ * once. The first paste or drop picks the format, and a wrong guess costs one
+ * click. Checked on /dev/workspace, whose stand-in stores new artifacts in
+ * the tab's sessionStorage, so a reload shows exactly what was stored.
+ */
+
+const creates = (page: Page) => page.evaluate(() => Number(window.sessionStorage.getItem("fixture:new-artifact-creates") ?? "0"));
+const storedNew = (page: Page) => page.evaluate(() => JSON.parse(window.sessionStorage.getItem("fixture:new-artifacts") ?? "[]") as { title: string; kind: string; content: string; files: unknown[] }[]);
+const cards = (page: Page, title: string) => page.locator("[data-slot=artifact-list] li").filter({ has: page.getByRole("heading", { name: title, exact: true }) });
+const blankPage = (page: Page) => page.getByRole("region", { name: "New artifact" });
+const body = (page: Page) => page.getByRole("region", { name: "Content" });
+
+async function openNewArtifact(page: Page) {
+  await page.goto("/dev/workspace");
+  await expect(page.locator("[data-slot=artifact-list] li").first()).toBeVisible();
+  await page.evaluate(() => { window.sessionStorage.clear(); });
+  await page.reload();
+  await expect(page.locator("[data-slot=artifact-list] li").first()).toBeVisible();
+  await pressNewArtifact(page);
+  // The rich editor loads on demand; a person typing a title gives it that moment.
+  await expect(body(page).locator('[contenteditable="true"]')).toBeVisible();
+}
+
+/** Presses New artifact once the workspace is interactive: the server-rendered button does nothing until it hydrates. */
+async function pressNewArtifact(page: Page) {
+  await expect(async () => {
+    await page.getByRole("button", { name: "New artifact" }).click();
+    await expect(blankPage(page)).toBeVisible({ timeout: 1000 });
+  }).toPass();
+}
+
+/** Pastes plain text into the empty body, as a person's paste would arrive. */
+async function pasteIntoBody(page: Page, text: string) {
+  const field = body(page).locator('[contenteditable="true"]');
+  await expect(field).toBeVisible();
+  await field.click();
+  await field.evaluate((element, value) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", value);
+    element.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  }, text);
+}
+
+test("should open a blank page with the cursor in the title when New artifact is pressed", async ({ page }) => {
+  await openNewArtifact(page);
+  const title = blankPage(page).getByRole("textbox", { name: "Artifact title" });
+  await expect(title).toBeFocused();
+  await expect(title).toHaveValue("");
+  await expect(title).toBeInViewport();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(blankPage(page).getByRole("button", { name: "Upload files" })).toBeVisible();
+});
+
+test("should reach New artifact and the title with the keyboard alone", async ({ page }) => {
+  await page.goto("/dev/workspace");
+  await expect(page.locator("[data-slot=artifact-list] li").first()).toBeVisible();
+  await expect(async () => {
+    await page.getByRole("button", { name: "New artifact" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(blankPage(page).getByRole("textbox", { name: "Artifact title" })).toBeFocused({ timeout: 1000 });
+  }).toPass();
+});
+
+test("should leave nothing behind when the blank page is left untouched", async ({ page }) => {
+  await openNewArtifact(page);
+  const before = await page.locator("[data-slot=artifact-list] li").count();
+  // Pressing New artifact again keeps the same blank page.
+  await page.getByRole("button", { name: "New artifact" }).click();
+  await expect(blankPage(page)).toHaveCount(1);
+  await cards(page, "Note 2").click();
+  await expect(blankPage(page)).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator("[data-slot=artifact-list] li").first()).toBeVisible();
+  expect(await page.locator("[data-slot=artifact-list] li").count()).toBe(before);
+  await expect(cards(page, "Untitled")).toHaveCount(0);
+  expect(await creates(page)).toBe(0);
+});
+
+test("should store the artifact once when someone types a title and keeps writing", async ({ page }) => {
+  await openNewArtifact(page);
+  await page.keyboard.type("Persist once check");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("First line of the body.");
+  await expect(cards(page, "Persist once check")).toHaveCount(1);
+  await expect(blankPage(page)).toHaveCount(0);
+  await page.keyboard.type(" More words.");
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 15_000 });
+  expect(await creates(page)).toBe(1);
+
+  await page.reload();
+  await expect(cards(page, "Persist once check")).toHaveCount(1);
+  const stored = await storedNew(page);
+  expect(stored).toHaveLength(1);
+  expect(stored[0]?.content).toContain("More words.");
+  expect(stored[0]?.kind, "typing stays Markdown").toBe("markdown");
+});
+
+test("should show a failed create in the page and keep the text for a retry", async ({ page }) => {
+  await openNewArtifact(page);
+  await page.evaluate(() => { window.sessionStorage.setItem("fixture:fail-next-create", "1"); });
+  await page.keyboard.type("Kept through a failure");
+  await expect(page.getByRole("status").filter({ hasText: "Not saved." })).toBeVisible({ timeout: 15_000 });
+  await expect(blankPage(page).getByRole("textbox", { name: "Artifact title" })).toHaveValue("Kept through a failure");
+  expect(await creates(page)).toBe(0);
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(cards(page, "Kept through a failure")).toHaveCount(1);
+  expect(await creates(page)).toBe(1);
+});
+
+test("should paste normally when the page already has content", async ({ page }) => {
+  await openNewArtifact(page);
+  await page.keyboard.press("Enter");
+  await expect(body(page).locator('[contenteditable="true"]'), "Enter in the title moves to the content").toBeFocused();
+  await page.keyboard.type("Intro line. ");
+  await expect(page.getByRole("button", { name: "Upload files" }), "typed content ends the blank state").toHaveCount(0);
+  await pasteIntoBody(page, "name,orders\nNorth,12");
+  await expect(page.locator("[data-slot=detected-format]")).toHaveCount(0);
+  await expect.poll(async () => (await storedNew(page))[0]?.content ?? "", { timeout: 15_000 }).toContain("North,12");
+  expect((await storedNew(page))[0]?.kind).toBe("markdown");
+});
+
+test("should store a page left right after typing, once", async ({ page }) => {
+  await openNewArtifact(page);
+  await page.keyboard.type("Quick note");
+  await cards(page, "Note 2").click();
+  await expect(cards(page, "Quick note")).toHaveCount(1);
+  await page.reload();
+  await expect(cards(page, "Quick note")).toHaveCount(1);
+  expect(await creates(page)).toBe(1);
+});
+
+test("should detect CSV from the first paste and switch the format in one click", async ({ page }) => {
+  await openNewArtifact(page);
+  await pasteIntoBody(page, "name,orders\nNorth,12\nSouth,9");
+  const chip = page.locator("[data-slot=detected-format]");
+  await expect(chip).toContainText("Detected CSV");
+  await expect(page.getByRole("status").filter({ hasText: "Detected CSV" })).toHaveCount(1);
+  await expect(body(page).getByRole("grid")).toBeVisible();
+  await expect.poll(async () => (await storedNew(page))[0]?.kind).toBe("csv");
+  expect((await storedNew(page))[0]?.content).toBe("name,orders\nNorth,12\nSouth,9");
+
+  await chip.getByRole("button", { name: "Change" }).click();
+  const dialog = page.getByRole("dialog", { name: "Format and language" });
+  await dialog.getByRole("combobox", { name: "Format" }).click();
+  await page.getByRole("option", { name: "JSON" }).click();
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("This content can’t be JSON yet");
+
+  await dialog.getByRole("combobox", { name: "Format" }).click();
+  await page.getByRole("option", { name: "Text" }).click();
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(chip).toHaveCount(0);
+  await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe("text");
+  expect(await creates(page)).toBe(1);
+});
+
+test("should keep pasted writing as Markdown and take a heading as the title", async ({ page }) => {
+  await openNewArtifact(page);
+  await pasteIntoBody(page, "# Launch plan\n\nShip it on Friday, with notes.");
+  await expect(blankPage(page).getByRole("textbox", { name: "Artifact title" })).toHaveValue("Launch plan");
+  await expect(page.locator("[data-slot=detected-format]")).toHaveCount(0);
+  await expect.poll(async () => (await storedNew(page))[0]?.content).toBe("# Launch plan\n\nShip it on Friday, with notes.");
+  expect((await storedNew(page))[0]?.kind).toBe("markdown");
+});
+
+test("should make a Files artifact when a file is dropped on the blank page", async ({ page }) => {
+  await openNewArtifact(page);
+  await body(page).evaluate((element) => {
+    const data = new DataTransfer();
+    data.items.add(new File(["%PDF-1.4"], "Quarterly report.pdf", { type: "application/pdf" }));
+    element.dispatchEvent(new DragEvent("drop", { dataTransfer: data, bubbles: true, cancelable: true }));
+  });
+  await expect(cards(page, "Quarterly report")).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Files" })).toContainText("1 attached");
+  await expect.poll(async () => (await storedNew(page))[0]?.kind).toBe("file");
+  expect(await creates(page)).toBe(1);
+});
+
+test("should move Format and language into the More menu of a stored artifact", async ({ page }) => {
+  await page.goto("/dev/workspace");
+  await cards(page, "Note 2").click();
+  await page.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Format and language" }).click();
+  await expect(page.getByRole("dialog", { name: "Format and language" })).toBeVisible();
+});

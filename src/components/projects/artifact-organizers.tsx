@@ -13,16 +13,19 @@ interface ArtifactOrganizersProps {
   artifact: ArtifactDto;
   onUpdated: (artifact: ArtifactDto) => void;
   className?: string;
+  /** A new artifact not stored yet has no project or tags to change. */
+  hidden?: boolean;
 }
 
 /**
  * The project and tag controls under an artifact's summary in the workspace editor.
  * Changes save at once and never touch the editor's draft or history.
  */
-export function ArtifactOrganizers({ artifact, onUpdated, className }: ArtifactOrganizersProps) {
+export function ArtifactOrganizers({ artifact, onUpdated, className, hidden = false }: ArtifactOrganizersProps) {
   // A save can finish after the editor moved on; merge into the newest artifact, not the one from the click.
   const latest = useRef(artifact);
   useEffect(() => { latest.current = artifact; }, [artifact]);
+  if (hidden) return null;
   return (
     <div className={cn("flex flex-wrap items-center gap-2 border-b px-5 py-1.5 sm:px-7", className)}>
       <ProjectPicker artifactId={artifact.id} value={artifact.project} onChange={(project) => { onUpdated({ ...latest.current, project }); }} />

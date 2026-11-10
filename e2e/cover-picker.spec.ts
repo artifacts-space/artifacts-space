@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 
 /**
  * The cover picker (the gallery's "cover picker" specimen, the same
- * component editors get on the artifact page and in the New artifact
- * dialog): keyboard use, gradients that follow the theme, the banner
+ * component editors get on the artifact page): keyboard use, gradients
+ * that follow the theme, the banner
  * height on phones and desktops, and removal.
  */
 test("should show a gradient cover picked with the keyboard, in each theme", async ({ page }, testInfo) => {

@@ -47,6 +47,19 @@ describe("draftProblem", () => {
     expect(draftProblem(edited({ kind: "ui", content: "{\"root\":\"a\",\"elements\":{}}" }))).toMatch(/^Not saved yet: /);
   });
 
+  it("should not hold a title change for the content when the content and format are unchanged", () => {
+    const empty = edited({ content: "" });
+    expect(draftProblem({ ...empty, title: "Plan B" }, empty)).toBeNull();
+  });
+
+  it("should still hold the save when it empties the content of a saved artifact", () => {
+    expect(draftProblem(edited({ content: "" }), base)).toBe("Add some content to save.");
+  });
+
+  it("should still check the content when the format changes", () => {
+    expect(draftProblem(edited({ kind: "json" }), base)).toMatch(/^Not saved yet: /);
+  });
+
   it("should allow the save when the content fits its format", () => {
     expect(draftProblem(edited({ kind: "json", content: "{\"ok\":true}" }))).toBeNull();
   });
