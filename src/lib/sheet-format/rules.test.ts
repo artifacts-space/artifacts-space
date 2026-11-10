@@ -9,6 +9,7 @@ import {
   fitsSheetFormatInput,
   plainSheetFormat,
   readSheetFormat,
+  sameSheetFormat,
   sheetFormatSchema,
   storedSheetFormat,
   withAlignment,
@@ -72,6 +73,20 @@ describe("withAlignment", () => {
     const format = { banding: null, align: { '="price"': "center" } } as const;
     expect(withAlignment(format, '="price"', "auto", ['="price"']).align).toEqual({});
   });
+
+  it("should drop columns the sheet no longer has when only banding changes", () => {
+    const format = { banding: null, align: { '="gone"': "center", '="kept"': "left" } } as const;
+    expect(withBanding(format, "muted", ['="kept"'])).toEqual({ banding: "muted", align: { '="kept"': "left" } });
+  });
+
+  it("should treat formattings as the same whatever order their columns come in, and different otherwise", () => {
+    const a = { banding: "muted", align: { '="a"': "left", '="b"': "right" } } as const;
+    const b = { banding: "muted", align: { '="b"': "right", '="a"': "left" } } as const;
+    expect(sameSheetFormat(a, b)).toBe(true);
+    expect(sameSheetFormat(a, { ...a, banding: null })).toBe(false);
+    expect(sameSheetFormat(a, { banding: "muted", align: { '="a"': "left" } })).toBe(false);
+    expect(sameSheetFormat(a, { banding: "muted", align: { '="a"': "left", '="b"': "center" } })).toBe(false);
+  });
 });
 
 describe("cellAlignment", () => {
@@ -89,11 +104,11 @@ describe("cellAlignment", () => {
 
 describe("storedSheetFormat", () => {
   it("should store nothing when the sheet is plain", () => {
-    expect(storedSheetFormat(withBanding(withBanding(plainSheetFormat, "muted"), null))).toBeNull();
+    expect(storedSheetFormat(withBanding(withBanding(plainSheetFormat, "muted", []), null, []))).toBeNull();
   });
 
   it("should store the formatting when banding is on", () => {
-    expect(storedSheetFormat(withBanding(plainSheetFormat, "primary"))).toEqual({ banding: "primary", align: {} });
+    expect(storedSheetFormat(withBanding(plainSheetFormat, "primary", []))).toEqual({ banding: "primary", align: {} });
   });
 });
 

@@ -3,10 +3,10 @@
 import { useCallback, useMemo } from "react";
 
 import { appliedWidths, columnKeys, isNaturalOrder, moveItem, naturalOrder, normalizeOrder } from "@/lib/sheet-column-rules";
-import { alignmentChoice, canAlignColumn, cellAlignment, type SheetAlignment, type SheetBanding, withAlignment } from "@/lib/sheet-format/rules";
+import { alignmentChoice, canAlignColumn, cellAlignment, type SheetAlignment, type SheetBanding, withAlignment, withBanding } from "@/lib/sheet-format/rules";
 
 import { measureFitWidth } from "./measure-text";
-import { type ColumnAlignControl, useSheetFormat } from "./sheet-format";
+import { type ColumnAlignControl, type SheetBandingControl, useSheetFormat } from "./sheet-format";
 import { useSheetPrefs } from "./use-sheet-prefs";
 
 interface SheetColumnsInput {
@@ -31,6 +31,8 @@ export interface SheetColumns {
   banding: SheetBanding | null;
   /** A shown column's alignment control for its menu; null for readers, who only see the alignment. */
   alignControl: (shown: number) => ColumnAlignControl | null;
+  /** The sheet's banding control for the toolbar menu; null for readers. */
+  bandingControl: SheetBandingControl | null;
   /** True when this reader moved columns, so they see an order nobody else does. */
   customOrder: boolean;
   resize: (shown: number, width: number) => void;
@@ -66,6 +68,11 @@ export function useSheetColumns({ header, rows, columnCount, defaults, numeric, 
     return { value: alignmentChoice(format, key), onChange: (choice) => { onChange(withAlignment(format, key, choice, keys)); } };
   }, [keys, dataColumn, format, onChange]);
 
+  const bandingControl = useMemo((): SheetBandingControl | null => {
+    if (!onChange) return null;
+    return { value: format.banding, onChange: (banding) => { onChange(withBanding(format, banding, keys)); } };
+  }, [keys, format, onChange]);
+
   const resize = useCallback((shown: number, width: number) => {
     const key = keys[dataColumn(shown)];
     if (key === undefined) return;
@@ -88,5 +95,5 @@ export function useSheetColumns({ header, rows, columnCount, defaults, numeric, 
 
   const resetOrder = useCallback(() => { setPrefs((current) => ({ ...current, order: null })); }, [setPrefs]);
 
-  return { dataColumn, widths, numeric: shownNumeric, align, banding: format.banding, alignControl, customOrder: !isNaturalOrder(order), resize, fit, moveLocal, resetOrder };
+  return { dataColumn, widths, numeric: shownNumeric, align, banding: format.banding, alignControl, bandingControl, customOrder: !isNaturalOrder(order), resize, fit, moveLocal, resetOrder };
 }

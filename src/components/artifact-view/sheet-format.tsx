@@ -12,11 +12,11 @@ import {
   bandingLabels,
   plainSheetFormat,
   readSheetFormat,
+  sameSheetFormat,
   type SheetAlignmentChoice,
   type SheetBanding,
   sheetBandings,
   type SheetFormat,
-  withBanding,
 } from "@/lib/sheet-format/rules";
 import { createSaveQueue } from "@/lib/sheet-format/save-queue";
 
@@ -62,10 +62,12 @@ export function SheetFormatProvider({ stored, save, children }: ProviderProps) {
       onFailed: () => { toast.error("Something went wrong. Check your connection and try again."); },
     }),
   );
-  if (seen !== stored) {
+  // Formatting changed elsewhere (another editor, or a restore) replaces what is shown and is what a failed
+  // save rolls back to. A new object with the same content, as a content save's refresh brings while a
+  // formatting save is still in flight, changes nothing, so the optimistic value never flips back.
+  if (!sameSheetFormat(seen, stored)) {
     setSeen(stored);
     setShown(stored);
-    // What the server now holds is what a failed save rolls back to.
     queue.reset(stored);
   }
 
@@ -97,10 +99,15 @@ export function ArtifactSheetFormat({ artifactId, stored, children }: { artifact
   return <SheetFormatProvider stored={format} save={save}>{children}</SheetFormatProvider>;
 }
 
-/** The toolbar's Format menu for editors: banded rows, in a tint from the theme. */
-export function SheetFormatMenu() {
-  const { format, onChange } = useSheetFormat();
-  if (!onChange) return null;
+/** The sheet's banding control, for the toolbar menu. */
+export interface SheetBandingControl {
+  value: SheetBanding | null;
+  onChange: (banding: SheetBanding | null) => void;
+}
+
+/** The toolbar's Format menu for editors (`control` is null for readers): banded rows, in a tint from the theme. */
+export function SheetFormatMenu({ control }: { control: SheetBandingControl | null }) {
+  if (!control) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="sm" aria-label="Banding" />}>
@@ -109,7 +116,7 @@ export function SheetFormatMenu() {
       <DropdownMenuContent align="start" className="w-44">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Banded rows</DropdownMenuLabel>
-          <DropdownMenuRadioGroup value={format.banding ?? "off"} onValueChange={(value: SheetBanding | "off") => { onChange(withBanding(format, value === "off" ? null : value)); }}>
+          <DropdownMenuRadioGroup value={control.value ?? "off"} onValueChange={(value: SheetBanding | "off") => { control.onChange(value === "off" ? null : value); }}>
             <DropdownMenuRadioItem value="off" closeOnClick className="py-2">Off</DropdownMenuRadioItem>
             {sheetBandings.map((banding) => (
               <DropdownMenuRadioItem key={banding} value={banding} closeOnClick className="py-2">{bandingLabels[banding]}</DropdownMenuRadioItem>

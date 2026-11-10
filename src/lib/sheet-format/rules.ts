@@ -60,24 +60,37 @@ export function storedSheetFormat(format: SheetFormat): SheetFormat | null {
   return format.banding === null && Object.keys(format.align).length === 0 ? null : format;
 }
 
+/** The alignments of the columns the sheet still has (`liveKeys`), leaving out `except`. */
+function liveAlign(format: SheetFormat, liveKeys: readonly string[], except: string | null): Record<string, SheetAlignment> {
+  const live = new Set(liveKeys);
+  const align: Record<string, SheetAlignment> = {};
+  for (const [column, alignment] of Object.entries(format.align)) {
+    if (live.has(column) && column !== except) align[column] = alignment;
+  }
+  return align;
+}
+
 /**
  * The formatting with one column's alignment changed. "auto" removes the
  * entry. Entries for columns the sheet no longer has (`liveKeys`) are
  * dropped, so the saved formatting never grows past the sheet.
  */
 export function withAlignment(format: SheetFormat, key: string, choice: SheetAlignmentChoice, liveKeys: readonly string[]): SheetFormat {
-  const live = new Set(liveKeys);
-  const align: Record<string, SheetAlignment> = {};
-  for (const [column, alignment] of Object.entries(format.align)) {
-    if (live.has(column) && column !== key) align[column] = alignment;
-  }
+  const align = liveAlign(format, liveKeys, key);
   if (choice !== "auto") align[key] = choice;
   return { ...format, align };
 }
 
-/** The formatting with banding turned off (null) or set to a tint. */
-export function withBanding(format: SheetFormat, banding: SheetBanding | null): SheetFormat {
-  return { ...format, banding };
+/** The formatting with banding turned off (null) or set to a tint. Every save drops the alignments of columns the sheet no longer has (`liveKeys`). */
+export function withBanding(format: SheetFormat, banding: SheetBanding | null, liveKeys: readonly string[]): SheetFormat {
+  return { banding, align: liveAlign(format, liveKeys, null) };
+}
+
+/** Whether two formattings are the same, whatever order their columns come in (jsonb reorders keys). */
+export function sameSheetFormat(a: SheetFormat, b: SheetFormat): boolean {
+  if (a.banding !== b.banding) return false;
+  const entries = (format: SheetFormat) => Object.entries(format.align).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0));
+  return JSON.stringify(entries(a)) === JSON.stringify(entries(b));
 }
 
 /** A column's chosen alignment, or "auto" when it has none. */
