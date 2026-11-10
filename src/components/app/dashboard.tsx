@@ -15,7 +15,7 @@ import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams
 import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
 import { useEditAccess, useWithdrawSharing } from "@/components/app/use-edit-access";
 import { useArtifactLink } from "@/components/app/use-artifact-link";
-import { useFullArtifact } from "@/components/app/use-full-artifact";
+import { useFullArtifact, type ArtifactLoader } from "@/components/app/use-full-artifact";
 import { useServerSearch } from "@/components/app/use-server-search";
 import { useDashboardProjects } from "@/components/app/use-dashboard-projects";
 import { PanelSizesBeforePaint, SidebarSplitter, sidebarPanelId } from "@/components/app/workspace-splitters";
@@ -49,6 +49,7 @@ interface DetailPaneProps {
   onDeleted: (id: string) => void;
   onCreate: () => void;
   initialFull: readonly ArtifactDto[] | undefined;
+  loadArtifact: ArtifactLoader | undefined;
 }
 
 /** Shown while the selected artifact's content loads, or when it could not. */
@@ -74,8 +75,8 @@ function withListProject(full: ArtifactDto | null, selected: ArtifactListItemDto
 }
 
 /** The editor for an artifact the viewer may edit, a read-only view for a teammate's, or the empty state. */
-function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull }: DetailPaneProps) {
-  const { full: loaded, failure, remember, retry } = useFullArtifact(selected, initialFull);
+function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull, loadArtifact }: DetailPaneProps) {
+  const { full: loaded, failure, remember, retry } = useFullArtifact(selected, initialFull, loadArtifact);
   const full = withListProject(loaded, selected);
   const access = useEditAccess(full, viewerId);
   const withdrawal = useWithdrawSharing(full?.id ?? "", onDeleted);
@@ -186,14 +187,18 @@ interface DashboardProps {
   linkTarget?: ArtifactListItemDto | null;
   /** The server could not check the link just now (a read limit, or a database error). */
   linkFailed?: boolean;
+  /** How an artifact's content loads when it is opened: the server action, or the fixture's stand-in. */
+  loadArtifact?: ArtifactLoader | undefined;
+  /** Called each time a link in the address bar is acted on (the fixture counts them for its tests). */
+  onLinkHandled?: () => void;
 }
 
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", linkTarget, linkFailed }: DashboardProps) {
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", linkTarget, linkFailed, loadArtifact, onLinkHandled }: DashboardProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
-  const { artifacts, setArtifacts, selectedId, setSelectedId, notice, dismissNotice, opened } = useArtifactLink({ initialArtifacts, target: linkTarget, failed: linkFailed, list: listRef, detail: detailRef });
+  const { artifacts, setArtifacts, selectedId, setSelectedId, notice, dismissNotice, opened } = useArtifactLink({ initialArtifacts, target: linkTarget, failed: linkFailed, onHandled: onLinkHandled, list: listRef, detail: detailRef });
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
@@ -299,6 +304,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
             onDeleted={deleted}
             onCreate={() => { setCreateOpen(true); }}
             initialFull={initialFull}
+            loadArtifact={loadArtifact}
           />
           </div>
         </div>

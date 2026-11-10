@@ -31,6 +31,8 @@ interface ArtifactLinkOptions {
   target?: ArtifactListItemDto | null | undefined;
   /** The server could not check the link just now (a read limit, or a database error), so it may still be there. */
   failed?: boolean | undefined;
+  /** Called each time a link in the address bar is acted on. */
+  onHandled?: (() => void) | undefined;
   list: RefObject<HTMLElement | null>;
   detail: RefObject<HTMLElement | null>;
 }
@@ -58,7 +60,7 @@ function cleanLocation(): string {
  * to "failed" when the server could not check it. `opened` is the last link
  * that opened its artifact, for its comments.
  */
-export function useArtifactLink({ initialArtifacts, target = null, failed = false, list, detail }: ArtifactLinkOptions) {
+export function useArtifactLink({ initialArtifacts, target = null, failed = false, onHandled, list, detail }: ArtifactLinkOptions) {
   const router = useRouter();
   const params = useSearchParams();
   const search = params.toString();
@@ -85,6 +87,7 @@ export function useArtifactLink({ initialArtifacts, target = null, failed = fals
     const clean = cleanLocation();
     window.history.replaceState(window.history.state, "", clean);
     router.replace(clean, { scroll: false });
+    onHandled?.();
   });
 
   // Runs after each navigation commits: the search or the server's answer for it changes.

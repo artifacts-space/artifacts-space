@@ -19,10 +19,11 @@ export const metadata: Metadata = {
  * project filter in the URL works as on /app, and so does the
  * `?artifact=<id>&comments=1` link. `?scopes=1` adds shared teams, so the
  * scope tabs show, and `&team=<slug>` opens one as the scope. `?linkcheck=failed`
- * acts as if the server could not check the link. Returns 404 in every other environment.
+ * acts as if the server could not check the link, and `?slowload=1` makes the
+ * Long markdown fixture load on open, held until a test releases it. Returns 404 in every other environment.
  */
 export default async function WorkspaceFixturePage({ searchParams }: PageProps<"/dev/workspace">) {
   if (process.env.NODE_ENV !== "development") notFound();
   const params = await searchParams;
-  return <WorkspaceFixture projectFilter={parseProjectFilter(params)} link={parseArtifactLink(params)} linkFailed={params.linkcheck === "failed"} scopes={params.scopes === "1"} team={typeof params.team === "string" ? params.team : null} />;
+  return <WorkspaceFixture projectFilter={parseProjectFilter(params)} link={parseArtifactLink(params)} linkFailed={params.linkcheck === "failed"} slowLoad={params.slowload === "1"} scopes={params.scopes === "1"} team={typeof params.team === "string" ? params.team : null} />;
 }
