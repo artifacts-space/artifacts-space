@@ -202,7 +202,7 @@ export function CsvGridEditor({ value, onChange, style, modeSwitch }: CsvGridEdi
           <Button type="button" variant="ghost" size="sm" onClick={() => { apply((current) => deleteColumn(current, active.column)); }} disabled={width <= 1} aria-label="Delete column"><IconColumnRemove /><span className="hidden sm:inline">Delete column</span></Button>
           <Button type="button" variant="ghost" size="icon-sm" onClick={() => { undo(); focusGrid(); }} aria-label="Undo"><IconArrowBackUp /></Button>
         </div>
-        <SheetFormatMenu />
+        <SheetFormatMenu control={sheet.bandingControl} />
         <p role="status" className="ml-auto text-sm text-muted-foreground">{status}</p>
       </div>
       <div className="min-w-0">

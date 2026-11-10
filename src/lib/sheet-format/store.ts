@@ -5,7 +5,7 @@ import { artifact } from "@/db/schema";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { getEditableArtifactMeta } from "@/lib/access";
 
-import { readSheetFormat, type SheetFormat, storedSheetFormat } from "./rules";
+import { readSheetFormat, sameSheetFormat, type SheetFormat, storedSheetFormat } from "./rules";
 
 /**
  * Writes a CSV artifact's sheet formatting (banding and column alignment).
@@ -38,7 +38,7 @@ export async function setSheetFormat(editorId: string, artifactId: string, forma
   if (record?.kind !== "csv") return undefined;
   await enforceRateLimit("artifactUpdate", editorId);
   const stored = storedSheetFormat(format);
-  if (JSON.stringify(storedSheetFormat(readSheetFormat(record.sheetFormat))) !== JSON.stringify(stored)) {
+  if (!sameSheetFormat(readSheetFormat(record.sheetFormat), format)) {
     await getDb().update(artifact).set({ sheetFormat: stored }).where(eq(artifact.id, record.id));
   }
   return { publicId: record.publicId, format: stored ?? readSheetFormat(null) };

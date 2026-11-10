@@ -106,6 +106,12 @@ describe("setSheetFormat", () => {
     expect(log).toEqual([]);
   });
 
+  it("should write nothing when only the order of the stored columns differs, as jsonb reorders keys", async () => {
+    Object.assign(current() ?? {}, { sheetFormat: { banding: "muted", align: { '="b"': "right", '="a"': "left" } } });
+    await setSheetFormat("author", "a1", { banding: "muted", align: { '="a"': "left", '="b"': "right" } });
+    expect(log).toEqual([]);
+  });
+
   it("should write nothing when the edit limit is reached", async () => {
     mocks.enforceRateLimit.mockRejectedValue(new Error("limit"));
     await expect(setSheetFormat("author", "a1", banded)).rejects.toThrow("limit");

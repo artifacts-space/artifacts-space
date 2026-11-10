@@ -27,7 +27,7 @@ import { pixelWidth } from "@/lib/sheet-grid-rules";
 import { CsvColumnMenu } from "./csv-column-menu";
 import { refuseCopy, useCsvExportAllowed } from "./csv-export";
 import { DataGrid, gridCellId } from "./data-grid";
-import { SheetFormatMenu } from "./sheet-format";
+import { type SheetBandingControl, SheetFormatMenu } from "./sheet-format";
 import { SheetFormulaBar } from "./sheet-formula-bar";
 import { useSheetColumns } from "./use-sheet-columns";
 import { copySelection, selectionLabel, useSheetSelection } from "./use-sheet-selection";
@@ -148,6 +148,7 @@ export function CsvTable({ content }: { content: string }) {
         shown={shown.length}
         total={parsed.rows.length}
         onResetOrder={sheet.customOrder ? sheet.resetOrder : null}
+        banding={sheet.bandingControl}
       />
       <p id={hintId} className="sr-only">Use the arrow keys, Tab, and Enter to move between cells, and Shift with the arrows to select a block. {exportAllowed ? "Copy copies the selection." : "Copying is off for this sheet."} On a column header, press Enter to sort, or Alt and Down Arrow for filters. To leave the grid, press Escape, then Tab.</p>
       {/* While the owner keeps downloads off, the grid and the formula bar copy nothing for this reader. */}
@@ -248,6 +249,8 @@ interface ToolbarProps {
   total: number;
   /** Puts the columns back in the file's order; null when this reader has not moved any. */
   onResetOrder: (() => void) | null;
+  /** The banding menu's control; null for readers. */
+  banding: SheetBandingControl | null;
 }
 
 function filterLabel(name: string, filter: ColumnFilter): string {
@@ -260,7 +263,7 @@ function filterLabel(name: string, filter: ColumnFilter): string {
 }
 
 /** The search box, active column filters as removable chips, and the row count. */
-function CsvToolbar({ searchId, view, onViewChange, name, shown, total, onResetOrder }: ToolbarProps) {
+function CsvToolbar({ searchId, view, onViewChange, name, shown, total, onResetOrder, banding }: ToolbarProps) {
   const filters = Object.entries(view.filters).flatMap(([column, filter]) => (isFilterActive(filter) ? [{ column: Number(column), filter }] : []));
   const filtering = view.quick.trim() !== "" || filters.length > 0;
   return (
@@ -297,7 +300,7 @@ function CsvToolbar({ searchId, view, onViewChange, name, shown, total, onResetO
         </Button>
       ) : null}
       {onResetOrder ? <OwnOrderNote onReset={onResetOrder} /> : null}
-      <SheetFormatMenu />
+      <SheetFormatMenu control={banding} />
       <p role="status" className="ml-auto text-sm text-muted-foreground tabular-nums">
         Showing {count(shown)} of {count(total)} {total === 1 ? "row" : "rows"}
       </p>
