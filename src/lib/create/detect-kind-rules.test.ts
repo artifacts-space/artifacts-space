@@ -85,6 +85,29 @@ describe("detectTextKind", () => {
       expect(detectTextKind("```ts\na\n```\n\n```ts\nb\n```").kind).toBe("markdown");
     });
 
+    it("should stay markdown when two lines of prose each have one comma", () => {
+      for (const text of [
+        "Hey team, quick update\nShipping today, more soon",
+        "Roses are red, violets are blue\nSugar is sweet, and so are you",
+        "Meeting notes, Monday\nAttendees: Ada, Bob",
+        "Milk, eggs, bread\nApples, pears, plums",
+        "Call Bob; then Alice\nEmail Carol; then Dan",
+      ]) {
+        expect(detectTextKind(text).kind, text).toBe("markdown");
+      }
+    });
+
+    it("should stay markdown when a line starts with #! but names no interpreter", () => {
+      expect(detectTextKind("#!important note\nRemember the deadline.").kind).toBe("markdown");
+      expect(detectTextKind("#!!! Breaking news\nWe shipped.").kind).toBe("markdown");
+    });
+
+    it("should stay markdown when timeline or journey alone on the first line is followed by prose", () => {
+      expect(detectTextKind("timeline\nThe launch is in two weeks and we are on track").kind).toBe("markdown");
+      expect(detectTextKind("journey\nWe walked to the river and back").kind).toBe("markdown");
+      expect(detectTextKind("timeline\nNote: ship on Friday\nThen we rest").kind).toBe("markdown");
+    });
+
     it("should stay markdown when text only mentions svg", () => {
       expect(detectTextKind("<svg> is a vector format.").kind).toBe("markdown");
     });
@@ -130,6 +153,14 @@ describe("detectTextKind", () => {
       expect(detectTextKind("Ada\nBo\nCy").kind).toBe("markdown");
     });
 
+    it("should detect csv when a header and one row hold short fields", () => {
+      expect(detectTextKind("name,value\nAda,1").kind).toBe("csv");
+    });
+
+    it("should detect csv when three or more records are spaced after the commas", () => {
+      expect(detectTextKind("name, score\nAda, 1\nBo, 2").kind).toBe("csv");
+    });
+
     it("should not detect csv when a header cell is empty", () => {
       expect(detectTextKind(",value\nAda,1").kind).toBe("markdown");
     });
@@ -166,6 +197,11 @@ describe("detectTextKind", () => {
       expect(detectTextKind("erDiagram\n  A ||--o{ B : has").kind).toBe("mermaid");
     });
 
+    it("should detect a timeline or journey when the lines under it are diagram source", () => {
+      expect(detectTextKind("timeline\n  title History\n  2002 : LinkedIn\n  2004 : Facebook").kind).toBe("mermaid");
+      expect(detectTextKind("journey\n  title My day\n  section Work\n    Make tea: 5: Me").kind).toBe("mermaid");
+    });
+
     it("should not detect mermaid when the header has no diagram under it", () => {
       expect(detectTextKind("flowchart TD").kind).toBe("markdown");
     });
@@ -194,6 +230,7 @@ describe("detectTextKind", () => {
       expect(detectTextKind("#!/bin/bash\necho hi")).toMatchObject({ kind: "code", language: "bash" });
       expect(detectTextKind("#!/usr/bin/env -S deno run\nconsole.log(1)")).toMatchObject({ kind: "code", language: "typescript" });
       expect(detectTextKind("#!/usr/bin/env node\nconsole.log(1)")).toMatchObject({ kind: "code", language: "javascript" });
+      expect(detectTextKind("#!python3\nprint(1)")).toMatchObject({ kind: "code", language: "python" });
     });
 
     it("should keep a shebang script exactly as pasted", () => {

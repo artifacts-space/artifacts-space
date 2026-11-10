@@ -121,9 +121,16 @@ function shebangLanguage(line: string): string | null {
   return shebangLanguages[name] ?? name;
 }
 
+/** A shebang names a path (`#!/usr/bin/env node`) or a known interpreter (`#!python3`); "#!important note" does neither. */
+function isShebang(line: string): boolean {
+  if (line.startsWith("#!/")) return true;
+  const name = (line.slice(2).trim().split(/\s+/)[0] ?? "").toLowerCase().replace(/[\d.]+$/, "");
+  return line.startsWith("#!") && Object.hasOwn(shebangLanguages, name);
+}
+
 function detectShebang(text: string): Detection | null {
   const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
-  if (!firstLine.startsWith("#!")) return null;
+  if (!isShebang(firstLine)) return null;
   const language = shebangLanguage(firstLine);
   return language ? { kind: "code", language, content: text, title: null, reason: "shebang" } : null;
 }
@@ -143,12 +150,27 @@ function isDiagramHeader(line: string, keyword: string): boolean {
   return true;
 }
 
+/** A line of diagram source: a sub-keyword, an arrow or link, a label, or a node shape. Prose lines have none of these. */
+const diagramLine = /^\s*(?:title|section|dateFormat|axisFormat|excludes|todayMarker|x-axis|y-axis|accTitle|accDescr)\b|-->|---|==>|-\.->|:\s*\S|[[\](){}|]/;
+
+/**
+ * True when the lines under the header read as a diagram. A keyword that is
+ * also a word ("timeline", "journey") alone on the first line could start a
+ * note, so every line under it must be diagram source.
+ */
+function hasDiagramBody(header: string, keyword: string, body: readonly string[]): boolean {
+  const bare = header.trim().slice(keyword.length).trim().replace(/;$/, "") === "";
+  if (!wordKeywords.has(keyword) || !bare) return body.length > 0;
+  return body.length > 0 && body.every((line) => diagramLine.test(line));
+}
+
 function detectMermaid(text: string): Detection | null {
   const keyword = mermaidDiagramType(text);
   if (!keyword || checkMermaidSource(text) !== null) return null;
   const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "" && !line.trim().startsWith("%%"));
-  const header = lines.find((line) => line.trim().startsWith(keyword));
-  if (!header || lines.length < 2 || !isDiagramHeader(header, keyword)) return null;
+  const at = lines.findIndex((line) => line.trim().startsWith(keyword));
+  const header = lines[at];
+  if (!header || !isDiagramHeader(header, keyword) || !hasDiagramBody(header, keyword, lines.slice(at + 1))) return null;
   return { kind: "mermaid", language: "", content: text, title: null, reason: "mermaid" };
 }
 
@@ -165,6 +187,30 @@ function isTabular(rows: readonly (readonly string[])[], columns: number): boole
   });
 }
 
+/** Share of fields after the first in each record that start with a space: prose and lists write "a, b"; files write "a,b". */
+function spacedShare(records: readonly (readonly string[])[]): number {
+  const later = records.flatMap((record) => record.slice(1));
+  return later.length === 0 ? 0 : later.filter((field) => /^\s/.test(field)).length / later.length;
+}
+
+/** True when some field is a phrase of several words. */
+function hasPhrases(records: readonly (readonly string[])[]): boolean {
+  return records.some((record) => record.some((field) => /\S\s+\S/.test(field.trim())));
+}
+
+/**
+ * True when the records read as data rather than writing. Tabs are data
+ * (spreadsheets paste them). With commas or semicolons, "a, b" spacing is
+ * how sentences and lists are written, so it needs at least three records
+ * of single words; unspaced fields need three records, or no phrases.
+ */
+function looksLikeData(delimiter: string, records: readonly (readonly string[])[]): boolean {
+  if (delimiter === "\t") return true;
+  const phrases = hasPhrases(records);
+  if (spacedShare(records) > 0.5) return records.length >= 3 && !phrases;
+  return records.length >= 3 || !phrases;
+}
+
 function detectCsv(text: string): Detection | null {
   const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
   if (lines.length < 2 || lines.some((line) => markdownLine.test(line))) return null;
@@ -173,7 +219,8 @@ function detectCsv(text: string): Detection | null {
   if (parsed.errors.length > 0 || parsed.header.length < 2 || parsed.totalRows < 1) return null;
   const all = parseCsv(text, { delimiter, maxRows: Math.min(parsed.totalRows, 1000) });
   if (all.header.some((field) => field.trim() === "")) return null;
-  if (!isTabular([all.header, ...all.rows], all.header.length)) return null;
+  const records = [all.header, ...all.rows];
+  if (!isTabular(records, all.header.length) || !looksLikeData(delimiter, records)) return null;
   return { kind: "csv", language: "", content: text, title: null, reason: "csv" };
 }
 

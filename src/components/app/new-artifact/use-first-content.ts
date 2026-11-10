@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
+import { leavesPasteToEditor } from "@/lib/create/new-artifact-rules";
+
 /** What came onto an empty page: text, or files. */
 export type FirstContent = { text: string } | { files: File[] };
 
@@ -27,7 +29,8 @@ function contentOf(data: DataTransfer | null, takes: Takes): FirstContent | null
   const files = Array.from(data.files);
   if (files.length > 0) return takes.files ? { files } : null;
   const text = data.getData("text/plain");
-  return takes.text && text.trim() !== "" ? { text } : null;
+  if (!takes.text || text.trim() === "") return null;
+  return leavesPasteToEditor(text, data.types.includes("text/html")) ? null : { text };
 }
 
 /** True when the target is a file drop box (FileUploader): the Files section's or the blank page's own. It takes its drops itself; anywhere else stays the page's. */
