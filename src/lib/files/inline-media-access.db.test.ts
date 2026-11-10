@@ -78,10 +78,12 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
   });
 
   /*
-   * Each case starts from: versions at minutes 0 (no image), 20 (embeds `image`), and 30 (image
-   * removed); `image` and `lateImage` attached at minute 10, after the version at 20 named
-   * `image` (so only attachFileRows marked it, back-dated to minute 20); `lateImage` a plain
-   * attachment no version names yet.
+   * Each case starts from versions at minutes 0 (no image), 20 (embeds `image`), and 30 (image
+   * removed). Both files are attached after those versions are written, so `image`'s time is set
+   * by attachFileRows (namedAtAttach), because a version already names it; `lateImage` is a plain
+   * attachment no version names yet, and only markNamedInContent can give it a time. The stored
+   * times are then set by hand (attached at 10, `image` named at 20), so the two pruning cases
+   * differ in which writer set the time, not in the order their timestamps record.
    */
   beforeEach(async () => {
     await clearCase();
@@ -150,7 +152,7 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
     expect(await namedInContentAt(lateImage)).toEqual(at(25));
   });
 
-  it("should keep refusing a removed image after pruning deleted every version that showed it, when it was attached after the version that named it", async () => {
+  it("should keep refusing a removed image after pruning deleted every version that showed it, when attachFileRows set its time", async () => {
     await serve(versions.after);
     await getDb().delete(artifactVersion).where(eq(artifactVersion.id, versions.shows));
     // Only attachFileRows (namedAtAttach) set its time.
@@ -160,7 +162,7 @@ describe.runIf(Boolean(databaseUrl))("inline media access with a database", asyn
     expect((await findReadableFile(image, ids.author))?.id).toBe(image);
   });
 
-  it("should keep refusing a removed image after pruning deleted every version that showed it, when a version named it after it was attached", async () => {
+  it("should keep refusing a removed image after pruning deleted every version that showed it, when markNamedInContent set its time", async () => {
     // Named at minute 25, before the approved version at 30 drops it (here, by the text that version holds).
     const named = await reviseTo(lateEmbed, 25);
     await serve(versions.after);
