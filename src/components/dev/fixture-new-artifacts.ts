@@ -1,3 +1,4 @@
+import { updateArtifactAction } from "@/app/(workspace)/app/actions";
 import type { NewArtifactApi } from "@/components/app/new-artifact/new-artifact-api";
 import { validateArtifactContent } from "@/lib/artifact-content";
 import type { ActionResult, ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
@@ -102,9 +103,10 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     const files = fileIds.flatMap((fileId) => uploaded.get(fileId) ?? []);
     return Promise.resolve(save({ ...base, summary: input.summary ?? "", language: input.language ?? "", icon: input.icon ?? null, files }));
   },
-  update: (id, changes) => {
+  update: (id, changes, options) => {
     const current = readStored().find((entry) => entry.id === id);
-    if (!current) return Promise.resolve({ success: false, error: "Artifact not found." });
+    // The fixture's own artifacts save as they always have, through the server action.
+    if (!current) return updateArtifactAction(id, changes, options);
     const next = { ...current, ...changes, updatedAt: new Date().toISOString() };
     const touchesContent = changes.content !== undefined || changes.kind !== undefined;
     const problem = touchesContent ? contentProblem(next.kind, next.content, false) : null;

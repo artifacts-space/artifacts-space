@@ -1,5 +1,6 @@
 "use client";
 
+import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import { useState } from "react";
 
 import { CommentsControl } from "@/components/app/comments-picker";
@@ -53,6 +54,8 @@ interface ArtifactEditorProps {
   blankPage?: BlankPageOptions | undefined;
   /** Changes each time New artifact is pressed, to bring the blank page back into view with the cursor in its title. */
   focusRequest?: number;
+  /** How a stored artifact saves: the server action unless the workspace hands its own (the /dev/workspace fixture's store). */
+  save?: SaveArtifact | undefined;
 }
 
 interface SharingSlotProps {
@@ -131,12 +134,12 @@ function ArtifactToolbar({ artifact, kind, shareUrl, shared, access, dirty, sour
  * shows the raw content. The author (or the person who added the agent that
  * wrote it) also shares and deletes it.
  */
-export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, seesComments, onWithdraw, onUpdated, onDeleted, blankPage, focusRequest }: ArtifactEditorProps) {
+export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, seesComments, onWithdraw, onUpdated, onDeleted, blankPage, focusRequest, save }: ArtifactEditorProps) {
   const { draft, update, replace, reset, remount, revision } = useArtifactDraft(artifact);
   const [sourceOpen, setSourceOpen] = useState(false);
   const { outerRef, bodyRef, remember } = useScrollPlace(sourceOpen ? "source" : "page");
-  const { page, sectionRef, titleRef, dragging, focusBody, filesApi } = useBlankEditor({ blankPage, artifact, draft, replace, onUpdated, body: bodyRef, sourceOpen, focusRequest });
-  const autosave = useAutosave({ artifact, draft, replaceDraft: replace, onUpdated, save: page.save, problem: page.problem, idle: page.idle });
+  const { page, sectionRef, titleRef, dragging, focusBody, filesApi, saveWith } = useBlankEditor({ blankPage, artifact, draft, replace, onUpdated, body: bodyRef, sourceOpen, focusRequest, save });
+  const autosave = useAutosave({ artifact, draft, replaceDraft: replace, onUpdated, save: saveWith, problem: page.problem, idle: page.idle });
   const [formatOpen, setFormatOpen] = useState(false);
   const { deleting, remove } = useArtifactActions({ artifact, onDeleted });
   const fullWidth = useFullWidth(artifact, onUpdated);

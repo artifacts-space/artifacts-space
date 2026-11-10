@@ -332,3 +332,27 @@ test("should leave an untouched blank page for the artifact a notification opens
   await expect(blankPage(page)).toHaveCount(0);
   expect(await creates(page), "the untouched page stored nothing").toBe(0);
 });
+
+test("should reopen an artifact made on a blank page with its latest body after New artifact was pressed again", async ({ page }) => {
+  await openNewArtifact(page);
+  await page.keyboard.type("Kept copy");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("First body");
+  await expect.poll(async () => (await storedNew(page))[0]?.content, { timeout: 15_000 }).toBe("First body");
+
+  // Edited on its own page after the blank page let go of it.
+  await cards(page, "Long ui fixture").click();
+  await expect(page.getByRole("region", { name: "Edit Long ui fixture" })).toBeVisible();
+  await cards(page, "Kept copy").click();
+  const own = page.getByRole("region", { name: "Edit Kept copy" }).locator('[contenteditable="true"]');
+  await own.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" and more");
+  await expect.poll(async () => (await storedNew(page))[0]?.content, { timeout: 15_000 }).toBe("First body and more");
+
+  // New artifact again, left untouched, then the artifact once more: it opens on the latest body.
+  await pressNewArtifact(page);
+  await cards(page, "Kept copy").click();
+  await expect(own).toContainText("First body and more");
+  expect(await creates(page)).toBe(1);
+});

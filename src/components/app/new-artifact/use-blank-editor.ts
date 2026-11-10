@@ -1,5 +1,6 @@
 import { useCallback, useRef, type RefObject } from "react";
 
+import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import type { ArtifactDraft } from "@/components/app/artifact-editor/use-artifact-draft";
 import type { ArtifactDto } from "@/lib/artifact-types";
 
@@ -17,6 +18,8 @@ interface BlankEditorOptions {
   body: RefObject<HTMLDivElement | null>;
   sourceOpen: boolean;
   focusRequest: number | undefined;
+  /** The stored artifact's save when the workspace hands one. */
+  save: SaveArtifact | undefined;
 }
 
 /**
@@ -25,7 +28,7 @@ interface BlankEditorOptions {
  * (useFirstContent), and the cursor in the title (useFocusTitle). For any
  * other artifact it is inert.
  */
-export function useBlankEditor({ blankPage, artifact, draft, replace, onUpdated, body, sourceOpen, focusRequest }: BlankEditorOptions) {
+export function useBlankEditor({ blankPage, artifact, draft, replace, onUpdated, body, sourceOpen, focusRequest, save }: BlankEditorOptions) {
   const page = useBlankPage(blankPage, { artifact, draft, replace, onUpdated });
   const sectionRef = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -40,5 +43,6 @@ export function useBlankEditor({ blankPage, artifact, draft, replace, onUpdated,
   const focusBody = useCallback(() => { focusContent(body.current); }, [body]);
   const label = page.blank ? "New artifact" : `Edit ${artifact.title}`;
   // Files added later through the artifact's Files section go through the same store (the fixture's stand-in on /dev/workspace).
-  return { page: { ...page, label }, sectionRef, titleRef, dragging: first.dragging, focusBody, filesApi: blankPage?.api };
+  // The blank page's create-once save while it has one, else the workspace's (or the editor's default, the server action).
+  return { page: { ...page, label }, sectionRef, titleRef, dragging: first.dragging, focusBody, filesApi: blankPage?.api, saveWith: page.save ?? save };
 }

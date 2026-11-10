@@ -4,6 +4,7 @@ import { IconInfoCircle, IconLoader2, IconPlus, IconSearch, IconX } from "@table
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
+import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import { ArtifactList } from "@/components/app/artifact-list";
 import { artifactListState, filterArtifactList } from "@/components/app/artifact-list-state";
 import { ProjectFilter } from "@/components/app/project-filter";
@@ -52,6 +53,8 @@ interface DetailPaneProps {
   onCreate: () => void;
   initialFull: readonly ArtifactDto[] | undefined;
   loadArtifact: ArtifactLoader | undefined;
+  /** How the artifact saves: the server action, or the fixture's store for artifacts New artifact made there. */
+  save: SaveArtifact | undefined;
 }
 
 /** Shown while the selected artifact's content loads, or when it could not. */
@@ -77,7 +80,7 @@ function withListProject(full: ArtifactDto | null, selected: ArtifactListItemDto
 }
 
 /** The editor for an artifact the viewer may edit, a read-only view for a teammate's, or the empty state. */
-function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull, loadArtifact }: DetailPaneProps) {
+function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull, loadArtifact, save }: DetailPaneProps) {
   const { full: loaded, failure, remember, retry } = useFullArtifact(selected, initialFull, loadArtifact);
   const full = withListProject(loaded, selected);
   const access = useEditAccess(full, viewerId);
@@ -101,6 +104,7 @@ function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate
         onWithdraw={onWithdraw}
         onUpdated={handleUpdated}
         onDeleted={onDeleted}
+        save={save}
       />
     );
   }
@@ -197,7 +201,7 @@ interface DashboardProps {
   newArtifactApi?: NewArtifactApi;
 }
 
-interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate"> {
+interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate" | "save"> {
   fresh: ReturnType<typeof useNewArtifact>;
   api: NewArtifactApi;
   /** The project the list is filtered to, for a new artifact. */
@@ -224,7 +228,7 @@ function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpda
       />
     );
   }
-  return <DetailPane selected={selected} viewerId={viewerId} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} onCreate={fresh.start} initialFull={full} loadArtifact={loadArtifact} />;
+  return <DetailPane selected={selected} viewerId={viewerId} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} onCreate={fresh.start} initialFull={full} loadArtifact={loadArtifact} save={api.update} />;
 }
 
 /** The card marked as open: the blank page's artifact once stored (none before), else the selected one. */
