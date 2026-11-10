@@ -99,4 +99,15 @@ describe("dropsShownImage", () => {
     expect(dropsShownImage({ icon: null, cover: "mist" }, { icon: null, cover: null })).toBe(false);
     expect(dropsShownImage({ icon: null, cover: null }, { icon: null, cover: `file:${newFile}` })).toBe(false);
   });
+
+  it("should be true when a Markdown save removes an embedded image, so Restore can bring it back", () => {
+    const shown = { ...markdown, content: `# Plan\n\n![Chart](/api/files/${oldFile})` };
+    expect(dropsShownImage(shown, { ...markdown, content: "# Plan" })).toBe(true);
+    expect(dropsShownImage(shown, { ...markdown, content: `![Chart](/api/files/${oldFile}#width=50 "Moved")` })).toBe(false);
+  });
+
+  it("should be true when a ui save drops an Image element's file", () => {
+    expect(dropsShownImage(uiUsing(oldFile), uiUsing(newFile))).toBe(true);
+    expect(dropsShownImage(uiUsing(oldFile), uiUsing(oldFile))).toBe(false);
+  });
 });

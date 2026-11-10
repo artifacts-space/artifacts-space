@@ -5,6 +5,8 @@ import { ReactNodeViewRenderer } from "@tiptap/react";
 import { CodeBlockView } from "./code-block-view";
 import { MarkdownPaste } from "./markdown-paste";
 import { markdownSchemaExtensions } from "./markdown-schema";
+import { MediaInput } from "./media-input";
+import { MediaView } from "./media-view";
 import { RawBlockView } from "./raw-block-view";
 import { SlashCommandExtension } from "./slash-menu";
 
@@ -23,17 +25,20 @@ export function placeholderFor({ editor, node }: PlaceholderContext): string {
 
 /**
  * Everything the rich editor runs: the shared Markdown schema with node views
- * for code and raw blocks, the placeholder, the slash menu, Markdown paste,
- * and ⌘K or Ctrl+K for links.
+ * for code, media, and raw blocks, the placeholder, the slash menu, file
+ * paste and drop (before Markdown paste, so a pasted screenshot uploads),
+ * Markdown paste, and ⌘K or Ctrl+K for links.
  */
 export function richEditorExtensions(options: { onLinkShortcut: (editor: Editor) => boolean }): AnyExtension[] {
   return [
     ...markdownSchemaExtensions({
       codeBlock: ReactNodeViewRenderer(CodeBlockView),
       rawMarkdown: ReactNodeViewRenderer(RawBlockView),
+      media: ReactNodeViewRenderer(MediaView),
     }),
     Placeholder.configure({ placeholder: placeholderFor, showOnlyCurrent: true, includeChildren: false }),
     SlashCommandExtension,
+    MediaInput,
     MarkdownPaste,
     Extension.create({
       name: "linkShortcut",

@@ -5,7 +5,7 @@ export const RAW_MARKDOWN = "rawMarkdown";
 
 /**
  * A block of Markdown the editor cannot show as formatted text, such as raw
- * HTML, footnotes, images, or link definitions. It holds the source exactly
+ * HTML, footnotes, images inside text, or link definitions. It holds the source exactly
  * as written and writes it back unchanged, so nothing is lost on save. The
  * editor shows it as an editable source box (see `raw-block-view.tsx`).
  */

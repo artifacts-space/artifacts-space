@@ -1,4 +1,4 @@
-import { and, eq, like, or, sql } from "drizzle-orm";
+import { and, eq, inArray, like, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, artifactVersion } from "@/db/schema";
@@ -24,17 +24,17 @@ function retainedImageRefs(artifactId: string) {
     .where(and(eq(artifactVersion.artifactId, artifactId), or(like(artifactVersion.icon, `${FILE_PREFIX}%`), like(artifactVersion.cover, `${FILE_PREFIX}%`))));
 }
 
-/** Whether any ui version of the artifact still names this file in its content (an Image or File element). A plain text match, so it errs on keeping. */
+/** Whether any ui or Markdown version of the artifact still names this file in its content (an Image or File element, or a media embed or link). A plain text match, so it errs on keeping. */
 async function namedInVersionContent(artifactId: string, fileId: string): Promise<boolean> {
   const [row] = await getDb()
     .select({ id: artifactVersion.id })
     .from(artifactVersion)
-    .where(and(eq(artifactVersion.artifactId, artifactId), eq(artifactVersion.kind, "ui"), sql`strpos(${artifactVersion.content}, ${fileId}) > 0`))
+    .where(and(eq(artifactVersion.artifactId, artifactId), inArray(artifactVersion.kind, ["ui", "markdown"]), sql`strpos(${artifactVersion.content}, ${fileId}) > 0`))
     .limit(1);
   return row !== undefined;
 }
 
-/** The files no ui version of the artifact names in its content. */
+/** The files no ui or Markdown version of the artifact names in its content. */
 async function notNamedInContent(artifactId: string, fileIds: readonly string[]): Promise<string[]> {
   const named = await Promise.all(fileIds.map((fileId) => namedInVersionContent(artifactId, fileId)));
   return fileIds.filter((_, index) => named[index] === false);
@@ -58,7 +58,7 @@ export async function pruneUnusedIconFiles(artifactId: string, candidates: reado
     .limit(1);
   if (!record) return 0;
   const unreferenced = unusedIconFiles(fileIds, record, await retainedImageRefs(artifactId));
-  const unused = record.kind === "ui" ? await notNamedInContent(artifactId, unreferenced) : unreferenced;
+  const unused = unreferenced.length > 0 ? await notNamedInContent(artifactId, unreferenced) : [];
   if (unused.length === 0) return 0;
   const rows = (await getFileRows(unused)).filter((row) => row.artifactId === artifactId);
   return (await removeFiles(rows)).length;

@@ -7,7 +7,10 @@ import {
   coverPrepareProfile,
   hasTransparentPixel,
   iconPrepareProfile,
+  DOCUMENT_IMAGE_MAX_BYTES,
+  documentPrepareProfile,
   imageOutputType,
+  uploadsUnprepared,
   imageSourceProblem,
   imageTargetSize,
   isHeic,
@@ -110,5 +113,31 @@ describe("icon profile", () => {
 
   it("should leave the server's 1 MB icon cap as the authority when a photo is not prepared", () => {
     expect(isIconUploadAllowed({ type: "image/jpeg", size: 2_000_000 })).toBe(false);
+  });
+});
+
+describe("documentPrepareProfile", () => {
+  it("should keep a screenshot a PNG when it fits, and make a photo a JPEG", () => {
+    expect(imageOutputType({ size: 2_000_000, type: "image/png" }, false, documentPrepareProfile)).toBe("image/png");
+    expect(imageOutputType({ size: 2_000_000, type: "image/jpeg" }, false, documentPrepareProfile)).toBe("image/jpeg");
+    expect(imageOutputType({ size: 2_000_000, type: "image/webp" }, true, documentPrepareProfile)).toBe("image/png");
+  });
+
+  it("should make a PNG too large to keep a JPEG", () => {
+    expect(imageOutputType({ size: DOCUMENT_IMAGE_MAX_BYTES + 1, type: "image/png" }, false, documentPrepareProfile)).toBe("image/jpeg");
+  });
+
+  it("should never keep PNG sources for covers", () => {
+    expect(imageOutputType({ size: 1000, type: "image/png" }, false, coverPrepareProfile)).toBe("image/jpeg");
+  });
+
+  it("should upload a GIF that fits as it is, and redraw every other image", () => {
+    expect(uploadsUnprepared({ type: "image/gif", size: 1_000_000 }, documentPrepareProfile)).toBe(true);
+    expect(uploadsUnprepared({ type: "image/gif", size: DOCUMENT_IMAGE_MAX_BYTES + 1 }, documentPrepareProfile)).toBe(false);
+    expect(uploadsUnprepared({ type: "image/png", size: 1000 }, documentPrepareProfile)).toBe(false);
+  });
+
+  it("should name the use when a picked file is not an image", () => {
+    expect(imageSourceProblem({ type: "application/pdf", name: "a.pdf", size: 10 }, documentPrepareProfile)).toContain("cannot be an image here");
   });
 });

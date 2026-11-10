@@ -201,11 +201,12 @@ describe("anonymous public artifact page queries", () => {
     expect(mocks.getAuth).not.toHaveBeenCalled();
   });
 
-  it("should cost six queries for the page and its metadata when an anonymous visitor opens a public page", async () => {
+  it("should cost five queries for the page and its metadata when an anonymous visitor opens a public page", async () => {
     const { metadata, statements } = await viewPage();
     expect(metadata.robots).toEqual({ index: true, follow: false });
-    // The read decision, the team (theme), the author (byline and last editor), files, hidden images, account age.
-    expect(statements).toHaveLength(6);
+    // The read decision, the team (theme), the author (byline and last editor), files, account age.
+    // Hidden images and media are checked only when the artifact has files (filesForViewer); this one has none.
+    expect(statements).toHaveLength(5);
     expect(distinct(statements)).toBe(statements.length);
   });
 

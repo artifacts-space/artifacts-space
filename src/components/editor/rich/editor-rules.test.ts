@@ -9,7 +9,15 @@ import { filterSlashCommands } from "./slash-commands";
 
 describe("filterSlashCommands", () => {
   it("should offer every block when nothing is typed after the slash", () => {
-    expect(filterSlashCommands("")).toHaveLength(10);
+    expect(filterSlashCommands("")).toHaveLength(15);
+  });
+
+  it("should offer the media blocks when their names are typed", () => {
+    expect(filterSlashCommands("image").map((command) => command.id)).toEqual(["image"]);
+    expect(filterSlashCommands("screens").map((command) => command.id)).toEqual(["image"]);
+    expect(filterSlashCommands("pdf").map((command) => command.id)).toEqual(["pdf"]);
+    expect(filterSlashCommands("mp4").map((command) => command.id)).toEqual(["video"]);
+    expect(filterSlashCommands("upload").map((command) => command.id)).toEqual(["file"]);
   });
 
   it("should match by title, keyword, or Markdown hint when text is typed", () => {

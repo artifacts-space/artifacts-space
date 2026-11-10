@@ -158,7 +158,8 @@ function allowSlash({ editor }: { editor: Editor; range: Range }) {
 
 /**
  * Typing `/` opens a menu of blocks to insert: headings, lists, task list,
- * quote, code block, table, and divider. Typing filters it.
+ * quote, code block, table, divider, and media (image, video, audio, PDF,
+ * file). Typing filters it.
  */
 export const SlashCommandExtension = Extension.create({
   name: "slashCommand",

@@ -198,6 +198,10 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
   `drizzle/` has a journal entry. A migration that is safe anyway starts with
   `-- migration-guard: allow <reason>`. Never edit an applied migration.
 - Keep test rows' emails under `@example.com` and delete them afterwards.
+- `drizzle.config.ts` loads `.env.local` and prefers `DATABASE_URL_UNPOOLED`,
+  so `DATABASE_URL=<throwaway> pnpm db:migrate` alone still reaches the shared
+  database. For a throwaway database, set both `DATABASE_URL` and
+  `DATABASE_URL_UNPOOLED` to it.
 
 ### Tripwire: no correlated subqueries in single-table selects
 
@@ -326,6 +330,19 @@ deletes one only when it leaves every retained version (history pruning in
 `versions/history.ts` hands it the dropped versions' images) or with the
 artifact. Kept images never widen access: readers of the approved version get
 only that version's icon and cover (`served-images.ts`, `canReadFile`).
+
+### Media in documents
+
+Markdown artifacts embed uploads as image syntax alone in a paragraph,
+`![alt](/api/files/<id>#<options> "Caption")`; the dialect, with every
+block's Markdown form and the block node conventions, is
+`src/components/editor/rich/markdown-dialect.md`. The URL rules live in
+`src/lib/files/media-rules.ts`. Embedded files follow the icon and cover
+rules above: a save attaches the editor's own uploads it names, a save that
+drops one files its own version so Restore brings it back, and readers of the
+approved version never load a file that version does not show
+(`served-images.ts`). Images from other sites never load. Add each new block
+to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
 
 ### Agent harnesses
 

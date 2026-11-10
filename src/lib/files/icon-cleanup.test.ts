@@ -39,13 +39,13 @@ describe("pruneUnusedIconFiles", () => {
   });
 
   it("should delete the image when the last version that showed it is gone", async () => {
-    stage([[artifact, [[{ ...record, cover: "mist" }]]], [artifactVersion, [[{ icon: `file:${other}`, cover: null }]]]]);
+    stage([[artifact, [[{ ...record, cover: "mist" }]]], [artifactVersion, [[{ icon: `file:${other}`, cover: null }], []]]]);
     await expect(pruneUnusedIconFiles("a1", [`file:${cover}`])).resolves.toBe(1);
     expect(store.removeFiles).toHaveBeenCalledWith([{ id: cover, artifactId: "a1", key: `files/${cover}/cover.jpg` }]);
   });
 
   it("should never delete a file attached to another artifact", async () => {
-    stage([[artifact, [[record]]], [artifactVersion, [[]]]]);
+    stage([[artifact, [[record]]], [artifactVersion, [[], []]]]);
     store.getFileRows.mockResolvedValue([{ id: cover, artifactId: "a2", key: "files/x" }]);
     await expect(pruneUnusedIconFiles("a1", [`file:${cover}`])).resolves.toBe(0);
     expect(store.removeFiles).toHaveBeenCalledWith([]);
@@ -53,6 +53,18 @@ describe("pruneUnusedIconFiles", () => {
 
   it("should keep an image a ui version still names in its content", async () => {
     stage([[artifact, [[{ ...record, kind: "ui", content: "{}" }]]], [artifactVersion, [[], [{ id: "v1" }]]]]);
+    await expect(pruneUnusedIconFiles("a1", [`file:${cover}`])).resolves.toBe(0);
+    expect(store.getFileRows).not.toHaveBeenCalled();
+  });
+
+  it("should keep an image a Markdown version still embeds, so Restore brings it back", async () => {
+    stage([[artifact, [[record]]], [artifactVersion, [[], [{ id: "v1" }]]]]);
+    await expect(pruneUnusedIconFiles("a1", [`file:${cover}`])).resolves.toBe(0);
+    expect(store.getFileRows).not.toHaveBeenCalled();
+  });
+
+  it("should keep a former cover when the current Markdown embeds it", async () => {
+    stage([[artifact, [[{ ...record, content: `![Cover](/api/files/${cover})` }]]], [artifactVersion, [[]]]]);
     await expect(pruneUnusedIconFiles("a1", [`file:${cover}`])).resolves.toBe(0);
     expect(store.getFileRows).not.toHaveBeenCalled();
   });

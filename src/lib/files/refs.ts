@@ -1,5 +1,7 @@
 import { isPlainObject } from "@/lib/ui/json-walk";
 
+import { markdownFileRefs } from "./media-rules";
+
 /** ui components that point at an uploaded file through their `file` prop. */
 export const fileComponentTypes: ReadonlySet<string> = new Set(["Image", "File"]);
 
@@ -17,12 +19,17 @@ function refsInElements(elements: unknown): string[] {
   return ids;
 }
 
+/** Formats whose content can point at uploaded files. */
+export const contentRefKinds: readonly string[] = ["ui", "markdown"];
+
 /**
  * The distinct file ids a piece of content points at: the `file` prop of
- * every Image and File element in a ui spec. Other formats point at none.
- * Content that does not parse points at none; validation reports it.
+ * every Image and File element in a ui spec, and every `/api/files/<id>` in
+ * Markdown (media and links; see media-rules.ts). Other formats point at
+ * none. A ui spec that does not parse points at none; validation reports it.
  */
 export function fileRefsInContent(kind: string, content: string): string[] {
+  if (kind === "markdown") return markdownFileRefs(content);
   if (kind !== "ui") return [];
   try {
     const spec: unknown = JSON.parse(content);

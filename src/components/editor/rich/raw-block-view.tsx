@@ -4,8 +4,8 @@ import { IconCode } from "@tabler/icons-react";
 import { NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react";
 
 /**
- * Markdown the editor keeps exactly as written (raw HTML, footnotes, images,
- * link definitions). It shows as its source in a quiet box that can be edited
+ * Markdown the editor keeps exactly as written (raw HTML, footnotes, images
+ * inside text, link definitions). It shows as its source in a quiet box that can be edited
  * as text, so nothing is dropped or rewritten on save.
  */
 export function RawBlockView({ node, updateAttributes, editor, selected }: ReactNodeViewProps) {

@@ -74,8 +74,27 @@ export async function attachFiles(editorId: string, artifactId: string, fileIds:
  */
 export async function checkContentFiles(authorId: string, artifactId: string | null, kind: string, content: string): Promise<string[]> {
   const ids = fileRefsInContent(kind, content);
+  if (kind === "markdown") return attachableMarkdownFiles(authorId, artifactId, ids);
   await assertUsableFiles(authorId, artifactId, ids);
   return ids;
+}
+
+/**
+ * The files a Markdown save attaches: the editor's own finished uploads and
+ * files already in this artifact. Markdown may also link files it cannot
+ * use (another artifact's, a deleted one, or text from a restored version);
+ * those stay plain links that load only for people who can read the file,
+ * so a save or a Restore never fails over them and never widens access.
+ */
+async function attachableMarkdownFiles(authorId: string, artifactId: string | null, fileIds: readonly string[]): Promise<string[]> {
+  if (fileIds.length === 0) return [];
+  if (fileIds.length > maxFileRefs) throw new UserFacingError(`An artifact can use at most ${String(maxFileRefs)} files.`);
+  const usable = (await getFileRows(fileIds)).filter((row) => canUseFileInArtifact(row, authorId, artifactId));
+  const adding = usable.filter((row) => row.artifactId === null).length;
+  if (adding > 0 && !(await hasRoomFor(artifactId, adding))) {
+    throw new UserFacingError(`An artifact holds at most ${String(fileLimits.maxFilesPerArtifact)} files. Remove some first.`);
+  }
+  return usable.map((row) => row.id);
 }
 
 async function mayEditArtifact(userId: string, artifactId: string) {

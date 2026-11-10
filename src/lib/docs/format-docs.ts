@@ -24,7 +24,7 @@ const count = (value: number) => value.toLocaleString("en-US");
 export const formatDocs: Record<FormatKind, FormatDoc> = {
   markdown: {
     checks: "Any non-empty text.",
-    renders: "GitHub-flavored Markdown: tables, task lists, strikethrough, and autolinks. Raw HTML is skipped. Images do not load; they show as their alt text. Links must be http, https, or mailto, and open with rel=\"nofollow ugc\".",
+    renders: "GitHub-flavored Markdown: tables, task lists, strikethrough, and autolinks. Raw HTML is skipped. Uploaded files embed as ![alt](/api/files/<file id>) on their own line: images, video and audio players, PDFs, and download cards, with a caption from the title and a width option (artifacts_formats_guide explains each form). Images from other sites do not load; they show as their alt text. Links must be http, https, or mailto, and open with rel=\"nofollow ugc\".",
     example: "# Billing migration plan\n\n- [x] Dual-write behind `billing.ledger_v2`\n- [ ] Backfill 2025 invoices\n\n| Step | Owner |\n| --- | --- |\n| Backfill | @dana |",
   },
   code: {

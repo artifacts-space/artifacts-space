@@ -67,6 +67,13 @@ describe("contentToMarkdown", () => {
     expect(content("file", "Notes")).toBe("Notes");
   });
 
+  it("should link uploaded media absolutely when Markdown embeds files", () => {
+    const id = "0f8fad5b-d9cb-469f-a165-70867728950e";
+    expect(content("markdown", `![Chart](/api/files/${id}#width=50 "Q3")`)).toBe(`![Chart](https://artifacts.space/api/files/${id}#width=50 "Q3")`);
+    expect(content("file", `See [it](/api/files/${id})`)).toBe(`See [it](https://artifacts.space/api/files/${id})`);
+    expect(content("text", `/api/files/${id}`)).toBe(`/api/files/${id}`);
+  });
+
   it("should fence code with its language", () => {
     expect(content("code", "const a = 1;", { language: "ts" })).toBe("```ts\nconst a = 1;\n```");
   });

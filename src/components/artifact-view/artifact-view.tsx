@@ -50,7 +50,7 @@ export interface ArtifactViewProps {
 function FormatBody({ kind, content, title, language }: ArtifactViewProps) {
   switch (kind) {
     case "markdown":
-      return <MarkdownView content={content} />;
+      return <MarkdownView content={content} media />;
     case "code":
       return <CodeView content={content} language={language} />;
     case "json":

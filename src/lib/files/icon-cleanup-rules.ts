@@ -47,29 +47,42 @@ export function unusedIconFiles(candidates: readonly string[], current: IconUseS
   return [...new Set(candidates)].filter((fileId) => !used.has(fileId));
 }
 
+/** One shown state for dropsShownImage: its icon and cover, and its content when known. */
+export interface ShownFiles extends ImageRefs {
+  kind?: string;
+  content?: string;
+}
+
+/** The uploaded files one state shows: its icon and cover, and the files its content embeds or links. */
+function shownFileIds(state: ShownFiles): string[] {
+  const contentRefs = state.kind !== undefined && state.content !== undefined ? fileRefsInContent(state.kind, state.content) : [];
+  return [...imageFileIdsOf(state), ...contentRefs];
+}
+
 /**
- * True when saving `next` over `latest` would stop showing an uploaded icon
- * or cover image that `latest` shows. Such a save never merges into the
- * latest version, so the image stays in the history and Restore can bring it
+ * True when saving `next` over `latest` would stop showing an uploaded file
+ * that `latest` shows: an icon or cover image, or an image or file its
+ * content (Markdown or ui) points at. Such a save never merges into the
+ * latest version, so the file stays in the history and Restore can bring it
  * back, even right after it was added.
  */
-export function dropsShownImage(latest: ImageRefs, next: ImageRefs): boolean {
-  const kept = new Set(imageFileIdsOf(next));
-  return imageFileIdsOf(latest).some((fileId) => !kept.has(fileId));
+export function dropsShownImage(latest: ShownFiles, next: ShownFiles): boolean {
+  const kept = new Set(shownFileIds(next));
+  return shownFileIds(latest).some((fileId) => !kept.has(fileId));
 }
 
 /** The version a reader outside the team is served: its icon, cover, and content. */
 export interface ServedImageState extends ImageRefs {
   kind: string;
-  /** The served content's file references; only ui content has any. */
+  /** The served content's file references (ui and Markdown content). */
   contentRefs: readonly string[];
 }
 
 /**
- * The icon and cover images a reader of the approved version may not open:
- * images some version (or the latest save) showed as its icon or cover that
- * the approved version shows neither as its icon or cover nor from its
- * content. Kept images let Restore bring a cover back, but they never widen
+ * The kept images and files a reader of the approved version may not open:
+ * files some version (or the latest save) showed as its icon or cover, or
+ * from its content, that the approved version shows neither as its icon or
+ * cover nor from its content. Kept images let Restore bring a cover back, but they never widen
  * what readers outside the team can see. A file artifact's attachments are
  * all content, so none is hidden there.
  */

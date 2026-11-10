@@ -34,9 +34,16 @@ export function servedVersionTime(viewable: Pick<ArtifactAccess, "version" | "se
   return viewable.version.source === "approved" ? viewable.served.updatedAt : null;
 }
 
-/** The files this viewer may see with the version they are served: never an old icon or cover image that version does not show. */
+/**
+ * The files this viewer may see with the version they are served: never an
+ * old icon or cover image, or a file the content once embedded, that this
+ * version does not show. Which files to hide is asked only when there are
+ * files, so a page without files costs one query here.
+ */
 export async function filesForViewer(viewable: Pick<ArtifactAccess, "record" | "version" | "served">): Promise<FileDto[]> {
-  const [files, hidden] = await Promise.all([listArtifactFiles(viewable.record.id, { attachedBy: servedVersionTime(viewable) }), hiddenImagesFor(viewable)]);
+  const files = await listArtifactFiles(viewable.record.id, { attachedBy: servedVersionTime(viewable) });
+  if (files.length === 0) return files;
+  const hidden = await hiddenImagesFor(viewable);
   return hidden.size === 0 ? files : files.filter((file) => !hidden.has(file.id));
 }
 
