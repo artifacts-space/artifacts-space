@@ -39,9 +39,27 @@ export function blankDraftProblem<T extends BlankDraft>(draft: T, check: (draft:
   return check({ ...draft, title: draft.title.trim() || UNTITLED });
 }
 
-/** The create input for the blank page: the draft, the title or "Untitled", and the project the list is filtered to. */
-export function createInputFor(draft: BlankDraft, project: string | null): ArtifactInput {
+const webCreatePrefix = "web:";
+const webCreateSession = /^web:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * The session id a blank page's create carries: "web:" and a random id the
+ * page picks once. A retry after a lost response carries the same one, so the
+ * server hands back the artifact the first try stored instead of a second.
+ */
+export function webCreateSessionId(requestId: string): string {
+  return `${webCreatePrefix}${requestId}`;
+}
+
+/** True for a session id a blank page's create sends (webCreateSessionId). */
+export function isWebCreateSessionId(sessionId: string | undefined): sessionId is string {
+  return sessionId !== undefined && webCreateSession.test(sessionId);
+}
+
+/** The create input for the blank page: the draft, the title or "Untitled", the project the list is filtered to, and the page's create id. */
+export function createInputFor(draft: BlankDraft, project: string | null, requestId?: string): ArtifactInput {
   return {
+    ...(requestId ? { sessionId: webCreateSessionId(requestId) } : {}),
     title: draft.title.trim() || UNTITLED,
     icon: draft.icon,
     summary: draft.summary,
@@ -62,22 +80,25 @@ interface PersistOnceOptions {
   update: SaveCall;
   /** The project the new artifact goes into, or null. */
   project: string | null;
+  /** Picked once per blank page, so every try of its create is the same create (webCreateSessionId). */
+  requestId: string;
 }
 
 /**
  * Wraps the editor's save so the blank page is created exactly once. Calls
  * that arrive while the create is in flight wait for it and then save to the
- * stored artifact; a failed create leaves nothing behind and can be retried;
+ * stored artifact; a failed create can be retried, and every try carries the
+ * same create id, so a retry after a lost response finds the first one;
  * after the create every save goes to the stored artifact, even when the
  * caller still names the blank id.
  */
-export function persistOnce({ current, create, update, project }: PersistOnceOptions): SaveCall {
+export function persistOnce({ current, create, update, project, requestId }: PersistOnceOptions): SaveCall {
   let created: ArtifactDto | null = null;
   let creating: Promise<SaveArtifactResult> | null = null;
 
   const runCreate = async (): Promise<SaveArtifactResult> => {
     const { draft, fileIds } = current();
-    const result = await create(createInputFor(draft, project), [...fileIds]);
+    const result = await create(createInputFor(draft, project, requestId), [...fileIds]);
     if (result.success) created = result.data;
     return result;
   };
@@ -96,4 +117,42 @@ export function persistOnce({ current, create, update, project }: PersistOnceOpt
     creating = runCreate().finally(() => { creating = null; });
     return creating;
   };
+}
+
+/** What the blank page does next with files dropped on it. */
+export type UploadStep =
+  | { step: "none" }
+  | { step: "wait" }
+  | { step: "create"; ids: string[] }
+  | { step: "attach"; ids: string[] }
+  | { step: "done" };
+
+interface UploadState {
+  /** The artifact is stored (it has a real id). */
+  stored: boolean;
+  /** Some files are still uploading or being checked. */
+  busy: boolean;
+  /** Finished uploads, in order. */
+  readyIds: readonly string[];
+  /** Files the stored artifact already has. */
+  attachedIds: readonly string[];
+  /** Files already handed to the create, which attaches them. */
+  handedIds: readonly string[];
+}
+
+/**
+ * The next step for dropped files, once every upload has finished: hand them
+ * to the create while the page is blank; attach any the stored artifact does
+ * not have (also files that finished while the create was already on its
+ * way, which it could not carry); done once it has them all.
+ */
+export function uploadStep({ stored, busy, readyIds, attachedIds, handedIds }: UploadState): UploadStep {
+  if (readyIds.length === 0) return { step: busy ? "wait" : "none" };
+  if (busy) return { step: "wait" };
+  const attached = new Set(attachedIds);
+  const pending = readyIds.filter((id) => !attached.has(id));
+  if (pending.length === 0) return { step: "done" };
+  if (stored) return { step: "attach", ids: pending };
+  const handed = new Set(handedIds);
+  return pending.every((id) => handed.has(id)) ? { step: "wait" } : { step: "create", ids: pending };
 }

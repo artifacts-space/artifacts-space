@@ -109,4 +109,8 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     const files = [...current.files, ...fileIds.flatMap((fileId) => uploaded.get(fileId) ?? [])];
     return Promise.resolve(save({ ...current, files, updatedAt: new Date().toISOString() }));
   },
+  discard: (fileId) => {
+    uploaded.delete(fileId);
+    return Promise.resolve();
+  },
 };

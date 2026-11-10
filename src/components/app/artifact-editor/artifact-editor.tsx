@@ -135,7 +135,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   const { draft, update, replace, reset, remount, revision } = useArtifactDraft(artifact);
   const [sourceOpen, setSourceOpen] = useState(false);
   const { outerRef, bodyRef, remember } = useScrollPlace(sourceOpen ? "source" : "page");
-  const { page, sectionRef, titleRef, dragging, focusBody } = useBlankEditor({ blankPage, artifact, draft, replace, onUpdated, body: bodyRef, sourceOpen, focusRequest });
+  const { page, sectionRef, titleRef, dragging, focusBody, filesApi } = useBlankEditor({ blankPage, artifact, draft, replace, onUpdated, body: bodyRef, sourceOpen, focusRequest });
   const autosave = useAutosave({ artifact, draft, replaceDraft: replace, onUpdated, save: page.save, problem: page.problem, idle: page.idle });
   const [formatOpen, setFormatOpen] = useState(false);
   const { deleting, remove } = useArtifactActions({ artifact, onDeleted });
@@ -220,7 +220,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
             </ArtifactSheetFormat>
           </SheetKeyContext>
           <BlankPageFilesSlot page={page} dragging={dragging} />
-          {!page.blank && showsFiles(draft.kind, artifact.files.length) ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} /> : null}
+          {!page.blank && showsFiles(draft.kind, artifact.files.length) ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} api={filesApi} /> : null}
         </div>
       </div>
       <FormatDialog

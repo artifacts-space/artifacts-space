@@ -28,10 +28,33 @@ export interface Detection {
 
 const markdown = (content: string, reason: DetectReason, title: string | null = null): Detection => ({ kind: "markdown", language: "", content, title, reason });
 
-const svgStart = /^(?:\s|<\?xml[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>)*<svg[\s>/]/i;
+/** Prologue parts that may come before an SVG root, with what ends each one. */
+const prologueParts: readonly (readonly [string, string])[] = [["<?xml", "?>"], ["<!--", "-->"], ["<!doctype", ">"]];
+const svgRoot = /^<svg[\s>/]/i;
+const space = /\s/;
+
+/**
+ * Where the content starts after a byte order mark, whitespace, an XML
+ * declaration, comments, and a doctype. A plain scan with indexOf, so it runs
+ * in linear time on any input, where a regex with repeated lazy groups can
+ * backtrack without end.
+ */
+export function afterPrologue(text: string): number {
+  let index = text.startsWith("﻿") ? 1 : 0;
+  for (;;) {
+    while (index < text.length && space.test(text.charAt(index))) index += 1;
+    const rest = text.slice(index, index + 9).toLowerCase();
+    const part = prologueParts.find(([open]) => rest.startsWith(open));
+    if (!part) return index;
+    const end = text.indexOf(part[1], index + part[0].length);
+    if (end === -1) return index;
+    index = end + part[1].length;
+  }
+}
 
 function detectSvg(text: string): Detection | null {
-  if (!svgStart.test(text.replace(/^﻿/, ""))) return null;
+  const start = afterPrologue(text);
+  if (!svgRoot.test(text.slice(start, start + 5))) return null;
   return checkSvg(text).ok ? { kind: "svg", language: "", content: text, title: null, reason: "svg" } : null;
 }
 
@@ -47,15 +70,35 @@ function detectJson(text: string): Detection | null {
   return { kind: "json", language: "", content: text, title: null, reason: "json" };
 }
 
-/** One fenced block that is the whole paste, with a language on its opening fence. */
-const wholeFence = /^\s*(`{3,}|~{3,})[ \t]*([\w#+.-]+)[^\n]*\n([\s\S]*?)\n[ \t]*\1[ \t]*\s*$/;
+/** An opening fence with a language label, such as ```ts or ~~~python. Anchored and without nested quantifiers, so it is linear. */
+const openingFence = /^(`{3,}|~{3,})[ \t]*([\w#+.-]+)/;
+
+/** The first and last lines with text, or null when there are fewer than two. */
+function outerLines(lines: readonly string[]): { first: number; last: number } | null {
+  const first = lines.findIndex((line) => line.trim() !== "");
+  let last = lines.length - 1;
+  while (last > first && lines[last]?.trim() === "") last -= 1;
+  return first === -1 || last <= first ? null : { first, last };
+}
+
+/** The fence lines and the lines between them, when the whole paste is one fenced block; null otherwise. */
+function wholeFence(text: string): { fence: string; label: string; body: string } | null {
+  const lines = text.split("\n").map((line) => line.replace(/\r$/, ""));
+  const outer = outerLines(lines);
+  if (!outer) return null;
+  const [opening = "", closing = ""] = [lines[outer.first], lines[outer.last]];
+  const [, fence = "", label = ""] = openingFence.exec(opening.trimStart()) ?? [];
+  if (fence === "" || closing.trim() !== fence) return null;
+  const inner = lines.slice(outer.first + 1, outer.last);
+  // A fence of the same kind inside means a document with several blocks, not one.
+  if (inner.some((line) => line.trimStart().startsWith(fence))) return null;
+  return { fence, label, body: inner.join("\n") };
+}
 
 function detectFence(text: string): Detection | null {
-  const match = wholeFence.exec(text);
-  if (!match) return null;
-  const [, fence = "", label = "", body = ""] = match;
-  // A second fence of the same kind inside means it is a document with several blocks, not one.
-  if (body.split("\n").some((line) => line.trimStart().startsWith(fence))) return null;
+  const found = wholeFence(text);
+  if (!found) return null;
+  const { label, body } = found;
   if (label.toLowerCase() === "mermaid" && checkMermaidSource(body) === null && mermaidDiagramType(body)) {
     return { kind: "mermaid", language: "", content: body, title: null, reason: "fence" };
   }
@@ -136,10 +179,16 @@ function detectCsv(text: string): Detection | null {
 
 /** The title a first line `# Heading` names, or null. Only a top-level heading counts. */
 export function headingTitle(text: string): string | null {
-  const firstLine = text.replace(/^﻿/, "").trimStart().split(/\r?\n/, 1)[0] ?? "";
-  const match = /^#[ \t]+(.+?)[ \t#]*$/.exec(firstLine);
-  const title = match?.[1]?.trim() ?? "";
+  const firstLine = text.slice(afterBom(text)).trimStart().split(/\r?\n/, 1)[0] ?? "";
+  if (!/^#[ \t]/.test(firstLine)) return null;
+  // Closing hashes (`# Plan ##`) are not part of the heading.
+  const title = firstLine.slice(1).trim().replace(/[ \t]#+$/, "").replace(/^#+$/, "").trim();
   return title === "" ? null : title.slice(0, 160);
+}
+
+/** 1 when the text starts with a byte order mark, else 0. */
+function afterBom(text: string): number {
+  return text.startsWith("\uFEFF") ? 1 : 0;
 }
 
 /** Detectors in order: the most specific signals first. CSV is last, since shape is the weakest signal. */

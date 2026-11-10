@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { draftProblem } from "@/components/app/artifact-editor/autosave-rules";
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import type { ArtifactDraft } from "@/components/app/artifact-editor/use-artifact-draft";
-import { deleteFileAction } from "@/app/(workspace)/app/file-actions";
-import { useFileUploads } from "@/components/files/use-file-uploads";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
-import { detectFileText, detectTextKind, filePlan, fileTitle, type Detection } from "@/lib/create/detect-kind-rules";
+import { detectFileText, detectTextKind, filePlan, type Detection } from "@/lib/create/detect-kind-rules";
 import { BLANK_ARTIFACT_ID, blankDraftProblem, isUntouched, persistOnce } from "@/lib/create/new-artifact-rules";
 
 import type { NewArtifactApi } from "./new-artifact-api";
+import { useBlankUploads } from "./use-blank-uploads";
 import type { FirstContent } from "./use-first-content";
 
 /** Set on the editor when it shows a new artifact that may not be stored yet. */
@@ -43,13 +42,6 @@ function withDetection(draft: ArtifactDraft, detection: Detection): ArtifactDraf
   return { ...draft, kind: detection.kind, language: detection.language || draft.language, content: detection.content, title };
 }
 
-/** The title for dropped files when the page has none. */
-function filesTitle(draft: ArtifactDraft, names: readonly string[]): string {
-  if (draft.title.trim() !== "") return draft.title;
-  const [first] = names;
-  return names.length === 1 && first ? fileTitle(first) : `${String(names.length)} files`;
-}
-
 /** Reads one dropped file as text when its extension says it is code, SVG, or Mermaid; null when it should upload. */
 async function readAsText(files: readonly File[]): Promise<Detection | null> {
   const [file] = files;
@@ -72,13 +64,15 @@ function stillDetected(detected: DetectedFormat | null, draft: ArtifactDraft): D
 /** The editor's save for a blank page: created once (persistOnce), then ordinary saves. Built on first use. */
 function useCreateOnceSave(api: NewArtifactApi | undefined, project: string | null, current: () => { draft: ArtifactDraft; fileIds: readonly string[] }) {
   const saverRef = useRef<SaveArtifact | null>(null);
+  // One create id per blank page, so a retry after a lost response is the same create (webCreateSessionId).
+  const [requestId] = useState(() => crypto.randomUUID());
   const currentRef = useRef(current);
   useEffect(() => { currentRef.current = current; }, [current]);
   const persist = useCallback<SaveArtifact>((id, changes, saveOptions) => {
     if (!api) return Promise.resolve({ success: false, error: "Nothing to save." });
-    saverRef.current ??= persistOnce({ current: () => currentRef.current(), create: api.create, update: api.update, project });
+    saverRef.current ??= persistOnce({ current: () => currentRef.current(), create: api.create, update: api.update, project, requestId });
     return saverRef.current(id, changes, saveOptions);
-  }, [api, project]);
+  }, [api, project, requestId]);
   return api ? persist : undefined;
 }
 
@@ -93,19 +87,17 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
   const { artifact, draft, replace, onUpdated } = editor;
   const blank = options !== undefined && artifact.id === BLANK_ARTIFACT_ID;
   const draftRef = useRef(draft);
-  const fileIdsRef = useRef<string[]>([]);
-  const committedRef = useRef(false);
   const [detected, setDetected] = useState<DetectedFormat | null>(null);
   const [readFailed, setReadFailed] = useState<string | null>(null);
   useEffect(() => { draftRef.current = draft; }, [draft]);
 
   const active = options !== undefined;
-  const uploads = useFileUploads({ send: options?.api.send });
-  const current = useCallback(() => ({ draft: draftRef.current, fileIds: fileIdsRef.current }), []);
+  const { uploads, fileIdsRef, problem: uploadProblem } = useBlankUploads({ options, artifact, draftRef, replace, onUpdated });
+  const current = useCallback(() => ({ draft: draftRef.current, fileIds: fileIdsRef.current }), [fileIdsRef]);
   const save = useCreateOnceSave(options?.api, options?.project ?? null, current);
 
   const problem = useCallback((current: ArtifactDraft, base: ArtifactDraft) => (blank ? blankDraftProblem(current, draftProblem) : draftProblem(current, base)), [blank]);
-  const idle = useCallback((current: ArtifactDraft) => blank && isUntouched(current, fileIdsRef.current), [blank]);
+  const idle = useCallback((current: ArtifactDraft) => blank && isUntouched(current, fileIdsRef.current), [blank, fileIdsRef]);
 
   // Created with no title: the draft takes the stored "Untitled", so the next save does not send an empty title.
   const stored = active && !blank;
@@ -119,7 +111,14 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
     setDetected(detection.kind === "markdown" ? null : { kind: detection.kind, language: detection.language, content: detection.content });
   }, [replace]);
 
+  // Read when content arrives: text only while the body is empty; files also while dropped files are still on their way.
+  const eligible = takesFirstContent(active, draft, uploads.items.length);
+  const acceptsRef = useRef({ text: eligible, files: eligible });
+  useEffect(() => { acceptsRef.current = { text: eligible, files: eligible || uploads.items.length > 0 }; }, [eligible, uploads.items.length]);
+
   const onContent = useCallback((content: FirstContent) => {
+    const accepts = acceptsRef.current;
+    if ("text" in content ? !accepts.text : !accepts.files) return;
     setReadFailed(null);
     if ("text" in content) {
       apply(detectTextKind(content.text));
@@ -130,9 +129,6 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
       .catch(() => { setReadFailed("That file could not be read. Try again, or upload it."); });
   }, [apply, uploads]);
 
-  useCommitUploads({ options, artifact, uploads, fileIdsRef, committedRef, draftRef, replace, onUpdated });
-  useForgetUnusedUploads(uploads.readyFiles, committedRef);
-
   const dismissDetected = useCallback(() => { setDetected(null); }, []);
   return {
     active,
@@ -141,60 +137,10 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
     problem,
     idle,
     onContent,
-    eligible: takesFirstContent(active, draft, uploads.items.length),
+    eligible,
     uploads,
-    readFailed,
+    readFailed: readFailed ?? uploadProblem,
     detected: stillDetected(detected, draft),
     dismissDetected,
   };
-}
-
-interface CommitOptions {
-  options: BlankPageOptions | undefined;
-  artifact: ArtifactDto;
-  uploads: ReturnType<typeof useFileUploads>;
-  fileIdsRef: React.RefObject<string[]>;
-  committedRef: React.RefObject<boolean>;
-  draftRef: React.RefObject<ArtifactDraft>;
-  replace: (draft: ArtifactDraft, remount: boolean) => void;
-  onUpdated: (artifact: ArtifactDto) => void;
-}
-
-/**
- * Once every dropped file has finished, makes the page a Files artifact: a
- * blank page is created with them attached; a page already stored (a title
- * was typed first) gets them attached, then its format saves as Files.
- */
-function useCommitUploads({ options, artifact, uploads, fileIdsRef, committedRef, draftRef, replace, onUpdated }: CommitOptions) {
-  const ready = uploads.readyFiles;
-  const readyKey = useMemo(() => ready.map((file) => file.id).join(","), [ready]);
-  useEffect(() => {
-    if (!options || committedRef.current || uploads.busy || readyKey === "") return;
-    committedRef.current = true;
-    const ids = readyKey.split(",");
-    const names = ready.map((file) => file.filename);
-    const asFiles = (current: ArtifactDraft): ArtifactDraft => ({ ...current, kind: "file", title: filesTitle(current, names) });
-    if (artifact.id === BLANK_ARTIFACT_ID) {
-      fileIdsRef.current = ids;
-      replace(asFiles(draftRef.current), true);
-      return;
-    }
-    options.api.attach(artifact.id, ids)
-      .then((result) => {
-        if (!result.success) { committedRef.current = false; return; }
-        onUpdated(result.data);
-        replace(asFiles(draftRef.current), true);
-      })
-      .catch(() => { committedRef.current = false; });
-  }, [options, artifact.id, uploads.busy, readyKey, ready, fileIdsRef, committedRef, draftRef, replace, onUpdated]);
-}
-
-/** Leaving before dropped files became an artifact deletes those uploads; the cleanup job is the backstop. */
-function useForgetUnusedUploads(ready: readonly { id: string }[], committedRef: React.RefObject<boolean>) {
-  const readyRef = useRef(ready);
-  useEffect(() => { readyRef.current = ready; }, [ready]);
-  useEffect(() => () => {
-    if (committedRef.current) return;
-    for (const file of readyRef.current) void deleteFileAction(file.id).catch(() => undefined);
-  }, [committedRef]);
 }

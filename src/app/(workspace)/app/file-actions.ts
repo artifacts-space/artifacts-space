@@ -7,6 +7,8 @@ import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult, ArtifactDto, ArtifactInput } from "@/lib/artifact-types";
 import { getEditableArtifact } from "@/lib/access";
 import { createArtifact, toArtifactDtos } from "@/lib/artifacts";
+import { artifactCreatedByRequest } from "@/lib/create/created-by-request";
+import { isWebCreateSessionId } from "@/lib/create/new-artifact-rules";
 import { assertUsableFiles, attachFiles, deleteOwnFile } from "@/lib/files/attach";
 import type { FileDto } from "@/lib/files/types";
 import { finalizeUpload, requestUpload, type UploadRequest } from "@/lib/files/uploads";
@@ -81,11 +83,15 @@ export async function attachFilesAction(artifactId: string, fileIds: string[]): 
 /**
  * Creates an artifact and attaches finished uploads to it. The files are
  * checked first. This is the blank page's create: a Markdown artifact may
- * start with a title and no body yet.
+ * start with a title and no body yet. A retry with the same create id
+ * (`sessionId` "web:<uuid>", see webCreateSessionId) hands back the
+ * artifact the first try stored, so a lost response never makes two.
  */
 export async function createArtifactWithFilesAction(input: ArtifactInput, fileIds: string[]): Promise<ActionResult<ArtifactDto>> {
   return run("The artifact could not be saved. Please try again.", async (userId) => {
     const ids = fileIdsSchema.parse(fileIds);
+    const earlier = isWebCreateSessionId(input.sessionId) ? await artifactCreatedByRequest(userId, input.sessionId) : null;
+    if (earlier) return editableArtifactDto(userId, earlier);
     await assertUsableFiles(userId, null, ids);
     const created = await createArtifact(userId, { ...input, source: input.source || "web" }, { emptyMarkdown: true });
     if (ids.length > 0) await attachFiles(userId, created.id, ids, "person");

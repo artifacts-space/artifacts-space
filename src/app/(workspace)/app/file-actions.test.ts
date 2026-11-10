@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   attachFiles: vi.fn(),
   getEditableArtifact: vi.fn(),
   toArtifactDtos: vi.fn(),
+  createdByRequest: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -21,6 +22,7 @@ vi.mock("@/lib/session", () => ({ getSession: mocks.session }));
 vi.mock("@/lib/access", () => ({ getEditableArtifact: mocks.getEditableArtifact }));
 vi.mock("@/lib/artifacts", () => ({ createArtifact: mocks.createArtifact, toArtifactDtos: mocks.toArtifactDtos }));
 vi.mock("@/lib/files/attach", () => ({ assertUsableFiles: mocks.assertUsableFiles, attachFiles: mocks.attachFiles, deleteOwnFile: vi.fn() }));
+vi.mock("@/lib/create/created-by-request", () => ({ artifactCreatedByRequest: mocks.createdByRequest }));
 vi.mock("@/lib/files/uploads", () => ({ finalizeUpload: vi.fn(), requestUpload: vi.fn() }));
 
 const { createArtifactWithFilesAction } = await import("./file-actions");
@@ -33,6 +35,7 @@ beforeEach(() => {
   mocks.createArtifact.mockResolvedValue({ id: "artifact-1" });
   mocks.getEditableArtifact.mockResolvedValue({ id: "artifact-1" });
   mocks.toArtifactDtos.mockResolvedValue([{ id: "artifact-1", title: "Plan" }]);
+  mocks.createdByRequest.mockResolvedValue(null);
 });
 
 describe("createArtifactWithFilesAction", () => {
@@ -61,5 +64,26 @@ describe("createArtifactWithFilesAction", () => {
     const result = await createArtifactWithFilesAction(input, ["not-an-id"]);
     expect(result.success).toBe(false);
     expect(mocks.createArtifact).not.toHaveBeenCalled();
+  });
+
+  it("should hand back the artifact the first try stored when a retry carries the same create id", async () => {
+    const sessionId = "web:0b6f6d43-8a8f-4b52-9f44-2f8c1a6d3e10";
+    mocks.createdByRequest.mockResolvedValue("artifact-1");
+    const result = await createArtifactWithFilesAction({ ...input, sessionId }, []);
+    expect(result).toMatchObject({ success: true, data: { id: "artifact-1" } });
+    expect(mocks.createdByRequest).toHaveBeenCalledWith("user-1", sessionId);
+    expect(mocks.createArtifact).not.toHaveBeenCalled();
+  });
+
+  it("should create when the create id finds nothing of this user's", async () => {
+    const sessionId = "web:0b6f6d43-8a8f-4b52-9f44-2f8c1a6d3e10";
+    await createArtifactWithFilesAction({ ...input, sessionId }, []);
+    expect(mocks.createArtifact).toHaveBeenCalledTimes(1);
+  });
+
+  it("should not look anything up when the session id is not a blank page's create id", async () => {
+    await createArtifactWithFilesAction({ ...input, sessionId: "agent-session-7" }, []);
+    expect(mocks.createdByRequest).not.toHaveBeenCalled();
+    expect(mocks.createArtifact).toHaveBeenCalledTimes(1);
   });
 });

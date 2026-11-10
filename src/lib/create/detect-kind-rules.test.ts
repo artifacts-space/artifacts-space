@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detectFileText, detectTextKind, filePlan, fileTitle, headingTitle } from "./detect-kind-rules";
+import { afterPrologue, detectFileText, detectTextKind, filePlan, fileTitle, headingTitle } from "./detect-kind-rules";
 
 const uiSpec = JSON.stringify({
   version: 1,
@@ -144,6 +144,13 @@ describe("detectTextKind", () => {
       expect(detectTextKind('\n  <?xml version="1.0"?>\n<svg viewBox="0 0 1 1"></svg>').kind).toBe("svg");
     });
 
+    it("should finish at once when a paste repeats prologue parts many times", () => {
+      const started = performance.now();
+      expect(detectTextKind(`<?xml${"?><?xml".repeat(50_000)}`).kind).toBe("markdown");
+      expect(detectTextKind(`<!--${"--><!--".repeat(50_000)}`).kind).toBe("markdown");
+      expect(performance.now() - started).toBeLessThan(1000);
+    });
+
     it("should stay markdown when the svg never closes", () => {
       expect(detectTextKind("<svg viewBox='0 0 1 1'><rect/>").kind).toBe("markdown");
     });
@@ -174,6 +181,10 @@ describe("detectTextKind", () => {
       expect(detectTextKind(`\`\`\`python\n${body}\n\`\`\`\n`).content).toBe(body);
     });
 
+    it("should detect a fenced block with Windows line breaks", () => {
+      expect(detectTextKind("```go\r\npackage main\r\n```\r\n")).toMatchObject({ kind: "code", language: "go", content: "package main" });
+    });
+
     it("should detect mermaid when a fenced block is labelled mermaid", () => {
       expect(detectTextKind("```mermaid\nflowchart TD\n  A --> B\n```")).toMatchObject({ kind: "mermaid", content: "flowchart TD\n  A --> B" });
     });
@@ -200,6 +211,17 @@ describe("headingTitle", () => {
   it("should return null when the first line is not a heading", () => {
     expect(headingTitle("Plan\n# Later")).toBeNull();
     expect(headingTitle("#hashtag")).toBeNull();
+  });
+});
+
+describe("afterPrologue", () => {
+  it("should skip a byte order mark, spaces, an xml declaration, comments, and a doctype", () => {
+    const text = '\uFEFF  <?xml version="1.0"?>\n<!-- logo --><!DOCTYPE svg>\n<svg/>';
+    expect(text.slice(afterPrologue(text))).toBe("<svg/>");
+  });
+
+  it("should stop at a part that never ends", () => {
+    expect(afterPrologue("<!-- open")).toBe(0);
   });
 });
 

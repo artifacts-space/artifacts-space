@@ -20,6 +20,9 @@ interface NewArtifactOptions {
   clearFilters: () => void;
 }
 
+/** How many artifacts made on blank pages stay in hand, so a long visit does not keep every body; older ones load when opened. */
+const keptStored = 5;
+
 /** The list with `artifact` in it: replaced where it is, or added first when it is new. */
 export function upsertListItem(list: readonly ArtifactListItemDto[], artifact: ArtifactDto): ArtifactListItemDto[] {
   const item = toArtifactListItem(artifact);
@@ -60,7 +63,7 @@ export function useNewArtifact({ setArtifacts, setSelectedId, clearFilters }: Ne
   /** A save from a blank page, possibly after it was left: the list gains or updates it; only the open page selects it. */
   const saved = useCallback((key: number, artifact: ArtifactDto) => {
     setArtifacts((current) => upsertListItem(current, artifact));
-    setStored((current) => [...current.filter((entry) => entry.id !== artifact.id), artifact]);
+    setStored((current) => [...current.filter((entry) => entry.id !== artifact.id), artifact].slice(-keptStored));
     if (sessionRef.current?.key !== key || sessionRef.current.createdId === artifact.id) return;
     sessionRef.current = { ...sessionRef.current, createdId: artifact.id };
     setSession((current) => (current?.key === key ? { ...current, createdId: artifact.id } : current));

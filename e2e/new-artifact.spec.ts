@@ -181,6 +181,44 @@ test("should make a Files artifact when a file is dropped on the blank page", as
   expect(await creates(page)).toBe(1);
 });
 
+/** Drops files onto an element, as a person dragging them from the desktop would. */
+async function dropFiles(target: ReturnType<Page["locator"]>, names: readonly string[]) {
+  await target.evaluate((element, files) => {
+    const data = new DataTransfer();
+    for (const name of files) data.items.add(new File(["%PDF-1.4"], name, { type: "application/pdf" }));
+    element.dispatchEvent(new DragEvent("drop", { dataTransfer: data, bubbles: true, cancelable: true }));
+  }, [...names]);
+}
+
+test("should add later files through the artifact's Files section once a drop made it", async ({ page }) => {
+  await openNewArtifact(page);
+  await dropFiles(body(page), ["First.pdf"]);
+  const files = page.getByRole("region", { name: "Files" });
+  await expect(files).toContainText("1 attached");
+  // The blank page's own uploader is gone: the Files section is the one place to add files now.
+  await expect(page.getByText("Drop files here, or")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Upload files" })).toHaveCount(0);
+
+  await dropFiles(files.getByText("Drop files here, or"), ["Second.pdf"]);
+  await expect(files).toContainText("2 attached");
+  await expect.poll(async () => (await storedNew(page))[0]?.files.length).toBe(2);
+  expect((await storedNew(page))[0]?.kind).toBe("file");
+  expect(await creates(page)).toBe(1);
+});
+
+test("should attach a file dropped after a title was already stored", async ({ page }) => {
+  await openNewArtifact(page);
+  await page.keyboard.type("Title first");
+  await expect(cards(page, "Title first")).toHaveCount(1);
+  await dropFiles(body(page), ["Later.pdf"]);
+  await expect(page.getByRole("region", { name: "Files" })).toContainText("1 attached");
+  await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe("file");
+  const [stored] = await storedNew(page);
+  expect(stored?.title, "the typed title stays").toBe("Title first");
+  expect(stored?.files).toHaveLength(1);
+  expect(await creates(page)).toBe(1);
+});
+
 test("should move Format and language into the More menu of a stored artifact", async ({ page }) => {
   await page.goto("/dev/workspace");
   await cards(page, "Note 2").click();

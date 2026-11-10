@@ -7,12 +7,18 @@ import { toast } from "sonner";
 import { attachFilesAction, deleteFileAction } from "@/app/(workspace)/app/file-actions";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
-import type { ArtifactDto } from "@/lib/artifact-types";
+import type { ActionResult, ArtifactDto } from "@/lib/artifact-types";
 import { formatBytes, fileTypeLabel } from "@/lib/files/config";
 import { fileUrl, type FileDto } from "@/lib/files/types";
 
 import { FileUploader } from "./file-uploader";
-import { useFileUploads } from "./use-file-uploads";
+import { useFileUploads, type SendFile } from "./use-file-uploads";
+
+/** Where the section uploads and attaches files: the server actions, or the /dev/workspace fixture's stand-in. */
+export interface AttachFilesApi {
+  send: SendFile;
+  attach: (artifactId: string, fileIds: string[]) => Promise<ActionResult<ArtifactDto>>;
+}
 
 /** One attached file: name, type and size, and open, copy-id, and remove actions. */
 function AttachedRow({ file, showId, removing, onRemove }: { file: FileDto; showId: boolean; removing: boolean; onRemove: () => void }) {
@@ -39,11 +45,13 @@ function AttachedRow({ file, showId, removing, onRemove }: { file: FileDto; show
  * that attaches each file as soon as it finishes. In a ui artifact, copy a
  * file's id into an Image or File element.
  */
-export function AttachedFiles({ artifact, onUpdated }: { artifact: ArtifactDto; onUpdated: (artifact: ArtifactDto) => void }) {
+export function AttachedFiles({ artifact, onUpdated, api }: { artifact: ArtifactDto; onUpdated: (artifact: ArtifactDto) => void; api?: AttachFilesApi | undefined }) {
   const [removing, setRemoving] = useState<string | null>(null);
+  const attach = api?.attach ?? attachFilesAction;
   const uploads = useFileUploads({
+    send: api?.send,
     onReady: (file, key) => {
-      void attachFilesAction(artifact.id, [file.id])
+      void attach(artifact.id, [file.id])
         .then((result) => {
           if (!result.success) { toast.error(result.error); return; }
           onUpdated(result.data);

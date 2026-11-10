@@ -39,5 +39,6 @@ export function useBlankEditor({ blankPage, artifact, draft, replace, onUpdated,
   useFocusTitle(titleRef, sectionRef, focusRequest ?? 0, page.blank);
   const focusBody = useCallback(() => { focusContent(body.current); }, [body]);
   const label = page.blank ? "New artifact" : `Edit ${artifact.title}`;
-  return { page: { ...page, label }, sectionRef, titleRef, dragging: first.dragging, focusBody };
+  // Files added later through the artifact's Files section go through the same store (the fixture's stand-in on /dev/workspace).
+  return { page: { ...page, label }, sectionRef, titleRef, dragging: first.dragging, focusBody, filesApi: blankPage?.api };
 }

@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { ActionResult, ArtifactDto } from "@/lib/artifact-types";
+import type { ActionResult, ArtifactDto, ArtifactInput } from "@/lib/artifact-types";
 
-import { BLANK_ARTIFACT_ID, blankDraftProblem, createInputFor, isUntouched, persistOnce, UNTITLED, type BlankDraft } from "./new-artifact-rules";
+import { BLANK_ARTIFACT_ID, blankDraftProblem, createInputFor, isUntouched, isWebCreateSessionId, persistOnce, UNTITLED, uploadStep, webCreateSessionId, type BlankDraft } from "./new-artifact-rules";
 
 const blank: BlankDraft = { title: "", icon: null, summary: "", content: "", language: "", kind: "markdown" };
+const requestId = "0b6f6d43-8a8f-4b52-9f44-2f8c1a6d3e10";
 const options = { expectedUpdatedAt: "2026-11-10T00:00:00.000Z", session: "start" as const };
 
 function stored(id: string, updatedAt = "2026-11-10T12:00:00.000Z"): ArtifactDto {
@@ -64,7 +65,7 @@ describe("persistOnce", () => {
   it("should create once when two saves arrive while the create is in flight", async () => {
     const held = heldCreate();
     const update = vi.fn(() => Promise.resolve({ success: true as const, data: stored("a-1", "2026-11-10T12:00:05.000Z") }));
-    const save = persistOnce({ current: () => ({ draft: { ...blank, title: "Plan" }, fileIds: [] }), create: held.create, update, project: null });
+    const save = persistOnce({ current: () => ({ draft: { ...blank, title: "Plan" }, fileIds: [] }), create: held.create, update, project: null, requestId });
 
     const first = save(BLANK_ARTIFACT_ID, { title: "Plan" }, options);
     const second = save(BLANK_ARTIFACT_ID, { title: "Plan B" }, options);
@@ -79,7 +80,7 @@ describe("persistOnce", () => {
   it("should save to the stored artifact when a later save still names the blank id", async () => {
     const create = vi.fn(() => Promise.resolve({ success: true as const, data: stored("a-1") }));
     const update = vi.fn(() => Promise.resolve({ success: true as const, data: stored("a-1") }));
-    const save = persistOnce({ current: () => ({ draft: { ...blank, content: "x" }, fileIds: [] }), create, update, project: null });
+    const save = persistOnce({ current: () => ({ draft: { ...blank, content: "x" }, fileIds: [] }), create, update, project: null, requestId });
 
     await save(BLANK_ARTIFACT_ID, { content: "x" }, options);
     await save(BLANK_ARTIFACT_ID, { content: "xy" }, options);
@@ -90,12 +91,22 @@ describe("persistOnce", () => {
     expect(update).toHaveBeenNthCalledWith(2, "a-1", { content: "xyz" }, options);
   });
 
+  it("should send the same create id on every try, so a retry after a lost response finds the first", async () => {
+    const create = vi.fn<(input: ArtifactInput, fileIds: string[]) => Promise<ActionResult<ArtifactDto>>>()
+      .mockResolvedValueOnce({ success: false, error: "Offline" })
+      .mockResolvedValueOnce({ success: true, data: stored("a-4") });
+    const save = persistOnce({ current: () => ({ draft: { ...blank, content: "x" }, fileIds: [] }), create, update: vi.fn(), project: null, requestId });
+    await save(BLANK_ARTIFACT_ID, { content: "x" }, options);
+    await save(BLANK_ARTIFACT_ID, { content: "x" }, options);
+    expect(create.mock.calls.map(([input]) => input.sessionId)).toEqual([webCreateSessionId(requestId), webCreateSessionId(requestId)]);
+  });
+
   it("should let a failed create be retried without having stored anything", async () => {
     const create = vi.fn<() => Promise<ActionResult<ArtifactDto>>>()
       .mockResolvedValueOnce({ success: false, error: "Too many new artifacts." })
       .mockResolvedValueOnce({ success: true, data: stored("a-2") });
     const update = vi.fn();
-    const save = persistOnce({ current: () => ({ draft: { ...blank, content: "x" }, fileIds: [] }), create, update, project: null });
+    const save = persistOnce({ current: () => ({ draft: { ...blank, content: "x" }, fileIds: [] }), create, update, project: null, requestId });
 
     await expect(save(BLANK_ARTIFACT_ID, { content: "x" }, options)).resolves.toEqual({ success: false, error: "Too many new artifacts." });
     await expect(save(BLANK_ARTIFACT_ID, { content: "x" }, options)).resolves.toMatchObject({ success: true });
@@ -105,7 +116,7 @@ describe("persistOnce", () => {
 
   it("should not create again when a save waiting on a failed create returns", async () => {
     const held = heldCreate();
-    const save = persistOnce({ current: () => ({ draft: { ...blank, content: "x" }, fileIds: [] }), create: held.create, update: vi.fn(), project: null });
+    const save = persistOnce({ current: () => ({ draft: { ...blank, content: "x" }, fileIds: [] }), create: held.create, update: vi.fn(), project: null, requestId });
     const first = save(BLANK_ARTIFACT_ID, { content: "x" }, options);
     const second = save(BLANK_ARTIFACT_ID, { content: "x" }, options);
     held.release({ success: false, error: "Offline" });
@@ -117,8 +128,51 @@ describe("persistOnce", () => {
   it("should create with the whole current draft, its files, and the project", async () => {
     const create = vi.fn(() => Promise.resolve({ success: true as const, data: stored("a-3") }));
     const draft: BlankDraft = { ...blank, title: "", kind: "file" };
-    const save = persistOnce({ current: () => ({ draft, fileIds: ["f-1", "f-2"] }), create, update: vi.fn(), project: "Launch" });
+    const save = persistOnce({ current: () => ({ draft, fileIds: ["f-1", "f-2"] }), create, update: vi.fn(), project: "Launch", requestId });
     await save(BLANK_ARTIFACT_ID, { kind: "file" }, options);
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ title: UNTITLED, kind: "file", project: "Launch" }), ["f-1", "f-2"]);
+  });
+});
+
+describe("uploadStep", () => {
+  const state = { stored: false, busy: false, readyIds: ["f-1"], attachedIds: [] as string[], handedIds: [] as string[] };
+
+  it("should do nothing when no file was dropped", () => {
+    expect(uploadStep({ ...state, readyIds: [] })).toEqual({ step: "none" });
+  });
+
+  it("should wait while any file is still uploading", () => {
+    expect(uploadStep({ ...state, busy: true })).toEqual({ step: "wait" });
+    expect(uploadStep({ ...state, readyIds: [], busy: true })).toEqual({ step: "wait" });
+  });
+
+  it("should hand the files to the create while the page is blank", () => {
+    expect(uploadStep(state)).toEqual({ step: "create", ids: ["f-1"] });
+  });
+
+  it("should wait for the create once it has the files", () => {
+    expect(uploadStep({ ...state, handedIds: ["f-1"] })).toEqual({ step: "wait" });
+  });
+
+  it("should attach files the stored artifact does not have when it was stored first", () => {
+    expect(uploadStep({ ...state, stored: true })).toEqual({ step: "attach", ids: ["f-1"] });
+  });
+
+  it("should attach a file that finished while the create was already on its way", () => {
+    expect(uploadStep({ ...state, stored: true, readyIds: ["f-1", "f-2"], attachedIds: ["f-1"], handedIds: ["f-1", "f-2"] })).toEqual({ step: "attach", ids: ["f-2"] });
+  });
+
+  it("should be done once the stored artifact has every file", () => {
+    expect(uploadStep({ ...state, stored: true, attachedIds: ["f-1"], handedIds: ["f-1"] })).toEqual({ step: "done" });
+  });
+});
+
+describe("isWebCreateSessionId", () => {
+  it("should accept the blank page's create id", () => {
+    expect(isWebCreateSessionId(webCreateSessionId(requestId))).toBe(true);
+  });
+
+  it("should refuse agent session ids and anything else", () => {
+    for (const value of [undefined, "", "claude-session-1", "web:", "web:not-a-uuid", `web:${requestId} `]) expect(isWebCreateSessionId(value)).toBe(false);
   });
 });
