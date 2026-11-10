@@ -72,14 +72,14 @@ interface BlankPageFilesProps {
 }
 
 /** The blank page's files section, when the page is a new artifact and there is something to show. */
-export function BlankPageFilesSlot({ page, dragging }: { page: { active: boolean; blank: boolean; eligible: boolean; filesProblem: string | null; uploads: { items: readonly UploadItem[]; remove: (key: string) => void }; onContent: (content: { files: File[] }) => void }; dragging: boolean }) {
-  const { active, eligible, filesProblem, uploads, onContent } = page;
+export function BlankPageFilesSlot({ page, dragging }: { page: { active: boolean; blank: boolean; eligible: boolean; filesProblem: string | null; uploads: { items: readonly UploadItem[] }; removeUpload: (key: string) => void; onContent: (content: { files: File[] }) => void }; dragging: boolean }) {
+  const { active, eligible, filesProblem, uploads, removeUpload, onContent } = page;
   if (!active || (!eligible && uploads.items.length === 0 && !filesProblem)) return null;
   return (
     <BlankPageFiles
       items={uploads.items}
       onFiles={(files) => { onContent({ files }); }}
-      onRemove={(key) => { uploads.remove(key); }}
+      onRemove={removeUpload}
       showUpload={eligible}
       dropBox={page.blank}
       dragging={dragging}

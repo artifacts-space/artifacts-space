@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ActionResult, ArtifactDto, ArtifactInput } from "@/lib/artifact-types";
 
-import { BLANK_ARTIFACT_ID, blankDraftProblem, contentRoute, createInputFor, isUntouched, isWebCreateSessionId, persistOnce, UNTITLED, uploadStep, webCreateSessionId, type BlankDraft } from "./new-artifact-rules";
+import { BLANK_ARTIFACT_ID, blankDraftProblem, contentRoute, createInputFor, filesForCreate, isUntouched, leavesPasteToEditor, persistOnce, UNTITLED, uploadStep, uploadsToDiscard, type BlankDraft } from "./new-artifact-rules";
 
 const blank: BlankDraft = { title: "", icon: null, summary: "", content: "", language: "", kind: "markdown" };
 const requestId = "0b6f6d43-8a8f-4b52-9f44-2f8c1a6d3e10";
@@ -92,13 +92,14 @@ describe("persistOnce", () => {
   });
 
   it("should send the same create id on every try, so a retry after a lost response finds the first", async () => {
-    const create = vi.fn<(input: ArtifactInput, fileIds: string[]) => Promise<ActionResult<ArtifactDto>>>()
+    const create = vi.fn<(input: ArtifactInput, fileIds: string[], requestId: string) => Promise<ActionResult<ArtifactDto>>>()
       .mockResolvedValueOnce({ success: false, error: "Offline" })
       .mockResolvedValueOnce({ success: true, data: stored("a-4") });
     const save = persistOnce({ current: () => ({ draft: { ...blank, content: "x" }, fileIds: [] }), create, update: vi.fn(), project: null, requestId });
     await save(BLANK_ARTIFACT_ID, { content: "x" }, options);
     await save(BLANK_ARTIFACT_ID, { content: "x" }, options);
-    expect(create.mock.calls.map(([input]) => input.sessionId)).toEqual([webCreateSessionId(requestId), webCreateSessionId(requestId)]);
+    expect(create.mock.calls.map(([, , id]) => id)).toEqual([requestId, requestId]);
+    expect(create.mock.calls.map(([input]) => input.sessionId), "the create id never rides in the agent's session id").toEqual([undefined, undefined]);
   });
 
   it("should let a failed create be retried without having stored anything", async () => {
@@ -130,7 +131,7 @@ describe("persistOnce", () => {
     const draft: BlankDraft = { ...blank, title: "", kind: "file" };
     const save = persistOnce({ current: () => ({ draft, fileIds: ["f-1", "f-2"] }), create, update: vi.fn(), project: "Launch", requestId });
     await save(BLANK_ARTIFACT_ID, { kind: "file" }, options);
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({ title: UNTITLED, kind: "file", project: "Launch" }), ["f-1", "f-2"]);
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ title: UNTITLED, kind: "file", project: "Launch" }), ["f-1", "f-2"], requestId);
   });
 });
 
@@ -168,16 +169,6 @@ describe("uploadStep", () => {
 
   it("should be done once the stored artifact has every file", () => {
     expect(uploadStep({ ...state, stored: true, attachedIds: ["f-1"], handedIds: ["f-1"] })).toEqual({ step: "done" });
-  });
-});
-
-describe("isWebCreateSessionId", () => {
-  it("should accept the blank page's create id", () => {
-    expect(isWebCreateSessionId(webCreateSessionId(requestId))).toBe(true);
-  });
-
-  it("should refuse agent session ids and anything else", () => {
-    for (const value of [undefined, "", "claude-session-1", "web:", "web:not-a-uuid", `web:${requestId} `]) expect(isWebCreateSessionId(value)).toBe(false);
   });
 });
 
@@ -219,5 +210,56 @@ describe("uploadStep for a page with content", () => {
 
   it("should attach the files when the page with writing is already stored", () => {
     expect(uploadStep({ stored: true, busy: false, readyIds: ["f-1"], attachedIds: [], handedIds: [] })).toEqual({ step: "attach", ids: ["f-1"] });
+  });
+});
+
+describe("filesForCreate", () => {
+  it("should leave out a handed file that was removed before the create", () => {
+    expect(filesForCreate(["f-1", "f-2"], ["f-2"])).toEqual(["f-2"]);
+  });
+
+  it("should carry nothing when every handed file was removed", () => {
+    expect(filesForCreate(["f-1"], [])).toEqual([]);
+  });
+});
+
+describe("uploadsToDiscard", () => {
+  const base = { readyIds: ["f-1", "f-2", "f-3"], attachedIds: [] as string[], handedIds: [] as string[], holdIds: [] as string[], create: "none" as const };
+
+  it("should delete finished uploads that reached no artifact when the page goes", () => {
+    expect(uploadsToDiscard(base)).toEqual(["f-1", "f-2", "f-3"]);
+  });
+
+  it("should never delete a file the artifact has", () => {
+    expect(uploadsToDiscard({ ...base, attachedIds: ["f-1"], create: "stored" })).toEqual(["f-2", "f-3"]);
+  });
+
+  it("should never delete a file whose attach is on its way or whose answer was lost", () => {
+    expect(uploadsToDiscard({ ...base, holdIds: ["f-2"], create: "stored" })).toEqual(["f-1", "f-3"]);
+  });
+
+  it("should keep files handed to a create that is on its way, has an unknown outcome, or stored them", () => {
+    for (const create of ["none", "inFlight", "unknown", "stored"] as const) {
+      expect(uploadsToDiscard({ ...base, handedIds: ["f-1"], create })).toEqual(["f-2", "f-3"]);
+    }
+  });
+
+  it("should delete files handed to a create that was refused", () => {
+    expect(uploadsToDiscard({ ...base, handedIds: ["f-1"], create: "failed" })).toEqual(["f-1", "f-2", "f-3"]);
+  });
+});
+
+describe("leavesPasteToEditor", () => {
+  it("should leave a rich paste of writing to the editor so headings, links, bold, and lists survive", () => {
+    expect(leavesPasteToEditor("Plan\nRead the docs", true)).toBe(true);
+  });
+
+  it("should still read a paste whose text is data, even when it carries HTML", () => {
+    expect(leavesPasteToEditor("name,value\nAda,1\nBo,2", true)).toBe(false);
+    expect(leavesPasteToEditor('{ "a": 1 }', true)).toBe(false);
+  });
+
+  it("should read a plain-text paste itself", () => {
+    expect(leavesPasteToEditor("Plan\nRead the docs", false)).toBe(false);
   });
 });

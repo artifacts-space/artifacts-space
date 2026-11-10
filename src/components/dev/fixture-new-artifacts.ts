@@ -2,6 +2,7 @@ import { updateArtifactAction } from "@/app/(workspace)/app/actions";
 import type { NewArtifactApi } from "@/components/app/new-artifact/new-artifact-api";
 import { validateArtifactContent } from "@/lib/artifact-content";
 import type { ActionResult, ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
+import { unusableFilesForPeople } from "@/lib/files/person-messages";
 import type { FileDto } from "@/lib/files/types";
 
 import { fixtureArtifact } from "./fixture-content";
@@ -15,31 +16,46 @@ import { fixtureArtifact } from "./fixture-content";
 
 const artifactsKey = "fixture:new-artifacts";
 const createsKey = "fixture:new-artifact-creates";
-/** Set to "1" by a test to make the next create fail, as a lost connection or a rate limit would. */
+/** Set by a test to refuse creates, as a rate limit would: "1" for the next one, "always" for every one. */
 const failNextKey = "fixture:fail-next-create";
-
 /** Set to "1" by a test to hold every upload until it dispatches `fixture:release-uploads` on window, so it can act while files are on their way. */
 const holdUploadsKey = "fixture:hold-uploads";
+/** Set to "1" by a test to hold attaches until it dispatches `fixture:release-attach`. */
+const holdAttachKey = "fixture:hold-attach";
+/** Set by a test for the next attach: "refuse" answers no; "lose" attaches the files and then loses the answer. */
+const nextAttachKey = "fixture:next-attach";
+/** The uploads deleted so far, so a test can check that none it kept was deleted. */
+const discardedKey = "fixture:discarded";
 
-/** Resolves at once, or when the test releases held uploads. */
-function uploadGate(): Promise<void> {
-  let held = false;
+function readFlag(key: string): string | null {
   try {
-    held = window.sessionStorage.getItem(holdUploadsKey) === "1";
+    return window.sessionStorage.getItem(key);
   } catch {
-    held = false;
+    return null;
   }
-  if (!held) return Promise.resolve();
-  return new Promise((resolve) => { window.addEventListener("fixture:release-uploads", () => { resolve(); }, { once: true }); });
 }
 
-function takeFailure(): boolean {
+/** Resolves at once, or when the test dispatches `release` on window while `key` is set. */
+function gate(key: string, release: string): Promise<void> {
+  if (readFlag(key) !== "1") return Promise.resolve();
+  return new Promise((resolve) => { window.addEventListener(release, () => { resolve(); }, { once: true }); });
+}
+
+/** Reads a one-time flag and clears it. */
+function takeFlag(key: string): string | null {
+  const value = readFlag(key);
+  if (value !== null && value !== "always") window.sessionStorage.removeItem(key);
+  return value;
+}
+
+function recordDiscard(fileId: string) {
   try {
-    if (window.sessionStorage.getItem(failNextKey) !== "1") return false;
-    window.sessionStorage.removeItem(failNextKey);
-    return true;
+    const raw = window.sessionStorage.getItem(discardedKey);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    const list = Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+    window.sessionStorage.setItem(discardedKey, JSON.stringify([...list, fileId]));
   } catch {
-    return false;
+    // Storage is off: the record is for tests only.
   }
 }
 
@@ -88,19 +104,32 @@ function save(next: ArtifactDto): ActionResult<ArtifactDto> {
   return { success: true, data: next };
 }
 
+/** Creates already stored in this tab, by create id. */
+const createdByRequest = new Map<string, string>();
+
+/** Every file some stored new artifact has. */
+function attachedIds(): Set<string> {
+  return new Set(readStored().flatMap((entry) => entry.files.map((file) => file.id)));
+}
+
 /** The fixture's NewArtifactApi. */
 export const fixtureNewArtifactApi: NewArtifactApi = {
-  create: (input, fileIds) => {
+  create: (input, fileIds, requestId) => {
+    const earlier = readStored().find((entry) => entry.id === createdByRequest.get(requestId));
+    if (earlier) return Promise.resolve({ success: true, data: earlier });
     const kind = input.kind ?? "markdown";
     const problem = contentProblem(kind, input.content, true);
     if (problem) return Promise.resolve({ success: false, error: problem });
-    if (takeFailure()) return Promise.resolve({ success: false, error: "You have made a lot of artifacts in a short time. Try again in a minute." });
+    // As the server does (assertUsableFiles): a file that is gone, or in another artifact, refuses the create.
+    if (fileIds.some((fileId) => !uploaded.has(fileId) || attachedIds().has(fileId))) return Promise.resolve({ success: false, error: unusableFilesForPeople });
+    if (takeFlag(failNextKey) !== null) return Promise.resolve({ success: false, error: "You have made a lot of artifacts in a short time. Try again in a minute." });
     countCreate();
     created += 1;
     const now = new Date().toISOString();
     const id = `fixture-new-${String(Date.now())}-${String(created)}`;
     const base = fixtureArtifact({ id, kind, title: input.title, content: input.content, publicId: `fixturenew${String(Date.now()).slice(-10)}${String(created).padStart(2, "0")}`, updatedAt: now });
     const files = fileIds.flatMap((fileId) => uploaded.get(fileId) ?? []);
+    createdByRequest.set(requestId, id);
     return Promise.resolve(save({ ...base, summary: input.summary ?? "", language: input.language ?? "", icon: input.icon ?? null, files }));
   },
   update: (id, changes, options) => {
@@ -114,21 +143,29 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     return Promise.resolve(save(next));
   },
   send: async (file, report) => {
-    await uploadGate();
+    await gate(holdUploadsKey, "fixture:release-uploads");
     report.progress(100);
     report.checking();
     const dto: FileDto = { id: crypto.randomUUID(), filename: file.name, contentType: file.type || "application/octet-stream", size: file.size, createdAt: new Date().toISOString() };
     uploaded.set(dto.id, dto);
     return { success: true, data: dto };
   },
-  attach: (artifactId, fileIds) => {
+  attach: async (artifactId, fileIds) => {
+    await gate(holdAttachKey, "fixture:release-attach");
+    const next = takeFlag(nextAttachKey);
+    if (next === "refuse") return { success: false, error: "The files could not be added. Try again." };
     const current = readStored().find((entry) => entry.id === artifactId);
-    if (!current) return Promise.resolve({ success: false, error: "Artifact not found." });
+    if (!current) return { success: false, error: "Artifact not found." };
     const files = [...current.files, ...fileIds.flatMap((fileId) => uploaded.get(fileId) ?? [])];
-    return Promise.resolve(save({ ...current, files, updatedAt: new Date().toISOString() }));
+    const result = save({ ...current, files, updatedAt: new Date().toISOString() });
+    if (next === "lose") throw new Error("The answer was lost.");
+    return result;
   },
   discard: (fileId) => {
+    // As the server does (discardUnattachedUpload): a file already in an artifact stays.
+    if (attachedIds().has(fileId)) return Promise.resolve();
     uploaded.delete(fileId);
+    recordDiscard(fileId);
     return Promise.resolve();
   },
 };

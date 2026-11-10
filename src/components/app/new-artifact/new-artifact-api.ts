@@ -1,5 +1,5 @@
 import { updateArtifactAction } from "@/app/(workspace)/app/actions";
-import { attachFilesAction, createArtifactWithFilesAction, deleteFileAction } from "@/app/(workspace)/app/file-actions";
+import { attachFilesAction, createArtifactWithFilesAction, discardUploadAction } from "@/app/(workspace)/app/file-actions";
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import { sendToServer, type SendFile } from "@/components/files/use-file-uploads";
 import type { ActionResult, ArtifactDto, ArtifactInput } from "@/lib/artifact-types";
@@ -10,23 +10,23 @@ import type { ActionResult, ArtifactDto, ArtifactInput } from "@/lib/artifact-ty
  * the /dev/workspace fixture's stand-in, which needs no database.
  */
 export interface NewArtifactApi {
-  /** Creates the artifact once, with any dropped files attached. */
-  create: (input: ArtifactInput, fileIds: string[]) => Promise<ActionResult<ArtifactDto>>;
+  /** Creates the artifact once per `requestId` (one per blank page), with any dropped files attached. */
+  create: (input: ArtifactInput, fileIds: string[], requestId: string) => Promise<ActionResult<ArtifactDto>>;
   /** Every save after the create. */
   update: SaveArtifact;
   /** Uploads one dropped or picked file. */
   send: SendFile;
   /** Attaches finished uploads to the artifact once it is stored (files dropped after a title was typed). */
   attach: (artifactId: string, fileIds: string[]) => Promise<ActionResult<ArtifactDto>>;
-  /** Deletes an upload that never reached an artifact. */
+  /** Deletes an upload that never reached an artifact; one already in an artifact is left alone. */
   discard: (fileId: string) => Promise<unknown>;
 }
 
 /** The server actions behind the blank page. */
 export const serverNewArtifactApi: NewArtifactApi = {
-  create: (input, fileIds) => createArtifactWithFilesAction(input, fileIds),
+  create: (input, fileIds, requestId) => createArtifactWithFilesAction(input, fileIds, requestId),
   update: (id, changes, options) => updateArtifactAction(id, changes, options),
   send: sendToServer,
   attach: (artifactId, fileIds) => attachFilesAction(artifactId, fileIds),
-  discard: (fileId) => deleteFileAction(fileId),
+  discard: (fileId) => discardUploadAction(fileId),
 };

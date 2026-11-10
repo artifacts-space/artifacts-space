@@ -8,7 +8,7 @@ import { detectFileText, detectTextKind, filePlan, type Detection } from "@/lib/
 import { BLANK_ARTIFACT_ID, blankDraftProblem, contentRoute, isUntouched, persistOnce, takesFirstContent, type PageForContent } from "@/lib/create/new-artifact-rules";
 
 import type { NewArtifactApi } from "./new-artifact-api";
-import { useBlankUploads } from "./use-blank-uploads";
+import { useBlankUploads, type CreateTracker } from "./use-blank-uploads";
 import type { FirstContent } from "./use-first-content";
 
 /** Set on the editor when it shows a new artifact that may not be stored yet. */
@@ -57,18 +57,41 @@ function stillDetected(detected: DetectedFormat | null, draft: ArtifactDraft): D
   return detected?.content === draft.content && detected.kind === draft.kind ? detected : null;
 }
 
+/**
+ * The page's create, keeping `tracker` up to date: what may be deleted when
+ * the page goes depends on it (uploadsToDiscard). A create refused after the
+ * page is gone (the editor's last save) deletes the files it carried, since
+ * nothing will try again; a lost answer keeps them for the cleanup job.
+ */
+function trackedCreate(api: NewArtifactApi, tracker: CreateTracker): NewArtifactApi["create"] {
+  return (input, fileIds, requestId) => {
+    tracker.set("inFlight");
+    return api.create(input, fileIds, requestId).then(
+      (result) => {
+        tracker.set(result.success ? "stored" : "failed");
+        if (!result.success && !tracker.read().mounted) for (const id of fileIds) void api.discard(id).catch(() => undefined);
+        return result;
+      },
+      (error: unknown) => {
+        tracker.set("unknown");
+        throw error;
+      },
+    );
+  };
+}
+
 /** The editor's save for a blank page: created once (persistOnce), then ordinary saves. Built on first use. */
-function useCreateOnceSave(api: NewArtifactApi | undefined, project: string | null, current: () => { draft: ArtifactDraft; fileIds: readonly string[] }) {
+function useCreateOnceSave(api: NewArtifactApi | undefined, project: string | null, current: () => { draft: ArtifactDraft; fileIds: readonly string[] }, tracker: CreateTracker) {
   const saverRef = useRef<SaveArtifact | null>(null);
-  // One create id per blank page, so a retry after a lost response is the same create (webCreateSessionId).
+  // One create id per blank page, so a retry after a lost response is the same create (artifact.create_request_id).
   const [requestId] = useState(() => crypto.randomUUID());
   const currentRef = useRef(current);
   useEffect(() => { currentRef.current = current; }, [current]);
   const persist = useCallback<SaveArtifact>((id, changes, saveOptions) => {
     if (!api) return Promise.resolve({ success: false, error: "Nothing to save." });
-    saverRef.current ??= persistOnce({ current: () => currentRef.current(), create: api.create, update: api.update, project, requestId });
+    saverRef.current ??= persistOnce({ current: () => currentRef.current(), create: trackedCreate(api, tracker), update: api.update, project, requestId });
     return saverRef.current(id, changes, saveOptions);
-  }, [api, project, requestId]);
+  }, [api, project, requestId, tracker]);
   return api ? persist : undefined;
 }
 
@@ -87,12 +110,12 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
   useEffect(() => { draftRef.current = draft; }, [draft]);
 
   const active = options !== undefined;
-  const { uploads, fileIdsRef, problem: uploadProblem } = useBlankUploads({ options, artifact, draftRef, replace, onUpdated });
-  const current = useCallback(() => ({ draft: draftRef.current, fileIds: fileIdsRef.current }), [fileIdsRef]);
-  const save = useCreateOnceSave(options?.api, options?.project ?? null, current);
+  const { uploads, fileIdsForCreate, removeUpload, problem: uploadProblem, tracker } = useBlankUploads({ options, artifact, draftRef, replace, onUpdated });
+  const current = useCallback(() => ({ draft: draftRef.current, fileIds: fileIdsForCreate() }), [fileIdsForCreate]);
+  const save = useCreateOnceSave(options?.api, options?.project ?? null, current, tracker);
 
   const problem = useCallback((current: ArtifactDraft, base: ArtifactDraft) => (blank ? blankDraftProblem(current, draftProblem) : draftProblem(current, base)), [blank]);
-  const idle = useCallback((current: ArtifactDraft) => blank && isUntouched(current, fileIdsRef.current), [blank, fileIdsRef]);
+  const idle = useCallback((current: ArtifactDraft) => blank && isUntouched(current, fileIdsForCreate()), [blank, fileIdsForCreate]);
 
   // Created with no title: the draft takes the stored "Untitled", so the next save does not send an empty title.
   const stored = active && !blank;
@@ -141,6 +164,7 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
     eligible,
     takesFiles: active,
     uploads,
+    removeUpload,
     filesProblem: uploadProblem,
     detected: stillDetected(detected, draft),
     dismissDetected,

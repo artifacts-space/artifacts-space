@@ -35,7 +35,7 @@ export function actionErrorMessage(error: unknown, fallback: string) {
   // A redirect or notFound() thrown inside the action is Next's control flow, never a failure to show.
   unstable_rethrow(error);
   if (error instanceof ZodError) return error.issues[0]?.message ?? fallback;
-  if (error instanceof UserFacingError) return error.message;
+  if (error instanceof UserFacingError) return error.personMessage ?? error.message;
   if (isLastOwnerRefusal(error)) return lastOwnerMessage;
   if (isAPIError(error) && error.message) return teamWording(error.message);
   return fallback;

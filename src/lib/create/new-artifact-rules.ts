@@ -1,5 +1,7 @@
 import type { ActionResult, ArtifactDto, ArtifactInput, ArtifactKind, SaveArtifactResult } from "@/lib/artifact-types";
 
+import { detectTextKind } from "./detect-kind-rules";
+
 /**
  * Rules for the blank page that New artifact opens. Nothing is stored until
  * the person puts something in it; then it is created once, through the
@@ -39,27 +41,9 @@ export function blankDraftProblem<T extends BlankDraft>(draft: T, check: (draft:
   return check({ ...draft, title: draft.title.trim() || UNTITLED });
 }
 
-const webCreatePrefix = "web:";
-const webCreateSession = /^web:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-/**
- * The session id a blank page's create carries: "web:" and a random id the
- * page picks once. A retry after a lost response carries the same one, so the
- * server hands back the artifact the first try stored instead of a second.
- */
-export function webCreateSessionId(requestId: string): string {
-  return `${webCreatePrefix}${requestId}`;
-}
-
-/** True for a session id a blank page's create sends (webCreateSessionId). */
-export function isWebCreateSessionId(sessionId: string | undefined): sessionId is string {
-  return sessionId !== undefined && webCreateSession.test(sessionId);
-}
-
-/** The create input for the blank page: the draft, the title or "Untitled", the project the list is filtered to, and the page's create id. */
-export function createInputFor(draft: BlankDraft, project: string | null, requestId?: string): ArtifactInput {
+/** The create input for the blank page: the draft, the title or "Untitled", and the project the list is filtered to. */
+export function createInputFor(draft: BlankDraft, project: string | null): ArtifactInput {
   return {
-    ...(requestId ? { sessionId: webCreateSessionId(requestId) } : {}),
     title: draft.title.trim() || UNTITLED,
     icon: draft.icon,
     summary: draft.summary,
@@ -76,11 +60,12 @@ export type SaveCall = (id: string, changes: Partial<BlankDraft>, options: { exp
 interface PersistOnceOptions {
   /** Reads the whole draft and the files to attach at the moment of creating. */
   current: () => { draft: BlankDraft; fileIds: readonly string[] };
-  create: (input: ArtifactInput, fileIds: string[]) => Promise<ActionResult<ArtifactDto>>;
+  /** Stores the artifact; `requestId` makes every try of one page's create the same create. */
+  create: (input: ArtifactInput, fileIds: string[], requestId: string) => Promise<ActionResult<ArtifactDto>>;
   update: SaveCall;
   /** The project the new artifact goes into, or null. */
   project: string | null;
-  /** Picked once per blank page, so every try of its create is the same create (webCreateSessionId). */
+  /** Picked once per blank page, so every try of its create is the same create (artifact.create_request_id). */
   requestId: string;
 }
 
@@ -98,7 +83,7 @@ export function persistOnce({ current, create, update, project, requestId }: Per
 
   const runCreate = async (): Promise<SaveArtifactResult> => {
     const { draft, fileIds } = current();
-    const result = await create(createInputFor(draft, project, requestId), [...fileIds]);
+    const result = await create(createInputFor(draft, project), [...fileIds], requestId);
     if (result.success) created = result.data;
     return result;
   };
@@ -187,4 +172,48 @@ export type ContentRoute = "first" | "upload" | "ignore";
 export function contentRoute(isText: boolean, page: PageForContent): ContentRoute {
   if (takesFirstContent(page)) return "first";
   return !isText && page.active ? "upload" : "ignore";
+}
+
+/** The files a blank page's create carries: those handed to it that are still on the page (not removed), in the order they came. */
+export function filesForCreate(handedIds: readonly string[], readyIds: readonly string[]): string[] {
+  const ready = new Set(readyIds);
+  return handedIds.filter((id) => ready.has(id));
+}
+
+/** Where the blank page's create stands, for what may be deleted when the page goes. */
+export type CreateState = "none" | "inFlight" | "stored" | "failed" | "unknown";
+
+interface DiscardState {
+  /** Finished uploads still on the page. */
+  readyIds: readonly string[];
+  /** Files the stored artifact has. */
+  attachedIds: readonly string[];
+  /** Files handed to the create. */
+  handedIds: readonly string[];
+  /** Files whose attach is on its way, or whose answer was lost: they may be in the artifact. */
+  holdIds: readonly string[];
+  create: CreateState;
+}
+
+/**
+ * The uploads to delete when the blank page goes: finished files that reached
+ * no artifact. Never one the artifact has, one whose attach is on its way or
+ * has an unknown outcome, and never one handed to a create unless that create
+ * was refused (a known failure). Anything unsure is left to the cleanup job,
+ * so a lost answer never turns into deleting a file someone kept.
+ */
+export function uploadsToDiscard({ readyIds, attachedIds, handedIds, holdIds, create }: DiscardState): string[] {
+  const keep = new Set([...attachedIds, ...holdIds, ...(create === "failed" ? [] : handedIds)]);
+  return readyIds.filter((id) => !keep.has(id));
+}
+
+/**
+ * True when a paste into the empty body is the rich editor's to handle: it
+ * carries HTML (copied from a page or a document) and its text would stay
+ * Markdown anyway. The editor turns the HTML into headings, links, bold, and
+ * lists (markdown-paste.ts); reading only the plain text would lose them.
+ * JSON, CSV, SVG, code, and diagrams are still read from the plain text.
+ */
+export function leavesPasteToEditor(plainText: string, hasHtml: boolean): boolean {
+  return hasHtml && detectTextKind(plainText).kind === "markdown";
 }
