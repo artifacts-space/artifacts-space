@@ -85,6 +85,20 @@ export function parseFileMediaUrl(url: string): FileMediaTarget | null {
   return { fileId: fileId.toLowerCase(), kind: options.kind ?? "image", width: options.width };
 }
 
+/**
+ * How to show the file a Markdown media URL names: the kind its fragment
+ * names, or, when it names none, the kind the file's type calls for, so
+ * `![clip](/api/files/<id>)` for a video plays instead of drawing a broken
+ * image. Null when `url` is not a media URL.
+ */
+export function shownMediaKind(url: string, contentType: string | null | undefined): MediaKind | null {
+  const target = parseFileMediaUrl(url);
+  if (!target) return null;
+  const fragment = url.trim().split("#")[1] ?? "";
+  if (fragment.split("&").some(isMediaKind) || !contentType) return target.kind;
+  return mediaKindForType(contentType);
+}
+
 /** True when `url` is a Markdown media URL for an uploaded file. */
 export function isFileMediaUrl(url: string): boolean {
   return parseFileMediaUrl(url) !== null;
@@ -134,10 +148,75 @@ export function hasAdjustableWidth(kind: MediaKind): boolean {
   return kind === "image" || kind === "video";
 }
 
+const fenceOpen = /^ {0,3}(`{3,}|~{3,})/;
+const fenceClose = /^ {0,3}(`{3,}|~{3,})[ \t]*\r?\n?$/;
+const inlineCode = /(`+)[\s\S]*?[^`]\1(?!`)/g;
+
+/** Runs `rewrite` on one line's text outside its inline code spans. */
+function outsideInlineCode(line: string, rewrite: (text: string, lineStart: boolean) => string): string {
+  let out = "";
+  let last = 0;
+  for (const match of line.matchAll(inlineCode)) {
+    out += rewrite(line.slice(last, match.index), last === 0) + match[0];
+    last = match.index + match[0].length;
+  }
+  return out + rewrite(line.slice(last), last === 0);
+}
+
 /**
- * Makes `/api/files/<id>` link and image targets absolute, for the Markdown
- * version, which is read outside the site. Only link targets change.
+ * Runs `rewrite` on the Markdown's text outside fenced code blocks and
+ * inline code, so a code sample that shows a file path stays exactly as
+ * written. `lineStart` says the text starts its line, where a reference
+ * definition can begin.
+ */
+function rewriteOutsideCode(markdown: string, rewrite: (text: string, lineStart: boolean) => string): string {
+  let fence: string | null = null;
+  return markdown
+    .split(/(?<=\n)/)
+    .map((line) => {
+      if (fence !== null) {
+        const close = fenceClose.exec(line)?.[1];
+        if (close?.startsWith(fence.charAt(0)) === true && close.length >= fence.length) fence = null;
+        return line;
+      }
+      const open = fenceOpen.exec(line)?.[1];
+      if (open) {
+        fence = open;
+        return line;
+      }
+      return outsideInlineCode(line, rewrite);
+    })
+    .join("");
+}
+
+/** Rewrites the start of every link, image, and reference-definition target that `from` matches. */
+function rewriteFileTargets(markdown: string, from: string, to: string): string {
+  const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const inline = new RegExp(`(\\]\\(\\s*<?)${escaped}`, "giu");
+  const definition = new RegExp(`^( {0,3}\\[[^\\]]+\\]:[ \\t]*<?)${escaped}`, "iu");
+  return rewriteOutsideCode(markdown, (text, lineStart) => {
+    const linked = text.replace(inline, `$1${to}`);
+    return lineStart ? linked.replace(definition, `$1${to}`) : linked;
+  });
+}
+
+/**
+ * Makes `/api/files/<id>` link, image, and reference-definition targets
+ * absolute, for the Markdown version, which is read outside the site. Only
+ * targets change; code blocks and inline code stay as written.
  */
 export function absoluteFileLinks(markdown: string, origin: string): string {
-  return markdown.replace(/(\]\(\s*<?)\/api\/files\//g, `$1${origin.replace(/\/+$/, "")}${FILE_PATH_PREFIX}`);
+  return rewriteFileTargets(markdown, FILE_PATH_PREFIX, `${origin.replace(/\/+$/, "")}${FILE_PATH_PREFIX}`);
+}
+
+/**
+ * The reverse of absoluteFileLinks, for saves: targets that name this
+ * site's own files absolutely (`https://<site>/api/files/<id>`, as an agent
+ * re-saving the Markdown version sends them) go back to the relative form
+ * the editor and read view show as media. Other origins stay as written.
+ */
+export function relativeFileLinks(markdown: string, origin: string): string {
+  const site = origin.replace(/\/+$/, "");
+  if (!site || !markdown.toLowerCase().includes(`${site.toLowerCase()}${FILE_PATH_PREFIX}`)) return markdown;
+  return rewriteFileTargets(markdown, `${site}${FILE_PATH_PREFIX}`, FILE_PATH_PREFIX);
 }

@@ -37,6 +37,13 @@ describe("Markdown media in the read view", () => {
     expect(html).toContain(`href="/api/files/${report}?download=1"`);
   });
 
+  it("should play a video and frame a PDF by their file type when the link names no kind", () => {
+    const html = render(`![Demo](/api/files/${video})\n\n![Report](/api/files/${report}#width=60)\n`);
+    expect(html).toContain(`<video src="/api/files/${video}"`);
+    expect(html).toContain(`<iframe src="/api/files/${report}"`);
+    expect(html).not.toContain(`<img src="/api/files/${video}"`);
+  });
+
   it("should show a download card when the kind is file", () => {
     const html = render(`![Q3 report](/api/files/${report}#file)\n`);
     expect(html).toContain("Q3 report");

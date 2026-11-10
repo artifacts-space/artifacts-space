@@ -1,6 +1,6 @@
 "use client";
 
-import { parseFileMediaUrl } from "@/lib/files/media-rules";
+import { parseFileMediaUrl, shownMediaKind } from "@/lib/files/media-rules";
 
 import { useArtifactFile } from "./files-context";
 import { MediaBlock, MediaNotice } from "./media-block";
@@ -16,8 +16,10 @@ export function MarkdownMedia({ src, alt, title }: { src: string; alt: string; t
   const target = parseFileMediaUrl(src);
   const view = useArtifactFile(target?.fileId ?? "");
   if (!target) return null;
-  if (!view.attached) return <MediaNotice kind={target.kind}>{alt ? `“${alt}” is not available.` : "This file is not available."}</MediaNotice>;
-  return <MediaBlock kind={target.kind} url={view.url} downloadUrl={view.downloadUrl} alt={alt} caption={title} width={target.width} file={view.file} />;
+  // A link without a kind (`![clip](/api/files/<id>)`) shows as its file's type does: a video plays, a PDF opens.
+  const kind = shownMediaKind(src, view.file?.contentType) ?? target.kind;
+  if (!view.attached) return <MediaNotice kind={kind}>{alt ? `“${alt}” is not available.` : "This file is not available."}</MediaNotice>;
+  return <MediaBlock kind={kind} url={view.url} downloadUrl={view.downloadUrl} alt={alt} caption={title} width={target.width} file={view.file} />;
 }
 
 /** An uploaded image that shares its paragraph with text: drawn in the text, through the same access-checked route. */

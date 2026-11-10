@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { absoluteFileLinks, clampMediaWidth, fileMediaUrl, hasAdjustableWidth, isFileLinkPath, isFileMediaUrl, markdownFileRefs, mediaKindForType, parseFileMediaUrl } from "./media-rules";
+import { absoluteFileLinks, relativeFileLinks, shownMediaKind, clampMediaWidth, fileMediaUrl, hasAdjustableWidth, isFileLinkPath, isFileMediaUrl, markdownFileRefs, mediaKindForType, parseFileMediaUrl } from "./media-rules";
 
 const id = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const other = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
@@ -113,5 +113,55 @@ describe("absoluteFileLinks", () => {
     expect(absoluteFileLinks(markdown, "https://artifacts.space/")).toBe(
       `![a](https://artifacts.space/api/files/${id}#width=50 "c") and [b](<https://artifacts.space/api/files/${other}>) and \`/api/files/${id}\``,
     );
+  });
+
+  it("should leave code samples as written when they show file links", () => {
+    const markdown = [
+      "```md",
+      `![a](/api/files/${id})`,
+      "```",
+      `Use \`![a](/api/files/${id})\` or \`\`[b](/api/files/${other})\`\`.`,
+      "~~~~",
+      `[c](/api/files/${other})`,
+      "~~~",
+      "~~~~",
+      `[d](/api/files/${id})`,
+    ].join("\n");
+    const expected = markdown.replace(`[d](/api/files/${id})`, `[d](https://artifacts.space/api/files/${id})`);
+    expect(absoluteFileLinks(markdown, "https://artifacts.space")).toBe(expected);
+  });
+
+  it("should point reference-style definitions at the site", () => {
+    const markdown = `See [the report][r] and ![chart][c].\n\n[r]: /api/files/${id}?download=1\n  [c]: </api/files/${other}#width=50> "Chart"`;
+    expect(absoluteFileLinks(markdown, "https://artifacts.space")).toBe(
+      `See [the report][r] and ![chart][c].\n\n[r]: https://artifacts.space/api/files/${id}?download=1\n  [c]: <https://artifacts.space/api/files/${other}#width=50> "Chart"`,
+    );
+  });
+});
+
+describe("relativeFileLinks", () => {
+  it("should turn this site's absolute file links back into the relative form when a save sends them", () => {
+    const absolute = absoluteFileLinks(`![a](/api/files/${id}#video)\n\n[r]: /api/files/${other}`, "https://artifacts.space");
+    expect(relativeFileLinks(absolute, "https://artifacts.space/")).toBe(`![a](/api/files/${id}#video)\n\n[r]: /api/files/${other}`);
+    expect(parseFileMediaUrl(relativeFileLinks(`![a](HTTPS://Artifacts.Space/api/files/${id})`, "https://artifacts.space").slice(5, -1))).toEqual({ fileId: id, kind: "image", width: null });
+  });
+
+  it("should leave other origins and code samples as written", () => {
+    const markdown = `![a](https://elsewhere.example/api/files/${id}) \`[b](https://artifacts.space/api/files/${id})\``;
+    expect(relativeFileLinks(markdown, "https://artifacts.space")).toBe(markdown);
+  });
+});
+
+describe("shownMediaKind", () => {
+  it("should show a file linked without a kind as its type calls for", () => {
+    expect(shownMediaKind(`/api/files/${id}`, "video/mp4")).toBe("video");
+    expect(shownMediaKind(`/api/files/${id}#width=60`, "application/pdf")).toBe("pdf");
+    expect(shownMediaKind(`/api/files/${id}`, "image/png")).toBe("image");
+  });
+
+  it("should keep the kind the URL names, or the image default when the type is unknown", () => {
+    expect(shownMediaKind(`/api/files/${id}#file`, "video/mp4")).toBe("file");
+    expect(shownMediaKind(`/api/files/${id}`, undefined)).toBe("image");
+    expect(shownMediaKind("https://example.com/a.mp4", "video/mp4")).toBeNull();
   });
 });
