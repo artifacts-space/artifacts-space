@@ -169,7 +169,7 @@ dev user.
 | Variable | Required | What it is |
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Postgres connection string. Vercel's Neon integration sets it. |
-| `DATABASE_URL_UNPOOLED` | For migrations | Direct (unpooled) connection string. Vercel production builds and `pnpm db:migrate` use it. A value set for the command wins over `.env.local`. |
+| `DATABASE_URL_UNPOOLED` | For migrations | Direct (unpooled) connection string. Vercel production builds and `pnpm db:migrate` use it, before `DATABASE_URL`, so fill it in or leave it out (`.env.example` has it commented out). A value set for the command wins over `.env.local`. |
 | `ALLOW_SHARED_MIGRATE` | No | Set to `1` for one run to let `pnpm db:migrate` change a database that is not on localhost. |
 | `BETTER_AUTH_SECRET` | Yes | At least 32 characters, for example from `openssl rand -base64 32`. |
 | `BETTER_AUTH_URL` | Yes | This site's origin, such as `http://localhost:3000` or `https://your-domain`. |
@@ -220,7 +220,8 @@ pnpm dev           # development server
 pnpm check         # typecheck, lint (zero warnings), 500-line check, unit tests
 pnpm build         # production build
 pnpm test          # unit tests (Vitest)
-pnpm test:e2e      # component gallery on phone and desktop (Playwright)
+pnpm test:e2e      # component gallery on phone and desktop (Playwright); starts its own
+                   # dev server on PLAYWRIGHT_PORT (3000), so stop pnpm dev or pick another port
 pnpm db:generate   # generate a migration from schema changes
 pnpm db:migrate    # apply migrations to a local database
 pnpm db:studio     # inspect the database

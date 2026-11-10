@@ -63,6 +63,7 @@ export function drizzleKitCommand(argv: readonly string[]): string | null {
  */
 export function sharedMigrateRefusal(input: { command: string | null; url: string; env: Env }): string | null {
   if (input.command === null || !schemaChangingCommands.has(input.command)) return null;
+  if (!input.url) return `drizzle-kit ${input.command} stopped: no database URL is set. Copy .env.example to .env.local and fill in DATABASE_URL, or set DATABASE_URL for this run.`;
   if (isLocalDatabaseUrl(input.url) || input.env[ALLOW_SHARED_MIGRATE] === "1") return null;
   return [
     `drizzle-kit ${input.command} stopped: the database is not on this machine (localhost or 127.0.0.1).`,

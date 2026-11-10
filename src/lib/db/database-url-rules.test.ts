@@ -42,9 +42,14 @@ describe("sharedMigrateRefusal", () => {
     }
   });
 
-  it("should stop when the URL is missing or malformed", () => {
-    expect(sharedMigrateRefusal({ command: "migrate", url: "", env: {} })).not.toBeNull();
-    expect(sharedMigrateRefusal({ command: "migrate", url: "not a url", env: {} })).not.toBeNull();
+  it("should say no URL is set, not that it is remote, when there is none", () => {
+    const refusal = sharedMigrateRefusal({ command: "migrate", url: "", env: { ALLOW_SHARED_MIGRATE: "1" } });
+    expect(refusal).toContain("no database URL is set");
+    expect(refusal).not.toContain("not on this machine");
+  });
+
+  it("should stop when the URL is malformed", () => {
+    expect(sharedMigrateRefusal({ command: "migrate", url: "not a url", env: {} })).toContain("not on this machine");
   });
 
   it("should let migrate reach a database on this machine", () => {
