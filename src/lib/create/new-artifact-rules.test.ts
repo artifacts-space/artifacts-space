@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ActionResult, ArtifactDto, ArtifactInput } from "@/lib/artifact-types";
 
-import { BLANK_ARTIFACT_ID, blankDraftProblem, contentRoute, createInputFor, filesForCreate, isUntouched, leavesPasteToEditor, persistOnce, UNTITLED, uploadStep, uploadsToDiscard, type BlankDraft } from "./new-artifact-rules";
+import { BLANK_ARTIFACT_ID, blankDraftProblem, contentRoute, createInputFor, filesForCreate, isUntouched, leavesPasteToEditor, persistOnce, sheetFormatTarget, UNTITLED, uploadStep, uploadsToDiscard, type BlankDraft } from "./new-artifact-rules";
 
 const blank: BlankDraft = { title: "", icon: null, summary: "", content: "", language: "", kind: "markdown" };
 const requestId = "0b6f6d43-8a8f-4b52-9f44-2f8c1a6d3e10";
@@ -261,5 +261,19 @@ describe("leavesPasteToEditor", () => {
 
   it("should read a plain-text paste itself", () => {
     expect(leavesPasteToEditor("Plan\nRead the docs", false)).toBe(false);
+  });
+});
+
+describe("sheetFormatTarget", () => {
+  it("should give a stored CSV artifact's id, so its formatting saves", () => {
+    expect(sheetFormatTarget("csv", "artifact-1")).toBe("artifact-1");
+  });
+
+  it("should keep formatting read-only while the CSV page is not stored yet", () => {
+    expect(sheetFormatTarget("csv", BLANK_ARTIFACT_ID)).toBeNull();
+  });
+
+  it("should give no target for other formats", () => {
+    expect(sheetFormatTarget("markdown", "artifact-1")).toBeNull();
   });
 });

@@ -18,6 +18,7 @@ import { ViewsDialog } from "@/components/views/views-dialog";
 import { ArtifactOrganizers } from "@/components/projects/artifact-organizers";
 import { useArtifactHarness, type HarnessControl } from "@/components/harness/use-artifact-harness";
 import type { ArtifactDto } from "@/lib/artifact-types";
+import { sheetFormatTarget } from "@/lib/create/new-artifact-rules";
 import { usesFullWidth } from "@/lib/page-width/rules";
 import { BlankPageFilesSlot } from "@/components/app/new-artifact/blank-page-parts";
 import type { BlankPageOptions } from "@/components/app/new-artifact/use-blank-page";
@@ -206,7 +207,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           className={detailBody}
         >
           <SheetKeyContext value={artifact.publicId}>
-            <ArtifactSheetFormat artifactId={draft.kind === "csv" ? artifact.id : null} stored={artifact.sheetFormat}>
+            <ArtifactSheetFormat artifactId={sheetFormatTarget(draft.kind, artifact.id)} stored={artifact.sheetFormat}>
             <InlineContent
               kind={draft.kind}
               content={draft.content}

@@ -217,3 +217,8 @@ export function uploadsToDiscard({ readyIds, attachedIds, handedIds, holdIds, cr
 export function leavesPasteToEditor(plainText: string, hasHtml: boolean): boolean {
   return hasHtml && detectTextKind(plainText).kind === "markdown";
 }
+
+/** The artifact whose sheet formatting the editor may save: only a stored CSV artifact. A page not stored yet keeps its formatting read-only, as readers see it. */
+export function sheetFormatTarget(kind: ArtifactKind, artifactId: string): string | null {
+  return kind === "csv" && artifactId !== BLANK_ARTIFACT_ID ? artifactId : null;
+}
