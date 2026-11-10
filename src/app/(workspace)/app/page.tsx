@@ -32,16 +32,18 @@ function scopeTeamFor(teams: ShareTeam[], teamParam: string | string[] | undefin
 /**
  * The linked artifact when it is not in the list already (someone else's,
  * shared by link, or outside the current filters), loaded through the one
- * access check. Null when it is in the list, missing, or not readable.
+ * access check. `artifact` is null when it is in the list, missing, or not
+ * readable; `failed` says the check itself could not run (a read limit, or a
+ * database error), so the workspace does not call the artifact gone.
  */
-async function linkedOutsideList(link: ArtifactLink | null, listed: ArtifactListItemDto[], viewerId: string): Promise<ArtifactDto | null> {
-  if (!link || listed.some((item) => item.publicId === link.publicId)) return null;
+async function linkedOutsideList(link: ArtifactLink | null, listed: ArtifactListItemDto[], viewerId: string): Promise<{ artifact: ArtifactDto | null; failed: boolean }> {
+  if (!link || listed.some((item) => item.publicId === link.publicId)) return { artifact: null, failed: false };
   try {
     await enforceRateLimit("readByUser", viewerId);
-    return (await loadArtifactForViewer(link.publicId, viewerId))?.dto ?? null;
+    return { artifact: (await loadArtifactForViewer(link.publicId, viewerId))?.dto ?? null, failed: false };
   } catch (error) {
     console.error("[app] A linked artifact could not be loaded", error instanceof Error ? error.name : "unknown error");
-    return null;
+    return { artifact: null, failed: true };
   }
 }
 
@@ -64,8 +66,8 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
   ]);
   // A link (from a notification, say) opens its artifact even when the list does not hold it: the workspace pins it to the top.
   const link = parseArtifactLink(params);
-  const linked = await linkedOutsideList(link, artifacts, session.user.id);
-  // Null for a link to an artifact that is gone or not readable: the workspace says so.
+  const { artifact: linked, failed: linkFailed } = await linkedOutsideList(link, artifacts, session.user.id);
+  // Null for a link to an artifact that is gone or not readable (or not checked): the workspace says so.
   const linkTarget = link ? (artifacts.find((item) => item.publicId === link.publicId) ?? (linked ? toArtifactListItem(linked) : null)) : null;
 
   return (
@@ -78,8 +80,8 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
       tagFacets={tagFacets}
       initialArtifacts={artifacts}
       {...(linked ? { initialFull: [linked] } : {})}
-      link={link}
       linkTarget={linkTarget}
+      linkFailed={linkFailed}
       origin={siteOrigin()}
       viewerId={session.user.id}
       teams={teams}

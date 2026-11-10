@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { AppHeader } from "@/components/app/app-header";
 import { Dashboard } from "@/components/app/dashboard";
@@ -51,6 +52,22 @@ function fixtureArtifacts(): ArtifactDto[] {
 /** Someone else's artifact shared by link: outside the list, so only a link (n6 in the bell) opens it, pinned to the top. */
 const linkOnlyArtifact: ArtifactDto = fixtureArtifact({ id: "fixture-link-only", kind: "text", title: "Shared by link fixture", content: "Opened from a link.", publicId: LINK_ONLY_PUBLIC_ID });
 
+declare global {
+  interface Window {
+    /** Development fixture only: a router refresh, as after a save that revalidates /app (e2e/notification-opens-artifact.spec.ts). */
+    fixtureRefresh?: () => void;
+  }
+}
+
+/** Lets e2e tests refresh the page from the server, as a save does on /app; the fixture has no server actions to do it. */
+function useFixtureRefresh() {
+  const router = useRouter();
+  useEffect(() => {
+    window.fixtureRefresh = () => { router.refresh(); };
+    return () => { delete window.fixtureRefresh; };
+  }, [router]);
+}
+
 /** The fixture's projects in memory, and a stand-in for the project server actions over them. */
 function useFixtureProjects(artifacts: readonly ArtifactDto[]) {
   const [store] = useState(() => createFixtureProjectsStore(new Map(artifacts.map((artifact) => [artifact.id, artifact.title]))));
@@ -73,6 +90,7 @@ export function WorkspaceFixture({ projectFilter, link = null, scopes = false, t
   const items = useMemo(() => artifacts.filter((artifact) => matchesProjectFilter(artifact.project, projectFilter)).map(toArtifactListItem), [artifacts, projectFilter]);
   const facets = useMemo(() => fixtureFacets(artifacts), [artifacts]);
   const notifications = useMemo(() => fixtureNotifications(), []);
+  useFixtureRefresh();
   // As on /app: what the link finds, in the list or not (the workspace pins it to the top), or null when it is gone.
   const full = useMemo(() => [...artifacts, linkOnlyArtifact], [artifacts]);
   const linkTarget = useMemo(() => {
@@ -98,7 +116,6 @@ export function WorkspaceFixture({ projectFilter, link = null, scopes = false, t
           tagFilter={[]}
           projectsApi={api}
           listPath="/dev/workspace"
-          link={link}
           linkTarget={linkTarget}
         />
       </div>

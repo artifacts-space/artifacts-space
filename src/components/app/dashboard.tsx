@@ -14,7 +14,7 @@ import { serverProjectsApi, type ProjectsApi } from "@/components/app/projects-a
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
 import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
 import { useEditAccess, useWithdrawSharing } from "@/components/app/use-edit-access";
-import { useArtifactLink } from "@/components/app/use-artifact-link";
+import { useArtifactLink, type LinkNotice } from "@/components/app/use-artifact-link";
 import { useFullArtifact } from "@/components/app/use-full-artifact";
 import { useServerSearch } from "@/components/app/use-server-search";
 import { useDashboardProjects } from "@/components/app/use-dashboard-projects";
@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/select";
 import { LinkedCommentsProvider } from "@/components/comments/linked-comments";
 import { SidebarProjects } from "@/components/projects/sidebar-projects";
-import type { ArtifactLink } from "@/lib/app-link";
 import { kinds } from "@/lib/artifact-kinds";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
@@ -137,12 +136,17 @@ function WorkspaceBar({ teams, scopeTeam, onCreate }: { teams: readonly ShareTea
   );
 }
 
-/** Shown when a link (from a notification, say) points to an artifact that is gone or no longer shared with the viewer. */
-function UnavailableNotice({ onDismiss }: { onDismiss: () => void }) {
+const linkNoticeText: Record<LinkNotice, string> = {
+  gone: "This artifact is no longer available.",
+  failed: "This artifact could not be opened just now. Try the link again in a moment.",
+};
+
+/** Shown when a link (from a notification, say) points to an artifact that is gone or no longer shared with the viewer, or could not be checked. */
+function LinkNoticeBar({ notice, onDismiss }: { notice: LinkNotice; onDismiss: () => void }) {
   return (
     <div role="status" className="mb-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
       <IconInfoCircle aria-hidden className="size-4 shrink-0" />
-      <p className="min-w-0 flex-1">This artifact is no longer available.</p>
+      <p className="min-w-0 flex-1">{linkNoticeText[notice]}</p>
       <Button variant="ghost" size="icon-sm" aria-label="Dismiss" title="Dismiss" onClick={onDismiss}><IconX /></Button>
     </div>
   );
@@ -177,18 +181,18 @@ interface DashboardProps {
   projectsApi?: ProjectsApi;
   /** The list's path, for filter links: /app, or the fixture's page. */
   listPath?: string;
-  /** The artifact the URL asked to open (`?artifact=<id>`), and whether to open its comments. */
-  link?: ArtifactLink | null;
-  /** What the server found for the link (in the list or not), or null when it is missing or not the viewer's to read. */
+  /** What the server found for the URL's link (`?artifact=<id>`), in the list or not, or null when it is missing or not the viewer's to read. */
   linkTarget?: ArtifactListItemDto | null;
+  /** The server could not check the link just now (a read limit, or a database error). */
+  linkFailed?: boolean;
 }
 
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", link = null, linkTarget = null }: DashboardProps) {
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", linkTarget, linkFailed }: DashboardProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
-  const { artifacts, setArtifacts, selectedId, setSelectedId, unavailable, dismissUnavailable, opened } = useArtifactLink({ initialArtifacts, link, target: linkTarget, list: listRef, detail: detailRef });
+  const { artifacts, setArtifacts, selectedId, setSelectedId, notice, dismissNotice, opened } = useArtifactLink({ initialArtifacts, target: linkTarget, failed: linkFailed, list: listRef, detail: detailRef });
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
@@ -222,11 +226,11 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
 
   return (
     <ShareTeamsProvider teams={teams}>
-      <LinkedCommentsProvider link={opened}>
+      <LinkedCommentsProvider link={opened} selectedPublicId={selected?.publicId ?? null}>
       {/* An app shell from md up: the frame is the viewport (workspace-frame), and only the list and the artifact scroll. */}
       <main data-app-shell className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col px-4 pb-4 sm:px-6 sm:pb-6 md:min-h-0 md:flex-1">
         <WorkspaceBar teams={teams} scopeTeam={scopeTeam} onCreate={() => { setCreateOpen(true); }} />
-        {unavailable ? <UnavailableNotice onDismiss={dismissUnavailable} /> : null}
+        {notice ? <LinkNoticeBar notice={notice} onDismiss={dismissNotice} /> : null}
 
         <PanelSizesBeforePaint />
         {/* overflow-clip, not hidden: it rounds the corners without becoming a scroll box, so the artifact's toolbar can stick on phones. */}

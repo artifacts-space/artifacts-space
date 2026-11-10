@@ -21,15 +21,20 @@ function pendingFor(link: ArtifactLink | null): string | null {
  * (`/app?artifact=<id>&comments=1`), so the comments open once for that
  * artifact and not again after the person moves on. `link` is the last link
  * that opened its artifact; each new one (even for the same artifact) asks
- * again, so a second click on a notification opens the comments again.
+ * again, so a second click on a notification opens the comments again. The
+ * request lapses when the person selects another artifact first (say, while
+ * the linked one is still loading), so it never fires later on its own.
  */
-export function LinkedCommentsProvider({ link, children }: { link: ArtifactLink | null; children: React.ReactNode }) {
+export function LinkedCommentsProvider({ link, selectedPublicId, children }: { link: ArtifactLink | null; selectedPublicId: string | null; children: React.ReactNode }) {
   const [pending, setPending] = useState(() => pendingFor(link));
   const [seen, setSeen] = useState(link);
+  let current = pending;
   if (link !== seen) {
     setSeen(link);
-    setPending(pendingFor(link));
+    current = pendingFor(link);
+    setPending(current);
   }
+  if (current !== null && current !== selectedPublicId) setPending(null);
   const consume = useCallback(() => { setPending(null); }, []);
   const value = useMemo(() => ({ pending, consume }), [pending, consume]);
   return <LinkedCommentsContext.Provider value={value}>{children}</LinkedCommentsContext.Provider>;
