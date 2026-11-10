@@ -27,11 +27,13 @@ declare global {
  * The fixture's test hooks in memory: a stand-in for the load server action
  * that holds the loads of the artifacts in `held` until the test releases
  * them, so a test can act while one is still opening, and answers any other
- * load at once (from the latest `setArtifacts`, or "not found"); and a count
- * of the links the workspace acted on.
+ * load at once (from `seed`, then the latest `setArtifacts`, or "not
+ * found"); and a count of the links the workspace acted on. Seeding at
+ * creation matters: a load can start in the first commit, before any effect
+ * of the fixture has run.
  */
-export function createFixtureStore(held: ReadonlySet<string> = new Set()) {
-  let artifacts: readonly ArtifactDto[] = [];
+export function createFixtureStore(held: ReadonlySet<string> = new Set(), seed: readonly ArtifactDto[] = []) {
+  let artifacts = seed;
   let handled = 0;
   const waiting: (() => void)[] = [];
   const load: ArtifactLoader = (publicId) => new Promise((resolve) => {
@@ -60,7 +62,8 @@ export function createFixtureStore(held: ReadonlySet<string> = new Set()) {
  */
 export function useFixtureControls(slowLoad: boolean, artifacts: readonly ArtifactDto[], held: ReadonlySet<string>) {
   const router = useRouter();
-  const [store] = useState(() => createFixtureStore(held));
+  const [store] = useState(() => createFixtureStore(held, artifacts));
+  // Later changes (an artifact moved to another project) reach the store here.
   useEffect(() => { store.setArtifacts(artifacts); }, [store, artifacts]);
   useEffect(() => {
     window.fixture = {

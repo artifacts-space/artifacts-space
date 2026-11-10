@@ -34,6 +34,11 @@ describe("createFixtureStore", () => {
     expect(store.held()).toBe(0);
   });
 
+  it("should answer a load right after creation from the artifacts it was seeded with", async () => {
+    const store = createFixtureStore(new Set(), [note]);
+    await expect(store.load("fixtureheld")).resolves.toEqual({ success: true, data: note });
+  });
+
   it("should count each link the workspace acts on", () => {
     const store = createFixtureStore();
     store.countLink();

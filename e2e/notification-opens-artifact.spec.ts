@@ -185,6 +185,19 @@ test("should open the comments only once the artifact has loaded when a comment 
   await expect(selectedCard(page)).toContainText("Long markdown fixture");
 });
 
+test("should open the comments once the artifact has loaded when the page itself opens on a comments link", async ({ page }) => {
+  await page.goto("/dev/workspace?slowload=1&artifact=fixtureworkspace000md&comments=1");
+  await expect(page.getByRole("status").filter({ hasText: "Opening the artifact" })).toBeVisible();
+  await expect.poll(() => heldLoads(page)).toBeGreaterThan(0);
+  await expect(commentsHeading(page, "Long markdown fixture")).toHaveCount(0);
+
+  await releaseLoads(page);
+  await expect(commentsHeading(page, "Long markdown fixture")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(editor(page, "Long markdown fixture")).toBeVisible();
+  await expect(page).toHaveURL(/\/dev\/workspace\?slowload=1$/);
+});
+
 test("should never open the comments later when the person picks another artifact while the linked one loads", async ({ page }) => {
   await page.goto("/dev/workspace?slowload=1");
   await expect(editor(page, "Long ui fixture")).toBeVisible();
