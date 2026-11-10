@@ -30,6 +30,22 @@ export function upsertListItem(list: readonly ArtifactListItemDto[], artifact: A
   return list.map((entry) => (entry.id === artifact.id ? item : entry));
 }
 
+/** The kept blank-page artifacts after a blank page saved `artifact`: it moves to the end, and only the newest `limit` stay. */
+export function withSaved(current: readonly ArtifactDto[], artifact: ArtifactDto, limit: number): readonly ArtifactDto[] {
+  return [...current.filter((entry) => entry.id !== artifact.id), artifact].slice(-limit);
+}
+
+/** The kept artifacts after `artifact` was saved elsewhere (its own page): its copy is replaced, so it never reopens on an older body. The same array when it is not kept. */
+export function withRefreshed(current: readonly ArtifactDto[], artifact: ArtifactDto): readonly ArtifactDto[] {
+  if (!current.some((entry) => entry.id === artifact.id)) return current;
+  return current.map((entry) => (entry.id === artifact.id ? artifact : entry));
+}
+
+/** The kept artifacts without a deleted one; the same array when it was not kept. */
+export function withoutDeleted(current: readonly ArtifactDto[], id: string): readonly ArtifactDto[] {
+  return current.some((entry) => entry.id === id) ? current.filter((entry) => entry.id !== id) : current;
+}
+
 /** The pane's full artifacts plus those blank pages became; the same array when there are none, so the pane does not render twice. */
 export function withStoredArtifacts(initial: readonly ArtifactDto[] | undefined, stored: readonly ArtifactDto[]): readonly ArtifactDto[] | undefined {
   return stored.length === 0 ? initial : [...(initial ?? []), ...stored];
@@ -68,7 +84,7 @@ export function useNewArtifact({ setArtifacts, setSelectedId, clearFilters }: Ne
   /** A save from a blank page, possibly after it was left: the list gains or updates it; only the open page selects it. */
   const saved = useCallback((key: number, artifact: ArtifactDto) => {
     setArtifacts((current) => upsertListItem(current, artifact));
-    setStored((current) => [...current.filter((entry) => entry.id !== artifact.id), artifact].slice(-keptStored));
+    setStored((current) => withSaved(current, artifact, keptStored));
     if (sessionRef.current?.key !== key || sessionRef.current.createdId === artifact.id) return;
     sessionRef.current = { ...sessionRef.current, createdId: artifact.id };
     setSession((current) => (current?.key === key ? { ...current, createdId: artifact.id } : current));
@@ -90,13 +106,19 @@ export function useNewArtifact({ setArtifacts, setSelectedId, clearFilters }: Ne
     setSession(null);
   }, []);
 
-  /** The page's artifact was deleted. */
+  /** An artifact was saved on its own page: a kept copy follows it. */
+  const refresh = useCallback((artifact: ArtifactDto) => {
+    setStored((current) => withRefreshed(current, artifact));
+  }, []);
+
+  /** An artifact was deleted: its kept copy goes, and so does the page when it was the page's own. */
   const deleted = useCallback((id: string) => {
+    setStored((current) => withoutDeleted(current, id));
     if (sessionRef.current?.createdId === id) setSession(null);
   }, []);
 
   /** Full artifacts already in hand for the artifact pane: the page's own, plus those the blank pages became. */
   const withStored = useCallback((initial: readonly ArtifactDto[] | undefined) => withStoredArtifacts(initial, stored), [stored]);
 
-  return { session, withStored, start, saved, select, leave, deleted };
+  return { session, withStored, start, saved, select, leave, refresh, deleted };
 }

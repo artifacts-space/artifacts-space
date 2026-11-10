@@ -259,6 +259,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
   const selected = pickSelected(artifacts, filtered, selectedId);
 
   function updated(artifact: ArtifactDto) {
+    fresh.refresh(artifact);
     setArtifacts((current) => current.map((item) => (item.id === artifact.id ? toArtifactListItem(artifact) : item)));
   }
 
