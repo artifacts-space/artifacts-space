@@ -68,6 +68,7 @@ export function FileUploader({ items, onFiles, onRemove, disabled = false, class
   return (
     <div className={cn("flex min-w-0 flex-col gap-3", className)}>
       <div
+        data-slot="file-drop"
         onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
         onDragLeave={() => { setDragging(false); }}
         onDrop={drop}
@@ -98,11 +99,17 @@ export function FileUploader({ items, onFiles, onRemove, disabled = false, class
           }}
         />
       </div>
-      {items.length > 0 ? (
-        <ul className="flex min-w-0 flex-col gap-2" aria-label="Uploads">
-          {items.map((item) => <UploadRow key={item.key} item={item} onRemove={onRemove} />)}
-        </ul>
-      ) : null}
+      <UploadList items={items} onRemove={onRemove} />
     </div>
+  );
+}
+
+/** The uploads' progress and errors on their own, for a page whose drop target is elsewhere. Renders nothing with no uploads. */
+export function UploadList({ items, onRemove }: Pick<FileUploaderProps, "items" | "onRemove">) {
+  if (items.length === 0) return null;
+  return (
+    <ul className="flex min-w-0 flex-col gap-2" aria-label="Uploads">
+      {items.map((item) => <UploadRow key={item.key} item={item} onRemove={onRemove} />)}
+    </ul>
   );
 }

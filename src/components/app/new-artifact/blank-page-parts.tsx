@@ -3,7 +3,7 @@
 import { IconUpload } from "@tabler/icons-react";
 import { useEffect, useRef, type RefObject } from "react";
 
-import { FileUploader } from "@/components/files/file-uploader";
+import { FileUploader, UploadList } from "@/components/files/file-uploader";
 import type { UploadItem } from "@/components/files/use-file-uploads";
 import { Button } from "@/components/ui/button";
 
@@ -65,12 +65,14 @@ interface BlankPageFilesProps {
   onRemove: (key: string) => void;
   /** Shown before anything was added: the quiet "Upload files" button. */
   showUpload: boolean;
+  /** Its own drop box with the uploads: only while the page is blank. A stored page has its Files section for that. */
+  dropBox: boolean;
   dragging: boolean;
   filesProblem: string | null;
 }
 
 /** The blank page's files section, when the page is a new artifact and there is something to show. */
-export function BlankPageFilesSlot({ page, dragging }: { page: { active: boolean; eligible: boolean; filesProblem: string | null; uploads: { items: readonly UploadItem[]; remove: (key: string) => void }; onContent: (content: { files: File[] }) => void }; dragging: boolean }) {
+export function BlankPageFilesSlot({ page, dragging }: { page: { active: boolean; blank: boolean; eligible: boolean; filesProblem: string | null; uploads: { items: readonly UploadItem[]; remove: (key: string) => void }; onContent: (content: { files: File[] }) => void }; dragging: boolean }) {
   const { active, eligible, filesProblem, uploads, onContent } = page;
   if (!active || (!eligible && uploads.items.length === 0 && !filesProblem)) return null;
   return (
@@ -79,6 +81,7 @@ export function BlankPageFilesSlot({ page, dragging }: { page: { active: boolean
       onFiles={(files) => { onContent({ files }); }}
       onRemove={(key) => { uploads.remove(key); }}
       showUpload={eligible}
+      dropBox={page.blank}
       dragging={dragging}
       filesProblem={filesProblem}
     />
@@ -90,7 +93,7 @@ export function BlankPageFilesSlot({ page, dragging }: { page: { active: boolean
  * empty, the uploads' progress and errors once files were dropped or picked,
  * and a hint while something is held over the page.
  */
-export function BlankPageFiles({ items, onFiles, onRemove, showUpload, dragging, filesProblem }: BlankPageFilesProps) {
+export function BlankPageFiles({ items, onFiles, onRemove, showUpload, dropBox, dragging, filesProblem }: BlankPageFilesProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="flex flex-col gap-3 px-5 pb-4 sm:px-7">
@@ -118,7 +121,8 @@ export function BlankPageFiles({ items, onFiles, onRemove, showUpload, dragging,
         </div>
       ) : null}
       {filesProblem ? <p role="alert" className="text-sm text-tone-danger">{filesProblem}</p> : null}
-      {items.length > 0 ? <FileUploader items={items} onFiles={onFiles} onRemove={onRemove} /> : null}
+      {items.length > 0 && dropBox ? <FileUploader items={items} onFiles={onFiles} onRemove={onRemove} /> : null}
+      {dropBox ? null : <UploadList items={items} onRemove={onRemove} />}
     </div>
   );
 }

@@ -10,7 +10,7 @@ interface FirstContentOptions {
   body: RefObject<HTMLElement | null>;
   /** Take pasted or dropped text: only while the page is a new artifact with an empty body. */
   text: boolean;
-  /** Take dropped or pasted files: anywhere on the new artifact's page except its own Files section. */
+  /** Take dropped or pasted files: anywhere on the new artifact's page except the drop box of its own Files section. */
   files: boolean;
   onContent: (content: FirstContent) => void;
 }
@@ -30,9 +30,9 @@ function contentOf(data: DataTransfer | null, takes: Takes): FirstContent | null
   return takes.text && text.trim() !== "" ? { text } : null;
 }
 
-/** True when the target sits in the artifact's own Files section (AttachedFiles). */
+/** True when the target is the drop box of the artifact's own Files section (AttachedFiles), which takes its drops itself. Anywhere else in that section stays the page's. */
 function inFilesSection(target: EventTarget | null): boolean {
-  return target instanceof Element && target.closest("[data-slot=attached-files]") !== null;
+  return target instanceof Element && target.closest("[data-slot=attached-files] [data-slot=file-drop]") !== null;
 }
 
 /** True when the transfer is files the page takes, or text over the body it takes. */
@@ -57,7 +57,7 @@ export function useFirstContent({ page, body, text, files, onContent }: FirstCon
   useEffect(() => {
     const root = page.current;
     if (!enabled || !root) return;
-    // The artifact's own Files section keeps its drops: it uploads and attaches them itself.
+    // The drop box of the artifact's own Files section keeps its drops: it uploads and attaches them itself.
     const takes = (target: EventTarget | null): Takes => ({ text: text && target instanceof Node && body.current?.contains(target) === true, files: files && !inFilesSection(target) });
     const take = (event: ClipboardEvent | DragEvent, content: FirstContent | null) => {
       if (!content) return;

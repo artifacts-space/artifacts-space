@@ -206,7 +206,11 @@ test("should add later files through the artifact's Files section once a drop ma
   await expect(page.getByText("Drop files here, or")).toHaveCount(1);
   await page.evaluate(() => { window.sessionStorage.removeItem("fixture:hold-uploads"); window.dispatchEvent(new Event("fixture:release-uploads")); });
   await expect(files).toContainText("2 attached");
-  await expect.poll(async () => (await storedNew(page))[0]?.files.length).toBe(2);
+
+  // A drop on the section but outside its drop box still lands: the page takes it.
+  await dropFiles(files.getByRole("heading", { name: "Files" }), ["Third.pdf"]);
+  await expect(files).toContainText("3 attached");
+  await expect.poll(async () => (await storedNew(page))[0]?.files.length).toBe(3);
   expect((await storedNew(page))[0]?.kind).toBe("file");
   expect(await creates(page)).toBe(1);
 });
@@ -254,7 +258,12 @@ test("should attach a file dropped on a page that already has writing, and keep 
   await page.keyboard.press("Enter");
   await page.keyboard.type("Written first");
   await expect(cards(page, "Notes")).toHaveCount(1);
+  // Held while it uploads: its progress shows, with no second drop box beside the Files section.
+  await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-uploads", "1"); });
   await dropFiles(body(page), ["Screenshot.pdf"]);
+  await expect(page.getByRole("list", { name: "Uploads" }).getByText("Screenshot.pdf")).toBeVisible();
+  await expect(page.getByText("Drop files here, or")).toHaveCount(0);
+  await page.evaluate(() => { window.sessionStorage.removeItem("fixture:hold-uploads"); window.dispatchEvent(new Event("fixture:release-uploads")); });
   await expect(page.getByRole("region", { name: "Files" })).toContainText("1 attached");
   await expect(body(page)).toContainText("Written first");
   await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(1);
