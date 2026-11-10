@@ -215,6 +215,18 @@ test("should add later files through the artifact's Files section once a drop ma
   expect(await creates(page)).toBe(1);
 });
 
+test("should take a drop on the blank page's own drop box while files upload", async ({ page }) => {
+  await openNewArtifact(page);
+  await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-uploads", "1"); });
+  await dropFiles(body(page), ["First.pdf"]);
+  await dropFiles(blankPage(page).getByText("Drop files here, or"), ["Second.pdf"]);
+  await expect(page.getByRole("list", { name: "Uploads" }).getByRole("listitem")).toHaveCount(2);
+  await page.evaluate(() => { window.sessionStorage.removeItem("fixture:hold-uploads"); window.dispatchEvent(new Event("fixture:release-uploads")); });
+  await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(2);
+  expect((await storedNew(page))[0]?.kind).toBe("file");
+  expect(await creates(page)).toBe(1);
+});
+
 test("should attach a file dropped after a title was already stored", async ({ page }) => {
   await openNewArtifact(page);
   await page.keyboard.type("Title first");
