@@ -21,16 +21,16 @@ export function toFileDto(row: ArtifactFileRecord, pictured?: boolean): FileDto 
 }
 
 /**
- * SQL: whether the file's artifact, or any of its versions, shows the file
- * as its icon or cover (replace.ts refuses to replace those). Only images
- * can be, so other files skip the version lookup.
+ * SQL: whether any version of the file's artifact shows the file as its
+ * icon or cover (replace.ts refuses to replace those). The artifact's
+ * current icon and cover are in the DTO itself (offersReplace). Only images
+ * can be either, so other files skip the version lookup.
  */
 function picturedSql(): SQL<boolean> {
   const ref = sql`${FILE_PREFIX}::text || ${artifactFile.id}::text`;
-  const shows = (icon: SQL, cover: SQL) => sql`(${icon} = ${ref} or ${cover} = ${ref} or ${cover} like (${ref} || '@%'))`;
-  return sql<boolean>`(${artifactFile.contentType} like 'image/%' and (
-    exists (select 1 from ${artifact} a where a.id = ${artifactFile.artifactId} and ${shows(sql`a.icon`, sql`a.cover`)})
-    or exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactFile.artifactId} and ${shows(sql`v.icon`, sql`v.cover`)})
+  return sql<boolean>`(${artifactFile.contentType} like 'image/%' and exists (
+    select 1 from ${artifactVersion} v
+    where v.artifact_id = ${artifactFile.artifactId} and (v.icon = ${ref} or v.cover = ${ref} or v.cover like (${ref} || '@%'))
   ))`;
 }
 
