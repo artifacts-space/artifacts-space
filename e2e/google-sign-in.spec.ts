@@ -56,11 +56,29 @@ test("should hide Continue with Google on the real sign-in and sign-up pages whe
 test("should send Google sign-in back to the invitation when the person came from one", async ({ page, baseURL }) => {
   await page.goto("/dev/sign-in?google=1&next=%2Finvitations%2Finv-123");
 
-  expect(await startGoogle(page)).toEqual({ provider: "google", callbackURL: `${baseURL ?? ""}/invitations/inv-123` });
+  expect(await startGoogle(page)).toEqual({
+    provider: "google",
+    callbackURL: `${baseURL ?? ""}/invitations/inv-123`,
+    errorCallbackURL: `${baseURL ?? ""}/dev/sign-in?next=%2Finvitations%2Finv-123`,
+  });
 });
 
 test("should send Google sign-in to the workspace when next points to another site", async ({ page, baseURL }) => {
   await page.goto("/dev/sign-in?google=1&next=%2F%2Fevil.example%2Fsteal");
 
-  expect(await startGoogle(page)).toEqual({ provider: "google", callbackURL: `${baseURL ?? ""}/app` });
+  expect(await startGoogle(page)).toEqual({ provider: "google", callbackURL: `${baseURL ?? ""}/app`, errorCallbackURL: `${baseURL ?? ""}/dev/sign-in` });
+});
+
+test("should explain in the page's own words when Google refused an unverified email", async ({ page }) => {
+  await page.goto("/dev/sign-in?google=1&error=google_email_not_verified&error_description=Call%20555-0100");
+
+  await expect(page.getByRole("alert").filter({ hasText: "Google has not verified this email address" })).toBeVisible();
+  await expect(page.getByText("555-0100")).toHaveCount(0);
+  expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
+});
+
+test("should show a plain fallback when a sign-in comes back with an unknown error", async ({ page }) => {
+  await page.goto("/dev/sign-in?error=something_else");
+
+  await expect(page.getByRole("alert").filter({ hasText: "Sign-in did not finish. Try again, or use an email link." })).toBeVisible();
 });

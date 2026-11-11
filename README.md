@@ -190,7 +190,7 @@ dev user.
 | `BETTER_AUTH_SECRET` | Yes | At least 32 characters, for example from `openssl rand -base64 32`. |
 | `BETTER_AUTH_URL` | Yes | This site's origin, such as `http://localhost:3000` or `https://your-domain`. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | For GitHub sign-in | From a GitHub OAuth app. GitHub sign-in stays off while the id is empty. |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | For Google sign-in | From a Google OAuth client (Web application) with the redirect URI `<BETTER_AUTH_URL>/api/auth/callback/google`. Google sign-in stays off while either value is empty or a `replace-with-…` placeholder, and on Vercel previews. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | For Google sign-in | From a Google OAuth client (Web application) with the redirect URI `<BETTER_AUTH_URL>/api/auth/callback/google`. Google sign-in stays off while either value is empty or a `replace-with-…` placeholder, and on Vercel previews. The sign-in pages read them at build time, so a change needs a new build. |
 | `SENDIR_API_KEY`, `SENDIR_IDENTITY_ID` | In production | Send magic sign-in links and other email. Use a key scoped to the identity. `SENDIR_URL` overrides the API base. |
 | `ABUSE_REPORT_EMAIL` | In production | The site operator's address. Every reader report on an artifact is emailed here, and only here. Without it, reports are still stored and each one logs a warning. |
 | `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | For files | The R2 bucket and an S3 API key scoped to it. |

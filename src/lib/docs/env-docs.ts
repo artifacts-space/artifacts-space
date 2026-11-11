@@ -17,7 +17,7 @@ export const envDocs: readonly EnvDoc[] = [
   { name: "BETTER_AUTH_URL", need: "required", what: "This site's origin, such as https://artifacts.example.com. Every absolute link, the OAuth issuer, and the MCP resource come from it." },
   { name: "GITHUB_CLIENT_ID", need: "optional", what: "GitHub OAuth app. Without both GitHub values, GitHub sign-in is off and email links remain." },
   { name: "GITHUB_CLIENT_SECRET", need: "optional", what: "Secret for the GitHub OAuth app." },
-  { name: "GOOGLE_CLIENT_ID", need: "optional", what: "Google OAuth client (Web application) with the redirect URI <BETTER_AUTH_URL>/api/auth/callback/google. Without both Google values, or with a replace-with-… placeholder, Google sign-in is off and its button is hidden." },
+  { name: "GOOGLE_CLIENT_ID", need: "optional", what: "Google OAuth client (Web application) with the redirect URI <BETTER_AUTH_URL>/api/auth/callback/google. Without both Google values, or with a replace-with-… placeholder, Google sign-in is off and its button is hidden. The sign-in pages read them when the app builds, so a change needs a new build, not just a restart." },
   { name: "GOOGLE_CLIENT_SECRET", need: "optional", what: "Secret for the Google OAuth client." },
   { name: "SENDIR_API_KEY", need: "for email", what: "Sendir key scoped to the sending identity. Production cannot send sign-in links without it." },
   { name: "SENDIR_IDENTITY_ID", need: "for email", what: "The Sendir identity whose address sends every email." },

@@ -12,7 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth/client";
 import { isDevSignInEnabled } from "@/lib/auth/dev-user";
+import { signInErrorMessage } from "@/lib/auth/sign-in-error-rules";
 import { safeNextPath, withNextPath } from "@/lib/safe-next";
+import { cn } from "@/lib/utils";
 
 type AuthMode = "sign-in" | "sign-up";
 type SocialProvider = "github" | "google";
@@ -49,6 +51,12 @@ export function validateEmail(email: string): string | null {
 function workspaceUrl() {
   const next = safeNextPath(new URLSearchParams(window.location.search).get("next"));
   return new URL(next ?? "/app", window.location.origin).href;
+}
+
+/** Where GitHub or Google sends a refused sign-in: this page, keeping `?next=`. Better Auth adds `?error=`. */
+function errorReturnUrl() {
+  const next = new URLSearchParams(window.location.search).get("next");
+  return new URL(withNextPath(window.location.pathname, next), window.location.origin).href;
 }
 
 function CheckEmail({ email, onBack }: { email: string; onBack: () => void }) {
@@ -116,12 +124,27 @@ function InvitationHint() {
   );
 }
 
-function ErrorMessage({ message }: { message: string }) {
+function ErrorMessage({ message, className }: { message: string; className?: string }) {
   if (!message) return null;
   return (
-    <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive">
+    <p role="alert" className={cn("rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive", className)}>
       {message}
     </p>
+  );
+}
+
+/** Why GitHub or Google sent the person back here (`?error=`), in the page's own words. */
+function ProviderErrorFromQuery() {
+  const message = signInErrorMessage(useSearchParams().get("error"));
+  return message ? <ErrorMessage message={message} className="mb-4" /> : null;
+}
+
+/** The provider error; nothing shows until the query string is read in the browser. */
+function ProviderError() {
+  return (
+    <Suspense fallback={null}>
+      <ProviderErrorFromQuery />
+    </Suspense>
   );
 }
 
@@ -140,7 +163,7 @@ function SocialButton({ provider, pending, onClick }: { provider: SocialProvider
  * shows only when the page says it is configured (`isGoogleSignInEnabled`),
  * so a deploy without it never offers a button that cannot work.
  */
-export function AuthForm({ mode, googleEnabled = false }: { mode: AuthMode; googleEnabled?: boolean }) {
+export function AuthForm({ mode, googleEnabled }: { mode: AuthMode; googleEnabled: boolean }) {
   const text = copy[mode];
   const [email, setEmail] = useState("");
   const [sentTo, setSentTo] = useState("");
@@ -151,7 +174,7 @@ export function AuthForm({ mode, googleEnabled = false }: { mode: AuthMode; goog
     setPending(provider);
     setError("");
     try {
-      const { error: failure } = await authClient.signIn.social({ provider, callbackURL: workspaceUrl() });
+      const { error: failure } = await authClient.signIn.social({ provider, callbackURL: workspaceUrl(), errorCallbackURL: errorReturnUrl() });
       if (failure) setError(failure.message ?? genericError);
     } catch {
       setError(genericError);
@@ -195,6 +218,7 @@ export function AuthForm({ mode, googleEnabled = false }: { mode: AuthMode; goog
         <InvitationHint />
       </div>
 
+      {error || pending ? null : <ProviderError />}
       <div className="space-y-3">
         <SocialButton provider="github" pending={pending} onClick={startSocial} />
         {googleEnabled ? <SocialButton provider="google" pending={pending} onClick={startSocial} /> : null}

@@ -94,7 +94,7 @@ async function signInWith(auth: TestAuth, provider: "google" | "github") {
     new Request(`${origin}/api/auth/sign-in/social`, {
       method: "POST",
       headers: { "content-type": "application/json", origin },
-      body: JSON.stringify({ provider, callbackURL: `${origin}/invitations/inv-1` }),
+      body: JSON.stringify({ provider, callbackURL: `${origin}/invitations/inv-1`, errorCallbackURL: `${origin}/sign-in?next=%2Finvitations%2Finv-1` }),
     }),
   );
   const { url } = (await started.json()) as { url: string };
@@ -156,7 +156,8 @@ describe("social sign-in account linking", () => {
 
     const location = await signInWith(auth, "google");
 
-    expect(location).toContain("error=");
+    // Better Auth's own linking rule refuses first; the Google gate would refuse it too.
+    expect(location).toMatch(/^https:\/\/artifacts\.space\/sign-in\?next=%2Finvitations%2Finv-1&error=(account_not_linked|google_email_not_verified)(&|$)/);
     expect(googleAccounts()).toEqual([]);
     expect(tables.user).toHaveLength(1);
     expect(tables.session).toEqual([]);
@@ -167,7 +168,7 @@ describe("social sign-in account linking", () => {
 
     const location = await signInWith(auth, "google");
 
-    expect(location).toContain("error=");
+    expect(location).toMatch(/^https:\/\/artifacts\.space\/sign-in\?next=%2Finvitations%2Finv-1&error=google_email_not_verified(&|$)/);
     expect(tables.user).toEqual([]);
     expect(googleAccounts()).toEqual([]);
     expect(tables.session).toEqual([]);
@@ -179,7 +180,7 @@ describe("social sign-in account linking", () => {
 
     const location = await signInWith(auth, "google");
 
-    expect(location).toContain("error=account_not_linked");
+    expect(location).toMatch(/^https:\/\/artifacts\.space\/sign-in\?next=%2Finvitations%2Finv-1&error=account_not_linked(&|$)/);
     expect(googleAccounts()).toEqual([]);
     expect(tables.session).toEqual([]);
   });
@@ -210,7 +211,7 @@ describe("social sign-in account linking", () => {
 
     const location = await signInWith(auth, "github");
 
-    expect(location).toContain("error=account_not_linked");
+    expect(location).toMatch(/^https:\/\/artifacts\.space\/sign-in\?next=%2Finvitations%2Finv-1&error=account_not_linked(&|$)/);
     expect(tables.account).toEqual([]);
   });
 

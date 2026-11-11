@@ -56,7 +56,9 @@ export default defineConfig({
       timeout: 120_000,
       // Both database URLs are always set, so next dev never fills them from .env.local:
       // empty for the fixture pages, or the local test database with E2E_LOCAL_DB=1.
-      env: e2eDevServerDatabaseEnv(process.env),
+      // Google sign-in is pinned off the same way, so Google values in .env.local
+      // never show the button on the real sign-in pages (google-sign-in.spec.ts).
+      env: { ...e2eDevServerDatabaseEnv(process.env), GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "" },
     },
     {
       // `next build` writes .next/ and `next dev` writes .next/dev/, so both can run at once.
