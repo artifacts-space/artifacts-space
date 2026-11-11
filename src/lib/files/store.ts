@@ -1,10 +1,12 @@
-import { and, asc, eq, gte, inArray, isNull, like, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, like, lt, lte, or, sql, type SQL } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { artifact, artifactFile, type ArtifactFileRecord } from "@/db/schema";
+import { artifact, artifactFile, artifactVersion, type ArtifactFileRecord } from "@/db/schema";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 
 import { fileLimits } from "./config";
+import { cleanupOrphanCopies, removeArtifactCopies, removeCopiesOf } from "./copies";
+import { imageFileIdsOf } from "./icon-cleanup-rules";
 import { deleteObject, r2ConfigFromEnv } from "./r2";
 import type { FileDto } from "./types";
 
@@ -15,7 +17,28 @@ import type { FileDto } from "./types";
 
 /** Maps a row to the shape the app and agents see. */
 export function toFileDto(row: ArtifactFileRecord): FileDto {
-  return { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString() };
+  return { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString(), replacedAt: row.replacedAt?.toISOString() ?? null, embedded: row.attachedByContent };
+}
+
+/**
+ * The uploaded images any version of these artifacts shows as its icon or
+ * cover, by artifact id: Replace is not offered for them (FileDto.pictured,
+ * offersReplace), as replace.ts refuses them. One read of artifact_version
+ * by artifact id (its artifact_id index).
+ */
+async function picturedFileIds(artifactIds: readonly string[]): Promise<Map<string, Set<string>>> {
+  const pictured = new Map<string, Set<string>>();
+  if (artifactIds.length === 0) return pictured;
+  const rows = await getDb()
+    .selectDistinct({ artifactId: artifactVersion.artifactId, icon: artifactVersion.icon, cover: artifactVersion.cover })
+    .from(artifactVersion)
+    .where(and(inArray(artifactVersion.artifactId, [...artifactIds]), or(like(artifactVersion.icon, `${FILE_PREFIX}%`), like(artifactVersion.cover, `${FILE_PREFIX}%`))));
+  for (const row of rows) {
+    const ids = pictured.get(row.artifactId) ?? new Set<string>();
+    for (const fileId of imageFileIdsOf(row)) ids.add(fileId);
+    pictured.set(row.artifactId, ids);
+  }
+  return pictured;
 }
 
 /** One file row by id, or null. */
@@ -30,24 +53,33 @@ export async function getFileRows(fileIds: readonly string[]): Promise<ArtifactF
   return getDb().select().from(artifactFile).where(inArray(artifactFile.id, [...fileIds]));
 }
 
+function withPictured(file: FileDto, pictured: ReadonlySet<string> | undefined): FileDto {
+  return pictured?.has(file.id) ? { ...file, pictured: true } : file;
+}
+
 /**
  * Ready files of these artifacts, in the order they were attached, by
  * artifact id. With `attachedBy`, only files attached at or before that
- * time: what readers of an approved version may see.
+ * time: what readers of an approved version may see. With `pictured`, files
+ * a version shows as icon or cover carry `pictured` (picturedFileIds), for
+ * the editor's Files section; lists and readers skip that read.
  */
-export async function listFilesForArtifacts(artifactIds: readonly string[], options: { attachedBy?: Date | null } = {}): Promise<Map<string, FileDto[]>> {
+export async function listFilesForArtifacts(artifactIds: readonly string[], options: { attachedBy?: Date | null; pictured?: boolean } = {}): Promise<Map<string, FileDto[]>> {
   const files = new Map<string, FileDto[]>();
   if (artifactIds.length === 0) return files;
   const cutoff = options.attachedBy ? lte(artifactFile.attachedAt, options.attachedBy) : undefined;
-  const rows = await getDb()
-    .select()
-    .from(artifactFile)
-    .where(and(inArray(artifactFile.artifactId, [...artifactIds]), eq(artifactFile.status, "ready"), cutoff))
-    .orderBy(asc(artifactFile.attachedAt), asc(artifactFile.createdAt));
+  const [rows, pictured] = await Promise.all([
+    getDb()
+      .select()
+      .from(artifactFile)
+      .where(and(inArray(artifactFile.artifactId, [...artifactIds]), eq(artifactFile.status, "ready"), cutoff))
+      .orderBy(asc(artifactFile.attachedAt), asc(artifactFile.createdAt)),
+    options.pictured === true ? picturedFileIds(artifactIds) : null,
+  ]);
   for (const row of rows) {
     if (!row.artifactId) continue;
     const list = files.get(row.artifactId) ?? [];
-    list.push(toFileDto(row));
+    list.push(withPictured(toFileDto(row), pictured?.get(row.artifactId)));
     files.set(row.artifactId, list);
   }
   return files;
@@ -126,8 +158,9 @@ export async function deleteStoredObjects(rows: readonly Pick<ArtifactFileRecord
 }
 
 /**
- * Deletes files from R2 and then their rows. A row stays when its object
- * could not be deleted, so the cleanup job tries again. Returns the ids removed.
+ * Deletes files from R2 and then their rows, with the old copies of any
+ * that were replaced. A row stays when its object could not be deleted, so
+ * the cleanup job tries again; so does a copy. Returns the ids removed.
  */
 export async function removeFiles(rows: readonly Pick<ArtifactFileRecord, "id" | "key">[]): Promise<string[]> {
   if (rows.length === 0) return [];
@@ -136,8 +169,24 @@ export async function removeFiles(rows: readonly Pick<ArtifactFileRecord, "id" |
   const removed = rows.filter((_, index) => results[index]?.status === "fulfilled").map((row) => row.id);
   const failed = rows.length - removed.length;
   if (failed > 0) console.error(`[files] ${String(failed)} R2 objects could not be deleted; the cleanup job will retry.`);
-  if (removed.length > 0) await getDb().delete(artifactFile).where(inArray(artifactFile.id, removed));
+  if (removed.length === 0) return removed;
+  await removeCopiesOf(removed);
+  await getDb().delete(artifactFile).where(inArray(artifactFile.id, removed));
   return removed;
+}
+
+/**
+ * Deletes the file rows `where` matches, in one statement, then the R2
+ * objects those rows held at that moment (`returning`). A replace can swap
+ * a new object into a row at any time (replace.ts), so the key is read by
+ * the delete itself, never earlier: the object that goes is always the one
+ * the deleted row held. An object R2 refuses to delete is logged and stays
+ * without a row. Returns the rows deleted.
+ */
+export async function deleteFileRows(where: SQL | undefined): Promise<Pick<ArtifactFileRecord, "id" | "key">[]> {
+  const rows = (await getDb().delete(artifactFile).where(where).returning()).map((row) => ({ id: row.id, key: row.key }));
+  await deleteStoredObjects(rows);
+  return rows;
 }
 
 /**
@@ -162,13 +211,15 @@ export async function removeUnattachedUpload(fileId: string, uploaderId: string)
 }
 
 /**
- * Deletes every file of an artifact, before the artifact itself is deleted.
- * Files whose objects could not be deleted lose their artifact when it goes
- * (the foreign key sets null), and the cleanup job removes them later.
+ * Deletes every file of an artifact, and every old copy of its replaced
+ * files, before the artifact itself is deleted. The rows go first, with
+ * the keys they hold then (deleteFileRows), so a replace landing meanwhile
+ * never leaves its new object behind. A copy a replace makes after this
+ * loses its artifact when it goes, and the cleanup job removes it.
  */
 export async function deleteArtifactFiles(artifactId: string): Promise<void> {
-  const rows = await getDb().select({ id: artifactFile.id, key: artifactFile.key }).from(artifactFile).where(eq(artifactFile.artifactId, artifactId));
-  await removeFiles(rows);
+  await removeArtifactCopies(artifactId);
+  await deleteFileRows(eq(artifactFile.artifactId, artifactId));
 }
 
 /** The most files one cleanup run removes. The next run continues. */
@@ -177,22 +228,31 @@ export const cleanupBatchSize = 200;
 /**
  * Removes abandoned files: uploads still pending after an hour, and files
  * never attached to an artifact after a day (including files left behind
- * by a deleted artifact or account). Returns how many were removed.
+ * by a deleted artifact or account), then old copies whose file or
+ * artifact is gone. Rows go before their objects (deleteFileRows); an object
+ * R2 refuses to delete is logged. Returns how many were removed.
  */
 export async function cleanupAbandonedFiles(now: Date = new Date()): Promise<{ removed: number; remaining: boolean }> {
-  const pendingBefore = new Date(now.getTime() - fileLimits.pendingTtlMs);
-  const unattachedBefore = new Date(now.getTime() - fileLimits.unattachedTtlMs);
-  const rows = await getDb()
-    .select({ id: artifactFile.id, key: artifactFile.key })
-    .from(artifactFile)
-    .where(
-      or(
-        and(eq(artifactFile.status, "pending"), lt(artifactFile.createdAt, pendingBefore)),
-        and(isNull(artifactFile.artifactId), lt(artifactFile.createdAt, unattachedBefore)),
-      ),
-    )
-    .orderBy(asc(artifactFile.createdAt))
-    .limit(cleanupBatchSize);
-  const removed = await removeFiles(rows);
-  return { removed: removed.length, remaining: rows.length === cleanupBatchSize };
+  const rows = await getDb().select({ id: artifactFile.id }).from(artifactFile).where(abandonedFiles(now)).orderBy(asc(artifactFile.createdAt)).limit(cleanupBatchSize);
+  const removed = await removeAbandonedFiles(rows.map((row) => row.id), now);
+  const copies = await cleanupOrphanCopies();
+  return { removed: removed + copies.removed, remaining: rows.length === cleanupBatchSize || copies.remaining };
+}
+
+/** File rows the cleanup job removes: uploads still pending after an hour, and files in no artifact after a day. */
+function abandonedFiles(now: Date) {
+  return or(
+    and(eq(artifactFile.status, "pending"), lt(artifactFile.createdAt, new Date(now.getTime() - fileLimits.pendingTtlMs))),
+    and(isNull(artifactFile.artifactId), lt(artifactFile.createdAt, new Date(now.getTime() - fileLimits.unattachedTtlMs))),
+  );
+}
+
+/**
+ * Deletes the cleanup job's picks, checking in the delete itself that each
+ * is still abandoned, so an upload a replace or an attach used since the
+ * job picked it stays where it went and keeps its object. Returns how many went.
+ */
+export async function removeAbandonedFiles(fileIds: readonly string[], now: Date = new Date()): Promise<number> {
+  if (fileIds.length === 0) return 0;
+  return (await deleteFileRows(and(inArray(artifactFile.id, [...fileIds]), abandonedFiles(now)))).length;
 }

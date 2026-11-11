@@ -11,8 +11,8 @@ import { fixtureFiles } from "@/lib/ui/fixtures/components";
  * path would be blocked, while the real viewer frames /api/files, which allows it.
  */
 
-export const mediaVideoFile: FileDto = { id: "00000000-0000-4000-8000-000000000004", filename: "walkthrough.webm", contentType: "video/webm", size: 9_400_000, createdAt: "2026-11-05T00:00:00.000Z" };
-export const mediaAudioFile: FileDto = { id: "00000000-0000-4000-8000-000000000005", filename: "interview.wav", contentType: "audio/wav", size: 1_200_000, createdAt: "2026-11-05T00:00:00.000Z" };
+export const mediaVideoFile: FileDto = { id: "00000000-0000-4000-8000-000000000004", filename: "walkthrough.webm", contentType: "video/webm", size: 9_400_000, createdAt: "2026-11-05T00:00:00.000Z", replacedAt: null };
+export const mediaAudioFile: FileDto = { id: "00000000-0000-4000-8000-000000000005", filename: "interview.wav", contentType: "audio/wav", size: 1_200_000, createdAt: "2026-11-05T00:00:00.000Z", replacedAt: null };
 
 /** The gallery's fixture files, plus a video and a recording. */
 export const mediaFixtureFiles: FileDto[] = [...fixtureFiles, mediaVideoFile, mediaAudioFile];

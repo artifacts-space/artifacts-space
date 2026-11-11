@@ -22,7 +22,7 @@ interface LimitPlacement {
 export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   readByToken: { per: "token", where: "Every MCP read tool call", refusal: "mcp-429", group: "MCP and artifacts" },
   readByUser: { per: "user", where: "MCP read tool calls and opening artifacts in the workspace", refusal: "mcp-429", group: "MCP and artifacts" },
-  artifactUpdateByToken: { per: "token", where: "artifacts_update, artifacts_restore_version, files_attach", refusal: "mcp-429", group: "MCP and artifacts" },
+  artifactUpdateByToken: { per: "token", where: "artifacts_update, artifacts_restore_version, files_attach, files_replace", refusal: "mcp-429", group: "MCP and artifacts" },
   artifactCreate: { per: "user", where: "artifacts_create, files_create_artifact, and the web app", refusal: "tool-error", group: "MCP and artifacts" },
   artifactUpdate: { per: "user", where: "Every artifact edit, from MCP and the web app, except web autosaves that continue an editing session", refusal: "tool-error", group: "MCP and artifacts" },
   artifactAutosave: { per: "user", where: "Web editor autosaves that continue an editing session (the editor sends at most one every 5 seconds)", refusal: "form", group: "MCP and artifacts" },

@@ -120,8 +120,8 @@ describe("ArtifactView for files", () => {
 
   it("should play video and audio in native players", () => {
     const media = [
-      { id: "00000000-0000-4000-8000-00000000000a", filename: "demo.mp4", contentType: "video/mp4", size: 10, createdAt: "2026-11-05T00:00:00.000Z" },
-      { id: "00000000-0000-4000-8000-00000000000b", filename: "note.mp3", contentType: "audio/mpeg", size: 10, createdAt: "2026-11-05T00:00:00.000Z" },
+      { id: "00000000-0000-4000-8000-00000000000a", filename: "demo.mp4", contentType: "video/mp4", size: 10, createdAt: "2026-11-05T00:00:00.000Z", replacedAt: null },
+      { id: "00000000-0000-4000-8000-00000000000b", filename: "note.mp3", contentType: "audio/mpeg", size: 10, createdAt: "2026-11-05T00:00:00.000Z", replacedAt: null },
     ];
     const html = renderFiles("", media);
     expect(html).toContain("<video");

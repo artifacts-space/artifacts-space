@@ -94,6 +94,26 @@ function SwitchLink({ href, label }: { href: string; label: string }) {
   );
 }
 
+/** Arriving from an invitation link: the invitation joins only the address it was sent to. */
+function InvitationHintFromQuery() {
+  const next = safeNextPath(useSearchParams().get("next"));
+  if (!next?.startsWith("/invitations/")) return null;
+  return (
+    <p data-slot="invitation-hint" className="mt-3 text-md leading-6 text-foreground">
+      Use the email address your invitation went to. You come back to the invitation after you sign in.
+    </p>
+  );
+}
+
+/** The invitation hint; nothing shows until the query string is read in the browser. */
+function InvitationHint() {
+  return (
+    <Suspense fallback={null}>
+      <InvitationHintFromQuery />
+    </Suspense>
+  );
+}
+
 function ErrorMessage({ message }: { message: string }) {
   if (!message) return null;
   return (
@@ -154,6 +174,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       <div className="mb-8">
         <h1 className="text-2xl font-medium tracking-[-0.015em]">{text.title}</h1>
         <p className="mt-2 text-md leading-6 text-muted-foreground">{text.description}</p>
+        <InvitationHint />
       </div>
 
       <Button type="button" variant="outline" onClick={() => void continueWithGitHub()} disabled={pending !== null} className="h-10 w-full text-sm">

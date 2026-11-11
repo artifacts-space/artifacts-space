@@ -81,7 +81,7 @@ test("should list people, agents, and invitations in one table", async ({ page }
   const table = membersTable(page);
   await expect(table.locator("[data-member-row=person]")).toHaveCount(5);
   await expect(table.locator("[data-member-row=agent]")).toHaveCount(3);
-  await expect(table.locator("[data-member-row=invitation]")).toHaveCount(2);
+  await expect(table.locator("[data-member-row=invitation]")).toHaveCount(3);
   await expect(table.locator("[data-member-row=agent]").first().getByText("Agent", { exact: true }).first()).toBeVisible();
   await expect(table.locator("[data-member-row=invitation]").first()).toContainText("Invited · expires Nov 15, 2026");
 });

@@ -1,3 +1,4 @@
+import { APIError } from "better-auth/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TeamRoleView } from "@/lib/teams/capabilities";
@@ -24,6 +25,11 @@ const mocks = vi.hoisted(() => ({
   updateOrganization: vi.fn(),
   leaveOrganization: vi.fn(),
   changeMemberRole: vi.fn(),
+  openInvitationRole: vi.fn(),
+  isEmailInTeam: vi.fn(),
+  assertCanInvite: vi.fn(),
+  assertCanInviteAs: vi.fn(),
+  precheckedDuringCreate: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -52,6 +58,9 @@ vi.mock("@/lib/teams/queries", () => ({
   getInvitationTeamId: mocks.invitationTeamId,
 }));
 vi.mock("@/lib/teams/role-store", () => ({ changeMemberRole: mocks.changeMemberRole }));
+vi.mock("@/lib/teams/invitation-queries", () => ({ openInvitationRole: mocks.openInvitationRole, isEmailInTeam: mocks.isEmailInTeam }));
+vi.mock("@/lib/teams/invitation-limits", () => ({ assertCanInvite: mocks.assertCanInvite }));
+vi.mock("@/lib/teams/guards", () => ({ assertCanInviteAs: mocks.assertCanInviteAs }));
 
 const actions = await import("./actions");
 
@@ -106,6 +115,10 @@ beforeEach(() => {
   mocks.session.mockResolvedValue({ user: { id: "viewer-1" } });
   for (const write of writes) write.mockResolvedValue(undefined);
   mocks.invitationTeamId.mockResolvedValue("team-1");
+  mocks.openInvitationRole.mockResolvedValue(null);
+  mocks.isEmailInTeam.mockResolvedValue(false);
+  mocks.assertCanInvite.mockResolvedValue(undefined);
+  mocks.assertCanInviteAs.mockResolvedValue(undefined);
 });
 
 describe("refusals for every member action", () => {
@@ -151,8 +164,72 @@ describe("inviteMemberAction", () => {
 
   it("should let a custom role that may invite invite a Member", async () => {
     signInAs(viewer("designer"));
-    await expect(actions.inviteMemberAction("team-1", { email: "New@Example.com", role: "member" })).resolves.toEqual({ success: true, data: null });
-    expect(mocks.createInvitation).toHaveBeenCalledWith(expect.objectContaining({ body: { email: "new@example.com", role: "member", organizationId: "team-1", resend: true } }));
+    await expect(actions.inviteMemberAction("team-1", { email: "New@Example.com", role: "member" })).resolves.toEqual({ success: true, data: { email: "new@example.com", resent: false } });
+    expect(mocks.createInvitation).toHaveBeenCalledWith(expect.objectContaining({ body: { email: "new@example.com", role: "member", organizationId: "team-1", resend: false } }));
+  });
+
+  it("should check the invitation limits itself when it sends an open invitation again", async () => {
+    signInAs(viewer("admin"));
+    mocks.openInvitationRole.mockResolvedValue("member");
+    await expect(actions.inviteMemberAction("team-1", { email: "ann@example.com", role: "member" })).resolves.toEqual({ success: true, data: { email: "ann@example.com", resent: true } });
+    expect(mocks.assertCanInvite).toHaveBeenCalledWith("viewer-1", "team-1");
+    expect(mocks.createInvitation.mock.calls[0]?.[0]).toMatchObject({ body: { resend: true } });
+  });
+
+  it("should refuse to send again when the invitation limits are used up", async () => {
+    signInAs(viewer("admin"));
+    mocks.openInvitationRole.mockResolvedValue("member");
+    mocks.assertCanInvite.mockRejectedValue(new APIError("TOO_MANY_REQUESTS", { message: "You have sent a lot of invitations in the last hour." }));
+    await expect(actions.inviteMemberAction("team-1", { email: "ann@example.com", role: "member" })).resolves.toEqual({ success: false, error: "You have sent a lot of invitations in the last hour." });
+    expectNothingWritten();
+  });
+
+  it("should replace the open invitation, not resend it, when the role changes", async () => {
+    signInAs(viewer("owner"));
+    mocks.openInvitationRole.mockResolvedValue("member");
+    await expect(actions.inviteMemberAction("team-1", { email: "ann@example.com", role: "admin" })).resolves.toMatchObject({ success: true, data: { resent: false } });
+    expect(mocks.assertCanInviteAs).toHaveBeenCalledWith("viewer-1", "team-1", "admin");
+    expect(mocks.assertCanInvite).toHaveBeenCalledTimes(1);
+    expect(mocks.createInvitation.mock.calls[0]?.[0]).toMatchObject({ body: { role: "admin", resend: false } });
+  });
+
+  it("should never reach Better Auth, which would cancel the open invitation, when a role change is refused", async () => {
+    signInAs(viewer("owner"));
+    mocks.openInvitationRole.mockResolvedValue("member");
+    mocks.assertCanInvite.mockRejectedValue(new APIError("TOO_MANY_REQUESTS", { message: "This team has sent a lot of invitations today." }));
+    await expect(actions.inviteMemberAction("team-1", { email: "ann@example.com", role: "admin" })).resolves.toEqual({ success: false, error: "This team has sent a lot of invitations today." });
+    expectNothingWritten();
+
+    mocks.assertCanInvite.mockResolvedValue(undefined);
+    mocks.assertCanInviteAs.mockRejectedValue(new APIError("BAD_REQUEST", { message: "You cannot invite someone to a role that can do more than yours." }));
+    await expect(actions.inviteMemberAction("team-1", { email: "ann@example.com", role: "admin" })).resolves.toMatchObject({ success: false });
+    expectNothingWritten();
+  });
+
+  it("should mark the Better Auth call as already checked, for this inviter and team only", async () => {
+    signInAs(viewer("admin"));
+    const { wasPrechecked } = await import("@/lib/teams/invite-precheck");
+    mocks.createInvitation.mockImplementation(() => {
+      mocks.precheckedDuringCreate(wasPrechecked("viewer-1", "team-1"), wasPrechecked("someone-else", "team-1"), wasPrechecked("viewer-1", "team-2"));
+      return Promise.resolve(undefined);
+    });
+    await actions.inviteMemberAction("team-1", { email: "ann@example.com", role: "member" });
+    expect(mocks.precheckedDuringCreate).toHaveBeenCalledWith(true, false, false);
+    expect(wasPrechecked("viewer-1", "team-1"), "the marker ends with the call").toBe(false);
+  });
+
+  it("should say the person is already in the team without counting an invitation", async () => {
+    signInAs(viewer("owner"));
+    mocks.isEmailInTeam.mockResolvedValue(true);
+    await expect(actions.inviteMemberAction("team-1", { email: "Ann@example.com", role: "member" })).resolves.toEqual({ success: false, error: "ann@example.com is already in this team." });
+    expect(mocks.assertCanInvite).not.toHaveBeenCalled();
+    expectNothingWritten();
+  });
+
+  it("should name the address when the person is already in the team", async () => {
+    signInAs(viewer("owner"));
+    mocks.createInvitation.mockRejectedValue(APIError.from("BAD_REQUEST", { code: "USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION", message: "User is already a member of this organization" }));
+    await expect(actions.inviteMemberAction("team-1", { email: "Ann@example.com", role: "member" })).resolves.toEqual({ success: false, error: "ann@example.com is already in this team." });
   });
 
   it("should refuse an invitation as Owner, whatever the viewer's role", async () => {

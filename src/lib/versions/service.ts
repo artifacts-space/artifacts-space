@@ -170,9 +170,12 @@ export async function recordArtifactSave(save: ArtifactSave): Promise<EditStatus
   return status;
 }
 
+/** Saves that change files: they always go through the approval rule, because readers outside the team see files by version. */
+const fileSaveKinds: ReadonlySet<VersionSaveKind> = new Set(["files", "replace"]);
+
 async function approvalFor(after: ArtifactRecord, approvedId: string, versionId: string, save: ArtifactSave): Promise<EditStatus> {
   const approved = await getArtifactVersion(approvedId);
-  if (save.saveKind !== "files" && approved && sameReviewedFields(approved, after)) {
+  if (!fileSaveKinds.has(save.saveKind) && approved && sameReviewedFields(approved, after)) {
     await cancelPendingEdits(after.id, save.editorId);
     return "applied";
   }
@@ -196,6 +199,44 @@ export async function recordArtifactChange(input: { artifactId: string; editorId
     .returning();
   if (!after) return "applied";
   return recordArtifactSave({ before, after, editorId: input.editorId, actor: input.actor, saveKind: "files", harness: input.harness ?? null });
+}
+
+/**
+ * Before a change that writes its own version row in the same statement as
+ * the change (a replaced file, src/lib/files/replace.ts): starts the
+ * history if needed, and gives a link or public artifact its approved
+ * version from what it shows now, so readers outside the team never see the
+ * change before it is approved. Returns that approved version's id, or null
+ * for private and team artifacts.
+ */
+export async function prepareVersionedChange(before: ArtifactRecord): Promise<string | null> {
+  await ensureHistoryStart(before);
+  return isReviewedLevel(before.visibility) ? ensureApprovedBefore(before) : null;
+}
+
+/**
+ * How a change that files its own version in one statement (a replaced
+ * file, src/lib/files/replace.ts) meets the approval rule, decided before
+ * that statement so the statement can write the outcome with the change:
+ * nothing for private and team artifacts (or none approved yet), "apply"
+ * (the version becomes the approved one, open edit requests are canceled,
+ * and an approver's own edit gets an audit row), or "pending" (the open edit
+ * request points at the version). The statement must re-check that the
+ * artifact still has the `visibility` and `teamId` this was decided for.
+ */
+export type VersionedChangeApproval =
+  | { outcome: "none" }
+  | { outcome: "apply"; auditTeamId: string | null; requestVisibility: "link" | "public" }
+  | { outcome: "pending"; teamId: string; requestVisibility: "link" | "public" };
+
+/** Decides VersionedChangeApproval for `before`; `approvedId` comes from prepareVersionedChange. Mirrors applyApprovalRule. */
+export async function planVersionedChangeApproval(before: ArtifactRecord, approvedId: string | null, editorId: string, actor: SharingActor): Promise<VersionedChangeApproval> {
+  if (!approvedId || !isReviewedLevel(before.visibility)) return { outcome: "none" };
+  const requestVisibility = before.visibility === "public" ? "public" : "link";
+  const { rule, outcome } = await decideFor(before, editorId, actor);
+  if (outcome === "pending" && before.teamId) return { outcome: "pending", teamId: before.teamId, requestVisibility };
+  const audit = before.teamId && editNeedsAuditRow({ visibility: before.visibility, team: rule }) ? before.teamId : null;
+  return { outcome: "apply", auditTeamId: audit, requestVisibility };
 }
 
 /**

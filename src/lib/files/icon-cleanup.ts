@@ -6,7 +6,8 @@ import { FILE_PREFIX } from "@/lib/artifact-icons";
 
 import { imageFileIdOf, imageFileIdsOf, unusedIconFiles, type IconUseState } from "./icon-cleanup-rules";
 import { fileRefsInContent } from "./refs";
-import { deleteStoredObjects, getFileRows, removeFiles } from "./store";
+import { removeCopiesOf } from "./copies";
+import { deleteFileRows, deleteStoredObjects, getFileRows } from "./store";
 
 /**
  * Deletes icon and cover images an artifact no longer keeps. An image stays
@@ -89,8 +90,11 @@ export async function pruneUnusedIconFiles(artifactId: string, candidates: reado
   if (!current) return 0;
   const unused = await unusedFiles(artifactId, fileIds, current);
   if (unused.length === 0) return 0;
-  const rows = (await getFileRows(unused)).filter((row) => row.artifactId === artifactId);
-  return (await removeFiles(rows)).length;
+  const owned = (await getFileRows(unused)).filter((row) => row.artifactId === artifactId).map((row) => row.id);
+  if (owned.length === 0) return 0;
+  await removeCopiesOf(owned);
+  // The delete reads each row's key itself (deleteFileRows), so an object a replace swapped in meanwhile goes with its row instead of staying in R2 without one.
+  return (await deleteFileRows(and(inArray(artifactFile.id, owned), eq(artifactFile.artifactId, artifactId)))).length;
 }
 
 /** The artifact's content media that its current state does not show. */

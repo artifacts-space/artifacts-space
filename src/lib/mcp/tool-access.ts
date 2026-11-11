@@ -35,6 +35,7 @@ export const toolAccess = {
   files_finalize: "write",
   files_create_artifact: "write",
   files_attach: "write",
+  files_replace: "write",
   files_delete: "write",
   // Inbox and comments
   inbox_list: "read",
@@ -79,6 +80,8 @@ export const writeTraits = {
   // Attaches only files not yet attached, so a repeat attaches nothing.
   files_attach: { destructive: false, idempotent: true },
   files_delete: { destructive: true, idempotent: true },
+  // Replaces the current file; a repeat with a new upload replaces it again.
+  files_replace: { destructive: true, idempotent: false },
   inbox_mark_read: { destructive: false, idempotent: true },
   comment_create: { destructive: false, idempotent: false },
   // Replaces the body. A repeat notifies no one again but still moves updatedAt, so it is not a no-op.

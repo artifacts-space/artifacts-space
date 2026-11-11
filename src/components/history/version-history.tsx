@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import type { ArtifactDto, VersionSummaryDto } from "@/lib/artifact-types";
+import type { ArtifactDto, VersionDetailDto, VersionSummaryDto } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
 import { restoreVersionAction } from "@/lib/versions/actions";
 import { cn } from "@/lib/utils";
@@ -42,8 +42,15 @@ function ListStatus({ versions, error }: { versions: readonly VersionSummaryDto[
   return null;
 }
 
-function restoreDescription(reviewed: boolean, hasUnsavedChanges: boolean) {
+/** Whether files were replaced since the selected version, so Restore leaves newer files in place. */
+function hasReplacedFiles(details: ReadonlyMap<string, VersionDetailDto>, selected: VersionSummaryDto | null): boolean {
+  if (!selected) return false;
+  return (details.get(selected.id)?.replacedSince?.length ?? 0) > 0;
+}
+
+function restoreDescription(reviewed: boolean, hasUnsavedChanges: boolean, replacedFiles: boolean) {
   const parts = ["It becomes the current version as a new save. Every version stays in the history."];
+  if (replacedFiles) parts.push("Replaced files stay as they are now. Download the older copies from this version.");
   if (reviewed) parts.push("If the team approves edits, readers outside the team keep the approved version until a team owner or admin approves this one.");
   if (hasUnsavedChanges) parts.push("Your unsaved changes in the editor are replaced.");
   return parts.join(" ");
@@ -144,7 +151,7 @@ export function VersionHistory({ publicId, title, updatedAt, reviewed, files, ha
       <ConfirmDialog
         state={confirmRestore.dialog}
         title="Restore this version?"
-        description={restoreDescription(reviewed, hasUnsavedChanges)}
+        description={restoreDescription(reviewed, hasUnsavedChanges, hasReplacedFiles(history.details, selected))}
         confirmLabel="Restore"
         confirmVariant="default"
         pending={restoring}

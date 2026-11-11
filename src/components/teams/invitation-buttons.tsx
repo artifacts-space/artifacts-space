@@ -7,8 +7,12 @@ import { toast } from "sonner";
 
 import { acceptInvitationAction, declineInvitationAction } from "@/app/invitations/actions";
 import { Button } from "@/components/ui/button";
+import { teamWorkspacePath } from "@/lib/teams/invitation-rules";
 
-/** Accept or decline one invitation. Accepting opens the team. */
+/** How long the welcome stays up: long enough to read three short sentences. */
+const WELCOME_MS = 15_000;
+
+/** Accept or decline one invitation. Accepting opens the team's workspace with a short welcome. */
 export function InvitationButtons({ invitationId }: { invitationId: string }) {
   const router = useRouter();
   const [pending, setPending] = useState<"accept" | "decline" | null>(null);
@@ -19,13 +23,15 @@ export function InvitationButtons({ invitationId }: { invitationId: string }) {
       const result = await acceptInvitationAction(invitationId);
       if (!result.success) {
         toast.error(result.error);
+        setPending(null);
         return;
       }
-      toast.success("You joined the team.");
-      router.push(`/teams/${result.data.slug}`);
+      // The toaster lives in the root layout, so the welcome stays up while the team's workspace loads.
+      toast.success(result.data.welcome.title, { description: result.data.welcome.description, duration: WELCOME_MS, closeButton: true });
+      // Stays pending while the workspace opens, so a second click cannot send the invitation again.
+      router.push(teamWorkspacePath(result.data.slug));
     } catch {
       toast.error("Something went wrong. Check your connection and try again.");
-    } finally {
       setPending(null);
     }
   }

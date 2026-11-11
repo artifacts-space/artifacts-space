@@ -4,13 +4,14 @@ import { drizzle as drizzlePostgres } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 import * as connectionSchema from "./connection-schema";
+import * as fileCopySchema from "./file-copy-schema";
 import * as notificationSchema from "./notification-schema";
 import * as oauthSchema from "./oauth-schema";
 import * as rolesSchema from "./roles-schema";
 import * as appSchema from "./schema";
 import * as viewsSchema from "./views-schema";
 
-const schema = { ...appSchema, ...oauthSchema, ...viewsSchema, ...notificationSchema, ...rolesSchema, ...connectionSchema };
+const schema = { ...appSchema, ...oauthSchema, ...viewsSchema, ...notificationSchema, ...rolesSchema, ...connectionSchema, ...fileCopySchema };
 
 let database: ReturnType<typeof createDatabase> | undefined;
 

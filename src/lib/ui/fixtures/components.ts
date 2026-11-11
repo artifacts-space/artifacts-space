@@ -172,9 +172,9 @@ const input: Pick<Record<UiComponentName, ComponentFixture[]>, "Checklist" | "Ch
 
 /** Files the media fixtures point at. The gallery shows them from local stand-ins; nothing is uploaded. */
 export const fixtureFiles = [
-  { id: "00000000-0000-4000-8000-000000000001", filename: "architecture.png", contentType: "image/png", size: 48_213, createdAt: "2026-11-05T00:00:00.000Z" },
-  { id: "00000000-0000-4000-8000-000000000002", filename: "quarterly-report-final-v3.pdf", contentType: "application/pdf", size: 2_481_934, createdAt: "2026-11-05T00:00:00.000Z" },
-  { id: "00000000-0000-4000-8000-000000000003", filename: `${unbroken(110)}.docx`, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size: 26_214_400, createdAt: "2026-11-05T00:00:00.000Z" },
+  { id: "00000000-0000-4000-8000-000000000001", filename: "architecture.png", contentType: "image/png", size: 48_213, createdAt: "2026-11-05T00:00:00.000Z", replacedAt: null },
+  { id: "00000000-0000-4000-8000-000000000002", filename: "quarterly-report-final-v3.pdf", contentType: "application/pdf", size: 2_481_934, createdAt: "2026-11-05T00:00:00.000Z", replacedAt: null },
+  { id: "00000000-0000-4000-8000-000000000003", filename: `${unbroken(110)}.docx`, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size: 26_214_400, createdAt: "2026-11-05T00:00:00.000Z", replacedAt: null },
 ] as const;
 
 const [imageFile, pdfFile, longFile] = fixtureFiles;

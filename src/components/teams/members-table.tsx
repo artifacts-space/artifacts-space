@@ -3,11 +3,12 @@ import { can } from "@/lib/teams/capability-rules";
 import { memberRowControls, type RoleOption } from "@/lib/teams/member-row-rules";
 import type { PendingInvitationView, TeamMemberView, TeamMembership } from "@/lib/teams/queries";
 import { inviteProblem } from "@/lib/teams/role-admin-rules";
-import { assignableRoles, type AssignableRole } from "@/lib/teams/roles";
+import { assignableRoles } from "@/lib/teams/roles";
+import { roleHint } from "@/lib/teams/team-rule-copy";
 
 import { AddAgentDialog } from "./add-agent-dialog";
 import { AgentMemberRow } from "./agent-member-row";
-import { InviteDialog } from "./invite-dialog";
+import { InviteDialog, type InviteRoleOption } from "./invite-dialog";
 import { InvitationRow, PersonRow } from "./member-rows";
 import { cell } from "./member-table-cells";
 import { Section } from "./section";
@@ -39,10 +40,10 @@ function Head() {
 
 function description(personal: boolean, canInvite: boolean) {
   if (personal) return "Your personal team is only you. Create a team to share with others.";
-  return canInvite ? "People and agents in this team. Invitations wait here until they are accepted." : "People and agents in this team.";
+  return canInvite ? "People and agents in this team. Invitations wait here until they are accepted; expired ones stay for 30 days so you can send them again." : "People and agents in this team.";
 }
 
-function HeaderActions({ teamId, inviteRoles, canAddAgents }: { teamId: string; inviteRoles: readonly AssignableRole[]; canAddAgents: boolean }) {
+function HeaderActions({ teamId, inviteRoles, canAddAgents }: { teamId: string; inviteRoles: readonly InviteRoleOption[]; canAddAgents: boolean }) {
   if (inviteRoles.length === 0 && !canAddAgents) return undefined;
   return (
     <div className="flex flex-wrap gap-2">
@@ -64,7 +65,9 @@ export function MembersTable({ viewer, members, agents, invitations, roles, orig
   const canInvite = shared && can(viewer, "members.invite");
   const canAddAgents = shared && can(viewer, "agents.manage");
   const grantFor = (key: string) => roles.find((role) => role.key === key) ?? { key, capabilities: [] };
-  const inviteRoles = canInvite ? assignableRoles.filter((key) => inviteProblem(viewer, grantFor(key)) === null) : [];
+  const inviteRoles = canInvite
+    ? assignableRoles.filter((key) => inviteProblem(viewer, grantFor(key)) === null).map((key) => ({ role: key, hint: roleHint(grantFor(key).capabilities) }))
+    : [];
   return (
     <Section title="Members" description={description(viewer.personal, canInvite)} action={HeaderActions({ teamId: viewer.id, inviteRoles, canAddAgents })}>
       {/* relative: the role picker's hidden input is absolutely placed and must stay inside the card. */}
@@ -78,7 +81,7 @@ export function MembersTable({ viewer, members, agents, invitations, roles, orig
             })}
             {agents.map((agent) => <AgentMemberRow key={agent.userId} agent={agent} canManage={canAddAgents} origin={origin} />)}
             {invitations.map((invitation) => (
-              <InvitationRow key={invitation.id} invitation={invitation} teamId={viewer.id} canResend={canInvite && inviteProblem(viewer, grantFor(invitation.role)) === null} />
+              <InvitationRow key={invitation.id} invitation={invitation} teamId={viewer.id} origin={origin} canResend={canInvite && inviteProblem(viewer, grantFor(invitation.role)) === null} />
             ))}
           </tbody>
         </table>

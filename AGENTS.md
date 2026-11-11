@@ -184,9 +184,9 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
 ## Database
 
 - The schema is in `src/db/schema.ts`, `src/db/oauth-schema.ts`,
-  `src/db/views-schema.ts`, `src/db/notification-schema.ts`, and
-  `src/db/connection-schema.ts`. Change it, then run `pnpm db:generate` and
-  commit the migration in `drizzle/`.
+  `src/db/views-schema.ts`, `src/db/notification-schema.ts`,
+  `src/db/connection-schema.ts`, and `src/db/file-copy-schema.ts`. Change it,
+  then run `pnpm db:generate` and commit the migration in `drizzle/`.
 - Migrations apply automatically when a production deploy builds:
   `pnpm build` runs `scripts/migrate-on-deploy.mts` before `next build`, under
   an advisory lock. A failed migration fails the build, and the old deployment
@@ -374,6 +374,34 @@ before the column) are plain attachments that pruning never removes, even
 after content links them. A ui artifact's Markdown block is text only
 (`media={false}`). Images from other sites never load. Add each new block
 to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
+
+### Replaced files
+
+Replace (the Files section, MCP `files_replace`, `src/lib/files/replace.ts`)
+puts an editor's finished upload in place of a plain attachment. The
+`artifact_file` row keeps its id, place, and name, so links and embeds open
+the new file; what it held moves to `artifact_file_copy`. The swap is one SQL
+statement, guarded on the key the editor saw, that also files the replace's
+version and writes its approval outcome (the edit request, or the new approved
+version), so the file, its History entry, and its approval land together or
+not at all. The approval is decided before the statement, which runs only
+while the artifact keeps that visibility and team. A refused replace leaves
+the file, its copies, the upload, and any request unchanged; steps before
+the swap may still give the history its starting snapshot, or pin an
+approved version to the artifact's current state where none existed, so
+readers see no difference. The page discards a refused upload with
+`removeUnattachedUpload`. A replace can
+swap a row's object at any time, so code that deletes file rows reads the key
+in the delete itself (`deleteFileRows`, `DELETE … RETURNING`).
+Content media and icon or cover images (of the artifact or any version) are
+never replaced; the Files section learns the version ones from
+`FileDto.pictured`, which only full artifact DTOs load. Readers get the
+current file, except readers of an approved version, who get the copy that
+was current when it was saved (`download.ts`, never a newer one). Old copies
+open only at `/api/files/<id>/copies/<copyId>`, for people who may edit, and
+never cached. A copy is kept while any version in the history was saved while
+it was current (`copies.ts`), goes with its file or artifact, and counts
+toward its uploader's file storage quota.
 
 ### Agent harnesses
 

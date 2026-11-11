@@ -88,6 +88,7 @@ describe("toolAccess", () => {
       "files_create_artifact",
       "files_delete",
       "files_finalize",
+      "files_replace",
       "files_request_upload",
       "inbox_mark_read",
     ]);
@@ -156,7 +157,7 @@ describe("tool annotations", () => {
   it("should mark the tools that delete or replace something destructive", async () => {
     const { tools } = await connect("full");
     const destructive = tools.filter((tool) => tool.annotations?.destructiveHint === true).map((tool) => tool.name).sort();
-    expect(destructive).toEqual(["artifacts_delete", "artifacts_restore_version", "artifacts_update", "comment_delete", "comment_update", "files_delete"]);
+    expect(destructive).toEqual(["artifacts_delete", "artifacts_restore_version", "artifacts_update", "comment_delete", "comment_update", "files_delete", "files_replace"]);
   });
 
   it("should mark the tools whose repeat changes nothing more idempotent", async () => {

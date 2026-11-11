@@ -1,4 +1,4 @@
-import type { FileDto } from "./files/types";
+import type { FileDto, OldFileDto } from "./files/types";
 import type { HarnessId } from "./harness/harnesses";
 import type { SheetFormat } from "./sheet-format/rules";
 import type { StoredArtifactTheme } from "./themes/artifact-theme";
@@ -27,11 +27,12 @@ export const sharingRequestKinds = ["sharing", "edit", "comments"] as const;
 export type SharingRequestKind = (typeof sharingRequestKinds)[number];
 /**
  * Why a version was saved. create: the first content. edit: a content or
- * metadata save. files: files were added or removed. restore: an older
+ * metadata save. files: files were added or removed. replace: a file was
+ * replaced by a newer upload (src/lib/files/replace.ts). restore: an older
  * version was brought back. snapshot: what an artifact showed before history
  * began, or when it was shared.
  */
-export const versionSaveKinds = ["create", "edit", "files", "restore", "snapshot"] as const;
+export const versionSaveKinds = ["create", "edit", "files", "replace", "restore", "snapshot"] as const;
 export type VersionSaveKind = (typeof versionSaveKinds)[number];
 /** Why a reader reports an artifact. */
 export const reportReasons = ["spam", "phishing", "malware", "harassment", "illegal", "private_info", "copyright", "other"] as const;
@@ -180,6 +181,8 @@ export interface VersionSummaryDto {
   pending: boolean;
   /** The newest version: what the artifact shows now. */
   latest: boolean;
+  /** For a replace: the name of the file it replaced, while History keeps the old copy. */
+  replacedFile: string | null;
 }
 
 /** One version with everything it saved. */
@@ -191,6 +194,8 @@ export interface VersionDetailDto extends VersionSummaryDto {
   language: string;
   source: string;
   metadata: Record<string, unknown>;
+  /** Files replaced since this version was saved, as they were then. For people who may edit the artifact. Set by the server. */
+  replacedSince?: OldFileDto[] | undefined;
 }
 
 /**

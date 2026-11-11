@@ -9,6 +9,7 @@ import { getEditableArtifact } from "@/lib/access";
 import { toArtifactDtos } from "@/lib/artifacts";
 import { createArtifactOnce } from "@/lib/create/create-once";
 import { attachFiles, deleteOwnFile, discardUnattachedUpload } from "@/lib/files/attach";
+import { replaceFile } from "@/lib/files/replace";
 import type { FileDto } from "@/lib/files/types";
 import { finalizeUpload, requestUpload, type UploadRequest } from "@/lib/files/uploads";
 import { getSession } from "@/lib/session";
@@ -87,6 +88,23 @@ export async function attachFilesAction(artifactId: string, fileIds: string[]): 
     const record = await getEditableArtifact(userId, { id: artifactId });
     if (!record) throw new UserFacingError("Artifact not found.");
     await attachFiles(userId, record.id, ids, "person");
+    revalidatePath("/app");
+    return editableArtifactDto(userId, record.id);
+  });
+}
+
+/**
+ * Replaces a file of an artifact the person may edit with their finished
+ * upload. The file keeps its id, place, and name; the old copy stays in
+ * History. A refusal leaves the file as it was (replaceFile says what else
+ * may be recorded); the page then discards the upload.
+ */
+export async function replaceFileAction(artifactId: string, fileId: string, uploadId: string): Promise<ActionResult<ArtifactDto>> {
+  return run("The file could not be replaced. Try again.", async (userId) => {
+    const ids = z.object({ fileId: z.uuid(), uploadId: z.uuid() }).parse({ fileId, uploadId });
+    const record = await getEditableArtifact(userId, { id: z.string().min(1).max(200).parse(artifactId) });
+    if (!record) throw new UserFacingError("Artifact not found.");
+    await replaceFile(userId, { ...ids, artifactId: record.id }, "person");
     revalidatePath("/app");
     return editableArtifactDto(userId, record.id);
   });

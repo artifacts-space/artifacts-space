@@ -9,7 +9,7 @@ import { leaveTeamAction, updateSharingRuleAction } from "@/app/(workspace)/team
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 
-import { SharingRulePicker } from "./sharing-rule-picker";
+import { SharingRulePicker, sharingRuleFootnote } from "./sharing-rule-picker";
 import { useTeamAction } from "./use-team-action";
 
 /** The team's sharing rule. Everyone sees it; only owners change it. */
@@ -28,7 +28,7 @@ export function SharingRuleSetting({ teamId, needsApproval, canEdit }: { teamId:
     <div className="space-y-3 p-5">
       <SharingRulePicker value={value} onChange={(next) => void change(next)} disabled={!canEdit || pending !== null} />
       <p className="text-sm leading-5 text-muted-foreground">
-        Link and public sharing always need an admin&apos;s approval in this team.
+        {sharingRuleFootnote}
         {canEdit ? "" : " Only owners can change this rule."}
       </p>
     </div>

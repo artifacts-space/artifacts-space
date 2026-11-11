@@ -22,6 +22,7 @@ import { SharedArtifactsTable } from "./shared-artifacts-table";
 import { TeamIcon } from "./team-icon";
 import { TeamIconControl } from "./team-icon-control";
 import { TeamTabs, type TabPanel } from "./team-tabs";
+import { TeamRuleNote } from "./team-rule-note";
 import { TeamThemes } from "./team-themes";
 import { LeaveTeamButton } from "./team-settings";
 
@@ -153,6 +154,7 @@ export function TeamPageView({ data, selection }: { data: TeamPageData; selectio
   return (
     <main className="mx-auto w-full max-w-4xl space-y-6 p-4 py-8 sm:p-6 sm:py-10">
       <TeamHeader team={data.team} />
+      {data.team.personal || data.team.kind !== "person" ? null : <TeamRuleNote team={data.team} />}
       <TeamTabs tabs={tabPanels(data, availableTeamTabs(access), approvals)} views={views} initial={selection} />
     </main>
   );

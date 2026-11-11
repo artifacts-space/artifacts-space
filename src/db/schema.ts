@@ -359,6 +359,8 @@ export const artifactFile = pgTable(
     // version that does not show it and removed once no version names it (served-images.ts, icon-cleanup.ts). False for files attached
     // any other way (files_attach, the Files panel), which pruning never removes, and for every file attached before this column.
     attachedByContent: boolean("attached_by_content").notNull().default(false),
+    // When its current object replaced an older one (src/lib/files/replace.ts); the old ones are in artifact_file_copy. Null until replaced.
+    replacedAt: timestamp("replaced_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

@@ -31,6 +31,7 @@ describe("mcpLimitChecks", () => {
   it("should count artifact edits per token when the tool changes an artifact", () => {
     expect(mcpLimitChecks(principal, ["artifacts_update"])).toEqual([{ name: "artifactUpdateByToken", subject: "api:t1" }]);
     expect(mcpLimitChecks(principal, ["files_attach"])).toEqual([{ name: "artifactUpdateByToken", subject: "api:t1" }]);
+    expect(mcpLimitChecks(principal, ["files_replace"])).toEqual([{ name: "artifactUpdateByToken", subject: "api:t1" }]);
     expect(mcpLimitChecks(principal, ["artifacts_restore_version"])).toEqual([{ name: "artifactUpdateByToken", subject: "api:t1" }]);
   });
 

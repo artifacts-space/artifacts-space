@@ -40,3 +40,10 @@ export function actionErrorMessage(error: unknown, fallback: string) {
   if (isAPIError(error) && error.message) return teamWording(error.message);
   return fallback;
 }
+
+/** The code of a Better Auth refusal (its error code name), or undefined for anything else. */
+export function apiErrorCode(error: unknown): string | undefined {
+  if (!isAPIError(error)) return undefined;
+  const code: unknown = error.body?.code;
+  return typeof code === "string" ? code : undefined;
+}
