@@ -160,15 +160,18 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4, 5, 6]
     steps:
-      # `strategy.job-total` counts every matrix combination, so a second
-      # matrix key would make each job run a smaller slice and skip tests
-      # while staying green. Fail instead.
-      - name: Check that shard is the only matrix key
+      # `--shard` takes its total from `strategy.job-total`, which counts every
+      # matrix combination. A second matrix key, or a repeated or missing shard
+      # number, would skip tests while staying green. Requiring `shard` to be
+      # the only key and equal to the job's position proves the shards are
+      # exactly 1 to job-total. Fail otherwise.
+      - name: Check that the shards are exactly 1 to the matrix total
         env:
           MATRIX: ${{ toJSON(matrix) }}
+          JOB_INDEX: ${{ strategy.job-index }}
         run: |
-          jq -e 'keys == ["shard"]' <<<"$MATRIX" > /dev/null || {
-            echo "::error::The gallery matrix must have only the shard key; --shard uses strategy.job-total"
+          jq -e --argjson index "$JOB_INDEX" 'keys == ["shard"] and .shard == $index + 1' <<<"$MATRIX" > /dev/null || {
+            echo "::error::matrix.shard must be the only matrix key and list 1, 2, 3, ... in order; --shard uses strategy.job-total"
             exit 1
           }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -187,12 +190,17 @@ jobs:
           version="$(node -p "require('./node_modules/@playwright/test/package.json').version")"
           [ -n "$version" ] || { echo "::error::Could not read the Playwright version"; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
+      - id: playwright-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with: &playwright-cache
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       # With the browser cached this only installs the system packages.
       - run: pnpm exec playwright install --with-deps chromium
+      # Only shard 1 saves a missed browser cache, so six shards do not race.
+      - if: matrix.shard == 1 && steps.playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with: *playwright-cache
       # Restore only, so six shards do not race to save it; the Build job saves
       # it. The exact key exists only once Build has finished for this commit;
       # before that, restore-keys brings back an earlier commit's cache.
