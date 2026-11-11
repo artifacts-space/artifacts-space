@@ -16,7 +16,7 @@ import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
 import { markdownThemeLabel } from "@/lib/themes/theme-privacy";
 import { coverLabel } from "@/lib/covers/cover";
 import { UserFacingError } from "@/lib/user-facing-error";
-import { latestVersion } from "@/lib/versions/history";
+import { versionAt } from "@/lib/versions/history";
 
 import type { ArtifactMarkdownInput } from "./artifact-markdown";
 import { commentsToMarkdown, type CommentsForMarkdown } from "./comments-markdown";
@@ -83,8 +83,9 @@ function emojiOf(icon: string | null): string | null {
 /** Editors read the latest version, so they also get the baseVersion an agent sends back with artifacts_update (src/lib/edits); null for everyone else. */
 async function baseVersionFor(viewable: ViewableArtifact): Promise<string | null> {
   if (!viewable.canEdit || viewable.version.source !== "latest") return null;
-  const latest = await latestVersion(viewable.record.id);
-  return encodeBaseVersion({ versionId: latest?.id ?? null, updatedAt: viewable.view.updatedAt });
+  // The version that holds the save the reader sees, as artifacts_get names it (baseVersionOf): never a later one.
+  const version = await versionAt(viewable.record.id, new Date(viewable.view.updatedAt));
+  return encodeBaseVersion({ versionId: version?.id ?? null, updatedAt: viewable.view.updatedAt });
 }
 
 /** Loads everything the Markdown version shows. `withComments` adds the thread (?comments=1). */

@@ -252,7 +252,9 @@ export async function dropSupersededSessionVersion(
   ]);
   const state = { newVersionId: save.newVersionId, approvedVersionId: owner?.approvedVersionId ?? null, references };
   if (!owner || !canDropSuperseded(previous, { ...save, now: record.updatedAt }, state)) return;
-  await getDb().delete(sharingRequest).where(and(eq(sharingRequest.artifactId, record.id), eq(sharingRequest.versionId, previous.id), eq(sharingRequest.status, "approved")));
+  // Both deletes run only while the artifact is still at this save: a newer save decides about the version from then on.
+  const stillAtSave = artifactStillAt(record.id, record.updatedAt);
+  await getDb().delete(sharingRequest).where(and(eq(sharingRequest.artifactId, record.id), eq(sharingRequest.versionId, previous.id), eq(sharingRequest.status, "approved"), stillAtSave));
   await getDb().delete(artifactVersion).where(and(eq(artifactVersion.artifactId, record.id), eq(artifactVersion.id, previous.id), artifactStillAt(record.id, record.updatedAt)));
 }
 
