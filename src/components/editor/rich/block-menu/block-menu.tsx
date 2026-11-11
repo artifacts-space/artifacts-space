@@ -8,7 +8,7 @@ import type { BlockMenuLastEdited } from "./block-menu-context";
 import { ChangeSubmenu, MenuFooter, MenuRow, panelClass, panelWidth, placementClass, SearchRow } from "./block-menu-parts";
 import { menuReducer, openedMenu, rowsFor, type MenuEvent, type MenuState } from "./block-menu-state";
 import { besideRule, menuWidth, pointMenuRule, submenuOpensBeside, submenuWidth } from "./menu-placement";
-import { canHover, useFloatingMenu, usePhoneSheet, usePressOutside, useRoomBelow, type MenuAnchor } from "./use-floating-menu";
+import { canHover, useFloatingMenu, usePhoneSheet, usePressOutside, useSettling, type MenuAnchor } from "./use-floating-menu";
 
 /** Why the menu closed: Escape and Tab return focus to the grip; a press outside leaves focus where it lands. */
 export type MenuCloseReason = "escape" | "outside";
@@ -23,6 +23,8 @@ export interface BlockMenuProps {
   anchor: MenuAnchor;
   /** Presses on this element (the grip) do not count as outside the menu. */
   keepOpenOn: HTMLElement | null;
+  /** True when opening scrolled the page to make room (makeRoomBelow): the menu ignores presses until the pointer moves. */
+  moved: boolean;
   onCommand: (command: MenuCommand) => void;
   onClose: (reason: MenuCloseReason) => void;
 }
@@ -124,7 +126,7 @@ export function MenuList({ menuId, typeName, rows, state, mac, onChangeRow, onHo
  * ← or Escape closes it, and Escape closes the menu. Beside its anchor on
  * wider screens; a sheet with 44px rows on phones.
  */
-export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, keepOpenOn, onCommand, onClose }: BlockMenuProps) {
+export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, keepOpenOn, moved, onCommand, onClose }: BlockMenuProps) {
   const reduce = useCallback((state: MenuState, event: MenuEvent) => menuReducer(state, event, context), [context]);
   const [state, send] = useReducer(reduce, openedMenu);
   const rows = useMemo(() => rowsFor(state, context), [state, context]);
@@ -138,7 +140,7 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
   const [changeRow, setChangeRow] = useState<HTMLElement | null>(null);
   const submenu = state.submenu;
 
-  useRoomBelow(anchor, menuWidth, !sheet);
+  const settling = useSettling(moved);
   useFloatingMenu(panelRef, anchor, anchor.kind === "element" ? besideRule : pointMenuRule, !sheet);
   useFloatingMenu(subRef, submenu ? changeRow : null, besideRule, !sheet);
   usePressOutside(insideRefs, useCallback(() => { onClose("outside"); }, [onClose]));
@@ -180,7 +182,7 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
   return createPortal(
     <>
       {sheet && submenu ? null : (
-        <div ref={panelRef} tabIndex={-1} onKeyDown={onKeyDown} data-slot="block-menu" className={`${panelClass} ${placementClass(sheet, "")}`} style={panelWidth(sheet, menuWidth)}>
+        <div ref={panelRef} tabIndex={-1} onKeyDown={onKeyDown} data-slot="block-menu" {...settling} className={`${panelClass} ${placementClass(sheet, "")}`} style={panelWidth(sheet, menuWidth)}>
           <SearchRow inputRef={inputRef} value={state.query} menuId={menuId} activeId={state.active >= 0 ? `${menuId}-row-${String(state.active)}` : undefined} onChange={(query) => { send({ type: "typed", query }); }} />
           <MenuList menuId={menuId} typeName={typeName} rows={rows} state={state} mac={mac} onChangeRow={setChangeRow} onHover={hover} onChoose={(index) => { choose(index, !canHover()); }} />
           {rows.length === 0 ? <p className="px-2 py-2 text-sm text-muted-foreground">No actions match “{state.query.trim()}”.</p> : null}

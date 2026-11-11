@@ -435,7 +435,8 @@ the beside layout appears from about a 1700px window; narrower windows take
 the below path, and opening scrolls the page just enough for the menu to fit
 under the block. It moves up or down to stay on
 screen but never flips above, never covers the handle (nor the block, unless
-the block runs off the window), and only fades in once placed. Keep it that way; `e2e/block-menu-position.spec.ts`
+the block runs off the window or the page is already at its end), and only
+fades in once placed. Keep it that way; `e2e/block-menu-position.spec.ts`
 checks it by bounding boxes. Readers get only Copy link to block
 on right-click (`src/components/block-links`).
 

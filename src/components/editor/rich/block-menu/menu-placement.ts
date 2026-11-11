@@ -41,7 +41,9 @@ export interface PlacementRule {
  * top-aligned, or below, aligned to its left edge, when the left has no
  * room. Below the handle means below the whole block (handleBox), and a submenu
  * below its row stays over the menu, so neither covers the handle, nor the
- * block unless it runs past the bottom of the window.
+ * block unless it runs past the bottom of the window. One exception: at the
+ * end of a page that cannot scroll further, the menu rises over the handle
+ * to stay on screen (handleBox).
  */
 export const besideRule: PlacementRule = { preferred: "left-start", fallback: "bottom-start" };
 

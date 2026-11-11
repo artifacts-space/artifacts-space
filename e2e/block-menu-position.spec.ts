@@ -186,6 +186,10 @@ test.describe("block menu placement on a narrow window", () => {
     expect(opened.menu.y + opened.menu.height).toBeLessThanOrEqual(opened.viewport.height - edge + 1);
     expect(overlaps(opened.menu, opened.handle)).toBe(false);
     expect(overlaps(opened.menu, opened.block)).toBe(false);
+    // The page moved under the pointer: the menu ignores presses until the pointer moves, then works as usual.
+    await expect(menu(page)).toHaveCSS("pointer-events", "none");
+    await page.mouse.move(opened.menu.x + 40, opened.menu.y + 60, { steps: 4 });
+    await expect(menu(page)).toHaveCSS("pointer-events", "auto");
   });
 });
 

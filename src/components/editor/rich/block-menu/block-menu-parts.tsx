@@ -29,7 +29,7 @@ export const panelClass =
  */
 export function placementClass(sheet: boolean, width: string): string {
   if (sheet) return "fixed inset-x-0 bottom-0 max-h-[72dvh] rounded-t-xl px-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] animate-in fade-in-0 duration-100 motion-reduce:animate-none";
-  return cn("fixed top-0 left-0 rounded-xl transition-opacity duration-100 not-data-placed:pointer-events-none not-data-placed:opacity-0 motion-reduce:transition-none", width);
+  return cn("fixed top-0 left-0 rounded-xl transition-opacity duration-100 not-data-placed:pointer-events-none data-settling:pointer-events-none not-data-placed:opacity-0 motion-reduce:transition-none", width);
 }
 
 /** A floating panel's width in pixels; none in the phone sheet, which spans the screen. */

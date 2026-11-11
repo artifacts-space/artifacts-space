@@ -16,12 +16,14 @@ import { BlockMenuExtension, setBlockMenuHost, setMenuTarget } from "./block-men
 import { blockCounts, blockShape, blockTargetAt, blockTargetFrom, canMoveBlock, documentBlocks } from "./block-target";
 import { blockTypeName, currentBlockType } from "./block-types";
 import { useBlockPlaces, useEditorState, useHoveredBlock } from "./use-block-places";
-import type { MenuAnchor } from "./use-floating-menu";
+import { makeRoomBelow, type MenuAnchor } from "./use-floating-menu";
 
 interface OpenMenu {
   pos: number;
   anchor: MenuAnchor;
   grip: HTMLElement | null;
+  /** Opening scrolled the page to make room below the block. */
+  moved: boolean;
 }
 
 /** What the menu shows for the block at `pos`, or null when no block starts there any more. */
@@ -138,7 +140,7 @@ function BlockControls({ editor, frame }: BlockControlsProps) {
   const places = useBlockPlaces(editor, frame, handlePositions(state.doc, touch, shown), state.doc, touch);
 
   const open = useCallback((pos: number, anchor: MenuAnchor, grip: HTMLElement | null = null) => {
-    setMenu({ pos, anchor, grip });
+    setMenu({ pos, anchor, grip, moved: makeRoomBelow(anchor) });
     setMenuTarget(editor.view, pos);
   }, [editor]);
 
@@ -198,6 +200,7 @@ function BlockControls({ editor, frame }: BlockControlsProps) {
           mac={mac}
           anchor={menu.anchor}
           keepOpenOn={menu.grip}
+          moved={menu.moved}
           onCommand={onCommand}
           onClose={close}
         />

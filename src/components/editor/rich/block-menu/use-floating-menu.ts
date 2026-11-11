@@ -1,9 +1,9 @@
 "use client";
 
 import { autoUpdate, computePosition, offset, shift, size, type VirtualElement } from "@floating-ui/dom";
-import { useEffect, useLayoutEffect, useSyncExternalStore, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useState, useSyncExternalStore, type RefObject } from "react";
 
-import { choosePlacement, handleBox, menuEdge, menuGap, menuMinHeight, scrollForRoom, type PlacementRule } from "./menu-placement";
+import { choosePlacement, handleBox, menuEdge, menuGap, menuMinHeight, menuWidth, scrollForRoom, type PlacementRule } from "./menu-placement";
 
 /**
  * Where a menu opens: beside a block's handle (with the block, read each
@@ -82,16 +82,39 @@ export function useFloatingMenu(floating: RefObject<HTMLElement | null>, anchor:
 /**
  * Before a menu from a grip opens below its block (the left has no room),
  * scrolls the page so the menu fits under the block instead of past the
- * window's bottom edge. Runs once as the menu opens, before it is placed.
+ * window's bottom edge. Called once from the click that opens the menu, so
+ * it runs before the menu is placed. Returns true when the page moved.
  */
-export function useRoomBelow(anchor: MenuAnchor, width: number, enabled: boolean) {
-  useLayoutEffect(() => {
-    if (!enabled || anchor.kind !== "element") return;
-    const root = document.documentElement;
-    const block = anchor.block?.()?.getBoundingClientRect() ?? null;
-    const by = scrollForRoom(anchor.element.getBoundingClientRect(), block, width, root.clientWidth, root.clientHeight);
-    if (by > 0) window.scrollBy({ top: by, behavior: "instant" });
-  }, [anchor, width, enabled]);
+export function makeRoomBelow(anchor: MenuAnchor): boolean {
+  if (anchor.kind !== "element" || window.matchMedia(phoneQuery).matches) return false;
+  const root = document.documentElement;
+  const block = anchor.block?.()?.getBoundingClientRect() ?? null;
+  const by = scrollForRoom(anchor.element.getBoundingClientRect(), block, menuWidth, root.clientWidth, root.clientHeight);
+  if (by <= 0) return false;
+  window.scrollBy({ top: by, behavior: "instant" });
+  return true;
+}
+
+/**
+ * After makeRoomBelow moved the page under a pointer that did not move, the
+ * menu can open under the pointer. Until the pointer really moves, the menu
+ * ignores presses (`data-settling`), so a second click on the grip never
+ * runs the row now under it. Spread the result onto the menu's panel.
+ */
+export function useSettling(moved: boolean): { "data-settling"?: "" } {
+  const [settling, setSettling] = useState(moved);
+  useEffect(() => {
+    if (!settling) return;
+    // Browsers may send a still pointer's position again after a scroll: only a move away from where it first shows counts.
+    let from: { x: number; y: number } | null = null;
+    const onMove = (event: PointerEvent) => {
+      from ??= { x: event.clientX, y: event.clientY };
+      if (Math.abs(event.clientX - from.x) + Math.abs(event.clientY - from.y) >= 3) setSettling(false);
+    };
+    window.addEventListener("pointermove", onMove);
+    return () => { window.removeEventListener("pointermove", onMove); };
+  }, [settling]);
+  return settling ? { "data-settling": "" } : {};
 }
 
 /** Closes a menu on a press anywhere outside the given elements. */
