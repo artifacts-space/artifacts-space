@@ -9,7 +9,7 @@ import { filterSlashCommands, slashCommandsFor } from "./slash-commands";
 
 describe("filterSlashCommands", () => {
   it("should offer every block when nothing is typed after the slash", () => {
-    expect(filterSlashCommands("")).toHaveLength(15);
+    expect(filterSlashCommands("")).toHaveLength(16);
   });
 
   it("should offer the media blocks when their names are typed", () => {
@@ -24,6 +24,9 @@ describe("filterSlashCommands", () => {
     expect(filterSlashCommands("tab").map((command) => command.id)).toEqual(["table"]);
     expect(filterSlashCommands("todo").map((command) => command.id)).toEqual(["task"]);
     expect(filterSlashCommands("---").map((command) => command.id)).toEqual(["divider"]);
+    expect(filterSlashCommands("mermaid").map((command) => command.id)).toEqual(["mermaid"]);
+    expect(filterSlashCommands("diagram").map((command) => command.id)).toEqual(["mermaid"]);
+    expect(filterSlashCommands("code").map((command) => command.id)).toEqual(["code", "mermaid"]);
   });
 
   it("should match nothing when no block fits", () => {
@@ -37,7 +40,7 @@ describe("editors without media", () => {
 
   it("should offer text blocks only when media is off", () => {
     const ids = slashCommandsFor(false).map((command) => command.id);
-    expect(ids).toEqual(["h1", "h2", "h3", "bullet", "ordered", "task", "quote", "code", "table", "divider"]);
+    expect(ids).toEqual(["h1", "h2", "h3", "bullet", "ordered", "task", "quote", "code", "mermaid", "table", "divider"]);
     expect(filterSlashCommands("image", slashCommandsFor(false))).toEqual([]);
     expect(filterSlashCommands("upload", slashCommandsFor(false))).toEqual([]);
   });

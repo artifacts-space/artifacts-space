@@ -7,9 +7,11 @@ import RichMarkdownEditor from "@/components/editor/rich-markdown-editor";
 
 /**
  * Development only: Mermaid diagrams in a Markdown document, with no
- * database. The read view draws one diagram that works and one that cannot
- * be drawn; the rich editor below holds a diagram to edit, and the Markdown
- * it would save shows under it. The markdown-mermaid e2e test reads both.
+ * database. The read view draws one diagram that works, one that cannot be
+ * drawn, one in the Code view, one in Split with a caption, and a wrapped,
+ * captioned code block; the rich editor below holds a diagram to edit, and
+ * the Markdown it would save shows under it. The markdown-mermaid e2e tests
+ * read both.
  */
 
 export const readFixtureMarkdown = `# Diagram fixture
@@ -35,6 +37,25 @@ Plain code stays code:
 \`\`\`ts
 const answer = 42;
 \`\`\`
+
+The source alone:
+
+\`\`\`mermaid {view=code}
+flowchart LR
+  Source --> Only
+\`\`\`
+
+The source and the diagram together:
+
+\`\`\`mermaid {view=split caption="Say \\"ship\\" when it is ready"}
+flowchart TD
+  Draft --> Review
+  Review --> Ship
+\`\`\`
+
+\`\`\`text {wrap=true caption="Build output"}
+A long line of build output that wraps onto the next line instead of scrolling sideways out of the frame.
+\`\`\`
 `;
 
 export const editorFixtureMarkdown = `# Editor diagram
@@ -53,7 +74,7 @@ End paragraph.
 export function MermaidFixture() {
   const [markdown, setMarkdown] = useState(editorFixtureMarkdown);
   return (
-    <main className="mx-auto w-full max-w-[72ch] px-4 py-10">
+    <main className="mx-auto w-full max-w-5xl px-4 py-10">
       <section aria-label="Read view">
         <ArtifactView kind="markdown" content={readFixtureMarkdown} title="Diagram fixture" />
       </section>

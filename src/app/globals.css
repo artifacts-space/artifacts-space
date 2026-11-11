@@ -781,7 +781,7 @@
     font-size: max(0.75em, var(--text-xs));
   }
   /* Fenced code is the shared code block (src/components/code), which styles itself. */
-  .artifact-prose > [data-code-block] {
+  .artifact-prose > :is([data-code-block], [data-code-figure]) {
     margin-top: 1.1em;
   }
   .artifact-prose [data-code-block] pre {
@@ -896,17 +896,29 @@
   .rich-editor-content .rich-code-block {
     margin-top: 0.9em;
   }
-  /* Same surface as the read-side code block (the --code tokens); plain text while editing. */
-  .rich-editor-content .rich-code-block pre {
-    margin-top: 0;
-    /* The read-side block's px-4 py-3.5, plus room on the right for the language picker. */
-    padding: 0.875rem 7.5rem 0.875rem 1rem;
-    border-color: var(--code-border);
+  /* Same surface as the read-side code block (the --code tokens): a toolbar, then the code; plain text while editing. */
+  .rich-editor-content .rich-code-frame {
+    overflow: hidden;
+    border: 1px solid var(--code-border);
     border-radius: var(--radius-lg);
     background: var(--code);
     color: var(--code-foreground);
+  }
+  .rich-editor-content .rich-code-block pre {
+    margin-top: 0;
+    /* The read-side block's px-4 py-3.5. */
+    padding: 0.875rem 1rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
     white-space: pre;
     tab-size: 2;
+  }
+  /* Wrap code: long lines fold instead of scrolling sideways. */
+  .rich-editor-content .rich-code-block pre[data-wrap] {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
   .rich-editor-content .rich-media {
     margin-top: 1.25em;

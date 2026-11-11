@@ -53,7 +53,7 @@ function FormatSection({ kind }: { kind: FormatKind }) {
         rows={[
           ["kind", kind],
           ["Saves when", <InlineCodeText key="checks" text={doc.checks} />],
-          ["Shows as", doc.renders],
+          ["Shows as", <InlineCodeText key="renders" text={doc.renders} />],
         ]}
       />
       <CodeSnippet title="Example content" language={exampleLanguage[kind]} code={doc.example} className="mt-4" />
