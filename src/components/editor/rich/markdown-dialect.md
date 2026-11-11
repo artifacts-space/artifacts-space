@@ -259,9 +259,9 @@ Ship it on Friday <!-- color: red -->
   the page, a card, and every hue's background, and body text reads at AA
   on every background (`block-color-tokens.test.ts`). An artifact theme
   derives its own pairs from the same hues (`blockColorTokens` in
-  `src/lib/themes/derive.ts`): each background tints the theme's card, and
-  each text color is re-lit to keep the same guarantee on the theme's
-  surfaces. A line with a background and no text color is drawn in the
+  `src/lib/themes/derive.ts`): each background tints the theme's card and
+  stays visibly apart from it, and each text color is re-lit to keep the
+  same guarantee on the theme's surfaces. A line with a background and no text color is drawn in the
   body text color, even in a quote or a small heading that is otherwise
   muted, so it stays readable on its background.
 - **The comment** holds `name: value` declarations split by `;`. `color` is

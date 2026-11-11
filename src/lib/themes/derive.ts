@@ -146,6 +146,23 @@ export function mentionTokens(mode: PaletteMode, colors: ThemeColors): Record<st
 /** How far a block background leans from the card toward its hue's text: a tint that reads as that hue. */
 const blockFillTint: Record<PaletteMode, number> = { light: 0.1, dark: 0.13 };
 
+/** How far a block background's lightness stays from the card's, so it shows as a block even when its hue is faint (gray). */
+export const blockFillGap = 0.03;
+
+/**
+ * One hue's background: the card tinted toward the hue, then kept at AA
+ * under the ink. When the ink sits near the AA floor on the card, that push
+ * lands the tint back on the card; it then steps to the far side of the card
+ * from the ink, which only raises the ink's contrast.
+ */
+function blockFill(mode: PaletteMode, card: Oklch, ink: Oklch, hueInk: Oklch): Oklch {
+  const fill = ensureContrast(mixOklch(card, hueInk, blockFillTint[mode]), ink, 4.55);
+  if (Math.abs(fill.l - card.l) >= blockFillGap) return fill;
+  const away = card.l >= ink.l ? 1 : -1;
+  const apart = { ...fill, l: Math.min(1, Math.max(0, card.l + away * blockFillGap)) };
+  return contrastRatio(ink, apart) >= 4.55 ? apart : fill;
+}
+
 /**
  * Block colors (markdown-dialect.md, "Block colors") for a themed card and
  * page. Each background is the card tinted toward the hue, kept readable
@@ -159,7 +176,7 @@ export function blockColorTokens(mode: PaletteMode, colors: ThemeColors): Record
   const ink = read(colors.foreground);
   const tokens: Record<string, string> = {};
   const fills = blockHues.map((hue) => {
-    const fill = ensureContrast(mixOklch(card, read(siteBlockColors[mode][hue].text), blockFillTint[mode]), ink, 4.55);
+    const fill = blockFill(mode, card, ink, read(siteBlockColors[mode][hue].text));
     tokens[`--block-${hue}-bg`] = formatOklch(fill);
     return fill;
   });
