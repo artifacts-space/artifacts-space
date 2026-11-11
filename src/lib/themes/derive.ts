@@ -149,7 +149,8 @@ const blockFillTint: Record<PaletteMode, number> = { light: 0.1, dark: 0.13 };
 /**
  * Block colors (markdown-dialect.md, "Block colors") for a themed card and
  * page. Each background is the card tinted toward the hue, kept readable
- * under the theme's ink. Any text color can sit on any background, so each
+ * under the theme's ink, which every line with a background and no text
+ * color uses (globals.css). Any text color can sit on any background, so each
  * keeps the site's hue and chroma and is re-lit until it reads at AA on the
  * card, the page, and every hue's background.
  */

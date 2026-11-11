@@ -28,9 +28,10 @@ function failingPairs(mode: PaletteMode, colors: ThemeColors): string[] {
 }
 
 /**
- * A preset's palette with its card at `card` lightness and its page a step
- * further from the ink, as a custom theme may set them: two surfaces on the
- * same side, not the same color.
+ * A preset's palette with its card at `card` lightness and its page beside
+ * it, as a custom theme may set them: two surfaces on the same side, not the
+ * same color. In light mode the page sits a little toward the ink (as the
+ * site's page sits under its white cards); in dark mode, below the card.
  */
 function withSurfaces(colors: ThemeColors, mode: PaletteMode, card: number): ThemeColors {
   const page = mode === "light" ? card - 0.05 : card - 0.08;

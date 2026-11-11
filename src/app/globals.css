@@ -1119,6 +1119,14 @@
 [data-block-background="red"] {
   --block-fill: var(--block-red-bg);
 }
+/*
+ * A line with a background and no text color is drawn in the body ink, even
+ * where it would be muted (a quote, a small heading, a done task): the
+ * backgrounds are tuned to keep the ink at AA, in every theme.
+ */
+[data-block-background]:not([data-block-color]) {
+  color: var(--foreground);
+}
 /* Lines with a background get room around the text, without moving it. */
 :is(.artifact-prose, .rich-editor-content) :is(p, h1, h2, h3, h4, h5, h6, li > span)[data-block-background] {
   padding-inline: 0.375rem;

@@ -288,3 +288,20 @@ test("should show block colors in the read view", async ({ page }) => {
   const fill = await line.evaluate((element) => getComputedStyle(element).backgroundColor);
   expect(fill).not.toBe("rgba(0, 0, 0, 0)");
 });
+
+test("should draw a quote with a background in the body text color, so it stays readable", async ({ page, isMobile }) => {
+  await openFixture(page);
+  await openMenu(page, "A person's lock", isMobile);
+  if (isMobile) {
+    await menu(page).getByRole("menuitem", { name: "Color" }).click();
+    await page.locator("[data-slot=block-menu-color]").getByRole("menuitemradio", { name: "Green background" }).click();
+  } else {
+    await page.keyboard.type("green background");
+    await page.keyboard.press("Enter");
+  }
+  await expect(savedMarkdown(page)).toContainText("> A person's lock beats a supplier close. <!-- background: green -->");
+  const quoted = editor(page).locator('blockquote p[data-block-background="green"]');
+  const plain = block(page, "Closing paragraph");
+  const [quoteInk, bodyInk] = await Promise.all([quoted.evaluate((element) => getComputedStyle(element).color), plain.evaluate((element) => getComputedStyle(element).color)]);
+  expect(quoteInk).toBe(bodyInk);
+});

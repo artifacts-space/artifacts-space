@@ -261,7 +261,9 @@ Ship it on Friday <!-- color: red -->
   derives its own pairs from the same hues (`blockColorTokens` in
   `src/lib/themes/derive.ts`): each background tints the theme's card, and
   each text color is re-lit to keep the same guarantee on the theme's
-  surfaces.
+  surfaces. A line with a background and no text color is drawn in the
+  body text color, even in a quote or a small heading that is otherwise
+  muted, so it stays readable on its background.
 - **The comment** holds `name: value` declarations split by `;`. `color` is
   the text color and `background` the background. The editor writes
   `<!-- color: <hue>; background: <hue> -->`, color first, with the
