@@ -131,29 +131,44 @@ jobs:
             next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm build
 
-  # The gallery (Playwright, `pnpm test:e2e`) runs in parallel shards. One
-  # worker ran 695 tests in 31 minutes on PR #117: about 15 minutes each for
-  # the phone and desktop projects, and seconds for the production checks.
-  # Six shards give each one about 5 minutes of tests. Playwright splits
+  # The gallery (Playwright, `pnpm test:e2e`) runs in parallel shards. On one
+  # worker its 683 tests took 34 minutes on main in Nov 2026: about 15 each
+  # for the phone and desktop projects, seconds for the production checks.
+  # Six shards finished in 5 to 8 minutes each (PR #119). Playwright splits
   # whole files in order, balanced by the number of tests that are not
   # skipped, so a shard's time varies with the files it gets. When the slowest
   # shard passes 12 minutes, add numbers to `matrix.shard`; `--shard` takes
   # its total from the matrix.
   #
   # Every shard starts both web servers from playwright.config.ts, including
-  # `next build` for the production checks. The build cache from the Build job
-  # makes that build take seconds, and it runs while the dev server starts, so
-  # building once and handing `.next` to the shards would be slower.
+  # `next build` for the production checks. That build runs while the dev
+  # server starts, and with a restored `.next/cache` both servers are up in
+  # 35-65 seconds (about 100 cold). A separate job that builds once and hands
+  # `.next` to the shards would add its own 45 seconds or more before any
+  # shard starts, and the dev server would still have to start, so each
+  # shard builds its own.
   e2e:
     name: Component gallery shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Shards take 5-8 minutes; the headroom covers a cold cache.
+    timeout-minutes: 25
     strategy:
       # Let every shard finish, so one run shows every failing test.
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6]
     steps:
+      # `strategy.job-total` counts every matrix combination, so a second
+      # matrix key would make each job run a smaller slice and skip tests
+      # while staying green. Fail instead.
+      - name: Check that shard is the only matrix key
+        env:
+          MATRIX: ${{ toJSON(matrix) }}
+        run: |
+          jq -e 'keys == ["shard"]' <<<"$MATRIX" > /dev/null || {
+            echo "::error::The gallery matrix must have only the shard key; --shard uses strategy.job-total"
+            exit 1
+          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -172,7 +187,9 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       # With the browser cached this only installs the system packages.
       - run: pnpm exec playwright install --with-deps chromium
-      # Restore only: the Build job saves this cache, so six shards do not race to.
+      # Restore only, so six shards do not race to save it; the Build job saves
+      # it. The exact key exists only once Build has finished for this commit;
+      # before that, restore-keys brings back an earlier commit's cache.
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .next/cache

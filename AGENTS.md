@@ -68,7 +68,8 @@ on `main`. The required checks are the job names: **Lint and typecheck**,
 **Dependency review**.
 The Playwright gallery runs in parallel shards ("Component gallery shard N");
 the **Component gallery** job only gates them and passes only when every
-shard passed. Add shards by extending `matrix.shard`; never rename the gate.
+shard passed. Add shards by extending `matrix.shard`, keep `shard` the only
+matrix key (a step fails otherwise), and never rename the gate.
 The build needs no secrets; keep it that way, and create database, auth,
 email, and R2 clients on first request, never at import time. CodeQL scans
 the code and the workflows. Dependabot opens grouped weekly updates and waits
