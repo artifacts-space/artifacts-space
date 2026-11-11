@@ -1,15 +1,34 @@
 "use client";
 
-import { autoUpdate, computePosition, flip, offset, shift, size, type Placement, type VirtualElement } from "@floating-ui/dom";
+import { autoUpdate, computePosition, offset, shift, size, type VirtualElement } from "@floating-ui/dom";
 import { useEffect, useLayoutEffect, useSyncExternalStore, type RefObject } from "react";
 
-/** Where a menu opens: beside an element (the grip), or at a point inside one (a right-click), so it follows the page as it scrolls. */
-export type MenuAnchor = { kind: "element"; element: HTMLElement } | { kind: "point"; element: HTMLElement; dx: number; dy: number };
+import { choosePlacement, handleBox, menuEdge, menuGap, type PlacementRule } from "./menu-placement";
+
+/**
+ * Where a menu opens: beside a block's handle (with the block, read each
+ * time the menu is placed so it is never stale), or at a point inside a
+ * block (a right-click). Both follow the page as it scrolls.
+ */
+export type MenuAnchor =
+  | { kind: "element"; element: HTMLElement; block?: () => HTMLElement | null }
+  | { kind: "point"; element: HTMLElement; dx: number; dy: number };
 
 /** The element floating-ui places the menu against. */
-function referenceFor(anchor: MenuAnchor): HTMLElement | VirtualElement {
-  if (anchor.kind === "element") return anchor.element;
-  const { element, dx, dy } = anchor;
+function referenceFor(anchor: MenuAnchor | HTMLElement): HTMLElement | VirtualElement {
+  if (anchor instanceof HTMLElement) return anchor;
+  const { element } = anchor;
+  if (anchor.kind === "element") {
+    const { block } = anchor;
+    return {
+      contextElement: element,
+      getBoundingClientRect: () => {
+        const box = handleBox(element.getBoundingClientRect(), block?.()?.getBoundingClientRect() ?? null, window.innerHeight);
+        return new DOMRect(box.left, box.top, box.right - box.left, box.bottom - box.top);
+      },
+    };
+  }
+  const { dx, dy } = anchor;
   return {
     contextElement: element,
     getBoundingClientRect: () => {
@@ -19,34 +38,36 @@ function referenceFor(anchor: MenuAnchor): HTMLElement | VirtualElement {
   };
 }
 
-/** Keeps a menu on screen and no taller than the room it has. */
-function middleware(fallbacks: Placement[]) {
-  return [
-    offset(6),
-    flip({ fallbackPlacements: fallbacks, padding: 8 }),
-    shift({ padding: 8 }),
-    size({
-      padding: 8,
-      apply: ({ availableHeight, elements }) => {
-        elements.floating.style.maxHeight = `${String(Math.max(160, Math.min(availableHeight, 560)))}px`;
-      },
-    }),
-  ];
-}
+/**
+ * Keeps a menu on screen and no taller than the room it has. There is no
+ * flip: a menu beside its anchor slides up or down to stay on screen and
+ * never jumps above or below it.
+ */
+const middleware = [
+  offset(menuGap),
+  shift({ padding: menuEdge }),
+  size({
+    padding: menuEdge,
+    apply: ({ availableHeight, elements }) => {
+      elements.floating.style.maxHeight = `${String(Math.max(160, Math.min(availableHeight, 560)))}px`;
+    },
+  }),
+];
 
 /**
- * Places a floating menu against its anchor and keeps it there while the
- * page scrolls or resizes. The menu stays hidden (`data-placed` unset) until
- * it has its first position. Off while `enabled` is false (the phone sheet).
+ * Places a floating menu against its anchor by `rule` and keeps it there
+ * while the page scrolls or resizes. The menu stays transparent
+ * (`data-placed` unset) until it has its first position, so it never shows
+ * at the wrong spot. Off while `enabled` is false (the phone sheet).
  */
-export function useFloatingMenu(floating: RefObject<HTMLElement | null>, anchor: MenuAnchor | HTMLElement | null, placement: Placement, enabled: boolean) {
+export function useFloatingMenu(floating: RefObject<HTMLElement | null>, anchor: MenuAnchor | HTMLElement | null, rule: PlacementRule, enabled: boolean) {
   useLayoutEffect(() => {
     const element = floating.current;
     if (!enabled || !element || !anchor) return;
-    const reference = anchor instanceof HTMLElement ? anchor : referenceFor(anchor);
-    const fallbacks: Placement[] = placement.startsWith("left") ? ["right-start", "bottom-start", "top-start"] : ["left-start", "bottom-start", "top-start"];
+    const reference = referenceFor(anchor);
     const update = () => {
-      computePosition(reference, element, { strategy: "fixed", placement, middleware: middleware(fallbacks) })
+      const placement = choosePlacement(rule, reference.getBoundingClientRect(), element.offsetWidth, document.documentElement.clientWidth);
+      computePosition(reference, element, { strategy: "fixed", placement, middleware })
         .then(({ x, y }) => {
           element.style.left = `${String(x)}px`;
           element.style.top = `${String(y)}px`;
@@ -55,7 +76,7 @@ export function useFloatingMenu(floating: RefObject<HTMLElement | null>, anchor:
         .catch(() => undefined);
     };
     return autoUpdate(reference, element, update);
-  }, [floating, anchor, placement, enabled]);
+  }, [floating, anchor, rule, enabled]);
 }
 
 /** Closes a menu on a press anywhere outside the given elements. */

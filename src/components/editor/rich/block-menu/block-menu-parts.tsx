@@ -21,10 +21,15 @@ export const rowClass =
 export const panelClass =
   "z-50 flex flex-col overflow-y-auto overscroll-contain bg-popover p-1.5 text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none scrollbar-quiet";
 
-/** Floating beside its anchor on wider screens; a sheet from the bottom on phones. */
+/**
+ * Floating beside its anchor on wider screens; a sheet from the bottom on
+ * phones. Neither slides, zooms, or moves as it opens: the floating menu
+ * stays transparent until it is placed, then fades in over 100ms, and the
+ * sheet only fades. No fade at all under reduced motion.
+ */
 export function placementClass(sheet: boolean, width: string): string {
-  if (sheet) return "fixed inset-x-0 bottom-0 max-h-[72dvh] rounded-t-xl px-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] animate-in fade-in-0 slide-in-from-bottom-4 duration-150 motion-reduce:animate-none";
-  return cn("fixed top-0 left-0 rounded-xl not-data-placed:opacity-0 animate-in fade-in-0 zoom-in-95 duration-100 motion-reduce:animate-none", width);
+  if (sheet) return "fixed inset-x-0 bottom-0 max-h-[72dvh] rounded-t-xl px-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] animate-in fade-in-0 duration-100 motion-reduce:animate-none";
+  return cn("fixed top-0 left-0 rounded-xl transition-opacity duration-100 not-data-placed:pointer-events-none not-data-placed:opacity-0 motion-reduce:transition-none", width);
 }
 
 interface SearchRowProps {

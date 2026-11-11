@@ -42,6 +42,17 @@ function menuView(doc: PMNode, pos: number, page: BlockMenuPage | null) {
   return { context, typeName: blockTypeName(shape, typeof mediaKind === "string" ? mediaKind : undefined), counts: blockCounts(target.node) };
 }
 
+/** The block's own element in the editor, or null when no element starts at `pos`. */
+function blockElement(editor: Editor, pos: number): HTMLElement | null {
+  const dom = editor.view.nodeDOM(pos);
+  return dom instanceof HTMLElement ? dom : null;
+}
+
+/** The whole handle ("+" and the grip) a grip sits in: the menu opens beside it, so it never covers "+". */
+function handleOf(grip: HTMLElement): HTMLElement {
+  return grip.closest<HTMLElement>("[data-slot=block-handle]") ?? grip;
+}
+
 /** Right-clicks that keep the browser's own menu: on touch, over selected text, and on links, media, and fields. */
 function keepsNativeMenu(editor: Editor, event: MouseEvent, touch: boolean): boolean {
   if (touch) return true;
@@ -168,7 +179,7 @@ function BlockControls({ editor, frame }: BlockControlsProps) {
           open={menu?.pos === place.pos}
           shown={!touch && shown === place.pos}
           gripRef={place.pos === (menu?.pos ?? shown) ? gripRef : undefined}
-          onOpen={(grip) => { if (menu?.pos === place.pos) close("outside"); else open(place.pos, { kind: "element", element: grip }, grip); }}
+          onOpen={(grip) => { if (menu?.pos === place.pos) close("outside"); else open(place.pos, { kind: "element", element: handleOf(grip), block: () => blockElement(editor, place.pos) }, grip); }}
           onAdd={() => { insertBelow(editor, place.pos); }}
           onDragStart={(event) => {
             const target = blockTargetFrom(editor.state.doc, place.pos);

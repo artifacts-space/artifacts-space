@@ -7,6 +7,7 @@ import type { MenuCommand, MenuContext, MenuEntry } from "./block-actions";
 import type { BlockMenuLastEdited } from "./block-menu-context";
 import { ChangeSubmenu, MenuFooter, MenuRow, panelClass, placementClass, SearchRow } from "./block-menu-parts";
 import { menuReducer, openedMenu, rowsFor, type MenuEvent, type MenuState } from "./block-menu-state";
+import { besideRule, pointMenuRule, submenuOpensBeside } from "./menu-placement";
 import { canHover, useFloatingMenu, usePhoneSheet, usePressOutside, type MenuAnchor } from "./use-floating-menu";
 
 /** Why the menu closed: Escape and Tab return focus to the grip; a press outside leaves focus where it lands. */
@@ -137,8 +138,8 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
   const [changeRow, setChangeRow] = useState<HTMLElement | null>(null);
   const submenu = state.submenu;
 
-  useFloatingMenu(panelRef, anchor, anchor.kind === "element" ? "left-start" : "right-start", !sheet);
-  useFloatingMenu(subRef, submenu ? changeRow : null, "right-start", !sheet);
+  useFloatingMenu(panelRef, anchor, anchor.kind === "element" ? besideRule : pointMenuRule, !sheet);
+  useFloatingMenu(subRef, submenu ? changeRow : null, besideRule, !sheet);
   usePressOutside(insideRefs, useCallback(() => { onClose("outside"); }, [onClose]));
   useEffect(() => { focusMenu(inputRef.current, panelRef.current); }, []);
   useEffect(() => {
@@ -157,7 +158,10 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
     if (state.active !== index) send({ type: "hover", index });
     if (sheet) return;
     const event = hoverSubmenu(rows[index]?.command, submenu);
-    if (event) send(event);
+    if (!event) return;
+    // A submenu that would open below its row (no room on the left) opens only on a click, Enter, or →.
+    if (event.type === "openSubmenu" && !(changeRow && submenuOpensBeside(changeRow.getBoundingClientRect(), document.documentElement.clientWidth))) return;
+    send(event);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {

@@ -427,7 +427,12 @@ there when the editor supports it. Duplicate, Move, and Delete are ordinary
 transactions on the whole top-level block, or on a list item as an item
 (`block-target.ts`), so Undo and autosave treat them like typing. The page
 supplies the artifact through `BlockMenuFor`; editors without it (a ui
-artifact's Markdown block) get no handles. Readers get only Copy link to block
+artifact's Markdown block) get no handles. The menu opens in one place
+(`menu-placement.ts`): left of the handle and level with the block's top,
+or below the block when the left has no room. It moves up or down to stay on
+screen but never flips above, never covers the handle (nor the block, unless
+the block runs off the window), and only fades in once placed. Keep it that way; `e2e/block-menu-position.spec.ts`
+checks it by bounding boxes. Readers get only Copy link to block
 on right-click (`src/components/block-links`).
 
 A block link names the block by its opening words, never by a stored id:

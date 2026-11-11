@@ -39,9 +39,17 @@ Written November 11, 2026 by the Supahost agent. Write your answer under each it
 Closing paragraph of the fixture.
 `;
 
-function fixture(): ArtifactDto {
+/** A tall document (`?doc=long`), for where the menu opens near the top and the bottom of the window. */
+export const longBlockMenuFixtureMarkdown = [
+  blockMenuFixtureMarkdown.trimEnd(),
+  ...Array.from({ length: 40 }, (_, index) => `Filler paragraph ${String(index + 1)} keeps the document taller than the window.`),
+  "## Open with you",
+  "The last paragraph of the tall document.",
+].join("\n\n") + "\n";
+
+function fixture(content: string): ArtifactDto {
   return {
-    ...fixtureArtifact({ id: "fixture-block-menu", kind: "markdown", title: "Block menu fixture", content: blockMenuFixtureMarkdown, publicId: "blockmenufixture000001" }),
+    ...fixtureArtifact({ id: "fixture-block-menu", kind: "markdown", title: "Block menu fixture", content, publicId: "blockmenufixture000001" }),
     comments: "team",
     updatedBy: { id: "fixture", kind: "person", handle: "charles", name: "Charles" },
     harness: { id: "claude-code", stamped: "claude-code", overridden: false },
@@ -93,8 +101,8 @@ function ReaderFixture({ artifact }: { artifact: ArtifactDto }) {
 }
 
 /** See the notes at the top of this file. */
-export function BlockMenuFixture({ reader }: { reader: boolean }) {
-  const artifact = useMemo(() => fixture(), []);
+export function BlockMenuFixture({ reader, long }: { reader: boolean; long: boolean }) {
+  const artifact = useMemo(() => fixture(long ? longBlockMenuFixtureMarkdown : blockMenuFixtureMarkdown), [long]);
   const save = useMemorySave(artifact);
   const onSaved = useCallback(() => undefined, []);
   if (reader) return <ReaderFixture artifact={artifact} />;
