@@ -70,13 +70,42 @@ test("should let the owner move a private artifact into a team from the page and
   await expect(header(page).getByRole("button", { name: "Team. Share settings" }), "the page refreshes from the server").toBeVisible();
   expect(await sharingOf(publicId)).toEqual({ visibility: "team", teamId: team.id });
 
-  // After the refresh the dialog starts from what the server stored.
+  // Reopened, Team and the team stay picked (the request-that-waits test below shows the picks come from the server).
   await header(page).getByRole("button", { name: "Team. Share settings" }).click();
   await expect(page.getByRole("dialog").getByRole("radio", { name: /^Team/ })).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("Escape");
 
   await page.reload();
   await expect(header(page).getByRole("button", { name: "Team. Share settings" })).toBeVisible();
+});
+
+test("should say Pending and start the dialog from the level that still applies when the move waits for approval", async ({ page }, testInfo) => {
+  await signIn(page);
+  const userId = await readyDevUser();
+  // A member of a team whose sharing needs approval: moving the artifact in files a request.
+  const team = await seedTeam(userId, "member");
+  const title = `Page share pending ${testInfo.project.name}`;
+  const publicId = await seedArtifact(userId, title);
+
+  await page.goto(`/artifact/${publicId}`);
+  await header(page).getByRole("button", { name: "Private. Share settings" }).click();
+  const dialog = page.getByRole("dialog", { name: `Share “${title}”` });
+  await dialog.getByRole("radio", { name: /^Team/ }).click();
+  await dialog.getByRole("combobox", { name: "Share with" }).click();
+  await page.getByRole("option", { name: new RegExp(`^Theme team ${team.id.slice(0, 4)}`) }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
+
+  await expect(page.getByText("Request sent. An owner or admin will review it.")).toBeVisible();
+  const pending = header(page).getByRole("button", { name: "Pending. Share settings" });
+  await expect(pending, "the page refreshes with the open request").toBeVisible();
+  expect(await sharingOf(publicId), "it stays private until approved").toEqual({ visibility: "private", teamId: null });
+
+  // The server stored Private with a request: the picks start from Private, not the Team that was asked for.
+  await pending.click();
+  const reopened = page.getByRole("dialog");
+  await expect(reopened.getByText(/Waiting for approval: team in Theme team/)).toBeVisible();
+  await expect(reopened.getByRole("radio", { name: /^Private/ })).toHaveAttribute("aria-checked", "true");
+  await expect(reopened.getByRole("combobox", { name: "Share with" })).toHaveCount(0);
 });
 
 test("should keep the read-only status for a teammate who may edit someone else's artifact", async ({ page }, testInfo) => {
