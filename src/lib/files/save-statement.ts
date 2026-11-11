@@ -94,6 +94,11 @@ const artifactColumns = getTableColumns(artifact);
  * already in this artifact are expected and not counted.
  */
 async function reportUnattached(artifactId: string, ids: readonly string[]) {
-  const loose = await getDb().select({ id: artifactFile.id }).from(artifactFile).where(and(inArray(artifactFile.id, [...ids]), isNull(artifactFile.artifactId)));
-  if (loose.length > 0) console.error("[files] A save named uploads it could not attach", { artifactId, count: loose.length });
+  // The save already landed: a failed look must never turn it into a reported failure.
+  try {
+    const loose = await getDb().select({ id: artifactFile.id }).from(artifactFile).where(and(inArray(artifactFile.id, [...ids]), isNull(artifactFile.artifactId)));
+    if (loose.length > 0) console.error("[files] A save named uploads it could not attach", { artifactId, count: loose.length });
+  } catch (error) {
+    console.error("[files] Could not check a save's uploads", { artifactId, error: error instanceof Error ? error.name : "unknown error" });
+  }
 }
