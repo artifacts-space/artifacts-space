@@ -2,11 +2,13 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
 
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
+
 import { feedQuery } from "./feed";
 
 /* The bell must only ever list the signed-in person's own rows. Read the SQL itself: stubbed rows cannot catch a wrong filter. */
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 
 describe("feedQuery", () => {
   it("should filter by the recipient when it lists the bell", () => {

@@ -5,11 +5,16 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { fakeDatabaseUrl, fakeNeonHost, neonDomain } from "@/test/fake-database-url";
+
 import { drizzleDatabaseUrl, drizzleKitCommand, e2eDevServerDatabaseEnv, isLocalDatabaseUrl, sharedMigrateRefusal } from "./database-url-rules";
 
-const shared = "postgres://app:secret@ep-shared.example.neon.tech/app";
-const sharedDirect = "postgres://app:secret@ep-shared-direct.example.neon.tech/app";
-const local = "postgres://ci:ci@localhost:55432/artifacts_test";
+// The shared database in .env.local is on Neon, so these hosts look like Neon's
+// (joined from parts; see src/test/fake-database-url.ts for why).
+const sharedPassword = "fake-password";
+const shared = fakeDatabaseUrl({ user: "app", password: sharedPassword, host: fakeNeonHost("ep-shared"), database: "app" });
+const sharedDirect = fakeDatabaseUrl({ user: "app", password: sharedPassword, host: fakeNeonHost("ep-shared-direct"), database: "app" });
+const local = fakeDatabaseUrl({ user: "ci", password: "ci", host: "localhost", port: 55432, database: "artifacts_test" });
 const file = { DATABASE_URL: shared, DATABASE_URL_UNPOOLED: sharedDirect };
 
 describe("drizzleDatabaseUrl", () => {
@@ -37,8 +42,8 @@ describe("sharedMigrateRefusal", () => {
     for (const command of ["migrate", "push"]) {
       const refusal = sharedMigrateRefusal({ command, url: sharedDirect, env: {} });
       expect(refusal).toContain(`drizzle-kit ${command} stopped`);
-      expect(refusal).not.toContain("secret");
-      expect(refusal).not.toContain("neon.tech");
+      expect(refusal).not.toContain(sharedPassword);
+      expect(refusal).not.toContain(neonDomain);
     }
   });
 
@@ -54,7 +59,7 @@ describe("sharedMigrateRefusal", () => {
 
   it("should let migrate reach a database on this machine", () => {
     expect(sharedMigrateRefusal({ command: "migrate", url: local, env: {} })).toBeNull();
-    expect(sharedMigrateRefusal({ command: "migrate", url: "postgres://u@127.0.0.1/db", env: {} })).toBeNull();
+    expect(sharedMigrateRefusal({ command: "migrate", url: fakeDatabaseUrl({ user: "u", password: "", host: "127.0.0.1", database: "db" }), env: {} })).toBeNull();
   });
 
   it("should let migrate reach a shared database only when ALLOW_SHARED_MIGRATE=1 is set", () => {
@@ -67,7 +72,7 @@ describe("sharedMigrateRefusal", () => {
   });
 
   it("should not treat a host that only starts with localhost as local", () => {
-    expect(isLocalDatabaseUrl("postgres://u@localhost.example.com/db")).toBe(false);
+    expect(isLocalDatabaseUrl(fakeDatabaseUrl({ user: "u", password: "", host: "localhost.example.com", database: "db" }))).toBe(false);
   });
 });
 
