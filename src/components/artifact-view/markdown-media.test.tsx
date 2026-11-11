@@ -10,9 +10,9 @@ const image = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const video = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
 const report = "9b2a4f43-6a7b-4a2e-8f61-3c1a9d2e7b10";
 const files: FileDto[] = [
-  { id: image, filename: "chart.png", contentType: "image/png", size: 1200, createdAt: "2026-11-10T00:00:00.000Z" },
-  { id: video, filename: "demo.mp4", contentType: "video/mp4", size: 9_000_000, createdAt: "2026-11-10T00:00:00.000Z" },
-  { id: report, filename: "q3.pdf", contentType: "application/pdf", size: 400_000, createdAt: "2026-11-10T00:00:00.000Z" },
+  { id: image, filename: "chart.png", contentType: "image/png", size: 1200, createdAt: "2026-11-10T00:00:00.000Z", replacedAt: null },
+  { id: video, filename: "demo.mp4", contentType: "video/mp4", size: 9_000_000, createdAt: "2026-11-10T00:00:00.000Z", replacedAt: null },
+  { id: report, filename: "q3.pdf", contentType: "application/pdf", size: 400_000, createdAt: "2026-11-10T00:00:00.000Z", replacedAt: null },
 ];
 
 function render(content: string, list: FileDto[] | undefined = files) {

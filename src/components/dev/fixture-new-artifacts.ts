@@ -30,6 +30,8 @@ const holdCreateKey = "fixture:hold-create";
 const holdAttachKey = "fixture:hold-attach";
 /** Set by a test for the next attach: "refuse" answers no; "lose" attaches the files and then loses the answer; "lose-always" loses every answer; "vanish" loses the answer without attaching ("vanish-always" every one); "first-only-always" attaches only the first file and loses every answer: a partial attach, which today's all-or-nothing server cannot produce (the page's defensive case). A comma list sets several in turn. */
 const nextAttachKey = "fixture:next-attach";
+/** Set by a test for the next replace: "refuse" answers no, as the server does when the file changed meanwhile. */
+const nextReplaceKey = "fixture:next-replace";
 /** The uploads deleted so far, so a test can check that none it kept was deleted. */
 const discardedKey = "fixture:discarded";
 /** Set by a test to make the next load fail ("always" for every one). */
@@ -166,7 +168,8 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     await gate(holdUploadsKey, "fixture:release-uploads");
     report.progress(100);
     report.checking();
-    const dto: FileDto = { id: crypto.randomUUID(), filename: file.name, contentType: file.type || "application/octet-stream", size: file.size, createdAt: new Date().toISOString() };
+    const dto: FileDto = { id: crypto.randomUUID(), filename: file.name, contentType: file.type || "application/octet-stream", size: file.size, createdAt: new Date().toISOString(), replacedAt: null };
+    report.started?.(dto.id);
     uploaded.set(dto.id, dto);
     return { success: true, data: dto };
   },
@@ -184,6 +187,16 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     const result = save({ ...current, files, updatedAt: new Date().toISOString() });
     if (next === "lose" || next === "lose-always" || next === "first-only-always") throw new Error("The answer was lost.");
     return result;
+  },
+  replace: (artifactId, fileId, uploadId) => {
+    if (takeFlag(nextReplaceKey) === "refuse") return Promise.resolve({ success: false, error: "The file changed while it was being replaced, so nothing was changed. Try again." });
+    const current = readStored().find((entry) => entry.id === artifactId);
+    const upload = uploaded.get(uploadId);
+    if (!current || !upload) return Promise.resolve({ success: false, error: "File not found." });
+    // As the server does: the entry keeps its id, place, and name; the upload is used up.
+    const files = current.files.map((file) => (file.id === fileId ? { ...file, contentType: upload.contentType, size: upload.size, replacedAt: new Date().toISOString() } : file));
+    uploaded.delete(uploadId);
+    return Promise.resolve(save({ ...current, files, updatedAt: new Date().toISOString() }));
   },
   discard: (fileId) => {
     // As the server does (discardUnattachedUpload): a file already in an artifact stays.

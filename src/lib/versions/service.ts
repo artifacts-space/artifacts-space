@@ -152,6 +152,11 @@ export interface ArtifactSave {
  * Old versions are pruned afterwards.
  */
 export async function recordArtifactSave(save: ArtifactSave): Promise<EditStatus> {
+  return (await fileArtifactSave(save)).status;
+}
+
+/** recordArtifactSave, also returning the version the save filed or merged into. */
+async function fileArtifactSave(save: ArtifactSave): Promise<{ status: EditStatus; versionId: string }> {
   const { before, after, editorId } = save;
   if (before) await ensureHistoryStart(before);
   const approvedId = before && isReviewedLevel(after.visibility) ? await ensureApprovedBefore(before) : null;
@@ -167,12 +172,15 @@ export async function recordArtifactSave(save: ArtifactSave): Promise<EditStatus
     // Pruning is housekeeping; the cleanup job retries it.
     console.error("[versions] Pruning after a save failed", error instanceof Error ? error.name : "unknown error");
   });
-  return status;
+  return { status, versionId };
 }
+
+/** Saves that change files: they always go through the approval rule, because readers outside the team see files by version. */
+const fileSaveKinds: ReadonlySet<VersionSaveKind> = new Set(["files", "replace"]);
 
 async function approvalFor(after: ArtifactRecord, approvedId: string, versionId: string, save: ArtifactSave): Promise<EditStatus> {
   const approved = await getArtifactVersion(approvedId);
-  if (save.saveKind !== "files" && approved && sameReviewedFields(approved, after)) {
+  if (!fileSaveKinds.has(save.saveKind) && approved && sameReviewedFields(approved, after)) {
     await cancelPendingEdits(after.id, save.editorId);
     return "applied";
   }
@@ -186,16 +194,31 @@ async function approvalFor(after: ArtifactRecord, approvedId: string, versionId:
  * the approved version (and its files) until the change is approved. Call it
  * after the change is saved.
  */
-export async function recordArtifactChange(input: { artifactId: string; editorId: string; actor: SharingActor; harness?: HarnessStamp | null | undefined }): Promise<EditStatus> {
+export async function recordArtifactChange(input: ArtifactChange): Promise<EditStatus> {
+  return (await recordArtifactChangeVersion(input)).status;
+}
+
+/** A change the artifact row does not show, for recordArtifactChange. */
+export interface ArtifactChange {
+  artifactId: string;
+  editorId: string;
+  actor: SharingActor;
+  harness?: HarnessStamp | null | undefined;
+  /** "replace" for a replaced file, which files its own version; "files" (the default) for files added or removed. */
+  saveKind?: "files" | "replace";
+}
+
+/** recordArtifactChange, also returning the version it filed (null when the artifact is gone). */
+export async function recordArtifactChangeVersion(input: ArtifactChange): Promise<{ status: EditStatus; versionId: string | null }> {
   const [before] = await getDb().select().from(artifact).where(eq(artifact.id, input.artifactId)).limit(1);
-  if (!before) return "applied";
+  if (!before) return { status: "applied", versionId: null };
   const [after] = await getDb()
     .update(artifact)
     .set({ ...stampColumns(input.harness), updatedBy: input.editorId, updatedAt: new Date() })
     .where(eq(artifact.id, input.artifactId))
     .returning();
-  if (!after) return "applied";
-  return recordArtifactSave({ before, after, editorId: input.editorId, actor: input.actor, saveKind: "files", harness: input.harness ?? null });
+  if (!after) return { status: "applied", versionId: null };
+  return fileArtifactSave({ before, after, editorId: input.editorId, actor: input.actor, saveKind: input.saveKind ?? "files", harness: input.harness ?? null });
 }
 
 /**

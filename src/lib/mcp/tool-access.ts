@@ -34,6 +34,7 @@ export const toolAccess = {
   files_finalize: "write",
   files_create_artifact: "write",
   files_attach: "write",
+  files_replace: "write",
   files_delete: "write",
   // Inbox and comments
   inbox_list: "read",

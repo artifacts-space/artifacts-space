@@ -131,7 +131,7 @@ export default function LimitsPage() {
         mono={[1]}
       />
       <Prose>
-        <p>Allowed types are listed on <Link href={docsHref("formats", "file")}>Formats</Link>.</p>
+        <p>Allowed types are listed on <Link href={docsHref("formats", "file")}>Formats</Link>. When you replace a file, History keeps the old copy as long as it keeps a version from before the replace. Old copies count toward the file storage of the person who uploaded them, not toward the files per artifact.</p>
       </Prose>
 
       <DocsH page={page} id="teams" />

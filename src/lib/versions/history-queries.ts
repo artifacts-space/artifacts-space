@@ -4,6 +4,7 @@ import { getDb } from "@/db";
 import { artifactVersion, sharingRequest, type ArtifactRecord, type ArtifactVersionRecord } from "@/db/schema";
 import type { VersionDetailDto, VersionSummaryDto } from "@/lib/artifact-types";
 import { lastEditorsFor } from "@/lib/artifacts";
+import { filesReplacedSince, replacedFileNames } from "@/lib/files/copies";
 import { harnessFor } from "@/lib/harness/harnesses";
 
 import { versionRetention } from "./history-rules";
@@ -45,6 +46,8 @@ interface SummaryContext {
   pendingId: string | null;
   latestId: string | null;
   editors: Awaited<ReturnType<typeof lastEditorsFor>>;
+  /** The file each replace version replaced, by version id. */
+  replaced: ReadonlyMap<string, string>;
 }
 
 function toSummary(row: SummaryRow, context: SummaryContext): VersionSummaryDto {
@@ -65,6 +68,7 @@ function toSummary(row: SummaryRow, context: SummaryContext): VersionSummaryDto 
     approved: row.id === context.record.approvedVersionId,
     pending: row.id === context.pendingId,
     latest: row.id === context.latestId,
+    replacedFile: context.replaced.get(row.id) ?? null,
   };
 }
 
@@ -89,12 +93,13 @@ export async function listArtifactVersions(record: Pick<ArtifactRecord, "id" | "
       .limit(Math.min(Math.max(limit, 1), versionRetention.keep + 10)),
     pendingVersionId(record.id),
   ]);
-  const editors = await lastEditorsFor(rows.map((row) => ({ updatedBy: row.createdBy })));
-  const context = { record, pendingId, latestId: rows[0]?.id ?? null, editors };
+  const replaceIds = rows.flatMap((row) => (row.saveKind === "replace" ? [row.id] : []));
+  const [editors, replaced] = await Promise.all([lastEditorsFor(rows.map((row) => ({ updatedBy: row.createdBy }))), replacedFileNames(replaceIds)]);
+  const context = { record, pendingId, latestId: rows[0]?.id ?? null, editors, replaced };
   return rows.map((row) => toSummary(row, context));
 }
 
-/** One version of the artifact with its content, or null when it is not in the history. */
+/** One version of the artifact with its content, and the files replaced since it was saved, or null when it is not in the history. */
 export async function getArtifactVersionDetail(record: Pick<ArtifactRecord, "id" | "approvedVersionId">, versionId: string): Promise<VersionDetailDto | null> {
   const [row] = await getDb()
     .select()
@@ -102,8 +107,14 @@ export async function getArtifactVersionDetail(record: Pick<ArtifactRecord, "id"
     .where(and(eq(artifactVersion.artifactId, record.id), eq(artifactVersion.id, versionId)))
     .limit(1);
   if (!row) return null;
-  const [pendingId, newest, editors] = await Promise.all([pendingVersionId(record.id), latestId(record.id), lastEditorsFor([{ updatedBy: row.createdBy }])]);
-  const summary = toSummary(row, { record, pendingId, latestId: newest, editors });
+  const [pendingId, newest, editors, replaced, replacedSince] = await Promise.all([
+    pendingVersionId(record.id),
+    latestId(record.id),
+    lastEditorsFor([{ updatedBy: row.createdBy }]),
+    replacedFileNames(row.saveKind === "replace" ? [row.id] : []),
+    filesReplacedSince(record.id, row.savedAt),
+  ]);
+  const summary = toSummary(row, { record, pendingId, latestId: newest, editors, replaced });
   const { summary: text, content, language, source, metadata } = row;
-  return { ...summary, summary: text, content, language, source, metadata };
+  return { ...summary, summary: text, content, language, source, metadata, replacedSince };
 }

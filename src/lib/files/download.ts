@@ -7,8 +7,10 @@ import { getArtifactAccess, type ArtifactAccess } from "@/lib/access";
 
 import { canReadFile, type FileArtifactAccess } from "./access-rules";
 import { fileLimits, isInlineType } from "./config";
+import { copiesCurrentAt } from "./copies";
 import { contentDisposition } from "./names";
 import { presignDownload, r2ConfigFromEnv } from "./r2";
+import { replacedSince } from "./replace-rules";
 import { fileHiddenFor, hiddenImagesFor } from "./served-images";
 import { listArtifactFiles } from "./store";
 import type { FileDto } from "./types";
@@ -41,10 +43,37 @@ export function servedVersionTime(viewable: Pick<ArtifactAccess, "version" | "se
  * files, so a page without files costs one query here.
  */
 export async function filesForViewer(viewable: Pick<ArtifactAccess, "record" | "version" | "served">): Promise<FileDto[]> {
-  const files = await listArtifactFiles(viewable.record.id, { attachedBy: servedVersionTime(viewable) });
+  const servedAt = servedVersionTime(viewable);
+  const files = await listArtifactFiles(viewable.record.id, { attachedBy: servedAt });
   if (files.length === 0) return files;
   const hidden = await hiddenImagesFor(viewable);
-  return hidden.size === 0 ? files : files.filter((file) => !hidden.has(file.id));
+  const shown = hidden.size === 0 ? files : files.filter((file) => !hidden.has(file.id));
+  return servedAt ? asServedAt(shown, servedAt) : shown;
+}
+
+/**
+ * The files as they were at `servedAt`, for readers of an approved version:
+ * a file replaced since then shows the copy that was current then, and is
+ * left out if that copy is gone. Never the newer, unapproved file.
+ */
+async function asServedAt(files: readonly FileDto[], servedAt: Date): Promise<FileDto[]> {
+  const replaced = files.filter((file) => replacedSince({ replacedAt: file.replacedAt ? new Date(file.replacedAt) : null }, servedAt));
+  if (replaced.length === 0) return [...files];
+  const replacedIds = new Set(replaced.map((file) => file.id));
+  const copies = await copiesCurrentAt([...replacedIds], servedAt);
+  return files.flatMap((file) => {
+    if (!replacedIds.has(file.id)) return [file];
+    const copy = copies.get(file.id);
+    return copy ? [{ ...file, filename: copy.filename, contentType: copy.contentType, size: copy.size, replacedAt: copy.currentFrom?.toISOString() ?? null }] : [];
+  });
+}
+
+/** One file as a reader of the version saved at `servedAt` gets it (see asServedAt), or null when its copy from then is gone. */
+async function fileServedAt(file: ArtifactFileRecord, servedAt: Date | null): Promise<ArtifactFileRecord | null> {
+  if (!servedAt || !replacedSince(file, servedAt)) return file;
+  const copy = (await copiesCurrentAt([file.id], servedAt)).get(file.id);
+  if (!copy) return null;
+  return { ...file, key: copy.key, filename: copy.filename, contentType: copy.contentType, size: copy.size, uploaderId: copy.uploaderId, replacedAt: copy.currentFrom };
 }
 
 /** One file request: asks only about this file, so a page with many media does not recompute the artifact's hidden set per file. */
@@ -57,15 +86,17 @@ async function artifactAccess(file: ArtifactFileRecord, publicId: string | null,
 
 /**
  * The file `viewerId` (null when signed out) asked for, or null when it does
- * not exist, is not ready, or they may not read it. Callers answer "not
- * found" for null, so a private file's existence never leaks.
+ * not exist, is not ready, or they may not read it. A reader of an approved
+ * version gets the file as that version showed it (fileServedAt). Callers
+ * answer "not found" for null, so a private file's existence never leaks.
  */
 export async function findReadableFile(fileId: string, viewerId: string | null): Promise<ArtifactFileRecord | null> {
   if (!z.uuid().safeParse(fileId).success) return null;
   const row = await loadWithArtifact(fileId.toLowerCase());
   if (!row) return null;
   const access = await artifactAccess(row.file, row.publicId, viewerId);
-  return canReadFile(row.file, viewerId, access) ? row.file : null;
+  if (!canReadFile(row.file, viewerId, access)) return null;
+  return fileServedAt(row.file, access?.servedVersionAt ?? null);
 }
 
 /**

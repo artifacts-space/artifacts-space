@@ -103,7 +103,7 @@ export default function FormatsPage() {
       </Prose>
       <FactTable head={["Content type", "Extensions", "Name", "Shown as"]} rows={fileTypeRows} mono={[0, 1]} />
       <Prose>
-        <p>Uploading takes three calls: <code>files_request_upload</code>, a PUT to the presigned URL (valid {fileLimits.uploadUrlSeconds / 60} minutes), then <code>files_finalize</code>, which checks the size and type. Then <code>files_create_artifact</code> makes a file artifact, or <code>files_attach</code> adds the files to an existing one, such as a ui artifact that shows them with Image and File. Unfinished uploads are deleted after {fileLimits.pendingTtlMs / 3_600_000} hour, and finished files never attached after {fileLimits.unattachedTtlMs / 3_600_000} hours. See the <Link href={`${docsHref("mcp")}#tools-files`}>Files tools</Link>.</p>
+        <p>Uploading takes three calls: <code>files_request_upload</code>, a PUT to the presigned URL (valid {fileLimits.uploadUrlSeconds / 60} minutes), then <code>files_finalize</code>, which checks the size and type. Then <code>files_create_artifact</code> makes a file artifact, or <code>files_attach</code> adds the files to an existing one, such as a ui artifact that shows them with Image and File. <code>files_replace</code> puts a new upload in place of a file already there: it keeps its id, place, and name, so links open the new file, and the old copy stays in History for people who can edit. Unfinished uploads are deleted after {fileLimits.pendingTtlMs / 3_600_000} hour, and finished files never attached after {fileLimits.unattachedTtlMs / 3_600_000} hours. See the <Link href={`${docsHref("mcp")}#tools-files`}>Files tools</Link>.</p>
       </Prose>
     </RegistryPage>
   );

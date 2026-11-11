@@ -6,6 +6,7 @@ const saveKindLabels: Record<VersionSaveKind, string> = {
   create: "Created",
   edit: "Edited",
   files: "Changed files",
+  replace: "Replaced a file",
   restore: "Restored an older version",
   snapshot: "Saved copy",
 };
@@ -13,6 +14,12 @@ const saveKindLabels: Record<VersionSaveKind, string> = {
 /** What a history entry says the save was. */
 export function saveKindLabel(kind: VersionSaveKind): string {
   return saveKindLabels[kind];
+}
+
+/** What a history entry says it was, naming the file a replace replaced: "Replaced sow.pdf". */
+export function versionLabel(version: Pick<VersionSummaryDto, "saveKind" | "replacedFile">): string {
+  if (version.saveKind === "replace" && version.replacedFile) return `Replaced ${version.replacedFile}`;
+  return saveKindLabel(version.saveKind);
 }
 
 /** The short size and format note under a history entry: "Markdown · 2.4 KB". */

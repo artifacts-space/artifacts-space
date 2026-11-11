@@ -5,6 +5,7 @@ import { artifact, artifactFile, type ArtifactFileRecord } from "@/db/schema";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 
 import { fileLimits } from "./config";
+import { cleanupOrphanCopies, removeArtifactCopies, removeCopiesOf } from "./copies";
 import { deleteObject, r2ConfigFromEnv } from "./r2";
 import type { FileDto } from "./types";
 
@@ -15,7 +16,7 @@ import type { FileDto } from "./types";
 
 /** Maps a row to the shape the app and agents see. */
 export function toFileDto(row: ArtifactFileRecord): FileDto {
-  return { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString() };
+  return { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString(), replacedAt: row.replacedAt?.toISOString() ?? null };
 }
 
 /** One file row by id, or null. */
@@ -126,8 +127,9 @@ export async function deleteStoredObjects(rows: readonly Pick<ArtifactFileRecord
 }
 
 /**
- * Deletes files from R2 and then their rows. A row stays when its object
- * could not be deleted, so the cleanup job tries again. Returns the ids removed.
+ * Deletes files from R2 and then their rows, with the old copies of any
+ * that were replaced. A row stays when its object could not be deleted, so
+ * the cleanup job tries again; so does a copy. Returns the ids removed.
  */
 export async function removeFiles(rows: readonly Pick<ArtifactFileRecord, "id" | "key">[]): Promise<string[]> {
   if (rows.length === 0) return [];
@@ -136,7 +138,9 @@ export async function removeFiles(rows: readonly Pick<ArtifactFileRecord, "id" |
   const removed = rows.filter((_, index) => results[index]?.status === "fulfilled").map((row) => row.id);
   const failed = rows.length - removed.length;
   if (failed > 0) console.error(`[files] ${String(failed)} R2 objects could not be deleted; the cleanup job will retry.`);
-  if (removed.length > 0) await getDb().delete(artifactFile).where(inArray(artifactFile.id, removed));
+  if (removed.length === 0) return removed;
+  await removeCopiesOf(removed);
+  await getDb().delete(artifactFile).where(inArray(artifactFile.id, removed));
   return removed;
 }
 
@@ -162,11 +166,13 @@ export async function removeUnattachedUpload(fileId: string, uploaderId: string)
 }
 
 /**
- * Deletes every file of an artifact, before the artifact itself is deleted.
- * Files whose objects could not be deleted lose their artifact when it goes
- * (the foreign key sets null), and the cleanup job removes them later.
+ * Deletes every file of an artifact, and every old copy of its replaced
+ * files, before the artifact itself is deleted. Files and copies whose
+ * objects could not be deleted lose their artifact when it goes (the
+ * foreign key sets null), and the cleanup job removes them later.
  */
 export async function deleteArtifactFiles(artifactId: string): Promise<void> {
+  await removeArtifactCopies(artifactId);
   const rows = await getDb().select({ id: artifactFile.id, key: artifactFile.key }).from(artifactFile).where(eq(artifactFile.artifactId, artifactId));
   await removeFiles(rows);
 }
@@ -177,7 +183,8 @@ export const cleanupBatchSize = 200;
 /**
  * Removes abandoned files: uploads still pending after an hour, and files
  * never attached to an artifact after a day (including files left behind
- * by a deleted artifact or account). Returns how many were removed.
+ * by a deleted artifact or account), then old copies whose file or
+ * artifact is gone. Returns how many were removed.
  */
 export async function cleanupAbandonedFiles(now: Date = new Date()): Promise<{ removed: number; remaining: boolean }> {
   const pendingBefore = new Date(now.getTime() - fileLimits.pendingTtlMs);
@@ -194,5 +201,6 @@ export async function cleanupAbandonedFiles(now: Date = new Date()): Promise<{ r
     .orderBy(asc(artifactFile.createdAt))
     .limit(cleanupBatchSize);
   const removed = await removeFiles(rows);
-  return { removed: removed.length, remaining: rows.length === cleanupBatchSize };
+  const copies = await cleanupOrphanCopies();
+  return { removed: removed.length + copies.removed, remaining: rows.length === cleanupBatchSize || copies.remaining };
 }

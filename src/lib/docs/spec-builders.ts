@@ -89,6 +89,6 @@ export function specJson(value: DocSpec): string {
 
 /** Files the media examples point at. The docs show a stand-in image; nothing is uploaded. */
 export const docsExampleFiles = [
-  { id: "7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a", filename: "architecture.png", contentType: "image/png", size: 48_213, createdAt: "2026-11-05T00:00:00.000Z" },
-  { id: "1f6b2a40-93c4-4c8e-b1d2-5e7a9c0f3b21", filename: "q3-board-report.pdf", contentType: "application/pdf", size: 2_481_934, createdAt: "2026-11-05T00:00:00.000Z" },
+  { id: "7d2c0c9e-4a51-4f53-9a7e-0f1d1e2c3b4a", filename: "architecture.png", contentType: "image/png", size: 48_213, createdAt: "2026-11-05T00:00:00.000Z", replacedAt: null },
+  { id: "1f6b2a40-93c4-4c8e-b1d2-5e7a9c0f3b21", filename: "q3-board-report.pdf", contentType: "application/pdf", size: 2_481_934, createdAt: "2026-11-05T00:00:00.000Z", replacedAt: null },
 ] as const;

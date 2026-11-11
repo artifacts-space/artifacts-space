@@ -13,7 +13,7 @@ import { toolAccess } from "./tool-access";
  */
 
 /** Tools that change an artifact's content or files, and so may file a new version. */
-const artifactEditTools = new Set<string>(["artifacts_update", "artifacts_restore_version", "files_attach"]);
+const artifactEditTools = new Set<string>(["artifacts_update", "artifacts_restore_version", "files_attach", "files_replace"]);
 const readTools = new Set<string>(Object.entries(toolAccess).flatMap(([name, level]) => (level === "read" ? [name] : [])));
 
 const messageSchema = z.object({ method: z.string(), params: z.object({ name: z.string() }).loose().optional() }).loose();

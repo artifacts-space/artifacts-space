@@ -88,6 +88,7 @@ describe("toolAccess", () => {
       "files_create_artifact",
       "files_delete",
       "files_finalize",
+      "files_replace",
       "files_request_upload",
       "inbox_mark_read",
     ]);

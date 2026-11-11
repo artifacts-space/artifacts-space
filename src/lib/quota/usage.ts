@@ -3,6 +3,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
 import { getDb } from "@/db";
+import { artifactFileCopy } from "@/db/file-copy-schema";
 import { agent, artifact, artifactFile, artifactVersion, user } from "@/db/schema";
 import { fileLimits } from "@/lib/files/config";
 import { byteLength } from "@/lib/artifact-limits";
@@ -53,13 +54,22 @@ export function contentBytesUsed(userId: string): Promise<number> {
   `);
 }
 
-/** Bytes of files in the account: finished uploads, plus uploads started within the last hour (older pending ones are abandoned). */
+/**
+ * Bytes of files in the account: finished uploads, plus uploads started
+ * within the last hour (older pending ones are abandoned), plus the old
+ * copies History keeps of files it replaced, each counted for the person
+ * who uploaded that copy.
+ */
 export function fileBytesUsed(userId: string, now = new Date()): Promise<number> {
   const pendingSince = new Date(now.getTime() - fileLimits.pendingTtlMs).toISOString();
   return sumBytes(sql`
-    select coalesce(sum(${artifactFile.size}), 0) as bytes from ${artifactFile}
-    where ${artifactFile.uploaderId} in ${accountUserIds(userId)}
-      and (${artifactFile.status} = 'ready' or ${artifactFile.createdAt} > ${pendingSince}::timestamptz)
+    select
+      coalesce((
+        select sum(${artifactFile.size}) from ${artifactFile}
+        where ${artifactFile.uploaderId} in ${accountUserIds(userId)}
+          and (${artifactFile.status} = 'ready' or ${artifactFile.createdAt} > ${pendingSince}::timestamptz)
+      ), 0)
+      + coalesce((select sum(${artifactFileCopy.size}) from ${artifactFileCopy} where ${artifactFileCopy.uploaderId} in ${accountUserIds(userId)}), 0) as bytes
   `);
 }
 

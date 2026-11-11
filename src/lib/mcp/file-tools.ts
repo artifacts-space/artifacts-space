@@ -6,6 +6,7 @@ import { createArtifact, getOwnArtifactByPublicId, toArtifactDtos } from "@/lib/
 import { allowedTypesHint, fileLimits, formatBytes } from "@/lib/files/config";
 import { assertUsableFiles, attachFiles, deleteOwnFile } from "@/lib/files/attach";
 import { findReadableFile, signedFileUrl } from "@/lib/files/download";
+import { replaceFile } from "@/lib/files/replace";
 import { finalizeUpload, requestUpload } from "@/lib/files/uploads";
 import type { ArtifactRecord } from "@/db/schema";
 import type { McpAccess } from "@/lib/oauth/scopes";
@@ -22,7 +23,7 @@ const fileIdField = z.uuid().describe("File id from files_request_upload");
 const fileIdsField = z.array(z.uuid()).min(1).max(fileLimits.maxFilesPerArtifact).describe("Ids of finished uploads (files_finalize)");
 const artifactIdField = z.string().refine(isPublicId, "Use the artifact's 22-character id.").describe("The id (22 characters) of an artifact you can edit");
 
-const flow = `Upload flow: 1) files_request_upload with the filename, type, and exact byte size. 2) PUT the bytes to upload.url with exactly upload.headers, for example: curl -X PUT -H "Content-Type: <type>" --data-binary @<path> "<url>" (curl sets Content-Length). The URL works for ${String(fileLimits.uploadUrlSeconds / 60)} minutes. 3) files_finalize with the file id. 4) files_create_artifact or files_attach, within a day, or the upload is deleted.`;
+const flow = `Upload flow: 1) files_request_upload with the filename, type, and exact byte size. 2) PUT the bytes to upload.url with exactly upload.headers, for example: curl -X PUT -H "Content-Type: <type>" --data-binary @<path> "<url>" (curl sets Content-Length). The URL works for ${String(fileLimits.uploadUrlSeconds / 60)} minutes. 3) files_finalize with the file id. 4) files_create_artifact, files_attach, or files_replace, within a day, or the upload is deleted.`;
 
 /** Runs a tool and returns JSON text. Errors written for the caller pass through; others are logged and replaced. */
 async function respond(run: () => Promise<unknown>) {
@@ -87,7 +88,7 @@ function registerUploadTools(server: ToolServer, userId: string) {
     },
     ({ fileId }) => respond(async () => {
       const file = await finalizeUpload(userId, fileId);
-      return { file, next: `Use the id in files_create_artifact, files_attach, an Image or File element of a ui artifact, or a Markdown media block: ![Alt text](/api/files/${file.id}) on its own line (artifacts_formats_guide, kind "markdown").` };
+      return { file, next: `Use the id in files_create_artifact, files_attach, files_replace (a new version of a file already in an artifact), an Image or File element of a ui artifact, or a Markdown media block: ![Alt text](/api/files/${file.id}) on its own line (artifacts_formats_guide, kind "markdown").` };
     }),
   );
 }
@@ -129,6 +130,25 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
       return artifactResult(userId, await editableArtifact(userId, artifact));
     }),
   );
+
+  server.registerTool(
+    "files_replace",
+    {
+      title: "Replace a file in an artifact",
+      description:
+        "Replaces a file in an artifact you can edit with your finished upload, such as a new draft of a statement of work or a deck. The file keeps its id, place, and name (the extension follows the new type), so links and embeds open the new file. The old copy stays in the artifact's History for people who can edit it, and readers outside the team keep the copy their approved version shows until the change is approved. Upload first (files_request_upload, PUT, files_finalize). Media a document embeds, and icon or cover images, change in the document or their picker instead.",
+      inputSchema: {
+        file: z.uuid().describe("Id of the file to replace, from the artifact's files"),
+        upload: z.uuid().describe("Id of your finished upload with the new content (files_finalize)"),
+      },
+    },
+    ({ file, upload }) => respond(async () => {
+      const { artifactId } = await replaceFile(userId, { fileId: file, uploadId: upload }, "agent", harness);
+      const record = await getEditableArtifact(userId, { id: artifactId });
+      if (!record) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+      return artifactResult(userId, record);
+    }),
+  );
 }
 
 function registerAccessTools(server: ToolServer, userId: string, harness: HarnessSource) {
@@ -163,7 +183,7 @@ function registerAccessTools(server: ToolServer, userId: string, harness: Harnes
 
 /**
  * Registers the file tools: request an upload URL, finalize it, put files in
- * an artifact, get a download URL, and delete. Reads go through the artifact
+ * an artifact, replace one, get a download URL, and delete. Reads go through the artifact
  * access check; writes need the edit check (the author, or a member of the
  * team the artifact is shared through), and are left out for read-only access.
  */

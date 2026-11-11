@@ -123,7 +123,7 @@ const [docsImage] = docsExampleFiles;
  */
 export const previewFiles: readonly FileDto[] = [
   ...docsExampleFiles,
-  { id: "3c1d9e57-8b20-4f6a-9d3e-2a7b5c0e8f14", filename: "checkout-v2-metrics.xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", size: 184_320, createdAt: "2026-11-06T00:00:00.000Z" },
+  { id: "3c1d9e57-8b20-4f6a-9d3e-2a7b5c0e8f14", filename: "checkout-v2-metrics.xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", size: 184_320, createdAt: "2026-11-06T00:00:00.000Z", replacedAt: null },
 ];
 
 /** The files a file artifact shows on the preview: an image and a spreadsheet, no PDF frame. */

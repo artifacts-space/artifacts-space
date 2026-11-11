@@ -30,7 +30,7 @@ const artifactShape = `{
   "pendingEdit": { "requestedAt" } | null,                            // author only
   "isAuthor": true,
   "updatedBy": "@reviewer" | null,
-  "files": [{ "id", "filename", "contentType", "size" }],
+  "files": [{ "id", "filename", "contentType", "size", "replacedAt": "…" | null }],
   "metadata": {}, "createdAt": "…", "updatedAt": "…"
 }`;
 
@@ -74,8 +74,9 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   artifacts_delete: { summary: "Confirms the delete. Only the author can delete.", shape: `{ "deleted": true, "id": "…" }` },
   artifacts_versions: {
     summary: "Without `version`: the saved versions, newest first. With `version`: that one version with its content, summary, and language.",
-    shape: `[ { "id", "createdAt", "savedAt", "saveKind": "create" | "edit" | "files" | "restore" | "snapshot",
+    shape: `[ { "id", "createdAt", "savedAt", "saveKind": "create" | "edit" | "files" | "replace" | "restore" | "snapshot",
     "restoredFromId", "bytes", "kind", "title", "icon", "theme", "cover", "coverPosition", "approved", "pending", "latest",
+    "replacedFile": "sow.pdf" | null,
     "savedBy": { "handle", "kind": "person" | "agent" } | null } ]`,
   },
   artifacts_restore_version: {
@@ -109,10 +110,11 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   },
   files_finalize: {
     summary: "The checked, ready file. A file whose size, type, or content does not match its request is deleted instead.",
-    shape: `{ "file": { … }, "next": "Use the id in files_create_artifact, files_attach, or an Image or File element of a ui artifact." }`,
+    shape: `{ "file": { … }, "next": "Use the id in files_create_artifact, files_attach, files_replace, or an Image or File element of a ui artifact." }`,
   },
   files_create_artifact: { summary: "The new private file artifact, with its files." },
   files_attach: { summary: "The artifact with its files after the attach." },
+  files_replace: { summary: "The artifact with its files after the replace. The replaced file keeps its id; `replacedAt` says when." },
   files_get_download_url: {
     summary: "A short-lived signed URL for the file.",
     shape: `{ "id", "filename", "contentType", "size", "url": "…", "expiresAt": "…" }`,
