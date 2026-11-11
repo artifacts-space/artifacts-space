@@ -1,7 +1,11 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { clientGuides, FxGuide } from "@/components/setup/client-guides";
+import { openAiMark } from "@/components/harness/openai-mark";
+import { ChatGptGuide, clientGuides, FxGuide } from "@/components/setup/client-guides";
 import { mcpClients } from "@/lib/setup/client-installs";
 
 import { ClientLogo } from "./client-logos";
@@ -31,6 +35,13 @@ describe("ClientLogo", () => {
     expect(html).toContain("size-4");
   });
 
+  it("should draw the same OpenAI mark as the harness icon file when showing ChatGPT", () => {
+    const iconFile = readFileSync(join(process.cwd(), "public/agent-icons/codex.svg"), "utf8");
+    expect(iconFile).toContain(`d="${openAiMark.path}"`);
+    expect(iconFile).toContain(`viewBox="${openAiMark.viewBox}"`);
+    expect(renderToStaticMarkup(<ClientLogo id="chatgpt" />)).toContain(`d="${openAiMark.path}"`);
+  });
+
   it("should carry no title or label of its own when the visible text names the client", () => {
     const html = renderToStaticMarkup(<ClientLogo id="opencode" />);
     expect(html).not.toContain("<title");
@@ -51,5 +62,19 @@ describe("client guides", () => {
     for (const step of ["fx.sh/setup.sh", `fx mcp add artifacts ${endpoint}`, "fx mcp login artifacts", "/skills install artifacts-space/skills", "fx mcp show artifacts"]) {
       expect(html).toContain(step);
     }
+  });
+
+  it("should send ChatGPT to Plugins with OAuth and no client ID when rendered in full", () => {
+    const html = renderToStaticMarkup(<ChatGptGuide origin={origin} full />);
+    for (const step of ['href="https://chatgpt.com/plugins"', "Add custom MCP server", `<code>${endpoint}</code>`, "<strong>OAuth</strong>", "Leave the client ID and secret empty", "Create as a plugin", "You do not need Developer mode"]) {
+      expect(html).toContain(step);
+    }
+  });
+
+  it("should say Pro does not work yet when the short ChatGPT guide names the plans", () => {
+    const html = renderToStaticMarkup(<ChatGptGuide origin={origin} />);
+    expect(html).toContain("You need a Business, Enterprise, or Edu workspace.");
+    expect(html).toContain("artifacts.space does not work on Pro for now");
+    expect(html).not.toContain("Developer mode");
   });
 });

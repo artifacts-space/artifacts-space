@@ -73,6 +73,17 @@ export function codexHeadlessConfigToml(origin: string): string {
 }
 
 /**
+ * Where ChatGPT on the web adds a custom MCP server: the Plugins page, then
+ * "+" and "Add custom MCP server". Developer mode is no longer needed first.
+ * ChatGPT on the web does not read the Codex config, so a server added for
+ * Codex is added here again.
+ * Sources: https://developers.openai.com/api/docs/guides/custom-mcp-server,
+ * https://developers.openai.com/plugins/deploy/connect-chatgpt, and
+ * https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt
+ */
+export const CHATGPT_PLUGINS_URL = "https://chatgpt.com/plugins";
+
+/**
  * The OpenCode command that adds the server to the project config. `--url`
  * makes it a remote Streamable HTTP server, which uses OAuth by default.
  * Source: https://opencode.ai/docs/mcp-servers/
@@ -175,6 +186,7 @@ export const mcpClients = [
   { id: "claude-code", label: "Claude Code", oneClick: false },
   { id: "cursor", label: "Cursor", oneClick: true },
   { id: "claude-desktop", label: "Claude Desktop", oneClick: false },
+  { id: "chatgpt", label: "ChatGPT", oneClick: false },
   { id: "codex", label: "Codex", oneClick: false },
   { id: "opencode", label: "OpenCode", oneClick: false },
   { id: "devin", label: "Devin", oneClick: false },

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { openAiMark } from "@/components/harness/openai-mark";
 import type { McpClientId } from "@/lib/setup/client-installs";
 import { cn } from "@/lib/utils";
 
@@ -13,8 +14,13 @@ import { cn } from "@/lib/utils";
  * - Claude Code, Claude, Cursor, OpenCode, Kimi, Model Context Protocol:
  *   Simple Icons v16.37.0 (https://simpleicons.org), path data under CC0 1.0.
  *   The marks stay trademarks of their owners.
- * - Codex: Simple Icons has no mark for it, and we found no brand terms
- *   that allow the use, so it gets a neutral initial in a hairline circle.
+ * - ChatGPT: the OpenAI mark (src/components/harness/openai-mark.ts), the
+ *   same mark the landing page and the harness icons already show for Codex.
+ *   Simple Icons has no OpenAI mark. OpenAI's brand guidelines
+ *   (https://openai.com/brand/) govern its use; it shows compatibility only.
+ * - Codex: a neutral initial in a hairline circle. That choice came before
+ *   the site used the OpenAI mark anywhere; moving Codex to the OpenAI mark
+ *   is left to its own change.
  * - Devin: no mark at all, by the owner's choice; an empty spacer of the
  *   same size keeps its label in line with the others.
  * - fx: its code is Apache-2.0, which grants no trademark rights, and the
@@ -26,11 +32,11 @@ interface LogoProps {
   className?: string | undefined;
 }
 
-/** A 24×24 mark that fills with the current text color. */
-function Mark({ className, children }: LogoProps & { children: ReactNode }) {
+/** A mark that fills with the current text color: 24×24 unless the source art has its own box. */
+function Mark({ className, children, viewBox = "0 0 24 24" }: LogoProps & { children: ReactNode; viewBox?: string }) {
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox={viewBox}
       fill="currentColor"
       aria-hidden="true"
       focusable="false"
@@ -108,7 +114,16 @@ function McpLogo({ className }: LogoProps) {
   );
 }
 
-/** Codex. Neutral fallback: no licensed mark found. */
+/** ChatGPT. The OpenAI mark, drawn in its source art's own box. */
+function ChatGptLogo({ className }: LogoProps) {
+  return (
+    <Mark className={className} viewBox={openAiMark.viewBox}>
+      <path d={openAiMark.path} />
+    </Mark>
+  );
+}
+
+/** Codex. A neutral initial; see the note on marks at the top of this file. */
 function CodexLogo({ className }: LogoProps) {
   return <InitialMark initial="C" className={className} />;
 }
@@ -137,6 +152,7 @@ export const clientLogos: Record<McpClientId, (props: LogoProps) => ReactNode> =
   "claude-code": ClaudeCodeLogo,
   cursor: CursorLogo,
   "claude-desktop": ClaudeLogo,
+  chatgpt: ChatGptLogo,
   codex: CodexLogo,
   opencode: OpenCodeLogo,
   devin: DevinLogo,
