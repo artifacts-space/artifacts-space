@@ -2,7 +2,7 @@ import { loadArtifactAction, updateArtifactAction } from "@/app/(workspace)/app/
 import { attachFilesAction, createArtifactWithFilesAction, discardUploadAction, replaceFileAction } from "@/app/(workspace)/app/file-actions";
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import { sendToServer, type SendFile } from "@/components/files/use-file-uploads";
-import type { ActionResult, ArtifactDto, ArtifactInput, ReplacedArtifactDto } from "@/lib/artifact-types";
+import type { ActionResult, ArtifactDto, ArtifactInput } from "@/lib/artifact-types";
 
 /**
  * What the blank page calls to store a new artifact: the server actions,
@@ -19,7 +19,7 @@ export interface NewArtifactApi {
   /** Attaches finished uploads to the artifact once it is stored (files dropped after a title was typed). */
   attach: (artifactId: string, fileIds: string[]) => Promise<ActionResult<ArtifactDto>>;
   /** Replaces a file of the stored artifact with a finished upload, from its Files section. */
-  replace: (artifactId: string, fileId: string, uploadId: string) => Promise<ActionResult<ReplacedArtifactDto>>;
+  replace: (artifactId: string, fileId: string, uploadId: string) => Promise<ActionResult<ArtifactDto>>;
   /** Deletes an upload that never reached an artifact; one already in an artifact is left alone. */
   discard: (fileId: string) => Promise<unknown>;
   /** The stored artifact as it is now, by public id: the workspace's own loader (loadArtifactAction), used when an answer was lost. */

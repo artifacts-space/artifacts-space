@@ -1,9 +1,6 @@
 import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type * as VersionService from "@/lib/versions/service";
-
 /*
  * Replacing a file against a real Postgres, through the same functions the
  * Files section, files_replace, /api/files, and History use: the entry keeps
@@ -28,15 +25,6 @@ vi.mock("./r2", () => ({
   },
 }));
 
-const settle = vi.hoisted(() => ({ fail: false }));
-vi.mock("@/lib/versions/service", async (importOriginal) => {
-  const actual = await importOriginal<typeof VersionService>();
-  return {
-    ...actual,
-    settleVersionedChange: (input: Parameters<typeof actual.settleVersionedChange>[0]) => (settle.fail ? Promise.reject(new Error("The approval step failed.")) : actual.settleVersionedChange(input)),
-  };
-});
-
 describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async () => {
   const { eq, inArray, like, or, sql } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
@@ -51,8 +39,7 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async 
   const { cleanupOrphanCopies, filesReplacedSince, findEditableCopy, pruneFileCopies } = await import("./copies");
   const { filesForViewer, findReadableFile } = await import("./download");
   const { replaceFile } = await import("./replace");
-  const { approvalNotSentNotice } = await import("./replace-rules");
-  const { deleteFileRows, listArtifactFiles, removeAbandonedFiles, removeUnattachedUpload } = await import("./store");
+  const { deleteFileRows, removeAbandonedFiles, removeUnattachedUpload } = await import("./store");
 
   const tag = randomUUID().slice(0, 8);
   const ids = { author: `replace-${tag}-author`, stranger: `replace-${tag}-stranger`, doc: `replace-${tag}-doc` };
@@ -114,6 +101,7 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async 
   async function clearCase() {
     const db = getDb();
     await serve(null);
+    await db.update(artifact).set({ icon: null }).where(eq(artifact.id, ids.doc));
     await db.delete(artifactFileCopy).where(or(eq(artifactFileCopy.artifactId, ids.doc), inArray(artifactFileCopy.uploaderId, [ids.author, ids.stranger])));
     await db.delete(artifactFile).where(inArray(artifactFile.uploaderId, [ids.author, ids.stranger]));
     await db.delete(artifactVersion).where(eq(artifactVersion.artifactId, ids.doc));
@@ -136,7 +124,6 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async 
     await versionAt(at(29));
     r2.deleted.length = 0;
     r2.refuse.clear();
-    settle.fail = false;
   });
 
   afterAll(async () => {
@@ -352,35 +339,6 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async 
     expect(await copies()).toEqual([]);
     expect(await removeUnattachedUpload(pending, ids.author)).toBe(true);
     expect(r2.deleted).toEqual([`files/${pending}/sow-v2.pdf`]);
-  });
-
-  it("should keep the replace and answer with a notice when its request for approval fails, so the page shows the new file", async () => {
-    const next = await upload(ids.author);
-    settle.fail = true;
-    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const result = await replaceFile(ids.author, { fileId: sow, uploadId: next }, "person");
-    errors.mockRestore();
-
-    expect(result).toMatchObject({ status: "not-sent", notice: approvalNotSentNotice, file: { id: sow, size: 20 } });
-    expect((await entry())?.key).toBe(`files/${next}/sow-v2.pdf`);
-    expect(await copies()).toHaveLength(1);
-    // Readers outside the team keep the approved file.
-    expect((await findReadableFile(sow, null))?.key).toBe(`files/${sow}/sow.pdf`);
-  });
-
-  it("should mark an image an older version shows as its icon as pictured, and refuse to replace it", async () => {
-    const image = randomUUID();
-    await getDb().insert(artifactFile).values({ id: image, uploaderId: ids.author, artifactId: ids.doc, attachedAt: at(25), key: `files/${image}/icon.png`, filename: "icon.png", contentType: "image/png", size: 10, status: "ready" });
-    await getDb().update(artifact).set({ icon: `file:${image}` }).where(eq(artifact.id, ids.doc));
-    await versionAt(at(24));
-    await getDb().update(artifact).set({ icon: null }).where(eq(artifact.id, ids.doc));
-
-    const files = await listArtifactFiles(ids.doc);
-    expect(files.find((file) => file.id === image)?.pictured).toBe(true);
-    expect(files.find((file) => file.id === sow)?.pictured).toBe(false);
-    const next = await upload(ids.author, "icon-v2.png", { contentType: "image/png" });
-    await expect(replaceFile(ids.author, { fileId: image, uploadId: next }, "person")).rejects.toThrow(/icon or cover/);
-    expect((await entry(image))?.key).toBe(`files/${image}/icon.png`);
   });
 
   it("should refuse to replace media a document embeds, and change nothing", async () => {

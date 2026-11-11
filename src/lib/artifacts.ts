@@ -202,12 +202,17 @@ export async function lastEditorsFor(records: Pick<ArtifactRecord, "updatedBy">[
   return new Map([...actors].map(([id, actor]) => [id, { id, kind: actor.kind, handle: actor.handle, name: actor.name }]));
 }
 
-/** Each row's extras, loaded together. `viewerId` decides whose projects show (src/lib/projects/queries.ts). */
-async function loadExtras(rows: ArtifactMetaRecord[], viewerId: string): Promise<(row: ArtifactMetaRecord) => DtoExtras> {
+/**
+ * Each row's extras, loaded together. `viewerId` decides whose projects show
+ * (src/lib/projects/queries.ts). `withPictured` marks the files a version
+ * shows as icon or cover, for the Files section of a full artifact; lists
+ * skip that read.
+ */
+async function loadExtras(rows: ArtifactMetaRecord[], viewerId: string, withPictured = false): Promise<(row: ArtifactMetaRecord) => DtoExtras> {
   const ids = rows.map((row) => row.id);
   const [pending, files, editors, projects, tags, agents] = await Promise.all([
     pendingRequestsFor(ids),
-    listFilesForArtifacts(ids),
+    listFilesForArtifacts(ids, { pictured: withPictured }),
     lastEditorsFor(rows),
     projectsForViewer(rows, viewerId),
     tagsForViewer(rows, viewerId),
@@ -229,7 +234,7 @@ async function loadExtras(rows: ArtifactMetaRecord[], viewerId: string): Promise
  * (the author and members of the team it is shared through).
  */
 export async function toArtifactDtos(records: ArtifactRecord[], viewerId: string): Promise<ArtifactDto[]> {
-  const extras = await loadExtras(records, viewerId);
+  const extras = await loadExtras(records, viewerId, true);
   return records.map((record) => toArtifactDto(record, extras(record)));
 }
 

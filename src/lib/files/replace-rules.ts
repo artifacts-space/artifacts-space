@@ -63,10 +63,6 @@ export function replaceTargetProblem(target: ReplaceTarget | null, options: { sh
   return null;
 }
 
-/** Told when a replace stood but its request for approval was not sent (replaceFile's "not-sent"). */
-export const approvalNotSentNotice =
-  "The file was replaced and History has it, but it could not be sent for approval. Readers outside the team keep the approved file until a later change is approved.";
-
 /**
  * Whether the Files section offers Replace for a file: not media the
  * document embeds, and not an image the artifact or any version shows as

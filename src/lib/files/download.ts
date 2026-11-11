@@ -45,10 +45,15 @@ export function servedVersionTime(viewable: Pick<ArtifactAccess, "version" | "se
 export async function filesForViewer(viewable: Pick<ArtifactAccess, "record" | "version" | "served">): Promise<FileDto[]> {
   const servedAt = servedVersionTime(viewable);
   const files = await listArtifactFiles(viewable.record.id, { attachedBy: servedAt });
-  if (files.length === 0) return files;
+  if (files.length === 0) return [];
   const hidden = await hiddenImagesFor(viewable);
   const shown = hidden.size === 0 ? files : files.filter((file) => !hidden.has(file.id));
-  return servedAt ? asServedAt(shown, servedAt) : shown;
+  return (servedAt ? await asServedAt(shown, servedAt) : shown).map(forReaders);
+}
+
+/** A file as readers get it: what it is, without the editing flags (embedded, pictured) only the Files section uses. */
+function forReaders({ id, filename, contentType, size, createdAt, replacedAt }: FileDto): FileDto {
+  return { id, filename, contentType, size, createdAt, replacedAt };
 }
 
 /**

@@ -79,20 +79,3 @@ test("should leave the file as it was and discard the upload when the replace is
   expect(await storedFiles(page)).toEqual([before]);
   await expect(filesSection(page).getByRole("button", { name: "Replace SOW.pdf" })).toBeEnabled();
 });
-
-test("should show the new file and say what is left when the replace stood but was not sent for approval", async ({ page }) => {
-  await openNewArtifact(page);
-  await dropFiles(page, ["SOW.pdf"]);
-  const [before] = await storedFiles(page);
-  if (!before) throw new Error("No stored file.");
-  await page.evaluate(() => { window.sessionStorage.setItem("fixture:next-replace", "not-sent"); });
-
-  await replaceWith(page, "SOW.pdf", { name: "SOW draft 3.pdf", content: "%PDF-1.4 version three, longer" });
-
-  await expect(page.getByText(/The file was replaced and History has it, but it could not be sent for approval/)).toBeVisible();
-  await expect(page.getByText("Replaced SOW.pdf. The old copy is in History.")).toHaveCount(0);
-  // The row shows the new file, and its upload was kept.
-  await expect(filesSection(page).locator('a[aria-label="Open SOW.pdf"]')).toHaveAttribute("href", /\?v=\d+$/);
-  expect((await storedFiles(page))[0]?.size).toBeGreaterThan(before.size);
-  expect(await discarded(page)).toEqual([]);
-});

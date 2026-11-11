@@ -1,4 +1,4 @@
-import { and, asc, eq, getTableColumns, gte, inArray, isNull, like, lt, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, like, lt, lte, or, sql, type SQL } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, artifactFile, artifactVersion, type ArtifactFileRecord } from "@/db/schema";
@@ -6,6 +6,7 @@ import { FILE_PREFIX } from "@/lib/artifact-icons";
 
 import { fileLimits } from "./config";
 import { cleanupOrphanCopies, removeArtifactCopies, removeCopiesOf } from "./copies";
+import { imageFileIdsOf } from "./icon-cleanup-rules";
 import { deleteObject, r2ConfigFromEnv } from "./r2";
 import type { FileDto } from "./types";
 
@@ -14,24 +15,30 @@ import type { FileDto } from "./types";
  * Callers check who may do what; access-rules.ts holds the rules.
  */
 
-/** Maps a row to the shape the app and agents see. `pictured` comes from listFilesForArtifacts. */
-export function toFileDto(row: ArtifactFileRecord, pictured?: boolean): FileDto {
-  const dto: FileDto = { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString(), replacedAt: row.replacedAt?.toISOString() ?? null, embedded: row.attachedByContent };
-  return pictured === undefined ? dto : { ...dto, pictured };
+/** Maps a row to the shape the app and agents see. */
+export function toFileDto(row: ArtifactFileRecord): FileDto {
+  return { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString(), replacedAt: row.replacedAt?.toISOString() ?? null, embedded: row.attachedByContent };
 }
 
 /**
- * SQL: whether any version of the file's artifact shows the file as its
- * icon or cover (replace.ts refuses to replace those). The artifact's
- * current icon and cover are in the DTO itself (offersReplace). Only images
- * can be either, so other files skip the version lookup.
+ * The uploaded images any version of these artifacts shows as its icon or
+ * cover, by artifact id: Replace is not offered for them (FileDto.pictured,
+ * offersReplace), as replace.ts refuses them. One read of artifact_version
+ * by artifact id (its artifact_id index).
  */
-function picturedSql(): SQL<boolean> {
-  const ref = sql`${FILE_PREFIX}::text || ${artifactFile.id}::text`;
-  return sql<boolean>`(${artifactFile.contentType} like 'image/%' and exists (
-    select 1 from ${artifactVersion} v
-    where v.artifact_id = ${artifactFile.artifactId} and (v.icon = ${ref} or v.cover = ${ref} or v.cover like (${ref} || '@%'))
-  ))`;
+async function picturedFileIds(artifactIds: readonly string[]): Promise<Map<string, Set<string>>> {
+  const pictured = new Map<string, Set<string>>();
+  if (artifactIds.length === 0) return pictured;
+  const rows = await getDb()
+    .selectDistinct({ artifactId: artifactVersion.artifactId, icon: artifactVersion.icon, cover: artifactVersion.cover })
+    .from(artifactVersion)
+    .where(and(inArray(artifactVersion.artifactId, [...artifactIds]), or(like(artifactVersion.icon, `${FILE_PREFIX}%`), like(artifactVersion.cover, `${FILE_PREFIX}%`))));
+  for (const row of rows) {
+    const ids = pictured.get(row.artifactId) ?? new Set<string>();
+    for (const fileId of imageFileIdsOf(row)) ids.add(fileId);
+    pictured.set(row.artifactId, ids);
+  }
+  return pictured;
 }
 
 /** One file row by id, or null. */
@@ -46,24 +53,33 @@ export async function getFileRows(fileIds: readonly string[]): Promise<ArtifactF
   return getDb().select().from(artifactFile).where(inArray(artifactFile.id, [...fileIds]));
 }
 
+function withPictured(file: FileDto, pictured: ReadonlySet<string> | undefined): FileDto {
+  return pictured?.has(file.id) ? { ...file, pictured: true } : file;
+}
+
 /**
  * Ready files of these artifacts, in the order they were attached, by
  * artifact id. With `attachedBy`, only files attached at or before that
- * time: what readers of an approved version may see.
+ * time: what readers of an approved version may see. With `pictured`, files
+ * a version shows as icon or cover carry `pictured` (picturedFileIds), for
+ * the editor's Files section; lists and readers skip that read.
  */
-export async function listFilesForArtifacts(artifactIds: readonly string[], options: { attachedBy?: Date | null } = {}): Promise<Map<string, FileDto[]>> {
+export async function listFilesForArtifacts(artifactIds: readonly string[], options: { attachedBy?: Date | null; pictured?: boolean } = {}): Promise<Map<string, FileDto[]>> {
   const files = new Map<string, FileDto[]>();
   if (artifactIds.length === 0) return files;
   const cutoff = options.attachedBy ? lte(artifactFile.attachedAt, options.attachedBy) : undefined;
-  const rows = await getDb()
-    .select({ ...getTableColumns(artifactFile), pictured: picturedSql() })
-    .from(artifactFile)
-    .where(and(inArray(artifactFile.artifactId, [...artifactIds]), eq(artifactFile.status, "ready"), cutoff))
-    .orderBy(asc(artifactFile.attachedAt), asc(artifactFile.createdAt));
-  for (const { pictured, ...row } of rows) {
+  const [rows, pictured] = await Promise.all([
+    getDb()
+      .select()
+      .from(artifactFile)
+      .where(and(inArray(artifactFile.artifactId, [...artifactIds]), eq(artifactFile.status, "ready"), cutoff))
+      .orderBy(asc(artifactFile.attachedAt), asc(artifactFile.createdAt)),
+    options.pictured === true ? picturedFileIds(artifactIds) : null,
+  ]);
+  for (const row of rows) {
     if (!row.artifactId) continue;
     const list = files.get(row.artifactId) ?? [];
-    list.push(toFileDto(row, pictured));
+    list.push(withPictured(toFileDto(row), pictured?.get(row.artifactId)));
     files.set(row.artifactId, list);
   }
   return files;

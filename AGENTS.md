@@ -374,11 +374,16 @@ puts an editor's finished upload in place of a plain attachment. The
 `artifact_file` row keeps its id, place, and name, so links and embeds open
 the new file; what it held moves to `artifact_file_copy`. The swap is one SQL
 statement, guarded on the key the editor saw, that also files the replace's
-version, so the file and its History entry land together or not at all; the
-page discards a refused upload with `removeUnattachedUpload`. A replace can
+version and writes its approval outcome (the edit request, or the new approved
+version), so the file, its History entry, and its approval land together or
+not at all. The approval is decided before the statement, which runs only
+while the artifact keeps that visibility and team. The page discards a
+refused upload with `removeUnattachedUpload`. A replace can
 swap a row's object at any time, so code that deletes file rows reads the key
 in the delete itself (`deleteFileRows`, `DELETE … RETURNING`).
-Content media and icon or cover images are never replaced. Readers get the
+Content media and icon or cover images (of the artifact or any version) are
+never replaced; the Files section learns the version ones from
+`FileDto.pictured`, which only full artifact DTOs load. Readers get the
 current file, except readers of an approved version, who get the copy that
 was current when it was saved (`download.ts`, never a newer one). Old copies
 open only at `/api/files/<id>/copies/<copyId>`, for people who may edit, and

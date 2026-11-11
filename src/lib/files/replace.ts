@@ -5,18 +5,20 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { artifactFileCopy } from "@/db/file-copy-schema";
-import { artifact, artifactFile, artifactVersion, type ArtifactFileRecord } from "@/db/schema";
+import { artifact, artifactFile, artifactVersion, sharingRequest, type ArtifactFileRecord, type ArtifactRecord } from "@/db/schema";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { getEditableArtifactMeta } from "@/lib/access";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 import type { HarnessStamp } from "@/lib/harness/harness-rules";
+import { notifySharingRequest } from "@/lib/notifications/create";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { UserFacingError } from "@/lib/user-facing-error";
-import { versionBytes } from "@/lib/versions/history-rules";
-import { prepareVersionedChange, settleVersionedChange, type EditStatus } from "@/lib/versions/service";
+import { forgetArtifactCache } from "@/lib/versions/cache";
+import { pruneArtifactVersions } from "@/lib/versions/history";
+import { planVersionedChangeApproval, prepareVersionedChange, type EditStatus, type VersionedChangeApproval } from "@/lib/versions/service";
 
 import { canUseFileInArtifact } from "./access-rules";
-import { approvalNotSentNotice, replacementFilename, replaceTargetProblem } from "./replace-rules";
+import { replacementFilename, replaceTargetProblem } from "./replace-rules";
 import { getFileRow, toFileDto } from "./store";
 import type { FileDto } from "./types";
 
@@ -36,12 +38,17 @@ const uploadProblem =
 /** No harness: a change in the web app. */
 const noStamp = () => Promise.resolve(null);
 
+/** SQL: whether a version of `artifactId` shows the file `ref` (file:<id>) as its icon or cover. The pre-check and the swap use the same rule. */
+function versionShows(artifactId: string, ref: string) {
+  return sql`exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and (v.icon = ${ref} or v.cover = ${ref} or v.cover like ${`${ref}@%`}))`;
+}
+
 /** Whether any version, or the artifact now, shows this file as its icon or cover. Such images are changed through their pickers. */
 async function shownAsIconOrCover(artifactId: string, fileId: string): Promise<boolean> {
   const ref = `${FILE_PREFIX}${fileId}`;
   const result = await getDb().execute<{ shown: boolean }>(sql`
     select exists (select 1 from ${artifact} a where a.id = ${artifactId} and (a.icon = ${ref} or a.cover = ${ref} or a.cover like ${`${ref}@%`}))
-      or exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and (v.icon = ${ref} or v.cover = ${ref} or v.cover like ${`${ref}@%`})) as shown
+      or ${versionShows(artifactId, ref)} as shown
   `);
   return result.rows[0]?.shown === true;
 }
@@ -65,35 +72,84 @@ async function usableUpload(editorId: string, uploadId: string): Promise<Artifac
 
 interface Swap {
   target: ArtifactFileRecord & { artifactId: string };
+  /** The artifact as the approval plan saw it; the swap runs only while its visibility and team are unchanged. */
+  before: ArtifactRecord;
+  approval: VersionedChangeApproval;
   upload: ArtifactFileRecord;
   editorId: string;
   copyId: string;
   versionId: string;
   filename: string;
-  /** The version's content and metadata size, from the artifact before the replace (a replace changes neither). */
-  bytes: number;
+  /** When the replace happens, by the app's clock like every other save (never earlier than the entry's last replace). */
+  at: Date;
   harness: HarnessStamp | null;
+}
+
+/**
+ * The approval outcome's writes, as CTEs after `version` in the swap: they
+ * run in the same statement, so the version and its approval stand
+ * together. "apply" makes the version the approved one (in `stamped`),
+ * cancels open edit requests, and files an approver's audit row; "pending"
+ * opens the edit request or points the open one at the version.
+ */
+function approvalCtes({ approval, target, editorId, at: when }: Swap) {
+  const at = sql`${when.toISOString()}::timestamptz`;
+  if (approval.outcome === "pending") {
+    return sql`,
+    request as (
+      insert into ${sharingRequest} (id, kind, artifact_id, team_id, requested_by, visibility, version_id, status, created_at)
+      select ${randomUUID()}, 'edit', ${target.artifactId}, ${approval.teamId}, ${editorId}, ${approval.requestVisibility}, version.id, 'pending', ${at}
+      from version
+      on conflict (artifact_id, kind) where status = 'pending'
+      do update set version_id = excluded.version_id, team_id = excluded.team_id, visibility = excluded.visibility, requested_by = excluded.requested_by, created_at = excluded.created_at
+      returning id, (xmax = 0) as opened
+    )`;
+  }
+  if (approval.outcome !== "apply") return sql``;
+  const audit = approval.auditTeamId === null ? sql`` : sql`,
+    audit as (
+      insert into ${sharingRequest} (id, kind, artifact_id, team_id, requested_by, visibility, version_id, status, decided_by, decided_at)
+      select ${randomUUID()}, 'edit', ${target.artifactId}, ${approval.auditTeamId}, ${editorId}, ${approval.requestVisibility}, version.id, 'approved', ${editorId}, ${at}
+      from version
+      returning id
+    )`;
+  return sql`,
+    canceled as (
+      update ${sharingRequest} r set status = 'canceled', decided_by = ${editorId}, decided_at = ${at}
+      from version
+      where r.artifact_id = ${target.artifactId} and r.kind = 'edit' and r.status = 'pending'
+      returning r.id
+    )${audit}`;
 }
 
 /**
  * The swap, in one statement: the production driver (neon-http) has no
  * interactive transactions, and one statement is all or nothing. It runs
  * only while the entry still holds the object the editor saw (`key`), is
- * still a plain attachment of the same artifact, and is shown as no icon or
- * cover, and while the upload is still the editor's, finished, and in no
- * artifact. It locks the entry and its artifact, so every part below runs or
- * none does. Then it deletes the upload's row, records what the entry held
- * as an old copy, files the replace's version (saved at the same moment the
- * copy stopped being current, so the version shows the new file and every
- * window between replaces holds the version that began it), stamps the
- * artifact, and points the entry at the upload's object. The upload row goes
- * before the entry takes its key, so the unique key index never sees the
- * key twice. Returns the updated entry, or null when nothing ran.
+ * still a plain attachment of the same artifact, is shown as no icon or
+ * cover by the artifact or any version, and the artifact keeps the
+ * visibility and team its approval plan was made for, and while the upload
+ * is still the editor's, finished, and in no artifact. It locks the entry
+ * and its artifact, so every part below runs or none does. Then it deletes
+ * the upload's row, records what the entry held as an old copy, files the
+ * replace's version (saved at the same moment the copy stopped being
+ * current, so the version shows the new file and every window between
+ * replaces holds the version that began it; its size is measured from the
+ * row it copies, counting metadata as Postgres prints jsonb, which errs a
+ * few bytes high), writes the approval outcome
+ * (approvalCtes), stamps the artifact, and points the entry at the upload's
+ * object. The upload row goes before the entry takes its key, so the unique
+ * key index never sees the key twice. Returns the edit request it opened,
+ * if any, or null when nothing ran.
  */
-async function swapInUpload({ target, upload, editorId, copyId, versionId, filename, bytes, harness }: Swap): Promise<ArtifactFileRecord | null> {
+async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | null } | null> {
+  const { target, before, approval, upload, editorId, copyId, versionId, filename, harness } = swap;
+  const at = sql`${swap.at.toISOString()}::timestamptz`;
   const ref = `${FILE_PREFIX}${target.id}`;
   const harnessId = harness?.harness ?? null;
-  const result = await getDb().execute<{ id: string }>(sql`
+  const approved = approval.outcome === "apply" ? sql`${versionId}` : sql`a.approved_version_id`;
+  const opened = approval.outcome === "pending" ? sql`(select id from request where opened)` : sql`null::text`;
+  const result = await getDb().execute<{ id: string; opened_request_id: string | null }>(sql`
     with target as (
       select f.id, f.artifact_id, f.key, f.filename, f.content_type, f.size, f.uploader_id, f.replaced_at
       from ${artifactFile} f
@@ -101,6 +157,8 @@ async function swapInUpload({ target, upload, editorId, copyId, versionId, filen
       where f.id = ${target.id} and f.artifact_id = ${target.artifactId} and f.key = ${target.key}
         and f.status = 'ready' and f.attached_by_content = false
         and a.icon is distinct from ${ref} and a.cover is distinct from ${ref} and coalesce(a.cover, '') not like ${`${ref}@%`}
+        and not ${versionShows(target.artifactId, ref)}
+        and a.visibility = ${before.visibility} and a.team_id is not distinct from ${before.teamId}
       for update
     ),
     upload as (
@@ -111,20 +169,21 @@ async function swapInUpload({ target, upload, editorId, copyId, versionId, filen
     ),
     copy as (
       insert into ${artifactFileCopy} (id, file_id, artifact_id, key, filename, content_type, size, uploader_id, current_from, replaced_at, replaced_by, version_id)
-      select ${copyId}, t.id, t.artifact_id, t.key, t.filename, t.content_type, t.size, t.uploader_id, t.replaced_at, now(), ${editorId}, ${versionId}
+      select ${copyId}, t.id, t.artifact_id, t.key, t.filename, t.content_type, t.size, t.uploader_id, t.replaced_at, greatest(${at}, t.replaced_at), ${editorId}, ${versionId}
       from target t, upload
       returning replaced_at
     ),
     version as (
       insert into ${artifactVersion} (id, artifact_id, title, icon, theme, cover, summary, content, kind, language, project, source, metadata, bytes, harness, created_by, save_kind, created_at, saved_at)
-      select ${versionId}, a.id, a.title, a.icon, a.theme, a.cover, a.summary, a.content, a.kind, a.language, a.project, a.source, a.metadata, ${bytes}, ${harnessId}, ${editorId}, 'replace', copy.replaced_at, copy.replaced_at
+      select ${versionId}, a.id, a.title, a.icon, a.theme, a.cover, a.summary, a.content, a.kind, a.language, a.project, a.source, a.metadata,
+        octet_length(a.content) + octet_length(a.metadata::text), ${harnessId}, ${editorId}, 'replace', copy.replaced_at, copy.replaced_at
       from ${artifact} a, copy
       where a.id = ${target.artifactId}
       returning id
-    ),
+    )${approvalCtes(swap)},
     stamped as (
-      update ${artifact} a set updated_by = ${editorId}, updated_at = now(), harness = coalesce(${harnessId}::text, a.harness)
-      from version
+      update ${artifact} a set updated_by = ${editorId}, updated_at = copy.replaced_at, harness = coalesce(${harnessId}::text, a.harness), approved_version_id = ${approved}
+      from version, copy
       where a.id = ${target.artifactId}
       returning a.id
     )
@@ -132,23 +191,17 @@ async function swapInUpload({ target, upload, editorId, copyId, versionId, filen
     set key = upload.key, filename = ${filename}, content_type = upload.content_type, size = upload.size, uploader_id = upload.uploader_id, replaced_at = copy.replaced_at
     from upload, copy, version, stamped
     where e.id = ${target.id}
-    returning e.id
+    returning e.id, ${opened} as opened_request_id
   `);
-  if (result.rows.length === 0) return null;
-  return getFileRow(target.id);
+  const [row] = result.rows;
+  return row ? { openedRequestId: row.opened_request_id } : null;
 }
 
-/**
- * What a replace returns: the artifact it changed, the entry as it is now,
- * and the approval outcome. "not-sent" means the swap and its version are
- * saved but the approval step failed; `notice` then says so. The replace
- * still happened, so callers show the new file and do not retry it.
- */
+/** What a replace returns: the artifact it changed, the entry as it is now, and the approval outcome. */
 export interface ReplacedFile {
   artifactId: string;
   file: FileDto;
-  status: EditStatus | "not-sent";
-  notice: string | null;
+  status: EditStatus;
 }
 
 /** Which file to replace with which upload. `artifactId`, when set, is the artifact the file must be in (the page the person is on). */
@@ -177,29 +230,27 @@ export async function replaceFile(editorId: string, request: ReplaceRequest, act
   const [before] = await getDb().select().from(artifact).where(eq(artifact.id, target.artifactId)).limit(1);
   if (!before) throw new UserFacingError("File not found.");
   const approvedId = await prepareVersionedChange(before);
+  const approval = await planVersionedChangeApproval(before, approvedId, editorId, actor);
   const versionId = randomUUID();
-  const swap = { target, upload, editorId, copyId: randomUUID(), versionId, filename: replacementFilename(target, upload), bytes: versionBytes(before), harness: await harness() };
+  const swap = { target, before, approval, upload, editorId, copyId: randomUUID(), versionId, filename: replacementFilename(target, upload), harness: await harness(), at: new Date() };
   const swapped = await swapInUpload(swap);
   if (!swapped) throw new UserFacingError("The file changed while it was being replaced, so nothing was changed. Try again.");
-  const status = await settleReplace({ artifactId: target.artifactId, approvedId, versionId, editorId, actor });
-  return { artifactId: target.artifactId, file: toFileDto(swapped), status, notice: status === "not-sent" ? approvalNotSentNotice : null };
+  await afterSwap(target.artifactId, swapped.openedRequestId);
+  const file = await getFileRow(target.id);
+  if (!file) throw new UserFacingError("File not found.");
+  return { artifactId: target.artifactId, file: toFileDto(file), status: approval.outcome === "pending" ? "pending" : "applied" };
 }
 
 /**
- * Applies the approval rule to the replace's version, trying twice. The file
- * and its version are already saved, so a failure is not thrown: if both
- * tries fail, readers outside the team keep the approved copy and the
- * answer is "not-sent".
+ * After the swap: drops the cached artifact (its approved version may have
+ * moved), notifies approvers of an edit request the swap opened, and prunes
+ * old versions. None of it can undo the replace; pruning is housekeeping
+ * the cleanup job retries.
  */
-async function settleReplace(input: Parameters<typeof settleVersionedChange>[0]): Promise<EditStatus | "not-sent"> {
-  try {
-    return await settleVersionedChange(input);
-  } catch {
-    try {
-      return await settleVersionedChange(input);
-    } catch (error) {
-      console.error("[files] A replaced file's approval step failed", error instanceof Error ? error.name : "unknown error");
-      return "not-sent";
-    }
-  }
+async function afterSwap(artifactId: string, openedRequestId: string | null) {
+  forgetArtifactCache(artifactId);
+  if (openedRequestId) notifySharingRequest(openedRequestId);
+  await pruneArtifactVersions(artifactId).catch((error: unknown) => {
+    console.error("[versions] Pruning after a replace failed", error instanceof Error ? error.name : "unknown error");
+  });
 }

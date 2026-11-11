@@ -215,19 +215,28 @@ export async function prepareVersionedChange(before: ArtifactRecord): Promise<st
 }
 
 /**
- * After such a change: applies the approval rule to the version it wrote
- * (live for every reader, or waiting for an owner or admin), then prunes
- * old versions. `approvedId` comes from prepareVersionedChange.
+ * How a change that files its own version in one statement (a replaced
+ * file, src/lib/files/replace.ts) meets the approval rule, decided before
+ * that statement so the statement can write the outcome with the change:
+ * nothing for private and team artifacts (or none approved yet), "apply"
+ * (the version becomes the approved one, open edit requests are canceled,
+ * and an approver's own edit gets an audit row), or "pending" (the open edit
+ * request points at the version). The statement must re-check that the
+ * artifact still has the `visibility` and `teamId` this was decided for.
  */
-export async function settleVersionedChange(input: { artifactId: string; approvedId: string | null; versionId: string; editorId: string; actor: SharingActor }): Promise<EditStatus> {
-  const [after] = await getDb().select().from(artifact).where(eq(artifact.id, input.artifactId)).limit(1);
-  if (!after) return "applied";
-  const save: ArtifactSave = { before: null, after, editorId: input.editorId, actor: input.actor, saveKind: "replace" };
-  const status = input.approvedId && isReviewedLevel(after.visibility) ? await approvalFor(after, input.approvedId, input.versionId, save) : "applied";
-  await pruneArtifactVersions(after.id).catch((error: unknown) => {
-    console.error("[versions] Pruning after a save failed", error instanceof Error ? error.name : "unknown error");
-  });
-  return status;
+export type VersionedChangeApproval =
+  | { outcome: "none" }
+  | { outcome: "apply"; auditTeamId: string | null; requestVisibility: "link" | "public" }
+  | { outcome: "pending"; teamId: string; requestVisibility: "link" | "public" };
+
+/** Decides VersionedChangeApproval for `before`; `approvedId` comes from prepareVersionedChange. Mirrors applyApprovalRule. */
+export async function planVersionedChangeApproval(before: ArtifactRecord, approvedId: string | null, editorId: string, actor: SharingActor): Promise<VersionedChangeApproval> {
+  if (!approvedId || !isReviewedLevel(before.visibility)) return { outcome: "none" };
+  const requestVisibility = before.visibility === "public" ? "public" : "link";
+  const { rule, outcome } = await decideFor(before, editorId, actor);
+  if (outcome === "pending" && before.teamId) return { outcome: "pending", teamId: before.teamId, requestVisibility };
+  const audit = before.teamId && editNeedsAuditRow({ visibility: before.visibility, team: rule }) ? before.teamId : null;
+  return { outcome: "apply", auditTeamId: audit, requestVisibility };
 }
 
 /**

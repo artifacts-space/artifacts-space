@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { actionErrorMessage } from "@/lib/action-errors";
-import type { ActionResult, ArtifactDto, ArtifactInput, ReplacedArtifactDto } from "@/lib/artifact-types";
+import type { ActionResult, ArtifactDto, ArtifactInput } from "@/lib/artifact-types";
 import { getEditableArtifact } from "@/lib/access";
 import { toArtifactDtos } from "@/lib/artifacts";
 import { createArtifactOnce } from "@/lib/create/create-once";
@@ -97,17 +97,15 @@ export async function attachFilesAction(artifactId: string, fileIds: string[]): 
  * Replaces a file of an artifact the person may edit with their finished
  * upload. The file keeps its id, place, and name; the old copy stays in
  * History. A refusal changes nothing; the page then discards the upload.
- * When the file was replaced but a later step failed, the answer still
- * carries the artifact, with a notice saying what is left.
  */
-export async function replaceFileAction(artifactId: string, fileId: string, uploadId: string): Promise<ActionResult<ReplacedArtifactDto>> {
+export async function replaceFileAction(artifactId: string, fileId: string, uploadId: string): Promise<ActionResult<ArtifactDto>> {
   return run("The file could not be replaced. Try again.", async (userId) => {
     const ids = z.object({ fileId: z.uuid(), uploadId: z.uuid() }).parse({ fileId, uploadId });
     const record = await getEditableArtifact(userId, { id: z.string().min(1).max(200).parse(artifactId) });
     if (!record) throw new UserFacingError("Artifact not found.");
-    const { notice } = await replaceFile(userId, { ...ids, artifactId: record.id }, "person");
+    await replaceFile(userId, { ...ids, artifactId: record.id }, "person");
     revalidatePath("/app");
-    return { artifact: await editableArtifactDto(userId, record.id), notice };
+    return editableArtifactDto(userId, record.id);
   });
 }
 

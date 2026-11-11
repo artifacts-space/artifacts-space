@@ -10,10 +10,12 @@ import { createTableQueueDb } from "./table-queue-db";
  */
 
 const state = vi.hoisted((): { db: unknown } => ({ db: null }));
-const store = vi.hoisted(() => ({ getFileRows: vi.fn(), removeFiles: vi.fn(), deleteStoredObjects: vi.fn() }));
+const store = vi.hoisted(() => ({ getFileRows: vi.fn(), deleteFileRows: vi.fn(), deleteStoredObjects: vi.fn() }));
+const copies = vi.hoisted(() => ({ removeCopiesOf: vi.fn() }));
 
 vi.mock("@/db", () => ({ getDb: () => state.db }));
 vi.mock("./store", () => store);
+vi.mock("./copies", () => copies);
 
 const { countHistoryOnlyFiles, pruneUnusedContentFiles, pruneUnusedIconFiles } = await import("./icon-cleanup");
 
@@ -28,7 +30,8 @@ function stage(tables: [unknown, unknown[]][]) {
 beforeEach(() => {
   vi.resetAllMocks();
   store.getFileRows.mockImplementation((ids: string[]) => Promise.resolve(ids.map((id) => ({ id, artifactId: "a1", key: `files/${id}/cover.jpg` }))));
-  store.removeFiles.mockImplementation((rows: { id: string }[]) => Promise.resolve(rows.map((row) => row.id)));
+  store.deleteFileRows.mockResolvedValue([{ id: cover, key: `files/${cover}/cover.jpg` }]);
+  copies.removeCopiesOf.mockResolvedValue(undefined);
 });
 
 describe("pruneUnusedIconFiles", () => {
@@ -36,20 +39,23 @@ describe("pruneUnusedIconFiles", () => {
   it("should keep a removed cover image when an older version still shows it, so Restore brings it back", async () => {
     stage([[artifact, [[record]]], [artifactVersion, [[{ icon: null, cover: `file:${cover}@20` }]]]]);
     await expect(pruneUnusedIconFiles("a1", [null, `file:${cover}@20`])).resolves.toBe(0);
-    expect(store.removeFiles).not.toHaveBeenCalled();
+    expect(store.deleteFileRows).not.toHaveBeenCalled();
   });
 
   it("should delete the image when the last version that showed it is gone", async () => {
     stage([[artifact, [[{ ...record, cover: "mist" }]]], [artifactVersion, [[{ icon: `file:${other}`, cover: null }]]], [artifactFile, [[{ id: cover }]]]]);
     await expect(pruneUnusedIconFiles("a1", [`file:${cover}`])).resolves.toBe(1);
-    expect(store.removeFiles).toHaveBeenCalledWith([{ id: cover, artifactId: "a1", key: `files/${cover}/cover.jpg` }]);
+    // One guarded delete that reads the key itself, after the file's old copies.
+    expect(copies.removeCopiesOf).toHaveBeenCalledWith([cover]);
+    expect(store.deleteFileRows).toHaveBeenCalledTimes(1);
   });
 
   it("should never delete a file attached to another artifact", async () => {
     stage([[artifact, [[record]]], [artifactVersion, [[]]], [artifactFile, [[{ id: cover }]]]]);
     store.getFileRows.mockResolvedValue([{ id: cover, artifactId: "a2", key: "files/x" }]);
     await expect(pruneUnusedIconFiles("a1", [`file:${cover}`])).resolves.toBe(0);
-    expect(store.removeFiles).toHaveBeenCalledWith([]);
+    expect(store.deleteFileRows).not.toHaveBeenCalled();
+    expect(copies.removeCopiesOf).not.toHaveBeenCalled();
   });
 
   it("should keep an image a ui or Markdown version still names in its content, so Restore brings it back", async () => {
