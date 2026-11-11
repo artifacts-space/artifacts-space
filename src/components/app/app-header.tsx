@@ -52,7 +52,6 @@ function InboxLink({ active }: { active: boolean }) {
   );
 }
 
-/** Brings back every confirmation the person turned off. Hidden when none are off. */
 /** A link in the account menu, marked as the current page while its section is open. */
 function AccountLink({ href, active, children }: { href: string; active: boolean; children: ReactNode }) {
   return (
@@ -62,6 +61,7 @@ function AccountLink({ href, active, children }: { href: string; active: boolean
   );
 }
 
+/** Brings back every confirmation the person turned off. Hidden when none are off. */
 function ResetConfirmationsItem() {
   const { skipped, reset } = useConfirmations();
   if (skipped.size === 0) return null;
@@ -149,7 +149,7 @@ export function AppHeader({ userId, name, email, username, unreadNotifications, 
               <AccountLink href="/teams" active={pathname.startsWith("/teams")}>
                 <IconUsers /> Teams
               </AccountLink>
-              <AccountLink href="/app/connections" active={false}>
+              <AccountLink href="/app/connections" active={pathname.startsWith("/app/connections")}>
                 <IconKey /> Access tokens
               </AccountLink>
               <AccountLink href="/docs" active={false}>

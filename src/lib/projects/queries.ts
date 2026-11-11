@@ -138,11 +138,6 @@ export interface ProjectFacets {
 }
 
 /**
- * The project filter's entries for a list scope, counted in the database so
- * they cover every artifact, not only the first page. `listCondition` is the
- * list's scope condition on artifact (the viewer's own, or a team's).
- */
-/**
  * How facet counts join artifacts to projects: only projects the viewer may
  * use in this list scope. A link that points anywhere else (it never should)
  * never names a filter entry.
@@ -168,6 +163,11 @@ export function facetTotalsQuery(viewerId: string, listCondition: SQL) {
     .where(listCondition);
 }
 
+/**
+ * The project filter's entries for a list scope, counted in the database so
+ * they cover every artifact, not only the first page. `listCondition` is the
+ * list's scope condition on artifact (the viewer's own, or a team's).
+ */
 export async function loadProjectFacets(viewerId: string, scope: ListScope, listCondition: SQL): Promise<ProjectFacets> {
   const db = getDb();
   const usable = await facetJoinCondition(viewerId, scope);
