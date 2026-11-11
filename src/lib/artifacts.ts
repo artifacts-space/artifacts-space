@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { artifact, sharingRequest, type ArtifactRecord } from "@/db/schema";
+import { CreateRequestTaken } from "@/lib/create/created-by-request";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { getEditableArtifact, viewableInTeamCondition } from "@/lib/access";
 import { authoredByViewerCondition, findDeletableArtifact, ownedAgentIds } from "@/lib/agents/owner-access";
@@ -322,16 +323,21 @@ export async function findPublicIdByShareId(shareId: string) {
   return record?.publicId ?? null;
 }
 
+/** The author's own project for a new artifact, made if needed; null for none. New artifacts are private, so it is among the author's own. */
+async function newArtifactProjectId(userId: string, projectName: string | null | undefined): Promise<string | null> {
+  return projectName ? (await findOrCreateProject({ kind: "user", userId }, projectName, userId)).id : null;
+}
+
 /**
  * Creates a private artifact for its author, within the hourly creation limit
  * and the account's storage quota. `harness` is the agent harness of the MCP
  * connection that created it; leave it out for the web app.
  */
-export async function createArtifact(userId: string, input: ArtifactInput, options: { harness?: HarnessStamp | null } = {}) {
+export async function createArtifact(userId: string, input: ArtifactInput, options: { harness?: HarnessStamp | null; emptyMarkdown?: boolean; createRequestId?: string } = {}) {
   const { project: projectName, tags: tagInput, ...parsed } = artifactInputSchema.parse(input);
   const tags = parseNewTags(tagInput);
   assertArtifactSize(parsed);
-  assertValidArtifactContent(parsed.kind, parsed.content);
+  assertValidArtifactContent(parsed.kind, parsed.content, { emptyMarkdown: options.emptyMarkdown === true });
   const contentFileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
   const imageFileIds = [...(await checkIconFile(userId, null, parsed.icon)), ...(await checkCoverFile(userId, null, parsed.cover))];
   const fileIds = [...new Set([...contentFileIds, ...imageFileIds])];
@@ -339,15 +345,14 @@ export async function createArtifact(userId: string, input: ArtifactInput, optio
   await assertTeamPresetUsable(userId, { userId, visibility: "private", teamId: null }, parsed.theme);
   await enforceRateLimit("artifactCreate", userId);
   await assertContentFits(userId, parsed.content);
-  // New artifacts are private, so their project is among the author's own.
   await assertRoomForNewTags(userId, tags);
-  const chosen = projectName ? await findOrCreateProject({ kind: "user", userId }, projectName, userId) : null;
+  const projectId = await newArtifactProjectId(userId, projectName);
   const [record] = await getDb()
     .insert(artifact)
     .values({
       ...parsed,
       ...stampColumns(options.harness),
-      projectId: chosen?.id ?? null,
+      projectId,
       tags,
       id: randomUUID(),
       shareId: randomUUID().replaceAll("-", ""),
@@ -357,9 +362,13 @@ export async function createArtifact(userId: string, input: ArtifactInput, optio
       comments: defaultCommentSetting({ visibility: "private", teamPersonal: null }),
       userId,
       updatedBy: userId,
+      createRequestId: options.createRequestId ?? null,
     })
+    // A second create with the same create id inserts nothing (artifact_user_create_request_idx).
+    .onConflictDoNothing({ target: [artifact.userId, artifact.createRequestId], where: sql`${artifact.createRequestId} is not null` })
     .returning();
 
+  if (!record && options.createRequestId) throw new CreateRequestTaken();
   if (!record) throw new Error("The artifact could not be created.");
   await attachFileRows(userId, record.id, fileIds);
   await recordArtifactSave({ before: null, after: record, editorId: userId, actor: "person", saveKind: "create", harness: options.harness ?? null });

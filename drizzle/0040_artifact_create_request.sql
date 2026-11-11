@@ -1,0 +1,2 @@
+ALTER TABLE "artifact" ADD COLUMN "create_request_id" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "artifact_user_create_request_idx" ON "artifact" USING btree ("user_id","create_request_id") WHERE "artifact"."create_request_id" is not null;

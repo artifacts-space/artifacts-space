@@ -15,6 +15,7 @@ import type { ProjectFilter } from "@/lib/projects/rules";
 import { matchesProjectFilter } from "@/lib/projects/sidebar-rules";
 
 import { fixtureArtifact, longCsv, longJson, longMarkdown, longUi } from "./fixture-content";
+import { fixtureNewArtifactApi, storedFixtureArtifacts } from "./fixture-new-artifacts";
 import { createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, withProjects } from "./fixture-projects";
 import { useFixtureControls } from "./fixture-controls";
 import { fixtureNotifications, LINK_ONLY_PUBLIC_ID } from "./notification-fixture";
@@ -49,6 +50,13 @@ function fixtureArtifacts(): ArtifactDto[] {
   })];
 }
 
+const subscribeNever = () => () => undefined;
+
+/** False while rendering on the server and hydrating, true after: what this tab stored is only known in the browser. */
+function useInBrowser(): boolean {
+  return useSyncExternalStore(subscribeNever, () => true, () => false);
+}
+
 /** Someone else's artifact shared by link: outside the list, so only a link (n6 in the bell) opens it, pinned to the top. */
 const linkOnlyArtifact: ArtifactDto = fixtureArtifact({ id: "fixture-link-only", kind: "text", title: "Shared by link fixture", content: "Opened from a link.", publicId: LINK_ONLY_PUBLIC_ID });
 
@@ -75,7 +83,10 @@ function useFixtureProjects(artifacts: readonly ArtifactDto[]) {
  * opened, and the load waits until a test releases it (`window.fixture`).
  */
 export function WorkspaceFixture({ projectFilter, link = null, linkFailed = false, slowLoad = false, scopes = false, team = null }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null; linkFailed?: boolean; slowLoad?: boolean; scopes?: boolean; team?: string | null }) {
-  const base = useMemo(() => fixtureArtifacts(), []);
+  const inBrowser = useInBrowser();
+  // Artifacts New artifact stored in this tab come first, as the server would list them after a reload.
+  const stored = useMemo(() => (inBrowser ? storedFixtureArtifacts() : []), [inBrowser]);
+  const base = useMemo(() => [...stored, ...fixtureArtifacts()], [stored]);
   const { state, api } = useFixtureProjects(base);
   const artifacts = useMemo(() => withProjects(base, state), [base, state]);
   const items = useMemo(() => artifacts.filter((artifact) => matchesProjectFilter(artifact.project, projectFilter)).map(toArtifactListItem), [artifacts, projectFilter]);
@@ -96,7 +107,8 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
       <div className="workspace-frame">
         <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" teams={[]} unreadNotifications={4} notificationSeed={notifications} />
         <Dashboard
-          key={projectFilterId(projectFilter)}
+          // The list is read once, so it remounts when the tab has stored artifacts; with none, nothing remounts after hydration.
+          key={`${projectFilterId(projectFilter)}:${String(stored.length > 0)}`}
           initialArtifacts={items}
           initialFull={seeded}
           loadArtifact={controls.loadArtifact}
@@ -114,6 +126,7 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
           listPath="/dev/workspace"
           linkTarget={linkTarget}
           linkFailed={linkFailed}
+          newArtifactApi={fixtureNewArtifactApi}
         />
       </div>
     </ConfirmationsProvider>

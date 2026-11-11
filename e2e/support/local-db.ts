@@ -393,3 +393,19 @@ export async function storedRoleKeys(teamId: string): Promise<string[]> {
   const result = await db().query<{ key: string }>(`select key from team_role where team_id = $1 order by key`, [teamId]);
   return result.rows.map((row) => row.key);
 }
+
+/** The artifacts a user has with this title, with their stored content, format, and version count. */
+export async function artifactsTitled(userId: string, title: string): Promise<{ publicId: string; content: string; kind: string; versions: number }[]> {
+  const result = await db().query<{ public_id: string; content: string; kind: string; versions: string }>(
+    `select a.public_id, a.content, a.kind, (select count(*) from artifact_version v where v.artifact_id = a.id) as versions
+     from artifact a where a.user_id = $1 and a.title = $2`,
+    [userId, title],
+  );
+  return result.rows.map((row) => ({ publicId: row.public_id, content: row.content, kind: row.kind, versions: Number(row.versions) }));
+}
+
+/** How many artifacts a user has. */
+export async function artifactCountOf(userId: string): Promise<number> {
+  const result = await db().query<{ n: string }>(`select count(*) as n from artifact where user_id = $1`, [userId]);
+  return Number(result.rows[0]?.n ?? 0);
+}

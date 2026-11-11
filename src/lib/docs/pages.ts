@@ -139,7 +139,7 @@ export const docsPages = [
       h2("artifact", "Set an artifact's theme"),
       h3("web", "On the artifact page"),
       h3("custom-theme", "Custom themes"),
-      h3("new", "In New artifact"),
+      h3("new", "For a new artifact"),
       h3("mcp", "Over MCP"),
       h3("themes-list", "themes_list"),
       h3("history", "History and approval"),

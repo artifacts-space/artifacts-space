@@ -56,15 +56,29 @@ const checks: Record<string, (content: string) => UiSpecIssue[]> = {
   ui: (content) => validateUiSpec(content).issues,
 };
 
+/** Exceptions a caller may ask for. */
+export interface ContentCheckOptions {
+  /**
+   * A Markdown artifact may be empty. Only the web's blank page asks for
+   * this, when someone typed a title and no body yet; agents never do.
+   */
+  emptyMarkdown?: boolean;
+}
+
+/** True when empty content is allowed for this format. */
+function mayBeEmpty(kind: string, options: ContentCheckOptions): boolean {
+  return kind === "file" || (kind === "markdown" && options.emptyMarkdown === true);
+}
+
 /**
  * Checks that `content` fits its format. Only file artifacts, whose content
- * is optional notes, may be empty. Markdown, code, and text accept any
- * text. JSON must parse, CSV must have a header and closed quotes, SVG must
- * have an <svg> root, Mermaid must name a diagram type, and ui must pass
- * `validateUiSpec`.
+ * is optional notes, may be empty (and Markdown, when `emptyMarkdown` is set).
+ * Markdown, code, and text accept any text. JSON must parse, CSV must have a
+ * header and closed quotes, SVG must have an <svg> root, Mermaid must name a
+ * diagram type, and ui must pass `validateUiSpec`.
  */
-export function validateArtifactContent(kind: string, content: string): ArtifactContentResult {
-  if (content === "" && kind !== "file") return result([error("empty_content", "Add content. Only file artifacts may be saved without it.")]);
+export function validateArtifactContent(kind: string, content: string, options: ContentCheckOptions = {}): ArtifactContentResult {
+  if (content === "" && !mayBeEmpty(kind, options)) return result([error("empty_content", "Add content. Only file artifacts may be saved without it.")]);
   const check = checks[kind];
   return result(check ? check(content) : []);
 }
@@ -83,9 +97,19 @@ export class ArtifactContentError extends ZodError {
 }
 
 /** Throws ArtifactContentError when `content` does not fit `kind`. */
-export function assertValidArtifactContent(kind: string, content: string): void {
-  const checked = validateArtifactContent(kind, content);
+export function assertValidArtifactContent(kind: string, content: string, options: ContentCheckOptions = {}): void {
+  const checked = validateArtifactContent(kind, content, options);
   if (!checked.valid) throw new ArtifactContentError(kind, checked.message);
+}
+
+/**
+ * The check options for an update to an artifact whose stored body is
+ * `storedContent`. A Markdown body may stay empty only when the stored body
+ * is already empty (a title-only page, or one switched to Files and back),
+ * so no update can blank out content. Web and MCP updates share this rule.
+ */
+export function updateCheckOptions(storedContent: string): ContentCheckOptions {
+  return { emptyMarkdown: storedContent === "" };
 }
 
 /** The saved format and content of an artifact, for checking an update. */
@@ -106,10 +130,12 @@ export async function assertValidArtifactUpdate(
   const { kind, content } = update;
   if (kind === undefined && content === undefined) return;
   if (kind !== undefined && content !== undefined) {
-    assertValidArtifactContent(kind, content);
+    // Only an empty body needs the stored one, checked against the stored row (updateCheckOptions).
+    const stored = content === "" ? await loadCurrent() : null;
+    assertValidArtifactContent(kind, content, stored ? updateCheckOptions(stored.content) : {});
     return;
   }
   const current = await loadCurrent();
   if (!current) return;
-  assertValidArtifactContent(kind ?? current.kind, content ?? current.content);
+  assertValidArtifactContent(kind ?? current.kind, content ?? current.content, updateCheckOptions(current.content));
 }

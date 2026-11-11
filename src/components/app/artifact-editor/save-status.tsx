@@ -27,13 +27,15 @@ interface SaveStatusBarProps {
   updatedBy: ArtifactEditorDto | null;
   /** The agent harness the artifact was made with, shown after who saved it last. */
   harness?: ArtifactHarnessDto | null | undefined;
+  /** False for a new artifact that is not stored yet: nobody has edited it. */
+  stored?: boolean;
   onRetry: () => void;
   /** Extra classes from the surrounding layout, such as sticking in the /app shell. */
   className?: string;
 }
 
 /** Character count, save status, and who saved last, in the row above the content. */
-export function SaveStatusBar({ status, dirty, length, updatedAt, updatedBy, harness, onRetry, className }: SaveStatusBarProps) {
+export function SaveStatusBar({ status, dirty, length, updatedAt, updatedBy, harness, stored = true, onRetry, className }: SaveStatusBarProps) {
   const label = saveStatusLabel(status, dirty);
   const problem = status.kind === "held" || status.kind === "failed";
   return (
@@ -44,10 +46,12 @@ export function SaveStatusBar({ status, dirty, length, updatedAt, updatedBy, har
         {label}
       </span>
       {status.kind === "failed" ? <Button variant="ghost" size="xs" onClick={onRetry}>Try again</Button> : null}
-      <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1">
-        <LastEdited editor={updatedBy} at={updatedAt} />
-        <HarnessByline harness={harness} className="text-xs" />
-      </span>
+      {stored ? (
+        <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1">
+          <LastEdited editor={updatedBy} at={updatedAt} />
+          <HarnessByline harness={harness} className="text-xs" />
+        </span>
+      ) : <span className="ml-auto text-xs text-muted-foreground">Saves once you write something</span>}
     </div>
   );
 }

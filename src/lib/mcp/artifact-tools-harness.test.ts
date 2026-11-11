@@ -93,6 +93,13 @@ describe("stamping the harness over MCP", () => {
     expect(result.json.artifact).toMatchObject({ harness: { id: "codex", name: "Codex" } });
   });
 
+  it("should never let an agent's create start with an empty body", async () => {
+    const result = (await client.callTool({ name: "artifacts_create", arguments: { title: "Plan", content: "" } })) as { isError?: boolean };
+    expect(result.isError).toBe(true);
+    // Only the web app's blank page may start empty (createArtifactOnce); createArtifact refuses it otherwise (artifacts-create.test.ts).
+    for (const call of data.createArtifact.mock.calls) expect(call[2]).not.toHaveProperty("emptyMarkdown");
+  });
+
   it("should stamp the connection's harness when an agent updates an artifact", async () => {
     await call("artifacts_update", { id: publicId, content: "# Plan v2" });
     expect(data.updateArtifact).toHaveBeenCalledWith("user-1", "internal-1", expect.objectContaining({ content: "# Plan v2" }), "agent", { harness: codex });

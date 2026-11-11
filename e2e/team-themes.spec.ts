@@ -117,9 +117,10 @@ test("should show a plain member the team preset in the picker but not the contr
   expect(stored.versions[0]).toBe(seeded.ref);
 
   // A new artifact starts private, and its picker offers the presets of the member's teams.
-  await page.goto("/app");
-  await page.getByRole("button", { name: "New artifact" }).first().click();
-  await page.locator("#artifact-theme").click();
+  const fresh = await createTestArtifact({ userId, title: "New private artifact", content: "# Notes", visibility: "private", theme: null });
+  seeded.publicIds.push(fresh);
+  await page.goto(`/artifact/${fresh}`);
+  await page.getByRole("button", { name: "Choose a theme" }).click();
   await expect(page.getByRole("radio", { name: new RegExp(`^${seeded.name}:`) })).toBeVisible();
 });
 

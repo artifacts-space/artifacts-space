@@ -281,6 +281,13 @@
       "when": 1794275376270,
       "tag": "0039_csv_download",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794342852977,
+      "tag": "0040_artifact_create_request",
+      "breakpoints": true
     }
   ]
 }

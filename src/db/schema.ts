@@ -74,6 +74,8 @@ export const artifact = pgTable(
     tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
     sessionId: text("session_id").notNull().default(""),
     source: text("source").notNull().default(""),
+    // The web app's create id for a blank page (one per page), so a retried create returns the first one. Never shown to agents.
+    createRequestId: text("create_request_id"),
     // The agent harness its last MCP save came through (src/lib/harness). An unknown client's own name stays on its connection.
     harness: text("harness"),
     // A harness someone who can edit it chose from its menu. Wins over `harness`. Not versioned.
@@ -107,6 +109,7 @@ export const artifact = pgTable(
   (table) => [
     uniqueIndex("artifact_share_id_idx").on(table.shareId),
     uniqueIndex("artifact_public_id_idx").on(table.publicId),
+    uniqueIndex("artifact_user_create_request_idx").on(table.userId, table.createRequestId).where(sql`${table.createRequestId} is not null`),
     index("artifact_user_updated_idx").on(table.userId, table.updatedAt),
     index("artifact_user_project_idx").on(table.userId, table.project),
     index("artifact_project_idx").on(table.projectId),
