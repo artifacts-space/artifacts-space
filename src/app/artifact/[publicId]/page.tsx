@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { toShareTeams } from "@/components/app/share-teams";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { TitleIcon } from "@/components/artifact-icon/title-icon";
 import { TitleTheme } from "@/components/artifact-theme/title-theme";
@@ -13,6 +14,7 @@ import { ArtifactHeader } from "@/components/artifact-page/artifact-header";
 import { ArtifactPageFooter } from "@/components/artifact-page/artifact-page-footer";
 import { ArtifactPageTheme } from "@/components/artifact-page/artifact-page-theme";
 import { ArtifactHeaderMenu } from "@/components/artifact-page/artifact-header-menu";
+import { ArtifactPageShare } from "@/components/artifact-page/page-share";
 import type { CsvDownloadSetting } from "@/components/artifact-page/csv-download-item";
 import { EditorIsland } from "@/components/artifact-page/editor-island";
 import { InlineBody, InlineSummary, InlineTitle } from "@/components/artifact-page/inline-fields";
@@ -20,6 +22,8 @@ import { PageConflictNotice, PageEditorChromeProvider } from "@/components/artif
 import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { BlockLinkTarget } from "@/components/block-links/block-link-target";
+import { ReaderBlockMenu } from "@/components/block-links/reader-block-menu";
 import { SheetFill } from "@/components/artifact-view/sheet-fill";
 import { CsvExportContext } from "@/components/artifact-view/csv-export";
 import { ArtifactSheetFormat } from "@/components/artifact-view/sheet-format";
@@ -46,6 +50,8 @@ import { pageOrganizersFor } from "@/lib/projects/page-project";
 import { isReportable } from "@/lib/reports/rules";
 import { isSearchIndexable, pageRobots, showsInSearch } from "@/lib/search/search-rules";
 import { getSession } from "@/lib/session";
+import { loadPageShare, type PageShare } from "@/lib/sharing/page-share";
+import { siteUrl } from "@/lib/site-origin";
 import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
 import { themeIdForReader } from "@/lib/themes/theme-privacy";
 import { noThemeChoices, type ThemeChoices } from "@/lib/themes/theme-choice-types";
@@ -282,6 +288,21 @@ function BodyReadView({ viewable, files }: { viewable: ViewableArtifact; files: 
   return body;
 }
 
+/**
+ * The body, unlocked for editors (with block handles and the block menu
+ * once editing loads). In a Markdown artifact, readers right-click a block
+ * to copy a link to it.
+ */
+function LinkableBody({ viewable, files, canComment }: { viewable: ViewableArtifact; files: FileDto[]; canComment: boolean }) {
+  return (
+    <InlineBody canComment={canComment}>
+      <ReaderBlockMenu publicId={viewable.record.publicId} enabled={viewable.view.kind === "markdown"}>
+        <BodyReadView viewable={viewable} files={files} />
+      </ReaderBlockMenu>
+    </InlineBody>
+  );
+}
+
 /** Whether this reader may take a CSV's data out: editors always; everyone else while "Allow CSV download" is on. */
 function exportsCsv(viewable: ViewableArtifact): boolean {
   return mayExportCsv({ canEdit: viewable.canEdit }, { kind: viewable.view.kind, allowCsvDownload: viewable.record.allowCsvDownload });
@@ -293,6 +314,25 @@ function exportControls(viewable: ViewableArtifact) {
   const { view, record } = viewable;
   const download = view.kind === "csv" ? { href: `/artifact/${record.publicId}/raw`, filename: csvFileName(view.title) } : null;
   return { content: view.content, download };
+}
+
+/**
+ * Share in the header, only for someone who may share the artifact (its
+ * author, or the person who added the agent that wrote it): the same dialog
+ * and server actions as the workspace. Everyone else, and the sharer when
+ * the load fails, keeps the read-only status.
+ */
+async function loadShare(viewable: ViewableArtifact, viewerId: string | null) {
+  return loadPageShare(viewable, viewerId).catch((error: unknown) => {
+    console.error("[sharing] The page's share settings could not be loaded", error instanceof Error ? error.name : "unknown error");
+    return null;
+  });
+}
+
+/** The sharer's Share button for the header, or null for the read-only status. */
+function shareButton(share: PageShare | null, publicId: string, sentence: string) {
+  if (!share) return null;
+  return <ArtifactPageShare artifact={share.artifact} teams={toShareTeams(share.teams)} sentence={sentence} shareUrl={siteUrl(artifactPagePath(publicId))} />;
 }
 
 /** "Allow CSV download" for the More menu, only for someone who may change it (the author, or a team owner or admin). */
@@ -328,7 +368,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   if (!viewable) notFound();
   const { record, view } = viewable;
   // getSession is deduplicated per request, so these reuse load()'s lookup.
-  const [byline, files, session, editor, organizers, resolved, themeChoices, csvDownload] = await Promise.all([
+  const copy = visibilityCopy(record.visibility);
+  const [byline, files, session, editor, organizers, resolved, themeChoices, csvDownload, share] = await Promise.all([
     loadArtifactByline(record, viewable.isTeamMember),
     filesForViewer(viewable),
     getSession(),
@@ -338,12 +379,14 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
     resolveThemeFor(record, view.theme),
     getSession().then((session) => loadThemeChoices(viewable, session?.user.id ?? null)),
     getSession().then((session) => csvDownloadSetting(viewable, session?.user.id ?? null)),
+    getSession().then((session) => loadShare(viewable, session?.user.id ?? null)),
   ]);
-  const copy = visibilityCopy(record.visibility);
+  const sentence = visibilitySentence(copy, byline);
   const { theme, presetId, source } = resolved;
   // Full width is a display setting on the row, not part of a version: every reader sees the current choice. A CSV is always full width.
   const fullWidth = usesFullWidth(view.kind, record.fullWidth);
   const column = pageColumnClass(fullWidth);
+  const canComment = session !== null && seesComments(viewable, session.user.id);
 
   return (
     // The header, comments, and footer wear the artifact theme's colors (none for an unthemed artifact) and swap with it.
@@ -354,7 +397,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
           <ArtifactHeader
             column={column}
             visibility={record.visibility}
-            sentence={visibilitySentence(copy, byline)}
+            sentence={sentence}
+            share={shareButton(share, record.publicId, sentence)}
             {...exportControls(viewable)}
             menu={viewable.canEdit ? <ArtifactHeaderMenu theme={theme} widthSetting={hasWidthSetting(view.kind)} csvDownload={csvDownload} waiting={{ publicId: record.publicId, title: record.title, updatedAt: record.updatedAt.toISOString(), reviewed: isReviewedLevel(record.visibility), fullWidth: record.fullWidth, files }} /> : null}
           />
@@ -373,23 +417,23 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
                 <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={themeIdForReader(presetId, viewable.canEdit)} data-theme-source={source}>
                   <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
                   <PageConflictNotice />
-                  <article className="mt-10">
+                  <article className="mt-10" data-block-links="">
                     {/* A CSV's grid fills the window under the header, as a sheet does. */}
                     <SheetFill artifactKey={record.publicId}>
                       {/* Banding and column alignment, the same for every reader; editors change them from the grid. */}
                       <SheetFormatFor viewable={viewable}>
-                        <InlineBody>
-                          <BodyReadView viewable={viewable} files={files} />
-                        </InlineBody>
+                        <LinkableBody viewable={viewable} files={files} canComment={canComment} />
                       </SheetFormatFor>
                     </SheetFill>
                   </article>
+                  {/* Opens links to one block (#block=…): scrolls to it and highlights it. */}
+                  <BlockLinkTarget />
                 </ThemeScope>
               </EditorIsland>
             </div>
             <SignUpAndReport copy={copy} publicId={record.publicId} visibility={record.visibility} />
             {/* Comments are for signed-in readers the comments setting lets in; the thread checks access itself too. */}
-            {session && seesComments(viewable, session.user.id) ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" raised /> : null}
+            {canComment ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" raised /> : null}
           </main>
         </ThemeBackdrop>
       </PageEditorChromeProvider>

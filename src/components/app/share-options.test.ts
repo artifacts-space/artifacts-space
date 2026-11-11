@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultTeamId, outcomeText, ruleTeamFor, selectedTeamLabel, teamsFor } from "./share-options";
+import { defaultTeamId, outcomeText, ruleTeamFor, selectedTeamLabel, shareChoiceBasis, teamsFor } from "./share-options";
 import type { ShareTeam } from "./share-teams-context";
 import { defaultActor } from "@/lib/teams/capability-rules";
 
@@ -80,5 +80,39 @@ describe("ruleTeamFor", () => {
 
   it("should state no rule when no team is picked yet", () => {
     expect(ruleTeamFor("team", undefined)).toBeNull();
+  });
+});
+
+describe("shareChoiceBasis", () => {
+  const stored = {
+    id: "a1",
+    publicId: "4fXkP9qR2sT7vW1yZ3aB5c",
+    title: "Plan",
+    icon: null,
+    visibility: "private" as const,
+    teamId: null,
+    comments: "off" as const,
+    showInSearch: false,
+    pendingSharing: null,
+    pendingEdit: null,
+    pendingComments: null,
+  };
+
+  it("should stay the same when nothing about the stored sharing changes", () => {
+    expect(shareChoiceBasis({ ...stored, title: "Renamed" })).toBe(shareChoiceBasis(stored));
+  });
+
+  it("should change when a save moves the artifact into a team", () => {
+    expect(shareChoiceBasis({ ...stored, visibility: "team", teamId: "t1" })).not.toBe(shareChoiceBasis(stored));
+  });
+
+  it("should change when a request starts waiting while the level stays", () => {
+    const pendingSharing = { requestId: "r1", level: "team" as const, teamId: "t1", comments: null, requestedAt: "2026-11-11T12:00:00.000Z" };
+    expect(shareChoiceBasis({ ...stored, pendingSharing })).not.toBe(shareChoiceBasis(stored));
+  });
+
+  it("should change when comments or search engines change", () => {
+    expect(shareChoiceBasis({ ...stored, comments: "team" })).not.toBe(shareChoiceBasis(stored));
+    expect(shareChoiceBasis({ ...stored, showInSearch: true })).not.toBe(shareChoiceBasis(stored));
   });
 });

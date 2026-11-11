@@ -63,6 +63,17 @@ export function canEditArtifact(subject: EditSubject, viewer: AccessViewer | nul
 }
 
 /**
+ * Who changes who can read an artifact, and so who gets Share in the
+ * workspace and on the artifact's page: the author, or the person who added
+ * the agent that wrote it. Teammates who may edit it, team owners and admins
+ * among them, never share it; owners and admins can only withdraw sharing.
+ * The sharing service checks the same rule again on every change.
+ */
+export function canShareArtifact(subject: Pick<AccessSubject, "userId">, viewer: AccessViewer | null): boolean {
+  return isAuthorOrActsFor(subject, viewer);
+}
+
+/**
  * People stay in charge of their own work and their agents' work: the author,
  * or the person who added the agent that wrote it, deletes an artifact and
  * changes who can read it (isAuthorOrActsFor). Team owners and admins can

@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { tokenLookupQuery } from "@/lib/tokens";
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
 
 /*
  * A departed member's agent must stop reading the team's work at once. These
@@ -35,7 +36,7 @@ vi.mock("@/db", () => ({
 const { handOverAgentsQuery, reconcileTeamAgents, revokeAgentTokensQuery } = await import("./handover");
 const { agent, apiToken } = await import("@/db/schema");
 
-const sqlDb = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const sqlDb = drizzle({ client: neon(fakeDatabaseUrl()) });
 const now = new Date("2026-11-08T12:00:00Z");
 const joined = (day: number) => new Date(Date.UTC(2026, 0, day));
 

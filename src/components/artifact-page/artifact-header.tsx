@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 import { VisibilityBadge } from "./visibility-badge";
 
 /**
- * The artifact page's top bar: the logo, who can see the artifact, the
+ * The artifact page's top bar: the logo, who can see the artifact (for
+ * someone who may share it, `share`: the same status as a Share button), the
  * source link, Download CSV and Copy when this reader may take the data
  * out (`download`, `content`), and for editors `menu` (the save status and the "⋯"
  * menu, ArtifactHeaderMenu). Its colors come from the tokens around it, so the
@@ -26,6 +27,7 @@ export function ArtifactHeader({
   download = null,
   column = pageColumnClass(false),
   menu = null,
+  share = null,
 }: {
   visibility: ArtifactVisibility;
   sentence: string;
@@ -35,13 +37,16 @@ export function ArtifactHeader({
   download?: { href: string; filename: string } | null;
   column?: string;
   menu?: React.ReactNode;
+  /** The sharer's Share button (ArtifactPageShare), shown in place of the read-only status; null for everyone else. */
+  share?: React.ReactNode;
 }) {
   return (
     <div className="border-b">
       <header className={cn("mx-auto flex h-14 w-full items-center justify-between gap-3", column)}>
-        <Logo />
+        {/* On phones the mark alone, as in the app and docs headers, so Share, Copy, and the ⋯ keep room at 375px. */}
+        <Logo compactOnPhones className="shrink-0" />
         <div className="flex min-w-0 items-center gap-2">
-          <VisibilityBadge visibility={visibility} sentence={sentence} iconOnlyOnPhones />
+          {share ?? <VisibilityBadge visibility={visibility} sentence={sentence} iconOnlyOnPhones />}
           <GitHubLink />
           {download ? (
             <a href={download.href} download={download.filename} aria-label="Download CSV" className={buttonVariants({ variant: "outline", size: "sm" })}>

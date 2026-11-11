@@ -23,6 +23,8 @@ interface WorkspaceSidebarProps {
   teams: readonly ShareTeam[];
   scopeTeam: ShareTeam | null;
   listPath: string;
+  /** The signed-in viewer, for the switcher's avatar. */
+  viewerId: string;
   query: string;
   onQuery: (query: string) => void;
   filters: SidebarFilters;
@@ -61,7 +63,7 @@ export function WorkspaceSidebar({ sidebarRef, listRef, ...props }: WorkspaceSid
       )}
     >
       <div className="flex shrink-0 items-center gap-1 px-2 pt-2">
-        <WorkspaceSwitcher teams={props.teams} scopeTeam={props.scopeTeam} listPath={props.listPath} />
+        <WorkspaceSwitcher teams={props.teams} scopeTeam={props.scopeTeam} listPath={props.listPath} viewerId={props.viewerId} />
         <CollapseSidebarButton onCollapse={props.onHide} />
       </div>
       <div className="shrink-0 border-b px-3 pt-2 pb-3">

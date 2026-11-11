@@ -14,6 +14,7 @@ import type { WriteOutcome } from "@/components/comments/use-comment-thread";
 import { Button } from "@/components/ui/button";
 import type { ArtifactVisibility } from "@/lib/artifact-types";
 import type { CommentView } from "@/lib/comments/views";
+import { pageColumnClass } from "@/lib/page-width/rules";
 import { themeLabel } from "@/lib/themes/artifact-theme";
 import { resolveTheme } from "@/lib/themes/resolve";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
@@ -58,7 +59,7 @@ export function ArtifactHeaderSpecimen() {
       <ThemePicker value={theme} onChange={setTheme} trigger={trigger} />
       <ArtifactPageTheme theme={resolved.theme} data-page-theme={resolved.presetId ?? "custom"} className="overflow-hidden rounded-md border">
         <ArtifactHeader visibility="private" sentence={visibilitySentence(visibilityCopy("private"))} content="# Release plan" />
-        <section aria-label="Comments" className="mx-auto w-full max-w-[960px] space-y-3 px-6 py-8">
+        <section aria-label="Comments" className={`mx-auto w-full space-y-3 py-8 ${pageColumnClass(false)}`}>
           <h2 className="flex items-center gap-2 text-md font-medium">
             <IconMessage className="size-4 text-muted-foreground" aria-hidden /> Comments
           </h2>

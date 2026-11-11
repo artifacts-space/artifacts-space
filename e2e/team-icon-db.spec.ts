@@ -76,7 +76,7 @@ test("should let an owner upload, see, replace, and remove the team icon, and re
   seeded.teamIds.push(outside.id);
 
   await page.goto(`/teams/${team.slug}`);
-  await expect(headerIcon(page)).toHaveAttribute("data-team-icon", "monogram");
+  await expect(headerIcon(page)).toHaveAttribute("data-team-icon", "avatar");
 
   // Upload: a 900 x 500 JPEG arrives as a 256 x 256 square.
   const uploadRequest = await upload(page, await widePhoto(page, 200), "Upload an image");
@@ -116,7 +116,7 @@ test("should let an owner upload, see, replace, and remove the team icon, and re
   await expect.poll(() => storedObjectExists(firstKey)).toBe(false);
   expect(await storedObjectExists(secondKey)).toBe(true);
 
-  // Remove: asks first, then the monogram is back and the object is gone.
+  // Remove: asks first, then the pixel avatar is back and the object is gone.
   await page.getByRole("button", { name: "Team icon", exact: true }).click();
   await page.getByRole("dialog", { name: "Team icon" }).getByRole("button", { name: "Remove" }).click();
   const confirm = page.getByRole("dialog", { name: "Remove the team icon?" });
@@ -125,7 +125,7 @@ test("should let an owner upload, see, replace, and remove the team icon, and re
   await expect(page.getByText("Team icon removed.")).toBeVisible();
   await expect.poll(() => teamLogoOf(team.id)).toBeNull();
   await expect.poll(() => storedObjectExists(secondKey)).toBe(false);
-  await expect(headerIcon(page)).toHaveAttribute("data-team-icon", "monogram");
+  await expect(headerIcon(page)).toHaveAttribute("data-team-icon", "avatar");
 
   // An admin cannot change team settings by default: no control, and the server refuses the same upload sent again.
   await setTeamRole(team.id, ownerId, "admin");

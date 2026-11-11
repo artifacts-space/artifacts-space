@@ -2,6 +2,8 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
 
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
+
 import { agentLockedCapabilities, agentLockedCapabilityList, teamCapabilities } from "./capability-rules";
 import { capabilityHolderTeamQuery } from "./capability-sql";
 
@@ -12,7 +14,7 @@ import { capabilityHolderTeamQuery } from "./capability-sql";
  * runs it against a real database.
  */
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 const query = () => capabilityHolderTeamQuery(db, "person-1", "team-1", "approve.sharing").toSQL();
 
 describe("capabilityHolderTeamQuery", () => {

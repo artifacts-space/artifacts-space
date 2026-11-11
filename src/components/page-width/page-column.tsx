@@ -8,7 +8,7 @@ interface PageColumnProps {
 
 /**
  * The artifact's body in an /app pane, in the same column as its public
- * page: centered at 960px with the page's padding when contained, the whole
+ * page: the centered contained column with the page's padding, or the whole
  * pane when full width. It sets no background, so a theme on the pane shows
  * through.
  */

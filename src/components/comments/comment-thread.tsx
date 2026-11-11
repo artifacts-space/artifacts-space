@@ -1,7 +1,7 @@
 "use client";
 
 import { IconLoader2, IconMessage } from "@tabler/icons-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { ThreadData } from "@/app/(workspace)/threads/actions";
 import { PixelAvatar } from "@/components/pixel-avatar";
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { CommentComposer } from "./comment-composer";
 import { CommentItem, type CommentHandlers } from "./comment-item";
 import { MentionablesProvider } from "./mentionables-context";
+import { takeQuotedComment, usePendingQuote } from "./quote-request";
 import { useCommentThread, type WriteOutcome } from "./use-comment-thread";
 
 /** Top-level comments, each with its replies. */
@@ -58,15 +59,48 @@ function MutedAgents({ agents, onMute }: { agents: ThreadAgentView[]; onMute: Co
   );
 }
 
+/** A new comment started from a block's menu: its opening text, and a count so each one starts a fresh composer. */
+interface StartedComment {
+  body: string;
+  count: number;
+}
+
+/**
+ * A quote the block menu sent to this artifact's comments (quote-request.ts),
+ * kept once taken so the composer holds it until it is posted.
+ */
+function useStartedComment(publicId: string): [StartedComment | null, () => void] {
+  const pending = usePendingQuote(publicId);
+  const [started, setStarted] = useState<StartedComment | null>(null);
+  const [seen, setSeen] = useState<string | null>(null);
+  if (pending !== seen) {
+    setSeen(pending);
+    if (pending !== null) setStarted({ body: pending, count: (started?.count ?? 0) + 1 });
+  }
+  useEffect(() => {
+    if (pending !== null) takeQuotedComment(publicId);
+  }, [pending, publicId]);
+  return [started, () => { setStarted(null); }];
+}
+
 interface ThreadComposerProps {
   replyTo: CommentView | null;
+  started: StartedComment | null;
   onCancelReply: () => void;
   onSubmit: (body: string) => Promise<WriteOutcome>;
   raised: boolean;
 }
 
-/** The composer under the thread: a new comment, or a reply to the picked comment. */
-function ThreadComposer({ replyTo, onCancelReply, onSubmit, raised }: ThreadComposerProps) {
+/** The composer's set-up: a reply, a new comment that quotes a block, or a blank new comment. */
+function composerSetup(replyTo: CommentView | null, started: StartedComment | null) {
+  if (replyTo) return { key: replyTo.id, initialBody: "", label: "Write a reply", submitLabel: "Reply", autoFocus: true };
+  if (started) return { key: `quote-${String(started.count)}`, initialBody: started.body, label: "Write a comment", submitLabel: "Comment", autoFocus: true };
+  return { key: "new", initialBody: "", label: "Write a comment", submitLabel: "Comment", autoFocus: false };
+}
+
+/** The composer under the thread: a new comment (perhaps quoting a block), or a reply to the picked comment. */
+function ThreadComposer({ replyTo, started, onCancelReply, onSubmit, raised }: ThreadComposerProps) {
+  const setup = composerSetup(replyTo, started);
   return (
     <>
       {replyTo ? (
@@ -77,11 +111,12 @@ function ThreadComposer({ replyTo, onCancelReply, onSubmit, raised }: ThreadComp
       ) : null}
       <div className={cn(raised && "card-surface p-3 sm:p-4")}>
         <CommentComposer
-          key={replyTo?.id ?? "new"}
-          label={replyTo ? "Write a reply" : "Write a comment"}
-          placeholder={replyTo ? "Write a reply" : "Write a comment"}
-          submitLabel={replyTo ? "Reply" : "Comment"}
-          autoFocus={replyTo !== null}
+          key={setup.key}
+          initialBody={setup.initialBody}
+          label={setup.label}
+          placeholder={setup.label}
+          submitLabel={setup.submitLabel}
+          autoFocus={setup.autoFocus}
           onSubmit={onSubmit}
         />
       </div>
@@ -90,6 +125,7 @@ function ThreadComposer({ replyTo, onCancelReply, onSubmit, raised }: ThreadComp
 }
 
 interface ThreadBodyProps {
+  publicId: string;
   data: ThreadData;
   handlers: CommentHandlers;
   post: (body: string, parentId: string | null) => Promise<WriteOutcome>;
@@ -98,8 +134,9 @@ interface ThreadBodyProps {
 }
 
 /** The loaded thread: muted agents, comments with replies, the composer, and mention notices. */
-function ThreadBody({ data, handlers, post, onNotices, raised }: ThreadBodyProps) {
+function ThreadBody({ publicId, data, handlers, post, onNotices, raised }: ThreadBodyProps) {
   const [replyTo, setReplyTo] = useState<CommentView | null>(null);
+  const [started, clearStarted] = useStartedComment(publicId);
   const groups = useMemo(() => groupThread(data.comments), [data.comments]);
   const agents = useMemo(() => new Map(data.agents.map((agent) => [agent.userId, agent])), [data.agents]);
   const agentFor = (comment: CommentView) => (comment.author?.kind === "agent" ? agents.get(comment.author.userId) : undefined);
@@ -108,7 +145,10 @@ function ThreadBody({ data, handlers, post, onNotices, raised }: ThreadBodyProps
   async function submit(body: string) {
     const outcome = await post(body, replyTo?.parentId ?? replyTo?.id ?? null);
     onNotices(outcome);
-    if (outcome.ok) setReplyTo(null);
+    if (!outcome.ok) return outcome;
+    // Once posted, a quoted comment is done: the next new comment starts blank.
+    if (!replyTo) clearStarted();
+    setReplyTo(null);
     return outcome;
   }
 
@@ -124,7 +164,7 @@ function ThreadBody({ data, handlers, post, onNotices, raised }: ThreadBodyProps
           </div>
         ))}
       </div>
-      <ThreadComposer replyTo={replyTo} onCancelReply={() => { setReplyTo(null); }} onSubmit={submit} raised={raised} />
+      <ThreadComposer replyTo={replyTo} started={started} onCancelReply={() => { setReplyTo(null); }} onSubmit={submit} raised={raised} />
     </>
   );
 }
@@ -165,7 +205,7 @@ export function CommentThread({ publicId, className, raised = false }: { publicI
       {state.status === "error" ? <p className="text-sm text-muted-foreground">{state.error}</p> : null}
       {state.status === "ready" ? (
         <MentionablesProvider publicId={publicId}>
-          <ThreadBody data={state.data} handlers={handlers} post={post} onNotices={showNotices} raised={raised} />
+          <ThreadBody publicId={publicId} data={state.data} handlers={handlers} post={post} onNotices={showNotices} raised={raised} />
         </MentionablesProvider>
       ) : null}
       <MentionNotices outcome={notices} />

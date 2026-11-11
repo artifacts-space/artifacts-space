@@ -1,4 +1,4 @@
-import type { ArtifactVisibility } from "@/lib/artifact-types";
+import type { ArtifactVisibility, ShareableArtifactDto } from "@/lib/artifact-types";
 import { decideSharing } from "@/lib/sharing/rules";
 
 import type { ShareTeam } from "./share-teams-context";
@@ -57,4 +57,16 @@ export function outcomeText(visibility: ArtifactVisibility, team: ShareTeam | un
   const outcome = decideSharing({ level: visibility, team, member: team, actor: "person" });
   if (outcome === "apply") return "It applies as soon as you save.";
   return `Someone in ${team.name} who approves sharing approves it first. Until then, it stays as it is.`;
+}
+
+/**
+ * What the Share dialog's picks start from: the artifact, who can read it,
+ * its team, comments, search engines, and its open requests. When any of
+ * these changes (a save, the page refreshing after one, an approval or a
+ * withdrawal elsewhere), the dialog starts again from what the server
+ * stored, so it never shows or re-sends picks that did not apply.
+ */
+export function shareChoiceBasis(artifact: ShareableArtifactDto): string {
+  const { id, visibility, teamId, comments, showInSearch, pendingSharing, pendingComments } = artifact;
+  return JSON.stringify([id, visibility, teamId, comments, showInSearch, pendingSharing?.requestId ?? null, pendingComments?.requestId ?? null]);
 }

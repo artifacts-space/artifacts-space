@@ -38,7 +38,8 @@ disagree, the editor keeps the source as written (see "Raw blocks").
 | Headings 1–6 | `#` to `######` (setext `===` reads too, and is kept as written) | `heading` |
 | Bulleted, numbered, and task lists | `-`, `1.`, `- [ ]` / `- [x]` | `bulletList`, `orderedList`, `taskList` |
 | Quote | `>` | `blockquote` |
-| Code block | Fenced with backticks and an optional language. The fence is one longer than any fence inside. | `codeBlock` |
+| Code block | Fenced with backticks, an optional language, and optional attributes in braces (below). The fence is one longer than any fence inside; tildes when the info string holds a backtick. | `codeBlock` |
+| Mermaid diagram | A code block fenced as `mermaid`, with an optional view (below) | `codeBlock` with language `mermaid` |
 | Table | GFM pipe table with optional alignment | `table` |
 | Divider | `---` | `horizontalRule` |
 | Media: image, video, audio, PDF, file | Image syntax alone in its paragraph (below) | `media` |
@@ -134,6 +135,105 @@ after it.
 
 The rules are in `src/lib/files/media-rules.ts` (URL form, kinds, widths) and
 `media-markdown.ts` (the block both ways).
+
+### Code block attributes
+
+A fenced code block can end its opening line with attributes in braces,
+after the language:
+
+````md
+```mermaid {view=split caption="How a change ships"}
+flowchart TD
+  A[Plan] --> B{Approved?}
+```
+
+```ts {caption="The answer, typed" wrap=true}
+const answer: number = 42;
+```
+````
+
+- **Form:** a space, then `{`, then `key=value` pairs separated by spaces,
+  then `}` as the last thing on the line. A value is a bare word, or
+  double-quoted with `\"` and `\\` escaped. Rules are in
+  `src/lib/markdown/fence-info.ts`.
+- **`view`** (mermaid blocks only): how the block shows, to every reader.
+  `preview`, the default, shows the diagram; `code` shows only the source as
+  a code block, and never loads Mermaid; `split` shows both, the source
+  first. Split is side by side when the block is at least 36rem wide and
+  stacked (source above diagram) when it is narrower, so phones and narrow
+  panes stack. The editor writes no `view` for Preview, and drops `view`
+  when a diagram turns into another language (caption, wrap, and unknown
+  keys stay).
+- **`caption`** (any code block): one line of plain text shown under the
+  block. Empty captions are dropped. A caption with a backtick makes the
+  editor write a tilde fence, since a backtick fence's info string cannot
+  hold one.
+- **`wrap=true`** (any code block): long lines wrap instead of scrolling
+  sideways.
+- **Unknown keys and values are kept and ignored.** `{view=sideways}` shows
+  the default view, and a block that does not parse (an open quote, text
+  after the `}`) is ignored whole. Editing a block keeps every attribute it
+  does not change, as written.
+- **The language comes first.** Other renderers, such as GitHub, read the
+  first word as the language, so a mermaid block with attributes still draws
+  there. A block with attributes and no language is written with `text`.
+- **Read as written.** Both Markdown parsers decode backslash escapes in the
+  info string, so the editor reads the fence line from the token's source
+  (`markdown-schema.ts`) and the read view from the document's source
+  (`remark-fence-info.ts`), never the decoded `lang` or `meta`.
+- **In the editor**, every code block has a toolbar along its top
+  (`code-block-toolbar.tsx`): the language picker on the left; Copy, Wrap
+  code, and Caption on the right. Caption opens a one-line field under the
+  block that saves on Enter or when it loses focus.
+- **Stored** in the `codeBlock` node's `language` attribute: the whole info
+  string as written, so it round-trips byte for byte. Copy and paste keeps it
+  through `data-info`.
+
+### Mermaid diagrams
+
+A fenced code block whose language is `mermaid` draws as a diagram:
+
+````md
+```mermaid
+flowchart TD
+  A[Plan] --> B{Approved?}
+  B -->|Yes| C[Ship]
+```
+````
+
+- **Detection** is the first word of the info string, in any case
+  (`isMermaidLanguage` in `src/lib/markdown/mermaid-fence.ts`). Backtick and
+  tilde fences both count.
+- **The Markdown is the fenced block.** It stays a `codeBlock` node with
+  language `mermaid`, so it round-trips like any code block and agents read
+  and write the source as text. Its view and caption are fence attributes
+  (above). Nothing else is stored.
+- **Drawing** uses the mermaid format's renderer and security settings
+  (`src/components/artifact-view/use-mermaid-diagram.ts` and
+  `mermaid-render.ts`: securityLevel `strict`, no HTML labels, shown as an
+  `<img>`), so nothing in a diagram can run. Mermaid loads only when a page
+  has a diagram to draw (never for the Code view), each diagram draws only
+  as it nears the viewport (renders run one at a time), and it redraws for
+  light, dark, and the artifact's theme. Screen readers get the source as
+  text after the image, or from the code block beside it in Split.
+- **Zoom:** a click on a drawn diagram, or its Zoom in button, opens it
+  larger in a dialog.
+- **A diagram that cannot be drawn** shows a short note ("Couldn’t draw this
+  diagram.") and its source as an ordinary code block, never an empty space.
+- **The read view** (`MarkdownView` with `diagrams`) shows each block in its
+  view, with its caption, in Markdown artifacts, a file artifact's notes, and
+  a ui artifact's Markdown block. Comments keep them as code.
+- **The editor** (`mermaid-block-view.tsx`) shows the block in its view, with
+  a toolbar: the language picker and the view picker (Code, Preview, Split)
+  on the left; Copy, Wrap code, and Caption on the right, shown on hover and
+  focus and always on touch screens. Picking a view saves it in the fence.
+  Split's diagram redraws once typing pauses. In Preview, the source shows
+  beside the diagram while the cursor is in it, and while the diagram is
+  empty or broken, so it can be fixed. The slash menu's "Mermaid diagram"
+  inserts an empty one, and "Mermaid diagram" in the language picker turns
+  any code block into one, or back.
+- **The Markdown version** keeps the fenced source. **Link previews** skip
+  it like any code block.
 
 ### Raw blocks
 

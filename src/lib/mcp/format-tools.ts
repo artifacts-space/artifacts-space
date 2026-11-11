@@ -45,6 +45,24 @@ export const MARKDOWN_MEDIA_GUIDE = [
   "Keep the image alone on its line. An image inside a sentence shows inline, and the editor keeps that paragraph as written.",
 ].join("\n");
 
+/** How agents put diagrams in Markdown: a fenced mermaid block, drawn in place (markdown-dialect.md). */
+export const MARKDOWN_DIAGRAM_GUIDE = [
+  "Draw diagrams in Markdown with a fenced mermaid block. It shows as the diagram, in the document's place, for every reader:",
+  "```mermaid",
+  "flowchart TD",
+  "  A[Plan] --> B{Approved?}",
+  "  B -->|Yes| C[Ship]",
+  "```",
+  "Start the source with the diagram type (flowchart TD, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, gantt, pie, mindmap). Keep the diagram in the document: do not publish it as a separate mermaid artifact and link to it.",
+  "The Markdown keeps the fenced source exactly as written, so you read and edit it as text. If Mermaid cannot read it, readers see the source as code with a short note. artifacts_validate with kind \"mermaid\" checks that it starts with a diagram type.",
+  "Optional attributes go in braces at the end of the fence line, after the language:",
+  "```mermaid {view=split caption=\"How a change ships\"}",
+  "- view: how the block shows to every reader. preview (the default) shows the diagram; code shows only the source as a code block; split shows the source and the diagram side by side, stacked on phones. Leave it out for the diagram.",
+  "- caption: one line of plain text shown under the block, in double quotes; write \\\" for a quote and \\\\ for a backslash. Captions work on any fenced code block.",
+  "- wrap=true: long lines of code wrap instead of scrolling sideways (any code block).",
+  "Unknown attributes and values are kept and ignored. Keep the language first: ```mermaid {view=code}, not ```{view=code}.",
+].join("\n");
+
 function text(value: string) {
   return { content: [{ type: "text" as const, text: value }] };
 }
@@ -52,7 +70,7 @@ function text(value: string) {
 /** The guide for one format, or an overview of all formats. */
 export function formatGuide(kind?: FormatKind): string {
   if (kind === "ui") return buildUiGuide();
-  if (kind === "markdown") return `${formatInfo.markdown.label} (markdown): ${formatInfo.markdown.agent}\n\n${MARKDOWN_MEDIA_GUIDE}`;
+  if (kind === "markdown") return `${formatInfo.markdown.label} (markdown): ${formatInfo.markdown.agent}\n\n${MARKDOWN_DIAGRAM_GUIDE}\n\n${MARKDOWN_MEDIA_GUIDE}`;
   if (kind) return `${formatInfo[kind].label} (${kind}): ${formatInfo[kind].agent}`;
   const lines = artifactKinds.map((item) => `- ${item}: ${formatInfo[item].agent}`);
   const uiHint = (artifactKinds as readonly string[]).includes("ui") ? ['', 'For rich pages, call artifacts_formats_guide with kind "ui" to get the component reference and an example.'] : [];

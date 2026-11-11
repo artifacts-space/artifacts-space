@@ -137,6 +137,7 @@ test("should widen the page from Full width in the header's ⋯ and keep it afte
   await page.goto(`/artifact/${publicId}`);
   const main = page.locator("main");
   await expect(main).toHaveAttribute("data-full-width", "false");
+  const contained = await main.evaluate((element) => element.getBoundingClientRect().width);
 
   await expect(page.getByRole("textbox", { name: "Title" }), "the editor is ready").toBeVisible();
   // Hold the width save so the menu can be read while it waits.
@@ -154,7 +155,7 @@ test("should widen the page from Full width in the header's ⋯ and keep it afte
   await expect(toggle).toHaveAttribute("aria-busy", "false");
   await expect(toggle).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("textbox", { name: "Title" }), "the page stays editable").toHaveValue(title);
-  expect(await main.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(960);
+  expect(await main.evaluate((element) => element.getBoundingClientRect().width), "wider than the contained column").toBeGreaterThan(contained);
 
   await page.reload();
   await expect(main).toHaveAttribute("data-full-width", "true");

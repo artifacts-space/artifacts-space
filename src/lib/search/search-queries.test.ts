@@ -2,6 +2,8 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
 
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
+
 import { sitemapCandidatesQuery } from "./search-queries";
 
 /*
@@ -10,7 +12,7 @@ import { sitemapCandidatesQuery } from "./search-queries";
  * "team_id" = "team_id". A loose filter here would list private artifacts.
  */
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 
 describe("sitemapCandidatesQuery", () => {
   it("should filter on the setting, public visibility, and account age when the sitemap is built", () => {

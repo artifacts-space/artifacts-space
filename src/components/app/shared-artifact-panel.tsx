@@ -5,6 +5,7 @@ import { IconLoader2, IconLock } from "@tabler/icons-react";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { VisibilityBadge } from "@/components/artifact-page/visibility-badge";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { ReaderBlockMenu } from "@/components/block-links/reader-block-menu";
 import { CsvExportContext } from "@/components/artifact-view/csv-export";
 import { ArtifactSheetFormat } from "@/components/artifact-view/sheet-format";
 import { SheetKeyContext } from "@/components/artifact-view/use-sheet-prefs";
@@ -143,7 +144,9 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
             <SheetKeyContext value={artifact.publicId}>
               <CsvExportContext value={exportable}>
                 <ArtifactSheetFormat artifactId={null} stored={artifact.sheetFormat}>
-                  <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
+                  <ReaderBlockMenu publicId={artifact.publicId} enabled={artifact.kind === "markdown"}>
+                    <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
+                  </ReaderBlockMenu>
                 </ArtifactSheetFormat>
               </CsvExportContext>
             </SheetKeyContext>

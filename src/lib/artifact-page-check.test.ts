@@ -2,6 +2,8 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
+
 /*
  * The proxy's artifact page check: one query answers who may read the page
  * and whether search engines may index it. The read rule must give exactly
@@ -134,7 +136,7 @@ describe("checkArtifactPage", () => {
   });
 });
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 
 describe("pageCheckQuery", () => {
   it("should look the artifact up by its public id when the proxy checks a page", () => {

@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it, vi } from "vitest";
 
 import { artifact, project } from "@/db/schema";
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
 
 import type * as ScopeModule from "./scope";
 
@@ -14,7 +15,7 @@ import type * as ScopeModule from "./scope";
  * usable scopes and never compare a column with itself.
  */
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 const teams = vi.hoisted(() => ({ ids: new Set<string>() }));
 
 vi.mock("@/db", () => ({ getDb: () => db }));

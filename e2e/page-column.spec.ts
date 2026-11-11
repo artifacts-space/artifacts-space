@@ -15,11 +15,16 @@ test.skip(!localDatabaseEnabled(), localDatabaseSkipReason);
 test.skip(({ isMobile }) => isMobile, "measured on desktop");
 
 const wide = { width: 1600, height: 900 };
-/** The public page's column is 960px with 24px of padding each side, so its content runs 912px wide. */
-const pageContent = 912;
 const created: string[] = [];
 
 const widthOf = (box: Locator) => box.evaluate((element) => element.getBoundingClientRect().width);
+
+/** A column's width and the width of the content inside its side padding, as rendered, so no width is written down twice. */
+const columnOf = (box: Locator) => box.evaluate((element) => {
+  const style = getComputedStyle(element);
+  const width = element.getBoundingClientRect().width;
+  return { width, content: width - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight) };
+});
 
 /** An interface with a callout and a diagram, the blocks that used to stretch across the /app pane. */
 const uiContent = JSON.stringify({
@@ -55,8 +60,10 @@ test("should match the public page's column in the /app preview and widen it wit
   await page.goto(`/artifact/${publicId}`);
   const readerCallout = page.locator("main article").getByRole("note").first();
   await expect(readerCallout).toBeVisible();
+  const column = await columnOf(page.locator("main"));
+  expect(column.width, "the contained column is capped on a wide window").toBeLessThan(wide.width - 200);
   const pageCallout = await widthOf(readerCallout);
-  expect(pageCallout).toBeLessThanOrEqual(pageContent + 1);
+  expect(pageCallout).toBeLessThanOrEqual(column.content + 1);
 
   await page.goto("/app");
   await page.locator("[data-slot=artifact-list]").getByRole("button", { name: new RegExp(title) }).click();
@@ -65,7 +72,7 @@ test("should match the public page's column in the /app preview and widen it wit
   const diagram = body.locator("figure");
   await expect(callout).toBeVisible();
   expect(Math.abs((await widthOf(callout)) - pageCallout), "the preview matches the page").toBeLessThanOrEqual(1);
-  expect(await widthOf(diagram)).toBeLessThanOrEqual(pageContent + 1);
+  expect(await widthOf(diagram)).toBeLessThanOrEqual(column.content + 1);
   const open = page.getByRole("link", { name: "Open the artifact page in a new tab" });
   await expect(open).toHaveAttribute("href", `/artifact/${publicId}`);
   await expect(open).toHaveAttribute("target", "_blank");
@@ -73,18 +80,18 @@ test("should match the public page's column in the /app preview and widen it wit
   await page.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: "View source" }).click();
   const source = page.getByRole("textbox", { name: "Artifact source" });
-  expect(await widthOf(source)).toBeLessThanOrEqual(960);
+  expect(await widthOf(source)).toBeLessThanOrEqual(column.width);
   await page.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitemcheckbox", { name: "Full width" }).click();
   await expect(body.locator("[data-full-width]")).toHaveAttribute("data-full-width", "true");
   await page.keyboard.press("Escape");
-  expect(await widthOf(source), "the source field follows Full width").toBeGreaterThan(1000);
+  expect(await widthOf(source), "the source field follows Full width").toBeGreaterThan(column.width);
 
   await page.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: "Hide source" }).click();
   await expect(callout).toBeVisible();
-  expect(await widthOf(callout), "callouts widen").toBeGreaterThan(1000);
-  expect(await widthOf(diagram), "diagrams widen").toBeGreaterThan(1000);
+  expect(await widthOf(callout), "callouts widen").toBeGreaterThan(column.width);
+  expect(await widthOf(diagram), "diagrams widen").toBeGreaterThan(column.width);
 });
 
 test("should offer Full width in the page header's More menu and widen the page while it stays editable", async ({ page }) => {
@@ -93,6 +100,7 @@ test("should offer Full width in the page header's More menu and widen the page 
   await page.goto(`/artifact/${publicId}`);
   const main = page.locator("main");
   await expect(main).toHaveAttribute("data-full-width", "false");
+  const contained = await widthOf(main);
 
   const more = page.getByRole("banner").getByRole("button", { name: "More actions" });
   await more.click();
@@ -105,5 +113,22 @@ test("should offer Full width in the page header's More menu and widen the page 
   await expect(toggle).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("textbox", { name: "Title" }), "the page stays editable").toHaveValue(title);
-  expect(await widthOf(main)).toBeGreaterThan(960);
+  expect(await widthOf(main)).toBeGreaterThan(contained);
+});
+
+test("should never narrow a callout when Full width turns on in a window as wide as the contained column", async ({ page }) => {
+  const title = "Page width crossover e2e";
+  const publicId = await seed(page, title, "ui");
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await page.goto(`/artifact/${publicId}`);
+  const main = page.locator("main");
+  const callout = main.locator("article").getByRole("note").first();
+  await expect(callout).toBeVisible();
+  const contained = await widthOf(callout);
+
+  await page.getByRole("banner").getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Full width" }).click();
+  await expect(main).toHaveAttribute("data-full-width", "true");
+  await page.keyboard.press("Escape");
+  expect(await widthOf(callout), "Full width is never narrower than contained").toBeGreaterThanOrEqual(contained - 1);
 });

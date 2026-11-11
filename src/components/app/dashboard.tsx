@@ -281,6 +281,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
             teams={teams}
             scopeTeam={scopeTeam}
             listPath={listPath}
+            viewerId={viewerId}
             query={query}
             onQuery={setQuery}
             filters={{ kind, onKind: setKind, facets, projectFilter, tagFacets, tagFilter, scopeTeam, listPath }}
