@@ -39,6 +39,8 @@ export function useEditingSignal({ artifactId, draft, dirty, signal }: EditingSi
 
   useEffect(() => {
     return () => {
+      // Typing in the artifact being left never counts as typing in the next one: opening an artifact takes no lease.
+      lastInputRef.current = null;
       if (lastSignalRef.current === null) return;
       lastSignalRef.current = null;
       latestRef.current.signal(artifactId, false).catch(() => {
