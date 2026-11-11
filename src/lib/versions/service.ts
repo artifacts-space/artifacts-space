@@ -152,11 +152,6 @@ export interface ArtifactSave {
  * Old versions are pruned afterwards.
  */
 export async function recordArtifactSave(save: ArtifactSave): Promise<EditStatus> {
-  return (await fileArtifactSave(save)).status;
-}
-
-/** recordArtifactSave, also returning the version the save filed or merged into. */
-async function fileArtifactSave(save: ArtifactSave): Promise<{ status: EditStatus; versionId: string }> {
   const { before, after, editorId } = save;
   if (before) await ensureHistoryStart(before);
   const approvedId = before && isReviewedLevel(after.visibility) ? await ensureApprovedBefore(before) : null;
@@ -172,7 +167,7 @@ async function fileArtifactSave(save: ArtifactSave): Promise<{ status: EditStatu
     // Pruning is housekeeping; the cleanup job retries it.
     console.error("[versions] Pruning after a save failed", error instanceof Error ? error.name : "unknown error");
   });
-  return { status, versionId };
+  return status;
 }
 
 /** Saves that change files: they always go through the approval rule, because readers outside the team see files by version. */
@@ -194,31 +189,45 @@ async function approvalFor(after: ArtifactRecord, approvedId: string, versionId:
  * the approved version (and its files) until the change is approved. Call it
  * after the change is saved.
  */
-export async function recordArtifactChange(input: ArtifactChange): Promise<EditStatus> {
-  return (await recordArtifactChangeVersion(input)).status;
-}
-
-/** A change the artifact row does not show, for recordArtifactChange. */
-export interface ArtifactChange {
-  artifactId: string;
-  editorId: string;
-  actor: SharingActor;
-  harness?: HarnessStamp | null | undefined;
-  /** "replace" for a replaced file, which files its own version; "files" (the default) for files added or removed. */
-  saveKind?: "files" | "replace";
-}
-
-/** recordArtifactChange, also returning the version it filed (null when the artifact is gone). */
-export async function recordArtifactChangeVersion(input: ArtifactChange): Promise<{ status: EditStatus; versionId: string | null }> {
+export async function recordArtifactChange(input: { artifactId: string; editorId: string; actor: SharingActor; harness?: HarnessStamp | null | undefined }): Promise<EditStatus> {
   const [before] = await getDb().select().from(artifact).where(eq(artifact.id, input.artifactId)).limit(1);
-  if (!before) return { status: "applied", versionId: null };
+  if (!before) return "applied";
   const [after] = await getDb()
     .update(artifact)
     .set({ ...stampColumns(input.harness), updatedBy: input.editorId, updatedAt: new Date() })
     .where(eq(artifact.id, input.artifactId))
     .returning();
-  if (!after) return { status: "applied", versionId: null };
-  return fileArtifactSave({ before, after, editorId: input.editorId, actor: input.actor, saveKind: input.saveKind ?? "files", harness: input.harness ?? null });
+  if (!after) return "applied";
+  return recordArtifactSave({ before, after, editorId: input.editorId, actor: input.actor, saveKind: "files", harness: input.harness ?? null });
+}
+
+/**
+ * Before a change that writes its own version row in the same statement as
+ * the change (a replaced file, src/lib/files/replace.ts): starts the
+ * history if needed, and gives a link or public artifact its approved
+ * version from what it shows now, so readers outside the team never see the
+ * change before it is approved. Returns that approved version's id, or null
+ * for private and team artifacts.
+ */
+export async function prepareVersionedChange(before: ArtifactRecord): Promise<string | null> {
+  await ensureHistoryStart(before);
+  return isReviewedLevel(before.visibility) ? ensureApprovedBefore(before) : null;
+}
+
+/**
+ * After such a change: applies the approval rule to the version it wrote
+ * (live for every reader, or waiting for an owner or admin), then prunes
+ * old versions. `approvedId` comes from prepareVersionedChange.
+ */
+export async function settleVersionedChange(input: { artifactId: string; approvedId: string | null; versionId: string; editorId: string; actor: SharingActor }): Promise<EditStatus> {
+  const [after] = await getDb().select().from(artifact).where(eq(artifact.id, input.artifactId)).limit(1);
+  if (!after) return "applied";
+  const save: ArtifactSave = { before: null, after, editorId: input.editorId, actor: input.actor, saveKind: "replace" };
+  const status = input.approvedId && isReviewedLevel(after.visibility) ? await approvalFor(after, input.approvedId, input.versionId, save) : "applied";
+  await pruneArtifactVersions(after.id).catch((error: unknown) => {
+    console.error("[versions] Pruning after a save failed", error instanceof Error ? error.name : "unknown error");
+  });
+  return status;
 }
 
 /**

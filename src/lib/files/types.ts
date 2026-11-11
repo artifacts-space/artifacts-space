@@ -7,6 +7,8 @@ export interface FileDto {
   createdAt: string;
   /** When a newer upload replaced the file's content, or null. Its id, place, and name stay. */
   replacedAt: string | null;
+  /** True for media a content save attached (an embed in the document): it changes in the document, so it is never replaced. Set by the server. */
+  embedded?: boolean;
 }
 
 /** An old copy of a replaced file, for History. Only people who may edit the artifact see these. */

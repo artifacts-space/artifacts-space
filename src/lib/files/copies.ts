@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
@@ -7,6 +7,7 @@ import { artifactFile, artifactVersion } from "@/db/schema";
 import { getEditableArtifactMeta } from "@/lib/access";
 
 import { deleteObject, r2ConfigFromEnv } from "./r2";
+import { copyCurrentAt } from "./replace-rules";
 import type { OldFileDto } from "./types";
 
 /**
@@ -67,16 +68,20 @@ export async function cleanupOrphanCopies(): Promise<{ removed: number; remainin
 
 /**
  * Deletes the artifact's copies that no version in its history was saved
- * while they were current, in one statement, then their objects. Versions
- * are pruned past the newest 100 or after a year, but never the approved
- * one or one waiting for approval, so a copy readers or reviewers rely on
- * always stays. A copy made in the last few minutes is never deleted. The
- * row names are written out (c., v.), never bare, so the subquery cannot
- * compare a column with itself (the correlated-subquery tripwire in AGENTS.md).
+ * while they were current: their objects first, then the rows whose object
+ * went (removeCopyRows), so a copy whose object R2 refused to delete keeps
+ * its row and the next prune tries again. Versions are pruned past the
+ * newest 100 or after a year, but never the approved one or one waiting for
+ * approval, so a copy readers or reviewers rely on always stays. Selecting
+ * first is safe: a version filed later is always saved after the copy was
+ * replaced, so it can never come to need a selected copy. A copy made in
+ * the last few minutes is never deleted. The row names are written out
+ * (c., v.), never bare, so the subquery cannot compare a column with itself
+ * (the correlated-subquery tripwire in AGENTS.md). Returns how many went.
  */
 export async function pruneFileCopies(artifactId: string): Promise<number> {
   const result = await getDb().execute<{ id: string; key: string }>(sql`
-    delete from ${artifactFileCopy} c
+    select c.id, c.key from ${artifactFileCopy} c
     where c.artifact_id = ${artifactId}
       and c.replaced_at < now() - make_interval(mins => ${copyPruneGraceMinutes})
       and not exists (
@@ -85,10 +90,8 @@ export async function pruneFileCopies(artifactId: string): Promise<number> {
           and v.saved_at < c.replaced_at
           and (c.current_from is null or v.saved_at >= c.current_from)
       )
-    returning c.id, c.key
   `);
-  await deleteObjects(result.rows.map((row) => row.key));
-  return result.rows.length;
+  return removeCopyRows(result.rows);
 }
 
 /** pruneFileCopies as housekeeping: a failure is logged, never thrown. */
@@ -98,17 +101,26 @@ export async function pruneFileCopiesQuietly(artifactId: string): Promise<void> 
   });
 }
 
-/** For each file, the copy that was current at `at`: the first one replaced after it. Files replaced only before `at` are left out. */
+/** For copy rows: current at `at`, from when it became current until a newer upload replaced it (the SQL form of copyCurrentAt). */
+function currentAtCondition(at: Date) {
+  return and(gt(artifactFileCopy.replacedAt, at), or(isNull(artifactFileCopy.currentFrom), lte(artifactFileCopy.currentFrom, at)));
+}
+
+/**
+ * For each file, the copy that was current at `at`. A file with no such
+ * copy is left out: replaced only before `at`, or its copy from then is
+ * gone, in which case a later copy is never handed out in its place.
+ */
 export async function copiesCurrentAt(fileIds: readonly string[], at: Date): Promise<Map<string, ArtifactFileCopyRecord>> {
   const copies = new Map<string, ArtifactFileCopyRecord>();
   if (fileIds.length === 0) return copies;
   const rows = await getDb()
     .select()
     .from(artifactFileCopy)
-    .where(and(inArray(artifactFileCopy.fileId, [...fileIds]), gt(artifactFileCopy.replacedAt, at)))
+    .where(and(inArray(artifactFileCopy.fileId, [...fileIds]), currentAtCondition(at)))
     .orderBy(asc(artifactFileCopy.replacedAt));
   for (const row of rows) {
-    if (row.fileId && !copies.has(row.fileId)) copies.set(row.fileId, row);
+    if (row.fileId && !copies.has(row.fileId) && copyCurrentAt(row, at)) copies.set(row.fileId, row);
   }
   return copies;
 }
@@ -127,13 +139,13 @@ export async function filesReplacedSince(artifactId: string, at: Date): Promise<
     .select({ copy: artifactFileCopy })
     .from(artifactFileCopy)
     .innerJoin(artifactFile, eq(artifactFile.id, artifactFileCopy.fileId))
-    .where(and(eq(artifactFileCopy.artifactId, artifactId), eq(artifactFile.artifactId, artifactId), sql`${artifactFile.attachedAt} <= ${at}`, gt(artifactFileCopy.replacedAt, at)))
+    .where(and(eq(artifactFileCopy.artifactId, artifactId), eq(artifactFile.artifactId, artifactId), lte(artifactFile.attachedAt, at), currentAtCondition(at)))
     .orderBy(asc(artifactFile.attachedAt), asc(artifactFileCopy.replacedAt));
   const seen = new Set<string>();
   const files: OldFileDto[] = [];
   for (const { copy } of rows) {
     const { fileId } = copy;
-    if (fileId === null || seen.has(fileId)) continue;
+    if (fileId === null || seen.has(fileId) || !copyCurrentAt(copy, at)) continue;
     seen.add(fileId);
     files.push(toOldFileDto({ ...copy, fileId }));
   }
@@ -164,9 +176,4 @@ export async function findEditableCopy(fileId: string, copyId: string, viewerId:
     .limit(1);
   if (!row?.artifactId) return null;
   return (await getEditableArtifactMeta(viewerId, row.artifactId)) ? row : null;
-}
-
-/** Records the version a replace filed on the copy it made, for History. */
-export async function linkCopyToVersion(copyId: string, versionId: string): Promise<void> {
-  await getDb().update(artifactFileCopy).set({ versionId }).where(eq(artifactFileCopy.id, copyId));
 }

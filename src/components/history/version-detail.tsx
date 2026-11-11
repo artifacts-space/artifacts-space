@@ -14,7 +14,7 @@ import { resolveTheme } from "@/lib/themes/resolve";
 import { diffableContent } from "@/lib/versions/diff-text";
 
 import { SavedAt } from "./last-edited";
-import { ReplacedFiles } from "./replaced-files";
+import { ReplacedFiles, VersionFiles } from "./replaced-files";
 import { versionLabel } from "./version-labels";
 import { VersionAuthor } from "./version-list";
 
@@ -50,7 +50,9 @@ function VersionBody({ view, selected, compareWith, compareId, files }: BodyProp
     return (
       <ThemeScope theme={selected.renderTheme ?? resolveTheme(selected.theme, null).theme} className="text-foreground">
         {selected.cover ? <div data-version-cover="" className="relative mb-6 h-20 overflow-hidden rounded-lg"><CoverArt cover={selected.cover} /></div> : null}
-        <ArtifactView kind={selected.kind} content={selected.content} title={selected.title} language={selected.language} files={files} />
+        <VersionFiles files={files} replacedSince={selected.latest ? [] : selected.replacedSince ?? []}>
+          <ArtifactView kind={selected.kind} content={selected.content} title={selected.title} language={selected.language} />
+        </VersionFiles>
       </ThemeScope>
     );
   }

@@ -1,3 +1,6 @@
+import { iconFileId } from "@/lib/artifact-icons";
+import { coverFileId } from "@/lib/covers/cover";
+
 import { allowedFileTypes, fileExtension, isAllowedFileType } from "./config";
 import { sanitizeFilename } from "./names";
 
@@ -58,6 +61,17 @@ export function replaceTargetProblem(target: ReplaceTarget | null, options: { sh
   if (target.attachedByContent) return "This file is shown in the document. Replace it there instead.";
   if (options.shownAsImage) return "This image is the artifact's icon or cover. Change it from the icon or cover instead.";
   return null;
+}
+
+/**
+ * Whether the Files section offers Replace for a file: not media the
+ * document embeds, and not the artifact's icon or cover. The server checks
+ * the same (replaceTargetProblem, and older versions' icons and covers too);
+ * this only spares people an upload it would refuse.
+ */
+export function offersReplace(file: { id: string; embedded?: boolean | undefined }, artifact: { icon: string | null; cover: string | null }): boolean {
+  if (file.embedded === true) return false;
+  return iconFileId(artifact.icon) !== file.id && coverFileId(artifact.cover) !== file.id;
 }
 
 /** One old copy as the served-copy rule sees it. */

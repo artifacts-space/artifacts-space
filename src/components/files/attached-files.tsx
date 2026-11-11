@@ -9,6 +9,7 @@ import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import type { ActionResult, ArtifactDto } from "@/lib/artifact-types";
 import { fileInputAccept, formatBytes, fileTypeLabel } from "@/lib/files/config";
+import { offersReplace } from "@/lib/files/replace-rules";
 import { fileUrl, type FileDto } from "@/lib/files/types";
 
 import { FileUploader } from "./file-uploader";
@@ -43,7 +44,8 @@ interface RowProps {
   replacing: Replacing | null;
   busy: boolean;
   onRemove: () => void;
-  onReplace: () => void;
+  /** Null when the file is not replaced here: media the document embeds, or the icon or cover. */
+  onReplace: (() => void) | null;
 }
 
 /** One attached file: name, type and size, and open, copy-id, replace, and remove actions. */
@@ -59,9 +61,11 @@ function AttachedRow({ file, showId, removing, replacing, busy, onRemove, onRepl
       <Button variant="ghost" size="icon-xs" nativeButton={false} render={<a href={fileUrl(file.id, { replacedAt: file.replacedAt })} target="_blank" rel="noopener noreferrer" aria-label={`Open ${file.filename}`} />}>
         <IconExternalLink />
       </Button>
-      <Button type="button" variant="ghost" size="icon-xs" aria-label={`Replace ${file.filename}`} title="Replace with a new file" disabled={busy} onClick={onReplace}>
-        {replacing ? <IconLoader2 className="animate-spin" /> : <IconReplace />}
-      </Button>
+      {onReplace ? (
+        <Button type="button" variant="ghost" size="icon-xs" aria-label={`Replace ${file.filename}`} title="Replace with a new file" disabled={busy} onClick={onReplace}>
+          {replacing ? <IconLoader2 className="animate-spin" /> : <IconReplace />}
+        </Button>
+      ) : null}
       <Button type="button" variant="ghost" size="icon-xs" aria-label={`Remove ${file.filename}`} disabled={removing || busy} onClick={onRemove}>
         {removing ? <IconLoader2 className="animate-spin" /> : <IconTrash />}
       </Button>
@@ -136,7 +140,7 @@ export function AttachedFiles({ artifact, onUpdated, api = serverApi }: { artifa
               replacing={replacing?.fileId === file.id ? replacing : null}
               busy={replacing !== null}
               onRemove={() => void remove(file)}
-              onReplace={() => { pickReplacement(file); }}
+              onReplace={offersReplace(file, artifact) ? () => { pickReplacement(file); } : null}
             />
           ))}
         </ul>

@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, isNull, like, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, like, lt, lte, or, sql, type SQL } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, artifactFile, type ArtifactFileRecord } from "@/db/schema";
@@ -16,7 +16,7 @@ import type { FileDto } from "./types";
 
 /** Maps a row to the shape the app and agents see. */
 export function toFileDto(row: ArtifactFileRecord): FileDto {
-  return { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString(), replacedAt: row.replacedAt?.toISOString() ?? null };
+  return { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString(), replacedAt: row.replacedAt?.toISOString() ?? null, embedded: row.attachedByContent };
 }
 
 /** One file row by id, or null. */
@@ -145,6 +145,20 @@ export async function removeFiles(rows: readonly Pick<ArtifactFileRecord, "id" |
 }
 
 /**
+ * Deletes the file rows `where` matches, in one statement, then the R2
+ * objects those rows held at that moment (`returning`). A replace can swap
+ * a new object into a row at any time (replace.ts), so the key is read by
+ * the delete itself, never earlier: the object that goes is always the one
+ * the deleted row held. An object R2 refuses to delete is logged and stays
+ * without a row. Returns the rows deleted.
+ */
+export async function deleteFileRows(where: SQL | undefined): Promise<Pick<ArtifactFileRecord, "id" | "key">[]> {
+  const rows = (await getDb().delete(artifactFile).where(where).returning()).map((row) => ({ id: row.id, key: row.key }));
+  await deleteStoredObjects(rows);
+  return rows;
+}
+
+/**
  * Deletes the uploader's own upload while it is in no artifact, in one
  * statement: the row goes only if it is still unattached and theirs, so an
  * attach landing at the same moment (another tab, an agent) keeps its file.
@@ -167,14 +181,14 @@ export async function removeUnattachedUpload(fileId: string, uploaderId: string)
 
 /**
  * Deletes every file of an artifact, and every old copy of its replaced
- * files, before the artifact itself is deleted. Files and copies whose
- * objects could not be deleted lose their artifact when it goes (the
- * foreign key sets null), and the cleanup job removes them later.
+ * files, before the artifact itself is deleted. The rows go first, with
+ * the keys they hold then (deleteFileRows), so a replace landing meanwhile
+ * never leaves its new object behind. A copy a replace makes after this
+ * loses its artifact when it goes, and the cleanup job removes it.
  */
 export async function deleteArtifactFiles(artifactId: string): Promise<void> {
   await removeArtifactCopies(artifactId);
-  const rows = await getDb().select({ id: artifactFile.id, key: artifactFile.key }).from(artifactFile).where(eq(artifactFile.artifactId, artifactId));
-  await removeFiles(rows);
+  await deleteFileRows(eq(artifactFile.artifactId, artifactId));
 }
 
 /** The most files one cleanup run removes. The next run continues. */
@@ -184,23 +198,30 @@ export const cleanupBatchSize = 200;
  * Removes abandoned files: uploads still pending after an hour, and files
  * never attached to an artifact after a day (including files left behind
  * by a deleted artifact or account), then old copies whose file or
- * artifact is gone. Returns how many were removed.
+ * artifact is gone. Rows go before their objects (deleteFileRows); an object
+ * R2 refuses to delete is logged. Returns how many were removed.
  */
 export async function cleanupAbandonedFiles(now: Date = new Date()): Promise<{ removed: number; remaining: boolean }> {
-  const pendingBefore = new Date(now.getTime() - fileLimits.pendingTtlMs);
-  const unattachedBefore = new Date(now.getTime() - fileLimits.unattachedTtlMs);
-  const rows = await getDb()
-    .select({ id: artifactFile.id, key: artifactFile.key })
-    .from(artifactFile)
-    .where(
-      or(
-        and(eq(artifactFile.status, "pending"), lt(artifactFile.createdAt, pendingBefore)),
-        and(isNull(artifactFile.artifactId), lt(artifactFile.createdAt, unattachedBefore)),
-      ),
-    )
-    .orderBy(asc(artifactFile.createdAt))
-    .limit(cleanupBatchSize);
-  const removed = await removeFiles(rows);
+  const rows = await getDb().select({ id: artifactFile.id }).from(artifactFile).where(abandonedFiles(now)).orderBy(asc(artifactFile.createdAt)).limit(cleanupBatchSize);
+  const removed = await removeAbandonedFiles(rows.map((row) => row.id), now);
   const copies = await cleanupOrphanCopies();
-  return { removed: removed.length + copies.removed, remaining: rows.length === cleanupBatchSize || copies.remaining };
+  return { removed: removed + copies.removed, remaining: rows.length === cleanupBatchSize || copies.remaining };
+}
+
+/** File rows the cleanup job removes: uploads still pending after an hour, and files in no artifact after a day. */
+function abandonedFiles(now: Date) {
+  return or(
+    and(eq(artifactFile.status, "pending"), lt(artifactFile.createdAt, new Date(now.getTime() - fileLimits.pendingTtlMs))),
+    and(isNull(artifactFile.artifactId), lt(artifactFile.createdAt, new Date(now.getTime() - fileLimits.unattachedTtlMs))),
+  );
+}
+
+/**
+ * Deletes the cleanup job's picks, checking in the delete itself that each
+ * is still abandoned, so an upload a replace or an attach used since the
+ * job picked it stays where it went and keeps its object. Returns how many went.
+ */
+export async function removeAbandonedFiles(fileIds: readonly string[], now: Date = new Date()): Promise<number> {
+  if (fileIds.length === 0) return 0;
+  return (await deleteFileRows(and(inArray(artifactFile.id, [...fileIds]), abandonedFiles(now)))).length;
 }

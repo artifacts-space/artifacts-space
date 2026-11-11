@@ -43,6 +43,8 @@ export const artifactFileCopy = pgTable(
     index("artifact_file_copy_file_replaced_idx").on(table.fileId, table.replacedAt),
     index("artifact_file_copy_artifact_idx").on(table.artifactId),
     index("artifact_file_copy_uploader_idx").on(table.uploaderId),
+    // Account deletion sets replaced_by null; the index keeps that from scanning every copy.
+    index("artifact_file_copy_replaced_by_idx").on(table.replacedBy),
     index("artifact_file_copy_version_idx").on(table.versionId),
     check("artifact_file_copy_size_check", sql`${table.size} > 0 and ${table.size} <= ${sql.raw(String(fileLimits.maxBytes))}`),
   ],

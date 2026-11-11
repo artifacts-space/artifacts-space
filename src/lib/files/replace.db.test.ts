@@ -16,17 +16,18 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (databaseUrl) process.env.DATABASE_URL = databaseUrl;
 
-const r2 = vi.hoisted(() => ({ deleted: [] as string[] }));
+const r2 = vi.hoisted(() => ({ deleted: [] as string[], refuse: new Set<string>() }));
 vi.mock("./r2", () => ({
   r2ConfigFromEnv: () => ({}),
   deleteObject: (_config: unknown, key: string) => {
+    if (r2.refuse.has(key)) return Promise.reject(new Error("R2 refused the delete."));
     r2.deleted.push(key);
     return Promise.resolve();
   },
 }));
 
 describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async () => {
-  const { eq, inArray, like, or } = await import("drizzle-orm");
+  const { eq, inArray, like, or, sql } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
   const { artifactFileCopy } = await import("@/db/file-copy-schema");
   const { artifact, artifactFile, artifactVersion, rateLimitBucket, user } = await import("@/db/schema");
@@ -36,10 +37,10 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async 
   const { fileBytesUsed } = await import("@/lib/quota/usage");
   const { insertVersion, pruneArtifactVersions } = await import("@/lib/versions/history");
   const { listArtifactVersions } = await import("@/lib/versions/history-queries");
-  const { filesReplacedSince, findEditableCopy } = await import("./copies");
+  const { cleanupOrphanCopies, filesReplacedSince, findEditableCopy, pruneFileCopies } = await import("./copies");
   const { filesForViewer, findReadableFile } = await import("./download");
   const { replaceFile } = await import("./replace");
-  const { removeUnattachedUpload } = await import("./store");
+  const { deleteFileRows, removeAbandonedFiles, removeUnattachedUpload } = await import("./store");
 
   const tag = randomUUID().slice(0, 8);
   const ids = { author: `replace-${tag}-author`, stranger: `replace-${tag}-stranger`, doc: `replace-${tag}-doc` };
@@ -60,6 +61,20 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async 
 
   async function copies() {
     return getDb().select().from(artifactFileCopy).where(eq(artifactFileCopy.artifactId, ids.doc));
+  }
+
+  /** The copies oldest first. */
+  async function copiesInOrder() {
+    return (await copies()).sort((a, b) => a.replacedAt.getTime() - b.replacedAt.getTime());
+  }
+
+  /** Moves every time this case wrote back by `minutes`, keeping their order, as if it all happened that long ago. */
+  async function shiftBack(minutes: number) {
+    const shift = sql`make_interval(mins => ${minutes})`;
+    const db = getDb();
+    await db.update(artifactFileCopy).set({ replacedAt: sql`${artifactFileCopy.replacedAt} - ${shift}`, currentFrom: sql`${artifactFileCopy.currentFrom} - ${shift}` }).where(eq(artifactFileCopy.artifactId, ids.doc));
+    await db.update(artifactVersion).set({ createdAt: sql`${artifactVersion.createdAt} - ${shift}`, savedAt: sql`${artifactVersion.savedAt} - ${shift}` }).where(eq(artifactVersion.artifactId, ids.doc));
+    await db.update(artifactFile).set({ replacedAt: sql`${artifactFile.replacedAt} - ${shift}`, attachedAt: sql`${artifactFile.attachedAt} - ${shift}` }).where(eq(artifactFile.id, sow));
   }
 
   async function publicId() {
@@ -108,6 +123,7 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async 
     await getDb().insert(artifactFile).values({ id: sow, uploaderId: ids.author, artifactId: ids.doc, attachedAt: at(30), key: `files/${sow}/sow.pdf`, filename: "sow.pdf", contentType: "application/pdf", size: 10, status: "ready" });
     await versionAt(at(29));
     r2.deleted.length = 0;
+    r2.refuse.clear();
   });
 
   afterAll(async () => {
@@ -185,10 +201,10 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async 
     expect(await publicFiles()).toEqual([]);
   });
 
-  it("should prune an old copy with the last version saved while it was current, and keep one the approved version shows", async () => {
+  /** Replaces sow.pdf, then moves time on a year and a half: the version from before the replace is past retention; the replace's own is the newest. */
+  async function replacedLongAgo() {
     const next = await upload(ids.author);
     await replaceFile(ids.author, { fileId: sow, uploadId: next }, "person");
-    // A year and a half on: the version from before the replace is past retention; the replace's own version is the newest.
     const db = getDb();
     await db.update(artifactFileCopy).set({ replacedAt: yearsAgo(1.5) }).where(eq(artifactFileCopy.fileId, sow));
     await db.update(artifactFile).set({ attachedAt: yearsAgo(3), replacedAt: yearsAgo(1.5) }).where(eq(artifactFile.id, sow));
@@ -198,6 +214,11 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async 
     if (!before || !replace) throw new Error("Expected a version before the replace and the replace's own.");
     await db.update(artifactVersion).set({ createdAt: yearsAgo(2), savedAt: yearsAgo(2) }).where(eq(artifactVersion.id, before.id));
     await db.update(artifactVersion).set({ createdAt: yearsAgo(1.4), savedAt: yearsAgo(1.4) }).where(eq(artifactVersion.id, replace.id));
+    return { next, before, replace };
+  }
+
+  it("should prune an old copy with the last version saved while it was current, and keep one the approved version shows", async () => {
+    const { next, before, replace } = await replacedLongAgo();
 
     // Readers outside the team are served the version from before the replace: it and its copy stay.
     await serve(before.id);
@@ -210,6 +231,86 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async 
     expect(await copies()).toEqual([]);
     expect(r2.deleted).toEqual([`files/${sow}/sow.pdf`]);
     expect((await entry())?.key).toBe(`files/${next}/sow-v2.pdf`);
+  });
+
+  it("should keep a pruned copy's row when R2 refuses to delete its object, and finish on the next prune", async () => {
+    const { replace } = await replacedLongAgo();
+    await serve(replace.id);
+    r2.refuse.add(`files/${sow}/sow.pdf`);
+    await pruneArtifactVersions(ids.doc);
+    expect(await copies()).toHaveLength(1);
+
+    r2.refuse.clear();
+    await expect(pruneFileCopies(ids.doc)).resolves.toBe(1);
+    expect(await copies()).toEqual([]);
+    expect(r2.deleted).toEqual([`files/${sow}/sow.pdf`]);
+  });
+
+  it("should never hand out a later copy as the file from before when the copy from then is gone", async () => {
+    const before = await versionAt(at(20));
+    await replaceFile(ids.author, { fileId: sow, uploadId: await upload(ids.author) }, "person");
+    await replaceFile(ids.author, { fileId: sow, uploadId: await upload(ids.author, "sow-v3.pdf") }, "person");
+    const [first] = (await copies()).sort((a, b) => a.replacedAt.getTime() - b.replacedAt.getTime());
+    if (!first) throw new Error("No copy.");
+    // The copy current at minute 20 (the original sow.pdf) is gone; the next one only became current later.
+    await getDb().delete(artifactFileCopy).where(eq(artifactFileCopy.id, first.id));
+    await serve(before);
+    await expect(findReadableFile(sow, null)).resolves.toBeNull();
+    expect(await publicFiles()).toEqual([]);
+    expect(await filesReplacedSince(ids.doc, at(20))).toEqual([]);
+  });
+
+  it("should never serve a newer copy when the approved version's copy is gone, with three replaces", async () => {
+    await replaceFile(ids.author, { fileId: sow, uploadId: await upload(ids.author, "sow-v2.pdf") }, "person");
+    await replaceFile(ids.author, { fileId: sow, uploadId: await upload(ids.author, "sow-v3.pdf") }, "person");
+    await replaceFile(ids.author, { fileId: sow, uploadId: await upload(ids.author, "sow-v4.pdf") }, "person");
+    const [, v2, v3] = await copiesInOrder();
+    if (!v2 || !v3) throw new Error("Three copies expected.");
+    // Approve a version saved while v2 was current, then lose v2's copy.
+    await serve(await versionAt(new Date((v2.replacedAt.getTime() + (v2.currentFrom ?? v2.replacedAt).getTime()) / 2)));
+    expect((await findReadableFile(sow, null))?.key).toBe(v2.key);
+    await getDb().delete(artifactFileCopy).where(eq(artifactFileCopy.id, v2.id));
+    await expect(findReadableFile(sow, null)).resolves.toBeNull();
+    expect(await publicFiles()).toEqual([]);
+    expect((await findReadableFile(sow, ids.author))?.key).not.toBe(v3.key);
+  });
+
+  it("should file the replace's version in the same statement, so quick replaces keep every upload through pruning", async () => {
+    await replaceFile(ids.author, { fileId: sow, uploadId: await upload(ids.author, "sow-a.pdf") }, "person");
+    await replaceFile(ids.author, { fileId: sow, uploadId: await upload(ids.author, "sow-b.pdf") }, "person");
+    const [first, second] = await copiesInOrder();
+    if (!first?.versionId || !second?.versionId) throw new Error("Each copy names its replace's version.");
+    const [version] = await getDb().select().from(artifactVersion).where(eq(artifactVersion.id, first.versionId));
+    // The version that made sow-a current is saved at that very moment, inside the window sow-a was current.
+    expect(version?.savedAt.getTime()).toBe(first.replacedAt.getTime());
+    expect(second.currentFrom?.getTime()).toBe(first.replacedAt.getTime());
+    await shiftBack(10);
+    await expect(pruneFileCopies(ids.doc)).resolves.toBe(0);
+    expect(await copies()).toHaveLength(2);
+  });
+
+  it("should leave an upload the cleanup job picked alone when a replace used it before the job deleted it", async () => {
+    const next = await upload(ids.author);
+    await getDb().update(artifactFile).set({ createdAt: new Date(Date.now() - 2 * 86_400_000) }).where(eq(artifactFile.id, next));
+    // The job picked the old, unattached upload; then a replace put it in the artifact.
+    await replaceFile(ids.author, { fileId: sow, uploadId: next }, "person");
+    await expect(removeAbandonedFiles([next, sow])).resolves.toBe(0);
+    expect((await entry())?.key).toBe(`files/${next}/sow-v2.pdf`);
+    expect(r2.deleted).toEqual([]);
+  });
+
+  it("should delete the object a file holds when it is deleted, even when a replace swapped it after the file was read", async () => {
+    const stale = await entry();
+    const next = await upload(ids.author);
+    await replaceFile(ids.author, { fileId: sow, uploadId: next }, "person");
+    // A delete that read the file before the replace: the row it deletes names the new object.
+    expect(stale?.key).toBe(`files/${sow}/sow.pdf`);
+    expect((await deleteFileRows(eq(artifactFile.id, sow))).map((row) => row.key)).toEqual([`files/${next}/sow-v2.pdf`]);
+    expect(r2.deleted).toEqual([`files/${next}/sow-v2.pdf`]);
+    // The old copy lost its file; the cleanup job removes it with its object.
+    await cleanupOrphanCopies();
+    expect(await copies()).toEqual([]);
+    expect(r2.deleted).toContain(`files/${sow}/sow.pdf`);
   });
 
   it("should delete the file and every old copy with the artifact", async () => {

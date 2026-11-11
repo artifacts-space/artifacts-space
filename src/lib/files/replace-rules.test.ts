@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { copyCurrentAt, replacedSince, replacementFilename, replaceTargetProblem } from "./replace-rules";
+import { copyCurrentAt, offersReplace, replacedSince, replacementFilename, replaceTargetProblem } from "./replace-rules";
 
 const pdf = "application/pdf";
 const docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -70,5 +70,23 @@ describe("replacedSince", () => {
     expect(replacedSince({ replacedAt: minute(20) }, minute(20))).toBe(false);
     expect(replacedSince({ replacedAt: null }, minute(10))).toBe(false);
     expect(replacedSince({ replacedAt: minute(20) }, null)).toBe(false);
+  });
+});
+
+describe("offersReplace", () => {
+  const id = "0b4f8a2e-7c1d-4e3a-9b6f-2d8c5e1a7f30";
+  const none = { icon: null, cover: null };
+
+  it("should offer Replace for a plain attachment", () => {
+    expect(offersReplace({ id, embedded: false }, none)).toBe(true);
+  });
+
+  it("should not offer Replace for media the document embeds", () => {
+    expect(offersReplace({ id, embedded: true }, none)).toBe(false);
+  });
+
+  it("should not offer Replace for the artifact's icon or cover image", () => {
+    expect(offersReplace({ id }, { icon: `file:${id}`, cover: null })).toBe(false);
+    expect(offersReplace({ id }, { icon: null, cover: `file:${id}@40` })).toBe(false);
   });
 });

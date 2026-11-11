@@ -1,5 +1,5 @@
 {
-  "id": "88f3e103-1ea1-4d3c-bb12-8115a13db56f",
+  "id": "91076081-f832-475d-89fe-36e30043fad0",
   "prevId": "d62903d6-2255-486e-a587-d4096fb21034",
   "version": "7",
   "dialect": "postgresql",
@@ -5685,6 +5685,21 @@
           "columns": [
             {
               "expression": "uploader_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "artifact_file_copy_replaced_by_idx": {
+          "name": "artifact_file_copy_replaced_by_idx",
+          "columns": [
+            {
+              "expression": "replaced_by",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

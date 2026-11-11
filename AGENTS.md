@@ -370,8 +370,11 @@ Replace (the Files section, MCP `files_replace`, `src/lib/files/replace.ts`)
 puts an editor's finished upload in place of a plain attachment. The
 `artifact_file` row keeps its id, place, and name, so links and embeds open
 the new file; what it held moves to `artifact_file_copy`. The swap is one SQL
-statement, guarded on the key the editor saw, so a refused replace changes
-nothing; the page then discards the upload with `removeUnattachedUpload`.
+statement, guarded on the key the editor saw, that also files the replace's
+version, so the file and its History entry land together or not at all; the
+page discards a refused upload with `removeUnattachedUpload`. A replace can
+swap a row's object at any time, so code that deletes file rows reads the key
+in the delete itself (`deleteFileRows`, `DELETE … RETURNING`).
 Content media and icon or cover images are never replaced. Readers get the
 current file, except readers of an approved version, who get the copy that
 was current when it was saved (`download.ts`, never a newer one). Old copies

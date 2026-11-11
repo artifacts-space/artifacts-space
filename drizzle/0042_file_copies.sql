@@ -24,4 +24,5 @@ CREATE UNIQUE INDEX "artifact_file_copy_key_idx" ON "artifact_file_copy" USING b
 CREATE INDEX "artifact_file_copy_file_replaced_idx" ON "artifact_file_copy" USING btree ("file_id","replaced_at");--> statement-breakpoint
 CREATE INDEX "artifact_file_copy_artifact_idx" ON "artifact_file_copy" USING btree ("artifact_id");--> statement-breakpoint
 CREATE INDEX "artifact_file_copy_uploader_idx" ON "artifact_file_copy" USING btree ("uploader_id");--> statement-breakpoint
+CREATE INDEX "artifact_file_copy_replaced_by_idx" ON "artifact_file_copy" USING btree ("replaced_by");--> statement-breakpoint
 CREATE INDEX "artifact_file_copy_version_idx" ON "artifact_file_copy" USING btree ("version_id");
