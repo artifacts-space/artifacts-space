@@ -149,9 +149,20 @@ jobs:
   # `.next` to the shards would add its own 45 seconds or more before any
   # shard starts, and the dev server would still have to start, so each
   # shard builds its own.
+  #
+  # The shards run in Playwright's own image, which already holds Chromium and
+  # every library it needs, so no step installs system packages. With
+  # `--with-deps` on the bare runner, an Ubuntu mirror outage failed every
+  # shard before a test ran (Nov 2026). Keep the image tag equal to
+  # `@playwright/test` in pnpm-lock.yaml; Dependabot does not update it.
   e2e:
     name: Component gallery shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f # v1.64.1-noble
+      # Playwright's Docker guide: Chromium can run out of shared memory
+      # without the host's IPC namespace.
+      options: --ipc=host
     # Shards take 5-8 minutes; the headroom covers a cold cache.
     timeout-minutes: 25
     strategy:
@@ -164,16 +175,20 @@ jobs:
       # matrix combination. A second matrix key, or a repeated or missing shard
       # number, would skip tests while staying green. Requiring `shard` to be
       # the only key and equal to the job's position proves the shards are
-      # exactly 1 to job-total. Fail otherwise.
+      # exactly 1 to job-total. Fail otherwise. The image has no jq, so this
+      # uses the image's own Node.
       - name: Check that the shards are exactly 1 to the matrix total
         env:
           MATRIX: ${{ toJSON(matrix) }}
           JOB_INDEX: ${{ strategy.job-index }}
         run: |
-          jq -e --argjson index "$JOB_INDEX" 'keys == ["shard"] and .shard == $index + 1' <<<"$MATRIX" > /dev/null || {
-            echo "::error::matrix.shard must be the only matrix key and list 1, 2, 3, ... in order; --shard uses strategy.job-total"
-            exit 1
-          }
+          node -e '
+            const matrix = JSON.parse(process.env.MATRIX);
+            const keys = Object.keys(matrix);
+            if (keys.length === 1 && keys[0] === "shard" && matrix.shard === Number(process.env.JOB_INDEX) + 1) process.exit(0);
+            console.log("::error::matrix.shard must be the only matrix key and list 1, 2, 3, ... in order; --shard uses strategy.job-total");
+            process.exit(1);
+          '
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -183,24 +198,26 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # The browser cache key; fail rather than share one key across versions.
-      - name: Read the Playwright version
-        id: playwright
+      # The image keeps its browsers in $PLAYWRIGHT_BROWSERS_PATH. When they
+      # match the installed Playwright this installs nothing. After a
+      # Playwright bump without an image bump, it downloads Chromium from
+      # Playwright's CDN (never apt) and warns, so the shards still run.
+      - name: Use the image's Chromium
+        shell: bash
         run: |
-          version="$(node -p "require('./node_modules/@playwright/test/package.json').version")"
-          [ -n "$version" ] || { echo "::error::Could not read the Playwright version"; exit 1; }
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - id: playwright-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with: &playwright-cache
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      # With the browser cached this only installs the system packages.
-      - run: pnpm exec playwright install --with-deps chromium
-      # Only shard 1 saves a missed browser cache, so six shards do not race.
-      - if: matrix.shard == 1 && steps.playwright-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with: *playwright-cache
+          dry_run="$(pnpm exec playwright install --dry-run chromium)"
+          locations="$(sed -n 's/^ *Install location: *//p' <<<"$dry_run")"
+          [ -n "$locations" ] || { echo "::error::Could not read Playwright's browser locations"; exit 1; }
+          missing=""
+          for dir in $locations; do
+            [ -d "$dir" ] || missing="$missing $dir"
+          done
+          if [ -z "$missing" ]; then
+            echo "The image has the browsers this Playwright needs."
+            exit 0
+          fi
+          echo "::warning::The Playwright image does not match @playwright/test (missing:$missing). Update container.image in ci.yml."
+          pnpm exec playwright install chromium
       # Restore only, so six shards do not race to save it; the Build job saves
       # it. The exact key exists only once Build has finished for this commit;
       # before that, restore-keys brings back an earlier commit's cache.
