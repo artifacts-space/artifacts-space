@@ -69,6 +69,9 @@ function sentenceFor(artifact: ArtifactDto) {
   return visibilitySentence(visibilityCopy(artifact.visibility), { author: "Dev", teamName: team?.name ?? null });
 }
 
+/** A Download CSV link that goes nowhere, for the widest header. */
+const widestDownload = { href: "#download", filename: "launch-checklist.csv" };
+
 /** The page header around the artifact's title, as the artifact page lays it out. */
 function FixturePage({ artifact, share }: { artifact: ArtifactDto; share: React.ReactNode }) {
   const column = pageColumnClass(false);
@@ -76,7 +79,8 @@ function FixturePage({ artifact, share }: { artifact: ArtifactDto; share: React.
     <div className="min-h-screen">
       <PageEditorChromeProvider>
         <StickyChrome>
-          <ArtifactHeader column={column} visibility={artifact.visibility} sentence={sentenceFor(artifact)} content={artifact.content} share={share} menu={share ? <ArtifactHeaderMenu /> : null} />
+          {/* The owner gets the widest header there is (a CSV editor's: Download CSV too), so the phone-width check covers it. */}
+          <ArtifactHeader column={column} visibility={artifact.visibility} sentence={sentenceFor(artifact)} content={artifact.content} share={share} menu={share ? <ArtifactHeaderMenu /> : null} download={share ? widestDownload : null} />
         </StickyChrome>
       </PageEditorChromeProvider>
       <main className={`mx-auto w-full py-12 sm:py-16 ${column}`}>

@@ -43,7 +43,8 @@ export function ArtifactHeader({
   return (
     <div className="border-b">
       <header className={cn("mx-auto flex h-14 w-full items-center justify-between gap-3", column)}>
-        <Logo />
+        {/* On phones the mark alone, as in the app and docs headers, so Share, Copy, and the ⋯ keep room at 375px. */}
+        <Logo compactOnPhones className="shrink-0" />
         <div className="flex min-w-0 items-center gap-2">
           {share ?? <VisibilityBadge visibility={visibility} sentence={sentence} iconOnlyOnPhones />}
           <GitHubLink />
