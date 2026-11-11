@@ -123,21 +123,57 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The gallery shards restore this cache through the `next-cache` anchor,
+      # so they always use the same key.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
+        with: &next-cache
           path: .next/cache
           key: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('src/**', 'next.config.ts') }}
           restore-keys: |
             next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm build
 
+  # The gallery (Playwright, `pnpm test:e2e`) runs in parallel shards. On one
+  # worker its 683 tests took 34 minutes on main in Nov 2026: about 15 each
+  # for the phone and desktop projects, seconds for the production checks.
+  # Six shards finished in 5 to 8 minutes each (PR #119). Playwright splits
+  # whole files in order, balanced by the number of tests that are not
+  # skipped, so a shard's time varies with the files it gets. When the slowest
+  # shard passes 12 minutes, add numbers to `matrix.shard`; `--shard` takes
+  # its total from the matrix.
+  #
+  # Every shard starts both web servers from playwright.config.ts, including
+  # `next build` for the production checks. That build runs while the dev
+  # server starts, and with a restored `.next/cache` both servers are up in
+  # 35-65 seconds (about 100 cold). A separate job that builds once and hands
+  # `.next` to the shards would add its own 45 seconds or more before any
+  # shard starts, and the dev server would still have to start, so each
+  # shard builds its own.
   e2e:
-    name: Component gallery
+    name: Component gallery shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    # The suite runs on one worker and takes 17-19 minutes as of Nov 2026, so
-    # 20 cut off healthy runs. Split it into shards before this is reached.
-    timeout-minutes: 35
+    # Shards take 5-8 minutes; the headroom covers a cold cache.
+    timeout-minutes: 25
+    strategy:
+      # Let every shard finish, so one run shows every failing test.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
+      # `--shard` takes its total from `strategy.job-total`, which counts every
+      # matrix combination. A second matrix key, or a repeated or missing shard
+      # number, would skip tests while staying green. Requiring `shard` to be
+      # the only key and equal to the job's position proves the shards are
+      # exactly 1 to job-total. Fail otherwise.
+      - name: Check that the shards are exactly 1 to the matrix total
+        env:
+          MATRIX: ${{ toJSON(matrix) }}
+          JOB_INDEX: ${{ strategy.job-index }}
+        run: |
+          jq -e --argjson index "$JOB_INDEX" 'keys == ["shard"] and .shard == $index + 1' <<<"$MATRIX" > /dev/null || {
+            echo "::error::matrix.shard must be the only matrix key and list 1, 2, 3, ... in order; --shard uses strategy.job-total"
+            exit 1
+          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -147,14 +183,57 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The browser cache key; fail rather than share one key across versions.
+      - name: Read the Playwright version
+        id: playwright
+        run: |
+          version="$(node -p "require('./node_modules/@playwright/test/package.json').version")"
+          [ -n "$version" ] || { echo "::error::Could not read the Playwright version"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - id: playwright-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with: &playwright-cache
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      # With the browser cached this only installs the system packages.
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+      # Only shard 1 saves a missed browser cache, so six shards do not race.
+      - if: matrix.shard == 1 && steps.playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with: *playwright-cache
+      # Restore only, so six shards do not race to save it; the Build job saves
+      # it. The exact key exists only once Build has finished for this commit;
+      # before that, restore-keys brings back an earlier commit's cache.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with: *next-cache
+      - run: pnpm test:e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: e2e-results
+          name: e2e-results-shard-${{ matrix.shard }}
           path: test-results/
           retention-days: 7
+
+  # "Component gallery" is the required check. It passes only when every shard
+  # passed: a failed, cancelled, or skipped shard fails it. `always()` makes it
+  # report even when a shard failed, so it is never skipped (a skipped
+  # required check would count as passing).
+  e2e-gate:
+    name: Component gallery
+    needs: e2e
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check that every gallery shard passed
+        env:
+          SHARDS_RESULT: ${{ needs.e2e.result }}
+        run: |
+          if [ "$SHARDS_RESULT" != "success" ]; then
+            echo "::error::Component gallery shards did not all pass (result: $SHARDS_RESULT)"
+            exit 1
+          fi
+          echo "Every Component gallery shard passed."
 
   # Fails a pull request that adds a dependency with a known vulnerability of
   # moderate severity or worse. It only applies to pull requests; on other

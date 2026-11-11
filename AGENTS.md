@@ -66,6 +66,13 @@ CI (`.github/workflows/ci.yml`) runs on pull requests, in the merge queue, and
 on `main`. The required checks are the job names: **Lint and typecheck**,
 **Unit tests**, **Build**, **Database tests**, **Component gallery**, and
 **Dependency review**.
+The Playwright gallery runs in parallel shards ("Component gallery shard N");
+the **Component gallery** job only gates them and passes only when every
+shard passed. Add shards by extending `matrix.shard`, which must stay the
+only matrix key and list 1, 2, 3, ... in order (a step fails otherwise), and
+never rename the gate. The gate keeps `needs: e2e` with `if: always()`:
+without `always()` a failed shard would skip the gate, and a skipped required
+check counts as passing.
 The build needs no secrets; keep it that way, and create database, auth,
 email, and R2 clients on first request, never at import time. CodeQL scans
 the code and the workflows. Dependabot opens grouped weekly updates and waits
@@ -284,7 +291,8 @@ catch this, so test the generated SQL with `.toSQL()`, as
   phone and a desktop viewport. It also builds and starts production on
   `PLAYWRIGHT_PORT + 1000` for the `*.prod.spec.ts` checks, which need real
   production HTML (for example, that theme fonts are never preloaded on pages
-  that do not use them).
+  that do not use them). CI splits it with `--shard=<i>/<n>`; run one shard
+  locally the same way.
 
 ### Themes
 
