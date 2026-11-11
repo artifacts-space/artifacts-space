@@ -185,7 +185,7 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, its approval and races, 
   });
 
   describe("changes between the checks and the swap", () => {
-    it("should refuse and change nothing when a version starts showing the file as its icon after the check", async () => {
+    it("should refuse and leave the file, upload, and requests as they were when a version starts showing the file as its icon after the check", async () => {
       await inTeam("member");
       const image = await attached(ids.doc, "logo.png", "image/png");
       const next = await upload("logo-v2.png", "image/png");
@@ -203,7 +203,7 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, its approval and races, 
       expect(await requests()).toEqual([]);
     });
 
-    it("should refuse and change nothing when the artifact's sharing changes after the approval was decided", async () => {
+    it("should refuse and leave the file and requests as they were when the artifact's sharing changes after the approval was decided", async () => {
       await inTeam("member");
       const madeTeamOnlyMeanwhile = async () => {
         await getDb().update(artifact).set({ visibility: "team" }).where(eq(artifact.id, ids.doc));

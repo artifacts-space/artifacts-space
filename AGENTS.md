@@ -377,8 +377,12 @@ statement, guarded on the key the editor saw, that also files the replace's
 version and writes its approval outcome (the edit request, or the new approved
 version), so the file, its History entry, and its approval land together or
 not at all. The approval is decided before the statement, which runs only
-while the artifact keeps that visibility and team. The page discards a
-refused upload with `removeUnattachedUpload`. A replace can
+while the artifact keeps that visibility and team. A refused replace leaves
+the file, its copies, the upload, and any request unchanged; steps before
+the swap may still give the history its starting snapshot, or pin an
+approved version to the artifact's current state where none existed, so
+readers see no difference. The page discards a refused upload with
+`removeUnattachedUpload`. A replace can
 swap a row's object at any time, so code that deletes file rows reads the key
 in the delete itself (`deleteFileRows`, `DELETE … RETURNING`).
 Content media and icon or cover images (of the artifact or any version) are

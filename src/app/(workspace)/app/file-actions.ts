@@ -96,7 +96,8 @@ export async function attachFilesAction(artifactId: string, fileIds: string[]): 
 /**
  * Replaces a file of an artifact the person may edit with their finished
  * upload. The file keeps its id, place, and name; the old copy stays in
- * History. A refusal changes nothing; the page then discards the upload.
+ * History. A refusal leaves the file as it was (replaceFile says what else
+ * may be recorded); the page then discards the upload.
  */
 export async function replaceFileAction(artifactId: string, fileId: string, uploadId: string): Promise<ActionResult<ArtifactDto>> {
   return run("The file could not be replaced. Try again.", async (userId) => {

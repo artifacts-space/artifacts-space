@@ -189,7 +189,7 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     return result;
   },
   replace: (artifactId, fileId, uploadId) => {
-    if (takeFlag(nextReplaceKey) === "refuse") return Promise.resolve({ success: false, error: "The file changed while it was being replaced, so nothing was changed. Try again." });
+    if (takeFlag(nextReplaceKey) === "refuse") return Promise.resolve({ success: false, error: "The file changed while it was being replaced, so it was not replaced. Try again." });
     const current = readStored().find((entry) => entry.id === artifactId);
     const upload = uploaded.get(uploadId);
     if (!current || !upload) return Promise.resolve({ success: false, error: "File not found." });

@@ -341,7 +341,7 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async 
     expect(r2.deleted).toEqual([`files/${pending}/sow-v2.pdf`]);
   });
 
-  it("should refuse to replace media a document embeds, and change nothing", async () => {
+  it("should refuse to replace media a document embeds, and leave the file and upload as they were", async () => {
     const next = await upload(ids.author);
     await getDb().update(artifactFile).set({ attachedByContent: true }).where(eq(artifactFile.id, sow));
     await expect(replaceFile(ids.author, { fileId: sow, uploadId: next }, "person")).rejects.toThrow(/shown in the document/);

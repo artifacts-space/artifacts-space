@@ -74,7 +74,7 @@ test("should leave the file as it was and discard the upload when the replace is
 
   await replaceWith(page, "SOW.pdf", { name: "Other.pdf", content: "%PDF-1.4 other" });
 
-  await expect(page.getByText("The file changed while it was being replaced, so nothing was changed. Try again.")).toBeVisible();
+  await expect(page.getByText("The file changed while it was being replaced, so it was not replaced. Try again.")).toBeVisible();
   await expect.poll(async () => (await discarded(page)).length).toBe(1);
   expect(await storedFiles(page)).toEqual([before]);
   await expect(filesSection(page).getByRole("button", { name: "Replace SOW.pdf" })).toBeEnabled();

@@ -28,7 +28,8 @@ import type { FileDto } from "./types";
  * and its name, so links and embeds open the new file; what it held before
  * becomes an old copy (artifact_file_copy) that History offers to people who
  * can edit. The swap is one statement, so a failed or refused replace leaves
- * the current file exactly as it was. The upload was checked and counted
+ * the current file, its copies, and the upload exactly as they were
+ * (replaceFile says what earlier steps may still record). The upload was checked and counted
  * like any other (files_request_upload, files_finalize).
  */
 
@@ -218,9 +219,14 @@ export interface ReplaceRequest {
  * per-editor edit limit; the upload already counted against the upload
  * limits and the storage quota. For a link or public artifact the version
  * goes through edit review, and readers outside the team keep the copy that
- * was current at the approved version. Refusals throw a UserFacingError and
- * change nothing; the caller then discards the upload
- * (removeUnattachedUpload), or reuses it.
+ * was current at the approved version. Refusals throw a UserFacingError.
+ * A refusal leaves the file, its copies, the upload, and any edit request
+ * as they were; the caller then discards the upload (removeUnattachedUpload),
+ * or reuses it. Steps before the swap may still have run and stay: the
+ * history can gain its starting snapshot (ensureHistoryStart), and a link or
+ * public artifact with no approved version gets one pinned to its current
+ * state (prepareVersionedChange). Both record what the artifact already
+ * showed, so readers see no difference.
  */
 export async function replaceFile(editorId: string, request: ReplaceRequest, actor: SharingActor, harness: () => Promise<HarnessStamp | null> = noStamp): Promise<ReplacedFile> {
   const target = await editableTarget(editorId, request.fileId, request.artifactId);
@@ -234,7 +240,7 @@ export async function replaceFile(editorId: string, request: ReplaceRequest, act
   const versionId = randomUUID();
   const swap = { target, before, approval, upload, editorId, copyId: randomUUID(), versionId, filename: replacementFilename(target, upload), harness: await harness(), at: new Date() };
   const swapped = await swapInUpload(swap);
-  if (!swapped) throw new UserFacingError("The file changed while it was being replaced, so nothing was changed. Try again.");
+  if (!swapped) throw new UserFacingError("The file changed while it was being replaced, so it was not replaced. Try again.");
   await afterSwap(target.artifactId, swapped.openedRequestId);
   const file = await getFileRow(target.id);
   if (!file) throw new UserFacingError("File not found.");
