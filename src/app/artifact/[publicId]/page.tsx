@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { toShareTeams } from "@/components/app/share-teams";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { TitleIcon } from "@/components/artifact-icon/title-icon";
 import { TitleTheme } from "@/components/artifact-theme/title-theme";
@@ -13,6 +14,7 @@ import { ArtifactHeader } from "@/components/artifact-page/artifact-header";
 import { ArtifactPageFooter } from "@/components/artifact-page/artifact-page-footer";
 import { ArtifactPageTheme } from "@/components/artifact-page/artifact-page-theme";
 import { ArtifactHeaderMenu } from "@/components/artifact-page/artifact-header-menu";
+import { ArtifactPageShare } from "@/components/artifact-page/page-share";
 import type { CsvDownloadSetting } from "@/components/artifact-page/csv-download-item";
 import { EditorIsland } from "@/components/artifact-page/editor-island";
 import { InlineBody, InlineSummary, InlineTitle } from "@/components/artifact-page/inline-fields";
@@ -46,6 +48,8 @@ import { pageOrganizersFor } from "@/lib/projects/page-project";
 import { isReportable } from "@/lib/reports/rules";
 import { isSearchIndexable, pageRobots, showsInSearch } from "@/lib/search/search-rules";
 import { getSession } from "@/lib/session";
+import { loadPageShare, type PageShare } from "@/lib/sharing/page-share";
+import { siteUrl } from "@/lib/site-origin";
 import { resolveThemeFor } from "@/lib/themes/artifact-theme-context";
 import { themeIdForReader } from "@/lib/themes/theme-privacy";
 import { noThemeChoices, type ThemeChoices } from "@/lib/themes/theme-choice-types";
@@ -295,6 +299,25 @@ function exportControls(viewable: ViewableArtifact) {
   return { content: view.content, download };
 }
 
+/**
+ * Share in the header, only for someone who may share the artifact (its
+ * author, or the person who added the agent that wrote it): the same dialog
+ * and server actions as the workspace. Everyone else, and the sharer when
+ * the load fails, keeps the read-only status.
+ */
+async function loadShare(viewable: ViewableArtifact, viewerId: string | null) {
+  return loadPageShare(viewable, viewerId).catch((error: unknown) => {
+    console.error("[sharing] The page's share settings could not be loaded", error instanceof Error ? error.name : "unknown error");
+    return null;
+  });
+}
+
+/** The sharer's Share button for the header, or null for the read-only status. */
+function shareButton(share: PageShare | null, publicId: string, sentence: string) {
+  if (!share) return null;
+  return <ArtifactPageShare artifact={share.artifact} teams={toShareTeams(share.teams)} sentence={sentence} shareUrl={siteUrl(artifactPagePath(publicId))} />;
+}
+
 /** "Allow CSV download" for the More menu, only for someone who may change it (the author, or a team owner or admin). */
 async function csvDownloadSetting(viewable: ViewableArtifact, viewerId: string | null): Promise<CsvDownloadSetting | null> {
   const { record } = viewable;
@@ -328,7 +351,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   if (!viewable) notFound();
   const { record, view } = viewable;
   // getSession is deduplicated per request, so these reuse load()'s lookup.
-  const [byline, files, session, editor, organizers, resolved, themeChoices, csvDownload] = await Promise.all([
+  const copy = visibilityCopy(record.visibility);
+  const [byline, files, session, editor, organizers, resolved, themeChoices, csvDownload, share] = await Promise.all([
     loadArtifactByline(record, viewable.isTeamMember),
     filesForViewer(viewable),
     getSession(),
@@ -338,8 +362,9 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
     resolveThemeFor(record, view.theme),
     getSession().then((session) => loadThemeChoices(viewable, session?.user.id ?? null)),
     getSession().then((session) => csvDownloadSetting(viewable, session?.user.id ?? null)),
+    getSession().then((session) => loadShare(viewable, session?.user.id ?? null)),
   ]);
-  const copy = visibilityCopy(record.visibility);
+  const sentence = visibilitySentence(copy, byline);
   const { theme, presetId, source } = resolved;
   // Full width is a display setting on the row, not part of a version: every reader sees the current choice. A CSV is always full width.
   const fullWidth = usesFullWidth(view.kind, record.fullWidth);
@@ -354,7 +379,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
           <ArtifactHeader
             column={column}
             visibility={record.visibility}
-            sentence={visibilitySentence(copy, byline)}
+            sentence={sentence}
+            share={shareButton(share, record.publicId, sentence)}
             {...exportControls(viewable)}
             menu={viewable.canEdit ? <ArtifactHeaderMenu theme={theme} widthSetting={hasWidthSetting(view.kind)} csvDownload={csvDownload} waiting={{ publicId: record.publicId, title: record.title, updatedAt: record.updatedAt.toISOString(), reviewed: isReviewedLevel(record.visibility), fullWidth: record.fullWidth, files }} /> : null}
           />

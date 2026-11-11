@@ -7,7 +7,12 @@ import type { ArtifactVisibility } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 import { visibilityCopy } from "@/lib/visibility-copy";
 
-const icons: Record<ArtifactVisibility, Icon> = { private: IconEyeOff, team: IconUsers, link: IconLink, public: IconEye };
+/** Each level's icon in the artifact page's header, for the read-only status and the sharer's Share button alike. */
+export const visibilityIcons: Record<ArtifactVisibility, Icon> = { private: IconEyeOff, team: IconUsers, link: IconLink, public: IconEye };
+
+/** The header status's look, shared with the sharer's Share button so the header keeps its size. */
+export const visibilityStatusClass =
+  "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50";
 
 /**
  * Who can see an artifact, as an icon and a short label ("Private",
@@ -27,17 +32,14 @@ export function VisibilityBadge({
   iconOnlyOnPhones?: boolean;
   className?: string;
 }) {
-  const VisibilityIcon = icons[visibility];
+  const VisibilityIcon = visibilityIcons[visibility];
   return (
     <Tooltip>
       <TooltipTrigger
         render={<button type="button" />}
         aria-label={sentence}
         data-visibility={visibility}
-        className={cn(
-          "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50",
-          className,
-        )}
+        className={cn(visibilityStatusClass, className)}
       >
         <VisibilityIcon aria-hidden className="size-4 shrink-0" />
         <span className={cn(iconOnlyOnPhones && "max-sm:sr-only")}>{visibilityCopy(visibility).label}</span>

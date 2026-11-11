@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ArtifactVisibility } from "@/lib/artifact-types";
 
-import { canDeleteArtifact, canEditArtifact, canViewArtifact, isAuthorOrActsFor, isIndexable, NEW_ACCOUNT_NOINDEX_DAYS, type AccessViewer } from "./access-rules";
+import { canDeleteArtifact, canEditArtifact, canShareArtifact, canViewArtifact, isAuthorOrActsFor, isIndexable, NEW_ACCOUNT_NOINDEX_DAYS, type AccessViewer } from "./access-rules";
 
 const author = "author";
 const subject = (visibility: ArtifactVisibility, teamId: string | null = "team-1") => ({ userId: author, visibility, teamId });
@@ -75,6 +75,28 @@ describe("canDeleteArtifact", () => {
     expect(canDeleteArtifact({ userId: author }, { userId: "member", isTeamMember: true })).toBe(false);
     expect(canDeleteArtifact({ userId: author }, null)).toBe(false);
   });
+});
+
+describe("canShareArtifact", () => {
+  it("should let the author share when they ask", () => {
+    expect(canShareArtifact({ userId: author }, { userId: author, isTeamMember: false })).toBe(true);
+  });
+
+  it("should let the person who added the agent share when they act for the author", () => {
+    expect(canShareArtifact({ userId: author }, { userId: "agent-owner", isTeamMember: true, actsForAuthor: true })).toBe(true);
+  });
+
+  const nonSharers: Record<string, AccessViewer | null> = {
+    signedOut: null,
+    teammateWhoEdits: { userId: "member", isTeamMember: true },
+    teamOwnerOrAdmin: { userId: "team-admin", isTeamMember: true, actsForAuthor: false },
+    outsider: { userId: "outsider", isTeamMember: false },
+  };
+  for (const [name, viewer] of Object.entries(nonSharers)) {
+    it(`should never let ${name} share when they are not the author and do not act for it`, () => {
+      expect(canShareArtifact({ userId: author }, viewer)).toBe(false);
+    });
+  }
 });
 
 describe("an agent's artifacts and the person who added the agent", () => {
