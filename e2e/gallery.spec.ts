@@ -38,6 +38,8 @@ test("should show every MCP client's mark, fx included, when the gallery opens",
   const clients = page.locator('[data-specimen="every client, in setup order"]');
 
   await expect(clients.locator('[data-client="fx"] svg[data-client-logo]')).toHaveCount(1);
+  // TEMPORARY: proves the Component gallery gate goes red when a shard fails. Reverted next commit.
+  await expect(clients.locator("[data-client-label]")).toHaveCount(0, { timeout: 2_000 });
   await expect(clients.locator("[data-client-label]")).toHaveText(["Claude Code", "Cursor", "Claude Desktop", "ChatGPT", "Codex", "OpenCode", "Devin", "Kimi Code CLI", "fx", "Other clients"]);
 });
 
