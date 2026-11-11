@@ -123,6 +123,16 @@ describe("blockColorTokens", () => {
     }
   });
 
+  it("should keep the card, not a near-white block, on a dark card under ink at the floor", () => {
+    const preset = builtInPresets().get("default");
+    if (!preset) throw new Error("default preset missing");
+    const colors = withInkAt(onOneSurface(preset.theme.dark, 0.08), "dark");
+    const tokens = blockColorTokens("dark", colors);
+    for (const hue of blockHues) expect(color(tokens[`--block-${hue}-bg`]).l, hue).toBeLessThanOrEqual(0.085);
+    // Every text color still reads on every surface; only the gap from the card is out of reach here.
+    expect(failingPairs("dark", colors).filter((pair) => !pair.endsWith("too close to the card"))).toEqual([]);
+  });
+
   it("should be part of every theme's tokens, so themed artifacts draw block colors from the theme", () => {
     const preset = builtInPresets().get("default");
     if (!preset) throw new Error("default preset missing");

@@ -261,11 +261,13 @@ Ship it on Friday <!-- color: red -->
   derives its own pairs from the same hues (`blockColorTokens` in
   `src/lib/themes/derive.ts`): each background tints the theme's card and
   stays visibly apart from it, and each text color is re-lit to keep the
-  same guarantee on the theme's surfaces. The one limit: on a card within
-  0.03 lightness of white or black, under body text close to 4.5:1 there,
-  a background can only sit as far off the card as the body text allows,
-  which is less than on other cards, and on the card itself when the body
-  text is right at 4.5:1. A line with a background and no text color is drawn in the
+  same guarantee on the theme's surfaces. The one limit: on a card so light
+  or so dark that body text close to 4.5:1 leaves no room on the card's
+  side of the text (near white, or darker than about oklch 0.1), a
+  background sits only as far off the card as the body text allows, and on
+  the card itself (no visible background) when even that is out of reach.
+  A background never moves to the other side of the body text, because the
+  colored text could not then read on both it and the card. A line with a background and no text color is drawn in the
   body text color, even in a quote or a small heading that is otherwise
   muted, so it stays readable on its background.
 - **The comment** holds `name: value` declarations split by `;`. `color` is

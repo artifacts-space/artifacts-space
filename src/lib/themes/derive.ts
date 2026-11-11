@@ -153,17 +153,18 @@ export const blockFillGap = 0.03;
  * One hue's background: the card tinted toward the hue, then kept at AA
  * under the ink. When the ink sits near the AA floor on the card, that push
  * lands the tint back on the card; it then steps the gap to the far side of
- * the card from the ink, which only raises the ink's contrast. A card within
- * the gap of white or black has no room on that side, and any step toward
- * the ink would take the ink under AA (the push already went as far that
- * way as the ink allows), so the pushed fill stays: apart from the card by
- * less than the gap, and the card itself when the ink is at the floor there
- * (the push would otherwise cross to the ink's far side).
+ * the card from the ink, which only raises the ink's contrast. A card with
+ * no room on that side (near white, or darker than about oklch 0.1 under
+ * ink at the floor) keeps the pushed fill, apart from the card by less than
+ * the gap. When even that is out of reach, the push crosses to the ink's
+ * other side (a near-black block under dark ink on a white card, a
+ * near-white one on a dark card); the fill is then the card itself, since no
+ * colored text could read on both that block and the card.
  */
 function blockFill(mode: PaletteMode, card: Oklch, ink: Oklch, hueInk: Oklch): Oklch {
   const fill = ensureContrast(mixOklch(card, hueInk, blockFillTint[mode]), ink, 4.55);
-  // Out of room on the card's side, the push crosses to the ink's far side (a near-black block under dark ink): keep the card.
-  if (fill.l >= ink.l !== card.l >= ink.l) return card;
+  const crossedInk = (fill.l >= ink.l) !== (card.l >= ink.l);
+  if (crossedInk) return card;
   if (Math.abs(fill.l - card.l) >= blockFillGap) return fill;
   const l = card.l + (card.l >= ink.l ? blockFillGap : -blockFillGap);
   if (l < 0 || l > 1) return fill;
