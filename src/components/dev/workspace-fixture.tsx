@@ -102,6 +102,29 @@ function useFixtureList(artifacts: readonly ArtifactDto[], projectFilter: Projec
 
 const noTags: string[] = [];
 
+/** Under `scopes`, Note 6 is the viewer's artifact shared with Design, so its Share dialog states Design's rule (e2e/share-search-engines.spec.ts). */
+function withTeamArtifact(artifacts: ArtifactDto[], scopes: boolean): ArtifactDto[] {
+  if (!scopes) return artifacts;
+  return artifacts.map((artifact) => (artifact.id === "fixture-note-5" ? { ...artifact, visibility: "team", teamId: "fixture-shared-0" } : artifact));
+}
+
+/** The welcome card: hidden, shown, or shown with a "Got it" save that is refused. */
+export type FixtureWelcome = "off" | "on" | "fails";
+
+/** "Got it" on the welcome card saves nothing here (the fixture has no database), or is refused. */
+const fixtureDismissWelcome = () => Promise.resolve({ success: true as const, data: null });
+const fixtureRefusedWelcome = () => Promise.resolve({ success: false as const, error: "Could not close the welcome. Try again." });
+
+/**
+ * The Dashboard's key, as on /app: the team, so per-team state (the welcome
+ * card) follows a team switch, and the filters. The list is read once, so it
+ * also remounts when the tab has stored artifacts; with none, nothing
+ * remounts after hydration.
+ */
+function dashboardKey(team: string | null, projectFilter: ProjectFilter | null, tags: readonly string[], hasStored: boolean): string {
+  return `${team ?? "mine"}:${projectFilterId(projectFilter)}:${tags.join(",")}:${String(hasStored)}`;
+}
+
 /** The viewer's teams, with the shared ones under `scopes`, and the one `team` opens as the scope. */
 function fixtureScope(scopes: boolean, team: string | null): { teams: ShareTeam[]; scopeTeam: ShareTeam | null } {
   if (!scopes) return { teams: fixtureTeams, scopeTeam: null };
@@ -119,15 +142,17 @@ function fixtureScope(scopes: boolean, team: string | null): { teams: ShareTeam[
  * `slowLoad`, the Long markdown fixture is not handed in full: it loads when
  * opened, and the load waits until a test releases it (`window.fixture`).
  * `many` adds 300 older notes, so the list holds the newest 100 as on /app,
- * and `tags` filters the list as the URL's tag filter does.
+ * and `tags` filters the list as the URL's tag filter does. `welcome` shows
+ * a new member's welcome card on the team workspace `team` opens; with
+ * "fails", its "Got it" save is refused.
  */
-export function WorkspaceFixture({ projectFilter, link = null, linkFailed = false, slowLoad = false, scopes = false, team = null, many = false, tags = noTags }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null; linkFailed?: boolean; slowLoad?: boolean; scopes?: boolean; team?: string | null; many?: boolean; tags?: string[] }) {
+export function WorkspaceFixture({ projectFilter, link = null, linkFailed = false, slowLoad = false, scopes = false, team = null, many = false, tags = noTags, welcome = "off" }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null; linkFailed?: boolean; slowLoad?: boolean; scopes?: boolean; team?: string | null; many?: boolean; tags?: string[]; welcome?: FixtureWelcome }) {
   const inBrowser = useInBrowser();
   // Artifacts New artifact stored in this tab come first, as the server would list them after a reload.
   const stored = useMemo(() => (inBrowser ? storedFixtureArtifacts() : []), [inBrowser]);
   // Kept from the first load, as `slowLoad` is: the sidebar's filter links drop `?many=1` from the URL.
   const [manyKept] = useState(many);
-  const base = useMemo(() => [...stored, ...fixtureArtifacts(manyKept)], [stored, manyKept]);
+  const base = useMemo(() => [...stored, ...withTeamArtifact(fixtureArtifacts(manyKept), scopes)], [stored, manyKept, scopes]);
   const { state, api } = useFixtureProjects(base);
   const artifacts = useMemo(() => withProjects(base, state), [base, state]);
   const { items, tagFacets } = useFixtureList(artifacts, projectFilter, tags);
@@ -148,8 +173,7 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
       <div className="workspace-frame">
         <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" unreadNotifications={4} notificationSeed={notifications} />
         <Dashboard
-          // The list is read once, so it remounts when the tab has stored artifacts; with none, nothing remounts after hydration.
-          key={`${projectFilterId(projectFilter)}:${tags.join(",")}:${String(stored.length > 0)}`}
+          key={dashboardKey(team, projectFilter, tags, stored.length > 0)}
           initialArtifacts={items}
           initialFull={seeded}
           loadArtifact={controls.loadArtifact}
@@ -167,6 +191,8 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
           linkTarget={linkTarget}
           linkFailed={linkFailed}
           newArtifactApi={fixtureNewArtifactApi}
+          welcome={welcome !== "off"}
+          dismissWelcome={welcome === "fails" ? fixtureRefusedWelcome : fixtureDismissWelcome}
         />
       </div>
     </ConfirmationsProvider>

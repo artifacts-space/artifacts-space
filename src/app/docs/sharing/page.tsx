@@ -59,7 +59,7 @@ export default function SharingPage() {
 
       <DocsH page={page} id="teams" />
       <Prose>
-        <p>Everyone has a <strong>personal team</strong> that holds only them. Create a shared team to work with others; invitations go by email and expire after 7 days. An invitation joins only the address it was sent to, so the invited person signs in with that address. Once they join, they land in the team&apos;s workspace and edit its artifacts directly. People who can invite can copy an invitation&apos;s link, send it again, or cancel it from the <strong>Members</strong> tab. Teams cannot be deleted.</p>
+        <p>Everyone has a <strong>personal team</strong> that holds only them. Create a shared team to work with others; invitations go by email and expire after 7 days. An invitation joins only the address it was sent to, so the invited person signs in with that address. Once they join, they land in the team&apos;s workspace, where a welcome card states the team&apos;s rule until they close it, and they edit its artifacts directly. The Share window states the same rule whenever you put an artifact in a shared team. People who can invite can copy an invitation&apos;s link, send it again, or cancel it from the <strong>Members</strong> tab. Teams cannot be deleted.</p>
       </Prose>
       <FactTable
         head={["Role", "Can"]}

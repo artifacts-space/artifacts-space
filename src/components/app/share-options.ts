@@ -39,6 +39,17 @@ export function defaultTeamId(visibility: ArtifactVisibility, teams: readonly Sh
   return options.find((team) => team.id === currentTeamId)?.id ?? options[0]?.id ?? null;
 }
 
+/**
+ * The shared team whose rule the Share dialog states: the team the choice
+ * puts the artifact in, whether it is already there or is moving in now (the
+ * moment the person decides). Null while the choice keeps it personal:
+ * private, or a link or public level approved by the viewer's personal team.
+ */
+export function ruleTeamFor(visibility: ArtifactVisibility, team: ShareTeam | undefined): ShareTeam | null {
+  if (visibility === "private" || !team || team.personal) return null;
+  return team;
+}
+
 /** What will happen when the viewer saves this choice, in one sentence. */
 export function outcomeText(visibility: ArtifactVisibility, team: ShareTeam | undefined) {
   if (visibility === "private") return "Only you can read it. Any open request is canceled.";
