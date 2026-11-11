@@ -19,6 +19,7 @@ import { fixtureArtifact, longCsv, longJson, longMarkdown, longUi } from "./fixt
 import { fixtureNewArtifactApi, storedFixtureArtifacts } from "./fixture-new-artifacts";
 import { createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, withProjects } from "./fixture-projects";
 import { useFixtureControls } from "./fixture-controls";
+import { fixtureFeedbackSend } from "./feedback-fixture";
 import { fixtureNotifications, LINK_ONLY_PUBLIC_ID } from "./notification-fixture";
 
 /** The viewer's personal team, so the Share dialog can offer link and public sharing. The switcher does not list it. */
@@ -146,7 +147,7 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
   return (
     <ConfirmationsProvider initial={[]}>
       <div className="workspace-frame">
-        <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" unreadNotifications={4} notificationSeed={notifications} />
+        <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" unreadNotifications={4} notificationSeed={notifications} feedbackSend={fixtureFeedbackSend} />
         <Dashboard
           // The list is read once, so it remounts when the tab has stored artifacts; with none, nothing remounts after hydration.
           key={`${projectFilterId(projectFilter)}:${tags.join(",")}:${String(stored.length > 0)}`}

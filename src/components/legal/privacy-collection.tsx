@@ -49,6 +49,7 @@ export function PrivacyCollection() {
           <li><strong>Notifications.</strong> The notifications you get in the app (who did what, on which artifact, and whether you have read it) and the notification settings you choose. A notification stores only references; the app shows a short piece of the comment only while you can still read the artifact.</li>
           <li><strong>Sharing and reviews.</strong> Sharing requests, approvals, declined requests, mutes, and the &quot;Don&apos;t ask again&quot; choices you make in confirmation dialogs.</li>
           <li><strong>Reports.</strong> If you report an artifact, the reason, any details you add, and your account if you are signed in.</li>
+          <li><strong>Problem reports.</strong> If you tell us &quot;Something&apos;s not working&quot;, your note, your name and email address (so we can follow up), the page path, your team workspace, your browser and window size, and the time. Never your artifacts or files.</li>
         </ul>
         <p>Do not put secrets, passwords, or other people&apos;s sensitive data in artifacts. Agents can save whatever is in front of them, so check what your agents send.</p>
       </Prose>
