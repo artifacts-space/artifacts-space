@@ -59,7 +59,7 @@ export default function SharingPage() {
 
       <DocsH page={page} id="teams" />
       <Prose>
-        <p>Everyone has a <strong>personal team</strong> that holds only them. Create a shared team to work with others; invitations go by email and expire after 7 days. Teams cannot be deleted.</p>
+        <p>Everyone has a <strong>personal team</strong> that holds only them. Create a shared team to work with others; invitations go by email and expire after 7 days. An invitation joins only the address it was sent to, so the invited person signs in with that address. Once they join, they land in the team&apos;s workspace and edit its artifacts directly. People who can invite can copy an invitation&apos;s link, send it again, or cancel it from the <strong>Members</strong> tab. Teams cannot be deleted.</p>
       </Prose>
       <FactTable
         head={["Role", "Can"]}
@@ -79,10 +79,10 @@ export default function SharingPage() {
 
       <DocsH page={page} id="approval" />
       <Prose>
-        <p>In a personal team, sharing applies at once. In a shared team:</p>
+        <p>Inside a team, nobody waits: every member edits the team&apos;s artifacts directly. Approval is about who can read an artifact. In a personal team, sharing applies at once. In a shared team:</p>
         <ul>
           <li><strong>Link and public</strong> sharing always needs an owner or admin. When an owner or admin shares from the web app, it applies at once.</li>
-          <li><strong>Team</strong> sharing follows the team&apos;s setting: on by default, the owner can turn approval off.</li>
+          <li><strong>Team</strong> sharing follows the team&apos;s setting. New teams share with the team right away; the owner can turn approval on. Teams made before this default keep their setting.</li>
           <li><strong>Agents never approve.</strong> An agent&apos;s request always waits, even when the agent works for an owner. <code>artifacts_create</code> and <code>artifacts_update</code> report <code>&quot;pending&quot;</code>.</li>
         </ul>
         <p>Owners and admins see waiting requests on the team page, under <strong>Shared artifacts</strong> and <strong>Needs approval</strong>, and approve or decline them there. Notifications link straight to that list.</p>

@@ -13,6 +13,17 @@ interface TeamInvitationEmail {
   email: string;
   teamName: string;
   inviterName: string;
+  /** When the link stops working. A resend moves it, which gives the resent email its own idempotency key. */
+  expiresAt: Date;
+}
+
+/**
+ * One key per email sent: the invitation and its expiry. Sendir keeps a key
+ * for good, so a key from the id alone would swallow every resend; a resend
+ * moves the expiry, so it sends. A retry of the same send keeps the key.
+ */
+export function invitationIdempotencyKey(invitationId: string, expiresAt: Date) {
+  return `team-invitation:${createHash("sha256").update(`${invitationId}:${expiresAt.toISOString()}`).digest("hex")}`;
 }
 
 /** The page where the invited person accepts or declines. Never built from the request. */
@@ -21,16 +32,19 @@ export function invitationUrl(invitationId: string) {
 }
 
 /** The team invitation in the shared layout. Team and inviter names are escaped. */
-export function renderTeamInvitationEmail(url: string, teamName: string, inviterName: string) {
+export function renderTeamInvitationEmail(url: string, teamName: string, inviterName: string, email: string) {
   return renderEmail({
     title: `Join ${teamName} on artifacts.space`,
-    preview: `${inviterName} invited you to the team. The invitation expires in 7 days.`,
+    preview: `${inviterName} invited you to the team. You can edit its artifacts as soon as you join.`,
     heading: html`Join ${teamName} on artifacts.space`,
-    paragraphs: [html`${inviterName} invited you to the team. Join to read the artifacts the team shares. The invitation expires in 7 days.`],
+    paragraphs: [
+      html`${inviterName} invited you to the team. Join to read and edit the artifacts the team shares, with no approval needed inside the team.`,
+      html`Sign in with ${email} to join. The invitation works only for this address, and it expires in 7 days.`,
+    ],
     action: { label: "View invitation", url },
     note: html`If you did not expect this email, you can ignore it.`,
     reason: "You got this email because someone invited this address to a team on artifacts.space.",
-    text: `${inviterName} invited you to join ${teamName} on artifacts.space.\n\n${url}\n\nThe invitation expires in 7 days. If you did not expect this email, you can ignore it.`,
+    text: `${inviterName} invited you to join ${teamName} on artifacts.space. Join to read and edit the artifacts the team shares.\n\n${url}\n\nSign in with ${email} to join. The invitation works only for this address, and it expires in 7 days. If you did not expect this email, you can ignore it.`,
   });
 }
 
@@ -54,9 +68,9 @@ export async function sendTeamInvitationEmail(input: TeamInvitationEmail) {
       to: input.email,
       fromName: "artifacts.space",
       subject: `Join ${input.teamName} on artifacts.space`,
-      ...renderTeamInvitationEmail(url, input.teamName, input.inviterName),
+      ...renderTeamInvitationEmail(url, input.teamName, input.inviterName, input.email),
     },
-    { idempotencyKey: `team-invitation:${createHash("sha256").update(input.invitationId).digest("hex")}` },
+    { idempotencyKey: invitationIdempotencyKey(input.invitationId, input.expiresAt) },
   );
   if (error) throw new Error(`Sendir could not send the invitation: ${error.name} (${String(error.statusCode ?? "no answer")})`);
 }

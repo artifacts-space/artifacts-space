@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
 
-import { actionErrorMessage } from "@/lib/action-errors";
+import { actionErrorMessage, apiErrorCode } from "@/lib/action-errors";
 import type { ActionResult } from "@/lib/artifact-types";
 import { getAuth } from "@/lib/auth/server";
 import { cleanHandleInput } from "@/lib/handles";
@@ -14,6 +14,9 @@ import { assignRoleProblem, countOwners, inviteProblem, leaveProblem, removeMemb
 import { changeMemberRole } from "@/lib/teams/role-store";
 import { getInvitationTeamId, listTeamMemberActors, type TeamMemberActor, type TeamMembership } from "@/lib/teams/queries";
 import { assignableRoles, type TeamRole } from "@/lib/teams/roles";
+import { openInvitationRole } from "@/lib/teams/invitation-queries";
+import { invitationRefusal, inviteMode } from "@/lib/teams/invitation-rules";
+import { assertCanInvite } from "@/lib/teams/invitation-limits";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { guardTeam, idSchema, requireUser } from "./team-guard";
@@ -53,24 +56,36 @@ const inviteSchema = z.object({
   role: z.enum(assignableRoles),
 });
 
-/** Invites someone by email, to a role that does no more than the inviter's. Never to a personal team. */
-export async function inviteMemberAction(teamId: string, input: z.input<typeof inviteSchema>): Promise<ActionResult<null>> {
+/**
+ * Invites someone by email, to a role that does no more than the inviter's.
+ * Never to a personal team. Inviting an address that already has an open
+ * invitation sends it again (same link, fresh expiry), or replaces it when
+ * the role changed. Every path counts against the invitation limits.
+ */
+export async function inviteMemberAction(teamId: string, input: z.input<typeof inviteSchema>): Promise<ActionResult<{ email: string; resent: boolean }>> {
+  let email = "";
   try {
     const checked = await guardTeam(teamId, holds("members.invite"), "You cannot invite people to this team.");
     if (!checked.ok) return checked.result;
-    const { email, role } = inviteSchema.parse(input);
+    const parsed = inviteSchema.parse(input);
+    email = parsed.email;
+    const { role } = parsed;
     const grant = checked.roles.get(role);
     if (!grant) return { success: false, error: "That role does not exist in this team." };
     const problem = inviteProblem(checked.membership, { key: grant.key, capabilities: grant.capabilities });
     if (problem) return { success: false, error: problem };
+    const mode = inviteMode(await openInvitationRole(checked.membership.id, email), role);
+    // Better Auth's resend skips its create hooks, so the invitation limits are checked here instead.
+    if (mode === "resend") await assertCanInvite(checked.membership.userId, checked.membership.id);
+    // A new role is a new invitation: Better Auth cancels the open one and its hooks check the role and the limits.
     await getAuth().api.createInvitation({
-      body: { email, role, organizationId: checked.membership.id, resend: true },
+      body: { email, role, organizationId: checked.membership.id, resend: mode === "resend" },
       headers: await headers(),
     });
     revalidatePath(`/teams/${checked.membership.slug}`);
-    return { success: true, data: null };
+    return { success: true, data: { email, resent: mode === "resend" } };
   } catch (error) {
-    return { success: false, error: actionErrorMessage(error, "The invitation could not be sent. Please try again.") };
+    return { success: false, error: invitationRefusal(apiErrorCode(error), email) ?? actionErrorMessage(error, "The invitation could not be sent. Please try again.") };
   }
 }
 

@@ -60,6 +60,7 @@ export function teamsPlugin() {
         email: data.email,
         teamName: data.organization.name,
         inviterName: data.inviter.user.name || data.inviter.user.email,
+        expiresAt: new Date(data.invitation.expiresAt),
       });
     },
     schema: {

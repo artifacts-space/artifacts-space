@@ -125,6 +125,9 @@ test("should let an owner create, edit, and give a custom role, and log each cha
   const invite = page.getByRole("dialog", { name: "Invite people" });
   await invite.getByLabel("Email").fill(invitee);
   await invite.getByRole("button", { name: "Send invitation" }).click();
+  // The dialog stays open for the next address; Done closes it.
+  await expect(invite.getByRole("list", { name: "Invitations sent" })).toContainText(`Sent to ${invitee}`);
+  await invite.getByRole("button", { name: "Done" }).click();
   await expect(page.getByRole("table", { name: "Members" }).locator("[data-member-row=invitation]")).toContainText(invitee);
 });
 

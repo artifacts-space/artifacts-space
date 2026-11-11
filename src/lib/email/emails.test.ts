@@ -19,6 +19,7 @@ vi.mock("@/lib/email/budget", () => ({ reserveBudgetedEmail: () => Promise.resol
 
 const LOGO = '<img src="https://artifacts.space/email/artifacts-space-icon.png"';
 const HOSTILE = `<script>alert("x")</script>`;
+const EXPIRES = new Date("2026-11-18T12:00:00.000Z");
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
 
 function lastSend(): { message: EmailMessage; key: string } {
@@ -30,7 +31,7 @@ function lastSend(): { message: EmailMessage; key: string } {
 async function sendEach() {
   await sendMagicLinkEmail({ email: "ann@example.com", url: "https://artifacts.space/api/auth/magic-link/verify?token=t1", token: "t1" });
   const magic = lastSend();
-  await sendTeamInvitationEmail({ invitationId: "inv1", email: "ann@example.com", teamName: HOSTILE, inviterName: HOSTILE });
+  await sendTeamInvitationEmail({ invitationId: "inv1", email: "ann@example.com", teamName: HOSTILE, inviterName: HOSTILE, expiresAt: EXPIRES });
   const invitation = lastSend();
   await sendMentionEmail({ mentionId: "m1", email: "ann@example.com", authorLabel: HOSTILE, artifactTitle: HOSTILE, publicId: "pub1", commentId: "c1" });
   const mention = lastSend();
@@ -85,12 +86,31 @@ describe("transactional emails", () => {
     expect(magic.key).toBe(`magic-link:${sha("t1")}`);
     expect(invitation.message.subject).toBe(`Join ${HOSTILE} on artifacts.space`);
     expect(invitation.message.html).toContain("expires in 7 days");
-    expect(invitation.key).toBe(`team-invitation:${sha("inv1")}`);
+    expect(invitation.key).toBe(`team-invitation:${sha(`inv1:${EXPIRES.toISOString()}`)}`);
     expect(mention.message.subject).toBe(`${HOSTILE} mentioned you on artifacts.space`);
     expect(mention.key).toBe(`mention:${sha("m1")}`);
     expect(report.message.to).toBe("operator@example.com");
     expect(report.message.subject).toBe(`Report on “${HOSTILE}”`);
     expect(report.key).toBe(`artifact-report:${sha("r1")}`);
+  });
+
+  it("should give a resent invitation its own idempotency key, so Sendir sends it again", async () => {
+    const first = { invitationId: "inv1", email: "ann@example.com", teamName: "Acme", inviterName: "Dana", expiresAt: EXPIRES };
+    await sendTeamInvitationEmail(first);
+    const original = lastSend().key;
+    await sendTeamInvitationEmail(first);
+    expect(lastSend().key, "a retry of the same send keeps its key").toBe(original);
+    await sendTeamInvitationEmail({ ...first, expiresAt: new Date("2026-11-19T09:30:00.000Z") });
+    expect(lastSend().key, "a resend moves the expiry, so it is a new email").not.toBe(original);
+  });
+
+  it("should tell the invited person which address to sign in with and that they can edit", async () => {
+    await sendTeamInvitationEmail({ invitationId: "inv1", email: "ann@example.com", teamName: "Acme", inviterName: "Dana", expiresAt: EXPIRES });
+    const { message } = lastSend();
+    for (const body of [message.html, message.text]) {
+      expect(body).toContain("Sign in with ann@example.com to join");
+      expect(body).toContain("read and edit the artifacts the team shares");
+    }
   });
 
   it("should render the sign-in heading with a quiet site link when the magic link is sent", async () => {

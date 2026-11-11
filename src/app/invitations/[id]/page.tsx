@@ -1,45 +1,40 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 
 import { AuthShell } from "@/components/auth/auth-shell";
-import { PixelAvatar } from "@/components/pixel-avatar";
-import { InvitationButtons } from "@/components/teams/invitation-buttons";
+import { InvitationView, type InvitationTeamView } from "@/components/teams/invitation-view";
 import { getSession } from "@/lib/session";
-import { getInvitationForEmail } from "@/lib/teams/queries";
-import { roleLabel } from "@/lib/teams/roles";
+import { getInvitationRecord, isInTeam, type InvitationRecord } from "@/lib/teams/invitation-queries";
+import { invitationPageState, showsTeam } from "@/lib/teams/invitation-rules";
 
 export const metadata: Metadata = { title: "Team invitation", robots: { index: false, follow: false } };
 export const instant = false;
+
+const idSchema = z.string().trim().min(1).max(200);
+
+/** The invitation, or null for an id that cannot be one. */
+async function loadInvitation(id: string): Promise<InvitationRecord | null> {
+  const parsed = idSchema.safeParse(id);
+  return parsed.success ? getInvitationRecord(parsed.data) : null;
+}
+
+function teamView(invitation: InvitationRecord | null): InvitationTeamView | null {
+  if (!invitation) return null;
+  return { teamName: invitation.teamName, teamSlug: invitation.teamSlug, inviterId: invitation.inviterId, inviterName: invitation.inviterName, role: invitation.role };
+}
 
 export default async function InvitationPage({ params }: PageProps<"/invitations/[id]">) {
   const { id } = await params;
   const session = await getSession();
   if (!session) redirect(`/sign-in?next=${encodeURIComponent(`/invitations/${id}`)}`);
-  const invitation = await getInvitationForEmail(id, session.user.email);
+  const invitation = await loadInvitation(id);
+  const isMember = invitation ? await isInTeam(session.user.id, invitation.teamId) : false;
+  const state = invitationPageState(invitation, { email: session.user.email, emailVerified: session.user.emailVerified, isMember }, new Date());
 
   return (
     <AuthShell>
-      <div className="w-full max-w-[400px]">
-        {invitation ? (
-          <>
-            <h1 className="text-2xl font-medium tracking-[-0.015em]">Join {invitation.teamName}</h1>
-            <p className="mt-2 mb-8 text-md leading-6 text-muted-foreground">
-              <PixelAvatar seed={invitation.inviterId} size={20} className="mr-1.5 -mt-0.5" />
-              {invitation.inviterName} invited you as {roleLabel(invitation.role).toLowerCase()}. You will see the artifacts the team shares.
-            </p>
-            <InvitationButtons invitationId={invitation.id} />
-          </>
-        ) : (
-          <>
-            <h1 className="text-2xl font-medium tracking-[-0.015em]">This invitation is not open</h1>
-            <p className="mt-2 text-md leading-6 text-muted-foreground">
-              It may have expired, been used, or been sent to another email address. You are signed in as {session.user.email}.
-            </p>
-            <Link href="/teams" className="mt-6 inline-block text-sm underline underline-offset-4">Go to your teams</Link>
-          </>
-        )}
-      </div>
+      <InvitationView invitationId={id} state={state} viewerEmail={session.user.email} team={showsTeam(state) ? teamView(invitation) : null} />
     </AuthShell>
   );
 }
