@@ -32,11 +32,23 @@ test("should show the image with replace and remove when the team has an icon", 
   await expect(dialog.getByRole("button", { name: "Remove" })).toBeVisible();
 });
 
+test("should show the team's pixel avatar instead when its icon cannot load", async ({ page }) => {
+  await page.goto("/dev/team?icon=broken");
+  await expect(headerIcon(page)).toHaveAttribute("data-team-icon", "avatar");
+  await expect(headerIcon(page).locator("svg")).toHaveAttribute("data-avatar-kind", "team");
+  // The same avatar as a team with no icon at all: both are seeded by the team id.
+  const drawing = (page: Page) => headerIcon(page).locator("svg").evaluate((svg) => [...svg.children].map((part) => `${getComputedStyle(part).fill} ${part.getAttribute("d") ?? ""}`));
+  const fallback = await drawing(page);
+  await page.goto("/dev/team");
+  expect(await drawing(page)).toEqual(fallback);
+});
+
 test("should ask before removing the icon, with Don't ask again", async ({ page }) => {
   await page.goto("/dev/team?icon=1");
   await control(page).click();
   await page.getByRole("dialog", { name: "Team icon" }).getByRole("button", { name: "Remove" }).click();
   const confirm = page.getByRole("dialog", { name: "Remove the team icon?" });
+  await expect(confirm.getByText("Fixture team shows its pixel avatar again, and the image is deleted.", { exact: false })).toBeVisible();
   await expect(confirm.getByRole("button", { name: "Remove icon" })).toBeVisible();
   await expect(confirm.getByText("Don't ask again")).toBeVisible();
   await confirm.getByRole("button", { name: "Cancel" }).click();

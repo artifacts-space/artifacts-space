@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { teamAvatar, type AvatarTeam } from "@/lib/teams/team-avatar-rules";
@@ -13,14 +13,15 @@ interface TeamIconProps {
   viewerId: string;
   /** Width and height in pixels. */
   size: number;
+  /** Goes on the outermost element in every case, so layout classes act the same with or without an image. */
   className?: string;
 }
 
 /** A pixel avatar, marked so tests and styles can tell it from an uploaded image. */
 function GeneratedAvatar({ seed, kind, size, className }: { seed: string; kind: "person" | "team"; size: number; className: string | undefined }) {
   return (
-    <span data-team-icon="avatar" className="inline-flex shrink-0">
-      <PixelAvatar seed={seed} kind={kind} size={size} {...(className ? { className } : {})} />
+    <span data-team-icon="avatar" className={cn("inline-flex shrink-0", className)}>
+      <PixelAvatar seed={seed} kind={kind} size={size} />
     </span>
   );
 }
@@ -36,12 +37,18 @@ function GeneratedAvatar({ seed, kind, size, className }: { seed: string; kind: 
 export function TeamIcon({ team, viewerId, size, className }: TeamIconProps) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const avatar = teamAvatar(team, viewerId);
+  const imageUrl = avatar.kind === "image" ? avatar.url : null;
+  // An image that failed before hydration fired its error event before React listened, so check it on mount too.
+  const checkLoaded = useCallback((image: HTMLImageElement | null) => {
+    if (image?.complete && image.naturalWidth === 0 && imageUrl) setFailedUrl(imageUrl);
+  }, [imageUrl]);
   if (avatar.kind === "person") return <GeneratedAvatar seed={avatar.seed} kind="person" size={size} className={className} />;
   if (avatar.kind === "team") return <GeneratedAvatar seed={avatar.seed} kind="team" size={size} className={className} />;
   if (failedUrl === avatar.url) return <GeneratedAvatar seed={avatar.fallbackSeed} kind="team" size={size} className={className} />;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- a members-only, privately cached route, which next/image cannot optimize
     <img
+      ref={checkLoaded}
       src={avatar.url}
       alt=""
       aria-hidden

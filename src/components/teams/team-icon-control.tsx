@@ -133,7 +133,7 @@ export function TeamIconControl({ teamId, teamName, iconUrl, viewerId }: TeamIco
       <ConfirmDialog
         state={confirmRemove.dialog}
         title="Remove the team icon?"
-        description={`${teamName} shows its first letter again, and the image is deleted. You can upload a new one at any time.`}
+        description={`${teamName} shows its pixel avatar again, and the image is deleted. You can upload a new one at any time.`}
         confirmLabel="Remove icon"
         pending={busy === "remove"}
       />
