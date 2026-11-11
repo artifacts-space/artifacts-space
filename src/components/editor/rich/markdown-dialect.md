@@ -160,7 +160,9 @@ const answer: number = 42;
   a code block, and never loads Mermaid; `split` shows both, the source
   first. Split is side by side when the block is at least 36rem wide and
   stacked (source above diagram) when it is narrower, so phones and narrow
-  panes stack. The editor writes no `view` for Preview.
+  panes stack. The editor writes no `view` for Preview, and drops `view`
+  when a diagram turns into another language (caption, wrap, and unknown
+  keys stay).
 - **`caption`** (any code block): one line of plain text shown under the
   block. Empty captions are dropped. A caption with a backtick makes the
   editor write a tilde fence, since a backtick fence's info string cannot

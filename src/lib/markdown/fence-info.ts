@@ -18,6 +18,8 @@
  * parsers' decoded `lang` or `meta`.
  */
 
+import { isMermaidLanguage } from "./mermaid-fence";
+
 /** How a mermaid block shows: the source, the diagram, or both. */
 export type DiagramView = "code" | "preview" | "split";
 
@@ -211,11 +213,14 @@ export function withFenceAttributes(info: string, changes: FenceAttributeChanges
 
 /**
  * The info string with its language word replaced by `language` (or removed
- * when null), keeping the rest of the line and any attributes. A block with
- * attributes and no language gets `text`.
+ * when null), keeping the rest of the line and any attributes. `view` means
+ * something only on a mermaid block, so it goes when the language becomes
+ * another one; a later switch back then starts from the default view. A
+ * block with attributes and no language gets `text`.
  */
 export function withFenceLanguage(info: unknown, language: string | null): string {
-  const current = typeof info === "string" ? info.trim() : "";
+  const written = typeof info === "string" ? info.trim() : "";
+  const current = isMermaidLanguage(language) ? written : withFenceAttributes(written, { view: null });
   const block = findBlock(current);
   const head = block ? current.slice(0, block.start).trim() : current;
   const rest = head.split(/\s+/u).slice(1).join(" ");

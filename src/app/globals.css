@@ -914,6 +914,8 @@
     color: inherit;
     white-space: pre;
     tab-size: 2;
+    /* The frame clips to its rounded corners, so long lines scroll here, as on the read side. */
+    overflow-x: auto;
   }
   /* Wrap code: long lines fold instead of scrolling sideways. */
   .rich-editor-content .rich-code-block pre[data-wrap] {

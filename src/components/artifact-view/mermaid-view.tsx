@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { svgDataUri } from "@/lib/svg";
 import { minReadableWidth } from "@/lib/svg-text-size";
 import { cn } from "@/lib/utils";
@@ -47,11 +49,11 @@ interface DiagramFigureProps {
 }
 
 /** The drawn image, as wide as it can be while its text stays readable. */
-function DiagramImage({ diagram, alt }: { diagram: RenderedDiagram; alt: string }) {
+function DiagramImage({ diagram, src, alt }: { diagram: RenderedDiagram; src: string; alt: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element -- a data URI image, which next/image cannot optimize
     <img
-      src={svgDataUri(diagram.svg)}
+      src={src}
       width={diagram.width}
       height={diagram.height}
       alt={alt}
@@ -69,13 +71,15 @@ function DiagramImage({ diagram, alt }: { diagram: RenderedDiagram; alt: string 
  */
 export function DiagramFigure({ title, diagram, source, zoomable = false, framed = true }: DiagramFigureProps) {
   const alt = title ?? "Diagram";
+  // Encoded once per drawing, and shared by the image and its zoomed copy.
+  const src = useMemo(() => (diagram ? svgDataUri(diagram.svg) : ""), [diagram]);
   return (
     <figure className="min-w-0">
       {title ? <figcaption className="mb-3 text-md font-medium">{title}</figcaption> : null}
       {/* justify-center-safe: when the diagram is wider than the frame, it starts at the left edge so all of it can be scrolled to. */}
       <div className={cn("flex min-h-24 justify-center-safe overflow-x-auto bg-card px-4 py-6 sm:px-6", framed && "card-nested")}>
         {diagram ? (
-          zoomable ? <DiagramZoom src={svgDataUri(diagram.svg)} width={diagram.width} height={diagram.height} label={alt}><DiagramImage diagram={diagram} alt={alt} /></DiagramZoom> : <DiagramImage diagram={diagram} alt={alt} />
+          zoomable ? <DiagramZoom src={src} width={diagram.width} height={diagram.height} label={alt}><DiagramImage diagram={diagram} src={src} alt={alt} /></DiagramZoom> : <DiagramImage diagram={diagram} src={src} alt={alt} />
         ) : (
           <div role="status" className="h-24 w-full max-w-md animate-pulse rounded-sm bg-muted motion-reduce:animate-none">
             <span className="sr-only">Drawing diagram…</span>

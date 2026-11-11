@@ -113,12 +113,21 @@ describe("withFenceAttributes", () => {
 
 describe("withFenceLanguage", () => {
   it("should swap the language and keep the attributes", () => {
-    expect(withFenceLanguage('mermaid {view=split caption="A"}', "ts")).toBe('ts {view=split caption="A"}');
+    expect(withFenceLanguage('js {wrap=true caption="A"}', "ts")).toBe('ts {wrap=true caption="A"}');
   });
 
   it("should write text before the attributes when the language is cleared", () => {
     expect(withFenceLanguage('mermaid {caption="A"}', null)).toBe('text {caption="A"}');
     expect(withFenceLanguage("mermaid", null)).toBe("");
+  });
+
+  it("should drop the view and keep the other attributes when a diagram becomes another language", () => {
+    expect(withFenceLanguage("mermaid {view=split}", null)).toBe("");
+    expect(withFenceLanguage('mermaid {view=split caption="A" wrap=true zoom=2}', "ts")).toBe('ts {caption="A" wrap=true zoom=2}');
+  });
+
+  it("should keep the view when the language stays mermaid", () => {
+    expect(withFenceLanguage("Mermaid {view=code}", "mermaid")).toBe("mermaid {view=code}");
   });
 
   it("should keep other words after the language", () => {
