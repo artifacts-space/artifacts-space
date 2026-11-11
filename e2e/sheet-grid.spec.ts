@@ -77,7 +77,7 @@ test("should span the window and fill it to the bottom when a CSV opens on its p
   // It ends just above the bottom of the window, once the heading above it has settled.
   await expect.poll(async () => { const { bottom } = await measure(); return bottom >= 0 && bottom <= 40; }).toBe(true);
   const sizes = await measure();
-  // Full width: only the page's side padding is left, never the 960px column.
+  // Full width: only the page's side padding is left, never the contained column.
   expect(sizes.left).toBeLessThanOrEqual(64);
   expect(sizes.right).toBeLessThanOrEqual(64);
   expect(sizes.width).toBeGreaterThan(sizes.window - 130);
