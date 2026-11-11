@@ -22,6 +22,7 @@ vi.mock("@/lib/themes/artifact-theme-context", () => ({ resolveThemeFor: vi.fn()
 vi.mock("./history-queries", () => ({ getArtifactVersionDetail: vi.fn(), listArtifactVersions: vi.fn() }));
 
 const { restoreVersionAction } = await import("./actions");
+const { STALE_SAVE_MESSAGE, StaleSaveError } = await import("@/lib/save-guard");
 
 const versionId = "4f1c8f3e-5b8a-4c56-9a8e-0d3f2b1c7e90";
 const seen = "2026-11-11T13:08:00.123Z";
@@ -38,6 +39,13 @@ describe("restoreVersionAction", () => {
     const result = await restoreVersionAction("pub1", versionId, seen);
     expect(result).toEqual({ success: true, data: { artifact: { id: "artifact-1" }, savedOverAgents: false } });
     expect(mocks.restoreArtifactVersion).toHaveBeenCalledWith("ann", "artifact-1", versionId, "person", { expectedUpdatedAt: seen });
+  });
+
+  it("should tell the person someone saved since when the guarded write refuses the restore", async () => {
+    mocks.restoreArtifactVersion.mockRejectedValue(new StaleSaveError("pub1"));
+    const result = await restoreVersionAction("pub1", versionId, seen);
+    expect(result).toEqual({ success: false, error: STALE_SAVE_MESSAGE });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
   it("should refuse and write nothing when no base is sent", async () => {
