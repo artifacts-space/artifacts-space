@@ -11,7 +11,11 @@ import { fixtureArtifact } from "./fixture-content";
  * The /dev/workspace fixture's stand-in for storing new artifacts: kept in
  * this tab's sessionStorage, so a reload shows what was stored (and only
  * that), and counted, so the e2e checks can prove a page was created once.
- * It refuses what the server refuses: content that does not fit its format.
+ * It refuses what the server refuses: content that does not fit its format,
+ * and files that are gone or in another artifact. Test switches (below) add
+ * outcomes on top; one of them, `first-only-always`, deliberately models a
+ * partial attach the server cannot produce today (attachFiles is
+ * all-or-nothing), to cover the page's defence against one.
  */
 
 const artifactsKey = "fixture:new-artifacts";
@@ -24,7 +28,7 @@ const holdUploadsKey = "fixture:hold-uploads";
 const holdCreateKey = "fixture:hold-create";
 /** Set to "1" by a test to hold attaches until it dispatches `fixture:release-attach`. */
 const holdAttachKey = "fixture:hold-attach";
-/** Set by a test for the next attach: "refuse" answers no; "lose" attaches the files and then loses the answer; "lose-always" loses every answer; "vanish" loses the answer without attaching ("vanish-always" every one); "first-only-always" attaches only the first file and loses every answer. A comma list sets several in turn. */
+/** Set by a test for the next attach: "refuse" answers no; "lose" attaches the files and then loses the answer; "lose-always" loses every answer; "vanish" loses the answer without attaching ("vanish-always" every one); "first-only-always" attaches only the first file and loses every answer: a partial attach, which today's all-or-nothing server cannot produce (the page's defensive case). A comma list sets several in turn. */
 const nextAttachKey = "fixture:next-attach";
 /** The uploads deleted so far, so a test can check that none it kept was deleted. */
 const discardedKey = "fixture:discarded";

@@ -46,7 +46,12 @@ function asFiles(draft: ArtifactDraft, names: readonly string[]): ArtifactDraft 
 }
 
 const attachFailed = "The files could not be added. Drop them again to try once more.";
-/** The answers were lost and the artifact, loaded again, has only some of them: its Files section shows which. */
+/**
+ * The answers were lost and the artifact, loaded again, has only some of them:
+ * its Files section shows which. Defensive: attachFiles is all-or-nothing
+ * today, so this needs a future attach that is not, or a batch with ids the
+ * artifact already held (which uploadStep rules out).
+ */
 const attachPartial = "Some files could not be added. The Files section shows the ones that were; drop the others again.";
 /** The answers were lost and the artifact could not be loaded either, so the Files section may be out of date. */
 const attachUnknownStale = "We could not confirm the files were added. Reload the page and check Files before adding them again.";
