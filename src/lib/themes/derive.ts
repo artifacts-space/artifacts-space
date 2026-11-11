@@ -153,13 +153,13 @@ export const blockFillGap = 0.03;
  * One hue's background: the card tinted toward the hue, then kept at AA
  * under the ink. When the ink sits near the AA floor on the card, that push
  * lands the tint back on the card; it then steps the gap to the far side of
- * the card from the ink, which only raises the ink's contrast. A card with
- * no room on that side (near white, or darker than about oklch 0.1 under
- * ink at the floor) keeps the pushed fill, apart from the card by less than
- * the gap. When even that is out of reach, the push crosses to the ink's
- * other side (a near-black block under dark ink on a white card, a
- * near-white one on a dark card); the fill is then the card itself, since no
- * colored text could read on both that block and the card.
+ * the card from the ink, which only raises the ink's contrast. A near-white
+ * card has no room on that side and keeps the pushed fill, apart from the
+ * card by less than the gap. When the ink is too close to the floor for any
+ * fill on the card's side, the push crosses to the ink's other side (a
+ * near-black block under dark ink on a white card, or a near-white one on a
+ * card darker than about oklch 0.1); the fill is then the card itself, since
+ * no colored text could read on both that block and the card.
  */
 function blockFill(mode: PaletteMode, card: Oklch, ink: Oklch, hueInk: Oklch): Oklch {
   const fill = ensureContrast(mixOklch(card, hueInk, blockFillTint[mode]), ink, 4.55);
