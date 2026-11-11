@@ -162,7 +162,7 @@ describe("tool annotations", () => {
   it("should mark the tools whose repeat changes nothing more idempotent", async () => {
     const { tools } = await connect("full");
     const idempotent = tools.filter((tool) => tool.annotations?.idempotentHint === true).map((tool) => tool.name).sort();
-    expect(idempotent).toEqual(["artifacts_delete", "comment_delete", "comment_update", "files_attach", "files_delete", "files_finalize", "inbox_mark_read"]);
+    expect(idempotent).toEqual(["artifacts_delete", "comment_delete", "files_attach", "files_delete", "files_finalize", "inbox_mark_read"]);
   });
 
   it("should list only tools marked read-only when access is read-only", async () => {

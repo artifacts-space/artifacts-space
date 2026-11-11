@@ -81,8 +81,8 @@ export const writeTraits = {
   files_delete: { destructive: true, idempotent: true },
   inbox_mark_read: { destructive: false, idempotent: true },
   comment_create: { destructive: false, idempotent: false },
-  // Replaces the body; mentions it already notified are not notified again.
-  comment_update: { destructive: true, idempotent: true },
+  // Replaces the body. A repeat notifies no one again but still moves updatedAt, so it is not a no-op.
+  comment_update: { destructive: true, idempotent: false },
   comment_delete: { destructive: true, idempotent: true },
 } as const satisfies Record<WriteToolName, WriteTraits>;
 
