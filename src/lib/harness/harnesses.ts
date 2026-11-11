@@ -7,7 +7,8 @@
  * the landing page.
  *
  * Icons live in public/agent-icons/<id>.svg (Claude shares the Claude Code
- * mark, claude-code.svg). They are single-color marks
+ * mark, claude-code.svg; ChatGPT shares Codex's OpenAI mark, codex.svg, the
+ * one src/components/harness/openai-mark.ts draws). They are single-color marks
  * drawn in `currentColor`, so they follow the theme when used as a CSS mask
  * (HarnessIcon) and draw black in a plain <img>. Most come from the
  * memories.sh agent marquee; fx has no published logo license, so it gets a
@@ -20,6 +21,7 @@ export const harnessIds = [
   "claude-code",
   "claude",
   "codex",
+  "chatgpt",
   "cursor",
   "vscode-copilot",
   "windsurf",
@@ -53,6 +55,7 @@ export const harnesses: readonly Harness[] = [
   { id: "claude-code", name: "Claude Code", icon: icon("claude-code") },
   { id: "claude", name: "Claude", icon: icon("claude-code") },
   { id: "codex", name: "Codex", icon: icon("codex") },
+  { id: "chatgpt", name: "ChatGPT", icon: icon("codex") },
   { id: "cursor", name: "Cursor", icon: icon("cursor") },
   { id: "vscode-copilot", name: "VS Code Copilot", icon: icon("vscode-copilot") },
   { id: "windsurf", name: "Windsurf", icon: icon("windsurf") },

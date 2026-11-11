@@ -13,7 +13,7 @@ import { registerProjectTools } from "./project-tools";
 import { registerTagTools } from "./tag-tools";
 import { registerTeamTools } from "./team-tools";
 import { registerThemeTools } from "./theme-tools";
-import { gateTools, toolAccess, toolAllowed } from "./tool-access";
+import { gateTools, toolAccess, toolAllowed, toolAnnotations, writeTraits } from "./tool-access";
 import { registerVersionTools } from "./version-tools";
 import { registerViewTools } from "./view-tools";
 
@@ -56,7 +56,7 @@ async function connect(access: McpAccess) {
     await server.close();
   });
   const { tools } = await client.listTools();
-  return { client, names: tools.map((tool) => tool.name).sort() };
+  return { client, tools, names: tools.map((tool) => tool.name).sort() };
 }
 
 afterEach(async () => {
@@ -120,5 +120,71 @@ describe("gateTools", () => {
     const server = new McpServer({ name: "test", version: "1.0.0" });
     const gated = gateTools(server, "full");
     expect(() => gated.registerTool("surprise_tool", { inputSchema: { x: z.string() } }, () => ({ content: [] }))).toThrow(/no access level/);
+  });
+
+  it("should refuse a tool that sets its own annotations when they would bypass tool-access.ts", () => {
+    const server = new McpServer({ name: "test", version: "1.0.0" });
+    const gated = gateTools(server, "full");
+    expect(() => gated.registerTool("artifacts_delete", { annotations: { readOnlyHint: true } }, () => ({ content: [] }))).toThrow(/sets its own annotations/);
+  });
+});
+
+describe("tool annotations", () => {
+  it("should annotate every tool with a read-only flag and a closed world when access is full", async () => {
+    const { tools } = await connect("full");
+    expect(tools.length).toBe(Object.keys(toolAccess).length);
+    for (const tool of tools) {
+      expect(typeof tool.annotations?.readOnlyHint, tool.name).toBe("boolean");
+      expect(tool.annotations?.openWorldHint, tool.name).toBe(false);
+    }
+  });
+
+  it("should mark exactly the read-only tool set read-only when access is full", async () => {
+    const { tools } = await connect("full");
+    const readOnly = tools.filter((tool) => tool.annotations?.readOnlyHint === true).map((tool) => tool.name).sort();
+    expect(readOnly).toEqual(readOnlyTools);
+  });
+
+  it("should say whether each write tool is destructive and idempotent when it is listed", async () => {
+    const { tools } = await connect("full");
+    for (const tool of tools.filter((item) => item.annotations?.readOnlyHint === false)) {
+      expect(typeof tool.annotations?.destructiveHint, tool.name).toBe("boolean");
+      expect(typeof tool.annotations?.idempotentHint, tool.name).toBe("boolean");
+    }
+  });
+
+  it("should mark the tools that delete or replace something destructive", async () => {
+    const { tools } = await connect("full");
+    const destructive = tools.filter((tool) => tool.annotations?.destructiveHint === true).map((tool) => tool.name).sort();
+    expect(destructive).toEqual(["artifacts_delete", "artifacts_restore_version", "artifacts_update", "comment_delete", "comment_update", "files_delete"]);
+  });
+
+  it("should mark the tools whose repeat changes nothing more idempotent", async () => {
+    const { tools } = await connect("full");
+    const idempotent = tools.filter((tool) => tool.annotations?.idempotentHint === true).map((tool) => tool.name).sort();
+    expect(idempotent).toEqual(["artifacts_delete", "comment_delete", "files_attach", "files_delete", "files_finalize", "inbox_mark_read"]);
+  });
+
+  it("should list only tools marked read-only and not destructive when access is read-only", async () => {
+    const { tools } = await connect("read");
+    for (const tool of tools) {
+      expect(tool.annotations?.readOnlyHint, tool.name).toBe(true);
+      expect(tool.annotations?.destructiveHint, tool.name).toBe(false);
+    }
+  });
+});
+
+describe("toolAnnotations", () => {
+  it("should throw when a tool has no access level", () => {
+    expect(() => toolAnnotations("artifacts_new_thing")).toThrow(/no access level/);
+  });
+
+  it("should give write traits to exactly the write tools", () => {
+    const writes = Object.entries(toolAccess).filter(([, level]) => level === "write").map(([name]) => name).sort();
+    expect(Object.keys(writeTraits).sort()).toEqual(writes);
+  });
+
+  it("should never mark a write tool read-only, or a read tool writable", () => {
+    for (const [name, level] of Object.entries(toolAccess)) expect(toolAnnotations(name).readOnlyHint, name).toBe(level === "read");
   });
 });

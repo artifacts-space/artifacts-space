@@ -66,15 +66,16 @@ describe("client guides", () => {
 
   it("should send ChatGPT to Plugins with OAuth and no client ID when rendered in full", () => {
     const html = renderToStaticMarkup(<ChatGptGuide origin={origin} full />);
-    for (const step of ['href="https://chatgpt.com/plugins"', "Add custom MCP server", `<code>${endpoint}</code>`, "<strong>OAuth</strong>", "Leave the client ID and secret empty", "Create as a plugin", "You do not need Developer mode"]) {
+    for (const step of ['href="https://chatgpt.com/plugins"', "Add custom MCP server", `<code>${endpoint}</code>`, "<strong>OAuth</strong>", "Leave the client ID and secret empty", "Create as a plugin", "You do not need Developer mode", "<strong>via ChatGPT</strong>"]) {
       expect(html).toContain(step);
     }
   });
 
-  it("should say Pro does not work yet when the short ChatGPT guide names the plans", () => {
+  it("should say Pro can read and writes need a team plan when the short ChatGPT guide names the plans", () => {
     const html = renderToStaticMarkup(<ChatGptGuide origin={origin} />);
-    expect(html).toContain("You need a Business, Enterprise, or Edu workspace.");
-    expect(html).toContain("artifacts.space does not work on Pro for now");
+    expect(html).toContain("On ChatGPT Pro, ChatGPT can use the read tools");
+    expect(html).toContain("To save or change them, you need a Business, Enterprise, or Edu workspace.");
+    expect(html).not.toContain("does not work on Pro");
     expect(html).not.toContain("Developer mode");
   });
 });
