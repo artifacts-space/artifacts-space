@@ -118,23 +118,50 @@ export async function protectedVersions(artifactId: string, approvedVersionId: s
 }
 
 /**
+ * Who saved the state a snapshot of `record` shows. A person, when
+ * `person_saved_at` is that save's own time (every person's save sets both
+ * in one UPDATE): no agent, and no harness. An agent, when a person saved
+ * earlier: the artifact's harness. Unknown for rows from before the column
+ * (null; History then reads the harness).
+ */
+export function snapshotSource(record: Pick<ArtifactRecord, "personSavedAt" | "updatedAt" | "harness">): { byAgent: boolean | null; harness: HarnessStamp | null } {
+  if (!record.personSavedAt) return { byAgent: null, harness: stampOf(record.harness) };
+  if (record.personSavedAt.getTime() === record.updatedAt.getTime()) return { byAgent: false, harness: null };
+  return { byAgent: true, harness: stampOf(record.harness) };
+}
+
+/**
  * Makes sure an artifact saved before history began has a first version:
  * what it showed before this save, credited to whoever saved it last.
  */
 export async function ensureHistoryStart(before: ArtifactRecord): Promise<void> {
   if (await latestVersion(before.id)) return;
-  await insertVersion(before, { createdBy: before.updatedBy ?? before.userId, saveKind: "snapshot", at: before.updatedAt, harness: stampOf(before.harness) });
+  await insertVersion(before, { createdBy: before.updatedBy ?? before.userId, saveKind: "snapshot", at: before.updatedAt, ...snapshotSource(before) });
+}
+
+/** The version filed for the save at `at` (to the millisecond), or null. */
+async function versionOfSave(artifactId: string, at: Date): Promise<ArtifactVersionRecord | null> {
+  const [row] = await getDb()
+    .select()
+    .from(artifactVersion)
+    .where(and(eq(artifactVersion.artifactId, artifactId), sql`date_trunc('milliseconds', ${artifactVersion.savedAt}) = ${at.toISOString()}::timestamptz`))
+    .limit(1);
+  return row ?? null;
 }
 
 /**
- * The latest version when it shows exactly what `record` shows; otherwise a
+ * The version that shows exactly what `record` shows: the latest, or the
+ * one its own save filed (a newer save may have filed after it). Otherwise a
  * new snapshot of it, dated at the save it shows (`record.updatedAt`), so a
- * snapshot of an older save never sorts after a newer save's version.
+ * snapshot of an older save never sorts after a newer save's version, and
+ * credited to whoever made that save (snapshotSource).
  */
 export async function versionMatching(record: ArtifactRecord, createdBy: string | null): Promise<string> {
   const latest = await latestVersion(record.id);
   if (latest && sameReviewedFields(latest, record)) return latest.id;
-  return insertVersion(record, { createdBy, saveKind: "snapshot", harness: stampOf(record.harness), at: record.updatedAt });
+  const ofSave = await versionOfSave(record.id, record.updatedAt);
+  if (ofSave && sameReviewedFields(ofSave, record)) return ofSave.id;
+  return insertVersion(record, { createdBy, saveKind: "snapshot", at: record.updatedAt, ...snapshotSource(record) });
 }
 
 /**

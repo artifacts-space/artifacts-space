@@ -59,6 +59,7 @@ describe.runIf(Boolean(databaseUrl))("a save's approval with a database", async 
   const { artifact, artifactVersion, rateLimitBucket, sharingRequest, team, teamMember, user } = await import("@/db/schema");
   const artifacts = await import("@/lib/artifacts");
   const { encodeBaseVersion } = await import("@/lib/edits/edit-conflict-rules");
+  const { versionMatching } = await import("./history");
 
   const tag = randomUUID().slice(0, 8);
   const owner = `approval-${tag}-owner`;
@@ -147,6 +148,39 @@ describe.runIf(Boolean(databaseUrl))("a save's approval with a database", async 
     // The owner's save went over the agent's, so what the owner approved by saving includes the agent's summary.
     expect(approved).toEqual({ content: "# Plan\n\nthe owner's v1", summary: "Agent, in between" });
     expect(await pendingRequest(page.id), "the owner's applied save settles the agent's request").toBeNull();
+  });
+
+  describe("snapshots of a save (versionMatching)", () => {
+    async function versionCount(artifactId: string) {
+      return (await getDb().select({ id: artifactVersion.id }).from(artifactVersion).where(eq(artifactVersion.artifactId, artifactId))).length;
+    }
+
+    it("should reuse the version a person's save filed instead of adding a duplicate after a newer save", async () => {
+      const page = await artifacts.createArtifact(owner, { title: "Notes", content: "# Notes" });
+      await artifacts.saveArtifactUpdate(owner, page.id, { content: "# Notes\n\nthe owner's" }, "person", { expectedUpdatedAt: page.updatedAt });
+      const atPersonSave = await row(page.id);
+      await agentSummary(page.id, "The agent's, filed after");
+      const count = await versionCount(page.id);
+
+      const matched = await versionMatching(atPersonSave, owner);
+      expect((await versionContent(matched))?.content).toBe("# Notes\n\nthe owner's");
+      expect(await versionCount(page.id)).toBe(count);
+    });
+
+    it("should credit a snapshot of a person's save to the person, never to the agent that saved before", async () => {
+      const page = await artifacts.createArtifact(owner, { title: "Notes", content: "# Notes" });
+      await agentSummary(page.id, "An agent first");
+      const agentRow = await row(page.id);
+      await artifacts.saveArtifactUpdate(owner, page.id, { content: "# Notes\n\nthen the owner" }, "person", { expectedUpdatedAt: agentRow.updatedAt.toISOString() });
+      const atPersonSave = await row(page.id);
+      expect(atPersonSave.harness).toBe("claude-code");
+      // No version holds the person's save any more (as if pruned): the snapshot is made fresh.
+      await getDb().delete(artifactVersion).where(and(eq(artifactVersion.artifactId, page.id), eq(artifactVersion.content, "# Notes\n\nthen the owner")));
+
+      const snapshot = await versionMatching(atPersonSave, owner);
+      const [filed] = await getDb().select({ byAgent: artifactVersion.byAgent, harness: artifactVersion.harness }).from(artifactVersion).where(eq(artifactVersion.id, snapshot));
+      expect(filed).toEqual({ byAgent: false, harness: null });
+    });
   });
 
   it("should file an agent's edit to the team's public artifact for approval in the save's own statement", async () => {
