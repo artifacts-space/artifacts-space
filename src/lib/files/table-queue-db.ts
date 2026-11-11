@@ -1,7 +1,7 @@
 /**
  * A tiny stand-in for getDb() in tests of thin database code: each query
- * answers with the next result queued for the table it reads or deletes
- * from, and `execute` with the next raw result. Queries are not interpreted;
+ * answers with the next result queued for the table it reads, updates, or
+ * deletes from, and `execute` with the next raw result. Queries are not interpreted;
  * the code under test owns the SQL, and the pure rules carry the decisions.
  * Not for production code.
  */
@@ -21,6 +21,7 @@ export function createTableQueueDb(byTable: ReadonlyMap<unknown, unknown[]>, exe
       where: () => chain,
       orderBy: () => chain,
       limit: () => chain,
+      returning: () => chain,
       then: (resolve: Settle, reject: Settle) => Promise.resolve().then(() => next(table)).then(resolve, reject),
     };
     return chain;
@@ -31,6 +32,7 @@ export function createTableQueueDb(byTable: ReadonlyMap<unknown, unknown[]>, exe
     select,
     selectDistinct: select,
     delete: query,
+    update: (table: unknown) => ({ set: () => query(table) }),
     execute: () => Promise.resolve(executeResults.shift()),
   };
 }

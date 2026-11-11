@@ -1,0 +1,1 @@
+ALTER TABLE "artifact_file" ADD COLUMN "attached_by_content" boolean DEFAULT false NOT NULL;

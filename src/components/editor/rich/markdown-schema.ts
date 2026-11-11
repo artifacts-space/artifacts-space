@@ -6,6 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 
 import { isSafeHref } from "@/lib/link-policy";
 
+import { MediaNode } from "./media-node";
 import { RawMarkdown } from "./raw-markdown-node";
 
 /** The longest run of backticks at the start of a line in `text`. */
@@ -59,16 +60,18 @@ export const MarkdownTable = Table.extend({
 export interface SchemaViews {
   codeBlock?: NodeViewRenderer;
   rawMarkdown?: NodeViewRenderer;
+  media?: NodeViewRenderer;
 }
 
 /**
  * The document model shared by the editor and the Markdown round-trip: the
- * GitHub-flavored Markdown that artifacts use, and nothing that Markdown
- * cannot store (underline is off). The editor swaps in node views for code
- * blocks and raw blocks; names and Markdown rules stay the same.
+ * GitHub-flavored Markdown that artifacts use, media blocks for uploaded
+ * files (markdown-dialect.md), and nothing that Markdown cannot store
+ * (underline is off). The editor swaps in node views for code blocks, media,
+ * and raw blocks; names and Markdown rules stay the same.
  */
 export function markdownSchemaExtensions(views: SchemaViews = {}): AnyExtension[] {
-  const { codeBlock, rawMarkdown } = views;
+  const { codeBlock, rawMarkdown, media } = views;
   return [
     StarterKit.configure({
       underline: false,
@@ -90,6 +93,7 @@ export function markdownSchemaExtensions(views: SchemaViews = {}): AnyExtension[
     TableRow,
     TableHeader,
     TableCell,
+    media ? MediaNode.extend({ addNodeView: () => media }) : MediaNode,
     rawMarkdown ? RawMarkdown.extend({ addNodeView: () => rawMarkdown }) : RawMarkdown,
   ];
 }

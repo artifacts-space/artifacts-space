@@ -12,10 +12,10 @@ import { recordArtifactChange } from "@/lib/versions/service";
 
 import { canUseFileInArtifact } from "./access-rules";
 import { fileLimits } from "./config";
+import { countHistoryOnlyFiles } from "./icon-cleanup";
 import { unusableFilesForPeople } from "./person-messages";
-import { countHistoryOnlyImages } from "./icon-cleanup";
 import { fileRefsInContent, maxFileRefs } from "./refs";
-import { attachFileRows, clearIconForFile, countArtifactFiles, getFileRow, getFileRows, removeFiles, removeUnattachedUpload } from "./store";
+import { attachFileRows, clearIconForFile, countArtifactFiles, getFileRow, getFileRows, removeFiles, removeUnattachedUpload, usableFileRows } from "./store";
 
 /**
  * Putting files into artifacts. A file belongs to one artifact. An editor
@@ -46,12 +46,12 @@ export async function assertUsableFiles(authorId: string, artifactId: string | n
   }
 }
 
-/** Whether the artifact (null on create) can take `adding` more files. Old icon and cover images kept only for Restore do not count (see countHistoryOnlyImages). */
+/** Whether the artifact (null on create) can take `adding` more files. Old icon and cover images, and removed media, kept only for Restore do not count (see countHistoryOnlyFiles). */
 async function hasRoomFor(artifactId: string | null, adding: number): Promise<boolean> {
   if (!artifactId) return adding <= fileLimits.maxFilesPerArtifact;
   const existing = await countArtifactFiles(artifactId);
   if (existing + adding <= fileLimits.maxFilesPerArtifact) return true;
-  return existing - (await countHistoryOnlyImages(artifactId)) + adding <= fileLimits.maxFilesPerArtifact;
+  return existing - (await countHistoryOnlyFiles(artifactId)) + adding <= fileLimits.maxFilesPerArtifact;
 }
 
 /** No harness: a change in the web app. An agent passes its harness, looked up only when the change files a version. */
@@ -72,12 +72,36 @@ export async function attachFiles(editorId: string, artifactId: string, fileIds:
 
 /**
  * The files a save points at, checked before anything is written. Returns
- * the ids to attach once the artifact exists. `artifactId` is null on create.
+ * the ids to attach once the artifact exists, as content media
+ * (`attachFileRows(…, { byContent: true })`). `artifactId` is null on create.
  */
 export async function checkContentFiles(authorId: string, artifactId: string | null, kind: string, content: string): Promise<string[]> {
   const ids = fileRefsInContent(kind, content);
+  if (kind === "markdown") return attachableMarkdownFiles(authorId, artifactId, ids);
   await assertUsableFiles(authorId, artifactId, ids);
   return ids;
+}
+
+/**
+ * The files a Markdown save attaches: the editor's own finished uploads and
+ * files already in this artifact. Markdown may also link files it cannot
+ * use (another artifact's, a deleted one, or text from a restored version);
+ * those stay plain links that load only for people who can read the file,
+ * so a save or a Restore never fails over them and never widens access.
+ * The lookup reads the files the author may use (usableFileRows), not the
+ * linked ids, and the file cap applies to the usable ones, so any number of
+ * links never fails a save and the author's own uploads are always found.
+ */
+async function attachableMarkdownFiles(authorId: string, artifactId: string | null, fileIds: readonly string[]): Promise<string[]> {
+  if (fileIds.length === 0) return [];
+  const named = new Set(fileIds);
+  const usable = (await usableFileRows(authorId, artifactId)).filter((row) => named.has(row.id) && canUseFileInArtifact(row, authorId, artifactId));
+  if (usable.length > maxFileRefs) throw new UserFacingError(`An artifact can use at most ${String(maxFileRefs)} files.`);
+  const adding = usable.filter((row) => row.artifactId === null).length;
+  if (adding > 0 && !(await hasRoomFor(artifactId, adding))) {
+    throw new UserFacingError(`An artifact holds at most ${String(fileLimits.maxFilesPerArtifact)} files. Remove some first.`);
+  }
+  return usable.map((row) => row.id);
 }
 
 async function mayEditArtifact(userId: string, artifactId: string) {

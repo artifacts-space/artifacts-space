@@ -1,6 +1,8 @@
 import {
   IconBlockquote,
   IconCode,
+  IconFile,
+  IconFileTypePdf,
   IconH1,
   IconH2,
   IconH3,
@@ -8,10 +10,22 @@ import {
   IconListCheck,
   IconListNumbers,
   IconMinus,
+  IconMovie,
+  IconMusic,
+  IconPhoto,
   IconTable,
   type Icon,
 } from "@tabler/icons-react";
 import type { ChainedCommands, Editor, Range } from "@tiptap/core";
+
+import type { MediaKind } from "@/lib/files/media-rules";
+
+import { emptyMediaAttrs, MEDIA_NODE } from "./media-markdown";
+
+/** Inserts an empty media block of `kind`; it offers an upload or a link. */
+function insertMedia(chain: ChainedCommands, kind: MediaKind): ChainedCommands {
+  return chain.insertContent({ type: MEDIA_NODE, attrs: emptyMediaAttrs(kind) });
+}
 
 /** One block the slash menu can insert. */
 export interface SlashCommand {
@@ -35,7 +49,22 @@ export const slashCommands: readonly SlashCommand[] = [
   { id: "code", title: "Code block", hint: "```", keywords: ["pre", "snippet", "fence"], icon: IconCode, apply: (chain) => chain.toggleCodeBlock() },
   { id: "table", title: "Table", hint: "3×3", keywords: ["grid", "columns", "rows"], icon: IconTable, apply: (chain) => chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }) },
   { id: "divider", title: "Divider", hint: "---", keywords: ["hr", "rule", "separator", "line"], icon: IconMinus, apply: (chain) => chain.setHorizontalRule() },
+  { id: "image", title: "Image", hint: "![]", keywords: ["image", "picture", "photo", "screenshot", "img"], icon: IconPhoto, apply: (chain) => insertMedia(chain, "image") },
+  { id: "video", title: "Video", hint: "#video", keywords: ["video", "movie", "mp4", "recording"], icon: IconMovie, apply: (chain) => insertMedia(chain, "video") },
+  { id: "audio", title: "Audio", hint: "#audio", keywords: ["audio", "sound", "mp3", "podcast", "voice"], icon: IconMusic, apply: (chain) => insertMedia(chain, "audio") },
+  { id: "pdf", title: "PDF", hint: "#pdf", keywords: ["pdf", "document", "report"], icon: IconFileTypePdf, apply: (chain) => insertMedia(chain, "pdf") },
+  { id: "file", title: "File", hint: "#file", keywords: ["file", "attachment", "upload", "download"], icon: IconFile, apply: (chain) => insertMedia(chain, "file") },
 ];
+
+const mediaCommandIds = new Set(["image", "video", "audio", "pdf", "file"]);
+
+/** The text blocks only, for editors that can't hold media (a ui artifact's Markdown block). */
+export const textSlashCommands: readonly SlashCommand[] = slashCommands.filter((command) => !mediaCommandIds.has(command.id));
+
+/** The commands an editor offers: every block, or text blocks only when `media` is false. */
+export function slashCommandsFor(media: boolean): readonly SlashCommand[] {
+  return media ? slashCommands : textSlashCommands;
+}
 
 /**
  * The commands that match what was typed after the slash, by title,

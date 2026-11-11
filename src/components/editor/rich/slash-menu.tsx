@@ -8,7 +8,7 @@ import { useEffect, useImperativeHandle, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
-import { filterSlashCommands, runSlashCommand, type SlashCommand } from "./slash-commands";
+import { filterSlashCommands, runSlashCommand, slashCommands, type SlashCommand } from "./slash-commands";
 
 const listboxId = "rich-editor-slash-menu";
 
@@ -158,19 +158,26 @@ function allowSlash({ editor }: { editor: Editor; range: Range }) {
 
 /**
  * Typing `/` opens a menu of blocks to insert: headings, lists, task list,
- * quote, code block, table, and divider. Typing filters it.
+ * quote, code block, table, divider, and media (image, video, audio, PDF,
+ * file). Typing filters it. The `commands` option narrows the menu, as for
+ * editors without media.
  */
-export const SlashCommandExtension = Extension.create({
+export const SlashCommandExtension = Extension.create<{ commands: readonly SlashCommand[] }>({
   name: "slashCommand",
 
+  addOptions() {
+    return { commands: slashCommands };
+  },
+
   addProseMirrorPlugins() {
+    const commands = this.options.commands;
     return [
       Suggestion<SlashCommand, SlashCommand>({
         editor: this.editor,
         char: "/",
         allowSpaces: false,
         allow: allowSlash,
-        items: ({ query }) => filterSlashCommands(query),
+        items: ({ query }) => filterSlashCommands(query, commands),
         command: ({ editor, range, props }) => { runSlashCommand(editor, range, props); },
         offset: { mainAxis: 6 },
         floatingUi: { middleware: menuMiddleware },

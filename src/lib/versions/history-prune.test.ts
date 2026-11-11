@@ -4,12 +4,12 @@ import { artifact, artifactVersion, sharingRequest } from "@/db/schema";
 import { createTableQueueDb } from "@/lib/files/table-queue-db";
 
 /*
- * History pruning takes the icon and cover images only the dropped versions
- * showed with it. The image cleanup itself is tested in icon-cleanup.test.ts.
+ * History pruning takes the icon and cover images, and the removed media,
+ * only the dropped versions showed with it. The image cleanup itself is tested in icon-cleanup.test.ts.
  */
 
 const state = vi.hoisted((): { db: unknown } => ({ db: null }));
-const cleanup = vi.hoisted(() => ({ pruneUnusedIconFilesQuietly: vi.fn() }));
+const cleanup = vi.hoisted(() => ({ pruneUnusedIconFilesQuietly: vi.fn(), pruneUnusedContentFilesQuietly: vi.fn() }));
 
 vi.mock("@/db", () => ({ getDb: () => state.db }));
 vi.mock("@/lib/files/icon-cleanup", () => cleanup);
@@ -33,6 +33,7 @@ function stageVersions(versions: Record<string, unknown>[]) {
 beforeEach(() => {
   vi.resetAllMocks();
   cleanup.pruneUnusedIconFilesQuietly.mockResolvedValue(undefined);
+  cleanup.pruneUnusedContentFilesQuietly.mockResolvedValue(undefined);
 });
 
 describe("pruneArtifactVersions", () => {
@@ -53,6 +54,15 @@ describe("pruneArtifactVersions", () => {
     await expect(pruneArtifactVersions("a1", now)).resolves.toBe(1);
     expect(cleanup.pruneUnusedIconFilesQuietly).not.toHaveBeenCalled();
   });
+
+  it("should check the artifact's removed media when pruning drops a version, since it may have been the last to embed them", async () => {
+    stageVersions([
+      { id: "v3", savedAt: now, icon: null, cover: null },
+      { id: "v1", savedAt: longAgo, icon: null, cover: null },
+    ]);
+    await expect(pruneArtifactVersions("a1", now)).resolves.toBe(1);
+    expect(cleanup.pruneUnusedContentFilesQuietly).toHaveBeenCalledWith("a1");
+  });
 });
 
 describe("pruneAllVersions", () => {
@@ -69,5 +79,6 @@ describe("pruneAllVersions", () => {
     await expect(pruneAllVersions()).resolves.toEqual({ removed: 3, remaining: false });
     expect(cleanup.pruneUnusedIconFilesQuietly).toHaveBeenCalledTimes(1);
     expect(cleanup.pruneUnusedIconFilesQuietly).toHaveBeenCalledWith("a1", [`file:${fileId}`]);
+    expect(cleanup.pruneUnusedContentFilesQuietly.mock.calls).toEqual([["a1"], ["a2"]]);
   });
 });

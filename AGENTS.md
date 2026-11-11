@@ -64,9 +64,8 @@ becomes the commit on `main` and must be a conventional commit message.
 
 CI (`.github/workflows/ci.yml`) runs on pull requests, in the merge queue, and
 on `main`. The required checks are the job names: **Lint and typecheck**,
-**Unit tests**, **Build**, **Component gallery**, and **Dependency review**.
-**Database tests** also runs on every pull request but is not required yet:
-until the owner adds it to the ruleset, a red run blocks nothing at merge.
+**Unit tests**, **Build**, **Database tests**, **Component gallery**, and
+**Dependency review**.
 The build needs no secrets; keep it that way, and create database, auth,
 email, and R2 clients on first request, never at import time. CodeQL scans
 the code and the workflows. Dependabot opens grouped weekly updates and waits
@@ -343,6 +342,27 @@ deletes one only when it leaves every retained version (history pruning in
 `versions/history.ts` hands it the dropped versions' images) or with the
 artifact. Kept images never widen access: readers of the approved version get
 only that version's icon and cover (`served-images.ts`, `canReadFile`).
+
+### Media in documents
+
+Markdown artifacts embed uploads as image syntax alone in a paragraph,
+`![alt](/api/files/<id>#<options> "Caption")`; the dialect, with every
+block's Markdown form and the block node conventions, is
+`src/components/editor/rich/markdown-dialect.md`. The URL rules live in
+`src/lib/files/media-rules.ts`. Embedded files follow the icon and cover
+rules above: a save attaches the editor's own uploads it names, a save that
+drops one files its own version so Restore brings it back, and readers of the
+approved version never load a file that version does not show
+(`served-images.ts`). Only content media, files a content save itself
+attached (`artifact_file.attached_by_content`, set by `attachFileRows(…, {
+byContent: true })`), follows these rules: hidden from readers of a version
+that does not show it, not counted toward the file limit while only older
+versions name it, and deleted once none does (`icon-cleanup.ts`). Files
+attached any other way (`files_attach`, the Files panel, and all files from
+before the column) are plain attachments that pruning never removes, even
+after content links them. A ui artifact's Markdown block is text only
+(`media={false}`). Images from other sites never load. Add each new block
+to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
 
 ### Agent harnesses
 

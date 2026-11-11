@@ -27,6 +27,23 @@ export const COVER_GUIDE =
 export const THEME_GUIDE =
   'Any format can carry a theme (colors, fonts, and corner radius for the artifact and the page behind it): set `theme` on artifacts_create or artifacts_update to a preset id from themes_list (such as "paper"), or to theme JSON (see /docs/themes). Pass null or "" on update to remove it.';
 
+/** How agents embed uploaded files in Markdown: the media block form from markdown-dialect.md. */
+export const MARKDOWN_MEDIA_GUIDE = [
+  "Embed uploaded files in Markdown:",
+  "1) Upload the file: files_request_upload, PUT the bytes, then files_finalize. Keep the file id.",
+  "2) Put a media block on its own line, with a blank line before and after it:",
+  "   ![Alt text](/api/files/<file id>)",
+  '   ![Alt text](/api/files/<file id> "Caption under the image")',
+  "3) Add options after # to change how it shows, joined with &:",
+  "   #width=60 sets the width in percent of the text column (10 to 100). Images and video only. Phones always use the full width.",
+  "   #video, #audio, or #pdf shows a player or the PDF viewer. #file shows a download card. Leave the kind out for an image.",
+  "   Example: ![Product walkthrough](/api/files/<file id>#video&width=80 \"Two minutes\")",
+  "For video, audio, and PDFs, the text in the brackets is the name people see.",
+  "Saving the artifact attaches your finished uploads that it names. You do not need files_attach. Readers can open a file only when they can read the artifact version that shows it.",
+  "Use the relative path /api/files/<file id>, not a full URL. Images from other sites never load: they show as their alt text.",
+  "Keep the image alone on its line. An image inside a sentence shows inline, and the editor keeps that paragraph as written.",
+].join("\n");
+
 function text(value: string) {
   return { content: [{ type: "text" as const, text: value }] };
 }
@@ -34,6 +51,7 @@ function text(value: string) {
 /** The guide for one format, or an overview of all formats. */
 export function formatGuide(kind?: FormatKind): string {
   if (kind === "ui") return buildUiGuide();
+  if (kind === "markdown") return `${formatInfo.markdown.label} (markdown): ${formatInfo.markdown.agent}\n\n${MARKDOWN_MEDIA_GUIDE}`;
   if (kind) return `${formatInfo[kind].label} (${kind}): ${formatInfo[kind].agent}`;
   const lines = artifactKinds.map((item) => `- ${item}: ${formatInfo[item].agent}`);
   const uiHint = (artifactKinds as readonly string[]).includes("ui") ? ['', 'For rich pages, call artifacts_formats_guide with kind "ui" to get the component reference and an example.'] : [];

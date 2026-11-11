@@ -15,6 +15,14 @@ describe("formatGuide", () => {
     expect(formatGuide()).toContain("tabler:rocket");
   });
 
+  it("should explain how to embed an uploaded file when the kind is markdown", () => {
+    const guide = formatGuide("markdown");
+    expect(guide).toContain("![Alt text](/api/files/<file id>)");
+    expect(guide).toContain("#width=60");
+    expect(guide).toContain("#video");
+    expect(guide).toContain("files_finalize");
+  });
+
   it("should include rules, the generated component list, and the example when the kind is ui", () => {
     const guide = formatGuide("ui");
     expect(guide).toContain("## Rules");

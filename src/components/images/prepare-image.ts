@@ -11,9 +11,9 @@ import {
 } from "@/lib/images/prepare-rules";
 
 /**
- * Prepares a picked image as a cover or an icon in the browser: decoded
+ * Prepares a picked image as a cover, an icon, or a document image in the browser: decoded
  * upright (camera orientation applied), scaled so its longest side fits the
- * profile (2400 px for covers, 512 px for icons), and re-encoded as a JPEG
+ * profile (2400 px for covers and documents, 512 px for icons), and re-encoded as a JPEG
  * (or a PNG that keeps its transparency when it fits the cap). Drawing it
  * fresh drops the camera metadata, so no GPS position ends up in a page.
  * The rules live in src/lib/images/prepare-rules.ts; the server still checks

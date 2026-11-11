@@ -3,6 +3,7 @@ import { csvColumnCap, csvRowCap } from "@/lib/csv-limits";
 import { parseCsv } from "@/lib/csv";
 import { csvDownloadOffNote } from "@/lib/csv-export/rules";
 import { fileTypeLabel } from "@/lib/files/config";
+import { absoluteFileLinks } from "@/lib/files/media-rules";
 import { prettyJson } from "@/lib/pretty-json";
 import { formatSize } from "@/lib/relative-time";
 
@@ -109,10 +110,25 @@ type ContentInput = Pick<ArtifactMarkdownInput, "kind" | "language" | "content" 
 
 const asIs = (input: ContentInput) => input.content;
 
+/** The site's origin, from the absolute raw URL, or "" when it is not absolute. */
+function originOf(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "";
+  }
+}
+
+/** Markdown with its uploaded files linked absolutely, so media and file links work wherever the Markdown is read. */
+const withAbsoluteFiles = (input: ContentInput) => {
+  const origin = originOf(input.rawUrl);
+  return origin ? absoluteFileLinks(input.content, origin) : input.content;
+};
+
 const byFormat: Record<ArtifactKind, (input: ContentInput) => string> = {
-  markdown: asIs,
+  markdown: withAbsoluteFiles,
   text: asIs,
-  file: asIs,
+  file: withAbsoluteFiles,
   code: (input) => fenced(input.content, input.language),
   json: (input) => fenced(prettyJson(input.content) ?? input.content, "json"),
   csv: (input) => csvToMarkdown(input.content, input.rawUrl),

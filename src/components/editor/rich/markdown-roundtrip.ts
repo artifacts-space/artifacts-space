@@ -153,8 +153,8 @@ function isDefinition(token: unknown): boolean {
 
 /**
  * Parses Markdown into editor content, block by block. Blocks the editor
- * cannot represent (raw HTML, images, footnotes, link definitions, and
- * anything that would not survive a round trip) become raw blocks that keep
+ * cannot represent (raw HTML, images inside text, footnotes, link
+ * definitions, and anything that would not survive a round trip) become raw blocks that keep
  * their source exactly. The returned map lets `serializeMarkdown` write
  * untouched blocks back byte for byte.
  */
@@ -233,7 +233,9 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine): Chu
     }
     position += 1;
     if (!node || isEmptyParagraph(node)) continue;
-    chunks.push({ text: renderNodes([node], current), block: -1 });
+    const text = renderNodes([node], current);
+    // A block with no Markdown yet (an empty or uploading media block) is left out.
+    if (text) chunks.push({ text, block: -1 });
   }
   return chunks;
 }

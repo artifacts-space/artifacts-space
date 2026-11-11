@@ -191,9 +191,14 @@ function CodeBlockField({ id, props }: BlockProps<"Code">) {
 /** The rich Markdown editor, loaded only when an interface has a Markdown block. */
 const RichMarkdownEditor = dynamic(() => import("@/components/editor/rich-markdown-editor"), { ssr: false });
 
+/**
+ * A Markdown block in an interface. It holds text only (`media={false}`): a
+ * ui artifact's saves attach only Image and File block files, so an upload
+ * here would never attach. Media in Markdown blocks is a later phase.
+ */
 function MarkdownBlock({ id, props }: BlockProps<"Markdown">) {
   const { setProp } = useBlockEditor();
-  return <RichMarkdownEditor value={props.content} onChange={(content) => { setProp(id, "content", content); }} label="Markdown" sourceToggle={false} />;
+  return <RichMarkdownEditor value={props.content} onChange={(content) => { setProp(id, "content", content); }} label="Markdown" sourceToggle={false} media={false} />;
 }
 
 /** Blocks typed into in place, by component. Every other component renders its view and edits through View source. */

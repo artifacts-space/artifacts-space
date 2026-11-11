@@ -1,19 +1,29 @@
 import { and, eq, like, or } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { artifactVersion } from "@/db/schema";
+import { artifactVersion, type ArtifactFileRecord } from "@/db/schema";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 import type { ArtifactAccess } from "@/lib/access";
 
+import { filesAttachedByContent } from "./content-files";
 import { hiddenImageFiles, imageFileIdsOf } from "./icon-cleanup-rules";
 import { fileRefsInContent } from "./refs";
 
 /**
- * Old icon and cover images stay attached while any version in the history
- * shows them, so Restore can bring them back. Readers outside the team, who
- * get the approved version, must still see only that version's images; this
- * finds the ones to hide from them.
+ * Old icon and cover images, and content media (files a content save
+ * attached), stay attached while any version in the history shows them, so
+ * Restore can bring them back. Readers outside the team, who get the
+ * approved version, must still see only that version's images and media;
+ * this finds the ones to hide from them.
+ *
+ * Content media is the file row's `attached_by_content` (content-files.ts),
+ * not a scan of the versions kept today: pruning drops old versions, and a
+ * file removed from the document must stay hidden after the versions that
+ * showed it are gone. A file attached any other way is a plain attachment
+ * and is never hidden here, even when some version links it.
  */
+
+type ServedViewer = Pick<ArtifactAccess, "record" | "version" | "served">;
 
 /** Every uploaded image the artifact's versions or latest save show as an icon or cover. */
 async function imagesEverShown(viewable: Pick<ArtifactAccess, "record">): Promise<Set<string>> {
@@ -24,25 +34,63 @@ async function imagesEverShown(viewable: Pick<ArtifactAccess, "record">): Promis
   return new Set([...rows, viewable.record].flatMap(imageFileIdsOf));
 }
 
-/** The file references in the approved version's content; only ui content has any. */
-async function approvedContentRefs(versionId: string, kind: string): Promise<string[]> {
-  if (kind !== "ui") return [];
-  const [row] = await getDb().select({ content: artifactVersion.content }).from(artifactVersion).where(eq(artifactVersion.id, versionId)).limit(1);
-  return row ? fileRefsInContent(kind, row.content) : [];
+/** Whether any version, or the latest save, shows this one file as its icon or cover. */
+async function shownAsImage(viewable: Pick<ArtifactAccess, "record">, fileId: string): Promise<boolean> {
+  if (imageFileIdsOf(viewable.record).includes(fileId)) return true;
+  const ref = `${FILE_PREFIX}${fileId}`;
+  const [row] = await getDb()
+    .select({ id: artifactVersion.id })
+    .from(artifactVersion)
+    .where(and(eq(artifactVersion.artifactId, viewable.record.id), or(eq(artifactVersion.icon, ref), like(artifactVersion.icon, `${ref}@%`), eq(artifactVersion.cover, ref), like(artifactVersion.cover, `${ref}@%`))))
+    .limit(1);
+  return row !== undefined;
+}
+
+/** The file references in the approved version's content (ui and Markdown). */
+async function approvedContentRefs(versionId: string): Promise<string[]> {
+  const [row] = await getDb().select({ kind: artifactVersion.kind, content: artifactVersion.content }).from(artifactVersion).where(eq(artifactVersion.id, versionId)).limit(1);
+  return row ? fileRefsInContent(row.kind, row.content) : [];
+}
+
+/** The approved version's id when this viewer reads it and could have hidden files; otherwise null. */
+function approvedVersionToCheck(viewable: ServedViewer): string | null {
+  const { versionId } = viewable.version;
+  if (viewable.version.source !== "approved" || versionId === null) return null;
+  return viewable.record.kind === "file" ? null : versionId;
+}
+
+/** Of `shown`, the files the approved version shows neither as its icon or cover nor from its content. */
+async function notServed(viewable: ServedViewer, versionId: string, shown: ReadonlySet<string>): Promise<Set<string>> {
+  const served = new Set(imageFileIdsOf(viewable.served));
+  if ([...shown].every((fileId) => served.has(fileId))) return new Set();
+  const contentRefs = await approvedContentRefs(versionId);
+  return hiddenImageFiles(shown, { icon: viewable.served.icon, cover: viewable.served.cover, kind: viewable.record.kind, contentRefs });
 }
 
 /**
- * The icon and cover images this viewer may not open: for a reader of the
- * approved version, images other versions showed that the approved version
- * does not. Empty for everyone who reads the latest version (the author and
- * the team), who may read the whole history anyway.
+ * The kept files this viewer may not open: for a reader of the approved
+ * version, images any version showed as an icon or cover, and content
+ * media, that the approved version does not show. Empty for
+ * everyone who reads the latest version (the author and the team), who may
+ * read the whole history anyway. For the file list; one file's request
+ * uses fileHiddenFor.
  */
-export async function hiddenImagesFor(viewable: Pick<ArtifactAccess, "record" | "version" | "served">): Promise<ReadonlySet<string>> {
-  const { versionId } = viewable.version;
-  if (viewable.version.source !== "approved" || versionId === null) return new Set();
-  const shown = await imagesEverShown(viewable);
-  const served = new Set(imageFileIdsOf(viewable.served));
-  if ([...shown].every((fileId) => served.has(fileId))) return new Set();
-  const contentRefs = await approvedContentRefs(versionId, viewable.record.kind);
-  return hiddenImageFiles(shown, { icon: viewable.served.icon, cover: viewable.served.cover, kind: viewable.record.kind, contentRefs });
+export async function hiddenImagesFor(viewable: ServedViewer): Promise<ReadonlySet<string>> {
+  const versionId = approvedVersionToCheck(viewable);
+  if (versionId === null) return new Set();
+  const [images, contentFiles] = await Promise.all([imagesEverShown(viewable), filesAttachedByContent(viewable.record.id)]);
+  return notServed(viewable, versionId, new Set([...images, ...contentFiles]));
+}
+
+/**
+ * Whether this viewer may not open one file of the artifact, by the same
+ * rule as hiddenImagesFor, at the cost of one small query or two: the file
+ * row already says whether it is content media, so no version is scanned.
+ */
+export async function fileHiddenFor(viewable: ServedViewer, file: Pick<ArtifactFileRecord, "id" | "attachedByContent">): Promise<boolean> {
+  const versionId = approvedVersionToCheck(viewable);
+  if (versionId === null) return false;
+  const kept = file.attachedByContent || (await shownAsImage(viewable, file.id));
+  if (!kept) return false;
+  return (await notServed(viewable, versionId, new Set([file.id]))).has(file.id);
 }

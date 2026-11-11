@@ -12,6 +12,7 @@ import { AvatarGallery } from "@/components/dev/avatar-gallery";
 import { ArtifactHeaderSpecimen } from "@/components/dev/artifact-header-specimen";
 import { CoverSpecimen } from "@/components/dev/cover-specimen";
 import { HarnessSpecimen } from "@/components/dev/harness-specimen";
+import { imageStandIn, mediaFixtureFiles, mediaStandInUrl } from "@/components/dev/media-stand-ins";
 import { NotificationsSpecimen } from "@/components/dev/notifications-specimen";
 import { SwitchSpecimen } from "@/components/dev/switch-specimen";
 import { ThemeFocusSpecimen } from "@/components/dev/theme-focus-specimen";
@@ -23,7 +24,7 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { uiComponentNames } from "@/lib/ui/catalog";
 import { componentFixtures, fixtureFiles, fixtureSpec } from "@/lib/ui/fixtures/components";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
-import { formatFixtures } from "@/lib/ui/fixtures/formats";
+import { formatFixtures, mediaFormatFixtures, type FormatFixture } from "@/lib/ui/fixtures/formats";
 import { deepSpec, invalidPropsSpec, javascriptLinkSpec, manyElementsSpec, repeatSpec, unknownTypeSpec } from "@/lib/ui/fixtures/specs";
 import { mcpClients } from "@/lib/setup/client-installs";
 import { presetTheme } from "@/lib/themes/resolve";
@@ -38,14 +39,24 @@ const specFixtures: { name: string; spec: unknown }[] = [
   { name: "Too deep (21)", spec: deepSpec(21) },
 ];
 
-/** Gallery files are not uploaded: every one shows a local stand-in image instead. */
-/**
- * Every fixture file (image, PDF, video) shows this stand-in. It is an inline
- * data URL, not a file on this site: the site sends frame-ancestors 'none'
- * (src/lib/security-header-rules.ts), so a PDF iframe pointed at a site path
- * would be blocked, while the real viewer frames /api/files, which allows it.
- */
-const standInUrl = () => "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 3'%3E%3Crect width='4' height='3' fill-opacity='.08'/%3E%3C/svg%3E";
+/** Gallery files are not uploaded: outside the media group, every one (image or PDF) shows the SVG stand-in (media-stand-ins.ts). */
+const standInUrl = () => imageStandIn;
+
+/** One format viewer specimen, with the gallery's stand-in files (or the media group's, which add a video and a recording). */
+function FormatSpecimen({ fixture, media = false }: { fixture: FormatFixture; media?: boolean }) {
+  return (
+    <Specimen name={`${fixture.kind} · ${fixture.name}`}>
+      <ArtifactFilesProvider files={media ? mediaFixtureFiles : fixtureFiles} urlFor={media ? mediaStandInUrl : standInUrl}>
+        {/* Sheets keep each viewer's column widths and order per artifact; here, per specimen. */}
+        <SheetKeyContext value={`gallery-${fixture.name}`}>
+          <SheetFormatProvider stored={fixture.sheetFormat ?? plainSheetFormat} save={null}>
+            <ArtifactView kind={fixture.kind} content={fixture.content} language={fixture.language} title={fixture.name} />
+          </SheetFormatProvider>
+        </SheetKeyContext>
+      </ArtifactFilesProvider>
+    </Specimen>
+  );
+}
 
 function Specimen({ name, children }: { name: string; children: ReactNode }) {
   return (
@@ -107,6 +118,7 @@ export function ComponentGallery() {
         <a href="#notifications" className="hover:text-foreground">Notifications</a>
         <a href="#clients" className="hover:text-foreground">Clients</a>
         <a href="#harnesses" className="hover:text-foreground">Agents</a>
+        <a href="#media" className="hover:text-foreground">Media</a>
       </nav>
       <div className="space-y-12">
         {uiComponentNames.map((name) => (
@@ -128,18 +140,7 @@ export function ComponentGallery() {
           ))}
         </Group>
         <Group id="formats" title="Format viewers">
-          {formatFixtures.map((fixture) => (
-            <Specimen key={fixture.name} name={`${fixture.kind} · ${fixture.name}`}>
-              <ArtifactFilesProvider files={fixtureFiles} urlFor={standInUrl}>
-                {/* Sheets keep each viewer's column widths and order per artifact; here, per specimen. */}
-                <SheetKeyContext value={`gallery-${fixture.name}`}>
-                  <SheetFormatProvider stored={fixture.sheetFormat ?? plainSheetFormat} save={null}>
-                    <ArtifactView kind={fixture.kind} content={fixture.content} language={fixture.language} title={fixture.name} />
-                  </SheetFormatProvider>
-                </SheetKeyContext>
-              </ArtifactFilesProvider>
-            </Specimen>
-          ))}
+          {formatFixtures.map((fixture) => <FormatSpecimen key={fixture.name} fixture={fixture} />)}
         </Group>
         <Group id="themes" title="Themes">
           {themeFixtureIds.map((id) => <ThemedSpecimen key={id} id={id} />)}
@@ -186,6 +187,10 @@ export function ComponentGallery() {
         </Group>
         <Group id="harnesses" title="Agent harnesses">
           <HarnessSpecimen />
+        </Group>
+        {/* Last: media blocks change height as they load, which would move any group under them. */}
+        <Group id="media" title="Media blocks">
+          {mediaFormatFixtures.map((fixture) => <FormatSpecimen key={fixture.name} fixture={fixture} media />)}
         </Group>
       </div>
     </div>

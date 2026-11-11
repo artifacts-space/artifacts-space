@@ -724,6 +724,10 @@
   .artifact-prose :where(p, ul, ol, blockquote, pre, table, hr) {
     margin-top: 0.9em;
   }
+  /* Media blocks (markdown-dialect.md) sit a little further from the text than a paragraph does. */
+  .artifact-prose :where(.artifact-media) {
+    margin-top: 1.25em;
+  }
   .artifact-prose :where(ul, ol) {
     padding-left: 1.4em;
   }
@@ -903,6 +907,12 @@
     color: var(--code-foreground);
     white-space: pre;
     tab-size: 2;
+  }
+  .rich-editor-content .rich-media {
+    margin-top: 1.25em;
+  }
+  .rich-editor-content .rich-media .artifact-media {
+    margin-top: 0;
   }
   .rich-editor-content .rich-raw-block {
     margin-top: 0.9em;
