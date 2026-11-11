@@ -22,7 +22,7 @@ import { getArtifactVersionDetail, listArtifactVersions } from "./history-querie
 
 const publicIdSchema = z.string().refine(isPublicId, "Artifact not found.");
 const versionIdSchema = z.uuid("That version is not in the history.");
-const expectedSchema = z.iso.datetime({ offset: true }).optional();
+const expectedSchema = z.iso.datetime({ offset: true, error: "Reload the artifact and try again." });
 
 async function run<T>(fallback: string, action: (userId: string) => Promise<T>): Promise<ActionResult<T>> {
   try {
@@ -61,11 +61,11 @@ export async function getVersionAction(publicId: string, versionId: string): Pro
 
 /**
  * Restores a version as a new save. `expectedUpdatedAt` is the artifact's
- * updatedAt the person saw; a newer save by another person refuses the
- * restore. Over agents' newer saves it goes through, and `savedOverAgents`
+ * updatedAt the person saw, and it is required, like every web save's base:
+ * a newer save by another person refuses the restore. Over agents' newer saves it goes through, and `savedOverAgents`
  * says so (their versions stay in History).
  */
-export async function restoreVersionAction(publicId: string, versionId: string, expectedUpdatedAt?: string): Promise<ActionResult<RestoredVersion>> {
+export async function restoreVersionAction(publicId: string, versionId: string, expectedUpdatedAt: string): Promise<ActionResult<RestoredVersion>> {
   return run("The version could not be restored. Try again.", async (userId) => {
     const record = await editable(userId, publicId);
     const options = { expectedUpdatedAt: expectedSchema.parse(expectedUpdatedAt) };

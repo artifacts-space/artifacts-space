@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifactEditLease } from "@/db/edit-lease-schema";
@@ -39,9 +39,14 @@ export function agentWriteCondition(artifactId: string, input: { base: BaseVersi
 /**
  * SQL: a version saved by a person (in the web app, or a person's restore or
  * file change), from the version's own `by_agent`, or for versions from
- * before that column, from its harness (none: the web app).
+ * before that column, from its harness (none: the web app). `alias` is the
+ * name the query gives `artifact_version`, so the fragment always names a
+ * table that is in its FROM clause.
  */
-export const personVersion = sql`coalesce(v.by_agent, v.harness is not null) = false`;
+export function personVersion(alias: string): SQL {
+  const table = sql.identifier(alias);
+  return sql`coalesce(${table}.by_agent, ${table}.harness is not null) = false`;
+}
 
 /**
  * The relaxed condition a person's web save falls back to when the artifact
@@ -66,7 +71,7 @@ export function onlyAgentsSavedSince(artifactId: string, expected: Date) {
   const base = sql`${expected.toISOString()}::timestamptz`;
   const notAhead = sql`date_trunc('milliseconds', ${artifact.updatedAt}) >= ${base}`;
   const noPersonSaveRecorded = sql`(${artifact.personSavedAt} is null or date_trunc('milliseconds', ${artifact.personSavedAt}) <= ${base})`;
-  const noPersonVersion = sql`not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and ${personVersion} and date_trunc('milliseconds', v.saved_at) > ${base})`;
+  const noPersonVersion = sql`not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and ${personVersion("v")} and date_trunc('milliseconds', v.saved_at) > ${base})`;
   return sql`(${notAhead} and ${noPersonSaveRecorded} and ${noPersonVersion})`;
 }
 

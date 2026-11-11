@@ -60,7 +60,7 @@ describe("onlyAgentsSavedSince", () => {
   it("should refuse a base later than the row's last save and any newer person save, recorded or versioned", () => {
     expect(sql).toContain(`date_trunc('milliseconds', "artifact"."updated_at") >= $`);
     expect(sql).toContain(`"artifact"."person_saved_at" is null or date_trunc('milliseconds', "artifact"."person_saved_at") <= $`);
-    expect(sql).toContain("coalesce(v.by_agent, v.harness is not null) = false");
+    expect(sql).toContain(`coalesce("v".by_agent, "v".harness is not null) = false`);
     expect(params.filter((value) => value === base.toISOString())).toHaveLength(3);
   });
 });
