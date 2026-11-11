@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { fakeDatabaseUrl } from "../src/test/fake-database-url";
+import { fakeDatabaseUrl, fakeNeonHost } from "../src/test/fake-database-url";
 
 import { describeError, pendingTags, planMigration, redact, secretsFrom } from "./migrate-on-deploy.mjs";
 
-// Production runs on Neon, so the redact tests use a Neon-shaped host. Its
-// parts are joined at run time so secret scanners do not flag the fixture.
+// Production runs on Neon, so the redact tests use a Neon-shaped host
+// (joined from parts; see src/test/fake-database-url.ts for why).
 const user = "fake_owner";
 const password = "fake-password";
 const endpoint = "ep-fake-endpoint-000000";
-const host = [endpoint, "us-east-2", "aws", "neon", "tech"].join(".");
+const host = fakeNeonHost(endpoint);
 const url = fakeDatabaseUrl({ user, password, host, database: "fake_db", query: "sslmode=require" });
 
 describe("planMigration", () => {

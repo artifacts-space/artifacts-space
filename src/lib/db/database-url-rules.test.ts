@@ -5,16 +5,15 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { fakeDatabaseUrl } from "@/test/fake-database-url";
+import { fakeDatabaseUrl, fakeNeonHost, neonDomain } from "@/test/fake-database-url";
 
 import { drizzleDatabaseUrl, drizzleKitCommand, e2eDevServerDatabaseEnv, isLocalDatabaseUrl, sharedMigrateRefusal } from "./database-url-rules";
 
-// The shared database in .env.local is on Neon, so these hosts look like Neon's.
-// They are joined from parts at run time so secret scanners do not flag them.
-const neonDomain = ["neon", "tech"].join(".");
+// The shared database in .env.local is on Neon, so these hosts look like Neon's
+// (joined from parts; see src/test/fake-database-url.ts for why).
 const sharedPassword = "fake-password";
-const shared = fakeDatabaseUrl({ user: "app", password: sharedPassword, host: ["ep-shared", "example", neonDomain].join("."), database: "app" });
-const sharedDirect = fakeDatabaseUrl({ user: "app", password: sharedPassword, host: ["ep-shared-direct", "example", neonDomain].join("."), database: "app" });
+const shared = fakeDatabaseUrl({ user: "app", password: sharedPassword, host: fakeNeonHost("ep-shared"), database: "app" });
+const sharedDirect = fakeDatabaseUrl({ user: "app", password: sharedPassword, host: fakeNeonHost("ep-shared-direct"), database: "app" });
 const local = fakeDatabaseUrl({ user: "ci", password: "ci", host: "localhost", port: 55432, database: "artifacts_test" });
 const file = { DATABASE_URL: shared, DATABASE_URL_UNPOOLED: sharedDirect };
 

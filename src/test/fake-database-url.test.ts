@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fakeDatabaseUrl } from "./fake-database-url";
+import { fakeDatabaseUrl, fakeNeonHost, neonDomain } from "./fake-database-url";
 
 describe("fakeDatabaseUrl", () => {
   it("should build a URL that parses into the given parts when every part is set", () => {
@@ -24,5 +24,28 @@ describe("fakeDatabaseUrl", () => {
     const url = new URL(fakeDatabaseUrl());
     expect(url.hostname).toBe("db.example.com");
     expect(url.password).toBe("fake-password");
+  });
+
+  it("should keep the host when the user or password holds reserved characters", () => {
+    const url = new URL(fakeDatabaseUrl({ user: "a@b", password: "p@ss:w/rd?#", host: "db.test", database: "x/y" }));
+    expect(url.hostname).toBe("db.test");
+    expect(decodeURIComponent(url.username)).toBe("a@b");
+    expect(decodeURIComponent(url.password)).toBe("p@ss:w/rd?#");
+    expect(decodeURIComponent(url.pathname)).toBe("/x/y");
+  });
+
+  it("should throw when the host or query holds a reserved character", () => {
+    expect(() => fakeDatabaseUrl({ host: "evil@db.test" })).toThrow("host");
+    expect(() => fakeDatabaseUrl({ host: "db.test:5432" })).toThrow("host");
+    expect(() => fakeDatabaseUrl({ query: "a=1#frag" })).toThrow("query");
+  });
+});
+
+describe("fakeNeonHost", () => {
+  it("should put the endpoint first and end with Neon's domain", () => {
+    const host = fakeNeonHost("ep-test-000000");
+    expect(host.startsWith("ep-test-000000.")).toBe(true);
+    expect(host.endsWith(`.${neonDomain}`)).toBe(true);
+    expect(new URL(fakeDatabaseUrl({ host })).hostname).toBe(host);
   });
 });
