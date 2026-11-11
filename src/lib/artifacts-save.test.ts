@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
   enforceRateLimit: vi.fn(() => Promise.resolve()),
   hasLiveLease: vi.fn(() => Promise.resolve(false)),
   selected: vi.fn((): unknown[] => []),
-  writeAndAttach: vi.fn((rows: unknown[]) => Promise.resolve(rows[0] ?? null)),
+  writeAndAttachWith: vi.fn((rows: unknown[]) => Promise.resolve(rows[0] ? { record: rows[0], note: null } : null)),
 }));
 
 vi.mock("@/db", () => ({
@@ -30,7 +30,7 @@ vi.mock("@/db", () => ({
     update: () => ({
       set: (values: Record<string, unknown>) => {
         mocks.set(values);
-        // The guarded UPDATE goes to writeAndAttach as SQL; here its "SQL" is the rows it would return.
+        // The guarded UPDATE goes to writeAndAttachWith as SQL; here its "SQL" is the rows it would return.
         return { where: () => ({ returning: () => ({ getSQL: () => mocks.returned(values) as unknown[] }) }) };
       },
     }),
@@ -46,7 +46,8 @@ vi.mock("@/lib/quota/usage", () => ({ assertContentFits: () => Promise.resolve()
 vi.mock("@/lib/files/attach", () => ({ checkContentFiles: () => Promise.resolve([]) }));
 vi.mock("@/lib/files/icon-file", () => ({ checkIconFile: () => Promise.resolve([]), restorableIcon: vi.fn() }));
 vi.mock("@/lib/files/icon-cleanup", () => ({ pruneUnusedIconFilesQuietly: () => Promise.resolve(), pruneUnusedContentFilesQuietly: () => Promise.resolve() }));
-vi.mock("@/lib/files/save-attach", () => ({ checkUpdatedContentFiles: () => Promise.resolve({ contentFileIds: ["media-1"], imageFileIds: [] }), writeAndAttach: mocks.writeAndAttach }));
+vi.mock("@/lib/files/save-attach", () => ({ checkUpdatedContentFiles: () => Promise.resolve({ contentFileIds: ["media-1"], imageFileIds: [] }), writeAndAttach: vi.fn() }));
+vi.mock("@/lib/files/save-statement", () => ({ writeAndAttachWith: mocks.writeAndAttachWith }));
 vi.mock("@/lib/files/store", () => ({ attachFileRows: () => Promise.resolve(0), deleteArtifactFiles: () => Promise.resolve(), listFilesForArtifacts: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/edits/agent-write-guard", async (importOriginal) => ({
   ...(await importOriginal<typeof AgentWriteGuard>()),
@@ -71,6 +72,8 @@ beforeEach(() => {
   mocks.returned.mockImplementation((values: Record<string, unknown>) => [{ ...baseRecord, ...values, updatedAt: new Date("2026-11-08T10:00:01.000Z"), personSavedAt: null }]);
   mocks.recordArtifactSave.mockResolvedValue("applied");
   mocks.hasLiveLease.mockResolvedValue(false);
+  // A read of the row after a write that matched nothing: unchanged, so the save's own rule refused it (save-write.ts).
+  mocks.selected.mockReturnValue([baseRecord]);
 });
 
 describe("updateArtifact permissions", () => {
@@ -99,7 +102,7 @@ describe("updateArtifact base-version check", () => {
 
   it("should hand the save's uploads to its guarded write, so they attach in the same statement or not at all", async () => {
     await updateArtifact("user-1", "artifact-1", { content: "# Plan v2" }, "person", { expectedUpdatedAt: baseRecord.updatedAt.toISOString() });
-    expect(mocks.writeAndAttach).toHaveBeenCalledWith(expect.anything(), "user-1", { contentFileIds: ["media-1"], imageFileIds: [] });
+    expect(mocks.writeAndAttachWith).toHaveBeenCalledWith(expect.anything(), "user-1", { contentFileIds: ["media-1"], imageFileIds: [] });
   });
 
   it("should refuse a base version that is not a date instead of saving blind", async () => {

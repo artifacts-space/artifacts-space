@@ -1,4 +1,4 @@
-import { and, eq, type SQL } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, type ArtifactRecord } from "@/db/schema";
@@ -10,16 +10,14 @@ import { coverFileId } from "@/lib/covers/cover";
 import { agentWriteCondition, editingPerson, hasLiveLease, hasPersonSavedLast, lastSavedBy, onlyAgentsSavedSince } from "@/lib/edits/agent-write-guard";
 import { BadBaseVersionError, EditConflictError } from "@/lib/edits/conflict-error";
 import { agentWriteRefusal, parseBaseVersion, touchesGuardedFields, type AgentWriteRefusal, type BaseVersion } from "@/lib/edits/edit-conflict-rules";
-import { nextSaveTime } from "@/lib/edits/save-time";
 import { pruneUnusedContentFilesQuietly, pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { droppedContentRefs } from "@/lib/files/icon-cleanup-rules";
-import { checkUpdatedContentFiles, writeAndAttach, type SaveFiles } from "@/lib/files/save-attach";
-import { stampColumns } from "@/lib/harness/harness-rules";
+import { checkUpdatedContentFiles, type SaveFiles } from "@/lib/files/save-attach";
 import { assertContentFits } from "@/lib/quota/usage";
 import { StaleSaveError, unchangedSince, type SaveOptions } from "@/lib/save-guard";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { assertTeamPresetUsable } from "@/lib/themes/team-preset-access";
-import { recordArtifactSave } from "@/lib/versions/service";
+import { writeSave, type SaveSpec, type WrittenSave } from "@/lib/versions/save-write";
 
 /**
  * Writing one save of an artifact's fields: the checks, the guarded UPDATE,
@@ -120,21 +118,15 @@ interface Write {
   files: SaveFiles;
 }
 
-/**
- * One guarded UPDATE, with the save's uploads attached in the same
- * statement (writeAndAttach): the row as saved, or null when the condition
- * did not match. The save time comes from the database clock (nextSaveTime).
- */
-async function updateWhere({ changes, context, files }: Write, condition: SQL | undefined): Promise<ArtifactRecord | null> {
-  const savedAt = nextSaveTime();
-  // A person's save marks when a person last saved, so later web saves can tell agents' saves from people's.
-  const personSaved = context.actor === "person" ? { personSavedAt: savedAt } : {};
-  const update = getDb()
-    .update(artifact)
-    .set({ ...changes, ...stampColumns(context.options.harness), ...personSaved, updatedBy: context.editorId, updatedAt: savedAt })
-    .where(and(eq(artifact.id, context.before.id), condition))
-    .returning();
-  return writeAndAttach(update.getSQL(), context.editorId, files);
+/** The save as writeSave writes it: who saves, how, what it changes, and its uploads. */
+function specOf({ changes, context, files }: Write): SaveSpec {
+  const kind = saveKindOf(context);
+  return { before: context.before, changes, editorId: context.editorId, actor: context.actor, saveKind: kind.saveKind, restoredFromId: kind.restoredFromId, session: "session" in kind ? kind.session : undefined, harness: context.options.harness, files };
+}
+
+/** A landed save, as writeArtifactSave hands it on. */
+function landed(written: WrittenSave, savedOverAgents: boolean): LandedSave {
+  return { record: written.record, savedOverAgents, before: written.before };
 }
 
 /** The refusal to report when nothing explains a miss any more: a stale base, a lease that ended (title, content, or format), or a person's save. */
@@ -154,11 +146,12 @@ async function agentRefusalAfter(context: SaveContext, guarded: boolean, base: B
 }
 
 /** An agent's save: matched only while its base is current; without one, only while no person saved last or types (agentWriteCondition). */
-async function writeAgentSave(write: Write, base: BaseVersion | undefined): Promise<SavedRow | null> {
+async function writeAgentSave(write: Write, base: BaseVersion | undefined): Promise<LandedSave | null> {
   const { changes, context } = write;
   const guarded = isGuarded(changes, context);
-  const record = await updateWhere(write, agentWriteCondition(context.before.id, { base, guarded }));
-  if (record) return { record, savedOverAgents: false };
+  const written = await writeSave(specOf(write), [agentWriteCondition(context.before.id, { base, guarded })]);
+  if (!written) return null;
+  if ("record" in written) return landed(written, false);
   const refusal = await agentRefusalAfter(context, guarded, base);
   if (refusal) throw refusal;
   return null;
@@ -172,19 +165,18 @@ async function writeAgentSave(write: Write, base: BaseVersion | undefined): Prom
  * does a base later than the artifact's last save, which no server handed
  * out (onlyAgentsSavedSince).
  */
-async function writePersonSave(write: Write): Promise<SavedRow | null> {
+async function writePersonSave(write: Write): Promise<LandedSave | null> {
   const { context } = write;
   const expected = context.options.expectedUpdatedAt;
-  const exact = await updateWhere(write, unchangedSince(expected, context.before.publicId));
-  if (exact) return { record: exact, savedOverAgents: false };
-  if (!expected) return null;
-  const overAgents = await updateWhere(write, onlyAgentsSavedSince(context.before.id, new Date(expected)));
-  if (overAgents) return { record: overAgents, savedOverAgents: true };
+  const conditions = expected ? [unchangedSince(expected, context.before.publicId), onlyAgentsSavedSince(context.before.id, new Date(expected))] : [undefined];
+  const written = await writeSave(specOf(write), conditions);
+  if (!written) return null;
+  if ("record" in written) return landed(written, written.matched === 1);
   throw new StaleSaveError(context.before.publicId);
 }
 
 /** The guarded write for the save's actor. */
-function writeGuarded(write: Write, base: BaseVersion | undefined): Promise<SavedRow | null> {
+function writeGuarded(write: Write, base: BaseVersion | undefined): Promise<LandedSave | null> {
   return write.context.actor === "agent" ? writeAgentSave(write, base) : writePersonSave(write);
 }
 
@@ -206,13 +198,19 @@ export async function writeArtifactSave(changes: ArtifactChanges, context: SaveC
   if (!context.restoredFromId && changes.theme !== before.theme) await assertTeamPresetUsable(editorId, before, changes.theme);
   // Uploads attach in the same statement as the write: a refused save attaches nothing, and the version filed next includes them.
   const files = await checkUpdatedContentFiles(editorId, before, changes);
+  // The write files the version and applies the approval rule too (src/lib/versions/save-write.ts).
   const saved = await writeGuarded({ changes, context, files }, base);
   if (!saved) return null;
-  const { record } = saved;
-  await recordArtifactSave({ before, after: record, editorId, actor: context.actor, ...saveKindOf(context), harness: context.options.harness ?? null });
+  // The row the save changed: `before`, or a newer one when only agents saved since (a person's save over them).
+  const { record, before: changed } = saved;
   // A replaced or removed image icon or cover goes with this save, unless something still shows it (see icon-cleanup.ts).
-  if (imageChanged(before, record)) await pruneUnusedIconFilesQuietly(record.id, [before.icon, before.cover]);
+  if (imageChanged(changed, record)) await pruneUnusedIconFilesQuietly(record.id, [changed.icon, changed.cover]);
   // So does media the content stopped embedding, once no version names it (a merged save can drop the only one).
-  await pruneUnusedContentFilesQuietly(record.id, droppedContentRefs(before, record));
-  return saved;
+  await pruneUnusedContentFilesQuietly(record.id, droppedContentRefs(changed, record));
+  return { record, savedOverAgents: saved.savedOverAgents };
+}
+
+/** A landed save inside this module: also the row it changed. */
+interface LandedSave extends SavedRow {
+  before: ArtifactRecord;
 }

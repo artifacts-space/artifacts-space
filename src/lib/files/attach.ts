@@ -8,7 +8,7 @@ import type { HarnessStamp } from "@/lib/harness/harness-rules";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { UserFacingError } from "@/lib/user-facing-error";
-import { recordArtifactChange } from "@/lib/versions/service";
+import { recordArtifactChange } from "@/lib/versions/save-write";
 
 import { canUseFileInArtifact } from "./access-rules";
 import { fileLimits } from "./config";

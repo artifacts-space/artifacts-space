@@ -19,13 +19,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/db", () => {
-  const rows = (value: unknown[]) => ({ where: () => Promise.resolve(value) });
+  const rows = (value: unknown[]) => ({ where: () => Object.assign(Promise.resolve(value), { limit: () => Promise.resolve(value) }) });
   return {
     getDb: () => ({
       update: () => ({
         set: (values: Record<string, unknown>) => {
           mocks.set(values);
-          // The guarded UPDATE goes to writeAndAttach as SQL; here its "SQL" is the row it would return.
+          // The guarded UPDATE goes to writeAndAttachWith as SQL; here its "SQL" is the row it would return.
           return { where: () => ({ returning: () => ({ getSQL: () => [{ ...baseRecord, ...values, updatedAt: new Date(), personSavedAt: null }] }) }) };
         },
       }),
@@ -44,6 +44,7 @@ vi.mock("@/lib/files/attach", () => ({ checkContentFiles: () => Promise.resolve(
 vi.mock("@/lib/files/icon-file", () => ({ checkIconFile: () => Promise.resolve([]), restorableIcon: (_user: string, _id: string, icon: string | null) => Promise.resolve(icon) }));
 vi.mock("@/lib/files/icon-cleanup", () => ({ pruneUnusedIconFilesQuietly: () => Promise.resolve(), pruneUnusedContentFilesQuietly: () => Promise.resolve() }));
 vi.mock("@/lib/files/save-attach", () => ({ checkUpdatedContentFiles: () => Promise.resolve({ contentFileIds: [], imageFileIds: [] }), writeAndAttach: (rows: unknown[]) => Promise.resolve(rows[0] ?? null) }));
+vi.mock("@/lib/files/save-statement", () => ({ writeAndAttachWith: (rows: unknown[]) => Promise.resolve(rows[0] ? { record: rows[0], note: null } : null) }));
 vi.mock("@/lib/files/store", () => ({ attachFileRows: () => Promise.resolve(), deleteArtifactFiles: () => Promise.resolve(), listFilesForArtifacts: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/agents/queries", () => ({ loadActors: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/agents/owner-access", () => ({ ownedAgentIds: () => Promise.resolve(new Set()), authoredByViewerCondition: vi.fn() }));

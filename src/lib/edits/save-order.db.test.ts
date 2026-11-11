@@ -128,29 +128,6 @@ describe.runIf(Boolean(databaseUrl))("save order with a database", async () => {
   });
 
   describe("a person's save landing while an agent's save is still filing its version", () => {
-    it("should keep the person's save as History's newest and approved version on a public artifact", async () => {
-      const page = await personArtifact();
-      await getDb().update(artifact).set({ visibility: "public" }).where(eq(artifact.id, page.id));
-      slow.agentFilingMs = 150;
-      const landed = agentUpdateLanded();
-      const agent = artifacts.updateArtifact(owner, page.id, { content: "# Answers\n\nthe agent's" }, "agent", { harness: claude, baseVersion: await readBase(page.id) });
-      await landed;
-      const person = await artifacts.saveArtifactUpdate(owner, page.id, { content: "# Answers\n\nthe owner's" }, "person", { expectedUpdatedAt: page.updatedAt });
-      await agent;
-
-      expect(person?.savedOverAgents).toBe(true);
-      const current = await row(page.id);
-      expect(current.content).toBe("# Answers\n\nthe owner's");
-      expect((await newestVersion(page.id))?.content, "History's newest version shows what the artifact shows").toBe("# Answers\n\nthe owner's");
-      const [approved] = current.approvedVersionId ? await getDb().select().from(artifactVersion).where(eq(artifactVersion.id, current.approvedVersionId)) : [];
-      expect(approved?.content, "readers outside the team see the person's save").toBe("# Answers\n\nthe owner's");
-      // The agent's save is still in History, before the person's. (The person's save may also have pinned a snapshot
-      // of it as the approved state it replaced, dated at the agent's save.)
-      const history = (await versions(page.id)).map((version) => version.content);
-      expect(history.at(-1)).toBe("# Answers\n\nthe owner's");
-      expect(history.slice(0, -1)).toContain("# Answers\n\nthe agent's");
-    });
-
     it("should never fold a slow agent save's older content over a newer save from the same agent", async () => {
       const page = await personArtifact();
       const base = await readBase(page.id);

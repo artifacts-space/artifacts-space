@@ -143,7 +143,7 @@ export async function versionMatching(record: ArtifactRecord, createdBy: string 
  * an agent's version is relabelled, never one a person saved, and only while
  * the artifact is still at this save.
  */
-async function restampVersion(latest: ArtifactVersionRecord, record: ArtifactRecord, save: FiledSave) {
+export async function restampVersion(latest: ArtifactVersionRecord, record: ArtifactRecord, save: FiledSave) {
   // A version a person saved stays theirs: an agent never relabels it (saveSourceKey).
   if (!save.byAgent || !save.harness || latest.createdBy !== save.editorId || latest.harness === null || !versionByAgent(latest)) return;
   // Versions an approval or a decision names (the approved one too) keep what was decided.
