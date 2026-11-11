@@ -83,9 +83,22 @@ test("should take an invited person from the invitation to editing a team artifa
   await welcome.getByRole("button", { name: "Got it" }).click();
   await expect(welcome).toHaveCount(0);
   await expect.poll(() => welcomeDismissed(team.id, devId), { message: "the close is saved for this member and team" }).toBe(true);
+  // The close is per team: a second team the person just joined still shows its own card.
+  const second = await teamOwnedBySomeoneElse();
+  await addTestMember(second.team.id, devId, "member");
   await page.reload();
   await expect(page.locator("[data-slot=workspace-detail]").first()).toBeAttached();
   await expect(welcome, "a reload after Got it shows no card").toHaveCount(0);
+  await page.getByRole("button", { name: /^Workspace: / }).click();
+  await page.getByRole("menuitem", { name: new RegExp(second.teamName) }).click();
+  await page.waitForURL(new RegExp(`/app\\?team=${second.team.slug}$`));
+  await expect(welcome.getByRole("heading", { name: `Welcome to ${second.teamName}` }), "switching teams shows the other team's card").toBeVisible();
+  await page.getByRole("button", { name: /^Workspace: / }).click();
+  await page.getByRole("menuitem", { name: new RegExp(teamName) }).click();
+  await page.waitForURL(new RegExp(`/app\\?team=${team.slug}$`));
+  await expect(page.getByRole("heading", { level: 1, name: `Shared with ${teamName}` })).toBeAttached();
+  await expect(welcome, "switching back keeps the first team's card closed").toHaveCount(0);
+  await leaveTestTeam(second.team.id, devId);
 
   // Edits the team artifact in place: it saves at once and nothing waits for approval.
   await page.goto(`/artifact/${publicId}`);

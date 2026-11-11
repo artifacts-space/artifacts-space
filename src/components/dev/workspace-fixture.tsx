@@ -115,6 +115,16 @@ export type FixtureWelcome = "off" | "on" | "fails";
 const fixtureDismissWelcome = () => Promise.resolve({ success: true as const, data: null });
 const fixtureRefusedWelcome = () => Promise.resolve({ success: false as const, error: "Could not close the welcome. Try again." });
 
+/**
+ * The Dashboard's key, as on /app: the team, so per-team state (the welcome
+ * card) follows a team switch, and the filters. The list is read once, so it
+ * also remounts when the tab has stored artifacts; with none, nothing
+ * remounts after hydration.
+ */
+function dashboardKey(team: string | null, projectFilter: ProjectFilter | null, tags: readonly string[], hasStored: boolean): string {
+  return `${team ?? "mine"}:${projectFilterId(projectFilter)}:${tags.join(",")}:${String(hasStored)}`;
+}
+
 /** The viewer's teams, with the shared ones under `scopes`, and the one `team` opens as the scope. */
 function fixtureScope(scopes: boolean, team: string | null): { teams: ShareTeam[]; scopeTeam: ShareTeam | null } {
   if (!scopes) return { teams: fixtureTeams, scopeTeam: null };
@@ -163,8 +173,7 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
       <div className="workspace-frame">
         <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" unreadNotifications={4} notificationSeed={notifications} />
         <Dashboard
-          // The list is read once, so it remounts when the tab has stored artifacts; with none, nothing remounts after hydration.
-          key={`${projectFilterId(projectFilter)}:${tags.join(",")}:${String(stored.length > 0)}`}
+          key={dashboardKey(team, projectFilter, tags, stored.length > 0)}
           initialArtifacts={items}
           initialFull={seeded}
           loadArtifact={controls.loadArtifact}
