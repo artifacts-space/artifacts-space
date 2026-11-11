@@ -1,25 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
-import { checkMermaidSource } from "@/lib/mermaid-source";
 import { svgDataUri } from "@/lib/svg";
 import { minReadableWidth } from "@/lib/svg-text-size";
 import { cn } from "@/lib/utils";
 
-import { embeddedFontFace, readFontFamily, readPalette } from "./mermaid-palette";
-import { renderMermaid, type DiagramStyle, type RenderedDiagram } from "./mermaid-render";
-import { useDarkTheme, useThemeKey } from "./theme-scope-context";
+import type { RenderedDiagram } from "./mermaid-render";
+import { useMermaidDiagram } from "./use-mermaid-diagram";
 import { ViewNotice } from "./view-notice";
-
-type Outcome = { key: string; diagram: RenderedDiagram } | { key: string; error: string };
-
-/** Reads colors and fonts in scope at `element` and waits for the font, so Mermaid measures text as it will draw it. */
-async function diagramStyle(element: Element): Promise<DiagramStyle> {
-  const fontFamily = readFontFamily(element);
-  const [fontFace] = await Promise.all([embeddedFontFace(fontFamily), document.fonts.load(`14px ${fontFamily}`).catch(() => [])]);
-  return { palette: readPalette(element), fontFamily, fontFace };
-}
 
 function SourceFallback({ code, title, reason }: { code: string; title: string; reason: string }) {
   return (
@@ -39,36 +26,20 @@ function SourceFallback({ code, title, reason }: { code: string; title: string; 
  * or larger; past that, the frame scrolls sideways.
  */
 export function MermaidView({ code, title, className }: { code: string; title?: string; className?: string }) {
-  const dark = useDarkTheme();
-  const themeKey = useThemeKey();
-  const key = `${dark ? "dark" : "light"}:${themeKey}:${code}`;
-  const sourceProblem = checkMermaidSource(code);
-  const [outcome, setOutcome] = useState<Outcome | null>(null);
-  const scopeRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const element = scopeRef.current;
-    if (sourceProblem || !element) return undefined;
-    let cancelled = false;
-    diagramStyle(element)
-      .then((style) => renderMermaid(code, style))
-      .then((diagram) => { if (!cancelled) setOutcome({ key, diagram }); })
-      .catch((error: unknown) => {
-        if (!cancelled) setOutcome({ key, error: error instanceof Error ? error.message : "Mermaid could not read this diagram." });
-      });
-    return () => { cancelled = true; };
-  }, [code, key, sourceProblem]);
-
-  const current = outcome?.key === key ? outcome : null;
-  const problem = sourceProblem ?? (current && "error" in current ? current.error.slice(0, 300) : null);
+  const { scopeRef, state } = useMermaidDiagram(code);
   return (
     <div ref={scopeRef} className={cn("min-w-0", className)}>
-      {problem ? <SourceFallback code={code} title="This diagram could not be drawn." reason={problem} /> : <Diagram title={title} diagram={current && "diagram" in current ? current.diagram : null} />}
+      {state.status === "failed" ? <SourceFallback code={code} title="This diagram could not be drawn." reason={state.reason} /> : <DiagramFigure title={title} diagram={state.diagram} />}
     </div>
   );
 }
 
-function Diagram({ title, diagram }: { title?: string | undefined; diagram: RenderedDiagram | null }) {
+/**
+ * The frame a Mermaid diagram shows in: the image once drawn, a quiet
+ * placeholder while it draws. Shared by the mermaid format and diagrams in
+ * Markdown documents.
+ */
+export function DiagramFigure({ title, diagram }: { title?: string | undefined; diagram: RenderedDiagram | null }) {
   return (
     <figure className="min-w-0">
       {title ? <figcaption className="mb-3 text-md font-medium">{title}</figcaption> : null}

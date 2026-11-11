@@ -39,6 +39,7 @@ disagree, the editor keeps the source as written (see "Raw blocks").
 | Bulleted, numbered, and task lists | `-`, `1.`, `- [ ]` / `- [x]` | `bulletList`, `orderedList`, `taskList` |
 | Quote | `>` | `blockquote` |
 | Code block | Fenced with backticks and an optional language. The fence is one longer than any fence inside. | `codeBlock` |
+| Mermaid diagram | A code block fenced as `mermaid` (below) | `codeBlock` with language `mermaid` |
 | Table | GFM pipe table with optional alignment | `table` |
 | Divider | `---` | `horizontalRule` |
 | Media: image, video, audio, PDF, file | Image syntax alone in its paragraph (below) | `media` |
@@ -133,6 +134,42 @@ after it.
 
 The rules are in `src/lib/files/media-rules.ts` (URL form, kinds, widths) and
 `media-markdown.ts` (the block both ways).
+
+### Mermaid diagrams
+
+A fenced code block whose language is `mermaid` draws as a diagram:
+
+````md
+```mermaid
+flowchart TD
+  A[Plan] --> B{Approved?}
+  B -->|Yes| C[Ship]
+```
+````
+
+- **Detection** is the first word of the info string, in any case
+  (`isMermaidLanguage` in `src/lib/markdown/mermaid-fence.ts`). Backtick and
+  tilde fences both count.
+- **The Markdown is the fenced block.** It stays a `codeBlock` node with
+  `language: "mermaid"`, so it round-trips like any code block and agents
+  read and write the source as text. Nothing else is stored.
+- **Drawing** uses the mermaid format's renderer and security settings
+  (`src/components/artifact-view/use-mermaid-diagram.ts` and
+  `mermaid-render.ts`: securityLevel `strict`, no HTML labels, shown as an
+  `<img>`), so nothing in a diagram can run. Mermaid loads only when a page
+  has a diagram, and it redraws for light, dark, and the artifact's theme.
+- **A diagram that cannot be drawn** shows a short note ("Couldn’t draw this
+  diagram.") and its source as an ordinary code block, never an empty space.
+- **The read view** (`MarkdownView` with `diagrams`) draws them in Markdown
+  artifacts, a file artifact's notes, and a ui artifact's Markdown block.
+  Comments keep them as code.
+- **The editor** (`mermaid-block-view.tsx`) shows the diagram. Clicking it,
+  or Edit diagram, opens the source below a live preview that redraws once
+  typing pauses; moving the cursor out, or Done, closes it. Empty and broken
+  diagrams keep the source open. "Mermaid diagram" is in the code block's
+  language picker.
+- **The Markdown version** keeps the fenced source. **Link previews** skip
+  it like any code block.
 
 ### Raw blocks
 
