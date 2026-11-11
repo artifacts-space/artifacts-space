@@ -70,9 +70,9 @@ The Playwright gallery runs in parallel shards ("Component gallery shard N");
 the **Component gallery** job only gates them and passes only when every
 shard passed. Add shards by extending `matrix.shard`, which must stay the
 only matrix key and list 1, 2, 3, ... in order (a step fails otherwise), and
-never rename the gate. The gate
-keeps `needs: e2e` with `if: always()`: without `always()` a failed shard
-would skip the gate, and a skipped required check counts as passing.
+never rename the gate. The gate keeps `needs: e2e` with `if: always()`:
+without `always()` a failed shard would skip the gate, and a skipped required
+check counts as passing.
 The build needs no secrets; keep it that way, and create database, auth,
 email, and R2 clients on first request, never at import time. CodeQL scans
 the code and the workflows. Dependabot opens grouped weekly updates and waits
