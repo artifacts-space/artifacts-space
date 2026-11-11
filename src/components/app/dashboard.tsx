@@ -210,7 +210,7 @@ interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate" | "save"> 
 
 /** The artifact pane: the blank page while New artifact has one open, else the selected artifact. */
 function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpdated, onDeleted, initialFull, loadArtifact }: WorkspacePaneProps) {
-  // Kept as one array between renders: the pane compares it by identity, and a new one each time would render it twice.
+  // Memoized so the stored copies are merged into the seed only when they or the seed change, not on every render.
   const { withStored } = fresh;
   const full = useMemo(() => withStored(initialFull), [withStored, initialFull]);
   if (fresh.session) {
