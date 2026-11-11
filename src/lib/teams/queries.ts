@@ -7,6 +7,7 @@ import { agent, team, teamInvitation, teamMember, user } from "@/db/schema";
 
 import { effectiveRoleKey, loadTeamRoles, resolveActor, type TeamRoleView } from "./capabilities";
 import { builtInRoleNames, type ActorKind, type TeamActor, type TeamCapability } from "./capability-rules";
+import { EXPIRED_INVITATION_DAYS, visibleInvitations } from "./invitation-rules";
 import type { TeamHeadcount } from "./member-counts";
 import { parseTeamRole, type TeamRole } from "./roles";
 import { teamIconUrl } from "./team-icon-rules";
@@ -200,22 +201,40 @@ export async function listTeamMembers(teamId: string): Promise<TeamMemberView[]>
   });
 }
 
-/** An invitation that is still open. */
+/** An invitation nobody answered: still open, or expired in the last EXPIRED_INVITATION_DAYS days. */
 export interface PendingInvitationView {
   id: string;
   email: string;
   role: TeamRole;
   expiresAt: string;
+  /** True once the link stopped working; the inviter can send a new one. */
+  expired: boolean;
 }
 
-/** Open invitations for a team. Callers must check the viewer may invite people (`can(member, "members.invite")`). */
-export async function listPendingInvitations(teamId: string): Promise<PendingInvitationView[]> {
-  const rows = await getDb()
-    .select({ id: teamInvitation.id, email: teamInvitation.email, role: teamInvitation.role, expiresAt: teamInvitation.expiresAt })
-    .from(teamInvitation)
-    .where(and(eq(teamInvitation.teamId, teamId), eq(teamInvitation.status, "pending"), gt(teamInvitation.expiresAt, new Date())))
-    .orderBy(desc(teamInvitation.createdAt));
-  return rows.map((row) => ({ ...row, role: parseTeamRole(row.role), expiresAt: row.expiresAt.toISOString() }));
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * Unanswered invitations for a team: every open one, then recently expired
+ * ones the inviter may want to send again (visibleInvitations decides).
+ * Callers must check the viewer may invite people (`can(member, "members.invite")`).
+ */
+export async function listPendingInvitations(teamId: string, now = new Date()): Promise<PendingInvitationView[]> {
+  const shownSince = new Date(now.getTime() - EXPIRED_INVITATION_DAYS * MS_PER_DAY);
+  const email = sql<string>`lower(${teamInvitation.email})`;
+  const [rows, newest] = await Promise.all([
+    getDb()
+      .select({ id: teamInvitation.id, email: teamInvitation.email, role: teamInvitation.role, expiresAt: teamInvitation.expiresAt, createdAt: teamInvitation.createdAt })
+      .from(teamInvitation)
+      .where(and(eq(teamInvitation.teamId, teamId), eq(teamInvitation.status, "pending"), gt(teamInvitation.expiresAt, shownSince))),
+    getDb()
+      .select({ email, createdAt: sql<Date>`max(${teamInvitation.createdAt})`.mapWith(teamInvitation.createdAt) })
+      .from(teamInvitation)
+      .where(eq(teamInvitation.teamId, teamId))
+      .groupBy(email),
+  ]);
+  const newestByEmail = new Map(newest.map((row) => [row.email, row.createdAt]));
+  const listed = visibleInvitations(rows.map((row) => ({ ...row, expired: row.expiresAt <= now })), newestByEmail);
+  return listed.map(({ id, email: address, role, expiresAt, expired }) => ({ id, email: address, role: parseTeamRole(role), expiresAt: expiresAt.toISOString(), expired }));
 }
 
 /** The team an invitation belongs to, or null when there is no such invitation. */
@@ -227,6 +246,7 @@ export async function getInvitationTeamId(invitationId: string): Promise<string 
 /** An invitation as the invited person sees it. */
 export interface InvitationForInvitee {
   id: string;
+  teamId: string;
   teamName: string;
   teamSlug: string;
   /** Seeds the inviter's pixel avatar. Only people invite. */
@@ -238,6 +258,7 @@ export interface InvitationForInvitee {
 
 const inviteeColumns = {
   id: teamInvitation.id,
+  teamId: team.id,
   teamName: team.name,
   teamSlug: team.slug,
   inviterId: user.id,
@@ -254,7 +275,7 @@ function inviteeCondition(email: string) {
   );
 }
 
-function toInviteeView(row: { id: string; teamName: string; teamSlug: string; inviterId: string; inviterName: string; role: string | null; expiresAt: Date }) {
+function toInviteeView(row: { id: string; teamId: string; teamName: string; teamSlug: string; inviterId: string; inviterName: string; role: string | null; expiresAt: Date }) {
   return { ...row, role: parseTeamRole(row.role), expiresAt: row.expiresAt.toISOString() };
 }
 

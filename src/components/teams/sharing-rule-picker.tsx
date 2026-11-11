@@ -2,10 +2,15 @@
 
 import { cn } from "@/lib/utils";
 
+// "No approval" comes first: it is the default for new teams, and approval is for sharing outside the team.
 const options = [
+  { value: false, title: "No approval", detail: "Members share their artifacts with the team right away." },
   { value: true, title: "Admins approve", detail: "An owner or admin approves each artifact before the team sees it." },
-  { value: false, title: "No approval", detail: "Members share with the team right away." },
 ] as const;
+
+/** What stays the same whichever option is chosen. Shown under the picker. */
+export const sharingRuleFootnote =
+  "Either way, everyone in the team edits the team's artifacts directly. Sharing by link or in public needs an owner's or admin's approval, unless someone's role allows it.";
 
 /** Two-choice control for a team's sharing rule. */
 export function SharingRulePicker({

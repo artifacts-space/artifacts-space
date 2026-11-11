@@ -1,10 +1,12 @@
 "use client";
 
-import { IconMail, IconSend, IconTrash, IconX } from "@tabler/icons-react";
+import { IconLink, IconMail, IconSend, IconTrash, IconX } from "@tabler/icons-react";
+import { toast } from "sonner";
 
 import { cancelInvitationAction, inviteMemberAction, removeMemberAction, updateMemberRoleAction } from "@/app/(workspace)/teams/actions";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { PixelAvatar } from "@/components/pixel-avatar";
+import { useCopyToClipboard } from "@/components/use-copy-to-clipboard";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { resendableRole, type RoleOption } from "@/lib/teams/member-row-rules";
@@ -76,13 +78,24 @@ export function PersonRow({ member, teamId, isViewer, roleOptions, canRemove }: 
   );
 }
 
-/** An open invitation in the Members table, with Resend (when the viewer may invite to its role) and Cancel in its ⋯ menu. */
-export function InvitationRow({ invitation, teamId, canResend }: { invitation: PendingInvitationView; teamId: string; canResend: boolean }) {
+/** Where the invitation's own link points. It joins only the invited address, so sharing it another way is safe. */
+function invitationLink(origin: string, invitationId: string) {
+  return `${origin}/invitations/${encodeURIComponent(invitationId)}`;
+}
+
+/**
+ * An unanswered invitation in the Members table. Its ⋯ menu copies the link
+ * (while it works), sends it again (when the viewer may invite to its role;
+ * an expired one gets a new link), and cancels it.
+ */
+export function InvitationRow({ invitation, teamId, origin, canResend }: { invitation: PendingInvitationView; teamId: string; origin: string; canResend: boolean }) {
   const { pending, run } = useTeamAction();
-  const status = `Invited · expires ${dateFormat.format(new Date(invitation.expiresAt))}`;
+  const { copy } = useCopyToClipboard();
+  const date = dateFormat.format(new Date(invitation.expiresAt));
+  const status = invitation.expired ? `Expired ${date}` : `Invited · expires ${date}`;
   const role = canResend ? resendableRole(invitation.role) : null;
   return (
-    <tr className="border-t" data-member-row="invitation">
+    <tr className="border-t" data-member-row="invitation" data-expired={invitation.expired ? "true" : undefined}>
       <NameCell
         avatar={<span className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground"><IconMail aria-hidden className="size-3.5" /></span>}
         name={invitation.email}
@@ -94,13 +107,18 @@ export function InvitationRow({ invitation, teamId, canResend }: { invitation: P
       <td className={`${cell.wide} whitespace-nowrap text-muted-foreground`}>{status}</td>
       <td className={cell.last}>
         <RowMenu label={`Actions for the invitation to ${invitation.email}`} disabled={pending !== null}>
+          {invitation.expired ? null : (
+            <DropdownMenuItem onClick={() => { void copy(invitationLink(origin, invitation.id)).then((copied) => { if (copied) toast.success("Invitation link copied. It works only for this address."); }); }}>
+              <IconLink aria-hidden /> Copy invitation link
+            </DropdownMenuItem>
+          )}
           {role ? (
-            <DropdownMenuItem onClick={() => void run("resend", () => inviteMemberAction(teamId, { email: invitation.email, role }), "Invitation sent again.")}>
-              <IconSend aria-hidden /> Resend
+            <DropdownMenuItem onClick={() => void run("resend", () => inviteMemberAction(teamId, { email: invitation.email, role }), invitation.expired ? "New invitation sent." : "Invitation sent again.")}>
+              <IconSend aria-hidden /> {invitation.expired ? "Send a new invitation" : "Resend"}
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem variant="destructive" onClick={() => void run("cancel", () => cancelInvitationAction(teamId, invitation.id), "Invitation canceled.")}>
-            <IconX aria-hidden /> Cancel invitation
+          <DropdownMenuItem variant="destructive" onClick={() => void run("cancel", () => cancelInvitationAction(teamId, invitation.id), invitation.expired ? "Invitation removed." : "Invitation canceled.")}>
+            <IconX aria-hidden /> {invitation.expired ? "Remove" : "Cancel invitation"}
           </DropdownMenuItem>
         </RowMenu>
       </td>

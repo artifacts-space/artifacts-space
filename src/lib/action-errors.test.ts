@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { UserFacingError } from "@/lib/user-facing-error";
 
-import { actionErrorMessage, teamWording } from "./action-errors";
+import { actionErrorMessage, apiErrorCode, teamWording } from "./action-errors";
 
 describe("teamWording", () => {
   it("should say team instead of organization", () => {
@@ -57,5 +57,16 @@ describe("actionErrorMessage with Next's control flow", () => {
       thrown = error;
     }
     expect(() => actionErrorMessage(thrown, "fallback")).toThrow();
+  });
+});
+
+describe("apiErrorCode", () => {
+  it("should read the code of a Better Auth refusal", () => {
+    expect(apiErrorCode(APIError.from("BAD_REQUEST", { code: "INVITATION_NOT_FOUND", message: "Invitation not found" }))).toBe("INVITATION_NOT_FOUND");
+  });
+
+  it("should return undefined when the error is not a Better Auth refusal", () => {
+    expect(apiErrorCode(new Error("INVITATION_NOT_FOUND"))).toBeUndefined();
+    expect(apiErrorCode(new APIError("BAD_REQUEST", { message: "no code" }))).toBeUndefined();
   });
 });

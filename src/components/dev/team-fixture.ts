@@ -60,8 +60,9 @@ export function teamFixture(role: TeamRole, personal: boolean): TeamPageData {
       agentRow({ userId: "fixture-agent-handed", handle: "planner", name: "Release planner", ownerName: null, ownerInTeam: false, handedOver: true }),
     ],
     invitations: manager ? [
-      { id: "fixture-invite-1", email: "new.teammate@example.com", role: "member", expiresAt: at(15) },
-      { id: "fixture-invite-2", email: "lead@example.com", role: "admin", expiresAt: at(16) },
+      { id: "fixture-invite-1", email: "new.teammate@example.com", role: "member", expiresAt: at(15), expired: false },
+      { id: "fixture-invite-2", email: "lead@example.com", role: "admin", expiresAt: at(16), expired: false },
+      { id: "fixture-invite-3", email: "late.reply@example.com", role: "member", expiresAt: at(1), expired: true },
     ] : [],
     shared: [
       { artifactId: "fixture-shared-1", publicId: "fixtureteamshared0001", title: "Launch plan", icon: null, visibility: "team", authorId: viewerId, authorKind: "person", authorName: "Dev User", authorUsername: "dev", updatedAt: at(7), sharedAt: null },

@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { cleanHandleInput, toHandle, validateHandle } from "@/lib/handles";
 
 import { FormError } from "./form-error";
-import { SharingRulePicker } from "./sharing-rule-picker";
+import { SharingRulePicker, sharingRuleFootnote } from "./sharing-rule-picker";
 
 /** Returns the first problem with the form, or "" when it can be sent. */
 function formProblem(name: string, slug: string) {
@@ -26,7 +26,8 @@ export function CreateTeamForm() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
-  const [needsApproval, setNeedsApproval] = useState(true);
+  // New teams default to no approval inside the team: approval is for sharing outside it.
+  const [needsApproval, setNeedsApproval] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -84,7 +85,7 @@ export function CreateTeamForm() {
         <legend className="mb-2 text-md font-medium">Sharing with the team</legend>
         <SharingRulePicker value={needsApproval} onChange={setNeedsApproval} />
         <p className="text-sm leading-5 text-muted-foreground">
-          Link and public sharing always need an admin&apos;s approval in a team. Owners can change this rule later.
+          {sharingRuleFootnote} Owners can change this rule later.
         </p>
       </fieldset>
       <FormError message={error} />

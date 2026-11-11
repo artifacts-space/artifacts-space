@@ -6,6 +6,8 @@ import { reconcileAfterDeparture } from "@/lib/auth/team-departure";
 import { assertCanInviteAs, assertInvitableRole, assertNotPersonal, assertTeamCapability, assertTeamUpdateAllowed, prepareNewTeam } from "@/lib/teams/guards";
 import { sendTeamInvitationEmail } from "@/lib/teams/invitation-email";
 import { assertCanCreateTeam, assertCanInvite } from "@/lib/teams/invitation-limits";
+import { cancelOlderOpenInvitations } from "@/lib/teams/invitation-queries";
+import { wasPrechecked } from "@/lib/teams/invite-precheck";
 import { teamLimits } from "@/lib/teams/limits";
 import { seedBuiltInRoles } from "@/lib/teams/role-store";
 
@@ -60,6 +62,7 @@ export function teamsPlugin() {
         email: data.email,
         teamName: data.organization.name,
         inviterName: data.inviter.user.name || data.inviter.user.email,
+        expiresAt: new Date(data.invitation.expiresAt),
       });
     },
     schema: {
@@ -98,8 +101,11 @@ export function teamsPlugin() {
         assertNotPersonal(team, "invite people");
         assertInvitableRole(invitation.role);
         await assertCanInviteAs(inviter.id, team.id, invitation.role);
-        await assertCanInvite(inviter.id, team.id);
+        // inviteMemberAction checks and counts the limits before it calls Better Auth (invite-precheck.ts); any other caller is counted here.
+        if (!wasPrechecked(inviter.id, team.id)) await assertCanInvite(inviter.id, team.id);
       },
+      // One open invitation per address: a new one cancels every older open one, whatever Better Auth's own cancel missed.
+      afterCreateInvitation: ({ invitation }) => cancelOlderOpenInvitations(invitation.id),
       beforeCancelInvitation: async ({ cancelledBy, organization: team }) => {
         await assertTeamCapability(cancelledBy.id, team.id, "members.invite");
       },
