@@ -113,15 +113,15 @@ describe("social sign-in hardening", () => {
     });
 
     it.each([
-      ["a different verified address", { sub: "g-other", email: "other@gmail.com", email_verified: true }],
-      ["an unverified address", { sub: "g-unverified", email: "sam@gmail.com", email_verified: false }],
-    ])("should refuse to link Google when it reports %s", async (_label, google) => {
+      ["a different verified address", { sub: "g-other", email: "other@gmail.com", email_verified: true }, "email_does_not_match"],
+      ["an unverified address", { sub: "g-unverified", email: "sam@gmail.com", email_verified: false }, "google_email_not_verified"],
+    ])("should refuse to link Google when it reports %s", async (_label, google, code) => {
       stubProviders({ google });
       const { cookie } = await magicLinkSession(auth, "sam@gmail.com");
 
       const location = await signInWith(auth, "google", { path: "/link-social", cookie });
 
-      expect(new URL(location).searchParams.get("error"), location).not.toBeNull();
+      expectRefused(location, [code]);
       expect(googleAccounts()).toEqual([]);
     });
 
@@ -131,7 +131,7 @@ describe("social sign-in hardening", () => {
 
       const location = await signInWith(auth, "google", { path: "/link-social", cookie });
 
-      expect(new URL(location).searchParams.get("error"), location).toBe("google_email_not_authoritative");
+      expectRefused(location, ["google_email_not_authoritative"]);
       expect(googleAccounts()).toEqual([]);
     });
   });
