@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { accountLinking, socialProviders } from "./social-auth-options";
-import { createTestAuth, emptyTables, env, errorReturn, existingUser, magicLinkSession, origin, signInWith, stubProviders, type Tables, type TestAuth } from "./social-auth-harness";
+import { createTestAuth, emptyTables, env, existingUser, magicLinkSession, origin, signInWith, stubProviders, type Tables, type TestAuth } from "./social-auth-harness";
 
 /*
  * Account linking through the whole Google and GitHub round trip, on a real
@@ -16,7 +16,13 @@ const workspace = (sub: string) => ({ sub, email_verified: true, hd: "example.co
 /** A consumer Google account registered with an outside address: verified once, not hosted by Google. */
 const outsideAddress = (sub: string) => ({ sub, email_verified: true });
 
-const refusedWith = (codes: string) => new RegExp(`^${errorReturn.replace(/[.?]/g, "\\$&")}&error=(${codes})(&|$)`);
+/** Checks that the browser went back to the sign-in page it started on, refused with one of `codes`. */
+function expectRefused(location: string, codes: string[]) {
+  const url = new URL(location);
+  expect(`${url.origin}${url.pathname}`).toBe(`${origin}/sign-in`);
+  expect(url.searchParams.get("next")).toBe("/invitations/inv-1");
+  expect(codes).toContain(url.searchParams.get("error"));
+}
 
 describe("social sign-in account linking", () => {
   let tables: Tables;
@@ -82,7 +88,7 @@ describe("social sign-in account linking", () => {
     const location = await signInWith(auth, "google");
 
     // Better Auth's own linking rule refuses first; the Google gate would refuse it too.
-    expect(location).toMatch(refusedWith("account_not_linked|google_email_not_verified"));
+    expectRefused(location, ["account_not_linked", "google_email_not_verified"]);
     expect(googleAccounts()).toEqual([]);
     expect(tables.user).toHaveLength(1);
     expect(tables.session).toEqual([]);
@@ -93,7 +99,7 @@ describe("social sign-in account linking", () => {
 
     const location = await signInWith(auth, "google");
 
-    expect(location).toMatch(refusedWith("google_email_not_verified"));
+    expectRefused(location, ["google_email_not_verified"]);
     expect(tables.user).toEqual([]);
     expect(googleAccounts()).toEqual([]);
     expect(tables.session).toEqual([]);
@@ -106,7 +112,7 @@ describe("social sign-in account linking", () => {
     const location = await signInWith(auth, "google");
 
     // Better Auth's own rule lets this through (verified on both sides), so only the Google gate stops it.
-    expect(location).toMatch(refusedWith("google_email_not_authoritative"));
+    expectRefused(location, ["google_email_not_authoritative"]);
     expect(googleAccounts()).toEqual([]);
     expect(tables.session).toEqual([]);
   });
@@ -116,7 +122,7 @@ describe("social sign-in account linking", () => {
 
     const location = await signInWith(auth, "google");
 
-    expect(location).toMatch(refusedWith("google_email_not_authoritative"));
+    expectRefused(location, ["google_email_not_authoritative"]);
     expect(tables.user).toEqual([]);
     expect(tables.session).toEqual([]);
   });
@@ -139,7 +145,7 @@ describe("social sign-in account linking", () => {
 
     const location = await signInWith(auth, "google");
 
-    expect(location).toMatch(refusedWith("account_not_linked"));
+    expectRefused(location, ["account_not_linked"]);
     expect(googleAccounts()).toEqual([]);
     expect(tables.session).toEqual([]);
   });
@@ -170,7 +176,7 @@ describe("social sign-in account linking", () => {
 
     const location = await signInWith(auth, "github");
 
-    expect(location).toMatch(refusedWith("account_not_linked"));
+    expectRefused(location, ["account_not_linked"]);
     expect(tables.account).toEqual([]);
   });
 
