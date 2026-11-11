@@ -73,6 +73,11 @@ only matrix key and list 1, 2, 3, ... in order (a step fails otherwise), and
 never rename the gate. The gate keeps `needs: e2e` with `if: always()`:
 without `always()` a failed shard would skip the gate, and a skipped required
 check counts as passing.
+The shards run inside Playwright's Docker image, pinned by digest, which
+already holds Chromium and its system libraries, so CI never installs
+packages from Ubuntu's mirrors. When you bump `@playwright/test`, bump the
+image tag and digest in `ci.yml` to the same version; until then the shards
+download Chromium and warn.
 The build needs no secrets; keep it that way, and create database, auth,
 email, and R2 clients on first request, never at import time. CodeQL scans
 the code and the workflows. Dependabot opens grouped weekly updates and waits
