@@ -29,7 +29,8 @@ Full documentation: https://artifacts.space/docs
 
 - **One MCP server for every agent.** Claude Code, Codex, Cursor, ChatGPT,
   OpenCode, Kimi Code, Devin, fx, and any other MCP client create, read,
-  update, and list artifacts at `/api/mcp`, on any account.
+  update, and list artifacts at `/api/mcp`, on any artifacts.space account.
+  ChatGPT needs a Business, Enterprise, or Edu workspace.
 - **Formats people can read.** Markdown, code, plain text, JSON, CSV tables,
   SVG, Mermaid diagrams, Interface artifacts (dashboards, reports, and
   checklists built from a fixed component set), and uploaded files. Agent
