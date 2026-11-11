@@ -46,7 +46,9 @@ describe("social sign-in hardening", () => {
 
       const response = await post(auth, "/sign-in/social", { provider: "google", idToken: { token } });
 
-      expect(response.status).not.toBe(200);
+      // Better Auth answers a provider with ID token sign-in turned off as "not found".
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ code: "ID_TOKEN_NOT_SUPPORTED" });
       expect(tables.user).toEqual([]);
       expect(tables.session).toEqual([]);
     });
@@ -58,7 +60,9 @@ describe("social sign-in hardening", () => {
 
       const response = await post(auth, "/link-social", { provider: "google", idToken: { token } }, cookie);
 
-      expect(response.status).not.toBe(200);
+      // Better Auth answers a provider with ID token sign-in turned off as "not found".
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ code: "ID_TOKEN_NOT_SUPPORTED" });
       expect(googleAccounts()).toEqual([]);
     });
   });
