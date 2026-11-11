@@ -53,11 +53,11 @@ export function teamTabAccess(team: TeamMembership, openReports: number): TeamTa
   return { personal: team.personal, reviews, reports: can(team, "reports.handle") && openReports > 0 };
 }
 
-function TeamHeader({ team }: { team: TeamMembership }) {
+function TeamHeader({ team, viewerId }: { team: TeamMembership; viewerId: string }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div className="flex min-w-0 items-center gap-3">
-        <TeamIcon name={team.name} iconUrl={team.iconUrl} size={48} className="text-lg" />
+        <TeamIcon team={team} viewerId={viewerId} size={48} />
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="truncate text-xl font-medium tracking-[-0.01em]">{team.name}</h1>
@@ -70,7 +70,7 @@ function TeamHeader({ team }: { team: TeamMembership }) {
       </div>
       {team.personal ? null : (
         <div className="flex flex-wrap items-center gap-2">
-          {canManageTeamIcon(team) ? <TeamIconControl teamId={team.id} teamName={team.name} iconUrl={team.iconUrl} /> : null}
+          {canManageTeamIcon(team) ? <TeamIconControl teamId={team.id} teamName={team.name} iconUrl={team.iconUrl} viewerId={viewerId} /> : null}
           <LeaveTeamButton teamId={team.id} teamName={team.name} />
         </div>
       )}
@@ -153,7 +153,7 @@ export function TeamPageView({ data, selection }: { data: TeamPageData; selectio
   const approvals = access.reviews ? data.requests.length + data.edits.length : 0;
   return (
     <main className="mx-auto w-full max-w-4xl space-y-6 p-4 py-8 sm:p-6 sm:py-10">
-      <TeamHeader team={data.team} />
+      <TeamHeader team={data.team} viewerId={data.viewerId} />
       {data.team.personal || data.team.kind !== "person" ? null : <TeamRuleNote team={data.team} />}
       <TeamTabs tabs={tabPanels(data, availableTeamTabs(access), approvals)} views={views} initial={selection} />
     </main>

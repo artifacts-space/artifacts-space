@@ -2,18 +2,19 @@ import { expect, test, type Page } from "@playwright/test";
 
 /**
  * The Team icon control and the icon in the team header, on /dev/team with
- * fixture data (no database or storage): who sees the control, the
- * monogram fallback, the image when the team has one, and a phone layout
+ * fixture data (no database or storage): who sees the control, the team's
+ * pixel avatar when it has no icon, the image when it has one, and a phone layout
  * that does not overflow. The upload itself is checked in team-icon-db.spec.ts.
  */
 
 const headerIcon = (page: Page) => page.getByRole("main").locator("[data-team-icon]").first();
 const control = (page: Page) => page.getByRole("button", { name: "Team icon", exact: true });
 
-test("should show the monogram and an upload control to an owner when the team has no icon", async ({ page }) => {
+test("should show the team's pixel avatar and an upload control to an owner when the team has no icon", async ({ page }) => {
   await page.goto("/dev/team");
-  await expect(headerIcon(page)).toHaveAttribute("data-team-icon", "monogram");
-  await expect(headerIcon(page)).toHaveText("F");
+  await expect(headerIcon(page)).toHaveAttribute("data-team-icon", "avatar");
+  await expect(headerIcon(page).locator("svg")).toHaveAttribute("data-avatar-kind", "team");
+  await expect(headerIcon(page)).toHaveText("");
   await control(page).click();
   const dialog = page.getByRole("dialog", { name: "Team icon" });
   await expect(dialog.getByRole("button", { name: "Upload an image" })).toBeVisible();
@@ -60,9 +61,10 @@ test.describe("people who cannot change team settings", () => {
     });
   }
 
-  test("should give a personal team no icon and no control", async ({ page }) => {
+  test("should give a personal team the viewer's own avatar and no control", async ({ page }) => {
     await page.goto("/dev/team?personal=1&icon=1");
-    await expect(headerIcon(page)).toHaveAttribute("data-team-icon", "monogram");
+    await expect(headerIcon(page)).toHaveAttribute("data-team-icon", "avatar");
+    await expect(headerIcon(page).locator("svg")).toHaveAttribute("data-avatar-kind", "person");
     await expect(control(page)).toHaveCount(0);
   });
 });

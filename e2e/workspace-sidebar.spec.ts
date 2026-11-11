@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 /**
  * The workspace sidebar and the artifact header, on /dev/workspace (the real
@@ -130,6 +130,30 @@ test("should name the team in the workspace switcher and the heading, and offer 
   await expect(page.getByRole("button", { name: "Workspace: Your artifacts. Switch workspace" })).toContainText("Personal workspace");
 });
 
+test("should mark each workspace with its avatar: the viewer's own, a team's icon, or the team's pixel avatar", async ({ page }) => {
+  await page.goto("/dev/workspace?scopes=1&team=fixture-shared-0");
+  const switcher = page.getByRole("button", { name: "Workspace: Design. Switch workspace" });
+  const triggerAvatar = switcher.locator("[data-team-icon=avatar]");
+  await expect(triggerAvatar.locator("svg")).toHaveAttribute("data-avatar-kind", "team");
+  // Computed, since the server and the browser write the same style with different spacing.
+  const tint = (avatar: Locator) => avatar.locator("rect").evaluate((rect) => getComputedStyle(rect).fill);
+  const triggerTint = await tint(triggerAvatar);
+  await switcher.click();
+  const avatarIn = (name: RegExp) => page.getByRole("menuitem", { name }).locator("[data-team-icon]");
+  await expect(avatarIn(/Your artifacts/).locator("svg")).toHaveAttribute("data-avatar-kind", "person");
+  await expect(avatarIn(/Design/).locator("svg")).toHaveAttribute("data-avatar-kind", "team");
+  // Drawn at the row's size, not shrunk to the menu's 16px icon size.
+  await expect.poll(async () => (await avatarIn(/Your artifacts/).locator("svg").boundingBox())?.width).toBe(24);
+  await expect(avatarIn(/Platform engineering/)).toHaveAttribute("data-team-icon", "image");
+  await expect(avatarIn(/Platform engineering/)).toHaveAttribute("alt", "");
+  // Seeded by team id: two teams without icons never share an avatar, and the trigger draws the same colors as the row.
+  expect(await avatarIn(/Customer research/).innerHTML()).not.toBe(await avatarIn(/Design/).innerHTML());
+  expect(await tint(avatarIn(/Design/))).toBe(triggerTint);
+  // Decorative: the name beside each avatar is what screen readers hear.
+  await expect(avatarIn(/Customer research/).locator("svg")).toHaveAttribute("aria-hidden", "true");
+  await expect(page.getByRole("menuitem", { name: /Customer research/ })).toHaveAccessibleName("Customer research");
+});
+
 
 test("should show a new member's welcome card on the team workspace until they close it", async ({ page }) => {
   await page.goto("/dev/workspace?scopes=1&team=fixture-shared-0&welcome=1");
@@ -186,6 +210,17 @@ test.describe("phone", () => {
       const box = await target.boundingBox();
       expect(box?.width ?? 0, String(target)).toBeGreaterThanOrEqual(44);
       expect(box?.height ?? 0, String(target)).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test("should give every workspace switcher item a 44px touch target", async ({ page }) => {
+    await page.goto("/dev/workspace?scopes=1");
+    await page.getByRole("button", { name: "Workspace: Your artifacts. Switch workspace" }).click();
+    const items = page.getByRole("menuitem");
+    await expect(items).toHaveCount(6);
+    for (const item of await items.all()) {
+      // Polled: the menu grows in from 95% as it opens.
+      await expect.poll(async () => (await item.boundingBox())?.height ?? 0, await item.innerText()).toBeGreaterThanOrEqual(44);
     }
   });
 

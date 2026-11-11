@@ -17,7 +17,6 @@ import {
   teamIconMemberCheck,
   teamIconNetworkCheck,
   teamIconUrl,
-  teamMonogram,
 } from "./team-icon-rules";
 
 const encoder = new TextEncoder();
@@ -271,23 +270,5 @@ describe("team icon rate limit keys", () => {
 
   it("should key the backstop by the network", () => {
     expect(teamIconNetworkCheck("network-1")).toEqual({ name: "teamIconByNetwork", subject: "network-1" });
-  });
-});
-
-describe("teamMonogram", () => {
-  it("should use the first letter of the name, upper-cased", () => {
-    expect(teamMonogram("acme design")).toBe("A");
-  });
-
-  it("should skip leading symbols and keep letters from any script", () => {
-    expect(teamMonogram("  #équipe")).toBe("É");
-  });
-
-  it("should give the same letter on every locale when the name starts with i", () => {
-    expect(teamMonogram("istanbul")).toBe("I");
-  });
-
-  it("should fall back to T when the name has no letter or digit", () => {
-    expect(teamMonogram("--")).toBe("T");
   });
 });
