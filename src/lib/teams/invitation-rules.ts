@@ -49,9 +49,16 @@ export function invitationPageState(invitation: InvitationFacts | null, viewer: 
   return viewer.emailVerified ? "open" : "verify";
 }
 
-/** Whether the invitation page may show the team's and inviter's names. */
-export function showsTeam(state: InvitationPageState): boolean {
-  return state !== "other-email" && state !== "missing";
+/**
+ * Whether the invitation page may show the team, the inviter, and the role.
+ * Members see their own team. Otherwise only someone who has confirmed the
+ * invited address does: an unconfirmed account with a matching email has
+ * not proved it owns that inbox, so it sees each state without team details.
+ */
+export function showsTeam(state: InvitationPageState, emailVerified: boolean): boolean {
+  if (state === "member") return true;
+  if (state === "other-email" || state === "missing" || state === "verify") return false;
+  return emailVerified;
 }
 
 /**
@@ -98,4 +105,26 @@ export const EXPIRED_INVITATION_DAYS = 30;
 /** A team's workspace: its artifacts, where a new member lands and starts editing. */
 export function teamWorkspacePath(slug: string) {
   return `/app?team=${encodeURIComponent(slug)}`;
+}
+
+/** An unanswered invitation as the inviter's list reads it. */
+export interface ListedInvitation {
+  email: string;
+  createdAt: Date;
+  expired: boolean;
+}
+
+/**
+ * Which unanswered invitations the inviter sees, open ones first, each group
+ * newest first. Every open invitation shows, so a second one to the same
+ * address (two invites at once) can always be seen and canceled. An expired
+ * one shows only while it is the newest invitation to that address in any
+ * state (`newestByEmail`, keyed by lowercased address): a newer invitation,
+ * or removing it, hides every older one instead of bringing the next back.
+ */
+export function visibleInvitations<T extends ListedInvitation>(rows: readonly T[], newestByEmail: ReadonlyMap<string, Date>): T[] {
+  const newestFirst = [...rows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const open = newestFirst.filter((row) => !row.expired);
+  const expired = newestFirst.filter((row) => row.expired && newestByEmail.get(row.email.toLowerCase())?.getTime() === row.createdAt.getTime());
+  return [...open, ...expired];
 }

@@ -13,7 +13,7 @@ async function pageOverflow(page: Page) {
 
 const headings: [string, string][] = [
   ["open", "Join Northwind Studio"],
-  ["verify", "Confirm your email to join Northwind Studio"],
+  ["verify", "Confirm your email to see this invitation"],
   ["member", "You are already in Northwind Studio"],
   ["other-email", "This invitation is for another email address"],
   ["expired", "This invitation expired"],
@@ -51,6 +51,18 @@ test("should never name the team to an account the invitation was not sent to", 
   await expect(page.getByRole("button", { name: "Sign in with another email" })).toBeVisible();
 });
 
+test("should show no team details to an account whose matching address is not confirmed", async ({ page }) => {
+  for (const state of ["verify", "expired", "used", "canceled", "declined"]) {
+    await page.goto(`/dev/invitation?state=${state}&unconfirmed=1`);
+    await expect(page.getByRole("heading", { level: 1 }), state).toBeVisible();
+    await expect(page.getByText(/Northwind Studio|Dana Reyes/), state).toHaveCount(0);
+  }
+  await page.goto("/dev/invitation?state=expired&unconfirmed=1");
+  await expect(page.getByText("The link stopped working after 7 days. Ask the person who invited you to send a new one.")).toBeVisible();
+  await page.goto("/dev/invitation?state=expired");
+  await expect(page.getByText(/invited you to Northwind Studio/)).toBeVisible();
+});
+
 test("should tell someone signing in from an invitation which address to use, and nobody else", async ({ page }) => {
   await page.goto("/sign-in?next=%2Finvitations%2Fabc123");
   await expect(page.locator("[data-slot=invitation-hint]")).toHaveText("Use the email address your invitation went to. You come back to the invitation after you sign in.");
@@ -65,8 +77,8 @@ test("should state the team's editing and sharing rule on the team page", async 
   const rule = page.locator("[data-slot=team-rule]");
   await expect(rule.getByRole("heading", { name: "How this team works" })).toBeVisible();
   await expect(rule).toContainText("Edit the team's artifacts directly. Your changes save at once, with no approval.");
-  await expect(rule).toContainText("Sharing your own artifacts with the team needs approval from an owner or admin.");
-  await expect(rule).toContainText("Sharing by link or in public needs approval from an owner or admin.");
+  await expect(rule).toContainText("Sharing your own artifacts with the team needs approval from someone who can approve sharing (owners and admins by default).");
+  await expect(rule).toContainText("Sharing by link or in public needs approval from someone who can approve sharing (owners and admins by default).");
 
   await page.goto("/dev/team?as=admin");
   await expect(page.locator("[data-slot=team-rule]")).toContainText("You can share by link or in public right away.");
@@ -83,7 +95,7 @@ test("should say what each invited role can do", async ({ page }) => {
   await expect(dialog.locator("#invite-role-hint")).toHaveText("Edits the team's artifacts and asks before sharing outside the team.");
   await dialog.getByRole("combobox", { name: "Role for the invited person" }).click();
   await page.getByRole("option", { name: "Admin" }).click();
-  await expect(dialog.locator("#invite-role-hint")).toHaveText("Edits the team's artifacts and shares outside the team without asking. Also invites people, approves sharing, adds agents.");
+  await expect(dialog.locator("#invite-role-hint")).toHaveText("Edits the team's artifacts and shares by link and in public without asking. Also invites people, approves sharing, adds agents.");
 });
 
 test("should mark an expired invitation and offer a new one instead of its dead link", async ({ page }) => {

@@ -26,7 +26,10 @@ const mocks = vi.hoisted(() => ({
   leaveOrganization: vi.fn(),
   changeMemberRole: vi.fn(),
   openInvitationRole: vi.fn(),
+  isEmailInTeam: vi.fn(),
   assertCanInvite: vi.fn(),
+  assertCanInviteAs: vi.fn(),
+  precheckedDuringCreate: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -55,8 +58,9 @@ vi.mock("@/lib/teams/queries", () => ({
   getInvitationTeamId: mocks.invitationTeamId,
 }));
 vi.mock("@/lib/teams/role-store", () => ({ changeMemberRole: mocks.changeMemberRole }));
-vi.mock("@/lib/teams/invitation-queries", () => ({ openInvitationRole: mocks.openInvitationRole }));
+vi.mock("@/lib/teams/invitation-queries", () => ({ openInvitationRole: mocks.openInvitationRole, isEmailInTeam: mocks.isEmailInTeam }));
 vi.mock("@/lib/teams/invitation-limits", () => ({ assertCanInvite: mocks.assertCanInvite }));
+vi.mock("@/lib/teams/guards", () => ({ assertCanInviteAs: mocks.assertCanInviteAs }));
 
 const actions = await import("./actions");
 
@@ -112,7 +116,9 @@ beforeEach(() => {
   for (const write of writes) write.mockResolvedValue(undefined);
   mocks.invitationTeamId.mockResolvedValue("team-1");
   mocks.openInvitationRole.mockResolvedValue(null);
+  mocks.isEmailInTeam.mockResolvedValue(false);
   mocks.assertCanInvite.mockResolvedValue(undefined);
+  mocks.assertCanInviteAs.mockResolvedValue(undefined);
 });
 
 describe("refusals for every member action", () => {
@@ -182,9 +188,42 @@ describe("inviteMemberAction", () => {
     signInAs(viewer("owner"));
     mocks.openInvitationRole.mockResolvedValue("member");
     await expect(actions.inviteMemberAction("team-1", { email: "ann@example.com", role: "admin" })).resolves.toMatchObject({ success: true, data: { resent: false } });
-    // Better Auth's create path runs its hooks, which hold the limits; checking here too would count twice.
-    expect(mocks.assertCanInvite).not.toHaveBeenCalled();
+    expect(mocks.assertCanInviteAs).toHaveBeenCalledWith("viewer-1", "team-1", "admin");
+    expect(mocks.assertCanInvite).toHaveBeenCalledTimes(1);
     expect(mocks.createInvitation.mock.calls[0]?.[0]).toMatchObject({ body: { role: "admin", resend: false } });
+  });
+
+  it("should never reach Better Auth, which would cancel the open invitation, when a role change is refused", async () => {
+    signInAs(viewer("owner"));
+    mocks.openInvitationRole.mockResolvedValue("member");
+    mocks.assertCanInvite.mockRejectedValue(new APIError("TOO_MANY_REQUESTS", { message: "This team has sent a lot of invitations today." }));
+    await expect(actions.inviteMemberAction("team-1", { email: "ann@example.com", role: "admin" })).resolves.toEqual({ success: false, error: "This team has sent a lot of invitations today." });
+    expectNothingWritten();
+
+    mocks.assertCanInvite.mockResolvedValue(undefined);
+    mocks.assertCanInviteAs.mockRejectedValue(new APIError("BAD_REQUEST", { message: "You cannot invite someone to a role that can do more than yours." }));
+    await expect(actions.inviteMemberAction("team-1", { email: "ann@example.com", role: "admin" })).resolves.toMatchObject({ success: false });
+    expectNothingWritten();
+  });
+
+  it("should mark the Better Auth call as already checked, for this inviter and team only", async () => {
+    signInAs(viewer("admin"));
+    const { wasPrechecked } = await import("@/lib/teams/invite-precheck");
+    mocks.createInvitation.mockImplementation(() => {
+      mocks.precheckedDuringCreate(wasPrechecked("viewer-1", "team-1"), wasPrechecked("someone-else", "team-1"), wasPrechecked("viewer-1", "team-2"));
+      return Promise.resolve(undefined);
+    });
+    await actions.inviteMemberAction("team-1", { email: "ann@example.com", role: "member" });
+    expect(mocks.precheckedDuringCreate).toHaveBeenCalledWith(true, false, false);
+    expect(wasPrechecked("viewer-1", "team-1"), "the marker ends with the call").toBe(false);
+  });
+
+  it("should say the person is already in the team without counting an invitation", async () => {
+    signInAs(viewer("owner"));
+    mocks.isEmailInTeam.mockResolvedValue(true);
+    await expect(actions.inviteMemberAction("team-1", { email: "Ann@example.com", role: "member" })).resolves.toEqual({ success: false, error: "ann@example.com is already in this team." });
+    expect(mocks.assertCanInvite).not.toHaveBeenCalled();
+    expectNothingWritten();
   });
 
   it("should name the address when the person is already in the team", async () => {

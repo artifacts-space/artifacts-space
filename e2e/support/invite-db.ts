@@ -66,6 +66,22 @@ export async function waitingReviews(publicId: string): Promise<number> {
   return Number(result.rows[0]?.n ?? 0);
 }
 
+/**
+ * Fills a team's daily invitation limit (teamInviteByTeamDay, 100 a day), in
+ * this window and the one before, so its next invitation is refused. Only
+ * this team's bucket changes; deleting the team does not remove it, but it
+ * names a team id that is never reused.
+ */
+export async function useUpTeamInvitations(teamId: string): Promise<void> {
+  const dayMs = 86_400_000;
+  const current = Math.floor(Date.now() / dayMs) * dayMs;
+  await db().query(
+    `insert into rate_limit_bucket (key, window_start, count) values ($1, $2, 1000), ($1, $3, 1000)
+     on conflict (key, window_start) do update set count = 1000`,
+    [`teamInviteByTeamDay:${teamId}`, new Date(current), new Date(current - dayMs)],
+  );
+}
+
 /** Closes this file's pool. */
 export async function closeInviteDb(): Promise<void> {
   await pool?.end();

@@ -22,15 +22,18 @@ function stateFrom(value: string | string[] | undefined): InvitationPageState {
 /**
  * Development-only page for the invitation e2e test: the real invitation
  * page content for each state (`?state=`), with fixture data and no
- * database. Returns 404 in every other environment.
+ * database. `?unconfirmed=1` views it as an account whose matching address
+ * is not confirmed, which sees no team details. Returns 404 in every other environment.
  */
 export default async function InvitationFixturePage({ searchParams }: PageProps<"/dev/invitation">) {
   if (process.env.NODE_ENV !== "development") notFound();
-  const state = stateFrom((await searchParams).state);
+  const params = await searchParams;
+  const state = stateFrom(params.state);
+  const verified = params.unconfirmed !== "1";
   const team = { teamName: "Northwind Studio", teamSlug: "northwind", inviterId: "fixture-inviter", inviterName: "Dana Reyes", role: "member" as const };
   return (
     <AuthShell>
-      <InvitationView invitationId="fixture-invitation" state={state} viewerEmail="sam.longaddress@example.com" team={showsTeam(state) ? team : null} />
+      <InvitationView invitationId="fixture-invitation" state={state} viewerEmail="sam.longaddress@example.com" team={showsTeam(state, verified) ? team : null} />
     </AuthShell>
   );
 }

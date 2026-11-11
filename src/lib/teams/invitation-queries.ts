@@ -42,6 +42,17 @@ export async function getInvitationRecord(id: string): Promise<InvitationRecord 
   return row ? { ...row, role: parseTeamRole(row.role) } : null;
 }
 
+/** Whether someone with this email address is already in a team, whatever the letter case. */
+export async function isEmailInTeam(teamId: string, email: string): Promise<boolean> {
+  const [row] = await getDb()
+    .select({ id: teamMember.id })
+    .from(teamMember)
+    .innerJoin(user, eq(user.id, teamMember.userId))
+    .where(and(eq(teamMember.teamId, teamId), sql`lower(${user.email}) = ${email.toLowerCase()}`))
+    .limit(1);
+  return row !== undefined;
+}
+
 /** Whether a user is in a team. */
 export async function isInTeam(userId: string, teamId: string): Promise<boolean> {
   const [row] = await getDb()
@@ -69,4 +80,25 @@ export async function openInvitationRole(teamId: string, email: string): Promise
     .orderBy(desc(teamInvitation.createdAt))
     .limit(1);
   return row ? (row.role ?? "member") : null;
+}
+
+/**
+ * Cancels every open invitation to the same address in the same team that
+ * was created before `invitationId`, so one address has one working link.
+ * Only older rows: when two invitations race, the later one survives and
+ * neither cancels the other's replacement. Runs after Better Auth creates an
+ * invitation; its own cancel covers just one row from an unordered read.
+ */
+export async function cancelOlderOpenInvitations(invitationId: string): Promise<void> {
+  await getDb().execute(sql`
+    update team_invitation as older
+    set status = 'canceled'
+    from team_invitation as created
+    where created.id = ${invitationId}
+      and older.team_id = created.team_id
+      and lower(older.email) = lower(created.email)
+      and older.status = 'pending'
+      and older.id <> created.id
+      and (older.created_at, older.id) < (created.created_at, created.id)
+  `);
 }

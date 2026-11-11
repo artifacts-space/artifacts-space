@@ -14,9 +14,11 @@ import { assignRoleProblem, countOwners, inviteProblem, leaveProblem, removeMemb
 import { changeMemberRole } from "@/lib/teams/role-store";
 import { getInvitationTeamId, listTeamMemberActors, type TeamMemberActor, type TeamMembership } from "@/lib/teams/queries";
 import { assignableRoles, type TeamRole } from "@/lib/teams/roles";
-import { openInvitationRole } from "@/lib/teams/invitation-queries";
+import { isEmailInTeam, openInvitationRole } from "@/lib/teams/invitation-queries";
 import { invitationRefusal, inviteMode } from "@/lib/teams/invitation-rules";
 import { assertCanInvite } from "@/lib/teams/invitation-limits";
+import { assertCanInviteAs } from "@/lib/teams/guards";
+import { withPrecheckedInvite } from "@/lib/teams/invite-precheck";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { guardTeam, idSchema, requireUser } from "./team-guard";
@@ -60,7 +62,8 @@ const inviteSchema = z.object({
  * Invites someone by email, to a role that does no more than the inviter's.
  * Never to a personal team. Inviting an address that already has an open
  * invitation sends it again (same link, fresh expiry), or replaces it when
- * the role changed. Every path counts against the invitation limits.
+ * the role changed. Every path is checked and counted once, here, before
+ * Better Auth touches the open invitation.
  */
 export async function inviteMemberAction(teamId: string, input: z.input<typeof inviteSchema>): Promise<ActionResult<{ email: string; resent: boolean }>> {
   let email = "";
@@ -74,14 +77,20 @@ export async function inviteMemberAction(teamId: string, input: z.input<typeof i
     if (!grant) return { success: false, error: "That role does not exist in this team." };
     const problem = inviteProblem(checked.membership, { key: grant.key, capabilities: grant.capabilities });
     if (problem) return { success: false, error: problem };
-    const mode = inviteMode(await openInvitationRole(checked.membership.id, email), role);
-    // Better Auth's resend skips its create hooks, so the invitation limits are checked here instead.
-    if (mode === "resend") await assertCanInvite(checked.membership.userId, checked.membership.id);
-    // A new role is a new invitation: Better Auth cancels the open one and its hooks check the role and the limits.
-    await getAuth().api.createInvitation({
-      body: { email, role, organizationId: checked.membership.id, resend: mode === "resend" },
-      headers: await headers(),
-    });
+    const scope = { inviterId: checked.membership.userId, teamId: checked.membership.id };
+    // Said before the limits are counted, so a mistyped teammate does not use up an invitation.
+    if (await isEmailInTeam(scope.teamId, email)) return { success: false, error: invitationRefusal("USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION", email) ?? "That person is already in this team." };
+    const mode = inviteMode(await openInvitationRole(scope.teamId, email), role);
+    // Every check runs before Better Auth is called. Its replace path cancels the open invitation
+    // before its hook runs, so a refusal there would leave the person with no working link.
+    // Its resend path skips the hook entirely. The marker stops the hook counting the limits twice.
+    await assertCanInviteAs(scope.inviterId, scope.teamId, role);
+    await assertCanInvite(scope.inviterId, scope.teamId);
+    const requestHeaders = await headers();
+    await withPrecheckedInvite(scope, () => getAuth().api.createInvitation({
+      body: { email, role, organizationId: scope.teamId, resend: mode === "resend" },
+      headers: requestHeaders,
+    }));
     revalidatePath(`/teams/${checked.membership.slug}`);
     return { success: true, data: { email, resent: mode === "resend" } };
   } catch (error) {

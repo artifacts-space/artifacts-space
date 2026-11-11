@@ -34,7 +34,7 @@ export default async function InvitationPage({ params }: PageProps<"/invitations
 
   return (
     <AuthShell>
-      <InvitationView invitationId={id} state={state} viewerEmail={session.user.email} team={showsTeam(state) ? teamView(invitation) : null} />
+      <InvitationView invitationId={id} state={state} viewerEmail={session.user.email} team={showsTeam(state, session.user.emailVerified) ? teamView(invitation) : null} />
     </AuthShell>
   );
 }

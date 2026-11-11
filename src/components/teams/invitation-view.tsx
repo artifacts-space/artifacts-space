@@ -53,46 +53,76 @@ function OpenInvitation({ invitationId, team }: { invitationId: string; team: In
   );
 }
 
-/** Sentences for the invitation states that end the flow, keyed by state. */
-function closedCopy(state: InvitationPageState, team: InvitationTeamView): { title: string; body: React.ReactNode } | null {
-  const who = <Inviter team={team} />;
+/** Sentences for the invitation states that end the flow. Without team details they still say what happened and what to do. */
+function closedCopy(state: InvitationPageState, team: InvitationTeamView | null): { title: string; body: React.ReactNode } | null {
+  const who = team ? <Inviter team={team} /> : "the person who invited you";
+  const teamName = team ? team.teamName : "the team";
   switch (state) {
     case "expired":
-      return { title: "This invitation expired", body: <>{who} invited you to {team.teamName}, but the link stopped working after 7 days. Ask them to send a new one.</> };
+      return { title: "This invitation expired", body: <>{team ? <>{who} invited you to {teamName}, but the</> : "The"} link stopped working after 7 days. Ask {team ? "them" : who} to send a new one.</> };
     case "used":
-      return { title: "This invitation was already used", body: <>Each invitation joins {team.teamName} once. If you left the team, ask {who} for a new one.</> };
+      return { title: "This invitation was already used", body: <>Each invitation joins {teamName} once. If you left the team, ask {who} for a new one.</> };
     case "canceled":
-      return { title: "This invitation was canceled", body: <>Ask {who} for a new one if you still want to join {team.teamName}.</> };
+      return { title: "This invitation was canceled", body: <>Ask {who} for a new one if you still want to join {teamName}.</> };
     case "declined":
-      return { title: "You declined this invitation", body: <>Ask {who} for a new one if you change your mind about {team.teamName}.</> };
+      return { title: "You declined this invitation", body: <>Ask {who} for a new one if you change your mind about {teamName}.</> };
     default:
       return null;
   }
 }
 
-function TeamState({ props, team }: { props: InvitationViewProps; team: InvitationTeamView }) {
-  const returnTo = invitationPath(props.invitationId);
-  if (props.state === "open") return <OpenInvitation invitationId={props.invitationId} team={team} />;
-  if (props.state === "member") {
-    return (
-      <>
-        <Heading>You are already in {team.teamName}</Heading>
-        <Body>Open the team&apos;s artifacts to keep working. You can edit them directly.</Body>
-        <Button size="sm" nativeButton={false} render={<Link href={teamWorkspacePath(team.teamSlug)} />}>Open {team.teamName}</Button>
-      </>
-    );
-  }
-  if (props.state === "verify") {
-    return (
-      <>
-        <Heading>Confirm your email to join {team.teamName}</Heading>
-        <Body>This account has not confirmed {props.viewerEmail} yet. Sign in with an emailed link to that address, and you come back here to join.</Body>
-        <SwitchAccountButton returnTo={returnTo} label="Sign in with an email link" />
-      </>
-    );
-  }
-  const closed = closedCopy(props.state, team);
-  if (!closed) return null;
+function MemberState({ team }: { team: InvitationTeamView }) {
+  return (
+    <>
+      <Heading>You are already in {team.teamName}</Heading>
+      <Body>Open the team&apos;s artifacts to keep working. You can edit them directly.</Body>
+      <Button size="sm" nativeButton={false} render={<Link href={teamWorkspacePath(team.teamSlug)} />}>Open {team.teamName}</Button>
+    </>
+  );
+}
+
+/** The address matches but is not confirmed: no team details until the person proves the inbox is theirs. */
+function VerifyState({ invitationId, viewerEmail }: { invitationId: string; viewerEmail: string }) {
+  return (
+    <>
+      <Heading>Confirm your email to see this invitation</Heading>
+      <Body>This account has not confirmed {viewerEmail} yet. Sign in with an emailed link to that address, and you come back here to join.</Body>
+      <SwitchAccountButton returnTo={invitationPath(invitationId)} label="Sign in with an email link" />
+    </>
+  );
+}
+
+function OtherEmailState({ invitationId, viewerEmail }: { invitationId: string; viewerEmail: string }) {
+  return (
+    <>
+      <Heading>This invitation is for another email address</Heading>
+      <Body>You are signed in as {viewerEmail}. Sign in with the address the invitation went to, and you come back here to join.</Body>
+      <div className="flex flex-wrap items-center gap-4">
+        <SwitchAccountButton returnTo={invitationPath(invitationId)} label="Sign in with another email" />
+        {teamsLink}
+      </div>
+    </>
+  );
+}
+
+function MissingState({ viewerEmail }: { viewerEmail: string }) {
+  return (
+    <>
+      <Heading>We could not find this invitation</Heading>
+      <Body>Check the link in your email. You are signed in as {viewerEmail}.</Body>
+      {teamsLink}
+    </>
+  );
+}
+
+function StateContent(props: InvitationViewProps) {
+  const { state, team, invitationId, viewerEmail } = props;
+  if (state === "open" && team) return <OpenInvitation invitationId={invitationId} team={team} />;
+  if (state === "member" && team) return <MemberState team={team} />;
+  if (state === "open" || state === "verify") return <VerifyState invitationId={invitationId} viewerEmail={viewerEmail} />;
+  if (state === "other-email") return <OtherEmailState invitationId={invitationId} viewerEmail={viewerEmail} />;
+  const closed = closedCopy(state, team);
+  if (!closed) return <MissingState viewerEmail={viewerEmail} />;
   return (
     <>
       <Heading>{closed.title}</Heading>
@@ -103,30 +133,12 @@ function TeamState({ props, team }: { props: InvitationViewProps; team: Invitati
 }
 
 /**
- * The invitation page's content for every state (invitation-rules.ts). Only
- * the invited person, or someone already in the team, sees the team's name;
- * a wrong account learns only that the invitation went to another address,
- * and gets a way to switch accounts that comes back here.
+ * The invitation page's content for every state (invitation-rules.ts). Team
+ * details come only when the page passes them (showsTeam): to a member, or
+ * to the invited person once their address is confirmed. Everyone else
+ * still learns what happened and gets the way on, such as switching
+ * accounts and coming back here.
  */
 export function InvitationView(props: InvitationViewProps) {
-  if (props.team) return <div className="w-full max-w-[400px]"><TeamState props={props} team={props.team} /></div>;
-  if (props.state === "other-email") {
-    return (
-      <div className="w-full max-w-[400px]">
-        <Heading>This invitation is for another email address</Heading>
-        <Body>You are signed in as {props.viewerEmail}. Sign in with the address the invitation went to, and you come back here to join.</Body>
-        <div className="flex flex-wrap items-center gap-4">
-          <SwitchAccountButton returnTo={invitationPath(props.invitationId)} label="Sign in with another email" />
-          {teamsLink}
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="w-full max-w-[400px]">
-      <Heading>We could not find this invitation</Heading>
-      <Body>Check the link in your email. You are signed in as {props.viewerEmail}.</Body>
-      {teamsLink}
-    </div>
-  );
+  return <div className="w-full max-w-[400px]"><StateContent {...props} /></div>;
 }

@@ -26,11 +26,13 @@ export interface TeamRuleLines {
   outside: string;
 }
 
-const approval = "approval from an owner or admin";
+/** Who approves: anyone whose role holds "approve sharing", which custom roles can too. */
+const approval = "approval from someone who can approve sharing (owners and admins by default)";
 
 function teamLine(subject: TeamRuleSubject): string {
   if (!subject.teamSharingNeedsApproval) return "Share your own artifacts with the team right away. Everyone in the team can then edit them.";
-  if (can(subject, "share.team")) return `You can share your own artifacts with the team right away. Others need ${approval} first.`;
+  // Only the viewer's own role is known here, so the line never guesses what other roles may do.
+  if (can(subject, "share.team")) return "Your role shares your own artifacts with the team right away. Roles without that permission need approval first.";
   return `Sharing your own artifacts with the team needs ${approval}.`;
 }
 
@@ -67,6 +69,16 @@ const extraPowers: readonly [TeamCapability, string][] = [
   ["agents.manage", "adds agents"],
 ];
 
+/** How a role shares outside the team, naming each level exactly: a link-only role still asks before sharing in public. */
+function outsideHint(actor: TeamActor): string {
+  const link = can(actor, "share.link");
+  const open = can(actor, "share.public");
+  if (link && open) return "shares by link and in public without asking";
+  if (link) return "shares by link without asking, and asks before sharing in public";
+  if (open) return "shares in public without asking, and asks before sharing by link";
+  return "asks before sharing outside the team";
+}
+
 /**
  * One line about what a role lets someone do, for the invitation's role
  * picker. Built from the role's capabilities, which an owner can change, so
@@ -74,8 +86,7 @@ const extraPowers: readonly [TeamCapability, string][] = [
  */
 export function roleHint(capabilities: readonly TeamCapability[]): string {
   const actor: TeamActor = { roleKey: "invitee", kind: "person", capabilities };
-  const outside = can(actor, "share.link") || can(actor, "share.public") ? "shares outside the team without asking" : "asks before sharing outside the team";
   const powers = extraPowers.filter(([capability]) => can(actor, capability)).map(([, words]) => words);
   const also = powers.length > 0 ? ` Also ${powers.join(", ")}.` : "";
-  return `Edits the team's artifacts and ${outside}.${also}`;
+  return `Edits the team's artifacts and ${outsideHint(actor)}.${also}`;
 }

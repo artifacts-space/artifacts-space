@@ -18,7 +18,7 @@ describe.runIf(Boolean(databaseUrl))("invitation queries with a database", async
   const { inArray } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
   const { team, teamInvitation, teamMember, user } = await import("@/db/schema");
-  const { getInvitationRecord, isInTeam, openInvitationRole } = await import("./invitation-queries");
+  const { cancelOlderOpenInvitations, getInvitationRecord, isEmailInTeam, isInTeam, openInvitationRole } = await import("./invitation-queries");
   const { listPendingInvitations } = await import("./queries");
 
   const tag = randomUUID().slice(0, 8);
@@ -54,6 +54,16 @@ describe.runIf(Boolean(databaseUrl))("invitation queries with a database", async
       invite("resent-older", "resent@example.com", "pending", 6.9, "admin", teamId, -20),
       invite("resent-newer", "resent@example.com", "pending", 4, "member", teamId, -3),
       invite("elsewhere", "ann@example.com", "pending", 5, "member", otherTeam),
+      // An expired invitation whose newer one was removed: it must not come back.
+      invite("removed-older", "removed@example.com", "pending", -5, "member", teamId, -12),
+      invite("removed-newer", "removed@example.com", "canceled", -1, "member", teamId, -8),
+      // Three open invitations to one address, the last one just created: the older two get canceled.
+      invite("dup-1", "dup@example.com", "pending", 5, "admin", teamId, -6),
+      invite("dup-2", "DUP@example.com", "pending", 5, "member", teamId, -5),
+      invite("dup-new", "dup@example.com", "pending", 6, "member", teamId, -1.5),
+      // A later invitation to that address, as if another request raced: never canceled by an older one.
+      invite("dup-later", "dup@example.com", "pending", 7, "member", teamId, 0.5),
+      invite("dup-other-team", "dup@example.com", "pending", 5, "member", otherTeam, -6),
     ]);
   });
 
@@ -84,16 +94,39 @@ describe.runIf(Boolean(databaseUrl))("invitation queries with a database", async
   it("should tell members from everyone else", async () => {
     expect(await isInTeam(owner, teamId)).toBe(true);
     expect(await isInTeam(owner, otherTeam)).toBe(false);
+    expect(await isEmailInTeam(teamId, `${owner.toUpperCase()}@EXAMPLE.COM`)).toBe(true);
+    expect(await isEmailInTeam(otherTeam, `${owner}@example.com`)).toBe(false);
   });
 
-  it("should list open invitations first, then ones expired in the last 30 days, one per address, newest created first", async () => {
+  it("should list every open invitation, newest first, then expired ones only while they are the newest to their address", async () => {
     const rows = await listPendingInvitations(teamId, new Date(now));
     expect(rows.map((row) => [row.email, row.expired, row.role])).toEqual([
+      ["dup@example.com", false, "member"],
       ["again@example.com", false, "member"],
       ["lead@example.com", false, "admin"],
+      ["dup@example.com", false, "member"],
       ["ann@example.com", false, "member"],
       ["resent@example.com", false, "member"],
+      ["DUP@example.com", false, "member"],
+      ["dup@example.com", false, "admin"],
+      ["resent@example.com", false, "admin"],
       ["late@example.com", true, "member"],
     ]);
+  });
+
+  it("should cancel only the older open invitations to the same address in the same team", async () => {
+    await cancelOlderOpenInvitations(id("dup-new"));
+    const states = await getDb()
+      .select({ id: teamInvitation.id, status: teamInvitation.status })
+      .from(teamInvitation)
+      .where(inArray(teamInvitation.id, [id("dup-1"), id("dup-2"), id("dup-new"), id("dup-later"), id("dup-other-team")]));
+    expect(Object.fromEntries(states.map((row) => [row.id.replace(`invq-${tag}-`, ""), row.status]))).toEqual({
+      "dup-1": "canceled",
+      "dup-2": "canceled",
+      "dup-new": "pending",
+      "dup-later": "pending",
+      "dup-other-team": "pending",
+    });
+    expect((await listPendingInvitations(teamId, new Date(now))).filter((row) => row.email.toLowerCase() === "dup@example.com")).toHaveLength(2);
   });
 });

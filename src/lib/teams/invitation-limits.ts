@@ -24,11 +24,13 @@ export function invitationLimitChecks(inviterId: string, teamId: string): { name
  * Refuses (with a message safe to show) when the inviter or the team sent
  * many invitations, or when today's shared email budget is used up, so
  * nothing is stored or sent that cannot be emailed. Every invitation email
- * passes it once: a new invitation through Better Auth's
- * beforeCreateInvitation hook, before the row is stored, and a resend in
- * inviteMemberAction, because Better Auth's resend path skips that hook.
- * Better Auth's invite-member HTTP route is closed (teamRoutesClosedOverHttp),
- * so the action is the only way in.
+ * passes it once: inviteMemberAction runs it before calling Better Auth, for
+ * new invitations, resends, and role changes alike (Better Auth's resend
+ * path skips its hooks, and its replace path cancels the open invitation
+ * before them), and marks the call so the beforeCreateInvitation hook does
+ * not count again (invite-precheck.ts). Any unmarked caller is counted in
+ * the hook. Better Auth's invite-member HTTP route is closed
+ * (teamRoutesClosedOverHttp), so the action is the only way in.
  */
 export async function assertCanInvite(inviterId: string, teamId: string): Promise<void> {
   if (!(await emailBudgetHasRoom())) {

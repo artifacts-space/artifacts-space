@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { storedText } from "./support/inline-edit-db";
-import { closeInviteDb, invitationState, leaveTestTeam, openInvitations, seedInvitation, storedTeamRole, waitingReviews } from "./support/invite-db";
+import { closeInviteDb, invitationState, leaveTestTeam, openInvitations, seedInvitation, storedTeamRole, useUpTeamInvitations, waitingReviews } from "./support/invite-db";
 import {
   addTestMember,
   cleanUp,
@@ -72,7 +72,7 @@ test("should take an invited person from the invitation to editing a team artifa
   await page.waitForURL(new RegExp(`/app\\?team=${team.slug}$`));
   const welcome = page.locator("[data-sonner-toast]").filter({ hasText: `Welcome to ${teamName}` });
   await expect(welcome).toBeVisible();
-  await expect(welcome).toContainText("You can edit the team's artifacts right away. Sharing by link or in public needs approval from an owner or admin.");
+  await expect(welcome).toContainText("You can edit the team's artifacts right away. Sharing by link or in public needs approval from someone who can approve sharing (owners and admins by default).");
   expect(await storedTeamRole(team.id, devId)).toBe("member");
   expect((await invitationState(invitationId)).status).toBe("accepted");
   if (testInfo.project.name === "desktop") await expect(page.locator("[data-slot=artifact-list]").getByRole("button", { name: new RegExp(title) })).toBeVisible();
@@ -156,6 +156,28 @@ test("should send two invitations from one dialog, resend one, change its role, 
   await dialog.getByLabel("Email").fill(devEmail);
   await dialog.getByRole("button", { name: "Send invitation" }).click();
   await expect(page.getByText(`${devEmail} is already in this team.`)).toBeVisible();
+});
+
+test("should keep the open invitation working when a role change is refused at the limits", async ({ page }, testInfo) => {
+  const devId = await signInAsDev(page);
+  const team = await createTestTeam(devId, "owner");
+  seeded.teamIds.push(team.id);
+  const email = `refused-${testInfo.project.name}-${team.id.slice(0, 6)}@example.com`;
+  const original = await seedInvitation({ teamId: team.id, inviterId: devId, email, role: "member" });
+  await useUpTeamInvitations(team.id);
+
+  await page.goto(`/teams/${team.slug}`);
+  await page.getByRole("button", { name: "Invite people" }).click();
+  const dialog = page.getByRole("dialog", { name: "Invite people" });
+  await dialog.getByLabel("Email").fill(email);
+  await dialog.getByRole("combobox", { name: "Role for the invited person" }).click();
+  await page.getByRole("option", { name: "Admin" }).click();
+  await dialog.getByRole("button", { name: "Send invitation" }).click();
+  await expect(page.getByText("This team has sent a lot of invitations today.", { exact: false })).toBeVisible();
+
+  // Nothing was canceled and nothing new was stored: the link Ann already has still works, at its old role.
+  expect(await invitationState(original)).toEqual({ status: "pending", role: "member" });
+  expect((await openInvitations(team.id, email)).map((row) => row.id)).toEqual([original]);
 });
 
 test("should keep an expired invitation in view for the inviter and offer a new one", async ({ page }) => {

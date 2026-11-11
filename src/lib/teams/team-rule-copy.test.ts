@@ -48,6 +48,15 @@ describe("teamRuleLines", () => {
 });
 
 describe("teamWelcome", () => {
+  it("should name approvers by permission, not only by built-in role, so custom approvers are covered", () => {
+    expect(teamRuleLines(subject(member, true)).outside).toContain("someone who can approve sharing (owners and admins by default)");
+  });
+
+  it("should not claim other roles need approval beyond what the rule says when the viewer may share with the team", () => {
+    const sharer: TeamActor = { roleKey: "sharer", kind: "person", capabilities: ["share.team"] };
+    expect(teamRuleLines(subject(sharer, true)).team).toBe("Your role shares your own artifacts with the team right away. Roles without that permission need approval first.");
+  });
+
   it("should welcome a member by team name and say edits need no approval but outside sharing does", () => {
     const welcome = teamWelcome("Northwind", subject(member, false));
     expect(welcome.title).toBe("Welcome to Northwind");
@@ -61,6 +70,12 @@ describe("roleHint", () => {
   });
 
   it("should list an Admin's extra powers", () => {
-    expect(roleHint(defaultRoleCapabilities.admin)).toBe("Edits the team's artifacts and shares outside the team without asking. Also invites people, approves sharing, adds agents.");
+    expect(roleHint(defaultRoleCapabilities.admin)).toBe("Edits the team's artifacts and shares by link and in public without asking. Also invites people, approves sharing, adds agents.");
+  });
+
+  it("should never say a link-only role shares in public without asking", () => {
+    const hint = roleHint(["share.link"]);
+    expect(hint).toBe("Edits the team's artifacts and shares by link without asking, and asks before sharing in public.");
+    expect(decideSharing({ level: "public", team: team(false), member: { roleKey: "linker", kind: "person", capabilities: ["share.link"] }, actor: "person" })).toBe("pending");
   });
 });
