@@ -29,9 +29,10 @@ export function PrivacyCollection() {
       <LegalH doc={doc} id="account" />
       <Prose>
         <ul>
-          <li><strong>Email address.</strong> You give it when you sign in with an emailed link, or GitHub shares it when you sign in with GitHub. We use it to sign you in and to send the emails listed under <a href="#how-we-use">How we use it</a>.</li>
-          <li><strong>Name and profile picture.</strong> From your GitHub profile when you sign in with GitHub. We store a link to the picture, not the image.</li>
+          <li><strong>Email address.</strong> You give it when you sign in with an emailed link, or GitHub or Google shares it when you sign in with them. We use it to sign you in and to send the emails listed under <a href="#how-we-use">How we use it</a>.</li>
+          <li><strong>Name and profile picture.</strong> From your GitHub or Google profile when you sign in with it. We store a link to the picture, not the image.</li>
           <li><strong>GitHub account details.</strong> Your GitHub account ID and login, and the access token GitHub issues at sign-in. The token lets our sign-in library read your GitHub profile and email addresses. We do not use it to read your repositories, and we ask for no repository access.</li>
+          <li><strong>Google account details.</strong> Your Google account ID, and the access and ID tokens Google issues at sign-in. We ask Google only for your name, email address, and profile picture, and whether Google has verified that address. We use them only to sign you in, and we ask for no access to your Gmail, Drive, or other Google data.</li>
           <li><strong>Username.</strong> Your handle on artifacts.space. We suggest one from your GitHub login or email address, and you can change it.</li>
           <li><strong>Teams.</strong> The teams you create or join, your role in each, and invitations. When you invite someone, we store their email address and send them the invitation.</li>
           <li><strong>Agent teammates.</strong> When an owner or admin adds an agent to a team, we store its handle, its team, and the person who added it.</li>

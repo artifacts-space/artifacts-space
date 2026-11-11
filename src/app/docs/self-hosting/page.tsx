@@ -44,6 +44,7 @@ export default function SelfHostingPage() {
           <li><strong>Sendir</strong> for email: sign-in links, invitations, mentions, and reports. People sign in with email links, so production needs it.</li>
           <li><strong>Cloudflare R2</strong> for uploaded files. Without it, everything but files works.</li>
           <li><strong>A GitHub OAuth app</strong>, if you want GitHub sign-in. Optional.</li>
+          <li><strong>A Google OAuth client</strong>, if you want Google sign-in. Optional.</li>
           <li><strong>Node.js 22.22.1 or later</strong> and <strong>pnpm 10</strong>. CI and production run Node 26, the version in <code>.nvmrc</code>.</li>
         </ul>
         <p>The source is at <a href={DOCS_REPOSITORY}>{DOCS_REPOSITORY.replace("https://", "")}</a>.</p>
@@ -68,10 +69,12 @@ export default function SelfHostingPage() {
 
       <DocsH page={page} id="auth" />
       <Prose>
-        <p>Sign-in is Better Auth, self-hosted: email links and, optionally, GitHub. There are no passwords. Better Auth is also the OAuth 2.1 server MCP clients connect through, at <code>{"<BETTER_AUTH_URL>"}/api/auth</code>.</p>
+        <p>Sign-in is Better Auth, self-hosted: email links and, optionally, GitHub and Google. There are no passwords. Better Auth is also the OAuth 2.1 server MCP clients connect through, at <code>{"<BETTER_AUTH_URL>"}/api/auth</code>.</p>
         <ul>
           <li>Set <code>BETTER_AUTH_URL</code> to the public origin. OAuth tokens are bound to <code>{"<BETTER_AUTH_URL>"}/api/mcp</code>, so a wrong origin breaks MCP sign-in.</li>
           <li>For GitHub, create an OAuth app with the callback URL <code>{"<BETTER_AUTH_URL>"}/api/auth/callback/github</code>. The GitHub login becomes the preferred username.</li>
+          <li>For Google, create an OAuth client of type Web application with the authorized redirect URI <code>{"<BETTER_AUTH_URL>"}/api/auth/callback/google</code>, and ask only for the <code>openid</code>, <code>email</code>, and <code>profile</code> scopes. The button shows only when both Google values are set, and never on Vercel preview deploys, because Google accepts only exact redirect URIs.</li>
+          <li>A GitHub or Google sign-in whose email matches an existing account joins that account only when the provider has verified the email and the account has confirmed it. Google sign-in with an unverified email is refused.</li>
           <li>MCP apps register themselves. Apps nobody approves are deleted after {oauthLimits.unapprovedClientHours} hours, and registration pauses while {oauthLimits.maxUnapprovedClients} wait.</li>
         </ul>
       </Prose>

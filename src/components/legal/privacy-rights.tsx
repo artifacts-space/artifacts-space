@@ -19,6 +19,7 @@ const providers = [
   { name: "Sendir", role: "sends our transactional email.", data: "the recipient's email address and the email itself" },
   { name: "Slack", role: "delivers the \"Something's not working\" reports you send from the app to our team.", data: "your note, your name and email address, the page you were on, your team workspace, and your browser and window size" },
   { name: "GitHub", role: "signs you in, if you choose GitHub.", data: "the fact that you use GitHub to sign in to artifacts.space" },
+  { name: "Google", role: "signs you in, if you choose Google.", data: "the fact that you use Google to sign in to artifacts.space" },
   {
     name: "Browser push services",
     role: "(Google for Chrome and Edge, Mozilla for Firefox, Apple for Safari, Microsoft for Windows) deliver browser notifications, only if you turn them on. Each message is encrypted for your browser, so the push service cannot read it.",
