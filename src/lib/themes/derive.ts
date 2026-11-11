@@ -149,20 +149,23 @@ const blockFillTint: Record<PaletteMode, number> = { light: 0.1, dark: 0.13 };
 /**
  * Block colors (markdown-dialect.md, "Block colors") for a themed card and
  * page. Each background is the card tinted toward the hue, kept readable
- * under the theme's ink; each text color keeps the site's hue and chroma,
- * re-lit until it reads at AA on the card, the page, and its own background.
+ * under the theme's ink. Any text color can sit on any background, so each
+ * keeps the site's hue and chroma and is re-lit until it reads at AA on the
+ * card, the page, and every hue's background.
  */
 export function blockColorTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
   const card = read(colors.card);
-  const page = read(colors.background);
   const ink = read(colors.foreground);
   const tokens: Record<string, string> = {};
-  for (const hue of blockHues) {
-    const site = read(siteBlockColors[mode][hue].text);
-    const fill = ensureContrast(mixOklch(card, site, blockFillTint[mode]), ink, 4.55);
-    const text = [card, page, fill].reduce((color, surface) => ensureContrast(color, surface, 4.55), site);
-    tokens[`--block-${hue}`] = formatOklch(text);
+  const fills = blockHues.map((hue) => {
+    const fill = ensureContrast(mixOklch(card, read(siteBlockColors[mode][hue].text), blockFillTint[mode]), ink, 4.55);
     tokens[`--block-${hue}-bg`] = formatOklch(fill);
+    return fill;
+  });
+  const surfaces = [card, read(colors.background), ...fills];
+  for (const hue of blockHues) {
+    const text = surfaces.reduce((color, surface) => ensureContrast(color, surface, 4.55), read(siteBlockColors[mode][hue].text));
+    tokens[`--block-${hue}`] = formatOklch(text);
   }
   return tokens;
 }

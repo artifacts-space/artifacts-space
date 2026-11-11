@@ -16,13 +16,13 @@ export const siteBlockColors: Readonly<Record<"light" | "dark", Readonly<Record<
   light: {
     gray: { text: "oklch(0.52 0.01 65)", fill: "oklch(0.94 0.004 80)" },
     brown: { text: "oklch(0.5 0.06 55)", fill: "oklch(0.94 0.02 60)" },
-    orange: { text: "oklch(0.54 0.15 50)", fill: "oklch(0.95 0.04 60)" },
-    yellow: { text: "oklch(0.54 0.13 85)", fill: "oklch(0.96 0.05 95)" },
-    green: { text: "oklch(0.52 0.12 150)", fill: "oklch(0.95 0.035 155)" },
+    orange: { text: "oklch(0.53 0.15 50)", fill: "oklch(0.95 0.04 60)" },
+    yellow: { text: "oklch(0.52 0.13 85)", fill: "oklch(0.96 0.05 95)" },
+    green: { text: "oklch(0.51 0.12 150)", fill: "oklch(0.95 0.035 155)" },
     blue: { text: "oklch(0.52 0.15 255)", fill: "oklch(0.95 0.03 250)" },
     purple: { text: "oklch(0.52 0.16 300)", fill: "oklch(0.95 0.03 305)" },
-    pink: { text: "oklch(0.55 0.17 350)", fill: "oklch(0.95 0.03 350)" },
-    red: { text: "oklch(0.55 0.19 27)", fill: "oklch(0.95 0.03 25)" },
+    pink: { text: "oklch(0.54 0.17 350)", fill: "oklch(0.95 0.03 350)" },
+    red: { text: "oklch(0.54 0.19 27)", fill: "oklch(0.95 0.03 25)" },
   },
   dark: {
     gray: { text: "oklch(0.7 0.01 70)", fill: "oklch(0.26 0.005 60)" },

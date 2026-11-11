@@ -218,19 +218,19 @@
   --block-gray-bg: oklch(0.94 0.004 80);
   --block-brown: oklch(0.5 0.06 55);
   --block-brown-bg: oklch(0.94 0.02 60);
-  --block-orange: oklch(0.54 0.15 50);
+  --block-orange: oklch(0.53 0.15 50);
   --block-orange-bg: oklch(0.95 0.04 60);
-  --block-yellow: oklch(0.54 0.13 85);
+  --block-yellow: oklch(0.52 0.13 85);
   --block-yellow-bg: oklch(0.96 0.05 95);
-  --block-green: oklch(0.52 0.12 150);
+  --block-green: oklch(0.51 0.12 150);
   --block-green-bg: oklch(0.95 0.035 155);
   --block-blue: oklch(0.52 0.15 255);
   --block-blue-bg: oklch(0.95 0.03 250);
   --block-purple: oklch(0.52 0.16 300);
   --block-purple-bg: oklch(0.95 0.03 305);
-  --block-pink: oklch(0.55 0.17 350);
+  --block-pink: oklch(0.54 0.17 350);
   --block-pink-bg: oklch(0.95 0.03 350);
-  --block-red: oklch(0.55 0.19 27);
+  --block-red: oklch(0.54 0.19 27);
   --block-red-bg: oklch(0.95 0.03 25);
   /*
    * Pixel avatars (src/lib/avatar). Each avatar's hue is data; these tokens

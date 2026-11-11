@@ -254,12 +254,14 @@ Ship it on Friday <!-- color: red -->
 - **Hues:** `gray`, `brown`, `orange`, `yellow`, `green`, `blue`, `purple`,
   `pink`, `red` (`blockHues` in `src/lib/block-colors/block-color-rules.ts`).
   Each is a pair of tokens in `globals.css`, `--block-<hue>` for text and
-  `--block-<hue>-bg` for backgrounds, with light and dark values that read
-  at WCAG AA (`block-color-tokens.test.ts`). An artifact theme derives its
-  own pair from the same hues (`blockColorTokens` in
-  `src/lib/themes/derive.ts`): the background tints the theme's card, and
-  the text is re-lit to stay at AA on the card, the page, and its
-  background.
+  `--block-<hue>-bg` for backgrounds, with light and dark values. Any text
+  color can sit on any background, so every text hue reads at WCAG AA on
+  the page, a card, and every hue's background, and body text reads at AA
+  on every background (`block-color-tokens.test.ts`). An artifact theme
+  derives its own pairs from the same hues (`blockColorTokens` in
+  `src/lib/themes/derive.ts`): each background tints the theme's card, and
+  each text color is re-lit to keep the same guarantee on the theme's
+  surfaces.
 - **The comment** holds `name: value` declarations split by `;`. `color` is
   the text color and `background` the background. The editor writes
   `<!-- color: <hue>; background: <hue> -->`, color first, with the

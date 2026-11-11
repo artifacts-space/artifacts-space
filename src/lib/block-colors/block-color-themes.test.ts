@@ -13,28 +13,28 @@ function color(value: string | undefined): Oklch {
   return parsed;
 }
 
-/** Every pair that must read at AA: each hue's text on the card, the page, and its own background, and the ink on each background. */
+/** Every pair that must read at AA: each hue's text on the card, the page, and every hue's background, and the ink on each background. */
 function failingPairs(mode: PaletteMode, colors: ThemeColors): string[] {
   const tokens = blockColorTokens(mode, colors);
+  const fills = blockHues.map((hue) => [`${hue} background`, color(tokens[`--block-${hue}-bg`])] as const);
+  const surfaces = [["card", color(colors.card)] as const, ["page", color(colors.background)] as const, ...fills];
   const failing: string[] = [];
   for (const hue of blockHues) {
     const text = color(tokens[`--block-${hue}`]);
-    const fill = color(tokens[`--block-${hue}-bg`]);
-    const pairs: [string, Oklch, Oklch][] = [
-      ["text on card", text, color(colors.card)],
-      ["text on page", text, color(colors.background)],
-      ["text on its background", text, fill],
-      ["ink on background", color(colors.foreground), fill],
-    ];
-    for (const [name, a, b] of pairs) if (contrastRatio(a, b) < 4.5) failing.push(`${hue} ${name}`);
+    for (const [name, surface] of surfaces) if (contrastRatio(text, surface) < 4.5) failing.push(`${hue} text on ${name}`);
   }
+  for (const [name, fill] of fills) if (contrastRatio(color(colors.foreground), fill) < 4.5) failing.push(`ink on ${name}`);
   return failing;
 }
 
-/** A preset's palette with its card and page moved to `lightness`, as a custom theme may. */
-function withSurface(colors: ThemeColors, lightness: number): ThemeColors {
-  const surface = `oklch(${String(lightness)} 0.02 80)`;
-  return { ...colors, card: surface, background: surface };
+/**
+ * A preset's palette with its card at `card` lightness and its page a step
+ * further from the ink, as a custom theme may set them: two surfaces on the
+ * same side, not the same color.
+ */
+function withSurfaces(colors: ThemeColors, mode: PaletteMode, card: number): ThemeColors {
+  const page = mode === "light" ? card - 0.05 : card - 0.08;
+  return { ...colors, card: `oklch(${String(card)} 0.02 80)`, background: `oklch(${String(page)} 0.02 80)` };
 }
 
 describe("blockColorTokens", () => {
@@ -47,9 +47,9 @@ describe("blockColorTokens", () => {
   it("should re-light the hues for a custom theme's card at the edge of what themes allow", () => {
     const preset = builtInPresets().get("default");
     if (!preset) throw new Error("default preset missing");
-    expect(failingPairs("light", withSurface(preset.theme.light, 0.9))).toEqual([]);
-    expect(failingPairs("light", withSurface(preset.theme.light, 0.7))).toEqual([]);
-    expect(failingPairs("dark", withSurface(preset.theme.dark, 0.4))).toEqual([]);
+    expect(failingPairs("light", withSurfaces(preset.theme.light, "light", 0.9))).toEqual([]);
+    expect(failingPairs("light", withSurfaces(preset.theme.light, "light", 0.75))).toEqual([]);
+    expect(failingPairs("dark", withSurfaces(preset.theme.dark, "dark", 0.4))).toEqual([]);
   });
 
   it("should be part of every theme's tokens, so themed artifacts draw block colors from the theme", () => {

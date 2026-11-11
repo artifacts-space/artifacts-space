@@ -34,12 +34,11 @@ describe("block color tokens", () => {
     }
   });
 
-  it.each(Object.keys(modes) as (keyof typeof modes)[])("should keep every %s text hue readable (AA) on the page, a card, and its own background", (mode) => {
+  it.each(Object.keys(modes) as (keyof typeof modes)[])("should keep every %s text hue readable (AA) on the page, a card, and every hue's background", (mode) => {
+    const surfaces = [token(mode, "--background"), token(mode, "--card"), ...blockHues.map((hue) => token(mode, `--block-${hue}-bg`))];
     for (const hue of blockHues) {
       const text = token(mode, `--block-${hue}`);
-      for (const surface of [token(mode, "--background"), token(mode, "--card"), token(mode, `--block-${hue}-bg`)]) {
-        expect(contrastRatio(text, surface), `${mode} ${hue}`).toBeGreaterThanOrEqual(4.5);
-      }
+      for (const [index, surface] of surfaces.entries()) expect(contrastRatio(text, surface), `${mode} ${hue} on surface ${String(index)}`).toBeGreaterThanOrEqual(4.5);
     }
   });
 
