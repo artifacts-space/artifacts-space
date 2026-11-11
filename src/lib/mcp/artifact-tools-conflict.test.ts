@@ -18,6 +18,7 @@ const data = vi.hoisted(() => ({
   updateArtifact: vi.fn(),
   restoreArtifactVersion: vi.fn(),
   getEditableArtifact: vi.fn(),
+  getEditableArtifactDto: vi.fn(),
   loadArtifactForViewer: vi.fn(),
   requestArtifactSharing: vi.fn(),
   setArtifactProject: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock("@/lib/artifacts", () => ({
   createArtifact: data.createArtifact,
   updateArtifact: data.updateArtifact,
   restoreArtifactVersion: data.restoreArtifactVersion,
+  getEditableArtifactDto: data.getEditableArtifactDto,
   deleteArtifact: vi.fn(),
   getOwnArtifactByPublicId: vi.fn(),
   listArtifacts: vi.fn(),
@@ -130,6 +132,26 @@ describe("artifacts_update base version", () => {
     expect(result.isError).toBe(true);
     expect(result.text).toMatch(/^@charles is editing this artifact in the web app right now\. Nothing was saved\./);
     expect(result.structured?.error?.code).toBe("artifact_being_edited");
+  });
+
+  it("should return the base-required error that names baseVersion when a person saved last and the agent sent none", async () => {
+    data.updateArtifact.mockRejectedValue(new EditConflictError("base_needed", { handle: "charles", harness: null }));
+    const result = await call("artifacts_update", { id: publicId, summary: "Old client" });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain("Read the artifact with artifacts_get and pass its baseVersion");
+    expect(result.structured?.error).toMatchObject({ code: "base_version_required", nextStep: "artifacts_get" });
+  });
+
+  it("should hand back no baseVersion when nothing was saved, so a later read never stands in for the agent's own", async () => {
+    // A person saved after the agent read it; the agent only moves it to a project.
+    data.getEditableArtifactDto.mockResolvedValue(dto("2026-11-11T13:20:00.000Z"));
+    data.setArtifactProject.mockResolvedValue("Plans");
+    const result = await call("artifacts_update", { id: publicId, project: "Plans", baseVersion: token });
+    expect(result.isError).toBe(false);
+    const body = JSON.parse(result.text) as { edit: string; artifact: Record<string, unknown> };
+    expect(body.edit).toBe("unchanged");
+    expect(body.artifact).not.toHaveProperty("baseVersion");
+    expect(body.artifact).not.toHaveProperty("versionId");
   });
 
   it("should not share, move, or tag after a refused save", async () => {

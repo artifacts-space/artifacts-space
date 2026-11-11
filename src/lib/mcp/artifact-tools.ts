@@ -355,7 +355,9 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
       const artifact = await applyFullWidth(userId, record.id, organized, fullWidth);
       const result = await shareAfterSave(userId, artifact, teams, { visibility, team, comments });
       // The agent's own save and its baseVersion, for its next update: never a later read that names a save it never saw (asSaved).
-      const current = { ...toMcpArtifact(asSaved(result.artifact, saved.artifact), view, { canEdit: true }), ...(await baseVersionOf(record.id, saved.artifact.updatedAt)) };
+      // With no save ("unchanged") there is no base of its own to hand back, so none is: the agent keeps the one it has.
+      const ownBase = saved.edit === "unchanged" ? {} : await baseVersionOf(record.id, saved.artifact.updatedAt);
+      const current = { ...toMcpArtifact(asSaved(result.artifact, saved.artifact), view, { canEdit: true }), ...ownBase };
       return { artifact: current, edit: saved.edit, sharing: result.sharing, comments: result.comments };
     }),
   );
