@@ -29,6 +29,7 @@ import { assertTeamPresetUsable } from "@/lib/themes/team-preset-access";
 import { artifactCoverInputSchema } from "@/lib/covers/cover";
 import { artifactSizeProblem } from "@/lib/artifact-limits";
 import { defaultCommentSetting } from "@/lib/comments/setting-rules";
+import { firstSaveTime } from "@/lib/edits/save-time";
 import { PREVIEW_CHARS, previewKinds } from "@/lib/artifact-preview";
 import { loadProjectFacets, projectFilterCondition, projectSearchCondition, projectsForViewer, type ProjectFacets, type ProjectFilter } from "@/lib/projects/queries";
 import { loadTagFacets, tagFilterCondition, tagSearchCondition, tagsForViewer, type TagFacet } from "@/lib/tags/queries";
@@ -40,7 +41,7 @@ import { contentForSave } from "@/lib/files/content-on-save";
 import { artifactHarnessOf, stampColumns, type HarnessStamp } from "@/lib/harness/harness-rules";
 import { checkIconFile, restorableIcon } from "@/lib/files/icon-file";
 import { checkCoverFile, restorableCover } from "@/lib/files/cover-file";
-import { attachContentAndImageFiles } from "@/lib/files/save-attach";
+import { writeAndAttach } from "@/lib/files/save-attach";
 import { deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
 import type { FileDto } from "@/lib/files/types";
 import { generatePublicId } from "@/lib/public-id";
@@ -338,12 +339,18 @@ async function newArtifactProjectId(userId: string, projectName: string | null |
   return projectName ? (await findOrCreateProject({ kind: "user", userId }, projectName, userId)).id : null;
 }
 
+/** Who creates an artifact: an agent over MCP, or a person. Callers that pass only a harness mean an agent. */
+function creatorOf(options: { harness?: HarnessStamp | null; actor?: SharingActor }): SharingActor {
+  return options.actor ?? (options.harness ? "agent" : "person");
+}
+
 /**
  * Creates a private artifact for its author, within the hourly creation limit
  * and the account's storage quota. `harness` is the agent harness of the MCP
  * connection that created it; leave it out for the web app.
  */
-export async function createArtifact(userId: string, input: ArtifactInput, options: { harness?: HarnessStamp | null; emptyMarkdown?: boolean; createRequestId?: string } = {}) {
+export async function createArtifact(userId: string, input: ArtifactInput, options: { harness?: HarnessStamp | null; actor?: SharingActor; emptyMarkdown?: boolean; createRequestId?: string } = {}) {
+  const actor = creatorOf(options);
   const { project: projectName, tags: tagInput, ...sent } = artifactInputSchema.parse(input);
   const parsed = contentForSave(sent.kind, sent);
   const tags = parseNewTags(tagInput);
@@ -357,7 +364,7 @@ export async function createArtifact(userId: string, input: ArtifactInput, optio
   await assertContentFits(userId, parsed.content);
   await assertRoomForNewTags(userId, tags);
   const projectId = await newArtifactProjectId(userId, projectName);
-  const [record] = await getDb()
+  const insert = getDb()
     .insert(artifact)
     .values({
       ...parsed,
@@ -372,18 +379,21 @@ export async function createArtifact(userId: string, input: ArtifactInput, optio
       comments: defaultCommentSetting({ visibility: "private", teamPersonal: null }),
       userId,
       updatedBy: userId,
+      // Save times come from the database clock (src/lib/edits/save-time.ts).
+      updatedAt: firstSaveTime(),
       // A person's own create counts as their save; an agent's does not (src/lib/artifact-save.ts).
-      personSavedAt: options.harness ? null : sql`now()`,
+      personSavedAt: actor === "agent" ? null : firstSaveTime(),
       createRequestId: options.createRequestId ?? null,
     })
     // A second create with the same create id inserts nothing (artifact_user_create_request_idx).
     .onConflictDoNothing({ target: [artifact.userId, artifact.createRequestId], where: sql`${artifact.createRequestId} is not null` })
     .returning();
+  // The uploads attach in the same statement as the insert (writeAndAttach): never a new artifact naming an upload it does not hold.
+  const record = await writeAndAttach(insert.getSQL(), userId, { contentFileIds, imageFileIds });
 
   if (!record && options.createRequestId) throw new CreateRequestTaken();
   if (!record) throw new Error("The artifact could not be created.");
-  await attachContentAndImageFiles(userId, record.id, contentFileIds, imageFileIds);
-  await recordArtifactSave({ before: null, after: record, editorId: userId, actor: "person", saveKind: "create", harness: options.harness ?? null });
+  await recordArtifactSave({ before: null, after: record, editorId: userId, actor, saveKind: "create", harness: options.harness ?? null });
   const [dto] = await toArtifactDtos([record], userId);
   return dto ?? toArtifactDto(record);
 }
@@ -431,9 +441,11 @@ export async function saveArtifactUpdate(userId: string, id: string, input: Arti
  * Brings back an older version as a new save. History is never rewritten:
  * the restore is filed as its own version, and for a link or public artifact
  * it waits for approval like any edit. Returns null when the user may not
- * edit the artifact; throws when the version is not the artifact's.
+ * edit the artifact; throws when the version is not the artifact's. A
+ * person's restore goes through over agents' newer saves, like any web save,
+ * and `savedOverAgents` says so.
  */
-export async function restoreArtifactVersion(userId: string, id: string, versionId: string, actor: SharingActor = "person", options: SaveOptions = {}) {
+export async function restoreArtifactVersion(userId: string, id: string, versionId: string, actor: SharingActor = "person", options: SaveOptions = {}): Promise<SavedArtifact | null> {
   const before = await getEditableArtifact(userId, { id });
   if (!before) return null;
   const version = await getVersionOf(before.id, versionId);
@@ -443,7 +455,7 @@ export async function restoreArtifactVersion(userId: string, id: string, version
   const [icon, cover] = await Promise.all([restorableIcon(userId, before.id, version.icon), restorableCover(userId, before.id, version.cover)]);
   const changes = contentForSave(kind, artifactUpdateSchema.parse({ title, icon, theme, cover, summary, content, kind, language, source, metadata }));
   assertArtifactSize(changes);
-  return (await saveChanges(changes, { editorId: userId, before, actor, options, restoredFromId: version.id }))?.artifact ?? null;
+  return saveChanges(changes, { editorId: userId, before, actor, options, restoredFromId: version.id });
 }
 
 /** Deletes an artifact and its files, for its author or the person who added the agent that wrote it. */

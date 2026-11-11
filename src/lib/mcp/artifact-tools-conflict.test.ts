@@ -37,7 +37,7 @@ vi.mock("@/lib/sharing/comments", () => ({ setArtifactComments: vi.fn() }));
 vi.mock("@/lib/sharing/service", () => ({ requestArtifactSharing: data.requestArtifactSharing }));
 vi.mock("@/lib/projects/store", () => ({ setArtifactProject: data.setArtifactProject }));
 vi.mock("@/lib/site-origin", () => ({ siteUrl: (path: string) => `https://artifacts.space${path}` }));
-vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: versionId }) }));
+vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: versionId }), versionAt: () => Promise.resolve({ id: versionId }) }));
 vi.mock("@/lib/versions/history-queries", () => ({ getArtifactVersionDetail: vi.fn(), listArtifactVersions: vi.fn() }));
 
 const versionId = "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f";
@@ -152,7 +152,7 @@ describe("artifacts_restore_version base version", () => {
   });
 
   it("should return the new baseVersion when the restore saves", async () => {
-    data.restoreArtifactVersion.mockResolvedValue(dto());
+    data.restoreArtifactVersion.mockResolvedValue({ artifact: dto(), savedOverAgents: false });
     const result = await call("artifacts_restore_version", { id: publicId, version: versionId, baseVersion: token });
     expect(JSON.parse(result.text)).toMatchObject({ versionId, baseVersion: token });
   });

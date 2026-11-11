@@ -35,7 +35,7 @@ vi.mock("@/lib/sharing/comments", () => ({ setArtifactComments: vi.fn() }));
 vi.mock("@/lib/sharing/service", () => ({ requestArtifactSharing: vi.fn() }));
 vi.mock("@/lib/site-origin", () => ({ siteUrl: (path: string) => `https://artifacts.space${path}` }));
 
-vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }) }));
+vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }), versionAt: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }) }));
 const { registerArtifactTools } = await import("./artifact-tools");
 const { registerThemeTools } = await import("./theme-tools");
 
@@ -88,7 +88,7 @@ describe("artifacts_create with theme", () => {
     data.createArtifact.mockResolvedValue(dto("paper"));
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", theme: "paper" });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ theme: "paper" }), { harness: null });
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ theme: "paper" }), { harness: null, actor: "agent" });
     expect((JSON.parse(result.text) as { artifact: { theme: string } }).artifact.theme).toBe("paper");
   });
 
@@ -97,7 +97,7 @@ describe("artifacts_create with theme", () => {
     const theme = { version: 1, light: { ...ocean().light, accent: "#1d4ed8" }, dark: ocean().dark };
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", theme });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ theme }), { harness: null });
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ theme }), { harness: null, actor: "agent" });
   });
 
   it("should refuse an unknown preset with the list of real ones before anything is saved", async () => {

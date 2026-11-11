@@ -96,35 +96,6 @@ export function agentWriteRefusal(check: AgentWriteCheck): AgentWriteRefusal | n
   return check.guarded && check.leaseLive ? "editing" : null;
 }
 
-/**
- * How far past this server's clock a web editor's base may be. Its base is a
- * save time a server handed out, so only clock drift between server
- * instances can put it ahead; a few seconds covers that.
- */
-export const BASE_CLOCK_SKEW_MS = 5_000;
-
-/**
- * How far after a person's base a web version's save time must be before it
- * counts as a newer person's save, for rows without `person_saved_at`
- * (onlyAgentsSavedSince). Smaller than BASE_CLOCK_SKEW_MS on purpose: a
- * version's `saved_at` comes from the database clock and the base from the
- * app server's `updated_at`, so it only absorbs drift between those two,
- * and every millisecond of margin is a window where a newer save is missed.
- */
-export const VERSION_CLOCK_SKEW_MS = 1_000;
-
-/**
- * Whether a person's base (`expectedUpdatedAt`) can be a save time the server
- * handed out. A base in the future would make every save look like it only
- * went over agents' saves, so such a save is refused instead of landing
- * silently over another person's newer save. It guards against a faulty
- * client, not a hostile one: an editor may overwrite the artifact anyway
- * (Keep my changes), so a crafted base gains them nothing.
- */
-export function isPlausibleBase(expected: Date, now: Date): boolean {
-  return expected.getTime() <= now.getTime() + BASE_CLOCK_SKEW_MS;
-}
-
 /** A lease is live until its expiry. */
 export function leaseIsLive(expiresAt: Date | null, now: Date): boolean {
   return expiresAt !== null && expiresAt.getTime() > now.getTime();

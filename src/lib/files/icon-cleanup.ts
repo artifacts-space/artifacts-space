@@ -120,8 +120,9 @@ export const contentPruneGraceMinutes = 5;
  * transactions or row locks: a save that wrote content naming the file
  * before this runs keeps it, and no window opens in which the file could be
  * attached again and then deleted. A file attached in the last few minutes
- * is never deleted: a margin for a save still in flight (an update writes
- * its content, then attaches the uploads it names; see artifact-save.ts).
+ * is never deleted: a margin for a save still in flight (a save attaches
+ * the uploads it names in the statement that writes its content; see
+ * writeAndAttach in save-attach.ts).
  */
 export function deleteUnnamedContentFiles(artifactId: string, fileIds: readonly string[]) {
   return getDb()

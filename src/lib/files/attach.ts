@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
-import { artifact, artifactFile } from "@/db/schema";
+import { artifact, artifactFile, type ArtifactRecord } from "@/db/schema";
 import { canEditRecord } from "@/lib/access";
 import type { HarnessStamp } from "@/lib/harness/harness-rules";
 import type { SharingActor } from "@/lib/sharing/rules";
@@ -63,18 +63,21 @@ const noStamp = () => Promise.resolve(null);
  * version. For a link or public artifact the change goes through edit review
  * (recordArtifactChange), so readers outside the team see new files only
  * once they are approved. Counts against the per-editor edit limit.
+ * Returns the artifact as this change saved it, or null when nothing was
+ * attached (every file was in it already) and so nothing saved.
  */
-export async function attachFiles(editorId: string, artifactId: string, fileIds: readonly string[], actor: SharingActor, harness: () => Promise<HarnessStamp | null> = noStamp): Promise<void> {
+export async function attachFiles(editorId: string, artifactId: string, fileIds: readonly string[], actor: SharingActor, harness: () => Promise<HarnessStamp | null> = noStamp): Promise<ArtifactRecord | null> {
   await assertUsableFiles(editorId, artifactId, fileIds);
   await enforceRateLimit("artifactUpdate", editorId);
   const attached = await attachFileRows(editorId, artifactId, fileIds);
-  if (attached > 0) await recordArtifactChange({ artifactId, editorId, actor, harness: await harness() });
+  if (attached === 0) return null;
+  return (await recordArtifactChange({ artifactId, editorId, actor, harness: await harness() })).record;
 }
 
 /**
  * The files a save points at, checked before anything is written. Returns
  * the ids to attach once the artifact exists, as content media
- * (`attachFileRows(…, { byContent: true })`). `artifactId` is null on create.
+ * (`writeAndAttach` in save-attach.ts). `artifactId` is null on create.
  */
 export async function checkContentFiles(authorId: string, artifactId: string | null, kind: string, content: string): Promise<string[]> {
   const ids = fileRefsInContent(kind, content);
@@ -125,10 +128,11 @@ async function deleteFileOf(row: { id: string; artifactId: string | null }, user
 /**
  * Deletes a file from R2 and the database. Allowed for the uploader while it
  * is not attached, and for anyone who may edit the artifact it belongs to.
- * Returns the artifact id it belonged to, or null. An agent passes its
- * harness, looked up only when the deletion files a version.
+ * Returns the artifact id it belonged to (null for an upload in none), and
+ * the artifact as this deletion saved it. An agent passes its harness,
+ * looked up only when the deletion files a version.
  */
-export async function deleteOwnFile(userId: string, fileId: string, actor: SharingActor, harness: () => Promise<HarnessStamp | null> = noStamp): Promise<string | null> {
+export async function deleteOwnFile(userId: string, fileId: string, actor: SharingActor, harness: () => Promise<HarnessStamp | null> = noStamp): Promise<DeletedFile> {
   const row = z.uuid().safeParse(fileId).success ? await getFileRow(fileId.toLowerCase()) : null;
   const allowed = row !== null && (row.artifactId === null ? row.uploaderId === userId : await mayEditArtifact(userId, row.artifactId));
   if (!row || !allowed) throw new UserFacingError("File not found.");
@@ -136,9 +140,16 @@ export async function deleteOwnFile(userId: string, fileId: string, actor: Shari
   if (row.artifactId) {
     // An icon that showed this image goes back to the format icon, and the change is versioned.
     await clearIconForFile(row.artifactId, row.id);
-    await recordArtifactChange({ artifactId: row.artifactId, editorId: userId, actor, harness: await harness() });
+    const { record } = await recordArtifactChange({ artifactId: row.artifactId, editorId: userId, actor, harness: await harness() });
+    return { artifactId: row.artifactId, saved: record };
   }
-  return row.artifactId;
+  return { artifactId: null, saved: null };
+}
+
+/** What deleteOwnFile did: the artifact the file was in, and that artifact as the deletion saved it. */
+export interface DeletedFile {
+  artifactId: string | null;
+  saved: ArtifactRecord | null;
 }
 
 /**

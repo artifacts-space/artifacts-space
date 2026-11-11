@@ -33,7 +33,7 @@ vi.mock("@/lib/sharing/comments", () => ({ setArtifactComments: vi.fn() }));
 vi.mock("@/lib/sharing/service", () => ({ requestArtifactSharing: vi.fn() }));
 vi.mock("@/lib/site-origin", () => ({ siteUrl: (path: string) => `https://artifacts.space${path}` }));
 
-vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }) }));
+vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }), versionAt: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }) }));
 const { registerArtifactTools } = await import("./artifact-tools");
 const { registerThemeTools } = await import("./theme-tools");
 
@@ -110,7 +110,7 @@ describe("theme with a team preset id", () => {
   it("should pass a team preset id to the data layer on create and update", async () => {
     data.createArtifact.mockResolvedValue(dto(ref));
     expect((await call("artifacts_create", { title: "Plan", content: "# Plan", theme: ref })).isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ theme: ref }), { harness: null });
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ theme: ref }), { harness: null, actor: "agent" });
 
     data.updateArtifact.mockResolvedValue(dto(ref));
     expect((await call("artifacts_update", { id: publicId, theme: ref })).isError).toBe(false);

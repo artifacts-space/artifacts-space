@@ -62,6 +62,7 @@ describe("signalEditingAction", () => {
     mocks.hitRateLimit.mockResolvedValue({ allowed: false, retryAfterSeconds: 60 });
     expect(await signalEditingAction(artifactId)).toEqual({ success: true, data: null });
     expect(mocks.renewEditLease).not.toHaveBeenCalled();
+    expect(mocks.getEditableArtifactMeta, "the limit stops a flood before it reads the artifact").not.toHaveBeenCalled();
   });
 
   it("should end the person's lease when their editor closes", async () => {

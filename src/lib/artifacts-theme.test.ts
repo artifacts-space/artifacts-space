@@ -25,7 +25,8 @@ vi.mock("@/db", () => {
       update: () => ({
         set: (values: Record<string, unknown>) => {
           mocks.set(values);
-          return { where: () => ({ returning: () => Promise.resolve([{ ...baseRecord, ...values }]) }) };
+          // The guarded UPDATE goes to writeAndAttach as SQL; here its "SQL" is the row it would return.
+          return { where: () => ({ returning: () => ({ getSQL: () => [{ ...baseRecord, ...values, updatedAt: new Date(), personSavedAt: null }] }) }) };
         },
       }),
       select: () => ({ from: () => rows([]) }),
@@ -42,6 +43,7 @@ vi.mock("@/lib/quota/usage", () => ({ assertContentFits: () => Promise.resolve()
 vi.mock("@/lib/files/attach", () => ({ checkContentFiles: () => Promise.resolve([]) }));
 vi.mock("@/lib/files/icon-file", () => ({ checkIconFile: () => Promise.resolve([]), restorableIcon: (_user: string, _id: string, icon: string | null) => Promise.resolve(icon) }));
 vi.mock("@/lib/files/icon-cleanup", () => ({ pruneUnusedIconFilesQuietly: () => Promise.resolve(), pruneUnusedContentFilesQuietly: () => Promise.resolve() }));
+vi.mock("@/lib/files/save-attach", () => ({ checkUpdatedContentFiles: () => Promise.resolve({ contentFileIds: [], imageFileIds: [] }), writeAndAttach: (rows: unknown[]) => Promise.resolve(rows[0] ?? null) }));
 vi.mock("@/lib/files/store", () => ({ attachFileRows: () => Promise.resolve(), deleteArtifactFiles: () => Promise.resolve(), listFilesForArtifacts: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/agents/queries", () => ({ loadActors: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/agents/owner-access", () => ({ ownedAgentIds: () => Promise.resolve(new Set()), authoredByViewerCondition: vi.fn() }));

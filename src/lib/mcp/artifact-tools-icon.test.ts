@@ -34,7 +34,7 @@ vi.mock("@/lib/sharing/comments", () => ({ setArtifactComments: vi.fn() }));
 vi.mock("@/lib/sharing/service", () => ({ requestArtifactSharing: vi.fn() }));
 vi.mock("@/lib/site-origin", () => ({ siteUrl: (path: string) => `https://artifacts.space${path}` }));
 
-vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }) }));
+vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }), versionAt: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }) }));
 const { registerArtifactTools } = await import("./artifact-tools");
 
 const publicId = "4fXkP9qR2sT7vW1yZ3aB5c";
@@ -79,7 +79,7 @@ describe("artifacts_create with icon", () => {
     data.createArtifact.mockResolvedValue(dto("🧪"));
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", icon: "🧪" });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ icon: "🧪" }), { harness: null });
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ icon: "🧪" }), { harness: null, actor: "agent" });
     expect((JSON.parse(result.text) as { artifact: { icon: string } }).artifact.icon).toBe("🧪");
   });
 
@@ -87,7 +87,7 @@ describe("artifacts_create with icon", () => {
     data.createArtifact.mockResolvedValue(dto("tabler:rocket"));
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", icon: "tabler:rocket" });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ icon: "tabler:rocket" }), { harness: null });
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ icon: "tabler:rocket" }), { harness: null, actor: "agent" });
   });
 
   it.each(["rocket", "🚀🚀", "<svg onload=alert(1)>", "tabler:not-real", "\u0007"])("should refuse %j before anything is saved", async (icon) => {

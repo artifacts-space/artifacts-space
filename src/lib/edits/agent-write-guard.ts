@@ -6,7 +6,7 @@ import { artifact, artifactVersion } from "@/db/schema";
 import { loadActor } from "@/lib/agents/queries";
 import { harnessFor } from "@/lib/harness/harnesses";
 
-import { EDIT_LEASE_MS, EDIT_SIGNAL_INTERVAL_MS, VERSION_CLOCK_SKEW_MS, type BaseVersion, type ChangedBy } from "./edit-conflict-rules";
+import { EDIT_LEASE_MS, EDIT_SIGNAL_INTERVAL_MS, type BaseVersion, type ChangedBy } from "./edit-conflict-rules";
 
 /**
  * The database side of edit-conflict-rules.ts: edit leases, and the SQL
@@ -37,25 +37,37 @@ export function agentWriteCondition(artifactId: string, input: { base: BaseVersi
 }
 
 /**
+ * SQL: a version saved by a person (in the web app, or a person's restore or
+ * file change), from the version's own `by_agent`, or for versions from
+ * before that column, from its harness (none: the web app).
+ */
+export const personVersion = sql`coalesce(v.by_agent, v.harness is not null) = false`;
+
+/**
  * The relaxed condition a person's web save falls back to when the artifact
- * moved on from the editor's base: every save since was an agent's, because
- * no person saved after the base. `person_saved_at` is set by every person's
- * save and never by an agent's. Null means no person has saved since the
- * column was added: either an agent created the artifact, or the row is
- * older than the column. Then the artifact's web versions (no harness) say
- * whether a person saved after the base; they cover all of the row's older
- * history, so no backfill is needed. A version's save time comes from the
- * database clock and the base from the app server's, so a web version
- * counts only from VERSION_CLOCK_SKEW_MS after the base: the save the base
- * came from never refuses its own editor. The artifact id is bound as a value,
- * never a bare column inside the subquery (the correlated-subquery tripwire
- * in AGENTS.md).
+ * moved on from the editor's base (`expected`): every save since was an
+ * agent's. All three parts must hold:
+ *
+ * - The base is a save time the artifact has had: not later than its last
+ *   save. A base from the future would pass the other two against everyone.
+ * - No person saved after the base by `person_saved_at`, which every person's
+ *   save sets in its own UPDATE (null: none since the column was added).
+ * - No version a person saved is later than the base. Versions are filed just
+ *   after the UPDATE, which the column covers; the versions cover saves the
+ *   column never saw (rows from before it, and saves by the previous
+ *   deployment while a new one rolls out).
+ *
+ * Save times are the database's, in whole milliseconds (save-time.ts), so
+ * the comparisons are exact; older values are truncated to match. The
+ * artifact id is bound as a value, never a bare column inside the subquery
+ * (the correlated-subquery tripwire in AGENTS.md).
  */
 export function onlyAgentsSavedSince(artifactId: string, expected: Date) {
   const base = sql`${expected.toISOString()}::timestamptz`;
-  const recorded = sql`date_trunc('milliseconds', ${artifact.personSavedAt}) <= ${base}`;
-  const noWebVersionSince = sql`not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and v.harness is null and v.saved_at > ${base} + make_interval(secs => ${VERSION_CLOCK_SKEW_MS / 1000}))`;
-  return sql`(case when ${artifact.personSavedAt} is null then ${noWebVersionSince} else ${recorded} end)`;
+  const notAhead = sql`date_trunc('milliseconds', ${artifact.updatedAt}) >= ${base}`;
+  const noPersonSaveRecorded = sql`(${artifact.personSavedAt} is null or date_trunc('milliseconds', ${artifact.personSavedAt}) <= ${base})`;
+  const noPersonVersion = sql`not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and ${personVersion} and date_trunc('milliseconds', v.saved_at) > ${base})`;
+  return sql`(${notAhead} and ${noPersonSaveRecorded} and ${noPersonVersion})`;
 }
 
 /** Whether a person's edit lease on the artifact is live now, by the database clock. */

@@ -66,11 +66,13 @@ export async function saveAsSomeoneElse(publicId: string, changes: { title?: str
 export async function saveAsAgent(publicId: string, content: string): Promise<void> {
   await db().query(
     `with saved as (
-       update artifact set content = $2, harness = 'claude-code', updated_by = user_id, updated_at = now() where public_id = $1
-       returning id, title, icon, theme, cover, summary, content, kind, language, source, metadata, user_id
+       update artifact set content = $2, harness = 'claude-code', updated_by = user_id,
+         updated_at = date_trunc('milliseconds', greatest(now(), updated_at + interval '1 millisecond'))
+       where public_id = $1
+       returning id, title, icon, theme, cover, summary, content, kind, language, source, metadata, user_id, updated_at
      )
-     insert into artifact_version (id, artifact_id, title, icon, theme, cover, summary, content, kind, language, source, metadata, harness, created_by, save_kind)
-     select gen_random_uuid()::text, id, title, icon, theme, cover, summary, content, kind, language, source, metadata, 'claude-code', user_id, 'edit' from saved`,
+     insert into artifact_version (id, artifact_id, title, icon, theme, cover, summary, content, kind, language, source, metadata, harness, by_agent, created_by, save_kind, created_at, saved_at)
+     select gen_random_uuid()::text, id, title, icon, theme, cover, summary, content, kind, language, source, metadata, 'claude-code', true, user_id, 'edit', updated_at, updated_at from saved`,
     [publicId, content],
   );
 }

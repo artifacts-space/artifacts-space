@@ -25,7 +25,7 @@ vi.mock("@/lib/comments/service", () => ({ listComments: mocks.listComments }));
 vi.mock("@/lib/files/download", () => ({ filesForViewer: mocks.filesForViewer }));
 vi.mock("@/lib/artifact-byline", () => ({ loadArtifactByline: mocks.loadArtifactByline }));
 vi.mock("@/lib/artifacts", () => ({ lastEditorsFor: mocks.lastEditorsFor }));
-vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }) }));
+vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }), versionAt: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }) }));
 vi.mock("@/db", () => {
   const chain = { from: () => chain, where: () => mocks.versionCount() as unknown };
   return { getDb: () => ({ select: () => chain }) };

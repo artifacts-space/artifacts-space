@@ -35,7 +35,7 @@ import { EditConflictError } from "@/lib/edits/conflict-error";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { toMcpArtifact, toMcpListItem, type McpViewContext } from "./artifact-view";
-import { baseVersionField, baseVersionOf, editConflictResult } from "./edit-conflict-tools";
+import { asSaved, baseVersionField, baseVersionOf, editConflictResult } from "./edit-conflict-tools";
 import { noHarness, type HarnessSource } from "./harness-context";
 import { applyTagChangeFor, tagChangeFields, tagChangeFor, tagFilterField, tagFilterFor, tagsField } from "./tag-tools";
 import { artifactToolCopy } from "./routing-copy";
@@ -318,9 +318,10 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
       const { teams, view } = await loadContext(userId);
       if (team) teamBySlug(teams, team);
       assertTheme(input.theme);
-      const created = await createArtifact(userId, { ...input, cover: coverFor(cover, coverPosition, null) }, { harness: await harness() });
+      const created = await createArtifact(userId, { ...input, cover: coverFor(cover, coverPosition, null) }, { harness: await harness(), actor: "agent" });
       const result = await shareAfterSave(userId, created, teams, { visibility, team, comments });
-      const artifact = { ...toMcpArtifact(result.artifact, view, { canEdit: true }), ...(await baseVersionOf(created.id, created.updatedAt)) };
+      // What the agent created, with the token of that save, even if someone saved since (asSaved).
+      const artifact = { ...toMcpArtifact(asSaved(result.artifact, created), view, { canEdit: true }), ...(await baseVersionOf(created.id, created.updatedAt)) };
       return { artifact, sharing: result.sharing, comments: result.comments };
     }),
   );
@@ -353,8 +354,8 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
       const organized = await organize(userId, record.id, saved.artifact, project, tagChange);
       const artifact = await applyFullWidth(userId, record.id, organized, fullWidth);
       const result = await shareAfterSave(userId, artifact, teams, { visibility, team, comments });
-      // The baseVersion of what is saved now, for the agent's next update.
-      const current = { ...toMcpArtifact(result.artifact, view, { canEdit: true }), ...(await baseVersionOf(record.id, result.artifact.updatedAt)) };
+      // The agent's own save and its baseVersion, for its next update: never a later read that names a save it never saw (asSaved).
+      const current = { ...toMcpArtifact(asSaved(result.artifact, saved.artifact), view, { canEdit: true }), ...(await baseVersionOf(record.id, saved.artifact.updatedAt)) };
       return { artifact: current, edit: saved.edit, sharing: result.sharing, comments: result.comments };
     }),
   );

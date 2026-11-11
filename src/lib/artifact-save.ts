@@ -9,10 +9,11 @@ import type { ArtifactChanges } from "@/lib/artifacts";
 import { coverFileId } from "@/lib/covers/cover";
 import { agentWriteCondition, editingPerson, hasLiveLease, lastSavedBy, onlyAgentsSavedSince } from "@/lib/edits/agent-write-guard";
 import { BadBaseVersionError, EditConflictError } from "@/lib/edits/conflict-error";
-import { agentWriteRefusal, isPlausibleBase, parseBaseVersion, touchesGuardedFields, type BaseVersion } from "@/lib/edits/edit-conflict-rules";
+import { agentWriteRefusal, parseBaseVersion, touchesGuardedFields, type BaseVersion } from "@/lib/edits/edit-conflict-rules";
+import { nextSaveTime } from "@/lib/edits/save-time";
 import { pruneUnusedContentFilesQuietly, pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { droppedContentRefs } from "@/lib/files/icon-cleanup-rules";
-import { attachContentAndImageFiles, checkUpdatedContentFiles } from "@/lib/files/save-attach";
+import { checkUpdatedContentFiles, writeAndAttach, type SaveFiles } from "@/lib/files/save-attach";
 import { stampColumns } from "@/lib/harness/harness-rules";
 import { assertContentFits } from "@/lib/quota/usage";
 import { StaleSaveError, unchangedSince, type SaveOptions } from "@/lib/save-guard";
@@ -104,17 +105,28 @@ async function assertAgentMayWrite(changes: ArtifactChanges, context: SaveContex
   if (refusal) throw await conflictFor(refusal, context.before.id);
 }
 
-/** One guarded UPDATE: the row as saved, or null when the condition did not match. */
-async function updateWhere(changes: ArtifactChanges, context: SaveContext, condition: SQL | undefined): Promise<ArtifactRecord | null> {
-  const now = new Date();
+/** One save's write: its changes, who saves, and the uploads it attaches when it lands. */
+interface Write {
+  changes: ArtifactChanges;
+  context: SaveContext;
+  files: SaveFiles;
+}
+
+/**
+ * One guarded UPDATE, with the save's uploads attached in the same
+ * statement (writeAndAttach): the row as saved, or null when the condition
+ * did not match. The save time comes from the database clock (nextSaveTime).
+ */
+async function updateWhere({ changes, context, files }: Write, condition: SQL | undefined): Promise<ArtifactRecord | null> {
+  const savedAt = nextSaveTime();
   // A person's save marks when a person last saved, so later web saves can tell agents' saves from people's.
-  const personSaved = context.actor === "person" ? { personSavedAt: now } : {};
-  const [record] = await getDb()
+  const personSaved = context.actor === "person" ? { personSavedAt: savedAt } : {};
+  const update = getDb()
     .update(artifact)
-    .set({ ...changes, ...stampColumns(context.options.harness), ...personSaved, updatedBy: context.editorId, updatedAt: now })
+    .set({ ...changes, ...stampColumns(context.options.harness), ...personSaved, updatedBy: context.editorId, updatedAt: savedAt })
     .where(and(eq(artifact.id, context.before.id), condition))
     .returning();
-  return record ?? null;
+  return writeAndAttach(update.getSQL(), context.editorId, files);
 }
 
 /** Why an agent's UPDATE matched nothing, read after the fact; null when the artifact is gone. */
@@ -128,9 +140,10 @@ async function agentRefusalAfter(context: SaveContext, guarded: boolean, base: B
 }
 
 /** An agent's save: matched only while its base is current, or while no person types when it named none. */
-async function writeAgentSave(changes: ArtifactChanges, context: SaveContext, base: BaseVersion | undefined): Promise<SavedRow | null> {
+async function writeAgentSave(write: Write, base: BaseVersion | undefined): Promise<SavedRow | null> {
+  const { changes, context } = write;
   const guarded = isGuarded(changes, context);
-  const record = await updateWhere(changes, context, agentWriteCondition(context.before.id, { base, guarded }));
+  const record = await updateWhere(write, agentWriteCondition(context.before.id, { base, guarded }));
   if (record) return { record, savedOverAgents: false };
   const refusal = await agentRefusalAfter(context, guarded, base);
   if (refusal) throw refusal;
@@ -141,24 +154,24 @@ async function writeAgentSave(changes: ArtifactChanges, context: SaveContext, ba
  * A person's save. With a base (`expectedUpdatedAt`), it first matches only
  * while the artifact is still at that base; when someone saved since, it
  * matches again only when every save since was an agent's, and reports that
- * it went over them. A newer save by another person refuses it.
+ * it went over them. A newer save by another person refuses it, and so
+ * does a base later than the artifact's last save, which no server handed
+ * out (onlyAgentsSavedSince).
  */
-async function writePersonSave(changes: ArtifactChanges, context: SaveContext): Promise<SavedRow | null> {
+async function writePersonSave(write: Write): Promise<SavedRow | null> {
+  const { context } = write;
   const expected = context.options.expectedUpdatedAt;
-  const exact = await updateWhere(changes, context, unchangedSince(expected, context.before.publicId));
+  const exact = await updateWhere(write, unchangedSince(expected, context.before.publicId));
   if (exact) return { record: exact, savedOverAgents: false };
   if (!expected) return null;
-  const base = new Date(expected);
-  // A base from the future would pass "no person saved since" against everyone: refuse it as stale.
-  if (!isPlausibleBase(base, new Date())) throw new StaleSaveError(context.before.publicId);
-  const overAgents = await updateWhere(changes, context, onlyAgentsSavedSince(context.before.id, base));
+  const overAgents = await updateWhere(write, onlyAgentsSavedSince(context.before.id, new Date(expected)));
   if (overAgents) return { record: overAgents, savedOverAgents: true };
   throw new StaleSaveError(context.before.publicId);
 }
 
 /** The guarded write for the save's actor. */
-function writeGuarded(changes: ArtifactChanges, context: SaveContext, base: BaseVersion | undefined): Promise<SavedRow | null> {
-  return context.actor === "agent" ? writeAgentSave(changes, context, base) : writePersonSave(changes, context);
+function writeGuarded(write: Write, base: BaseVersion | undefined): Promise<SavedRow | null> {
+  return write.context.actor === "agent" ? writeAgentSave(write, base) : writePersonSave(write);
 }
 
 /**
@@ -177,12 +190,11 @@ export async function writeArtifactSave(changes: ArtifactChanges, context: SaveC
   await assertValidArtifactUpdate(changes, () => Promise.resolve(before));
   // A restore keeps the version's theme as it was; a team preset it may no longer use just falls back.
   if (!context.restoredFromId && changes.theme !== before.theme) await assertTeamPresetUsable(editorId, before, changes.theme);
+  // Uploads attach in the same statement as the write: a refused save attaches nothing, and the version filed next includes them.
   const files = await checkUpdatedContentFiles(editorId, before, changes);
-  const saved = await writeGuarded(changes, context, base);
+  const saved = await writeGuarded({ changes, context, files }, base);
   if (!saved) return null;
   const { record } = saved;
-  // Uploads attach only once the write landed, so a refused save leaves them as they were; still before the version is filed, so it includes them.
-  await attachContentAndImageFiles(editorId, record.id, files.contentFileIds, files.imageFileIds);
   await recordArtifactSave({ before, after: record, editorId, actor: context.actor, ...saveKindOf(context), harness: context.options.harness ?? null });
   // A replaced or removed image icon or cover goes with this save, unless something still shows it (see icon-cleanup.ts).
   if (imageChanged(before, record)) await pruneUnusedIconFilesQuietly(record.id, [before.icon, before.cover]);

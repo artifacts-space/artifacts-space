@@ -59,8 +59,9 @@ function isNewerOrSame(next: ArtifactDto, current: ArtifactDto) {
  * newer save by someone else; then the draft merges with theirs when the two
  * changed different fields, or the editor shows a notice to load their
  * version or keep these changes. A save over agents' newer saves goes
- * through (the person's work wins) and `agentSaved` says so; incoming content
- * never replaces what the person is typing. While the person types, the
+ * through (the person's work wins) and `agentSaved` says so; an agent's
+ * change to a field the person did not touch stays. Incoming content never
+ * replaces content the person changed and has not saved. While the person types, the
  * editor tells the server it is editing (useEditingSignal), so agents that
  * name no base version wait. Saves in one editing session file one
  * version (see autosave-rules.ts and src/lib/versions/history-rules.ts).
@@ -137,13 +138,12 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
       setStatus({ kind: "saved", waitingForApproval: Boolean(result.data.pendingEdit) });
       callbacksRef.current.onUpdated(result.data);
       if (result.savedOverAgents === true) {
-        // The person's version wins. Fields this save did not send may hold an agent's change; the editor still
-        // shows the person's, so what differs from the saved row is sent next, into the same version.
+        // The person's changes won. An agent's change to a field the person never touched stays: the editor takes
+        // it (keepMineOver keeps every field the person changed from their base, including typing since the send).
         setAgentSaved(true);
-        if (hasChanges(draftFrom(result.data), draftRef.current)) {
-          resendRef.current = true;
-          setRetry((count) => count + 1);
-        }
+        const mine = draftRef.current;
+        const next = keepMineOver(draftFrom(base), mine, draftFrom(result.data));
+        if (hasChanges(mine, next)) callbacksRef.current.replaceDraft(next, next.content !== mine.content);
       }
       return;
     }

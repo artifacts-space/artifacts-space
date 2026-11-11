@@ -28,6 +28,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   store.getFileRows.mockResolvedValue([{ id: upload, status: "ready", uploaderId: "author", artifactId: null }]);
   store.usableFileRows.mockResolvedValue([{ id: upload, status: "ready", uploaderId: "author", artifactId: null }]);
+  versions.recordArtifactChange.mockResolvedValue({ status: "applied", record: null });
 });
 
 describe("assertUsableFiles", () => {

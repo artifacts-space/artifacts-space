@@ -83,8 +83,9 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
     },
     ({ id, version, baseVersion }) => respond(async () => {
       const record = await editable(userId, id);
-      const restored = await restoreArtifactVersion(userId, record.id, version, "agent", { harness: await harness(), baseVersion });
-      if (!restored) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+      const saved = await restoreArtifactVersion(userId, record.id, version, "agent", { harness: await harness(), baseVersion });
+      if (!saved) throw new UserFacingError("Artifact not found, or you cannot edit it.");
+      const restored = saved.artifact;
       return { id, restoredFrom: version, edit: restored.pendingEdit ? "pending" : "applied", updatedAt: restored.updatedAt, ...(await baseVersionOf(record.id, restored.updatedAt)) };
     }),
   );

@@ -39,7 +39,7 @@ vi.mock("@/lib/sharing/comments", () => ({ setArtifactComments: vi.fn() }));
 vi.mock("@/lib/sharing/service", () => ({ requestArtifactSharing: vi.fn() }));
 vi.mock("@/lib/site-origin", () => ({ siteUrl: (path: string) => `https://artifacts.space${path}` }));
 
-vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }) }));
+vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }), versionAt: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }) }));
 const { registerArtifactTools } = await import("./artifact-tools");
 const { memoHarness } = await import("./harness-context");
 
@@ -90,7 +90,7 @@ describe("stamping the harness over MCP", () => {
   it("should stamp the connection's harness when an agent creates an artifact", async () => {
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan" });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("user-1", expect.objectContaining({ title: "Plan" }), { harness: codex });
+    expect(data.createArtifact).toHaveBeenCalledWith("user-1", expect.objectContaining({ title: "Plan" }), { harness: codex, actor: "agent" });
     expect(result.json.artifact).toMatchObject({ harness: { id: "codex", name: "Codex" } });
   });
 
@@ -126,7 +126,7 @@ describe("stamping the harness over MCP", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan" });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("user-1", expect.anything(), { harness: null });
+    expect(data.createArtifact).toHaveBeenCalledWith("user-1", expect.anything(), { harness: null, actor: "agent" });
   });
 });
 

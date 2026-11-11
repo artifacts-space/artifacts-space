@@ -118,14 +118,17 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     summary: "The checked, ready file. A file whose size, type, or content does not match its request is deleted instead.",
     shape: `{ "file": { … }, "next": "Use the id in files_create_artifact, files_attach, files_replace, or an Image or File element of a ui artifact." }`,
   },
-  files_create_artifact: { summary: "The new private file artifact, with its files." },
-  files_attach: { summary: "The artifact with its files after the attach." },
-  files_replace: { summary: "The artifact with its files after the replace. The replaced file keeps its id; `replacedAt` says when." },
+  files_create_artifact: { summary: "The new private file artifact, with its files and the `baseVersion` of this save." },
+  files_attach: { summary: "The artifact as the attach saved it, with its files and the `baseVersion` of this save." },
+  files_replace: { summary: "The artifact as the replace saved it, with its files and the `baseVersion` of this save. The replaced file keeps its id; `replacedAt` says when." },
   files_get_download_url: {
     summary: "A short-lived signed URL for the file.",
     shape: `{ "id", "filename", "contentType", "size", "url": "…", "expiresAt": "…" }`,
   },
-  files_delete: { summary: "Confirms the delete.", shape: `{ "deleted": true, "fileId": "…" }` },
+  files_delete: {
+    summary: "Confirms the delete. A file deleted from an artifact saves the artifact: the result names it with the `baseVersion` of this save.",
+    shape: `{ "deleted": true, "fileId": "…", "artifact": "<22-character id>", "versionId": "…", "baseVersion": "…" }`,
+  },
   inbox_list: {
     summary: "Your mentions, newest first, each with the comment, the comments just before it, and how to reply. Every comment body is wrapped as untrusted text.",
     shape: `{ "untrustedContentNotice": "…",

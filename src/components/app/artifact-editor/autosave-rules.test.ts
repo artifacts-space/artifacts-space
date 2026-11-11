@@ -195,9 +195,14 @@ describe("autosave over an hour of typing", () => {
 describe("replacesContentUnderEdits", () => {
   const theirs = edited({ content: "# Plan\n\nAgent's rewrite." });
 
-  it("should be true when incoming content would replace the editor's while the person has unsaved changes", () => {
+  it("should be true when incoming content would replace content the person changed and has not saved", () => {
     expect(replacesContentUnderEdits(base, edited({ content: "# Plan\n\nShip it. Typing" }), theirs)).toBe(true);
-    expect(replacesContentUnderEdits(base, edited({ title: "Plan B" }), theirs)).toBe(true);
+    expect(replacesContentUnderEdits(base, edited({ kind: "text" }), theirs)).toBe(true);
+  });
+
+  it("should be false when the person changed only other fields, so someone else's new body is taken as it is", () => {
+    expect(replacesContentUnderEdits(base, edited({ title: "Plan B" }), theirs)).toBe(false);
+    expect(replacesContentUnderEdits(base, edited({ summary: "Mine" }), theirs)).toBe(false);
   });
 
   it("should be false when the person has nothing unsaved", () => {

@@ -150,7 +150,8 @@ function roleGuard({ approval, editorId }: Swap) {
  * and its artifact, so every part below runs or none does. Then it deletes
  * the upload's row, records what the entry held as an old copy, files the
  * replace's version (saved at the same moment the copy stopped being
- * current: the database clock, as every version's saved_at is, and never
+ * current: the database clock in whole milliseconds, a millisecond or more
+ * after the artifact's last save (src/lib/edits/save-time.ts), and never
  * before the entry's last replace, so the version shows the new file and every window between
  * replaces holds the version that began it; its size is measured from the
  * row it copies, counting metadata as Postgres prints jsonb, which errs a
@@ -160,7 +161,7 @@ function roleGuard({ approval, editorId }: Swap) {
  * key index never sees the key twice. Returns the edit request it opened,
  * if any, or null when nothing ran.
  */
-async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | null } | null> {
+async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | null; savedAt: Date } | null> {
   const { target, before, approval, upload, editorId, copyId, versionId, filename, harness, actor } = swap;
   const personSaved = actor === "person" ? sql`copy.replaced_at` : sql`a.person_saved_at`;
   const guard = roleGuard(swap);
@@ -168,9 +169,9 @@ async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | nul
   const harnessId = harness?.harness ?? null;
   const approved = approval.outcome === "apply" ? sql`${versionId}` : sql`a.approved_version_id`;
   const opened = approval.outcome === "pending" ? sql`(select id from request where opened)` : sql`null::text`;
-  const result = await getDb().execute<{ id: string; opened_request_id: string | null }>(sql`
+  const result = await getDb().execute<{ id: string; opened_request_id: string | null; saved_at: string | Date }>(sql`
     with target as (
-      select f.id, f.artifact_id, f.key, f.filename, f.content_type, f.size, f.uploader_id, f.replaced_at
+      select f.id, f.artifact_id, f.key, f.filename, f.content_type, f.size, f.uploader_id, f.replaced_at, a.updated_at as artifact_updated_at
       from ${artifactFile} f
       join ${artifact} a on a.id = f.artifact_id
       where f.id = ${target.id} and f.artifact_id = ${target.artifactId} and f.key = ${target.key}
@@ -188,14 +189,15 @@ async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | nul
     ),
     copy as (
       insert into ${artifactFileCopy} (id, file_id, artifact_id, key, filename, content_type, size, uploader_id, current_from, replaced_at, replaced_by, version_id)
-      select ${copyId}, t.id, t.artifact_id, t.key, t.filename, t.content_type, t.size, t.uploader_id, t.replaced_at, greatest(now(), t.replaced_at), ${editorId}, ${versionId}
+      select ${copyId}, t.id, t.artifact_id, t.key, t.filename, t.content_type, t.size, t.uploader_id, t.replaced_at,
+        greatest(date_trunc('milliseconds', greatest(now(), t.artifact_updated_at + interval '1 millisecond')), t.replaced_at), ${editorId}, ${versionId}
       from target t, upload
       returning replaced_at
     ),
     version as (
-      insert into ${artifactVersion} (id, artifact_id, title, icon, theme, cover, summary, content, kind, language, project, source, metadata, bytes, harness, created_by, save_kind, created_at, saved_at)
+      insert into ${artifactVersion} (id, artifact_id, title, icon, theme, cover, summary, content, kind, language, project, source, metadata, bytes, harness, by_agent, created_by, save_kind, created_at, saved_at)
       select ${versionId}, a.id, a.title, a.icon, a.theme, a.cover, a.summary, a.content, a.kind, a.language, a.project, a.source, a.metadata,
-        octet_length(a.content) + octet_length(a.metadata::text), ${harnessId}, ${editorId}, 'replace', copy.replaced_at, copy.replaced_at
+        octet_length(a.content) + octet_length(a.metadata::text), ${harnessId}, ${actor === "agent"}, ${editorId}, 'replace', copy.replaced_at, copy.replaced_at
       from ${artifact} a, copy
       where a.id = ${target.artifactId}
       returning id, saved_at
@@ -204,23 +206,26 @@ async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | nul
       update ${artifact} a set updated_by = ${editorId}, updated_at = copy.replaced_at, person_saved_at = ${personSaved}, harness = coalesce(${harnessId}::text, a.harness), approved_version_id = ${approved}
       from version, copy
       where a.id = ${target.artifactId}
-      returning a.id
+      returning a.id, a.updated_at
     )
     update ${artifactFile} e
     set key = upload.key, filename = ${filename}, content_type = upload.content_type, size = upload.size, uploader_id = upload.uploader_id, replaced_at = copy.replaced_at
     from upload, copy, version, stamped
     where e.id = ${target.id}
-    returning e.id, ${opened} as opened_request_id
+    returning e.id, ${opened} as opened_request_id, stamped.updated_at as saved_at
   `);
   const [row] = result.rows;
-  return row ? { openedRequestId: row.opened_request_id } : null;
+  return row ? { openedRequestId: row.opened_request_id, savedAt: new Date(row.saved_at) } : null;
 }
 
-/** What a replace returns: the artifact it changed, the entry as it is now, and the approval outcome. */
+/** What a replace returns: the artifact it changed, the entry as it is now, the approval outcome, and the replace's own save. */
 export interface ReplacedFile {
   artifactId: string;
   file: FileDto;
   status: EditStatus;
+  /** The artifact's save time this replace stamped, and the version it filed: what the replace saw, for the agent's next baseVersion. */
+  savedAt: Date;
+  versionId: string;
 }
 
 /** Which file to replace with which upload. `artifactId`, when set, is the artifact the file must be in (the page the person is on). */
@@ -262,7 +267,7 @@ export async function replaceFile(editorId: string, request: ReplaceRequest, act
   await afterSwap(target.artifactId, swapped.openedRequestId);
   const file = await getFileRow(target.id);
   if (!file) throw new UserFacingError("File not found.");
-  return { artifactId: target.artifactId, file: toFileDto(file), status: approval.outcome === "pending" ? "pending" : "applied" };
+  return { artifactId: target.artifactId, file: toFileDto(file), status: approval.outcome === "pending" ? "pending" : "applied", savedAt: swapped.savedAt, versionId };
 }
 
 /**

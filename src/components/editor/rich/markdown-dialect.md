@@ -128,8 +128,8 @@ after it.
   version's, again, so a save
   that has just written content naming it keeps it; then its R2 object goes.
   A file attached in the last five minutes is never deleted, as a margin for
-  a save still in flight (an update writes its content, then attaches the
-  uploads it names, so a refused save attaches nothing). Plain
+  a save still in flight (a save attaches the uploads it names in the same
+  statement that writes its content, so a refused save attaches nothing). Plain
   attachments are never deleted this way.
 
 The rules are in `src/lib/files/media-rules.ts` (URL form, kinds, widths) and

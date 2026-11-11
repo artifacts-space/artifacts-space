@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
   enforceRateLimit: vi.fn(() => Promise.resolve()),
   hasLiveLease: vi.fn(() => Promise.resolve(false)),
   selected: vi.fn((): unknown[] => []),
-  attachFileRows: vi.fn(() => Promise.resolve(0)),
+  writeAndAttach: vi.fn((rows: unknown[]) => Promise.resolve(rows[0] ?? null)),
 }));
 
 vi.mock("@/db", () => ({
@@ -30,7 +30,8 @@ vi.mock("@/db", () => ({
     update: () => ({
       set: (values: Record<string, unknown>) => {
         mocks.set(values);
-        return { where: () => ({ returning: () => Promise.resolve(mocks.returned(values)) }) };
+        // The guarded UPDATE goes to writeAndAttach as SQL; here its "SQL" is the rows it would return.
+        return { where: () => ({ returning: () => ({ getSQL: () => mocks.returned(values) as unknown[] }) }) };
       },
     }),
     select: () => ({ from: () => ({ where: () => Object.assign(Promise.resolve([]), { limit: () => Promise.resolve(mocks.selected()) }) }) }),
@@ -45,7 +46,8 @@ vi.mock("@/lib/quota/usage", () => ({ assertContentFits: () => Promise.resolve()
 vi.mock("@/lib/files/attach", () => ({ checkContentFiles: () => Promise.resolve([]) }));
 vi.mock("@/lib/files/icon-file", () => ({ checkIconFile: () => Promise.resolve([]), restorableIcon: vi.fn() }));
 vi.mock("@/lib/files/icon-cleanup", () => ({ pruneUnusedIconFilesQuietly: () => Promise.resolve(), pruneUnusedContentFilesQuietly: () => Promise.resolve() }));
-vi.mock("@/lib/files/store", () => ({ attachFileRows: mocks.attachFileRows, deleteArtifactFiles: () => Promise.resolve(), listFilesForArtifacts: () => Promise.resolve(new Map()) }));
+vi.mock("@/lib/files/save-attach", () => ({ checkUpdatedContentFiles: () => Promise.resolve({ contentFileIds: ["media-1"], imageFileIds: [] }), writeAndAttach: mocks.writeAndAttach }));
+vi.mock("@/lib/files/store", () => ({ attachFileRows: () => Promise.resolve(0), deleteArtifactFiles: () => Promise.resolve(), listFilesForArtifacts: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/edits/agent-write-guard", async (importOriginal) => ({
   ...(await importOriginal<typeof AgentWriteGuard>()),
   hasLiveLease: mocks.hasLiveLease,
@@ -66,7 +68,7 @@ const { updateArtifact } = await import("./artifacts");
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getEditableArtifact.mockResolvedValue(baseRecord);
-  mocks.returned.mockImplementation((values: Record<string, unknown>) => [{ ...baseRecord, ...values }]);
+  mocks.returned.mockImplementation((values: Record<string, unknown>) => [{ ...baseRecord, ...values, updatedAt: new Date("2026-11-08T10:00:01.000Z"), personSavedAt: null }]);
   mocks.recordArtifactSave.mockResolvedValue("applied");
   mocks.hasLiveLease.mockResolvedValue(false);
 });
@@ -95,23 +97,9 @@ describe("updateArtifact base-version check", () => {
     expect(mocks.recordArtifactSave).not.toHaveBeenCalled();
   });
 
-  it("should attach no uploads when a save is refused because another person saved since", async () => {
-    mocks.returned.mockReturnValue([]);
-    await expect(updateArtifact("user-1", "artifact-1", { content: "# Mine" }, "person", { expectedUpdatedAt: "2026-11-08T09:59:00.000Z" })).rejects.toBeInstanceOf(StaleSaveError);
-    expect(mocks.attachFileRows).not.toHaveBeenCalled();
-  });
-
-  it("should attach a save's uploads only after its write landed", async () => {
+  it("should hand the save's uploads to its guarded write, so they attach in the same statement or not at all", async () => {
     await updateArtifact("user-1", "artifact-1", { content: "# Plan v2" }, "person", { expectedUpdatedAt: baseRecord.updatedAt.toISOString() });
-    expect(mocks.attachFileRows).toHaveBeenCalled();
-    expect(mocks.set.mock.invocationCallOrder[0]).toBeLessThan(mocks.attachFileRows.mock.invocationCallOrder[0] ?? 0);
-  });
-
-  it("should refuse a base from the future instead of landing over everyone's newer saves", async () => {
-    mocks.returned.mockImplementation((values: Record<string, unknown>) => (mocks.set.mock.calls.length > 1 ? [{ ...baseRecord, ...values }] : []));
-    await expect(updateArtifact("user-1", "artifact-1", { content: "# Mine" }, "person", { expectedUpdatedAt: "3000-01-01T00:00:00.000Z" })).rejects.toBeInstanceOf(StaleSaveError);
-    expect(mocks.set, "only the exact-base attempt ran").toHaveBeenCalledTimes(1);
-    expect(mocks.recordArtifactSave).not.toHaveBeenCalled();
+    expect(mocks.writeAndAttach).toHaveBeenCalledWith(expect.anything(), "user-1", { contentFileIds: ["media-1"], imageFileIds: [] });
   });
 
   it("should refuse a base version that is not a date instead of saving blind", async () => {
@@ -199,7 +187,7 @@ describe("updateArtifact agent harness", () => {
   it("should record the agent that saved on the version, never the artifact's own choice of label", async () => {
     const overridden = { ...baseRecord, harness: "codex", harnessOverride: "cursor" };
     mocks.getEditableArtifact.mockResolvedValue(overridden);
-    mocks.returned.mockImplementation((values: Record<string, unknown>) => [{ ...overridden, ...values }]);
+    mocks.returned.mockImplementation((values: Record<string, unknown>) => [{ ...overridden, ...values, updatedAt: new Date("2026-11-08T10:00:01.000Z") }]);
     await updateArtifact("user-1", "artifact-1", { content: "# Plan v3" }, "agent", { harness: codex });
     expect(mocks.set).toHaveBeenCalledWith(expect.objectContaining({ harness: "codex" }));
     expect(mocks.set.mock.calls[0]?.[0]).not.toHaveProperty("harnessOverride");

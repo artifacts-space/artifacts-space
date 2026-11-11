@@ -42,8 +42,15 @@ export interface MergeTarget {
   createdBy: string | null;
   savedAt: Date;
   saveKind: VersionSaveKind;
-  /** The agent harness the version came through; null for the web app. */
+  /** The agent harness the version came through; null for the web app or when an agent's harness was unknown. */
   harness: string | null;
+  /** Whether an agent saved it; null on versions from before this was recorded (see versionByAgent). */
+  byAgent: boolean | null;
+}
+
+/** Whether an agent saved a version: its `byAgent`, or for older versions, whether it names a harness. */
+export function versionByAgent(version: { byAgent: boolean | null; harness: string | null }): boolean {
+  return version.byAgent ?? version.harness !== null;
 }
 
 /** Save kinds that may merge into the latest version. Restores, replaced files, and snapshots always stand alone. */
@@ -57,18 +64,23 @@ export interface MergeCandidate {
   saveKind: VersionSaveKind;
   now: Date;
   session?: EditSessionStep | undefined;
-  /** The agent harness the save comes through; null or undefined for the web app. */
+  /** The agent harness the save comes through; null or undefined for the web app, or when an agent's is unknown. */
   harness?: { harness: string } | null | undefined;
+  /** Whether an agent saves it (over MCP), whatever harness it names. */
+  byAgent: boolean;
 }
 
 /**
- * Who a save came from, for merging: the person and the agent harness, or
- * none for the web app. Agents save as the person who connected them, so the
- * person alone would fold a web save and an agent save into one version and
- * hide what happened; History merges only saves with the same key.
+ * Who a save came from, for merging: the person, and for an agent's save
+ * the agent harness ("agent" when it is unknown), or null for the person's
+ * own saves. Agents save as the person who connected them, so the person
+ * alone would fold a web save and an agent save into one version and hide
+ * what happened; History merges only saves with the same key. Whether a save
+ * is an agent's comes from who saved it, never from the harness alone: an
+ * agent whose harness lookup failed is still an agent.
  */
-export function saveSourceKey(editorId: string | null, harness: string | null | undefined): string {
-  return JSON.stringify([editorId, harness ?? null]);
+export function saveSourceKey(editorId: string | null, byAgent: boolean, harness: string | null | undefined): string {
+  return JSON.stringify([editorId, byAgent ? (harness ?? "agent") : null]);
 }
 
 /** How long after `latest` a save may still merge into it. */
@@ -96,7 +108,7 @@ export function shouldMergeInto(
   windowMs: number = VERSION_MERGE_WINDOW_MS,
 ): boolean {
   if (save.session === "start" || !latest) return false;
-  if (saveSourceKey(latest.createdBy, latest.harness) !== saveSourceKey(save.editorId, save.harness?.harness)) return false;
+  if (saveSourceKey(latest.createdBy, versionByAgent(latest), latest.harness) !== saveSourceKey(save.editorId, save.byAgent, save.harness?.harness)) return false;
   if (!mergingKinds.has(save.saveKind) || !mergeableKinds.has(latest.saveKind)) return false;
   if (protectedIds.has(latest.id)) return false;
   const age = save.now.getTime() - latest.savedAt.getTime();

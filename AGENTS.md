@@ -366,8 +366,8 @@ rules above: a save attaches the editor's own uploads it names, a save that
 drops one files its own version so Restore brings it back, and readers of the
 approved version never load a file that version does not show
 (`served-images.ts`). Only content media, files a content save itself
-attached (`artifact_file.attached_by_content`, set by `attachFileRows(…, {
-byContent: true })`), follows these rules: hidden from readers of a version
+attached (`artifact_file.attached_by_content`, set in the save's own
+statement by `writeAndAttach`), follows these rules: hidden from readers of a version
 that does not show it, not counted toward the file limit while only older
 versions name it, and deleted once none does (`icon-cleanup.ts`). Files
 attached any other way (`files_attach`, the Files panel, and all files from
@@ -421,20 +421,39 @@ the UPDATE itself, one statement, never a read-then-write:
   editing" signal (`src/lib/edits/actions.ts`): on input, at most every 20 s,
   about 60 s long, never on a timer; a closing editor cuts its lease to one
   signal interval (leases are per person, so another open tab keeps it).
-- A save attaches its uploads (content media, icon, cover) only after its
-  guarded write lands, so a refused save attaches nothing.
+- A save attaches its uploads (content media, icon, cover) in the same
+  statement as its guarded write (`writeAndAttach`, a CTE), so a refused save
+  attaches nothing and a landed one never names an upload it did not attach.
 - A person's web save with `expectedUpdatedAt` falls back, when the artifact
-  moved on, to "no person saved since" (`artifact.person_saved_at`, set by
-  every person's save and never by an agent's). While it is null (an agent
-  created the artifact, or the row predates the column), the artifact's web
-  versions decide instead (`onlyAgentsSavedSince`); there is no backfill. It lands over agents' saves
-  and reports `savedOverAgents`; another person's newer save still refuses it.
-- History merges quick saves only with the same source key (person and
-  harness, null for the web app: `saveSourceKey`), so a web save never folds
-  into an agent's version or the reverse.
-- The editor never swaps incoming content under the person's unsaved edits
-  (`replacesContentUnderEdits`). Keep every new agent write path for
-  content, title, or format on `writeArtifactSave`.
+  moved on, to "only agents saved since" (`onlyAgentsSavedSince`): the base is
+  not later than the row's last save, no person's save is later by
+  `artifact.person_saved_at` (set by every person's save in its own UPDATE,
+  never by an agent's), and no version a person saved is later. The versions
+  cover saves the column never saw (older rows, and the previous deployment
+  during a rollout); there is no backfill. It lands over agents' saves and
+  reports `savedOverAgents`; another person's newer save still refuses it.
+- Save times come from the database clock in whole milliseconds, a
+  millisecond or more after the row's last save (`src/lib/edits/save-time.ts`),
+  never from an app server's clock. Every write of `artifact.updated_at` uses
+  `nextSaveTime`/`firstSaveTime`, so a base names exactly one save.
+- A save files its version and applies the approval rule after its UPDATE,
+  and a newer save can land in between. The version is dated at its save and
+  placed before any newer one, merges and restamps run only while the row is
+  still at that save, and the approval writes are guarded the same way
+  (`artifactStillAt`). History's newest version and the approved version are
+  always the newest save's.
+- History merges quick saves only with the same source key (the person, and
+  for an agent's save its harness, or "agent" when unknown: `saveSourceKey`).
+  Whether a save is an agent's comes from who saved it
+  (`artifact_version.by_agent`; older versions read their harness), never
+  from the harness alone, so a web save never folds into an agent's version
+  or the reverse.
+- The editor never swaps incoming content under content the person changed
+  and has not saved (`replacesContentUnderEdits`). After a save over agents,
+  it keeps the agents' changes to fields the person never touched. Keep every
+  new agent write path for content, title, or format on `writeArtifactSave`.
+- Every result an agent gets after its own save carries the `baseVersion` of
+  that save and shows what it wrote (`asSaved`), never a later read.
 
 ### Agent harnesses
 

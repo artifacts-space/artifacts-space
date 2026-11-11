@@ -35,3 +35,13 @@ export function versionBadges(version: Pick<VersionSummaryDto, "latest" | "appro
   if (version.pending) badges.push("Waiting for approval");
   return badges;
 }
+
+/**
+ * What the person reads after Restore: that it is restored, whether it waits
+ * for approval, and when an agent saved since they opened History, that the
+ * restore still went through and the agent's version is in History.
+ */
+export function restoredMessage(result: { artifact: { pendingEdit: unknown }; savedOverAgents: boolean }): string {
+  const restored = result.artifact.pendingEdit ? "Restored. Waiting for approval." : "Restored.";
+  return result.savedOverAgents ? `${restored} An agent saved changes since you opened History; theirs is in History.` : restored;
+}

@@ -215,6 +215,9 @@ export const artifactVersion = pgTable(
     source: text("source").notNull().default(""),
     // The harness the save came through over MCP; null for saves in the web app.
     harness: text("harness"),
+    // Whether an agent saved this version (over MCP), whatever harness it named. Null on versions from
+    // before 0045: those read `harness is not null` instead (versionByAgent in src/lib/versions/history-rules.ts).
+    byAgent: boolean("by_agent"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -1,8 +1,9 @@
 import { z } from "zod";
 
+import type { ArtifactDto } from "@/lib/artifact-types";
 import { EditConflictError } from "@/lib/edits/conflict-error";
 import { encodeBaseVersion } from "@/lib/edits/edit-conflict-rules";
-import { latestVersion } from "@/lib/versions/history";
+import { versionAt } from "@/lib/versions/history";
 
 /**
  * How agents name the version they read (src/lib/edits): every tool that
@@ -24,13 +25,33 @@ export interface McpBaseVersion {
 }
 
 /**
- * The version an agent reads: the artifact's newest version, and the token
- * of its save time. `updatedAt` is the save time of the content the agent got.
+ * The version an agent reads or wrote, and the token of its save time.
+ * `updatedAt` is the save time of the content the agent got: what it read,
+ * or after a save, what its own save wrote, never a later read. A token from
+ * a later read would name a person's save the agent never saw, and the
+ * agent's next update, built on what it wrote, would overwrite that person.
  */
 export async function baseVersionOf(artifactId: string, updatedAt: string): Promise<McpBaseVersion> {
-  const latest = await latestVersion(artifactId);
-  const versionId = latest?.id ?? null;
+  const version = await versionAt(artifactId, new Date(updatedAt));
+  const versionId = version?.id ?? null;
   return { versionId, baseVersion: encodeBaseVersion({ versionId, updatedAt }) };
+}
+
+/** The fields a save wrote, which an agent's next update builds on. */
+const savedFields = ["title", "icon", "theme", "cover", "summary", "content", "kind", "language", "source", "metadata", "harness", "updatedBy", "updatedAt"] as const satisfies readonly (keyof ArtifactDto)[];
+
+/**
+ * The artifact as an agent's own save left it, for the save's result: the
+ * current sharing, files, and settings, with the saved fields from `saved`,
+ * the DTO of the save itself. When nobody saved since, that is `current`.
+ * The result's content and its baseVersion then always describe the same
+ * save (baseVersionOf with `saved.updatedAt`).
+ */
+export function asSaved(current: ArtifactDto, saved: ArtifactDto): ArtifactDto {
+  if (current.updatedAt === saved.updatedAt) return current;
+  const written: Partial<ArtifactDto> = {};
+  for (const field of savedFields) Object.assign(written, { [field]: saved[field] });
+  return { ...current, ...written };
 }
 
 /** A tool result that is a typed refusal: the message as text, and the code and who changed it as structured content. */

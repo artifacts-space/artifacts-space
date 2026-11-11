@@ -9,7 +9,8 @@ const notice = "An agent saved changes while you were editing. Your version is s
  * A person's work wins over an agent's: on the editor fixture with
  * `?save=agent`, an agent saves a new summary just before the person's first
  * save, and that save goes through over it (as src/lib/artifact-save.ts
- * does). The editor says so, keeps what the person typed, and offers History.
+ * does). The editor says so, keeps what the person typed, keeps the agent's
+ * change to the summary the person never touched, and offers History.
  * No database: saves stay in memory.
  */
 test("should keep the person's typing and say an agent's version is in History when their save lands over an agent's", async ({ page }) => {
@@ -17,7 +18,6 @@ test("should keep the person's typing and say an agent's version is in History w
   const content = page.getByRole("textbox", { name: "Artifact content" });
   await expect(content).toBeVisible();
   const summary = page.getByRole("textbox", { name: "Summary" });
-  const summaryBefore = await summary.inputValue();
 
   await content.getByText("A paragraph that runs long").first().click();
   await page.keyboard.press("End");
@@ -25,9 +25,9 @@ test("should keep the person's typing and say an agent's version is in History w
 
   const shown = page.locator("[data-slot=agent-save-notice]");
   await expect(shown).toContainText(notice, savedWithin);
-  // Nothing replaced what the person typed or sees: their summary stays, never the agent's.
+  // Nothing replaced what the person typed. The agent changed only the summary, which the person never touched, so it stays.
   await expect(content).toContainText("My answer.");
-  await expect(summary).toHaveValue(summaryBefore);
+  await expect(summary).toHaveValue("An agent rewrote this summary.");
   await expect(page.getByRole("banner").locator("[data-slot=save-indicator]")).toHaveText("Saved", savedWithin);
 
   // Typing on goes on saving normally, with the notice still there until it is dismissed.
