@@ -136,7 +136,7 @@ export function MermaidBlockView({ node, updateAttributes, editor, getPos }: Rea
           editable={editable}
           sourceOpen={sourceOpen}
           onEdit={openSource}
-          picker={<CodeLanguagePicker language={language} disabled={!editable} onChange={setLanguage} className="static" />}
+          picker={<CodeLanguagePicker language={language} disabled={!editable} onChange={setLanguage} placement="inline" />}
         />
       </div>
       <div className={sourceOpen ? "mt-3" : "hidden"}>

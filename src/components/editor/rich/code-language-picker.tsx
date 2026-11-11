@@ -1,7 +1,6 @@
 "use client";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 
 const plain = "plain";
 
@@ -47,14 +46,21 @@ export function blockLanguage(attr: unknown): string {
   return typeof attr === "string" && attr ? attr : plain;
 }
 
+/** Where the picker sits: pinned in its block's top-right corner, or in line inside a toolbar that places it. */
+export type PickerPlacement = "corner" | "inline";
+
+const placementClass: Record<PickerPlacement, string> = {
+  corner: "absolute top-1.5 right-1.5 z-[1]",
+  inline: "",
+};
+
 /**
- * The quiet language picker in a code block's corner. Choosing Plain text
- * clears the language. `className` replaces the corner placement, for a
- * picker that sits in a toolbar instead.
+ * The quiet language picker for a code block, in the block's corner by
+ * default. Choosing Plain text clears the language.
  */
-export function CodeLanguagePicker({ language, disabled, onChange, className }: { language: string; disabled: boolean; onChange: (language: string | null) => void; className?: string }) {
+export function CodeLanguagePicker({ language, disabled, onChange, placement = "corner" }: { language: string; disabled: boolean; onChange: (language: string | null) => void; placement?: PickerPlacement }) {
   return (
-    <div contentEditable={false} className={cn("absolute top-1.5 right-1.5 z-[1]", className)}>
+    <div contentEditable={false} className={placementClass[placement]}>
       <Select
         value={language}
         disabled={disabled}
