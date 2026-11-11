@@ -185,8 +185,9 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
 
 - The schema is in `src/db/schema.ts`, `src/db/oauth-schema.ts`,
   `src/db/views-schema.ts`, `src/db/notification-schema.ts`,
-  `src/db/connection-schema.ts`, and `src/db/file-copy-schema.ts`. Change it,
-  then run `pnpm db:generate` and commit the migration in `drizzle/`.
+  `src/db/connection-schema.ts`, `src/db/file-copy-schema.ts`, and
+  `src/db/team-welcome-schema.ts`. Change it, then run `pnpm db:generate` and
+  commit the migration in `drizzle/`.
 - Migrations apply automatically when a production deploy builds:
   `pnpm build` runs `scripts/migrate-on-deploy.mts` before `next build`, under
   an advisory lock. A failed migration fails the build, and the old deployment

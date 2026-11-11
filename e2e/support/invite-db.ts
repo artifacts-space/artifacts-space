@@ -52,6 +52,12 @@ export async function storedTeamRole(teamId: string, userId: string): Promise<st
   return result.rows[0]?.role ?? null;
 }
 
+/** Whether a member closed the team's welcome card (team_welcome_dismissal). */
+export async function welcomeDismissed(teamId: string, userId: string): Promise<boolean> {
+  const result = await db().query(`select 1 from team_welcome_dismissal where team_id = $1 and user_id = $2`, [teamId, userId]);
+  return result.rowCount === 1;
+}
+
 /** Removes a user from a team, so the dev user can join it again in the next run. */
 export async function leaveTestTeam(teamId: string, userId: string): Promise<void> {
   await db().query(`delete from team_member where team_id = $1 and user_id = $2`, [teamId, userId]);

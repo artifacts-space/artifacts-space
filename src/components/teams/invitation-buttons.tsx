@@ -9,10 +9,7 @@ import { acceptInvitationAction, declineInvitationAction } from "@/app/invitatio
 import { Button } from "@/components/ui/button";
 import { teamWorkspacePath } from "@/lib/teams/invitation-rules";
 
-/** How long the welcome stays up: long enough to read three short sentences. */
-const WELCOME_MS = 15_000;
-
-/** Accept or decline one invitation. Accepting opens the team's workspace with a short welcome. */
+/** Accept or decline one invitation. Accepting opens the team's workspace, where a welcome card waits until the member closes it. */
 export function InvitationButtons({ invitationId }: { invitationId: string }) {
   const router = useRouter();
   const [pending, setPending] = useState<"accept" | "decline" | null>(null);
@@ -26,8 +23,6 @@ export function InvitationButtons({ invitationId }: { invitationId: string }) {
         setPending(null);
         return;
       }
-      // The toaster lives in the root layout, so the welcome stays up while the team's workspace loads.
-      toast.success(result.data.welcome.title, { description: result.data.welcome.description, duration: WELCOME_MS, closeButton: true });
       // Stays pending while the workspace opens, so a second click cannot send the invitation again.
       router.push(teamWorkspacePath(result.data.slug));
     } catch {

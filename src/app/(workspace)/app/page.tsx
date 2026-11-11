@@ -16,6 +16,7 @@ import { toSidebarRows } from "@/lib/projects/sidebar-rules";
 import { getSession } from "@/lib/session";
 import { siteOrigin } from "@/lib/site-origin";
 import { listTeamsForUser } from "@/lib/teams/queries";
+import { shouldWelcome } from "@/lib/teams/welcome";
 
 export const metadata: Metadata = { title: "Artifacts" };
 // Reads the signed-in session, so it renders per request.
@@ -48,6 +49,17 @@ async function linkedOutsideList(link: ArtifactLink | null, listed: ArtifactList
   }
 }
 
+/** Whether a new member sees the team's welcome card. A failed read hides it: the workspace still opens. */
+async function welcomeFor(userId: string, scopeTeam: ShareTeam | null): Promise<boolean> {
+  if (!scopeTeam) return false;
+  try {
+    return await shouldWelcome(userId, scopeTeam.id);
+  } catch (error) {
+    console.error("[app] The team welcome could not be read", error instanceof Error ? error.name : "unknown error");
+    return false;
+  }
+}
+
 export default async function AppPage({ searchParams }: PageProps<"/app">) {
   const session = await getSession();
   if (!session) redirect("/sign-in");
@@ -59,11 +71,12 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
   const scope = scopeTeam ? { kind: "team" as const, teamId: scopeTeam.id } : { kind: "mine" as const };
   const projectFilter = parseProjectFilter(params);
   const tagFilter = parseTagFilter(params);
-  const [artifacts, facets, tagFacets, projectSources] = await Promise.all([
+  const [artifacts, facets, tagFacets, projectSources, welcome] = await Promise.all([
     listArtifacts(session.user.id, { scope, project: projectFilter ?? undefined, tags: tagFilter }),
     listProjectFacets(session.user.id, scope),
     listTagFacets(session.user.id, scope),
     listSidebarProjects(session.user.id, scope),
+    welcomeFor(session.user.id, scopeTeam),
   ]);
   // A link (from a notification, say) opens its artifact even when the list does not hold it: the workspace pins it to the top.
   const link = parseArtifactLink(params);
@@ -87,6 +100,7 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
       viewerId={session.user.id}
       teams={teams}
       scopeTeam={scopeTeam}
+      welcome={welcome}
     />
   );
 }

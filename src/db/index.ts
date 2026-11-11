@@ -9,9 +9,10 @@ import * as notificationSchema from "./notification-schema";
 import * as oauthSchema from "./oauth-schema";
 import * as rolesSchema from "./roles-schema";
 import * as appSchema from "./schema";
+import * as teamWelcomeSchema from "./team-welcome-schema";
 import * as viewsSchema from "./views-schema";
 
-const schema = { ...appSchema, ...oauthSchema, ...viewsSchema, ...notificationSchema, ...rolesSchema, ...connectionSchema, ...fileCopySchema };
+const schema = { ...appSchema, ...oauthSchema, ...viewsSchema, ...notificationSchema, ...rolesSchema, ...connectionSchema, ...fileCopySchema, ...teamWelcomeSchema };
 
 let database: ReturnType<typeof createDatabase> | undefined;
 

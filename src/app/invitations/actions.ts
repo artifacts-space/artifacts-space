@@ -10,8 +10,7 @@ import type { ActionResult } from "@/lib/artifact-types";
 import { getAuth } from "@/lib/auth/server";
 import { getSession } from "@/lib/session";
 import { invitationRefusal } from "@/lib/teams/invitation-rules";
-import { getInvitationForEmail, getTeamMembershipById } from "@/lib/teams/queries";
-import { teamWelcome } from "@/lib/teams/team-rule-copy";
+import { getInvitationForEmail } from "@/lib/teams/queries";
 
 const invitationIdSchema = z.string().trim().min(1).max(200);
 
@@ -23,32 +22,19 @@ async function requireOwnInvitation(invitationId: string) {
   return { userId: session.user.id, invitation };
 }
 
-/** What the new member lands on: the team's workspace, with a short welcome that states the team's rule. */
+/** What the new member lands on: the team's workspace, where a welcome card states the team's rule until they close it. */
 export interface JoinedTeam {
   slug: string;
-  welcome: { title: string; description: string };
 }
 
-/** The welcome for the role the person now holds. A failed lookup keeps a plain welcome; they joined either way. */
-async function welcomeFor(userId: string, teamId: string, teamName: string): Promise<JoinedTeam["welcome"]> {
-  const fallback = { title: `Welcome to ${teamName}`, description: "You can edit the team's artifacts right away." };
-  try {
-    const membership = await getTeamMembershipById(userId, teamId);
-    return membership ? teamWelcome(teamName, membership) : fallback;
-  } catch (error) {
-    console.error("[teams] The welcome could not load the new member's role", error instanceof Error ? error.name : "unknown error");
-    return fallback;
-  }
-}
-
-/** Accepts an invitation and returns where to land: the team's workspace and its welcome. */
+/** Accepts an invitation and returns where to land: the team's workspace. */
 export async function acceptInvitationAction(invitationId: string): Promise<ActionResult<JoinedTeam>> {
   try {
-    const { userId, invitation } = await requireOwnInvitation(invitationId);
+    const { invitation } = await requireOwnInvitation(invitationId);
     if (!invitation) return { success: false, error: "This invitation is no longer open." };
     await getAuth().api.acceptInvitation({ body: { invitationId: invitation.id }, headers: await headers() });
     revalidatePath("/teams");
-    return { success: true, data: { slug: invitation.teamSlug, welcome: await welcomeFor(userId, invitation.teamId, invitation.teamName) } };
+    return { success: true, data: { slug: invitation.teamSlug } };
   } catch (error) {
     return { success: false, error: invitationRefusal(apiErrorCode(error)) ?? actionErrorMessage(error, "The invitation could not be accepted. Please try again.") };
   }

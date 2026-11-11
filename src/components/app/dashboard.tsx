@@ -9,6 +9,7 @@ import { artifactListState } from "@/components/app/artifact-list-state";
 import { serverProjectsApi, type ProjectsApi } from "@/components/app/projects-api";
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
 import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
+import { TeamWelcome, type DismissWelcome } from "@/components/app/team-welcome";
 import { useEditAccess, useWithdrawSharing } from "@/components/app/use-edit-access";
 import { useArtifactLink } from "@/components/app/use-artifact-link";
 import { useFullArtifact, type ArtifactLoader } from "@/components/app/use-full-artifact";
@@ -110,9 +111,9 @@ function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate
   );
 }
 
-/** The page's heading, for screen readers: the workspace switcher shows sighted people where they are. */
-function WorkspaceHeading({ scopeTeam }: { scopeTeam: ShareTeam | null }) {
-  return <h1 className="sr-only">{scopeTeam ? `Shared with ${scopeTeam.name}` : "Artifacts"}</h1>;
+/** The page's heading, for screen readers: the workspace switcher shows sighted people where they are. Focusable from code, so closing the welcome card can land there. */
+function WorkspaceHeading({ scopeTeam, ref }: { scopeTeam: ShareTeam | null; ref: React.Ref<HTMLHeadingElement> }) {
+  return <h1 ref={ref} tabIndex={-1} className="sr-only">{scopeTeam ? `Shared with ${scopeTeam.name}` : "Artifacts"}</h1>;
 }
 
 const linkNoticeText: Record<LinkNotice, string> = {
@@ -171,6 +172,10 @@ interface DashboardProps {
   onLinkHandled?: () => void;
   /** Where New artifact stores the blank page: the server actions, or the fixture's stand-in. */
   newArtifactApi?: NewArtifactApi;
+  /** The server decided this member sees the team's welcome card (src/lib/teams/welcome-rules.ts). Team workspaces only. */
+  welcome?: boolean;
+  /** Where "Got it" saves the closed welcome: the server action, or the fixture's stand-in. */
+  dismissWelcome?: DismissWelcome;
 }
 
 interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate" | "save"> {
@@ -224,11 +229,12 @@ function useLinkLeavesNewArtifact(opened: unknown, leave: () => void) {
   useEffect(() => { if (opened) leave(); }, [opened, leave]);
 }
 
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", linkTarget, linkFailed, loadArtifact, onLinkHandled, newArtifactApi = serverNewArtifactApi }: DashboardProps) {
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", linkTarget, linkFailed, loadArtifact, onLinkHandled, newArtifactApi = serverNewArtifactApi, welcome, dismissWelcome }: DashboardProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const { artifacts, setArtifacts, selectedId, setSelectedId, notice, dismissNotice, opened } = useArtifactLink({ initialArtifacts, target: linkTarget, failed: linkFailed, onHandled: onLinkHandled, list: listRef, detail: detailRef });
   const listFilters = useListFilters();
   const { query, setQuery, kind, setKind, view, setView, clearFilters } = listFilters;
@@ -261,8 +267,9 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
       <SidebarVisibilityProvider value={visibility}>
       {/* An app shell from md up: the frame is the viewport (workspace-frame), and only the sidebar's tree and the artifact scroll. */}
       <main data-app-shell className="flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col md:min-h-0 md:flex-1">
-        <WorkspaceHeading scopeTeam={scopeTeam} />
+        <WorkspaceHeading scopeTeam={scopeTeam} ref={headingRef} />
         <LinkNoticeBar notice={notice} onDismiss={dismissNotice} />
+        <TeamWelcome team={scopeTeam} initial={welcome} dismiss={dismissWelcome} focusAfter={headingRef} />
 
         <PanelSizesBeforePaint />
         <div ref={shellRef} className={cn("relative grid min-h-[640px] flex-1 bg-card md:min-h-0 md:grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]", shellColumns(sidebarHidden))}>

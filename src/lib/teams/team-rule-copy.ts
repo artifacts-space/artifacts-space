@@ -36,14 +36,19 @@ function teamLine(subject: TeamRuleSubject): string {
   return `Sharing your own artifacts with the team needs ${approval}.`;
 }
 
-function outsideLine(subject: TeamRuleSubject): string {
+/** What sharing by link or in public needs for this viewer, naming each level exactly. */
+function outsideSharing(subject: TeamRuleSubject): string {
   const link = can(subject, "share.link");
   const open = can(subject, "share.public");
+  if (link && open) return "You can share by link or in public right away.";
+  if (link) return `You can share by link right away. Sharing in public needs ${approval}.`;
+  if (open) return `You can share in public right away. Sharing by link needs ${approval}.`;
+  return `Sharing by link or in public needs ${approval}.`;
+}
+
+function outsideLine(subject: TeamRuleSubject): string {
   const edits = can(subject, "approve.edits") ? "" : " Edits to those artifacts reach outside readers once approved.";
-  if (link && open) return `You can share by link or in public right away.${edits}`;
-  if (link) return `You can share by link right away. Sharing in public needs ${approval}.${edits}`;
-  if (open) return `You can share in public right away. Sharing by link needs ${approval}.${edits}`;
-  return `Sharing by link or in public needs ${approval}.${edits}`;
+  return `${outsideSharing(subject)}${edits}`;
 }
 
 /** The team's rule for this viewer, in three sentences. */
@@ -55,12 +60,30 @@ export function teamRuleLines(subject: TeamRuleSubject): TeamRuleLines {
   };
 }
 
-/** The short welcome a person sees after they join a team. */
+/** The welcome card a person sees in the team's workspace after they join: what they can do first, then the rule for sharing outside. */
 export function teamWelcome(teamName: string, subject: TeamRuleSubject): { title: string; description: string } {
   return {
     title: `Welcome to ${teamName}`,
     description: `You can edit the team's artifacts right away. ${outsideLine(subject)}`,
   };
+}
+
+/** The levels that put an artifact in a team: the Share dialog states the rule only for these. */
+export type TeamShareLevel = "team" | "link" | "public";
+
+/**
+ * The team's rule for the Share dialog, after the sentence about what saving
+ * will do: everyone in the team edits it with no approval, then only what
+ * that sentence did not already say. At Team, what sharing outside would
+ * need for this viewer (the team page card's sentence). At Link or Public,
+ * the outcome sentence already says whether sharing waits, so only whether
+ * this viewer's edits wait before outside readers see them.
+ */
+export function shareRuleLine(teamName: string, subject: TeamRuleSubject, level: TeamShareLevel): string {
+  const inside = `Everyone in ${teamName} can edit it directly, with no approval.`;
+  if (level === "team") return `${inside} ${outsideSharing(subject)}`;
+  if (can(subject, "approve.edits")) return inside;
+  return `${inside} Your edits reach readers outside the team once approved.`;
 }
 
 const extraPowers: readonly [TeamCapability, string][] = [
