@@ -1,7 +1,7 @@
-import { and, asc, eq, gte, inArray, isNull, like, lt, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, getTableColumns, gte, inArray, isNull, like, lt, lte, or, sql, type SQL } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { artifact, artifactFile, type ArtifactFileRecord } from "@/db/schema";
+import { artifact, artifactFile, artifactVersion, type ArtifactFileRecord } from "@/db/schema";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 
 import { fileLimits } from "./config";
@@ -14,9 +14,24 @@ import type { FileDto } from "./types";
  * Callers check who may do what; access-rules.ts holds the rules.
  */
 
-/** Maps a row to the shape the app and agents see. */
-export function toFileDto(row: ArtifactFileRecord): FileDto {
-  return { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString(), replacedAt: row.replacedAt?.toISOString() ?? null, embedded: row.attachedByContent };
+/** Maps a row to the shape the app and agents see. `pictured` comes from listFilesForArtifacts. */
+export function toFileDto(row: ArtifactFileRecord, pictured?: boolean): FileDto {
+  const dto: FileDto = { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString(), replacedAt: row.replacedAt?.toISOString() ?? null, embedded: row.attachedByContent };
+  return pictured === undefined ? dto : { ...dto, pictured };
+}
+
+/**
+ * SQL: whether the file's artifact, or any of its versions, shows the file
+ * as its icon or cover (replace.ts refuses to replace those). Only images
+ * can be, so other files skip the version lookup.
+ */
+function picturedSql(): SQL<boolean> {
+  const ref = sql`${FILE_PREFIX}::text || ${artifactFile.id}::text`;
+  const shows = (icon: SQL, cover: SQL) => sql`(${icon} = ${ref} or ${cover} = ${ref} or ${cover} like (${ref} || '@%'))`;
+  return sql<boolean>`(${artifactFile.contentType} like 'image/%' and (
+    exists (select 1 from ${artifact} a where a.id = ${artifactFile.artifactId} and ${shows(sql`a.icon`, sql`a.cover`)})
+    or exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactFile.artifactId} and ${shows(sql`v.icon`, sql`v.cover`)})
+  ))`;
 }
 
 /** One file row by id, or null. */
@@ -41,14 +56,14 @@ export async function listFilesForArtifacts(artifactIds: readonly string[], opti
   if (artifactIds.length === 0) return files;
   const cutoff = options.attachedBy ? lte(artifactFile.attachedAt, options.attachedBy) : undefined;
   const rows = await getDb()
-    .select()
+    .select({ ...getTableColumns(artifactFile), pictured: picturedSql() })
     .from(artifactFile)
     .where(and(inArray(artifactFile.artifactId, [...artifactIds]), eq(artifactFile.status, "ready"), cutoff))
     .orderBy(asc(artifactFile.attachedAt), asc(artifactFile.createdAt));
-  for (const row of rows) {
+  for (const { pictured, ...row } of rows) {
     if (!row.artifactId) continue;
     const list = files.get(row.artifactId) ?? [];
-    list.push(toFileDto(row));
+    list.push(toFileDto(row, pictured));
     files.set(row.artifactId, list);
   }
   return files;

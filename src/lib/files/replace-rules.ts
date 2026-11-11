@@ -63,14 +63,19 @@ export function replaceTargetProblem(target: ReplaceTarget | null, options: { sh
   return null;
 }
 
+/** Told when a replace stood but its request for approval was not sent (replaceFile's "not-sent"). */
+export const approvalNotSentNotice =
+  "The file was replaced and History has it, but it could not be sent for approval. Readers outside the team keep the approved file until a later change is approved.";
+
 /**
  * Whether the Files section offers Replace for a file: not media the
- * document embeds, and not the artifact's icon or cover. The server checks
- * the same (replaceTargetProblem, and older versions' icons and covers too);
+ * document embeds, and not an image the artifact or any version shows as
+ * its icon or cover (`pictured`, and the artifact's icon and cover as the
+ * page has them now). The server checks the same (replaceTargetProblem);
  * this only spares people an upload it would refuse.
  */
-export function offersReplace(file: { id: string; embedded?: boolean | undefined }, artifact: { icon: string | null; cover: string | null }): boolean {
-  if (file.embedded === true) return false;
+export function offersReplace(file: { id: string; embedded?: boolean | undefined; pictured?: boolean | undefined }, artifact: { icon: string | null; cover: string | null }): boolean {
+  if (file.embedded === true || file.pictured === true) return false;
   return iconFileId(artifact.icon) !== file.id && coverFileId(artifact.cover) !== file.id;
 }
 

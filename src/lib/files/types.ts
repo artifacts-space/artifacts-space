@@ -9,6 +9,8 @@ export interface FileDto {
   replacedAt: string | null;
   /** True for media a content save attached (an embed in the document): it changes in the document, so it is never replaced. Set by the server. */
   embedded?: boolean;
+  /** True for an image the artifact, or one of its versions, shows as its icon or cover: it changes through those pickers, so it is never replaced. Set by the server. */
+  pictured?: boolean;
 }
 
 /** An old copy of a replaced file, for History. Only people who may edit the artifact see these. */

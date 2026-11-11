@@ -230,6 +230,16 @@ export type ActionResult<T> =
   | { success: false; error: string };
 
 /**
+ * What replacing a file answers: the artifact as it is now, and `notice`
+ * when the file was replaced but a later step was not done (the request for
+ * approval), so the page shows the new file and says what is left.
+ */
+export interface ReplacedArtifactDto {
+  artifact: ArtifactDto;
+  notice: string | null;
+}
+
+/**
  * The result of saving an artifact from the web editor. A save refused because
  * someone saved since the editor's base version carries `latest`, the newest
  * version the editor may read, so it can merge or offer a reload.

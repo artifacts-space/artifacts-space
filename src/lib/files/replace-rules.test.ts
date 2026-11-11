@@ -89,4 +89,8 @@ describe("offersReplace", () => {
     expect(offersReplace({ id }, { icon: `file:${id}`, cover: null })).toBe(false);
     expect(offersReplace({ id }, { icon: null, cover: `file:${id}@40` })).toBe(false);
   });
+
+  it("should not offer Replace for an image a past version shows as its icon or cover", () => {
+    expect(offersReplace({ id, embedded: false, pictured: true }, none)).toBe(false);
+  });
 });

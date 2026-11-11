@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
-import type { ActionResult, ArtifactDto } from "@/lib/artifact-types";
+import type { ActionResult, ArtifactDto, ReplacedArtifactDto } from "@/lib/artifact-types";
 import { checkUpload } from "@/lib/files/config";
 import type { FileDto } from "@/lib/files/types";
 
@@ -12,7 +12,7 @@ import type { SendFile } from "./use-file-uploads";
 /** What replacing needs: send the new file, swap it in, and discard an upload that was not used. */
 export interface ReplaceFileApi {
   send: SendFile;
-  replace: (artifactId: string, fileId: string, uploadId: string) => Promise<ActionResult<ArtifactDto>>;
+  replace: (artifactId: string, fileId: string, uploadId: string) => Promise<ActionResult<ReplacedArtifactDto>>;
   discard: (fileId: string) => Promise<unknown>;
 }
 
@@ -33,7 +33,8 @@ function discardQuietly(api: ReplaceFileApi, uploadId: string | null) {
  * then swaps it in under the same entry. When the upload is refused, the
  * replace is refused, or an answer is lost, the upload is discarded (the
  * server keeps it only if it already became the file) and the current file
- * stays as it was.
+ * stays as it was. A replace that stood with a notice (its request for
+ * approval was not sent) shows the new file and the notice.
  */
 export function useReplaceFile({ artifactId, api, onUpdated }: { artifactId: string; api: ReplaceFileApi; onUpdated: (artifact: ArtifactDto) => void }) {
   const [replacing, setReplacing] = useState<Replacing | null>(null);
@@ -53,8 +54,9 @@ export function useReplaceFile({ artifactId, api, onUpdated }: { artifactId: str
       uploadId = sent.data.id;
       const result = await api.replace(artifactId, target.id, sent.data.id);
       if (!result.success) { toast.error(result.error); discardQuietly(api, uploadId); return; }
-      onUpdated(result.data);
-      toast.success(`Replaced ${target.filename}. The old copy is in History.`);
+      onUpdated(result.data.artifact);
+      if (result.data.notice) toast.warning(result.data.notice);
+      else toast.success(`Replaced ${target.filename}. The old copy is in History.`);
     } catch {
       discardQuietly(api, uploadId);
       toast.error("The file could not be replaced. Check your connection and try again.");

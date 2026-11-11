@@ -16,7 +16,7 @@ import { versionBytes } from "@/lib/versions/history-rules";
 import { prepareVersionedChange, settleVersionedChange, type EditStatus } from "@/lib/versions/service";
 
 import { canUseFileInArtifact } from "./access-rules";
-import { replacementFilename, replaceTargetProblem } from "./replace-rules";
+import { approvalNotSentNotice, replacementFilename, replaceTargetProblem } from "./replace-rules";
 import { getFileRow, toFileDto } from "./store";
 import type { FileDto } from "./types";
 
@@ -138,11 +138,17 @@ async function swapInUpload({ target, upload, editorId, copyId, versionId, filen
   return getFileRow(target.id);
 }
 
-/** What a replace returns: the artifact it changed and the entry as it is now. */
+/**
+ * What a replace returns: the artifact it changed, the entry as it is now,
+ * and the approval outcome. "not-sent" means the swap and its version are
+ * saved but the approval step failed; `notice` then says so. The replace
+ * still happened, so callers show the new file and do not retry it.
+ */
 export interface ReplacedFile {
   artifactId: string;
   file: FileDto;
-  status: EditStatus;
+  status: EditStatus | "not-sent";
+  notice: string | null;
 }
 
 /** Which file to replace with which upload. `artifactId`, when set, is the artifact the file must be in (the page the person is on). */
@@ -176,16 +182,16 @@ export async function replaceFile(editorId: string, request: ReplaceRequest, act
   const swapped = await swapInUpload(swap);
   if (!swapped) throw new UserFacingError("The file changed while it was being replaced, so nothing was changed. Try again.");
   const status = await settleReplace({ artifactId: target.artifactId, approvedId, versionId, editorId, actor });
-  return { artifactId: target.artifactId, file: toFileDto(swapped), status };
+  return { artifactId: target.artifactId, file: toFileDto(swapped), status, notice: status === "not-sent" ? approvalNotSentNotice : null };
 }
 
 /**
  * Applies the approval rule to the replace's version, trying twice. The file
- * and its version are already saved; if both tries fail, readers outside the
- * team keep the approved copy, and the caller hears that the request for
- * approval was not sent.
+ * and its version are already saved, so a failure is not thrown: if both
+ * tries fail, readers outside the team keep the approved copy and the
+ * answer is "not-sent".
  */
-async function settleReplace(input: Parameters<typeof settleVersionedChange>[0]): Promise<EditStatus> {
+async function settleReplace(input: Parameters<typeof settleVersionedChange>[0]): Promise<EditStatus | "not-sent"> {
   try {
     return await settleVersionedChange(input);
   } catch {
@@ -193,7 +199,7 @@ async function settleReplace(input: Parameters<typeof settleVersionedChange>[0])
       return await settleVersionedChange(input);
     } catch (error) {
       console.error("[files] A replaced file's approval step failed", error instanceof Error ? error.name : "unknown error");
-      throw new UserFacingError("The file was replaced and History has it, but it could not be sent for approval. Readers outside the team keep the approved file until a later change is approved.");
+      return "not-sent";
     }
   }
 }

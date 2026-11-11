@@ -136,17 +136,18 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
     {
       title: "Replace a file in an artifact",
       description:
-        "Replaces a file in an artifact you can edit with your finished upload, such as a new draft of a statement of work or a deck. The file keeps its id, place, and name (the extension follows the new type), so links and embeds open the new file. The old copy stays in the artifact's History for people who can edit it, and readers outside the team keep the copy their approved version shows until the change is approved. Upload first (files_request_upload, PUT, files_finalize). Media a document embeds, and icon or cover images, change in the document or their picker instead.",
+        "Replaces a file in an artifact you can edit with your finished upload, such as a new draft of a statement of work or a deck. The file keeps its id, place, and name (the extension follows the new type), so links and embeds open the new file. The old copy stays in the artifact's History for people who can edit it, and readers outside the team keep the copy their approved version shows until the change is approved. Upload first (files_request_upload, PUT, files_finalize). A result with `notice` means the file was replaced but a later step was not done; do not replace it again. Media a document embeds, and icon or cover images, change in the document or their picker instead.",
       inputSchema: {
         file: z.uuid().describe("Id of the file to replace, from the artifact's files"),
         upload: z.uuid().describe("Id of your finished upload with the new content (files_finalize)"),
       },
     },
     ({ file, upload }) => respond(async () => {
-      const { artifactId } = await replaceFile(userId, { fileId: file, uploadId: upload }, "agent", harness);
+      const { artifactId, notice } = await replaceFile(userId, { fileId: file, uploadId: upload }, "agent", harness);
       const record = await getEditableArtifact(userId, { id: artifactId });
       if (!record) throw new UserFacingError("Artifact not found, or you cannot edit it.");
-      return artifactResult(userId, record);
+      const result = await artifactResult(userId, record);
+      return notice ? { ...result, notice } : result;
     }),
   );
 }
