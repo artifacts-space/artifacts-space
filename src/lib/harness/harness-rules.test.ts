@@ -27,6 +27,9 @@ describe("matchHarness", () => {
     ["Anthropic/ClaudeAI", "claude"],
     ["codex-mcp-client", "codex"],
     ["Codex", "codex"],
+    ["openai-mcp", "chatgpt"],
+    ["OpenAI-MCP", "chatgpt"],
+    ["ChatGPT", "chatgpt"],
     ["cursor-vscode", "cursor"],
     ["Cursor", "cursor"],
     ["Visual Studio Code", "vscode-copilot"],
@@ -48,7 +51,7 @@ describe("matchHarness", () => {
     expect(matchHarness(name)).toBe(harness);
   });
 
-  it.each(["zed", "Continue", "firefox", "example", "mogplex", "GitHub Copilot", "copilot-cli", "Anthropic", "", "   "])("should match nothing when the name is %j", (name) => {
+  it.each(["zed", "Continue", "firefox", "example", "mogplex", "GitHub Copilot", "copilot-cli", "Anthropic", "OpenAI", "openai-agents", "", "   "])("should match nothing when the name is %j", (name) => {
     expect(matchHarness(name)).toBeNull();
   });
 });
@@ -68,6 +71,19 @@ describe("detectHarness", () => {
 
   it("should prefer the OAuth name when clientInfo only names an MCP library", () => {
     expect(detectHarness({ clientName: "ai-sdk-mcp-client", oauthName: "Cursor" })).toEqual({ harness: "cursor", label: null });
+  });
+
+  it("should detect ChatGPT when its connector names itself openai-mcp in initialize", () => {
+    const found = clientInfoFromBody({ jsonrpc: "2.0", id: 0, method: "initialize", params: { protocolVersion: "2025-03-26", clientInfo: { name: "openai-mcp", version: "1.0.0" } } });
+    expect(detectHarness({ clientName: found?.info.name, oauthName: "artifacts.space" })).toEqual({ harness: "chatgpt", label: null });
+  });
+
+  it("should detect ChatGPT from the OAuth registration when clientInfo is missing", () => {
+    expect(detectHarness({ clientName: null, oauthName: "ChatGPT" })).toEqual({ harness: "chatgpt", label: null });
+  });
+
+  it("should keep Codex as Codex when it registers under an OpenAI software_id", () => {
+    expect(detectHarness({ clientName: "codex-mcp-client", softwareId: "com.openai.codex" })).toEqual({ harness: "codex", label: null });
   });
 
   it("should become Other agent with the raw name kept when nothing matches", () => {

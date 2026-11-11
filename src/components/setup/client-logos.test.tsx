@@ -71,10 +71,11 @@ describe("client guides", () => {
     }
   });
 
-  it("should say Pro does not work yet when the short ChatGPT guide names the plans", () => {
+  it("should say Pro can read and writes need a team plan when the short ChatGPT guide names the plans", () => {
     const html = renderToStaticMarkup(<ChatGptGuide origin={origin} />);
-    expect(html).toContain("You need a Business, Enterprise, or Edu workspace.");
-    expect(html).toContain("artifacts.space does not work on Pro for now");
+    expect(html).toContain("On ChatGPT Pro, ChatGPT can use the read tools");
+    expect(html).toContain("To save or change them, you need a Business, Enterprise, or Edu workspace.");
+    expect(html).not.toContain("does not work on Pro");
     expect(html).not.toContain("Developer mode");
   });
 });

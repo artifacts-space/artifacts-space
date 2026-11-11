@@ -143,6 +143,7 @@ export default function McpReferencePage() {
       <DocsH page={page} id="tools" />
       <Prose>
         <p>{tools.length} tools: {readCount} read and {writeCount} write. Arguments marked <em>required</em> must be sent; everything else is optional.</p>
+        <p>Each tool carries MCP annotations, so clients such as ChatGPT can run reads without asking and ask you before a write. Read tools are marked <code>readOnlyHint</code>. Write tools say whether they delete or replace something (<code>destructiveHint</code>) and whether a repeat changes nothing more (<code>idempotentHint</code>). No tool reaches outside artifacts.space, so <code>openWorldHint</code> is false.</p>
       </Prose>
       <ToolIndex />
       {mcpToolGroups.map((group) => (

@@ -30,7 +30,8 @@ Full documentation: https://artifacts.space/docs
 - **One MCP server for every agent.** Claude Code, Codex, Cursor, ChatGPT,
   OpenCode, Kimi Code, Devin, fx, and any other MCP client create, read,
   update, and list artifacts at `/api/mcp`, on any artifacts.space account.
-  ChatGPT needs a Business, Enterprise, or Edu workspace.
+  ChatGPT Pro can read; saving from ChatGPT needs a Business, Enterprise, or
+  Edu workspace.
 - **Formats people can read.** Markdown, code, plain text, JSON, CSV tables,
   SVG, Mermaid diagrams, Interface artifacts (dashboards, reports, and
   checklists built from a fixed component set), and uploaded files. Agent
@@ -97,9 +98,10 @@ server**. Paste `https://artifacts.space/api/mcp`, choose **OAuth**, and leave
 the client ID and secret empty. Then create and install the plugin, and sign
 in when ChatGPT asks. In a chat, type `@` and choose the plugin.
 
-You need a Business, Enterprise, or Edu workspace: ChatGPT Pro can use only
-tools that are marked read-only, and our tools do not have that mark yet. In a
-Business workspace, only owners and admins can add a custom server. See the
+On ChatGPT Pro, ChatGPT can use the read tools: it finds and reads your
+artifacts, comments, and files. To save or change them, you need a Business,
+Enterprise, or Edu workspace. In a Business workspace, only owners and admins
+can add a custom server. See the
 [client setup page](https://artifacts.space/docs/clients#chatgpt) for every
 step.
 

@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 
 import type { McpAccess } from "@/lib/oauth/scopes";
 
@@ -46,27 +47,89 @@ export const toolAccess = {
 
 export type McpToolName = keyof typeof toolAccess;
 
-/** What tool registration needs from an McpServer. */
-export type ToolServer = Pick<McpServer, "registerTool">;
+/** The tools classified "write" in toolAccess. */
+export type WriteToolName = { [Name in McpToolName]: (typeof toolAccess)[Name] extends "write" ? Name : never }[McpToolName];
 
-const classified = new Map<string, "read" | "write">(Object.entries(toolAccess));
-
-/** Whether a connection with `access` may use the tool. Throws for a tool nobody classified. */
-export function toolAllowed(name: string, access: McpAccess): boolean {
-  const level = classified.get(name);
-  if (!level) throw new Error(`MCP tool "${name}" has no access level. Add it to toolAccess in src/lib/mcp/tool-access.ts.`);
-  return level === "read" || access === "full";
+/** What a write does, for the MCP annotations clients use to decide when to ask the person first. */
+interface WriteTraits {
+  /** It deletes or replaces something (MCP `destructiveHint`). False when it only adds. */
+  destructive: boolean;
+  /** A second call with the same arguments changes nothing more (MCP `idempotentHint`). */
+  idempotent: boolean;
 }
 
 /**
- * The server the tool registration functions use: the same McpServer, but a
- * tool the connection may not use is removed as soon as it is registered, so
- * it never appears in tools/list and a call to it is refused as unknown.
+ * How each write tool changes things. The type needs every write tool and no
+ * other, so a new write tool cannot ship without saying whether it is
+ * destructive. Idempotent is true only where the code makes a repeat a no-op.
+ */
+export const writeTraits = {
+  // A new artifact on every call.
+  artifacts_create: { destructive: false, idempotent: false },
+  // Replaces content, tags, and sharing; a repeat can file a version or a sharing request.
+  artifacts_update: { destructive: true, idempotent: false },
+  artifacts_delete: { destructive: true, idempotent: true },
+  // Replaces the current content with an older version, as a new save each time.
+  artifacts_restore_version: { destructive: true, idempotent: false },
+  // A new pending upload on every call.
+  files_request_upload: { destructive: false, idempotent: false },
+  // Finalizing a ready file returns it unchanged. It removes only an upload that failed its checks, which was never usable.
+  files_finalize: { destructive: false, idempotent: true },
+  files_create_artifact: { destructive: false, idempotent: false },
+  // Attaches only files not yet attached, so a repeat attaches nothing.
+  files_attach: { destructive: false, idempotent: true },
+  files_delete: { destructive: true, idempotent: true },
+  inbox_mark_read: { destructive: false, idempotent: true },
+  comment_create: { destructive: false, idempotent: false },
+  // Replaces the body; mentions it already notified are not notified again.
+  comment_update: { destructive: true, idempotent: true },
+  comment_delete: { destructive: true, idempotent: true },
+} as const satisfies Record<WriteToolName, WriteTraits>;
+
+const classified = new Map<string, "read" | "write">(Object.entries(toolAccess));
+const traits = new Map<string, WriteTraits>(Object.entries(writeTraits));
+
+/** The access level of a tool. Throws for a tool nobody classified. */
+function levelOf(name: string): "read" | "write" {
+  const level = classified.get(name);
+  if (!level) throw new Error(`MCP tool "${name}" has no access level. Add it to toolAccess in src/lib/mcp/tool-access.ts.`);
+  return level;
+}
+
+/** Whether a connection with `access` may use the tool. Throws for a tool nobody classified. */
+export function toolAllowed(name: string, access: McpAccess): boolean {
+  return levelOf(name) === "read" || access === "full";
+}
+
+/**
+ * The MCP annotations a tool lists with, derived from toolAccess and
+ * writeTraits. Read tools say `readOnlyHint: true`, which ChatGPT needs to run
+ * them without asking and to offer them at all on plans that allow only
+ * read-only tools. Every tool acts only inside artifacts.space, so
+ * `openWorldHint` is false. Throws for a tool nobody classified.
+ */
+export function toolAnnotations(name: string): ToolAnnotations {
+  if (levelOf(name) === "read") return { readOnlyHint: true, openWorldHint: false };
+  const write = traits.get(name);
+  if (!write) throw new Error(`MCP write tool "${name}" has no traits. Add it to writeTraits in src/lib/mcp/tool-access.ts.`);
+  return { readOnlyHint: false, destructiveHint: write.destructive, idempotentHint: write.idempotent, openWorldHint: false };
+}
+
+/** What tool registration needs from an McpServer. */
+export type ToolServer = Pick<McpServer, "registerTool">;
+
+/**
+ * The server the tool registration functions use: the same McpServer, but
+ * every tool gets its annotations from toolAnnotations, and a tool the
+ * connection may not use is removed as soon as it is registered, so it never
+ * appears in tools/list and a call to it is refused as unknown. A tool that
+ * sets its own annotations is refused, so this file stays the one source.
  */
 export function gateTools(server: ToolServer, access: McpAccess): ToolServer {
   const registerTool: McpServer["registerTool"] = (name, config, handler) => {
     const allowed = toolAllowed(name, access);
-    const registered = server.registerTool(name, config, handler);
+    if (config.annotations) throw new Error(`MCP tool "${name}" sets its own annotations. They come from src/lib/mcp/tool-access.ts.`);
+    const registered = server.registerTool(name, { ...config, annotations: toolAnnotations(name) }, handler);
     if (!allowed) registered.remove();
     return registered;
   };
