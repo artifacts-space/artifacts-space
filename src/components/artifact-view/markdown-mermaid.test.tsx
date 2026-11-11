@@ -9,6 +9,20 @@ import { ThemeScope } from "./theme-scope";
 const flowchart = "flowchart TD\n  A[Start] --> B[Ship]";
 const document = `# Plan\n\n\`\`\`mermaid\n${flowchart}\n\`\`\`\n\n\`\`\`ts\nconst x = 1;\n\`\`\`\n`;
 
+const voidElements = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
+
+/** Where the first element in `html` closes: its matching end tag, by counting tags (static markup is well formed). */
+function firstElementEnd(html: string): number {
+  let depth = 0;
+  for (const match of html.matchAll(/<(\/?)([a-z][a-z0-9-]*)[^>]*?(\/?)>/gu)) {
+    const [tag, closing, name = "", selfClosing] = match;
+    if (voidElements.has(name) || selfClosing) continue;
+    depth += closing ? -1 : 1;
+    if (depth === 0) return match.index + tag.length;
+  }
+  return html.length;
+}
+
 const drawnSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40"><text font-size="14">Start</text></svg>';
 
 describe("Mermaid blocks in the Markdown read view", () => {
@@ -30,9 +44,14 @@ describe("Mermaid blocks in the Markdown read view", () => {
   });
 
   it("should draw the diagram inside the theme scope when the artifact pins dark", () => {
-    const html = renderToStaticMarkup(<ThemeScope mode="dark"><ArtifactView kind="markdown" content={document} /></ThemeScope>);
+    const html = renderToStaticMarkup(<><ThemeScope mode="dark"><ArtifactView kind="markdown" content={document} /></ThemeScope><div data-after-scope="" /></>);
     // The diagram reads its colors from the tokens in scope at its own element, so it must sit inside the dark scope.
-    expect(html).toMatch(/^<div[^>]*class="[^"]*\bdark\b[^"]*"[\s\S]*data-markdown-diagram/u);
+    expect(html).toMatch(/^<div[^>]*class="[^"]*\bdark\b/u);
+    const scopeEnd = firstElementEnd(html);
+    const diagram = html.indexOf("data-markdown-diagram");
+    expect(diagram).toBeGreaterThan(0);
+    expect(diagram).toBeLessThan(scopeEnd);
+    expect(html.indexOf("data-after-scope")).toBeGreaterThan(scopeEnd);
   });
 });
 

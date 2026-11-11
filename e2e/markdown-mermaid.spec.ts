@@ -116,8 +116,24 @@ test("should keep the source open with the note when an edit breaks the diagram"
   await page.keyboard.type(" -- >");
   await expect(block).toHaveAttribute("data-diagram-state", "failed", { timeout: 30_000 });
   await expect(block.getByRole("note")).toContainText("Couldn’t draw this diagram.");
+  // Its source stays open until it draws, so it offers no Done.
+  await expect(block.getByRole("button", { name: "Done" })).toHaveCount(0);
 
   // Moving the cursor out leaves the source open, so the mistake can be fixed.
   await editor(page).getByText("End paragraph.").click();
   await expect(block.locator("pre")).toBeVisible();
+});
+
+test("should turn a closed diagram back into a code block when Plain text is picked", async ({ page }) => {
+  await openFixture(page);
+  const block = await editorBlock(page);
+  await expect(block.locator("pre")).toBeHidden();
+  const picker = block.getByRole("combobox", { name: "Code language" }).filter({ visible: true });
+  await expect(picker).toHaveCount(1);
+  await picker.click();
+  await page.getByRole("option", { name: "Plain text" }).click();
+
+  await expect(editorDiagram(page)).toHaveCount(0);
+  await expect(editor(page).locator("pre").filter({ hasText: "Plan --> Build" })).toBeVisible();
+  await expect(savedMarkdown(page)).toContainText("Intro paragraph.\n\n```\nflowchart LR\n  Plan --> Build\n```\n\nEnd paragraph.");
 });

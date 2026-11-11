@@ -4,7 +4,7 @@ import { IconPencil } from "@tabler/icons-react";
 import type { Editor } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
 import { NodeViewContent, NodeViewWrapper, useEditorState, type ReactNodeViewProps } from "@tiptap/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 
 import { DiagramFailedNote, MarkdownDiagramBody } from "@/components/artifact-view/markdown-mermaid";
@@ -54,10 +54,12 @@ interface PreviewProps {
   editable: boolean;
   sourceOpen: boolean;
   onEdit: () => void;
+  /** The language picker, shown over a collapsed diagram so it can turn back into code like any code block. */
+  picker: ReactNode;
 }
 
 /** The diagram above the source: a hint when empty, the short note when it fails, else the drawing. */
-function DiagramPreview({ code, state, editable, sourceOpen, onEdit }: PreviewProps) {
+function DiagramPreview({ code, state, editable, sourceOpen, onEdit, picker }: PreviewProps) {
   if (code.trim() === "") return <p role="note" className="text-sm leading-6 text-muted-foreground">Write Mermaid source below, such as <code>flowchart TD</code>, to draw a diagram.</p>;
   if (!editable) return <MarkdownDiagramBody code={code} state={state} />;
   if (state.status === "failed") return <DiagramFailedNote reason={state.reason} />;
@@ -66,19 +68,27 @@ function DiagramPreview({ code, state, editable, sourceOpen, onEdit }: PreviewPr
     // A click anywhere on the diagram opens its source; the Edit button does the same for keyboards and screen readers.
     <div className="relative cursor-pointer" onClick={onEdit}>
       <DiagramFigure diagram={state.diagram} />
-      <Button type="button" variant="ghost" size="sm" onClick={(event) => { event.stopPropagation(); onEdit(); }} className="absolute top-1.5 right-1.5 text-muted-foreground">
-        <IconPencil aria-hidden /> Edit diagram
-      </Button>
+      {/* Clicks here (and in the picker's menu, a React child) stay off the diagram, so they never open the source. */}
+      <div className="absolute top-1.5 right-1.5 flex items-center gap-1" onClick={(event) => { event.stopPropagation(); }}>
+        {picker}
+        <Button type="button" variant="ghost" size="sm" onClick={onEdit} className="text-muted-foreground">
+          <IconPencil aria-hidden /> Edit diagram
+        </Button>
+      </div>
     </div>
   );
 }
 
-/** The line between the live preview and the source: what it is, and Done to close it. */
-function SourceBar({ onDone }: { onDone: () => void }) {
+/**
+ * The line between the live preview and the source: what it is, and Done to
+ * close it. Without `onDone` (an empty or broken diagram, whose source stays
+ * open) there is no Done.
+ */
+function SourceBar({ onDone }: { onDone: (() => void) | null }) {
   return (
-    <div contentEditable={false} className="mb-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground select-none">
+    <div contentEditable={false} className="mb-1.5 flex min-h-8 items-center justify-between gap-2 text-xs text-muted-foreground select-none">
       <span>Mermaid source. The diagram updates as you type.</span>
-      <Button type="button" variant="ghost" size="sm" onClick={onDone}>Done</Button>
+      {onDone ? <Button type="button" variant="ghost" size="sm" onClick={onDone}>Done</Button> : null}
     </div>
   );
 }
@@ -88,7 +98,8 @@ function SourceBar({ onDone }: { onDone: () => void }) {
  * renderer as the read view. Clicking it (or Edit diagram) puts the cursor in
  * its source, which opens below a live preview that redraws once typing
  * pauses; moving the cursor out, or Done, closes it. Empty and broken
- * diagrams keep the source open. The Markdown stays the fenced block.
+ * diagrams keep the source open and offer no Done. The language picker
+ * shows over a collapsed diagram too. The Markdown stays the fenced block.
  */
 export function MermaidBlockView({ node, updateAttributes, editor, getPos }: ReactNodeViewProps) {
   const code = node.textContent;
@@ -97,7 +108,11 @@ export function MermaidBlockView({ node, updateAttributes, editor, getPos }: Rea
   const { scopeRef, state } = useMermaidDiagram(preview, { keepPrevious: true, deferUntilNear: true });
   const [opening, setOpening] = useState(false);
   const editable = editor.isEditable;
-  const sourceOpen = editable && (opening || inside || code.trim() === "" || state.status === "failed");
+  // Empty and broken diagrams keep their source open: there is nothing to show instead.
+  const forcedOpen = code.trim() === "" || state.status === "failed";
+  const sourceOpen = editable && (opening || inside || forcedOpen);
+  const language = blockLanguage(node.attrs.language);
+  const setLanguage = (next: string | null) => { updateAttributes({ language: next }); };
 
   function openSource() {
     const pos = getPos();
@@ -115,12 +130,19 @@ export function MermaidBlockView({ node, updateAttributes, editor, getPos }: Rea
   return (
     <NodeViewWrapper className="rich-code-block" data-mermaid-block="" data-diagram-state={state.status} data-source-open={sourceOpen ? "" : undefined}>
       <div ref={scopeRef} contentEditable={false} className="min-w-0 select-none">
-        <DiagramPreview code={preview} state={state} editable={editable} sourceOpen={sourceOpen} onEdit={openSource} />
+        <DiagramPreview
+          code={preview}
+          state={state}
+          editable={editable}
+          sourceOpen={sourceOpen}
+          onEdit={openSource}
+          picker={<CodeLanguagePicker language={language} disabled={!editable} onChange={setLanguage} className="static" />}
+        />
       </div>
       <div className={sourceOpen ? "mt-3" : "hidden"}>
-        {editable ? <SourceBar onDone={closeSource} /> : null}
+        {editable ? <SourceBar onDone={forcedOpen ? null : closeSource} /> : null}
         <div className="relative">
-          <CodeLanguagePicker language={blockLanguage(node.attrs.language)} disabled={!editable} onChange={(next) => { updateAttributes({ language: next }); }} />
+          <CodeLanguagePicker language={language} disabled={!editable} onChange={setLanguage} />
           <pre spellCheck={false}>
             <NodeViewContent<"code"> as="code" />
           </pre>

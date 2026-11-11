@@ -1,6 +1,7 @@
 "use client";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 const plain = "plain";
 
@@ -46,10 +47,14 @@ export function blockLanguage(attr: unknown): string {
   return typeof attr === "string" && attr ? attr : plain;
 }
 
-/** The quiet language picker in a code block's corner. Choosing Plain text clears the language. */
-export function CodeLanguagePicker({ language, disabled, onChange }: { language: string; disabled: boolean; onChange: (language: string | null) => void }) {
+/**
+ * The quiet language picker in a code block's corner. Choosing Plain text
+ * clears the language. `className` replaces the corner placement, for a
+ * picker that sits in a toolbar instead.
+ */
+export function CodeLanguagePicker({ language, disabled, onChange, className }: { language: string; disabled: boolean; onChange: (language: string | null) => void; className?: string }) {
   return (
-    <div contentEditable={false} className="absolute top-1.5 right-1.5 z-[1]">
+    <div contentEditable={false} className={cn("absolute top-1.5 right-1.5 z-[1]", className)}>
       <Select
         value={language}
         disabled={disabled}

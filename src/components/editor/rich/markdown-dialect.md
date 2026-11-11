@@ -168,8 +168,9 @@ flowchart TD
 - **The editor** (`mermaid-block-view.tsx`) shows the diagram. Clicking it,
   or Edit diagram, opens the source below a live preview that redraws once
   typing pauses; moving the cursor out, or Done, closes it. Empty and broken
-  diagrams keep the source open. "Mermaid diagram" is in the code block's
-  language picker.
+  diagrams keep the source open, with no Done, until they draw. "Mermaid
+  diagram" is in the code block's language picker, which also shows over a
+  closed diagram, so a diagram turns back into code like any code block.
 - **The Markdown version** keeps the fenced source. **Link previews** skip
   it like any code block.
 
