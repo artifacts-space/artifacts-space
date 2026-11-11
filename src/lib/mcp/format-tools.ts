@@ -45,6 +45,18 @@ export const MARKDOWN_MEDIA_GUIDE = [
   "Keep the image alone on its line. An image inside a sentence shows inline, and the editor keeps that paragraph as written.",
 ].join("\n");
 
+/** How agents put diagrams in Markdown: a fenced mermaid block, drawn in place (markdown-dialect.md). */
+export const MARKDOWN_DIAGRAM_GUIDE = [
+  "Draw diagrams in Markdown with a fenced mermaid block. It shows as the diagram, in the document's place, for every reader:",
+  "```mermaid",
+  "flowchart TD",
+  "  A[Plan] --> B{Approved?}",
+  "  B -->|Yes| C[Ship]",
+  "```",
+  "Start the source with the diagram type (flowchart TD, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, gantt, pie, mindmap). Keep the diagram in the document: do not publish it as a separate mermaid artifact and link to it.",
+  "The Markdown keeps the fenced source exactly as written, so you read and edit it as text. If Mermaid cannot read it, readers see the source as code with a short note. artifacts_validate with kind \"mermaid\" checks that it starts with a diagram type.",
+].join("\n");
+
 function text(value: string) {
   return { content: [{ type: "text" as const, text: value }] };
 }
@@ -52,7 +64,7 @@ function text(value: string) {
 /** The guide for one format, or an overview of all formats. */
 export function formatGuide(kind?: FormatKind): string {
   if (kind === "ui") return buildUiGuide();
-  if (kind === "markdown") return `${formatInfo.markdown.label} (markdown): ${formatInfo.markdown.agent}\n\n${MARKDOWN_MEDIA_GUIDE}`;
+  if (kind === "markdown") return `${formatInfo.markdown.label} (markdown): ${formatInfo.markdown.agent}\n\n${MARKDOWN_DIAGRAM_GUIDE}\n\n${MARKDOWN_MEDIA_GUIDE}`;
   if (kind) return `${formatInfo[kind].label} (${kind}): ${formatInfo[kind].agent}`;
   const lines = artifactKinds.map((item) => `- ${item}: ${formatInfo[item].agent}`);
   const uiHint = (artifactKinds as readonly string[]).includes("ui") ? ['', 'For rich pages, call artifacts_formats_guide with kind "ui" to get the component reference and an example.'] : [];

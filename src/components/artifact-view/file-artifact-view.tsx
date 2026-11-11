@@ -60,7 +60,7 @@ export function FileArtifactView({ notes }: { notes: string }) {
   const files = useArtifactFiles();
   return (
     <div className="flex min-w-0 flex-col gap-6">
-      {notes.trim() ? <MarkdownView content={notes} media /> : null}
+      {notes.trim() ? <MarkdownView content={notes} media diagrams /> : null}
       {files === null ? <ViewNotice title="Files show on the artifact page." /> : null}
       {files?.length === 0 ? <ViewNotice title="No files yet." /> : null}
       {files && files.length > 0 ? (

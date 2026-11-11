@@ -38,7 +38,7 @@ export function TextView({ props }: ViewProps<"Text">) {
 
 export function MarkdownBlockView({ props }: ViewProps<"Markdown">) {
   if (!props.content.trim()) return null;
-  return <MarkdownView content={props.content} />;
+  return <MarkdownView content={props.content} diagrams />;
 }
 
 export function CodeView({ props }: ViewProps<"Code">) {

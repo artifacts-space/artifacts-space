@@ -16,7 +16,7 @@ export const formatInfo: Record<FormatKind, FormatInfo> = {
   markdown: {
     label: "Markdown",
     helper: "Readable prose with headings, lists, tables, and links.",
-    agent: "GitHub-flavored Markdown, shown as formatted prose. Raw HTML is not rendered. Uploaded images, video, audio, and files embed as ![alt](/api/files/<file id>) on its own line; artifacts_formats_guide with kind \"markdown\" explains how.",
+    agent: "GitHub-flavored Markdown, shown as formatted prose. Raw HTML is not rendered. A fenced code block with the language `mermaid` draws as a diagram, so keep diagrams in the document. Uploaded images, video, audio, and files embed as ![alt](/api/files/<file id>) on its own line; artifacts_formats_guide with kind \"markdown\" explains how.",
   },
   code: {
     label: "Code",
@@ -46,7 +46,7 @@ export const formatInfo: Record<FormatKind, FormatInfo> = {
   mermaid: {
     label: "Mermaid",
     helper: "A diagram drawn from Mermaid source.",
-    agent: "Mermaid diagram source that starts with its type, such as flowchart TD or sequenceDiagram.",
+    agent: "Mermaid diagram source that starts with its type, such as flowchart TD or sequenceDiagram. Use it for a diagram that stands alone; for a diagram inside a document, put a fenced code block with the language `mermaid` in the Markdown instead.",
   },
   ui: {
     label: "Interface",
