@@ -60,9 +60,12 @@ export async function writeAndAttachWith(update: SQL, editorId: string, files: S
   const attach = ids.length > 0 ? [attachedCte(editorId, files, ids)] : [];
   const more = (extras?.ctes ?? []).map((cte) => db.$with(cte.name, { id: artifactFile.id }).as(cte.query));
   const attachedCount = ids.length > 0 ? sql<number>`(select count(*) from attached)::int` : sql<number>`0`;
-  const [row] = await db.with(saved, ...attach, ...more).select({ record: savedRow(saved), attachedCount, note: extras?.note ?? sql<string | null>`null::text` }).from(saved);
+  // Uploads the save named that were in no artifact when the statement began (its snapshot; files already in this artifact are expected).
+  const looseCount = ids.length > 0 ? sql<number>`(select count(*) from ${artifactFile} l where l.id in (${idList(ids)}) and l.artifact_id is null)::int` : sql<number>`0`;
+  const [row] = await db.with(saved, ...attach, ...more).select({ record: savedRow(saved), attachedCount, looseCount, note: extras?.note ?? sql<string | null>`null::text` }).from(saved);
   if (!row) return null;
-  if (row.attachedCount < ids.length) await reportUnattached(row.record.id, ids);
+  // Only when one of those was taken or deleted in between does the save look further: no extra query on the common path.
+  if (row.attachedCount < row.looseCount) await reportUnattached(row.record.id, ids);
   return { record: row.record, note: row.note };
 }
 
