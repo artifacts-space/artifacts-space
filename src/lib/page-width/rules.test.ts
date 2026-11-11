@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { editColumnClass, hasWidthSetting, pageColumnClass, previewColumnClass, readingMeasureClass, usesFullWidth } from "./rules";
 
+/** Side padding classes, with or without a breakpoint prefix. */
+const sidePadding = /^(\w+:)?px-/;
+
 describe("pageColumnClass", () => {
   it("should keep the 1024px reading column when the artifact is contained", () => {
     expect(pageColumnClass(false)).toBe("max-w-5xl px-6");
@@ -12,6 +15,13 @@ describe("pageColumnClass", () => {
     expect(classes).toContain("max-w-none");
     expect(classes).toContain("px-6");
     expect(classes.some((name) => name.startsWith("max-w-5xl"))).toBe(false);
+  });
+
+  it("should pad full width no more than contained below the xl breakpoint, so Full width never narrows the page", () => {
+    const contained = pageColumnClass(false).split(" ").filter((name) => sidePadding.test(name));
+    const full = pageColumnClass(true).split(" ").filter((name) => sidePadding.test(name));
+    expect(contained).toEqual(["px-6"]);
+    expect(full.filter((name) => !name.startsWith("xl:"))).toEqual(contained);
   });
 });
 

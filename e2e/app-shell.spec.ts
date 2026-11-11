@@ -30,9 +30,6 @@ const slot = (page: Page, name: string) => page.locator(`[data-slot=${name}]`);
 /** A box's rendered width. */
 const widthOf = (box: Locator) => box.evaluate((element) => element.getBoundingClientRect().width);
 
-/** The public page's column is 1024px (max-w-5xl) with 24px of padding each side, so its content runs 976px wide. */
-const pageColumn = 1024;
-const pageContent = 976;
 const wide = { width: 1600, height: 900 };
 
 /** Scrolls a scroll box to its bottom and returns its scrollTop. */
@@ -337,19 +334,26 @@ test.describe("open and page column", () => {
   test("should hold the whole preview and the source field to the centered page column when Full width is off", async ({ page }) => {
     await openWorkspace(page, wide);
     const body = slot(page, "detail-body");
-    expect(await widthOf(body), "the pane is wider than the page column").toBeGreaterThan(pageColumn);
     const column = body.locator("[data-slot=page-column]");
-    expect(await widthOf(column)).toBeLessThanOrEqual(pageColumn);
+    // The column's own cap and padding, as rendered, so the width lives only in src/lib/page-width/rules.ts.
+    const cap = await column.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const width = Number.parseFloat(style.maxWidth);
+      return { width, content: width - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight) };
+    });
+    expect(cap.width, "the contained column has a cap").toBeGreaterThan(0);
+    expect(await widthOf(body), "the pane is wider than the page column").toBeGreaterThan(cap.width);
+    expect(await widthOf(column)).toBeLessThanOrEqual(cap.width);
     const gaps = await column.evaluate((element) => {
       const pane = element.parentElement?.getBoundingClientRect();
       const box = element.getBoundingClientRect();
       return pane ? { left: box.left - pane.left, right: pane.right - box.right } : { left: -1, right: 0 };
     });
     expect(Math.abs(gaps.left - gaps.right), "the column is centered").toBeLessThanOrEqual(2);
-    expect(await widthOf(body.getByRole("note").first()), "a callout keeps to the column").toBeLessThanOrEqual(pageContent + 1);
+    expect(await widthOf(body.getByRole("note").first()), "a callout keeps to the column").toBeLessThanOrEqual(cap.content + 1);
 
     await viewSource(page);
-    expect(await widthOf(page.getByRole("textbox", { name: "Artifact source" })), "the source field keeps to the column").toBeLessThanOrEqual(pageColumn);
+    expect(await widthOf(page.getByRole("textbox", { name: "Artifact source" })), "the source field keeps to the column").toBeLessThanOrEqual(cap.width);
   });
 });
 
@@ -456,10 +460,10 @@ test.describe("full width", () => {
     expect(await versionCount(publicId), "a display setting files no version").toBe(0);
     await expectPageDoesNotScroll(page);
 
-    // The artifact's own page follows the same setting: wider than the column it has when contained.
+    // The artifact's own page follows the same setting: it drops the contained column's cap.
     await page.goto(`/artifact/${publicId}`);
     await expect(page.locator("main")).toHaveAttribute("data-full-width", "true");
-    expect(await page.locator("main").evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(pageColumn);
+    expect(await page.locator("main").evaluate((element) => getComputedStyle(element).maxWidth)).toBe("none");
   });
 
   test("should keep side padding and no sideways scroll on a full-width page at phone width", async ({ page }, testInfo) => {
