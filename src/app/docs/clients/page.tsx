@@ -21,6 +21,7 @@ const origin = "https://artifacts.space";
  * tokens only for headless use. The steps follow each client's own docs:
  * - Cursor: https://cursor.com/docs/context/mcp/install-links and https://cursor.com/docs/context/mcp
  * - Claude: https://support.claude.com/en/articles/11175166-getting-started-with-custom-connectors-using-remote-mcp
+ * - ChatGPT: https://developers.openai.com/api/docs/guides/custom-mcp-server and https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt
  * - Codex: https://learn.chatgpt.com/docs/extend/mcp?surface=cli
  * - OpenCode: https://opencode.ai/docs/mcp-servers/
  * - Devin: https://docs.devin.ai/work-with-devin/mcp

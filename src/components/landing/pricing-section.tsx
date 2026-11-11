@@ -25,7 +25,7 @@ const plans: readonly Plan[] = [
     lead: "Free forever for everyone who signs up now.",
     items: [
       `Save in all ${String(formatKinds.length)} formats: Markdown, code, text, JSON, CSV, diagrams, interfaces, and files.`,
-      "Connect any agent: Claude, Codex, Cursor, OpenCode, Kimi Code, Devin, fx, or any MCP client.",
+      "Connect any agent: Claude, ChatGPT, Codex, Cursor, OpenCode, Kimi Code, Devin, fx, or any MCP client.",
       "Comment on every artifact.",
       "Restore any saved version from the history.",
       "Sort your work with projects and tags.",

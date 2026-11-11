@@ -38,5 +38,5 @@ test("should show every MCP client's mark, fx included, when the gallery opens",
   const clients = page.locator('[data-specimen="every client, in setup order"]');
 
   await expect(clients.locator('[data-client="fx"] svg[data-client-logo]')).toHaveCount(1);
-  await expect(clients.locator("[data-client-label]")).toHaveText(["Claude Code", "Cursor", "Claude Desktop", "Codex", "OpenCode", "Devin", "Kimi Code CLI", "fx", "Other clients"]);
+  await expect(clients.locator("[data-client-label]")).toHaveText(["Claude Code", "Cursor", "Claude Desktop", "ChatGPT", "Codex", "OpenCode", "Devin", "Kimi Code CLI", "fx", "Other clients"]);
 });
