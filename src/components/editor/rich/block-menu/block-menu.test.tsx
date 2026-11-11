@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { MenuContext } from "./block-actions";
-import { MenuList } from "./block-menu";
+import { hoverSubmenu, MenuList } from "./block-menu";
 import { ChangeSubmenu, MenuFooter, SearchRow } from "./block-menu-parts";
 import { menuReducer, openedMenu, rowsFor, type MenuState } from "./block-menu-state";
 
@@ -74,5 +74,17 @@ describe("the block menu", () => {
     expect(html).toContain("Claude Code");
     expect(html).toContain("Today at");
     expect(html).toContain("3 words, 16 characters");
+  });
+});
+
+describe("hoverSubmenu", () => {
+  it("should open the hovered row's own submenu when hovering it", () => {
+    expect(hoverSubmenu({ kind: "submenu", id: "change" }, null)).toEqual({ type: "openSubmenu", id: "change", focused: false });
+    expect(hoverSubmenu({ kind: "submenu", id: "change" }, { id: "change", focused: false })).toBeNull();
+  });
+
+  it("should close the open submenu when hovering another row", () => {
+    expect(hoverSubmenu({ kind: "action", id: "duplicate" }, { id: "change", focused: true })).toEqual({ type: "closeSubmenu" });
+    expect(hoverSubmenu({ kind: "action", id: "duplicate" }, null)).toBeNull();
   });
 });

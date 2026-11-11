@@ -124,7 +124,7 @@ function BlockControls({ editor, frame }: BlockControlsProps) {
   const view = useMemo(() => (openedPos === null ? null : menuView(state.doc, openedPos, page)), [openedPos, state.doc, page]);
   const menu = view ? opened : null;
   const shown = menu?.pos ?? hovered;
-  const places = useBlockPlaces(editor, frame, handlePositions(state.doc, touch, shown), state.doc);
+  const places = useBlockPlaces(editor, frame, handlePositions(state.doc, touch, shown), state.doc, touch);
 
   const open = useCallback((pos: number, anchor: MenuAnchor, grip: HTMLElement | null = null) => {
     setMenu({ pos, anchor, grip });

@@ -103,9 +103,17 @@ export function buildBlockAnchor(blocks: readonly AnchorBlock[], target: number)
   return { kind: "place", index: block.topIndex };
 }
 
+/**
+ * Percent-encodes words for a link, parentheses included: a stray `(` or `)`
+ * would end the link early where it is pasted into Markdown or plain text.
+ */
+function encodeWords(words: string): string {
+  return encodeURIComponent(words).replace(/\(/g, "%28").replace(/\)/g, "%29");
+}
+
 /** Percent-encodes words for a text fragment, where `-`, `,`, and `&` have meanings of their own. */
 export function encodeTextDirective(words: string): string {
-  return encodeURIComponent(words).replace(/-/g, "%2D");
+  return encodeWords(words).replace(/-/g, "%2D");
 }
 
 /**
@@ -123,7 +131,7 @@ export function blockHash(anchor: BlockAnchor): string {
   if (anchor.kind === "file") return `#block-file=${anchor.fileId}`;
   if (anchor.kind === "place") return `#block-at=${String(anchor.index)}`;
   const nth = anchor.nth > 1 ? `&n=${String(anchor.nth)}` : "";
-  return `#block=${encodeURIComponent(anchor.words)}${nth}${textDirective(anchor)}`;
+  return `#block=${encodeWords(anchor.words)}${nth}${textDirective(anchor)}`;
 }
 
 /** The full link to a block: the artifact page with the block's fragment. */

@@ -24,6 +24,13 @@ function blockWith(state: EditorState, text: string): BlockTarget {
   return found;
 }
 
+/** The list item that starts with `text`, skipping the quote around it. */
+function itemWith(state: EditorState, text: string): BlockTarget {
+  const found = documentBlocks(state.doc).find((block) => block.item && block.node.textContent.startsWith(text));
+  if (!found) throw new Error(`No list item starts with ${text}`);
+  return found;
+}
+
 function run(state: EditorState, tr: ReturnType<typeof deleteBlock> | null): EditorState {
   if (!tr) throw new Error("No transaction");
   return state.apply(tr);
@@ -118,6 +125,19 @@ describe("deleteBlock", () => {
     expect(markdownOf(nestedGone)).toContain("- one\n- two\n- three");
     const single = stateOf("Intro\n\n- only\n");
     expect(markdownOf(single.apply(deleteBlock(single, blockWith(single, "only"))))).toBe("Intro\n");
+  });
+
+  it("should remove a quote left empty when its only list item goes", () => {
+    const state = stateOf("Intro\n\n> - only item\n\nAfter\n");
+    const next = state.apply(deleteBlock(state, itemWith(state, "only item")));
+    expect(markdownOf(next)).toBe("Intro\n\nAfter\n");
+  });
+
+  it("should leave an empty paragraph when a quote's lone item was the whole document", () => {
+    const state = stateOf("> - only item\n");
+    const next = state.apply(deleteBlock(state, itemWith(state, "only item")));
+    expect(next.doc.childCount).toBe(1);
+    expect(next.doc.firstChild?.type.name).toBe("paragraph");
   });
 
   it("should leave an empty paragraph when the last block goes", () => {

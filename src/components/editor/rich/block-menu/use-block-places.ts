@@ -4,10 +4,10 @@ import type { Editor } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import type { EditorState } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
-import { useEffect, useLayoutEffect, useState, useSyncExternalStore, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 
 import type { HandlePlace } from "./block-handle";
-import { blockTargetAt, isListItem } from "./block-target";
+import { blockTargetAt, documentBlocks, isListItem } from "./block-target";
 
 /** The editor's current state, re-read on every transaction. */
 export function useEditorState(editor: Editor): EditorState {
@@ -72,6 +72,19 @@ function measure(view: EditorView, frame: HTMLElement, pos: number, room: number
   return { pos, middle: (line.top + line.bottom) / 2 - origin.top, left: left - origin.left, room };
 }
 
+/** Measures each block's handle place, skipping blocks not in `shown` when it is set. */
+function measureAll(view: EditorView, frame: HTMLElement, positions: readonly number[], shown: Set<Node> | null): HandlePlace[] {
+  const room = roomOnLeft(frame);
+  const measured: HandlePlace[] = [];
+  for (const pos of positions) {
+    const block = view.nodeDOM(pos);
+    if (shown && (!block || !shown.has(block))) continue;
+    const place = measure(view, frame, pos, room);
+    if (place) measured.push(place);
+  }
+  return measured;
+}
+
 /** Bumps a counter when the editor or the window changes size, so handles are measured again. */
 function useResizeTick(editor: Editor): number {
   const [tick, setTick] = useState(0);
@@ -88,20 +101,98 @@ function useResizeTick(editor: Editor): number {
   return tick;
 }
 
-/** The handle places for the given block positions, measured after each document change and resize (not on cursor moves). */
-export function useBlockPlaces(editor: Editor, frame: RefObject<HTMLElement | null>, positions: readonly number[], doc: PMNode): HandlePlace[] {
+interface BlockWatch {
+  observer: IntersectionObserver;
+  observed: Set<Element>;
+}
+
+/** The element of every block that gets a handle. */
+function blockElements(view: EditorView, doc: PMNode): Set<Element> {
+  const elements = new Set<Element>();
+  for (const block of documentBlocks(doc)) {
+    const element = view.nodeDOM(block.pos);
+    if (element instanceof Element) elements.add(element);
+  }
+  return elements;
+}
+
+/**
+ * Observes the blocks not yet observed and lets go of the ones gone. The
+ * editor keeps the elements of blocks a change did not touch, so most
+ * keystrokes observe nothing new.
+ */
+function watchBlocks(watch: BlockWatch, blocks: Set<Element>, seen: Set<Node> | null) {
+  for (const element of watch.observed) {
+    if (blocks.has(element)) continue;
+    watch.observer.unobserve(element);
+    watch.observed.delete(element);
+    seen?.delete(element);
+  }
+  for (const element of blocks) {
+    if (watch.observed.has(element)) continue;
+    watch.observer.observe(element);
+    watch.observed.add(element);
+  }
+}
+
+/** How far beyond the screen a block still counts as on it, so handles are ready as it scrolls in. */
+const SCREEN_MARGIN = "400px 0px";
+
+/**
+ * The block elements on or near the screen, kept by an IntersectionObserver
+ * (null when `enabled` is off: every block counts). With a handle beside
+ * every block on touch screens, only these are measured, so a keystroke in
+ * a long document does not re-measure every block. The returned number
+ * changes when blocks scroll in or out.
+ */
+function useBlocksOnScreen(editor: Editor, enabled: boolean, doc: PMNode): [RefObject<Set<Node> | null>, number] {
+  const onScreen = useRef<Set<Node> | null>(null);
+  const watch = useRef<BlockWatch | null>(null);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    const seen = new Set<Node>();
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) seen.add(entry.target);
+        else seen.delete(entry.target);
+      }
+      setTick((value) => value + 1);
+    }, { rootMargin: SCREEN_MARGIN });
+    onScreen.current = seen;
+    watch.current = { observer, observed: new Set() };
+    return () => {
+      observer.disconnect();
+      watch.current = null;
+      onScreen.current = null;
+    };
+  }, [editor, enabled]);
+  useEffect(() => {
+    const current = watch.current;
+    if (!current || editor.isDestroyed) return;
+    watchBlocks(current, blockElements(editor.view, doc), onScreen.current);
+  }, [editor, enabled, doc]);
+  return [onScreen, tick];
+}
+
+/**
+ * The handle places for the given block positions, measured after each
+ * document change and resize (not on cursor moves). With `onlyOnScreen`
+ * (a handle beside every block), only blocks on or near the screen.
+ */
+export function useBlockPlaces(editor: Editor, frame: RefObject<HTMLElement | null>, positions: readonly number[], doc: PMNode, onlyOnScreen = false): HandlePlace[] {
   const [places, setPlaces] = useState<HandlePlace[]>([]);
   const tick = useResizeTick(editor);
+  const [onScreen, screenTick] = useBlocksOnScreen(editor, onlyOnScreen, doc);
   const key = positions.join(",");
   useLayoutEffect(() => {
     const element = frame.current;
     const update = () => {
       if (!element || editor.isDestroyed) return;
-      const room = roomOnLeft(element);
-      setPlaces(key ? key.split(",").map((pos) => measure(editor.view, element, Number(pos), room)).filter((place) => place !== null) : []);
+      setPlaces(measureAll(editor.view, element, key ? key.split(",").map(Number) : [], onScreen.current));
     };
     update();
-  }, [editor, frame, key, doc, tick]);
+  }, [editor, frame, key, doc, tick, onScreen, screenTick]);
   return places;
 }
 

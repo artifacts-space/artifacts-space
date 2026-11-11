@@ -63,6 +63,12 @@ function keyAction(key: string, state: MenuState, rows: readonly MenuEntry[], ac
   return keys[key];
 }
 
+/** Hovering a row with a submenu opens that submenu beside the menu; hovering any other row closes the open one. */
+export function hoverSubmenu(command: MenuCommand | undefined, submenu: MenuState["submenu"]): MenuEvent | null {
+  if (command?.kind === "submenu") return submenu?.id === command.id ? null : { type: "openSubmenu", id: command.id, focused: false };
+  return submenu ? { type: "closeSubmenu" } : null;
+}
+
 /** Focuses the search with a mouse or trackpad; on touch, the panel, so the keyboard stays down until the search is tapped. */
 function focusMenu(input: HTMLInputElement | null, panel: HTMLElement | null) {
   (canHover() ? input : panel)?.focus({ preventScroll: true });
@@ -147,13 +153,11 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
     else onCommand(row.command);
   };
 
-  // Hovering Change opens it beside the menu; hovering any other row closes it.
   const hover = (index: number) => {
     if (state.active !== index) send({ type: "hover", index });
     if (sheet) return;
-    const opens = rows[index]?.command.kind === "submenu";
-    if (opens && !submenu) send({ type: "openSubmenu", id: "change", focused: false });
-    if (!opens && submenu) send({ type: "closeSubmenu" });
+    const event = hoverSubmenu(rows[index]?.command, submenu);
+    if (event) send(event);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {

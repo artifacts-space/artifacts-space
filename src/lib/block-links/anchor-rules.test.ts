@@ -109,6 +109,13 @@ describe("blockLink", () => {
 });
 
 describe("encodeTextDirective", () => {
+  it("should encode parentheses so the link survives in Markdown", () => {
+    expect(encodeTextDirective("1) First (draft")).toBe("1%29%20First%20%28draft");
+    const hash = blockHash({ kind: "words", words: "1) First thing", nth: 2 });
+    expect(hash).toBe("#block=1%29%20First%20thing&n=2");
+    expect(parseBlockHash(hash)).toEqual({ kind: "words", words: "1) First thing", nth: 2 });
+  });
+
   it("should encode dashes, which mark a text fragment's context", () => {
     expect(encodeTextDirective("a-b")).toBe("a%2Db");
   });

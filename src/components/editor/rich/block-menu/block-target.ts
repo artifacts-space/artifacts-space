@@ -140,33 +140,41 @@ export function duplicateBlock(state: EditorState, target: BlockTarget): Transac
   return keepCursorIn(tr, state, target, end).scrollIntoView();
 }
 
-/** The range a delete removes: the block, or its whole list when it is the list's only item. */
-function deletedRange(doc: PMNode, target: BlockTarget): { from: number; to: number; only: boolean } {
+/** True when `node` would break the schema with its only child gone (a list, a quote, the document). */
+function needsContent(node: PMNode): boolean {
+  return node.childCount === 1 && !node.type.validContent(Fragment.empty);
+}
+
+/**
+ * The range a delete removes: the block, or the container it leaves empty
+ * (a list losing its only item, a quote holding only that list), walking
+ * up until a container keeps other content. `fill` is set when the
+ * container that stops the walk (the document, a table cell) cannot be
+ * removed and still needs a line.
+ */
+function deletedRange(doc: PMNode, target: BlockTarget): { from: number; to: number; fill: boolean } {
   let from = target.pos;
   let to = target.pos + target.node.nodeSize;
   let $from = doc.resolve(from);
-  while ($from.depth > 0 && $from.parent.childCount === 1 && isList($from.parent)) {
+  while ($from.depth > 0 && needsContent($from.parent) && $from.parent.type.spec.isolating !== true) {
     from = $from.before();
     to = $from.after();
     $from = doc.resolve(from);
   }
-  return { from, to, only: $from.depth === 0 && doc.childCount === 1 };
+  return { from, to, fill: needsContent($from.parent) };
 }
 
 /**
- * Deletes the block (a list that would be left empty goes with it). The last
- * block in the document becomes an empty paragraph instead, so the document
- * always has a line to type on.
+ * Deletes the block, with any container it leaves empty (a list, a quote).
+ * When the block is all that is left of the document or a table cell, an
+ * empty paragraph takes its place, so there is always a line to type on.
  */
 export function deleteBlock(state: EditorState, target: BlockTarget): Transaction {
-  const { from, to, only } = deletedRange(state.doc, target);
+  const { from, to, fill } = deletedRange(state.doc, target);
   const tr = state.tr;
-  if (only) {
-    const paragraph = state.schema.nodes.paragraph;
-    if (paragraph) tr.replaceWith(from, to, paragraph.create());
-  } else {
-    tr.delete(from, to);
-  }
+  const line = fill ? state.doc.resolve(from).parent.type.contentMatch.defaultType?.createAndFill() : null;
+  if (line) tr.replaceWith(from, to, line);
+  else tr.delete(from, to);
   const at = Math.min(from, tr.doc.content.size);
   return tr.setSelection(Selection.near(tr.doc.resolve(at))).scrollIntoView();
 }
