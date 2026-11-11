@@ -2,7 +2,9 @@
 
 import { useEffect, useRef } from "react";
 
-import type { ArtifactDto } from "@/lib/artifact-types";
+import { formatInfo } from "@/lib/artifact-formats";
+import { kindColors, kindIcons } from "@/lib/artifact-kinds";
+import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
 import { TagsInput } from "@/components/tags/tags-input";
@@ -11,25 +13,48 @@ import { ProjectPicker } from "./project-picker";
 
 interface ArtifactOrganizersProps {
   artifact: ArtifactDto;
+  /** The format the editor shows now: the draft's, which can run ahead of the stored one. */
+  kind: ArtifactKind;
+  /** Opens Format and language. */
+  onChangeFormat: () => void;
   onUpdated: (artifact: ArtifactDto) => void;
+  /** The content's column (previewColumnClass), so the chips line up with the title. */
+  column: string;
   className?: string;
   /** A new artifact not stored yet has no project or tags to change. */
   hidden?: boolean;
 }
 
+/** The format as a chip in its colour; choosing it opens Format and language. */
+export function KindChip({ kind, onChange }: { kind: ArtifactKind; onChange?: () => void }) {
+  const KindIcon = kindIcons[kind];
+  const label = formatInfo[kind].label;
+  const chip = "inline-flex h-7 items-center gap-1.5 rounded-lg border px-2 text-sm font-medium";
+  if (!onChange) return <span className={cn(chip, kindColors[kind])}><KindIcon aria-hidden className="size-3.5" /> {label}</span>;
+  return (
+    <button type="button" onClick={onChange} aria-label={`Format: ${label}. Change format`} title="Change format and language" className={cn(chip, kindColors[kind], "transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none")}>
+      <KindIcon aria-hidden className="size-3.5" /> {label}
+    </button>
+  );
+}
+
 /**
- * The project and tag controls under an artifact's summary in the workspace editor.
- * Changes save at once and never touch the editor's draft or history.
+ * The chips under an artifact's title in the workspace editor: its format,
+ * its project, and its tags. Project and tag changes save at once and never
+ * touch the editor's draft or history.
  */
-export function ArtifactOrganizers({ artifact, onUpdated, className, hidden = false }: ArtifactOrganizersProps) {
+export function ArtifactOrganizers({ artifact, kind, onChangeFormat, onUpdated, column, className, hidden = false }: ArtifactOrganizersProps) {
   // A save can finish after the editor moved on; merge into the newest artifact, not the one from the click.
   const latest = useRef(artifact);
   useEffect(() => { latest.current = artifact; }, [artifact]);
   if (hidden) return null;
   return (
-    <div className={cn("flex flex-wrap items-center gap-2 border-b px-5 py-1.5 sm:px-7", className)}>
-      <ProjectPicker artifactId={artifact.id} value={artifact.project} onChange={(project) => { onUpdated({ ...latest.current, project }); }} />
-      <TagsInput artifactId={artifact.id} value={artifact.tags} onChange={(tags) => { onUpdated({ ...latest.current, tags }); }} />
+    <div className={cn("pt-3 pb-1", className)}>
+      <div className={cn("flex flex-wrap items-center gap-2", column)}>
+        <KindChip kind={kind} onChange={onChangeFormat} />
+        <ProjectPicker artifactId={artifact.id} value={artifact.project} appearance="chip" onChange={(project) => { onUpdated({ ...latest.current, project }); }} />
+        <TagsInput artifactId={artifact.id} value={artifact.tags} appearance="chip" onChange={(tags) => { onUpdated({ ...latest.current, tags }); }} />
+      </div>
     </div>
   );
 }

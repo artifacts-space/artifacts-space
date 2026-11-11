@@ -110,18 +110,20 @@ async function openWorkspace(page: Page, viewport = desktop) {
   await expect(page.getByText("Checkout v2 rollout").first()).toBeVisible();
 }
 
-/** The scope tabs, New artifact, and the workspace panel, on the fixture with shared teams. */
-async function openWorkspaceBar(page: Page, viewport?: { width: number; height: number }) {
+/** The workspace switcher, search, New artifact, and the shell, on the fixture with shared teams. */
+async function openSidebarTop(page: Page, viewport?: { width: number; height: number }) {
   if (viewport) await page.setViewportSize(viewport);
   await page.goto("/dev/workspace?scopes=1");
   await expect(page.getByText("Checkout v2 rollout").first()).toBeVisible();
   const box = async (locator: Locator) => (await locator.boundingBox()) ?? { x: -1, y: -1, width: -1, height: -1 };
   return {
     header: await box(page.getByRole("banner")),
-    bar: await box(slot(page, "workspace-bar")),
-    tabs: await box(page.getByRole("navigation", { name: "Artifact scope" })),
+    sidebar: await box(page.getByRole("complementary", { name: "Workspace" })),
+    switcher: await box(page.getByRole("button", { name: /^Workspace: / })),
+    search: await box(page.getByRole("textbox", { name: "Search artifacts" })),
+    filters: await box(page.getByRole("button", { name: /^Filters/ })),
     create: await box(page.getByRole("button", { name: "New artifact" })),
-    panel: await box(page.locator("[data-app-shell] > .card-surface")),
+    shell: await box(page.locator("[data-app-shell] > .grid")),
   };
 }
 
@@ -159,16 +161,21 @@ function overlappingSections(page: Page) {
 test.describe("desktop and tablet", () => {
   test.skip(({ isMobile }) => isMobile, "phones keep a page that scrolls");
 
-  test("should put the scope tabs and New artifact in one slim bar under the header and give the panel the rest", async ({ page }) => {
-    const { header, bar, tabs, create, panel } = await openWorkspaceBar(page, desktop);
+  test("should put the workspace switcher, search, filters, and New artifact at the top of the sidebar, right under the header", async ({ page }) => {
+    const { header, sidebar, switcher, search, filters, create, shell } = await openSidebarTop(page, desktop);
     await expect(page.getByRole("heading", { level: 1, name: "Artifacts" })).toHaveClass(/sr-only/);
-    await expect(page.getByText(/artifacts? across/)).toHaveCount(0);
-    expect(Math.abs(bar.y - (header.y + header.height)), "the bar sits right under the header").toBeLessThanOrEqual(1);
-    expect(bar.height, "the bar is slim").toBeLessThanOrEqual(48);
-    expect(Math.abs(tabs.y + tabs.height / 2 - (create.y + create.height / 2)), "tabs and button share a row").toBeLessThanOrEqual(2);
-    expect(create.x + create.width, "the button sits at the right gutter").toBeGreaterThan(desktop.width - 40);
-    expect(panel.y - (bar.y + bar.height), "the panel starts under the bar").toBeLessThanOrEqual(1);
-    expect(desktop.height - (panel.y + panel.height), "the panel fills to the bottom gutter").toBeLessThanOrEqual(25);
+    await expect(page.locator("[data-slot=workspace-bar]"), "the slim bar under the header is gone").toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Artifact scope" })).toHaveCount(0);
+    expect(Math.abs(shell.y - (header.y + header.height)), "the shell starts right under the header").toBeLessThanOrEqual(1);
+    expect(desktop.height - (shell.y + shell.height), "the shell fills to the bottom of the window").toBeLessThanOrEqual(1);
+    expect(sidebar.x, "the sidebar starts at the window's left edge").toBeLessThanOrEqual(1);
+    expect(switcher.y, "the switcher is at the top of the sidebar").toBeLessThan(search.y);
+    for (const [name, control] of [["filters", filters], ["create", create]] as const) {
+      expect(Math.abs(control.y + control.height / 2 - (search.y + search.height / 2)), `search and ${name} share a row`).toBeLessThanOrEqual(2);
+      expect(control.x + control.width, `${name} stays inside the sidebar`).toBeLessThanOrEqual(sidebar.x + sidebar.width);
+    }
+    expect(search.x + search.width, "search comes first").toBeLessThanOrEqual(filters.x);
+    expect(filters.x + filters.width, "then the filters, then New artifact").toBeLessThanOrEqual(create.x);
     await expectPageDoesNotScroll(page);
   });
 
@@ -311,7 +318,7 @@ test.describe("desktop and tablet", () => {
 test.describe("open and page column", () => {
   test.skip(({ isMobile }) => isMobile, "measured on desktop; the phone check is below");
 
-  test("should open the artifact's own page in a new tab from beside the copy button", async ({ page }) => {
+  test("should open the artifact's own page in a new tab from the top bar", async ({ page }) => {
     await openWorkspace(page, wide);
     const open = page.getByRole("link", { name: "Open the artifact page in a new tab" });
     await expect(open).toHaveAttribute("href", "/artifact/fixtureworkspace0000ui");
@@ -365,26 +372,14 @@ test.describe("phone", () => {
     expect(await escapedElements(page), "nothing sticks out sideways").toEqual([]);
   });
 
-  test("should keep the scope tabs and an icon-only New artifact on one row without a sideways page scroll", async ({ page }) => {
-    const { bar, tabs, create } = await openWorkspaceBar(page);
-    expect(bar.height, "one slim row").toBeLessThanOrEqual(48);
-    expect(create.width, "icon only").toBeLessThanOrEqual(32);
-    expect(tabs.x + tabs.width, "the tabs stop before the button").toBeLessThanOrEqual(create.x);
-    const nav = page.getByRole("navigation", { name: "Artifact scope" });
-    expect(await nav.evaluate((element) => element.scrollWidth > element.clientWidth), "long team names scroll inside the tabs").toBe(true);
+  test("should keep search, filters, and an icon-only New artifact on one row without a sideways page scroll", async ({ page }) => {
+    const { search, filters, create, sidebar } = await openSidebarTop(page);
+    expect(create.width, "icon only").toBeLessThanOrEqual(40);
+    expect(Math.abs(create.y + create.height / 2 - (search.y + search.height / 2)), "one row").toBeLessThanOrEqual(2);
+    expect(search.x + search.width).toBeLessThanOrEqual(filters.x);
+    expect(create.x + create.width, "the row fits the sidebar").toBeLessThanOrEqual(sidebar.x + sidebar.width);
     const scroll = await pageScroll(page);
     expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.clientWidth + 1);
-  });
-
-  test("should scroll the active team's tab into view and name the team in the page heading", async ({ page }) => {
-    await page.goto("/dev/workspace?scopes=1&team=fixture-shared-2");
-    await expect(page.getByText("Checkout v2 rollout").first()).toBeVisible();
-    const active = page.getByRole("navigation", { name: "Artifact scope" }).getByRole("link", { name: "Customer research" });
-    await expect(active).toHaveAttribute("aria-current", "page");
-    await expect(active).toBeInViewport({ ratio: 1 });
-    await expect(page.getByRole("heading", { level: 1, name: "Shared with Customer research" })).toHaveCount(1);
-    await expect(page.getByRole("button", { name: "New artifact" }), "team scopes list others' work").toHaveCount(0);
-    expect((await pageScroll(page)).scrollY, "only the tabs scrolled").toBe(0);
   });
 
   test("should show Open as an icon with its name kept for screen readers", async ({ page }) => {

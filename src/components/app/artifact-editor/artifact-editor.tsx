@@ -19,7 +19,7 @@ import { ArtifactOrganizers } from "@/components/projects/artifact-organizers";
 import { useArtifactHarness, type HarnessControl } from "@/components/harness/use-artifact-harness";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { sheetFormatTarget } from "@/lib/create/new-artifact-rules";
-import { usesFullWidth } from "@/lib/page-width/rules";
+import { previewColumnClass, usesFullWidth } from "@/lib/page-width/rules";
 import { BlankPageFilesSlot } from "@/components/app/new-artifact/blank-page-parts";
 import type { BlankPageOptions } from "@/components/app/new-artifact/use-blank-page";
 import { useBlankEditor } from "@/components/app/new-artifact/use-blank-editor";
@@ -83,6 +83,8 @@ function showsFiles(kind: ArtifactDto["kind"], fileCount: number) {
 interface ArtifactToolbarProps {
   artifact: ArtifactDto;
   kind: ArtifactDto["kind"];
+  /** The title as typed, for the breadcrumb. */
+  title: string;
   shareUrl: string;
   shared: boolean;
   access: Pick<ArtifactEditorProps, "canShare" | "canDelete" | "team" | "seesComments" | "onWithdraw">;
@@ -98,12 +100,13 @@ interface ArtifactToolbarProps {
 }
 
 /** The toolbar of a stored artifact: copy, open, history, views, comments, share, and the More menu. */
-function ArtifactToolbar({ artifact, kind, shareUrl, shared, access, dirty, source, onRequestDelete, onRestored, onUpdated, fullWidth, harness, onChangeFormat, notice }: ArtifactToolbarProps) {
+function ArtifactToolbar({ artifact, kind, title, shareUrl, shared, access, dirty, source, onRequestDelete, onRestored, onUpdated, fullWidth, harness, onChangeFormat, notice }: ArtifactToolbarProps) {
   const { canShare, canDelete, team, seesComments, onWithdraw } = access;
   return (
     <EditorToolbar
-      id={artifact.id}
       publicId={artifact.publicId}
+      project={artifact.project}
+      title={title}
       kind={kind}
       content={artifact.content}
       shareControl={<SharingSlot artifact={artifact} shareUrl={shareUrl} canShare={canShare} manager={onWithdraw !== null} team={team} onUpdated={onUpdated} />}
@@ -152,6 +155,9 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   const notice = <DetectedNotice detected={page.detected} onChange={() => { setFormatOpen(true); }} onDismiss={dismissDetected} />;
   const theme = useRenderTheme(artifact);
   const saving = autosave.status.kind === "saving";
+  const fullWidthShown = usesFullWidth(draft.kind, artifact.fullWidth);
+  // The title, chips, and meta line sit in the content's column, so they line up with the body.
+  const column = previewColumnClass(fullWidthShown);
   useLeaveGuard(autosave.dirty || saving);
 
   const toggleSource = () => {
@@ -167,6 +173,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
         <ArtifactToolbar
           artifact={artifact}
           kind={draft.kind}
+          title={draft.title}
           shareUrl={shareUrl}
           shared={shared}
           access={{ canShare, canDelete, team, seesComments, onWithdraw }}
@@ -183,8 +190,8 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
       )}
       <div ref={outerRef} data-slot="detail-outer" className={detailOuter}>
         {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
-        <TitleFields title={draft.title} icon={draft.icon} summary={draft.summary} update={update} titleRef={titleRef} onEnter={focusBody} />
-        <ArtifactOrganizers artifact={artifact} onUpdated={onUpdated} hidden={page.blank} />
+        <TitleFields title={draft.title} icon={draft.icon} summary={draft.summary} update={update} titleRef={titleRef} onEnter={focusBody} column={column} />
+        <ArtifactOrganizers artifact={artifact} kind={draft.kind} onChangeFormat={() => { setFormatOpen(true); }} onUpdated={onUpdated} column={column} hidden={page.blank} />
         <SaveStatusBar
           status={autosave.status}
           dirty={autosave.dirty}
@@ -193,7 +200,9 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           updatedBy={artifact.updatedBy}
           harness={artifact.harness}
           stored={!page.blank}
+          id={page.blank ? undefined : artifact.id}
           onRetry={autosave.retryNow}
+          column={column}
           className={stickyModeBar}
         />
         <ConflictNotice status={autosave.status} onLoadTheirs={autosave.loadTheirs} onKeepMine={autosave.keepMine} />
@@ -216,7 +225,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
               files={artifact.files}
               revision={revision}
               sourceOpen={sourceOpen}
-              fullWidth={usesFullWidth(draft.kind, artifact.fullWidth)}
+              fullWidth={fullWidthShown}
               theme={theme}
               onChange={(content) => { update("content", content); }}
               onShowSource={() => { if (!sourceOpen) toggleSource(); }}

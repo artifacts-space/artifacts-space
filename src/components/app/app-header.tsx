@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { IconBook, IconChevronDown, IconExternalLink, IconInbox, IconKey, IconLogout, IconRestore, IconSettings } from "@tabler/icons-react";
-import { useState } from "react";
+import { IconBook, IconExternalLink, IconInbox, IconKey, IconLogout, IconRestore, IconSettings, IconUsers } from "@tabler/icons-react";
+import { useState, type ReactNode } from "react";
 
 import { useConfirmations } from "@/components/confirmations-provider";
 import { GitHubLink } from "@/components/github-link";
@@ -11,7 +11,6 @@ import { Logo } from "@/components/logo";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { forgetThisBrowser } from "@/components/notifications/push/forget-this-browser";
 import { PixelAvatar } from "@/components/pixel-avatar";
-import { TeamSwitcher, type HeaderTeam } from "@/components/teams/team-switcher";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +18,7 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLinkItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -32,21 +32,32 @@ const artifactsLink = { href: "/app", label: "Artifacts" };
 const landingPageHref = `/?${landingPageFlag}`;
 const connectionsLink = { href: "/app/connections", label: "Connections" };
 
+/** A header tab: the open one is a filled pill. */
+const tabClass = "flex h-8 items-center rounded-lg px-2.5 text-sm transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:px-3";
+const activeTab = "bg-muted font-medium text-foreground";
+const idleTab = "text-muted-foreground hover:bg-muted/60 hover:text-foreground";
+
 /** The inbox link: every mention with its thread. The bell carries the unread count. */
 function InboxLink({ active }: { active: boolean }) {
   return (
     <Link
       href="/inbox"
       aria-label="Inbox"
-      className={cn(
-        "relative flex h-full items-center gap-1.5 px-2 text-sm transition-colors sm:px-3",
-        active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
-      )}
+      aria-current={active ? "page" : undefined}
+      className={cn(tabClass, "gap-1.5", active ? activeTab : idleTab)}
     >
       <IconInbox className="size-4 sm:hidden" aria-hidden />
       <span className="hidden sm:inline">Inbox</span>
-      {active && <span className="absolute inset-x-2 bottom-0 h-px bg-foreground sm:inset-x-3" />}
     </Link>
+  );
+}
+
+/** A link in the account menu, marked as the current page while its section is open. */
+function AccountLink({ href, active, children }: { href: string; active: boolean; children: ReactNode }) {
+  return (
+    <DropdownMenuLinkItem render={<Link href={href} />} aria-current={active ? "page" : undefined} className={cn("px-2 py-2", active && "bg-muted font-medium")}>
+      {children}
+    </DropdownMenuLinkItem>
   );
 }
 
@@ -63,16 +74,8 @@ function ResetConfirmationsItem() {
 
 function NavLink({ href, label, active, className }: { href: string; label: string; active: boolean; className?: string }) {
   return (
-    <Link
-      href={href}
-      className={cn(
-        "relative flex h-full items-center px-2 text-sm transition-colors sm:px-3",
-        active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
-        className,
-      )}
-    >
+    <Link href={href} aria-current={active ? "page" : undefined} className={cn(tabClass, active ? activeTab : idleTab, className)}>
       {label}
-      {active && <span className="absolute inset-x-2 bottom-0 h-px bg-foreground sm:inset-x-3" />}
     </Link>
   );
 }
@@ -83,14 +86,13 @@ interface AppHeaderProps {
   name: string;
   email: string;
   username: string;
-  teams: HeaderTeam[];
   /** Unread notifications for the bell. */
   unreadNotifications: number;
   /** A bell list without a database, for the dev fixture only. */
   notificationSeed?: NotificationView[];
 }
 
-export function AppHeader({ userId, name, email, username, teams, unreadNotifications, notificationSeed }: AppHeaderProps) {
+export function AppHeader({ userId, name, email, username, unreadNotifications, notificationSeed }: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -106,12 +108,12 @@ export function AppHeader({ userId, name, email, username, teams, unreadNotifica
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-md">
-      <div className="mx-auto flex h-14 w-full max-w-none items-center gap-3 px-4 sm:gap-8 sm:px-6">
+      <div className="mx-auto flex h-14 w-full max-w-none items-center gap-3 px-4 sm:gap-6 sm:px-6">
         <span className="sm:hidden"><Logo href="/app" compact /></span>
         <span className="hidden sm:inline"><Logo href="/app" /></span>
+        {/* Teams live in the sidebar's workspace switcher and the account menu. */}
         <nav className="flex h-full items-center gap-1" aria-label="Workspace navigation">
           <NavLink {...artifactsLink} active={pathname === artifactsLink.href} />
-          <TeamSwitcher teams={teams} active={pathname.startsWith("/teams")} />
           <InboxLink active={pathname.startsWith("/inbox") || pathname.startsWith("/threads")} />
           {/* On phones, Connections lives in the account menu ("Access tokens"). */}
           <NavLink {...connectionsLink} active={pathname.startsWith(connectionsLink.href)} className="max-sm:hidden" />
@@ -121,10 +123,9 @@ export function AppHeader({ userId, name, email, username, teams, unreadNotifica
           <NotificationBell initialUnread={unreadNotifications} {...(notificationSeed ? { seed: notificationSeed } : {})} />
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={<Button variant="ghost" className="h-9 gap-2 px-1.5" disabled={signingOut} aria-label="Account menu" />}
+              render={<Button variant="ghost" className="size-9 rounded-full p-0" disabled={signingOut} aria-label="Account menu" />}
             >
               <PixelAvatar seed={userId} size={28} />
-              <IconChevronDown className="size-3 text-muted-foreground" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               {/* Base UI requires a group label to sit inside a group. */}
@@ -142,19 +143,22 @@ export function AppHeader({ userId, name, email, username, teams, unreadNotifica
                 <ThemeSwitcher />
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => { router.push("/app/settings"); }} className="px-2 py-2">
+              <AccountLink href="/app/settings" active={pathname.startsWith("/app/settings")}>
                 <IconSettings /> Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { router.push("/app/connections"); }} className="px-2 py-2">
+              </AccountLink>
+              <AccountLink href="/teams" active={pathname.startsWith("/teams")}>
+                <IconUsers /> Teams
+              </AccountLink>
+              <AccountLink href="/app/connections" active={pathname.startsWith("/app/connections")}>
                 <IconKey /> Access tokens
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { router.push("/docs"); }} className="px-2 py-2">
+              </AccountLink>
+              <AccountLink href="/docs" active={false}>
                 <IconBook /> Docs
-              </DropdownMenuItem>
+              </AccountLink>
               {/* `/?home` shows the landing page; a plain `/` sends signed-in people back here. */}
-              <DropdownMenuItem onClick={() => { router.push(landingPageHref); }} className="px-2 py-2">
+              <AccountLink href={landingPageHref} active={false}>
                 <IconExternalLink /> Public site
-              </DropdownMenuItem>
+              </AccountLink>
               <ResetConfirmationsItem />
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => void signOut()} className="px-2 py-2">

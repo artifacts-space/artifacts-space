@@ -121,6 +121,13 @@ function ShareOutcome(props: { artifact: ArtifactDto; visibility: ArtifactVisibi
   return <p className="text-sm leading-5 text-muted-foreground">{text}</p>;
 }
 
+/** The Share button's name and tooltip: it says "Pending" while a change waits for approval, so its name does too. */
+function shareTriggerText(waiting: boolean, visibility: ArtifactDto["visibility"]) {
+  const now = visibilityLabel(visibility);
+  if (waiting) return { "aria-label": "Pending. Share settings", title: `Waiting for approval. Until then: ${now}` };
+  return { "aria-label": "Share settings", title: `Who can read it: ${now}` };
+}
+
 type SaveResult = ActionResult<{ status: "applied" | "pending"; artifact: ArtifactDto }>;
 
 interface SaveChoice {
@@ -203,8 +210,15 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => { setOpen(true); }} className="gap-1.5" aria-label="Share settings">
-        <Icon /> {waiting ? "Pending" : visibilityLabel(artifact.visibility)}
+      {/* The icon says who can read it now (a lock while private, a clock while a change waits); the title spells it out. */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => { setOpen(true); }}
+        className="gap-1.5"
+        {...shareTriggerText(waiting, artifact.visibility)}
+      >
+        <Icon /> {waiting ? "Pending" : "Share"}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-lg">

@@ -21,7 +21,7 @@ describe("upsertListItem", () => {
 });
 
 describe("filteredProjectName", () => {
-  const facets = { projects: [{ key: "launch", name: "Launch", icon: null, count: 2 }], none: 1, total: 3 };
+  const facets = { projects: [{ key: "launch", name: "Launch", icon: null, count: 2 }], none: 1, total: 3, shared: 0, public: 0 };
 
   it("should name the project the list is filtered to", () => {
     expect(filteredProjectName({ key: "launch" }, facets)).toBe("Launch");

@@ -1,11 +1,14 @@
 "use client";
 
-import { IconArrowsHorizontal, IconCode, IconDots, IconLock, IconTransform, IconTrash } from "@tabler/icons-react";
+import { IconArrowsHorizontal, IconCode, IconCopy, IconDots, IconLock, IconTransform, IconTrash } from "@tabler/icons-react";
+import { toast } from "sonner";
 
-import { CopyButton } from "@/components/copy-button";
+import { ShowSidebarButton } from "@/components/app/sidebar-visibility";
 import { HarnessMenu } from "@/components/harness/harness-menu";
 import type { HarnessControl } from "@/components/harness/use-artifact-harness";
 import { OpenPageButton } from "@/components/page-width/open-page-button";
+import { ProjectMark } from "@/components/projects/project-label";
+import { useCopyToClipboard } from "@/components/use-copy-to-clipboard";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
-import type { ArtifactKind } from "@/lib/artifact-types";
+import type { ArtifactKind, ArtifactProjectDto } from "@/lib/artifact-types";
 import { FULL_WIDTH_LABEL, hasWidthSetting } from "@/lib/page-width/rules";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +31,8 @@ export interface SourceToggle {
 }
 
 interface MoreMenuProps {
+  /** The raw content, for Copy content. */
+  content: string;
   source: SourceToggle;
   /** Opens the Format and language dialog. */
   onChangeFormat: () => void;
@@ -39,13 +44,18 @@ interface MoreMenuProps {
 }
 
 /** View source, Format and language, Full width, and Made with for every editor; Delete for the author; Withdraw sharing for a team owner or admin editing a teammate's artifact. */
-function MoreMenu({ source, onChangeFormat, fullWidth, harness, onRequestDelete, onWithdraw }: MoreMenuProps) {
+function MoreMenu({ content, source, onChangeFormat, fullWidth, harness, onRequestDelete, onWithdraw }: MoreMenuProps) {
+  const { copy } = useCopyToClipboard();
+  const copyContent = () => { void copy(content).then((done) => { if (done) toast.success("Copied the content."); }); };
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="More actions" />}>
         <IconDots />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuItem onClick={copyContent} className="py-2">
+          <IconCopy /> Copy content
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={source.onToggle} className="py-2">
           <IconCode /> {source.open ? "Hide source" : "View source"}
         </DropdownMenuItem>
@@ -74,9 +84,11 @@ function MoreMenu({ source, onChangeFormat, fullWidth, harness, onRequestDelete,
 }
 
 interface EditorToolbarProps {
-  id: string;
-  /** For Open, beside copy: the artifact's own page in a new tab. */
+  /** For Open: the artifact's own page in a new tab. */
   publicId: string;
+  /** The breadcrumb: the artifact's project (null when unfiled) and its title. */
+  project: ArtifactProjectDto | null;
+  title: string;
   kind: ArtifactKind;
   content: string;
   /** The share button and dialog (ShareControl). Null for teammates: only the author (or the person who added the agent that wrote it) shares. */
@@ -99,16 +111,36 @@ interface EditorToolbarProps {
   harness: HarnessControl;
   /** Format and language, in the More menu. */
   onChangeFormat: () => void;
-  /** Shown beside the format icon, such as the "Detected CSV · Change" chip. */
+  /** Shown after the breadcrumb, such as the "Detected CSV · Change" chip. */
   notice?: React.ReactNode;
+}
+
+/**
+ * Where the artifact sits: its project (or Unfiled), then its title. The
+ * title is the page's own heading below, so here it is plain text.
+ */
+export function ArtifactBreadcrumb({ project, title }: { project: ArtifactProjectDto | null; title: string }) {
+  return (
+    <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
+      <ol className="flex min-w-0 items-center gap-1.5 text-sm">
+        <li className="flex min-w-0 shrink-0 items-center gap-1.5 text-muted-foreground max-sm:hidden">
+          <ProjectMark name={project?.name ?? null} icon={project?.icon ?? null} />
+          <span className="max-w-48 truncate">{project?.name ?? "Unfiled"}</span>
+          <span aria-hidden>/</span>
+        </li>
+        <li aria-current="page" className="min-w-0 truncate font-medium text-foreground">{title || "Untitled artifact"}</li>
+      </ol>
+    </nav>
+  );
 }
 
 /** The toolbar of a new artifact before it is stored: there is nothing to copy, share, or look back on yet. */
 export function BlankToolbar({ kind, notice, onChangeFormat }: { kind: ArtifactKind; notice?: React.ReactNode; onChangeFormat: () => void }) {
   return (
     <div className={toolbarClass}>
+      <ShowSidebarButton />
       <KindMark kind={kind} />
-      <span className="text-xs text-muted-foreground">New artifact</span>
+      <span className="text-sm font-medium">New artifact</span>
       {notice}
       {/* Start a table, an interface, a diagram, or code directly: the format's starter fills the empty page. */}
       <Button type="button" variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={onChangeFormat}>
@@ -118,7 +150,7 @@ export function BlankToolbar({ kind, notice, onChangeFormat }: { kind: ArtifactK
   );
 }
 
-const toolbarClass = "flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5";
+const toolbarClass = "flex min-h-14 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5";
 
 function KindMark({ kind }: { kind: ArtifactKind }) {
   const KindIcon = kindIcons[kind];
@@ -126,26 +158,26 @@ function KindMark({ kind }: { kind: ArtifactKind }) {
 }
 
 /**
- * The editor's top bar: format icon, short id, copy, history, views, comments,
- * share, and more actions (View source, delete). Changes save on their own,
- * so there is no Save button. On phones the page scrolls, so it sticks under
- * the app header (h-14) to keep History in reach; from md up the /app shell
- * keeps it in place.
+ * The editor's top bar: the breadcrumb (project / title) on the left;
+ * Comments, History, Views, Share, Open, and more actions (Copy content, View
+ * source, Format, Delete) on the right. Changes save on their own, so there
+ * is no Save button. On phones the page scrolls, so it sticks under the app
+ * header (h-14) to keep History in reach; from md up the /app shell keeps it
+ * in place.
  */
-export function EditorToolbar({ id, publicId, kind, content, shareControl, history, comments, views, source, onRequestDelete, onWithdraw, fullWidth, harness, onChangeFormat, notice }: EditorToolbarProps) {
+export function EditorToolbar({ publicId, project, title, kind, content, shareControl, history, comments, views, source, onRequestDelete, onWithdraw, fullWidth, harness, onChangeFormat, notice }: EditorToolbarProps) {
   return (
     <div className={toolbarClass}>
-      <KindMark kind={kind} />
-      <span className="font-mono text-xs text-muted-foreground">{id.slice(0, 8)}</span>
+      <ShowSidebarButton />
+      <ArtifactBreadcrumb project={project} title={title} />
       {notice}
       <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
-        <CopyButton value={content} variant="ghost" size="icon" />
-        <OpenPageButton publicId={publicId} />
+        {comments}
         {history}
         {views}
-        {comments}
         {shareControl}
-        <MoreMenu source={source} onChangeFormat={onChangeFormat} fullWidth={hasWidthSetting(kind) ? fullWidth : null} harness={harness} onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
+        <OpenPageButton publicId={publicId} />
+        <MoreMenu content={content} source={source} onChangeFormat={onChangeFormat} fullWidth={hasWidthSetting(kind) ? fullWidth : null} harness={harness} onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
       </div>
     </div>
   );

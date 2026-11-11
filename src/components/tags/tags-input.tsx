@@ -15,6 +15,8 @@ interface TagsInputProps {
   artifactId: string;
   value: string[];
   onChange: (tags: string[]) => void;
+  /** "chip": one dashed chip around the tags and the field, as under the title in the workspace. */
+  appearance?: "inline" | "chip";
 }
 
 interface TagChange {
@@ -40,6 +42,13 @@ function useScopeTags(artifactId: string) {
       .catch(() => { loaded.current = false; });
   };
   return { tags, load };
+}
+
+/** The field's hint: how many tags is the most, or what to type. The chip says just "Tag". */
+function placeholderFor(full: boolean, count: number, appearance: "inline" | "chip"): string {
+  if (full) return `${String(tagLimits.maxPerArtifact)} tags is the most`;
+  if (appearance === "chip") return count === 0 ? "Tag" : "Add";
+  return count === 0 ? "Add tags" : "Add tag";
 }
 
 /** One tag with its remove button. */
@@ -123,7 +132,7 @@ function useTagSave(artifactId: string, value: string[], onChange: (tags: string
  * uses. Saves at once, without a version or approval. For the artifact's
  * author and team only.
  */
-export function TagsInput({ artifactId, value, onChange }: TagsInputProps) {
+export function TagsInput({ artifactId, value, onChange, appearance = "inline" }: TagsInputProps) {
   const listId = useId();
   const [typed, setTyped] = useState("");
   const [open, setOpen] = useState(false);
@@ -152,7 +161,7 @@ export function TagsInput({ artifactId, value, onChange }: TagsInputProps) {
   }
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1">
+    <div className={cn("flex min-w-0 flex-wrap items-center gap-1", appearance === "chip" && "min-h-7 rounded-lg border border-dashed px-1.5 focus-within:border-solid")}>
       <IconTag aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
       {tags.map((tag) => (
         <TagChip key={tag} tag={tag} disabled={pending} onRemove={() => { save({ add: [], remove: [tag] }); }} />
@@ -165,14 +174,14 @@ export function TagsInput({ artifactId, value, onChange }: TagsInputProps) {
           onBlur={() => { setOpen(false); }}
           onKeyDown={onKeyDown}
           disabled={full}
-          placeholder={full ? `${String(tagLimits.maxPerArtifact)} tags is the most` : tags.length === 0 ? "Add tags" : "Add tag"}
+          placeholder={placeholderFor(full, tags.length, appearance)}
           aria-label="Add a tag"
           role="combobox"
           aria-expanded={options.length > 0}
           aria-controls={listId}
           aria-activedescendant={highlight >= 0 ? `${listId}-${String(highlight)}` : undefined}
           aria-invalid={error ? true : undefined}
-          className="h-6 w-32 rounded-md bg-transparent px-1 text-base text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed sm:text-sm"
+          className={cn("h-6 rounded-md bg-transparent px-1", appearance === "chip" ? "w-20 focus:w-32" : "w-32", "text-base text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed sm:text-sm")}
         />
         {options.length > 0 ? <SuggestionList id={listId} options={options} highlight={highlight} onPick={add} /> : null}
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { IconCheck, IconChevronDown, IconFolderPlus, IconLoader2, IconPlus, IconSettings, IconX } from "@tabler/icons-react";
+import { IconCheck, IconChevronDown, IconFolder, IconFolderPlus, IconLoader2, IconPlus, IconSettings, IconX } from "@tabler/icons-react";
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -13,7 +13,7 @@ import type { ProjectChoice } from "@/lib/projects/store";
 import { cn } from "@/lib/utils";
 
 import { pickerOptions } from "./picker-options";
-import { ProjectIcon, ProjectLabel } from "./project-label";
+import { ProjectIcon, ProjectLabel, ProjectMark } from "./project-label";
 
 interface ProjectPickerProps {
   /** The artifact's internal id. */
@@ -21,6 +21,8 @@ interface ProjectPickerProps {
   value: ArtifactProjectDto | null;
   /** Called with the artifact's project after a change saved. */
   onChange: (project: ArtifactProjectDto | null) => void;
+  /** "chip": a bordered chip, dashed while there is no project, as under the title in the workspace. */
+  appearance?: "inline" | "chip";
 }
 
 /** One row in the list: no project, an existing project, or a new one to create. */
@@ -41,13 +43,27 @@ function choiceFor(row: PickerRow): ProjectChoice {
 }
 
 function RowContent({ row, selectedId }: { row: PickerRow; selectedId: string | null }) {
-  if (row.kind === "none") return <><IconX aria-hidden className="size-3.5 text-muted-foreground" /> No project</>;
+  if (row.kind === "none") return <><IconX aria-hidden className="size-3.5 text-muted-foreground" /> Unfiled</>;
   if (row.kind === "create") return <><IconPlus aria-hidden className="size-3.5 text-muted-foreground" /> Create “{row.name}”</>;
   return (
     <>
       <ProjectIcon icon={row.project.icon} />
       <span className="min-w-0 flex-1 truncate">{row.project.name}</span>
       {row.project.id === selectedId ? <IconCheck aria-label="Current project" className="size-3.5" /> : <span className="text-xs text-muted-foreground">{row.project.count}</span>}
+    </>
+  );
+}
+
+/** What the trigger shows: the project, or the offer to add one. */
+function TriggerLabel({ value, appearance }: { value: ArtifactProjectDto | null; appearance: "inline" | "chip" }) {
+  if (appearance === "chip") {
+    if (!value) return <><IconFolder aria-hidden className="size-3.5" /> Add to project</>;
+    return <span className="inline-flex min-w-0 items-center gap-1.5 text-foreground"><ProjectMark name={value.name} icon={value.icon} /><span className="truncate">{value.name}</span></span>;
+  }
+  return (
+    <>
+      {value ? <ProjectLabel name={value.name} icon={value.icon} className="text-foreground" /> : <><IconFolderPlus aria-hidden className="size-3.5" /> Add to project</>}
+      <IconChevronDown aria-hidden className="size-3 opacity-60" />
     </>
   );
 }
@@ -82,7 +98,7 @@ function useChoices(artifactId: string) {
  * name, or clear it. Saves at once, without a version or approval. For the
  * artifact's author and team only.
  */
-export function ProjectPicker({ artifactId, value, onChange }: ProjectPickerProps) {
+export function ProjectPicker({ artifactId, value, onChange, appearance = "inline" }: ProjectPickerProps) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [highlight, setHighlight] = useState(0);
@@ -129,14 +145,16 @@ export function ProjectPicker({ artifactId, value, onChange }: ProjectPickerProp
         render={
           <button
             type="button"
-            aria-label={value ? `Project: ${value.name}. Change project` : "Add to a project"}
-            className="-ml-1.5 inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg px-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-[popup-open]:bg-muted"
+            aria-label={value ? `Project: ${value.name}. Change project` : "Add to project"}
+            className={cn(
+              "inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg px-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-[popup-open]:bg-muted",
+              appearance === "chip" ? cn("border px-2", value ? null : "border-dashed") : "-ml-1.5",
+            )}
           />
         }
       >
         {pending ? <IconLoader2 aria-hidden className="size-3.5 animate-spin" /> : null}
-        {value ? <ProjectLabel name={value.name} icon={value.icon} className="text-foreground" /> : <><IconFolderPlus aria-hidden className="size-3.5" /> Add to a project</>}
-        <IconChevronDown aria-hidden className="size-3 opacity-60" />
+        <TriggerLabel value={value} appearance={appearance} />
       </PopoverTrigger>
       <PopoverContent align="start" sideOffset={6} className="w-72 p-0">
         <PopoverTitle className="sr-only">Choose a project</PopoverTitle>

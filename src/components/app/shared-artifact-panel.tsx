@@ -19,11 +19,14 @@ import { ViewsDialog } from "@/components/views/views-dialog";
 import { OpenPageButton } from "@/components/page-width/open-page-button";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { mayExportCsv } from "@/lib/csv-export/rules";
-import { usesFullWidth } from "@/lib/page-width/rules";
+import { previewColumnClass, usesFullWidth } from "@/lib/page-width/rules";
 import { artifactPageHref } from "@/lib/artifact-page-href";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
+import { ArtifactBreadcrumb } from "./artifact-editor/editor-toolbar";
 import { PreviewSurface } from "./artifact-editor/preview-surface";
+import { ShowSidebarButton } from "./sidebar-visibility";
+import { KindChip } from "@/components/projects/artifact-organizers";
 import { detailBody, detailOuter, detailSection } from "./artifact-editor/detail-scroll";
 import { useEditAccess, useWithdrawSharing } from "./use-edit-access";
 import { useRenderTheme } from "./use-render-theme";
@@ -56,29 +59,59 @@ interface SharedArtifactPanelProps {
   onWithdrawn: (id: string) => void;
 }
 
-/**
- * View of an artifact someone else shared with the viewer's team. Members
- * who may edit it see its history and can restore a version. Owners and
- * admins of that team can make it private again.
- */
 /** Copy, unless the owner turned downloads off for this reader. */
 function PanelCopy({ content, shown }: { content: string; shown: boolean }) {
   return shown ? <CopyButton value={content} variant="ghost" size="icon" /> : null;
 }
 
+/** The title (a link to its page), summary, format and tags, and the meta line, in the content's column. */
+function PanelHeader({ artifact, column, status }: { artifact: ArtifactDto; column: string; status: React.ReactNode }) {
+  const length = artifact.content.length;
+  return (
+    <div className="pt-6 pb-1 sm:pt-10">
+      <div className={column}>
+        <ArtifactIcon icon={artifact.icon} size="heading" className="mb-2 block" />
+        <h2 className="text-3xl leading-tight font-semibold tracking-[-0.02em] sm:text-4xl">
+          <a href={artifactPageHref(artifact.publicId)} target="_blank" rel="noopener noreferrer" className="hover:underline">{artifact.title}</a>
+        </h2>
+        {artifact.summary ? <p className="mt-2 text-md leading-6 text-muted-foreground">{artifact.summary}</p> : null}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <KindChip kind={artifact.kind} />
+          {artifact.tags.map((tag) => <span key={tag} className="inline-flex h-7 items-center rounded-lg border px-2 text-sm text-muted-foreground">{tag}</span>)}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-3 text-xs text-muted-foreground">
+          <LastEdited editor={artifact.updatedBy} at={artifact.updatedAt} />
+          <HarnessByline harness={artifact.harness} className="text-xs" />
+          <span aria-hidden>·</span>
+          <span>{length.toLocaleString()} {length === 1 ? "char" : "chars"}</span>
+          <span aria-hidden>·</span>
+          {status}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * View of an artifact someone else shared with the viewer's team. Members
+ * who may edit it see its history and can restore a version. Owners and
+ * admins of that team can make it private again.
+ */
 export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn }: SharedArtifactPanelProps) {
   const { team, canEdit, canWithdraw, seesComments } = useEditAccess(artifact, viewerId);
   const { withdrawing, withdraw } = useWithdrawSharing(artifact.id, onWithdrawn);
   const theme = useRenderTheme(artifact);
   // A CSV whose owner turned downloads off: no Copy, and the grid copies nothing, for a reader who cannot edit it.
   const exportable = mayExportCsv({ canEdit }, artifact);
+  const column = previewColumnClass(usesFullWidth(artifact.kind, artifact.fullWidth));
 
   return (
     <section className={detailSection} aria-label={artifact.title}>
-      <div className="flex min-h-12 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5">
-        <PanelStatus artifact={artifact} teamName={team?.name ?? null} canEdit={canEdit} />
+      <div className="flex min-h-14 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5">
+        <ShowSidebarButton />
+        <ArtifactBreadcrumb project={artifact.project} title={artifact.title} />
         <div className="ml-auto flex items-center gap-1">
-          <PanelCopy content={artifact.content} shown={exportable} />
+          {seesComments ? <CommentsDialog publicId={artifact.publicId} title={artifact.title} seesComments offNotice="" /> : null}
           {canEdit ? (
             <>
               <VersionHistory
@@ -92,28 +125,18 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
               <ViewsDialog publicId={artifact.publicId} title={artifact.title} />
             </>
           ) : null}
-          {seesComments ? <CommentsDialog publicId={artifact.publicId} title={artifact.title} seesComments offNotice="" /> : null}
-          <OpenPageButton publicId={artifact.publicId} />
           {canWithdraw ? <CommentsControl artifact={artifact} team={team} onUpdated={onUpdated} /> : null}
           {canWithdraw ? (
             <Button variant="outline" size="sm" disabled={withdrawing} onClick={() => void withdraw()}>
               {withdrawing ? <IconLoader2 className="animate-spin" /> : <IconLock />} Withdraw sharing
             </Button>
           ) : null}
+          <PanelCopy content={artifact.content} shown={exportable} />
+          <OpenPageButton publicId={artifact.publicId} />
         </div>
       </div>
       <div data-slot="detail-outer" className={detailOuter}>
-        <div className="border-b px-5 py-5 sm:px-7">
-          <ArtifactIcon icon={artifact.icon} size="heading" className="mb-2 block" />
-          <h2 className="text-2xl font-medium tracking-[-0.015em]">
-            <a href={artifactPageHref(artifact.publicId)} target="_blank" rel="noopener noreferrer" className="hover:underline">{artifact.title}</a>
-          </h2>
-          {artifact.summary ? <p className="mt-2 text-md leading-6 text-muted-foreground">{artifact.summary}</p> : null}
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <LastEdited editor={artifact.updatedBy} at={artifact.updatedAt} />
-            <HarnessByline harness={artifact.harness} className="text-xs" />
-          </div>
-        </div>
+        <PanelHeader artifact={artifact} column={column} status={<PanelStatus artifact={artifact} teamName={team?.name ?? null} canEdit={canEdit} />} />
         {/* Read only, so nothing in the pane takes focus first: the pane does, for keyboard scrolling. */}
         <div data-slot="detail-body" role="region" aria-label="Content" tabIndex={0} className={detailBody}>
           <PreviewSurface theme={theme} fullWidth={usesFullWidth(artifact.kind, artifact.fullWidth)} className="py-6 sm:py-8">

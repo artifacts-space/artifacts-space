@@ -7,7 +7,7 @@ import type { ProjectFacets } from "@/lib/projects/queries";
 import type { ProjectFilter } from "@/lib/projects/rules";
 import { homeSpaceOf, type SidebarProject, type SidebarProjectRow } from "@/lib/projects/sidebar-rules";
 
-import type { CardMoves } from "./artifact-list";
+import type { CardMoves } from "./tree-artifact";
 import type { ProjectsApi } from "./projects-api";
 import type { ShareTeam } from "./share-teams-context";
 import { useMediaQuery } from "./use-media-query";

@@ -17,6 +17,8 @@ export interface ShareTeam {
   kind: ActorKind;
   capabilities: readonly TeamCapability[];
   teamSharingNeedsApproval: boolean;
+  /** The members-only icon URL, for the workspace switcher; null or left out for the monogram. */
+  iconUrl?: string | null;
 }
 
 const ShareTeamsContext = createContext<readonly ShareTeam[]>([]);
