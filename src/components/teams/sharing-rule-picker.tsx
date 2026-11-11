@@ -10,7 +10,7 @@ const options = [
 
 /** What stays the same whichever option is chosen. Shown under the picker. */
 export const sharingRuleFootnote =
-  "Either way, everyone in the team edits the team's artifacts directly. Sharing by link or in public needs an owner's or admin's approval.";
+  "Either way, everyone in the team edits the team's artifacts directly. Sharing by link or in public needs an owner's or admin's approval, unless someone's role allows it.";
 
 /** Two-choice control for a team's sharing rule. */
 export function SharingRulePicker({

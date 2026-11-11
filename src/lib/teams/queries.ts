@@ -211,23 +211,27 @@ export interface PendingInvitationView {
   expired: boolean;
 }
 
+const MS_PER_DAY = 86_400_000;
+
 /**
  * Unanswered invitations for a team: open ones, then recently expired ones,
- * so the inviter can see an invitation ran out and send a new one. Callers
- * must check the viewer may invite people (`can(member, "members.invite")`).
+ * so the inviter can see an invitation ran out and send a new one. One row
+ * per address, the one created last. Callers must check the viewer may
+ * invite people (`can(member, "members.invite")`).
  */
 export async function listPendingInvitations(teamId: string, now = new Date()): Promise<PendingInvitationView[]> {
-  const shownSince = new Date(now.getTime() - EXPIRED_INVITATION_DAYS * 86_400_000);
+  const shownSince = new Date(now.getTime() - EXPIRED_INVITATION_DAYS * MS_PER_DAY);
   const rows = await getDb()
     .select({ id: teamInvitation.id, email: teamInvitation.email, role: teamInvitation.role, expiresAt: teamInvitation.expiresAt })
     .from(teamInvitation)
     .where(and(eq(teamInvitation.teamId, teamId), eq(teamInvitation.status, "pending"), gt(teamInvitation.expiresAt, shownSince)))
-    .orderBy(desc(teamInvitation.expiresAt));
+    .orderBy(desc(teamInvitation.createdAt));
   const views = rows.map((row) => ({ ...row, role: parseTeamRole(row.role), expiresAt: row.expiresAt.toISOString(), expired: row.expiresAt <= now }));
-  return newestPerEmail(views);
+  const latest = newestPerEmail(views);
+  return [...latest.filter((view) => !view.expired), ...latest.filter((view) => view.expired)];
 }
 
-/** Keeps one row per address, the newest: an expired invitation hides behind a newer one to the same person. */
+/** Keeps one row per address, the first in creation order (newest first): an expired invitation hides behind a newer one to the same person. */
 function newestPerEmail(views: PendingInvitationView[]): PendingInvitationView[] {
   const seen = new Set<string>();
   return views.filter((view) => {

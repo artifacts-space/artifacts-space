@@ -38,8 +38,8 @@ describe.runIf(Boolean(databaseUrl))("invitation queries with a database", async
       { id: otherTeam, name: "Other team", slug: otherTeam, personal: false },
     ]);
     await db.insert(teamMember).values([{ id: id("m-owner"), teamId, userId: owner, role: "owner" }]);
-    const invite = (name: string, email: string, status: string, expiresIn: number, role = "member", team = teamId) =>
-      ({ id: id(name), teamId: team, email, role, status, expiresAt: at(expiresIn), inviterId: owner, createdAt: at(expiresIn - 7) });
+    const invite = (name: string, email: string, status: string, expiresIn: number, role = "member", team = teamId, createdIn = expiresIn - 7) =>
+      ({ id: id(name), teamId: team, email, role, status, expiresAt: at(expiresIn), inviterId: owner, createdAt: at(createdIn) });
     await db.insert(teamInvitation).values([
       invite("open", "ann@example.com", "pending", 5),
       invite("open-admin", "lead@example.com", "pending", 6, "admin"),
@@ -50,6 +50,9 @@ describe.runIf(Boolean(databaseUrl))("invitation queries with a database", async
       // An address that expired, then got a fresh invitation: only the fresh one shows.
       invite("again-old", "again@example.com", "pending", -2),
       invite("again-new", "again@example.com", "pending", 7),
+      // Two open rows for one address, the older one resent so it expires later: the one created last is shown.
+      invite("resent-older", "resent@example.com", "pending", 6.9, "admin", teamId, -20),
+      invite("resent-newer", "resent@example.com", "pending", 4, "member", teamId, -3),
       invite("elsewhere", "ann@example.com", "pending", 5, "member", otherTeam),
     ]);
   });
@@ -83,13 +86,14 @@ describe.runIf(Boolean(databaseUrl))("invitation queries with a database", async
     expect(await isInTeam(owner, otherTeam)).toBe(false);
   });
 
-  it("should list open invitations first, then ones expired in the last 30 days, one per address", async () => {
+  it("should list open invitations first, then ones expired in the last 30 days, one per address, newest created first", async () => {
     const rows = await listPendingInvitations(teamId, new Date(now));
-    expect(rows.map((row) => [row.email, row.expired])).toEqual([
-      ["again@example.com", false],
-      ["lead@example.com", false],
-      ["ann@example.com", false],
-      ["late@example.com", true],
+    expect(rows.map((row) => [row.email, row.expired, row.role])).toEqual([
+      ["again@example.com", false, "member"],
+      ["lead@example.com", false, "admin"],
+      ["ann@example.com", false, "member"],
+      ["resent@example.com", false, "member"],
+      ["late@example.com", true, "member"],
     ]);
   });
 });
