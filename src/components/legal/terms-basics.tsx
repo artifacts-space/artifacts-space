@@ -37,7 +37,7 @@ export function TermsBasics() {
       <LegalH doc={doc} id="accounts" />
       <Prose>
         <p>
-          You sign in with GitHub or with a link we email you. There are no passwords, so the security of your account depends on your email and GitHub accounts. Keep them secure. You are responsible for everything done through your account, including by access tokens you create and apps you connect. Tell us at once at <Mail to={legalContact.legalEmail} /> if you think someone else is using your account.
+          You sign in with GitHub, with Google, or with a link we email you. There are no passwords, so the security of your account depends on your email, GitHub, and Google accounts. Keep them secure. You are responsible for everything done through your account, including by access tokens you create and apps you connect. Tell us at once at <Mail to={legalContact.legalEmail} /> if you think someone else is using your account.
         </p>
         <p>
           Give accurate information, and do not create accounts to get around limits or enforcement. Your username is public to the people who can see your work. We may reclaim or change a username that impersonates someone, infringes a trademark, or misleads people.

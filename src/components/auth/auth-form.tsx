@@ -5,16 +5,20 @@ import { IconBrandGithub, IconLoader2, IconMailCheck } from "@tabler/icons-react
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
+import { GoogleMark } from "@/components/auth/google-mark";
 import { ConsentNotice } from "@/components/legal-links";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth/client";
 import { isDevSignInEnabled } from "@/lib/auth/dev-user";
+import { signInErrorMessage } from "@/lib/auth/sign-in-error-rules";
 import { safeNextPath, withNextPath } from "@/lib/safe-next";
+import { cn } from "@/lib/utils";
 
 type AuthMode = "sign-in" | "sign-up";
-type Pending = "github" | "email" | null;
+type SocialProvider = "github" | "google";
+type Pending = SocialProvider | "email" | null;
 
 const copy = {
   "sign-up": {
@@ -47,6 +51,12 @@ export function validateEmail(email: string): string | null {
 function workspaceUrl() {
   const next = safeNextPath(new URLSearchParams(window.location.search).get("next"));
   return new URL(next ?? "/app", window.location.origin).href;
+}
+
+/** Where GitHub or Google sends a refused sign-in: this page, keeping `?next=`. Better Auth adds `?error=`. */
+function errorReturnUrl() {
+  const next = new URLSearchParams(window.location.search).get("next");
+  return new URL(withNextPath(window.location.pathname, next), window.location.origin).href;
 }
 
 function CheckEmail({ email, onBack }: { email: string; onBack: () => void }) {
@@ -114,28 +124,57 @@ function InvitationHint() {
   );
 }
 
-function ErrorMessage({ message }: { message: string }) {
+function ErrorMessage({ message, className }: { message: string; className?: string }) {
   if (!message) return null;
   return (
-    <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive">
+    <p role="alert" className={cn("rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive", className)}>
       {message}
     </p>
   );
 }
 
-/** Sign in or sign up with GitHub or an emailed magic link. */
-export function AuthForm({ mode }: { mode: AuthMode }) {
+/** Why GitHub or Google sent the person back here (`?error=`), in the page's own words. */
+function ProviderErrorFromQuery() {
+  const message = signInErrorMessage(useSearchParams().get("error"));
+  return message ? <ErrorMessage message={message} className="mb-4" /> : null;
+}
+
+/** The provider error; nothing shows until the query string is read in the browser. */
+function ProviderError() {
+  return (
+    <Suspense fallback={null}>
+      <ProviderErrorFromQuery />
+    </Suspense>
+  );
+}
+
+function SocialButton({ provider, pending, onClick }: { provider: SocialProvider; pending: Pending; onClick: (provider: SocialProvider) => void }) {
+  const icon = provider === "github" ? <IconBrandGithub /> : <GoogleMark />;
+  return (
+    <Button type="button" variant="outline" onClick={() => { onClick(provider); }} disabled={pending !== null} className="h-10 w-full text-sm">
+      {pending === provider ? <IconLoader2 className="animate-spin" /> : icon}
+      Continue with {provider === "github" ? "GitHub" : "Google"}
+    </Button>
+  );
+}
+
+/**
+ * Sign in or sign up with GitHub, Google, or an emailed magic link. Google
+ * shows only when the page says it is configured (`isGoogleSignInEnabled`),
+ * so a deploy without it never offers a button that cannot work.
+ */
+export function AuthForm({ mode, googleEnabled }: { mode: AuthMode; googleEnabled: boolean }) {
   const text = copy[mode];
   const [email, setEmail] = useState("");
   const [sentTo, setSentTo] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState<Pending>(null);
 
-  async function continueWithGitHub() {
-    setPending("github");
+  async function continueWith(provider: SocialProvider) {
+    setPending(provider);
     setError("");
     try {
-      const { error: failure } = await authClient.signIn.social({ provider: "github", callbackURL: workspaceUrl() });
+      const { error: failure } = await authClient.signIn.social({ provider, callbackURL: workspaceUrl(), errorCallbackURL: errorReturnUrl() });
       if (failure) setError(failure.message ?? genericError);
     } catch {
       setError(genericError);
@@ -143,6 +182,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       setPending(null);
     }
   }
+
+  const startSocial = (provider: SocialProvider) => void continueWith(provider);
 
   async function sendLink(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -177,10 +218,11 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         <InvitationHint />
       </div>
 
-      <Button type="button" variant="outline" onClick={() => void continueWithGitHub()} disabled={pending !== null} className="h-10 w-full text-sm">
-        {pending === "github" ? <IconLoader2 className="animate-spin" /> : <IconBrandGithub />}
-        Continue with GitHub
-      </Button>
+      {error || pending ? null : <ProviderError />}
+      <div className="space-y-3">
+        <SocialButton provider="github" pending={pending} onClick={startSocial} />
+        {googleEnabled ? <SocialButton provider="google" pending={pending} onClick={startSocial} /> : null}
+      </div>
       <DevSignIn />
 
       <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">

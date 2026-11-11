@@ -326,7 +326,7 @@ export const docsPages = [
   {
     slug: "self-hosting",
     title: "Self-hosting",
-    description: "Run your own artifacts.space on Vercel with Neon Postgres, Better Auth, GitHub sign-in, Cloudflare R2, and Sendir.",
+    description: "Run your own artifacts.space on Vercel with Neon Postgres, Better Auth, GitHub and Google sign-in, Cloudflare R2, and Sendir.",
     section: "Run it",
     source: app("self-hosting/"),
     headings: [

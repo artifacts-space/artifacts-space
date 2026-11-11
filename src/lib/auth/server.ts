@@ -10,6 +10,7 @@ import { sessionHooks } from "@/lib/auth/agent-guards";
 import { sendMagicLinkEmail } from "@/lib/auth/magic-link-email";
 import { oauthPlugins } from "@/lib/auth/oauth-plugins";
 import { sessionConfig } from "@/lib/auth/session-config";
+import { accountHooks, accountLinking, socialAuthEnv, socialProviders, socialSignInGuard, validateUserInfo } from "@/lib/auth/social-auth-options";
 import { teamDepartureHook } from "@/lib/auth/team-departure";
 import { closedTeamRoutesHook } from "@/lib/auth/closed-team-routes";
 import { teamRoutesClosedOverHttp, teamsPlugin } from "@/lib/auth/teams-plugin";
@@ -36,20 +37,6 @@ const authSchema = {
   oauthClientAssertion: oauthSchema.oauthClientAssertion,
 };
 
-function githubProvider() {
-  const clientId = process.env.GITHUB_CLIENT_ID;
-  const clientSecret = process.env.GITHUB_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return {};
-  return {
-    github: {
-      clientId,
-      clientSecret,
-      // The GitHub login is the preferred username. The create hook checks it.
-      mapProfileToUser: (profile: { login: string }) => ({ username: profile.login }),
-    },
-  };
-}
-
 function createAuth() {
   return betterAuth({
     appName: "artifacts.space",
@@ -57,17 +44,19 @@ function createAuth() {
     ...(process.env.BETTER_AUTH_URL ? { baseURL: process.env.BETTER_AUTH_URL } : {}),
     database: drizzleAdapter(getDb(), { provider: "pg", schema: authSchema }),
     session: sessionConfig,
-    // Sign-in is GitHub or an emailed link. There are no passwords.
+    // Sign-in is GitHub, Google, or an emailed link. There are no passwords.
     emailAndPassword: { enabled: false },
-    socialProviders: githubProvider(),
+    socialProviders: socialProviders(socialAuthEnv()),
+    account: { accountLinking },
     user: {
+      validateUserInfo,
       additionalFields: {
         // Settable on create only (the GitHub mapping). The update hook drops it.
         username: { type: "string", required: false, unique: true },
         usernameConfirmed: { type: "boolean", required: false, defaultValue: false, input: false },
       },
     },
-    databaseHooks: { user: userHooks, session: sessionHooks },
+    databaseHooks: { user: userHooks, session: sessionHooks, account: accountHooks },
     hooks: { before: closedTeamRoutesHook, after: teamDepartureHook },
     disabledPaths: teamRoutesClosedOverHttp,
     plugins: [
@@ -76,6 +65,7 @@ function createAuth() {
         sendMagicLink: ({ email, url, token }) => sendMagicLinkEmail({ email, url, token }),
       }),
       teamsPlugin(),
+      socialSignInGuard(),
       ...oauthPlugins(),
       // Must stay last so server actions can set auth cookies.
       nextCookies(),
