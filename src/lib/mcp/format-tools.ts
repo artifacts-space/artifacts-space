@@ -56,6 +56,12 @@ export const MARKDOWN_DIAGRAM_GUIDE = [
   "```",
   "Start the source with the diagram type (flowchart TD, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, gantt, pie, mindmap). Keep the diagram in the document: do not publish it as a separate mermaid artifact and link to it.",
   "The Markdown keeps the fenced source exactly as written, so you read and edit it as text. If Mermaid cannot read it, readers see the source as code with a short note. artifacts_validate with kind \"mermaid\" checks that it starts with a diagram type.",
+  "Optional attributes go in braces at the end of the fence line, after the language:",
+  "```mermaid {view=split caption=\"How a change ships\"}",
+  "- view: how the block shows to every reader. preview (the default) shows the diagram; code shows only the source as a code block; split shows the source and the diagram side by side, stacked on phones. Leave it out for the diagram.",
+  "- caption: one line of plain text shown under the block, in double quotes; write \\\" for a quote and \\\\ for a backslash. Captions work on any fenced code block.",
+  "- wrap=true: long lines of code wrap instead of scrolling sideways (any code block).",
+  "Unknown attributes and values are kept and ignored. Keep the language first: ```mermaid {view=code}, not ```{view=code}.",
 ].join("\n");
 
 /** How agents color lines in Markdown: a color comment at the end of the line's text (markdown-dialect.md, "Block colors"). */

@@ -54,6 +54,8 @@ interface DiagramOptions {
   keepPrevious?: boolean;
   /** Wait until the diagram is near the viewport before drawing: for documents, which can hold many. */
   deferUntilNear?: boolean;
+  /** Draw nothing (and never load Mermaid) while true: a block showing only its source. */
+  skip?: boolean;
 }
 
 /**
@@ -63,7 +65,7 @@ interface DiagramOptions {
  * Mermaid loads only on the first draw. Renders run one at a time, so
  * documents defer each diagram until it nears the viewport.
  */
-export function useMermaidDiagram(code: string, { keepPrevious = false, deferUntilNear = false }: DiagramOptions = {}): MermaidDiagram {
+export function useMermaidDiagram(code: string, { keepPrevious = false, deferUntilNear = false, skip = false }: DiagramOptions = {}): MermaidDiagram {
   const dark = useDarkTheme();
   const themeKey = useThemeKey();
   const key = `${dark ? "dark" : "light"}:${themeKey}:${code}`;
@@ -75,7 +77,7 @@ export function useMermaidDiagram(code: string, { keepPrevious = false, deferUnt
 
   useEffect(() => {
     const element = scopeRef.current;
-    if (sourceProblem || !near || !element) return undefined;
+    if (skip || sourceProblem || !near || !element) return undefined;
     let cancelled = false;
     diagramStyle(element)
       .then((style) => renderMermaid(code, style))
@@ -88,7 +90,7 @@ export function useMermaidDiagram(code: string, { keepPrevious = false, deferUnt
         if (!cancelled) setOutcome({ key, error: error instanceof Error ? error.message : "Mermaid could not read this diagram." });
       });
     return () => { cancelled = true; };
-  }, [code, key, near, sourceProblem]);
+  }, [code, key, near, skip, sourceProblem]);
 
   const current = outcome?.key === key ? outcome : null;
   return { scopeRef, state: diagramState(sourceProblem, current, keepPrevious ? lastDrawn : null) };

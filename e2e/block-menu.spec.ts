@@ -101,7 +101,8 @@ test("should open the block menu from the grip with no row highlighted", async (
       const sheet = await menu(page).boundingBox();
       return sheet ? Math.round(sheet.y + sheet.height) : 0;
     }).toBe(viewport?.height);
-    expect((await menu(page).getByRole("menuitem", { name: "Duplicate" }).boundingBox())?.height).toBe(44);
+    // Measured while the sheet may still be sliding in, so rounded.
+    await expect.poll(async () => Math.round((await menu(page).getByRole("menuitem", { name: "Duplicate" }).boundingBox())?.height ?? 0)).toBe(44);
   }
 });
 

@@ -60,7 +60,7 @@ describe("colorChoiceLabel", () => {
 
   it("should shorten what a submenu row shows under its section label", () => {
     expect(colorChoiceLabel("color", "red", "inSection")).toBe("Red");
-    expect(colorChoiceLabel("background", "red", "inSection")).toBe("Red background");
+    expect(colorChoiceLabel("background", "red", "inSection")).toBe("Red");
     expect(colorChoiceLabel("background", null, "inSection")).toBe("Default");
   });
 });

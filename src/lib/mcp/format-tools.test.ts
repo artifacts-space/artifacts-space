@@ -27,6 +27,9 @@ describe("formatGuide", () => {
     const guide = formatGuide("markdown");
     expect(guide).toContain("```mermaid\nflowchart TD");
     expect(guide).toContain("do not publish it as a separate mermaid artifact");
+    expect(guide).toContain("```mermaid {view=split caption=\"How a change ships\"}");
+    expect(guide).toMatch(/view: .*preview \(the default\).*code shows only the source.*split shows the source and the diagram/u);
+    expect(guide).toContain("wrap=true");
     expect(formatGuide()).toContain("A fenced code block with the language `mermaid` draws as a diagram");
   });
 

@@ -59,7 +59,9 @@ describe("MarkdownDiagramBody", () => {
   it("should show the drawn diagram only as an image when Mermaid succeeds", () => {
     const html = renderToStaticMarkup(<MarkdownDiagramBody code={flowchart} state={{ status: "drawn", diagram: { svg: drawnSvg, width: 120, height: 40, smallestFont: 14 } }} />);
     expect(html).toContain('src="data:image/svg+xml');
-    expect(html).not.toContain("<svg");
+    // The diagram's own SVG is never inlined (the only inline SVG is the zoom button's icon).
+    expect(html).not.toContain('viewBox="0 0 120 40"');
+    expect(html).not.toContain("<text");
     expect(html).not.toContain("Couldn’t draw");
   });
 
@@ -82,5 +84,71 @@ describe("MarkdownDiagramBody", () => {
     expect(html).toContain("data-code-block");
     expect(html).toContain("A -- &gt; B");
     expect(html).not.toContain("<img");
+  });
+});
+
+/** A document with one mermaid fence whose info string is `info`. */
+const fenced = (info: string) => `\`\`\`${info}\n${flowchart}\n\`\`\`\n`;
+
+describe("Mermaid views in the Markdown read view", () => {
+  it.each(["mermaid", "mermaid {view=preview}", "mermaid {view=sideways}"])("should show only the diagram when the fence is %s", (info) => {
+    const html = renderToStaticMarkup(<ArtifactView kind="markdown" content={fenced(info)} />);
+    expect(html).toContain('data-diagram-view="preview"');
+    expect(html).toContain("data-markdown-diagram");
+    expect(html).not.toContain("data-code-block");
+  });
+
+  it("should show only the source as a code block, and never start drawing, when the view is code", () => {
+    const html = renderToStaticMarkup(<ArtifactView kind="markdown" content={fenced("mermaid {view=code}")} />);
+    expect(html).toContain('data-diagram-view="code"');
+    expect(html).toContain("data-code-block");
+    expect(html).toContain("flowchart TD");
+    expect(html).not.toContain("data-markdown-diagram");
+    expect(html).not.toContain("Drawing diagram…");
+  });
+
+  it("should show the source and the diagram together, with the source only once, when the view is split", () => {
+    const html = renderToStaticMarkup(<ArtifactView kind="markdown" content={fenced("mermaid {view=split}")} />);
+    expect(html).toContain('data-diagram-view="split"');
+    expect(html).toContain("data-diagram-split");
+    expect(html.match(/data-code-block/g)).toHaveLength(1);
+    expect(html).toContain("Drawing diagram…");
+    // The code block beside the diagram already gives screen readers the source.
+    expect(html).not.toContain("Diagram source, in Mermaid:");
+    // Side by side only when the block is wide: it stacks in a narrow column.
+    expect(html).toMatch(/class="[^"]*@container/u);
+    expect(html).toMatch(/class="[^"]*@xl:grid-cols-2/u);
+  });
+
+  it("should show the caption below the diagram, with escaped quotes read as written", () => {
+    const html = renderToStaticMarkup(<ArtifactView kind="markdown" content={fenced('mermaid {view=split caption="Say \\"ship\\" now"}')} />);
+    expect(html).toMatch(/<figcaption[^>]*>Say &quot;ship&quot; now<\/figcaption><\/figure>/u);
+  });
+
+  it("should show the caption and wrap long lines when a plain code block asks for them", () => {
+    const html = renderToStaticMarkup(<ArtifactView kind="markdown" content={'```ts {wrap=true caption="The answer"}\nconst x = 1;\n```\n'} />);
+    expect(html).toContain("data-code-figure");
+    expect(html).toContain("whitespace-pre-wrap");
+    expect(html).toMatch(/<figcaption[^>]*>The answer<\/figcaption>/u);
+  });
+
+  it("should read the attributes as written when the fence sits in a quote or uses Windows line endings", () => {
+    const quoted = renderToStaticMarkup(<ArtifactView kind="markdown" content={'> ```mermaid {view=code caption="Quoted"}\n> graph LR\n>   A --> B\n> ```\n'} />);
+    expect(quoted).toContain('data-diagram-view="code"');
+    expect(quoted).toMatch(/<figcaption[^>]*>Quoted<\/figcaption>/u);
+    const crlf = renderToStaticMarkup(<ArtifactView kind="markdown" content={"```mermaid {view=split}\r\ngraph LR\r\n  A --> B\r\n```\r\n"} />);
+    expect(crlf).toContain('data-diagram-view="split"');
+  });
+
+  it("should keep a code block without attributes as it was", () => {
+    const html = renderToStaticMarkup(<ArtifactView kind="markdown" content={"```ts\nconst x = 1;\n```\n"} />);
+    expect(html).not.toContain("data-code-figure");
+    expect(html).not.toContain("whitespace-pre-wrap");
+  });
+
+  it("should offer zoom on a drawn diagram in a document", () => {
+    const html = renderToStaticMarkup(<MarkdownDiagramBody code={flowchart} state={{ status: "drawn", diagram: { svg: drawnSvg, width: 120, height: 40, smallestFont: 14 } }} />);
+    expect(html).toContain('aria-label="Zoom in"');
+    expect(html).toContain("cursor-zoom-in");
   });
 });

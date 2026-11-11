@@ -11,12 +11,14 @@ import type { MentionKind } from "@/lib/comments/mentions";
 import { remarkMentions } from "@/lib/comments/remark-mentions";
 import { isFileLinkPath, isFileMediaUrl } from "@/lib/files/media-rules";
 import { safeHref } from "@/lib/link-policy";
+import { parseFenceInfo, type FenceInfo } from "@/lib/markdown/fence-info";
 import { isMermaidLanguage } from "@/lib/markdown/mermaid-fence";
+import { remarkFenceInfo } from "@/lib/markdown/remark-fence-info";
 import { cn } from "@/lib/utils";
 
 import { ExternalLink } from "./external-link";
 import { InlineFileImage, MarkdownMedia } from "./markdown-media";
-import { MarkdownMermaid } from "./markdown-mermaid";
+import { BlockCaption, MarkdownMermaid } from "./markdown-mermaid";
 
 /** A resolved @mention: a subtle chip. Agents get a robot icon and their own hue. */
 function MentionChip({ kind, children }: { kind: MentionKind; children: React.ReactNode }) {
@@ -43,30 +45,37 @@ function textOf(node: HastNode): string {
 }
 
 /** The language from a fenced block's `language-*` class, if any. */
-function fenceLanguage(className: unknown): string | undefined {
+function classLanguage(className: unknown): string | undefined {
   const classes = Array.isArray(className) ? className : [];
   const match = classes.find((name): name is string => typeof name === "string" && name.startsWith("language-"));
   return match?.slice("language-".length);
 }
 
-/** A fenced block's code and language, or null when the `pre` holds no code. */
-function fencedCodeOf(node: ExtraProps["node"]): { text: string; language: string | undefined } | null {
+/** A fenced block's code, language, and attributes (from the fence line as written), or null when the `pre` holds no code. */
+function fencedCodeOf(node: ExtraProps["node"]): { text: string; language: string | undefined; info: FenceInfo } | null {
   const code = node?.children.find((child) => child.type === "element" && child.tagName === "code");
   if (code?.type !== "element") return null;
-  return { text: textOf(code), language: fenceLanguage(code.properties.className) };
+  const info = parseFenceInfo(code.properties.dataFenceInfo);
+  return { text: textOf(code), language: classLanguage(code.properties.className), info };
 }
 
-/** A fenced code block, drawn by the shared CodeBlock and highlighted on the server when it can be. */
+/**
+ * A fenced code block, drawn by the shared CodeBlock and highlighted on the
+ * server when it can be. `wrap=true` wraps long lines, and a caption shows
+ * below (markdown-dialect.md, "Code block attributes").
+ */
 function FencedCode({ node }: ExtraProps) {
   const fenced = fencedCodeOf(node);
   if (!fenced) return null;
-  return <CodeBlock code={fenced.text} language={fenced.language} lines={highlightCode(fenced.text, fenced.language)} capHeight />;
+  const block = <CodeBlock code={fenced.text} language={fenced.language} lines={highlightCode(fenced.text, fenced.language)} wrap={fenced.info.wrap} capHeight />;
+  if (!fenced.info.caption) return block;
+  return <figure data-code-figure="" className="min-w-0">{block}<BlockCaption caption={fenced.info.caption} /></figure>;
 }
 
-/** A fenced block in a document: a ```mermaid block draws as its diagram (markdown-dialect.md); any other is code. */
+/** A fenced block in a document: a ```mermaid block draws in its view (markdown-dialect.md); any other is code. */
 function FencedCodeOrDiagram({ node }: ExtraProps) {
   const fenced = fencedCodeOf(node);
-  if (fenced && isMermaidLanguage(fenced.language)) return <MarkdownMermaid code={fenced.text.replace(/\n$/u, "")} />;
+  if (fenced && isMermaidLanguage(fenced.language)) return <MarkdownMermaid code={fenced.text.replace(/\n$/u, "")} view={fenced.info.view} caption={fenced.info.caption} />;
   return <FencedCode node={node} />;
 }
 
@@ -161,7 +170,7 @@ const noMentions: ReadonlyMap<string, MentionKind> = new Map();
 export function MarkdownView({ content, className, mentions = noMentions, media = false, diagrams = false }: { content: string; className?: string; mentions?: ReadonlyMap<string, MentionKind>; media?: boolean; diagrams?: boolean }) {
   return (
     <div className={cn("artifact-prose", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBlockColors, remarkMentions(mentions)]} skipHtml urlTransform={urlTransform} components={componentsFor(media, diagrams)}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkFenceInfo, remarkBlockColors, remarkMentions(mentions)]} skipHtml urlTransform={urlTransform} components={componentsFor(media, diagrams)}>
         {content}
       </ReactMarkdown>
     </div>
