@@ -17,6 +17,8 @@ export const envDocs: readonly EnvDoc[] = [
   { name: "BETTER_AUTH_URL", need: "required", what: "This site's origin, such as https://artifacts.example.com. Every absolute link, the OAuth issuer, and the MCP resource come from it." },
   { name: "GITHUB_CLIENT_ID", need: "optional", what: "GitHub OAuth app. Without both GitHub values, GitHub sign-in is off and email links remain." },
   { name: "GITHUB_CLIENT_SECRET", need: "optional", what: "Secret for the GitHub OAuth app." },
+  { name: "GOOGLE_CLIENT_ID", need: "optional", what: "Google OAuth client (Web application) with the redirect URI <BETTER_AUTH_URL>/api/auth/callback/google. Without both Google values, or with a replace-with-… placeholder, Google sign-in is off and its button is hidden. The sign-in pages read them when the app builds, so a change needs a new build, not just a restart." },
+  { name: "GOOGLE_CLIENT_SECRET", need: "optional", what: "Secret for the Google OAuth client." },
   { name: "SENDIR_API_KEY", need: "for email", what: "Sendir key scoped to the sending identity. Production cannot send sign-in links without it." },
   { name: "SENDIR_IDENTITY_ID", need: "for email", what: "The Sendir identity whose address sends every email." },
   { name: "SENDIR_URL", need: "optional", what: "Overrides https://sendir.ai." },
@@ -34,7 +36,7 @@ export const envDocs: readonly EnvDoc[] = [
   { name: "STORAGE_QUOTA_CONTENT_BYTES", need: "optional", what: "Artifact content quota per account, in bytes. Default 100 MB." },
   { name: "STORAGE_QUOTA_FILE_BYTES", need: "optional", what: "File quota per account, in bytes. Default 1 GB." },
   { name: "VERCEL_PROJECT_PRODUCTION_URL", need: "platform", what: "Set by Vercel. The site origin when BETTER_AUTH_URL is unset." },
-  { name: "VERCEL_ENV", need: "platform", what: "Set by Vercel. Production and preview share one email budget; anything else counts its own. Problem reports name it with the commit." },
+  { name: "VERCEL_ENV", need: "platform", what: "Set by Vercel. Production and preview share one email budget; anything else counts its own. Problem reports name it with the commit. Google sign-in is off on preview, whose URLs are not registered with Google." },
   { name: "VERCEL_GIT_COMMIT_SHA", need: "platform", what: "Set by Vercel. Problem reports name the deploy by its short commit." },
   { name: "NODE_ENV", need: "platform", what: "Set by Next.js. Development turns on the dev sign-in route and prints sign-in links instead of sending them." },
 ];
