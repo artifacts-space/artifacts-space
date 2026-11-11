@@ -12,6 +12,7 @@ import { ArtifactSheetFormat } from "@/components/artifact-view/sheet-format";
 import { SheetKeyContext } from "@/components/artifact-view/use-sheet-prefs";
 import { AttachedFiles } from "@/components/files/attached-files";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
+import { BlockMenuFor } from "@/components/editor/rich/block-menu/block-menu-context";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { VersionHistory } from "@/components/history/version-history";
 import { ViewsDialog } from "@/components/views/views-dialog";
@@ -217,6 +218,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
         >
           <SheetKeyContext value={artifact.publicId}>
             <ArtifactSheetFormat artifactId={sheetFormatTarget(draft.kind, artifact.id)} stored={artifact.sheetFormat}>
+            <BlockMenuFor artifact={artifact} canComment={seesComments} stored={!page.blank}>
             <InlineContent
               kind={draft.kind}
               content={draft.content}
@@ -230,6 +232,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
               onChange={(content) => { update("content", content); }}
               onShowSource={() => { if (!sourceOpen) toggleSource(); }}
             />
+            </BlockMenuFor>
             </ArtifactSheetFormat>
           </SheetKeyContext>
           <BlankPageFilesSlot page={page} dragging={dragging} />

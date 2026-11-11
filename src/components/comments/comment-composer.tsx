@@ -1,7 +1,7 @@
 "use client";
 
 import { IconLoader2, IconSend } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ExternalLink } from "@/components/artifact-view/external-link";
 import { MarkdownView } from "@/components/artifact-view/markdown-view";
@@ -55,6 +55,15 @@ export function CommentComposer({ label, placeholder, submitLabel, initialBody =
     setBody: (next) => { setBody(next); setError(""); },
   });
   const { ref: textareaRef, ...textareaProps } = mentions.textareaProps;
+  const startedWith = useRef(autoFocus ? initialBody : "");
+
+  // A comment that starts with text (a quoted block) opens with the cursor after it, in view.
+  useEffect(() => {
+    const field = textareaRef.current;
+    if (!field || !startedWith.current) return;
+    field.setSelectionRange(field.value.length, field.value.length);
+    field.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, [textareaRef]);
 
   async function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();

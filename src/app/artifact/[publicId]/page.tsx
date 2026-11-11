@@ -20,6 +20,8 @@ import { PageConflictNotice, PageEditorChromeProvider } from "@/components/artif
 import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { BlockLinkTarget } from "@/components/block-links/block-link-target";
+import { ReaderBlockMenu } from "@/components/block-links/reader-block-menu";
 import { SheetFill } from "@/components/artifact-view/sheet-fill";
 import { CsvExportContext } from "@/components/artifact-view/csv-export";
 import { ArtifactSheetFormat } from "@/components/artifact-view/sheet-format";
@@ -282,6 +284,21 @@ function BodyReadView({ viewable, files }: { viewable: ViewableArtifact; files: 
   return body;
 }
 
+/**
+ * The body, unlocked for editors (with block handles and the block menu
+ * once editing loads). In a Markdown artifact, readers right-click a block
+ * to copy a link to it.
+ */
+function LinkableBody({ viewable, files, canComment }: { viewable: ViewableArtifact; files: FileDto[]; canComment: boolean }) {
+  return (
+    <InlineBody canComment={canComment}>
+      <ReaderBlockMenu publicId={viewable.record.publicId} enabled={viewable.view.kind === "markdown"}>
+        <BodyReadView viewable={viewable} files={files} />
+      </ReaderBlockMenu>
+    </InlineBody>
+  );
+}
+
 /** Whether this reader may take a CSV's data out: editors always; everyone else while "Allow CSV download" is on. */
 function exportsCsv(viewable: ViewableArtifact): boolean {
   return mayExportCsv({ canEdit: viewable.canEdit }, { kind: viewable.view.kind, allowCsvDownload: viewable.record.allowCsvDownload });
@@ -344,6 +361,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   // Full width is a display setting on the row, not part of a version: every reader sees the current choice. A CSV is always full width.
   const fullWidth = usesFullWidth(view.kind, record.fullWidth);
   const column = pageColumnClass(fullWidth);
+  const canComment = session !== null && seesComments(viewable, session.user.id);
 
   return (
     // The header, comments, and footer wear the artifact theme's colors (none for an unthemed artifact) and swap with it.
@@ -373,23 +391,23 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
                 <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={themeIdForReader(presetId, viewable.canEdit)} data-theme-source={source}>
                   <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
                   <PageConflictNotice />
-                  <article className="mt-10">
+                  <article className="mt-10" data-block-links="">
                     {/* A CSV's grid fills the window under the header, as a sheet does. */}
                     <SheetFill artifactKey={record.publicId}>
                       {/* Banding and column alignment, the same for every reader; editors change them from the grid. */}
                       <SheetFormatFor viewable={viewable}>
-                        <InlineBody>
-                          <BodyReadView viewable={viewable} files={files} />
-                        </InlineBody>
+                        <LinkableBody viewable={viewable} files={files} canComment={canComment} />
                       </SheetFormatFor>
                     </SheetFill>
                   </article>
+                  {/* Opens links to one block (#block=…): scrolls to it and highlights it. */}
+                  <BlockLinkTarget />
                 </ThemeScope>
               </EditorIsland>
             </div>
             <SignUpAndReport copy={copy} publicId={record.publicId} visibility={record.visibility} />
             {/* Comments are for signed-in readers the comments setting lets in; the thread checks access itself too. */}
-            {session && seesComments(viewable, session.user.id) ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" raised /> : null}
+            {canComment ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" raised /> : null}
           </main>
         </ThemeBackdrop>
       </PageEditorChromeProvider>

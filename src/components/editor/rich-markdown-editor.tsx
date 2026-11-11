@@ -3,31 +3,20 @@
 import { IconMarkdown } from "@tabler/icons-react";
 import type { Editor } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { HighlightedTextarea } from "./highlighted-textarea";
+import { BlockHandlesFrame, useBlockHandles } from "./rich/block-menu/block-controls";
 import { TableBubbleMenu, TextBubbleMenu } from "./rich/bubble-menus";
 import { richEditorExtensions } from "./rich/editor-extensions";
 import { parseMarkdown, serializeMarkdown, type SourceMap } from "./rich/markdown-roundtrip";
 import { TouchToolbar } from "./rich/touch-toolbar";
+import { useCoarsePointer } from "./rich/use-coarse-pointer";
 
 type Mode = "rich" | "markdown";
-
-const coarseQuery = "(pointer: coarse)";
-
-function subscribeCoarse(onChange: () => void) {
-  const query = window.matchMedia(coarseQuery);
-  query.addEventListener("change", onChange);
-  return () => { query.removeEventListener("change", onChange); };
-}
-
-/** True on touch screens, where the toolbar replaces the menu over the selection. */
-function useCoarsePointer(): boolean {
-  return useSyncExternalStore(subscribeCoarse, () => window.matchMedia(coarseQuery).matches, () => false);
-}
 
 interface RichMarkdownEditorProps {
   value: string;
@@ -40,6 +29,8 @@ interface RichMarkdownEditorProps {
   onEditSource?: () => void;
   /** False where saves don't attach files (a ui artifact's Markdown block): no media blocks, and file paste or drop is refused with a note. */
   media?: boolean | undefined;
+  /** Block handles and the block menu, for a document on an artifact page (BlockMenuFor). Off by default, as in a ui artifact's Markdown block. */
+  blockHandles?: boolean | undefined;
 }
 
 /** What a block without media says when a file is pasted or dropped into it. */
@@ -87,7 +78,7 @@ function canEditLink(editor: Editor): boolean {
  * the raw source. It reads and writes Markdown; blocks nobody touched are
  * saved exactly as they were loaded.
  */
-export default function RichMarkdownEditor({ value, onChange, label, autoFocus = false, sourceToggle = true, onEditSource, media }: RichMarkdownEditorProps) {
+export default function RichMarkdownEditor({ value, onChange, label, autoFocus = false, sourceToggle = true, onEditSource, media, blockHandles }: RichMarkdownEditorProps) {
   const [mode, setMode] = useState<Mode>("rich");
   const [loaded] = useState(() => parseMarkdown(value));
   const [rawBlocks, setRawBlocks] = useState(loaded.rawBlocks);
@@ -97,12 +88,13 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
   const onChangeRef = useRef(onChange);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const coarse = useCoarsePointer();
+  const blocks = useBlockHandles(blockHandles === true);
 
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
   const extensions = useMemo(
-    () =>
-      richEditorExtensions({
+    () => [
+      ...richEditorExtensions({
         onLinkShortcut: (current) => {
           if (!canEditLink(current)) return false;
           setLinkOpen(true);
@@ -111,7 +103,9 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
         media,
         onMediaRefused: () => { setMediaRefused(true); },
       }),
-    [media],
+      ...blocks.extensions,
+    ],
+    [media, blocks.extensions],
   );
 
   const editor = useEditor({
@@ -166,7 +160,9 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
             <TableBubbleMenu editor={editor} />
           </>
         ) : null}
-        <EditorContent editor={editor} className="min-h-[50dvh]" />
+        <BlockHandlesFrame editor={editor} on={blocks.on}>
+          <EditorContent editor={editor} className="min-h-[50dvh]" />
+        </BlockHandlesFrame>
       </div>
     </div>
   );

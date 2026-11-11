@@ -376,6 +376,27 @@ after content links them. A ui artifact's Markdown block is text only
 (`media={false}`). Images from other sites never load. Add each new block
 to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
 
+### Block menu and block links
+
+People who may edit a Markdown artifact get a handle beside each block in the
+rich editor (on hover; always faint on touch screens) and a block menu from
+the grip or a right-click (`src/components/editor/rich/block-menu`). Change
+lists the block types in `block-types.ts`, one entry per type: add a type
+there when the editor supports it. Duplicate, Move, and Delete are ordinary
+transactions on the whole top-level block, or on a list item as an item
+(`block-target.ts`), so Undo and autosave treat them like typing. The page
+supplies the artifact through `BlockMenuFor`; editors without it (a ui
+artifact's Markdown block) get no handles. Readers get only Copy link to block
+on right-click (`src/components/block-links`).
+
+A block link names the block by its opening words, never by a stored id:
+`/artifact/<id>#block=<words>[&n=<k>]:~:text=<words>`, or `#block-file=<uuid>`
+for media, or `#block-at=<index>` for a block without text
+(`src/lib/block-links/anchor-rules.ts`). The editor and the read view list
+blocks the same way (each top-level block that is not a list, then every list
+item, in document order), so a link built on one surface finds its block on
+the other; `BlockLinkTarget` on the page scrolls to it and highlights it.
+
 ### Replaced files
 
 Replace (the Files section, MCP `files_replace`, `src/lib/files/replace.ts`)

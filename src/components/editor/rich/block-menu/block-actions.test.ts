@@ -1,0 +1,112 @@
+import { describe, expect, it } from "vitest";
+
+import { firstRunnable, menuEntries, nextRunnable, searchMenu, shortcutFor, type MenuContext } from "./block-actions";
+import { blockTypeName, blockTypes, currentBlockType } from "./block-types";
+
+const paragraph: MenuContext = { changeable: true, currentType: "text", canMoveUp: true, canMoveDown: true, canLink: true, canComment: true };
+
+const labels = (context: MenuContext, query = "") => searchMenu(query, context).map((entry) => entry.label);
+
+describe("menuEntries", () => {
+  it("should list Change, the block actions, then Comment when nothing is typed", () => {
+    expect(labels(paragraph)).toEqual(["Change", "Copy link to block", "Duplicate", "Move up", "Move down", "Delete", "Comment"]);
+    expect(menuEntries(paragraph).map((entry) => entry.group)).toEqual([0, 1, 1, 1, 1, 1, 2]);
+  });
+
+  it("should leave out Change for blocks it cannot change, and link and comment when the page does not allow them", () => {
+    expect(labels({ ...paragraph, changeable: false, currentType: null, canLink: false, canComment: false })).toEqual(["Duplicate", "Move up", "Move down", "Delete"]);
+  });
+
+  it("should never offer Ask AI, Suggest edits, Move to, or Color yet", () => {
+    const all = labels(paragraph).join(" ").toLowerCase();
+    for (const missing of ["ask", "suggest", "move to", "color", "synced", "page"]) expect(all).not.toContain(missing);
+  });
+
+  it("should disable Move up on the first block and Move down on the last", () => {
+    const entries = menuEntries({ ...paragraph, canMoveUp: false, canMoveDown: false });
+    expect(entries.filter((entry) => entry.disabled).map((entry) => entry.label)).toEqual(["Move up", "Move down"]);
+  });
+
+  it("should mark Delete as the destructive row", () => {
+    expect(menuEntries(paragraph).filter((entry) => entry.danger).map((entry) => entry.label)).toEqual(["Delete"]);
+  });
+});
+
+describe("searchMenu", () => {
+  it("should find actions by name or keyword when text is typed", () => {
+    expect(labels(paragraph, "dup")).toEqual(["Duplicate"]);
+    expect(labels(paragraph, "remove")).toEqual(["Delete"]);
+    expect(labels(paragraph, "URL")).toEqual(["Copy link to block"]);
+    expect(labels(paragraph, "move")).toEqual(["Move up", "Move down"]);
+  });
+
+  it("should find submenu entries written out when a type is typed", () => {
+    expect(labels(paragraph, "heading 2")).toEqual(["Change to Heading 2"]);
+    expect(labels(paragraph, "h3")).toEqual(["Change to Heading 3"]);
+    expect(labels(paragraph, "todo")).toEqual(["Change to Task list"]);
+  });
+
+  it("should list every other type when Change itself is typed", () => {
+    expect(labels(paragraph, "change")).toEqual(["Change", ...blockTypes.filter((type) => type.id !== "text").map((type) => `Change to ${type.label}`)]);
+    expect(labels(paragraph, "turn into q")).toEqual(["Change to Quote"]);
+  });
+
+  it("should leave out the block's own type when searching types", () => {
+    expect(labels({ ...paragraph, currentType: "h2" }, "heading")).toEqual(["Change to Heading 1", "Change to Heading 3"]);
+  });
+
+  it("should offer no type changes for blocks Change cannot change", () => {
+    expect(labels({ ...paragraph, changeable: false, currentType: null }, "heading")).toEqual([]);
+  });
+
+  it("should find nothing when nothing matches", () => {
+    expect(labels(paragraph, "zzz")).toEqual([]);
+  });
+});
+
+describe("firstRunnable and nextRunnable", () => {
+  const entries = menuEntries({ ...paragraph, canMoveUp: false });
+
+  it("should skip disabled rows and wrap around", () => {
+    expect(firstRunnable(entries)).toBe(0);
+    expect(nextRunnable(entries, 2, 1)).toBe(4);
+    expect(nextRunnable(entries, 6, 1)).toBe(0);
+    expect(nextRunnable(entries, -1, -1)).toBe(6);
+    expect(nextRunnable([], -1, 1)).toBe(-1);
+  });
+});
+
+describe("shortcutFor", () => {
+  it("should show Apple keys on a Mac and Ctrl or Alt elsewhere", () => {
+    expect(shortcutFor("duplicate", true)).toEqual({ label: "⌘D", binding: "Mod-d" });
+    expect(shortcutFor("copyLink", true).label).toBe("⌘⌃L");
+    expect(shortcutFor("moveUp", true).label).toBe("⌥⇧↑");
+    expect(shortcutFor("comment", false)).toEqual({ label: "Ctrl+Shift+M", binding: "Mod-Shift-m" });
+    expect(shortcutFor("delete", false).binding).toBe("");
+  });
+});
+
+describe("blockTypes", () => {
+  it("should offer only the types the editor supports today, in menu order", () => {
+    expect(blockTypes.map((type) => type.label)).toEqual(["Text", "Heading 1", "Heading 2", "Heading 3", "Bulleted list", "Numbered list", "Task list", "Code block", "Quote"]);
+    expect(new Set(blockTypes.map((type) => type.id)).size).toBe(blockTypes.length);
+  });
+
+  it("should recognise each block's current type", () => {
+    expect(currentBlockType({ node: "paragraph" })?.id).toBe("text");
+    expect(currentBlockType({ node: "paragraph", list: "bulletList" })?.id).toBe("bullet");
+    expect(currentBlockType({ node: "heading", level: 3 })?.id).toBe("h3");
+    expect(currentBlockType({ node: "heading", level: 5 })).toBeNull();
+    expect(currentBlockType({ node: "codeBlock" })?.id).toBe("code");
+    expect(currentBlockType({ node: "table" })).toBeNull();
+  });
+
+  it("should name blocks Change does not list when labelling the menu", () => {
+    expect(blockTypeName({ node: "table" })).toBe("Table");
+    expect(blockTypeName({ node: "horizontalRule" })).toBe("Divider");
+    expect(blockTypeName({ node: "media" }, "pdf")).toBe("PDF");
+    expect(blockTypeName({ node: "rawMarkdown" })).toBe("Markdown");
+    expect(blockTypeName({ node: "heading", level: 5 })).toBe("Block");
+    expect(blockTypeName({ node: "blockquote" })).toBe("Quote");
+  });
+});

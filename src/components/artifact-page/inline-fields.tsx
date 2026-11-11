@@ -2,6 +2,7 @@
 
 import { InlineContent } from "@/components/app/artifact-editor/inline-content";
 import { EditorLoadingFallback } from "@/components/editor/document-editor";
+import { BlockMenuFor } from "@/components/editor/rich/block-menu/block-menu-context";
 
 import { usePageEdit } from "./page-edit-context";
 
@@ -53,13 +54,18 @@ export function InlineSummary({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** The artifact itself: the read view, or the same content editable in place. */
-export function InlineBody({ children }: { children: React.ReactNode }) {
+/**
+ * The artifact itself: the read view, or the same content editable in place.
+ * A Markdown document gets block handles and the block menu; `canComment`
+ * says whether its Comment action may open the comments under the page.
+ */
+export function InlineBody({ canComment = false, children }: { canComment?: boolean; children: React.ReactNode }) {
   const edit = usePageEdit();
   if (!edit) return children;
   const { artifact, draft, revision, sourceOpen, update, showSource } = edit;
   return (
     // While the rich editor's code loads, the read view stays in place.
+    <BlockMenuFor artifact={artifact} canComment={canComment}>
     <EditorLoadingFallback value={children}>
       <InlineContent
         surface="page"
@@ -74,5 +80,6 @@ export function InlineBody({ children }: { children: React.ReactNode }) {
         onShowSource={showSource}
       />
     </EditorLoadingFallback>
+    </BlockMenuFor>
   );
 }

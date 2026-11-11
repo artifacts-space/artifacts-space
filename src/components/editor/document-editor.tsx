@@ -70,6 +70,6 @@ function PlainTextEditor({ value, onChange, label, autoFocus = false }: Omit<Doc
  * rich editor (loaded on demand); Text gets a plain field with no formatting.
  */
 export function DocumentEditor({ kind, ...props }: DocumentEditorProps) {
-  if (kind === "markdown") return <RichMarkdownEditor {...props} />;
+  if (kind === "markdown") return <RichMarkdownEditor {...props} blockHandles />;
   return <PlainTextEditor value={props.value} onChange={props.onChange} label={props.label} autoFocus={props.autoFocus ?? false} />;
 }

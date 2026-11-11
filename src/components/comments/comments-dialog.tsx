@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 
 import { CommentThread } from "./comment-thread";
 import { useLinkedComments } from "./linked-comments";
+import { usePendingQuote } from "./quote-request";
 
 interface CommentsDialogProps {
   publicId: string;
@@ -34,6 +35,13 @@ export function CommentsDialog({ publicId, title, seesComments, offNotice, class
   if (linked !== wasLinked) {
     setWasLinked(linked);
     if (linked) setOpen(true);
+  }
+  // "Comment" in a block's menu opens the dialog; the thread inside takes the quote (quote-request.ts).
+  const quote = usePendingQuote(publicId);
+  const [quoteSeen, setQuoteSeen] = useState(quote);
+  if (quote !== quoteSeen) {
+    setQuoteSeen(quote);
+    if (quote !== null && seesComments) setOpen(true);
   }
   useEffect(() => {
     if (linked) consume();

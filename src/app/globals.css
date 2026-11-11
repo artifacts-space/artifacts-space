@@ -543,6 +543,34 @@
   }
 }
 
+/*
+ * Minimal scrollbars for menus and popovers: no track, and a thin thumb that
+ * shows only while the pointer is over the box or focus is inside it.
+ */
+@utility scrollbar-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  &:hover,
+  &:focus-within {
+    scrollbar-color: color-mix(in oklch, var(--foreground) 18%, transparent) transparent;
+  }
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: transparent;
+  }
+  &:hover::-webkit-scrollbar-thumb,
+  &:focus-within::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--foreground) 18%, transparent);
+  }
+}
+
 @utility card-nested {
   border: 1px solid var(--card-edge);
   border-radius: var(--radius-lg);
@@ -933,6 +961,41 @@
   }
   .rich-editor-content a {
     cursor: text;
+  }
+  /* The block a block menu is open for: tinted like selected text, so it is clear what the menu acts on. */
+  .rich-editor-content .block-menu-target {
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklch, var(--brand) 10%, transparent);
+  }
+}
+
+/*
+ * A block opened from a link (/artifact/<id>#block=…): a tint laid over it
+ * that fades out, so the eye finds it. With reduced motion it stays still
+ * and is removed after the same time (block-link-target.tsx).
+ */
+.block-link-flash {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--brand) 18%, transparent);
+  animation: block-link-flash 1800ms ease-out forwards;
+}
+
+@keyframes block-link-flash {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block-link-flash {
+    animation: none;
   }
 }
 
