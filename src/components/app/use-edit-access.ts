@@ -2,7 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { withdrawSharingAction } from "@/app/(workspace)/app/sharing-actions";
-import { canEditArtifact } from "@/lib/access-rules";
+import { canEditArtifact, canShareArtifact } from "@/lib/access-rules";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { canSeeComments } from "@/lib/comments/setting-rules";
 import { can } from "@/lib/teams/capability-rules";
@@ -25,13 +25,11 @@ export function useEditAccess(artifact: AccessFields | null, viewerId: string) {
   const team = teams.find((item) => item.id === artifact.teamId);
   const isAuthor = artifact.authorId === viewerId;
   const actsForAuthor = artifact.actsForAuthor === true;
-  const canEdit = canEditArtifact(
-    { userId: artifact.authorId, visibility: artifact.visibility, teamId: artifact.teamId, teamPersonal: team?.personal ?? null },
-    { userId: viewerId, isTeamMember: team !== undefined, actsForAuthor },
-  );
+  const viewer = { userId: viewerId, isTeamMember: team !== undefined, actsForAuthor };
+  const canEdit = canEditArtifact({ userId: artifact.authorId, visibility: artifact.visibility, teamId: artifact.teamId, teamPersonal: team?.personal ?? null }, viewer);
   const seesComments = canSeeComments(artifact.comments, { canViewArtifact: true, isAuthor, isTeamMember: team !== undefined });
-  // The author, or the person who added the agent that wrote it, shares and deletes it (canDeleteArtifact).
-  const canShare = isAuthor || actsForAuthor;
+  // The author, or the person who added the agent that wrote it, shares and deletes it (canShareArtifact, canDeleteArtifact).
+  const canShare = canShareArtifact({ userId: artifact.authorId }, viewer);
   return { team, isAuthor, canShare, canDelete: canShare, canEdit, canWithdraw: !canShare && team !== undefined && can(team, "artifacts.withdraw"), seesComments };
 }
 

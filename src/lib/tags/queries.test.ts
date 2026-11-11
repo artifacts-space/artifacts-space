@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { artifact } from "@/db/schema";
 import type * as ScopeModule from "@/lib/projects/scope";
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
 
 /*
  * Tag reads. The conditions are read as SQL (see the tripwire in AGENTS.md):
@@ -12,7 +13,7 @@ import type * as ScopeModule from "@/lib/projects/scope";
  * shared through, and never compare a column with itself.
  */
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 const teams = vi.hoisted(() => ({ ids: new Set<string>() }));
 
 vi.mock("@/db", () => ({ getDb: () => db }));

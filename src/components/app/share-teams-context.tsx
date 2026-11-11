@@ -17,7 +17,7 @@ export interface ShareTeam {
   kind: ActorKind;
   capabilities: readonly TeamCapability[];
   teamSharingNeedsApproval: boolean;
-  /** The members-only icon URL, for the workspace switcher; null or left out for the monogram. */
+  /** The members-only icon URL, for the workspace switcher; null or left out for the team's pixel avatar. */
   iconUrl?: string | null;
 }
 

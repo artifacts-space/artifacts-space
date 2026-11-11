@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
 
 import { artifact } from "@/db/schema";
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
 
 import { authoredByViewerCondition, ownedAgentIdsQuery } from "./owner-access";
 
@@ -12,7 +13,7 @@ import { authoredByViewerCondition, ownedAgentIdsQuery } from "./owner-access";
  * stubbed rows cannot catch a join that matches the wrong people.
  */
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 
 describe("ownedAgentIdsQuery", () => {
   it("should match only agents the viewer added when it lists the agents they act for", () => {

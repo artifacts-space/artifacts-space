@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
 
 import { artifact } from "@/db/schema";
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
 
 import { csvDownloadWriteCondition } from "./write-condition";
 
@@ -13,7 +14,7 @@ import { csvDownloadWriteCondition } from "./write-condition";
  * column (the AGENTS.md tripwire). store.db.test.ts runs it for real.
  */
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 
 function updateSql(record: { userId: string; teamId: string | null }, actorId = "lead-1") {
   return db.update(artifact).set({ allowCsvDownload: true }).where(csvDownloadWriteCondition(db, { actorId, artifactId: "art-1", record })).toSQL();

@@ -97,18 +97,21 @@ function LogoMark({ spin }: { spin: boolean }) {
 export function Logo({
   href = "/",
   compact = false,
+  compactOnPhones = false,
   spin = false,
   className,
 }: {
   href?: string;
   compact?: boolean;
+  /** The mark alone below the sm breakpoint, the full logo from there up: one link, so a header row lays out the same. */
+  compactOnPhones?: boolean;
   spin?: boolean;
   className?: string;
 }) {
   return (
     <Link href={href} className={cn("inline-flex items-center gap-2.5", className)} aria-label="artifacts.space home">
       <LogoMark spin={spin} />
-      {!compact && <span className="text-md font-medium tracking-[-0.01em]">artifacts.space</span>}
+      {!compact && <span className={cn("text-md font-medium tracking-[-0.01em]", compactOnPhones && "max-sm:hidden")}>artifacts.space</span>}
     </Link>
   );
 }

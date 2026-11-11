@@ -30,10 +30,17 @@ describe("PixelAvatar", () => {
     expect(agent).toContain('data-avatar-kind="agent"');
   });
 
+  it("should draw a team with the rounded corners of an uploaded team icon", () => {
+    const team = renderToStaticMarkup(<PixelAvatar seed="team-1" kind="team" />);
+    expect(team).toContain("rounded-md");
+    expect(team).toContain('data-avatar-kind="team"');
+  });
+
   it("should draw crisp pixels sized by the size prop", () => {
     const html = renderToStaticMarkup(<PixelAvatar seed="user-1" size={64} />);
     expect(html).toContain('width="64"');
     expect(html).toContain('viewBox="0 0 64 64"');
     expect(html).toContain('shape-rendering="crispEdges"');
+    expect(html).toContain('style="width:64px;height:64px"');
   });
 });

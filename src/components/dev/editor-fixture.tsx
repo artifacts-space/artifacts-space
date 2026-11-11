@@ -83,7 +83,7 @@ export function EditorFixture({ kind, failingSaves = false }: { kind: EditorFixt
         </main>
       </PageEditorChromeProvider>
       <footer className="border-t">
-        <div className="mx-auto w-full max-w-[960px] px-6 py-6 text-sm text-muted-foreground">artifacts.space</div>
+        <div className={`mx-auto w-full py-6 text-sm text-muted-foreground ${pageColumnClass(false)}`}>artifacts.space</div>
       </footer>
     </div>
   );

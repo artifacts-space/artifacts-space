@@ -2,6 +2,8 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
 
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
+
 import { unreadMentionSubjects } from "./comments/inbox";
 import { accountCreatedAtQuery } from "./account-age";
 
@@ -11,7 +13,7 @@ import { accountCreatedAtQuery } from "./account-age";
  * single-table select, which once turned a team check into "team_id" = "team_id".
  */
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 
 describe("unreadMentionSubjects", () => {
   it("should qualify every join and read the comments setting from the artifact", () => {

@@ -17,6 +17,7 @@ const providers = [
   { name: "Neon", role: "runs our Postgres database.", data: "account, team, artifact, comment, and token-hash records" },
   { name: "Cloudflare R2", role: "stores uploaded files.", data: "files and their names" },
   { name: "Sendir", role: "sends our transactional email.", data: "the recipient's email address and the email itself" },
+  { name: "Slack", role: "delivers the \"Something's not working\" reports you send from the app to our team.", data: "your note, your name and email address, the page you were on, your team workspace, and your browser and window size" },
   { name: "GitHub", role: "signs you in, if you choose GitHub.", data: "the fact that you use GitHub to sign in to artifacts.space" },
   {
     name: "Browser push services",

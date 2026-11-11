@@ -38,6 +38,18 @@ export const blockCorpus: Readonly<Record<string, BlockSamples>> = {
   orderedList: { node: "orderedList", rich: true, samples: { orderedList: "1. first\n2. second\n3. third\n", mixedNested: "1. step\n   - note\n   - other\n2. next\n" } },
   taskList: { node: "taskList", rich: true, samples: { taskList: "- [ ] todo\n- [x] done\n", taskListNoNewline: "- [ ] todo\n- [x] done" } },
   codeBlock: { node: "codeBlock", rich: true, samples: { fencedCode: "```ts\nconst answer: number = 42;\nconsole.log(answer);\n```\n", fencedNoLang: "```\nplain block\n```\n", indentedCode: "    indented code\n" } },
+  mermaid: {
+    node: "codeBlock",
+    rich: true,
+    samples: {
+      mermaidFlowchart: "Intro.\n\n```mermaid\nflowchart TD\n  A[Agent writes] --> B{Reviewed?}\n  B -->|Yes| C[Publish]\n  B -->|No| A\n```\n\nOutro.\n",
+      mermaidSequence: "```mermaid\nsequenceDiagram\n  participant P as Person\n  P->>Agent: Draft the plan\n  Agent-->>P: Here it is\n```\n",
+      mermaidFrontMatter: "```mermaid\n---\ntitle: Release\n---\n%% stages\ngantt\n  dateFormat YYYY-MM-DD\n  Build :a1, 2026-11-01, 3d\n```\n",
+      mermaidTilde: "~~~mermaid\npie\n  \"Docs\" : 3\n  \"Code\" : 5\n~~~\n",
+      mermaidBroken: "```mermaid\nflowchart TD\n  A -- > B\n```\n",
+      mermaidInQuote: "> ```mermaid\n> graph LR\n>   A --> B\n> ```\n",
+    },
+  },
   blockquote: { node: "blockquote", rich: true, samples: { quote: "> Quoted text\n> continues here.\n", quoteWithList: "> quote\n>\n> - list in quote\n" } },
   horizontalRule: { node: "horizontalRule", rich: true, samples: { rule: "Above\n\n---\n\nBelow\n" } },
   table: { node: "table", rich: true, samples: { table: "| Name | Role |\n| --- | --- |\n| Ada | Lead |\n| Lin | Dev |\n", alignedTable: "| Left | Center | Right |\n| :--- | :---: | ---: |\n| a | b | c |\n" } },

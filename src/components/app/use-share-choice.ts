@@ -2,23 +2,35 @@
 
 import { useState } from "react";
 
-import type { ArtifactDto, ArtifactVisibility, CommentSetting } from "@/lib/artifact-types";
+import type { ArtifactVisibility, CommentSetting, ShareableArtifactDto } from "@/lib/artifact-types";
 
 import { previewComments } from "./comment-options";
-import { defaultTeamId } from "./share-options";
+import { defaultTeamId, shareChoiceBasis } from "./share-options";
 import type { ShareTeam } from "./share-teams-context";
 
 /**
  * The Share dialog's choice: who can read it, through which team, who can
  * comment, and whether a public artifact shows in search engines. Until the person picks a comments setting, it follows the level and
- * team the way the server would decide it.
+ * team the way the server would decide it. When the stored sharing changes
+ * (shareChoiceBasis), the picks start again from it: after a request that
+ * waits, the dialog shows the level that still applies, not the one asked for.
  */
-export function useShareChoice(artifact: ArtifactDto, teams: readonly ShareTeam[]) {
+export function useShareChoice(artifact: ShareableArtifactDto, teams: readonly ShareTeam[]) {
   const [visibility, setVisibility] = useState<ArtifactVisibility>(artifact.visibility);
   const [teamId, setTeamId] = useState(() => defaultTeamId(artifact.visibility, teams, artifact.teamId));
   const [comments, setComments] = useState<CommentSetting>(artifact.comments);
   const [commentsChosen, setCommentsChosen] = useState(false);
   const [showInSearch, setShowInSearch] = useState(artifact.showInSearch);
+  const basis = shareChoiceBasis(artifact);
+  const [seenBasis, setSeenBasis] = useState(basis);
+  if (seenBasis !== basis) {
+    setSeenBasis(basis);
+    setVisibility(artifact.visibility);
+    setTeamId(defaultTeamId(artifact.visibility, teams, artifact.teamId));
+    setComments(artifact.comments);
+    setCommentsChosen(false);
+    setShowInSearch(artifact.showInSearch);
+  }
 
   function follow(nextVisibility: ArtifactVisibility, nextTeamId: string | null) {
     if (commentsChosen) return;

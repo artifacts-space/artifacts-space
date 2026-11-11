@@ -21,6 +21,8 @@ interface TeamIconControlProps {
   teamId: string;
   teamName: string;
   iconUrl: string | null;
+  /** The signed-in viewer, for the preview's avatar. */
+  viewerId: string;
 }
 
 /** Prepares and uploads one picked image. Resolves to an error message for people, or null when it saved. */
@@ -42,7 +44,7 @@ async function uploadPicked(teamId: string, file: File): Promise<string | null> 
  * can change team settings; the server checks the same rule on every call.
  * Removing asks first, with "Don't ask again".
  */
-export function TeamIconControl({ teamId, teamName, iconUrl }: TeamIconControlProps) {
+export function TeamIconControl({ teamId, teamName, iconUrl, viewerId }: TeamIconControlProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const hintId = useId();
@@ -101,7 +103,7 @@ export function TeamIconControl({ teamId, teamName, iconUrl }: TeamIconControlPr
           </DialogHeader>
           <form noValidate onSubmit={(event) => { event.preventDefault(); }} className="grid gap-4">
             <div className="flex items-center gap-4">
-              <TeamIcon name={teamName} iconUrl={iconUrl} size={64} className="text-lg" />
+              <TeamIcon team={{ id: teamId, personal: false, iconUrl }} viewerId={viewerId} size={64} />
               <p id={hintId} className="text-sm leading-5 text-muted-foreground">PNG, JPEG, or WebP, up to {TEAM_ICON_SOURCE_LIMIT_LABEL}. We cut it to a square.</p>
             </div>
             <input
@@ -131,7 +133,7 @@ export function TeamIconControl({ teamId, teamName, iconUrl }: TeamIconControlPr
       <ConfirmDialog
         state={confirmRemove.dialog}
         title="Remove the team icon?"
-        description={`${teamName} shows its first letter again, and the image is deleted. You can upload a new one at any time.`}
+        description={`${teamName} shows its pixel avatar again, and the image is deleted. You can upload a new one at any time.`}
         confirmLabel="Remove icon"
         pending={busy === "remove"}
       />

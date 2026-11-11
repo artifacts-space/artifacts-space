@@ -19,14 +19,20 @@ import { fixtureArtifact, longCsv, longJson, longMarkdown, longUi } from "./fixt
 import { fixtureNewArtifactApi, storedFixtureArtifacts } from "./fixture-new-artifacts";
 import { createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, withProjects } from "./fixture-projects";
 import { useFixtureControls } from "./fixture-controls";
+import { fixtureFeedbackSend } from "./feedback-fixture";
 import { fixtureNotifications, LINK_ONLY_PUBLIC_ID } from "./notification-fixture";
 
 /** The viewer's personal team, so the Share dialog can offer link and public sharing. The switcher does not list it. */
 const fixtureTeams: ShareTeam[] = [{ id: "fixture-team", slug: "fixture", name: "Fixture", personal: true, role: "owner", roleKey: "owner", kind: "person", capabilities: [...defaultRoleCapabilities.owner], teamSharingNeedsApproval: false }];
 
-/** Shared teams for `?scopes=1`, with long names for the workspace switcher. */
+/**
+ * Shared teams for `?scopes=1`, with long names for the workspace switcher.
+ * Platform engineering has an uploaded icon (a static image standing in for
+ * the members-only route); the others show their pixel avatars.
+ */
 const fixtureSharedTeams: ShareTeam[] = ["Design", "Platform engineering", "Customer research"].map((name, index) => ({
   id: `fixture-shared-${String(index)}`, slug: `fixture-shared-${String(index)}`, name, personal: false, role: "member", roleKey: "member", kind: "person", capabilities: [...defaultRoleCapabilities.member], teamSharingNeedsApproval: false,
+  iconUrl: index === 1 ? "/artifacts-space-icon.png" : null,
 }));
 
 /** Long csv (in Research), Note 4, and Note 5 carry the tag "launch", for `?tag=launch`. */
@@ -171,7 +177,7 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
   return (
     <ConfirmationsProvider initial={[]}>
       <div className="workspace-frame">
-        <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" unreadNotifications={4} notificationSeed={notifications} />
+        <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" unreadNotifications={4} notificationSeed={notifications} feedbackSend={fixtureFeedbackSend} />
         <Dashboard
           key={dashboardKey(team, projectFilter, tags, stored.length > 0)}
           initialArtifacts={items}
