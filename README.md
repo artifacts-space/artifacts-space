@@ -95,9 +95,13 @@ skill.
 In ChatGPT on the web, open **Plugins**, choose **+**, then **Add custom MCP
 server**. Paste `https://artifacts.space/api/mcp`, choose **OAuth**, and leave
 the client ID and secret empty. Then create and install the plugin, and sign
-in when ChatGPT asks. You need a Business, Enterprise, or Edu workspace:
-ChatGPT Pro can use only tools that are marked read-only, and our tools do not
-have that mark yet.
+in when ChatGPT asks. In a chat, type `@` and choose the plugin.
+
+You need a Business, Enterprise, or Edu workspace: ChatGPT Pro can use only
+tools that are marked read-only, and our tools do not have that mark yet. In a
+Business workspace, only owners and admins can add a custom server. See the
+[client setup page](https://artifacts.space/docs/clients#chatgpt) for every
+step.
 
 ### CI and headless agents (access token)
 
