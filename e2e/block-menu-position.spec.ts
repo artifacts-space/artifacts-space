@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { choosePlacement, menuEdge as edge, menuGap as gap, pointMenuRule } from "../src/components/editor/rich/block-menu/menu-placement";
+
 /*
  * Where the block menu opens, measured by bounding boxes on the dev fixture's
  * tall document (/dev/block-menu?doc=long). With room on the left, the menu
@@ -15,10 +17,6 @@ interface Box {
   width: number;
   height: number;
 }
-
-/** The gap between the menu and what it opens from, and its distance from the window's edge (menu-placement.ts). */
-const gap = 6;
-const edge = 8;
 
 const editor = (page: Page) => page.getByRole("textbox", { name: "Artifact content" });
 const menu = (page: Page) => page.locator("[data-slot=block-menu]");
@@ -177,5 +175,28 @@ test.describe("block menu placement on a narrow window", () => {
     expect(Math.abs(opened.menu.y - (opened.block.y + opened.block.height + gap))).toBeLessThanOrEqual(1);
     expect(overlaps(opened.menu, opened.handle)).toBe(false);
     expect(overlaps(opened.menu, opened.block)).toBe(false);
+  });
+});
+
+test.describe("block menu placement from a right-click", () => {
+  test.skip(({ isMobile }) => isMobile, "Touch screens keep the browser's own long-press menu.");
+  test.use({ viewport: { width: 900, height: 700 } });
+
+  test("should open beside the pointer near the bottom-right corner, moving up instead of flipping", async ({ page }) => {
+    await page.goto("/dev/block-menu?doc=long");
+    const target = block(page, "The last paragraph of the tall document");
+    await expect(target).toBeVisible();
+    await target.evaluate((element) => { element.scrollIntoView({ block: "end" }); });
+    const box = await boxOf(target);
+    const pointer = { x: box.x + box.width - 12, y: box.y + box.height / 2 };
+    // The pointer is too close to the window's right edge for the menu to open to its right.
+    expect(choosePlacement(pointMenuRule, { left: pointer.x, right: pointer.x }, 300, 900)).toBe("left-start");
+    await page.mouse.click(pointer.x, pointer.y, { button: "right" });
+    await expect(menu(page)).toHaveAttribute("data-placed", "");
+    const placed = await boxOf(menu(page));
+    expect(Math.abs(placed.x + placed.width - (pointer.x - gap))).toBeLessThanOrEqual(1);
+    // Too low for the menu to start at the pointer: it ends at the window's edge instead of opening above.
+    expect(Math.abs(placed.y + placed.height - (700 - edge))).toBeLessThanOrEqual(1);
+    expect(placed.y).toBeGreaterThanOrEqual(edge - 1);
   });
 });

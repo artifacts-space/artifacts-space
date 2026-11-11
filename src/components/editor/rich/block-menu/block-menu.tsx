@@ -7,7 +7,7 @@ import type { MenuCommand, MenuContext, MenuEntry } from "./block-actions";
 import type { BlockMenuLastEdited } from "./block-menu-context";
 import { ChangeSubmenu, MenuFooter, MenuRow, panelClass, placementClass, SearchRow } from "./block-menu-parts";
 import { menuReducer, openedMenu, rowsFor, type MenuEvent, type MenuState } from "./block-menu-state";
-import { besideRule, pointMenuRule, submenuOpensBeside } from "./menu-placement";
+import { besideRule, pointMenuRule, submenuOpensBeside, submenuWidth } from "./menu-placement";
 import { canHover, useFloatingMenu, usePhoneSheet, usePressOutside, type MenuAnchor } from "./use-floating-menu";
 
 /** Why the menu closed: Escape and Tab return focus to the grip; a press outside leaves focus where it lands. */
@@ -189,7 +189,8 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
       {submenu ? (
         <ChangeSubmenu
           panelRef={subRef}
-          className={`${panelClass} ${placementClass(sheet, "w-[260px]")}`}
+          className={`${panelClass} ${placementClass(sheet, "")}`}
+          width={sheet ? undefined : submenuWidth}
           currentType={context.currentType}
           focused={submenu.focused || sheet}
           sheet={sheet}

@@ -23,7 +23,7 @@ function referenceFor(anchor: MenuAnchor | HTMLElement): HTMLElement | VirtualEl
     return {
       contextElement: element,
       getBoundingClientRect: () => {
-        const box = handleBox(element.getBoundingClientRect(), block?.()?.getBoundingClientRect() ?? null, window.innerHeight);
+        const box = handleBox(element.getBoundingClientRect(), block?.()?.getBoundingClientRect() ?? null, document.documentElement.clientHeight);
         return new DOMRect(box.left, box.top, box.right - box.left, box.bottom - box.top);
       },
     };

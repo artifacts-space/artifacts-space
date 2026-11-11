@@ -39,7 +39,7 @@ export interface PlacementRule {
  */
 export const besideRule: PlacementRule = { preferred: "left-start", fallback: "bottom-start" };
 
-/** The width of a submenu (`w-[260px]` on the panel), known before it opens. */
+/** The width of a submenu beside the menu: set on the panel (block-menu.tsx) and known before it opens, for the hover check below. */
 export const submenuWidth = 260;
 
 /**

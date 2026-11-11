@@ -140,6 +140,8 @@ function moveFocus(event: KeyboardEvent<HTMLElement>, container: HTMLElement | n
 interface ChangeSubmenuProps {
   panelRef: RefObject<HTMLDivElement | null>;
   className: string;
+  /** Its width in pixels beside the menu (none in the phone sheet), the same number the hover check in block-menu.tsx uses. */
+  width?: number | undefined;
   currentType: string | null;
   focused: boolean;
   /** Phones show the submenu in place of the menu, with a way back. */
@@ -150,7 +152,7 @@ interface ChangeSubmenuProps {
 }
 
 /** "Change": every block type, each with its icon, and a check on the current one. */
-export function ChangeSubmenu({ panelRef, className, currentType, focused, sheet, onPick, onBack, onCloseAll }: ChangeSubmenuProps) {
+export function ChangeSubmenu({ panelRef, className, width, currentType, focused, sheet, onPick, onBack, onCloseAll }: ChangeSubmenuProps) {
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!focused) return;
@@ -173,7 +175,7 @@ export function ChangeSubmenu({ panelRef, className, currentType, focused, sheet
   };
 
   return (
-    <div ref={panelRef} className={className} onKeyDown={onKeyDown} data-slot="block-menu-change">
+    <div ref={panelRef} className={className} style={width === undefined ? undefined : { width }} onKeyDown={onKeyDown} data-slot="block-menu-change">
       {sheet ? (
         <button type="button" onClick={onBack} className={cn(rowClass, "text-muted-foreground")}>
           <IconChevronLeft aria-hidden /> Change

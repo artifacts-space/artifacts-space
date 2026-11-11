@@ -429,7 +429,10 @@ transactions on the whole top-level block, or on a list item as an item
 supplies the artifact through `BlockMenuFor`; editors without it (a ui
 artifact's Markdown block) get no handles. The menu opens in one place
 (`menu-placement.ts`): left of the handle and level with the block's top,
-or below the block when the left has no room. It moves up or down to stay on
+or below the block when the left has no room. The left needs 314px beside
+the handle (the 300px menu and its gaps), so with the contained page column
+the beside layout appears from about a 1700px window; narrower windows take
+the below path. It moves up or down to stay on
 screen but never flips above, never covers the handle (nor the block, unless
 the block runs off the window), and only fades in once placed. Keep it that way; `e2e/block-menu-position.spec.ts`
 checks it by bounding boxes. Readers get only Copy link to block
