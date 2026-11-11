@@ -88,3 +88,15 @@ export function blockColorAttributes(colors: BlockColors): Record<string, string
 export function hueLabel(hue: BlockHue): string {
   return `${hue.charAt(0).toUpperCase()}${hue.slice(1)}`;
 }
+
+/**
+ * The name of one color choice: "Red text", "Red background", "Default
+ * text". With `shown: "inSection"`, the shorter text a row shows under its
+ * section's label in the Color submenu ("Red" under Text color, "Default"
+ * under either); its accessible name stays the full one.
+ */
+export function colorChoiceLabel(part: BlockColorPart, hue: BlockHue | null, shown: "full" | "inSection" = "full"): string {
+  const name = hue ? hueLabel(hue) : "Default";
+  if (shown === "inSection" && (part === "color" || hue === null)) return name;
+  return `${name} ${part === "color" ? "text" : "background"}`;
+}

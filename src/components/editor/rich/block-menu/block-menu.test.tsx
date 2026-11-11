@@ -73,6 +73,9 @@ describe("the block menu", () => {
     expect(html).toMatch(/aria-checked="true"[^>]*><span aria-hidden="true" data-block-color="red"[^>]*>A<\/span><span[^>]*>Red</);
     expect(html).toMatch(/aria-checked="true"[^>]*><span aria-hidden="true" class[^>]*><\/span><span[^>]*>Default</);
     expect(html).toContain('data-block-background="blue"');
+    expect(html).toContain('aria-label="Default text"');
+    expect(html).toContain('aria-label="Default background"');
+    expect(html).toContain('aria-label="Red text"');
     expect(html).toContain('aria-label="Text color"');
     expect(html).toContain('aria-label="Background"');
   });

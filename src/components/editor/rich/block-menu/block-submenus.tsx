@@ -3,7 +3,7 @@
 import { IconCheck, IconChevronLeft } from "@tabler/icons-react";
 import { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 
-import { blockHues, hueLabel, type BlockColorPart, type BlockColors, type BlockHue } from "@/lib/block-colors/block-color-rules";
+import { blockHues, colorChoiceLabel, type BlockColorPart, type BlockColors, type BlockHue } from "@/lib/block-colors/block-color-rules";
 import { cn } from "@/lib/utils";
 
 import { rowClass } from "./block-menu-parts";
@@ -31,6 +31,8 @@ function moveFocus(event: KeyboardEvent<HTMLElement>, container: HTMLElement | n
 interface SubmenuOption {
   key: string;
   label: string;
+  /** The accessible name, when the shown label leans on its section's label. */
+  name?: string;
   icon: ReactNode;
   checked: boolean;
   onPick: () => void;
@@ -61,7 +63,7 @@ interface SubmenuProps extends SubmenuFrame {
 
 function OptionRow({ option }: { option: SubmenuOption }) {
   return (
-    <button type="button" role="menuitemradio" aria-checked={option.checked} tabIndex={-1} onClick={option.onPick} className={subRowClass}>
+    <button type="button" role="menuitemradio" aria-checked={option.checked} aria-label={option.name} tabIndex={-1} onClick={option.onPick} className={subRowClass}>
       {option.icon}
       <span className="min-w-0 flex-1 truncate">{option.label}</span>
       <IconCheck aria-hidden className={cn("ml-auto text-foreground!", option.checked ? "visible" : "invisible")} />
@@ -137,7 +139,8 @@ export function ColorSubmenu({ colors, onPick, ...frame }: SubmenuFrame & { colo
     label,
     options: hues.map((hue) => ({
       key: `${part}:${hue ?? "default"}`,
-      label: hue ? `${hueLabel(hue)}${part === "background" ? " background" : ""}` : "Default",
+      label: colorChoiceLabel(part, hue, "inSection"),
+      name: colorChoiceLabel(part, hue),
       icon: <Swatch part={part} hue={hue} />,
       checked: colors[part] === hue,
       onPick: () => { onPick(part, hue); },

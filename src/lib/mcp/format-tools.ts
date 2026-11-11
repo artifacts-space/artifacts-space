@@ -65,7 +65,7 @@ export const MARKDOWN_COLOR_GUIDE = [
   "   ## Open questions <!-- background: yellow -->",
   "   - [ ] Call the venue <!-- color: blue; background: gray -->",
   `Hues: ${blockHues.join(", ")}. "color" sets the text color and "background" the background; write color first. Leave the comment out for the default.`,
-  "Other Markdown readers hide the comment. Keep it at the end of the line's text: a comment in the middle of text, or with another name or hue, does not color anything.",
+  "Other Markdown readers hide the comment. Keep it at the end of the line's text: a comment in the middle of text does not color anything. A hue or name not listed here is ignored, and the editor removes it when someone edits that line.",
 ].join("\n");
 
 function text(value: string) {

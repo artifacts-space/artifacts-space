@@ -241,7 +241,7 @@ test("should color a block's text from Color, and write it into the Markdown", a
   await openMenu(page, "Closing paragraph", isMobile);
   if (isMobile) {
     await menu(page).getByRole("menuitem", { name: "Color" }).click();
-    await page.locator("[data-slot=block-menu-color]").getByRole("group", { name: "Text color" }).getByRole("menuitemradio", { name: "Blue" }).click();
+    await page.locator("[data-slot=block-menu-color]").getByRole("group", { name: "Text color" }).getByRole("menuitemradio", { name: "Blue text" }).click();
   } else {
     await page.keyboard.type("blue text");
     await page.keyboard.press("Enter");
@@ -259,8 +259,8 @@ test("should check the current colors in Color and set a background back to Defa
   const color = page.locator("[data-slot=block-menu-color]");
   const background = color.getByRole("group", { name: "Background" });
   await expect(background.getByRole("menuitemradio", { name: "Yellow background" })).toHaveAttribute("aria-checked", "true");
-  await expect(color.getByRole("group", { name: "Text color" }).getByRole("menuitemradio", { name: "Default" })).toHaveAttribute("aria-checked", "true");
-  await background.getByRole("menuitemradio", { name: "Default" }).click();
+  await expect(color.getByRole("menuitemradio", { name: "Default text" })).toHaveAttribute("aria-checked", "true");
+  await background.getByRole("menuitemradio", { name: "Default background" }).click();
   await expect(savedMarkdown(page)).toContainText("Write your answer under each item.\n\n## Rate plan writes");
   await expect(editor(page).locator("p[data-block-background]")).toHaveCount(0);
 });
@@ -274,7 +274,7 @@ test("should open Color with the keyboard and put focus on the current choice", 
   await expect(menu(page).getByRole("menuitem", { name: "Color" })).toHaveAttribute("data-highlighted", "");
   await page.keyboard.press("ArrowRight");
   const color = page.locator("[data-slot=block-menu-color]");
-  await expect(color.getByRole("menuitemradio", { name: "Default" }).first()).toBeFocused();
+  await expect(color.getByRole("menuitemradio", { name: "Default text" })).toBeFocused();
   await page.keyboard.press("ArrowLeft");
   await expect(color).toBeHidden();
 });

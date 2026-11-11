@@ -208,11 +208,13 @@ Ship it on Friday <!-- color: red -->
   of its first line (items nested under it keep their own). In the block
   menu, Color on a quote colors every line in it; code blocks, tables,
   dividers, media, and raw blocks have no Color.
-- **Ignored, never lost:** a color comment that names `color` or
-  `background` with a value that is not a hue colors nothing (`<!-- color:
-  teal -->`), and unknown names in it are ignored. It stays as written until
-  that block is edited, and is then left out. Any other comment, or a color
-  comment in the middle of text, is raw HTML: the block stays a raw block.
+- **Unknown hues and names are ignored:** a color comment that names
+  `color` or `background` with a value that is not a hue colors nothing
+  (`<!-- color: teal -->`), and unknown names in it are ignored. Loading
+  keeps it as written, but once that line is edited, the editor writes only
+  the colors it knows, so the comment is removed (or rewritten without the
+  unknown parts). Any other comment, or a color comment in the middle of
+  text, is raw HTML: the block stays a raw block, as written.
 - **An empty line** cannot keep colors: with no text, the comment would
   start the line and turn it into an HTML block.
 - **Surfaces:** the editor sets `data-block-color` and

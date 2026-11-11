@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { blockColorAttributes, colorMarker, hasBlockColors, parseColorMarker, readBlockColors, readBlockHue } from "./block-color-rules";
+import { blockColorAttributes, colorChoiceLabel, colorMarker, hasBlockColors, parseColorMarker, readBlockColors, readBlockHue } from "./block-color-rules";
 
 describe("parseColorMarker", () => {
   it("should read the text color and background from a color comment", () => {
@@ -47,5 +47,20 @@ describe("readBlockColors and blockColorAttributes", () => {
   it("should give data- attributes only for set colors", () => {
     expect(blockColorAttributes({ color: "red", background: null })).toEqual({ "data-block-color": "red" });
     expect(blockColorAttributes({ color: null, background: null })).toEqual({});
+  });
+});
+
+describe("colorChoiceLabel", () => {
+  it("should spell out the part for search and accessible names", () => {
+    expect(colorChoiceLabel("color", "red")).toBe("Red text");
+    expect(colorChoiceLabel("background", "red")).toBe("Red background");
+    expect(colorChoiceLabel("color", null)).toBe("Default text");
+    expect(colorChoiceLabel("background", null)).toBe("Default background");
+  });
+
+  it("should shorten what a submenu row shows under its section label", () => {
+    expect(colorChoiceLabel("color", "red", "inSection")).toBe("Red");
+    expect(colorChoiceLabel("background", "red", "inSection")).toBe("Red background");
+    expect(colorChoiceLabel("background", null, "inSection")).toBe("Default");
   });
 });

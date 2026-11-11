@@ -1,6 +1,6 @@
 import { IconArrowDown, IconArrowUp, IconCopy, IconLink, IconMessage, IconPaint, IconRepeat, IconTrash, type Icon } from "@tabler/icons-react";
 
-import { blockHues, hueLabel, type BlockColorPart, type BlockColors, type BlockHue } from "@/lib/block-colors/block-color-rules";
+import { blockHues, colorChoiceLabel, type BlockColorPart, type BlockColors, type BlockHue } from "@/lib/block-colors/block-color-rules";
 
 import { blockTypes, type BlockTypeOption } from "./block-types";
 
@@ -109,11 +109,6 @@ export function menuEntries(context: MenuContext): MenuEntry[] {
   return [...submenus, ...actions];
 }
 
-/** What a color row says: "Red text", "Red background", "Default text". */
-function colorLabel(part: BlockColorPart, hue: BlockHue | null): string {
-  return `${hue ? hueLabel(hue) : "Default"} ${part === "color" ? "text" : "background"}`;
-}
-
 /** Every color row, text colors then backgrounds, each starting with Default, except the block's current ones. */
 export function colorEntries(colors: BlockColors): MenuEntry[] {
   const hues: readonly (BlockHue | null)[] = [null, ...blockHues];
@@ -121,7 +116,7 @@ export function colorEntries(colors: BlockColors): MenuEntry[] {
   return parts.flatMap((part) =>
     hues
       .filter((hue) => hue !== colors[part])
-      .map((hue) => ({ key: `${part}:${hue ?? "default"}`, label: colorLabel(part, hue), icon: IconPaint, command: { kind: "color", part, hue }, group: 0 }) satisfies MenuEntry),
+      .map((hue) => ({ key: `${part}:${hue ?? "default"}`, label: colorChoiceLabel(part, hue), icon: IconPaint, command: { kind: "color", part, hue }, group: 0 }) satisfies MenuEntry),
   );
 }
 
