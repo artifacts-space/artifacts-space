@@ -29,10 +29,10 @@ export function PanelSizesBeforePaint() {
 }
 
 /** The handle on the sidebar's right edge, sizing its width against the artifact pane. It sits in the workspace card, not the sidebar. */
-export function SidebarSplitter({ shell, sidebar }: { shell: RefObject<HTMLElement | null>; sidebar: RefObject<HTMLElement | null> }) {
+export function SidebarSplitter({ sidebar }: { sidebar: RefObject<HTMLElement | null> }) {
   const measure = () => {
-    if (!shell.current || !sidebar.current) return null;
-    return { size: Math.round(sidebar.current.getBoundingClientRect().width), bounds: sidebarBounds(shell.current.clientWidth) };
+    if (!sidebar.current) return null;
+    return { size: Math.round(sidebar.current.getBoundingClientRect().width), bounds: sidebarBounds() };
   };
   return (
     <PanelSplitter
@@ -41,7 +41,7 @@ export function SidebarSplitter({ shell, sidebar }: { shell: RefObject<HTMLEleme
       controls={sidebarPanelId}
       orientation="vertical"
       measure={measure}
-      watch={() => [shell.current, sidebar.current]}
+      watch={() => [sidebar.current]}
       initial={{ size: sidebarPanel.defaultSize, bounds: { min: sidebarPanel.min, max: sidebarPanel.max } }}
       // In the workspace card, just past the sidebar's edge: the sidebar can scroll on short windows, and its list's scroll bar stays free.
       className={cn("inset-y-0 w-3", sidebarHandleLeft)}

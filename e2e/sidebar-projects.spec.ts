@@ -15,11 +15,11 @@ const entry = (page: Page, name: string) => projects(page).getByRole("button", {
 const entryRow = (page: Page, name: string) => projects(page).locator("[data-slot=project-row]").filter({ has: page.getByRole("button", { name: entryName(name) }) });
 const group = (page: Page, name: string) => projects(page).getByRole("group", { name, exact: true });
 const card = (page: Page, title: string) =>
-  page.locator("[data-slot=artifact-list] li").filter({ has: page.getByRole("heading", { name: title, exact: true }) });
+  page.locator("[data-slot=artifact-list] li").filter({ has: page.getByText(title, { exact: true }) });
 
 /** Checks which group of the tree an artifact sits under. */
 async function expectIn(page: Page, title: string, groupName: string) {
-  await expect(group(page, groupName).getByRole("heading", { name: title, exact: true })).toBeVisible();
+  await expect(group(page, groupName).getByText(title, { exact: true })).toBeVisible();
 }
 
 async function openWorkspace(page: Page, path = "/dev/workspace") {

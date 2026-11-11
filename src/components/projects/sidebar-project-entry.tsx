@@ -65,7 +65,7 @@ export interface Disclosure {
 }
 
 function DisclosureButton({ label, disclosure }: { label: string; disclosure: Disclosure }) {
-  if (!disclosure.enabled) return <span aria-hidden className="size-6 shrink-0" />;
+  if (!disclosure.enabled) return <span aria-hidden className="size-6 shrink-0 pointer-coarse:w-11" />;
   return (
     <button
       type="button"
@@ -73,7 +73,7 @@ function DisclosureButton({ label, disclosure }: { label: string; disclosure: Di
       aria-controls={disclosure.open ? disclosure.controls : undefined}
       aria-label={`${disclosure.open ? "Hide" : "Show"} the artifacts in ${label}`}
       onClick={disclosure.onToggle}
-      className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+      className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground pointer-coarse:size-11 hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
     >
       <IconChevronRight aria-hidden className={cn("size-3.5 transition-transform", disclosure.open && "rotate-90")} />
     </button>
@@ -126,13 +126,13 @@ export function DropRow({ blocked = false, label, icon, count, active, disclosur
         title={active ? "Show every project" : `Show only ${label}`}
         onClick={onFilter}
         className={cn(
-          "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 text-left text-sm transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+          "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 text-left text-sm pointer-coarse:h-11 transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
           active ? "bg-muted font-medium text-foreground" : "text-foreground/90 hover:bg-muted/60 hover:text-foreground",
         )}
       >
         {icon}
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        <span className={cn("shrink-0 text-xs text-muted-foreground tabular-nums", children ? "pr-6" : "pr-1.5")}>{count}</span>
+        <span className={cn("shrink-0 text-xs text-muted-foreground tabular-nums", children ? "pr-6 pointer-coarse:pr-11" : "pr-1.5")}>{count}</span>
       </button>
       {children}
     </div>
@@ -160,7 +160,7 @@ function EntryMenu({ project, namesTeams, onRename, onDelete }: EntryMenuProps) 
       <DropdownMenuTrigger
         render={<button type="button" />}
         aria-label={`Options for ${project.name}`}
-        className="absolute top-1 right-1 inline-flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover/entry:opacity-100 group-focus-within/entry:opacity-100 pointer-coarse:opacity-100 hover:bg-background hover:text-foreground focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-[popup-open]:opacity-100"
+        className="absolute top-1 right-1 inline-flex size-6 items-center pointer-coarse:top-0 pointer-coarse:right-0 pointer-coarse:size-11 justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover/entry:opacity-100 group-focus-within/entry:opacity-100 pointer-coarse:opacity-100 hover:bg-background hover:text-foreground focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-[popup-open]:opacity-100"
       >
         <IconDots aria-hidden className="size-3.5" />
       </DropdownMenuTrigger>

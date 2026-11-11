@@ -1,6 +1,7 @@
-import { and, count, eq, ilike, inArray, isNull, sql, type SQL } from "drizzle-orm";
+import { and, count, eq, ilike, inArray, isNull, not, notInArray, or, sql, type SQL } from "drizzle-orm";
 
 import { getDb } from "@/db";
+import { authoredByViewerCondition } from "@/lib/agents/owner-access";
 import { artifact, project, team, type ProjectRecord } from "@/db/schema";
 import type { ArtifactVisibility, ArtifactProjectDto } from "@/lib/artifact-types";
 
@@ -105,8 +106,14 @@ export type { ProjectFilter } from "./rules";
  * project ids in the viewer's usable scopes with that key.
  */
 export async function projectFilterCondition(viewerId: string, scope: ListScope, filter: ProjectFilter): Promise<SQL> {
-  if ("none" in filter) return isNull(artifact.projectId);
-  const ids = getDb().select({ id: project.id }).from(project).where(and(await projectCondition(viewerId, scope), eq(project.nameKey, filter.key)));
+  const usable = await projectCondition(viewerId, scope);
+  if ("none" in filter) {
+    // Unfiled: no project, or one the viewer cannot use in this list, so it holds what the facets count as unfiled.
+    const unfiled = or(isNull(artifact.projectId), notInArray(artifact.projectId, getDb().select({ id: project.id }).from(project).where(usable)));
+    if (!unfiled) throw new Error("The unfiled condition could not be built.");
+    return unfiled;
+  }
+  const ids = getDb().select({ id: project.id }).from(project).where(and(usable, eq(project.nameKey, filter.key)));
   return inArray(artifact.projectId, ids);
 }
 
@@ -120,10 +127,14 @@ export async function projectSearchCondition(viewerId: string, scope: ListScope,
 export interface ProjectFacets {
   /** One entry per project name, with how many artifacts in the list it holds. */
   projects: ProjectFacet[];
-  /** Artifacts in the list with no project. */
+  /** Artifacts in the list with no project the viewer can use here: Unfiled. */
   none: number;
   /** Every artifact in the list. */
   total: number;
+  /** Artifacts in the list that someone else wrote (not the viewer or their agents): the Shared with me view. */
+  shared: number;
+  /** Artifacts in the list anyone can read: the Public view. */
+  public: number;
 }
 
 /**
@@ -140,6 +151,23 @@ export async function facetJoinCondition(viewerId: string, scope: ListScope): Pr
   return and(eq(project.id, artifact.projectId), await projectCondition(viewerId, scope));
 }
 
+/**
+ * One row over the list: every artifact, those someone else wrote (not the
+ * viewer or their agents: Shared with me), and the public ones. One table,
+ * and the agents subquery is not correlated (see the tripwire in AGENTS.md).
+ */
+export function facetTotalsQuery(viewerId: string, listCondition: SQL) {
+  const db = getDb();
+  return db
+    .select({
+      total: count(),
+      shared: sql<number>`count(*) filter (where ${not(authoredByViewerCondition(db, viewerId))})`.mapWith(Number),
+      public: sql<number>`count(*) filter (where ${artifact.visibility} = 'public')`.mapWith(Number),
+    })
+    .from(artifact)
+    .where(listCondition);
+}
+
 export async function loadProjectFacets(viewerId: string, scope: ListScope, listCondition: SQL): Promise<ProjectFacets> {
   const db = getDb();
   const usable = await facetJoinCondition(viewerId, scope);
@@ -150,13 +178,13 @@ export async function loadProjectFacets(viewerId: string, scope: ListScope, list
       .innerJoin(project, usable)
       .where(listCondition)
       .groupBy(project.id),
-    db
-      .select({ total: count(), none: sql<number>`count(*) filter (where ${artifact.projectId} is null)`.mapWith(Number) })
-      .from(artifact)
-      .where(listCondition),
+    facetTotalsQuery(viewerId, listCondition),
   ]);
   const projects = mergeProjectFacets(perProject.map((row) => ({ ...row, own: row.userId === viewerId })));
-  return { projects, none: totals[0]?.none ?? 0, total: totals[0]?.total ?? 0 };
+  const total = totals[0]?.total ?? 0;
+  // Every artifact is in at most one project, so what no usable project holds is Unfiled.
+  const filed = perProject.reduce((sum, row) => sum + row.count, 0);
+  return { projects, none: Math.max(0, total - filed), total, shared: totals[0]?.shared ?? 0, public: totals[0]?.public ?? 0 };
 }
 
 /** One project in a scope's list, with how many artifacts it holds. */

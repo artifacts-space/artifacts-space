@@ -29,6 +29,27 @@ test.describe("desktop", () => {
     await expect(search, "a / typed in the search stays in it").toHaveValue("/");
   });
 
+  test("should leave / to an open dialog or menu instead of pulling focus to the search", async ({ page }) => {
+    await openWorkspace(page);
+    // By its label, not its role: an open modal hides the rest of the page from the accessibility tree.
+    const search = page.locator("input[aria-label='Search artifacts']");
+    await page.getByRole("button", { name: "Share settings" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    const inside = dialog.getByRole("button").first();
+    await inside.focus();
+    await page.keyboard.press("/");
+    await expect(inside, "focus stays in the dialog").toBeFocused();
+    await expect(search).not.toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await page.getByRole("button", { name: "Workspace: Your artifacts. Switch workspace" }).click();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await page.keyboard.press("/");
+    await expect(page.getByRole("menu")).toBeVisible();
+    await expect(search, "the open menu keeps the key").not.toBeFocused();
+  });
+
   test("should open the filters from the button beside the search and count the ones that are on", async ({ page }) => {
     await openWorkspace(page);
     await page.getByRole("button", { name: "Filters" }).click();
@@ -38,8 +59,8 @@ test.describe("desktop", () => {
     await expect(format).toContainText("json");
     await page.keyboard.press("Escape");
     await expect(page.getByRole("button", { name: "Filters, 1 on" })).toBeVisible();
-    await expect(slot(page, "artifact-list").getByRole("heading", { name: "Long json fixture", exact: true })).toBeVisible();
-    await expect(slot(page, "artifact-list").getByRole("heading", { name: "Long csv fixture", exact: true })).toHaveCount(0);
+    await expect(slot(page, "artifact-list").getByText("Long json fixture", { exact: true })).toBeVisible();
+    await expect(slot(page, "artifact-list").getByText("Long csv fixture", { exact: true })).toHaveCount(0);
   });
 
   test("should narrow the tree to a view and show each view's count", async ({ page }) => {
@@ -100,9 +121,33 @@ test("should name the team in the workspace switcher and the heading, and offer 
   await switcher.click();
   await expect(page.getByRole("menuitem", { name: /Customer research/ })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("menuitem", { name: /Your artifacts/ })).not.toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("menuitem", { name: "Manage teams" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Manage teams" })).toHaveAttribute("href", "/teams");
+  // Real links, so middle-click and Open in new tab work.
+  await expect(page.getByRole("menuitem", { name: /Your artifacts/ })).toHaveAttribute("href", "/dev/workspace");
   await page.getByRole("menuitem", { name: /Your artifacts/ }).click();
   await expect(page).toHaveURL(/\/dev\/workspace$/);
   await expect(page.getByRole("button", { name: "Workspace: Your artifacts. Switch workspace" })).toContainText("Personal workspace");
 });
 
+
+test.describe("phone", () => {
+  test.skip(({ isMobile }) => !isMobile, "touch targets on a phone");
+
+  test("should give every small control in the tree and the meta line a 44px touch target", async ({ page }) => {
+    await openWorkspace(page);
+    const tree = page.getByRole("region", { name: "Projects" });
+    const targets = [
+      tree.getByRole("button", { name: "Hide the artifacts in Design" }),
+      tree.getByRole("button", { name: "Options for Design" }),
+      tree.getByRole("button", { name: "Move to project" }).first(),
+      tree.getByRole("button", { name: "New project" }),
+      tree.getByRole("button", { name: "Close every project" }),
+      page.getByRole("button", { name: "Copy the artifact id" }),
+    ];
+    for (const target of targets) {
+      const box = await target.boundingBox();
+      expect(box?.width ?? 0, String(target)).toBeGreaterThanOrEqual(44);
+      expect(box?.height ?? 0, String(target)).toBeGreaterThanOrEqual(44);
+    }
+  });
+});

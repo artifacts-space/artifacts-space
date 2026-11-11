@@ -55,7 +55,8 @@ function ShortId({ id }: { id: string }) {
         onClick={() => void copy(id)}
         aria-label={copied ? "Copied the id" : "Copy the artifact id"}
         title="Copy the artifact id"
-        className="inline-flex size-6 items-center justify-center rounded-md hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+        // 44px to tap on touch screens; the negative margin keeps the meta line's height.
+        className="inline-flex size-6 items-center justify-center rounded-md hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none pointer-coarse:-m-2.5 pointer-coarse:size-11"
       >
         {copied ? <IconCheck aria-hidden className="size-3.5" /> : <IconCopy aria-hidden className="size-3.5" />}
       </button>

@@ -29,6 +29,8 @@ interface WorkspaceSidebarProps {
   onCreate: (() => void) | null;
   view: WorkspaceView;
   counts: ViewCounts;
+  /** True when the counts come from a list cut at its newest artifacts. */
+  partialCounts: boolean;
   onView: (view: WorkspaceView) => void;
   sidebar: ReturnType<typeof useDashboardProjects>;
   projectFilter: ProjectFilter | null;
@@ -54,7 +56,7 @@ export function WorkspaceSidebar({ sidebarRef, listRef, ...props }: WorkspaceSid
       id={sidebarPanelId}
       aria-label="Workspace"
       className={cn(
-        "relative flex min-h-0 min-w-0 flex-col border-b bg-background max-md:max-h-[420px] md:max-lg:max-h-[min(420px,40dvh)] lg:border-r lg:border-b-0",
+        "relative flex min-h-0 min-w-0 flex-col border-b bg-background max-md:max-h-[min(560px,75dvh)] md:max-lg:max-h-[min(420px,40dvh)] lg:border-r lg:border-b-0",
         props.hidden && "lg:hidden",
       )}
     >
@@ -66,7 +68,7 @@ export function WorkspaceSidebar({ sidebarRef, listRef, ...props }: WorkspaceSid
         <SidebarToolbar query={props.query} onQuery={props.onQuery} filters={props.filters} onCreate={props.onCreate} />
       </div>
       <div ref={listRef} data-slot="artifact-list" className="relative min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-2 py-2">
-        <SidebarViews view={props.view} counts={props.counts} onView={props.onView} />
+        <SidebarViews view={props.view} counts={props.counts} partial={props.partialCounts} onView={props.onView} />
         <SidebarProjects
           controls={sidebar.projects}
           filter={props.projectFilter}
@@ -78,6 +80,7 @@ export function WorkspaceSidebar({ sidebarRef, listRef, ...props }: WorkspaceSid
           onDropArtifact={sidebar.dropped}
           groups={props.groups}
           narrowed={props.narrowed}
+          total={props.filters.facets.total}
           selectedId={props.selectedId}
           onSelect={props.onSelect}
           moves={sidebar.moves}

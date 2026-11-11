@@ -1,7 +1,7 @@
 "use client";
 
 import { IconInfoCircle, IconLoader2, IconPlus, IconX } from "@tabler/icons-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
@@ -18,7 +18,7 @@ import { serverNewArtifactApi, type NewArtifactApi } from "@/components/app/new-
 import { NewArtifactPane } from "@/components/app/new-artifact/new-artifact-pane";
 import { filteredProjectName, useNewArtifact, type NewArtifactSession } from "@/components/app/new-artifact/use-new-artifact";
 import { PanelSizesBeforePaint, SidebarSplitter } from "@/components/app/workspace-splitters";
-import { SidebarVisibilityProvider } from "@/components/app/sidebar-visibility";
+import { SidebarVisibilityProvider, useSidebarToggle } from "@/components/app/sidebar-visibility";
 import { WorkspaceSidebar } from "@/components/app/workspace-sidebar";
 import { Button } from "@/components/ui/button";
 import { LinkedCommentsProvider } from "@/components/comments/linked-comments";
@@ -232,12 +232,12 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
   const { artifacts, setArtifacts, selectedId, setSelectedId, notice, dismissNotice, opened } = useArtifactLink({ initialArtifacts, target: linkTarget, failed: linkFailed, onHandled: onLinkHandled, list: listRef, detail: detailRef });
   const listFilters = useListFilters();
   const { query, setQuery, kind, setKind, view, setView, clearFilters } = listFilters;
-  const [sidebarHidden, setSidebarHidden] = useState(false);
+  const { hidden: sidebarHidden, hide: hideSidebar, visibility } = useSidebarToggle(shellRef, sidebarRef);
   const fresh = useNewArtifact({ setArtifacts, setSelectedId, clearFilters });
   useLinkLeavesNewArtifact(opened, fresh.leave);
   const sidebar = useDashboardProjects({ artifacts, setArtifacts, rows: projectRows, facets, api: projectsApi, teams, scopeTeam, tagFilter, listPath, viewerId });
   const entryKeys = useMemo(() => sidebar.projects.entries.map((entry) => entry.key), [sidebar.projects.entries]);
-  const { counts, filtered, groups, narrowed } = useWorkspaceList({ artifacts, filters: listFilters, projectFilter, tagFilter, teamId: scopeTeam?.id ?? null, viewerId, entryKeys });
+  const { counts, partial, filtered, groups, narrowed } = useWorkspaceList({ artifacts, filters: listFilters, projectFilter, tagFilter, teamId: scopeTeam?.id ?? null, viewerId, entryKeys, totals: facets });
 
   const selected = pickSelected(artifacts, filtered, selectedId);
 
@@ -255,8 +255,6 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
     });
   }
 
-  const visibility = useMemo(() => ({ hidden: sidebarHidden, show: () => { setSidebarHidden(false); } }), [sidebarHidden]);
-
   return (
     <ShareTeamsProvider teams={teams}>
       <LinkedCommentsProvider link={opened} selectedPublicId={selected?.publicId ?? null}>
@@ -272,7 +270,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
             sidebarRef={sidebarRef}
             listRef={listRef}
             hidden={sidebarHidden}
-            onHide={() => { setSidebarHidden(true); }}
+            onHide={hideSidebar}
             teams={teams}
             scopeTeam={scopeTeam}
             listPath={listPath}
@@ -282,6 +280,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
             onCreate={createIn(scopeTeam, fresh.start)}
             view={view}
             counts={counts}
+            partialCounts={partial}
             onView={setView}
             sidebar={sidebar}
             projectFilter={projectFilter}
@@ -292,7 +291,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
             listState={artifactListState({ total: artifacts.length, shown: filtered.length })}
             onClearFilters={clearFilters}
           />
-          {sidebarHidden ? null : <SidebarSplitter shell={shellRef} sidebar={sidebarRef} />}
+          {sidebarHidden ? null : <SidebarSplitter sidebar={sidebarRef} />}
 
           {/* `contents` keeps the pane a grid item; the ref lets a link bring it into view on phones. */}
           <div ref={detailRef} data-slot="workspace-detail" className="contents">

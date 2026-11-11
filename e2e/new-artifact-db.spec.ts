@@ -74,8 +74,8 @@ test("should reopen an artifact made on a blank page with its latest body after 
   if (first) created.push(first.publicId);
 
   // Edited on its own page after the blank page let go of it.
-  const card = page.locator("[data-slot=artifact-list] li").filter({ has: page.getByRole("heading", { name: title, exact: true }) });
-  await page.locator("[data-slot=artifact-list] li").filter({ has: page.getByRole("heading", { name: otherTitle, exact: true }) }).click();
+  const card = page.locator("[data-slot=artifact-list] li").filter({ has: page.getByText(title, { exact: true }) });
+  await page.locator("[data-slot=artifact-list] li").filter({ has: page.getByText(otherTitle, { exact: true }) }).click();
   await expect(page.getByRole("region", { name: `Edit ${otherTitle}` })).toBeVisible();
   await card.click();
   const own = page.getByRole("region", { name: `Edit ${title}` }).locator('[contenteditable="true"]');

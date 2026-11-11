@@ -63,7 +63,7 @@ interface Move {
 
 function moveMessage(title: string, to: ArtifactProjectDto | null, from: ArtifactProjectDto | null) {
   if (to) return `Moved “${title}” to ${to.name}.`;
-  return from ? `Took “${title}” out of ${from.name}.` : `“${title}” has no project.`;
+  return from ? `Took “${title}” out of ${from.name}.` : `Moved “${title}” to Unfiled.`;
 }
 
 /**
@@ -155,7 +155,7 @@ export function useSidebarProjects({ rows, facets, api, teams, setArtifacts, hom
     }
     setState((current) => afterRowDeleted(current, row.id));
     patchRow(setArtifacts, row.id, () => null);
-    toast.success(`Deleted “${row.name}”. Its artifacts are still here, with no project.`);
+    toast.success(`Deleted “${row.name}”. Its artifacts are still here, in Unfiled.`);
     return true;
   }
 

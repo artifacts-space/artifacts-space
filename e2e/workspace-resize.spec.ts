@@ -172,8 +172,8 @@ test.describe("desktop", () => {
     await expect.poll(outline, "an outline from the keyboard").toBe("solid");
   });
 
-  test("should keep the artifact pane at least 480px wide on the narrowest desktop", async ({ page }) => {
-    // At 1024 px, the narrowest window with the sidebar beside the artifact, the 520 px cap leaves the pane 504 px.
+  test("should leave the artifact pane at least 480px beside the widest sidebar on the narrowest desktop", async ({ page }) => {
+    // At 1024 px, the narrowest window with the sidebar beside the artifact, the 520 px cap leaves the pane over 480 px, so no floor is needed.
     await openWorkspace(page, { width: 1024, height: 900 });
     const handle = sidebarHandle(page);
     await handle.press("End");
@@ -197,7 +197,7 @@ test.describe("desktop", () => {
     const switcherName = page.locator("[data-slot=workspace-name]");
     expect(await switcherName.evaluate((element) => element.scrollWidth <= element.clientWidth), "the workspace name shows in full").toBe(true);
     // Titles are the viewer's own text and wrap to two lines, so measure the room: about 20 characters a line.
-    const title = list(page).getByRole("heading", { name: "Long markdown fixture" });
+    const title = list(page).getByText("Long markdown fixture", { exact: true });
     expect(await widthOf(title), "an artifact title keeps room for about 20 characters").toBeGreaterThanOrEqual(150);
   });
 
@@ -250,8 +250,11 @@ test.describe("desktop", () => {
     await openWorkspace(page);
     const content = page.getByRole("region", { name: "Content" });
     const before = await widthOf(content);
-    await page.getByRole("button", { name: "Hide the sidebar" }).click();
+    const hide = page.getByRole("button", { name: "Hide the sidebar" });
+    await hide.focus();
+    await page.keyboard.press("Enter");
     await expect(sidebar(page)).toBeHidden();
+    await expect(page.getByRole("button", { name: "Show the sidebar" }), "focus moves to the button that brings it back").toBeFocused();
     await expect(sidebarHandle(page)).toHaveCount(0);
     expect(await widthOf(content), "the artifact takes the sidebar's room").toBeGreaterThan(before + 200);
     const slashTaken = await page.evaluate(() => {
@@ -260,9 +263,9 @@ test.describe("desktop", () => {
       return press.defaultPrevented;
     });
     expect(slashTaken, "a hidden search leaves the / key to the page").toBe(false);
-    const show = page.getByRole("button", { name: "Show the sidebar" });
-    await show.click();
+    await page.keyboard.press("Enter");
     await expect(sidebar(page)).toBeVisible();
+    await expect(hide, "and back to Hide when the sidebar returns").toBeFocused();
     await expect(page.getByRole("button", { name: "Show the sidebar" })).toHaveCount(0);
     expect(await widthOf(content)).toBe(before);
   });

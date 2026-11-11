@@ -30,13 +30,13 @@ function filterFromId(id: string): Filter | null {
 /** The label of the chosen filter entry. */
 function chosenLabel(id: string, facets: ProjectFacets) {
   if (id === "all") return "All projects";
-  if (id === "none") return "No project";
+  if (id === "none") return "Unfiled";
   const facet = facets.projects.find((item) => `key:${item.key}` === id);
   return facet ? <ProjectLabel name={facet.name} icon={facet.icon} /> : "All projects";
 }
 
 /**
- * The project filter beside the format filter: all projects, no project, or
+ * The project filter beside the format filter: all projects, Unfiled, or
  * one project with its icon and count. It lives in the URL, so links keep it.
  */
 export function ProjectFilter({ facets, filter, scopeTeam, tags, listPath = "/app" }: ProjectFilterProps) {
@@ -59,7 +59,7 @@ export function ProjectFilter({ facets, filter, scopeTeam, tags, listPath = "/ap
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All projects <span className="ml-auto pl-3 text-xs text-muted-foreground">{facets.total}</span></SelectItem>
-          <SelectItem value="none">No project <span className="ml-auto pl-3 text-xs text-muted-foreground">{facets.none}</span></SelectItem>
+          <SelectItem value="none">Unfiled <span className="ml-auto pl-3 text-xs text-muted-foreground">{facets.none}</span></SelectItem>
           {facets.projects.length > 0 ? <SelectSeparator /> : null}
           {facets.projects.map((facet) => (
             <SelectItem key={facet.key} value={`key:${facet.key}`}>

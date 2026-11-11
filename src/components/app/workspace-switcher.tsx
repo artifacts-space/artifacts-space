@@ -1,14 +1,14 @@
 "use client";
 
 import { IconCheck, IconLayoutSidebarLeftCollapse, IconPlus, IconSelector, IconUsers } from "@tabler/icons-react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
-  DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuLinkItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -17,6 +17,7 @@ import { workspaceQuery } from "@/lib/projects/filter-params";
 import { cn } from "@/lib/utils";
 
 import type { ShareTeam } from "./share-teams-context";
+import { hideSidebarSlot } from "./sidebar-visibility";
 
 /** The first letter of a workspace's name, for its tile. */
 function initial(name: string) {
@@ -48,11 +49,10 @@ interface WorkspaceSwitcherProps {
  * scope tabs it replaces did.
  */
 export function WorkspaceSwitcher({ teams, scopeTeam, listPath }: WorkspaceSwitcherProps) {
-  const router = useRouter();
   const shared = teams.filter((team) => !team.personal);
   const name = scopeTeam ? scopeTeam.name : "Your artifacts";
   const kind = scopeTeam ? "Team workspace" : "Personal workspace";
-  const go = (slug: string | null) => { router.push(`${listPath}${workspaceQuery(slug, null)}`); };
+  const hrefFor = (slug: string | null) => `${listPath}${workspaceQuery(slug, null)}`;
 
   return (
     <DropdownMenu>
@@ -71,31 +71,31 @@ export function WorkspaceSwitcher({ teams, scopeTeam, listPath }: WorkspaceSwitc
       <DropdownMenuContent align="start" className="w-64">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-2 py-1.5 text-xs">Workspaces</DropdownMenuLabel>
-          <SwitchItem name="Your artifacts" iconUrl={null} current={scopeTeam === null} onChoose={() => { go(null); }} />
+          <SwitchItem name="Your artifacts" iconUrl={null} current={scopeTeam === null} href={hrefFor(null)} />
           {shared.map((team) => (
-            <SwitchItem key={team.id} name={team.name} iconUrl={team.iconUrl ?? null} current={scopeTeam?.id === team.id} onChoose={() => { go(team.slug); }} />
+            <SwitchItem key={team.id} name={team.name} iconUrl={team.iconUrl ?? null} current={scopeTeam?.id === team.id} href={hrefFor(team.slug)} />
           ))}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => { router.push("/teams"); }} className="px-2 py-2">
+        <DropdownMenuLinkItem render={<Link href="/teams" />} className="px-2 py-2">
           <IconUsers aria-hidden /> Manage teams
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { router.push("/teams/new"); }} className="px-2 py-2">
+        </DropdownMenuLinkItem>
+        <DropdownMenuLinkItem render={<Link href="/teams/new" />} className="px-2 py-2">
           <IconPlus aria-hidden /> Create a team
-        </DropdownMenuItem>
+        </DropdownMenuLinkItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
-/** One workspace in the menu, with a check on the one shown. */
-function SwitchItem({ name, iconUrl, current, onChoose }: { name: string; iconUrl: string | null; current: boolean; onChoose: () => void }) {
+/** One workspace in the menu, a link to its list, with a check on the one shown. */
+function SwitchItem({ name, iconUrl, current, href }: { name: string; iconUrl: string | null; current: boolean; href: string }) {
   return (
-    <DropdownMenuItem onClick={onChoose} aria-current={current ? "page" : undefined} className="px-2 py-1.5">
+    <DropdownMenuLinkItem render={<Link href={href} />} aria-current={current ? "page" : undefined} className="px-2 py-1.5">
       <WorkspaceTile name={name} iconUrl={iconUrl} size="sm" />
       <span className="min-w-0 flex-1 truncate">{name}</span>
       {current ? <IconCheck aria-label="Current workspace" className="size-4" /> : null}
-    </DropdownMenuItem>
+    </DropdownMenuLinkItem>
   );
 }
 
@@ -104,6 +104,7 @@ export function CollapseSidebarButton({ onCollapse }: { onCollapse: () => void }
   return (
     <button
       type="button"
+      data-slot={hideSidebarSlot}
       aria-label="Hide the sidebar"
       title="Hide the sidebar"
       onClick={onCollapse}

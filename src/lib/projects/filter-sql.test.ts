@@ -23,7 +23,7 @@ vi.mock("./scope", async (importOriginal) => ({
   sharedTeamIdsFor: () => Promise.resolve(teams.ids),
 }));
 
-const { facetJoinCondition, projectFilterCondition, projectSearchCondition } = await import("./queries");
+const { facetJoinCondition, facetTotalsQuery, projectFilterCondition, projectSearchCondition } = await import("./queries");
 
 function listSql(condition: Parameters<typeof and>[0]) {
   return db.select({ id: artifact.id }).from(artifact).where(and(eq(artifact.userId, "viewer-1"), condition)).toSQL();
@@ -51,9 +51,22 @@ describe("projectFilterCondition", () => {
     expect(params).toEqual(expect.arrayContaining(["team-b", "docs"]));
   });
 
-  it("should match artifacts without a project when the filter is none", async () => {
-    const { sql } = listSql(await projectFilterCondition("viewer-1", { kind: "mine" }, { none: true }));
-    expect(sql).toContain('"project_id" is null');
+  it("should match artifacts with no project, or none the viewer can use here, when the filter is Unfiled", async () => {
+    teams.ids = new Set(["team-a"]);
+    const { sql, params } = listSql(await projectFilterCondition("viewer-1", { kind: "mine" }, { none: true }));
+    expect(sql).toMatch(/"project_id" is null or "artifact"\."project_id" not in \(select "id" from "project" where/);
+    expect(params).toEqual(expect.arrayContaining(["viewer-1", "team-a"]));
+    expect(sql).not.toMatch(/"(\w+)" = "\1"/);
+  });
+});
+
+describe("facetTotalsQuery", () => {
+  it("should count the shared and public artifacts in the same one-table query as the total, without comparing a column with itself", () => {
+    const { sql, params } = facetTotalsQuery("viewer-1", eq(artifact.userId, "viewer-1")).toSQL();
+    expect(sql).toMatch(/count\(\*\) filter \(where not \(/);
+    expect(sql).toContain(`count(*) filter (where "visibility" = 'public')`);
+    expect(params.filter((value) => value === "viewer-1").length, "the viewer's own and their agents' artifacts are not shared with them").toBeGreaterThanOrEqual(2);
+    expect(sql).not.toMatch(/"(\w+)" = "\1"/);
   });
 });
 

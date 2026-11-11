@@ -56,7 +56,7 @@ function MoveMenu({ artifact, moves, titleId }: { artifact: ArtifactListItemDto;
         render={<button type="button" />}
         aria-label="Move to project"
         aria-describedby={titleId}
-        className="absolute top-1.5 right-1 inline-flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover/item:opacity-100 group-focus-within/item:opacity-100 pointer-coarse:opacity-100 hover:bg-background hover:text-foreground focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-[popup-open]:opacity-100"
+        className="absolute top-1.5 right-1 inline-flex size-6 items-center pointer-coarse:top-0 pointer-coarse:right-0 pointer-coarse:size-11 justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover/item:opacity-100 group-focus-within/item:opacity-100 pointer-coarse:opacity-100 hover:bg-background hover:text-foreground focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-[popup-open]:opacity-100"
       >
         <IconDots aria-hidden className="size-4" />
       </DropdownMenuTrigger>
@@ -114,7 +114,7 @@ export function TreeArtifact({ artifact, active, onSelect, moves }: TreeArtifact
         onClick={() => { onSelect(artifact.id); }}
         aria-current={active ? "true" : undefined}
         className={cn(
-          "relative flex w-full items-start gap-2 rounded-lg py-1.5 pr-8 pl-2 text-left transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+          "relative flex w-full items-start gap-2 rounded-lg py-1.5 pr-8 pl-2 text-left pointer-coarse:min-h-11 pointer-coarse:pr-12 transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
           active ? "bg-muted before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-foreground" : "hover:bg-muted/60",
         )}
       >
@@ -122,7 +122,8 @@ export function TreeArtifact({ artifact, active, onSelect, moves }: TreeArtifact
           <ArtifactIcon icon={artifact.icon} kind={artifact.kind} className={artifact.icon ? undefined : "size-3.5"} />
         </span>
         <span className="min-w-0 flex-1">
-          <h3 id={titleId} className={cn("line-clamp-2 text-sm break-words", active ? "font-medium text-foreground" : "text-foreground/90")}>{artifact.title || "Untitled artifact"}</h3>
+          {/* A span, not a heading: nothing structural belongs inside a button. */}
+          <span id={titleId} data-slot="artifact-title" className={cn("line-clamp-2 block text-sm break-words", active ? "font-medium text-foreground" : "text-foreground/90")}>{artifact.title || "Untitled artifact"}</span>
           <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             <SavedAt at={artifact.updatedAt} />
             <SharingBadge artifact={artifact} />

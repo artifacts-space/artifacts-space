@@ -88,7 +88,7 @@ describe("projectDotIndex", () => {
 });
 
 describe("focusesSearch", () => {
-  const press = { key: "/", metaKey: false, ctrlKey: false, altKey: false, typing: false };
+  const press = { key: "/", metaKey: false, ctrlKey: false, altKey: false, typing: false, inOverlay: false };
 
   it("should focus the search when / is pressed outside a field", () => {
     expect(focusesSearch(press)).toBe(true);
@@ -99,5 +99,9 @@ describe("focusesSearch", () => {
     expect(focusesSearch({ ...press, metaKey: true })).toBe(false);
     expect(focusesSearch({ ...press, ctrlKey: true })).toBe(false);
     expect(focusesSearch({ ...press, key: "?" })).toBe(false);
+  });
+
+  it("should leave / to an open dialog, popover, menu, or list box", () => {
+    expect(focusesSearch({ ...press, inOverlay: true })).toBe(false);
   });
 });

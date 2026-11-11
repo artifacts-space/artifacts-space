@@ -10,6 +10,7 @@ import {
   keyboardResize,
   parseStoredSize,
   sidebarBounds,
+  sideBySideMinWidth,
   sidebarColumns,
   sidebarHandleLeft,
   sidebarPanel,
@@ -32,16 +33,13 @@ describe("clampSize", () => {
 });
 
 describe("sidebarBounds", () => {
-  it("should allow the full range when the workspace is wide", () => {
-    expect(sidebarBounds(1600)).toEqual({ min: sidebarPanel.min, max: sidebarPanel.max });
+  it("should allow the sidebar's full range", () => {
+    expect(sidebarBounds()).toEqual({ min: sidebarPanel.min, max: sidebarPanel.max });
   });
 
-  it("should leave the artifact pane its minimum width when the workspace is narrower", () => {
-    expect(sidebarBounds(900)).toEqual({ min: sidebarPanel.min, max: 900 - sidebarPanel.contentMin });
-  });
-
-  it("should never put the maximum under the minimum when the workspace is very narrow", () => {
-    expect(sidebarBounds(500)).toEqual({ min: sidebarPanel.min, max: sidebarPanel.min });
+  it("should leave the artifact pane its minimum width beside the widest sidebar when the window is the narrowest side-by-side one", () => {
+    // A classic scrollbar takes up to 17 px of the window.
+    expect(sideBySideMinWidth - 17 - sidebarPanel.max).toBeGreaterThanOrEqual(sidebarPanel.contentMin);
   });
 });
 
@@ -134,8 +132,8 @@ describe("beforePaintScript", () => {
 
 describe("layout classes", () => {
   it("should draw the sidebar column inside the same bounds the handle reports when a size is stored", () => {
-    const { min, max, contentMin, defaultSize, cssVar } = sidebarPanel;
-    const clamp = `clamp(${String(min)}px,var(${cssVar},${String(defaultSize)}px),min(${String(max)}px,100%_-_${String(contentMin)}px))`;
+    const { min, max, defaultSize, cssVar } = sidebarPanel;
+    const clamp = `clamp(${String(min)}px,var(${cssVar},${String(defaultSize)}px),${String(max)}px)`;
     expect(sidebarColumns).toContain(clamp);
     expect(sidebarHandleLeft, "the handle sits on the same edge").toBe(`lg:left-[${clamp}]`);
   });

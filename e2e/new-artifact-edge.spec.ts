@@ -13,7 +13,7 @@ const storedNew = (page: Page) => page.evaluate(() => JSON.parse(window.sessionS
 const discarded = (page: Page) => page.evaluate(() => JSON.parse(window.sessionStorage.getItem("fixture:discarded") ?? "[]") as string[]);
 const setFlag = (page: Page, key: string, value: string) => page.evaluate(([name, flag]) => { window.sessionStorage.setItem(name, flag); }, [key, value] as const);
 const fire = (page: Page, name: string) => page.evaluate((event) => { window.dispatchEvent(new Event(event)); }, name);
-const cards = (page: Page, title: string) => page.locator("[data-slot=artifact-list] li").filter({ has: page.getByRole("heading", { name: title, exact: true }) });
+const cards = (page: Page, title: string) => page.locator("[data-slot=artifact-list] li").filter({ has: page.getByText(title, { exact: true }) });
 const blankPage = (page: Page) => page.getByRole("region", { name: "New artifact" });
 const body = (page: Page) => page.getByRole("region", { name: "Content" });
 const notSaved = (page: Page) => page.getByRole("status").filter({ hasText: "Not saved." });

@@ -24,9 +24,11 @@ export interface PanelSpec {
 }
 
 /**
- * The sidebar: wide enough at its minimum for the format and project
- * filters side by side and a card's title with its date, and never so wide
- * that the artifact pane drops under `contentMin`.
+ * The sidebar: wide enough at its minimum for the search row and an
+ * artifact's title with its date. The workspace is full width and the
+ * sidebar sits beside the artifact only from 1024 px (lg), so at its widest
+ * the artifact pane keeps `contentMin` with room to spare (a unit test
+ * checks it); no width needs a floor of its own.
  */
 export const sidebarPanel = {
   storageKey: "artifacts.space:workspace:sidebar-width",
@@ -34,9 +36,12 @@ export const sidebarPanel = {
   defaultSize: 280,
   min: 272,
   max: 520,
-  /** The narrowest the artifact pane may get, so its toolbar and content stay usable. */
+  /** The narrowest the artifact pane gets beside the widest sidebar, so its toolbar and content stay usable. */
   contentMin: 480,
 } as const satisfies PanelSpec & { max: number; contentMin: number };
+
+/** The narrowest window with the sidebar beside the artifact: Tailwind's lg breakpoint. */
+export const sideBySideMinWidth = 1024;
 
 /** Every panel whose size is remembered. */
 export const rememberedPanels: readonly PanelSpec[] = [sidebarPanel];
@@ -46,10 +51,10 @@ export const rememberedPanels: readonly PanelSpec[] = [sidebarPanel];
  * stored width never draws the sidebar or the artifact pane past them, even
  * before the handle has measured anything.
  */
-export const sidebarColumns = "lg:[grid-template-columns:clamp(272px,var(--workspace-sidebar-width,280px),min(520px,100%_-_480px))_minmax(0,1fr)]";
+export const sidebarColumns = "lg:[grid-template-columns:clamp(272px,var(--workspace-sidebar-width,280px),520px)_minmax(0,1fr)]";
 
 /** The sidebar handle's place in the workspace card from lg up: the same clamp as `sidebarColumns`, so it sits on the sidebar's edge. */
-export const sidebarHandleLeft = "lg:left-[clamp(272px,var(--workspace-sidebar-width,280px),min(520px,100%_-_480px))]";
+export const sidebarHandleLeft = "lg:left-[clamp(272px,var(--workspace-sidebar-width,280px),520px)]";
 
 /** One arrow press moves a handle this far; with Shift held, `bigStep`. */
 export const step = 16;
@@ -63,10 +68,9 @@ export function clampSize(size: number, bounds: SizeBounds): number {
   return Math.max(bounds.min, Math.min(size, bounds.max));
 }
 
-/** The sidebar's bounds inside a workspace card `shellWidth` pixels wide. */
-export function sidebarBounds(shellWidth: number): SizeBounds {
-  const { min, max, contentMin } = sidebarPanel;
-  return { min, max: Math.max(min, Math.min(max, shellWidth - contentMin)) };
+/** The sidebar's bounds: the same at every width where it sits beside the artifact. */
+export function sidebarBounds(): SizeBounds {
+  return { min: sidebarPanel.min, max: sidebarPanel.max };
 }
 
 /** Which way a handle moves: a vertical line moves left and right, a horizontal one up and down. */

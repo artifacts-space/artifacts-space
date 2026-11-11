@@ -92,7 +92,7 @@ type Subject = { source: ProjectSummary; target: ProjectSummary | null } | null;
 function deleteCopy(subject: Subject) {
   if (!subject) return "";
   const { name, count } = subject.source;
-  return `“${name}” goes away. Its ${String(count)} ${count === 1 ? "artifact stays" : "artifacts stay"}, with no project.`;
+  return `“${name}” goes away. Its ${String(count)} ${count === 1 ? "artifact stays" : "artifacts stay"}, in Unfiled.`;
 }
 
 function mergeCopy(subject: Subject) {
@@ -122,7 +122,7 @@ export function ProjectManager({ initialProjects, teams, team }: ProjectManagerP
       return false;
     }
     setProjects((current) => current.filter((item) => item.id !== source.id));
-    toast.success(`Deleted “${source.name}”. Its artifacts now have no project.`);
+    toast.success(`Deleted “${source.name}”. Its artifacts are now in Unfiled.`);
     return true;
   }
 

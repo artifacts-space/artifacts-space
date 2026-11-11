@@ -1,8 +1,8 @@
 /**
  * The workspace sidebar's views and project tree, as pure rules: which
  * artifacts each view shows, the views' counts, how the shown artifacts group
- * under their projects, and the colour a project's dot takes. Everything is
- * read from the list the workspace already holds, so no count needs a query.
+ * under their projects, and the colour a project's dot takes. Which counts
+ * the sidebar shows, the server's or the matches, is sidebar-count-rules.
  */
 
 /** The views in the sidebar's nav list. */
@@ -105,9 +105,11 @@ export interface ShortcutPress {
   altKey: boolean;
   /** True when focus is in a field, a text area, a select, or editable content. */
   typing: boolean;
+  /** True while a dialog, popover, menu, or list box is open, or the key comes from inside one. */
+  inOverlay: boolean;
 }
 
-/** True when "/" should move focus to the sidebar search: never while typing or with a modifier held. */
+/** True when "/" should move focus to the sidebar search: never while typing, inside an open overlay, or with a modifier held. */
 export function focusesSearch(press: ShortcutPress): boolean {
-  return press.key === "/" && !press.typing && !press.metaKey && !press.ctrlKey && !press.altKey;
+  return press.key === "/" && !press.typing && !press.inOverlay && !press.metaKey && !press.ctrlKey && !press.altKey;
 }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { IconBook, IconExternalLink, IconInbox, IconKey, IconLogout, IconRestore, IconSettings, IconUsers } from "@tabler/icons-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { useConfirmations } from "@/components/confirmations-provider";
 import { GitHubLink } from "@/components/github-link";
@@ -18,6 +18,7 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLinkItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -52,6 +53,15 @@ function InboxLink({ active }: { active: boolean }) {
 }
 
 /** Brings back every confirmation the person turned off. Hidden when none are off. */
+/** A link in the account menu, marked as the current page while its section is open. */
+function AccountLink({ href, active, children }: { href: string; active: boolean; children: ReactNode }) {
+  return (
+    <DropdownMenuLinkItem render={<Link href={href} />} aria-current={active ? "page" : undefined} className={cn("px-2 py-2", active && "bg-muted font-medium")}>
+      {children}
+    </DropdownMenuLinkItem>
+  );
+}
+
 function ResetConfirmationsItem() {
   const { skipped, reset } = useConfirmations();
   if (skipped.size === 0) return null;
@@ -133,22 +143,22 @@ export function AppHeader({ userId, name, email, username, unreadNotifications, 
                 <ThemeSwitcher />
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => { router.push("/app/settings"); }} className="px-2 py-2">
+              <AccountLink href="/app/settings" active={pathname.startsWith("/app/settings")}>
                 <IconSettings /> Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { router.push("/teams"); }} className="px-2 py-2">
+              </AccountLink>
+              <AccountLink href="/teams" active={pathname.startsWith("/teams")}>
                 <IconUsers /> Teams
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { router.push("/app/connections"); }} className="px-2 py-2">
+              </AccountLink>
+              <AccountLink href="/app/connections" active={false}>
                 <IconKey /> Access tokens
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { router.push("/docs"); }} className="px-2 py-2">
+              </AccountLink>
+              <AccountLink href="/docs" active={false}>
                 <IconBook /> Docs
-              </DropdownMenuItem>
+              </AccountLink>
               {/* `/?home` shows the landing page; a plain `/` sends signed-in people back here. */}
-              <DropdownMenuItem onClick={() => { router.push(landingPageHref); }} className="px-2 py-2">
+              <AccountLink href={landingPageHref} active={false}>
                 <IconExternalLink /> Public site
-              </DropdownMenuItem>
+              </AccountLink>
               <ResetConfirmationsItem />
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => void signOut()} className="px-2 py-2">

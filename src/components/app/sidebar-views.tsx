@@ -2,6 +2,7 @@
 
 import { IconClock, IconStack2, IconUsers, IconWorld } from "@tabler/icons-react";
 
+import { listLimit } from "@/lib/projects/sidebar-count-rules";
 import type { ViewCounts, WorkspaceView } from "@/lib/projects/sidebar-view-rules";
 import { cn } from "@/lib/utils";
 
@@ -19,14 +20,17 @@ function countOf(counts: ViewCounts, view: WorkspaceView): number | null {
 
 /**
  * The sidebar's views over the workspace's list: All artifacts, Recent,
- * Shared with me, and Public. Picking one narrows the project tree below it;
- * the counts come from the list the workspace already holds.
+ * Shared with me, and Public. Picking one narrows the project tree below it.
+ * With no filter on, the counts cover every artifact in the workspace; with
+ * one on, they count the matches, and `partial` says when only the newest
+ * artifacts were counted. On phones the views sit in one row that scrolls
+ * sideways, so the tree keeps the sidebar's height.
  */
-export function SidebarViews({ view, counts, onView }: { view: WorkspaceView; counts: ViewCounts; onView: (view: WorkspaceView) => void }) {
+export function SidebarViews({ view, counts, partial, onView }: { view: WorkspaceView; counts: ViewCounts; partial: boolean; onView: (view: WorkspaceView) => void }) {
   return (
     <nav aria-label="Views">
       {/* Buttons, not list items: the tree's list items are artifacts only. */}
-      <div className="space-y-px">
+      <div className="space-y-px max-md:-mx-2 max-md:flex max-md:gap-1 max-md:space-y-0 max-md:overflow-x-auto max-md:px-2 max-md:pb-1">
         {views.map((item) => {
           const active = item.view === view;
           const count = countOf(counts, item.view);
@@ -39,17 +43,18 @@ export function SidebarViews({ view, counts, onView }: { view: WorkspaceView; co
               title={item.hint}
               onClick={() => { onView(item.view); }}
               className={cn(
-                "flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-sm transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+                "flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-sm transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none max-md:w-auto max-md:shrink-0 max-md:gap-1.5 max-md:border pointer-coarse:h-11",
                 active ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
               )}
             >
               <Icon aria-hidden className="size-4 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              <span className="min-w-0 flex-1 truncate max-md:flex-none">{item.label}</span>
               {count === null ? null : <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{count}</span>}
             </button>
           );
         })}
       </div>
+      {partial ? <p className="px-2 pt-1 text-xs text-muted-foreground">Counts cover the newest {listLimit} only.</p> : null}
     </nav>
   );
 }

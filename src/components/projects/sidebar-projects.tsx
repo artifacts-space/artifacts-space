@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { ArtifactListItemDto } from "@/lib/artifact-types";
 import { projectNameKey, type ProjectFilter } from "@/lib/projects/rules";
 import { deleteProjectCopy, projectKeyOf, type SidebarProject, type SidebarProjectRow, type SidebarTeam } from "@/lib/projects/sidebar-rules";
+import { groupCount, moreRow, unfiledCount, type GroupCount } from "@/lib/projects/sidebar-count-rules";
 import type { TreeGroup } from "@/lib/projects/sidebar-view-rules";
 
 import { InlineNameForm } from "./inline-name-form";
@@ -31,8 +32,10 @@ interface SidebarProjectsProps {
   onDropArtifact: (artifactId: string, target: SidebarProject | null) => void;
   /** The shown artifacts under their projects, Unfiled last (groupByProject). */
   groups: readonly TreeGroup<ArtifactListItemDto>[];
-  /** True while a search or a view narrows the list: only groups with something in them show, all open. */
+  /** True while a search, the format, a view, or tags narrow the list: only groups with matches show, all open, counting their matches. */
   narrowed: boolean;
+  /** Every artifact in the scope, from the server: Unfiled counts what no project holds. */
+  total: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
   moves: CardMoves;
@@ -111,24 +114,53 @@ function selectedIn(artifact: ArtifactListItemDto | undefined, known: ReadonlySe
   return { id: artifact.id, key: key !== null && known.has(key) ? key : UNFILED };
 }
 
-type TreeProps = Pick<SidebarProjectsProps, "controls" | "filter" | "onFilter" | "onDropArtifact" | "blockedKeys" | "groups" | "narrowed" | "selectedId" | "onSelect" | "moves"> & {
+type TreeProps = Pick<SidebarProjectsProps, "controls" | "filter" | "onFilter" | "onDropArtifact" | "blockedKeys" | "groups" | "narrowed" | "total" | "selectedId" | "onSelect" | "moves"> & {
   namesTeams: boolean;
   closed: ReadonlySet<string>;
   onToggle: (key: string) => void;
 };
 
-/** The artifacts under one group, or nothing while it is closed. */
-function GroupItems({ id, items, open, selectedId, onSelect, moves }: { id: string; items: readonly ArtifactListItemDto[]; open: boolean } & Pick<TreeProps, "selectedId" | "onSelect" | "moves">) {
-  if (!open || items.length === 0) return null;
+interface GroupItemsProps extends Pick<TreeProps, "selectedId" | "onSelect" | "moves"> {
+  id: string;
+  label: string;
+  items: readonly ArtifactListItemDto[];
+  open: boolean;
+  /** The row under the artifacts when the group lists fewer than its count. */
+  more: ReturnType<typeof moreRow>;
+  onShowAll: () => void;
+}
+
+/** What the row under a group says when it lists fewer artifacts than its count, and its Show all button. */
+function MoreRow({ label, more, onShowAll }: Pick<GroupItemsProps, "label" | "more" | "onShowAll">) {
+  if (!more) return null;
+  if (more.kind === "newest") return <p className="py-1 pl-2 text-xs text-muted-foreground">Showing the newest {more.shown} of {more.count}. Search to find older ones.</p>;
   return (
-    <ul id={id} className="mt-px mb-1 ml-3 space-y-px border-l pl-2">
-      {items.map((artifact) => <TreeArtifact key={artifact.id} artifact={artifact} active={artifact.id === selectedId} onSelect={onSelect} moves={moves} />)}
-    </ul>
+    <p className="flex items-center gap-2 py-0.5 pl-2 text-xs text-muted-foreground">
+      <span>Showing {more.shown} of {more.count}</span>
+      <button type="button" aria-label={`Show all ${String(more.count)} in ${label}`} onClick={onShowAll} className="rounded-md px-1.5 py-1 font-medium text-foreground underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none pointer-coarse:min-h-11">
+        Show all
+      </button>
+    </p>
+  );
+}
+
+/** The artifacts under one group, then the Show all row when it holds more; nothing while it is closed. */
+function GroupItems({ id, label, items, open, more, onShowAll, selectedId, onSelect, moves }: GroupItemsProps) {
+  if (!open || (items.length === 0 && !more)) return null;
+  return (
+    <div id={id} className="mt-px mb-1 ml-3 border-l pl-2">
+      {items.length > 0 ? (
+        <ul className="space-y-px">
+          {items.map((artifact) => <TreeArtifact key={artifact.id} artifact={artifact} active={artifact.id === selectedId} onSelect={onSelect} moves={moves} />)}
+        </ul>
+      ) : null}
+      <MoreRow label={label} more={more} onShowAll={onShowAll} />
+    </div>
   );
 }
 
 /** Every project with its artifacts, then Unfiled, with rename in place and delete behind a confirm. */
-function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, namesTeams, groups, narrowed, selectedId, onSelect, moves, closed, onToggle }: TreeProps) {
+function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, namesTeams, groups, narrowed, total, selectedId, onSelect, moves, closed, onToggle }: TreeProps) {
   const baseId = useId();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<{ row: SidebarProjectRow; count: number | null } | null>(null);
@@ -142,10 +174,15 @@ function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, 
     confirmDelete.request(() => controls.remove(row));
   }
 
-  // While a search, the format filter, or a view narrows the tree, every group with matches is open and cannot close,
+  // While a search, the format, a view, or tags narrow the tree, every group with matches is open and cannot close,
   // so its row has no chevron, and its count is what it shows.
-  function disclosure(key: string, items: readonly ArtifactListItemDto[]): Disclosure {
-    return { open: narrowed || !closed.has(key), controls: `${baseId}-${key}`, enabled: !narrowed && items.length > 0, onToggle: () => { onToggle(key); } };
+  function disclosure(key: string, count: GroupCount, more: ReturnType<typeof moreRow>): Disclosure {
+    return { open: narrowed || !closed.has(key), controls: `${baseId}-${key}`, enabled: !narrowed && (count.shown > 0 || more !== null), onToggle: () => { onToggle(key); } };
+  }
+
+  /** The row under a group listing fewer artifacts than its count. */
+  function moreFor(count: GroupCount, active: boolean) {
+    return moreRow(count, { narrowed, filterOn: filter !== null, active });
   }
 
   function renameForm(project: SidebarProject, row: SidebarProjectRow) {
@@ -165,12 +202,14 @@ function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, 
     if (narrowed && items.length === 0) return null;
     const renaming = project.rows.find((row) => row.id === renamingId);
     const active = isActive(filter, project.key);
-    const open = disclosure(project.key, items);
+    const count = groupCount(narrowed, project.count, items.length);
+    const more = moreFor(count, active);
+    const open = disclosure(project.key, count, more);
     return (
       <div key={project.key} role="group" aria-label={project.name}>
         {renaming ? renameForm(project, renaming) : (
           <ProjectEntry
-            project={narrowed ? { ...project, count: items.length } : project}
+            project={{ ...project, count: count.count }}
             active={active}
             blocked={blockedKeys.has(project.key)}
             namesTeams={namesTeams}
@@ -181,19 +220,22 @@ function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, 
             onDelete={(row) => { requestDelete(project, row); }}
           />
         )}
-        <GroupItems id={open.controls} items={items} open={open.open} selectedId={selectedId} onSelect={onSelect} moves={moves} />
+        <GroupItems id={open.controls} label={project.name} items={items} open={open.open} more={more} onShowAll={() => { onFilter({ key: project.key }); }} selectedId={selectedId} onSelect={onSelect} moves={moves} />
       </div>
     );
   }
 
-  const unfiledOpen = disclosure(UNFILED, unfiled);
+  // Unfiled holds every artifact no entry holds, so its count and its rows agree.
+  const unfiledTotal = groupCount(narrowed, unfiledCount(total, controls.entries.map((entry) => entry.count)), unfiled.length);
+  const unfiledMore = moreFor(unfiledTotal, noneActive);
+  const unfiledOpen = disclosure(UNFILED, unfiledTotal, unfiledMore);
   return (
     <>
       {controls.entries.map(renderEntry)}
       {narrowed && unfiled.length === 0 ? null : (
         <div role="group" aria-label="Unfiled">
-          <NoProjectRow count={narrowed ? unfiled.length : controls.none} active={noneActive} disclosure={unfiledOpen} onFilter={() => { onFilter(noneActive ? null : { none: true }); }} onDropArtifact={(id) => { onDropArtifact(id, null); }} />
-          <GroupItems id={unfiledOpen.controls} items={unfiled} open={unfiledOpen.open} selectedId={selectedId} onSelect={onSelect} moves={moves} />
+          <NoProjectRow count={unfiledTotal.count} active={noneActive} disclosure={unfiledOpen} onFilter={() => { onFilter(noneActive ? null : { none: true }); }} onDropArtifact={(id) => { onDropArtifact(id, null); }} />
+          <GroupItems id={unfiledOpen.controls} label="Unfiled" items={unfiled} open={unfiledOpen.open} more={unfiledMore} onShowAll={() => { onFilter({ none: true }); }} selectedId={selectedId} onSelect={onSelect} moves={moves} />
         </div>
       )}
       <ConfirmDialog state={confirmDelete.dialog} title="Delete this project?" description={deleting ? deleteProjectCopy(deleting.row, deleting.count) : ""} confirmLabel="Delete project" />
@@ -201,13 +243,13 @@ function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, 
   );
 }
 
-const headerButton = "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none";
+const headerButton = "inline-flex size-7 shrink-0 items-center pointer-coarse:size-11 justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none";
 
 /** The group's heading: close or open every project (not while the tree is narrowed), and start a new one. */
 function GroupHeader({ dragging, allClosed, canFold, onFoldAll, onCreate }: { dragging: boolean; allClosed: boolean; canFold: boolean; onFoldAll: () => void; onCreate: () => void }) {
   const foldLabel = allClosed ? "Open every project" : "Close every project";
   return (
-    <div className="flex h-8 items-center gap-1 pr-0.5 pl-2">
+    <div className="flex h-8 items-center gap-1 pr-0.5 pl-2 pointer-coarse:h-11">
       <h2 className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
         {dragging ? "Drop on a project" : "Projects"}
       </h2>

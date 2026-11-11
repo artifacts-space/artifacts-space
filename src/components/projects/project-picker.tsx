@@ -43,7 +43,7 @@ function choiceFor(row: PickerRow): ProjectChoice {
 }
 
 function RowContent({ row, selectedId }: { row: PickerRow; selectedId: string | null }) {
-  if (row.kind === "none") return <><IconX aria-hidden className="size-3.5 text-muted-foreground" /> No project</>;
+  if (row.kind === "none") return <><IconX aria-hidden className="size-3.5 text-muted-foreground" /> Unfiled</>;
   if (row.kind === "create") return <><IconPlus aria-hidden className="size-3.5 text-muted-foreground" /> Create “{row.name}”</>;
   return (
     <>
@@ -62,7 +62,7 @@ function TriggerLabel({ value, appearance }: { value: ArtifactProjectDto | null;
   }
   return (
     <>
-      {value ? <ProjectLabel name={value.name} icon={value.icon} className="text-foreground" /> : <><IconFolderPlus aria-hidden className="size-3.5" /> Add to a project</>}
+      {value ? <ProjectLabel name={value.name} icon={value.icon} className="text-foreground" /> : <><IconFolderPlus aria-hidden className="size-3.5" /> Add to project</>}
       <IconChevronDown aria-hidden className="size-3 opacity-60" />
     </>
   );
@@ -145,7 +145,7 @@ export function ProjectPicker({ artifactId, value, onChange, appearance = "inlin
         render={
           <button
             type="button"
-            aria-label={value ? `Project: ${value.name}. Change project` : "Add to a project"}
+            aria-label={value ? `Project: ${value.name}. Change project` : "Add to project"}
             className={cn(
               "inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg px-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-[popup-open]:bg-muted",
               appearance === "chip" ? cn("border px-2", value ? null : "border-dashed") : "-ml-1.5",

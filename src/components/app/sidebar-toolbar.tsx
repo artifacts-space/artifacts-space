@@ -22,18 +22,27 @@ function isTyping(target: EventTarget | null): boolean {
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
+/** Dialogs, popovers, menus, and list boxes: while one is open, "/" belongs to it. */
+const overlaySelector = "[role=dialog], [role=alertdialog], [role=menu], [role=listbox], [aria-modal=true]";
+
+/** True when the key comes from inside an overlay, or one is open on the page. */
+function inOverlay(target: EventTarget | null): boolean {
+  if (target instanceof Element && target.closest(overlaySelector)) return true;
+  return [...document.querySelectorAll(overlaySelector)].some((element) => element.getClientRects().length > 0);
+}
+
 /** True when the field is drawn and can take focus: not while the sidebar is hidden. */
 function isShown(field: HTMLInputElement | null): field is HTMLInputElement {
   return field !== null && field.getClientRects().length > 0;
 }
 
-/** "/" anywhere outside a field puts the cursor in the search, while the search is on screen; otherwise the key is left alone. */
+/** "/" anywhere outside a field and any open overlay puts the cursor in the search, while the search is on screen; otherwise the key is left alone. */
 function useSearchShortcut(field: React.RefObject<HTMLInputElement | null>) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const input = field.current;
-      if (event.defaultPrevented || !isShown(input)) return;
-      if (!focusesSearch({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, altKey: event.altKey, typing: isTyping(event.target) })) return;
+      if (event.key !== "/" || event.defaultPrevented || !isShown(input)) return;
+      if (!focusesSearch({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, altKey: event.altKey, typing: isTyping(event.target), inOverlay: inOverlay(event.target) })) return;
       event.preventDefault();
       input.focus();
     };

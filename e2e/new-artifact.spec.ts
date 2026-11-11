@@ -10,7 +10,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const creates = (page: Page) => page.evaluate(() => Number(window.sessionStorage.getItem("fixture:new-artifact-creates") ?? "0"));
 const storedNew = (page: Page) => page.evaluate(() => JSON.parse(window.sessionStorage.getItem("fixture:new-artifacts") ?? "[]") as { title: string; kind: string; content: string; files: unknown[] }[]);
-const cards = (page: Page, title: string) => page.locator("[data-slot=artifact-list] li").filter({ has: page.getByRole("heading", { name: title, exact: true }) });
+const cards = (page: Page, title: string) => page.locator("[data-slot=artifact-list] li").filter({ has: page.getByText(title, { exact: true }) });
 const blankPage = (page: Page) => page.getByRole("region", { name: "New artifact" });
 const body = (page: Page) => page.getByRole("region", { name: "Content" });
 

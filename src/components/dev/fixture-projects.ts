@@ -48,7 +48,7 @@ export function withProjects(artifacts: readonly ArtifactDto[], state: FixturePr
 }
 
 /** The project filter's facets for the fixture's artifacts. */
-export function fixtureFacets(artifacts: readonly ArtifactDto[]): ProjectFacets {
+export function fixtureFacets(artifacts: readonly ArtifactDto[], viewerId = "fixture"): ProjectFacets {
   const counts = new Map<string, { project: ArtifactProjectDto; count: number }>();
   for (const artifact of artifacts) {
     if (!artifact.project) continue;
@@ -56,7 +56,9 @@ export function fixtureFacets(artifacts: readonly ArtifactDto[]): ProjectFacets 
     counts.set(artifact.project.id, { project: artifact.project, count: (current?.count ?? 0) + 1 });
   }
   const projects = mergeProjectFacets([...counts.values()].map(({ project, count }) => ({ ...project, nameKey: projectNameKey(project.name), own: true, count })));
-  return { projects, none: artifacts.filter((artifact) => !artifact.project).length, total: artifacts.length };
+  const shared = artifacts.filter((artifact) => artifact.authorId !== viewerId && !artifact.actsForAuthor).length;
+  const shown = artifacts.filter((artifact) => artifact.visibility === "public").length;
+  return { projects, none: artifacts.filter((artifact) => !artifact.project).length, total: artifacts.length, shared, public: shown };
 }
 
 type Update = (change: (current: FixtureProjectsState) => FixtureProjectsState) => void;
