@@ -14,25 +14,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TeamIcon } from "@/components/teams/team-icon";
 import { workspaceQuery } from "@/lib/projects/filter-params";
-import { cn } from "@/lib/utils";
 
 import type { ShareTeam } from "./share-teams-context";
 import { hideSidebarSlot } from "./sidebar-visibility";
-
-/** The first letter of a workspace's name, for its tile. */
-function initial(name: string) {
-  return (name.trim().at(0) ?? "?").toUpperCase();
-}
-
-/** A workspace's tile: a team's own icon when it has one, else its first letter. Decorative: the name beside it says which workspace. */
-function WorkspaceTile({ name, iconUrl, size }: { name: string; iconUrl: string | null; size: "md" | "sm" }) {
-  if (iconUrl) return <TeamIcon name={name} iconUrl={iconUrl} size={size === "md" ? 32 : 24} className="rounded-lg" />;
-  return (
-    <span aria-hidden className={cn("inline-flex shrink-0 items-center justify-center bg-foreground font-semibold text-background", size === "md" ? "size-8 rounded-lg text-sm" : "size-6 rounded-md text-xs")}>
-      {initial(name)}
-    </span>
-  );
-}
 
 interface WorkspaceSwitcherProps {
   teams: readonly ShareTeam[];
@@ -40,6 +24,8 @@ interface WorkspaceSwitcherProps {
   scopeTeam: ShareTeam | null;
   /** The list's path: /app, or the fixture's page. */
   listPath: string;
+  /** The signed-in viewer, whose own avatar marks their personal workspace. */
+  viewerId: string;
 }
 
 /**
@@ -48,7 +34,7 @@ interface WorkspaceSwitcherProps {
  * to another, manage teams, or create one. Switching keeps no filters, as the
  * scope tabs it replaces did.
  */
-export function WorkspaceSwitcher({ teams, scopeTeam, listPath }: WorkspaceSwitcherProps) {
+export function WorkspaceSwitcher({ teams, scopeTeam, listPath, viewerId }: WorkspaceSwitcherProps) {
   const shared = teams.filter((team) => !team.personal);
   const name = scopeTeam ? scopeTeam.name : "Your artifacts";
   const kind = scopeTeam ? "Team workspace" : "Personal workspace";
@@ -61,7 +47,7 @@ export function WorkspaceSwitcher({ teams, scopeTeam, listPath }: WorkspaceSwitc
         aria-label={`Workspace: ${name}. Switch workspace`}
         className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 text-left transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-[popup-open]:bg-muted"
       >
-        <WorkspaceTile name={name} iconUrl={scopeTeam?.iconUrl ?? null} size="md" />
+        <TeamIcon team={scopeTeam} viewerId={viewerId} size={32} />
         <span className="min-w-0 flex-1">
           <span data-slot="workspace-name" className="block truncate text-md font-medium">{name}</span>
           <span className="block truncate text-xs text-muted-foreground">{kind}</span>
@@ -71,16 +57,16 @@ export function WorkspaceSwitcher({ teams, scopeTeam, listPath }: WorkspaceSwitc
       <DropdownMenuContent align="start" className="w-64">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-2 py-1.5 text-xs">Workspaces</DropdownMenuLabel>
-          <SwitchItem name="Your artifacts" iconUrl={null} current={scopeTeam === null} href={hrefFor(null)} />
+          <SwitchItem name="Your artifacts" team={null} viewerId={viewerId} current={scopeTeam === null} href={hrefFor(null)} />
           {shared.map((team) => (
-            <SwitchItem key={team.id} name={team.name} iconUrl={team.iconUrl ?? null} current={scopeTeam?.id === team.id} href={hrefFor(team.slug)} />
+            <SwitchItem key={team.id} name={team.name} team={team} viewerId={viewerId} current={scopeTeam?.id === team.id} href={hrefFor(team.slug)} />
           ))}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuLinkItem render={<Link href="/teams" />} className="px-2 py-2">
+        <DropdownMenuLinkItem render={<Link href="/teams" />} className="px-2 py-2 pointer-coarse:min-h-11">
           <IconUsers aria-hidden /> Manage teams
         </DropdownMenuLinkItem>
-        <DropdownMenuLinkItem render={<Link href="/teams/new" />} className="px-2 py-2">
+        <DropdownMenuLinkItem render={<Link href="/teams/new" />} className="px-2 py-2 pointer-coarse:min-h-11">
           <IconPlus aria-hidden /> Create a team
         </DropdownMenuLinkItem>
       </DropdownMenuContent>
@@ -88,11 +74,11 @@ export function WorkspaceSwitcher({ teams, scopeTeam, listPath }: WorkspaceSwitc
   );
 }
 
-/** One workspace in the menu, a link to its list, with a check on the one shown. */
-function SwitchItem({ name, iconUrl, current, href }: { name: string; iconUrl: string | null; current: boolean; href: string }) {
+/** One workspace in the menu, a link to its list, with its avatar and a check on the one shown. */
+function SwitchItem({ name, team, viewerId, current, href }: { name: string; team: ShareTeam | null; viewerId: string; current: boolean; href: string }) {
   return (
-    <DropdownMenuLinkItem render={<Link href={href} />} aria-current={current ? "page" : undefined} className="px-2 py-1.5">
-      <WorkspaceTile name={name} iconUrl={iconUrl} size="sm" />
+    <DropdownMenuLinkItem render={<Link href={href} />} aria-current={current ? "page" : undefined} className="px-2 py-1.5 pointer-coarse:min-h-11">
+      <TeamIcon team={team} viewerId={viewerId} size={24} />
       <span className="min-w-0 flex-1 truncate">{name}</span>
       {current ? <IconCheck aria-label="Current workspace" className="size-4" /> : null}
     </DropdownMenuLinkItem>

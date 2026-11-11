@@ -247,13 +247,3 @@ export function teamIconNetworkCheck(network: string): RateLimitCheck {
 export function teamIconMemberCheck(userId: string): RateLimitCheck {
   return { name: "teamIconByUser", subject: userId };
 }
-
-/**
- * The letter shown when a team has no icon: the first letter or digit of its
- * name, upper-cased without a locale, so the server and every browser draw
- * the same letter (a Turkish locale would turn "i" into "İ").
- */
-export function teamMonogram(name: string): string {
-  const match = /[\p{L}\p{N}]/u.exec(name);
-  return match ? match[0].toUpperCase() : "T";
-}

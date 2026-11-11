@@ -7,6 +7,7 @@ const sizes = [20, 32, 64] as const;
 const kinds: { kind: AvatarKind; label: string }[] = [
   { kind: "person", label: "People" },
   { kind: "agent", label: "Agents" },
+  { kind: "team", label: "Teams" },
 ];
 
 function AvatarRow({ size, kind, gridSize }: { size: number; kind: AvatarKind; gridSize?: number }) {
@@ -75,7 +76,7 @@ function InContext() {
   );
 }
 
-/** Pixel avatars for the dev gallery: forty seeds at three sizes, people and agents, light and dark. */
+/** Pixel avatars for the dev gallery: forty seeds at three sizes, people, agents, and teams, light and dark. */
 export function AvatarGallery() {
   return (
     <div className="grid min-w-0 gap-6">
