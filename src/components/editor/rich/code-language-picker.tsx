@@ -1,6 +1,7 @@
 "use client";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { fenceLanguage } from "@/lib/markdown/fence-info";
 
 const plain = "plain";
 
@@ -41,26 +42,21 @@ function labelFor(value: string) {
   return languageOptions(value).find((option) => option.value === value)?.label ?? value;
 }
 
-/** The block's language from its attributes, or "plain". */
+/**
+ * The block's language from its `language` attribute, which holds the
+ * fence's whole info string: its first word (attributes aside), or "plain".
+ */
 export function blockLanguage(attr: unknown): string {
-  return typeof attr === "string" && attr ? attr : plain;
+  return fenceLanguage(attr) || plain;
 }
 
-/** Where the picker sits: pinned in its block's top-right corner, or in line inside a toolbar that places it. */
-export type PickerPlacement = "corner" | "inline";
-
-const placementClass: Record<PickerPlacement, string> = {
-  corner: "absolute top-1.5 right-1.5 z-[1]",
-  inline: "",
-};
-
 /**
- * The quiet language picker for a code block, in the block's corner by
- * default. Choosing Plain text clears the language.
+ * The quiet language picker for a code block, at the left of its toolbar.
+ * Choosing Plain text clears the language.
  */
-export function CodeLanguagePicker({ language, disabled, onChange, placement = "corner" }: { language: string; disabled: boolean; onChange: (language: string | null) => void; placement?: PickerPlacement }) {
+export function CodeLanguagePicker({ language, disabled, onChange }: { language: string; disabled: boolean; onChange: (language: string | null) => void }) {
   return (
-    <div contentEditable={false} className={placementClass[placement]}>
+    <div contentEditable={false}>
       <Select
         value={language}
         disabled={disabled}
@@ -69,7 +65,7 @@ export function CodeLanguagePicker({ language, disabled, onChange, placement = "
         <SelectTrigger size="sm" aria-label="Code language" className="h-7 border-transparent bg-transparent text-xs text-muted-foreground shadow-none hover:text-foreground dark:bg-transparent">
           <SelectValue>{(value: string) => labelFor(value)}</SelectValue>
         </SelectTrigger>
-        <SelectContent alignItemWithTrigger={false} align="end">
+        <SelectContent alignItemWithTrigger={false} align="start">
           {languageOptions(language).map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
         </SelectContent>
       </Select>

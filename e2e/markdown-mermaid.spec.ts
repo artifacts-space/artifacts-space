@@ -19,8 +19,12 @@ const sourceOf = (block: Locator) => block.locator("pre:has([data-node-view-cont
 async function openFixture(page: Page) {
   await page.goto("/dev/mermaid");
   await expect(readView(page).getByRole("heading", { name: "Diagram fixture" })).toBeVisible();
-  // Diagrams draw as they near the viewport; the first one is on screen.
-  await expect(readDiagrams(page).first()).toHaveAttribute("data-diagram-state", "drawn", { timeout: 60_000 });
+  // Diagrams draw as they near the viewport. Let every read-view diagram finish, so none moves the page under a later click.
+  for (const diagram of await readDiagrams(page).all()) {
+    await diagram.scrollIntoViewIfNeeded();
+    await expect(diagram).not.toHaveAttribute("data-diagram-state", "drawing", { timeout: 60_000 });
+  }
+  await page.evaluate(() => { window.scrollTo(0, 0); });
 }
 
 /** Scrolls the editor's diagram into view, where it draws, and returns it. */
@@ -83,61 +87,175 @@ test("should redraw the diagram in dark colors when the reader switches to dark 
   await expect(readDiagrams(page).first()).toHaveAttribute("data-diagram-state", "drawn");
 });
 
-test("should open the source under a live preview and keep the fenced block when a diagram is edited", async ({ page }) => {
+/** Picks a view from a diagram block's view picker. */
+async function pickView(page: Page, block: Locator, view: "Code" | "Preview" | "Split") {
+  await block.getByRole("combobox", { name: "Diagram view" }).click();
+  await page.getByRole("option", { name: view, exact: true }).click();
+}
+
+/**
+ * Clicks into the editor and waits for it to take the click's cursor:
+ * ProseMirror reads the browser's selection a moment after the mouse comes
+ * up, and a key pressed before then lands at the old cursor.
+ */
+async function clickInEditor(target: Locator, options: Parameters<Locator["click"]>[0] = {}) {
+  await target.click(options);
+  await target.page().evaluate(() => new Promise((resolve) => { setTimeout(resolve, 100); }));
+}
+
+/** Puts the cursor at the end of a diagram's source: a click right of its last line (End differs across platforms). */
+async function clickSourceEnd(block: Locator) {
+  const source = sourceOf(block);
+  const box = await source.boundingBox();
+  if (!box) throw new Error("the source should be on screen");
+  await clickInEditor(source, { position: { x: box.width - 6, y: box.height - 26 } });
+}
+
+/** True when `second` sits to the right of `first` (side by side), false when it sits below (stacked). */
+async function sideBySide(first: Locator, second: Locator): Promise<boolean> {
+  const [a, b] = await Promise.all([first.boundingBox(), second.boundingBox()]);
+  if (!a || !b) throw new Error("both sides should be on screen");
+  return b.x >= a.x + a.width - 1 && Math.abs(b.y - a.y) < a.height;
+}
+
+test("should show only the source when a diagram's view is code, and both with the caption when it is split", async ({ page, isMobile }) => {
   await openFixture(page);
-  const block = await editorBlock(page);
-  await expect(sourceOf(block)).toBeHidden();
-  // While closed, screen readers get the source after the diagram.
-  await expect(block.locator(".sr-only pre")).toHaveText("flowchart LR\n  Plan --> Build");
-  const before = await block.getByRole("img", { name: "Diagram" }).getAttribute("src");
+  const codeOnly = readView(page).locator('[data-markdown-mermaid][data-diagram-view="code"]');
+  await codeOnly.scrollIntoViewIfNeeded();
+  await expect(codeOnly.locator("[data-code-block]")).toContainText("Source --> Only");
+  await expect(codeOnly.getByRole("img", { name: "Diagram" })).toHaveCount(0);
 
-  await block.getByRole("button", { name: "Edit diagram" }).click();
-  await expect(block).toHaveAttribute("data-source-open", "");
-  await expect(sourceOf(block)).toBeVisible();
-  await expect(block.getByRole("img", { name: "Diagram" })).toBeVisible();
+  const split = readView(page).locator('[data-markdown-mermaid][data-diagram-view="split"]');
+  await split.scrollIntoViewIfNeeded();
+  await expect(split.locator("[data-markdown-diagram]")).toHaveAttribute("data-diagram-state", "drawn", { timeout: 60_000 });
+  const source = split.locator("[data-code-block]");
+  const diagram = split.getByRole("img", { name: "Diagram" });
+  await expect(source).toContainText("Review --> Ship");
+  await expect(diagram).toBeVisible();
+  // Side by side on a desktop; stacked, source first, on a phone.
+  expect(await sideBySide(source, diagram)).toBe(!isMobile);
+  await expect(split.locator("[data-block-caption]")).toHaveText('Say "ship" when it is ready');
 
-  await page.keyboard.press("Enter");
-  await page.keyboard.type("  Build --> Ship");
-  await expect(savedMarkdown(page)).toContainText("```mermaid\nflowchart LR\n  Plan --> Build\n  Build --> Ship\n```");
-  await expect(block.getByRole("img", { name: "Diagram" })).not.toHaveAttribute("src", before ?? "", { timeout: 30_000 });
-  expect(await svgOf(page, await block.getByRole("img", { name: "Diagram" }).getAttribute("src"))).toContain("Ship");
-
-  // A selection that starts in the source and runs past it keeps the source open.
-  await page.keyboard.press("Control+Shift+End");
-  await expect(sourceOf(block)).toBeVisible();
-
-  await block.getByRole("button", { name: "Done" }).click();
-  await expect(block).not.toHaveAttribute("data-source-open", "");
-  await expect(sourceOf(block)).toBeHidden();
-  await expect(savedMarkdown(page)).toContainText("# Editor diagram\n\nIntro paragraph.\n\n```mermaid\nflowchart LR\n  Plan --> Build\n  Build --> Ship\n```\n\nEnd paragraph.");
+  const wrapped = readView(page).locator("[data-code-figure]");
+  await expect(wrapped.locator("[data-block-caption]")).toHaveText("Build output");
+  await expect(wrapped.locator("pre")).toHaveClass(/whitespace-pre-wrap/u);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
 });
 
-test("should keep the source open with the note when an edit breaks the diagram", async ({ page }) => {
+test("should open a diagram larger when a reader clicks it", async ({ page }) => {
+  await openFixture(page);
+  const drawn = readDiagrams(page).first();
+  await drawn.getByRole("img", { name: "Diagram" }).click();
+  const dialog = page.getByRole("dialog", { name: "Diagram" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("img", { name: "Diagram" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await drawn.getByRole("button", { name: "Zoom in" }).click();
+  await expect(dialog).toBeVisible();
+});
+
+test("should show the diagram alone, keeping its source in place, when the view is preview", async ({ page }) => {
   await openFixture(page);
   const block = await editorBlock(page);
-  // A click on the diagram itself opens its source, with the cursor at the end.
-  await block.getByRole("img", { name: "Diagram" }).click();
+  await expect(block).toHaveAttribute("data-diagram-view", "preview");
+  await expect(sourceOf(block)).toBeHidden();
+  // While the source is hidden, screen readers get it after the diagram.
+  await expect(block.locator(".sr-only pre")).toHaveText("flowchart LR\n  Plan --> Build");
+  await expect(block.getByRole("combobox", { name: "Code language" })).toHaveText(/Mermaid diagram/u);
+  await expect(block.getByRole("combobox", { name: "Diagram view" })).toHaveText(/Preview/u);
+});
+
+test("should save the view in the fence and redraw as the source changes when Split is picked", async ({ page, isMobile }) => {
+  await openFixture(page);
+  const block = await editorBlock(page);
+  const before = await block.getByRole("img", { name: "Diagram" }).getAttribute("src");
+
+  await pickView(page, block, "Split");
+  await expect(savedMarkdown(page)).toContainText("```mermaid {view=split}\nflowchart LR\n  Plan --> Build\n```");
+  await expect(sourceOf(block)).toBeVisible();
+  const diagram = block.getByRole("img", { name: "Diagram" });
+  await expect(diagram).toBeVisible();
+  expect(await sideBySide(sourceOf(block), diagram)).toBe(!isMobile);
+
+  await clickSourceEnd(block);
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("  Build --> Ship");
+  await expect(savedMarkdown(page)).toContainText("```mermaid {view=split}\nflowchart LR\n  Plan --> Build\n  Build --> Ship\n```");
+  await expect(diagram).not.toHaveAttribute("src", before ?? "", { timeout: 30_000 });
+  expect(await svgOf(page, await diagram.getAttribute("src"))).toContain("Ship");
+
+  await pickView(page, block, "Code");
+  await expect(savedMarkdown(page)).toContainText("```mermaid {view=code}\n");
+  await expect(sourceOf(block)).toBeVisible();
+  await expect(block.getByRole("img", { name: "Diagram" })).toBeHidden();
+
+  // Preview is the default, so picking it leaves the fence plain.
+  await pickView(page, block, "Preview");
+  await expect(savedMarkdown(page)).toContainText("Intro paragraph.\n\n```mermaid\nflowchart LR\n  Plan --> Build\n  Build --> Ship\n```\n\nEnd paragraph.");
+});
+
+test("should save a caption and wrapping in the fence when an editor adds them", async ({ page }) => {
+  await openFixture(page);
+  const block = await editorBlock(page);
+  await block.getByRole("button", { name: "Caption" }).click();
+  const caption = block.getByRole("textbox", { name: "Caption" });
+  await expect(caption).toBeFocused();
+  await caption.fill('The "build" path');
+  await caption.press("Enter");
+  await expect(savedMarkdown(page)).toContainText('```mermaid {caption="The \\"build\\" path"}\nflowchart LR');
+  await expect(block.getByRole("button", { name: "Caption" })).toHaveCount(0);
+
+  await block.getByRole("button", { name: "Wrap code" }).click();
+  await expect(block.getByRole("button", { name: "Wrap code" })).toHaveAttribute("aria-pressed", "true");
+  await expect(savedMarkdown(page)).toContainText('```mermaid {caption="The \\"build\\" path" wrap=true}\n');
+
+  await caption.fill("");
+  await caption.press("Enter");
+  await expect(savedMarkdown(page)).toContainText("```mermaid {wrap=true}\n");
+});
+
+test("should keep the source showing with the note when an edit breaks a diagram in preview", async ({ page }) => {
+  await openFixture(page);
+  const block = await editorBlock(page);
+  await pickView(page, block, "Split");
+  await clickSourceEnd(block);
   await page.keyboard.type(" -- >");
   await expect(block).toHaveAttribute("data-diagram-state", "failed", { timeout: 30_000 });
   await expect(block.getByRole("note")).toContainText("Couldn’t draw this diagram.");
-  // Its source stays open until it draws, so it offers no Done.
-  await expect(block.getByRole("button", { name: "Done" })).toHaveCount(0);
 
-  // Moving the cursor out leaves the source open, so the mistake can be fixed.
+  // Back in Preview, a broken diagram keeps its source showing, so the mistake can be fixed.
+  await pickView(page, block, "Preview");
   await editor(page).getByText("End paragraph.").click();
+  await expect(block).toHaveAttribute("data-diagram-view", "preview");
   await expect(sourceOf(block)).toBeVisible();
 });
 
-test("should turn a closed diagram back into a code block when Plain text is picked", async ({ page }) => {
+test("should turn a diagram back into a code block when Plain text is picked", async ({ page }) => {
   await openFixture(page);
   const block = await editorBlock(page);
-  await expect(sourceOf(block)).toBeHidden();
-  const picker = block.getByRole("combobox", { name: "Code language" }).filter({ visible: true });
-  await expect(picker).toHaveCount(1);
-  await picker.click();
+  await block.getByRole("combobox", { name: "Code language" }).click();
   await page.getByRole("option", { name: "Plain text" }).click();
 
   await expect(editorDiagram(page)).toHaveCount(0);
   await expect(editor(page).locator("pre").filter({ hasText: "Plan --> Build" })).toBeVisible();
   await expect(savedMarkdown(page)).toContainText("Intro paragraph.\n\n```\nflowchart LR\n  Plan --> Build\n```\n\nEnd paragraph.");
+});
+
+test("should insert an empty diagram with its source open when Mermaid diagram is picked from the slash menu", async ({ page }) => {
+  await openFixture(page);
+  await editorBlock(page);
+  await clickInEditor(editor(page).getByText("End paragraph."));
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/mermaid");
+  await page.getByRole("option", { name: /Mermaid diagram/u }).click();
+  await expect(editorDiagram(page)).toHaveCount(2);
+  // An empty diagram shows its source, with a hint where the diagram will draw.
+  const added = editorDiagram(page).filter({ hasText: "Write Mermaid source" });
+  await expect(added).toHaveAttribute("data-source-open", "");
+  await expect(sourceOf(added)).toBeVisible();
+  await page.keyboard.type("flowchart TD\n  New --> Diagram");
+  await expect(savedMarkdown(page)).toContainText("End paragraph.\n\n```mermaid\nflowchart TD\n  New --> Diagram\n```");
 });

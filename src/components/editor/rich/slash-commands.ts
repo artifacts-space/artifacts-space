@@ -13,6 +13,7 @@ import {
   IconMovie,
   IconMusic,
   IconPhoto,
+  IconSitemap,
   IconTable,
   type Icon,
 } from "@tabler/icons-react";
@@ -47,6 +48,7 @@ export const slashCommands: readonly SlashCommand[] = [
   { id: "task", title: "Task list", hint: "[ ]", keywords: ["todo", "checkbox", "check"], icon: IconListCheck, apply: (chain) => chain.toggleTaskList() },
   { id: "quote", title: "Quote", hint: ">", keywords: ["blockquote", "citation"], icon: IconBlockquote, apply: (chain) => chain.toggleBlockquote() },
   { id: "code", title: "Code block", hint: "```", keywords: ["pre", "snippet", "fence"], icon: IconCode, apply: (chain) => chain.toggleCodeBlock() },
+  { id: "mermaid", title: "Mermaid diagram", hint: "```mermaid", keywords: ["mermaid", "diagram", "flowchart", "chart", "code"], icon: IconSitemap, apply: (chain) => chain.setCodeBlock({ language: "mermaid" }) },
   { id: "table", title: "Table", hint: "3×3", keywords: ["grid", "columns", "rows"], icon: IconTable, apply: (chain) => chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }) },
   { id: "divider", title: "Divider", hint: "---", keywords: ["hr", "rule", "separator", "line"], icon: IconMinus, apply: (chain) => chain.setHorizontalRule() },
   { id: "image", title: "Image", hint: "![]", keywords: ["image", "picture", "photo", "screenshot", "img"], icon: IconPhoto, apply: (chain) => insertMedia(chain, "image") },
