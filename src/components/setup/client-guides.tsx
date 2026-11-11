@@ -138,8 +138,8 @@ export function ChatGptGuide({ origin, full = false }: ClientGuideProps) {
       <ApproveSteps opener="ChatGPT asks you to connect. A sign-in window opens." />
       <Label>Use it in a chat</Label>
       <Prose className="mt-2">
-        <p>Start a new chat, type <code>@</code>, and choose <strong>artifacts.space</strong>. ChatGPT asks you to approve tool calls. You can keep your answer for the rest of the chat.</p>
-        <p>Business, Enterprise, and Edu workspaces can use every tool. On ChatGPT Pro, ChatGPT allows only tools that read.</p>
+        <p>Start a new chat, type <code>@</code>, and choose <strong>artifacts.space</strong>. ChatGPT asks before it uses a tool. You can tell it to remember your answer for that tool until the chat ends.</p>
+        <p>You need a Business, Enterprise, or Edu workspace. ChatGPT Pro can use only tools that are marked read-only, and our tools do not have that mark yet, so artifacts.space does not work on Pro for now.</p>
       </Prose>
       {full ? (
         <Prose className="mt-4">

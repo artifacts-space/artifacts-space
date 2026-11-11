@@ -1,6 +1,10 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { openAiMark } from "@/components/harness/openai-mark";
 import { ChatGptGuide, clientGuides, FxGuide } from "@/components/setup/client-guides";
 import { mcpClients } from "@/lib/setup/client-installs";
 
@@ -29,6 +33,13 @@ describe("ClientLogo", () => {
     expect(html).not.toContain("<svg");
     expect(html).toMatch(/^<span aria-hidden="true" data-client-logo-spacer=""/);
     expect(html).toContain("size-4");
+  });
+
+  it("should draw the same OpenAI mark as the harness icon file when showing ChatGPT", () => {
+    const iconFile = readFileSync(join(process.cwd(), "public/agent-icons/codex.svg"), "utf8");
+    expect(iconFile).toContain(`d="${openAiMark.path}"`);
+    expect(iconFile).toContain(`viewBox="${openAiMark.viewBox}"`);
+    expect(renderToStaticMarkup(<ClientLogo id="chatgpt" />)).toContain(`d="${openAiMark.path}"`);
   });
 
   it("should carry no title or label of its own when the visible text names the client", () => {
@@ -60,10 +71,10 @@ describe("client guides", () => {
     }
   });
 
-  it("should state which ChatGPT plans can use every tool when rendered in short form", () => {
+  it("should say Pro does not work yet when the short ChatGPT guide names the plans", () => {
     const html = renderToStaticMarkup(<ChatGptGuide origin={origin} />);
-    expect(html).toContain("Business, Enterprise, and Edu workspaces can use every tool.");
-    expect(html).toContain("only tools that read");
+    expect(html).toContain("You need a Business, Enterprise, or Edu workspace.");
+    expect(html).toContain("artifacts.space does not work on Pro for now");
     expect(html).not.toContain("Developer mode");
   });
 });
