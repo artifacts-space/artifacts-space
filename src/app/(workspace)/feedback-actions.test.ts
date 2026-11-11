@@ -114,6 +114,24 @@ describe("sendFeedbackAction", () => {
     expect(await sendFeedbackAction(input)).toEqual({ success: false, error: feedbackMessages.retry });
   });
 
+  it("should log the kind of failure when the post times out, so outages and bad URLs differ", async () => {
+    mocks.fetch.mockRejectedValue(new DOMException("The operation timed out.", "TimeoutError"));
+    await sendFeedbackAction(input);
+    expect(vi.mocked(console.error)).toHaveBeenCalledWith("[feedback] Send failed", "Slack post failed: timeout");
+  });
+
+  it("should log a refused redirect apart from other network failures", async () => {
+    mocks.fetch.mockRejectedValue(new TypeError("fetch failed", { cause: new Error("unexpected redirect") }));
+    await sendFeedbackAction(input);
+    expect(vi.mocked(console.error)).toHaveBeenCalledWith("[feedback] Send failed", "Slack post failed: redirect");
+  });
+
+  it("should log the status when Slack answers with an error", async () => {
+    mocks.fetch.mockResolvedValue(new Response("no_service", { status: 404 }));
+    await sendFeedbackAction(input);
+    expect(vi.mocked(console.error)).toHaveBeenCalledWith("[feedback] Send failed", "Slack post failed: status 404");
+  });
+
   it("should never log the webhook URL when Slack fails", async () => {
     mocks.fetch.mockRejectedValue(new TypeError(`fetch failed for ${webhook}`));
     await sendFeedbackAction(input);

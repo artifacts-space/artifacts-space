@@ -26,12 +26,15 @@ function pageContext(): Omit<FeedbackInput, "note"> {
   };
 }
 
-/** Shows a count once the note nears the limit, so nobody is surprised by the error. */
+/** The count shows once the note is within this many characters of the limit. */
+const COUNT_FROM = FEEDBACK_NOTE_MAX_LENGTH - 200;
+
+/** Shows a count once the note nears the limit, so nobody is surprised by the error. Screen readers hear it politely. */
 function LengthHint({ length }: { length: number }) {
-  if (length < FEEDBACK_NOTE_MAX_LENGTH - 200) return null;
+  if (length < COUNT_FROM) return null;
   const over = length > FEEDBACK_NOTE_MAX_LENGTH;
   return (
-    <p id="feedback-note-count" className={over ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
+    <p id="feedback-note-count" aria-live="polite" className={over ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
       {length.toLocaleString("en-US")} of {FEEDBACK_NOTE_MAX_LENGTH.toLocaleString("en-US")} characters
     </p>
   );
@@ -52,6 +55,9 @@ interface FeedbackFormProps {
 export function FeedbackForm({ note, onNoteChange, send, onSent }: FeedbackFormProps) {
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
+  const length = note.trim().length;
+  // The error and the count, whichever show, describe the text box.
+  const describedBy = [error ? "feedback-note-error" : null, length >= COUNT_FROM ? "feedback-note-count" : null].filter((id) => id !== null).join(" ");
 
   async function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -87,10 +93,10 @@ export function FeedbackForm({ note, onNoteChange, send, onSent }: FeedbackFormP
           onChange={(event) => { onNoteChange(event.target.value); setError(""); }}
           placeholder="For example: I press Save and nothing happens."
           aria-invalid={error ? true : undefined}
-          aria-describedby={error ? "feedback-note-error" : undefined}
+          aria-describedby={describedBy || undefined}
           className="min-h-28 max-sm:min-h-32"
         />
-        <LengthHint length={note.trim().length} />
+        <LengthHint length={length} />
       </div>
       <div id="feedback-note-error">
         <FormError message={error} />

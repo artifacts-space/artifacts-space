@@ -30,6 +30,11 @@ async function memberTeamSlug(userId: string, slug: string | null): Promise<stri
  * file names. Without a valid SLACK_FEEDBACK_WEBHOOK_URL it says feedback is
  * not available and posts nothing. A Slack failure asks the person to try
  * again; the dialog keeps their text.
+ *
+ * The rate limit counts a report before it is posted, so a failed post
+ * still uses one of the five. That is deliberate: counting only accepted
+ * posts would let a flood through whenever Slack is slow or down, and a
+ * person who hits the limit during an outage waits under an hour.
  */
 export async function sendFeedbackAction(input: unknown): Promise<ActionResult<null>> {
   try {

@@ -58,6 +58,16 @@ describe("FeedbackForm", () => {
     expect(render("x".repeat(FEEDBACK_NOTE_MAX_LENGTH - 10))).toContain("1,990 of 2,000 characters");
   });
 
+  it("should tie the count to the text box and announce it politely when it shows", () => {
+    const html = render("x".repeat(FEEDBACK_NOTE_MAX_LENGTH - 10));
+    expect(html).toMatch(/<textarea[^>]*aria-describedby="feedback-note-count"/);
+    expect(html).toMatch(/<p id="feedback-note-count" aria-live="polite"/);
+  });
+
+  it("should describe the text box with nothing when the note is short and has no error", () => {
+    expect(render("It broke.")).not.toMatch(/<textarea[^>]*aria-describedby/);
+  });
+
   it("should keep the typed note in the box when it renders again", () => {
     expect(render("The Save button does nothing.")).toContain("The Save button does nothing.</textarea>");
   });
