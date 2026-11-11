@@ -160,7 +160,7 @@ function EntryMenu({ project, namesTeams, onRename, onDelete }: EntryMenuProps) 
       <DropdownMenuTrigger
         render={<button type="button" />}
         aria-label={`Options for ${project.name}`}
-        className="absolute right-1 inline-flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover/entry:opacity-100 group-focus-within/entry:opacity-100 pointer-coarse:opacity-100 hover:bg-background hover:text-foreground focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-[popup-open]:opacity-100"
+        className="absolute top-1 right-1 inline-flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover/entry:opacity-100 group-focus-within/entry:opacity-100 pointer-coarse:opacity-100 hover:bg-background hover:text-foreground focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-[popup-open]:opacity-100"
       >
         <IconDots aria-hidden className="size-3.5" />
       </DropdownMenuTrigger>

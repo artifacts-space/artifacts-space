@@ -59,6 +59,19 @@ test.describe("desktop", () => {
     await expect(slot(page, "artifact-list").locator("li")).toHaveCount(40);
   });
 
+  test("should count only the matches and keep every matching project open while a search narrows the tree", async ({ page }) => {
+    await openWorkspace(page);
+    const tree = page.getByRole("region", { name: "Projects" });
+    await expect(tree.getByRole("button", { name: "Design, 2 artifacts" })).toBeVisible();
+    await page.getByRole("textbox", { name: "Search artifacts" }).fill("Long ui");
+    await expect(tree.getByRole("button", { name: "Design, 1 artifact" })).toBeVisible();
+    await expect(tree.getByRole("button", { name: /^(Hide|Show) the artifacts in / })).toHaveCount(0);
+    await expect(tree.getByRole("button", { name: /every project$/ })).toHaveCount(0);
+    await page.getByRole("textbox", { name: "Search artifacts" }).fill("");
+    await expect(tree.getByRole("button", { name: "Design, 2 artifacts" })).toBeVisible();
+    await expect(tree.getByRole("button", { name: "Close every project" })).toBeVisible();
+  });
+
   test("should show the open artifact's project and title in the top bar and its format, project, and tags under the title", async ({ page }) => {
     await openWorkspace(page);
     const crumbs = page.getByRole("navigation", { name: "Breadcrumb" });

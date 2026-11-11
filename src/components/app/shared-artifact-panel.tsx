@@ -59,11 +59,6 @@ interface SharedArtifactPanelProps {
   onWithdrawn: (id: string) => void;
 }
 
-/**
- * View of an artifact someone else shared with the viewer's team. Members
- * who may edit it see its history and can restore a version. Owners and
- * admins of that team can make it private again.
- */
 /** Copy, unless the owner turned downloads off for this reader. */
 function PanelCopy({ content, shown }: { content: string; shown: boolean }) {
   return shown ? <CopyButton value={content} variant="ghost" size="icon" /> : null;
@@ -97,6 +92,11 @@ function PanelHeader({ artifact, column, status }: { artifact: ArtifactDto; colu
   );
 }
 
+/**
+ * View of an artifact someone else shared with the viewer's team. Members
+ * who may edit it see its history and can restore a version. Owners and
+ * admins of that team can make it private again.
+ */
 export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn }: SharedArtifactPanelProps) {
   const { team, canEdit, canWithdraw, seesComments } = useEditAccess(artifact, viewerId);
   const { withdrawing, withdraw } = useWithdrawSharing(artifact.id, onWithdrawn);

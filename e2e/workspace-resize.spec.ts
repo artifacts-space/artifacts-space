@@ -254,6 +254,12 @@ test.describe("desktop", () => {
     await expect(sidebar(page)).toBeHidden();
     await expect(sidebarHandle(page)).toHaveCount(0);
     expect(await widthOf(content), "the artifact takes the sidebar's room").toBeGreaterThan(before + 200);
+    const slashTaken = await page.evaluate(() => {
+      const press = new KeyboardEvent("keydown", { key: "/", bubbles: true, cancelable: true });
+      document.body.dispatchEvent(press);
+      return press.defaultPrevented;
+    });
+    expect(slashTaken, "a hidden search leaves the / key to the page").toBe(false);
     const show = page.getByRole("button", { name: "Show the sidebar" });
     await show.click();
     await expect(sidebar(page)).toBeVisible();

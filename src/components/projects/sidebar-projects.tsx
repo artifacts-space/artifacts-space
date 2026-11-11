@@ -142,8 +142,10 @@ function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, 
     confirmDelete.request(() => controls.remove(row));
   }
 
+  // While a search, the format filter, or a view narrows the tree, every group with matches is open and cannot close,
+  // so its row has no chevron, and its count is what it shows.
   function disclosure(key: string, items: readonly ArtifactListItemDto[]): Disclosure {
-    return { open: narrowed || !closed.has(key), controls: `${baseId}-${key}`, enabled: items.length > 0, onToggle: () => { onToggle(key); } };
+    return { open: narrowed || !closed.has(key), controls: `${baseId}-${key}`, enabled: !narrowed && items.length > 0, onToggle: () => { onToggle(key); } };
   }
 
   function renameForm(project: SidebarProject, row: SidebarProjectRow) {
@@ -168,7 +170,7 @@ function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, 
       <div key={project.key} role="group" aria-label={project.name}>
         {renaming ? renameForm(project, renaming) : (
           <ProjectEntry
-            project={project}
+            project={narrowed ? { ...project, count: items.length } : project}
             active={active}
             blocked={blockedKeys.has(project.key)}
             namesTeams={namesTeams}
@@ -190,7 +192,7 @@ function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, 
       {controls.entries.map(renderEntry)}
       {narrowed && unfiled.length === 0 ? null : (
         <div role="group" aria-label="Unfiled">
-          <NoProjectRow count={controls.none} active={noneActive} disclosure={unfiledOpen} onFilter={() => { onFilter(noneActive ? null : { none: true }); }} onDropArtifact={(id) => { onDropArtifact(id, null); }} />
+          <NoProjectRow count={narrowed ? unfiled.length : controls.none} active={noneActive} disclosure={unfiledOpen} onFilter={() => { onFilter(noneActive ? null : { none: true }); }} onDropArtifact={(id) => { onDropArtifact(id, null); }} />
           <GroupItems id={unfiledOpen.controls} items={unfiled} open={unfiledOpen.open} selectedId={selectedId} onSelect={onSelect} moves={moves} />
         </div>
       )}
@@ -201,17 +203,19 @@ function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, 
 
 const headerButton = "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none";
 
-/** The group's heading: close or open every project, and start a new one. */
-function GroupHeader({ dragging, allClosed, onFoldAll, onCreate }: { dragging: boolean; allClosed: boolean; onFoldAll: () => void; onCreate: () => void }) {
+/** The group's heading: close or open every project (not while the tree is narrowed), and start a new one. */
+function GroupHeader({ dragging, allClosed, canFold, onFoldAll, onCreate }: { dragging: boolean; allClosed: boolean; canFold: boolean; onFoldAll: () => void; onCreate: () => void }) {
   const foldLabel = allClosed ? "Open every project" : "Close every project";
   return (
     <div className="flex h-8 items-center gap-1 pr-0.5 pl-2">
       <h2 className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
         {dragging ? "Drop on a project" : "Projects"}
       </h2>
-      <button type="button" aria-label={foldLabel} title={foldLabel} onClick={onFoldAll} className={headerButton}>
-        {allClosed ? <IconFoldDown aria-hidden className="size-4" /> : <IconFold aria-hidden className="size-4" />}
-      </button>
+      {canFold ? (
+        <button type="button" aria-label={foldLabel} title={foldLabel} onClick={onFoldAll} className={headerButton}>
+          {allClosed ? <IconFoldDown aria-hidden className="size-4" /> : <IconFold aria-hidden className="size-4" />}
+        </button>
+      ) : null}
       <button type="button" aria-label="New project" title="New project" onClick={onCreate} className={headerButton}>
         <IconPlus aria-hidden className="size-4" />
       </button>
@@ -252,6 +256,8 @@ export function SidebarProjects({ dragging, scopeTeam, teams, listState, onClear
       <GroupHeader
         dragging={dragging}
         allClosed={allClosed}
+        // While the tree is narrowed every group with matches is open, so there is nothing to fold.
+        canFold={!tree.narrowed}
         onFoldAll={() => { setClosed(allClosed ? new Set() : new Set(allKeys)); }}
         onCreate={() => { setCreating(true); }}
       />

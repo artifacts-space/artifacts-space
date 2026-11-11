@@ -22,14 +22,20 @@ function isTyping(target: EventTarget | null): boolean {
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
-/** "/" anywhere outside a field puts the cursor in the search. */
+/** True when the field is drawn and can take focus: not while the sidebar is hidden. */
+function isShown(field: HTMLInputElement | null): field is HTMLInputElement {
+  return field !== null && field.getClientRects().length > 0;
+}
+
+/** "/" anywhere outside a field puts the cursor in the search, while the search is on screen; otherwise the key is left alone. */
 function useSearchShortcut(field: React.RefObject<HTMLInputElement | null>) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return;
+      const input = field.current;
+      if (event.defaultPrevented || !isShown(input)) return;
       if (!focusesSearch({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, altKey: event.altKey, typing: isTyping(event.target) })) return;
       event.preventDefault();
-      field.current?.focus();
+      input.focus();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => { document.removeEventListener("keydown", onKeyDown); };
