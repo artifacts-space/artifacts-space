@@ -3,15 +3,17 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { contrastRatio, parseColor, type Oklch } from "@/lib/themes/color";
+import { contrastRatio, normalizeColor, parseColor, type Oklch } from "@/lib/themes/color";
 
+import { siteBlockColors } from "./block-color-palette";
 import { blockHues } from "./block-color-rules";
 
 const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
 
-/** The `--name: value` declarations of the first block whose selector starts with `selector`. */
+/** The `--name: value` declarations of the first block whose selector list contains `selector`. */
 function block(selector: string): Map<string, string> {
   const start = css.indexOf(selector);
+  if (start < 0) throw new Error(`globals.css has no block with "${selector}": the test's selector drifted`);
   const body = css.slice(css.indexOf("{", start) + 1, css.indexOf("\n}", start));
   return new Map([...body.matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm)].map((match) => [match[1] ?? "", (match[2] ?? "").trim()] as const));
 }
@@ -25,6 +27,13 @@ function token(mode: keyof typeof modes, name: string): Oklch {
 }
 
 describe("block color tokens", () => {
+  it.each(Object.keys(modes) as (keyof typeof modes)[])("should match the %s palette themes start from (block-color-palette.ts)", (mode) => {
+    for (const hue of blockHues) {
+      expect(normalizeColor(modes[mode].get(`--block-${hue}`) ?? ""), `${mode} ${hue} text`).toBe(normalizeColor(siteBlockColors[mode][hue].text));
+      expect(normalizeColor(modes[mode].get(`--block-${hue}-bg`) ?? ""), `${mode} ${hue} background`).toBe(normalizeColor(siteBlockColors[mode][hue].fill));
+    }
+  });
+
   it.each(Object.keys(modes) as (keyof typeof modes)[])("should keep every %s text hue readable (AA) on the page, a card, and its own background", (mode) => {
     for (const hue of blockHues) {
       const text = token(mode, `--block-${hue}`);

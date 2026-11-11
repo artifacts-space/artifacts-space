@@ -409,8 +409,10 @@ Color (text color and background) is a block attribute on paragraphs and
 headings, stored in Markdown as a color comment at the end of the line's
 text, `<!-- color: red; background: yellow -->` (markdown-dialect.md, "Block
 colors"; rules in `src/lib/block-colors`). Every hue is a token pair in
-`globals.css` (`--block-<hue>`, `--block-<hue>-bg`), light and dark; add a
-hue there and in `blockHues` together.
+`globals.css` (`--block-<hue>`, `--block-<hue>-bg`), light and dark, at
+WCAG AA; themes re-light them for their own surfaces (`blockColorTokens` in
+`src/lib/themes/derive.ts`). Add a hue in `globals.css`, `blockHues`, and
+`block-color-palette.ts` together; tests check they match.
 
 A block link names the block by its opening words, never by a stored id:
 `/artifact/<id>#block=<words>[&n=<k>]:~:text=<words>`, or `#block-file=<uuid>`

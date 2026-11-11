@@ -1,3 +1,6 @@
+import { siteBlockColors } from "@/lib/block-colors/block-color-palette";
+import { blockHues } from "@/lib/block-colors/block-color-rules";
+
 import { contrastRatio, ensureContrast, formatOklch, mixOklch, parseColor, relativeLuminance, type Oklch } from "./color";
 import type { ThemeColors } from "./schema";
 
@@ -140,6 +143,30 @@ export function mentionTokens(mode: PaletteMode, colors: ThemeColors): Record<st
   return { ...chip(siteMentionInk[mode].person, "--mention"), ...chip(siteMentionInk[mode].agent, "--mention-agent") };
 }
 
+/** How far a block background leans from the card toward its hue's text: a tint that reads as that hue. */
+const blockFillTint: Record<PaletteMode, number> = { light: 0.1, dark: 0.13 };
+
+/**
+ * Block colors (markdown-dialect.md, "Block colors") for a themed card and
+ * page. Each background is the card tinted toward the hue, kept readable
+ * under the theme's ink; each text color keeps the site's hue and chroma,
+ * re-lit until it reads at AA on the card, the page, and its own background.
+ */
+export function blockColorTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
+  const card = read(colors.card);
+  const page = read(colors.background);
+  const ink = read(colors.foreground);
+  const tokens: Record<string, string> = {};
+  for (const hue of blockHues) {
+    const site = read(siteBlockColors[mode][hue].text);
+    const fill = ensureContrast(mixOklch(card, site, blockFillTint[mode]), ink, 4.55);
+    const text = [card, page, fill].reduce((color, surface) => ensureContrast(color, surface, 4.55), site);
+    tokens[`--block-${hue}`] = formatOklch(text);
+    tokens[`--block-${hue}-bg`] = formatOklch(fill);
+  }
+  return tokens;
+}
+
 /** The site's switch colors per mode, from globals.css: the on track and both thumbs. */
 const siteSwitch: Record<PaletteMode, { on: string; onThumb: string; offThumb: string }> = {
   light: { on: "oklch(0.56 0.15 150)", onThumb: "oklch(1 0 0)", offThumb: "oklch(0.56 0.008 65)" },
@@ -246,5 +273,5 @@ export function ringTokens(mode: PaletteMode, colors: ThemeColors): Record<strin
 
 /** Every CSS token a palette sets, keyed by custom property name, with canonical color values. */
 export function paletteTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
-  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors), ...switchTokens(mode, colors), ...ringTokens(mode, colors) };
+  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors), ...switchTokens(mode, colors), ...ringTokens(mode, colors), ...blockColorTokens(mode, colors) };
 }

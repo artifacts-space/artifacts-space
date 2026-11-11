@@ -117,10 +117,15 @@ describe("color search", () => {
     expect(searchMenu("pink background", paragraph)[0]?.command).toEqual({ kind: "color", part: "background", hue: "pink" });
   });
 
-  it("should list every background when typing background, after the Color row", () => {
-    const found = labels(paragraph, "background");
-    expect(found[0]).toBe("Color");
-    expect(found.filter((label) => label.endsWith(" background"))).toHaveLength(9);
+  it("should list every background when typing background, so Enter applies the first one", () => {
+    const found = searchMenu("background", paragraph);
+    expect(found.map((entry) => entry.label)).toHaveLength(9);
+    expect(found[firstRunnable(found)]?.command).toEqual({ kind: "color", part: "background", hue: "gray" });
+  });
+
+  it("should find the Color row itself by its name or by colour and highlight", () => {
+    expect(labels(paragraph, "colour")[0]).toBe("Color");
+    expect(labels(paragraph, "highlight")[0]).toBe("Color");
   });
 
   it("should leave out the current colors, and offer Default only to remove one", () => {

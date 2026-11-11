@@ -168,7 +168,8 @@ function submenuMatches(needle: string, entry: MenuEntry, context: MenuContext):
 
 /** The Color row when it matches, then each color row whose name contains what was typed ("red", "background"). */
 function colorMatches(needle: string, entry: MenuEntry, context: MenuContext): MenuEntry[] {
-  const own = matchesWords(needle, entry.label, ["colour", "highlight", "background"]) ? [entry] : [];
+  // "background" finds the background rows, not the Color row, so Enter applies one instead of opening the submenu.
+  const own = matchesWords(needle, entry.label, ["colour", "highlight"]) ? [entry] : [];
   return [...own, ...colorEntries(context.colors).filter((row) => row.label.toLowerCase().includes(needle))];
 }
 
