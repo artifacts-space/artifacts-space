@@ -1,21 +1,20 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 /**
- * The /app workspace's resizable panels, on /dev/workspace (the real
+ * The /app workspace's resizable sidebar, on /dev/workspace (the real
  * workspace without a database): a handle on the sidebar's right edge sizes
- * its width, and one under the Projects rows trades height with the artifact
- * list. Sizes are remembered per viewer; phones and tablets, where the
- * sidebar stacks over the artifact, have no handles.
+ * its width, and the sidebar can be hidden. The width is remembered per
+ * viewer; phones and tablets, where the sidebar stacks over the artifact,
+ * have no handle.
  */
 
 const desktop = { width: 1440, height: 900 };
 const sidebarKey = "artifacts.space:workspace:sidebar-width";
+/** The Projects rows' height, remembered before the tree replaced them: still in some browsers, and ignored. */
 const projectsKey = "artifacts.space:workspace:projects-height";
 
 const sidebarHandle = (page: Page) => page.getByRole("separator", { name: "Resize the sidebar" });
-const projectsHandle = (page: Page) => page.getByRole("separator", { name: "Resize the projects" });
 const sidebar = (page: Page) => page.locator("aside#workspace-sidebar");
-const rows = (page: Page) => page.locator("[data-slot=sidebar-projects]");
 const list = (page: Page) => page.locator("[data-slot=artifact-list]");
 
 async function openWorkspace(page: Page, viewport = desktop) {
@@ -24,15 +23,10 @@ async function openWorkspace(page: Page, viewport = desktop) {
   await expect(page.getByRole("region", { name: "Content" })).toBeVisible();
   // The handles report their real bounds once they have measured the page.
   await expect(sidebarHandle(page)).toHaveAttribute("data-measured", "");
-  await expect(projectsHandle(page)).toHaveAttribute("data-measured", "");
 }
 
 function widthOf(box: Locator) {
   return box.evaluate((element) => Math.round(element.getBoundingClientRect().width));
-}
-
-function heightOf(box: Locator) {
-  return box.evaluate((element) => Math.round(element.getBoundingClientRect().height));
 }
 
 /** How far the sidebar handle's left edge is from the sidebar's right edge, in pixels. */
@@ -178,16 +172,14 @@ test.describe("desktop", () => {
     await expect.poll(outline, "an outline from the keyboard").toBe("solid");
   });
 
-  test("should stop the sidebar where the artifact pane keeps its minimum width on a narrow desktop", async ({ page }) => {
-    // At 1024 px the workspace card is under 1000 px wide, so the pane's 480 px floor binds before the 520 px cap.
+  test("should keep the artifact pane at least 480px wide on the narrowest desktop", async ({ page }) => {
+    // At 1024 px, the narrowest window with the sidebar beside the artifact, the 520 px cap leaves the pane 504 px.
     await openWorkspace(page, { width: 1024, height: 900 });
-    const card = await sidebar(page).evaluate((element) => element.parentElement?.clientWidth ?? 0);
-    const widest = card - 480;
-    expect(widest, "the floor binds before the cap").toBeLessThan(520);
     const handle = sidebarHandle(page);
-    await expect(handle).toHaveAttribute("aria-valuemax", String(widest));
     await handle.press("End");
-    expect(await widthOf(sidebar(page))).toBe(widest);
+    const widest = await widthOf(sidebar(page));
+    await expect(handle).toHaveAttribute("aria-valuemax", String(widest));
+    expect(await widthOf(page.getByRole("region", { name: "Content" })), "the pane keeps its floor").toBeGreaterThanOrEqual(480);
     expect(await sidebarEdgeGap(page), "the handle stays on the sidebar's edge").toBeLessThan(2);
     await dragBy(page, handle, 200, 0);
     expect(await widthOf(sidebar(page)), "a drag stops at the same edge").toBe(widest);
@@ -196,83 +188,33 @@ test.describe("desktop", () => {
     expect(scroll.width, "no horizontal page scroll").toBeLessThanOrEqual(scroll.clientWidth + 1);
   });
 
-  test("should fit the filters and card titles when the sidebar is at its narrowest", async ({ page }) => {
+  test("should fit the search row and artifact titles when the sidebar is at its narrowest", async ({ page }) => {
     await openWorkspace(page);
     await sidebarHandle(page).press("Home");
-    for (const name of ["Filter by format", "Filter by project"]) {
-      const value = page.getByRole("combobox", { name }).locator("[data-slot=select-value]");
-      const fit = await value.evaluate((element) => element.scrollWidth <= element.clientWidth);
-      expect(fit, `${name} shows its whole label`).toBe(true);
-    }
-    // Titles are the viewer's own text and truncate, so measure the room: about 20 characters, with the date beside it in full.
+    const right = (box: Locator) => box.evaluate((element) => Math.round(element.getBoundingClientRect().right));
+    expect(await widthOf(page.getByRole("textbox", { name: "Search artifacts" })), "the search keeps room to type").toBeGreaterThanOrEqual(140);
+    expect(await right(page.getByRole("button", { name: "New artifact" })), "New artifact stays inside the sidebar").toBeLessThanOrEqual(await right(sidebar(page)));
+    const switcherName = page.locator("[data-slot=workspace-name]");
+    expect(await switcherName.evaluate((element) => element.scrollWidth <= element.clientWidth), "the workspace name shows in full").toBe(true);
+    // Titles are the viewer's own text and wrap to two lines, so measure the room: about 20 characters a line.
     const title = list(page).getByRole("heading", { name: "Long markdown fixture" });
-    const room = await title.evaluate((element) => {
-      const date = element.nextElementSibling;
-      return { title: element.clientWidth, dateFits: date !== null && date.scrollWidth <= date.clientWidth };
-    });
-    expect(room.title, "a card title keeps room for about 20 characters").toBeGreaterThanOrEqual(150);
-    expect(room.dateFits, "the date beside it shows in full").toBe(true);
+    expect(await widthOf(title), "an artifact title keeps room for about 20 characters").toBeGreaterThanOrEqual(150);
   });
 
-  test("should trade height between the Projects rows and the list within their bounds", async ({ page }) => {
-    await openWorkspace(page);
-    const handle = projectsHandle(page);
-    await expect(handle).toHaveAttribute("aria-orientation", "horizontal");
-    expect(await handle.evaluate((element) => getComputedStyle(element).cursor)).toBe("row-resize");
-    const total = (await heightOf(rows(page))) + (await heightOf(list(page)));
-    const tallest = Number(await handle.getAttribute("aria-valuemax"));
-    expect(await heightOf(rows(page)), "the rows show in full by default").toBe(tallest);
-
-    await handle.press("Home");
-    expect(await heightOf(rows(page))).toBe(64);
-    await expect(handle).toHaveAttribute("aria-valuenow", "64");
-    const handleBox = await handle.boundingBox();
-    const rowsBox = await rows(page).boundingBox();
-    const centre = (handleBox?.y ?? 0) + (handleBox?.height ?? 0) / 2;
-    expect(Math.abs(centre - ((rowsBox?.y ?? 0) + (rowsBox?.height ?? 0))), "the handle straddles the rows' bottom edge").toBeLessThan(10);
-    await expect(handle).toHaveAccessibleDescription(/Up and Down arrows/);
-    expect((await heightOf(rows(page))) + (await heightOf(list(page))), "the list takes the height the rows gave up").toBe(total);
-
-    await dragBy(page, handle, 0, 24);
-    expect(await heightOf(rows(page))).toBe(88);
-    expect((await heightOf(rows(page))) + (await heightOf(list(page)))).toBe(total);
-    await dragBy(page, handle, 0, 600);
-    expect(await heightOf(rows(page)), "never taller than the rows need").toBe(tallest);
-    await handle.press("ArrowUp");
-    await expect(handle).toHaveAttribute("aria-valuenow", String(tallest - 16));
-
-    // Closing the group removes the handle and gives the list the room; opening it brings both back.
-    const toggle = page.getByRole("region", { name: "Projects" }).getByRole("button", { name: "Projects" });
-    await toggle.click();
-    await expect(handle).toHaveCount(0);
-    expect(await heightOf(list(page))).toBeGreaterThan(total - tallest);
-    await toggle.click();
-    await expect(handle).toBeVisible();
-    expect(await heightOf(rows(page))).toBe(tallest - 16);
-  });
-
-  test("should remember both sizes after a reload and go back to the defaults on double-click", async ({ page }) => {
+  test("should remember the width after a reload and go back to the default on double-click", async ({ page }) => {
     const problems = collectProblems(page);
     await openWorkspace(page);
-    const defaultRows = await heightOf(rows(page));
     await sidebarHandle(page).press("End");
-    await projectsHandle(page).press("Home");
     expect(await stored(page, sidebarKey)).toBe("520");
-    expect(await stored(page, projectsKey)).toBe("64");
 
     await page.reload();
     await expect(page.getByRole("region", { name: "Content" })).toBeVisible();
     expect(await widthOf(sidebar(page))).toBe(520);
-    expect(await heightOf(rows(page))).toBe(64);
 
     await sidebarHandle(page).dblclick();
     expect(await widthOf(sidebar(page))).toBe(280);
     await expect(sidebarHandle(page)).toHaveAttribute("aria-valuenow", "280");
     expect(await stored(page, sidebarKey)).toBeNull();
-    await projectsHandle(page).dblclick();
-    expect(await heightOf(rows(page))).toBe(defaultRows);
-    await expect(projectsHandle(page)).toHaveAttribute("aria-valuenow", String(defaultRows));
-    expect(await stored(page, projectsKey)).toBeNull();
 
     // A filter remounts the workspace on the client, so the before-paint script renders again there, inert.
     await sidebarHandle(page).press("ArrowRight");
@@ -284,7 +226,7 @@ test.describe("desktop", () => {
   });
 
   test("should open at the stored sizes from the server HTML, before the page hydrates", async ({ page }) => {
-    await storeSizes(page, { [sidebarKey]: "400", [projectsKey]: "64" });
+    await storeSizes(page, { [sidebarKey]: "400" });
     await page.setViewportSize(desktop);
     // Hold the page's scripts so only the server HTML and its inline script run.
     let held = 0;
@@ -296,47 +238,27 @@ test.describe("desktop", () => {
     expect(held, "the page's scripts were held back").toBeGreaterThan(0);
     await expect(sidebarHandle(page), "the page has not hydrated").not.toHaveAttribute("data-measured");
     expect(await widthOf(sidebar(page))).toBe(400);
-    expect(await heightOf(rows(page))).toBe(64);
   });
 
   test("should ignore stored sizes outside the bounds and draw the nearest allowed size", async ({ page }) => {
     await storeSizes(page, { [sidebarKey]: "3000", [projectsKey]: "1" });
     await openWorkspace(page);
     expect(await widthOf(sidebar(page))).toBe(520);
-    expect(await heightOf(rows(page))).toBe(64);
   });
 
-  test("should keep the Projects rows below their heading when the rows scroll", async ({ page }) => {
+  test("should hide the sidebar so the artifact takes the width, and bring it back from the top bar", async ({ page }) => {
     await openWorkspace(page);
-    await projectsHandle(page).press("Home");
-    const box = rows(page);
-    const heading = page.getByRole("region", { name: "Projects" }).getByRole("button", { name: "Projects" });
-    const headingBox = await heading.boundingBox();
-    const rowsBox = await box.boundingBox();
-    if (!headingBox || !rowsBox) throw new Error("The Projects group is not on screen.");
-    expect(rowsBox.y, "the rows start below the heading").toBeGreaterThanOrEqual(headingBox.y + headingBox.height - 0.5);
-    await expect(box).not.toHaveAttribute("data-scrolled");
-
-    await box.evaluate((element) => { element.scrollTop = 12; });
-    await expect(box).toHaveAttribute("data-scrolled", "");
-    const edge = await box.evaluate((element) => getComputedStyle(element).borderTopColor);
-    expect(edge, "a divider marks where the rows scroll out of view").not.toBe("rgba(0, 0, 0, 0)");
-
-    // The first row, partly scrolled away, shows only inside the rows box: the heading above it is not covered.
-    const hits = await page.evaluate(({ heading: top, rows: area }) => {
-      const x = area.x + 40;
-      const inHeading = document.elementFromPoint(x, top.y + top.height / 2);
-      const atEdge = document.elementFromPoint(x, area.y + 2);
-      return {
-        heading: inHeading?.closest("button")?.textContent ?? "",
-        edge: atEdge?.closest("[data-slot=sidebar-projects]") !== null,
-      };
-    }, { heading: headingBox, rows: rowsBox });
-    expect(hits.heading).toContain("Projects");
-    expect(hits.edge, "just under the heading is the rows box").toBe(true);
-    const firstRow = box.getByRole("button", { name: /^No project, / });
-    const rowTop = await firstRow.evaluate((element) => element.getBoundingClientRect().top);
-    expect(rowTop, "the first row has scrolled up out of the box").toBeLessThan(rowsBox.y);
+    const content = page.getByRole("region", { name: "Content" });
+    const before = await widthOf(content);
+    await page.getByRole("button", { name: "Hide the sidebar" }).click();
+    await expect(sidebar(page)).toBeHidden();
+    await expect(sidebarHandle(page)).toHaveCount(0);
+    expect(await widthOf(content), "the artifact takes the sidebar's room").toBeGreaterThan(before + 200);
+    const show = page.getByRole("button", { name: "Show the sidebar" });
+    await show.click();
+    await expect(sidebar(page)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Show the sidebar" })).toHaveCount(0);
+    expect(await widthOf(content)).toBe(before);
   });
 
   test("should keep working and stay quiet when the browser blocks storage", async ({ page }) => {
@@ -350,8 +272,6 @@ test.describe("desktop", () => {
     await openWorkspace(page);
     await sidebarHandle(page).press("End");
     expect(await widthOf(sidebar(page))).toBe(520);
-    await projectsHandle(page).press("Home");
-    expect(await heightOf(rows(page))).toBe(64);
     // The size holds for the visit, through a client remount, though it cannot be stored.
     await page.getByRole("region", { name: "Projects" }).getByRole("button", { name: /^Design, / }).click();
     await expect(page).toHaveURL(/project=design/);
@@ -377,16 +297,16 @@ test.describe("desktop", () => {
     await page.mouse.up();
   });
 
-  test("should let the sidebar scroll to its footer on a short, wide window instead of cutting it off", async ({ page }) => {
+  test("should let the tree scroll to its last artifact on a short, wide window instead of cutting it off", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 480 });
     await page.goto("/dev/workspace");
     await expect(page.getByRole("region", { name: "Content" })).toBeVisible();
-    const footer = sidebar(page).getByText(/\d+ shown/);
-    await footer.scrollIntoViewIfNeeded();
+    const last = list(page).locator("li").last();
+    await last.scrollIntoViewIfNeeded();
     const aside = await sidebar(page).boundingBox();
-    const foot = await footer.boundingBox();
-    expect((foot?.y ?? 0) + (foot?.height ?? 0), "the footer is inside the sidebar").toBeLessThanOrEqual((aside?.y ?? 0) + (aside?.height ?? 0) + 1);
-    await expect(footer).toBeInViewport();
+    const row = await last.boundingBox();
+    expect((row?.y ?? 0) + (row?.height ?? 0), "the last artifact is inside the sidebar").toBeLessThanOrEqual((aside?.y ?? 0) + (aside?.height ?? 0) + 1);
+    await expect(last).toBeInViewport();
     expect(await page.evaluate(() => window.scrollY), "the page itself does not scroll").toBe(0);
   });
 

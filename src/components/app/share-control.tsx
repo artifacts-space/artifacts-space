@@ -203,8 +203,9 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => { setOpen(true); }} className="gap-1.5" aria-label="Share settings">
-        <Icon /> {waiting ? "Pending" : visibilityLabel(artifact.visibility)}
+      {/* The icon says who can read it now (a lock while private); the title spells it out. */}
+      <Button variant="outline" size="sm" onClick={() => { setOpen(true); }} className="gap-1.5" aria-label="Share settings" title={`Who can read it: ${visibilityLabel(artifact.visibility)}`}>
+        <Icon /> {waiting ? "Pending" : "Share"}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-lg">

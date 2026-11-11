@@ -28,8 +28,8 @@ export const detailBody = [
   "focus-visible:outline-2 focus-visible:-outline-offset-2",
 ].join(" ");
 
-/** The save status bar on short viewports: it sticks to the top of the scroll box, opaque, in the colour it has today over the card. */
-export const stickyModeBar = "shell-short:sticky shell-short:top-0 shell-short:z-10 shell-short:bg-[color-mix(in_srgb,var(--background)_60%,var(--card))]";
+/** The meta line on short viewports: it sticks to the top of the scroll box, opaque on the pane's card colour. */
+export const stickyModeBar = "shell-short:sticky shell-short:top-0 shell-short:z-10 shell-short:bg-card";
 
 interface ScrollBox {
   scrollTop: number;

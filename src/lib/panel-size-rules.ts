@@ -1,6 +1,6 @@
 /**
- * Size rules for the /app workspace's resizable panels: the sidebar's width
- * and the height of its Projects group. Pure, so the bounds, keys, and stored
+ * Size rules for the /app workspace's resizable panel: the sidebar's width.
+ * Pure, so the bounds, keys, and stored
  * values can be tested without a browser. The CSS in the dashboard mirrors
  * these bounds so a stored size never draws outside them.
  */
@@ -38,21 +38,8 @@ export const sidebarPanel = {
   contentMin: 480,
 } as const satisfies PanelSpec & { max: number; contentMin: number };
 
-/**
- * The Projects group's rows: at least about two rows, never taller than its
- * rows need, and always leaving `listMin` for the artifact list below it.
- */
-export const projectsPanel = {
-  storageKey: "artifacts.space:workspace:projects-height",
-  cssVar: "--workspace-projects-height",
-  defaultSize: 192,
-  min: 64,
-  /** The shortest the artifact list may get: about two cards. */
-  listMin: 120,
-} as const satisfies PanelSpec & { listMin: number };
-
 /** Every panel whose size is remembered. */
-export const rememberedPanels: readonly PanelSpec[] = [sidebarPanel, projectsPanel];
+export const rememberedPanels: readonly PanelSpec[] = [sidebarPanel];
 
 /**
  * The sidebar column from lg up. The bounds mirror `sidebarPanel` (a unit test checks it), so a
@@ -63,16 +50,6 @@ export const sidebarColumns = "lg:[grid-template-columns:clamp(272px,var(--works
 
 /** The sidebar handle's place in the workspace card from lg up: the same clamp as `sidebarColumns`, so it sits on the sidebar's edge. */
 export const sidebarHandleLeft = "lg:left-[clamp(272px,var(--workspace-sidebar-width,280px),min(520px,100%_-_480px))]";
-
-/** The Projects rows' height from lg up, mirroring `projectsPanel` in pixels like the handle (a unit test checks it); phones keep the fixed cap. */
-export const projectsRowsHeight = "max-h-48 lg:min-h-[64px] lg:max-h-[var(--workspace-projects-height,192px)]";
-
-/**
- * The artifact list's floor from lg up, so the Projects rows never squeeze it
- * away (`projectsPanel.listMin`). On a window too short for every floor, the
- * sidebar scrolls instead of cutting off its footer.
- */
-export const listMinHeight = "lg:min-h-[120px]";
 
 /** One arrow press moves a handle this far; with Shift held, `bigStep`. */
 export const step = 16;
@@ -90,15 +67,6 @@ export function clampSize(size: number, bounds: SizeBounds): number {
 export function sidebarBounds(shellWidth: number): SizeBounds {
   const { min, max, contentMin } = sidebarPanel;
   return { min, max: Math.max(min, Math.min(max, shellWidth - contentMin)) };
-}
-
-/**
- * The Projects rows' bounds. `content` is the rows' full height, and
- * `shared` is the height the rows and the artifact list hold between them.
- */
-export function projectsBounds({ content, shared }: { content: number; shared: number }): SizeBounds {
-  const { min, listMin } = projectsPanel;
-  return { min, max: Math.max(min, Math.min(content, shared - listMin)) };
 }
 
 /** Which way a handle moves: a vertical line moves left and right, a horizontal one up and down. */

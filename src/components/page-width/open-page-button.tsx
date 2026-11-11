@@ -15,8 +15,8 @@ interface OpenPageButtonProps {
 /**
  * "Open": the artifact's own page (the link Share and Copy link give out) in
  * a new tab, so the workspace keeps its place. It works for private
- * artifacts too, because the page lets their editors in. Icon only on
- * phones, where the toolbar is tight; the name stays for screen readers.
+ * artifacts too, because the page lets their editors in. Icon only; the
+ * name stays for screen readers and the tooltip says what it does.
  * A plain link styled as a button, so it keeps the link role.
  */
 export function OpenPageButton({ publicId, className }: OpenPageButtonProps) {
@@ -29,11 +29,11 @@ export function OpenPageButton({ publicId, className }: OpenPageButtonProps) {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Open the artifact page in a new tab"
-            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), className)}
+            className={cn(buttonVariants({ variant: "ghost", size: "icon" }), className)}
           />
         }
       >
-        <IconExternalLink aria-hidden /> <span className="max-sm:sr-only">Open</span>
+        <IconExternalLink aria-hidden /> <span className="sr-only">Open</span>
       </TooltipTrigger>
       <TooltipContent>Open its page in a new tab</TooltipContent>
     </Tooltip>

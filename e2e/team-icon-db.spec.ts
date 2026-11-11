@@ -88,12 +88,13 @@ test("should let an owner upload, see, replace, and remove the team icon, and re
   await expect(headerIcon(page)).toHaveAttribute("data-team-icon", "image");
   expect(await loadedSize(headerIcon(page))).toEqual({ width: 256, height: 256 });
 
-  // The team list and the Teams menu show it too.
+  // The team list and the workspace switcher show it too.
   await page.goto("/teams");
   const listIcon = page.locator(`a[href="/teams/${team.slug}"] [data-team-icon]`);
   await expect(listIcon).toHaveAttribute("data-team-icon", "image");
   await loadedSize(listIcon);
-  await page.getByRole("button", { name: "Teams" }).click();
+  await page.goto("/app");
+  await page.getByRole("button", { name: /^Workspace: .+\. Switch workspace$/ }).click();
   const menuIcon = page.getByRole("menuitem").filter({ has: page.locator('[data-team-icon="image"]') });
   await expect(menuIcon).toHaveCount(1);
   await loadedSize(menuIcon.locator("[data-team-icon]"));

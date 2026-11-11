@@ -69,13 +69,14 @@ test("should open the same artifact again when the same notification is chosen t
   await expect(editor(page, "Long markdown fixture")).toBeVisible();
 });
 
-test("should pin an artifact outside the list to the top and open it when its notification is chosen", async ({ page }) => {
+test("should pin an artifact outside the list to the top of its group and open it when its notification is chosen", async ({ page }) => {
   await page.goto("/dev/workspace");
   await expect(editor(page, "Long ui fixture")).toBeVisible();
 
   await chooseNotification(page, "approved sharing Shared by link fixture");
   await expect(editor(page, "Shared by link fixture")).toBeVisible();
-  await expect(page.locator('[data-slot="artifact-list"] li').first()).toContainText("Shared by link fixture");
+  // It has no project for this viewer, so it leads the Unfiled group.
+  await expect(page.locator('[data-slot="artifact-list"] [role=group][aria-label=Unfiled] li').first()).toContainText("Shared by link fixture");
   await expect(selectedCard(page)).toContainText("Shared by link fixture");
   await expect(commentsHeading(page, "Shared by link fixture")).toHaveCount(0);
   await expectBroughtIntoView(page, "Shared by link fixture");
@@ -84,13 +85,18 @@ test("should pin an artifact outside the list to the top and open it when its no
 test("should keep the list's filters when a notification opens an artifact", async ({ page }) => {
   // The format filter, not search: search asks the server, which the fixture has none of.
   await page.goto("/dev/workspace");
+  await page.getByRole("button", { name: "Filters" }).click();
   const format = page.getByRole("combobox", { name: "Filter by format" });
   await format.click();
   await page.getByRole("option", { name: "text", exact: true }).click();
   await expect(format).toContainText("text");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Filters, 1 on" })).toBeVisible();
 
   await chooseNotification(page, "approved your changes to Long markdown fixture");
   await expect(editor(page, "Long markdown fixture")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Filters, 1 on" })).toBeVisible();
+  await page.getByRole("button", { name: "Filters, 1 on" }).click();
   await expect(format).toContainText("text");
 });
 

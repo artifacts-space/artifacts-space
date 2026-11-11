@@ -8,11 +8,7 @@ import {
   clampSize,
   isResetKey,
   keyboardResize,
-  listMinHeight,
   parseStoredSize,
-  projectsBounds,
-  projectsPanel,
-  projectsRowsHeight,
   sidebarBounds,
   sidebarColumns,
   sidebarHandleLeft,
@@ -46,20 +42,6 @@ describe("sidebarBounds", () => {
 
   it("should never put the maximum under the minimum when the workspace is very narrow", () => {
     expect(sidebarBounds(500)).toEqual({ min: sidebarPanel.min, max: sidebarPanel.min });
-  });
-});
-
-describe("projectsBounds", () => {
-  it("should stop at the rows' own height when the list has room to spare", () => {
-    expect(projectsBounds({ content: 300, shared: 700 })).toEqual({ min: projectsPanel.min, max: 300 });
-  });
-
-  it("should leave the artifact list its minimum height when the rows are tall", () => {
-    expect(projectsBounds({ content: 900, shared: 500 })).toEqual({ min: projectsPanel.min, max: 500 - projectsPanel.listMin });
-  });
-
-  it("should never put the maximum under the minimum when there are few rows", () => {
-    expect(projectsBounds({ content: 40, shared: 500 })).toEqual({ min: projectsPanel.min, max: projectsPanel.min });
   });
 });
 
@@ -118,7 +100,7 @@ describe("parseStoredSize", () => {
 describe("beforePaintScript", () => {
   it("should name every remembered panel's key and CSS property when it is built", () => {
     const script = beforePaintScript();
-    for (const panel of [sidebarPanel, projectsPanel]) {
+    for (const panel of [sidebarPanel]) {
       expect(script).toContain(panel.storageKey);
       expect(script).toContain(panel.cssVar);
     }
@@ -132,8 +114,8 @@ describe("beforePaintScript", () => {
     return Object.fromEntries(set);
   }
 
-  it("should set only the sizes parseStoredSize accepts when it runs", () => {
-    const stored = new Map<string, string>([[sidebarPanel.storageKey, "333"], [projectsPanel.storageKey, "abc"]]);
+  it("should set only the remembered panels' sizes when other keys are stored", () => {
+    const stored = new Map<string, string>([[sidebarPanel.storageKey, "333"], ["artifacts.space:workspace:projects-height", "300"]]);
     expect(runScript((key) => stored.get(key) ?? null)).toEqual({ [sidebarPanel.cssVar]: "333px" });
   });
 
@@ -156,12 +138,5 @@ describe("layout classes", () => {
     const clamp = `clamp(${String(min)}px,var(${cssVar},${String(defaultSize)}px),min(${String(max)}px,100%_-_${String(contentMin)}px))`;
     expect(sidebarColumns).toContain(clamp);
     expect(sidebarHandleLeft, "the handle sits on the same edge").toBe(`lg:left-[${clamp}]`);
-  });
-
-  it("should draw the Projects rows and the list inside the bounds the handle reports when a size is stored", () => {
-    const { min, defaultSize, listMin, cssVar } = projectsPanel;
-    expect(projectsRowsHeight).toContain(`lg:max-h-[var(${cssVar},${String(defaultSize)}px)]`);
-    expect(projectsRowsHeight).toContain(`lg:min-h-[${String(min)}px]`);
-    expect(listMinHeight).toBe(`lg:min-h-[${String(listMin)}px]`);
   });
 });

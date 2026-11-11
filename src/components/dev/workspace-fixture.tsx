@@ -20,10 +20,10 @@ import { createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, withProjects }
 import { useFixtureControls } from "./fixture-controls";
 import { fixtureNotifications, LINK_ONLY_PUBLIC_ID } from "./notification-fixture";
 
-/** The viewer's personal team, so the Share dialog can offer link and public sharing. It adds no scope tab. */
+/** The viewer's personal team, so the Share dialog can offer link and public sharing. The switcher does not list it. */
 const fixtureTeams: ShareTeam[] = [{ id: "fixture-team", slug: "fixture", name: "Fixture", personal: true, role: "owner", roleKey: "owner", kind: "person", capabilities: [...defaultRoleCapabilities.owner], teamSharingNeedsApproval: false }];
 
-/** Shared teams for `?scopes=1`, with names long enough that the scope tabs run out of room on a phone. */
+/** Shared teams for `?scopes=1`, with long names for the workspace switcher. */
 const fixtureSharedTeams: ShareTeam[] = ["Design", "Platform engineering", "Customer research"].map((name, index) => ({
   id: `fixture-shared-${String(index)}`, slug: `fixture-shared-${String(index)}`, name, personal: false, role: "member", roleKey: "member", kind: "person", capabilities: [...defaultRoleCapabilities.member], teamSharingNeedsApproval: false,
 }));
@@ -76,7 +76,7 @@ function useFixtureProjects(artifacts: readonly ArtifactDto[]) {
  * with long artifacts, a long list, and projects, and no database. Every
  * artifact is handed in full, so none loads. Project changes stay in
  * memory. The app shell and sidebar projects e2e tests use it. With
- * `scopes`, the viewer is also in shared teams, so the scope tabs show, and
+ * `scopes`, the viewer is also in shared teams, so the workspace switcher lists them, and
  * `team` opens one of them as the scope. `linkFailed` stands in for a link
  * the server could not check (a read limit, or a database error). With
  * `slowLoad`, the Long markdown fixture is not handed in full: it loads when
@@ -105,7 +105,7 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
   return (
     <ConfirmationsProvider initial={[]}>
       <div className="workspace-frame">
-        <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" teams={[]} unreadNotifications={4} notificationSeed={notifications} />
+        <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" unreadNotifications={4} notificationSeed={notifications} />
         <Dashboard
           // The list is read once, so it remounts when the tab has stored artifacts; with none, nothing remounts after hydration.
           key={`${projectFilterId(projectFilter)}:${String(stored.length > 0)}`}

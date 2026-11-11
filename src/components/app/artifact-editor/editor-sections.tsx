@@ -36,12 +36,15 @@ interface TitleFieldsProps {
   titleRef?: React.Ref<HTMLInputElement>;
   /** Enter in the title moves on to the content. */
   onEnter?: () => void;
+  /** The content's column (previewColumnClass), so the title lines up with the body. */
+  column: string;
 }
 
 /** Icon, title, and one-line summary inputs. */
-export function TitleFields({ title, icon, summary, update, titleRef, onEnter }: TitleFieldsProps) {
+export function TitleFields({ title, icon, summary, update, titleRef, onEnter, column }: TitleFieldsProps) {
   return (
-    <div className="group/title border-b px-5 py-5 sm:px-7">
+    <div className="group/title pt-6 sm:pt-10">
+      <div className={column}>
       <DraftIcon icon={icon} update={update} />
       <input
         ref={titleRef}
@@ -53,7 +56,7 @@ export function TitleFields({ title, icon, summary, update, titleRef, onEnter }:
           onEnter();
         }}
         aria-label="Artifact title"
-        className="w-full bg-transparent text-2xl font-medium tracking-[-0.015em] outline-none placeholder:text-muted-foreground/60"
+        className="w-full bg-transparent text-3xl leading-tight font-semibold tracking-[-0.02em] outline-none placeholder:text-muted-foreground/60 sm:text-4xl"
         placeholder="Untitled artifact"
       />
       <input
@@ -63,6 +66,7 @@ export function TitleFields({ title, icon, summary, update, titleRef, onEnter }:
         className="mt-2 w-full bg-transparent text-base leading-6 md:text-md text-muted-foreground outline-none placeholder:text-muted-foreground/60"
         placeholder="Add a one-line summary for search and agent retrieval"
       />
+      </div>
     </div>
   );
 }

@@ -51,7 +51,7 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
   const session = await getSession();
   if (!session) redirect("/sign-in");
   const [params, memberships] = await Promise.all([searchParams, listTeamsForUser(session.user.id)]);
-  const teams: ShareTeam[] = memberships.map(({ id, slug, name, personal, role, roleKey, kind, capabilities, teamSharingNeedsApproval }) => ({ id, slug, name, personal, role, roleKey, kind, capabilities, teamSharingNeedsApproval }));
+  const teams: ShareTeam[] = memberships.map(({ id, slug, name, personal, role, roleKey, kind, capabilities, teamSharingNeedsApproval, iconUrl }) => ({ id, slug, name, personal, role, roleKey, kind, capabilities, teamSharingNeedsApproval, iconUrl }));
   const scopeTeam = scopeTeamFor(teams, params.team);
 
   // Previews only: content loads when an artifact is opened (loadArtifactAction).

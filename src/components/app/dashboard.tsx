@@ -1,46 +1,34 @@
 "use client";
 
-import { IconInfoCircle, IconLoader2, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { IconInfoCircle, IconLoader2, IconPlus, IconX } from "@tabler/icons-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
-import { ArtifactList } from "@/components/app/artifact-list";
-import { artifactListState, filterArtifactList } from "@/components/app/artifact-list-state";
-import { ProjectFilter } from "@/components/app/project-filter";
-import { TagFilter } from "@/components/app/tag-filter";
-import { ScopeTabs } from "@/components/app/scope-tabs";
+import { artifactListState } from "@/components/app/artifact-list-state";
 import { serverProjectsApi, type ProjectsApi } from "@/components/app/projects-api";
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
 import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
 import { useEditAccess, useWithdrawSharing } from "@/components/app/use-edit-access";
 import { useArtifactLink } from "@/components/app/use-artifact-link";
 import { useFullArtifact, type ArtifactLoader } from "@/components/app/use-full-artifact";
-import { useServerSearch } from "@/components/app/use-server-search";
+import { useListFilters, useWorkspaceList } from "@/components/app/use-workspace-list";
 import { useDashboardProjects } from "@/components/app/use-dashboard-projects";
 import { serverNewArtifactApi, type NewArtifactApi } from "@/components/app/new-artifact/new-artifact-api";
 import { NewArtifactPane } from "@/components/app/new-artifact/new-artifact-pane";
 import { filteredProjectName, useNewArtifact, type NewArtifactSession } from "@/components/app/new-artifact/use-new-artifact";
-import { PanelSizesBeforePaint, SidebarSplitter, sidebarPanelId } from "@/components/app/workspace-splitters";
+import { PanelSizesBeforePaint, SidebarSplitter } from "@/components/app/workspace-splitters";
+import { SidebarVisibilityProvider } from "@/components/app/sidebar-visibility";
+import { WorkspaceSidebar } from "@/components/app/workspace-sidebar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { LinkedCommentsProvider } from "@/components/comments/linked-comments";
-import { SidebarProjects } from "@/components/projects/sidebar-projects";
 import type { LinkNotice } from "@/lib/app-link-rules";
-import { kinds } from "@/lib/artifact-kinds";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
-import { listMinHeight, sidebarColumns } from "@/lib/panel-size-rules";
+import { sidebarColumns } from "@/lib/panel-size-rules";
 import type { ProjectFacets } from "@/lib/projects/queries";
 import type { ProjectFilter as ProjectFilterValue } from "@/lib/projects/rules";
-import { matchesProjectFilter, type SidebarProjectRow } from "@/lib/projects/sidebar-rules";
+import type { SidebarProjectRow } from "@/lib/projects/sidebar-rules";
 import type { TagFacet } from "@/lib/tags/queries";
 import { cn } from "@/lib/utils";
 
@@ -122,26 +110,9 @@ function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate
   );
 }
 
-/**
- * The slim bar right under the app header: scope tabs on the left, the create
- * button on the right, so the workspace below gets the height. The page's h1
- * stays for screen readers only. Team scopes list others' work, so they have
- * no create button. On phones the button shows only its icon and keeps its name.
- */
-function WorkspaceBar({ teams, scopeTeam, onCreate }: { teams: readonly ShareTeam[]; scopeTeam: ShareTeam | null; onCreate: () => void }) {
-  return (
-    <>
-      <h1 className="sr-only">{scopeTeam ? `Shared with ${scopeTeam.name}` : "Artifacts"}</h1>
-      <div data-slot="workspace-bar" className="flex min-h-11 shrink-0 items-center gap-3 py-2">
-        <ScopeTabs teams={teams} activeSlug={scopeTeam?.slug ?? null} />
-        {scopeTeam ? null : (
-          <Button size="sm" onClick={onCreate} title="New artifact" className="ml-auto shrink-0 max-sm:size-7 max-sm:px-0">
-            <IconPlus /><span className="max-sm:sr-only">New artifact</span>
-          </Button>
-        )}
-      </div>
-    </>
-  );
+/** The page's heading, for screen readers: the workspace switcher shows sighted people where they are. */
+function WorkspaceHeading({ scopeTeam }: { scopeTeam: ShareTeam | null }) {
+  return <h1 className="sr-only">{scopeTeam ? `Shared with ${scopeTeam.name}` : "Artifacts"}</h1>;
 }
 
 const linkNoticeText: Record<LinkNotice, string> = {
@@ -150,9 +121,10 @@ const linkNoticeText: Record<LinkNotice, string> = {
 };
 
 /** Shown when a link (from a notification, say) points to an artifact that is gone or no longer shared with the viewer, or could not be checked. */
-function LinkNoticeBar({ notice, onDismiss }: { notice: LinkNotice; onDismiss: () => void }) {
+function LinkNoticeBar({ notice, onDismiss }: { notice: LinkNotice | null; onDismiss: () => void }) {
+  if (!notice) return null;
   return (
-    <div role="status" className="mb-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+    <div role="status" className="flex items-center gap-2 border-b bg-muted px-4 py-2 text-sm text-muted-foreground">
       <IconInfoCircle aria-hidden className="size-4 shrink-0" />
       <p className="min-w-0 flex-1">{linkNoticeText[notice]}</p>
       <Button variant="ghost" size="icon-sm" aria-label="Dismiss" title="Dismiss" onClick={onDismiss}><IconX /></Button>
@@ -237,6 +209,16 @@ function listSelection(session: NewArtifactSession | null, selected: ArtifactLis
   return selected?.id ?? null;
 }
 
+/** The shell's columns from lg up: the sidebar and the pane, or the pane alone while the sidebar is hidden. */
+function shellColumns(sidebarHidden: boolean): string {
+  return sidebarHidden ? "lg:grid-cols-[minmax(0,1fr)]" : sidebarColumns;
+}
+
+/** New artifact, on the viewer's own workspace only: team workspaces list others' work. */
+function createIn(scopeTeam: ShareTeam | null, start: () => void): (() => void) | null {
+  return scopeTeam ? null : start;
+}
+
 /** A link that opens an artifact (a notification, a pasted URL) closes the blank page, so the pane shows what was asked for. */
 function useLinkLeavesNewArtifact(opened: unknown, leave: () => void) {
   useEffect(() => { if (opened) leave(); }, [opened, leave]);
@@ -248,17 +230,14 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
   const listRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
   const { artifacts, setArtifacts, selectedId, setSelectedId, notice, dismissNotice, opened } = useArtifactLink({ initialArtifacts, target: linkTarget, failed: linkFailed, onHandled: onLinkHandled, list: listRef, detail: detailRef });
-  const [query, setQuery] = useState("");
-  const [kind, setKind] = useState("all");
-  const clearFilters = useCallback(() => { setQuery(""); setKind("all"); }, []);
+  const listFilters = useListFilters();
+  const { query, setQuery, kind, setKind, view, setView, clearFilters } = listFilters;
+  const [sidebarHidden, setSidebarHidden] = useState(false);
   const fresh = useNewArtifact({ setArtifacts, setSelectedId, clearFilters });
   useLinkLeavesNewArtifact(opened, fresh.leave);
   const sidebar = useDashboardProjects({ artifacts, setArtifacts, rows: projectRows, facets, api: projectsApi, teams, scopeTeam, tagFilter, listPath, viewerId });
-
-  const serverMatches = useServerSearch(query, scopeTeam?.id ?? null, projectFilter, tagFilter);
-  // A card moved out of the filtered project leaves the list at once; Undo brings it back.
-  const inFilter = useMemo(() => artifacts.filter((item) => matchesProjectFilter(item.project, projectFilter)), [artifacts, projectFilter]);
-  const filtered = useMemo(() => filterArtifactList(inFilter, { query, kind }, serverMatches), [inFilter, kind, query, serverMatches]);
+  const entryKeys = useMemo(() => sidebar.projects.entries.map((entry) => entry.key), [sidebar.projects.entries]);
+  const { counts, filtered, groups, narrowed } = useWorkspaceList({ artifacts, filters: listFilters, projectFilter, tagFilter, teamId: scopeTeam?.id ?? null, viewerId, entryKeys });
 
   const selected = pickSelected(artifacts, filtered, selectedId);
 
@@ -276,69 +255,44 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
     });
   }
 
+  const visibility = useMemo(() => ({ hidden: sidebarHidden, show: () => { setSidebarHidden(false); } }), [sidebarHidden]);
+
   return (
     <ShareTeamsProvider teams={teams}>
       <LinkedCommentsProvider link={opened} selectedPublicId={selected?.publicId ?? null}>
-      {/* An app shell from md up: the frame is the viewport (workspace-frame), and only the list and the artifact scroll. */}
-      <main data-app-shell className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col px-4 pb-4 sm:px-6 sm:pb-6 md:min-h-0 md:flex-1">
-        <WorkspaceBar teams={teams} scopeTeam={scopeTeam} onCreate={fresh.start} />
-        {notice ? <LinkNoticeBar notice={notice} onDismiss={dismissNotice} /> : null}
+      <SidebarVisibilityProvider value={visibility}>
+      {/* An app shell from md up: the frame is the viewport (workspace-frame), and only the sidebar's tree and the artifact scroll. */}
+      <main data-app-shell className="flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col md:min-h-0 md:flex-1">
+        <WorkspaceHeading scopeTeam={scopeTeam} />
+        <LinkNoticeBar notice={notice} onDismiss={dismissNotice} />
 
         <PanelSizesBeforePaint />
-        {/* overflow-clip, not hidden: it rounds the corners without becoming a scroll box, so the artifact's toolbar can stick on phones. */}
-        <div ref={shellRef} className={cn("card-surface relative grid min-h-[640px] flex-1 overflow-clip md:min-h-0 md:grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]", sidebarColumns)}>
-          <aside ref={sidebarRef} id={sidebarPanelId} className="relative flex min-h-0 min-w-0 flex-col border-b bg-background/60 max-md:max-h-[360px] md:max-lg:max-h-[min(360px,32dvh)] lg:overflow-y-auto lg:overscroll-contain lg:border-r lg:border-b-0">
-            <div className="shrink-0 space-y-2 border-b p-3">
-              <div className="relative">
-                <IconSearch className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(event) => { setQuery(event.target.value); }}
-                  placeholder="Search"
-                  aria-label="Search artifacts"
-                  className="h-8 bg-card pl-8"
-                />
-              </div>
-              <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-1">
-                <Select value={kind} onValueChange={(value) => { setKind(value ?? "all"); }}>
-                  <SelectTrigger size="sm" className="h-7 w-full min-w-0 border-0 bg-transparent px-1 text-sm text-muted-foreground shadow-none" aria-label="Filter by format">
-                    <SelectValue>{(value: string) => (value === "all" ? "All formats" : value)}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All formats</SelectItem>
-                    {kinds.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <ProjectFilter facets={facets} filter={projectFilter} scopeTeam={scopeTeam} tags={tagFilter} listPath={listPath} />
-              </div>
-              <TagFilter facets={tagFacets} selected={tagFilter} projectFilter={projectFilter} scopeTeam={scopeTeam} listPath={listPath} />
-            </div>
-            <SidebarProjects
-              controls={sidebar.projects}
-              filter={projectFilter}
-              onFilter={sidebar.filterBy}
-              scopeTeam={scopeTeam}
-              teams={sidebar.shared}
-              dragging={sidebar.dragging}
-              blockedKeys={sidebar.blockedKeys}
-              onDropArtifact={sidebar.dropped}
-              listRef={listRef}
-            />
-            <div ref={listRef} data-slot="artifact-list" className={cn("relative min-h-0 flex-1 overflow-y-auto overscroll-contain p-2", listMinHeight)}>
-              <ArtifactList
-                state={artifactListState({ total: artifacts.length, shown: filtered.length })}
-                artifacts={filtered}
-                selectedId={listSelection(fresh.session, selected)}
-                onSelect={fresh.select}
-                onClearFilters={clearFilters}
-                moves={sidebar.moves}
-              />
-            </div>
-            <div className="shrink-0 border-t px-4 py-2.5 text-xs text-muted-foreground">
-              {filtered.length} shown
-            </div>
-          </aside>
-          <SidebarSplitter shell={shellRef} sidebar={sidebarRef} />
+        <div ref={shellRef} className={cn("relative grid min-h-[640px] flex-1 bg-card md:min-h-0 md:grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]", shellColumns(sidebarHidden))}>
+          <WorkspaceSidebar
+            sidebarRef={sidebarRef}
+            listRef={listRef}
+            hidden={sidebarHidden}
+            onHide={() => { setSidebarHidden(true); }}
+            teams={teams}
+            scopeTeam={scopeTeam}
+            listPath={listPath}
+            query={query}
+            onQuery={setQuery}
+            filters={{ kind, onKind: setKind, facets, projectFilter, tagFacets, tagFilter, scopeTeam, listPath }}
+            onCreate={createIn(scopeTeam, fresh.start)}
+            view={view}
+            counts={counts}
+            onView={setView}
+            sidebar={sidebar}
+            projectFilter={projectFilter}
+            groups={groups}
+            narrowed={narrowed}
+            selectedId={listSelection(fresh.session, selected)}
+            onSelect={fresh.select}
+            listState={artifactListState({ total: artifacts.length, shown: filtered.length })}
+            onClearFilters={clearFilters}
+          />
+          {sidebarHidden ? null : <SidebarSplitter shell={shellRef} sidebar={sidebarRef} />}
 
           {/* `contents` keeps the pane a grid item; the ref lets a link bring it into view on phones. */}
           <div ref={detailRef} data-slot="workspace-detail" className="contents">
@@ -357,6 +311,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
           </div>
         </div>
       </main>
+      </SidebarVisibilityProvider>
       </LinkedCommentsProvider>
     </ShareTeamsProvider>
   );

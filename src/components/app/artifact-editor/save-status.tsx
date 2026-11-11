@@ -1,10 +1,11 @@
 "use client";
 
-import { IconAlertTriangle } from "@tabler/icons-react";
+import { IconAlertTriangle, IconCheck, IconCopy } from "@tabler/icons-react";
 
 import { HarnessByline } from "@/components/harness/harness-byline";
 import { editorName, LastEdited } from "@/components/history/last-edited";
 import { Button } from "@/components/ui/button";
+import { useCopyToClipboard } from "@/components/use-copy-to-clipboard";
 import type { ArtifactEditorDto, ArtifactHarnessDto } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
@@ -29,29 +30,71 @@ interface SaveStatusBarProps {
   harness?: ArtifactHarnessDto | null | undefined;
   /** False for a new artifact that is not stored yet: nobody has edited it. */
   stored?: boolean;
+  /** The artifact's id: its first 8 characters show, with a button that copies all of it. Left out for a new artifact. */
+  id?: string | undefined;
   onRetry: () => void;
+  /** The content's column (previewColumnClass), so the line sits under the title. */
+  column?: string;
   /** Extra classes from the surrounding layout, such as sticking in the /app shell. */
   className?: string;
 }
 
-/** Character count, save status, and who saved last, in the row above the content. */
-export function SaveStatusBar({ status, dirty, length, updatedAt, updatedBy, harness, stored = true, onRetry, className }: SaveStatusBarProps) {
+/** A dot between the meta line's parts. */
+function Dot() {
+  return <span aria-hidden>·</span>;
+}
+
+/** The short id and a button that copies the whole id, for an agent or a support request. */
+function ShortId({ id }: { id: string }) {
+  const { copied, copy } = useCopyToClipboard();
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      <span className="font-mono">{id.slice(0, 8)}</span>
+      <button
+        type="button"
+        onClick={() => void copy(id)}
+        aria-label={copied ? "Copied the id" : "Copy the artifact id"}
+        title="Copy the artifact id"
+        className="inline-flex size-6 items-center justify-center rounded-md hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+      >
+        {copied ? <IconCheck aria-hidden className="size-3.5" /> : <IconCopy aria-hidden className="size-3.5" />}
+      </button>
+    </span>
+  );
+}
+
+/** Who saved it last and through which agent, or that a new artifact saves once something is written. */
+function EditedBy({ stored, updatedAt, updatedBy, harness }: Pick<SaveStatusBarProps, "updatedAt" | "updatedBy" | "harness"> & { stored: boolean }) {
+  if (!stored) return <span>Saves once you write something</span>;
+  return (
+    <>
+      <LastEdited editor={updatedBy} at={updatedAt} />
+      <HarnessByline harness={harness} className="text-xs" />
+    </>
+  );
+}
+
+/**
+ * The meta line under the title: who saved it last and through which agent,
+ * how long it is, the save status, and the short id with a copy button.
+ */
+export function SaveStatusBar({ status, dirty, length, updatedAt, updatedBy, harness, stored = true, id, onRetry, column, className }: SaveStatusBarProps) {
   const label = saveStatusLabel(status, dirty);
   const problem = status.kind === "held" || status.kind === "failed";
   return (
-    <div data-slot="save-status" className={cn("flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 border-b bg-background/60 px-5 py-2 sm:px-7", className)}>
-      <span className="text-xs text-muted-foreground">{length.toLocaleString()} characters</span>
-      <span role="status" aria-live="polite" className={cn("inline-flex items-center gap-1.5 text-xs", problem ? "text-foreground" : "text-muted-foreground")}>
-        {problem ? <IconAlertTriangle aria-hidden className="size-3.5 shrink-0 text-tone-warning" /> : null}
-        {label}
-      </span>
-      {status.kind === "failed" ? <Button variant="ghost" size="xs" onClick={onRetry}>Try again</Button> : null}
-      {stored ? (
-        <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1">
-          <LastEdited editor={updatedBy} at={updatedAt} />
-          <HarnessByline harness={harness} className="text-xs" />
+    <div data-slot="save-status" className={cn("pt-1", className)}>
+      <div className={cn("flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b pb-3 text-xs text-muted-foreground", column ?? "px-5 sm:px-7")}>
+        <EditedBy stored={stored} updatedAt={updatedAt} updatedBy={updatedBy} harness={harness} />
+        <Dot />
+        <span>{length.toLocaleString()} {length === 1 ? "char" : "chars"}</span>
+        {label ? <Dot /> : null}
+        <span role="status" aria-live="polite" className={cn("inline-flex items-center gap-1.5", problem ? "text-foreground" : undefined)}>
+          {problem ? <IconAlertTriangle aria-hidden className="size-3.5 shrink-0 text-tone-warning" /> : null}
+          {label}
         </span>
-      ) : <span className="ml-auto text-xs text-muted-foreground">Saves once you write something</span>}
+        {status.kind === "failed" ? <Button variant="ghost" size="xs" onClick={onRetry}>Try again</Button> : null}
+        {id ? <><Dot /><ShortId id={id} /></> : null}
+      </div>
     </div>
   );
 }

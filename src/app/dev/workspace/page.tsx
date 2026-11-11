@@ -18,7 +18,7 @@ export const metadata: Metadata = {
  * long artifacts, a long list, and projects, without a database. The
  * project filter in the URL works as on /app, and so does the
  * `?artifact=<id>&comments=1` link. `?scopes=1` adds shared teams, so the
- * scope tabs show, and `&team=<slug>` opens one as the scope. `?linkcheck=failed`
+ * workspace switcher lists them, and `&team=<slug>` opens one as the scope. `?linkcheck=failed`
  * acts as if the server could not check the link, and `?slowload=1` makes the
  * Long markdown fixture load on open, held until a test releases it. Returns 404 in every other environment.
  */
