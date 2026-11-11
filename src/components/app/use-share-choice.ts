@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { ArtifactDto, ArtifactVisibility, CommentSetting } from "@/lib/artifact-types";
+import type { ArtifactVisibility, CommentSetting, ShareableArtifactDto } from "@/lib/artifact-types";
 
 import { previewComments } from "./comment-options";
 import { defaultTeamId } from "./share-options";
@@ -13,7 +13,7 @@ import type { ShareTeam } from "./share-teams-context";
  * comment, and whether a public artifact shows in search engines. Until the person picks a comments setting, it follows the level and
  * team the way the server would decide it.
  */
-export function useShareChoice(artifact: ArtifactDto, teams: readonly ShareTeam[]) {
+export function useShareChoice(artifact: ShareableArtifactDto, teams: readonly ShareTeam[]) {
   const [visibility, setVisibility] = useState<ArtifactVisibility>(artifact.visibility);
   const [teamId, setTeamId] = useState(() => defaultTeamId(artifact.visibility, teams, artifact.teamId));
   const [comments, setComments] = useState<CommentSetting>(artifact.comments);

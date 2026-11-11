@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Dashboard } from "@/components/app/dashboard";
 import type { ShareTeam } from "@/components/app/share-teams-context";
+import { toShareTeams } from "@/components/app/share-teams";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { parseArtifactLink, type ArtifactLink } from "@/lib/app-link";
 import { toArtifactListItem } from "@/lib/artifact-preview";
@@ -51,7 +52,7 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
   const session = await getSession();
   if (!session) redirect("/sign-in");
   const [params, memberships] = await Promise.all([searchParams, listTeamsForUser(session.user.id)]);
-  const teams: ShareTeam[] = memberships.map(({ id, slug, name, personal, role, roleKey, kind, capabilities, teamSharingNeedsApproval, iconUrl }) => ({ id, slug, name, personal, role, roleKey, kind, capabilities, teamSharingNeedsApproval, iconUrl }));
+  const teams = toShareTeams(memberships);
   const scopeTeam = scopeTeamFor(teams, params.team);
 
   // Previews only: content loads when an artifact is opened (loadArtifactAction).

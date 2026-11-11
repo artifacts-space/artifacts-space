@@ -409,3 +409,11 @@ export async function artifactCountOf(userId: string): Promise<number> {
   const result = await db().query<{ n: string }>(`select count(*) as n from artifact where user_id = $1`, [userId]);
   return Number(result.rows[0]?.n ?? 0);
 }
+
+/** Who can read an artifact now: its visibility and the team it is shared through. */
+export async function sharingOf(publicId: string): Promise<{ visibility: string; teamId: string | null }> {
+  const result = await db().query<{ visibility: string; team_id: string | null }>(`select visibility, team_id from artifact where public_id = $1`, [publicId]);
+  const row = result.rows[0];
+  if (!row) throw new Error("No such test artifact.");
+  return { visibility: row.visibility, teamId: row.team_id };
+}

@@ -156,6 +156,16 @@ export interface ArtifactDto {
   updatedAt: string;
 }
 
+/**
+ * What the Share dialog reads from an artifact: who can read it now, its
+ * team, comments, search engines, and open requests. The artifact page sends
+ * only these to its sharer, never the content a second time.
+ */
+export type ShareableArtifactDto = Pick<
+  ArtifactDto,
+  "id" | "publicId" | "title" | "icon" | "visibility" | "teamId" | "comments" | "showInSearch" | "pendingSharing" | "pendingEdit" | "pendingComments"
+>;
+
 /** One entry in an artifact's history, without its content. */
 export interface VersionSummaryDto {
   id: string;
