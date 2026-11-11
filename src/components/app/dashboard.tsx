@@ -1,12 +1,12 @@
 "use client";
 
 import { IconInfoCircle, IconLoader2, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
+import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import { ArtifactList } from "@/components/app/artifact-list";
 import { artifactListState, filterArtifactList } from "@/components/app/artifact-list-state";
-import { CreateArtifactDialog } from "@/components/app/create-artifact-dialog";
 import { ProjectFilter } from "@/components/app/project-filter";
 import { TagFilter } from "@/components/app/tag-filter";
 import { ScopeTabs } from "@/components/app/scope-tabs";
@@ -18,6 +18,9 @@ import { useArtifactLink } from "@/components/app/use-artifact-link";
 import { useFullArtifact, type ArtifactLoader } from "@/components/app/use-full-artifact";
 import { useServerSearch } from "@/components/app/use-server-search";
 import { useDashboardProjects } from "@/components/app/use-dashboard-projects";
+import { serverNewArtifactApi, type NewArtifactApi } from "@/components/app/new-artifact/new-artifact-api";
+import { NewArtifactPane } from "@/components/app/new-artifact/new-artifact-pane";
+import { filteredProjectName, useNewArtifact, type NewArtifactSession } from "@/components/app/new-artifact/use-new-artifact";
 import { PanelSizesBeforePaint, SidebarSplitter, sidebarPanelId } from "@/components/app/workspace-splitters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +53,8 @@ interface DetailPaneProps {
   onCreate: () => void;
   initialFull: readonly ArtifactDto[] | undefined;
   loadArtifact: ArtifactLoader | undefined;
+  /** How the artifact saves: the server action, or the fixture's store for artifacts New artifact made there. */
+  save: SaveArtifact | undefined;
 }
 
 /** Shown while the selected artifact's content loads, or when it could not. */
@@ -75,7 +80,7 @@ function withListProject(full: ArtifactDto | null, selected: ArtifactListItemDto
 }
 
 /** The editor for an artifact the viewer may edit, a read-only view for a teammate's, or the empty state. */
-function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull, loadArtifact }: DetailPaneProps) {
+function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull, loadArtifact, save }: DetailPaneProps) {
   const { full: loaded, failure, remember, retry } = useFullArtifact(selected, initialFull, loadArtifact);
   const full = withListProject(loaded, selected);
   const access = useEditAccess(full, viewerId);
@@ -99,6 +104,7 @@ function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate
         onWithdraw={onWithdraw}
         onUpdated={handleUpdated}
         onDeleted={onDeleted}
+        save={save}
       />
     );
   }
@@ -191,9 +197,52 @@ interface DashboardProps {
   loadArtifact?: ArtifactLoader | undefined;
   /** Called each time a link in the address bar is acted on (the fixture counts them for its tests). */
   onLinkHandled?: () => void;
+  /** Where New artifact stores the blank page: the server actions, or the fixture's stand-in. */
+  newArtifactApi?: NewArtifactApi;
 }
 
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", linkTarget, linkFailed, loadArtifact, onLinkHandled }: DashboardProps) {
+interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate" | "save"> {
+  fresh: ReturnType<typeof useNewArtifact>;
+  api: NewArtifactApi;
+  /** The project the list is filtered to, for a new artifact. */
+  project: string | null;
+}
+
+/** The artifact pane: the blank page while New artifact has one open, else the selected artifact. */
+function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpdated, onDeleted, initialFull, loadArtifact }: WorkspacePaneProps) {
+  // Memoized so the stored copies are merged into the seed only when they or the seed change, not on every render.
+  const { withStored } = fresh;
+  const full = useMemo(() => withStored(initialFull), [withStored, initialFull]);
+  if (fresh.session) {
+    return (
+      <NewArtifactPane
+        key={fresh.session.key}
+        viewerId={viewerId}
+        origin={origin}
+        api={api}
+        project={project}
+        sessionKey={fresh.session.key}
+        focusRequest={fresh.session.focusRequest}
+        onSaved={fresh.saved}
+        onDeleted={onDeleted}
+      />
+    );
+  }
+  return <DetailPane selected={selected} viewerId={viewerId} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} onCreate={fresh.start} initialFull={full} loadArtifact={loadArtifact} save={api.update} />;
+}
+
+/** The card marked as open: the blank page's artifact once stored (none before), else the selected one. */
+function listSelection(session: NewArtifactSession | null, selected: ArtifactListItemDto | null): string | null {
+  if (session) return session.createdId;
+  return selected?.id ?? null;
+}
+
+/** A link that opens an artifact (a notification, a pasted URL) closes the blank page, so the pane shows what was asked for. */
+function useLinkLeavesNewArtifact(opened: unknown, leave: () => void) {
+  useEffect(() => { if (opened) leave(); }, [opened, leave]);
+}
+
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", linkTarget, linkFailed, loadArtifact, onLinkHandled, newArtifactApi = serverNewArtifactApi }: DashboardProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -201,7 +250,9 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
   const { artifacts, setArtifacts, selectedId, setSelectedId, notice, dismissNotice, opened } = useArtifactLink({ initialArtifacts, target: linkTarget, failed: linkFailed, onHandled: onLinkHandled, list: listRef, detail: detailRef });
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
-  const [createOpen, setCreateOpen] = useState(false);
+  const clearFilters = useCallback(() => { setQuery(""); setKind("all"); }, []);
+  const fresh = useNewArtifact({ setArtifacts, setSelectedId, clearFilters });
+  useLinkLeavesNewArtifact(opened, fresh.leave);
   const sidebar = useDashboardProjects({ artifacts, setArtifacts, rows: projectRows, facets, api: projectsApi, teams, scopeTeam, tagFilter, listPath, viewerId });
 
   const serverMatches = useServerSearch(query, scopeTeam?.id ?? null, projectFilter, tagFilter);
@@ -211,18 +262,13 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
 
   const selected = pickSelected(artifacts, filtered, selectedId);
 
-  function created(artifact: ArtifactDto) {
-    setArtifacts((current) => [toArtifactListItem(artifact), ...current]);
-    setSelectedId(artifact.id);
-    setQuery("");
-    setKind("all");
-  }
-
   function updated(artifact: ArtifactDto) {
+    fresh.refresh(artifact);
     setArtifacts((current) => current.map((item) => (item.id === artifact.id ? toArtifactListItem(artifact) : item)));
   }
 
   function deleted(id: string) {
+    fresh.deleted(id);
     setArtifacts((current) => {
       const next = current.filter((artifact) => artifact.id !== id);
       setSelectedId(next[0]?.id ?? "");
@@ -235,7 +281,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
       <LinkedCommentsProvider link={opened} selectedPublicId={selected?.publicId ?? null}>
       {/* An app shell from md up: the frame is the viewport (workspace-frame), and only the list and the artifact scroll. */}
       <main data-app-shell className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col px-4 pb-4 sm:px-6 sm:pb-6 md:min-h-0 md:flex-1">
-        <WorkspaceBar teams={teams} scopeTeam={scopeTeam} onCreate={() => { setCreateOpen(true); }} />
+        <WorkspaceBar teams={teams} scopeTeam={scopeTeam} onCreate={fresh.start} />
         {notice ? <LinkNoticeBar notice={notice} onDismiss={dismissNotice} /> : null}
 
         <PanelSizesBeforePaint />
@@ -282,9 +328,9 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
               <ArtifactList
                 state={artifactListState({ total: artifacts.length, shown: filtered.length })}
                 artifacts={filtered}
-                selectedId={selected?.id ?? null}
-                onSelect={setSelectedId}
-                onClearFilters={() => { setQuery(""); setKind("all"); }}
+                selectedId={listSelection(fresh.session, selected)}
+                onSelect={fresh.select}
+                onClearFilters={clearFilters}
                 moves={sidebar.moves}
               />
             </div>
@@ -296,20 +342,20 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
 
           {/* `contents` keeps the pane a grid item; the ref lets a link bring it into view on phones. */}
           <div ref={detailRef} data-slot="workspace-detail" className="contents">
-          <DetailPane
+          <WorkspacePane
+            fresh={fresh}
+            api={newArtifactApi}
+            project={filteredProjectName(projectFilter, facets)}
             selected={selected}
             viewerId={viewerId}
             origin={origin}
             onUpdated={updated}
             onDeleted={deleted}
-            onCreate={() => { setCreateOpen(true); }}
             initialFull={initialFull}
             loadArtifact={loadArtifact}
           />
           </div>
         </div>
-
-        <CreateArtifactDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={created} />
       </main>
       </LinkedCommentsProvider>
     </ShareTeamsProvider>

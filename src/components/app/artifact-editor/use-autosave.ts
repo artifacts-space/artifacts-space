@@ -33,7 +33,13 @@ interface AutosaveOptions {
   replaceDraft: (draft: ArtifactDraft, remount: boolean) => void;
   onUpdated: (artifact: ArtifactDto) => void;
   save?: SaveArtifact | undefined;
+  /** Why the draft cannot be saved yet; defaults to draftProblem against the saved version. */
+  problem?: ((draft: ArtifactDraft, base: ArtifactDraft) => string | null) | undefined;
+  /** True while there is nothing worth saving (a blank new page): no save, no status, nothing to guard on leaving. */
+  idle?: ((draft: ArtifactDraft) => boolean) | undefined;
 }
+
+const neverIdle = () => false;
 
 /** True when `next` is at least as new as `current`, so a late, older DTO never replaces the base. */
 function isNewerOrSame(next: ArtifactDto, current: ArtifactDto) {
@@ -54,7 +60,7 @@ function isNewerOrSame(next: ArtifactDto, current: ArtifactDto) {
  * reloading the tab with unsaved changes asks first (useLeaveGuard), since a
  * save sent while the page unloads may not arrive.
  */
-export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = updateArtifactAction }: AutosaveOptions) {
+export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = updateArtifactAction, problem: problemOf = draftProblem, idle = neverIdle }: AutosaveOptions) {
   const [status, setStatus] = useState<AutosaveStatus>({ kind: "idle" });
   const [retry, setRetry] = useState(0);
   const baseRef = useRef(artifact);
@@ -68,10 +74,10 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
   const pausedRef = useRef(false);
   /** The next save resends a merged or kept draft (see SaveTiming.resend). */
   const resendRef = useRef(false);
-  const callbacksRef = useRef({ replaceDraft, onUpdated, save });
+  const callbacksRef = useRef({ replaceDraft, onUpdated, save, problemOf, idle });
 
   useEffect(() => { draftRef.current = draft; }, [draft]);
-  useEffect(() => { callbacksRef.current = { replaceDraft, onUpdated, save }; }, [replaceDraft, onUpdated, save]);
+  useEffect(() => { callbacksRef.current = { replaceDraft, onUpdated, save, problemOf, idle }; }, [replaceDraft, onUpdated, save, problemOf, idle]);
   /** Adopts someone else's newer version as the base, merging the draft when that is trivial. */
   /** Makes `theirs` the base with `next` as the draft, and sends `next` again when it still differs from theirs. */
   const adopt = useCallback((theirs: ArtifactDto, next: ArtifactDraft, mine: ArtifactDraft) => {
@@ -139,9 +145,10 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
     }
     const base = baseRef.current;
     const current = draftRef.current;
+    if (callbacksRef.current.idle(current)) return;
     const changes = changedFields(draftFrom(base), current);
     if (Object.keys(changes).length === 0) return;
-    const problem = draftProblem(current);
+    const problem = callbacksRef.current.problemOf(current, draftFrom(base));
     if (problem) {
       setStatus({ kind: "held", message: problem });
       return;
@@ -168,7 +175,7 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
   }, [applyResult]);
   useEffect(() => { saveNowRef.current = saveNow; }, [saveNow]);
 
-  const dirty = hasChanges(draftFrom(artifact), draft);
+  const dirty = hasChanges(draftFrom(artifact), draft) && !idle(draft);
   const paused = status.kind === "conflict";
   useEffect(() => { pausedRef.current = paused; }, [paused]);
 

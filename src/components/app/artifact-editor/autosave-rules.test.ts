@@ -43,8 +43,32 @@ describe("draftProblem", () => {
     expect(draftProblem(edited({ kind: "file", content: "" }))).toBeNull();
   });
 
+  it("should let a page whose stored body is empty go back to empty Markdown", () => {
+    const storedEmpty = edited({ kind: "file", content: "" });
+    expect(draftProblem(edited({ content: "" }), storedEmpty)).toBeNull();
+  });
+
+  it("should hold the save when a body with content is emptied", () => {
+    expect(draftProblem(edited({ content: "" }), base)).toBe("Add some content to save.");
+    expect(draftProblem(edited({ kind: "file", content: "" }), edited({ kind: "file", content: "Notes" }))).toBeNull();
+    expect(draftProblem(edited({ content: "" }), edited({ kind: "file", content: "Notes" }))).toBe("Add some content to save.");
+  });
+
   it("should hold the save when a ui spec does not pass the same check agents' specs do", () => {
     expect(draftProblem(edited({ kind: "ui", content: "{\"root\":\"a\",\"elements\":{}}" }))).toMatch(/^Not saved yet: /);
+  });
+
+  it("should not hold a title change for the content when the content and format are unchanged", () => {
+    const empty = edited({ content: "" });
+    expect(draftProblem({ ...empty, title: "Plan B" }, empty)).toBeNull();
+  });
+
+  it("should still hold the save when it empties the content of a saved artifact", () => {
+    expect(draftProblem(edited({ content: "" }), base)).toBe("Add some content to save.");
+  });
+
+  it("should still check the content when the format changes", () => {
+    expect(draftProblem(edited({ kind: "json" }), base)).toMatch(/^Not saved yet: /);
   });
 
   it("should allow the save when the content fits its format", () => {

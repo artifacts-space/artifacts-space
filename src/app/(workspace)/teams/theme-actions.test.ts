@@ -23,7 +23,6 @@ const mocks = vi.hoisted(() => ({
   restoreDefaultRevision: vi.fn(),
   listPresetRevisions: vi.fn(),
   listDefaultRevisions: vi.fn(),
-  newArtifactThemeChoices: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -40,7 +39,6 @@ vi.mock("@/lib/themes/team-presets", () => ({
   restoreDefaultRevision: mocks.restoreDefaultRevision,
 }));
 vi.mock("@/lib/themes/team-theme-revisions", () => ({ listPresetRevisions: mocks.listPresetRevisions, listDefaultRevisions: mocks.listDefaultRevisions }));
-vi.mock("@/lib/themes/theme-choices", () => ({ newArtifactThemeChoices: mocks.newArtifactThemeChoices }));
 
 const actions = await import("./theme-actions");
 
@@ -134,11 +132,5 @@ describe("team theme actions", () => {
     expect(mocks.restorePresetRevision).toHaveBeenCalledWith("team-1", "preset-1", "rev-1", "user-1");
     expect(await changes.restoreDefault()).toEqual({ success: true, data: "paper" });
     expect(mocks.restoreDefaultRevision).toHaveBeenCalledWith("team-1", "rev-2", "user-1");
-  });
-
-  it("should give no team presets for a new artifact when signed out", async () => {
-    mocks.session.mockResolvedValue(null);
-    expect(await actions.newArtifactThemeChoicesAction()).toEqual({ success: true, data: { groups: [], inherited: null, manageable: [] } });
-    expect(mocks.newArtifactThemeChoices).not.toHaveBeenCalled();
   });
 });

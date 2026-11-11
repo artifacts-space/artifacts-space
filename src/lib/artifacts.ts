@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { artifact, sharingRequest, type ArtifactRecord } from "@/db/schema";
+import { CreateRequestTaken } from "@/lib/create/created-by-request";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { getEditableArtifact, viewableInTeamCondition } from "@/lib/access";
 import { authoredByViewerCondition, findDeletableArtifact, ownedAgentIds } from "@/lib/agents/owner-access";
@@ -41,7 +42,8 @@ import { pruneUnusedContentFilesQuietly, pruneUnusedIconFilesQuietly } from "@/l
 import { droppedContentRefs } from "@/lib/files/icon-cleanup-rules";
 import { checkIconFile, restorableIcon } from "@/lib/files/icon-file";
 import { checkCoverFile, restorableCover } from "@/lib/files/cover-file";
-import { attachFileRows, deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
+import { attachContentAndImageFiles, attachUpdatedContentFiles } from "@/lib/files/save-attach";
+import { deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
 import type { FileDto } from "@/lib/files/types";
 import { generatePublicId } from "@/lib/public-id";
 import { assertContentFits } from "@/lib/quota/usage";
@@ -324,32 +326,36 @@ export async function findPublicIdByShareId(shareId: string) {
   return record?.publicId ?? null;
 }
 
+/** The author's own project for a new artifact, made if needed; null for none. New artifacts are private, so it is among the author's own. */
+async function newArtifactProjectId(userId: string, projectName: string | null | undefined): Promise<string | null> {
+  return projectName ? (await findOrCreateProject({ kind: "user", userId }, projectName, userId)).id : null;
+}
+
 /**
  * Creates a private artifact for its author, within the hourly creation limit
  * and the account's storage quota. `harness` is the agent harness of the MCP
  * connection that created it; leave it out for the web app.
  */
-export async function createArtifact(userId: string, input: ArtifactInput, options: { harness?: HarnessStamp | null } = {}) {
+export async function createArtifact(userId: string, input: ArtifactInput, options: { harness?: HarnessStamp | null; emptyMarkdown?: boolean; createRequestId?: string } = {}) {
   const { project: projectName, tags: tagInput, ...sent } = artifactInputSchema.parse(input);
   const parsed = contentForSave(sent.kind, sent);
   const tags = parseNewTags(tagInput);
   assertArtifactSize(parsed);
-  assertValidArtifactContent(parsed.kind, parsed.content);
+  assertValidArtifactContent(parsed.kind, parsed.content, { emptyMarkdown: options.emptyMarkdown === true });
   const contentFileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
   const imageFileIds = [...(await checkIconFile(userId, null, parsed.icon)), ...(await checkCoverFile(userId, null, parsed.cover))];
   // New artifacts are private: a team preset must be one of the author's teams'.
   await assertTeamPresetUsable(userId, { userId, visibility: "private", teamId: null }, parsed.theme);
   await enforceRateLimit("artifactCreate", userId);
   await assertContentFits(userId, parsed.content);
-  // New artifacts are private, so their project is among the author's own.
   await assertRoomForNewTags(userId, tags);
-  const chosen = projectName ? await findOrCreateProject({ kind: "user", userId }, projectName, userId) : null;
+  const projectId = await newArtifactProjectId(userId, projectName);
   const [record] = await getDb()
     .insert(artifact)
     .values({
       ...parsed,
       ...stampColumns(options.harness),
-      projectId: chosen?.id ?? null,
+      projectId,
       tags,
       id: randomUUID(),
       shareId: randomUUID().replaceAll("-", ""),
@@ -359,9 +365,13 @@ export async function createArtifact(userId: string, input: ArtifactInput, optio
       comments: defaultCommentSetting({ visibility: "private", teamPersonal: null }),
       userId,
       updatedBy: userId,
+      createRequestId: options.createRequestId ?? null,
     })
+    // A second create with the same create id inserts nothing (artifact_user_create_request_idx).
+    .onConflictDoNothing({ target: [artifact.userId, artifact.createRequestId], where: sql`${artifact.createRequestId} is not null` })
     .returning();
 
+  if (!record && options.createRequestId) throw new CreateRequestTaken();
   if (!record) throw new Error("The artifact could not be created.");
   await attachContentAndImageFiles(userId, record.id, contentFileIds, imageFileIds);
   await recordArtifactSave({ before: null, after: record, editorId: userId, actor: "person", saveKind: "create", harness: options.harness ?? null });
@@ -463,23 +473,6 @@ export async function restoreArtifactVersion(userId: string, id: string, version
   const changes = contentForSave(kind, artifactUpdateSchema.parse({ title, icon, theme, cover, summary, content, kind, language, source, metadata }));
   assertArtifactSize(changes);
   return saveChanges(changes, { editorId: userId, before, actor, options, restoredFromId: version.id });
-}
-
-/**
- * Checks and attaches the files an update's content and icon point at, before the
- * row changes, so a version saved with the edit already includes them.
- */
-async function attachUpdatedContentFiles(userId: string, current: ArtifactRecord, update: { kind?: string | undefined; content?: string | undefined; icon?: string | null | undefined; cover?: string | null | undefined }) {
-  const iconFileIds = [...(await checkIconFile(userId, current.id, update.icon)), ...(await checkCoverFile(userId, current.id, update.cover))];
-  const contentChanged = update.kind !== undefined || update.content !== undefined;
-  const contentFileIds = contentChanged ? await checkContentFiles(userId, current.id, update.kind ?? current.kind, update.content ?? current.content) : [];
-  await attachContentAndImageFiles(userId, current.id, contentFileIds, iconFileIds);
-}
-
-/** Attaches a save's uploads: the ones its content names as content media first, then its icon and cover images as plain files. */
-async function attachContentAndImageFiles(userId: string, artifactId: string, contentFileIds: readonly string[], imageFileIds: readonly string[]) {
-  await attachFileRows(userId, artifactId, contentFileIds, { byContent: true });
-  await attachFileRows(userId, artifactId, imageFileIds);
 }
 
 /** Deletes an artifact and its files, for its author or the person who added the agent that wrote it. */

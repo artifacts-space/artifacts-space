@@ -13,8 +13,9 @@ import { recordArtifactChange } from "@/lib/versions/service";
 import { canUseFileInArtifact } from "./access-rules";
 import { fileLimits } from "./config";
 import { countHistoryOnlyFiles } from "./icon-cleanup";
+import { unusableFilesForPeople } from "./person-messages";
 import { fileRefsInContent, maxFileRefs } from "./refs";
-import { attachFileRows, clearIconForFile, countArtifactFiles, getFileRow, getFileRows, removeFiles, usableFileRows } from "./store";
+import { attachFileRows, clearIconForFile, countArtifactFiles, getFileRow, getFileRows, removeFiles, removeUnattachedUpload, usableFileRows } from "./store";
 
 /**
  * Putting files into artifacts. A file belongs to one artifact. An editor
@@ -24,7 +25,7 @@ import { attachFileRows, clearIconForFile, countArtifactFiles, getFileRow, getFi
  * Callers check that the editor may edit the artifact (getEditableArtifact).
  */
 
-/** Throws a UserFacingError, naming the ids, unless every file is usable in this artifact. */
+/** Throws a UserFacingError, naming the ids for agents, unless every file is usable in this artifact. */
 export async function assertUsableFiles(authorId: string, artifactId: string | null, fileIds: readonly string[]): Promise<void> {
   if (fileIds.length === 0) return;
   if (fileIds.length > maxFileRefs) throw new UserFacingError(`An artifact can use at most ${String(maxFileRefs)} files.`);
@@ -36,6 +37,7 @@ export async function assertUsableFiles(authorId: string, artifactId: string | n
   if (unusable.length > 0) {
     throw new UserFacingError(
       `These file ids are unknown, still uploading, or not yours to use here: ${unusable.join(", ")}. Upload each file (files_request_upload, PUT, files_finalize) and use the id you get back. A file belongs to one artifact.`,
+      unusableFilesForPeople,
     );
   }
   const adding = fileIds.filter((id) => rows.get(id)?.artifactId === null).length;
@@ -125,4 +127,15 @@ export async function deleteOwnFile(userId: string, fileId: string, actor: Shari
     await recordArtifactChange({ artifactId: row.artifactId, editorId: userId, actor, harness: await harness() });
   }
   return row.artifactId;
+}
+
+/**
+ * Deletes the uploader's own upload while it belongs to no artifact; does
+ * nothing for a file in an artifact or someone else's. A blank page sends
+ * it for uploads that never reached an artifact, so a lost answer can never
+ * turn into removing a file from one. The check and the delete are one
+ * statement (removeUnattachedUpload).
+ */
+export async function discardUnattachedUpload(userId: string, fileId: string): Promise<void> {
+  await removeUnattachedUpload(fileId.toLowerCase(), userId);
 }

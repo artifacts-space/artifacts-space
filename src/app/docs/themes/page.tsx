@@ -86,7 +86,7 @@ export default function ThemesPage() {
       </Prose>
       <DocsH page={page} id="new" />
       <Prose>
-        <p>The <strong>New artifact</strong> dialog has a <strong>Theme</strong> field with the same picker, including the presets of your teams. The artifact starts with the preset you select. Keep Default for the standard look.</p>
+        <p><strong>New artifact</strong> opens a blank page, so you can start writing at once. It saves as soon as you write something. A new artifact uses Default. To pick another theme, open the artifact&apos;s page with <strong>Open</strong> and use the same picker in its header, which includes the presets of your teams.</p>
       </Prose>
 
       <DocsH page={page} id="mcp" />
@@ -181,7 +181,7 @@ export default function ThemesPage() {
           <li><strong>Reposition</strong>, for images, lets you drag the image up or down. You can also use the arrow keys (Shift for bigger steps), Home, and End. Enter or <strong>Save position</strong> saves; Escape or <strong>Cancel</strong> stops.</li>
           <li><strong>Remove</strong> takes the cover away at once. Restore brings it back (see History and approval).</li>
         </ul>
-        <p>The <strong>New artifact</strong> dialog has a <strong>Cover</strong> field with the gradients. Readers see only the cover.</p>
+        <p>A new artifact starts without a cover. Add one on its page once you have written something. Readers see only the cover.</p>
       </Prose>
 
       <DocsH page={page} id="cover-mcp" />

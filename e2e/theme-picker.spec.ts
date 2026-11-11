@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 
 /**
  * The artifact theme picker (the gallery's "theme picker" specimen, the
- * same component editors get on the artifact page and in the New artifact
- * dialog): keyboard use, and the scope it drives rendering the chosen theme.
+ * same component editors get on the artifact page): keyboard use, and the
+ * scope it drives rendering the chosen theme.
  */
 test("should apply a preset picked with the keyboard when an editor opens the picker", async ({ page }) => {
   await page.goto("/dev/components#themes");

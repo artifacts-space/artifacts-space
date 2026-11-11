@@ -1,0 +1,124 @@
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+
+import { toArtifactListItem } from "@/lib/artifact-preview";
+import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
+import type { ProjectFacets } from "@/lib/projects/queries";
+import type { ProjectFilter } from "@/lib/projects/rules";
+
+/** One blank page New artifact opened, and the artifact it became once stored. */
+export interface NewArtifactSession {
+  key: number;
+  createdId: string | null;
+  /** Changes each time New artifact is pressed while this page shows. */
+  focusRequest: number;
+}
+
+interface NewArtifactOptions {
+  setArtifacts: Dispatch<SetStateAction<ArtifactListItemDto[]>>;
+  setSelectedId: (id: string) => void;
+  /** Clears the search and format filter, so the new artifact shows in the list. */
+  clearFilters: () => void;
+}
+
+/** How many artifacts made on blank pages stay in hand, so a long visit does not keep every body; older ones load when opened. */
+const keptStored = 5;
+
+/** The list with `artifact` in it: replaced where it is, or added first when it is new. */
+export function upsertListItem(list: readonly ArtifactListItemDto[], artifact: ArtifactDto): ArtifactListItemDto[] {
+  const item = toArtifactListItem(artifact);
+  if (!list.some((entry) => entry.id === artifact.id)) return [item, ...list];
+  return list.map((entry) => (entry.id === artifact.id ? item : entry));
+}
+
+/** The kept blank-page artifacts after a blank page saved `artifact`: it moves to the end, and only the newest `limit` stay. */
+export function withSaved(current: readonly ArtifactDto[], artifact: ArtifactDto, limit: number): readonly ArtifactDto[] {
+  return [...current.filter((entry) => entry.id !== artifact.id), artifact].slice(-limit);
+}
+
+/** The kept artifacts after `artifact` was saved elsewhere (its own page): its copy is replaced, so it never reopens on an older body. The same array when it is not kept. */
+export function withRefreshed(current: readonly ArtifactDto[], artifact: ArtifactDto): readonly ArtifactDto[] {
+  if (!current.some((entry) => entry.id === artifact.id)) return current;
+  return current.map((entry) => (entry.id === artifact.id ? artifact : entry));
+}
+
+/** The kept artifacts without a deleted one; the same array when it was not kept. */
+export function withoutDeleted(current: readonly ArtifactDto[], id: string): readonly ArtifactDto[] {
+  return current.some((entry) => entry.id === id) ? current.filter((entry) => entry.id !== id) : current;
+}
+
+/** The pane's full artifacts plus those blank pages became; the same array when there are none, so the pane does not render twice. */
+export function withStoredArtifacts(initial: readonly ArtifactDto[] | undefined, stored: readonly ArtifactDto[]): readonly ArtifactDto[] | undefined {
+  return stored.length === 0 ? initial : [...(initial ?? []), ...stored];
+}
+
+/** The name of the project the list is filtered to, for a new artifact; null for "No project" or no filter. */
+export function filteredProjectName(filter: ProjectFilter | null, facets: ProjectFacets): string | null {
+  if (!filter || "none" in filter) return null;
+  return facets.projects.find((entry) => entry.key === filter.key)?.name ?? null;
+}
+
+/**
+ * The workspace's New artifact: `start` opens a blank page in the artifact
+ * pane, and nothing reaches the list until the page is stored. Picking
+ * another artifact, changing scope, or leaving drops an untouched page; one
+ * already stored stays in the list. Pressing New artifact again on a page
+ * that is still blank keeps it and puts the cursor back in its title, so a
+ * double click opens one page.
+ */
+export function useNewArtifact({ setArtifacts, setSelectedId, clearFilters }: NewArtifactOptions) {
+  const [session, setSession] = useState<NewArtifactSession | null>(null);
+  /** Artifacts the blank pages became, so they open without a load when picked again. */
+  const [stored, setStored] = useState<readonly ArtifactDto[]>([]);
+  const sessionRef = useRef(session);
+  useEffect(() => { sessionRef.current = session; }, [session]);
+  const nextKey = useRef(0);
+
+  const start = useCallback(() => {
+    setSession((current) => {
+      if (current?.createdId === null) return { ...current, focusRequest: current.focusRequest + 1 };
+      nextKey.current += 1;
+      return { key: nextKey.current, createdId: null, focusRequest: 0 };
+    });
+  }, []);
+
+  /** A save from a blank page, possibly after it was left: the list gains or updates it; only the open page selects it. */
+  const saved = useCallback((key: number, artifact: ArtifactDto) => {
+    setArtifacts((current) => upsertListItem(current, artifact));
+    setStored((current) => withSaved(current, artifact, keptStored));
+    if (sessionRef.current?.key !== key || sessionRef.current.createdId === artifact.id) return;
+    sessionRef.current = { ...sessionRef.current, createdId: artifact.id };
+    setSession((current) => (current?.key === key ? { ...current, createdId: artifact.id } : current));
+    setSelectedId(artifact.id);
+    clearFilters();
+  }, [clearFilters, setArtifacts, setSelectedId]);
+
+  /** Opens an artifact from the list. The page's own artifact keeps the page open. */
+  const select = useCallback((id: string) => {
+    if (sessionRef.current?.createdId === id) return;
+    sessionRef.current = null;
+    setSession(null);
+    setSelectedId(id);
+  }, [setSelectedId]);
+
+  /** Closes the page without opening another artifact: the link that arrived already selected one. */
+  const leave = useCallback(() => {
+    sessionRef.current = null;
+    setSession(null);
+  }, []);
+
+  /** An artifact was saved on its own page: a kept copy follows it. */
+  const refresh = useCallback((artifact: ArtifactDto) => {
+    setStored((current) => withRefreshed(current, artifact));
+  }, []);
+
+  /** An artifact was deleted: its kept copy goes, and so does the page when it was the page's own. */
+  const deleted = useCallback((id: string) => {
+    setStored((current) => withoutDeleted(current, id));
+    if (sessionRef.current?.createdId === id) setSession(null);
+  }, []);
+
+  /** Full artifacts already in hand for the artifact pane: the page's own, plus those the blank pages became. */
+  const withStored = useCallback((initial: readonly ArtifactDto[] | undefined) => withStoredArtifacts(initial, stored), [stored]);
+
+  return { session, withStored, start, saved, select, leave, refresh, deleted };
+}

@@ -141,6 +141,27 @@ export async function removeFiles(rows: readonly Pick<ArtifactFileRecord, "id" |
 }
 
 /**
+ * Deletes the uploader's own upload while it is in no artifact, in one
+ * statement: the row goes only if it is still unattached and theirs, so an
+ * attach landing at the same moment (another tab, an agent) keeps its file.
+ * The R2 object goes after; if that fails, it is logged and stays in R2
+ * without a row. Returns true when the upload was deleted.
+ */
+export async function removeUnattachedUpload(fileId: string, uploaderId: string): Promise<boolean> {
+  const [row] = await getDb()
+    .delete(artifactFile)
+    .where(and(eq(artifactFile.id, fileId), isNull(artifactFile.artifactId), eq(artifactFile.uploaderId, uploaderId)))
+    .returning();
+  if (!row) return false;
+  try {
+    await deleteObject(r2ConfigFromEnv(), row.key);
+  } catch {
+    console.error("[files] A discarded upload's R2 object could not be deleted.");
+  }
+  return true;
+}
+
+/**
  * Deletes every file of an artifact, before the artifact itself is deleted.
  * Files whose objects could not be deleted lose their artifact when it goes
  * (the foreign key sets null), and the cleanup job removes them later.

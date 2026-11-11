@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 
 import { deleteFileAction, finalizeUploadAction, requestUploadAction } from "@/app/(workspace)/app/file-actions";
+import type { ActionResult } from "@/lib/artifact-types";
 import { checkUpload, fileLimits } from "@/lib/files/config";
 import type { FileDto } from "@/lib/files/types";
 
@@ -21,13 +22,32 @@ export interface UploadItem {
 
 let nextKey = 0;
 
+/** What an upload reports while it runs: bytes sent, then the server checking the file. */
+export interface UploadProgress {
+  progress: (percent: number) => void;
+  checking: () => void;
+}
+
+/** Sends one file and returns it once the server has checked it. */
+export type SendFile = (file: File, report: UploadProgress) => Promise<ActionResult<FileDto>>;
+
+/** The real upload: ask the server for a presigned PUT, send the bytes to R2, then have the server check the file. */
+export const sendToServer: SendFile = async (file, report) => {
+  const ticket = await requestUploadAction({ filename: file.name, contentType: file.type, size: file.size });
+  if (!ticket.success) return ticket;
+  await putFile(ticket.data.url, ticket.data.headers, file, report.progress);
+  report.checking();
+  return finalizeUploadAction(ticket.data.fileId);
+};
+
 /**
  * Uploads picked files one request each: ask the server for a presigned PUT,
  * send the bytes to R2 with progress, then have the server check the file.
- * Each file succeeds or fails on its own. `onReady` runs for each finished file.
+ * Each file succeeds or fails on its own. `onReady` runs for each finished
+ * file. `send` replaces the upload (the /dev/workspace fixture's stand-in).
  */
-export function useFileUploads(options: { onReady?: (file: FileDto, key: string) => void } = {}) {
-  const { onReady } = options;
+export function useFileUploads(options: { onReady?: (file: FileDto, key: string) => void; send?: SendFile | undefined } = {}) {
+  const { onReady, send = sendToServer } = options;
   const [items, setItems] = useState<UploadItem[]>([]);
 
   const patch = useCallback((key: string, change: Partial<UploadItem>) => {
@@ -37,18 +57,17 @@ export function useFileUploads(options: { onReady?: (file: FileDto, key: string)
   const upload = useCallback(async (key: string, file: File) => {
     const fail = (error: string) => { patch(key, { status: "error", error }); };
     try {
-      const ticket = await requestUploadAction({ filename: file.name, contentType: file.type, size: file.size });
-      if (!ticket.success) { fail(ticket.error); return; }
-      await putFile(ticket.data.url, ticket.data.headers, file, (progress) => { patch(key, { progress }); });
-      patch(key, { status: "checking", progress: 100 });
-      const ready = await finalizeUploadAction(ticket.data.fileId);
+      const ready = await send(file, {
+        progress: (progress) => { patch(key, { progress }); },
+        checking: () => { patch(key, { status: "checking", progress: 100 }); },
+      });
       if (!ready.success) { fail(ready.error); return; }
       patch(key, { status: "ready", file: ready.data });
       onReady?.(ready.data, key);
     } catch (error) {
       fail(error instanceof Error ? error.message : "The upload failed. Try again.");
     }
-  }, [onReady, patch]);
+  }, [onReady, patch, send]);
 
   const addFiles = useCallback((files: readonly File[]) => {
     const added = files.slice(0, fileLimits.maxFilesPerArtifact).map((file) => {
@@ -76,7 +95,12 @@ export function useFileUploads(options: { onReady?: (file: FileDto, key: string)
     setItems([]);
   }, [items]);
 
+  /** Shows finished files as being checked again (an answer about them was lost); they count as busy until removed. */
+  const markChecking = useCallback((fileIds: readonly string[]) => {
+    setItems((current) => current.map((item) => (item.file && fileIds.includes(item.file.id) ? { ...item, status: "checking" } : item)));
+  }, []);
+
   const readyFiles = items.flatMap((item) => (item.status === "ready" && item.file ? [item.file] : []));
   const busy = items.some((item) => item.status === "uploading" || item.status === "checking");
-  return { items, addFiles, remove, reset, readyFiles, busy };
+  return { items, addFiles, remove, reset, markChecking, readyFiles, busy };
 }
