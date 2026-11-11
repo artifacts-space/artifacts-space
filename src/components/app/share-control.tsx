@@ -18,13 +18,14 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ValueField } from "@/components/value-field";
 import type { ActionResult, ArtifactDto, ArtifactVisibility, CommentSetting } from "@/lib/artifact-types";
+import { shareRuleLine } from "@/lib/teams/team-rule-copy";
 import { cn } from "@/lib/utils";
 
 import { commentLabel, commentsWaitForApproval } from "./comment-options";
 import { CommentsPicker } from "./comments-picker";
 import { SearchEnginesPicker } from "./search-engines-picker";
 import { searchChangeAfterSave, searchSwitchState, type SearchSwitchState } from "./search-options";
-import { outcomeText, selectedTeamLabel, teamLabel, teamsFor, visibilityLabel, visibilityOptions } from "./share-options";
+import { outcomeText, ruleTeamFor, selectedTeamLabel, teamLabel, teamsFor, visibilityLabel, visibilityOptions } from "./share-options";
 import { useShareTeams, type ShareTeam } from "./share-teams-context";
 import { useShareChoice } from "./use-share-choice";
 
@@ -110,15 +111,22 @@ function commentsApprovalNote(input: { artifact: ArtifactDto; visibility: Artifa
   return wait ? `Comments from anyone signed in need an owner's or admin's approval in ${input.team?.name ?? "the team"}.` : null;
 }
 
-/** What saving will do: now or after approval, for the level and for comments. */
-function ShareOutcome(props: { artifact: ArtifactDto; visibility: ArtifactVisibility; team: ShareTeam | undefined; comments: CommentSetting }) {
+/** The team's editing and sharing rule, for a team artifact that stays in a shared team (team-rule-copy.ts); null otherwise. */
+function teamRuleText(props: { artifact: ArtifactDto; visibility: ArtifactVisibility; team: ShareTeam | undefined; teams: readonly ShareTeam[] }) {
+  const ruleTeam = ruleTeamFor(props.artifact.teamId, props.visibility, props.team, props.teams);
+  return ruleTeam ? shareRuleLine(ruleTeam.name, ruleTeam) : null;
+}
+
+/** What saving will do: now or after approval, for the level and for comments, then the team's rule for a team artifact. */
+function ShareOutcome(props: { artifact: ArtifactDto; visibility: ArtifactVisibility; team: ShareTeam | undefined; teams: readonly ShareTeam[]; comments: CommentSetting }) {
   const { artifact, visibility, team, comments } = props;
   const note = commentsApprovalNote(props);
   const onlyComments = visibility === artifact.visibility && (visibility === "private" || team?.id === artifact.teamId) && comments !== artifact.comments;
   // Only the comments change: sharing stays as it is, so only the comments rule applies.
   const commentsText = note ? `${note} Until then, comments stay as they are.` : "It applies as soon as you save.";
-  const text = onlyComments ? commentsText : [outcomeText(visibility, team), note].filter(Boolean).join(" ");
-  return <p className="text-sm leading-5 text-muted-foreground">{text}</p>;
+  const outcome = onlyComments ? commentsText : [outcomeText(visibility, team), note].filter(Boolean).join(" ");
+  const text = [outcome, teamRuleText(props)].filter(Boolean).join(" ");
+  return <p data-slot="share-outcome" className="text-sm leading-5 text-muted-foreground">{text}</p>;
 }
 
 /** The Share button's name and tooltip: it says "Pending" while a change waits for approval, so its name does too. */
@@ -236,7 +244,7 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
             <TeamPicker visibility={visibility} teams={teams} value={teamId} onChange={choice.changeTeam} />
             <SearchEnginesPicker state={searchState} checked={showInSearch} onChange={choice.chooseShowInSearch} />
             <CommentsPicker visibility={visibility} team={team} value={comments} onChange={choice.chooseComments} />
-            <ShareOutcome artifact={artifact} visibility={visibility} team={team} comments={comments} />
+            <ShareOutcome artifact={artifact} visibility={visibility} team={team} teams={teams} comments={comments} />
             {live ? (
               <ValueField value={shareUrl} copyLabel="Copy link" />
             ) : null}

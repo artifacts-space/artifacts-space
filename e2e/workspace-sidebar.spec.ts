@@ -4,7 +4,8 @@ import { expect, test, type Page } from "@playwright/test";
  * The workspace sidebar and the artifact header, on /dev/workspace (the real
  * workspace without a database): the "/" shortcut, the filters behind their
  * button, the views, the workspace switcher, and the breadcrumb, chips, and
- * meta line around the open artifact.
+ * meta line around the open artifact, and a new member's welcome card on a
+ * team workspace.
  */
 
 const slot = (page: Page, name: string) => page.locator(`[data-slot=${name}]`);
@@ -130,6 +131,33 @@ test("should name the team in the workspace switcher and the heading, and offer 
 });
 
 
+test("should show a new member's welcome card on the team workspace until they close it", async ({ page }) => {
+  await page.goto("/dev/workspace?scopes=1&team=fixture-shared-0&welcome=1");
+  const card = slot(page, "team-welcome");
+  await expect(card.getByRole("heading", { name: "Welcome to Design" })).toBeVisible();
+  // What the member can do comes first, then the rule for sharing outside, then the actions.
+  await expect(card.getByRole("paragraph")).toHaveText(
+    "You can edit the team's artifacts right away. Sharing by link or in public needs approval from someone who can approve sharing (owners and admins by default). Edits to those artifacts reach outside readers once approved.",
+  );
+  await expect(card.getByRole("link", { name: "How this team works" })).toHaveAttribute("href", "/teams/fixture-shared-0");
+  const copyBox = await card.getByRole("paragraph").boundingBox();
+  const buttonBox = await card.getByRole("button", { name: "Got it" }).boundingBox();
+  expect(buttonBox?.y ?? 0, "the actions sit below the copy").toBeGreaterThan((copyBox?.y ?? 0) + (copyBox?.height ?? 0) - 1);
+
+  await card.getByRole("button", { name: "Got it" }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByText("Checkout v2 rollout").first(), "the workspace stays open").toBeVisible();
+});
+
+test("should show no welcome card on the viewer's own workspace or when the server hides it", async ({ page }) => {
+  await page.goto("/dev/workspace?scopes=1&welcome=1");
+  await expect(page.getByText("Checkout v2 rollout").first()).toBeVisible();
+  await expect(slot(page, "team-welcome")).toHaveCount(0);
+  await page.goto("/dev/workspace?scopes=1&team=fixture-shared-0");
+  await expect(page.getByText("Checkout v2 rollout").first()).toBeVisible();
+  await expect(slot(page, "team-welcome")).toHaveCount(0);
+});
+
 test.describe("phone", () => {
   test.skip(({ isMobile }) => !isMobile, "touch targets on a phone");
 
@@ -149,5 +177,17 @@ test.describe("phone", () => {
       expect(box?.width ?? 0, String(target)).toBeGreaterThanOrEqual(44);
       expect(box?.height ?? 0, String(target)).toBeGreaterThanOrEqual(44);
     }
+  });
+
+  test("should give the welcome card's actions a 44px touch target and never scroll sideways", async ({ page }) => {
+    await page.goto("/dev/workspace?scopes=1&team=fixture-shared-0&welcome=1");
+    const card = slot(page, "team-welcome");
+    await expect(card).toBeVisible();
+    for (const target of [card.getByRole("button", { name: "Got it" }), card.getByRole("link", { name: "How this team works" })]) {
+      const box = await target.boundingBox();
+      expect(box?.height ?? 0, String(target)).toBeGreaterThanOrEqual(44);
+    }
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 });

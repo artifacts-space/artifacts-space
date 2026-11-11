@@ -22,10 +22,11 @@ export const metadata: Metadata = {
  * acts as if the server could not check the link, and `?slowload=1` makes the
  * Long markdown fixture load on open, held until a test releases it. `?many=1`
  * adds 300 older notes (the list holds the newest 100), and `?tag=launch`
- * filters by tag as on /app. Returns 404 in every other environment.
+ * filters by tag as on /app. `&welcome=1` shows a new member's welcome card
+ * on the team workspace `&team=<slug>` opens. Returns 404 in every other environment.
  */
 export default async function WorkspaceFixturePage({ searchParams }: PageProps<"/dev/workspace">) {
   if (process.env.NODE_ENV !== "development") notFound();
   const params = await searchParams;
-  return <WorkspaceFixture projectFilter={parseProjectFilter(params)} link={parseArtifactLink(params)} linkFailed={params.linkcheck === "failed"} slowLoad={params.slowload === "1"} scopes={params.scopes === "1"} team={typeof params.team === "string" ? params.team : null} many={params.many === "1"} tags={parseTagFilter(params)} />;
+  return <WorkspaceFixture projectFilter={parseProjectFilter(params)} link={parseArtifactLink(params)} linkFailed={params.linkcheck === "failed"} slowLoad={params.slowload === "1"} scopes={params.scopes === "1"} team={typeof params.team === "string" ? params.team : null} many={params.many === "1"} tags={parseTagFilter(params)} welcome={params.welcome === "1"} />;
 }

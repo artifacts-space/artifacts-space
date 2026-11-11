@@ -55,12 +55,21 @@ export function teamRuleLines(subject: TeamRuleSubject): TeamRuleLines {
   };
 }
 
-/** The short welcome a person sees after they join a team. */
+/** The welcome card a person sees in the team's workspace after they join: what they can do first, then the rule for sharing outside. */
 export function teamWelcome(teamName: string, subject: TeamRuleSubject): { title: string; description: string } {
   return {
     title: `Welcome to ${teamName}`,
     description: `You can edit the team's artifacts right away. ${outsideLine(subject)}`,
   };
+}
+
+/**
+ * The team's rule for the Share dialog on a team artifact: everyone in the
+ * team edits it with no approval, then what sharing outside the team needs
+ * for this viewer. The same sentences as the team page's card.
+ */
+export function shareRuleLine(teamName: string, subject: TeamRuleSubject): string {
+  return `Everyone in ${teamName} can edit it directly, with no approval. ${outsideLine(subject)}`;
 }
 
 const extraPowers: readonly [TeamCapability, string][] = [

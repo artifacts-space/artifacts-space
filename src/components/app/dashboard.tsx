@@ -9,6 +9,7 @@ import { artifactListState } from "@/components/app/artifact-list-state";
 import { serverProjectsApi, type ProjectsApi } from "@/components/app/projects-api";
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
 import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
+import { TeamWelcome, type DismissWelcome } from "@/components/app/team-welcome";
 import { useEditAccess, useWithdrawSharing } from "@/components/app/use-edit-access";
 import { useArtifactLink } from "@/components/app/use-artifact-link";
 import { useFullArtifact, type ArtifactLoader } from "@/components/app/use-full-artifact";
@@ -171,6 +172,10 @@ interface DashboardProps {
   onLinkHandled?: () => void;
   /** Where New artifact stores the blank page: the server actions, or the fixture's stand-in. */
   newArtifactApi?: NewArtifactApi;
+  /** The server decided this member sees the team's welcome card (src/lib/teams/welcome-rules.ts). Team workspaces only. */
+  welcome?: boolean;
+  /** Where "Got it" saves the closed welcome: the server action, or the fixture's stand-in. */
+  dismissWelcome?: DismissWelcome;
 }
 
 interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate" | "save"> {
@@ -224,7 +229,7 @@ function useLinkLeavesNewArtifact(opened: unknown, leave: () => void) {
   useEffect(() => { if (opened) leave(); }, [opened, leave]);
 }
 
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", linkTarget, linkFailed, loadArtifact, onLinkHandled, newArtifactApi = serverNewArtifactApi }: DashboardProps) {
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", linkTarget, linkFailed, loadArtifact, onLinkHandled, newArtifactApi = serverNewArtifactApi, welcome, dismissWelcome }: DashboardProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -263,6 +268,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
       <main data-app-shell className="flex min-h-[calc(100vh-3.5rem)] w-full max-w-none flex-col md:min-h-0 md:flex-1">
         <WorkspaceHeading scopeTeam={scopeTeam} />
         <LinkNoticeBar notice={notice} onDismiss={dismissNotice} />
+        <TeamWelcome team={scopeTeam} initial={welcome} dismiss={dismissWelcome} />
 
         <PanelSizesBeforePaint />
         <div ref={shellRef} className={cn("relative grid min-h-[640px] flex-1 bg-card md:min-h-0 md:grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]", shellColumns(sidebarHidden))}>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultTeamId, outcomeText, selectedTeamLabel, teamsFor } from "./share-options";
+import { defaultTeamId, outcomeText, ruleTeamFor, selectedTeamLabel, teamsFor } from "./share-options";
 import type { ShareTeam } from "./share-teams-context";
 import { defaultActor } from "@/lib/teams/capability-rules";
 
@@ -51,5 +51,34 @@ describe("selectedTeamLabel", () => {
   it("should ask for a team when no known team is chosen", () => {
     expect(selectedTeamLabel("", teams)).toBe("Choose a team");
     expect(selectedTeamLabel(null, teams)).toBe("Choose a team");
+  });
+});
+
+describe("ruleTeamFor", () => {
+  const open: ShareTeam = { ...strict, id: "o", slug: "open", name: "Open", teamSharingNeedsApproval: false };
+  const all = [personal, strict, open];
+
+  it("should state the team's rule when a team artifact stays in its team", () => {
+    expect(ruleTeamFor("s", "team", strict, all)?.id).toBe("s");
+    expect(ruleTeamFor("s", "link", strict, all)?.id).toBe("s");
+  });
+
+  it("should state the new team's rule when a team artifact moves to another shared team", () => {
+    expect(ruleTeamFor("s", "team", open, all)?.id).toBe("o");
+  });
+
+  it("should state no rule when the artifact is personal", () => {
+    expect(ruleTeamFor(null, "team", strict, all)).toBeNull();
+    expect(ruleTeamFor("p", "public", personal, all)).toBeNull();
+    expect(ruleTeamFor("p", "team", strict, all)).toBeNull();
+  });
+
+  it("should state no rule when a team artifact is made private or approved by the personal team", () => {
+    expect(ruleTeamFor("s", "private", undefined, all)).toBeNull();
+    expect(ruleTeamFor("s", "link", personal, all)).toBeNull();
+  });
+
+  it("should state no rule when the viewer is not in the artifact's team", () => {
+    expect(ruleTeamFor("gone", "team", strict, all)).toBeNull();
   });
 });

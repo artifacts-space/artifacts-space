@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { storedText } from "./support/inline-edit-db";
-import { closeInviteDb, invitationState, leaveTestTeam, openInvitations, seedInvitation, storedTeamRole, useUpTeamInvitations, waitingReviews } from "./support/invite-db";
+import { closeInviteDb, invitationState, leaveTestTeam, openInvitations, seedInvitation, storedTeamRole, useUpTeamInvitations, waitingReviews, welcomeDismissed } from "./support/invite-db";
 import {
   addTestMember,
   cleanUp,
@@ -18,11 +18,11 @@ import {
 /**
  * Inviting two people as editors, end to end, against a local throwaway
  * database: the invited person accepts, lands in the team's workspace with
- * a welcome, and edits a team artifact with no approval; the inviter sends,
- * resends, re-roles, copies, and cancels invitations; and every dead end
- * (another account, expired, canceled, already a member, unknown link) says
- * what happened and offers the way on. Runs on phone and desktop. Emails are
- * printed by the dev server, never sent.
+ * a welcome card that stays until they close it, and edits a team artifact
+ * with no approval; the inviter sends, resends, re-roles, copies, and cancels
+ * invitations; and every dead end (another account, expired, canceled,
+ * already a member, unknown link) says what happened and offers the way on.
+ * Runs on phone and desktop. Emails are printed by the dev server, never sent.
  */
 
 test.skip(!localDatabaseEnabled(), localDatabaseSkipReason);
@@ -68,14 +68,24 @@ test("should take an invited person from the invitation to editing a team artifa
   await expect(page.getByText(/invited you as member\. You can edit the team's artifacts as soon as you join/)).toBeVisible();
   await page.getByRole("button", { name: "Join team" }).click();
 
-  // Lands in the team's workspace, not a settings page, with a welcome that states the rule.
+  // Lands in the team's workspace, not a settings page, with a welcome card that states the rule.
   await page.waitForURL(new RegExp(`/app\\?team=${team.slug}$`));
-  const welcome = page.locator("[data-sonner-toast]").filter({ hasText: `Welcome to ${teamName}` });
-  await expect(welcome).toBeVisible();
+  const welcome = page.locator("[data-slot=team-welcome]");
+  await expect(welcome.getByRole("heading", { name: `Welcome to ${teamName}` })).toBeVisible();
   await expect(welcome).toContainText("You can edit the team's artifacts right away. Sharing by link or in public needs approval from someone who can approve sharing (owners and admins by default).");
   expect(await storedTeamRole(team.id, devId)).toBe("member");
   expect((await invitationState(invitationId)).status).toBe("accepted");
   if (testInfo.project.name === "desktop") await expect(page.locator("[data-slot=artifact-list]").getByRole("button", { name: new RegExp(title) })).toBeVisible();
+
+  // The card stays until the member closes it, and stays closed after that.
+  await page.reload();
+  await expect(welcome.getByRole("heading", { name: `Welcome to ${teamName}` }), "a reload keeps the card").toBeVisible();
+  await welcome.getByRole("button", { name: "Got it" }).click();
+  await expect(welcome).toHaveCount(0);
+  await expect.poll(() => welcomeDismissed(team.id, devId), { message: "the close is saved for this member and team" }).toBe(true);
+  await page.reload();
+  await expect(page.locator("[data-slot=workspace-detail]").first()).toBeAttached();
+  await expect(welcome, "a reload after Got it shows no card").toHaveCount(0);
 
   // Edits the team artifact in place: it saves at once and nothing waits for approval.
   await page.goto(`/artifact/${publicId}`);

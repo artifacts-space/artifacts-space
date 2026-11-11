@@ -4,7 +4,7 @@ import { decideSharing } from "@/lib/sharing/rules";
 import { decideEdit } from "@/lib/versions/rules";
 
 import { defaultActor, defaultRoleCapabilities, type TeamActor } from "./capability-rules";
-import { roleHint, teamRuleLines, teamWelcome, type TeamRuleSubject } from "./team-rule-copy";
+import { roleHint, shareRuleLine, teamRuleLines, teamWelcome, type TeamRuleSubject } from "./team-rule-copy";
 
 const subject = (actor: TeamActor, teamSharingNeedsApproval: boolean): TeamRuleSubject => ({ ...actor, teamSharingNeedsApproval });
 const member = defaultActor("member");
@@ -61,6 +61,24 @@ describe("teamWelcome", () => {
     const welcome = teamWelcome("Northwind", subject(member, false));
     expect(welcome.title).toBe("Welcome to Northwind");
     expect(welcome.description).toMatch(/^You can edit the team's artifacts right away\. Sharing by link or in public needs approval/);
+  });
+});
+
+describe("shareRuleLine", () => {
+  it("should say everyone in the team edits with no approval and a member needs approval to share outside", () => {
+    const line = shareRuleLine("Northwind", subject(member, false));
+    expect(line).toBe("Everyone in Northwind can edit it directly, with no approval. Sharing by link or in public needs approval from someone who can approve sharing (owners and admins by default). Edits to those artifacts reach outside readers once approved.");
+    expect(decideSharing({ level: "link", team: team(false), member, actor: "person" })).toBe("pending");
+  });
+
+  it("should tell an admin they share outside right away when their role allows it", () => {
+    expect(shareRuleLine("Northwind", subject(admin, true))).toBe("Everyone in Northwind can edit it directly, with no approval. You can share by link or in public right away.");
+    expect(decideSharing({ level: "link", team: team(true), member: admin, actor: "person" })).toBe("apply");
+  });
+
+  it("should say the same thing about sharing outside as the team page's card", () => {
+    const viewer = subject(member, true);
+    expect(shareRuleLine("Northwind", viewer)).toContain(teamRuleLines(viewer).outside);
   });
 });
 
