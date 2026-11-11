@@ -3,30 +3,24 @@ import { useCallback, useEffect, useState } from "react";
 import { loadArtifactAction } from "@/app/(workspace)/app/actions";
 import type { ActionResult, ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
 
+import { byId, seedKey, withMissing } from "./full-artifact-rules";
+
 /** Loads one artifact in full by its public id: the server action on /app, a stand-in in the /dev/workspace fixture. */
 export type ArtifactLoader = (publicId: string) => Promise<ActionResult<ArtifactDto>>;
 
 const loadFailed = "The artifact could not be loaded. Check your connection and try again.";
 
-function byId(artifacts: readonly ArtifactDto[] | undefined): ReadonlyMap<string, ArtifactDto> {
-  return new Map(artifacts?.map((artifact) => [artifact.id, artifact]));
-}
-
-/** Adds the artifacts not held yet; what is held already (perhaps just saved) stays. */
-function withMissing(current: ReadonlyMap<string, ArtifactDto>, artifacts: readonly ArtifactDto[]): ReadonlyMap<string, ArtifactDto> {
-  const missing = artifacts.filter((artifact) => !current.has(artifact.id));
-  if (missing.length === 0) return current;
-  const next = new Map(current);
-  for (const artifact of missing) next.set(artifact.id, artifact);
-  return next;
-}
-
-/** The artifacts held so far, seeded from `initial` and taking new ones each time `initial` changes. */
+/**
+ * The artifacts held so far, seeded from `initial` and taking new ones when
+ * `initial` brings new ids. Compared by ids (seedKey), not by array
+ * identity, so a new array with the same artifacts changes nothing.
+ */
 function useLoaded(initial: readonly ArtifactDto[] | undefined) {
   const [loaded, setLoaded] = useState(() => byId(initial));
-  const [seenInitial, setSeenInitial] = useState(initial);
-  if (initial !== seenInitial) {
-    setSeenInitial(initial);
+  const key = seedKey(initial);
+  const [seenKey, setSeenKey] = useState(key);
+  if (key !== seenKey) {
+    setSeenKey(key);
     if (initial) setLoaded((current) => withMissing(current, initial));
   }
   const add = useCallback((artifact: ArtifactDto) => {
