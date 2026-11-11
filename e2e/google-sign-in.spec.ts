@@ -78,7 +78,8 @@ test("should explain in the page's own words when Google refused an unverified e
 });
 
 test("should show a plain fallback when a sign-in comes back with an unknown error", async ({ page }) => {
-  await page.goto("/dev/sign-in?error=something_else");
-
-  await expect(page.getByRole("alert").filter({ hasText: "Sign-in did not finish. Try again, or use an email link." })).toBeVisible();
+  for (const code of ["something_else", "__proto__", "toString"]) {
+    await page.goto(`/dev/sign-in?error=${code}`);
+    await expect(page.getByRole("alert").filter({ hasText: "Sign-in did not finish. Try again, or use an email link." }), code).toBeVisible();
+  }
 });
