@@ -96,14 +96,20 @@ export function agentWriteRefusal(check: AgentWriteCheck): AgentWriteRefusal | n
   return check.guarded && check.leaseLive ? "editing" : null;
 }
 
-/** How far past the server's clock a web editor's base may be: its base is a save time the server handed out. */
-export const BASE_CLOCK_SKEW_MS = 60_000;
+/**
+ * How far past this server's clock a web editor's base may be. Its base is a
+ * save time a server handed out, so only clock drift between server
+ * instances can put it ahead; a few seconds covers that.
+ */
+export const BASE_CLOCK_SKEW_MS = 5_000;
 
 /**
  * Whether a person's base (`expectedUpdatedAt`) can be a save time the server
  * handed out. A base in the future would make every save look like it only
  * went over agents' saves, so such a save is refused instead of landing
- * silently over another person's newer save.
+ * silently over another person's newer save. It guards against a faulty
+ * client, not a hostile one: an editor may overwrite the artifact anyway
+ * (Keep my changes), so a crafted base gains them nothing.
  */
 export function isPlausibleBase(expected: Date, now: Date): boolean {
   return expected.getTime() <= now.getTime() + BASE_CLOCK_SKEW_MS;

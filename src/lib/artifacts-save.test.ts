@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
   enforceRateLimit: vi.fn(() => Promise.resolve()),
   hasLiveLease: vi.fn(() => Promise.resolve(false)),
   selected: vi.fn((): unknown[] => []),
-  pruneContent: vi.fn(() => Promise.resolve()),
+  attachFileRows: vi.fn(() => Promise.resolve(0)),
 }));
 
 vi.mock("@/db", () => ({
@@ -44,8 +44,8 @@ vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: mocks.enforceRateLi
 vi.mock("@/lib/quota/usage", () => ({ assertContentFits: () => Promise.resolve() }));
 vi.mock("@/lib/files/attach", () => ({ checkContentFiles: () => Promise.resolve([]) }));
 vi.mock("@/lib/files/icon-file", () => ({ checkIconFile: () => Promise.resolve([]), restorableIcon: vi.fn() }));
-vi.mock("@/lib/files/icon-cleanup", () => ({ pruneUnusedIconFilesQuietly: () => Promise.resolve(), pruneUnusedContentFilesQuietly: mocks.pruneContent }));
-vi.mock("@/lib/files/store", () => ({ attachFileRows: () => Promise.resolve(), deleteArtifactFiles: () => Promise.resolve(), listFilesForArtifacts: () => Promise.resolve(new Map()) }));
+vi.mock("@/lib/files/icon-cleanup", () => ({ pruneUnusedIconFilesQuietly: () => Promise.resolve(), pruneUnusedContentFilesQuietly: () => Promise.resolve() }));
+vi.mock("@/lib/files/store", () => ({ attachFileRows: mocks.attachFileRows, deleteArtifactFiles: () => Promise.resolve(), listFilesForArtifacts: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/edits/agent-write-guard", async (importOriginal) => ({
   ...(await importOriginal<typeof AgentWriteGuard>()),
   hasLiveLease: mocks.hasLiveLease,
@@ -95,10 +95,16 @@ describe("updateArtifact base-version check", () => {
     expect(mocks.recordArtifactSave).not.toHaveBeenCalled();
   });
 
-  it("should remove the media a refused save attached when another person saved since", async () => {
+  it("should attach no uploads when a save is refused because another person saved since", async () => {
     mocks.returned.mockReturnValue([]);
     await expect(updateArtifact("user-1", "artifact-1", { content: "# Mine" }, "person", { expectedUpdatedAt: "2026-11-08T09:59:00.000Z" })).rejects.toBeInstanceOf(StaleSaveError);
-    expect(mocks.pruneContent).toHaveBeenCalledWith("artifact-1");
+    expect(mocks.attachFileRows).not.toHaveBeenCalled();
+  });
+
+  it("should attach a save's uploads only after its write landed", async () => {
+    await updateArtifact("user-1", "artifact-1", { content: "# Plan v2" }, "person", { expectedUpdatedAt: baseRecord.updatedAt.toISOString() });
+    expect(mocks.attachFileRows).toHaveBeenCalled();
+    expect(mocks.set.mock.invocationCallOrder[0]).toBeLessThan(mocks.attachFileRows.mock.invocationCallOrder[0] ?? 0);
   });
 
   it("should refuse a base from the future instead of landing over everyone's newer saves", async () => {

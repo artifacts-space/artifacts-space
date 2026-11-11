@@ -12,11 +12,12 @@ const mocks = vi.hoisted(() => ({
   getEditableArtifactMeta: vi.fn(),
   hitRateLimit: vi.fn(),
   renewEditLease: vi.fn(),
+  endEditLease: vi.fn(),
 }));
 vi.mock("@/lib/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/access", () => ({ getEditableArtifactMeta: mocks.getEditableArtifactMeta }));
 vi.mock("@/lib/abuse/rate-limit", () => ({ hitRateLimit: mocks.hitRateLimit }));
-vi.mock("./agent-write-guard", () => ({ renewEditLease: mocks.renewEditLease }));
+vi.mock("./agent-write-guard", () => ({ renewEditLease: mocks.renewEditLease, endEditLease: mocks.endEditLease }));
 
 const { signalEditingAction } = await import("./actions");
 
@@ -28,6 +29,7 @@ beforeEach(() => {
   mocks.getEditableArtifactMeta.mockResolvedValue({ id: artifactId });
   mocks.hitRateLimit.mockResolvedValue({ allowed: true });
   mocks.renewEditLease.mockResolvedValue(undefined);
+  mocks.endEditLease.mockResolvedValue(undefined);
 });
 
 describe("signalEditingAction", () => {
@@ -60,5 +62,17 @@ describe("signalEditingAction", () => {
     mocks.hitRateLimit.mockResolvedValue({ allowed: false, retryAfterSeconds: 60 });
     expect(await signalEditingAction(artifactId)).toEqual({ success: true, data: null });
     expect(mocks.renewEditLease).not.toHaveBeenCalled();
+  });
+
+  it("should end the person's lease when their editor closes", async () => {
+    await expect(signalEditingAction(artifactId, false)).resolves.toEqual({ success: true, data: null });
+    expect(mocks.endEditLease).toHaveBeenCalledWith("artifact-1", "ann");
+    expect(mocks.renewEditLease).not.toHaveBeenCalled();
+  });
+
+  it("should end no lease when the person may not edit the artifact", async () => {
+    mocks.getEditableArtifactMeta.mockResolvedValue(null);
+    expect((await signalEditingAction(artifactId, false)).success).toBe(false);
+    expect(mocks.endEditLease).not.toHaveBeenCalled();
   });
 });

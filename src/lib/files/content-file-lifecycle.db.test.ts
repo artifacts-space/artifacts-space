@@ -185,7 +185,7 @@ describe.runIf(Boolean(databaseUrl))("embedded media over time, with a database"
     expect(r2.deleted).toEqual([`files/${shot ?? ""}/shot.png`]);
   });
 
-  it("should never delete an upload a save attached moments ago, before that save writes the content naming it", async () => {
+  it("should never delete an upload a save attached moments ago, while nothing names it yet", async () => {
     const [shot] = shots;
     // The save has attached the upload; the artifact still holds the old content, and no version names it.
     await getDb().update(artifactFile).set({ artifactId: doc, attachedAt: new Date(), attachedByContent: true }).where(eq(artifactFile.id, shot ?? ""));

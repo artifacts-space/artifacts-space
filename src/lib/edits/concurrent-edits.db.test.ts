@@ -20,17 +20,36 @@ describe.runIf(Boolean(databaseUrl))("concurrent edits with a database", async (
   const { asc, eq, inArray, like, sql } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
   const { artifactEditLease } = await import("@/db/edit-lease-schema");
-  const { artifact, artifactVersion, rateLimitBucket, user } = await import("@/db/schema");
-  const { createArtifact, saveArtifactUpdate, updateArtifact, restoreArtifactVersion } = await import("@/lib/artifacts");
+  const { artifact, artifactFile, artifactVersion, rateLimitBucket, user } = await import("@/db/schema");
+  const artifacts = await import("@/lib/artifacts");
+  const { createArtifact, restoreArtifactVersion } = artifacts;
   const { EditConflictError } = await import("./conflict-error");
   const { encodeBaseVersion } = await import("./edit-conflict-rules");
-  const { renewEditLease } = await import("./agent-write-guard");
+  const { endEditLease, renewEditLease } = await import("./agent-write-guard");
   const { StaleSaveError } = await import("@/lib/save-guard");
 
   const tag = randomUUID().slice(0, 8);
   const owner = `edits-${tag}-owner`;
   const claude = { harness: "claude-code" as const, label: null };
   const cursor = { harness: "cursor" as const, label: null };
+
+  /**
+   * Save times have millisecond precision, so two saves in the same
+   * millisecond look like one and a stale base would match. People never
+   * save that fast; a local database can. Each save here starts in a new
+   * millisecond, so the tests never flake on it.
+   */
+  const nextMillisecond = () => new Promise((resolve) => setTimeout(resolve, 2));
+
+  async function updateArtifact(...args: Parameters<typeof artifacts.updateArtifact>) {
+    await nextMillisecond();
+    return artifacts.updateArtifact(...args);
+  }
+
+  async function saveArtifactUpdate(...args: Parameters<typeof artifacts.saveArtifactUpdate>) {
+    await nextMillisecond();
+    return artifacts.saveArtifactUpdate(...args);
+  }
 
   async function row(id: string) {
     const [found] = await getDb().select().from(artifact).where(eq(artifact.id, id)).limit(1);
@@ -68,6 +87,7 @@ describe.runIf(Boolean(databaseUrl))("concurrent edits with a database", async (
 
   afterAll(async () => {
     const db = getDb();
+    await db.delete(artifactFile).where(eq(artifactFile.uploaderId, owner));
     await db.delete(artifact).where(eq(artifact.userId, owner));
     await db.delete(rateLimitBucket).where(like(rateLimitBucket.key, `%edits-${tag}-%`));
     await db.delete(user).where(inArray(user.id, [owner]));
@@ -168,6 +188,14 @@ describe.runIf(Boolean(databaseUrl))("concurrent edits with a database", async (
       await expect(restoreArtifactVersion(owner, page.id, first.id, "agent", { harness: claude })).rejects.toMatchObject({ code: "artifact_being_edited" });
     });
 
+    it("should accept a baseVersion-less agent at once when the person's editor closed and ended the lease", async () => {
+      const page = await personArtifact();
+      await renewEditLease(page.id, owner);
+      await expect(updateArtifact(owner, page.id, { content: "# Answers\n\nold client" }, "agent", { harness: claude })).rejects.toMatchObject({ code: "artifact_being_edited" });
+      await endEditLease(page.id, owner);
+      expect((await updateArtifact(owner, page.id, { content: "# Answers\n\nold client" }, "agent", { harness: claude }))?.content).toBe("# Answers\n\nold client");
+    });
+
     it("should renew one lease per person and artifact, from the database clock", async () => {
       const page = await personArtifact();
       await renewEditLease(page.id, owner);
@@ -218,6 +246,46 @@ describe.runIf(Boolean(databaseUrl))("concurrent edits with a database", async (
       const page = await personArtifact();
       const saved = await saveArtifactUpdate(owner, page.id, { content: "# Answers\n\nQ1: plain" }, "person", { expectedUpdatedAt: page.updatedAt });
       expect(saved?.savedOverAgents).toBe(false);
+    });
+  });
+
+  describe("uploads of a refused save", () => {
+    /** A ready upload of the owner's, not attached to any artifact yet. */
+    async function upload() {
+      const id = randomUUID();
+      await getDb().insert(artifactFile).values({ id, uploaderId: owner, key: `files/${id}/shot.png`, filename: "shot.png", contentType: "image/png", size: 10, status: "ready" });
+      return id;
+    }
+
+    async function attachedTo(fileId: string) {
+      const [file] = await getDb().select({ artifactId: artifactFile.artifactId }).from(artifactFile).where(eq(artifactFile.id, fileId)).limit(1);
+      return file?.artifactId ?? null;
+    }
+
+    const embed = (fileId: string) => `# Answers\n\n![Screenshot](/api/files/${fileId})\n`;
+
+    it("should leave a refused web save's content media and cover unattached", async () => {
+      const page = await personArtifact();
+      await updateArtifact(owner, page.id, { content: "# Answers\n\nfrom the owner's other tab" }, "person", { expectedUpdatedAt: page.updatedAt });
+      const [shot, cover] = [await upload(), await upload()];
+      const stale = saveArtifactUpdate(owner, page.id, { content: embed(shot), cover: `file:${cover}` }, "person", { expectedUpdatedAt: page.updatedAt });
+      await expect(stale).rejects.toBeInstanceOf(StaleSaveError);
+      expect(await attachedTo(shot)).toBeNull();
+      expect(await attachedTo(cover)).toBeNull();
+    });
+
+    it("should attach only the winning agent's upload when two agents race with the same base", async () => {
+      const page = await personArtifact();
+      const base = await readBase(page.id);
+      const [first, second] = [await upload(), await upload()];
+      const results = await Promise.allSettled([
+        updateArtifact(owner, page.id, { content: embed(first) }, "agent", { harness: claude, baseVersion: base }),
+        updateArtifact(owner, page.id, { content: embed(second) }, "agent", { harness: cursor, baseVersion: base }),
+      ]);
+      const [winner, loser] = results[0].status === "fulfilled" ? [first, second] : [second, first];
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(await attachedTo(winner)).toBe(page.id);
+      expect(await attachedTo(loser), "the refused save attached nothing").toBeNull();
     });
   });
 

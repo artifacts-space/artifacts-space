@@ -12,7 +12,7 @@ import { BadBaseVersionError, EditConflictError } from "@/lib/edits/conflict-err
 import { agentWriteRefusal, isPlausibleBase, parseBaseVersion, touchesGuardedFields, type BaseVersion } from "@/lib/edits/edit-conflict-rules";
 import { pruneUnusedContentFilesQuietly, pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { droppedContentRefs } from "@/lib/files/icon-cleanup-rules";
-import { attachUpdatedContentFiles } from "@/lib/files/save-attach";
+import { attachContentAndImageFiles, checkUpdatedContentFiles } from "@/lib/files/save-attach";
 import { stampColumns } from "@/lib/harness/harness-rules";
 import { assertContentFits } from "@/lib/quota/usage";
 import { StaleSaveError, unchangedSince, type SaveOptions } from "@/lib/save-guard";
@@ -156,21 +156,9 @@ async function writePersonSave(changes: ArtifactChanges, context: SaveContext): 
   throw new StaleSaveError(context.before.publicId);
 }
 
-/**
- * The guarded write for the save's actor. When it is refused, or matches
- * nothing, the media this save attached for its content (attachUpdatedContentFiles
- * runs first) goes again unless something still shows it, so a refused save
- * leaves no stray files.
- */
-async function writeGuarded(changes: ArtifactChanges, context: SaveContext, base: BaseVersion | undefined): Promise<SavedRow | null> {
-  try {
-    const saved = context.actor === "agent" ? await writeAgentSave(changes, context, base) : await writePersonSave(changes, context);
-    if (!saved && changes.content !== undefined) await pruneUnusedContentFilesQuietly(context.before.id);
-    return saved;
-  } catch (error) {
-    if (changes.content !== undefined) await pruneUnusedContentFilesQuietly(context.before.id);
-    throw error;
-  }
+/** The guarded write for the save's actor. */
+function writeGuarded(changes: ArtifactChanges, context: SaveContext, base: BaseVersion | undefined): Promise<SavedRow | null> {
+  return context.actor === "agent" ? writeAgentSave(changes, context, base) : writePersonSave(changes, context);
 }
 
 /**
@@ -189,10 +177,12 @@ export async function writeArtifactSave(changes: ArtifactChanges, context: SaveC
   await assertValidArtifactUpdate(changes, () => Promise.resolve(before));
   // A restore keeps the version's theme as it was; a team preset it may no longer use just falls back.
   if (!context.restoredFromId && changes.theme !== before.theme) await assertTeamPresetUsable(editorId, before, changes.theme);
-  await attachUpdatedContentFiles(editorId, before, changes);
+  const files = await checkUpdatedContentFiles(editorId, before, changes);
   const saved = await writeGuarded(changes, context, base);
   if (!saved) return null;
   const { record } = saved;
+  // Uploads attach only once the write landed, so a refused save leaves them as they were; still before the version is filed, so it includes them.
+  await attachContentAndImageFiles(editorId, record.id, files.contentFileIds, files.imageFileIds);
   await recordArtifactSave({ before, after: record, editorId, actor: context.actor, ...saveKindOf(context), harness: context.options.harness ?? null });
   // A replaced or removed image icon or cover goes with this save, unless something still shows it (see icon-cleanup.ts).
   if (imageChanged(before, record)) await pruneUnusedIconFilesQuietly(record.id, [before.icon, before.cover]);

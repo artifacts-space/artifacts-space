@@ -13,7 +13,7 @@ vi.mock("./attach", () => ({ checkContentFiles: checks.checkContentFiles }));
 vi.mock("./icon-file", () => ({ checkIconFile: checks.checkIconFile }));
 vi.mock("./cover-file", () => ({ checkCoverFile: checks.checkCoverFile }));
 
-const { attachContentAndImageFiles, attachUpdatedContentFiles } = await import("./save-attach");
+const { attachContentAndImageFiles, checkUpdatedContentFiles } = await import("./save-attach");
 
 const media = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
 const icon = "0f8fad5b-d9cb-469f-a165-70867728950e";
@@ -35,17 +35,17 @@ describe("attachContentAndImageFiles", () => {
   });
 });
 
-describe("attachUpdatedContentFiles", () => {
-  it("should check the new content when a save changes it", async () => {
-    await attachUpdatedContentFiles("u1", current, { content: `![x](/api/files/${media})` });
+describe("checkUpdatedContentFiles", () => {
+  it("should check the new content when a save changes it, and attach nothing yet", async () => {
+    const files = await checkUpdatedContentFiles("u1", current, { content: `![x](/api/files/${media})` });
     expect(checks.checkContentFiles).toHaveBeenCalledWith("u1", "a1", "markdown", `![x](/api/files/${media})`);
-    expect(store.attachFileRows).toHaveBeenCalledWith("u1", "a1", [media], { byContent: true });
+    expect(files).toEqual({ contentFileIds: [media], imageFileIds: [icon, cover] });
+    expect(store.attachFileRows).not.toHaveBeenCalled();
   });
 
-  it("should attach no content media when a save changes only the icon", async () => {
-    await attachUpdatedContentFiles("u1", current, { icon: `/api/files/${icon}` });
+  it("should name no content media when a save changes only the icon", async () => {
+    const files = await checkUpdatedContentFiles("u1", current, { icon: `/api/files/${icon}` });
     expect(checks.checkContentFiles).not.toHaveBeenCalled();
-    expect(store.attachFileRows).toHaveBeenCalledWith("u1", "a1", [], { byContent: true });
-    expect(store.attachFileRows).toHaveBeenCalledWith("u1", "a1", [icon, cover]);
+    expect(files).toEqual({ contentFileIds: [], imageFileIds: [icon, cover] });
   });
 });

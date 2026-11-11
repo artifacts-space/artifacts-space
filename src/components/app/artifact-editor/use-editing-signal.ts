@@ -4,8 +4,8 @@ import { shouldSignalEditing } from "@/lib/edits/edit-conflict-rules";
 
 import type { ArtifactDraft } from "./use-artifact-draft";
 
-/** Sends one "I'm editing" signal for an artifact. Its result is ignored: saves still win without it. */
-export type SignalEditing = (artifactId: string) => Promise<unknown>;
+/** Sends one "I'm editing" signal for an artifact, or with `editing` false, "I stopped". Its result is ignored: saves still win without it. */
+export type SignalEditing = (artifactId: string, editing?: boolean) => Promise<unknown>;
 
 interface EditingSignalOptions {
   artifactId: string;
@@ -20,8 +20,13 @@ interface EditingSignalOptions {
  * version waits instead of overwriting their typing (src/lib/edits). Event
  * driven: it runs when the draft changes (the person typed), never on a
  * timer, and sends at most once every 20 seconds while there are unsaved
- * changes or typing just happened (shouldSignalEditing). The lease ends on
- * its own about a minute after the last signal.
+ * changes or typing just happened (shouldSignalEditing). When the editor
+ * closes (or moves to another artifact) after it took a lease, it ends that
+ * lease at once. Otherwise the lease ends on its own about a minute after
+ * the last signal: a save that leaves nothing unsaved keeps it, because the
+ * person usually goes on typing, and ending it on every autosave would turn
+ * the 20-second throttle into a request per save. A closed tab cannot send
+ * anything reliably, so its lease runs out the same way.
  */
 export function useEditingSignal({ artifactId, draft, dirty, signal }: EditingSignalOptions) {
   const lastSignalRef = useRef<number | null>(null);
@@ -29,6 +34,16 @@ export function useEditingSignal({ artifactId, draft, dirty, signal }: EditingSi
   // Read when the draft changes; a save that only flips `dirty` is not typing.
   const latestRef = useRef({ artifactId, dirty, signal });
   useEffect(() => { latestRef.current = { artifactId, dirty, signal }; }, [artifactId, dirty, signal]);
+
+  useEffect(() => {
+    return () => {
+      if (lastSignalRef.current === null) return;
+      lastSignalRef.current = null;
+      latestRef.current.signal(artifactId, false).catch(() => {
+        // Best effort: the lease runs out on its own.
+      });
+    };
+  }, [artifactId]);
 
   useEffect(() => {
     const now = Date.now();

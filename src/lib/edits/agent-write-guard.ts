@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifactEditLease } from "@/db/edit-lease-schema";
@@ -72,6 +72,11 @@ export async function renewEditLease(artifactId: string, userId: string): Promis
     .insert(artifactEditLease)
     .values({ artifactId, userId, expiresAt: sql`now() + make_interval(secs => ${seconds})` })
     .onConflictDoUpdate({ target: [artifactEditLease.artifactId, artifactEditLease.userId], set: { expiresAt: sql`now() + make_interval(secs => ${seconds})` } });
+}
+
+/** Ends a person's edit lease on an artifact at once, when their editor closes. */
+export async function endEditLease(artifactId: string, userId: string): Promise<void> {
+  await getDb().delete(artifactEditLease).where(and(eq(artifactEditLease.artifactId, artifactId), eq(artifactEditLease.userId, userId)));
 }
 
 /** Deletes leases that ended more than an hour ago; the cleanup job runs it. Returns how many went. */
