@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { artifact, artifactVersion } from "@/db/schema";
+import { artifact, artifactFile, artifactVersion } from "@/db/schema";
 
 import { createTableQueueDb } from "./table-queue-db";
 
@@ -10,12 +10,12 @@ import { createTableQueueDb } from "./table-queue-db";
  */
 
 const state = vi.hoisted((): { db: unknown } => ({ db: null }));
-const store = vi.hoisted(() => ({ getFileRows: vi.fn(), removeFiles: vi.fn() }));
+const store = vi.hoisted(() => ({ getFileRows: vi.fn(), removeFiles: vi.fn(), deleteStoredObjects: vi.fn() }));
 
 vi.mock("@/db", () => ({ getDb: () => state.db }));
 vi.mock("./store", () => store);
 
-const { countHistoryOnlyImages, pruneUnusedIconFiles } = await import("./icon-cleanup");
+const { countHistoryOnlyFiles, pruneUnusedContentFiles, pruneUnusedIconFiles } = await import("./icon-cleanup");
 
 const cover = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const other = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
@@ -32,6 +32,7 @@ beforeEach(() => {
 });
 
 describe("pruneUnusedIconFiles", () => {
+  // Queries in order: the artifact, the icons and covers its versions show, then one check of the candidates against version content.
   it("should keep a removed cover image when an older version still shows it, so Restore brings it back", async () => {
     stage([[artifact, [[record]]], [artifactVersion, [[{ icon: null, cover: `file:${cover}@20` }]]]]);
     await expect(pruneUnusedIconFiles("a1", [null, `file:${cover}@20`])).resolves.toBe(0);
@@ -39,20 +40,26 @@ describe("pruneUnusedIconFiles", () => {
   });
 
   it("should delete the image when the last version that showed it is gone", async () => {
-    stage([[artifact, [[{ ...record, cover: "mist" }]]], [artifactVersion, [[{ icon: `file:${other}`, cover: null }]]]]);
+    stage([[artifact, [[{ ...record, cover: "mist" }]]], [artifactVersion, [[{ icon: `file:${other}`, cover: null }]]], [artifactFile, [[{ id: cover }]]]]);
     await expect(pruneUnusedIconFiles("a1", [`file:${cover}`])).resolves.toBe(1);
     expect(store.removeFiles).toHaveBeenCalledWith([{ id: cover, artifactId: "a1", key: `files/${cover}/cover.jpg` }]);
   });
 
   it("should never delete a file attached to another artifact", async () => {
-    stage([[artifact, [[record]]], [artifactVersion, [[]]]]);
+    stage([[artifact, [[record]]], [artifactVersion, [[]]], [artifactFile, [[{ id: cover }]]]]);
     store.getFileRows.mockResolvedValue([{ id: cover, artifactId: "a2", key: "files/x" }]);
     await expect(pruneUnusedIconFiles("a1", [`file:${cover}`])).resolves.toBe(0);
     expect(store.removeFiles).toHaveBeenCalledWith([]);
   });
 
-  it("should keep an image a ui version still names in its content", async () => {
-    stage([[artifact, [[{ ...record, kind: "ui", content: "{}" }]]], [artifactVersion, [[], [{ id: "v1" }]]]]);
+  it("should keep an image a ui or Markdown version still names in its content, so Restore brings it back", async () => {
+    stage([[artifact, [[{ ...record, kind: "ui", content: "{}" }]]], [artifactVersion, [[]]], [artifactFile, [[]]]]);
+    await expect(pruneUnusedIconFiles("a1", [`file:${cover}`])).resolves.toBe(0);
+    expect(store.getFileRows).not.toHaveBeenCalled();
+  });
+
+  it("should keep a former cover when the current Markdown embeds it", async () => {
+    stage([[artifact, [[{ ...record, content: `![Cover](/api/files/${cover})` }]]], [artifactVersion, [[]]]]);
     await expect(pruneUnusedIconFiles("a1", [`file:${cover}`])).resolves.toBe(0);
     expect(store.getFileRows).not.toHaveBeenCalled();
   });
@@ -63,15 +70,54 @@ describe("pruneUnusedIconFiles", () => {
   });
 });
 
-describe("countHistoryOnlyImages", () => {
+describe("countHistoryOnlyFiles", () => {
   it("should count the attached images only older versions show, not the current cover", async () => {
-    stage([[artifact, [[{ ...record, cover: `file:${other}` }]]], [artifactVersion, [[{ icon: null, cover: `file:${cover}@20` }, { icon: null, cover: `file:${other}` }]]]]);
-    await expect(countHistoryOnlyImages("a1")).resolves.toBe(1);
+    stage([[artifact, [[{ ...record, cover: `file:${other}` }]]], [artifactVersion, [[{ icon: null, cover: `file:${cover}@20` }, { icon: null, cover: `file:${other}` }]]], [artifactFile, [[]]]]);
+    await expect(countHistoryOnlyFiles("a1")).resolves.toBe(1);
     expect(store.getFileRows).toHaveBeenCalledWith([cover]);
   });
 
   it("should count nothing when every kept image is still shown", async () => {
-    stage([[artifact, [[{ ...record, icon: `file:${cover}` }]]], [artifactVersion, [[{ icon: `file:${cover}`, cover: null }]]]]);
-    await expect(countHistoryOnlyImages("a1")).resolves.toBe(0);
+    stage([[artifact, [[{ ...record, icon: `file:${cover}` }]]], [artifactVersion, [[{ icon: `file:${cover}`, cover: null }]]], [artifactFile, [[]]]]);
+    await expect(countHistoryOnlyFiles("a1")).resolves.toBe(0);
+  });
+
+  it("should count media the document no longer embeds, but not media it still embeds", async () => {
+    const shown = "3b241101-e2bb-4255-8caf-4136c566a962";
+    stage([[artifact, [[{ ...record, content: `![Now](/api/files/${shown})` }]]], [artifactVersion, [[]]], [artifactFile, [[{ id: cover }, { id: other }, { id: shown }]]]]);
+    await expect(countHistoryOnlyFiles("a1")).resolves.toBe(2);
+  });
+
+  it("should count a file once when it was both a cover and an embed", async () => {
+    stage([[artifact, [[record]]], [artifactVersion, [[{ icon: null, cover: `file:${cover}` }]]], [artifactFile, [[{ id: cover }]]]]);
+    await expect(countHistoryOnlyFiles("a1")).resolves.toBe(1);
+  });
+});
+
+describe("pruneUnusedContentFiles", () => {
+  const deleted = [{ id: cover, key: `files/${cover}/shot.png` }];
+
+  // Queries in order: the artifact, its content media, the icons and covers its versions show, then one checked delete.
+  it("should delete removed media and its R2 object when the checked delete finds no content naming it", async () => {
+    stage([[artifact, [[record]]], [artifactFile, [[{ id: cover }], deleted]], [artifactVersion, [[]]]]);
+    await expect(pruneUnusedContentFiles("a1")).resolves.toBe(1);
+    expect(store.deleteStoredObjects).toHaveBeenCalledWith(deleted);
+  });
+
+  it("should delete nothing when the checked delete finds content naming the file", async () => {
+    stage([[artifact, [[record]]], [artifactFile, [[]]], [artifactVersion, [[]]]]);
+    await expect(pruneUnusedContentFiles("a1", [cover])).resolves.toBe(0);
+    expect(store.deleteStoredObjects).toHaveBeenCalledWith([]);
+  });
+
+  it("should not touch media the artifact still shows", async () => {
+    stage([[artifact, [[{ ...record, content: `![Shot](/api/files/${cover})` }]]], [artifactVersion, [[]]]]);
+    await expect(pruneUnusedContentFiles("a1", [cover])).resolves.toBe(0);
+    expect(store.deleteStoredObjects).not.toHaveBeenCalled();
+  });
+
+  it("should read nothing when a save stopped naming no file", async () => {
+    stage([]);
+    await expect(pruneUnusedContentFiles("a1", [])).resolves.toBe(0);
   });
 });

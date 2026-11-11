@@ -11,9 +11,9 @@ import { unusableFilesForPeople } from "./person-messages";
  * at the store boundary.
  */
 
-const store = vi.hoisted(() => ({ getFileRows: vi.fn(), countArtifactFiles: vi.fn(), attachFileRows: vi.fn(), clearIconForFile: vi.fn(), getFileRow: vi.fn(), removeFiles: vi.fn(), removeUnattachedUpload: vi.fn() }));
+const store = vi.hoisted(() => ({ getFileRows: vi.fn(), countArtifactFiles: vi.fn(), attachFileRows: vi.fn(), clearIconForFile: vi.fn(), getFileRow: vi.fn(), removeFiles: vi.fn(), removeUnattachedUpload: vi.fn(), usableFileRows: vi.fn() }));
 vi.mock("./store", () => store);
-vi.mock("./icon-cleanup", () => ({ countHistoryOnlyImages: vi.fn() }));
+vi.mock("./icon-cleanup", () => ({ countHistoryOnlyFiles: vi.fn() }));
 vi.mock("@/lib/access", () => ({ canEditRecord: vi.fn() }));
 vi.mock("@/db", () => ({ getDb: vi.fn() }));
 vi.mock("@/lib/versions/service", () => ({ recordArtifactChange: vi.fn() }));

@@ -38,6 +38,16 @@ interface RichMarkdownEditorProps {
   sourceToggle?: boolean;
   /** Opens the source elsewhere when a part can only be edited as Markdown; without it, the switch above opens. */
   onEditSource?: () => void;
+  /** False where saves don't attach files (a ui artifact's Markdown block): no media blocks, and file paste or drop is refused with a note. */
+  media?: boolean | undefined;
+}
+
+/** What a block without media says when a file is pasted or dropped into it. */
+export const mediaRefusedMessage = "Files can’t go in a Markdown block. To show an image or a file, add an Image or File block.";
+
+/** Says why a pasted or dropped file did not go in, in a block without media; empty otherwise, so screen readers hear it when it appears. */
+function MediaRefusedNote({ shown }: { shown: boolean }) {
+  return <p role="status" className={cn("text-sm text-muted-foreground", shown ? "mb-3" : "sr-only")}>{shown ? mediaRefusedMessage : ""}</p>;
 }
 
 function RawBlocksNotice({ count, onShowMarkdown }: { count: number; onShowMarkdown: () => void }) {
@@ -77,11 +87,12 @@ function canEditLink(editor: Editor): boolean {
  * the raw source. It reads and writes Markdown; blocks nobody touched are
  * saved exactly as they were loaded.
  */
-export default function RichMarkdownEditor({ value, onChange, label, autoFocus = false, sourceToggle = true, onEditSource }: RichMarkdownEditorProps) {
+export default function RichMarkdownEditor({ value, onChange, label, autoFocus = false, sourceToggle = true, onEditSource, media }: RichMarkdownEditorProps) {
   const [mode, setMode] = useState<Mode>("rich");
   const [loaded] = useState(() => parseMarkdown(value));
   const [rawBlocks, setRawBlocks] = useState(loaded.rawBlocks);
   const [linkOpen, setLinkOpen] = useState(false);
+  const [mediaRefused, setMediaRefused] = useState(false);
   const sourceRef = useRef<SourceMap>(loaded.source);
   const onChangeRef = useRef(onChange);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -97,8 +108,10 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
           setLinkOpen(true);
           return true;
         },
+        media,
+        onMediaRefused: () => { setMediaRefused(true); },
       }),
-    [],
+    [media],
   );
 
   const editor = useEditor({
@@ -109,7 +122,10 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
     editorProps: {
       attributes: { class: "artifact-prose rich-editor-content", "aria-label": label, role: "textbox", "aria-multiline": "true", spellcheck: "true" },
     },
-    onUpdate: ({ editor: current }) => { onChangeRef.current(serializeMarkdown(current.getJSON(), sourceRef.current)); },
+    onUpdate: ({ editor: current }) => {
+      setMediaRefused(false);
+      onChangeRef.current(serializeMarkdown(current.getJSON(), sourceRef.current));
+    },
     onSelectionUpdate: () => { setLinkOpen(false); },
   });
 
@@ -145,6 +161,7 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
         {editor ? (
           <>
             <RawBlocksNotice count={rawBlocks} onShowMarkdown={onEditSource ?? showMarkdown} />
+            <MediaRefusedNote shown={mediaRefused} />
             {coarse ? <TouchToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /> : <TextBubbleMenu editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
             <TableBubbleMenu editor={editor} />
           </>

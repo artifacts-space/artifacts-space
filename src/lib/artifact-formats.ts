@@ -16,7 +16,7 @@ export const formatInfo: Record<FormatKind, FormatInfo> = {
   markdown: {
     label: "Markdown",
     helper: "Readable prose with headings, lists, tables, and links.",
-    agent: "GitHub-flavored Markdown, shown as formatted prose. Raw HTML is not rendered.",
+    agent: "GitHub-flavored Markdown, shown as formatted prose. Raw HTML is not rendered. Uploaded images, video, audio, and files embed as ![alt](/api/files/<file id>) on its own line; artifacts_formats_guide with kind \"markdown\" explains how.",
   },
   code: {
     label: "Code",

@@ -85,7 +85,10 @@ function registerUploadTools(server: ToolServer, userId: string) {
       description: "Checks an uploaded file's size, type, and content, and makes it usable. Call after the PUT succeeds. A file that does not match its request is deleted.",
       inputSchema: { fileId: fileIdField },
     },
-    ({ fileId }) => respond(async () => ({ file: await finalizeUpload(userId, fileId), next: "Use the id in files_create_artifact, files_attach, or an Image or File element of a ui artifact." })),
+    ({ fileId }) => respond(async () => {
+      const file = await finalizeUpload(userId, fileId);
+      return { file, next: `Use the id in files_create_artifact, files_attach, an Image or File element of a ui artifact, or a Markdown media block: ![Alt text](/api/files/${file.id}) on its own line (artifacts_formats_guide, kind "markdown").` };
+    }),
   );
 }
 

@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, isNull, like, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, like, lt, lte, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, artifactFile, type ArtifactFileRecord } from "@/db/schema";
@@ -30,14 +30,19 @@ export async function getFileRows(fileIds: readonly string[]): Promise<ArtifactF
   return getDb().select().from(artifactFile).where(inArray(artifactFile.id, [...fileIds]));
 }
 
-/** Ready files of these artifacts, in the order they were attached, by artifact id. */
-export async function listFilesForArtifacts(artifactIds: readonly string[]): Promise<Map<string, FileDto[]>> {
+/**
+ * Ready files of these artifacts, in the order they were attached, by
+ * artifact id. With `attachedBy`, only files attached at or before that
+ * time: what readers of an approved version may see.
+ */
+export async function listFilesForArtifacts(artifactIds: readonly string[], options: { attachedBy?: Date | null } = {}): Promise<Map<string, FileDto[]>> {
   const files = new Map<string, FileDto[]>();
   if (artifactIds.length === 0) return files;
+  const cutoff = options.attachedBy ? lte(artifactFile.attachedAt, options.attachedBy) : undefined;
   const rows = await getDb()
     .select()
     .from(artifactFile)
-    .where(and(inArray(artifactFile.artifactId, [...artifactIds]), eq(artifactFile.status, "ready")))
+    .where(and(inArray(artifactFile.artifactId, [...artifactIds]), eq(artifactFile.status, "ready"), cutoff))
     .orderBy(asc(artifactFile.attachedAt), asc(artifactFile.createdAt));
   for (const row of rows) {
     if (!row.artifactId) continue;
@@ -48,17 +53,9 @@ export async function listFilesForArtifacts(artifactIds: readonly string[]): Pro
   return files;
 }
 
-/**
- * Ready files of one artifact. With `attachedBy`, only files attached at or
- * before that time: what readers of an approved version may see.
- */
+/** Ready files of one artifact, in one query; `attachedBy` as for listFilesForArtifacts. */
 export async function listArtifactFiles(artifactId: string, options: { attachedBy?: Date | null } = {}): Promise<FileDto[]> {
-  const files = (await listFilesForArtifacts([artifactId])).get(artifactId) ?? [];
-  const cutoff = options.attachedBy;
-  if (!cutoff) return files;
-  const rows = await getFileRows(files.map((file) => file.id));
-  const allowed = new Set(rows.filter((row) => row.attachedAt !== null && row.attachedAt <= cutoff).map((row) => row.id));
-  return files.filter((file) => allowed.has(file.id));
+  return (await listFilesForArtifacts([artifactId], options)).get(artifactId) ?? [];
 }
 
 /** Removes an icon or cover that points at a file being deleted from its artifact. Call before the change is recorded. */
@@ -86,16 +83,46 @@ export async function countPendingUploads(uploaderId: string, now: Date = new Da
 
 /**
  * Attaches the uploader's own ready, unattached files to an artifact. Files
- * already attached anywhere are left alone. Returns how many changed.
+ * already attached anywhere are left alone. `byContent` marks them as
+ * content media: true only when a content save attaches the uploads its
+ * content names (content-files.ts). Returns how many changed.
  */
-export async function attachFileRows(uploaderId: string, artifactId: string, fileIds: readonly string[]): Promise<number> {
+export async function attachFileRows(uploaderId: string, artifactId: string, fileIds: readonly string[], options: { byContent?: boolean } = {}): Promise<number> {
   if (fileIds.length === 0) return 0;
   const rows = await getDb()
     .update(artifactFile)
-    .set({ artifactId, attachedAt: sql`now()` })
+    .set({ artifactId, attachedAt: sql`now()`, attachedByContent: options.byContent ?? false })
     .where(and(inArray(artifactFile.id, [...fileIds]), eq(artifactFile.uploaderId, uploaderId), eq(artifactFile.status, "ready"), isNull(artifactFile.artifactId)))
     .returning();
   return rows.length;
+}
+
+/**
+ * The ready files `authorId` may use in an artifact (null on create): the
+ * artifact's own files and the author's unattached uploads. Read without an
+ * id list, so a save that links any number of files never sends a huge
+ * query and never misses the author's own uploads (canUseFileInArtifact).
+ */
+export async function usableFileRows(authorId: string, artifactId: string | null): Promise<ArtifactFileRecord[]> {
+  const own = and(isNull(artifactFile.artifactId), eq(artifactFile.uploaderId, authorId));
+  return getDb()
+    .select()
+    .from(artifactFile)
+    .where(and(eq(artifactFile.status, "ready"), artifactId ? or(eq(artifactFile.artifactId, artifactId), own) : own));
+}
+
+/**
+ * Deletes the R2 objects of file rows already deleted, for callers that
+ * must delete the row first, under a check, in one statement. An object R2
+ * refuses to delete is left behind and logged by key; with no row, no one
+ * can open it.
+ */
+export async function deleteStoredObjects(rows: readonly Pick<ArtifactFileRecord, "key">[]): Promise<void> {
+  if (rows.length === 0) return;
+  const config = r2ConfigFromEnv();
+  const results = await Promise.allSettled(rows.map((row) => deleteObject(config, row.key)));
+  const failed = rows.filter((_, index) => results[index]?.status === "rejected").map((row) => row.key);
+  if (failed.length > 0) console.error(`[files] ${String(failed.length)} R2 objects of deleted files could not be deleted`, failed);
 }
 
 /**

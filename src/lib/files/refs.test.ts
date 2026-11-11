@@ -21,8 +21,14 @@ describe("fileRefsInContent", () => {
     expect(fileRefsInContent("ui", JSON.stringify(spec))).toEqual([a, b]);
   });
 
+  it("should collect every file a Markdown document embeds or links when the content is Markdown", () => {
+    const markdown = `![Plan](/api/files/${a.toUpperCase()}#width=50 "Cap")\n\nSee [the deck](/api/files/${b}) and ![again](/api/files/${a}).`;
+    expect(fileRefsInContent("markdown", markdown)).toEqual([a, b]);
+  });
+
   it("should find nothing in other formats or unreadable specs", () => {
     expect(fileRefsInContent("markdown", a)).toEqual([]);
+    expect(fileRefsInContent("text", `/api/files/${a}`)).toEqual([]);
     expect(fileRefsInContent("ui", "{ nope")).toEqual([]);
     expect(fileRefsInContent("ui", "[]")).toEqual([]);
   });

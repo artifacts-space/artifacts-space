@@ -38,6 +38,11 @@ describe("plainMarkdown", () => {
     expect(plainMarkdown("a\nb\nc\nd", 2).lines).toEqual(["a", "b"]);
   });
 
+  it("should leave media blocks out of the text when a line is only an image", () => {
+    const doc = '# Plan\n\n![Team photo](/api/files/0f8fad5b-d9cb-469f-a165-70867728950e#width=50 "Lisbon")\n\nWe ship Friday.\n\n> ![Quoted](https://example.com/a.png)\n\nSee ![inline](x.png) here.';
+    expect(plainMarkdown(doc, 5)).toEqual({ heading: "Plan", lines: ["We ship Friday.", "See inline here."] });
+  });
+
   it("should return no heading when the document has none", () => {
     expect(plainMarkdown("just text", 3)).toEqual({ heading: null, lines: ["just text"] });
   });

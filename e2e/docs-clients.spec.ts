@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 const endpoint = "https://artifacts.space/api/mcp";
-const clients = ["Claude Code", "Cursor", "Claude Desktop and claude.ai", "Codex", "OpenCode", "Devin", "Kimi Code CLI", "fx", "Other clients"];
+const clients = ["Claude Code", "Cursor", "Claude Desktop and claude.ai", "ChatGPT", "Codex", "OpenCode", "Devin", "Kimi Code CLI", "fx", "Other clients"];
 
 /** A section heading's accessible name: its title, then the hidden "Link to this section". */
 function headingName(title: string): RegExp {
@@ -63,5 +63,21 @@ test("should give the fx steps when its section and quickstart tab open", async 
   await expect(fxTab.locator("svg[data-client-logo]")).toHaveCount(1);
   await fxTab.click();
   await expect(page.getByRole("tabpanel").locator('[data-variant="command"]').filter({ hasText: `fx mcp add artifacts ${endpoint}` })).toBeVisible();
+  expect(await pageScrollsSideways(page)).toBe(false);
+});
+
+test("should give the ChatGPT steps when its section and quickstart tab open", async ({ page }) => {
+  await page.goto("/docs/clients");
+
+  const section = page.locator("section", { has: page.getByRole("heading", { level: 2, name: headingName("ChatGPT") }) });
+  await expect(section.getByRole("link", { name: "Plugins" })).toHaveAttribute("href", "https://chatgpt.com/plugins");
+  await expect(section.getByText("Add custom MCP server")).toBeVisible();
+  await expect(section.locator("code").filter({ hasText: endpoint })).toBeVisible();
+
+  await page.goto("/docs/quickstart");
+  const chatgptTab = page.getByRole("tab", { name: "ChatGPT", exact: true });
+  await expect(chatgptTab.locator("svg[data-client-logo]")).toHaveCount(1);
+  await chatgptTab.click();
+  await expect(page.getByRole("tabpanel").getByText("Leave the client ID and secret empty", { exact: false })).toBeVisible();
   expect(await pageScrollsSideways(page)).toBe(false);
 });

@@ -31,6 +31,8 @@ const blockPrefix = /^\s{0,3}(?:>\s?)*(?:[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)?/
 const heading = /^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$/;
 const rule = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/;
 const tableDivider = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+/** A line that is only an image: a media block (an upload, video, or file), not prose. */
+const mediaLine = /^\s{0,3}(?:>\s?)*!\[[^\]]*\]\([^)]*\)\s*$/;
 
 /** Markdown inline syntax removed: links and images keep their text, emphasis and code marks go. */
 export function stripInlineMarkdown(text: string): string {
@@ -47,7 +49,7 @@ export interface PlainMarkdown {
 }
 
 function bodyLine(line: string): string | null {
-  if (rule.test(line) || tableDivider.test(line)) return null;
+  if (rule.test(line) || tableDivider.test(line) || mediaLine.test(line)) return null;
   const plain = stripInlineMarkdown(line.replace(blockPrefix, ""));
   return plain === "" ? null : plain;
 }

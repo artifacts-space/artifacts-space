@@ -7,10 +7,12 @@ import { highlightCode } from "#syntax-highlight";
 import { CodeBlock } from "@/components/code/code-block";
 import type { MentionKind } from "@/lib/comments/mentions";
 import { remarkMentions } from "@/lib/comments/remark-mentions";
+import { isFileLinkPath, isFileMediaUrl } from "@/lib/files/media-rules";
 import { safeHref } from "@/lib/link-policy";
 import { cn } from "@/lib/utils";
 
 import { ExternalLink } from "./external-link";
+import { InlineFileImage, MarkdownMedia } from "./markdown-media";
 
 /** A resolved @mention: a subtle chip. Agents get a robot icon and their own hue. */
 function MentionChip({ kind, children }: { kind: MentionKind; children: React.ReactNode }) {
@@ -52,17 +54,35 @@ function FencedCode({ node }: ExtraProps) {
   return <CodeBlock code={text} language={language} lines={highlightCode(text, language)} capHeight />;
 }
 
+/** An image as its alt text: what every image that is not an upload shows, so nothing can track readers. */
+function ImageAltText({ alt }: { alt: string | undefined }) {
+  return <span className="text-muted-foreground">[Image{alt ? `: ${alt}` : ""}]</span>;
+}
+
+function stringProperty(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+/** The uploaded file a paragraph holds when it is a media block: one image alone, pointing at /api/files. */
+function mediaImageOf(node: ExtraProps["node"]): { src: string; alt: string; title: string | null } | null {
+  const children = (node?.children ?? []).filter((child) => child.type !== "text" || child.value.trim() !== "");
+  const [only] = children;
+  if (children.length !== 1 || only?.type !== "element" || only.tagName !== "img") return null;
+  const src = stringProperty(only.properties.src);
+  if (!src || !isFileMediaUrl(src)) return null;
+  return { src, alt: stringProperty(only.properties.alt) ?? "", title: stringProperty(only.properties.title) };
+}
+
 /**
- * Element overrides. Links follow the link policy. Images never load: they
- * could track readers, and artifact images will come only from our own file
- * storage, so an image shows as its alt text instead. Spans exist only when
- * the mention plugin made them (raw HTML is skipped), and render as chips.
- * Fenced code renders as the shared code block.
+ * Element overrides. Links follow the link policy. Images never load from
+ * other sites: they could track readers, so an image shows as its alt text
+ * instead. Spans exist only when the mention plugin made them (raw HTML is
+ * skipped), and render as chips. Fenced code renders as the shared code block.
  */
 const components: Components = {
   pre: FencedCode,
   a: ({ href, children }) => <ExternalLink href={href}>{children}</ExternalLink>,
-  img: ({ alt }) => <span className="text-muted-foreground">[Image{alt ? `: ${alt}` : ""}]</span>,
+  img: ({ alt }) => <ImageAltText alt={alt} />,
   span: ({ node, children }) => {
     const kind = node?.properties.dataMention;
     if (kind !== "person" && kind !== "agent") return <span>{children}</span>;
@@ -70,9 +90,26 @@ const components: Components = {
   },
 };
 
-/** Keeps only URLs the link policy allows. Everything else becomes an empty href. */
+/**
+ * An artifact's own Markdown also shows its uploaded files (see
+ * markdown-dialect.md): an image alone in its paragraph becomes a media
+ * block (image, player, PDF, or download card), an upload inside text shows
+ * inline, and links to uploads stay on this site. Every one loads through
+ * the access-checked /api/files route.
+ */
+const mediaComponents: Components = {
+  ...components,
+  p: ({ node, children }) => {
+    const media = mediaImageOf(node);
+    return media ? <MarkdownMedia {...media} /> : <p>{children}</p>;
+  },
+  a: ({ href, children }) => (typeof href === "string" && isFileLinkPath(href) ? <a href={href} className="underline decoration-border underline-offset-[3px] hover:decoration-foreground">{children}</a> : <ExternalLink href={href}>{children}</ExternalLink>),
+  img: ({ src, alt }) => (typeof src === "string" && isFileMediaUrl(src) ? <InlineFileImage src={src} alt={alt ?? ""} /> : <ImageAltText alt={alt} />),
+};
+
+/** Keeps only URLs the link policy allows, and links to this site's uploads. Everything else becomes an empty href. */
 function urlTransform(url: string): string {
-  return safeHref(url) ?? "";
+  return safeHref(url) ?? (isFileLinkPath(url) ? url : "");
 }
 
 const noMentions: ReadonlyMap<string, MentionKind> = new Map();
@@ -80,13 +117,14 @@ const noMentions: ReadonlyMap<string, MentionKind> = new Map();
 /**
  * GitHub-flavored Markdown rendered as prose. Raw HTML is never rendered
  * (skipHtml), and links pass through the same policy as every artifact link.
- * `mentions` lists the @handles that resolved, which show as chips.
+ * `mentions` lists the @handles that resolved, which show as chips. `media`
+ * shows uploaded files, for an artifact's own content (not comments).
  * Works on the server and the client.
  */
-export function MarkdownView({ content, className, mentions = noMentions }: { content: string; className?: string; mentions?: ReadonlyMap<string, MentionKind> }) {
+export function MarkdownView({ content, className, mentions = noMentions, media = false }: { content: string; className?: string; mentions?: ReadonlyMap<string, MentionKind>; media?: boolean }) {
   return (
     <div className={cn("artifact-prose", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMentions(mentions)]} skipHtml urlTransform={urlTransform} components={components}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMentions(mentions)]} skipHtml urlTransform={urlTransform} components={media ? mediaComponents : components}>
         {content}
       </ReactMarkdown>
     </div>

@@ -36,11 +36,14 @@ import { assertRoomForNewTags, parseNewTags } from "@/lib/tags/store";
 import { projectChoiceSchema } from "@/lib/projects/rules";
 import { findOrCreateProject } from "@/lib/projects/store";
 import { checkContentFiles } from "@/lib/files/attach";
+import { contentForSave } from "@/lib/files/content-on-save";
 import { artifactHarnessOf, stampColumns, type HarnessStamp } from "@/lib/harness/harness-rules";
-import { pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
+import { pruneUnusedContentFilesQuietly, pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
+import { droppedContentRefs } from "@/lib/files/icon-cleanup-rules";
 import { checkIconFile, restorableIcon } from "@/lib/files/icon-file";
 import { checkCoverFile, restorableCover } from "@/lib/files/cover-file";
-import { attachFileRows, deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
+import { attachContentAndImageFiles, attachUpdatedContentFiles } from "@/lib/files/save-attach";
+import { deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
 import type { FileDto } from "@/lib/files/types";
 import { generatePublicId } from "@/lib/public-id";
 import { assertContentFits } from "@/lib/quota/usage";
@@ -334,13 +337,13 @@ async function newArtifactProjectId(userId: string, projectName: string | null |
  * connection that created it; leave it out for the web app.
  */
 export async function createArtifact(userId: string, input: ArtifactInput, options: { harness?: HarnessStamp | null; emptyMarkdown?: boolean; createRequestId?: string } = {}) {
-  const { project: projectName, tags: tagInput, ...parsed } = artifactInputSchema.parse(input);
+  const { project: projectName, tags: tagInput, ...sent } = artifactInputSchema.parse(input);
+  const parsed = contentForSave(sent.kind, sent);
   const tags = parseNewTags(tagInput);
   assertArtifactSize(parsed);
   assertValidArtifactContent(parsed.kind, parsed.content, { emptyMarkdown: options.emptyMarkdown === true });
   const contentFileIds = await checkContentFiles(userId, null, parsed.kind, parsed.content);
   const imageFileIds = [...(await checkIconFile(userId, null, parsed.icon)), ...(await checkCoverFile(userId, null, parsed.cover))];
-  const fileIds = [...new Set([...contentFileIds, ...imageFileIds])];
   // New artifacts are private: a team preset must be one of the author's teams'.
   await assertTeamPresetUsable(userId, { userId, visibility: "private", teamId: null }, parsed.theme);
   await enforceRateLimit("artifactCreate", userId);
@@ -370,7 +373,7 @@ export async function createArtifact(userId: string, input: ArtifactInput, optio
 
   if (!record && options.createRequestId) throw new CreateRequestTaken();
   if (!record) throw new Error("The artifact could not be created.");
-  await attachFileRows(userId, record.id, fileIds);
+  await attachContentAndImageFiles(userId, record.id, contentFileIds, imageFileIds);
   await recordArtifactSave({ before: null, after: record, editorId: userId, actor: "person", saveKind: "create", harness: options.harness ?? null });
   const [dto] = await toArtifactDtos([record], userId);
   return dto ?? toArtifactDto(record);
@@ -431,6 +434,8 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
   await recordArtifactSave({ before, after: record, editorId, actor: context.actor, ...saveKindOf(context), harness: context.options.harness ?? null });
   // A replaced or removed image icon or cover goes with this save, unless something still shows it (see icon-cleanup.ts).
   if (imageChanged(before, record)) await pruneUnusedIconFilesQuietly(record.id, [before.icon, before.cover]);
+  // So does media the content stopped embedding, once no version names it (a merged save can drop the only one).
+  await pruneUnusedContentFilesQuietly(record.id, droppedContentRefs(before, record));
   const [dto] = await toArtifactDtos([record], editorId);
   return dto ?? null;
 }
@@ -443,10 +448,11 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
  * approved version. `actor` is "agent" for MCP calls, which never approve.
  */
 export async function updateArtifact(userId: string, id: string, input: ArtifactUpdateInput, actor: SharingActor = "person", options: SaveOptions = {}) {
-  const parsed = artifactUpdateSchema.parse(input);
-  assertArtifactSize(parsed);
+  const sent = artifactUpdateSchema.parse(input);
   const before = await getEditableArtifact(userId, { id });
   if (!before) return null;
+  const parsed = contentForSave(sent.kind ?? before.kind, sent);
+  assertArtifactSize(parsed);
   return saveChanges(parsed, { editorId: userId, before, actor, options });
 }
 
@@ -464,20 +470,9 @@ export async function restoreArtifactVersion(userId: string, id: string, version
   // The project is not versioned: a restore keeps the artifact in its current project.
   const { title, theme, summary, content, kind, language, source, metadata } = version;
   const [icon, cover] = await Promise.all([restorableIcon(userId, before.id, version.icon), restorableCover(userId, before.id, version.cover)]);
-  const changes = artifactUpdateSchema.parse({ title, icon, theme, cover, summary, content, kind, language, source, metadata });
+  const changes = contentForSave(kind, artifactUpdateSchema.parse({ title, icon, theme, cover, summary, content, kind, language, source, metadata }));
   assertArtifactSize(changes);
   return saveChanges(changes, { editorId: userId, before, actor, options, restoredFromId: version.id });
-}
-
-/**
- * Checks and attaches the files an update's content and icon point at, before the
- * row changes, so a version saved with the edit already includes them.
- */
-async function attachUpdatedContentFiles(userId: string, current: ArtifactRecord, update: { kind?: string | undefined; content?: string | undefined; icon?: string | null | undefined; cover?: string | null | undefined }) {
-  const iconFileIds = [...(await checkIconFile(userId, current.id, update.icon)), ...(await checkCoverFile(userId, current.id, update.cover))];
-  const contentChanged = update.kind !== undefined || update.content !== undefined;
-  const contentFileIds = contentChanged ? await checkContentFiles(userId, current.id, update.kind ?? current.kind, update.content ?? current.content) : [];
-  await attachFileRows(userId, current.id, [...new Set([...contentFileIds, ...iconFileIds])]);
 }
 
 /** Deletes an artifact and its files, for its author or the person who added the agent that wrote it. */

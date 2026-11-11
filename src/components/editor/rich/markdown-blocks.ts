@@ -36,8 +36,9 @@ function containsRawToken(value: unknown): boolean {
 
 /**
  * True when a top-level block must stay as written: raw HTML (block or
- * inline), images, link reference definitions, and footnotes. The editor
- * keeps these as raw blocks instead of dropping or rewriting them.
+ * inline), images inside text (an image alone in its paragraph is a media
+ * block, a token of its own), link reference definitions, and footnotes.
+ * The editor keeps these as raw blocks instead of dropping or rewriting them.
  */
 export function needsRawBlock(token: unknown): boolean {
   if (!isRecord(token)) return true;

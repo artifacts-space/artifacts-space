@@ -32,6 +32,8 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   sharingRequest: { per: "user", where: "Sharing and comments-setting changes (making private is never limited)", refusal: "tool-error", group: "MCP and artifacts" },
   fileUpload: { per: "user", where: "files_request_upload and web uploads", refusal: "tool-error", group: "Files and pages" },
   fileDownloadByNetwork: { per: "network", where: "/api/files views and downloads", refusal: "http-429", group: "Files and pages" },
+  fileRequestByNetwork: { per: "network", where: "Every /api/files request: views, downloads, and video and audio playback (seeks and later parts)", refusal: "http-429", group: "Files and pages" },
+  fileRangeByNetworkFile: { per: "network", where: "/api/files playback of one file: seeks and later parts", refusal: "http-429", group: "Files and pages" },
   teamIconByUser: { per: "user", where: "/api/teams/<id>/icon team icon views (browsers keep each icon for a day)", refusal: "http-429", group: "Files and pages" },
   teamIconByNetwork: { per: "network", where: "/api/teams/<id>/icon team icon views", refusal: "http-429", group: "Files and pages" },
   artifactPageByNetwork: { per: "network", where: "/artifact/<id> pages", refusal: "http-429", group: "Files and pages" },
