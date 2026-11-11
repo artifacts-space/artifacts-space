@@ -9,12 +9,13 @@ import { EditDiff } from "@/components/teams/edit-diff";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { VersionDetailDto, VersionSummaryDto } from "@/lib/artifact-types";
-import type { FileDto } from "@/lib/files/types";
+import type { FileDto, OldFileDto } from "@/lib/files/types";
 import { resolveTheme } from "@/lib/themes/resolve";
 import { diffableContent } from "@/lib/versions/diff-text";
 
 import { SavedAt } from "./last-edited";
-import { saveKindLabel } from "./version-labels";
+import { ReplacedFiles, VersionFiles } from "./replaced-files";
+import { versionLabel } from "./version-labels";
 import { VersionAuthor } from "./version-list";
 
 /** How the selected version is shown: rendered, or as changes. */
@@ -49,7 +50,9 @@ function VersionBody({ view, selected, compareWith, compareId, files }: BodyProp
     return (
       <ThemeScope theme={selected.renderTheme ?? resolveTheme(selected.theme, null).theme} className="text-foreground">
         {selected.cover ? <div data-version-cover="" className="relative mb-6 h-20 overflow-hidden rounded-lg"><CoverArt cover={selected.cover} /></div> : null}
-        <ArtifactView kind={selected.kind} content={selected.content} title={selected.title} language={selected.language} files={files} />
+        <VersionFiles files={files} replacedSince={selected.latest ? [] : selected.replacedSince ?? []}>
+          <ArtifactView kind={selected.kind} content={selected.content} title={selected.title} language={selected.language} />
+        </VersionFiles>
       </ThemeScope>
     );
   }
@@ -67,6 +70,12 @@ function Loading() {
       <IconLoader2 className="size-3.5 animate-spin" /> Loading version…
     </p>
   );
+}
+
+/** The files replaced since an older version, as it was then; none for the current version. */
+function filesReplacedSince(version: VersionSummaryDto, detail: VersionDetailDto | undefined): readonly OldFileDto[] {
+  if (version.latest || !detail?.replacedSince) return [];
+  return detail.replacedSince;
 }
 
 interface VersionDetailProps {
@@ -90,7 +99,7 @@ export function VersionDetail({ version, versions, details, error, view, onView,
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-3 sm:px-5">
         <p className="min-w-0 text-sm">
-          <VersionAuthor version={version} /> <span className="text-muted-foreground">· {saveKindLabel(version.saveKind)} · <SavedAt at={version.savedAt} /></span>
+          <VersionAuthor version={version} /> <span className="text-muted-foreground">· {versionLabel(version)} · <SavedAt at={version.savedAt} /></span>
         </p>
         {version.latest ? null : (
           <Button size="sm" variant="outline" className="ml-auto" disabled={restoring} onClick={onRestore}>
@@ -109,6 +118,7 @@ export function VersionDetail({ version, versions, details, error, view, onView,
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
         {error ? <p role="alert" className="mb-3 text-sm text-destructive">{error}</p> : null}
+        <ReplacedFiles files={filesReplacedSince(version, selected)} />
         {selected ? (
           <VersionBody view={view} selected={selected} compareWith={compareId ? details.get(compareId) ?? null : null} compareId={compareId} files={files} />
         ) : (

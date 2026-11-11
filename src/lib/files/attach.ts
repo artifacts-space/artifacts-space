@@ -1,8 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
-import { artifact } from "@/db/schema";
+import { artifact, artifactFile } from "@/db/schema";
 import { canEditRecord } from "@/lib/access";
 import type { HarnessStamp } from "@/lib/harness/harness-rules";
 import type { SharingActor } from "@/lib/sharing/rules";
@@ -15,7 +15,8 @@ import { fileLimits } from "./config";
 import { countHistoryOnlyFiles } from "./icon-cleanup";
 import { unusableFilesForPeople } from "./person-messages";
 import { fileRefsInContent, maxFileRefs } from "./refs";
-import { attachFileRows, clearIconForFile, countArtifactFiles, getFileRow, getFileRows, removeFiles, removeUnattachedUpload, usableFileRows } from "./store";
+import { removeCopiesOf } from "./copies";
+import { attachFileRows, clearIconForFile, countArtifactFiles, deleteFileRows, getFileRow, getFileRows, removeUnattachedUpload, usableFileRows } from "./store";
 
 /**
  * Putting files into artifacts. A file belongs to one artifact. An editor
@@ -110,6 +111,18 @@ async function mayEditArtifact(userId: string, artifactId: string) {
 }
 
 /**
+ * Deletes one file row and then the object it held at that moment, so a
+ * replace landing meanwhile never leaves its new object behind
+ * (deleteFileRows). An upload in no artifact goes only while it still is
+ * (removeUnattachedUpload); a file in an artifact goes with its old copies.
+ */
+async function deleteFileOf(row: { id: string; artifactId: string | null }, userId: string): Promise<boolean> {
+  if (row.artifactId === null) return removeUnattachedUpload(row.id, userId);
+  await removeCopiesOf([row.id]);
+  return (await deleteFileRows(and(eq(artifactFile.id, row.id), eq(artifactFile.artifactId, row.artifactId)))).length > 0;
+}
+
+/**
  * Deletes a file from R2 and the database. Allowed for the uploader while it
  * is not attached, and for anyone who may edit the artifact it belongs to.
  * Returns the artifact id it belonged to, or null. An agent passes its
@@ -119,8 +132,7 @@ export async function deleteOwnFile(userId: string, fileId: string, actor: Shari
   const row = z.uuid().safeParse(fileId).success ? await getFileRow(fileId.toLowerCase()) : null;
   const allowed = row !== null && (row.artifactId === null ? row.uploaderId === userId : await mayEditArtifact(userId, row.artifactId));
   if (!row || !allowed) throw new UserFacingError("File not found.");
-  const removed = await removeFiles([row]);
-  if (removed.length === 0) throw new UserFacingError("The file could not be deleted. Try again.");
+  if (!(await deleteFileOf(row, userId))) throw new UserFacingError("The file could not be deleted. Try again.");
   if (row.artifactId) {
     // An icon that showed this image goes back to the format icon, and the change is versioned.
     await clearIconForFile(row.artifactId, row.id);

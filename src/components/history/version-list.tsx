@@ -7,7 +7,7 @@ import type { VersionSummaryDto } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
 import { editorName, SavedAt } from "./last-edited";
-import { saveKindLabel, versionBadges, versionNote } from "./version-labels";
+import { versionBadges, versionLabel, versionNote } from "./version-labels";
 
 /** Who saved a version, or a stand-in when they are gone. */
 export function VersionAuthor({ version }: { version: VersionSummaryDto }) {
@@ -53,7 +53,7 @@ export function VersionList({ versions, selectedId, onSelect }: VersionListProps
                 <HarnessByline harness={version.harness} className="text-xs" />
               </span>
               <span className="block truncate text-xs text-muted-foreground">
-                {saveKindLabel(version.saveKind)} · {versionNote(version)}
+                {versionLabel(version)} · {versionNote(version)}
               </span>
               <VersionBadges version={version} />
             </span>

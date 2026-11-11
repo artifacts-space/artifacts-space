@@ -43,9 +43,9 @@ export interface MergeTarget {
   saveKind: VersionSaveKind;
 }
 
-/** Save kinds that may merge into the latest version. Restores and snapshots always stand alone. */
+/** Save kinds that may merge into the latest version. Restores, replaced files, and snapshots always stand alone. */
 const mergingKinds: ReadonlySet<VersionSaveKind> = new Set(["edit", "files"]);
-/** Versions a later save may merge into. A restore stays visible as its own entry. */
+/** Versions a later save may merge into. A restore or a replaced file stays visible as its own entry. */
 const mergeableKinds: ReadonlySet<VersionSaveKind> = new Set(["create", "edit", "files"]);
 
 /** One save, as the merge rule sees it. `session` is set for web editor autosaves only. */

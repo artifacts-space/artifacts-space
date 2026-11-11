@@ -6,6 +6,7 @@ import { getDb } from "@/db";
 import { artifact, artifactVersion, sharingRequest, type ArtifactRecord, type ArtifactVersionRecord } from "@/db/schema";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 import type { VersionSaveKind } from "@/lib/artifact-types";
+import { pruneFileCopiesQuietly } from "@/lib/files/copies";
 import { pruneUnusedContentFilesQuietly, pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { dropsShownImage } from "@/lib/files/icon-cleanup-rules";
 import { restampTo, stampColumns, stampOf, type HarnessStamp } from "@/lib/harness/harness-rules";
@@ -166,7 +167,8 @@ function droppedImages(rows: readonly { icon: string | null; cover: string | nul
 
 /**
  * Deletes the versions of one artifact that retention lets go, then the icon
- * and cover images, and the removed media, only those versions showed.
+ * and cover images, the removed media, and the old copies of replaced files
+ * only those versions showed.
  * Returns how many versions went.
  */
 export async function pruneArtifactVersions(artifactId: string, now: Date = new Date()): Promise<number> {
@@ -187,13 +189,14 @@ export async function pruneArtifactVersions(artifactId: string, now: Date = new 
   const images = droppedImages(versions.filter((version) => dropped.has(version.id)));
   if (images.length > 0) await pruneUnusedIconFilesQuietly(artifactId, images);
   await pruneUnusedContentFilesQuietly(artifactId);
+  await pruneFileCopiesQuietly(artifactId);
   return prunable.length;
 }
 
 /** The most versions one cleanup run deletes. The next run continues. */
 export const versionCleanupBatchSize = 1000;
 
-/** Removes the icon and cover images, and the removed media, that only the dropped versions showed, one artifact at a time. */
+/** Removes the icon and cover images, the removed media, and the old file copies that only the dropped versions showed, one artifact at a time. */
 async function pruneDroppedFiles(rows: readonly { artifact_id: string; icon: string | null; cover: string | null }[]): Promise<void> {
   const byArtifact = new Map<string, { icon: string | null; cover: string | null }[]>();
   for (const row of rows) byArtifact.set(row.artifact_id, [...(byArtifact.get(row.artifact_id) ?? []), row]);
@@ -201,6 +204,7 @@ async function pruneDroppedFiles(rows: readonly { artifact_id: string; icon: str
     const images = droppedImages(dropped);
     if (images.length > 0) await pruneUnusedIconFilesQuietly(artifactId, images);
     await pruneUnusedContentFilesQuietly(artifactId);
+    await pruneFileCopiesQuietly(artifactId);
   }
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { saveKindLabel, versionBadges, versionNote } from "./version-labels";
+import { saveKindLabel, versionBadges, versionLabel, versionNote } from "./version-labels";
 
 describe("version labels", () => {
   it("should describe the format and size when given a version", () => {
@@ -14,5 +14,14 @@ describe("version labels", () => {
 
   it("should name a restore plainly when asked for its label", () => {
     expect(saveKindLabel("restore")).toBe("Restored an older version");
+  });
+
+  it("should name the replaced file when a version replaced one", () => {
+    expect(versionLabel({ saveKind: "replace", replacedFile: "sow.pdf" })).toBe("Replaced sow.pdf");
+  });
+
+  it("should fall back to a plain label when the replaced file's old copy is gone", () => {
+    expect(versionLabel({ saveKind: "replace", replacedFile: null })).toBe("Replaced a file");
+    expect(versionLabel({ saveKind: "edit", replacedFile: "sow.pdf" })).toBe("Edited");
   });
 });

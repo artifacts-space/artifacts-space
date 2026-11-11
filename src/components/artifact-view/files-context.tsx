@@ -16,6 +16,13 @@ interface ArtifactFilesValue {
 }
 
 const defaultUrlFor: FileUrlBuilder = (fileId, download) => fileUrl(fileId, { download });
+
+/** The access-checked URLs, each with its file's replace time, so a browser never opens a replaced file's old content from its redirect cache. */
+function urlsFor(files: ReadonlyMap<string, FileDto> | null): FileUrlBuilder {
+  if (!files) return defaultUrlFor;
+  return (fileId, download) => fileUrl(fileId, { download, replacedAt: files.get(fileId)?.replacedAt });
+}
+
 const ArtifactFilesContext = createContext<ArtifactFilesValue>({ list: null, files: null, urlFor: defaultUrlFor });
 
 /**
@@ -24,7 +31,10 @@ const ArtifactFilesContext = createContext<ArtifactFilesValue>({ list: null, fil
  */
 export function ArtifactFilesProvider({ files, urlFor, children }: { files: readonly FileDto[] | undefined; urlFor?: FileUrlBuilder | undefined; children: ReactNode }) {
   const value = useMemo<ArtifactFilesValue>(
-    () => ({ list: files ?? null, files: files ? new Map(files.map((file) => [file.id, file])) : null, urlFor: urlFor ?? defaultUrlFor }),
+    () => {
+      const byId = files ? new Map(files.map((file) => [file.id, file])) : null;
+      return { list: files ?? null, files: byId, urlFor: urlFor ?? urlsFor(byId) };
+    },
     [files, urlFor],
   );
   return <ArtifactFilesContext.Provider value={value}>{children}</ArtifactFilesContext.Provider>;

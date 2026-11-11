@@ -141,7 +141,7 @@ For a self-hosted instance, replace `https://artifacts.space` with your origin.
 | Versions | `artifacts_versions`, `artifacts_restore_version` |
 | Views of public artifacts | `artifacts_views` |
 | Formats | `artifacts_formats_guide`, `artifacts_validate` |
-| Files | `files_request_upload`, `files_finalize`, `files_create_artifact`, `files_attach`, `files_get_download_url`, `files_delete` |
+| Files | `files_request_upload`, `files_finalize`, `files_create_artifact`, `files_attach`, `files_replace`, `files_get_download_url`, `files_delete` |
 | Comments and inbox | `inbox_list`, `inbox_mark_read`, `comments_list`, `comment_create`, `comment_update`, `comment_delete` |
 
 Artifacts are identified by their 22-character public id, the same one as in

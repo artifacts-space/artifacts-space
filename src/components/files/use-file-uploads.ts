@@ -26,6 +26,8 @@ let nextKey = 0;
 export interface UploadProgress {
   progress: (percent: number) => void;
   checking: () => void;
+  /** The upload's id, as soon as the server started it, so a caller can discard an upload that stops part way. */
+  started?: (fileId: string) => void;
 }
 
 /** Sends one file and returns it once the server has checked it. */
@@ -35,6 +37,7 @@ export type SendFile = (file: File, report: UploadProgress) => Promise<ActionRes
 export const sendToServer: SendFile = async (file, report) => {
   const ticket = await requestUploadAction({ filename: file.name, contentType: file.type, size: file.size });
   if (!ticket.success) return ticket;
+  report.started?.(ticket.data.fileId);
   await putFile(ticket.data.url, ticket.data.headers, file, report.progress);
   report.checking();
   return finalizeUploadAction(ticket.data.fileId);
