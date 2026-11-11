@@ -6,6 +6,9 @@ import { team, user } from "./schema";
  * A member closed the welcome card in one team's workspace
  * (src/lib/teams/welcome.ts). One row per person and team, so the card
  * stays closed on every device. Only the card changes; access stays the same.
+ * The row outlives a membership on purpose: a close counts only when it is
+ * newer than the membership (welcome-rules.ts), so someone removed and
+ * invited again is welcomed again, and closing it then moves `created_at`.
  */
 export const teamWelcomeDismissal = pgTable(
   "team_welcome_dismissal",

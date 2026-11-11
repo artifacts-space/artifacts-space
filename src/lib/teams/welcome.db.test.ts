@@ -13,7 +13,7 @@ const databaseUrl = process.env.TEST_DATABASE_URL;
 if (databaseUrl) process.env.DATABASE_URL = databaseUrl;
 
 describe.runIf(Boolean(databaseUrl))("team welcome with a database", async () => {
-  const { inArray } = await import("drizzle-orm");
+  const { and, eq, inArray } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
   const { team, teamMember, user } = await import("@/db/schema");
   const { teamWelcomeDismissal } = await import("@/db/team-welcome-schema");
@@ -67,5 +67,17 @@ describe.runIf(Boolean(databaseUrl))("team welcome with a database", async () =>
     expect(await dismissTeamWelcome(member, teamId)).toBe(true);
     expect(await shouldWelcome(member, teamId)).toBe(false);
     expect(await shouldWelcome(member, otherTeam)).toBe(true);
+  });
+
+  it("should welcome a person again when they rejoin after closing the card, and keep the new close", async () => {
+    const db = getDb();
+    const hourAgo = new Date(Date.now() - 3_600_000);
+    // The close belongs to the first membership, an hour ago; the person was then removed and joined again a minute ago.
+    await db.update(teamWelcomeDismissal).set({ createdAt: hourAgo }).where(and(eq(teamWelcomeDismissal.userId, member), eq(teamWelcomeDismissal.teamId, teamId)));
+    await db.delete(teamMember).where(eq(teamMember.id, id("m-member")));
+    await db.insert(teamMember).values({ id: id("m-member-again"), teamId, userId: member, role: "member", createdAt: new Date(Date.now() - 60_000) });
+    expect(await shouldWelcome(member, teamId)).toBe(true);
+    expect(await dismissTeamWelcome(member, teamId)).toBe(true);
+    expect(await shouldWelcome(member, teamId)).toBe(false);
   });
 });

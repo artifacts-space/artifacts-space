@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { team, teamMember } from "@/db/schema";
@@ -27,13 +27,14 @@ export function teamWelcomeQuery(db: Db, userId: string, teamId: string) {
 export async function shouldWelcome(userId: string, teamId: string, now = new Date()): Promise<boolean> {
   const [row] = await teamWelcomeQuery(getDb(), userId, teamId);
   if (!row) return false;
-  return showTeamWelcome({ userId, personal: row.personal, createdBy: row.createdBy, joinedAt: row.joinedAt, dismissed: row.dismissedAt !== null }, now);
+  return showTeamWelcome({ userId, personal: row.personal, createdBy: row.createdBy, joinedAt: row.joinedAt, dismissedAt: row.dismissedAt }, now);
 }
 
 /**
  * Closes the welcome card for this member of this team, on every device.
  * Returns false, saving nothing, when they are not in the team. Saving it
- * twice is harmless.
+ * twice is harmless. A row from an earlier membership is moved to now, so
+ * the close counts for the current one.
  */
 export async function dismissTeamWelcome(userId: string, teamId: string): Promise<boolean> {
   const db = getDb();
@@ -43,6 +44,9 @@ export async function dismissTeamWelcome(userId: string, teamId: string): Promis
     .where(and(eq(teamMember.userId, userId), eq(teamMember.teamId, teamId)))
     .limit(1);
   if (!member) return false;
-  await db.insert(teamWelcomeDismissal).values({ userId, teamId }).onConflictDoNothing();
+  await db
+    .insert(teamWelcomeDismissal)
+    .values({ userId, teamId })
+    .onConflictDoUpdate({ target: [teamWelcomeDismissal.userId, teamWelcomeDismissal.teamId], set: { createdAt: sql`now()` } });
   return true;
 }

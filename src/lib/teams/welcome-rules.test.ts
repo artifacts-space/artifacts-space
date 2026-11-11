@@ -9,7 +9,7 @@ const facts = (overrides: Partial<TeamWelcomeFacts> = {}): TeamWelcomeFacts => (
   personal: false,
   createdBy: "owner-1",
   joinedAt: daysAgo(0),
-  dismissed: false,
+  dismissedAt: null,
   ...overrides,
 });
 
@@ -23,7 +23,11 @@ describe("showTeamWelcome", () => {
   });
 
   it("should hide the card when the member closed it", () => {
-    expect(showTeamWelcome(facts({ dismissed: true }), now)).toBe(false);
+    expect(showTeamWelcome(facts({ joinedAt: daysAgo(2), dismissedAt: daysAgo(1) }), now)).toBe(false);
+  });
+
+  it("should show the card again when the person rejoined after closing it in an earlier membership", () => {
+    expect(showTeamWelcome(facts({ joinedAt: daysAgo(1), dismissedAt: daysAgo(3) }), now)).toBe(true);
   });
 
   it("should hide the card when the member joined before the welcome window", () => {

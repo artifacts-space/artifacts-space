@@ -1,3 +1,4 @@
+import { createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -13,10 +14,11 @@ const { TeamWelcome } = await import("./team-welcome");
 
 const design: ShareTeam = { id: "t1", slug: "design", name: "Design", personal: false, role: "member", ...defaultActor("member"), teamSharingNeedsApproval: false };
 const save = () => Promise.resolve({ success: true as const, data: null });
+const heading = createRef<HTMLElement>();
 
 describe("TeamWelcome", () => {
   it("should lead with what the member can do, then the outside rule, then the actions when the server shows it", () => {
-    const html = renderToStaticMarkup(<TeamWelcome team={design} initial dismiss={save} />);
+    const html = renderToStaticMarkup(<TeamWelcome team={design} initial dismiss={save} focusAfter={heading} />);
     expect(html).toContain("Welcome to Design");
     const copy = html.indexOf("You can edit the team&#x27;s artifacts right away.");
     const outside = html.indexOf("Sharing by link or in public needs approval");
@@ -28,11 +30,11 @@ describe("TeamWelcome", () => {
   });
 
   it("should render nothing when the server hides it", () => {
-    expect(renderToStaticMarkup(<TeamWelcome team={design} initial={false} dismiss={save} />)).toBe("");
-    expect(renderToStaticMarkup(<TeamWelcome team={design} initial={undefined} dismiss={undefined} />)).toBe("");
+    expect(renderToStaticMarkup(<TeamWelcome team={design} initial={false} dismiss={save} focusAfter={heading} />)).toBe("");
+    expect(renderToStaticMarkup(<TeamWelcome team={design} initial={undefined} dismiss={undefined} focusAfter={heading} />)).toBe("");
   });
 
   it("should render nothing on the viewer's own workspace", () => {
-    expect(renderToStaticMarkup(<TeamWelcome team={null} initial dismiss={save} />)).toBe("");
+    expect(renderToStaticMarkup(<TeamWelcome team={null} initial dismiss={save} focusAfter={heading} />)).toBe("");
   });
 });

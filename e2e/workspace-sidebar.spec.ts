@@ -146,7 +146,17 @@ test("should show a new member's welcome card on the team workspace until they c
 
   await card.getByRole("button", { name: "Got it" }).click();
   await expect(card).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "Shared with Design" }), "focus lands on the workspace heading, not the page body").toBeFocused();
   await expect(page.getByText("Checkout v2 rollout").first(), "the workspace stays open").toBeVisible();
+});
+
+test("should bring the welcome card back with the error when closing it cannot be saved", async ({ page }) => {
+  await page.goto("/dev/workspace?scopes=1&team=fixture-shared-0&welcome=fails");
+  const card = slot(page, "team-welcome");
+  await expect(card.getByRole("heading", { name: "Welcome to Design" })).toBeVisible();
+  await card.getByRole("button", { name: "Got it" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Could not close the welcome. Try again." })).toBeVisible();
+  await expect(card.getByRole("heading", { name: "Welcome to Design" }), "the card comes back, so it is not silently lost").toBeVisible();
 });
 
 test("should show no welcome card on the viewer's own workspace or when the server hides it", async ({ page }) => {

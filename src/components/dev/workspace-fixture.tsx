@@ -108,8 +108,12 @@ function withTeamArtifact(artifacts: ArtifactDto[], scopes: boolean): ArtifactDt
   return artifacts.map((artifact) => (artifact.id === "fixture-note-5" ? { ...artifact, visibility: "team", teamId: "fixture-shared-0" } : artifact));
 }
 
-/** "Got it" on the welcome card saves nothing here: the fixture has no database. */
+/** The welcome card: hidden, shown, or shown with a "Got it" save that is refused. */
+export type FixtureWelcome = "off" | "on" | "fails";
+
+/** "Got it" on the welcome card saves nothing here (the fixture has no database), or is refused. */
 const fixtureDismissWelcome = () => Promise.resolve({ success: true as const, data: null });
+const fixtureRefusedWelcome = () => Promise.resolve({ success: false as const, error: "Could not close the welcome. Try again." });
 
 /** The viewer's teams, with the shared ones under `scopes`, and the one `team` opens as the scope. */
 function fixtureScope(scopes: boolean, team: string | null): { teams: ShareTeam[]; scopeTeam: ShareTeam | null } {
@@ -129,9 +133,10 @@ function fixtureScope(scopes: boolean, team: string | null): { teams: ShareTeam[
  * opened, and the load waits until a test releases it (`window.fixture`).
  * `many` adds 300 older notes, so the list holds the newest 100 as on /app,
  * and `tags` filters the list as the URL's tag filter does. `welcome` shows
- * a new member's welcome card on the team workspace `team` opens.
+ * a new member's welcome card on the team workspace `team` opens; with
+ * "fails", its "Got it" save is refused.
  */
-export function WorkspaceFixture({ projectFilter, link = null, linkFailed = false, slowLoad = false, scopes = false, team = null, many = false, tags = noTags, welcome = false }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null; linkFailed?: boolean; slowLoad?: boolean; scopes?: boolean; team?: string | null; many?: boolean; tags?: string[]; welcome?: boolean }) {
+export function WorkspaceFixture({ projectFilter, link = null, linkFailed = false, slowLoad = false, scopes = false, team = null, many = false, tags = noTags, welcome = "off" }: { projectFilter: ProjectFilter | null; link?: ArtifactLink | null; linkFailed?: boolean; slowLoad?: boolean; scopes?: boolean; team?: string | null; many?: boolean; tags?: string[]; welcome?: FixtureWelcome }) {
   const inBrowser = useInBrowser();
   // Artifacts New artifact stored in this tab come first, as the server would list them after a reload.
   const stored = useMemo(() => (inBrowser ? storedFixtureArtifacts() : []), [inBrowser]);
@@ -177,8 +182,8 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
           linkTarget={linkTarget}
           linkFailed={linkFailed}
           newArtifactApi={fixtureNewArtifactApi}
-          welcome={welcome}
-          dismissWelcome={fixtureDismissWelcome}
+          welcome={welcome !== "off"}
+          dismissWelcome={welcome === "fails" ? fixtureRefusedWelcome : fixtureDismissWelcome}
         />
       </div>
     </ConfirmationsProvider>

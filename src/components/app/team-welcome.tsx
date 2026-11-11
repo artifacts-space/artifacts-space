@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type RefObject } from "react";
 import { toast } from "sonner";
 
 import { dismissTeamWelcomeAction } from "@/app/(workspace)/app/welcome-actions";
@@ -19,14 +19,16 @@ export type DismissWelcome = (teamId: string) => Promise<ActionResult<null>>;
 export const serverDismissWelcome: DismissWelcome = (teamId) => dismissTeamWelcomeAction(teamId);
 
 /**
- * Whether the card shows, and the one-click close. It closes at once; when
- * the save fails, it comes back with the error, so the member knows it would
- * show again next time.
+ * Whether the card shows, and the one-click close. It closes at once and
+ * moves focus to `focusAfter`, so keyboard and screen reader users keep
+ * their place; when the save fails, it comes back with the error, so the
+ * member knows it would show again next time.
  */
-function useTeamWelcome(initial: boolean, teamId: string, save: DismissWelcome) {
+function useTeamWelcome(initial: boolean, teamId: string, save: DismissWelcome, focusAfter: RefObject<HTMLElement | null>) {
   const [shown, setShown] = useState(initial);
   async function dismiss() {
     setShown(false);
+    focusAfter.current?.focus();
     const result = await settle(save(teamId), "Could not close the welcome. Try again.");
     if (result.success) return;
     setShown(true);
@@ -47,7 +49,7 @@ function TeamWelcomeCard({ team, onDismiss }: { team: ShareTeam; onDismiss: () =
       <p className="mt-1 max-w-prose text-sm leading-5 text-muted-foreground">{welcome.description}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button className={actionSize} onClick={onDismiss}>Got it</Button>
-        {/* A real link, so it reads as one and opens in a new tab: the team page's "How this team works" card. */}
+        {/* A real link, not a button, so it reads as one and middle-click works: the team page's "How this team works" card. */}
         <Link href={`/teams/${team.slug}`} className={buttonVariants({ variant: "ghost", className: actionSize })}>How this team works</Link>
       </div>
     </section>
@@ -61,6 +63,8 @@ interface TeamWelcomeProps {
   initial: boolean | undefined;
   /** Left out, the server action saves the close. */
   dismiss: DismissWelcome | undefined;
+  /** Where focus goes when the card closes: the workspace's heading. */
+  focusAfter: RefObject<HTMLElement | null>;
 }
 
 /**
@@ -68,8 +72,8 @@ interface TeamWelcomeProps {
  * they close it, and the close is saved for them in this team on every
  * device. The server decides who sees it (src/lib/teams/welcome-rules.ts).
  */
-export function TeamWelcome({ team, initial = false, dismiss = serverDismissWelcome }: TeamWelcomeProps) {
-  const welcome = useTeamWelcome(initial, team?.id ?? "", dismiss);
+export function TeamWelcome({ team, initial = false, dismiss = serverDismissWelcome, focusAfter }: TeamWelcomeProps) {
+  const welcome = useTeamWelcome(initial, team?.id ?? "", dismiss, focusAfter);
   if (!team || !welcome.shown) return null;
   return (
     <div className="border-b bg-background p-3 sm:px-4">
