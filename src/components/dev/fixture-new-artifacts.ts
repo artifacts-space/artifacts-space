@@ -24,7 +24,7 @@ const holdUploadsKey = "fixture:hold-uploads";
 const holdCreateKey = "fixture:hold-create";
 /** Set to "1" by a test to hold attaches until it dispatches `fixture:release-attach`. */
 const holdAttachKey = "fixture:hold-attach";
-/** Set by a test for the next attach: "refuse" answers no; "lose" attaches the files and then loses the answer; "lose-always" loses every answer; "vanish-always" loses every answer without attaching. */
+/** Set by a test for the next attach: "refuse" answers no; "lose" attaches the files and then loses the answer; "lose-always" loses every answer; "vanish" loses the answer without attaching ("vanish-always" every one). A comma list sets several in turn. */
 const nextAttachKey = "fixture:next-attach";
 /** The uploads deleted so far, so a test can check that none it kept was deleted. */
 const discardedKey = "fixture:discarded";
@@ -53,11 +53,14 @@ function gate(key: string, release: string): Promise<void> {
   });
 }
 
-/** Reads a one-time flag and clears it. */
+/** Reads a one-time flag and clears it. A value ending in "always" stays; a comma list ("vanish,refuse") gives one value per call. */
 function takeFlag(key: string): string | null {
   const value = readFlag(key);
-  if (value !== null && !value.endsWith("always")) window.sessionStorage.removeItem(key);
-  return value;
+  if (value === null || value.endsWith("always")) return value;
+  const [first = "", ...rest] = value.split(",");
+  if (rest.length > 0) window.sessionStorage.setItem(key, rest.join(","));
+  else window.sessionStorage.removeItem(key);
+  return first;
 }
 
 function recordDiscard(fileId: string) {
@@ -167,7 +170,7 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     await gate(holdAttachKey, "fixture:release-attach");
     const next = takeFlag(nextAttachKey);
     if (next === "refuse") return { success: false, error: "The files could not be added. Try again." };
-    if (next === "vanish-always") throw new Error("The answer was lost.");
+    if (next === "vanish" || next === "vanish-always") throw new Error("The answer was lost.");
     const current = readStored().find((entry) => entry.id === artifactId);
     if (!current) return { success: false, error: "Artifact not found." };
     // As the server does: a file already in this artifact is not added twice.

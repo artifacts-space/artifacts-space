@@ -18,7 +18,6 @@ const blankPage = (page: Page) => page.getByRole("region", { name: "New artifact
 const body = (page: Page) => page.getByRole("region", { name: "Content" });
 const notSaved = (page: Page) => page.getByRole("status").filter({ hasText: "Not saved." });
 const attachProblem = "The files could not be added. Drop them again to try once more.";
-const attachUnknown = "We could not confirm the files were added. Check the Files section before adding them again.";
 const attachUnknownStale = "We could not confirm the files were added. Reload the page and check Files before adding them again.";
 
 async function openNewArtifact(page: Page) {
@@ -85,42 +84,65 @@ test("should keep a file whose attach is still on its way when the page is left"
   expect(await discarded(page)).toEqual([]);
 });
 
-test("should show the file once when an attach answer is lost and the check finds it attached", async ({ page }) => {
+/**
+ * After an attach settles, however it settled: its rows have left the
+ * Uploads list (nothing is stuck Checking, so the page is not busy), and a
+ * file dropped next still uploads and is attached.
+ */
+async function expectSettledAndNextDropAttaches(page: Page) {
+  await expect(page.getByRole("list", { name: "Uploads" })).toHaveCount(0);
+  await page.evaluate(() => {
+    for (const key of ["fixture:next-attach", "fixture:fail-load", "fixture:hold-load"]) window.sessionStorage.removeItem(key);
+  });
+  await dropFiles(body(page), ["Next.pdf"]);
+  await expect.poll(async () => (await storedNew(page))[0]?.files.map((file) => file.filename) ?? [], { timeout: 15_000 }).toContain("Next.pdf");
+  await expect(page.getByRole("list", { name: "Uploads" })).toHaveCount(0);
+}
+
+test("should show the file once, clear the list, and take the next drop when a lost answer's check finds it attached", async ({ page }) => {
   await openNewArtifact(page);
   await storeWithTitle(page, "Lost answer");
   await setFlag(page, "fixture:next-attach", "lose");
   await dropFiles(body(page), ["Maybe.pdf"]);
   await expect(page.getByRole("region", { name: "Files" })).toContainText("1 attached");
   await expect(page.getByText(attachProblem, { exact: true })).toHaveCount(0);
-  await expect(page.getByText(attachUnknown, { exact: true })).toHaveCount(0);
   expect((await storedNew(page))[0]?.files, "the check adds no second copy").toHaveLength(1);
+  await expectSettledAndNextDropAttaches(page);
   expect(await discarded(page)).toEqual([]);
 });
 
-test("should load the artifact again when every attach answer is lost, and show the file it has", async ({ page }) => {
+test("should delete the file, say so, and take the next drop when a lost answer's check is refused", async ({ page }) => {
+  await openNewArtifact(page);
+  await storeWithTitle(page, "Lost then refused");
+  await setFlag(page, "fixture:next-attach", "vanish,refuse");
+  await dropFiles(body(page), ["Refused.pdf"]);
+  await expect(page.getByText(attachProblem, { exact: true })).toBeVisible();
+  await expect.poll(async () => (await discarded(page)).length).toBe(1);
+  await expectSettledAndNextDropAttaches(page);
+  expect((await storedNew(page))[0]?.files.map((file) => file.filename)).toEqual(["Next.pdf"]);
+});
+
+test("should load the artifact again when every attach answer is lost, show the file it has, and take the next drop", async ({ page }) => {
   await openNewArtifact(page);
   await storeWithTitle(page, "Lost twice");
   await setFlag(page, "fixture:next-attach", "lose-always");
   await dropFiles(body(page), ["Maybe.pdf"]);
   // The answers were lost, but the artifact loaded again has the file: the Files section shows it, and nothing more needs saying.
-  await expect(page.getByRole("region", { name: "Files" })).toContainText("1 attached");
   await expect(page.getByRole("region", { name: "Files" })).toContainText("Maybe.pdf");
   await expect(page.getByText(attachProblem, { exact: true }), "not told to drop it again").toHaveCount(0);
-  await expect(page.getByText(attachUnknown, { exact: true })).toHaveCount(0);
-  await cards(page, "Long ui fixture").click();
-  await expect(page.getByRole("region", { name: "Edit Long ui fixture" })).toBeVisible();
-  expect((await storedNew(page))[0]?.files).toHaveLength(1);
+  await expectSettledAndNextDropAttaches(page);
   expect(await discarded(page)).toEqual([]);
 });
 
-test("should keep a title-only page as Markdown when the answers are lost and the artifact does not have the file", async ({ page }) => {
+test("should delete a file the loaded artifact does not have, keep a title-only page as Markdown, and take the next drop", async ({ page }) => {
   await openNewArtifact(page);
   await storeWithTitle(page, "Not there");
   await setFlag(page, "fixture:next-attach", "vanish-always");
   await dropFiles(body(page), ["Missing.pdf"]);
   await expect(page.getByText(attachProblem, { exact: true })).toBeVisible();
-  await expect(page.getByText(attachUnknown, { exact: true }), "no Files section to point at").toHaveCount(0);
   await expect(page.getByRole("region", { name: "Files" })).toHaveCount(0);
+  // Known not to be in the artifact once it is loaded again, so the upload goes (the delete is guarded).
+  await expect.poll(async () => (await discarded(page)).length).toBe(1);
   // Typing saves the page: it stays Markdown, never an empty Files artifact.
   await body(page).locator('[contenteditable="true"]').click();
   await page.keyboard.type("Still writing");
@@ -128,7 +150,7 @@ test("should keep a title-only page as Markdown when the answers are lost and th
   const [stored] = await storedNew(page);
   expect(stored?.kind).toBe("markdown");
   expect(stored?.files).toHaveLength(0);
-  expect(await discarded(page), "an unknown outcome never deletes").toEqual([]);
+  await expectSettledAndNextDropAttaches(page);
 });
 
 test("should show a file as Checking while a lost answer is checked, and queue a drop made meanwhile", async ({ page }) => {
@@ -152,20 +174,41 @@ test("should show a file as Checking while a lost answer is checked, and queue a
   });
   await expect(page.getByRole("region", { name: "Files" })).toContainText("2 attached", { timeout: 15_000 });
   expect((await storedNew(page))[0]?.files.map((file) => file.filename).sort()).toEqual(["First.pdf", "Second.pdf"]);
-  await expect(page.getByText(attachUnknown, { exact: true })).toHaveCount(0);
+  await expect(uploadsList).toHaveCount(0);
   expect(await discarded(page)).toEqual([]);
 });
 
-test("should ask for a reload when the answers are lost and the artifact cannot be loaded either", async ({ page }) => {
+test("should ask for a reload, keep the file, and take the next drop when the answers are lost and the artifact cannot be loaded", async ({ page }) => {
   await openNewArtifact(page);
   await storeWithTitle(page, "Offline");
   await setFlag(page, "fixture:next-attach", "lose-always");
   await setFlag(page, "fixture:fail-load", "1");
   await dropFiles(body(page), ["Maybe.pdf"]);
   await expect(page.getByText(attachUnknownStale, { exact: true })).toBeVisible();
-  await expect(page.getByText(attachUnknown, { exact: true })).toHaveCount(0);
   expect((await storedNew(page))[0]?.files).toHaveLength(1);
-  expect(await discarded(page)).toEqual([]);
+  await expectSettledAndNextDropAttaches(page);
+  expect(await discarded(page), "an unknown outcome never deletes").toEqual([]);
+});
+
+test("should keep a file being checked when the page is left, with no prompt", async ({ page }) => {
+  await openNewArtifact(page);
+  await storeWithTitle(page, "Left while checking");
+  await setFlag(page, "fixture:next-attach", "lose-always");
+  await setFlag(page, "fixture:hold-load", "1");
+  await dropFiles(body(page), ["Pending.pdf"]);
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem("fixture:hold-load:waiting")), { timeout: 15_000 }).toBe("1");
+  let prompted = false;
+  page.on("dialog", (dialog) => { prompted = true; void dialog.dismiss(); });
+  await cards(page, "Long ui fixture").click();
+  await expect(page.getByRole("region", { name: "Edit Long ui fixture" })).toBeVisible();
+  await page.evaluate(() => {
+    window.sessionStorage.removeItem("fixture:hold-load");
+    window.dispatchEvent(new Event("fixture:release-load"));
+  });
+  await expect(page.getByRole("region", { name: "Edit Long ui fixture" })).toBeVisible();
+  expect(prompted, "moving to another artifact never asks").toBe(false);
+  expect((await storedNew(page))[0]?.files).toHaveLength(1);
+  expect(await discarded(page), "a file still being checked is never deleted").toEqual([]);
 });
 
 test("should keep a CSV page's formatting read-only until the page is stored", async ({ page }) => {

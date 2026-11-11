@@ -46,9 +46,9 @@ function asFiles(draft: ArtifactDraft, names: readonly string[]): ArtifactDraft 
 }
 
 const attachFailed = "The files could not be added. Drop them again to try once more.";
-/** The answer was lost twice and the artifact, loaded again, has some of them: its Files section shows which. */
-const attachUnknown = "We could not confirm the files were added. Check the Files section before adding them again.";
-/** As above, but the artifact could not be loaded either, so the Files section may be out of date. */
+/** The answers were lost and the artifact, loaded again, has only some of them: its Files section shows which. */
+const attachPartial = "Some files could not be added. The Files section shows the ones that were; drop the others again.";
+/** The answers were lost and the artifact could not be loaded either, so the Files section may be out of date. */
 const attachUnknownStale = "We could not confirm the files were added. Reload the page and check Files before adding them again.";
 
 type Uploads = ReturnType<typeof useFileUploads>;
@@ -82,18 +82,21 @@ interface Settled {
   loaded: ArtifactDto | null;
   /** The files the loaded artifact holds. */
   landed: string[];
-  /** What to tell the person; null when the artifact holds every file, and "could not be added" when it holds none (it has no Files section to check then). */
+  /** Files the loaded artifact does not hold: known not to be in it, so they can go (the delete is guarded). */
+  missing: string[];
+  /** What to tell the person; null when the artifact holds every file. */
   message: string | null;
 }
 
 /** After every attach answer was lost: loads the artifact as it is now, so its Files section can show the truth. */
 async function settleUnknownAttach(api: Api, publicId: string, ids: readonly string[]): Promise<Settled> {
   const result = await api.load(publicId).catch(() => null);
-  if (!result?.success) return { loaded: null, landed: [], message: attachUnknownStale };
+  if (!result?.success) return { loaded: null, landed: [], missing: [], message: attachUnknownStale };
   const have = new Set(result.data.files.map((file) => file.id));
   const landed = ids.filter((id) => have.has(id));
-  if (landed.length === ids.length) return { loaded: result.data, landed, message: null };
-  return { loaded: result.data, landed, message: landed.length > 0 ? attachUnknown : attachFailed };
+  const missing = ids.filter((id) => !have.has(id));
+  if (missing.length === 0) return { loaded: result.data, landed, missing, message: null };
+  return { loaded: result.data, landed, missing, message: landed.length > 0 ? attachPartial : attachFailed };
 }
 
 /** Where an attach's outcome goes: files that landed (the page may become a Files page), or the artifact as it is, with no file of the batch. */
@@ -106,10 +109,13 @@ interface AttachOutcomes {
  * Attaches finished files to the stored artifact. A refusal deletes them
  * (they are in no artifact). A lost answer is checked once more
  * (attachWithRecheck) and, if it stays unknown, the artifact is loaded again
- * (settleUnknownAttach); until then the files show as Checking, and new
- * drops wait. Files whose outcome stays unknown are kept and never deleted
- * from here. `round` changes after each attach, so files that finished
- * meanwhile are taken next.
+ * (settleUnknownAttach): files it holds are done, files it lacks go (the
+ * delete is guarded, so a late attach keeps its file), and if it cannot be
+ * loaded the files are kept, held, and never deleted from here. Until the
+ * outcome is known the files show as Checking and new drops wait; every way
+ * out takes them off the list (the finally), so the list is never left busy.
+ * `round` changes after each attach, so files that finished meanwhile are
+ * taken next.
  */
 function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, holdRef: React.RefObject<Set<string>>, outcomes: AttachOutcomes) {
   const [problem, setProblem] = useState<string | null>(null);
@@ -125,10 +131,10 @@ function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, h
     };
     const settle = async () => {
       const settled = await settleUnknownAttach(api, stored.publicId, ids);
-      // Files the artifact holds are settled; the rest stay held, never deleted from here.
-      for (const id of settled.landed) holdRef.current.delete(id);
+      // Known either way once loaded: files it holds are done, files it lacks go. Unloaded, they stay held.
+      for (const id of [...settled.landed, ...settled.missing]) holdRef.current.delete(id);
+      discardAll(api, settled.missing);
       if (settled.loaded) (settled.landed.length > 0 ? attached : refreshed)(settled.loaded);
-      dropFromList();
       setProblem(settled.message);
     };
     void attachWithRecheck(api, stored.id, ids, () => { uploadsRef.current.markChecking(ids); })
@@ -145,10 +151,11 @@ function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, h
         }
         // Refused: the files are in no artifact, so they go.
         setProblem(attachFailed);
-        dropFromList();
         discardAll(api, ids);
       })
       .finally(() => {
+        // Every way out, including an attach that answered after a lost one: the files leave the list, so it is never stuck busy.
+        dropFromList();
         attachingRef.current = false;
         setRound((count) => count + 1);
       });
