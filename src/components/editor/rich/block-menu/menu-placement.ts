@@ -16,6 +16,12 @@ export const menuEdge = 8;
 /** The room the menu keeps below the block when it opens beneath it. */
 export const fallbackRoom = 240;
 
+/** The block menu's width (set on its panel in block-menu.tsx), known before it opens. */
+export const menuWidth = 300;
+
+/** The shortest a menu gets when the window is short: its search and a few rows. */
+export const menuMinHeight = 160;
+
 /** A box in window coordinates. */
 export interface Box {
   left: number;
@@ -71,10 +77,30 @@ export function choosePlacement(rule: PlacementRule, reference: Pick<DOMRect, "l
  * menu beside it is top-aligned with the block, not the handle), and the
  * block's bottom (so a menu below it never covers the block). When the
  * block runs too far down the window to leave `fallbackRoom` beneath it, the
- * bottom rises to make that room, but never above the handle.
+ * bottom rises to make that room, but not above the handle. Opening scrolls
+ * the handle up to make that room first (`scrollForRoom`); only where the
+ * page cannot scroll further (its very end) does the bottom rise past the
+ * handle, just enough for a `menuMinHeight` menu, so the menu stays on screen.
  */
 export function handleBox(handle: Box, block: Box | null, viewportHeight: number): Box {
-  if (!block || block.bottom <= block.top) return handle;
+  const onScreen = viewportHeight - menuEdge - menuGap - menuMinHeight;
+  if (!block || block.bottom <= block.top) return { ...handle, bottom: Math.min(handle.bottom, onScreen) };
   const lowest = viewportHeight - menuEdge - menuGap - fallbackRoom;
-  return { left: handle.left, right: handle.right, top: block.top, bottom: Math.max(handle.bottom, Math.min(block.bottom, lowest)) };
+  const bottom = Math.max(handle.bottom, Math.min(block.bottom, lowest));
+  return { left: handle.left, right: handle.right, top: block.top, bottom: Math.min(bottom, onScreen) };
+}
+
+/**
+ * How far to scroll the page down before the block menu opens below a
+ * block (the left has no room): enough, in whole pixels, to bring the
+ * block's bottom up so that `fallbackRoom` fits beneath it, but never so
+ * far that the handle leaves the top of the window (a tall block). Zero
+ * when the menu opens beside the handle, which slides up and down on its
+ * own.
+ */
+export function scrollForRoom(handle: Box, block: Box | null, width: number, viewportWidth: number, viewportHeight: number): number {
+  if (choosePlacement(besideRule, handle, width, viewportWidth) === besideRule.preferred) return 0;
+  const bottom = block && block.bottom > block.top ? Math.max(block.bottom, handle.bottom) : handle.bottom;
+  const needed = bottom - (viewportHeight - menuEdge - menuGap - fallbackRoom);
+  return Math.max(0, Math.ceil(Math.min(needed, handle.top - menuEdge)));
 }

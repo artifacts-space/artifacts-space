@@ -176,6 +176,17 @@ test.describe("block menu placement on a narrow window", () => {
     expect(overlaps(opened.menu, opened.handle)).toBe(false);
     expect(overlaps(opened.menu, opened.block)).toBe(false);
   });
+
+  test("should scroll to make room and open below a block near the bottom of the window", async ({ page }) => {
+    await page.goto("/dev/block-menu?doc=long");
+    // Opened from the bottom of the window, the page scrolls up just enough for the menu to fit below the block.
+    const opened = await openFrom(page, "Filler paragraph 30", "bottom");
+    expect(Math.abs(opened.menu.x - Math.max(opened.handle.x, edge))).toBeLessThanOrEqual(1);
+    expect(Math.abs(opened.menu.y - (opened.block.y + opened.block.height + gap))).toBeLessThanOrEqual(1);
+    expect(opened.menu.y + opened.menu.height).toBeLessThanOrEqual(opened.viewport.height - edge + 1);
+    expect(overlaps(opened.menu, opened.handle)).toBe(false);
+    expect(overlaps(opened.menu, opened.block)).toBe(false);
+  });
 });
 
 test.describe("block menu placement from a right-click", () => {

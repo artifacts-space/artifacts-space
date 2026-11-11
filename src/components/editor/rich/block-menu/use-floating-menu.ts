@@ -3,7 +3,7 @@
 import { autoUpdate, computePosition, offset, shift, size, type VirtualElement } from "@floating-ui/dom";
 import { useEffect, useLayoutEffect, useSyncExternalStore, type RefObject } from "react";
 
-import { choosePlacement, handleBox, menuEdge, menuGap, type PlacementRule } from "./menu-placement";
+import { choosePlacement, handleBox, menuEdge, menuGap, menuMinHeight, scrollForRoom, type PlacementRule } from "./menu-placement";
 
 /**
  * Where a menu opens: beside a block's handle (with the block, read each
@@ -49,7 +49,7 @@ const middleware = [
   size({
     padding: menuEdge,
     apply: ({ availableHeight, elements }) => {
-      elements.floating.style.maxHeight = `${String(Math.max(160, Math.min(availableHeight, 560)))}px`;
+      elements.floating.style.maxHeight = `${String(Math.max(menuMinHeight, Math.min(availableHeight, 560)))}px`;
     },
   }),
 ];
@@ -77,6 +77,21 @@ export function useFloatingMenu(floating: RefObject<HTMLElement | null>, anchor:
     };
     return autoUpdate(reference, element, update);
   }, [floating, anchor, rule, enabled]);
+}
+
+/**
+ * Before a menu from a grip opens below its block (the left has no room),
+ * scrolls the page so the menu fits under the block instead of past the
+ * window's bottom edge. Runs once as the menu opens, before it is placed.
+ */
+export function useRoomBelow(anchor: MenuAnchor, width: number, enabled: boolean) {
+  useLayoutEffect(() => {
+    if (!enabled || anchor.kind !== "element") return;
+    const root = document.documentElement;
+    const block = anchor.block?.()?.getBoundingClientRect() ?? null;
+    const by = scrollForRoom(anchor.element.getBoundingClientRect(), block, width, root.clientWidth, root.clientHeight);
+    if (by > 0) window.scrollBy({ top: by, behavior: "instant" });
+  }, [anchor, width, enabled]);
 }
 
 /** Closes a menu on a press anywhere outside the given elements. */
