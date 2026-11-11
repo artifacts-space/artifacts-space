@@ -20,15 +20,19 @@ import type * as VersionService from "@/lib/versions/service";
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (databaseUrl) process.env.DATABASE_URL = databaseUrl;
 
-const slow = vi.hoisted(() => ({ agentFilingMs: 0, skipLeasePrecheck: false }));
+const slow = vi.hoisted(() => ({ agentFilingMs: 0, skipLeasePrecheck: false, filingStarted: (): void => undefined }));
 
 // An agent's steps after its UPDATE (filing its version, approval) take as long as the test says.
+// `filingStarted` fires once the agent's UPDATE has landed, so a test can act in that window without guessing a delay.
 vi.mock("@/lib/versions/service", async (importOriginal) => {
   const real = await importOriginal<typeof VersionService>();
   return {
     ...real,
     recordArtifactSave: async (save: Parameters<typeof real.recordArtifactSave>[0]) => {
-      if (save.actor === "agent" && save.before && slow.agentFilingMs > 0) await new Promise((resolve) => setTimeout(resolve, slow.agentFilingMs));
+      if (save.actor === "agent" && save.before && slow.agentFilingMs > 0) {
+        slow.filingStarted();
+        await new Promise((resolve) => setTimeout(resolve, slow.agentFilingMs));
+      }
       return real.recordArtifactSave(save);
     },
   };
@@ -54,7 +58,8 @@ describe.runIf(Boolean(databaseUrl))("save order with a database", async () => {
   const tag = randomUUID().slice(0, 8);
   const owner = `order-${tag}-owner`;
   const claude = { harness: "claude-code" as const, label: null };
-  const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  /** Resolves once a slowed agent save's UPDATE has landed and its filing has begun. */
+  const agentUpdateLanded = () => new Promise<void>((resolve) => { slow.filingStarted = resolve; });
 
   async function row(id: string) {
     const [found] = await getDb().select().from(artifact).where(eq(artifact.id, id)).limit(1);
@@ -93,6 +98,7 @@ describe.runIf(Boolean(databaseUrl))("save order with a database", async () => {
   afterEach(() => {
     slow.agentFilingMs = 0;
     slow.skipLeasePrecheck = false;
+    slow.filingStarted = () => undefined;
   });
 
   afterAll(async () => {
@@ -108,8 +114,9 @@ describe.runIf(Boolean(databaseUrl))("save order with a database", async () => {
       const page = await personArtifact();
       await getDb().update(artifact).set({ visibility: "public" }).where(eq(artifact.id, page.id));
       slow.agentFilingMs = 150;
+      const landed = agentUpdateLanded();
       const agent = artifacts.updateArtifact(owner, page.id, { content: "# Answers\n\nthe agent's" }, "agent", { harness: claude, baseVersion: await readBase(page.id) });
-      await pause(40);
+      await landed;
       const person = await artifacts.saveArtifactUpdate(owner, page.id, { content: "# Answers\n\nthe owner's" }, "person", { expectedUpdatedAt: page.updatedAt });
       await agent;
 
@@ -130,8 +137,9 @@ describe.runIf(Boolean(databaseUrl))("save order with a database", async () => {
       const page = await personArtifact();
       const base = await readBase(page.id);
       slow.agentFilingMs = 150;
+      const landed = agentUpdateLanded();
       const first = artifacts.updateArtifact(owner, page.id, { content: "# Answers\n\nfirst pass" }, "agent", { harness: claude, baseVersion: base });
-      await pause(40);
+      await landed;
       slow.agentFilingMs = 0;
       await artifacts.updateArtifact(owner, page.id, { content: "# Answers\n\nsecond pass" }, "agent", { harness: claude, baseVersion: await readBase(page.id) });
       await first;
