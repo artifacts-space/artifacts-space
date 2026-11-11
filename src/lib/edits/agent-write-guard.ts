@@ -6,7 +6,7 @@ import { artifact, artifactVersion } from "@/db/schema";
 import { loadActor } from "@/lib/agents/queries";
 import { harnessFor } from "@/lib/harness/harnesses";
 
-import { EDIT_LEASE_MS, EDIT_SIGNAL_INTERVAL_MS, type BaseVersion, type ChangedBy } from "./edit-conflict-rules";
+import { EDIT_LEASE_MS, EDIT_SIGNAL_INTERVAL_MS, VERSION_CLOCK_SKEW_MS, type BaseVersion, type ChangedBy } from "./edit-conflict-rules";
 
 /**
  * The database side of edit-conflict-rules.ts: edit leases, and the SQL
@@ -46,15 +46,15 @@ export function agentWriteCondition(artifactId: string, input: { base: BaseVersi
  * whether a person saved after the base; they cover all of the row's older
  * history, so no backfill is needed. A version's save time comes from the
  * database clock and the base from the app server's, so a web version
- * counts only from a second after the base: the save the base came from
- * never refuses its own editor. The artifact id is bound as a value,
+ * counts only from VERSION_CLOCK_SKEW_MS after the base: the save the base
+ * came from never refuses its own editor. The artifact id is bound as a value,
  * never a bare column inside the subquery (the correlated-subquery tripwire
  * in AGENTS.md).
  */
 export function onlyAgentsSavedSince(artifactId: string, expected: Date) {
   const base = sql`${expected.toISOString()}::timestamptz`;
   const recorded = sql`date_trunc('milliseconds', ${artifact.personSavedAt}) <= ${base}`;
-  const noWebVersionSince = sql`not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and v.harness is null and v.saved_at > ${base} + interval '1 second')`;
+  const noWebVersionSince = sql`not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and v.harness is null and v.saved_at > ${base} + make_interval(secs => ${VERSION_CLOCK_SKEW_MS / 1000}))`;
   return sql`(case when ${artifact.personSavedAt} is null then ${noWebVersionSince} else ${recorded} end)`;
 }
 

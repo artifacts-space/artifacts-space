@@ -104,6 +104,16 @@ export function agentWriteRefusal(check: AgentWriteCheck): AgentWriteRefusal | n
 export const BASE_CLOCK_SKEW_MS = 5_000;
 
 /**
+ * How far after a person's base a web version's save time must be before it
+ * counts as a newer person's save, for rows without `person_saved_at`
+ * (onlyAgentsSavedSince). Smaller than BASE_CLOCK_SKEW_MS on purpose: a
+ * version's `saved_at` comes from the database clock and the base from the
+ * app server's `updated_at`, so it only absorbs drift between those two,
+ * and every millisecond of margin is a window where a newer save is missed.
+ */
+export const VERSION_CLOCK_SKEW_MS = 1_000;
+
+/**
  * Whether a person's base (`expectedUpdatedAt`) can be a save time the server
  * handed out. A base in the future would make every save look like it only
  * went over agents' saves, so such a save is refused instead of landing

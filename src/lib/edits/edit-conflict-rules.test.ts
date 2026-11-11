@@ -12,6 +12,7 @@ import {
   RECENT_TYPING_MS,
   shouldSignalEditing,
   touchesGuardedFields,
+  VERSION_CLOCK_SKEW_MS,
 } from "./edit-conflict-rules";
 
 const versionId = "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f";
@@ -150,5 +151,12 @@ describe("isPlausibleBase", () => {
   it("should refuse a base from the future, which would let a stale save land over a person's newer one", () => {
     expect(isPlausibleBase(new Date(now.getTime() + BASE_CLOCK_SKEW_MS + 1), now)).toBe(false);
     expect(isPlausibleBase(new Date("3000-01-01T00:00:00Z"), now)).toBe(false);
+  });
+});
+
+describe("VERSION_CLOCK_SKEW_MS", () => {
+  it("should stay below the base skew, because every millisecond of it is a window where a newer person's save is missed", () => {
+    expect(VERSION_CLOCK_SKEW_MS).toBeGreaterThan(0);
+    expect(VERSION_CLOCK_SKEW_MS).toBeLessThan(BASE_CLOCK_SKEW_MS);
   });
 });

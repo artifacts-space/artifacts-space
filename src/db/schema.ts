@@ -105,8 +105,9 @@ export const artifact = pgTable(
     updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-    // The `updated_at` of the last save a person made in the web app; agent saves leave it. Null: none
-    // known (rows from before 0044), read as `updated_at`. A web save over only agents' saves goes through (src/lib/edits).
+    // When a person last saved (web app, a person's restore or file replace); agent saves leave it. Null: no
+    // person has saved since 0044 (an agent created it, or an older row); the artifact's web versions decide then.
+    // A web save over only agents' saves goes through (onlyAgentsSavedSince in src/lib/edits/agent-write-guard.ts).
     personSavedAt: timestamp("person_saved_at", { withTimezone: true }),
   },
   (table) => [
