@@ -1,4 +1,4 @@
-import { unverifiedGoogleEmail } from "@/lib/auth/google-sign-in-rules";
+import { nonAuthoritativeGoogleEmail, unverifiedGoogleEmail } from "@/lib/auth/google-sign-in-rules";
 
 /**
  * What the sign-in page says when GitHub or Google sends the person back
@@ -6,10 +6,17 @@ import { unverifiedGoogleEmail } from "@/lib/auth/google-sign-in-rules";
  * `error_description`: anyone can put any text in a link, so the page shows
  * only its own sentences. A Map, not an object, so a code such as
  * `__proto__` or `toString` cannot reach an inherited member.
+ *
+ * Every refusal about the address says the same neutral sentence, so the
+ * page never tells a visitor whether an account exists for that address
+ * (`account_not_linked` happens only when one does).
  */
+const refusedAddress = "We could not sign you in with that account. Use an email link to your address instead.";
+
 const messages: ReadonlyMap<string, string> = new Map([
-  [unverifiedGoogleEmail.error, "Google has not verified this email address, so we cannot sign you in with it. Use an email link instead."],
-  ["account_not_linked", "This email already has an account, and we could not confirm that this sign-in belongs to it. Use an email link instead."],
+  [unverifiedGoogleEmail.error, refusedAddress],
+  [nonAuthoritativeGoogleEmail.error, refusedAddress],
+  ["account_not_linked", refusedAddress],
 ]);
 
 const fallback = "Sign-in did not finish. Try again, or use an email link.";

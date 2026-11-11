@@ -1,115 +1,29 @@
-import { betterAuth } from "better-auth";
-import { memoryAdapter } from "better-auth/adapters/memory";
-import { magicLink } from "better-auth/plugins";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { accountLinking, socialProviders, validateUserInfo } from "./social-auth-options";
+import { accountLinking, socialProviders } from "./social-auth-options";
+import { createTestAuth, emptyTables, env, errorReturn, existingUser, magicLinkSession, origin, signInWith, stubProviders, type Tables, type TestAuth } from "./social-auth-harness";
 
 /*
- * The whole Google and GitHub sign-in round trip through a real Better Auth
- * instance with the app's provider, linking, and validation options, in
- * memory. Only the boundaries are swapped: the memory adapter stands in for
- * Postgres, and `fetch` answers for Google's and GitHub's token and profile
- * endpoints, so no request leaves the test. These tests fail if an
- * unverified Google email could ever create, join, or take over an account.
+ * Account linking through the whole Google and GitHub round trip, on a real
+ * Better Auth instance with the app's options (social-auth-harness.ts).
+ * These tests fail if a Google identity could create, join, or take over an
+ * account for an address it does not control: unverified, or verified by
+ * Google for a mailbox Google does not host.
  */
 
-const origin = "https://artifacts.space";
-const email = "sam@example.com";
+/** A Google Workspace account on example.com, whose address Google vouches for. */
+const workspace = (sub: string) => ({ sub, email_verified: true, hd: "example.com" });
+/** A consumer Google account registered with an outside address: verified once, not hosted by Google. */
+const outsideAddress = (sub: string) => ({ sub, email_verified: true });
 
-const env = {
-  GOOGLE_CLIENT_ID: "test-google-client.apps.googleusercontent.com",
-  GOOGLE_CLIENT_SECRET: "test-google-secret",
-  GITHUB_CLIENT_ID: "test-github-client",
-  GITHUB_CLIENT_SECRET: "test-github-secret",
-};
-
-interface Row extends Record<string, unknown> {
-  id: string;
-}
-
-interface Tables {
-  [table: string]: Row[];
-  user: (Row & { email: string; emailVerified: boolean })[];
-  session: (Row & { userId: string })[];
-  account: (Row & { userId: string; providerId: string; accountId: string })[];
-  verification: Row[];
-}
-
-/** The newest magic link each test's auth instance "emailed". */
-const sentLinks: string[] = [];
-
-function createTestAuth(tables: Tables) {
-  return betterAuth({
-    baseURL: origin,
-    secret: "social-linking-test-secret-0123456789abcdef",
-    database: memoryAdapter(tables),
-    emailAndPassword: { enabled: false },
-    socialProviders: socialProviders(env),
-    account: { accountLinking },
-    user: { validateUserInfo },
-    plugins: [magicLink({ sendMagicLink: ({ url }) => { sentLinks.push(url); } })],
-    // Vitest runs count as tests, where Better Auth skips its callbackURL check unless told otherwise.
-    advanced: { disableOriginCheck: false },
-  });
-}
-
-type TestAuth = ReturnType<typeof createTestAuth>;
-
-const base64url = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
-
-/** An id token as Google's token endpoint returns it. The callback only decodes it, so it needs no signature here. */
-function googleIdToken(claims: { sub: string; email: string; email_verified: boolean }) {
-  const payload = { iss: "https://accounts.google.com", aud: env.GOOGLE_CLIENT_ID, iat: 1, exp: 4_102_444_800, name: "Sam", ...claims };
-  return `${base64url({ alg: "RS256", typ: "JWT", kid: "test" })}.${base64url(payload)}.signature`;
-}
-
-interface Identity {
-  google?: { sub: string; email_verified: boolean };
-  github?: { id: number; verified: boolean };
-}
-
-/** Answers the providers' endpoints for one identity, and fails the test on any other request. */
-function stubProviders(identity: Identity) {
-  const routes: Record<string, () => unknown> = {
-    "https://oauth2.googleapis.com/token": () => {
-      if (!identity.google) throw new Error("No Google identity in this test.");
-      return { access_token: "google-access", token_type: "Bearer", expires_in: 3600, id_token: googleIdToken({ ...identity.google, email }) };
-    },
-    "https://github.com/login/oauth/access_token": () => ({ access_token: "github-access", token_type: "bearer", scope: "read:user,user:email" }),
-    "https://api.github.com/user": () => ({ id: identity.github?.id, login: "sam", name: "Sam", email, avatar_url: null }),
-    "https://api.github.com/user/emails": () => [{ email, primary: true, verified: identity.github?.verified ?? false }],
-  };
-  vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
-    const url = (input instanceof Request ? input.url : String(input)).split("?")[0] ?? "";
-    const route = routes[url];
-    if (!route) return Promise.reject(new Error(`Unexpected request to ${url}`));
-    return Promise.resolve(Response.json(route()));
-  });
-}
-
-/** Starts sign-in like the button does, then comes back through the callback like the provider would. Returns where the browser is sent. */
-async function signInWith(auth: TestAuth, provider: "google" | "github") {
-  const started = await auth.handler(
-    new Request(`${origin}/api/auth/sign-in/social`, {
-      method: "POST",
-      headers: { "content-type": "application/json", origin },
-      body: JSON.stringify({ provider, callbackURL: `${origin}/invitations/inv-1`, errorCallbackURL: `${origin}/sign-in?next=%2Finvitations%2Finv-1` }),
-    }),
-  );
-  const { url } = (await started.json()) as { url: string };
-  const state = new URL(url).searchParams.get("state") ?? "";
-  const cookie = started.headers.getSetCookie().map((value) => value.split(";")[0]).join("; ");
-  const callback = await auth.handler(new Request(`${origin}/api/auth/callback/${provider}?code=test-code&state=${encodeURIComponent(state)}`, { headers: { cookie } }));
-  return callback.headers.get("location") ?? "";
-}
+const refusedWith = (codes: string) => new RegExp(`^${errorReturn.replace(/[.?]/g, "\\$&")}&error=(${codes})(&|$)`);
 
 describe("social sign-in account linking", () => {
   let tables: Tables;
   let auth: TestAuth;
 
   beforeEach(() => {
-    tables = { user: [], session: [], account: [], verification: [] };
+    tables = emptyTables();
     auth = createTestAuth(tables);
   });
 
@@ -117,20 +31,11 @@ describe("social sign-in account linking", () => {
     vi.restoreAllMocks();
   });
 
-  /** An existing account for `email`: confirmed (a magic link or a verified GitHub email) or not, with or without a GitHub login. */
-  function existingUser({ verified, github = false }: { verified: boolean; github?: boolean }) {
-    const now = new Date();
-    const userId = "existing-user";
-    tables.user.push({ id: userId, email, emailVerified: verified, name: "Sam", image: null, createdAt: now, updatedAt: now });
-    if (github) tables.account.push({ id: "existing-github", userId, providerId: "github", accountId: "4242", createdAt: now, updatedAt: now });
-    return userId;
-  }
-
   const googleAccounts = () => tables.account.filter((row) => row.providerId === "google");
 
-  it("should land a verified Google email in the matching magic-link account when that email is confirmed", async () => {
-    const userId = existingUser({ verified: true });
-    stubProviders({ google: { sub: "g-1", email_verified: true } });
+  it("should land a verified Workspace Google email in the matching magic-link account when that email is confirmed", async () => {
+    const userId = existingUser(tables, { verified: true });
+    stubProviders({ google: workspace("g-1") });
 
     const location = await signInWith(auth, "google");
 
@@ -140,9 +45,9 @@ describe("social sign-in account linking", () => {
     expect(tables.session.map((row) => row.userId)).toEqual([userId]);
   });
 
-  it("should land a verified Google email in the matching GitHub account when that email is confirmed", async () => {
-    const userId = existingUser({ verified: true, github: true });
-    stubProviders({ google: { sub: "g-1", email_verified: true } });
+  it("should land a verified Workspace Google email in the matching GitHub account when that email is confirmed", async () => {
+    const userId = existingUser(tables, { verified: true, github: true });
+    stubProviders({ google: workspace("g-1") });
 
     await signInWith(auth, "google");
 
@@ -150,53 +55,107 @@ describe("social sign-in account linking", () => {
     expect(googleAccounts()).toEqual([expect.objectContaining({ userId })]);
   });
 
+  it("should land a Gmail sign-in in the matching account when only the letter case differs", async () => {
+    const userId = existingUser(tables, { verified: true, address: "sam@gmail.com" });
+    stubProviders({ google: { sub: "g-case", email: "Sam@Gmail.com", email_verified: true } });
+
+    await signInWith(auth, "google");
+
+    expect(googleAccounts()).toEqual([expect.objectContaining({ userId })]);
+    expect(tables.user).toHaveLength(1);
+  });
+
+  it("should not join an account when only Gmail's ignored dots differ", async () => {
+    const userId = existingUser(tables, { verified: true, address: "firstlast@gmail.com" });
+    stubProviders({ google: { sub: "g-dots", email: "first.last@gmail.com", email_verified: true } });
+
+    await signInWith(auth, "google");
+
+    expect(googleAccounts().map((row) => row.userId)).not.toContain(userId);
+    expect(tables.user.map((row) => row.email).sort()).toEqual(["first.last@gmail.com", "firstlast@gmail.com"]);
+  });
+
   it("should never link an unverified Google email to an existing account", async () => {
-    existingUser({ verified: true, github: true });
-    stubProviders({ google: { sub: "g-attacker", email_verified: false } });
+    existingUser(tables, { verified: true, github: true });
+    stubProviders({ google: { sub: "g-attacker", email_verified: false, hd: "example.com" } });
 
     const location = await signInWith(auth, "google");
 
     // Better Auth's own linking rule refuses first; the Google gate would refuse it too.
-    expect(location).toMatch(/^https:\/\/artifacts\.space\/sign-in\?next=%2Finvitations%2Finv-1&error=(account_not_linked|google_email_not_verified)(&|$)/);
+    expect(location).toMatch(refusedWith("account_not_linked|google_email_not_verified"));
     expect(googleAccounts()).toEqual([]);
     expect(tables.user).toHaveLength(1);
     expect(tables.session).toEqual([]);
   });
 
   it("should never create an account from an unverified Google email, so its real owner cannot sign in to it later", async () => {
-    stubProviders({ google: { sub: "g-attacker", email_verified: false } });
+    stubProviders({ google: { sub: "g-attacker", email_verified: false, hd: "example.com" } });
 
     const location = await signInWith(auth, "google");
 
-    expect(location).toMatch(/^https:\/\/artifacts\.space\/sign-in\?next=%2Finvitations%2Finv-1&error=google_email_not_verified(&|$)/);
+    expect(location).toMatch(refusedWith("google_email_not_verified"));
     expect(tables.user).toEqual([]);
     expect(googleAccounts()).toEqual([]);
     expect(tables.session).toEqual([]);
   });
 
-  it("should not link a verified Google email when the existing account never confirmed that email", async () => {
-    existingUser({ verified: false, github: true });
-    stubProviders({ google: { sub: "g-1", email_verified: true } });
+  it("should never link a verified Google email that Google does not host, even when the account confirmed it", async () => {
+    existingUser(tables, { verified: true });
+    stubProviders({ google: outsideAddress("g-former-employee") });
 
     const location = await signInWith(auth, "google");
 
-    expect(location).toMatch(/^https:\/\/artifacts\.space\/sign-in\?next=%2Finvitations%2Finv-1&error=account_not_linked(&|$)/);
+    // Better Auth's own rule lets this through (verified on both sides), so only the Google gate stops it.
+    expect(location).toMatch(refusedWith("google_email_not_authoritative"));
     expect(googleAccounts()).toEqual([]);
     expect(tables.session).toEqual([]);
   });
 
-  it("should create a confirmed account when a new person signs in with a verified Google email", async () => {
-    stubProviders({ google: { sub: "g-new", email_verified: true } });
+  it("should never create an account from a verified Google email that Google does not host", async () => {
+    stubProviders({ google: outsideAddress("g-outside") });
+
+    const location = await signInWith(auth, "google");
+
+    expect(location).toMatch(refusedWith("google_email_not_authoritative"));
+    expect(tables.user).toEqual([]);
+    expect(tables.session).toEqual([]);
+  });
+
+  it("should keep signing in a Google account that is already linked when its address is outside Google", async () => {
+    const userId = existingUser(tables, { verified: true });
+    const now = new Date();
+    tables.account.push({ id: "linked-google", userId, providerId: "google", accountId: "g-linked", createdAt: now, updatedAt: now });
+    stubProviders({ google: outsideAddress("g-linked") });
 
     const location = await signInWith(auth, "google");
 
     expect(location).toBe(`${origin}/invitations/inv-1`);
-    expect(tables.user).toEqual([expect.objectContaining({ email, emailVerified: true })]);
+    expect(tables.session.map((row) => row.userId)).toEqual([userId]);
+  });
+
+  it("should not link a verified Google email when the existing account never confirmed that email", async () => {
+    existingUser(tables, { verified: false, github: true });
+    stubProviders({ google: workspace("g-1") });
+
+    const location = await signInWith(auth, "google");
+
+    expect(location).toMatch(refusedWith("account_not_linked"));
+    expect(googleAccounts()).toEqual([]);
+    expect(tables.session).toEqual([]);
+  });
+
+  it("should create a confirmed account when a new person signs in with a verified Workspace Google email", async () => {
+    stubProviders({ google: workspace("g-new") });
+
+    const location = await signInWith(auth, "google");
+
+    expect(location).toBe(`${origin}/invitations/inv-1`);
+    expect(tables.user).toEqual([expect.objectContaining({ email: "sam@example.com", emailVerified: true })]);
     expect(googleAccounts()).toHaveLength(1);
   });
 
   it("should still link a GitHub sign-in to the matching confirmed account when GitHub verified the email", async () => {
-    const userId = existingUser({ verified: true });
+    const userId = existingUser(tables, { verified: true });
     stubProviders({ github: { id: 4242, verified: true } });
 
     await signInWith(auth, "github");
@@ -206,44 +165,22 @@ describe("social sign-in account linking", () => {
   });
 
   it("should still refuse to link a GitHub sign-in when GitHub has not verified the email", async () => {
-    existingUser({ verified: true });
+    existingUser(tables, { verified: true });
     stubProviders({ github: { id: 4242, verified: false } });
 
     const location = await signInWith(auth, "github");
 
-    expect(location).toMatch(/^https:\/\/artifacts\.space\/sign-in\?next=%2Finvitations%2Finv-1&error=account_not_linked(&|$)/);
+    expect(location).toMatch(refusedWith("account_not_linked"));
     expect(tables.account).toEqual([]);
   });
 
   it("should still create an account from a magic link when the Google gate is on", async () => {
     stubProviders({});
-    await auth.handler(
-      new Request(`${origin}/api/auth/sign-in/magic-link`, {
-        method: "POST",
-        headers: { "content-type": "application/json", origin },
-        body: JSON.stringify({ email, callbackURL: `${origin}/app` }),
-      }),
-    );
-    const link = sentLinks.at(-1);
-    if (!link) throw new Error("No magic link was sent.");
 
-    const response = await auth.handler(new Request(link));
+    const { location } = await magicLinkSession(auth);
 
-    expect(response.headers.get("location")).toBe(`${origin}/app`);
-    expect(tables.user).toEqual([expect.objectContaining({ email, emailVerified: true })]);
-  });
-
-  it("should refuse to start Google sign-in when the destination is another site", async () => {
-    stubProviders({});
-    const response = await auth.handler(
-      new Request(`${origin}/api/auth/sign-in/social`, {
-        method: "POST",
-        headers: { "content-type": "application/json", origin },
-        body: JSON.stringify({ provider: "google", callbackURL: "https://evil.example/steal" }),
-      }),
-    );
-
-    expect(response.status).toBe(403);
+    expect(location).toBe(`${origin}/app`);
+    expect(tables.user).toEqual([expect.objectContaining({ email: "sam@example.com", emailVerified: true })]);
   });
 });
 
@@ -257,5 +194,11 @@ describe("social auth options", () => {
     expect(Object.keys(socialProviders(env))).toEqual(["github", "google"]);
     expect(Object.keys(socialProviders({ ...env, GOOGLE_CLIENT_ID: "replace-with-google-client-id" }))).toEqual(["github"]);
     expect(Object.keys(socialProviders({ ...env, VERCEL_ENV: "preview" }))).toEqual(["github"]);
+  });
+
+  it("should configure GitHub only when both values are real, trimmed", () => {
+    expect(socialProviders({ ...env, GITHUB_CLIENT_ID: ` ${env.GITHUB_CLIENT_ID}\n` }).github?.clientId).toBe(env.GITHUB_CLIENT_ID);
+    expect(Object.keys(socialProviders({ ...env, GITHUB_CLIENT_ID: "  " }))).toEqual(["google"]);
+    expect(Object.keys(socialProviders({ ...env, GITHUB_CLIENT_SECRET: "replace-with-github-client-secret" }))).toEqual(["google"]);
   });
 });

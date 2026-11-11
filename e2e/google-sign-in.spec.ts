@@ -69,10 +69,10 @@ test("should send Google sign-in to the workspace when next points to another si
   expect(await startGoogle(page)).toEqual({ provider: "google", callbackURL: `${baseURL ?? ""}/app`, errorCallbackURL: `${baseURL ?? ""}/dev/sign-in` });
 });
 
-test("should explain in the page's own words when Google refused an unverified email", async ({ page }) => {
+test("should explain in the page's own neutral words when Google refused the address", async ({ page }) => {
   await page.goto("/dev/sign-in?google=1&error=google_email_not_verified&error_description=Call%20555-0100");
 
-  await expect(page.getByRole("alert").filter({ hasText: "Google has not verified this email address" })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "We could not sign you in with that account. Use an email link to your address instead." })).toBeVisible();
   await expect(page.getByText("555-0100")).toHaveCount(0);
   expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
 });

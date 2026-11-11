@@ -58,10 +58,33 @@ export function isGoogleEmailVerified(profile: Record<string, unknown> | undefin
   return claim === true || claim === "true";
 }
 
+/** Domains whose mailboxes Google itself hosts for consumer accounts. */
+const googleMailDomains = new Set(["gmail.com", "googlemail.com"]);
+
+/**
+ * True when Google is the authority for the address: a Gmail address, or a
+ * Google Workspace account whose verified `hd` (hosted domain) claim is the
+ * address's own domain. A consumer Google account registered with an outside
+ * address keeps `email_verified: true` after its owner loses that mailbox
+ * (someone who left a company, for example), so Google's word on it is not
+ * proof that the person controls the address today.
+ */
+export function isGoogleAuthoritativeEmail(profile: Record<string, unknown> | undefined): boolean {
+  const email = profile?.email;
+  if (typeof email !== "string") return false;
+  const at = email.lastIndexOf("@");
+  if (at < 1) return false;
+  const domain = email.slice(at + 1).trim().toLowerCase();
+  if (googleMailDomains.has(domain)) return true;
+  const hostedDomain = profile?.hd;
+  return typeof hostedDomain === "string" && hostedDomain.trim().toLowerCase() === domain;
+}
+
 /** What Better Auth's `user.validateUserInfo` hook is told about an incoming identity. */
 export interface IncomingIdentity {
   source: {
     method: string;
+    action?: string | undefined;
     oauth?: { providerId: string; profile?: Record<string, unknown> | undefined } | undefined;
   };
 }
@@ -69,18 +92,28 @@ export interface IncomingIdentity {
 /** The refusal for a Google account whose email Google has not verified. */
 export const unverifiedGoogleEmail = {
   error: "google_email_not_verified",
-  errorDescription: "Google has not verified this email address. Sign in with an emailed link instead.",
+  errorDescription: "Google could not confirm this email address. Sign in with an emailed link instead.",
+} as const;
+
+/** The refusal for a Google account whose address Google does not host. */
+export const nonAuthoritativeGoogleEmail = {
+  error: "google_email_not_authoritative",
+  errorDescription: "Google could not confirm this email address. Sign in with an emailed link instead.",
 } as const;
 
 /**
- * Refuses a Google identity whose email Google has not verified, for every
- * step: creating an account, linking to an existing one, and signing in
- * again. An unverified address could belong to someone else, so it must
- * never create the account that its real owner later signs in to, nor join
- * an existing one. Other providers and methods pass through unchanged.
+ * Refuses a Google identity that could claim an address it does not
+ * control. Unverified emails are refused for every step: creating an
+ * account, linking to an existing one, and signing in again. Verified emails
+ * that Google is not the authority for (see isGoogleAuthoritativeEmail) are
+ * refused when they would create or join an account; a Google account that
+ * is already linked keeps signing in. Unknown actions count as claiming.
+ * Other providers and methods pass through unchanged.
  */
-export function googleIdentityProblem(identity: IncomingIdentity): typeof unverifiedGoogleEmail | undefined {
-  const { oauth } = identity.source;
+export function googleIdentityProblem(identity: IncomingIdentity): typeof unverifiedGoogleEmail | typeof nonAuthoritativeGoogleEmail | undefined {
+  const { oauth, action } = identity.source;
   if (identity.source.method !== "oauth" || oauth?.providerId !== "google") return undefined;
-  return isGoogleEmailVerified(oauth.profile) ? undefined : unverifiedGoogleEmail;
+  if (!isGoogleEmailVerified(oauth.profile)) return unverifiedGoogleEmail;
+  if (action === "sign-in") return undefined;
+  return isGoogleAuthoritativeEmail(oauth.profile) ? undefined : nonAuthoritativeGoogleEmail;
 }

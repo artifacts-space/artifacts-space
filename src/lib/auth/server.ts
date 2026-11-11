@@ -10,7 +10,7 @@ import { sessionHooks } from "@/lib/auth/agent-guards";
 import { sendMagicLinkEmail } from "@/lib/auth/magic-link-email";
 import { oauthPlugins } from "@/lib/auth/oauth-plugins";
 import { sessionConfig } from "@/lib/auth/session-config";
-import { accountLinking, socialAuthEnv, socialProviders, validateUserInfo } from "@/lib/auth/social-auth-options";
+import { accountHooks, accountLinking, socialAuthEnv, socialProviders, socialSignInGuard, validateUserInfo } from "@/lib/auth/social-auth-options";
 import { teamDepartureHook } from "@/lib/auth/team-departure";
 import { closedTeamRoutesHook } from "@/lib/auth/closed-team-routes";
 import { teamRoutesClosedOverHttp, teamsPlugin } from "@/lib/auth/teams-plugin";
@@ -56,7 +56,7 @@ function createAuth() {
         usernameConfirmed: { type: "boolean", required: false, defaultValue: false, input: false },
       },
     },
-    databaseHooks: { user: userHooks, session: sessionHooks },
+    databaseHooks: { user: userHooks, session: sessionHooks, account: accountHooks },
     hooks: { before: closedTeamRoutesHook, after: teamDepartureHook },
     disabledPaths: teamRoutesClosedOverHttp,
     plugins: [
@@ -65,6 +65,7 @@ function createAuth() {
         sendMagicLink: ({ email, url, token }) => sendMagicLinkEmail({ email, url, token }),
       }),
       teamsPlugin(),
+      socialSignInGuard(),
       ...oauthPlugins(),
       // Must stay last so server actions can set auth cookies.
       nextCookies(),

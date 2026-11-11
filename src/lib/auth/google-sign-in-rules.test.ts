@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { googleCredentials, googleIdentityProblem, isGoogleEmailVerified, isGoogleSignInEnabled, isRealCredential, unverifiedGoogleEmail } from "./google-sign-in-rules";
+import {
+  googleCredentials,
+  googleIdentityProblem,
+  isGoogleAuthoritativeEmail,
+  isGoogleEmailVerified,
+  isGoogleSignInEnabled,
+  isRealCredential,
+  nonAuthoritativeGoogleEmail,
+  unverifiedGoogleEmail,
+} from "./google-sign-in-rules";
 
 const real = { GOOGLE_CLIENT_ID: "1234-abc.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET: "GOCSPX-test-only" };
 
@@ -68,23 +77,61 @@ describe("isGoogleEmailVerified", () => {
   });
 });
 
+describe("isGoogleAuthoritativeEmail", () => {
+  it.each([
+    { email: "sam@gmail.com" },
+    { email: "Sam@GoogleMail.com" },
+    { email: "sam@corp.example", hd: "corp.example" },
+    { email: "sam@Corp.Example", hd: "corp.example" },
+  ])("should trust Google for %j when Google hosts the mailbox", (profile) => {
+    expect(isGoogleAuthoritativeEmail(profile)).toBe(true);
+  });
+
+  it.each([
+    { email: "sam@corp.example" },
+    { email: "sam@corp.example", hd: "other.example" },
+    { email: "sam@sub.corp.example", hd: "corp.example" },
+    { email: "sam@gmail.com.evil.example" },
+    { email: "not-an-address" },
+    { email: "@gmail.com" },
+    {},
+    undefined,
+  ])("should not trust Google for %j when Google does not host the mailbox", (profile) => {
+    expect(isGoogleAuthoritativeEmail(profile)).toBe(false);
+  });
+});
+
 describe("googleIdentityProblem", () => {
-  const google = (profile: Record<string, unknown> | undefined) => ({ source: { method: "oauth", oauth: { providerId: "google", profile } } });
+  const google = (profile: Record<string, unknown> | undefined, action?: string) => ({ source: { method: "oauth", action, oauth: { providerId: "google", profile } } });
+  const outsideAddress = { email: "sam@corp.example", email_verified: true };
 
   it("should refuse a Google identity when Google has not verified the email", () => {
-    expect(googleIdentityProblem(google({ email: "sam@example.com", email_verified: false }))).toEqual(unverifiedGoogleEmail);
+    for (const action of ["create-user", "link-account", "sign-in"]) {
+      expect(googleIdentityProblem(google({ email: "sam@gmail.com", email_verified: false }, action)), action).toEqual(unverifiedGoogleEmail);
+    }
   });
 
   it("should refuse a Google identity when the profile is missing", () => {
-    expect(googleIdentityProblem(google(undefined))).toEqual(unverifiedGoogleEmail);
+    expect(googleIdentityProblem(google(undefined, "create-user"))).toEqual(unverifiedGoogleEmail);
   });
 
-  it("should allow a Google identity when Google verified the email", () => {
-    expect(googleIdentityProblem(google({ email: "sam@example.com", email_verified: true }))).toBeUndefined();
+  it("should allow a Google identity when Google verified an address it hosts", () => {
+    expect(googleIdentityProblem(google({ email: "sam@gmail.com", email_verified: true }, "create-user"))).toBeUndefined();
+    expect(googleIdentityProblem(google({ email: "sam@corp.example", hd: "corp.example", email_verified: true }, "link-account"))).toBeUndefined();
+  });
+
+  it("should refuse a verified outside address when it would create or join an account", () => {
+    expect(googleIdentityProblem(google(outsideAddress, "create-user"))).toEqual(nonAuthoritativeGoogleEmail);
+    expect(googleIdentityProblem(google(outsideAddress, "link-account"))).toEqual(nonAuthoritativeGoogleEmail);
+    expect(googleIdentityProblem(google(outsideAddress))).toEqual(nonAuthoritativeGoogleEmail);
+  });
+
+  it("should let an already linked Google account sign in again when its verified address is outside Google", () => {
+    expect(googleIdentityProblem(google(outsideAddress, "sign-in"))).toBeUndefined();
   });
 
   it("should leave GitHub and magic links alone when they carry no Google claim", () => {
-    expect(googleIdentityProblem({ source: { method: "oauth", oauth: { providerId: "github", profile: { login: "sam" } } } })).toBeUndefined();
-    expect(googleIdentityProblem({ source: { method: "magic-link" } })).toBeUndefined();
+    expect(googleIdentityProblem({ source: { method: "oauth", action: "link-account", oauth: { providerId: "github", profile: { login: "sam" } } } })).toBeUndefined();
+    expect(googleIdentityProblem({ source: { method: "magic-link", action: "create-user" } })).toBeUndefined();
   });
 });

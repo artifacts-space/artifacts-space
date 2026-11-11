@@ -14,7 +14,7 @@ const refreshDays = Math.round(oauthLimits.refreshTokenSeconds / 86_400);
 
 const providers = [
   { name: "Vercel", role: "hosts the website, the MCP server, and scheduled cleanup jobs, and keeps request logs.", data: "request data, logs, and everything the service handles in transit" },
-  { name: "Neon", role: "runs our Postgres database.", data: "account, team, artifact, comment, and token-hash records" },
+  { name: "Neon", role: "runs our Postgres database.", data: "account, team, artifact, and comment records, hashes of the tokens we issue, and the access token GitHub issues if you sign in with GitHub" },
   { name: "Cloudflare R2", role: "stores uploaded files.", data: "files and their names" },
   { name: "Sendir", role: "sends our transactional email.", data: "the recipient's email address and the email itself" },
   { name: "Slack", role: "delivers the \"Something's not working\" reports you send from the app to our team.", data: "your note, your name and email address, the page you were on, your team workspace, and your browser and window size" },
@@ -124,7 +124,7 @@ export function PrivacyRights() {
           If you live in California or another US state with a consumer privacy law (such as Colorado, Connecticut, Oregon, Texas, Utah, or Virginia), you have the right to know what personal information we collect and how we use and disclose it, to access it, to correct it, to delete it, to get a portable copy, and to opt out of sale, sharing for targeted advertising, and profiling. We do none of those three things. We will not treat you differently for using your rights.
         </p>
         <p>
-          In the past 12 months we collected these categories of personal information, as California law names them: identifiers (name, email address, username, IP address, account IDs); internet or network activity (sessions, request logs, connected apps); customer records (your email address); and the content you and your agents create. They came from you, your agents and connected apps, your teammates (for example, invitations and mentions), GitHub (if you sign in with it), and your browser. We use them for the purposes in <a href="#how-we-use">How we use it</a>, and we disclosed them for business purposes only to the providers in <a href="#providers">Service providers</a>.
+          In the past 12 months we collected these categories of personal information, as California law names them: identifiers (name, email address, username, IP address, account IDs); internet or network activity (sessions, request logs, connected apps); customer records (your email address); and the content you and your agents create. They came from you, your agents and connected apps, your teammates (for example, invitations and mentions), GitHub or Google (if you sign in with one), and your browser. We use them for the purposes in <a href="#how-we-use">How we use it</a>, and we disclosed them for business purposes only to the providers in <a href="#providers">Service providers</a>.
         </p>
       </Prose>
 
