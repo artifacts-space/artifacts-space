@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 /*
  * Mermaid diagrams in Markdown documents, on the dev fixture (/dev/mermaid,
@@ -13,6 +13,8 @@ const editor = (page: Page) => page.getByRole("textbox", { name: "Artifact conte
 const savedMarkdown = (page: Page) => page.getByTestId("fixture-markdown");
 const readDiagrams = (page: Page) => readView(page).locator("[data-markdown-diagram]");
 const editorDiagram = (page: Page) => editor(page).locator("[data-mermaid-block]");
+/** A diagram block's editable source: the code block holding the editor's own text. */
+const sourceOf = (block: Locator) => block.locator("pre:has([data-node-view-content])");
 
 async function openFixture(page: Page) {
   await page.goto("/dev/mermaid");
@@ -84,12 +86,14 @@ test("should redraw the diagram in dark colors when the reader switches to dark 
 test("should open the source under a live preview and keep the fenced block when a diagram is edited", async ({ page }) => {
   await openFixture(page);
   const block = await editorBlock(page);
-  await expect(block.locator("pre")).toBeHidden();
+  await expect(sourceOf(block)).toBeHidden();
+  // While closed, screen readers get the source after the diagram.
+  await expect(block.locator(".sr-only pre")).toHaveText("flowchart LR\n  Plan --> Build");
   const before = await block.getByRole("img", { name: "Diagram" }).getAttribute("src");
 
   await block.getByRole("button", { name: "Edit diagram" }).click();
   await expect(block).toHaveAttribute("data-source-open", "");
-  await expect(block.locator("pre")).toBeVisible();
+  await expect(sourceOf(block)).toBeVisible();
   await expect(block.getByRole("img", { name: "Diagram" })).toBeVisible();
 
   await page.keyboard.press("Enter");
@@ -100,11 +104,11 @@ test("should open the source under a live preview and keep the fenced block when
 
   // A selection that starts in the source and runs past it keeps the source open.
   await page.keyboard.press("Control+Shift+End");
-  await expect(block.locator("pre")).toBeVisible();
+  await expect(sourceOf(block)).toBeVisible();
 
   await block.getByRole("button", { name: "Done" }).click();
   await expect(block).not.toHaveAttribute("data-source-open", "");
-  await expect(block.locator("pre")).toBeHidden();
+  await expect(sourceOf(block)).toBeHidden();
   await expect(savedMarkdown(page)).toContainText("# Editor diagram\n\nIntro paragraph.\n\n```mermaid\nflowchart LR\n  Plan --> Build\n  Build --> Ship\n```\n\nEnd paragraph.");
 });
 
@@ -121,13 +125,13 @@ test("should keep the source open with the note when an edit breaks the diagram"
 
   // Moving the cursor out leaves the source open, so the mistake can be fixed.
   await editor(page).getByText("End paragraph.").click();
-  await expect(block.locator("pre")).toBeVisible();
+  await expect(sourceOf(block)).toBeVisible();
 });
 
 test("should turn a closed diagram back into a code block when Plain text is picked", async ({ page }) => {
   await openFixture(page);
   const block = await editorBlock(page);
-  await expect(block.locator("pre")).toBeHidden();
+  await expect(sourceOf(block)).toBeHidden();
   const picker = block.getByRole("combobox", { name: "Code language" }).filter({ visible: true });
   await expect(picker).toHaveCount(1);
   await picker.click();

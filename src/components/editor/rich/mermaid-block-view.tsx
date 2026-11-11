@@ -67,7 +67,8 @@ function DiagramPreview({ code, state, editable, sourceOpen, onEdit, picker }: P
   return (
     // A click anywhere on the diagram opens its source; the Edit button does the same for keyboards and screen readers.
     <div className="relative cursor-pointer" onClick={onEdit}>
-      <DiagramFigure diagram={state.diagram} />
+      {/* The source is hidden while closed, so screen readers get it here, as in the read view. */}
+      <DiagramFigure diagram={state.diagram} source={code} />
       {/* Clicks here (and in the picker's menu, a React child) stay off the diagram, so they never open the source. */}
       <div className="absolute top-1.5 right-1.5 flex items-center gap-1" onClick={(event) => { event.stopPropagation(); }}>
         {picker}
