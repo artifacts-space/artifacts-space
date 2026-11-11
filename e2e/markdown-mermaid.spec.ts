@@ -17,7 +17,16 @@ const editorDiagram = (page: Page) => editor(page).locator("[data-mermaid-block]
 async function openFixture(page: Page) {
   await page.goto("/dev/mermaid");
   await expect(readView(page).getByRole("heading", { name: "Diagram fixture" })).toBeVisible();
-  await expect(page.getByRole("status").filter({ hasText: "Drawing diagram" })).toHaveCount(0, { timeout: 60_000 });
+  // Diagrams draw as they near the viewport; the first one is on screen.
+  await expect(readDiagrams(page).first()).toHaveAttribute("data-diagram-state", "drawn", { timeout: 60_000 });
+}
+
+/** Scrolls the editor's diagram into view, where it draws, and returns it. */
+async function editorBlock(page: Page) {
+  const block = editorDiagram(page);
+  await block.scrollIntoViewIfNeeded();
+  await expect(block).toHaveAttribute("data-diagram-state", "drawn", { timeout: 60_000 });
+  return block;
 }
 
 /** The decoded SVG behind a diagram image, so the test can check it really is a drawn diagram. */
@@ -42,6 +51,8 @@ test("should draw a fenced mermaid block as an SVG diagram that fits the page wh
 
   // The source never shows as code, and other fences stay code blocks.
   await expect(drawn.locator("[data-code-block]")).toHaveCount(0);
+  // Screen readers get the source as text after the image.
+  await expect(drawn.locator(".sr-only pre")).toHaveText(/^flowchart TD\n {2}A\[Agent drafts\]/u);
   await expect(readView(page).locator("[data-code-block]").filter({ hasText: "const answer = 42;" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
@@ -51,6 +62,7 @@ test("should draw a fenced mermaid block as an SVG diagram that fits the page wh
 test("should show the source with a short note when a diagram cannot be drawn", async ({ page }) => {
   await openFixture(page);
   const broken = readDiagrams(page).nth(1);
+  await broken.scrollIntoViewIfNeeded();
   await expect(broken).toHaveAttribute("data-diagram-state", "failed");
   await expect(broken.getByRole("note")).toContainText("Couldn’t draw this diagram.");
   await expect(broken.locator("[data-code-block]")).toContainText("A -- > B");
@@ -71,8 +83,7 @@ test("should redraw the diagram in dark colors when the reader switches to dark 
 
 test("should open the source under a live preview and keep the fenced block when a diagram is edited", async ({ page }) => {
   await openFixture(page);
-  const block = editorDiagram(page);
-  await expect(block).toHaveAttribute("data-diagram-state", "drawn");
+  const block = await editorBlock(page);
   await expect(block.locator("pre")).toBeHidden();
   const before = await block.getByRole("img", { name: "Diagram" }).getAttribute("src");
 
@@ -87,6 +98,10 @@ test("should open the source under a live preview and keep the fenced block when
   await expect(block.getByRole("img", { name: "Diagram" })).not.toHaveAttribute("src", before ?? "", { timeout: 30_000 });
   expect(await svgOf(page, await block.getByRole("img", { name: "Diagram" }).getAttribute("src"))).toContain("Ship");
 
+  // A selection that starts in the source and runs past it keeps the source open.
+  await page.keyboard.press("Control+Shift+End");
+  await expect(block.locator("pre")).toBeVisible();
+
   await block.getByRole("button", { name: "Done" }).click();
   await expect(block).not.toHaveAttribute("data-source-open", "");
   await expect(block.locator("pre")).toBeHidden();
@@ -95,7 +110,7 @@ test("should open the source under a live preview and keep the fenced block when
 
 test("should keep the source open with the note when an edit breaks the diagram", async ({ page }) => {
   await openFixture(page);
-  const block = editorDiagram(page);
+  const block = await editorBlock(page);
   // A click on the diagram itself opens its source, with the cursor at the end.
   await block.getByRole("img", { name: "Diagram" }).click();
   await page.keyboard.type(" -- >");

@@ -157,7 +157,9 @@ flowchart TD
   (`src/components/artifact-view/use-mermaid-diagram.ts` and
   `mermaid-render.ts`: securityLevel `strict`, no HTML labels, shown as an
   `<img>`), so nothing in a diagram can run. Mermaid loads only when a page
-  has a diagram, and it redraws for light, dark, and the artifact's theme.
+  has a diagram, each diagram draws only as it nears the viewport (renders
+  run one at a time), and it redraws for light, dark, and the artifact's
+  theme. Screen readers get the source as text after the image.
 - **A diagram that cannot be drawn** shows a short note ("Couldn’t draw this
   diagram.") and its source as an ordinary code block, never an empty space.
 - **The read view** (`MarkdownView` with `diagrams`) draws them in Markdown

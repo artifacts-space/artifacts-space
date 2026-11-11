@@ -37,9 +37,10 @@ export function MermaidView({ code, title, className }: { code: string; title?: 
 /**
  * The frame a Mermaid diagram shows in: the image once drawn, a quiet
  * placeholder while it draws. Shared by the mermaid format and diagrams in
- * Markdown documents.
+ * Markdown documents. `source`, when given, is read to screen readers after
+ * the image, so the diagram's content stays available as text.
  */
-export function DiagramFigure({ title, diagram }: { title?: string | undefined; diagram: RenderedDiagram | null }) {
+export function DiagramFigure({ title, diagram, source }: { title?: string | undefined; diagram: RenderedDiagram | null; source?: string | undefined }) {
   return (
     <figure className="min-w-0">
       {title ? <figcaption className="mb-3 text-md font-medium">{title}</figcaption> : null}
@@ -61,6 +62,12 @@ export function DiagramFigure({ title, diagram }: { title?: string | undefined; 
           </div>
         )}
       </div>
+      {source ? (
+        <div className="sr-only">
+          <p>Diagram source, in Mermaid:</p>
+          <pre>{source}</pre>
+        </div>
+      ) : null}
     </figure>
   );
 }

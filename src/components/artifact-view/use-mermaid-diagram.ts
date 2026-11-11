@@ -29,14 +29,41 @@ export interface MermaidDiagram {
   state: DiagramState;
 }
 
+/** How far outside the viewport a deferred diagram starts drawing, so it is ready by the time it scrolls in. */
+const nearViewport = "600px 0px";
+
+/** True once `ref`'s element has come near the viewport; true from the start when `defer` is off or the browser cannot tell. */
+function useNearViewport(ref: RefObject<HTMLElement | null>, defer: boolean): boolean {
+  const [near, setNear] = useState(() => !defer || typeof IntersectionObserver === "undefined");
+  useEffect(() => {
+    const element = ref.current;
+    if (near || !element) return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      setNear(true);
+      observer.disconnect();
+    }, { rootMargin: nearViewport });
+    observer.observe(element);
+    return () => { observer.disconnect(); };
+  }, [near, ref]);
+  return near;
+}
+
+interface DiagramOptions {
+  /** Keep the last diagram on screen while the next one draws, so a live preview never blinks. */
+  keepPrevious?: boolean;
+  /** Wait until the diagram is near the viewport before drawing: for documents, which can hold many. */
+  deferUntilNear?: boolean;
+}
+
 /**
  * Draws Mermaid source with the shared renderer (securityLevel "strict", no
  * HTML labels; see mermaid-render.ts), in the colors and font in scope at
  * `scopeRef`, and draws again when light or dark mode or the theme changes.
- * Mermaid loads only on the first draw. With `keepPrevious`, the last diagram
- * stays on screen while the next one draws, so a live preview never blinks.
+ * Mermaid loads only on the first draw. Renders run one at a time, so
+ * documents defer each diagram until it nears the viewport.
  */
-export function useMermaidDiagram(code: string, { keepPrevious = false }: { keepPrevious?: boolean } = {}): MermaidDiagram {
+export function useMermaidDiagram(code: string, { keepPrevious = false, deferUntilNear = false }: DiagramOptions = {}): MermaidDiagram {
   const dark = useDarkTheme();
   const themeKey = useThemeKey();
   const key = `${dark ? "dark" : "light"}:${themeKey}:${code}`;
@@ -44,10 +71,11 @@ export function useMermaidDiagram(code: string, { keepPrevious = false }: { keep
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [lastDrawn, setLastDrawn] = useState<RenderedDiagram | null>(null);
   const scopeRef = useRef<HTMLDivElement>(null);
+  const near = useNearViewport(scopeRef, deferUntilNear);
 
   useEffect(() => {
     const element = scopeRef.current;
-    if (sourceProblem || !element) return undefined;
+    if (sourceProblem || !near || !element) return undefined;
     let cancelled = false;
     diagramStyle(element)
       .then((style) => renderMermaid(code, style))
@@ -60,7 +88,7 @@ export function useMermaidDiagram(code: string, { keepPrevious = false }: { keep
         if (!cancelled) setOutcome({ key, error: error instanceof Error ? error.message : "Mermaid could not read this diagram." });
       });
     return () => { cancelled = true; };
-  }, [code, key, sourceProblem]);
+  }, [code, key, near, sourceProblem]);
 
   const current = outcome?.key === key ? outcome : null;
   return { scopeRef, state: diagramState(sourceProblem, current, keepPrevious ? lastDrawn : null) };

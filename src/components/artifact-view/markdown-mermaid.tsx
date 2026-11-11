@@ -30,8 +30,9 @@ export function DiagramFailedNote({ reason }: { reason: string }) {
 
 /**
  * A diagram in a document, by state: the drawn image (or its placeholder
- * while it draws), or, when Mermaid cannot read the source, the short note
- * and the source as an ordinary code block. Never an empty space.
+ * while it draws) with its source for screen readers, or, when Mermaid
+ * cannot read the source, the short note and the source as an ordinary code
+ * block. Never an empty space.
  */
 export function MarkdownDiagramBody({ code, state }: { code: string; state: DiagramState }) {
   if (state.status === "failed") {
@@ -42,17 +43,18 @@ export function MarkdownDiagramBody({ code, state }: { code: string; state: Diag
       </div>
     );
   }
-  return <DiagramFigure diagram={state.diagram} />;
+  return <DiagramFigure diagram={state.diagram} source={code} />;
 }
 
 /**
  * A fenced ```mermaid block in a Markdown document, drawn as its diagram with
  * the mermaid format's renderer and security settings. Mermaid loads only
- * when a document has a diagram. It follows light and dark mode and the
+ * when a document has a diagram, and each diagram draws only as it nears the
+ * viewport, so a document with many stays quick. It follows light and dark mode and the
  * artifact's theme. The Markdown keeps the fenced source.
  */
 export function MarkdownMermaid({ code }: { code: string }) {
-  const { scopeRef, state } = useMermaidDiagram(code);
+  const { scopeRef, state } = useMermaidDiagram(code, { deferUntilNear: true });
   return (
     <div ref={scopeRef} data-markdown-diagram="" data-diagram-state={state.status} className="min-w-0 not-first:mt-5">
       <MarkdownDiagramBody code={code} state={state} />

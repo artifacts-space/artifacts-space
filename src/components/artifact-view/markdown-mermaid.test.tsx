@@ -16,7 +16,6 @@ describe("Mermaid blocks in the Markdown read view", () => {
     const html = renderToStaticMarkup(<ArtifactView kind="markdown" content={document} title="Plan" />);
     expect(html).toContain("data-markdown-diagram");
     expect(html).toContain("Drawing diagram…");
-    expect(html).not.toContain("flowchart TD");
     expect(html.match(/data-code-block/g)).toHaveLength(1);
   });
 
@@ -43,6 +42,12 @@ describe("MarkdownDiagramBody", () => {
     expect(html).toContain('src="data:image/svg+xml');
     expect(html).not.toContain("<svg");
     expect(html).not.toContain("Couldn’t draw");
+  });
+
+  it("should give screen readers the diagram's source when it is drawn as an image", () => {
+    const html = renderToStaticMarkup(<MarkdownDiagramBody code={flowchart} state={{ status: "drawn", diagram: { svg: drawnSvg, width: 120, height: 40, smallestFont: 14 } }} />);
+    expect(html).toMatch(/<div class="sr-only"><p>Diagram source, in Mermaid:<\/p><pre>flowchart TD\n {2}A\[Start\] --&gt; B\[Ship\]<\/pre><\/div>/u);
+    expect(html).not.toContain("data-code-block");
   });
 
   it("should show a placeholder, never an empty space, while the diagram draws", () => {

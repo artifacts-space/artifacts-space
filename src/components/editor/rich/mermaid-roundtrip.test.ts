@@ -6,7 +6,21 @@ import { isMermaidLanguage } from "@/lib/markdown/mermaid-fence";
 import { blockCorpus } from "./block-corpus";
 import { parseMarkdown, serializeMarkdown } from "./markdown-roundtrip";
 
-const samples = blockCorpus.mermaid?.samples ?? {};
+/** The corpus's mermaid samples; fails loudly when the entry is missing, so no test passes on an empty string. */
+function mermaidSamples(): Readonly<Record<string, string>> {
+  const samples = blockCorpus.mermaid?.samples;
+  if (!samples || Object.keys(samples).length === 0) throw new Error("block-corpus.ts has no mermaid samples");
+  return samples;
+}
+
+const samples = mermaidSamples();
+
+/** One sample by name; fails loudly when it was renamed or removed. */
+function sample(name: string): string {
+  const markdown = samples[name];
+  if (markdown === undefined) throw new Error(`block-corpus.ts has no mermaid sample named ${name}`);
+  return markdown;
+}
 
 function codeBlocks(doc: JSONContent): JSONContent[] {
   return (doc.content ?? []).flatMap((node) => (node.type === "codeBlock" ? [node] : codeBlocks(node)));
@@ -20,7 +34,7 @@ describe("Mermaid blocks in the editor model", () => {
   });
 
   it("should write exactly the fenced block when the diagram source is edited", () => {
-    const loaded = parseMarkdown(samples.mermaidFlowchart ?? "");
+    const loaded = parseMarkdown(sample("mermaidFlowchart"));
     const content = (loaded.doc.content ?? []).map((node) =>
       node.type === "codeBlock" ? { ...node, content: [{ type: "text", text: "flowchart LR\n  A --> B" }] } : node,
     );
@@ -28,7 +42,7 @@ describe("Mermaid blocks in the editor model", () => {
   });
 
   it("should keep a broken diagram's source as written when it is not edited", () => {
-    const markdown = samples.mermaidBroken ?? "";
+    const markdown = sample("mermaidBroken");
     const loaded = parseMarkdown(markdown);
     expect(loaded.rawBlocks).toBe(0);
     expect(serializeMarkdown(loaded.doc, loaded.source)).toBe(markdown);

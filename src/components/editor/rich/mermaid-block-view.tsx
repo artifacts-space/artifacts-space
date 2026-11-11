@@ -2,6 +2,7 @@
 
 import { IconPencil } from "@tabler/icons-react";
 import type { Editor } from "@tiptap/core";
+import { NodeSelection } from "@tiptap/pm/state";
 import { NodeViewContent, NodeViewWrapper, useEditorState, type ReactNodeViewProps } from "@tiptap/react";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
@@ -27,17 +28,22 @@ function useSettledValue(value: string, delay: number): string {
   return settled;
 }
 
-/** True while the cursor (or the whole selection) is inside the block at `getPos()`. */
+/**
+ * True while the cursor or a text selection touches the source of the block
+ * at `getPos()`, including a selection that starts inside and runs past it,
+ * so the source never hides under the text being selected. Selecting the
+ * block itself (after Done) does not count.
+ */
 function useCursorInside(editor: Editor, getPos: () => number | undefined): boolean {
   return useEditorState({
     editor,
     selector: ({ editor: current }) => {
       const pos = getPos();
-      if (typeof pos !== "number") return false;
-      const node = current.state.doc.nodeAt(pos);
+      const { selection, doc } = current.state;
+      if (typeof pos !== "number" || selection instanceof NodeSelection) return false;
+      const node = doc.nodeAt(pos);
       if (!node) return false;
-      const { from, to } = current.state.selection;
-      return from > pos && to < pos + node.nodeSize;
+      return selection.from <= pos + node.nodeSize - 1 && selection.to >= pos + 1;
     },
   });
 }
@@ -88,7 +94,7 @@ export function MermaidBlockView({ node, updateAttributes, editor, getPos }: Rea
   const code = node.textContent;
   const preview = useSettledValue(code, previewDelayMs);
   const inside = useCursorInside(editor, getPos);
-  const { scopeRef, state } = useMermaidDiagram(preview, { keepPrevious: true });
+  const { scopeRef, state } = useMermaidDiagram(preview, { keepPrevious: true, deferUntilNear: true });
   const [opening, setOpening] = useState(false);
   const editable = editor.isEditable;
   const sourceOpen = editable && (opening || inside || code.trim() === "" || state.status === "failed");
