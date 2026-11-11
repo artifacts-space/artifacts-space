@@ -157,11 +157,13 @@ export const blockFillGap = 0.03;
  * the gap of white or black has no room on that side, and any step toward
  * the ink would take the ink under AA (the push already went as far that
  * way as the ink allows), so the pushed fill stays: apart from the card by
- * less than the gap, and on the card itself only when the ink is at the
- * floor there.
+ * less than the gap, and the card itself when the ink is at the floor there
+ * (the push would otherwise cross to the ink's far side).
  */
 function blockFill(mode: PaletteMode, card: Oklch, ink: Oklch, hueInk: Oklch): Oklch {
   const fill = ensureContrast(mixOklch(card, hueInk, blockFillTint[mode]), ink, 4.55);
+  // Out of room on the card's side, the push crosses to the ink's far side (a near-black block under dark ink): keep the card.
+  if (fill.l >= ink.l !== card.l >= ink.l) return card;
   if (Math.abs(fill.l - card.l) >= blockFillGap) return fill;
   const l = card.l + (card.l >= ink.l ? blockFillGap : -blockFillGap);
   if (l < 0 || l > 1) return fill;

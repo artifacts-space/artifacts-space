@@ -107,6 +107,22 @@ describe("blockColorTokens", () => {
     }
   });
 
+  it("should draw backgrounds on a white or black card itself when the ink is right at the AA floor there", () => {
+    const preset = builtInPresets().get("default");
+    if (!preset) throw new Error("default preset missing");
+    // The documented limit (markdown-dialect.md, "Block colors"): no fill can sit off the card and keep this ink readable.
+    for (const mode of ["light", "dark"] as const) {
+      const card = mode === "light" ? 1 : 0;
+      const colors = withInkAt(onOneSurface(preset.theme[mode], card), mode);
+      const tokens = blockColorTokens(mode, colors);
+      for (const hue of blockHues) {
+        const fill = color(tokens[`--block-${hue}-bg`]);
+        expect(contrastRatio(color(colors.foreground), fill), `${mode} ${hue}`).toBeGreaterThanOrEqual(4.5);
+        expect(Math.abs(fill.l - card), `${mode} ${hue}`).toBeLessThanOrEqual(0.005);
+      }
+    }
+  });
+
   it("should be part of every theme's tokens, so themed artifacts draw block colors from the theme", () => {
     const preset = builtInPresets().get("default");
     if (!preset) throw new Error("default preset missing");
