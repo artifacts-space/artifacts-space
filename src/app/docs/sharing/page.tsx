@@ -81,7 +81,7 @@ export default function SharingPage() {
       <Prose>
         <p>Inside a team, nobody waits: every member edits the team&apos;s artifacts directly. Approval is about who can read an artifact. In a personal team, sharing applies at once. In a shared team:</p>
         <ul>
-          <li><strong>Link and public</strong> sharing always needs an owner or admin. When an owner or admin shares from the web app, it applies at once.</li>
+          <li><strong>Link and public</strong> sharing needs an owner&apos;s or admin&apos;s approval, unless the person&apos;s role allows it. When an owner or admin shares from the web app, it applies at once.</li>
           <li><strong>Team</strong> sharing follows the team&apos;s setting. The <strong>Create a team</strong> form starts with no approval, so members share with the team right away; the owner can pick approval there or turn it on later. Teams made before this default keep their setting.</li>
           <li><strong>Agents never approve.</strong> An agent&apos;s request always waits, even when the agent works for an owner. <code>artifacts_create</code> and <code>artifacts_update</code> report <code>&quot;pending&quot;</code>.</li>
         </ul>
