@@ -138,13 +138,14 @@ export function ChatGptGuide({ origin, full = false }: ClientGuideProps) {
       <ApproveSteps opener="ChatGPT asks you to connect. A sign-in window opens." />
       <Label>Use it in a chat</Label>
       <Prose className="mt-2">
-        <p>Start a new chat, type <code>@</code>, and choose <strong>artifacts.space</strong>. ChatGPT asks before it uses a tool. You can tell it to remember your answer for that tool until the chat ends.</p>
-        <p>You need a Business, Enterprise, or Edu workspace. ChatGPT Pro can use only tools that are marked read-only, and our tools do not have that mark yet, so artifacts.space does not work on Pro for now.</p>
+        <p>Start a new chat, type <code>@</code>, and choose <strong>artifacts.space</strong>. It reads without asking. Before it saves, changes, or deletes anything, it asks you. You can tell it to remember your answer for that tool until the chat ends.</p>
+        <p>On ChatGPT Pro, ChatGPT can use the read tools: it finds and reads your artifacts, comments, and files. To save or change them, you need a Business, Enterprise, or Edu workspace.</p>
       </Prose>
       {full ? (
         <Prose className="mt-4">
           <p>You do not need Developer mode. In a Business workspace, only owners and admins can add a custom server. In Enterprise and Edu, an admin can give members the <strong>Create plugins with MCPs</strong> permission.</p>
           <p>ChatGPT on the web does not read the Codex config. If you added the server for Codex, add it here too. When new tools arrive, open the plugin and choose <strong>Refresh</strong>.</p>
+          <p>What ChatGPT saves shows <strong>via ChatGPT</strong>. Apps built on OpenAI&apos;s API can connect the same way and show as ChatGPT too. To fix the label for one connection, choose its agent on the <strong>Connections</strong> page.</p>
         </Prose>
       ) : null}
     </>
