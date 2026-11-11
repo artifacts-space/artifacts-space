@@ -30,8 +30,9 @@ const slot = (page: Page, name: string) => page.locator(`[data-slot=${name}]`);
 /** A box's rendered width. */
 const widthOf = (box: Locator) => box.evaluate((element) => element.getBoundingClientRect().width);
 
-/** The public page's column is 960px with 24px of padding each side, so its content runs 912px wide. */
-const pageContent = 912;
+/** The public page's column is 1024px (max-w-5xl) with 24px of padding each side, so its content runs 976px wide. */
+const pageColumn = 1024;
+const pageContent = 976;
 const wide = { width: 1600, height: 900 };
 
 /** Scrolls a scroll box to its bottom and returns its scrollTop. */
@@ -336,9 +337,9 @@ test.describe("open and page column", () => {
   test("should hold the whole preview and the source field to the centered page column when Full width is off", async ({ page }) => {
     await openWorkspace(page, wide);
     const body = slot(page, "detail-body");
-    expect(await widthOf(body), "the pane is wider than the page column").toBeGreaterThan(1000);
+    expect(await widthOf(body), "the pane is wider than the page column").toBeGreaterThan(pageColumn);
     const column = body.locator("[data-slot=page-column]");
-    expect(await widthOf(column)).toBeLessThanOrEqual(960);
+    expect(await widthOf(column)).toBeLessThanOrEqual(pageColumn);
     const gaps = await column.evaluate((element) => {
       const pane = element.parentElement?.getBoundingClientRect();
       const box = element.getBoundingClientRect();
@@ -348,7 +349,7 @@ test.describe("open and page column", () => {
     expect(await widthOf(body.getByRole("note").first()), "a callout keeps to the column").toBeLessThanOrEqual(pageContent + 1);
 
     await viewSource(page);
-    expect(await widthOf(page.getByRole("textbox", { name: "Artifact source" })), "the source field keeps to the column").toBeLessThanOrEqual(960);
+    expect(await widthOf(page.getByRole("textbox", { name: "Artifact source" })), "the source field keeps to the column").toBeLessThanOrEqual(pageColumn);
   });
 });
 
@@ -455,10 +456,10 @@ test.describe("full width", () => {
     expect(await versionCount(publicId), "a display setting files no version").toBe(0);
     await expectPageDoesNotScroll(page);
 
-    // The artifact's own page follows the same setting: wider than the 960px column it has when contained.
+    // The artifact's own page follows the same setting: wider than the column it has when contained.
     await page.goto(`/artifact/${publicId}`);
     await expect(page.locator("main")).toHaveAttribute("data-full-width", "true");
-    expect(await page.locator("main").evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(960);
+    expect(await page.locator("main").evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(pageColumn);
   });
 
   test("should keep side padding and no sideways scroll on a full-width page at phone width", async ({ page }, testInfo) => {

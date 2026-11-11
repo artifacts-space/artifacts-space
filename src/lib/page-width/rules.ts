@@ -11,11 +11,17 @@ import type { ArtifactKind } from "@/lib/artifact-types";
 export const FULL_WIDTH_LABEL = "Full width";
 
 /**
- * The public page's column (header, notice, main, footer): the 960px column
- * it has always had, or the whole window with wider padding on larger screens.
+ * The contained column's cap, 1024px, shared by the page, the /app panes,
+ * and the Edit view. Change the reading width here, once.
+ */
+const CONTAINED_COLUMN = "max-w-5xl";
+
+/**
+ * The public page's column (header, notice, main, footer): the contained
+ * 1024px column, or the whole window with wider padding on larger screens.
  */
 export function pageColumnClass(fullWidth: boolean): string {
-  return fullWidth ? "max-w-none px-6 sm:px-10 lg:px-16" : "max-w-[960px] px-6";
+  return fullWidth ? "max-w-none px-6 sm:px-10 lg:px-16" : `${CONTAINED_COLUMN} px-6`;
 }
 
 /**
@@ -30,7 +36,7 @@ export function readingMeasureClass(fullWidth: boolean): string {
 /**
  * The column an artifact's body sits in inside the /app panes. Contained,
  * it is the public page's own column (pageColumnClass): everything (text,
- * callouts, tabs, diagrams) keeps to the centered 960px column readers see.
+ * callouts, tabs, diagrams) keeps to the centered 1024px column readers see.
  * Full width uses the whole pane and lifts the reading measure; it keeps the
  * page's base padding only, because a pane is narrower than the window the
  * page's wider padding is sized for. The pane keeps its top and bottom padding.
@@ -40,11 +46,11 @@ export function previewColumnClass(fullWidth: boolean): string {
 }
 
 /**
- * The /app Edit view's column: the source field keeps to the same 960px
+ * The /app Edit view's column: the source field keeps to the same 1024px
  * column as the preview when contained, and spans the pane when full width.
  */
 export function editColumnClass(fullWidth: boolean): string {
-  return fullWidth ? "w-full" : "mx-auto w-full max-w-[960px]";
+  return fullWidth ? "w-full" : `mx-auto w-full ${CONTAINED_COLUMN}`;
 }
 
 /**

@@ -3,15 +3,15 @@ import { describe, expect, it } from "vitest";
 import { editColumnClass, hasWidthSetting, pageColumnClass, previewColumnClass, readingMeasureClass, usesFullWidth } from "./rules";
 
 describe("pageColumnClass", () => {
-  it("should keep the 960px reading column when the artifact is contained", () => {
-    expect(pageColumnClass(false)).toBe("max-w-[960px] px-6");
+  it("should keep the 1024px reading column when the artifact is contained", () => {
+    expect(pageColumnClass(false)).toBe("max-w-5xl px-6");
   });
 
   it("should drop the column cap and keep side padding when the artifact is full width", () => {
     const classes = pageColumnClass(true).split(" ");
     expect(classes).toContain("max-w-none");
     expect(classes).toContain("px-6");
-    expect(classes.some((name) => name.startsWith("max-w-[960px]"))).toBe(false);
+    expect(classes.some((name) => name.startsWith("max-w-5xl"))).toBe(false);
   });
 });
 
@@ -26,16 +26,16 @@ describe("readingMeasureClass", () => {
 });
 
 describe("previewColumnClass", () => {
-  it("should hold the whole preview to the public page's centered 960px column when the artifact is contained", () => {
+  it("should hold the whole preview to the public page's centered 1024px column when the artifact is contained", () => {
     const classes = previewColumnClass(false).split(" ");
-    expect(classes).toEqual(expect.arrayContaining(["mx-auto", "w-full", "max-w-[960px]", "px-6"]));
+    expect(classes).toEqual(expect.arrayContaining(["mx-auto", "w-full", "max-w-5xl", "px-6"]));
     expect(classes).not.toContain("[--artifact-measure:none]");
   });
 
   it("should use the whole pane and lift the reading measure when the artifact is full width", () => {
     const classes = previewColumnClass(true).split(" ");
     expect(classes).toEqual(expect.arrayContaining(["max-w-none", "px-6", "[--artifact-measure:none]"]));
-    expect(classes.some((name) => name.startsWith("max-w-[960px]"))).toBe(false);
+    expect(classes.some((name) => name.startsWith("max-w-5xl"))).toBe(false);
   });
 
   it("should give the contained preview exactly the public page's column", () => {
@@ -50,12 +50,12 @@ describe("previewColumnClass", () => {
 });
 
 describe("editColumnClass", () => {
-  it("should keep the source field to the 960px column when the artifact is contained", () => {
-    expect(editColumnClass(false).split(" ")).toEqual(expect.arrayContaining(["mx-auto", "max-w-[960px]"]));
+  it("should keep the source field to the 1024px column when the artifact is contained", () => {
+    expect(editColumnClass(false).split(" ")).toEqual(expect.arrayContaining(["mx-auto", "max-w-5xl"]));
   });
 
   it("should let the source field span the pane when the artifact is full width", () => {
-    expect(editColumnClass(true)).not.toContain("max-w-[960px]");
+    expect(editColumnClass(true)).not.toContain("max-w-5xl");
   });
 });
 

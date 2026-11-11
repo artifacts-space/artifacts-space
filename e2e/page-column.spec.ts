@@ -15,8 +15,9 @@ test.skip(!localDatabaseEnabled(), localDatabaseSkipReason);
 test.skip(({ isMobile }) => isMobile, "measured on desktop");
 
 const wide = { width: 1600, height: 900 };
-/** The public page's column is 960px with 24px of padding each side, so its content runs 912px wide. */
-const pageContent = 912;
+/** The public page's column is 1024px (max-w-5xl) with 24px of padding each side, so its content runs 976px wide. */
+const pageColumn = 1024;
+const pageContent = 976;
 const created: string[] = [];
 
 const widthOf = (box: Locator) => box.evaluate((element) => element.getBoundingClientRect().width);
@@ -73,18 +74,18 @@ test("should match the public page's column in the /app preview and widen it wit
   await page.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: "View source" }).click();
   const source = page.getByRole("textbox", { name: "Artifact source" });
-  expect(await widthOf(source)).toBeLessThanOrEqual(960);
+  expect(await widthOf(source)).toBeLessThanOrEqual(pageColumn);
   await page.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitemcheckbox", { name: "Full width" }).click();
   await expect(body.locator("[data-full-width]")).toHaveAttribute("data-full-width", "true");
   await page.keyboard.press("Escape");
-  expect(await widthOf(source), "the source field follows Full width").toBeGreaterThan(1000);
+  expect(await widthOf(source), "the source field follows Full width").toBeGreaterThan(pageColumn);
 
   await page.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: "Hide source" }).click();
   await expect(callout).toBeVisible();
-  expect(await widthOf(callout), "callouts widen").toBeGreaterThan(1000);
-  expect(await widthOf(diagram), "diagrams widen").toBeGreaterThan(1000);
+  expect(await widthOf(callout), "callouts widen").toBeGreaterThan(pageColumn);
+  expect(await widthOf(diagram), "diagrams widen").toBeGreaterThan(pageColumn);
 });
 
 test("should offer Full width in the page header's More menu and widen the page while it stays editable", async ({ page }) => {
@@ -105,5 +106,5 @@ test("should offer Full width in the page header's More menu and widen the page 
   await expect(toggle).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("textbox", { name: "Title" }), "the page stays editable").toHaveValue(title);
-  expect(await widthOf(main)).toBeGreaterThan(960);
+  expect(await widthOf(main)).toBeGreaterThan(pageColumn);
 });
