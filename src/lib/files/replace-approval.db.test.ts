@@ -42,7 +42,7 @@ vi.mock("./copies", async (importOriginal) => {
 });
 
 describe.runIf(Boolean(databaseUrl))("replacing a file, its approval and races, with a database", async () => {
-  const { eq, inArray, like, or } = await import("drizzle-orm");
+  const { eq, inArray, like, or, sql } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
   const { artifactFileCopy } = await import("@/db/file-copy-schema");
   const { artifact, artifactFile, artifactVersion, rateLimitBucket, sharingRequest, team, teamMember, user } = await import("@/db/schema");
@@ -84,7 +84,7 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, its approval and races, 
   }
 
   /** Puts the artifact in a team where the author has `role`: a member's edits to a public artifact wait for approval; an owner's apply. */
-  async function inTeam(role: "member" | "owner") {
+  async function inTeam(role: "member" | "admin" | "owner") {
     await getDb().insert(team).values({ id: teamId, name: "Replace team", slug: teamId, personal: false });
     await getDb().insert(teamMember).values({ id: `${teamId}-m`, teamId, userId: ids.author, role });
     await getDb().update(artifact).set({ teamId }).where(eq(artifact.id, ids.doc));
@@ -170,16 +170,30 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, its approval and races, 
       expect((await findReadableFile(sow, null))?.key).toBe(`files/${next}/sow-v2.pdf`);
     });
 
-    it("should date the copy, the version, and the artifact's save by one app-clock time", async () => {
-      const before = Date.now();
-      await replaceFile(ids.author, { fileId: sow, uploadId: await upload() }, "person");
-      const [copy] = await copies();
-      const [version] = await replaceVersions();
-      const [record] = await getDb().select().from(artifact).where(eq(artifact.id, ids.doc));
+    it.each([-5, 5])("should date the replace by the database clock when the app clock is %i minutes off, so outside readers keep the approved copy", async (skewMinutes) => {
+      await inTeam("member");
+      const next = await upload();
+      const databaseNow = async () => (await getDb().execute<{ now: string | Date }>(sql`select now() as now`)).rows[0]?.now;
+      const before = new Date(String(await databaseNow()));
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.now() + skewMinutes * 60_000);
+      try {
+        await replaceFile(ids.author, { fileId: sow, uploadId: next }, "person");
+      } finally {
+        vi.useRealTimers();
+      }
+      const after = new Date(String(await databaseNow()));
 
-      expect(copy?.replacedAt.getTime()).toBeGreaterThanOrEqual(before);
-      expect(version?.savedAt.getTime()).toBe(copy?.replacedAt.getTime());
-      expect(record?.updatedAt.getTime()).toBe(copy?.replacedAt.getTime());
+      const [version] = await replaceVersions();
+      const [copy] = await copies();
+      const [record] = await getDb().select().from(artifact).where(eq(artifact.id, ids.doc));
+      const savedAt = version?.savedAt.getTime() ?? 0;
+      expect(savedAt).toBeGreaterThanOrEqual(before.getTime());
+      expect(savedAt).toBeLessThanOrEqual(after.getTime());
+      expect(copy?.replacedAt.getTime()).toBe(savedAt);
+      expect(record?.updatedAt.getTime()).toBe(savedAt);
+      expect((await requests())[0]?.createdAt.getTime()).toBe(savedAt);
+      expect((await findReadableFile(sow, null))?.key).toBe(`files/${sow}/sow.pdf`);
       expect(version?.bytes).toBeGreaterThan(0);
     });
   });
@@ -201,6 +215,21 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, its approval and races, 
       expect(await copies()).toEqual([]);
       expect(await replaceVersions()).toEqual([]);
       expect(await requests()).toEqual([]);
+    });
+
+    it("should refuse and leave everything as it was when an admin is demoted after the approval was decided", async () => {
+      await inTeam("admin");
+      // An admin's own edit (the plan applies it because admins may approve edits), demoted before the swap.
+      const demotedMeanwhile = async () => {
+        await getDb().update(teamMember).set({ role: "member" }).where(eq(teamMember.teamId, teamId));
+        return null;
+      };
+
+      await expect(replaceFile(ids.author, { fileId: sow, uploadId: await upload() }, "person", demotedMeanwhile)).rejects.toThrow(/changed while it was being replaced/);
+      expect((await entry(sow))?.key).toBe(`files/${sow}/sow.pdf`);
+      expect(await replaceVersions()).toEqual([]);
+      expect(await requests()).toEqual([]);
+      expect((await findReadableFile(sow, null))?.key).toBe(`files/${sow}/sow.pdf`);
     });
 
     it("should refuse and leave the file and requests as they were when the artifact's sharing changes after the approval was decided", async () => {
