@@ -45,6 +45,12 @@ async function signInAsDev(page: Page): Promise<string> {
   return readyDevUser();
 }
 
+/** Opens a team's workspace from the workspace switcher, picking the item by its link: test team names can share a prefix. */
+async function switchToTeam(page: Page, slug: string) {
+  await page.getByRole("button", { name: /^Workspace: / }).click();
+  await page.getByRole("menuitem").and(page.locator(`[href="/app?team=${slug}"]`)).click();
+}
+
 /** A shared team owned by a seeded @example.com person, who invites. */
 async function teamOwnedBySomeoneElse() {
   const ownerId = await createTestUser();
@@ -89,12 +95,10 @@ test("should take an invited person from the invitation to editing a team artifa
   await page.reload();
   await expect(page.locator("[data-slot=workspace-detail]").first()).toBeAttached();
   await expect(welcome, "a reload after Got it shows no card").toHaveCount(0);
-  await page.getByRole("button", { name: /^Workspace: / }).click();
-  await page.getByRole("menuitem", { name: new RegExp(second.teamName) }).click();
+  await switchToTeam(page, second.team.slug);
   await page.waitForURL(new RegExp(`/app\\?team=${second.team.slug}$`));
   await expect(welcome.getByRole("heading", { name: `Welcome to ${second.teamName}` }), "switching teams shows the other team's card").toBeVisible();
-  await page.getByRole("button", { name: /^Workspace: / }).click();
-  await page.getByRole("menuitem", { name: new RegExp(teamName) }).click();
+  await switchToTeam(page, team.slug);
   await page.waitForURL(new RegExp(`/app\\?team=${team.slug}$`));
   await expect(page.getByRole("heading", { level: 1, name: `Shared with ${teamName}` })).toBeAttached();
   await expect(welcome, "switching back keeps the first team's card closed").toHaveCount(0);
