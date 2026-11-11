@@ -165,9 +165,12 @@ describe("tool annotations", () => {
     expect(idempotent).toEqual(["artifacts_delete", "comment_delete", "files_attach", "files_delete", "files_finalize", "inbox_mark_read"]);
   });
 
-  it("should list only tools marked read-only when access is read-only", async () => {
+  it("should list only tools marked read-only and not destructive when access is read-only", async () => {
     const { tools } = await connect("read");
-    expect(tools.every((tool) => tool.annotations?.readOnlyHint === true)).toBe(true);
+    for (const tool of tools) {
+      expect(tool.annotations?.readOnlyHint, tool.name).toBe(true);
+      expect(tool.annotations?.destructiveHint, tool.name).toBe(false);
+    }
   });
 });
 

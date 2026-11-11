@@ -109,7 +109,8 @@ export function toolAllowed(name: string, access: McpAccess): boolean {
  * `openWorldHint` is false. Throws for a tool nobody classified.
  */
 export function toolAnnotations(name: string): ToolAnnotations {
-  if (levelOf(name) === "read") return { readOnlyHint: true, openWorldHint: false };
+  // destructiveHint defaults to true in MCP; say false so no client that resolves defaults asks before a read.
+  if (levelOf(name) === "read") return { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
   const write = traits.get(name);
   if (!write) throw new Error(`MCP write tool "${name}" has no traits. Add it to writeTraits in src/lib/mcp/tool-access.ts.`);
   return { readOnlyHint: false, destructiveHint: write.destructive, idempotentHint: write.idempotent, openWorldHint: false };
