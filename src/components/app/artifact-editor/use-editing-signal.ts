@@ -22,7 +22,9 @@ interface EditingSignalOptions {
  * timer, and sends at most once every 20 seconds while there are unsaved
  * changes or typing just happened (shouldSignalEditing). When the editor
  * closes (or moves to another artifact) after it took a lease, it ends that
- * lease at once. Otherwise the lease ends on its own about a minute after
+ * lease within 20 seconds; not at once, because the lease is per person,
+ * and another tab of theirs still typing keeps it with its next signal.
+ * Otherwise the lease ends on its own about a minute after
  * the last signal: a save that leaves nothing unsaved keeps it, because the
  * person usually goes on typing, and ending it on every autosave would turn
  * the 20-second throttle into a request per save. A closed tab cannot send

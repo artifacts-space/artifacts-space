@@ -17,7 +17,7 @@ const signalSchema = z.object({ artifactId: z.string().trim().min(1).max(200), e
  * that names no base version cannot overwrite their typing for about a
  * minute. The editor sends it on input only, at most every 20 seconds, with
  * the artifact's id, and sends `editing: false` when it closes, which ends
- * the lease at once. The access check reads the row without its content.
+ * the lease within one signal interval (endEditLease). The access check reads the row without its content.
  * Over the runaway limit the lease is simply left as it is and the answer is
  * still a success: the person's saves work, and their next save still wins
  * over agents' saves.

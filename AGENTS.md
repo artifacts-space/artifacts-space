@@ -419,12 +419,14 @@ the UPDATE itself, one statement, never a read-then-write:
   format change matches only while no person's edit lease is live
   (`artifact_being_edited`). Leases come only from the web editor's "I'm
   editing" signal (`src/lib/edits/actions.ts`): on input, at most every 20 s,
-  about 60 s long, never on a timer; the editor ends its lease when it closes.
+  about 60 s long, never on a timer; a closing editor cuts its lease to one
+  signal interval (leases are per person, so another open tab keeps it).
 - A save attaches its uploads (content media, icon, cover) only after its
   guarded write lands, so a refused save attaches nothing.
 - A person's web save with `expectedUpdatedAt` falls back, when the artifact
   moved on, to "no person saved since" (`artifact.person_saved_at`, set by
-  every person's save and never by an agent's). It lands over agents' saves
+  every person's save and never by an agent's; null when no person has saved
+  yet, as on an artifact an agent created). It lands over agents' saves
   and reports `savedOverAgents`; another person's newer save still refuses it.
 - History merges quick saves only with the same source key (person and
   harness, null for the web app: `saveSourceKey`), so a web save never folds

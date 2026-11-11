@@ -188,11 +188,20 @@ describe.runIf(Boolean(databaseUrl))("concurrent edits with a database", async (
       await expect(restoreArtifactVersion(owner, page.id, first.id, "agent", { harness: claude })).rejects.toMatchObject({ code: "artifact_being_edited" });
     });
 
-    it("should accept a baseVersion-less agent at once when the person's editor closed and ended the lease", async () => {
+    it("should end the lease within one signal interval when an editor closes, unless another open editor signals again", async () => {
       const page = await personArtifact();
       await renewEditLease(page.id, owner);
-      await expect(updateArtifact(owner, page.id, { content: "# Answers\n\nold client" }, "agent", { harness: claude })).rejects.toMatchObject({ code: "artifact_being_edited" });
       await endEditLease(page.id, owner);
+      const secondsLeft = async () => {
+        const [lease] = await getDb().select({ expiresAt: artifactEditLease.expiresAt }).from(artifactEditLease).where(eq(artifactEditLease.artifactId, page.id));
+        return ((lease?.expiresAt.getTime() ?? 0) - Date.now()) / 1000;
+      };
+      expect(await secondsLeft()).toBeLessThanOrEqual(21);
+      // The person's other tab, still typing, signals within that interval and keeps the lease.
+      await renewEditLease(page.id, owner);
+      expect(await secondsLeft()).toBeGreaterThan(50);
+      await endEditLease(page.id, owner);
+      await getDb().update(artifactEditLease).set({ expiresAt: sql`now() - interval '1 second'` }).where(eq(artifactEditLease.artifactId, page.id));
       expect((await updateArtifact(owner, page.id, { content: "# Answers\n\nold client" }, "agent", { harness: claude }))?.content).toBe("# Answers\n\nold client");
     });
 
@@ -225,6 +234,21 @@ describe.runIf(Boolean(databaseUrl))("concurrent edits with a database", async (
         ["# Answers\n\nQ1: the agent's draft", "claude-code"],
         ["# Answers\n\nQ1: the owner's answer", null],
       ]);
+    });
+
+    it("should land the person's save over an agent's on an artifact an agent created", async () => {
+      const page = await createArtifact(owner, { title: "Agent notes", content: "# Notes\n\nfrom the agent" }, { harness: claude });
+      // The person opens it in the web app; the agent saves again from what it read.
+      await updateArtifact(owner, page.id, { content: "# Notes\n\nthe agent's second pass" }, "agent", { harness: claude, baseVersion: await readBase(page.id) });
+      const saved = await saveArtifactUpdate(owner, page.id, { content: "# Notes\n\nthe owner's edit" }, "person", { expectedUpdatedAt: page.updatedAt });
+      expect(saved?.savedOverAgents).toBe(true);
+      // The agent's quick second pass folds into its own first version; the person's save stands apart.
+      expect((await versions(page.id)).map((version) => [version.content, version.harness])).toEqual([
+        ["# Notes\n\nthe agent's second pass", "claude-code"],
+        ["# Notes\n\nthe owner's edit", null],
+      ]);
+      // From now on a person has saved it, so another person's stale tab is refused as before.
+      await expect(saveArtifactUpdate(owner, page.id, { content: "# Notes\n\nstale tab" }, "person", { expectedUpdatedAt: page.updatedAt })).rejects.toBeInstanceOf(StaleSaveError);
     });
 
     it("should still refuse a web save over another person's newer save", async () => {

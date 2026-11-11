@@ -6,7 +6,7 @@ import { artifact, artifactVersion } from "@/db/schema";
 import { loadActor } from "@/lib/agents/queries";
 import { harnessFor } from "@/lib/harness/harnesses";
 
-import { EDIT_LEASE_MS, type BaseVersion, type ChangedBy } from "./edit-conflict-rules";
+import { EDIT_LEASE_MS, EDIT_SIGNAL_INTERVAL_MS, type BaseVersion, type ChangedBy } from "./edit-conflict-rules";
 
 /**
  * The database side of edit-conflict-rules.ts: edit leases, and the SQL
@@ -39,11 +39,14 @@ export function agentWriteCondition(artifactId: string, input: { base: BaseVersi
 /**
  * The relaxed condition a person's web save falls back to when the artifact
  * moved on from the editor's base: every save since was an agent's, because
- * no person saved after the base (person_saved_at, null on older rows, which
- * then reads as the last save time and so refuses as before).
+ * no person saved after the base. `person_saved_at` is set by every person's
+ * save and never by an agent's; null means no person has saved the artifact
+ * yet (an agent created it), so only agents can have saved since. Rows from
+ * before the column took it from their newest web version
+ * (drizzle/0044_edit_lease.sql).
  */
 export function onlyAgentsSavedSince(expected: Date) {
-  return sql`date_trunc('milliseconds', coalesce(${artifact.personSavedAt}, ${artifact.updatedAt})) <= ${expected.toISOString()}::timestamptz`;
+  return sql`(${artifact.personSavedAt} is null or date_trunc('milliseconds', ${artifact.personSavedAt}) <= ${expected.toISOString()}::timestamptz)`;
 }
 
 /** Whether a person's edit lease on the artifact is live now, by the database clock. */
@@ -74,9 +77,18 @@ export async function renewEditLease(artifactId: string, userId: string): Promis
     .onConflictDoUpdate({ target: [artifactEditLease.artifactId, artifactEditLease.userId], set: { expiresAt: sql`now() + make_interval(secs => ${seconds})` } });
 }
 
-/** Ends a person's edit lease on an artifact at once, when their editor closes. */
+/**
+ * Ends a person's edit lease on an artifact soon, when one of their editors
+ * closes: within one signal interval instead of a full lease. The lease is
+ * per person, not per tab, so it is not deleted outright: another editor of
+ * theirs still typing on the artifact signals within that interval and keeps it.
+ */
 export async function endEditLease(artifactId: string, userId: string): Promise<void> {
-  await getDb().delete(artifactEditLease).where(and(eq(artifactEditLease.artifactId, artifactId), eq(artifactEditLease.userId, userId)));
+  const seconds = EDIT_SIGNAL_INTERVAL_MS / 1000;
+  await getDb()
+    .update(artifactEditLease)
+    .set({ expiresAt: sql`least(${artifactEditLease.expiresAt}, now() + make_interval(secs => ${seconds}))` })
+    .where(and(eq(artifactEditLease.artifactId, artifactId), eq(artifactEditLease.userId, userId)));
 }
 
 /** Deletes leases that ended more than an hour ago; the cleanup job runs it. Returns how many went. */
