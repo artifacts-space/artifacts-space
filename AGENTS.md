@@ -73,6 +73,11 @@ only matrix key and list 1, 2, 3, ... in order (a step fails otherwise), and
 never rename the gate. The gate keeps `needs: e2e` with `if: always()`:
 without `always()` a failed shard would skip the gate, and a skipped required
 check counts as passing.
+The shards run inside Playwright's Docker image, pinned by digest, which
+already holds Chromium and its system libraries, so CI never installs
+packages from Ubuntu's mirrors. When you bump `@playwright/test`, bump the
+image tag and digest in `ci.yml` to the same version; until then the shards
+download Chromium and warn.
 The build needs no secrets; keep it that way, and create database, auth,
 email, and R2 clients on first request, never at import time. CodeQL scans
 the code and the workflows. Dependabot opens grouped weekly updates and waits
@@ -262,6 +267,17 @@ catch this, so test the generated SQL with `.toSQL()`, as
   (`src/lib/auth/entry-rules.ts`), and `/?home` shows the landing page. Only
   `/` may trust cookie presence: every other redirect toward the workspace
   checks the real session and expires a stale cookie, or it can loop.
+- "Something's not working" (account menu, `src/components/feedback`) posts
+  to Slack through the Incoming Webhook in `SLACK_FEEDBACK_WEBHOOK_URL` (set
+  in Vercel Production and Preview). It is a secret: never hardcode, log, or
+  print it, and never post to it from tests (mock `fetch`). A URL that does
+  not start with `https://hooks.slack.com/` counts as unconfigured. A report
+  carries the note, the sender's name and email, the page path (no query or
+  hash), the team slug, browser, viewport, deploy, and time. It must never
+  carry artifact content, titles, file names, or anything typed in the
+  editor. Rules and the Slack message live in
+  `src/lib/feedback/feedback-rules.ts`; every value a person controls is
+  escaped `plain_text`.
 - Search engines list an artifact page only when it is public, someone who
   may share it (its author, or the person who added the agent that wrote it,
   while still in the agent's team) turned on "Show in search engines"

@@ -21,6 +21,7 @@ export const envDocs: readonly EnvDoc[] = [
   { name: "SENDIR_IDENTITY_ID", need: "for email", what: "The Sendir identity whose address sends every email." },
   { name: "SENDIR_URL", need: "optional", what: "Overrides https://sendir.ai." },
   { name: "ABUSE_REPORT_EMAIL", need: "for email", what: "The site operator's address. Every reader report on an artifact is emailed here, and only here. Without it, reports are still stored and shown on the team page, and each one logs a warning." },
+  { name: "SLACK_FEEDBACK_WEBHOOK_URL", need: "optional", what: "Slack Incoming Webhook for \"Something's not working\" reports from the account menu. Must start with https://hooks.slack.com/. Keep it secret. Without a valid one, the dialog says feedback is not available." },
   { name: "R2_ACCOUNT_ID", need: "for files", what: "Cloudflare account id for R2." },
   { name: "R2_BUCKET", need: "for files", what: "The bucket that holds uploads." },
   { name: "R2_ACCESS_KEY_ID", need: "for files", what: "S3 access key: the id of an API token scoped to the bucket." },
@@ -33,6 +34,7 @@ export const envDocs: readonly EnvDoc[] = [
   { name: "STORAGE_QUOTA_CONTENT_BYTES", need: "optional", what: "Artifact content quota per account, in bytes. Default 100 MB." },
   { name: "STORAGE_QUOTA_FILE_BYTES", need: "optional", what: "File quota per account, in bytes. Default 1 GB." },
   { name: "VERCEL_PROJECT_PRODUCTION_URL", need: "platform", what: "Set by Vercel. The site origin when BETTER_AUTH_URL is unset." },
-  { name: "VERCEL_ENV", need: "platform", what: "Set by Vercel. Production and preview share one email budget; anything else counts its own." },
+  { name: "VERCEL_ENV", need: "platform", what: "Set by Vercel. Production and preview share one email budget; anything else counts its own. Problem reports name it with the commit." },
+  { name: "VERCEL_GIT_COMMIT_SHA", need: "platform", what: "Set by Vercel. Problem reports name the deploy by its short commit." },
   { name: "NODE_ENV", need: "platform", what: "Set by Next.js. Development turns on the dev sign-in route and prints sign-in links instead of sending them." },
 ];
