@@ -145,6 +145,7 @@ export function ChatGptGuide({ origin, full = false }: ClientGuideProps) {
         <Prose className="mt-4">
           <p>You do not need Developer mode. In a Business workspace, only owners and admins can add a custom server. In Enterprise and Edu, an admin can give members the <strong>Create plugins with MCPs</strong> permission.</p>
           <p>ChatGPT on the web does not read the Codex config. If you added the server for Codex, add it here too. When new tools arrive, open the plugin and choose <strong>Refresh</strong>.</p>
+          <p>What ChatGPT saves shows <strong>via ChatGPT</strong>. Apps built on OpenAI&apos;s API can connect the same way and show as ChatGPT too. To fix the label for one connection, choose its agent on the <strong>Connections</strong> page.</p>
         </Prose>
       ) : null}
     </>
