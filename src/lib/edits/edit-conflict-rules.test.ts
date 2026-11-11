@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   agentRefusalMessage,
   agentWriteRefusal,
+  BASE_CLOCK_SKEW_MS,
   EDIT_SIGNAL_INTERVAL_MS,
   encodeBaseVersion,
+  isPlausibleBase,
   leaseIsLive,
   parseBaseVersion,
   RECENT_TYPING_MS,
@@ -128,5 +130,19 @@ describe("agentRefusalMessage", () => {
   it("should say someone is editing right now when a lease refused it", () => {
     expect(agentRefusalMessage("editing", { handle: "charles", harness: null })).toMatch(/^@charles is editing this artifact in the web app right now\./);
     expect(agentRefusalMessage("editing", null)).toMatch(/^Someone is editing this artifact/);
+  });
+});
+
+describe("isPlausibleBase", () => {
+  const now = new Date("2026-11-11T13:29:00Z");
+
+  it("should accept a base the server handed out, up to the allowed clock skew", () => {
+    expect(isPlausibleBase(new Date("2026-11-11T13:08:00Z"), now)).toBe(true);
+    expect(isPlausibleBase(new Date(now.getTime() + BASE_CLOCK_SKEW_MS), now)).toBe(true);
+  });
+
+  it("should refuse a base from the future, which would let a stale save land over a person's newer one", () => {
+    expect(isPlausibleBase(new Date(now.getTime() + BASE_CLOCK_SKEW_MS + 1), now)).toBe(false);
+    expect(isPlausibleBase(new Date("3000-01-01T00:00:00Z"), now)).toBe(false);
   });
 });

@@ -96,6 +96,19 @@ export function agentWriteRefusal(check: AgentWriteCheck): AgentWriteRefusal | n
   return check.guarded && check.leaseLive ? "editing" : null;
 }
 
+/** How far past the server's clock a web editor's base may be: its base is a save time the server handed out. */
+export const BASE_CLOCK_SKEW_MS = 60_000;
+
+/**
+ * Whether a person's base (`expectedUpdatedAt`) can be a save time the server
+ * handed out. A base in the future would make every save look like it only
+ * went over agents' saves, so such a save is refused instead of landing
+ * silently over another person's newer save.
+ */
+export function isPlausibleBase(expected: Date, now: Date): boolean {
+  return expected.getTime() <= now.getTime() + BASE_CLOCK_SKEW_MS;
+}
+
 /** A lease is live until its expiry. */
 export function leaseIsLive(expiresAt: Date | null, now: Date): boolean {
   return expiresAt !== null && expiresAt.getTime() > now.getTime();

@@ -196,7 +196,7 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
 
   const dirty = hasChanges(draftFrom(artifact), draft) && !idle(draft);
   const paused = status.kind === "conflict";
-  useEditingSignal({ publicId: artifact.publicId, draft, dirty, signal: signalEditing });
+  useEditingSignal({ artifactId: artifact.id, draft, dirty, signal: signalEditing });
   useEffect(() => { pausedRef.current = paused; }, [paused]);
 
   useEffect(() => {

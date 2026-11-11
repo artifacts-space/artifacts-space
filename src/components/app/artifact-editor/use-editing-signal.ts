@@ -5,10 +5,10 @@ import { shouldSignalEditing } from "@/lib/edits/edit-conflict-rules";
 import type { ArtifactDraft } from "./use-artifact-draft";
 
 /** Sends one "I'm editing" signal for an artifact. Its result is ignored: saves still win without it. */
-export type SignalEditing = (publicId: string) => Promise<unknown>;
+export type SignalEditing = (artifactId: string) => Promise<unknown>;
 
 interface EditingSignalOptions {
-  publicId: string;
+  artifactId: string;
   draft: ArtifactDraft;
   /** The editor has changes it has not saved. */
   dirty: boolean;
@@ -23,19 +23,20 @@ interface EditingSignalOptions {
  * changes or typing just happened (shouldSignalEditing). The lease ends on
  * its own about a minute after the last signal.
  */
-export function useEditingSignal({ publicId, draft, dirty, signal }: EditingSignalOptions) {
+export function useEditingSignal({ artifactId, draft, dirty, signal }: EditingSignalOptions) {
   const lastSignalRef = useRef<number | null>(null);
-  const firstDraftRef = useRef(draft);
+  const lastInputRef = useRef<number | null>(null);
   // Read when the draft changes; a save that only flips `dirty` is not typing.
-  const latestRef = useRef({ publicId, dirty, signal });
-  useEffect(() => { latestRef.current = { publicId, dirty, signal }; }, [publicId, dirty, signal]);
+  const latestRef = useRef({ artifactId, dirty, signal });
+  useEffect(() => { latestRef.current = { artifactId, dirty, signal }; }, [artifactId, dirty, signal]);
 
   useEffect(() => {
-    // The draft the editor opened with is not typing.
-    if (draft === firstDraftRef.current) return;
     const now = Date.now();
-    const { publicId: id, dirty: unsaved, signal: send } = latestRef.current;
-    if (!shouldSignalEditing({ now, lastSignalAt: lastSignalRef.current, unsaved, lastInputAt: now })) return;
+    const { artifactId: id, dirty: unsaved, signal: send } = latestRef.current;
+    // A change that leaves unsaved edits is typing. A draft replaced to match the saved artifact (the editable
+    // copy loading, a restore, loading their version) is not, so opening an artifact never takes a lease.
+    if (unsaved) lastInputRef.current = now;
+    if (!shouldSignalEditing({ now, lastSignalAt: lastSignalRef.current, unsaved, lastInputAt: lastInputRef.current })) return;
     lastSignalRef.current = now;
     send(id).catch(() => {
       // Best effort: the person's next save still goes through over agents' saves.

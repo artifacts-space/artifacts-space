@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   enforceRateLimit: vi.fn(() => Promise.resolve()),
   hasLiveLease: vi.fn(() => Promise.resolve(false)),
   selected: vi.fn((): unknown[] => []),
+  pruneContent: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("@/db", () => ({
@@ -43,7 +44,7 @@ vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: mocks.enforceRateLi
 vi.mock("@/lib/quota/usage", () => ({ assertContentFits: () => Promise.resolve() }));
 vi.mock("@/lib/files/attach", () => ({ checkContentFiles: () => Promise.resolve([]) }));
 vi.mock("@/lib/files/icon-file", () => ({ checkIconFile: () => Promise.resolve([]), restorableIcon: vi.fn() }));
-vi.mock("@/lib/files/icon-cleanup", () => ({ pruneUnusedIconFilesQuietly: () => Promise.resolve(), pruneUnusedContentFilesQuietly: () => Promise.resolve() }));
+vi.mock("@/lib/files/icon-cleanup", () => ({ pruneUnusedIconFilesQuietly: () => Promise.resolve(), pruneUnusedContentFilesQuietly: mocks.pruneContent }));
 vi.mock("@/lib/files/store", () => ({ attachFileRows: () => Promise.resolve(), deleteArtifactFiles: () => Promise.resolve(), listFilesForArtifacts: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/edits/agent-write-guard", async (importOriginal) => ({
   ...(await importOriginal<typeof AgentWriteGuard>()),
@@ -91,6 +92,19 @@ describe("updateArtifact base-version check", () => {
     const save = updateArtifact("user-1", "artifact-1", { content: "# Mine" }, "person", { expectedUpdatedAt: "2026-11-08T09:59:00.000Z" });
     await expect(save).rejects.toBeInstanceOf(StaleSaveError);
     await expect(save).rejects.toMatchObject({ publicId: baseRecord.publicId });
+    expect(mocks.recordArtifactSave).not.toHaveBeenCalled();
+  });
+
+  it("should remove the media a refused save attached when another person saved since", async () => {
+    mocks.returned.mockReturnValue([]);
+    await expect(updateArtifact("user-1", "artifact-1", { content: "# Mine" }, "person", { expectedUpdatedAt: "2026-11-08T09:59:00.000Z" })).rejects.toBeInstanceOf(StaleSaveError);
+    expect(mocks.pruneContent).toHaveBeenCalledWith("artifact-1");
+  });
+
+  it("should refuse a base from the future instead of landing over everyone's newer saves", async () => {
+    mocks.returned.mockImplementation((values: Record<string, unknown>) => (mocks.set.mock.calls.length > 1 ? [{ ...baseRecord, ...values }] : []));
+    await expect(updateArtifact("user-1", "artifact-1", { content: "# Mine" }, "person", { expectedUpdatedAt: "3000-01-01T00:00:00.000Z" })).rejects.toBeInstanceOf(StaleSaveError);
+    expect(mocks.set, "only the exact-base attempt ran").toHaveBeenCalledTimes(1);
     expect(mocks.recordArtifactSave).not.toHaveBeenCalled();
   });
 

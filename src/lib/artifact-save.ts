@@ -9,7 +9,7 @@ import type { ArtifactChanges } from "@/lib/artifacts";
 import { coverFileId } from "@/lib/covers/cover";
 import { agentWriteCondition, editingPerson, hasLiveLease, lastSavedBy, onlyAgentsSavedSince } from "@/lib/edits/agent-write-guard";
 import { BadBaseVersionError, EditConflictError } from "@/lib/edits/conflict-error";
-import { agentWriteRefusal, parseBaseVersion, touchesGuardedFields, type BaseVersion } from "@/lib/edits/edit-conflict-rules";
+import { agentWriteRefusal, isPlausibleBase, parseBaseVersion, touchesGuardedFields, type BaseVersion } from "@/lib/edits/edit-conflict-rules";
 import { pruneUnusedContentFilesQuietly, pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { droppedContentRefs } from "@/lib/files/icon-cleanup-rules";
 import { attachUpdatedContentFiles } from "@/lib/files/save-attach";
@@ -148,9 +148,29 @@ async function writePersonSave(changes: ArtifactChanges, context: SaveContext): 
   const exact = await updateWhere(changes, context, unchangedSince(expected, context.before.publicId));
   if (exact) return { record: exact, savedOverAgents: false };
   if (!expected) return null;
-  const overAgents = await updateWhere(changes, context, onlyAgentsSavedSince(new Date(expected)));
+  const base = new Date(expected);
+  // A base from the future would pass "no person saved since" against everyone: refuse it as stale.
+  if (!isPlausibleBase(base, new Date())) throw new StaleSaveError(context.before.publicId);
+  const overAgents = await updateWhere(changes, context, onlyAgentsSavedSince(base));
   if (overAgents) return { record: overAgents, savedOverAgents: true };
   throw new StaleSaveError(context.before.publicId);
+}
+
+/**
+ * The guarded write for the save's actor. When it is refused, or matches
+ * nothing, the media this save attached for its content (attachUpdatedContentFiles
+ * runs first) goes again unless something still shows it, so a refused save
+ * leaves no stray files.
+ */
+async function writeGuarded(changes: ArtifactChanges, context: SaveContext, base: BaseVersion | undefined): Promise<SavedRow | null> {
+  try {
+    const saved = context.actor === "agent" ? await writeAgentSave(changes, context, base) : await writePersonSave(changes, context);
+    if (!saved && changes.content !== undefined) await pruneUnusedContentFilesQuietly(context.before.id);
+    return saved;
+  } catch (error) {
+    if (changes.content !== undefined) await pruneUnusedContentFilesQuietly(context.before.id);
+    throw error;
+  }
 }
 
 /**
@@ -170,7 +190,7 @@ export async function writeArtifactSave(changes: ArtifactChanges, context: SaveC
   // A restore keeps the version's theme as it was; a team preset it may no longer use just falls back.
   if (!context.restoredFromId && changes.theme !== before.theme) await assertTeamPresetUsable(editorId, before, changes.theme);
   await attachUpdatedContentFiles(editorId, before, changes);
-  const saved = context.actor === "agent" ? await writeAgentSave(changes, context, base) : await writePersonSave(changes, context);
+  const saved = await writeGuarded(changes, context, base);
   if (!saved) return null;
   const { record } = saved;
   await recordArtifactSave({ before, after: record, editorId, actor: context.actor, ...saveKindOf(context), harness: context.options.harness ?? null });
