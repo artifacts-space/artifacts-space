@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { IconBook, IconExternalLink, IconInbox, IconKey, IconLogout, IconRestore, IconSettings, IconUsers } from "@tabler/icons-react";
+import { IconBook, IconExternalLink, IconInbox, IconKey, IconLogout, IconMessageReport, IconRestore, IconSettings, IconUsers } from "@tabler/icons-react";
 import { useState, type ReactNode } from "react";
 
 import { useConfirmations } from "@/components/confirmations-provider";
+import { FeedbackDialog, type FeedbackSend } from "@/components/feedback/feedback-dialog";
 import { GitHubLink } from "@/components/github-link";
 import { Logo } from "@/components/logo";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -90,12 +91,15 @@ interface AppHeaderProps {
   unreadNotifications: number;
   /** A bell list without a database, for the dev fixture only. */
   notificationSeed?: NotificationView[];
+  /** A stand-in for sending "Something's not working" reports, for the dev fixture only. */
+  feedbackSend?: FeedbackSend;
 }
 
-export function AppHeader({ userId, name, email, username, unreadNotifications, notificationSeed }: AppHeaderProps) {
+export function AppHeader({ userId, name, email, username, unreadNotifications, notificationSeed, feedbackSend }: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   async function signOut() {
     setSigningOut(true);
@@ -155,6 +159,10 @@ export function AppHeader({ userId, name, email, username, unreadNotifications, 
               <AccountLink href="/docs" active={false}>
                 <IconBook /> Docs
               </AccountLink>
+              {/* Opens a dialog outside the menu, so the menu can close first. */}
+              <DropdownMenuItem onClick={() => { setFeedbackOpen(true); }} className="px-2 py-2">
+                <IconMessageReport /> Something&apos;s not working
+              </DropdownMenuItem>
               {/* `/?home` shows the landing page; a plain `/` sends signed-in people back here. */}
               <AccountLink href={landingPageHref} active={false}>
                 <IconExternalLink /> Public site
@@ -166,6 +174,7 @@ export function AppHeader({ userId, name, email, username, unreadNotifications, 
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} {...(feedbackSend ? { send: feedbackSend } : {})} />
         </div>
       </div>
     </header>

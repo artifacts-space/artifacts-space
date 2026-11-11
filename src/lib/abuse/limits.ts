@@ -98,6 +98,11 @@ export const rateLimits = {
   reportByNetworkDay: { limit: 10, windowSeconds: day },
   /** Reports about one artifact per network address per hour. Each report emails the site operator. */
   reportByNetworkArtifact: { limit: 3, windowSeconds: hour },
+  /**
+   * "Something's not working" reports per signed-in person per hour. Each
+   * one posts to the team's Slack channel, so a person may send a few.
+   */
+  feedbackByUser: { limit: 5, windowSeconds: hour },
   /** Started file uploads per user per hour, from the web app and MCP together. */
   fileUpload: { limit: 200, windowSeconds: hour },
   /** Comments per agent per minute and per hour. Agents are stricter, to stop runaway loops. */
@@ -173,6 +178,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   reportByNetwork: "We have received a lot of reports from your network in the last few minutes.",
   reportByNetworkDay: "We have received a lot of reports from your network today.",
   reportByNetworkArtifact: "We have received a lot of reports about this artifact from your network in the last hour.",
+  feedbackByUser: "You have sent several problem reports in the last hour.",
   fileUpload: "You have uploaded a lot of files in the last hour.",
   agentCommentMinute: "You have posted a lot of comments in the last minute.",
   agentCommentHour: "You have posted a lot of comments in the last hour.",
