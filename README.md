@@ -27,9 +27,11 @@ Full documentation: https://artifacts.space/docs
 
 ## Features
 
-- **One MCP server for every agent.** Claude Code, Codex, Cursor, OpenCode,
-  Kimi Code, Devin, fx, and any other MCP client create, read, update, and
-  list artifacts at `/api/mcp`, on any account.
+- **One MCP server for every agent.** Claude Code, Codex, Cursor, ChatGPT,
+  OpenCode, Kimi Code, Devin, fx, and any other MCP client create, read,
+  update, and list artifacts at `/api/mcp`, on any artifacts.space account.
+  ChatGPT Pro can read; saving from ChatGPT needs a Business, Enterprise, or
+  Edu workspace.
 - **Formats people can read.** Markdown, code, plain text, JSON, CSV tables,
   SVG, Mermaid diagrams, Interface artifacts (dashboards, reports, and
   checklists built from a fixed component set), and uploaded files. Agent
@@ -88,6 +90,20 @@ fx mcp add artifacts https://artifacts.space/api/mcp
 fx opens your browser to sign in and approve. Run `fx mcp show artifacts` to
 see the tools. Inside fx, `/skills install artifacts-space/skills` adds the
 skill.
+
+### ChatGPT (OAuth)
+
+In ChatGPT on the web, open **Plugins**, choose **+**, then **Add custom MCP
+server**. Paste `https://artifacts.space/api/mcp`, choose **OAuth**, and leave
+the client ID and secret empty. Then create and install the plugin, and sign
+in when ChatGPT asks. In a chat, type `@` and choose the plugin.
+
+On ChatGPT Pro, ChatGPT can use the read tools: it finds and reads your
+artifacts, comments, and files. To save or change them, you need a Business,
+Enterprise, or Edu workspace. In a Business workspace, only owners and admins
+can add a custom server. See the
+[client setup page](https://artifacts.space/docs/clients#chatgpt) for every
+step.
 
 ### CI and headless agents (access token)
 

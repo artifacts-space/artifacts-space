@@ -4,6 +4,7 @@ import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
 import { Prose } from "@/components/docs/docs-content";
 import { CursorInstallButton } from "@/components/setup/cursor-install-button";
 import {
+  CHATGPT_PLUGINS_URL,
   codexConfigToml,
   codexMcpAddCommand,
   codexMcpLoginCommand,
@@ -117,6 +118,36 @@ export function ClaudeDesktopGuide({ origin, full = false }: ClientGuideProps) {
           </p>
         ) : null}
       </Prose>
+    </>
+  );
+}
+
+/** ChatGPT on the web: a custom MCP server, added from the Plugins page by URL. */
+export function ChatGptGuide({ origin, full = false }: ClientGuideProps) {
+  return (
+    <>
+      <NoOneClick client="ChatGPT" />
+      <Prose className="mt-2">
+        <ol>
+          <li>In ChatGPT on the web, open <a href={CHATGPT_PLUGINS_URL}><strong>Plugins</strong></a>. Choose <strong>+</strong>, then <strong>Add custom MCP server</strong>.</li>
+          <li>Name it <code>artifacts.space</code>. Under <strong>Connection</strong>, paste the server URL <code>{mcpEndpoint(origin)}</code>.</li>
+          <li>Choose <strong>OAuth</strong> for authentication. Leave the client ID and secret empty: ChatGPT registers itself.</li>
+          <li>Choose <strong>I understand and want to continue</strong>, then <strong>Create as a plugin</strong>. Then install the plugin.</li>
+        </ol>
+      </Prose>
+      <ApproveSteps opener="ChatGPT asks you to connect. A sign-in window opens." />
+      <Label>Use it in a chat</Label>
+      <Prose className="mt-2">
+        <p>Start a new chat, type <code>@</code>, and choose <strong>artifacts.space</strong>. It reads without asking. Before it saves, changes, or deletes anything, it asks you. You can tell it to remember your answer for that tool until the chat ends.</p>
+        <p>On ChatGPT Pro, ChatGPT can use the read tools: it finds and reads your artifacts, comments, and files. To save or change them, you need a Business, Enterprise, or Edu workspace.</p>
+      </Prose>
+      {full ? (
+        <Prose className="mt-4">
+          <p>You do not need Developer mode. In a Business workspace, only owners and admins can add a custom server. In Enterprise and Edu, an admin can give members the <strong>Create plugins with MCPs</strong> permission.</p>
+          <p>ChatGPT on the web does not read the Codex config. If you added the server for Codex, add it here too. When new tools arrive, open the plugin and choose <strong>Refresh</strong>.</p>
+          <p>What ChatGPT saves shows <strong>via ChatGPT</strong>. Apps built on OpenAI&apos;s API can connect the same way and show as ChatGPT too. To fix the label for one connection, choose its agent on the <strong>Connections</strong> page.</p>
+        </Prose>
+      ) : null}
     </>
   );
 }
@@ -303,6 +334,7 @@ export const clientGuides: Record<McpClientId, (props: ClientGuideProps) => Reac
   "claude-code": ClaudeCodeGuide,
   cursor: CursorGuide,
   "claude-desktop": ClaudeDesktopGuide,
+  chatgpt: ChatGptGuide,
   codex: CodexGuide,
   opencode: OpenCodeGuide,
   devin: DevinGuide,

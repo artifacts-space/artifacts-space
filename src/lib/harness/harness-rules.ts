@@ -134,6 +134,12 @@ const harnessRules: readonly (readonly [HarnessId, RegExp])[] = [
   ["kilo-code", /\bkilo( ?code)?\b/],
   ["cline", /\bcline\b/],
   ["codex", /\bcodex\b/],
+  // ChatGPT. OpenAI does not document the name its MCP client sends; developers report clientInfo
+  // "openai-mcp" (User-Agent openai-mcp/1.0.0) from ChatGPT connectors, e.g.
+  // https://community.openai.com/t/how-to-set-up-a-remote-mcp-server-and-connect-it-to-chatgpt-deep-research/1278375/16
+  // OpenAI's API-hosted MCP tool may send the same name, so those saves read as ChatGPT too.
+  // "ChatGPT" covers an OAuth registration that names it. Codex comes first: it is an OpenAI client too.
+  ["chatgpt", /\b(chatgpt|openai mcp)\b/],
   ["gemini-cli", /\bgemini\b/],
   ["opencode", /\bopen ?code\b/],
   ["goose", /\bgoose\b/],

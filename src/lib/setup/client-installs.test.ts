@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { docsHeading } from "@/lib/docs/pages";
 
 import {
+  CHATGPT_PLUGINS_URL,
   codexConfigToml,
   codexHeadlessConfigToml,
   codexMcpAddCommand,
@@ -87,6 +88,15 @@ describe("codex snippets", () => {
 
   it("should read the token from the environment when building headless config.toml", () => {
     expect(codexHeadlessConfigToml(origin)).toBe(`[mcp_servers.artifacts]\nurl = "${endpoint}"\nbearer_token_env_var = "ARTIFACTS_SPACE_TOKEN"`);
+  });
+});
+
+describe("chatgpt", () => {
+  it("should open ChatGPT's own Plugins page over HTTPS when linking to it", () => {
+    const url = new URL(CHATGPT_PLUGINS_URL);
+    expect(url.protocol).toBe("https:");
+    expect(url.host).toBe("chatgpt.com");
+    expect(url.pathname).toBe("/plugins");
   });
 });
 
