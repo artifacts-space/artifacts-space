@@ -24,7 +24,7 @@ const holdUploadsKey = "fixture:hold-uploads";
 const holdCreateKey = "fixture:hold-create";
 /** Set to "1" by a test to hold attaches until it dispatches `fixture:release-attach`. */
 const holdAttachKey = "fixture:hold-attach";
-/** Set by a test for the next attach: "refuse" answers no; "lose" attaches the files and then loses the answer; "lose-always" loses every answer; "vanish" loses the answer without attaching ("vanish-always" every one). A comma list sets several in turn. */
+/** Set by a test for the next attach: "refuse" answers no; "lose" attaches the files and then loses the answer; "lose-always" loses every answer; "vanish" loses the answer without attaching ("vanish-always" every one); "first-only-always" attaches only the first file and loses every answer. A comma list sets several in turn. */
 const nextAttachKey = "fixture:next-attach";
 /** The uploads deleted so far, so a test can check that none it kept was deleted. */
 const discardedKey = "fixture:discarded";
@@ -175,9 +175,10 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     if (!current) return { success: false, error: "Artifact not found." };
     // As the server does: a file already in this artifact is not added twice.
     const have = new Set(current.files.map((file) => file.id));
-    const files = [...current.files, ...fileIds.flatMap((fileId) => (have.has(fileId) ? [] : (uploaded.get(fileId) ?? [])))];
+    const taking = next === "first-only-always" ? fileIds.slice(0, 1) : fileIds;
+    const files = [...current.files, ...taking.flatMap((fileId) => (have.has(fileId) ? [] : (uploaded.get(fileId) ?? [])))];
     const result = save({ ...current, files, updatedAt: new Date().toISOString() });
-    if (next === "lose" || next === "lose-always") throw new Error("The answer was lost.");
+    if (next === "lose" || next === "lose-always" || next === "first-only-always") throw new Error("The answer was lost.");
     return result;
   },
   discard: (fileId) => {

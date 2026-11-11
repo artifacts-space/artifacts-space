@@ -18,6 +18,7 @@ const blankPage = (page: Page) => page.getByRole("region", { name: "New artifact
 const body = (page: Page) => page.getByRole("region", { name: "Content" });
 const notSaved = (page: Page) => page.getByRole("status").filter({ hasText: "Not saved." });
 const attachProblem = "The files could not be added. Drop them again to try once more.";
+const attachPartial = "Some files could not be added. The Files section shows the ones that were; drop the others again.";
 const attachUnknownStale = "We could not confirm the files were added. Reload the page and check Files before adding them again.";
 
 async function openNewArtifact(page: Page) {
@@ -151,6 +152,26 @@ test("should delete a file the loaded artifact does not have, keep a title-only 
   expect(stored?.kind).toBe("markdown");
   expect(stored?.files).toHaveLength(0);
   await expectSettledAndNextDropAttaches(page);
+});
+
+test("should keep the file that landed, delete the one that did not, and say so when only some files were attached", async ({ page }) => {
+  await openNewArtifact(page);
+  await storeWithTitle(page, "Partly there");
+  // Every answer is lost, and only the first file reaches the artifact.
+  await setFlag(page, "fixture:next-attach", "first-only-always");
+  await dropFiles(body(page), ["Kept.pdf", "Dropped.pdf"]);
+  await expect(page.getByText(attachPartial, { exact: true })).toBeVisible();
+  const files = page.getByRole("region", { name: "Files" });
+  await expect(files).toContainText("1 attached");
+  await expect(files).toContainText("Kept.pdf");
+  await expect(files).not.toContainText("Dropped.pdf");
+  const [stored] = await storedNew(page);
+  expect(stored?.files.map((file) => file.filename)).toEqual(["Kept.pdf"]);
+  const keptId = stored?.files[0]?.id;
+  await expect.poll(async () => (await discarded(page)).length).toBe(1);
+  expect(await discarded(page), "only the upload that did not land goes").not.toContain(keptId);
+  await expectSettledAndNextDropAttaches(page);
+  expect((await storedNew(page))[0]?.files.map((file) => file.filename)).toEqual(["Kept.pdf", "Next.pdf"]);
 });
 
 test("should show a file as Checking while a lost answer is checked, and queue a drop made meanwhile", async ({ page }) => {
