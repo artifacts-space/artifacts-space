@@ -7,9 +7,9 @@ import { assertValidArtifactUpdate } from "@/lib/artifact-content";
 import { iconFileId } from "@/lib/artifact-icons";
 import type { ArtifactChanges } from "@/lib/artifacts";
 import { coverFileId } from "@/lib/covers/cover";
-import { agentWriteCondition, editingPerson, hasLiveLease, lastSavedBy, onlyAgentsSavedSince } from "@/lib/edits/agent-write-guard";
+import { agentWriteCondition, editingPerson, hasLiveLease, hasPersonSavedLast, lastSavedBy, onlyAgentsSavedSince } from "@/lib/edits/agent-write-guard";
 import { BadBaseVersionError, EditConflictError } from "@/lib/edits/conflict-error";
-import { agentWriteRefusal, parseBaseVersion, touchesGuardedFields, type BaseVersion } from "@/lib/edits/edit-conflict-rules";
+import { agentWriteRefusal, parseBaseVersion, touchesGuardedFields, type AgentWriteRefusal, type BaseVersion } from "@/lib/edits/edit-conflict-rules";
 import { nextSaveTime } from "@/lib/edits/save-time";
 import { pruneUnusedContentFilesQuietly, pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
 import { droppedContentRefs } from "@/lib/files/icon-cleanup-rules";
@@ -27,9 +27,10 @@ import { recordArtifactSave } from "@/lib/versions/service";
  * once, the person's work wins (src/lib/edits/edit-conflict-rules.ts):
  *
  * - An agent's save names the version it read (`baseVersion`); the UPDATE
- *   matches only while the artifact is still at it. Without one, a change to
- *   the title, content, or format matches only while no person's edit lease
- *   is live. A refused save writes nothing and throws EditConflictError.
+ *   matches only while the artifact is still at it. Without one, it matches
+ *   only while the newest save is not a person's (any field), and a change
+ *   to the title, content, or format also needs no person's edit lease to be
+ *   live. A refused save writes nothing and throws EditConflictError.
  * - A person's web save names the version its draft started from
  *   (`expectedUpdatedAt`). When someone saved since, it still goes through if
  *   every save since was an agent's: the agents' versions stay in History.
@@ -88,8 +89,15 @@ function isGuarded(changes: ArtifactChanges, context: SaveContext): boolean {
 }
 
 /** The refused agent's error, with who saved last or who is typing. */
-async function conflictFor(refusal: "changed" | "editing", artifactId: string): Promise<EditConflictError> {
-  return new EditConflictError(refusal, refusal === "changed" ? await lastSavedBy(artifactId) : await editingPerson(artifactId));
+async function conflictFor(refusal: AgentWriteRefusal, artifactId: string): Promise<EditConflictError> {
+  return new EditConflictError(refusal, refusal === "editing" ? await editingPerson(artifactId) : await lastSavedBy(artifactId));
+}
+
+/** What the agent-write rule needs besides the base: a live lease (only for a guarded save) and whether a person saved last, read only when no base was sent. */
+async function baselessState(artifactId: string, base: BaseVersion | undefined, guarded: boolean) {
+  if (base) return { leaseLive: false, personSavedLast: false };
+  const [leaseLive, personSavedLast] = await Promise.all([guarded ? hasLiveLease(artifactId) : Promise.resolve(false), hasPersonSavedLast(artifactId)]);
+  return { leaseLive, personSavedLast };
 }
 
 /**
@@ -100,8 +108,8 @@ async function conflictFor(refusal: "changed" | "editing", artifactId: string): 
 async function assertAgentMayWrite(changes: ArtifactChanges, context: SaveContext, base: BaseVersion | undefined) {
   if (context.actor !== "agent") return;
   const guarded = isGuarded(changes, context);
-  const leaseLive = !base && guarded ? await hasLiveLease(context.before.id) : false;
-  const refusal = agentWriteRefusal({ base, updatedAt: context.before.updatedAt, guarded, leaseLive });
+  const state = await baselessState(context.before.id, base, guarded);
+  const refusal = agentWriteRefusal({ base, updatedAt: context.before.updatedAt, guarded, ...state });
   if (refusal) throw await conflictFor(refusal, context.before.id);
 }
 
@@ -129,17 +137,23 @@ async function updateWhere({ changes, context, files }: Write, condition: SQL | 
   return writeAndAttach(update.getSQL(), context.editorId, files);
 }
 
+/** The refusal to report when nothing explains a miss any more: a stale base, a lease that ended (title, content, or format), or a person's save. */
+function fallbackRefusal(base: BaseVersion | undefined, guarded: boolean): AgentWriteRefusal {
+  if (base) return "changed";
+  return guarded ? "editing" : "base_needed";
+}
+
 /** Why an agent's UPDATE matched nothing, read after the fact; null when the artifact is gone. */
 async function agentRefusalAfter(context: SaveContext, guarded: boolean, base: BaseVersion | undefined): Promise<EditConflictError | null> {
   const [current] = await getDb().select({ updatedAt: artifact.updatedAt }).from(artifact).where(eq(artifact.id, context.before.id)).limit(1);
   if (!current) return null;
-  const leaseLive = !base && guarded ? await hasLiveLease(context.before.id) : false;
-  // A lease that ended in between still refused this save: say so.
-  const refusal = agentWriteRefusal({ base, updatedAt: current.updatedAt, guarded, leaseLive }) ?? (base ? "changed" : "editing");
+  const state = await baselessState(context.before.id, base, guarded);
+  // A lease that ended in between, or a person's save an agent's has since followed, still refused this save: name the likelier one.
+  const refusal = agentWriteRefusal({ base, updatedAt: current.updatedAt, guarded, ...state }) ?? fallbackRefusal(base, guarded);
   return conflictFor(refusal, context.before.id);
 }
 
-/** An agent's save: matched only while its base is current, or while no person types when it named none. */
+/** An agent's save: matched only while its base is current; without one, only while no person saved last or types (agentWriteCondition). */
 async function writeAgentSave(write: Write, base: BaseVersion | undefined): Promise<SavedRow | null> {
   const { changes, context } = write;
   const guarded = isGuarded(changes, context);

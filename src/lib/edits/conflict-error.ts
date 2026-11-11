@@ -4,7 +4,8 @@ import { agentRefusalCodes, agentRefusalMessage, type AgentWriteRefusal, type Ch
 
 /**
  * An agent's save refused because the artifact changed since the agent read
- * it, or because a person is typing in it. Nothing was saved. MCP tools turn
+ * it, a person is typing in it, or a person saved it last and the agent sent
+ * no base version. Nothing was saved. MCP tools turn
  * it into a typed tool error (src/lib/mcp/tool-errors.ts).
  */
 export class EditConflictError extends UserFacingError {

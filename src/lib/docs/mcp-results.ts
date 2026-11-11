@@ -69,12 +69,13 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     shape: `{ "artifact": { … }, ${sharingShape} }`,
   },
   artifacts_update: {
-    summary: "The artifact after the save, with its new `baseVersion` for your next update. `edit` is \"pending\" when the change waits for approval (link or public artifacts shared through a team); readers outside the team keep the last approved version. `edit` is \"unchanged\" when you sent no content or fields (only `project`, tags, sharing, or comments): nothing was saved to the history. A refused save is a tool error (`isError`) whose `structuredContent.error.code` is \"artifact_changed\" (someone saved since your `baseVersion`) or \"artifact_being_edited\" (no `baseVersion`, and a person is typing in it): nothing was saved, so read it again with artifacts_get and merge.",
+    summary: "The artifact after the save, with its new `baseVersion` for your next update. `edit` is \"pending\" when the change waits for approval (link or public artifacts shared through a team); readers outside the team keep the last approved version. `edit` is \"unchanged\" when you sent no content or fields (only `project`, tags, sharing, or comments): nothing was saved to the history, and the result has no `baseVersion`, so keep the one you have. A refused save is a tool error (`isError`) whose `structuredContent.error.code` is \"artifact_changed\" (someone saved since your `baseVersion`), \"base_version_required\" (no `baseVersion`, and a person saved it last), or \"artifact_being_edited\" (no `baseVersion`, and a person is typing in it): nothing was saved, so read it with artifacts_get, merge, and save with its `baseVersion`.",
     shape: `{ "artifact": { …, "versionId": "…", "baseVersion": "…" }, "edit": "applied" | "pending" | "unchanged", ${sharingShape} }
+// "unchanged": the artifact has no versionId or baseVersion.
 
 // refused:
 { "isError": true, "content": [{ "type": "text", "text": "This artifact changed since you read it (by @ann via the web). …" }],
-  "structuredContent": { "error": { "code": "artifact_changed" | "artifact_being_edited", "message": "…",
+  "structuredContent": { "error": { "code": "artifact_changed" | "base_version_required" | "artifact_being_edited", "message": "…",
     "changedBy": { "handle": "ann", "via": "web" | "Claude Code" } | null, "nextStep": "artifacts_get" } } }`,
   },
   artifacts_delete: { summary: "Confirms the delete. Only the author can delete.", shape: `{ "deleted": true, "id": "…" }` },

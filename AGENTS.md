@@ -452,8 +452,13 @@ the UPDATE itself, one statement, never a read-then-write:
 
 - An agent save with a `baseVersion` matches only while the artifact's
   `updated_at` is still that one; otherwise it throws `EditConflictError`,
-  a typed tool error (`artifact_changed`). Without one, a title, content, or
-  format change matches only while no person's edit lease is live
+  a typed tool error (`artifact_changed`). Without one, any change matches
+  only while the artifact's newest save is not a person's (`personSavedLast`:
+  `person_saved_at` is the row's save time, or the newest version is a
+  person's), or it is refused with `base_version_required`, whose message
+  tells the agent to read it and pass its `baseVersion`; artifacts agents
+  saved last still take saves without one. A title, content, or format
+  change also matches only while no person's edit lease is live
   (`artifact_being_edited`). Leases come only from the web editor's "I'm
   editing" signal (`src/lib/edits/actions.ts`): on input, at most every 20 s,
   about 60 s long, never on a timer; a closing editor cuts its lease to one

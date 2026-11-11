@@ -1,11 +1,11 @@
 import { neon } from "@neondatabase/serverless";
-import { and, eq } from "drizzle-orm";
+import { and, eq, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
 
 import { artifact, artifactVersion } from "@/db/schema";
 
-import { agentWriteCondition, liveLeaseCondition, onlyAgentsSavedSince } from "./agent-write-guard";
+import { agentWriteCondition, liveLeaseCondition, onlyAgentsSavedSince, personSavedLast } from "./agent-write-guard";
 import { artifactStillAt, nextSaveTime } from "./save-time";
 
 /*
@@ -19,7 +19,7 @@ const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") 
 const artifactId = "artifact-1";
 const base = new Date("2026-11-11T13:08:00.123Z");
 
-function updateSql(condition: ReturnType<typeof onlyAgentsSavedSince> | undefined) {
+function updateSql(condition: SQL | undefined) {
   return db.update(artifact).set({ title: "x", updatedAt: nextSaveTime() }).where(and(eq(artifact.id, artifactId), condition)).toSQL();
 }
 
@@ -43,7 +43,28 @@ describe("agentWriteCondition", () => {
 
   it("should add the lease guard only for a guarded save without a base", () => {
     expect(updateSql(agentWriteCondition(artifactId, { base: undefined, guarded: true })).sql).toMatch(/not exists \(select 1 from "artifact_edit_lease" l/);
-    expect(agentWriteCondition(artifactId, { base: undefined, guarded: false })).toBeUndefined();
+    expect(updateSql(agentWriteCondition(artifactId, { base: undefined, guarded: false })).sql).not.toContain("artifact_edit_lease");
+  });
+
+  it("should refuse any save without a base while a person saved last, guarded or not", () => {
+    for (const guarded of [true, false]) {
+      const { sql } = updateSql(agentWriteCondition(artifactId, { base: undefined, guarded }));
+      expect(sql).toContain(`not (("artifact"."person_saved_at" is not null and date_trunc('milliseconds', "artifact"."person_saved_at") = date_trunc('milliseconds', "artifact"."updated_at"))`);
+    }
+  });
+});
+
+describe("personSavedLast", () => {
+  const { sql, params } = updateSql(personSavedLast(artifactId));
+
+  it("should read the row's own columns, so a save the UPDATE waited for is re-checked on the row it wrote", () => {
+    expect(sql).toContain(`date_trunc('milliseconds', "artifact"."person_saved_at") = date_trunc('milliseconds', "artifact"."updated_at")`);
+  });
+
+  it("should take the newest version by save time, tied to the artifact by a bound value", () => {
+    expect(sql).toMatch(/select coalesce\("v"\.by_agent, "v"\.harness is not null\) = false from "artifact_version" v where v\.artifact_id = \$\d+ order by v\.saved_at desc, v\.id desc limit 1/);
+    expect(params).toContain(artifactId);
+    expect(sql).not.toMatch(/"artifact_id" = "artifact_id"/);
   });
 });
 

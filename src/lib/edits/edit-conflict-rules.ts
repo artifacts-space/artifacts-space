@@ -8,7 +8,10 @@ import type { HarnessId } from "@/lib/harness/harnesses";
  * - An agent names the version it read (`baseVersion`, from artifacts_get).
  *   When the artifact changed since, its save is refused and nothing is saved.
  * - An agent that names no version is refused while a person is typing in
- *   the artifact (a live edit lease), so older clients cannot overwrite them.
+ *   the artifact (a live edit lease), and whenever a person's save is the
+ *   artifact's newest, for any field: it cannot know what that person wrote.
+ *   It must read the artifact and send that baseVersion. Artifacts only
+ *   agents saved last keep taking saves without one.
  * - A person's web save goes through when only agents saved since the
  *   person's editor loaded; the agents' versions stay in History.
  */
@@ -64,8 +67,12 @@ export function touchesGuardedFields(changes: Partial<Record<(typeof leaseGuarde
   return leaseGuardedFields.some((field) => changes[field] !== undefined);
 }
 
-/** Why an agent's save is refused: the artifact changed since the agent read it, or a person is typing in it. */
-export type AgentWriteRefusal = "changed" | "editing";
+/**
+ * Why an agent's save is refused: the artifact changed since the agent read
+ * it, a person is typing in it, or a person saved it last and the agent
+ * named no base version.
+ */
+export type AgentWriteRefusal = "changed" | "editing" | "base_needed";
 
 /** What the agent-write rule looks at. */
 export interface AgentWriteCheck {
@@ -77,6 +84,8 @@ export interface AgentWriteCheck {
   guarded: boolean;
   /** Whether a person's edit lease on the artifact is live. */
   leaseLive: boolean;
+  /** Whether the artifact's newest save is a person's. */
+  personSavedLast: boolean;
 }
 
 /** Postgres keeps microseconds; tokens and the browser carry milliseconds. */
@@ -89,11 +98,13 @@ function sameMillisecond(a: Date, b: Date): boolean {
  * version always decides: the save goes through only while the artifact is
  * still at it, live lease or not, so a careful agent is never locked out.
  * Without one, a change to the title, content, or format waits while a
- * person is typing.
+ * person is typing, and any change is refused while a person's save is the
+ * newest: the agent never saw it, so it could only overwrite it.
  */
 export function agentWriteRefusal(check: AgentWriteCheck): AgentWriteRefusal | null {
   if (check.base) return sameMillisecond(check.base.updatedAt, check.updatedAt) ? null : "changed";
-  return check.guarded && check.leaseLive ? "editing" : null;
+  if (check.guarded && check.leaseLive) return "editing";
+  return check.personSavedLast ? "base_needed" : null;
 }
 
 /** A lease is live until its expiry. */
@@ -137,6 +148,10 @@ function changedByPhrase(changedBy: ChangedBy | null): string {
 
 /** The refusal message an agent gets. It says what happened and the one way forward: read, merge, save with the new base. */
 export function agentRefusalMessage(refusal: AgentWriteRefusal, changedBy: ChangedBy | null): string {
+  if (refusal === "base_needed") {
+    const who = changedBy?.handle ? `@${changedBy.handle}` : "A person";
+    return `${who} saved this artifact last, and your update sent no baseVersion. Nothing was saved. Read the artifact with artifacts_get and pass its baseVersion: merge your changes into the content you get, and send that baseVersion with your update.`;
+  }
   if (refusal === "changed") {
     return `This artifact changed since you read it${changedByPhrase(changedBy)}. Nothing was saved. Read it again with artifacts_get, merge your changes into the new content, and save with the new baseVersion.`;
   }
@@ -148,4 +163,5 @@ export function agentRefusalMessage(refusal: AgentWriteRefusal, changedBy: Chang
 export const agentRefusalCodes: Record<AgentWriteRefusal, string> = {
   changed: "artifact_changed",
   editing: "artifact_being_edited",
+  base_needed: "base_version_required",
 };

@@ -202,7 +202,8 @@ describe.runIf(Boolean(databaseUrl))("concurrent edits with a database", async (
       expect(await secondsLeft()).toBeGreaterThan(50);
       await endEditLease(page.id, owner);
       await getDb().update(artifactEditLease).set({ expiresAt: sql`now() - interval '1 second'` }).where(eq(artifactEditLease.artifactId, page.id));
-      expect((await updateArtifact(owner, page.id, { content: "# Answers\n\nold client" }, "agent", { harness: claude }))?.content).toBe("# Answers\n\nold client");
+      // The lease no longer holds it; the agent still needs the person's save as its base, because a person saved last.
+      expect((await updateArtifact(owner, page.id, { content: "# Answers\n\nold client" }, "agent", { harness: claude, baseVersion: await readBase(page.id) }))?.content).toBe("# Answers\n\nold client");
     });
 
     it("should renew one lease per person and artifact, from the database clock", async () => {
@@ -355,16 +356,16 @@ describe.runIf(Boolean(databaseUrl))("concurrent edits with a database", async (
     it("should never fold saves from two different agent harnesses into one version", async () => {
       const page = await personArtifact();
       await ageVersions(page.id);
-      await updateArtifact(owner, page.id, { content: "# Answers\n\nclaude" }, "agent", { harness: claude });
-      await updateArtifact(owner, page.id, { content: "# Answers\n\ncursor" }, "agent", { harness: cursor });
+      await updateArtifact(owner, page.id, { content: "# Answers\n\nclaude" }, "agent", { harness: claude, baseVersion: await readBase(page.id) });
+      await updateArtifact(owner, page.id, { content: "# Answers\n\ncursor" }, "agent", { harness: cursor, baseVersion: await readBase(page.id) });
       expect((await versions(page.id)).slice(1).map((version) => version.harness)).toEqual(["claude-code", "cursor"]);
     });
 
     it("should still fold quick saves from the same source into one version", async () => {
       const page = await personArtifact();
       await ageVersions(page.id);
-      await updateArtifact(owner, page.id, { content: "# Answers\n\nagent one" }, "agent", { harness: claude });
-      await updateArtifact(owner, page.id, { content: "# Answers\n\nagent two" }, "agent", { harness: claude });
+      await updateArtifact(owner, page.id, { content: "# Answers\n\nagent one" }, "agent", { harness: claude, baseVersion: await readBase(page.id) });
+      await updateArtifact(owner, page.id, { content: "# Answers\n\nagent two" }, "agent", { harness: claude, baseVersion: await readBase(page.id) });
       const afterAgent = await versions(page.id);
       expect(afterAgent.slice(1).map((version) => version.content)).toEqual(["# Answers\n\nagent two"]);
     });
@@ -372,7 +373,7 @@ describe.runIf(Boolean(databaseUrl))("concurrent edits with a database", async (
     it("should never relabel a web version with an agent's harness when the agent's save changes nothing", async () => {
       const page = await personArtifact();
       await updateArtifact(owner, page.id, { content: "# Answers\n\nsame" }, "person", { expectedUpdatedAt: page.updatedAt });
-      await updateArtifact(owner, page.id, { content: "# Answers\n\nsame" }, "agent", { harness: claude });
+      await updateArtifact(owner, page.id, { content: "# Answers\n\nsame" }, "agent", { harness: claude, baseVersion: await readBase(page.id) });
       const history = await versions(page.id);
       expect(history.at(-1)?.harness).toBeNull();
     });

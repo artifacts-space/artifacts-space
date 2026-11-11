@@ -97,6 +97,11 @@ describe.runIf(Boolean(databaseUrl))("save order with a database", async () => {
       .orderBy(asc(artifactVersion.createdAt), asc(artifactVersion.id));
   }
 
+  /** An artifact an agent created over MCP: no person has saved it, so an agent may save it without a base. */
+  async function agentArtifact(content = "# Answers\n\nQ1: ") {
+    return artifacts.createArtifact(owner, { title: "Answers", content }, { harness: claude, actor: "agent" });
+  }
+
   /** A person's artifact whose first version is old enough that the next save files its own. */
   async function personArtifact(content = "# Answers\n\nQ1: ") {
     const page = await artifacts.createArtifact(owner, { title: "Answers", content });
@@ -184,7 +189,7 @@ describe.runIf(Boolean(databaseUrl))("save order with a database", async () => {
 
   describe("the lease guard in the UPDATE itself", () => {
     it("should refuse a baseVersion-less agent when a lease went live after its pre-check", async () => {
-      const page = await personArtifact();
+      const page = await agentArtifact();
       await renewEditLease(page.id, owner);
       slow.skipLeasePrecheck = true;
       await expect(artifacts.updateArtifact(owner, page.id, { content: "# Answers\n\nold client" }, "agent", { harness: claude })).rejects.toMatchObject({ code: "artifact_being_edited" });
@@ -193,7 +198,7 @@ describe.runIf(Boolean(databaseUrl))("save order with a database", async () => {
 
     it("should let a lease or a person's version on another artifact change nothing", async () => {
       const held = await personArtifact();
-      const other = await personArtifact();
+      const other = await agentArtifact();
       await renewEditLease(held.id, owner);
       expect((await artifacts.updateArtifact(owner, other.id, { content: "# Answers\n\nfree" }, "agent", { harness: claude }))?.content).toBe("# Answers\n\nfree");
       // A person's newer web version of the held artifact never refuses a save over agents on the other one.

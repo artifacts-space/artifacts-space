@@ -41,31 +41,47 @@ describe("agentWriteRefusal", () => {
   const base = { versionId, updatedAt: readAt };
 
   it("should accept a save when the artifact is still at the agent's base version", () => {
-    expect(agentWriteRefusal({ base, updatedAt: new Date(readAt), guarded: true, leaseLive: false })).toBeNull();
+    expect(agentWriteRefusal({ base, updatedAt: new Date(readAt), guarded: true, leaseLive: false, personSavedLast: false })).toBeNull();
   });
 
   it("should refuse a stale agent save when someone saved after the agent read it", () => {
-    expect(agentWriteRefusal({ base, updatedAt: new Date(readAt.getTime() + 1), guarded: true, leaseLive: false })).toBe("changed");
+    expect(agentWriteRefusal({ base, updatedAt: new Date(readAt.getTime() + 1), guarded: true, leaseLive: false, personSavedLast: false })).toBe("changed");
   });
 
   it("should refuse a stale agent save even when it changes no guarded field", () => {
-    expect(agentWriteRefusal({ base, updatedAt: new Date(readAt.getTime() + 60_000), guarded: false, leaseLive: false })).toBe("changed");
+    expect(agentWriteRefusal({ base, updatedAt: new Date(readAt.getTime() + 60_000), guarded: false, leaseLive: false, personSavedLast: false })).toBe("changed");
   });
 
   it("should accept a current agent save while a person types, because it names its base", () => {
-    expect(agentWriteRefusal({ base, updatedAt: readAt, guarded: true, leaseLive: true })).toBeNull();
+    expect(agentWriteRefusal({ base, updatedAt: readAt, guarded: true, leaseLive: true, personSavedLast: false })).toBeNull();
   });
 
   it("should refuse a save without a base while a person's lease is live", () => {
-    expect(agentWriteRefusal({ base: undefined, updatedAt: readAt, guarded: true, leaseLive: true })).toBe("editing");
+    expect(agentWriteRefusal({ base: undefined, updatedAt: readAt, guarded: true, leaseLive: true, personSavedLast: false })).toBe("editing");
   });
 
   it("should accept a save without a base after the lease expired", () => {
-    expect(agentWriteRefusal({ base: undefined, updatedAt: readAt, guarded: true, leaseLive: false })).toBeNull();
+    expect(agentWriteRefusal({ base: undefined, updatedAt: readAt, guarded: true, leaseLive: false, personSavedLast: false })).toBeNull();
   });
 
   it("should accept a save without a base that changes no title, content, or format during a lease", () => {
-    expect(agentWriteRefusal({ base: undefined, updatedAt: readAt, guarded: false, leaseLive: true })).toBeNull();
+    expect(agentWriteRefusal({ base: undefined, updatedAt: readAt, guarded: false, leaseLive: true, personSavedLast: false })).toBeNull();
+  });
+
+  it("should refuse a save without a base when a person saved last, after the lease ended", () => {
+    expect(agentWriteRefusal({ base: undefined, updatedAt: readAt, guarded: true, leaseLive: false, personSavedLast: true })).toBe("base_needed");
+  });
+
+  it("should refuse a save without a base to a field no lease guards when a person saved last", () => {
+    expect(agentWriteRefusal({ base: undefined, updatedAt: readAt, guarded: false, leaseLive: true, personSavedLast: true })).toBe("base_needed");
+  });
+
+  it("should say a person is typing first when both refuse a save without a base", () => {
+    expect(agentWriteRefusal({ base: undefined, updatedAt: readAt, guarded: true, leaseLive: true, personSavedLast: true })).toBe("editing");
+  });
+
+  it("should accept a save with a current base even when a person saved last", () => {
+    expect(agentWriteRefusal({ base, updatedAt: readAt, guarded: false, leaseLive: false, personSavedLast: true })).toBeNull();
   });
 });
 
@@ -128,5 +144,12 @@ describe("agentRefusalMessage", () => {
   it("should say someone is editing right now when a lease refused it", () => {
     expect(agentRefusalMessage("editing", { handle: "charles", harness: null })).toMatch(/^@charles is editing this artifact in the web app right now\./);
     expect(agentRefusalMessage("editing", null)).toMatch(/^Someone is editing this artifact/);
+  });
+
+  it("should tell an agent that sent no base to read the artifact and pass its baseVersion when a person saved last", () => {
+    const message = agentRefusalMessage("base_needed", { handle: "charles", harness: null });
+    expect(message).toMatch(/^@charles saved this artifact last, and your update sent no baseVersion\. Nothing was saved\./);
+    expect(message).toContain("Read the artifact with artifacts_get and pass its baseVersion");
+    expect(agentRefusalMessage("base_needed", null)).toMatch(/^A person saved this artifact last/);
   });
 });

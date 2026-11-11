@@ -13,7 +13,7 @@ import { versionAt } from "@/lib/versions/history";
  */
 
 export const BASE_VERSION_DESCRIPTION =
-  "The `baseVersion` you got with the content you are changing (artifacts_get, or the result of your last save). Always pass it: the save is refused, and nothing is saved, if the artifact changed since you read it. Then read it again with artifacts_get, merge your changes into the new content, and save with the new baseVersion; never resend blindly. Without it, a change to the title, content, or format is refused while a person is typing in the artifact.";
+  "The `baseVersion` you got with the content you are changing (artifacts_get, or the result of your last save). Always pass it: the save is refused, and nothing is saved, if the artifact changed since you read it. Then read it again with artifacts_get, merge your changes into the new content, and save with the new baseVersion; never resend blindly. Without it, the save is refused (base_version_required) whenever a person saved the artifact last, and a change to the title, content, or format is also refused while a person is typing in it: read the artifact with artifacts_get and pass its baseVersion. Only artifacts that agents saved last take saves without one.";
 
 /** The `baseVersion` input of a write tool. */
 export const baseVersionField = z.string().max(80).optional().describe(BASE_VERSION_DESCRIPTION);

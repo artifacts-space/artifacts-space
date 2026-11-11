@@ -28,12 +28,15 @@ export function stillAt(updatedAt: Date) {
 
 /**
  * The condition an agent's save adds to its UPDATE: with a base version, the
- * artifact must still be at it; without one, a change to the title, content,
- * or format needs no person's lease to be live. Undefined: no condition.
+ * artifact must still be at it. Without one, the artifact's newest save must
+ * not be a person's (personSavedLast), whatever the save changes, and a
+ * change to the title, content, or format also needs no person's lease to be
+ * live.
  */
-export function agentWriteCondition(artifactId: string, input: { base: BaseVersion | undefined; guarded: boolean }) {
+export function agentWriteCondition(artifactId: string, input: { base: BaseVersion | undefined; guarded: boolean }): SQL {
   if (input.base) return stillAt(input.base.updatedAt);
-  return input.guarded ? sql`not ${liveLeaseCondition(artifactId)}` : undefined;
+  const notPersonLast = sql`not ${personSavedLast(artifactId)}`;
+  return input.guarded ? sql`(${notPersonLast} and not ${liveLeaseCondition(artifactId)})` : notPersonLast;
 }
 
 /**
@@ -46,6 +49,27 @@ export function agentWriteCondition(artifactId: string, input: { base: BaseVersi
 export function personVersion(alias: string): SQL {
   const table = sql.identifier(alias);
   return sql`coalesce(${table}.by_agent, ${table}.harness is not null) = false`;
+}
+
+/**
+ * SQL: the artifact's newest save is a person's. Either `person_saved_at`
+ * is the row's own save time (every person's save sets both in one UPDATE),
+ * or the newest version by save time is a person's, which also covers saves
+ * the column never saw (rows from before it, and the previous deployment
+ * during a rollout). The row's own columns come first, so a concurrent
+ * person's save that the UPDATE waited for is re-checked on the row it wrote.
+ * The artifact id is bound as a value in the subquery (the tripwire in AGENTS.md).
+ */
+export function personSavedLast(artifactId: string): SQL {
+  const byColumn = sql`(${artifact.personSavedAt} is not null and date_trunc('milliseconds', ${artifact.personSavedAt}) = date_trunc('milliseconds', ${artifact.updatedAt}))`;
+  const byVersion = sql`coalesce((select ${personVersion("v")} from ${artifactVersion} v where v.artifact_id = ${artifactId} order by v.saved_at desc, v.id desc limit 1), false)`;
+  return sql`(${byColumn} or ${byVersion})`;
+}
+
+/** Whether the artifact's newest save is a person's (personSavedLast), now. False when the artifact is gone. */
+export async function hasPersonSavedLast(artifactId: string): Promise<boolean> {
+  const [row] = await getDb().select({ last: sql<boolean>`${personSavedLast(artifactId)}` }).from(artifact).where(eq(artifact.id, artifactId)).limit(1);
+  return row?.last === true;
 }
 
 /**
