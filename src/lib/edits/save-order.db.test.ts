@@ -58,8 +58,21 @@ describe.runIf(Boolean(databaseUrl))("save order with a database", async () => {
   const tag = randomUUID().slice(0, 8);
   const owner = `order-${tag}-owner`;
   const claude = { harness: "claude-code" as const, label: null };
-  /** Resolves once a slowed agent save's UPDATE has landed and its filing has begun. */
-  const agentUpdateLanded = () => new Promise<void>((resolve) => { slow.filingStarted = resolve; });
+  /**
+   * Resolves once a slowed agent save's UPDATE has landed and its filing has
+   * begun. Fails with a clear message, not a test timeout, if the save never
+   * reaches the mocked filing step (the mock stopped matching, or the save threw).
+   */
+  const agentUpdateLanded = () =>
+    new Promise<void>((resolve, reject) => {
+      const deadline = setTimeout(() => {
+        reject(new Error("The slowed agent save never reached its filing step: check the recordArtifactSave mock."));
+      }, 5_000);
+      slow.filingStarted = () => {
+        clearTimeout(deadline);
+        resolve();
+      };
+    });
 
   async function row(id: string) {
     const [found] = await getDb().select().from(artifact).where(eq(artifact.id, id)).limit(1);
