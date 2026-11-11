@@ -62,13 +62,14 @@ test("should state the team's rule in the outcome line when the artifact is shar
   const outcome = dialog.locator("[data-slot=share-outcome]");
   await expect(dialog.getByRole("radiogroup", { name: "Who can read it" }).getByRole("radio", { name: /Team/ })).toHaveAttribute("aria-checked", "true");
   await expect(outcome).toHaveText(
-    "It applies as soon as you save. Everyone in Design can edit it directly, with no approval. Sharing by link or in public needs approval from someone who can approve sharing (owners and admins by default). Edits to those artifacts reach outside readers once approved.",
+    "It applies as soon as you save. Everyone in Design can edit it directly, with no approval. Sharing by link or in public needs approval from someone who can approve sharing (owners and admins by default).",
   );
 
-  // Asking for a link in the team keeps the team's rule after what saving will do.
+  // Asking for a link in the team: the approval is said once, then the team's rule and that edits wait.
   await dialog.getByRole("radiogroup", { name: "Who can read it" }).getByRole("radio", { name: /Link/ }).click();
-  await expect(outcome).toContainText("Someone in Design who approves sharing approves it first.");
-  await expect(outcome).toContainText("Everyone in Design can edit it directly, with no approval.");
+  await expect(outcome).toHaveText(
+    "Someone in Design who approves sharing approves it first. Until then, it stays as it is. Everyone in Design can edit it directly, with no approval. Your edits reach readers outside the team once approved.",
+  );
 
   // Making it private leaves the team, so the rule goes.
   await dialog.getByRole("radiogroup", { name: "Who can read it" }).getByRole("radio", { name: /Private/ }).click();
@@ -86,7 +87,7 @@ test("should state the team's rule when a personal artifact moves into a shared 
   await readers.getByRole("radio", { name: /Team/ }).click();
   await expect(dialog.getByRole("combobox", { name: "Share with" })).toContainText("Design");
   await expect(outcome).toHaveText(
-    "It applies as soon as you save. Everyone in Design can edit it directly, with no approval. Sharing by link or in public needs approval from someone who can approve sharing (owners and admins by default). Edits to those artifacts reach outside readers once approved.",
+    "It applies as soon as you save. Everyone in Design can edit it directly, with no approval. Sharing by link or in public needs approval from someone who can approve sharing (owners and admins by default).",
   );
 
   // A link through Design keeps Design's rule after what saving will do.

@@ -114,7 +114,9 @@ function commentsApprovalNote(input: { artifact: ArtifactDto; visibility: Artifa
 /** The team's editing and sharing rule when the choice puts the artifact in a shared team (team-rule-copy.ts); null while it stays personal. */
 function teamRuleText(props: { visibility: ArtifactVisibility; team: ShareTeam | undefined }) {
   const ruleTeam = ruleTeamFor(props.visibility, props.team);
-  return ruleTeam ? shareRuleLine(ruleTeam.name, ruleTeam) : null;
+  // ruleTeamFor already returns null for Private; the check also narrows the level for shareRuleLine.
+  if (!ruleTeam || props.visibility === "private") return null;
+  return shareRuleLine(ruleTeam.name, ruleTeam, props.visibility);
 }
 
 /** What saving will do: now or after approval, for the level and for comments, then the team's rule when it lands in a shared team. */
