@@ -1,6 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createTestAuth, emptyTables, existingUser, magicLinkSession, origin, post, signedIdToken, signInWith, stubProviders, type Tables, type TestAuth } from "./social-auth-harness";
+import {
+  createTestAuth,
+  emptyTables,
+  existingUser,
+  expectRefused,
+  invitationPath,
+  magicLinkSession,
+  origin,
+  post,
+  signedIdToken,
+  signInWith,
+  stubProviders,
+  type Tables,
+  type TestAuth,
+} from "./social-auth-harness";
 
 /*
  * The edges of GitHub and Google sign-in on a real Better Auth instance with
@@ -107,7 +121,7 @@ describe("social sign-in hardening", () => {
 
       const location = await signInWith(auth, "google", { path: "/link-social", cookie });
 
-      expect(location).toContain("error=");
+      expect(new URL(location).searchParams.get("error"), location).not.toBeNull();
       expect(googleAccounts()).toEqual([]);
     });
 
@@ -117,7 +131,7 @@ describe("social sign-in hardening", () => {
 
       const location = await signInWith(auth, "google", { path: "/link-social", cookie });
 
-      expect(location).toContain("error=google_email_not_authoritative");
+      expect(new URL(location).searchParams.get("error"), location).toBe("google_email_not_authoritative");
       expect(googleAccounts()).toEqual([]);
     });
   });
@@ -128,10 +142,10 @@ describe("social sign-in hardening", () => {
     it("should keep none of Google's tokens when a person signs up and again when they sign back in", async () => {
       stubProviders({ google: { sub: "g-tokens", email_verified: true, hd: "example.com" } });
 
-      expect(await signInWith(auth, "google")).toBe(`${origin}/invitations/inv-1`);
+      expect(await signInWith(auth, "google")).toBe(`${origin}${invitationPath}`);
       expect(tokens(googleAccounts()[0]).filter(Boolean)).toEqual([]);
 
-      expect(await signInWith(auth, "google")).toBe(`${origin}/invitations/inv-1`);
+      expect(await signInWith(auth, "google")).toBe(`${origin}${invitationPath}`);
       expect(googleAccounts()).toHaveLength(1);
       expect(tokens(googleAccounts()[0]).filter(Boolean)).toEqual([]);
       expect(tables.session).toHaveLength(2);
@@ -159,10 +173,6 @@ describe("social sign-in hardening", () => {
   it("should send a refused sign-in back to the page it started on", async () => {
     stubProviders({ google: { sub: "g-outside", email_verified: true } });
 
-    const location = new URL(await signInWith(auth, "google"));
-
-    expect(`${location.origin}${location.pathname}`).toBe(`${origin}/sign-in`);
-    expect(location.searchParams.get("next")).toBe("/invitations/inv-1");
-    expect(location.searchParams.get("error")).toBe("google_email_not_authoritative");
+    expectRefused(await signInWith(auth, "google"), ["google_email_not_authoritative"]);
   });
 });

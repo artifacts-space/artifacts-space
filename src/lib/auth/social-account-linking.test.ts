@@ -1,7 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { accountLinking, socialProviders } from "./social-auth-options";
-import { createTestAuth, emptyTables, env, existingUser, magicLinkSession, origin, signInWith, stubProviders, type Tables, type TestAuth } from "./social-auth-harness";
+import {
+  createTestAuth,
+  emptyTables,
+  env,
+  existingUser,
+  expectRefused,
+  invitationPath,
+  magicLinkSession,
+  origin,
+  signInWith,
+  stubProviders,
+  type Tables,
+  type TestAuth,
+} from "./social-auth-harness";
 
 /*
  * Account linking through the whole Google and GitHub round trip, on a real
@@ -15,14 +28,6 @@ import { createTestAuth, emptyTables, env, existingUser, magicLinkSession, origi
 const workspace = (sub: string) => ({ sub, email_verified: true, hd: "example.com" });
 /** A consumer Google account registered with an outside address: verified once, not hosted by Google. */
 const outsideAddress = (sub: string) => ({ sub, email_verified: true });
-
-/** Checks that the browser went back to the sign-in page it started on, refused with one of `codes`. */
-function expectRefused(location: string, codes: string[]) {
-  const url = new URL(location);
-  expect(`${url.origin}${url.pathname}`).toBe(`${origin}/sign-in`);
-  expect(url.searchParams.get("next")).toBe("/invitations/inv-1");
-  expect(codes).toContain(url.searchParams.get("error"));
-}
 
 describe("social sign-in account linking", () => {
   let tables: Tables;
@@ -45,7 +50,7 @@ describe("social sign-in account linking", () => {
 
     const location = await signInWith(auth, "google");
 
-    expect(location).toBe(`${origin}/invitations/inv-1`);
+    expect(location).toBe(`${origin}${invitationPath}`);
     expect(tables.user).toHaveLength(1);
     expect(googleAccounts()).toEqual([expect.objectContaining({ userId, accountId: "g-1" })]);
     expect(tables.session.map((row) => row.userId)).toEqual([userId]);
@@ -135,7 +140,7 @@ describe("social sign-in account linking", () => {
 
     const location = await signInWith(auth, "google");
 
-    expect(location).toBe(`${origin}/invitations/inv-1`);
+    expect(location).toBe(`${origin}${invitationPath}`);
     expect(tables.session.map((row) => row.userId)).toEqual([userId]);
   });
 
@@ -155,7 +160,7 @@ describe("social sign-in account linking", () => {
 
     const location = await signInWith(auth, "google");
 
-    expect(location).toBe(`${origin}/invitations/inv-1`);
+    expect(location).toBe(`${origin}${invitationPath}`);
     expect(tables.user).toEqual([expect.objectContaining({ email: "sam@example.com", emailVerified: true })]);
     expect(googleAccounts()).toHaveLength(1);
   });

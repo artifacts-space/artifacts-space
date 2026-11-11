@@ -3,7 +3,7 @@ import { generateKeyPairSync, sign } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { magicLink } from "better-auth/plugins";
-import { vi } from "vitest";
+import { expect, vi } from "vitest";
 
 import { accountHooks, accountLinking, socialProviders, socialSignInGuard, validateUserInfo } from "./social-auth-options";
 
@@ -132,8 +132,22 @@ export function post(auth: TestAuth, path: string, body: Record<string, unknown>
 
 const cookiesFrom = (response: Response) => response.headers.getSetCookie().map((value) => value.split(";")[0] ?? "");
 
+/** The page each test sign-in starts from: an invitation, so redirects carry a `next`. */
+export const invitationPath = "/invitations/inv-1";
+
 /** Where a failed sign-in comes back to, as the sign-in form sets it. */
-export const errorReturn = `${origin}/sign-in?next=%2Finvitations%2Finv-1`;
+const errorReturn = `${origin}/sign-in?${new URLSearchParams({ next: invitationPath }).toString()}`;
+
+/** Checks that a sign-in went back to the page it started on, refused with one of `codes`. Failures name the location. */
+export function expectRefused(location: string, codes: string[]) {
+  expect(location, "a refused sign-in redirects").not.toBe("");
+  const url = new URL(location);
+  expect(`${url.origin}${url.pathname}`, location).toBe(`${origin}/sign-in`);
+  expect(url.searchParams.get("next"), location).toBe(invitationPath);
+  const error = url.searchParams.get("error");
+  expect(error, location).not.toBeNull();
+  expect(codes, location).toContain(error);
+}
 
 /**
  * Starts a sign-in (or, with a session cookie, a link) like the button does,
@@ -142,7 +156,7 @@ export const errorReturn = `${origin}/sign-in?next=%2Finvitations%2Finv-1`;
  */
 export async function signInWith(auth: TestAuth, provider: "google" | "github", options: { path?: "/sign-in/social" | "/link-social"; cookie?: string } = {}) {
   const { path = "/sign-in/social", cookie = "" } = options;
-  const started = await post(auth, path, { provider, callbackURL: `${origin}/invitations/inv-1`, errorCallbackURL: errorReturn }, cookie);
+  const started = await post(auth, path, { provider, callbackURL: `${origin}${invitationPath}`, errorCallbackURL: errorReturn }, cookie);
   const { url } = (await started.json()) as { url: string };
   const state = new URL(url).searchParams.get("state") ?? "";
   const cookies = [cookie, ...cookiesFrom(started)].filter(Boolean).join("; ");
