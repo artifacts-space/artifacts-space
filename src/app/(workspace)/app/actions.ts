@@ -11,7 +11,7 @@ import { getSession } from "@/lib/session";
 import {
   deleteArtifact,
   listArtifacts,
-  updateArtifact,
+  saveArtifactUpdate,
   type ArtifactUpdateInput,
 } from "@/lib/artifacts";
 import type {
@@ -63,8 +63,10 @@ async function latestFor(publicId: string, userId: string): Promise<ArtifactDto 
 
 /**
  * Saves changes to an artifact the person may edit. `options.expectedUpdatedAt`
- * is the version the editor's draft is based on: when someone else saved
- * since, nothing is written and the result carries their newest version.
+ * is the version the editor's draft is based on. When only agents saved
+ * since, the save goes through anyway (a person's work wins) and says so in
+ * `savedOverAgents`; when another person saved since, nothing is written and
+ * the result carries their newest version.
  * `options.session` groups an editor's autosaves into one version.
  */
 export async function updateArtifactAction(
@@ -75,11 +77,11 @@ export async function updateArtifactAction(
   let userId: string | null = null;
   try {
     userId = await requireUserId();
-    const updated = await updateArtifact(userId, id, input, "person", saveOptionsSchema.parse(options));
-    if (!updated) return { success: false, error: "Artifact not found." };
+    const saved = await saveArtifactUpdate(userId, id, input, "person", saveOptionsSchema.parse(options));
+    if (!saved) return { success: false, error: "Artifact not found." };
     revalidatePath("/app");
-    revalidatePath(`/artifact/${updated.publicId}`);
-    return { success: true, data: updated };
+    revalidatePath(`/artifact/${saved.artifact.publicId}`);
+    return { success: true, data: saved.artifact, savedOverAgents: saved.savedOverAgents };
   } catch (error) {
     if (error instanceof StaleSaveError && userId) {
       const latest = await latestFor(error.publicId, userId);

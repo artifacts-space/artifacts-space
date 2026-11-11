@@ -185,9 +185,9 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
 
 - The schema is in `src/db/schema.ts`, `src/db/oauth-schema.ts`,
   `src/db/views-schema.ts`, `src/db/notification-schema.ts`,
-  `src/db/connection-schema.ts`, `src/db/file-copy-schema.ts`, and
-  `src/db/team-welcome-schema.ts`. Change it, then run `pnpm db:generate` and
-  commit the migration in `drizzle/`.
+  `src/db/connection-schema.ts`, `src/db/file-copy-schema.ts`,
+  `src/db/team-welcome-schema.ts`, and `src/db/edit-lease-schema.ts`. Change
+  it, then run `pnpm db:generate` and commit the migration in `drizzle/`.
 - Migrations apply automatically when a production deploy builds:
   `pnpm build` runs `scripts/migrate-on-deploy.mts` before `next build`, under
   an advisory lock. A failed migration fails the build, and the old deployment
@@ -403,6 +403,33 @@ open only at `/api/files/<id>/copies/<copyId>`, for people who may edit, and
 never cached. A copy is kept while any version in the history was saved while
 it was current (`copies.ts`), goes with its file or artifact, and counts
 toward its uploader's file storage quota.
+
+### Concurrent edits
+
+A person's work wins over an agent's (`src/lib/edits`, rules in
+`edit-conflict-rules.ts`, the write in `src/lib/artifact-save.ts`). Every
+tool that hands an agent an artifact it may edit also hands it `versionId`
+and `baseVersion` (`src/lib/mcp/edit-conflict-tools.ts`); `artifacts_update`
+and `artifacts_restore_version` take `baseVersion` back. The checks live in
+the UPDATE itself, one statement, never a read-then-write:
+
+- An agent save with a `baseVersion` matches only while the artifact's
+  `updated_at` is still that one; otherwise it throws `EditConflictError`,
+  a typed tool error (`artifact_changed`). Without one, a title, content, or
+  format change matches only while no person's edit lease is live
+  (`artifact_being_edited`). Leases come only from the web editor's "I'm
+  editing" signal (`src/lib/edits/actions.ts`): on input, at most every 20 s,
+  about 60 s long, never on a timer.
+- A person's web save with `expectedUpdatedAt` falls back, when the artifact
+  moved on, to "no person saved since" (`artifact.person_saved_at`, set by
+  every person's save and never by an agent's). It lands over agents' saves
+  and reports `savedOverAgents`; another person's newer save still refuses it.
+- History merges quick saves only with the same source key (person and
+  harness, null for the web app: `saveSourceKey`), so a web save never folds
+  into an agent's version or the reverse.
+- The editor never swaps incoming content under the person's unsaved edits
+  (`replacesContentUnderEdits`). Keep every new agent write path for
+  content, title, or format on `writeArtifactSave`.
 
 ### Agent harnesses
 

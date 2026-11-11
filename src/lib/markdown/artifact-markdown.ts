@@ -56,6 +56,8 @@ export interface ArtifactMarkdownInput {
   version: number | null;
   /** True when the reader gets the last approved version because newer changes wait for approval. */
   approvedVersion: boolean;
+  /** For readers who may edit it: the `baseVersion` to send with artifacts_update (src/lib/edits). Optional. */
+  baseVersion?: string | null;
   files: MarkdownFile[];
   /** The comments section, already rendered, or null when not asked for. */
   comments: string | null;
@@ -72,6 +74,7 @@ function headerLines(input: ArtifactMarkdownInput): string[] {
     input.updatedBy ? `- Last edited by: ${inlineText(input.updatedBy)}` : null,
     `- Last updated: ${input.updatedAt.toISOString()}`,
     version,
+    input.baseVersion ? `- Base version: ${input.baseVersion} (send it as baseVersion with artifacts_update)` : null,
     `- URL: ${input.url}`,
   ].filter((line): line is string => line !== null);
 }

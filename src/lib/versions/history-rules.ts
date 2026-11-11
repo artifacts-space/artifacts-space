@@ -2,13 +2,14 @@ import type { VersionSaveKind } from "@/lib/artifact-types";
 
 /**
  * Version history rules. Every save of any artifact files a version. Quick
- * follow-up saves by the same editor merge into the latest version instead,
+ * follow-up saves from the same source (the same person through the same
+ * agent harness, or the web app) merge into the latest version instead,
  * and old versions are pruned. Versions that readers rely on (the approved
  * version of a link or public artifact, and a version waiting for approval)
  * are never merged into or pruned.
  */
 
-/** Saves by the same editor this soon after the latest version merge into it. */
+/** Saves from the same source this soon after the latest version merge into it. */
 export const VERSION_MERGE_WINDOW_MS = 2 * 60 * 1000;
 
 /**
@@ -41,6 +42,8 @@ export interface MergeTarget {
   createdBy: string | null;
   savedAt: Date;
   saveKind: VersionSaveKind;
+  /** The agent harness the version came through; null for the web app. */
+  harness: string | null;
 }
 
 /** Save kinds that may merge into the latest version. Restores, replaced files, and snapshots always stand alone. */
@@ -54,6 +57,18 @@ export interface MergeCandidate {
   saveKind: VersionSaveKind;
   now: Date;
   session?: EditSessionStep | undefined;
+  /** The agent harness the save comes through; null or undefined for the web app. */
+  harness?: { harness: string } | null | undefined;
+}
+
+/**
+ * Who a save came from, for merging: the person and the agent harness, or
+ * none for the web app. Agents save as the person who connected them, so the
+ * person alone would fold a web save and an agent save into one version and
+ * hide what happened; History merges only saves with the same key.
+ */
+export function saveSourceKey(editorId: string | null, harness: string | null | undefined): string {
+  return JSON.stringify([editorId, harness ?? null]);
 }
 
 /** How long after `latest` a save may still merge into it. */
@@ -62,13 +77,16 @@ function mergeWindow(session: EditSessionStep | undefined, windowMs: number): nu
 }
 
 /**
- * Whether a save merges into `latest` instead of adding a version: the same
- * editor saved it within the merge window, both are ordinary saves, and
+ * Whether a save merges into `latest` instead of adding a version: it comes
+ * from the same source (saveSourceKey: the same person through the same agent
+ * harness, or the web app) within the merge window, both are ordinary saves, and
  * `latest` is not protected (approved, or part of an approval request).
  * An autosave that starts an editing session never merges. One that continues
  * a session merges while the pause since the last save is under
- * EDIT_SESSION_IDLE_MS. A save by anyone else in between makes `latest`
- * theirs, so the session's next save files a new version. Protected
+ * EDIT_SESSION_IDLE_MS. A save by anyone else in between, or by an agent
+ * of the same person, makes `latest` theirs, so the session's next save
+ * files a new version: a web save never merges into an agent's version, or
+ * the reverse. Protected
  * versions are never merged into, even by a session: see canDropSuperseded.
  */
 export function shouldMergeInto(
@@ -77,8 +95,8 @@ export function shouldMergeInto(
   protectedIds: ReadonlySet<string>,
   windowMs: number = VERSION_MERGE_WINDOW_MS,
 ): boolean {
-  if (save.session === "start") return false;
-  if (latest?.createdBy !== save.editorId) return false;
+  if (save.session === "start" || !latest) return false;
+  if (saveSourceKey(latest.createdBy, latest.harness) !== saveSourceKey(save.editorId, save.harness?.harness)) return false;
   if (!mergingKinds.has(save.saveKind) || !mergeableKinds.has(latest.saveKind)) return false;
   if (protectedIds.has(latest.id)) return false;
   const age = save.now.getTime() - latest.savedAt.getTime();

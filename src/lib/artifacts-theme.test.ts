@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ArtifactRecord, ArtifactVersionRecord } from "@/db/schema";
+import type * as AgentWriteGuard from "@/lib/edits/agent-write-guard";
 import { presetTheme } from "@/lib/themes/resolve";
 
 /*
@@ -36,6 +37,7 @@ vi.mock("@/lib/versions/history", () => ({ getVersionOf: mocks.getVersionOf }));
 vi.mock("@/lib/versions/service", () => ({ recordArtifactSave: mocks.recordArtifactSave }));
 vi.mock("@/lib/versions/cache", () => ({ forgetArtifactCache: vi.fn() }));
 vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: () => Promise.resolve() }));
+vi.mock("@/lib/edits/agent-write-guard", async (importOriginal) => ({ ...(await importOriginal<typeof AgentWriteGuard>()), hasLiveLease: () => Promise.resolve(false) }));
 vi.mock("@/lib/quota/usage", () => ({ assertContentFits: () => Promise.resolve() }));
 vi.mock("@/lib/files/attach", () => ({ checkContentFiles: () => Promise.resolve([]) }));
 vi.mock("@/lib/files/icon-file", () => ({ checkIconFile: () => Promise.resolve([]), restorableIcon: (_user: string, _id: string, icon: string | null) => Promise.resolve(icon) }));
@@ -47,7 +49,7 @@ vi.mock("@/lib/agents/owner-access", () => ({ ownedAgentIds: () => Promise.resol
 const baseRecord = {
   id: "artifact-1", publicId: "4fXkP9qR2sT7vW1yZ3aB5c", userId: "user-1", title: "Plan", icon: null, theme: "ocean", cover: null, fullWidth: false, sheetFormat: null, allowCsvDownload: false, summary: "", content: "# Plan",
   kind: "markdown", language: "", project: "", projectId: null, tags: [], sessionId: "", source: "", harness: null, harnessOverride: null, createRequestId: null, visibility: "private", comments: "team", showInSearch: false, shareId: "s", teamId: null,
-  originalAuthorId: null, metadata: {}, approvedVersionId: null, updatedBy: "user-1", createdAt: new Date(), updatedAt: new Date(),
+  originalAuthorId: null, metadata: {}, approvedVersionId: null, updatedBy: "user-1", createdAt: new Date(), updatedAt: new Date(), personSavedAt: null,
 } satisfies ArtifactRecord;
 
 const { artifactInputSchema, artifactUpdateSchema, restoreArtifactVersion } = await import("./artifacts");

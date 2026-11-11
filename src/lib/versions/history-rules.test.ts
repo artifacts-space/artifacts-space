@@ -4,6 +4,7 @@ import {
   canDropSuperseded,
   EDIT_SESSION_IDLE_MS,
   selectPrunableVersions,
+  saveSourceKey,
   shouldMergeInto,
   VERSION_MERGE_WINDOW_MS,
   versionBytes,
@@ -13,7 +14,7 @@ import {
 
 const now = new Date("2026-11-06T12:00:00Z");
 const secondsAgo = (seconds: number) => new Date(now.getTime() - seconds * 1000);
-const latest = (overrides: Partial<MergeTarget> = {}): MergeTarget => ({ id: "v1", createdBy: "ann", savedAt: secondsAgo(30), saveKind: "edit", ...overrides });
+const latest = (overrides: Partial<MergeTarget> = {}): MergeTarget => ({ id: "v1", createdBy: "ann", savedAt: secondsAgo(30), saveKind: "edit", harness: null, ...overrides });
 const none = new Set<string>();
 
 describe("shouldMergeInto", () => {
@@ -48,6 +49,36 @@ describe("shouldMergeInto", () => {
   it("should not merge when there is no version yet or the editor is unknown", () => {
     expect(shouldMergeInto(null, { editorId: "ann", saveKind: "edit", now }, none)).toBe(false);
     expect(shouldMergeInto(latest({ createdBy: null }), { editorId: "ann", saveKind: "edit", now }, none)).toBe(false);
+  });
+});
+
+describe("shouldMergeInto across sources", () => {
+  const claude = { harness: "claude-code" };
+
+  it("should merge an agent's quick follow-up into its own version when the harness matches", () => {
+    expect(shouldMergeInto(latest({ harness: "claude-code" }), { editorId: "ann", saveKind: "edit", now, harness: claude }, none)).toBe(true);
+  });
+
+  it("should never merge a web save into an agent's version when the same person connected the agent", () => {
+    expect(shouldMergeInto(latest({ harness: "claude-code" }), { editorId: "ann", saveKind: "edit", now }, none)).toBe(false);
+    expect(shouldMergeInto(latest({ harness: "claude-code", savedAt: secondsAgo(5) }), { editorId: "ann", saveKind: "edit", now, session: "continue" }, none)).toBe(false);
+  });
+
+  it("should never merge an agent save into a web version when the same person saved it", () => {
+    expect(shouldMergeInto(latest(), { editorId: "ann", saveKind: "edit", now, harness: claude }, none)).toBe(false);
+  });
+
+  it("should never merge saves from two different agent harnesses", () => {
+    expect(shouldMergeInto(latest({ harness: "cursor" }), { editorId: "ann", saveKind: "edit", now, harness: claude }, none)).toBe(false);
+  });
+});
+
+describe("saveSourceKey", () => {
+  it("should be equal only for the same person and the same harness, with the web app as its own source", () => {
+    expect(saveSourceKey("ann", null)).toBe(saveSourceKey("ann", undefined));
+    expect(saveSourceKey("ann", null)).not.toBe(saveSourceKey("ann", "claude-code"));
+    expect(saveSourceKey("ann", "claude-code")).not.toBe(saveSourceKey("bob", "claude-code"));
+    expect(saveSourceKey("ann", "web")).not.toBe(saveSourceKey("ann", null));
   });
 });
 

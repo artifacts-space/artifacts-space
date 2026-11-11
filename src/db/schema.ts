@@ -105,6 +105,9 @@ export const artifact = pgTable(
     updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    // The `updated_at` of the last save a person made in the web app; agent saves leave it. Null: none
+    // known (rows from before 0044), read as `updated_at`. A web save over only agents' saves goes through (src/lib/edits).
+    personSavedAt: timestamp("person_saved_at", { withTimezone: true }),
   },
   (table) => [
     uniqueIndex("artifact_share_id_idx").on(table.shareId),

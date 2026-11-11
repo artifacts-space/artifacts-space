@@ -30,7 +30,7 @@ import { ShareBanner, TitleFields } from "./editor-sections";
 import { BlankToolbar, EditorToolbar, type SourceToggle } from "./editor-toolbar";
 import { FormatDialog } from "./format-dialog";
 import { hasInlineField, InlineContent } from "./inline-content";
-import { ConflictNotice, SaveStatusBar } from "./save-status";
+import { AgentSaveNotice, ConflictNotice, openHistoryButton, SaveStatusBar } from "./save-status";
 import { useArtifactActions } from "./use-artifact-actions";
 import { useArtifactDraft } from "./use-artifact-draft";
 import { useAutosave } from "./use-autosave";
@@ -206,6 +206,11 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           className={stickyModeBar}
         />
         <ConflictNotice status={autosave.status} onLoadTheirs={autosave.loadTheirs} onKeepMine={autosave.keepMine} />
+        <AgentSaveNotice
+          show={autosave.agentSaved}
+          onDismiss={autosave.dismissAgentSaved}
+          history={<VersionHistory publicId={artifact.publicId} title={artifact.title} updatedAt={artifact.updatedAt} reviewed={shared} files={artifact.files} hasUnsavedChanges={autosave.dirty} onRestored={(restored) => { reset(restored); onUpdated(restored); }} trigger={openHistoryButton} />}
+        />
         {/* A rendered view has no field to focus first, so the pane itself takes focus for Page Up/Down, Space, and the arrows. */}
         <div
           ref={bodyRef}

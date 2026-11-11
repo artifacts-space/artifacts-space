@@ -6,6 +6,7 @@ import { RegistryPage } from "@/components/docs/docs-page";
 import { AccessBadge, McpToolEntry } from "@/components/docs/mcp-tool-entry";
 import { rateLimitMessage } from "@/lib/abuse/rate-limit";
 import { mcpToolResults } from "@/lib/docs/mcp-results";
+import { agentRefusalCodes, agentRefusalMessage } from "@/lib/edits/edit-conflict-rules";
 import { docsMcpTools, mcpToolGroups, toolsInGroup } from "@/lib/docs/mcp-tools";
 import { docsMetadata } from "@/lib/docs/metadata";
 import { docsHref } from "@/lib/docs/pages";
@@ -53,6 +54,21 @@ const rateLimitedBody = JSON.stringify(
 
 const toolErrorBody = JSON.stringify(
   { jsonrpc: "2.0", id: 8, result: { content: [{ type: "text", text: rateLimitMessage("artifactCreate", 1260) }], isError: true } },
+  null,
+  2,
+);
+
+const conflictMessage = agentRefusalMessage("changed", { handle: "ann", harness: null });
+const conflictErrorBody = JSON.stringify(
+  {
+    jsonrpc: "2.0",
+    id: 9,
+    result: {
+      content: [{ type: "text", text: conflictMessage }],
+      structuredContent: { error: { code: agentRefusalCodes.changed, message: conflictMessage, changedBy: { handle: "ann", via: "web" }, nextStep: "artifacts_get" } },
+      isError: true,
+    },
+  },
   null,
   2,
 );
@@ -152,6 +168,19 @@ export default function McpReferencePage() {
           {toolsInGroup(group).map((tool) => <McpToolEntry key={tool.name} tool={tool} result={mcpToolResults[tool.name]} />)}
         </section>
       ))}
+
+      <DocsH page={page} id="concurrent-edits" />
+      <Prose>
+        <p>A person&apos;s work wins over an agent&apos;s. When someone types in the web editor while an agent updates the same artifact, nothing they type is lost.</p>
+        <ul>
+          <li><strong>Pass the version you read.</strong> <code>artifacts_get</code> gives editors <code>versionId</code> and <code>baseVersion</code>; every save result carries the new <code>baseVersion</code>. Send it with <code>artifacts_update</code> and <code>artifacts_restore_version</code>.</li>
+          <li><strong>A stale save is refused.</strong> If anyone saved after your <code>baseVersion</code>, nothing is saved and the tool returns an error with code <code>artifact_changed</code> that says who changed it. Read the artifact again with <code>artifacts_get</code>, merge your changes into the new content, and save with the new <code>baseVersion</code>. Never resend the same call blindly.</li>
+          <li><strong>Without a base version</strong>, a change to the title, content, or format is refused with code <code>artifact_being_edited</code> while a person is typing in the artifact (their editor holds a lease for about a minute after the last keystroke).</li>
+          <li><strong>People&apos;s saves always land.</strong> When an agent saved while a person was editing, the person&apos;s save still goes through, the agent&apos;s version stays in History, and the editor says so.</li>
+          <li><strong>History keeps sources apart.</strong> Quick saves merge into one version only when they come from the same person through the same agent, or from the web app. A web save never merges with an agent&apos;s.</li>
+        </ul>
+      </Prose>
+      <CodeSnippet title="200 · a refused update" language="json" code={conflictErrorBody} className="mt-4" />
 
       <DocsH page={page} id="errors" />
       <Prose>

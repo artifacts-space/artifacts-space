@@ -1,6 +1,6 @@
 "use client";
 
-import { IconAlertTriangle, IconCheck, IconCopy } from "@tabler/icons-react";
+import { IconAlertTriangle, IconCheck, IconCopy, IconInfoCircle } from "@tabler/icons-react";
 
 import { HarnessByline } from "@/components/harness/harness-byline";
 import { editorName, LastEdited } from "@/components/history/last-edited";
@@ -130,4 +130,41 @@ export function ConflictNotice({ status, onLoadTheirs, onKeepMine, className }: 
       </div>
     </div>
   );
+}
+
+interface AgentSaveNoticeProps {
+  /** An agent saved while this editor had changes, and this editor's save went through over it. */
+  show: boolean;
+  onDismiss: () => void;
+  /** Opens History, where the agent's version is; the caller draws it with its own History props. */
+  history?: React.ReactNode;
+  /** Extra classes from the surrounding layout, such as a framed notice on the artifact page. */
+  className?: string;
+}
+
+/** The words of the notice, kept in one place for the editor and its tests. */
+export const AGENT_SAVE_NOTICE = "An agent saved changes while you were editing. Your version is saved; theirs is in History.";
+
+/**
+ * Shown after the person's save went through over an agent's newer save: a
+ * person's work wins, and the agent's version stays in History, where the
+ * person can compare or restore it. Nothing shows otherwise.
+ */
+export function AgentSaveNotice({ show, onDismiss, history, className }: AgentSaveNoticeProps) {
+  if (!show) return null;
+  return (
+    <div role="status" data-slot="agent-save-notice" className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-muted/50 px-5 py-2.5 sm:px-7", className)}>
+      <IconInfoCircle aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+      <p className="min-w-0 flex-1 text-sm">{AGENT_SAVE_NOTICE}</p>
+      <div className="flex shrink-0 items-center gap-1">
+        {history}
+        <Button variant="ghost" size="sm" onClick={onDismiss}>Dismiss</Button>
+      </div>
+    </div>
+  );
+}
+
+/** The notice's way into History, as VersionHistory's `trigger`. */
+export function openHistoryButton(openHistory: () => void) {
+  return <Button variant="outline" size="sm" onClick={openHistory}>Open History</Button>;
 }

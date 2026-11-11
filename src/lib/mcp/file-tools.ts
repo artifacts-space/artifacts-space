@@ -16,6 +16,7 @@ import { listTeamsForUser } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { toMcpArtifact } from "./artifact-view";
+import { baseVersionOf } from "./edit-conflict-tools";
 import { noHarness, type HarnessSource } from "./harness-context";
 import { gateTools, type ToolServer } from "./tool-access";
 
@@ -37,10 +38,11 @@ async function respond(run: () => Promise<unknown>) {
   }
 }
 
+/** The artifact after a file change, with the baseVersion for the agent's next update. */
 async function artifactResult(userId: string, record: ArtifactRecord) {
-  const [[dto], teams] = await Promise.all([toArtifactDtos([record], userId), listTeamsForUser(userId)]);
+  const [[dto], teams, base] = await Promise.all([toArtifactDtos([record], userId), listTeamsForUser(userId), baseVersionOf(record.id, record.updatedAt.toISOString())]);
   if (!dto) throw new UserFacingError("Artifact not found.");
-  return toMcpArtifact(dto, { viewerId: userId, teamSlugs: new Map(teams.map((team) => [team.id, team.slug])), urlFor: (publicId) => siteUrl(`/artifact/${publicId}`) }, { canEdit: true });
+  return { ...toMcpArtifact(dto, { viewerId: userId, teamSlugs: new Map(teams.map((team) => [team.id, team.slug])), urlFor: (publicId) => siteUrl(`/artifact/${publicId}`) }, { canEdit: true }), ...base };
 }
 
 async function ownArtifact(userId: string, publicId: string) {

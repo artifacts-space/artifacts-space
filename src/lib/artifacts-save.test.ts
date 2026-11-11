@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ArtifactRecord } from "@/db/schema";
+import type * as AgentWriteGuard from "@/lib/edits/agent-write-guard";
 
+import { EditConflictError } from "./edits/conflict-error";
+import { encodeBaseVersion } from "./edits/edit-conflict-rules";
 import { StaleSaveError } from "./save-guard";
 
 /*
@@ -17,6 +20,8 @@ const mocks = vi.hoisted(() => ({
   getEditableArtifact: vi.fn(),
   recordArtifactSave: vi.fn(),
   enforceRateLimit: vi.fn(() => Promise.resolve()),
+  hasLiveLease: vi.fn(() => Promise.resolve(false)),
+  selected: vi.fn((): unknown[] => []),
 }));
 
 vi.mock("@/db", () => ({
@@ -27,7 +32,7 @@ vi.mock("@/db", () => ({
         return { where: () => ({ returning: () => Promise.resolve(mocks.returned(values)) }) };
       },
     }),
-    select: () => ({ from: () => ({ where: () => Promise.resolve([]) }) }),
+    select: () => ({ from: () => ({ where: () => Object.assign(Promise.resolve([]), { limit: () => Promise.resolve(mocks.selected()) }) }) }),
   }),
 }));
 vi.mock("@/lib/access", () => ({ getEditableArtifact: mocks.getEditableArtifact, viewableInTeamCondition: vi.fn() }));
@@ -40,13 +45,19 @@ vi.mock("@/lib/files/attach", () => ({ checkContentFiles: () => Promise.resolve(
 vi.mock("@/lib/files/icon-file", () => ({ checkIconFile: () => Promise.resolve([]), restorableIcon: vi.fn() }));
 vi.mock("@/lib/files/icon-cleanup", () => ({ pruneUnusedIconFilesQuietly: () => Promise.resolve(), pruneUnusedContentFilesQuietly: () => Promise.resolve() }));
 vi.mock("@/lib/files/store", () => ({ attachFileRows: () => Promise.resolve(), deleteArtifactFiles: () => Promise.resolve(), listFilesForArtifacts: () => Promise.resolve(new Map()) }));
+vi.mock("@/lib/edits/agent-write-guard", async (importOriginal) => ({
+  ...(await importOriginal<typeof AgentWriteGuard>()),
+  hasLiveLease: mocks.hasLiveLease,
+  lastSavedBy: () => Promise.resolve({ handle: "charles", harness: null }),
+  editingPerson: () => Promise.resolve({ handle: "charles", harness: null }),
+}));
 vi.mock("@/lib/agents/queries", () => ({ loadActors: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/agents/owner-access", () => ({ ownedAgentIds: () => Promise.resolve(new Set()), authoredByViewerCondition: vi.fn(), findDeletableArtifact: vi.fn() }));
 
 const baseRecord = {
   id: "artifact-1", publicId: "4fXkP9qR2sT7vW1yZ3aB5c", userId: "user-1", title: "Plan", icon: null, theme: null, cover: null, summary: "", content: "# Plan",
   kind: "markdown", language: "", project: "", projectId: null, tags: [], sessionId: "", source: "", harness: null, harnessOverride: null, createRequestId: null, visibility: "private", comments: "team", shareId: "s", teamId: null,
-  originalAuthorId: null, metadata: {}, approvedVersionId: null, fullWidth: false, sheetFormat: null, allowCsvDownload: false, showInSearch: false, updatedBy: "user-1", createdAt: new Date(), updatedAt: new Date("2026-11-08T10:00:00.000Z"),
+  originalAuthorId: null, metadata: {}, approvedVersionId: null, fullWidth: false, sheetFormat: null, allowCsvDownload: false, showInSearch: false, updatedBy: "user-1", createdAt: new Date(), updatedAt: new Date("2026-11-08T10:00:00.000Z"), personSavedAt: null,
 } satisfies ArtifactRecord;
 
 const { updateArtifact } = await import("./artifacts");
@@ -56,6 +67,7 @@ beforeEach(() => {
   mocks.getEditableArtifact.mockResolvedValue(baseRecord);
   mocks.returned.mockImplementation((values: Record<string, unknown>) => [{ ...baseRecord, ...values }]);
   mocks.recordArtifactSave.mockResolvedValue("applied");
+  mocks.hasLiveLease.mockResolvedValue(false);
 });
 
 describe("updateArtifact permissions", () => {
@@ -85,6 +97,42 @@ describe("updateArtifact base-version check", () => {
   it("should refuse a base version that is not a date instead of saving blind", async () => {
     await expect(updateArtifact("user-1", "artifact-1", { content: "# Mine" }, "person", { expectedUpdatedAt: "yesterday" })).rejects.toBeInstanceOf(StaleSaveError);
     expect(mocks.returned).not.toHaveBeenCalled();
+    expect(mocks.recordArtifactSave).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateArtifact agent base version", () => {
+  const read = encodeBaseVersion({ versionId: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f", updatedAt: baseRecord.updatedAt });
+  const older = encodeBaseVersion({ versionId: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f", updatedAt: new Date(baseRecord.updatedAt.getTime() - 60_000) });
+
+  it("should refuse a stale agent save and write nothing when the artifact changed since the agent read it", async () => {
+    const save = updateArtifact("user-1", "artifact-1", { content: "# Agent's" }, "agent", { baseVersion: older });
+    await expect(save).rejects.toBeInstanceOf(EditConflictError);
+    await expect(save).rejects.toMatchObject({ code: "artifact_changed", message: expect.stringContaining("(by @charles via the web)") as string });
+    expect(mocks.set).not.toHaveBeenCalled();
+    expect(mocks.recordArtifactSave).not.toHaveBeenCalled();
+  });
+
+  it("should save an agent's change when its base version is current", async () => {
+    const saved = await updateArtifact("user-1", "artifact-1", { content: "# Agent's" }, "agent", { baseVersion: read });
+    expect(saved?.content).toBe("# Agent's");
+  });
+
+  it("should refuse an agent's save without a base version while a person types, and write nothing", async () => {
+    mocks.hasLiveLease.mockResolvedValue(true);
+    await expect(updateArtifact("user-1", "artifact-1", { content: "# Agent's" }, "agent", {})).rejects.toMatchObject({ code: "artifact_being_edited" });
+    expect(mocks.set).not.toHaveBeenCalled();
+  });
+
+  it("should refuse a base version the server never handed out", async () => {
+    await expect(updateArtifact("user-1", "artifact-1", { content: "# Agent's" }, "agent", { baseVersion: "latest" })).rejects.toThrow(/baseVersion is not one/);
+    expect(mocks.set).not.toHaveBeenCalled();
+  });
+
+  it("should refuse an agent's save when the guarded write matches nothing because a person saved in between", async () => {
+    mocks.returned.mockReturnValue([]);
+    mocks.selected.mockReturnValue([{ updatedAt: new Date(baseRecord.updatedAt.getTime() + 1000) }]);
+    await expect(updateArtifact("user-1", "artifact-1", { content: "# Agent's" }, "agent", { baseVersion: read })).rejects.toMatchObject({ code: "artifact_changed" });
     expect(mocks.recordArtifactSave).not.toHaveBeenCalled();
   });
 });

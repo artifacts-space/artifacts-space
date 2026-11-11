@@ -50,12 +50,38 @@ export async function setStoredSheetFormat(publicId: string, format: unknown): P
   await db().query(`update artifact set sheet_format = $2 where public_id = $1`, [publicId, JSON.stringify(format)]);
 }
 
-/** Saves fields of an artifact as someone else would: the row changes and its updatedAt moves on. */
+/** Saves fields of an artifact as another person would in the web app: the row changes, and its updatedAt and person save time move on. */
 export async function saveAsSomeoneElse(publicId: string, changes: { title?: string; content?: string }): Promise<void> {
   await db().query(
-    `update artifact set title = coalesce($2, title), content = coalesce($3, content), updated_by = null, updated_at = now() where public_id = $1`,
+    `update artifact set title = coalesce($2, title), content = coalesce($3, content), updated_by = null, updated_at = now(), person_saved_at = now() where public_id = $1`,
     [publicId, changes.title ?? null, changes.content ?? null],
   );
+}
+
+/**
+ * Saves new content as the artifact's author through an agent (Claude Code),
+ * as an MCP save would: the row and its updatedAt change, the person save
+ * time stays, and the save files its own version with the harness.
+ */
+export async function saveAsAgent(publicId: string, content: string): Promise<void> {
+  await db().query(
+    `with saved as (
+       update artifact set content = $2, harness = 'claude-code', updated_by = user_id, updated_at = now() where public_id = $1
+       returning id, title, icon, theme, cover, summary, content, kind, language, source, metadata, user_id
+     )
+     insert into artifact_version (id, artifact_id, title, icon, theme, cover, summary, content, kind, language, source, metadata, harness, created_by, save_kind)
+     select gen_random_uuid()::text, id, title, icon, theme, cover, summary, content, kind, language, source, metadata, 'claude-code', user_id, 'edit' from saved`,
+    [publicId, content],
+  );
+}
+
+/** The content and harness of an artifact's versions, oldest first. */
+export async function versionSources(publicId: string): Promise<{ content: string; harness: string | null }[]> {
+  const result = await db().query<{ content: string; harness: string | null }>(
+    `select v.content, v.harness from artifact_version v join artifact a on a.id = v.artifact_id where a.public_id = $1 order by v.created_at, v.id`,
+    [publicId],
+  );
+  return result.rows;
 }
 
 /** Closes this file's connections. */

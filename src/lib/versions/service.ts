@@ -159,7 +159,7 @@ export async function recordArtifactSave(save: ArtifactSave): Promise<EditStatus
   const previous = save.session === "continue" ? await latestVersion(after.id) : null;
   const versionId = await fileVersion({ ...after, approvedVersionId: approvedId ?? after.approvedVersionId }, { editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null, session: save.session, harness: save.harness });
   const status = approvedId ? await approvalFor(after, approvedId, versionId, save) : "applied";
-  await dropSupersededSessionVersion(after, previous, { editorId, saveKind: save.saveKind, session: save.session, newVersionId: versionId }).catch((error: unknown) => {
+  await dropSupersededSessionVersion(after, previous, { editorId, saveKind: save.saveKind, session: save.session, harness: save.harness, newVersionId: versionId }).catch((error: unknown) => {
     // Housekeeping only: an extra version in History is the worst case.
     console.error("[versions] Dropping a superseded session version failed", error instanceof Error ? error.name : "unknown error");
   });
@@ -192,9 +192,12 @@ async function approvalFor(after: ArtifactRecord, approvedId: string, versionId:
 export async function recordArtifactChange(input: { artifactId: string; editorId: string; actor: SharingActor; harness?: HarnessStamp | null | undefined }): Promise<EditStatus> {
   const [before] = await getDb().select().from(artifact).where(eq(artifact.id, input.artifactId)).limit(1);
   if (!before) return "applied";
+  const now = new Date();
+  // A person's change marks when a person last saved (src/lib/artifact-save.ts); an agent's does not.
+  const personSaved = input.actor === "person" ? { personSavedAt: now } : {};
   const [after] = await getDb()
     .update(artifact)
-    .set({ ...stampColumns(input.harness), updatedBy: input.editorId, updatedAt: new Date() })
+    .set({ ...stampColumns(input.harness), ...personSaved, updatedBy: input.editorId, updatedAt: now })
     .where(eq(artifact.id, input.artifactId))
     .returning();
   if (!after) return "applied";

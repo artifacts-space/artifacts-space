@@ -14,6 +14,7 @@ import {
   keepMineOver,
   mergeDrafts,
   nextSaveDelay,
+  replacesContentUnderEdits,
   sessionStep,
   type EditSession,
 } from "./autosave-rules";
@@ -188,5 +189,23 @@ describe("autosave over an hour of typing", () => {
     const savedAt = saves.map((save) => save.at);
     const longestWait = Math.max(...keystrokes.map((at) => (savedAt.find((saved) => saved >= at) ?? Number.POSITIVE_INFINITY) - at));
     expect(longestWait).toBeLessThanOrEqual(AUTOSAVE_MAX_WAIT_MS + AUTOSAVE_MIN_INTERVAL_MS);
+  });
+});
+
+describe("replacesContentUnderEdits", () => {
+  const theirs = edited({ content: "# Plan\n\nAgent's rewrite." });
+
+  it("should be true when incoming content would replace the editor's while the person has unsaved changes", () => {
+    expect(replacesContentUnderEdits(base, edited({ content: "# Plan\n\nShip it. Typing" }), theirs)).toBe(true);
+    expect(replacesContentUnderEdits(base, edited({ title: "Plan B" }), theirs)).toBe(true);
+  });
+
+  it("should be false when the person has nothing unsaved", () => {
+    expect(replacesContentUnderEdits(base, base, theirs)).toBe(false);
+  });
+
+  it("should be false when the content the editor shows stays", () => {
+    const mine = edited({ content: "# Plan\n\nShip it. Typing" });
+    expect(replacesContentUnderEdits(base, mine, edited({ title: "Renamed", content: mine.content }))).toBe(false);
   });
 });

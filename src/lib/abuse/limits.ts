@@ -34,6 +34,12 @@ export const rateLimits = {
    */
   harnessChoice: { limit: 600, windowSeconds: hour },
   /**
+   * "I'm editing" signals from the web editor per user per hour (src/lib/edits).
+   * The editor sends at most one every 20 seconds while the person types, so
+   * 180 an hour per open editor; this is the runaway cap.
+   */
+  editLease: { limit: 1200, windowSeconds: hour },
+  /**
    * MCP `initialize` requests whose clientInfo is stored, per user per hour.
    * Over the limit the request still runs; only the clientInfo is not stored,
    * so a client that renames itself on every connect cannot churn the row.
@@ -156,6 +162,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   artifactUpdateByToken: "This connection has changed artifacts a lot in the last hour.",
   organize: "You have changed projects and tags a lot in the last hour.",
   harnessChoice: "You have changed agent labels a lot in the last hour.",
+  editLease: "Your editors have said you are typing a lot in the last hour.",
   clientInfoRecord: "Your agents have connected a lot in the last hour.",
   readByUser: "You have read a lot of artifacts in the last hour.",
   readByToken: "This connection has read a lot in the last hour.",

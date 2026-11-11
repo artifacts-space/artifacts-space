@@ -142,3 +142,14 @@ export function keepMineOver(base: ArtifactDraft, mine: ArtifactDraft, theirs: A
   }
   return draft;
 }
+
+/**
+ * True when taking `next` would replace the content in the editor while the
+ * person has unsaved changes: the editor never swaps what they see or type
+ * under the cursor then. Someone else's content waits for the person's
+ * choice instead (the conflict notice), or for their save, which wins over
+ * agents' saves (src/lib/artifact-save.ts).
+ */
+export function replacesContentUnderEdits(base: ArtifactDraft, mine: ArtifactDraft, next: ArtifactDraft): boolean {
+  return hasChanges(base, mine) && next.content !== mine.content;
+}

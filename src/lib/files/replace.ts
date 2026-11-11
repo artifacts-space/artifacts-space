@@ -83,6 +83,8 @@ interface Swap {
   versionId: string;
   filename: string;
   harness: HarnessStamp | null;
+  /** A person's replace marks when a person last saved (src/lib/artifact-save.ts); an agent's does not. */
+  actor: SharingActor;
 }
 
 /**
@@ -159,7 +161,8 @@ function roleGuard({ approval, editorId }: Swap) {
  * if any, or null when nothing ran.
  */
 async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | null } | null> {
-  const { target, before, approval, upload, editorId, copyId, versionId, filename, harness } = swap;
+  const { target, before, approval, upload, editorId, copyId, versionId, filename, harness, actor } = swap;
+  const personSaved = actor === "person" ? sql`copy.replaced_at` : sql`a.person_saved_at`;
   const guard = roleGuard(swap);
   const ref = `${FILE_PREFIX}${target.id}`;
   const harnessId = harness?.harness ?? null;
@@ -198,7 +201,7 @@ async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | nul
       returning id, saved_at
     )${approvalCtes(swap)},
     stamped as (
-      update ${artifact} a set updated_by = ${editorId}, updated_at = copy.replaced_at, harness = coalesce(${harnessId}::text, a.harness), approved_version_id = ${approved}
+      update ${artifact} a set updated_by = ${editorId}, updated_at = copy.replaced_at, person_saved_at = ${personSaved}, harness = coalesce(${harnessId}::text, a.harness), approved_version_id = ${approved}
       from version, copy
       where a.id = ${target.artifactId}
       returning a.id
@@ -253,7 +256,7 @@ export async function replaceFile(editorId: string, request: ReplaceRequest, act
   const approvedId = await prepareVersionedChange(before);
   const approval = await planVersionedChangeApproval(before, approvedId, editorId, actor);
   const versionId = randomUUID();
-  const swap = { target, before, approval, upload, editorId, copyId: randomUUID(), versionId, filename: replacementFilename(target, upload), harness: await harness() };
+  const swap = { target, before, approval, upload, editorId, copyId: randomUUID(), versionId, filename: replacementFilename(target, upload), harness: await harness(), actor };
   const swapped = await swapInUpload(swap);
   if (!swapped) throw new UserFacingError("The file changed while it was being replaced, so it was not replaced. Try again.");
   await afterSwap(target.artifactId, swapped.openedRequestId);

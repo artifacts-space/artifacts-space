@@ -102,6 +102,7 @@ export const docsPages = [
       h2("auth", "Authentication and scopes"),
       h3("read-only", "Read-only connections"),
       h2("tools", "Tools"),
+      h2("concurrent-edits", "When people and agents edit at once"),
       h2("errors", "Errors"),
       h3("rate-limits", "Rate limits"),
       h2("untrusted", "Untrusted content"),

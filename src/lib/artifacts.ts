@@ -10,7 +10,7 @@ import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { getEditableArtifact, viewableInTeamCondition } from "@/lib/access";
 import { authoredByViewerCondition, findDeletableArtifact, ownedAgentIds } from "@/lib/agents/owner-access";
 import { loadActors } from "@/lib/agents/queries";
-import { assertValidArtifactContent, assertValidArtifactUpdate } from "@/lib/artifact-content";
+import { assertValidArtifactContent } from "@/lib/artifact-content";
 import {
   artifactKinds,
   type ArtifactDto,
@@ -23,10 +23,10 @@ import {
   type PendingSharingDto,
 } from "@/lib/artifact-types";
 import { artifactMetaColumns, type ArtifactMetaRecord } from "@/lib/artifact-columns";
-import { artifactIconInputSchema, iconFileId } from "@/lib/artifact-icons";
+import { artifactIconInputSchema } from "@/lib/artifact-icons";
 import { artifactThemeInputSchema } from "@/lib/themes/artifact-theme";
 import { assertTeamPresetUsable } from "@/lib/themes/team-preset-access";
-import { artifactCoverInputSchema, coverFileId } from "@/lib/covers/cover";
+import { artifactCoverInputSchema } from "@/lib/covers/cover";
 import { artifactSizeProblem } from "@/lib/artifact-limits";
 import { defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { PREVIEW_CHARS, previewKinds } from "@/lib/artifact-preview";
@@ -38,17 +38,16 @@ import { findOrCreateProject } from "@/lib/projects/store";
 import { checkContentFiles } from "@/lib/files/attach";
 import { contentForSave } from "@/lib/files/content-on-save";
 import { artifactHarnessOf, stampColumns, type HarnessStamp } from "@/lib/harness/harness-rules";
-import { pruneUnusedContentFilesQuietly, pruneUnusedIconFilesQuietly } from "@/lib/files/icon-cleanup";
-import { droppedContentRefs } from "@/lib/files/icon-cleanup-rules";
 import { checkIconFile, restorableIcon } from "@/lib/files/icon-file";
 import { checkCoverFile, restorableCover } from "@/lib/files/cover-file";
-import { attachContentAndImageFiles, attachUpdatedContentFiles } from "@/lib/files/save-attach";
+import { attachContentAndImageFiles } from "@/lib/files/save-attach";
 import { deleteArtifactFiles, listFilesForArtifacts } from "@/lib/files/store";
 import type { FileDto } from "@/lib/files/types";
 import { generatePublicId } from "@/lib/public-id";
 import { assertContentFits } from "@/lib/quota/usage";
 import type { SharingActor } from "@/lib/sharing/rules";
-import { StaleSaveError, unchangedSince, type SaveOptions } from "@/lib/save-guard";
+import type { SaveOptions } from "@/lib/save-guard";
+import { writeArtifactSave, type SaveContext } from "@/lib/artifact-save";
 import { showsInSearch } from "@/lib/search/search-rules";
 import { readSheetFormat } from "@/lib/sheet-format/rules";
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -84,6 +83,9 @@ export const artifactUpdateSchema = z.object({
 
 /** Fields an update may change. Every field is optional. */
 export type ArtifactUpdateInput = z.input<typeof artifactUpdateSchema>;
+
+/** An update's fields once checked, as a save writes them. */
+export type ArtifactChanges = z.output<typeof artifactUpdateSchema>;
 
 export const artifactInputSchema = artifactUpdateSchema
   .required({ title: true, content: true })
@@ -370,6 +372,8 @@ export async function createArtifact(userId: string, input: ArtifactInput, optio
       comments: defaultCommentSetting({ visibility: "private", teamPersonal: null }),
       userId,
       updatedBy: userId,
+      // A person's own create counts as their save; an agent's does not (src/lib/artifact-save.ts).
+      personSavedAt: options.harness ? null : sql`now()`,
       createRequestId: options.createRequestId ?? null,
     })
     // A second create with the same create id inserts nothing (artifact_user_create_request_idx).
@@ -384,67 +388,6 @@ export async function createArtifact(userId: string, input: ArtifactInput, optio
   return dto ?? toArtifactDto(record);
 }
 
-/** True when a save replaced or removed an uploaded image icon or cover. */
-function imageChanged(before: ArtifactRecord, after: ArtifactRecord): boolean {
-  return (iconFileId(before.icon) !== null && after.icon !== before.icon) || (coverFileId(before.cover) !== null && after.cover !== before.cover);
-}
-
-interface SaveContext {
-  editorId: string;
-  before: ArtifactRecord;
-  actor: SharingActor;
-  options: SaveOptions;
-  restoredFromId?: string | null;
-}
-
-/** How a save is filed: a restore stands alone; an edit may belong to an editing session. */
-function saveKindOf(context: SaveContext) {
-  if (context.restoredFromId) return { saveKind: "restore" as const, restoredFromId: context.restoredFromId };
-  return { saveKind: "edit" as const, restoredFromId: null, session: context.options.session };
-}
-
-/**
- * The limit a save counts against: an autosave that continues an open
- * editing session folds into that session's version, so it has its own
- * runaway cap; every other save can file a version and counts as an edit.
- */
-function saveLimit(context: SaveContext) {
-  return !context.restoredFromId && context.options.session === "continue" ? "artifactAutosave" : "artifactUpdate";
-}
-
-/**
- * Writes checked changes, files the version, and returns the DTO. Saves are
- * limited per editor per hour (web and MCP together), because each one can
- * file a version; see saveLimit.
- */
-async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, context: SaveContext) {
-  const { editorId, before } = context;
-  await enforceRateLimit(saveLimit(context), editorId);
-  // Content counts toward the author's account, whoever edits it.
-  if (changes.content !== undefined) await assertContentFits(before.userId, changes.content, before.content, editorId);
-  await assertValidArtifactUpdate(changes, () => Promise.resolve(before));
-  // A restore keeps the version's theme as it was; a team preset it may no longer use just falls back.
-  if (!context.restoredFromId && changes.theme !== before.theme) await assertTeamPresetUsable(editorId, before, changes.theme);
-  await attachUpdatedContentFiles(editorId, before, changes);
-  const [record] = await getDb()
-    .update(artifact)
-    .set({ ...changes, ...stampColumns(context.options.harness), updatedBy: editorId, updatedAt: new Date() })
-    .where(and(eq(artifact.id, before.id), unchangedSince(context.options.expectedUpdatedAt, before.publicId)))
-    .returning();
-
-  if (!record) {
-    if (context.options.expectedUpdatedAt) throw new StaleSaveError(before.publicId);
-    return null;
-  }
-  await recordArtifactSave({ before, after: record, editorId, actor: context.actor, ...saveKindOf(context), harness: context.options.harness ?? null });
-  // A replaced or removed image icon or cover goes with this save, unless something still shows it (see icon-cleanup.ts).
-  if (imageChanged(before, record)) await pruneUnusedIconFilesQuietly(record.id, [before.icon, before.cover]);
-  // So does media the content stopped embedding, once no version names it (a merged save can drop the only one).
-  await pruneUnusedContentFilesQuietly(record.id, droppedContentRefs(before, record));
-  const [dto] = await toArtifactDtos([record], editorId);
-  return dto ?? null;
-}
-
 /**
  * Changes an artifact the user may edit: their own, or one shared through a
  * team they belong to. Returns null when they may not. Every save files a
@@ -453,6 +396,29 @@ async function saveChanges(changes: z.output<typeof artifactUpdateSchema>, conte
  * approved version. `actor` is "agent" for MCP calls, which never approve.
  */
 export async function updateArtifact(userId: string, id: string, input: ArtifactUpdateInput, actor: SharingActor = "person", options: SaveOptions = {}) {
+  return (await saveArtifactUpdate(userId, id, input, actor, options))?.artifact ?? null;
+}
+
+/** What a save returns: the artifact after it, and whether a person's save went over agents' newer saves (theirs stay in History). */
+export interface SavedArtifact {
+  artifact: ArtifactDto;
+  savedOverAgents: boolean;
+}
+
+/** Writes checked changes (writeArtifactSave) and returns the DTO, or null when the artifact is gone. */
+async function saveChanges(changes: ArtifactChanges, context: SaveContext): Promise<SavedArtifact | null> {
+  const saved = await writeArtifactSave(changes, context);
+  if (!saved) return null;
+  const [dto] = await toArtifactDtos([saved.record], context.editorId);
+  return dto ? { artifact: dto, savedOverAgents: saved.savedOverAgents } : null;
+}
+
+/**
+ * updateArtifact, also saying whether a person's save went over agents'
+ * newer saves, so the web editor can say so. For agents, `options.baseVersion`
+ * names the version they read; a refused save throws EditConflictError.
+ */
+export async function saveArtifactUpdate(userId: string, id: string, input: ArtifactUpdateInput, actor: SharingActor = "person", options: SaveOptions = {}): Promise<SavedArtifact | null> {
   const sent = artifactUpdateSchema.parse(input);
   const before = await getEditableArtifact(userId, { id });
   if (!before) return null;
@@ -477,7 +443,7 @@ export async function restoreArtifactVersion(userId: string, id: string, version
   const [icon, cover] = await Promise.all([restorableIcon(userId, before.id, version.icon), restorableCover(userId, before.id, version.cover)]);
   const changes = contentForSave(kind, artifactUpdateSchema.parse({ title, icon, theme, cover, summary, content, kind, language, source, metadata }));
   assertArtifactSize(changes);
-  return saveChanges(changes, { editorId: userId, before, actor, options, restoredFromId: version.id });
+  return (await saveChanges(changes, { editorId: userId, before, actor, options, restoredFromId: version.id }))?.artifact ?? null;
 }
 
 /** Deletes an artifact and its files, for its author or the person who added the agent that wrote it. */

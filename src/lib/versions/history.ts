@@ -89,10 +89,12 @@ export async function versionMatching(record: ArtifactRecord, createdBy: string 
 
 /**
  * An agent save that changes nothing still says which agent saved last, so
- * the latest version records it too and History agrees with the byline.
+ * the latest version records it too and History agrees with the byline. Only
+ * an agent's version is relabelled, never one saved in the web app.
  */
 async function restampVersion(latest: ArtifactVersionRecord, record: ArtifactRecord, save: { editorId: string; harness?: HarnessStamp | null | undefined }) {
-  if (!save.harness || latest.createdBy !== save.editorId) return;
+  // A version saved in the web app stays the person's: an agent never relabels it (saveSourceKey).
+  if (!save.harness || latest.createdBy !== save.editorId || latest.harness === null) return;
   // Versions an approval or a decision names (the approved one too) keep what was decided.
   const { referenced } = await protectedVersions(record.id, record.approvedVersionId);
   const next = restampTo({ harness: latest.harness, locked: referenced.has(latest.id) }, save.harness);
@@ -100,7 +102,7 @@ async function restampVersion(latest: ArtifactVersionRecord, record: ArtifactRec
   await getDb().update(artifactVersion).set({ harness: next }).where(eq(artifactVersion.id, latest.id));
 }
 
-/** Folds a save into a version. A save from the web app keeps the harness an agent save already recorded there. */
+/** Folds a save into a version from the same source (saveSourceKey), so the harness it records stays right. */
 async function mergeInto(versionId: string, record: ArtifactRecord, harness: HarnessStamp | null | undefined) {
   await getDb()
     .update(artifactVersion)
@@ -111,7 +113,8 @@ async function mergeInto(versionId: string, record: ArtifactRecord, harness: Har
 /**
  * Files a save of `record` as a version and returns its id. A save that
  * changes nothing the latest version shows returns that version. A quick
- * follow-up save by the same editor merges into the latest version, unless
+ * follow-up save from the same source (the same person through the same
+ * agent harness, or the web app) merges into the latest version, unless
  * that version is protected (see protectedVersions) or the save drops an
  * uploaded icon or cover image the latest version shows. A web editor
  * autosave passes its editing-session step: see shouldMergeInto.
@@ -144,7 +147,7 @@ export async function fileVersion(
 export async function dropSupersededSessionVersion(
   record: ArtifactRecord,
   previous: ArtifactVersionRecord | null,
-  save: { editorId: string; saveKind: VersionSaveKind; session?: EditSessionStep | undefined; newVersionId: string },
+  save: { editorId: string; saveKind: VersionSaveKind; session?: EditSessionStep | undefined; harness?: HarnessStamp | null | undefined; newVersionId: string },
 ): Promise<void> {
   if (!previous || previous.id === save.newVersionId || save.session !== "continue" || dropsShownImage(previous, record)) return;
   const [[owner], references] = await Promise.all([
