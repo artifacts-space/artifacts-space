@@ -40,13 +40,22 @@ export function agentWriteCondition(artifactId: string, input: { base: BaseVersi
  * The relaxed condition a person's web save falls back to when the artifact
  * moved on from the editor's base: every save since was an agent's, because
  * no person saved after the base. `person_saved_at` is set by every person's
- * save and never by an agent's; null means no person has saved the artifact
- * yet (an agent created it), so only agents can have saved since. Rows from
- * before the column took it from their newest web version
- * (drizzle/0044_edit_lease.sql).
+ * save and never by an agent's. Null means no person has saved since the
+ * column was added: either an agent created the artifact, or the row is
+ * older than the column. Then the artifact's web versions (no harness) say
+ * whether a person saved after the base; they cover all of the row's older
+ * history, so no backfill is needed. A version's save time comes from the
+ * database clock and the base from the app server's, so a web version
+ * counts only from a second after the base: the save the base came from
+ * never refuses its own editor. The artifact id is bound as a value,
+ * never a bare column inside the subquery (the correlated-subquery tripwire
+ * in AGENTS.md).
  */
-export function onlyAgentsSavedSince(expected: Date) {
-  return sql`(${artifact.personSavedAt} is null or date_trunc('milliseconds', ${artifact.personSavedAt}) <= ${expected.toISOString()}::timestamptz)`;
+export function onlyAgentsSavedSince(artifactId: string, expected: Date) {
+  const base = sql`${expected.toISOString()}::timestamptz`;
+  const recorded = sql`date_trunc('milliseconds', ${artifact.personSavedAt}) <= ${base}`;
+  const noWebVersionSince = sql`not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and v.harness is null and v.saved_at > ${base} + interval '1 second')`;
+  return sql`(case when ${artifact.personSavedAt} is null then ${noWebVersionSince} else ${recorded} end)`;
 }
 
 /** Whether a person's edit lease on the artifact is live now, by the database clock. */

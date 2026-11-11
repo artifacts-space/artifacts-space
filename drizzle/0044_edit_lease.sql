@@ -8,6 +8,4 @@ CREATE TABLE "artifact_edit_lease" (
 ALTER TABLE "artifact" ADD COLUMN "person_saved_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "artifact_edit_lease" ADD CONSTRAINT "artifact_edit_lease_artifact_id_artifact_id_fk" FOREIGN KEY ("artifact_id") REFERENCES "public"."artifact"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "artifact_edit_lease" ADD CONSTRAINT "artifact_edit_lease_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "artifact_edit_lease_expires_idx" ON "artifact_edit_lease" USING btree ("expires_at");--> statement-breakpoint
--- Existing rows: when a person last saved, from their newest version saved without an agent harness. Rows no person ever saved stay null.
-UPDATE "artifact" SET "person_saved_at" = "web"."saved_at" FROM (SELECT "artifact_id", max("saved_at") AS "saved_at" FROM "artifact_version" WHERE "harness" IS NULL GROUP BY "artifact_id") AS "web" WHERE "web"."artifact_id" = "artifact"."id";
+CREATE INDEX "artifact_edit_lease_expires_idx" ON "artifact_edit_lease" USING btree ("expires_at");

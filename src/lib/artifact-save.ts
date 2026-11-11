@@ -151,7 +151,7 @@ async function writePersonSave(changes: ArtifactChanges, context: SaveContext): 
   const base = new Date(expected);
   // A base from the future would pass "no person saved since" against everyone: refuse it as stale.
   if (!isPlausibleBase(base, new Date())) throw new StaleSaveError(context.before.publicId);
-  const overAgents = await updateWhere(changes, context, onlyAgentsSavedSince(base));
+  const overAgents = await updateWhere(changes, context, onlyAgentsSavedSince(context.before.id, base));
   if (overAgents) return { record: overAgents, savedOverAgents: true };
   throw new StaleSaveError(context.before.publicId);
 }

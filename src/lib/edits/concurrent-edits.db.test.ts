@@ -17,7 +17,7 @@ const databaseUrl = process.env.TEST_DATABASE_URL;
 if (databaseUrl) process.env.DATABASE_URL = databaseUrl;
 
 describe.runIf(Boolean(databaseUrl))("concurrent edits with a database", async () => {
-  const { asc, eq, inArray, like, sql } = await import("drizzle-orm");
+  const { and, asc, eq, inArray, like, sql } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
   const { artifactEditLease } = await import("@/db/edit-lease-schema");
   const { artifact, artifactFile, artifactVersion, rateLimitBucket, user } = await import("@/db/schema");
@@ -249,6 +249,23 @@ describe.runIf(Boolean(databaseUrl))("concurrent edits with a database", async (
       ]);
       // From now on a person has saved it, so another person's stale tab is refused as before.
       await expect(saveArtifactUpdate(owner, page.id, { content: "# Notes\n\nstale tab" }, "person", { expectedUpdatedAt: page.updatedAt })).rejects.toBeInstanceOf(StaleSaveError);
+    });
+
+    it("should decide from History on a row older than person_saved_at: refuse over a person's newer web version, land over agents'", async () => {
+      const olderRow = (id: string) => getDb().update(artifact).set({ personSavedAt: null }).where(eq(artifact.id, id));
+      const page = await personArtifact();
+      await ageVersions(page.id);
+      // Another person's web version, saved over a second after this editor's base.
+      await updateArtifact(owner, page.id, { content: "# Answers\n\nother person" }, "person", { expectedUpdatedAt: page.updatedAt });
+      await getDb().update(artifactVersion).set({ savedAt: sql`now() + interval '2 seconds'` }).where(and(eq(artifactVersion.artifactId, page.id), eq(artifactVersion.content, "# Answers\n\nother person")));
+      await olderRow(page.id);
+      await expect(saveArtifactUpdate(owner, page.id, { content: "# Answers\n\nstale tab" }, "person", { expectedUpdatedAt: page.updatedAt })).rejects.toBeInstanceOf(StaleSaveError);
+
+      const agentsOnly = await personArtifact();
+      await updateArtifact(owner, agentsOnly.id, { content: "# Answers\n\nagent" }, "agent", { harness: claude, baseVersion: await readBase(agentsOnly.id) });
+      await olderRow(agentsOnly.id);
+      const saved = await saveArtifactUpdate(owner, agentsOnly.id, { content: "# Answers\n\nmine" }, "person", { expectedUpdatedAt: agentsOnly.updatedAt });
+      expect(saved?.savedOverAgents).toBe(true);
     });
 
     it("should still refuse a web save over another person's newer save", async () => {
