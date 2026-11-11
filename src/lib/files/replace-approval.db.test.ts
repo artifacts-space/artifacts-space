@@ -140,6 +140,41 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, its approval and races, 
     await getDb().delete(user).where(eq(user.id, ids.author));
   });
 
+  describe("a save during the swap", () => {
+    /** Waits (bounded) until another session is blocked on a row lock: the swap waiting for the open transaction. */
+    async function untilSomeoneWaitsForALock(client: { query: (text: string) => Promise<{ rows: { waiting: number }[] }> }) {
+      for (let attempt = 0; attempt < 200; attempt += 1) {
+        const { rows } = await client.query("select count(*)::int as waiting from pg_stat_activity where wait_event_type = 'Lock' and datname = current_database()");
+        if ((rows[0]?.waiting ?? 0) > 0) return;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      throw new Error("The swap never waited for the artifact's row lock.");
+    }
+
+    it("should copy the version from the row the swap locked, so a save that committed while it waited is in it", async () => {
+      // Private: no approval to plan, so nothing before the swap writes the artifact row.
+      await getDb().update(artifact).set({ visibility: "private" }).where(eq(artifact.id, ids.doc));
+      const next = await upload();
+      const { Pool } = await import("pg");
+      const pool = new Pool({ connectionString: databaseUrl });
+      const client = await pool.connect();
+      try {
+        // Another save holds the artifact's row: the swap's statement starts, then waits for it.
+        await client.query("begin");
+        await client.query("update artifact set content = '# Plan, saved meanwhile', updated_at = date_trunc('milliseconds', updated_at + interval '5 milliseconds') where id = $1", [ids.doc]);
+        const replacing = replaceFile(ids.author, { fileId: sow, uploadId: next }, "person");
+        await untilSomeoneWaitsForALock(client);
+        await client.query("commit");
+        await replacing;
+      } finally {
+        client.release();
+        await pool.end();
+      }
+      const [version] = await replaceVersions();
+      expect(version?.content).toBe("# Plan, saved meanwhile");
+    });
+  });
+
   describe("approval", () => {
     it("should open the edit request in the same statement as the swap when the change needs approval, and move it along on the next replace", async () => {
       await inTeam("member");

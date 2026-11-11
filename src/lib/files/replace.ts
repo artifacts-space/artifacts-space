@@ -147,7 +147,10 @@ function roleGuard({ approval, editorId }: Swap) {
  * visibility and team its approval plan was made for (and, when that plan
  * relied on the editor's role, the editor still holds it), and while the upload
  * is still the editor's, finished, and in no artifact. It locks the entry
- * and its artifact, so every part below runs or none does. Then it deletes
+ * and its artifact, so every part below runs or none does. The version is
+ * copied from `target`, the locked row: a save that committed while the
+ * swap waited for the lock is in it, where a fresh read of the artifact
+ * would still see the statement's older snapshot. Then it deletes
  * the upload's row, records what the entry held as an old copy, files the
  * replace's version (saved at the same moment the copy stopped being
  * current: the database clock in whole milliseconds, a millisecond or more
@@ -171,7 +174,8 @@ async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | nul
   const opened = approval.outcome === "pending" ? sql`(select id from request where opened)` : sql`null::text`;
   const result = await getDb().execute<{ id: string; opened_request_id: string | null; saved_at: string | Date }>(sql`
     with target as (
-      select f.id, f.artifact_id, f.key, f.filename, f.content_type, f.size, f.uploader_id, f.replaced_at, a.updated_at as artifact_updated_at
+      select f.id, f.artifact_id, f.key, f.filename, f.content_type, f.size, f.uploader_id, f.replaced_at, a.updated_at as artifact_updated_at,
+        a.title, a.icon, a.theme, a.cover, a.summary, a.content, a.kind, a.language, a.project, a.source, a.metadata
       from ${artifactFile} f
       join ${artifact} a on a.id = f.artifact_id
       where f.id = ${target.id} and f.artifact_id = ${target.artifactId} and f.key = ${target.key}
@@ -196,10 +200,9 @@ async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | nul
     ),
     version as (
       insert into ${artifactVersion} (id, artifact_id, title, icon, theme, cover, summary, content, kind, language, project, source, metadata, bytes, harness, by_agent, created_by, save_kind, created_at, saved_at)
-      select ${versionId}, a.id, a.title, a.icon, a.theme, a.cover, a.summary, a.content, a.kind, a.language, a.project, a.source, a.metadata,
-        octet_length(a.content) + octet_length(a.metadata::text), ${harnessId}, ${actor === "agent"}, ${editorId}, 'replace', copy.replaced_at, copy.replaced_at
-      from ${artifact} a, copy
-      where a.id = ${target.artifactId}
+      select ${versionId}, t.artifact_id, t.title, t.icon, t.theme, t.cover, t.summary, t.content, t.kind, t.language, t.project, t.source, t.metadata,
+        octet_length(t.content) + octet_length(t.metadata::text), ${harnessId}, ${actor === "agent"}, ${editorId}, 'replace', copy.replaced_at, copy.replaced_at
+      from target t, copy
       returning id, saved_at
     )${approvalCtes(swap)},
     stamped as (
