@@ -1,7 +1,7 @@
 "use client";
 
-import { IconCheck, IconChevronLeft, IconChevronRight, IconSearch } from "@tabler/icons-react";
-import { useEffect, useRef, type KeyboardEvent, type RefObject } from "react";
+import { IconChevronRight, IconSearch } from "@tabler/icons-react";
+import type { RefObject } from "react";
 
 import { HarnessByline } from "@/components/harness/harness-byline";
 import { editorName } from "@/components/history/last-edited";
@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 
 import { shortcutFor, type MenuEntry } from "./block-actions";
 import type { BlockMenuLastEdited } from "./block-menu-context";
-import { blockTypes } from "./block-types";
 import { formatCounts, formatEditedAt } from "./edited-at";
 
 /** One row of the menu: 32px high, 44px on phones, highlighted by hover, the arrow keys, or typing. */
@@ -115,86 +114,6 @@ export function MenuFooter({ lastEdited, words, characters }: { lastEdited: Bloc
         </>
       ) : null}
       <span>{formatCounts(words, characters)}</span>
-    </div>
-  );
-}
-
-const subRowClass = cn(rowClass, "focus:bg-accent focus:text-accent-foreground");
-
-/** Moves focus between the submenu's rows with the arrow keys, Home, and End. */
-function moveFocus(event: KeyboardEvent<HTMLElement>, container: HTMLElement | null): boolean {
-  const rows = [...(container?.querySelectorAll<HTMLElement>("[role=menuitemradio]") ?? [])];
-  const current = rows.findIndex((row) => row === document.activeElement);
-  const steps: Record<string, number> = { ArrowDown: current + 1, ArrowUp: current - 1, Home: 0, End: rows.length - 1 };
-  const next = steps[event.key];
-  if (next === undefined || rows.length === 0) return false;
-  rows[(next + rows.length) % rows.length]?.focus();
-  return true;
-}
-
-interface ChangeSubmenuProps {
-  panelRef: RefObject<HTMLDivElement | null>;
-  className: string;
-  currentType: string | null;
-  focused: boolean;
-  /** Phones show the submenu in place of the menu, with a way back. */
-  sheet: boolean;
-  onPick: (typeId: string) => void;
-  onBack: () => void;
-  onCloseAll: () => void;
-}
-
-/** "Change": every block type, each with its icon, and a check on the current one. */
-export function ChangeSubmenu({ panelRef, className, currentType, focused, sheet, onPick, onBack, onCloseAll }: ChangeSubmenuProps) {
-  const listRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!focused) return;
-    const rows = listRef.current?.querySelectorAll<HTMLElement>("[role=menuitemradio]");
-    const checked = listRef.current?.querySelector<HTMLElement>("[aria-checked=true]");
-    (checked ?? rows?.[0])?.focus({ preventScroll: true });
-  }, [focused]);
-
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (moveFocus(event, listRef.current)) {
-      event.preventDefault();
-    } else if (event.key === "ArrowLeft" || event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      onBack();
-    } else if (event.key === "Tab") {
-      event.preventDefault();
-      onCloseAll();
-    }
-  };
-
-  return (
-    <div ref={panelRef} className={className} onKeyDown={onKeyDown} data-slot="block-menu-change">
-      {sheet ? (
-        <button type="button" onClick={onBack} className={cn(rowClass, "text-muted-foreground")}>
-          <IconChevronLeft aria-hidden /> Change
-        </button>
-      ) : null}
-      <div ref={listRef} role="menu" aria-label="Change to" className="flex flex-col">
-        {blockTypes.map((option) => {
-          const Icon = option.icon;
-          const checked = option.id === currentType;
-          return (
-            <button
-              key={option.id}
-              type="button"
-              role="menuitemradio"
-              aria-checked={checked}
-              tabIndex={-1}
-              onClick={() => { onPick(option.id); }}
-              className={subRowClass}
-            >
-              <Icon aria-hidden />
-              <span className="min-w-0 flex-1 truncate">{option.label}</span>
-              <IconCheck aria-hidden className={cn("ml-auto text-foreground!", checked ? "visible" : "invisible")} />
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }

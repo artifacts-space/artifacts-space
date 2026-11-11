@@ -43,6 +43,7 @@ disagree, the editor keeps the source as written (see "Raw blocks").
 | Table | GFM pipe table with optional alignment | `table` |
 | Divider | `---` | `horizontalRule` |
 | Media: image, video, audio, PDF, file | Image syntax alone in its paragraph (below) | `media` |
+| Block colors on a paragraph or heading (also in lists and quotes) | A color comment at the end of its text (below) | `color` and `background` attributes |
 | Anything else | As written | `rawMarkdown` |
 
 ### Media
@@ -173,6 +174,53 @@ flowchart TD
   closed diagram, so a diagram turns back into code like any code block.
 - **The Markdown version** keeps the fenced source. **Link previews** skip
   it like any code block.
+
+### Block colors
+
+A paragraph or heading can have a text color, a background, or both. They
+are a block attribute, written as an HTML comment at the end of the line's
+text:
+
+```md
+Ship it on Friday <!-- color: red -->
+
+## Open questions <!-- background: yellow -->
+
+- [ ] Call the venue <!-- color: blue; background: gray -->
+
+> Quoted and shaded <!-- background: green -->
+```
+
+- **Hues:** `gray`, `brown`, `orange`, `yellow`, `green`, `blue`, `purple`,
+  `pink`, `red` (`blockHues` in `src/lib/block-colors/block-color-rules.ts`).
+  Each is a pair of theme tokens in `globals.css`, `--block-<hue>` for text
+  and `--block-<hue>-bg` for backgrounds, with light and dark values.
+- **The comment** holds `name: value` declarations split by `;`. `color` is
+  the text color and `background` the background. The editor writes
+  `<!-- color: <hue>; background: <hue> -->`, color first, with the
+  default left out, and no comment at all for a line with no colors.
+- **Why a comment:** it stays inside the block, so a colored line is still
+  one block for the round trip, and every other Markdown reader (GitHub,
+  editors, agents' renderers) hides it. Rule 1's forms all show up as text
+  or structure in plain GFM; a color should not.
+- **What colors:** the comment must be the last thing in a paragraph's or
+  heading's text (only spaces may follow it). A list item's colors are those
+  of its first line (items nested under it keep their own). In the block
+  menu, Color on a quote colors every line in it; code blocks, tables,
+  dividers, media, and raw blocks have no Color.
+- **Ignored, never lost:** a color comment that names `color` or
+  `background` with a value that is not a hue colors nothing (`<!-- color:
+  teal -->`), and unknown names in it are ignored. It stays as written until
+  that block is edited, and is then left out. Any other comment, or a color
+  comment in the middle of text, is raw HTML: the block stays a raw block.
+- **An empty line** cannot keep colors: with no text, the comment would
+  start the line and turn it into an HTML block.
+- **Surfaces:** the editor sets `data-block-color` and
+  `data-block-background` on the paragraph or heading
+  (`block-color-nodes.ts`); the read view does the same
+  (`remark-block-colors.ts`), on a span around the line for the first line
+  of an item in a tight list, which has no `<p>`. The Markdown version keeps
+  the comment as written, and link preview text leaves it out.
 
 ### Raw blocks
 

@@ -213,6 +213,25 @@
   --mention-foreground: oklch(0.42 0.13 262);
   --mention-agent: oklch(0.95 0.025 300);
   --mention-agent-foreground: oklch(0.42 0.13 300);
+  /* Block colors (markdown-dialect.md, "Block colors"): text, then background, per hue. */
+  --block-gray: oklch(0.52 0.01 65);
+  --block-gray-bg: oklch(0.94 0.004 80);
+  --block-brown: oklch(0.5 0.06 55);
+  --block-brown-bg: oklch(0.94 0.02 60);
+  --block-orange: oklch(0.58 0.15 50);
+  --block-orange-bg: oklch(0.95 0.04 60);
+  --block-yellow: oklch(0.6 0.13 85);
+  --block-yellow-bg: oklch(0.96 0.05 95);
+  --block-green: oklch(0.52 0.12 150);
+  --block-green-bg: oklch(0.95 0.035 155);
+  --block-blue: oklch(0.52 0.15 255);
+  --block-blue-bg: oklch(0.95 0.03 250);
+  --block-purple: oklch(0.52 0.16 300);
+  --block-purple-bg: oklch(0.95 0.03 305);
+  --block-pink: oklch(0.56 0.17 350);
+  --block-pink-bg: oklch(0.95 0.03 350);
+  --block-red: oklch(0.55 0.19 27);
+  --block-red-bg: oklch(0.95 0.03 25);
   /*
    * Pixel avatars (src/lib/avatar). Each avatar's hue is data; these tokens
    * adapt it to the theme. The background is the hue mixed into the tint base;
@@ -405,6 +424,25 @@
   --mention-foreground: oklch(0.86 0.08 262);
   --mention-agent: oklch(0.3 0.045 300);
   --mention-agent-foreground: oklch(0.86 0.08 300);
+  /* Block colors (markdown-dialect.md, "Block colors"): text, then background, per hue. */
+  --block-gray: oklch(0.7 0.01 70);
+  --block-gray-bg: oklch(0.26 0.005 60);
+  --block-brown: oklch(0.7 0.06 60);
+  --block-brown-bg: oklch(0.27 0.02 55);
+  --block-orange: oklch(0.74 0.13 55);
+  --block-orange-bg: oklch(0.28 0.04 50);
+  --block-yellow: oklch(0.8 0.12 90);
+  --block-yellow-bg: oklch(0.29 0.04 90);
+  --block-green: oklch(0.74 0.12 150);
+  --block-green-bg: oklch(0.27 0.035 155);
+  --block-blue: oklch(0.74 0.12 255);
+  --block-blue-bg: oklch(0.27 0.04 255);
+  --block-purple: oklch(0.74 0.13 300);
+  --block-purple-bg: oklch(0.28 0.04 305);
+  --block-pink: oklch(0.75 0.13 350);
+  --block-pink-bg: oklch(0.28 0.04 350);
+  --block-red: oklch(0.72 0.15 27);
+  --block-red-bg: oklch(0.28 0.05 25);
   --avatar-tint-base: oklch(0.22 0.005 60);
   --avatar-tint-strength: 32%;
   --avatar-ink: oklch(0.95 0.004 80);
@@ -997,6 +1035,96 @@
   .block-link-flash {
     animation: none;
   }
+}
+
+/*
+ * Block colors (markdown-dialect.md, "Block colors"): a paragraph or heading,
+ * in the editor and the read view, or the span around a tight list item's
+ * line in the read view. The block menu's swatches use the same attributes.
+ */
+[data-block-color] {
+  color: var(--block-text);
+}
+[data-block-color="gray"] {
+  --block-text: var(--block-gray);
+}
+[data-block-color="brown"] {
+  --block-text: var(--block-brown);
+}
+[data-block-color="orange"] {
+  --block-text: var(--block-orange);
+}
+[data-block-color="yellow"] {
+  --block-text: var(--block-yellow);
+}
+[data-block-color="green"] {
+  --block-text: var(--block-green);
+}
+[data-block-color="blue"] {
+  --block-text: var(--block-blue);
+}
+[data-block-color="purple"] {
+  --block-text: var(--block-purple);
+}
+[data-block-color="pink"] {
+  --block-text: var(--block-pink);
+}
+[data-block-color="red"] {
+  --block-text: var(--block-red);
+}
+[data-block-background] {
+  border-radius: var(--radius-sm);
+  background-color: var(--block-fill);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+[data-block-background="gray"] {
+  --block-fill: var(--block-gray-bg);
+}
+[data-block-background="brown"] {
+  --block-fill: var(--block-brown-bg);
+}
+[data-block-background="orange"] {
+  --block-fill: var(--block-orange-bg);
+}
+[data-block-background="yellow"] {
+  --block-fill: var(--block-yellow-bg);
+}
+[data-block-background="green"] {
+  --block-fill: var(--block-green-bg);
+}
+[data-block-background="blue"] {
+  --block-fill: var(--block-blue-bg);
+}
+[data-block-background="purple"] {
+  --block-fill: var(--block-purple-bg);
+}
+[data-block-background="pink"] {
+  --block-fill: var(--block-pink-bg);
+}
+[data-block-background="red"] {
+  --block-fill: var(--block-red-bg);
+}
+/* Lines with a background get room around the text, without moving it. */
+:is(.artifact-prose, .rich-editor-content) :is(p, h1, h2, h3, h4, h5, h6, li > span)[data-block-background] {
+  padding-inline: 0.375rem;
+  margin-inline: -0.375rem;
+}
+/* A tight list item's line in the read view is a span: draw it as the whole line, beside a task's checkbox. */
+.artifact-prose li > span:is([data-block-color], [data-block-background]) {
+  display: block;
+}
+.artifact-prose .task-list-item:has(> span:is([data-block-color], [data-block-background])) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+.artifact-prose .task-list-item > span:is([data-block-color], [data-block-background]) {
+  flex: 1;
+  min-width: 0;
+}
+.artifact-prose .task-list-item > :is(ul, ol) {
+  flex-basis: 100%;
 }
 
 /*

@@ -405,6 +405,13 @@ supplies the artifact through `BlockMenuFor`; editors without it (a ui
 artifact's Markdown block) get no handles. Readers get only Copy link to block
 on right-click (`src/components/block-links`).
 
+Color (text color and background) is a block attribute on paragraphs and
+headings, stored in Markdown as a color comment at the end of the line's
+text, `<!-- color: red; background: yellow -->` (markdown-dialect.md, "Block
+colors"; rules in `src/lib/block-colors`). Every hue is a token pair in
+`globals.css` (`--block-<hue>`, `--block-<hue>-bg`), light and dark; add a
+hue there and in `blockHues` together.
+
 A block link names the block by its opening words, never by a stored id:
 `/artifact/<id>#block=<words>[&n=<k>]:~:text=<words>`, or `#block-file=<uuid>`
 for media, or `#block-at=<index>` for a block without text

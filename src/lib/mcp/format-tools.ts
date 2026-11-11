@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import { validateArtifactContent } from "@/lib/artifact-content";
+import { blockHues } from "@/lib/block-colors/block-color-rules";
 import { formatInfo, type FormatKind } from "@/lib/artifact-formats";
 import { artifactKinds } from "@/lib/artifact-types";
 import type { McpAccess } from "@/lib/oauth/scopes";
@@ -57,6 +58,16 @@ export const MARKDOWN_DIAGRAM_GUIDE = [
   "The Markdown keeps the fenced source exactly as written, so you read and edit it as text. If Mermaid cannot read it, readers see the source as code with a short note. artifacts_validate with kind \"mermaid\" checks that it starts with a diagram type.",
 ].join("\n");
 
+/** How agents color lines in Markdown: a color comment at the end of the line's text (markdown-dialect.md, "Block colors"). */
+export const MARKDOWN_COLOR_GUIDE = [
+  "Color a paragraph, heading, list item, or quoted line by ending its text with a color comment:",
+  "   Ship it on Friday <!-- color: red -->",
+  "   ## Open questions <!-- background: yellow -->",
+  "   - [ ] Call the venue <!-- color: blue; background: gray -->",
+  `Hues: ${blockHues.join(", ")}. "color" sets the text color and "background" the background; write color first. Leave the comment out for the default.`,
+  "Other Markdown readers hide the comment. Keep it at the end of the line's text: a comment in the middle of text, or with another name or hue, does not color anything.",
+].join("\n");
+
 function text(value: string) {
   return { content: [{ type: "text" as const, text: value }] };
 }
@@ -64,7 +75,7 @@ function text(value: string) {
 /** The guide for one format, or an overview of all formats. */
 export function formatGuide(kind?: FormatKind): string {
   if (kind === "ui") return buildUiGuide();
-  if (kind === "markdown") return `${formatInfo.markdown.label} (markdown): ${formatInfo.markdown.agent}\n\n${MARKDOWN_DIAGRAM_GUIDE}\n\n${MARKDOWN_MEDIA_GUIDE}`;
+  if (kind === "markdown") return `${formatInfo.markdown.label} (markdown): ${formatInfo.markdown.agent}\n\n${MARKDOWN_DIAGRAM_GUIDE}\n\n${MARKDOWN_MEDIA_GUIDE}\n\n${MARKDOWN_COLOR_GUIDE}`;
   if (kind) return `${formatInfo[kind].label} (${kind}): ${formatInfo[kind].agent}`;
   const lines = artifactKinds.map((item) => `- ${item}: ${formatInfo[item].agent}`);
   const uiHint = (artifactKinds as readonly string[]).includes("ui") ? ['', 'For rich pages, call artifacts_formats_guide with kind "ui" to get the component reference and an example.'] : [];

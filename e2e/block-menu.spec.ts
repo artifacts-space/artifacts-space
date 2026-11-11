@@ -235,3 +235,55 @@ test("should give readers only Copy link to block, and no handles", async ({ pag
   await expect(items).toHaveCount(1);
   await expect(items).toHaveText("Copy link to block");
 });
+
+test("should color a block's text from Color, and write it into the Markdown", async ({ page, isMobile }) => {
+  await openFixture(page);
+  await openMenu(page, "Closing paragraph", isMobile);
+  if (isMobile) {
+    await menu(page).getByRole("menuitem", { name: "Color" }).click();
+    await page.locator("[data-slot=block-menu-color]").getByRole("group", { name: "Text color" }).getByRole("menuitemradio", { name: "Blue" }).click();
+  } else {
+    await page.keyboard.type("blue text");
+    await page.keyboard.press("Enter");
+  }
+  await expect(menu(page)).toBeHidden();
+  await expect(savedMarkdown(page)).toContainText("Closing paragraph of the fixture. <!-- color: blue -->");
+  await expect(editor(page).locator('p[data-block-color="blue"]')).toHaveText("Closing paragraph of the fixture.");
+});
+
+test("should check the current colors in Color and set a background back to Default", async ({ page, isMobile }) => {
+  await openFixture(page);
+  await expect(editor(page).locator('p[data-block-background="yellow"]')).toContainText("Written November 11");
+  await openMenu(page, "Written November 11", isMobile);
+  await menu(page).getByRole("menuitem", { name: "Color" }).click();
+  const color = page.locator("[data-slot=block-menu-color]");
+  const background = color.getByRole("group", { name: "Background" });
+  await expect(background.getByRole("menuitemradio", { name: "Yellow background" })).toHaveAttribute("aria-checked", "true");
+  await expect(color.getByRole("group", { name: "Text color" }).getByRole("menuitemradio", { name: "Default" })).toHaveAttribute("aria-checked", "true");
+  await background.getByRole("menuitemradio", { name: "Default" }).click();
+  await expect(savedMarkdown(page)).toContainText("Write your answer under each item.\n\n## Rate plan writes");
+  await expect(editor(page).locator("p[data-block-background]")).toHaveCount(0);
+});
+
+test("should open Color with the keyboard and put focus on the current choice", async ({ page, isMobile }) => {
+  test.skip(isMobile, "Phones have no hardware keyboard.");
+  await openFixture(page);
+  await openMenu(page, "Written November 11", false);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await expect(menu(page).getByRole("menuitem", { name: "Color" })).toHaveAttribute("data-highlighted", "");
+  await page.keyboard.press("ArrowRight");
+  const color = page.locator("[data-slot=block-menu-color]");
+  await expect(color.getByRole("menuitemradio", { name: "Default" }).first()).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(color).toBeHidden();
+});
+
+test("should show block colors in the read view", async ({ page }) => {
+  await page.goto("/dev/block-menu?as=reader");
+  const line = page.locator('.artifact-prose p[data-block-background="yellow"]');
+  await expect(line).toContainText("Write your answer under each item.");
+  await expect(line).not.toContainText("background");
+  const fill = await line.evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(fill).not.toBe("rgba(0, 0, 0, 0)");
+});
