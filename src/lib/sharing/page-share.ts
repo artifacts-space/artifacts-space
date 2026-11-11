@@ -19,6 +19,8 @@ type ShareRecord = Pick<ArtifactMetaRecord, "id" | "publicId" | "userId" | "titl
 /** The page's access decision, as far as sharing needs it (ArtifactAccess). */
 interface ShareAccess {
   record: ShareRecord;
+  /** The viewer belongs to the artifact's team. */
+  isTeamMember: boolean;
   /** The viewer added the agent that wrote it and is still in its team. */
   actsForAuthor: boolean;
 }
@@ -29,9 +31,10 @@ interface ShareAccess {
  * a link or public page, and teammates who may edit it (owners and admins
  * among them) keep the read-only status.
  */
-export function sharesOnPage(access: Pick<ShareAccess, "actsForAuthor"> & { record: Pick<ShareRecord, "userId"> }, viewerId: string | null): viewerId is string {
+export function sharesOnPage(access: Pick<ShareAccess, "isTeamMember" | "actsForAuthor"> & { record: Pick<ShareRecord, "userId"> }, viewerId: string | null): viewerId is string {
   if (!viewerId) return false;
-  return canShareArtifact({ userId: access.record.userId }, { userId: viewerId, isTeamMember: false, actsForAuthor: access.actsForAuthor });
+  // The same viewer the workspace passes (use-edit-access.ts): the real team membership, so the two never diverge.
+  return canShareArtifact({ userId: access.record.userId }, { userId: viewerId, isTeamMember: access.isTeamMember, actsForAuthor: access.actsForAuthor });
 }
 
 /** The Share dialog's view of a stored row and its open requests. */

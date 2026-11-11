@@ -35,36 +35,36 @@ beforeEach(() => {
 
 describe("sharesOnPage", () => {
   it("should give the author Share when they open their own artifact", () => {
-    expect(sharesOnPage({ record, actsForAuthor: false }, author)).toBe(true);
+    expect(sharesOnPage({ record, isTeamMember: true, actsForAuthor: false }, author)).toBe(true);
   });
 
   it("should give Share to the person who added the agent when they act for its author", () => {
-    expect(sharesOnPage({ record, actsForAuthor: true }, "agent-owner")).toBe(true);
+    expect(sharesOnPage({ record, isTeamMember: true, actsForAuthor: true }, "agent-owner")).toBe(true);
   });
 
-  const readers: Record<string, string | null> = {
-    signedOut: null,
-    teammateWhoMayEdit: "teammate",
-    teamOwnerOrAdmin: "team-admin",
-    linkOrPublicReader: "stranger",
+  const readers: Record<string, { viewerId: string | null; isTeamMember: boolean }> = {
+    signedOut: { viewerId: null, isTeamMember: false },
+    teammateWhoMayEdit: { viewerId: "teammate", isTeamMember: true },
+    teamOwnerOrAdmin: { viewerId: "team-admin", isTeamMember: true },
+    linkOrPublicReader: { viewerId: "stranger", isTeamMember: false },
   };
-  for (const [name, viewerId] of Object.entries(readers)) {
+  for (const [name, { viewerId, isTeamMember }] of Object.entries(readers)) {
     it(`should keep the read-only status for ${name} when they are not the author`, () => {
-      expect(sharesOnPage({ record, actsForAuthor: false }, viewerId)).toBe(false);
+      expect(sharesOnPage({ record, isTeamMember, actsForAuthor: false }, viewerId)).toBe(false);
     });
   }
 });
 
 describe("loadPageShare", () => {
   it("should load nothing and return null when the viewer may not share", async () => {
-    await expect(loadPageShare({ record, actsForAuthor: false }, "teammate")).resolves.toBeNull();
-    await expect(loadPageShare({ record, actsForAuthor: false }, null)).resolves.toBeNull();
+    await expect(loadPageShare({ record, isTeamMember: true, actsForAuthor: false }, "teammate")).resolves.toBeNull();
+    await expect(loadPageShare({ record, isTeamMember: false, actsForAuthor: false }, null)).resolves.toBeNull();
     expect(mocks.pendingRequestsFor).not.toHaveBeenCalled();
     expect(mocks.listTeamsForUser).not.toHaveBeenCalled();
   });
 
   it("should load the open requests and the sharer's own teams when the author opens it", async () => {
-    const share = await loadPageShare({ record, actsForAuthor: false }, author);
+    const share = await loadPageShare({ record, isTeamMember: true, actsForAuthor: false }, author);
     expect(mocks.listTeamsForUser).toHaveBeenCalledWith(author);
     expect(mocks.pendingRequestsFor).toHaveBeenCalledWith([record.id]);
     expect(share?.artifact.pendingSharing).toEqual(pendingSharing);

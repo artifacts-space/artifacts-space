@@ -70,6 +70,11 @@ test("should let the owner move a private artifact into a team from the page and
   await expect(header(page).getByRole("button", { name: "Team. Share settings" }), "the page refreshes from the server").toBeVisible();
   expect(await sharingOf(publicId)).toEqual({ visibility: "team", teamId: team.id });
 
+  // After the refresh the dialog starts from what the server stored.
+  await header(page).getByRole("button", { name: "Team. Share settings" }).click();
+  await expect(page.getByRole("dialog").getByRole("radio", { name: /^Team/ })).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
+
   await page.reload();
   await expect(header(page).getByRole("button", { name: "Team. Share settings" })).toBeVisible();
 });

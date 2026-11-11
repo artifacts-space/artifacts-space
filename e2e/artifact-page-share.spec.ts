@@ -48,6 +48,12 @@ test("should move a personal artifact into a team from the page's Share when the
   await expect(moved).toHaveAttribute("data-visibility", "team");
   await expect(page.locator("[data-fixture-sharing]")).toHaveText("team:fixture-platform");
   await expect(moved, "focus comes back to the button").toBeFocused();
+
+  // Reopened, the dialog starts from what was saved.
+  await moved.click();
+  const reopened = page.getByRole("dialog");
+  await expect(reopened.getByRole("radio", { name: /^Team/ })).toHaveAttribute("aria-checked", "true");
+  await expect(reopened.getByRole("combobox", { name: "Share with" })).toContainText("Platform");
 });
 
 test("should say Pending in the header when the team's sharing waits for approval", async ({ page }) => {
@@ -66,7 +72,12 @@ test("should say Pending in the header when the team's sharing waits for approva
   await expect(page.locator("[data-fixture-sharing]"), "it stays private until approved").toHaveText("private:none");
 
   await pending.click();
-  await expect(page.getByRole("dialog").getByText(/Waiting for approval: team in Design/)).toBeVisible();
+  const reopened = page.getByRole("dialog");
+  await expect(reopened.getByText(/Waiting for approval: team in Design/)).toBeVisible();
+  // The picks start from the level that still applies, not the one waiting, so Save never re-sends the request.
+  await expect(reopened.getByRole("radio", { name: /^Private/ })).toHaveAttribute("aria-checked", "true");
+  await expect(reopened.getByRole("combobox", { name: "Share with" })).toHaveCount(0);
+  await expect(reopened.locator("[data-slot=share-outcome]")).toHaveText("Only you can read it. Any open request is canceled.");
 });
 
 test("should show a reader only the read-only status when they may not share", async ({ page }) => {
