@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { shouldSignalEditing } from "@/lib/edits/edit-conflict-rules";
+import { createEditingSignalTracker } from "./editing-signal-tracker";
 
 import type { ArtifactDraft } from "./use-artifact-draft";
 
@@ -31,8 +31,8 @@ interface EditingSignalOptions {
  * anything reliably, so its lease runs out the same way.
  */
 export function useEditingSignal({ artifactId, draft, dirty, signal }: EditingSignalOptions) {
-  const lastSignalRef = useRef<number | null>(null);
-  const lastInputRef = useRef<number | null>(null);
+  // When it last signalled and when the person last typed (editing-signal-tracker.ts); one per editor.
+  const [tracker] = useState(createEditingSignalTracker);
   // Read when the draft changes; a save that only flips `dirty` is not typing.
   const latestRef = useRef({ artifactId, dirty, signal });
   useEffect(() => { latestRef.current = { artifactId, dirty, signal }; }, [artifactId, dirty, signal]);
@@ -40,25 +40,20 @@ export function useEditingSignal({ artifactId, draft, dirty, signal }: EditingSi
   useEffect(() => {
     return () => {
       // Typing in the artifact being left never counts as typing in the next one: opening an artifact takes no lease.
-      lastInputRef.current = null;
-      if (lastSignalRef.current === null) return;
-      lastSignalRef.current = null;
+      if (!tracker.onLeave()) return;
       latestRef.current.signal(artifactId, false).catch(() => {
         // Best effort: the lease runs out on its own.
       });
     };
-  }, [artifactId]);
+  }, [artifactId, tracker]);
 
   useEffect(() => {
-    const now = Date.now();
     const { artifactId: id, dirty: unsaved, signal: send } = latestRef.current;
     // A change that leaves unsaved edits is typing. A draft replaced to match the saved artifact (the editable
     // copy loading, a restore, loading their version) is not, so opening an artifact never takes a lease.
-    if (unsaved) lastInputRef.current = now;
-    if (!shouldSignalEditing({ now, lastSignalAt: lastSignalRef.current, unsaved, lastInputAt: lastInputRef.current })) return;
-    lastSignalRef.current = now;
+    if (!tracker.onDraftChange(Date.now(), unsaved)) return;
     send(id).catch(() => {
       // Best effort: the person's next save still goes through over agents' saves.
     });
-  }, [draft]);
+  }, [draft, tracker]);
 }
