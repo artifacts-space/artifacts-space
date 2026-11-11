@@ -111,14 +111,14 @@ function commentsApprovalNote(input: { artifact: ArtifactDto; visibility: Artifa
   return wait ? `Comments from anyone signed in need an owner's or admin's approval in ${input.team?.name ?? "the team"}.` : null;
 }
 
-/** The team's editing and sharing rule, for a team artifact that stays in a shared team (team-rule-copy.ts); null otherwise. */
-function teamRuleText(props: { artifact: ArtifactDto; visibility: ArtifactVisibility; team: ShareTeam | undefined; teams: readonly ShareTeam[] }) {
-  const ruleTeam = ruleTeamFor(props.artifact.teamId, props.visibility, props.team, props.teams);
+/** The team's editing and sharing rule when the choice puts the artifact in a shared team (team-rule-copy.ts); null while it stays personal. */
+function teamRuleText(props: { visibility: ArtifactVisibility; team: ShareTeam | undefined }) {
+  const ruleTeam = ruleTeamFor(props.visibility, props.team);
   return ruleTeam ? shareRuleLine(ruleTeam.name, ruleTeam) : null;
 }
 
-/** What saving will do: now or after approval, for the level and for comments, then the team's rule for a team artifact. */
-function ShareOutcome(props: { artifact: ArtifactDto; visibility: ArtifactVisibility; team: ShareTeam | undefined; teams: readonly ShareTeam[]; comments: CommentSetting }) {
+/** What saving will do: now or after approval, for the level and for comments, then the team's rule when it lands in a shared team. */
+function ShareOutcome(props: { artifact: ArtifactDto; visibility: ArtifactVisibility; team: ShareTeam | undefined; comments: CommentSetting }) {
   const { artifact, visibility, team, comments } = props;
   const note = commentsApprovalNote(props);
   const onlyComments = visibility === artifact.visibility && (visibility === "private" || team?.id === artifact.teamId) && comments !== artifact.comments;
@@ -244,7 +244,7 @@ export function ShareControl({ artifact, shareUrl, onUpdated }: ShareControlProp
             <TeamPicker visibility={visibility} teams={teams} value={teamId} onChange={choice.changeTeam} />
             <SearchEnginesPicker state={searchState} checked={showInSearch} onChange={choice.chooseShowInSearch} />
             <CommentsPicker visibility={visibility} team={team} value={comments} onChange={choice.chooseComments} />
-            <ShareOutcome artifact={artifact} visibility={visibility} team={team} teams={teams} comments={comments} />
+            <ShareOutcome artifact={artifact} visibility={visibility} team={team} comments={comments} />
             {live ? (
               <ValueField value={shareUrl} copyLabel="Copy link" />
             ) : null}

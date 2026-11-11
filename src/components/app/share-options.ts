@@ -40,15 +40,13 @@ export function defaultTeamId(visibility: ArtifactVisibility, teams: readonly Sh
 }
 
 /**
- * The shared team whose rule the Share dialog states: only for a team
- * artifact (one already in a shared team) that stays in a shared team.
- * Null for a personal artifact, for making it private, and for a link or
- * public level approved by the viewer's personal team.
+ * The shared team whose rule the Share dialog states: the team the choice
+ * puts the artifact in, whether it is already there or is moving in now (the
+ * moment the person decides). Null while the choice keeps it personal:
+ * private, or a link or public level approved by the viewer's personal team.
  */
-export function ruleTeamFor(artifactTeamId: string | null, visibility: ArtifactVisibility, team: ShareTeam | undefined, teams: readonly ShareTeam[]): ShareTeam | null {
+export function ruleTeamFor(visibility: ArtifactVisibility, team: ShareTeam | undefined): ShareTeam | null {
   if (visibility === "private" || !team || team.personal) return null;
-  const current = teams.find((item) => item.id === artifactTeamId);
-  if (!current || current.personal) return null;
   return team;
 }
 

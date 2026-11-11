@@ -75,10 +75,30 @@ test("should state the team's rule in the outcome line when the artifact is shar
   await expect(outcome).toHaveText("Only you can read it. Any open request is canceled.");
 });
 
-test("should leave the outcome line without a team rule when the artifact is personal", async ({ page }) => {
+test("should state the team's rule when a personal artifact moves into a shared team, and none while it stays personal", async ({ page }) => {
   const dialog = await openLinkedShare(page, "fixtureworkspacenote04", "Note 5");
+  const readers = dialog.getByRole("radiogroup", { name: "Who can read it" });
   const outcome = dialog.locator("[data-slot=share-outcome]");
+  // Private: it stays personal, so no team rule.
   await expect(outcome).toHaveText("Only you can read it. Any open request is canceled.");
-  await dialog.getByRole("radiogroup", { name: "Who can read it" }).getByRole("radio", { name: /Team/ }).click();
+
+  // Moving it into Design is the moment the person decides, so the rule shows.
+  await readers.getByRole("radio", { name: /Team/ }).click();
+  await expect(dialog.getByRole("combobox", { name: "Share with" })).toContainText("Design");
+  await expect(outcome).toHaveText(
+    "It applies as soon as you save. Everyone in Design can edit it directly, with no approval. Sharing by link or in public needs approval from someone who can approve sharing (owners and admins by default). Edits to those artifacts reach outside readers once approved.",
+  );
+
+  // A link through Design keeps Design's rule after what saving will do.
+  await readers.getByRole("radio", { name: /Link/ }).click();
+  const approver = dialog.getByRole("combobox", { name: "Approved by" });
+  await expect(approver).toContainText("Design");
+  await expect(outcome).toContainText("Someone in Design who approves sharing approves it first.");
+  await expect(outcome).toContainText("Everyone in Design can edit it directly, with no approval.");
+
+  // A link approved by the personal team keeps it personal: no team rule.
+  await approver.click();
+  await page.getByRole("option", { name: "Fixture (personal)" }).click();
+  await expect(approver).toContainText("Fixture (personal)");
   await expect(outcome).toHaveText("It applies as soon as you save.");
 });

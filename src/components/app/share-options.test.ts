@@ -56,29 +56,29 @@ describe("selectedTeamLabel", () => {
 
 describe("ruleTeamFor", () => {
   const open: ShareTeam = { ...strict, id: "o", slug: "open", name: "Open", teamSharingNeedsApproval: false };
-  const all = [personal, strict, open];
 
   it("should state the team's rule when a team artifact stays in its team", () => {
-    expect(ruleTeamFor("s", "team", strict, all)?.id).toBe("s");
-    expect(ruleTeamFor("s", "link", strict, all)?.id).toBe("s");
+    expect(ruleTeamFor("team", strict)?.id).toBe("s");
+    expect(ruleTeamFor("link", strict)?.id).toBe("s");
   });
 
-  it("should state the new team's rule when a team artifact moves to another shared team", () => {
-    expect(ruleTeamFor("s", "team", open, all)?.id).toBe("o");
+  it("should state the team's rule when a personal artifact moves into a shared team, at every shared level", () => {
+    expect(ruleTeamFor("team", open)?.id).toBe("o");
+    expect(ruleTeamFor("link", open)?.id).toBe("o");
+    expect(ruleTeamFor("public", strict)?.id).toBe("s");
   });
 
-  it("should state no rule when the artifact is personal", () => {
-    expect(ruleTeamFor(null, "team", strict, all)).toBeNull();
-    expect(ruleTeamFor("p", "public", personal, all)).toBeNull();
-    expect(ruleTeamFor("p", "team", strict, all)).toBeNull();
+  it("should state no rule while the artifact stays private", () => {
+    expect(ruleTeamFor("private", undefined)).toBeNull();
+    expect(ruleTeamFor("private", strict)).toBeNull();
   });
 
-  it("should state no rule when a team artifact is made private or approved by the personal team", () => {
-    expect(ruleTeamFor("s", "private", undefined, all)).toBeNull();
-    expect(ruleTeamFor("s", "link", personal, all)).toBeNull();
+  it("should state no rule when a link or public level is approved by the personal team", () => {
+    expect(ruleTeamFor("link", personal)).toBeNull();
+    expect(ruleTeamFor("public", personal)).toBeNull();
   });
 
-  it("should state no rule when the viewer is not in the artifact's team", () => {
-    expect(ruleTeamFor("gone", "team", strict, all)).toBeNull();
+  it("should state no rule when no team is picked yet", () => {
+    expect(ruleTeamFor("team", undefined)).toBeNull();
   });
 });
