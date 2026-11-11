@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
 
 import { team } from "@/db/schema";
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
 
 import { effectiveRoleKey, groupRoleRows, resolveActor, teamRolesQuery } from "./capabilities";
 import { defaultRoleCapabilities } from "./capability-rules";
@@ -15,7 +16,7 @@ import { listTeamMemberActorsQuery, listTeamMembersQuery, membershipQuery } from
  * and nothing compares a column with itself.
  */
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 const selfCompare = /"(\w+)" = "\1"(?!\.)/;
 
 describe("teamRolesQuery", () => {

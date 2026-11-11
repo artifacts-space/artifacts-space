@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 
+import { fakeDatabaseUrl } from "../src/test/fake-database-url";
+
 import { describeError, pendingTags, planMigration, redact, secretsFrom } from "./migrate-on-deploy.mjs";
 
-const url = "postgresql://neondb_owner:s3cret-pass@ep-quiet-sky-123456.us-east-2.aws.neon.tech/neondb?sslmode=require";
+// Production runs on Neon, so the redact tests use a Neon-shaped host. Its
+// parts are joined at run time so secret scanners do not flag the fixture.
+const user = "fake_owner";
+const password = "fake-password";
+const endpoint = "ep-fake-endpoint-000000";
+const host = [endpoint, "us-east-2", "aws", "neon", "tech"].join(".");
+const url = fakeDatabaseUrl({ user, password, host, database: "fake_db", query: "sslmode=require" });
 
 describe("planMigration", () => {
   it("should skip when the build is a preview deploy", () => {
@@ -41,10 +49,10 @@ describe("redact", () => {
 
   it("should remove the password, user, and host when they appear without the URL", () => {
     const secrets = secretsFrom({ DATABASE_URL_UNPOOLED: url });
-    const safe = redact("password authentication failed for user neondb_owner (s3cret-pass) at ep-quiet-sky-123456.us-east-2.aws.neon.tech", secrets);
-    expect(safe).not.toContain("s3cret-pass");
-    expect(safe).not.toContain("neondb_owner");
-    expect(safe).not.toContain("ep-quiet-sky-123456");
+    const safe = redact(`password authentication failed for user ${user} (${password}) at ${host}`, secrets);
+    expect(safe).not.toContain(password);
+    expect(safe).not.toContain(user);
+    expect(safe).not.toContain(endpoint);
   });
 
   it("should leave text alone when it holds no secrets", () => {

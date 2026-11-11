@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type * as R2 from "@/lib/files/r2";
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
 
 /*
  * Team icon storage: the bytes are checked before anything is stored, the
@@ -151,7 +152,7 @@ describe("memberTeamIcon", () => {
 });
 
 describe("memberIconKeyQuery", () => {
-  const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+  const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 
   it("should reach the icon only through the viewer's own membership in a shared team", () => {
     const { sql, params } = memberIconKeyQuery(db, "user-1", "team-1").toSQL();

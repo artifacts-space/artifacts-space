@@ -2,6 +2,8 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
 
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
+
 import { subjectQuery } from "./access";
 
 /*
@@ -11,7 +13,7 @@ import { subjectQuery } from "./access";
  * itself, because stubbed rows cannot catch that.
  */
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 
 describe("subjectQuery", () => {
   it("should tie the viewer's membership to the artifact's own team when a viewer is signed in", () => {

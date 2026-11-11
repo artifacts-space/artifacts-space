@@ -2,9 +2,11 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
 
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
+
 import { deletedOnRemovalQuery } from "./queries";
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 
 describe("deletedOnRemovalQuery", () => {
   it("should count artifacts that are private or not shared through the agent's team when removal would delete them", () => {

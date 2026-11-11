@@ -2,6 +2,8 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
 
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
+
 import { createdByRequestQuery } from "./created-by-request";
 
 /*
@@ -11,7 +13,7 @@ import { createdByRequestQuery } from "./created-by-request";
  * stubbed rows cannot show a missing condition.
  */
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 const requestId = "0b6f6d43-8a8f-4b52-9f44-2f8c1a6d3e10";
 
 describe("createdByRequestQuery", () => {

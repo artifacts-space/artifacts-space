@@ -2,6 +2,8 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { describe, expect, it } from "vitest";
 
+import { fakeDatabaseUrl } from "@/test/fake-database-url";
+
 import { teamWelcomeQuery } from "./welcome";
 
 /*
@@ -10,7 +12,7 @@ import { teamWelcomeQuery } from "./welcome";
  * catch an unqualified column that compares with itself (see AGENTS.md).
  */
 
-const db = drizzle({ client: neon("postgres://user:password@db.example.com/db") });
+const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 
 describe("teamWelcomeQuery", () => {
   it("should tie the dismissal to the same member and team when it reads the card's facts", () => {
