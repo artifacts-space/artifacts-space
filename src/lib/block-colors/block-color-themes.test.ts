@@ -43,12 +43,21 @@ function withSurfaces(colors: ThemeColors, mode: PaletteMode, card: number): The
   return { ...colors, card: `oklch(${String(card)} 0.02 80)`, background: `oklch(${String(page)} 0.02 80)` };
 }
 
-/** The palette with its body text moved to just clear AA on both its card and its page: the darkest (or lightest) ink a theme may choose. */
-function withInkAtFloor(colors: ThemeColors, mode: PaletteMode): ThemeColors {
+/** A preset's palette on one surface: the page and the card are the same color, so the card alone binds the ink. */
+function onOneSurface(colors: ThemeColors, card: number): ThemeColors {
+  return { ...colors, card: `oklch(${String(card)} 0 0)`, background: `oklch(${String(card)} 0 0)` };
+}
+
+/**
+ * The palette with its body text moved to just clear `ratio` (AA by
+ * default) on both its card and its page: the darkest (or lightest) ink a
+ * theme may choose.
+ */
+function withInkAt(colors: ThemeColors, mode: PaletteMode, ratio = 4.5): ThemeColors {
   const surfaces = [color(colors.card), color(colors.background)];
   let ink: Oklch = { ...color(colors.card), c: 0.01 };
   const step = mode === "light" ? -0.002 : 0.002;
-  while (surfaces.some((surface) => contrastRatio(ink, surface) < 4.5)) ink = { ...ink, l: ink.l + step };
+  while (surfaces.some((surface) => contrastRatio(ink, surface) < ratio)) ink = { ...ink, l: ink.l + step };
   return { ...colors, foreground: `oklch(${ink.l.toFixed(3)} 0.01 80)` };
 }
 
@@ -70,10 +79,32 @@ describe("blockColorTokens", () => {
   it("should keep backgrounds readable and set apart from the card when a theme sits at both limits", () => {
     const preset = builtInPresets().get("default");
     if (!preset) throw new Error("default preset missing");
-    expect(failingPairs("light", withInkAtFloor(withSurfaces(preset.theme.light, "light", 0.9), "light"))).toEqual([]);
-    expect(failingPairs("light", withInkAtFloor(withSurfaces(preset.theme.light, "light", 0.75), "light"))).toEqual([]);
-    expect(failingPairs("dark", withInkAtFloor(withSurfaces(preset.theme.dark, "dark", 0.4), "dark"))).toEqual([]);
-    expect(failingPairs("dark", withInkAtFloor(withSurfaces(preset.theme.dark, "dark", 0.2), "dark"))).toEqual([]);
+    expect(failingPairs("light", withInkAt(withSurfaces(preset.theme.light, "light", 0.9), "light"))).toEqual([]);
+    expect(failingPairs("light", withInkAt(withSurfaces(preset.theme.light, "light", 0.75), "light"))).toEqual([]);
+    expect(failingPairs("dark", withInkAt(withSurfaces(preset.theme.dark, "dark", 0.4), "dark"))).toEqual([]);
+    expect(failingPairs("dark", withInkAt(withSurfaces(preset.theme.dark, "dark", 0.2), "dark"))).toEqual([]);
+  });
+
+  it("should keep backgrounds apart from the card when the ink is bound by the card itself", () => {
+    const preset = builtInPresets().get("default");
+    if (!preset) throw new Error("default preset missing");
+    expect(failingPairs("light", withInkAt(onOneSurface(preset.theme.light, 0.9), "light"))).toEqual([]);
+    expect(failingPairs("dark", withInkAt(onOneSurface(preset.theme.dark, 0.2), "dark"))).toEqual([]);
+  });
+
+  it("should never draw backgrounds on a white or black card itself, keeping them as far off it as the ink allows", () => {
+    const preset = builtInPresets().get("default");
+    if (!preset) throw new Error("default preset missing");
+    for (const mode of ["light", "dark"] as const) {
+      const card = mode === "light" ? 1 : 0;
+      const colors = withInkAt(onOneSurface(preset.theme[mode], card), mode, 4.8);
+      const tokens = blockColorTokens(mode, colors);
+      for (const hue of blockHues) {
+        const fill = color(tokens[`--block-${hue}-bg`]);
+        expect(contrastRatio(color(colors.foreground), fill), `${mode} ${hue}`).toBeGreaterThanOrEqual(4.5);
+        expect(Math.abs(fill.l - card), `${mode} ${hue}`).toBeGreaterThan(0.01);
+      }
+    }
   });
 
   it("should be part of every theme's tokens, so themed artifacts draw block colors from the theme", () => {
