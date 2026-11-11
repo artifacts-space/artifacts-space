@@ -420,7 +420,7 @@ puts an editor's finished upload in place of a plain attachment. The
 `artifact_file` row keeps its id, place, and name, so links and embeds open
 the new file; what it held moves to `artifact_file_copy`. The swap is one SQL
 statement, guarded on the key the editor saw, that also files the replace's
-version and writes its approval outcome (the edit request, or the new approved
+version (copied from the artifact row the statement locked) and writes its approval outcome (the edit request, or the new approved
 version), so the file, its History entry, and its approval land together or
 not at all. The approval is decided before the statement, which runs only
 while the artifact keeps that visibility and team. A refused replace leaves
@@ -478,12 +478,23 @@ the UPDATE itself, one statement, never a read-then-write:
   millisecond or more after the row's last save (`src/lib/edits/save-time.ts`),
   never from an app server's clock. Every write of `artifact.updated_at` uses
   `nextSaveTime`/`firstSaveTime`, so a base names exactly one save.
-- A save files its version and applies the approval rule after its UPDATE,
-  and a newer save can land in between. The version is dated at its save and
-  placed before any newer one, merges and restamps run only while the row is
-  still at that save, and the approval writes are guarded the same way
-  (`artifactStillAt`). History's newest version and the approved version are
-  always the newest save's.
+- On a link or public artifact, a save (and a files change,
+  `recordArtifactChange`) decides its approval before its UPDATE, for exactly
+  the row it changes, and writes its version and approval (approved version,
+  edit request, canceled requests, an approver's audit row) in the same
+  statement (`src/lib/versions/save-write.ts`, like a replaced file). The
+  UPDATE runs only while the row keeps the save time, visibility, team, and
+  approved version the plan was made for, read from the row's own columns;
+  when another save or decision moved it on, the save is planned again on the
+  new row. So no save can land between another save and its approval. On
+  private and team artifacts the version is filed just after the UPDATE:
+  dated at its save and placed before any newer one, and merges and restamps
+  run only while the row is still at that save (`artifactStillAt`). History's
+  newest version and the approved version are always the newest save's.
+- Snapshots (`versionMatching`, `ensureHistoryStart`) reuse the version a
+  save filed when one shows the row, and are credited by `snapshotSource`: a
+  person when `person_saved_at` is the row's save time, never the artifact's
+  last agent.
 - History merges quick saves only with the same source key (the person, and
   for an agent's save its harness, or "agent" when unknown: `saveSourceKey`).
   Whether a save is an agent's comes from who saved it
