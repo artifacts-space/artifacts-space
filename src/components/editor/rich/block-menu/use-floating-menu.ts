@@ -71,6 +71,7 @@ export function useFloatingMenu(floating: RefObject<HTMLElement | null>, anchor:
       // Off again (the phone sheet, or a new anchor): drop the old place so the sheet's own layout applies and the next place fades in again.
       element.style.removeProperty("left");
       element.style.removeProperty("top");
+      element.style.removeProperty("max-height");
       delete element.dataset.placed;
     };
   }, [floating, anchor, rule, enabled]);
