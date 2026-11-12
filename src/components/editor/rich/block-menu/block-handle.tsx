@@ -5,6 +5,8 @@ import type { DragEvent, Ref } from "react";
 
 import { cn } from "@/lib/utils";
 
+import type { MenuPoint } from "./use-floating-menu";
+
 /** Where a handle sits, relative to the editor: centred on the block's first line, just left of it. */
 export interface HandlePlace {
   pos: number;
@@ -25,7 +27,8 @@ interface BlockHandleProps {
   /** Shown because the pointer is over the block. */
   shown: boolean;
   gripRef?: Ref<HTMLButtonElement> | undefined;
-  onOpen: (grip: HTMLButtonElement) => void;
+  /** `press` is where the pointer pressed the grip, or null when the keyboard opened it. */
+  onOpen: (grip: HTMLButtonElement, press: MenuPoint | null) => void;
   onAdd: () => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
   onDragEnd: () => void;
@@ -73,7 +76,7 @@ export function BlockHandle({ place, touch, open, shown, gripRef, onOpen, onAdd,
         aria-haspopup="menu"
         aria-expanded={open}
         draggable={!touch}
-        onClick={(event) => { onOpen(event.currentTarget); }}
+        onClick={(event) => { onOpen(event.currentTarget, event.detail === 0 ? null : { x: event.clientX, y: event.clientY }); }}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
         className={cn(buttonClass, "cursor-grab active:cursor-grabbing", touch && "h-8 w-6")}

@@ -1,7 +1,7 @@
 "use client";
 
 import { autoUpdate, computePosition, offset, shift, size, type VirtualElement } from "@floating-ui/dom";
-import { useEffect, useLayoutEffect, useState, useSyncExternalStore, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
 
 import { choosePlacement, handleBox, menuEdge, menuGap, menuMinHeight, menuWidth, scrollForRoom, type PlacementRule } from "./menu-placement";
 
@@ -95,26 +95,46 @@ export function makeRoomBelow(anchor: MenuAnchor): boolean {
   return true;
 }
 
+/** A point in window coordinates. */
+export interface MenuPoint {
+  x: number;
+  y: number;
+}
+
+/** How far a click or the pointer must be from the opening press to count as a new one. */
+const stillDistance = 3;
+
+function near(point: MenuPoint, x: number, y: number): boolean {
+  return Math.abs(x - point.x) + Math.abs(y - point.y) < stillDistance;
+}
+
 /**
  * After makeRoomBelow moved the page under a pointer that did not move, the
- * menu can open under the pointer. Until the pointer really moves, the menu
- * ignores presses (`data-settling`), so a second click on the grip never
- * runs the row now under it. Spread the result onto the menu's panel.
+ * menu can open under the opening press. Until the pointer moves or a click
+ * lands somewhere else, a click at that same spot (the second half of a
+ * double-click on the grip, or a second tap) is swallowed, so it never runs
+ * the row now under it. Mouse, pen, and touch alike: any click elsewhere
+ * works at once. Spread the result onto the menu's panel.
  */
-export function useSettling(moved: boolean): { "data-settling"?: "" } {
-  const [settling, setSettling] = useState(moved);
+export function useSettling(still: MenuPoint | null): { onClickCapture: (event: ReactMouseEvent) => void } {
+  const [at, setAt] = useState(still);
   useEffect(() => {
-    if (!settling) return;
-    // Browsers may send a still pointer's position again after a scroll: only a move away from where it first shows counts.
-    let from: { x: number; y: number } | null = null;
-    const onMove = (event: PointerEvent) => {
-      from ??= { x: event.clientX, y: event.clientY };
-      if (Math.abs(event.clientX - from.x) + Math.abs(event.clientY - from.y) >= 3) setSettling(false);
-    };
+    if (!at) return;
+    const onMove = (event: PointerEvent) => { if (!near(at, event.clientX, event.clientY)) setAt(null); };
     window.addEventListener("pointermove", onMove);
     return () => { window.removeEventListener("pointermove", onMove); };
-  }, [settling]);
-  return settling ? { "data-settling": "" } : {};
+  }, [at]);
+  return {
+    onClickCapture: (event) => {
+      if (!at) return;
+      if (!near(at, event.clientX, event.clientY)) {
+        setAt(null);
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+    },
+  };
 }
 
 /** Closes a menu on a press anywhere outside the given elements. */

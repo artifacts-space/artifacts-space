@@ -72,11 +72,13 @@ async function openFrom(page: Page, text: string, at: "top" | "bottom") {
   await target.hover({ position: { x: 8, y: 6 } });
   await expect(handle(page)).toHaveCount(1);
   await watchOpening(page);
-  await handle(page).getByRole("button", { name: "Block actions" }).click();
+  const grip = await boxOf(handle(page).getByRole("button", { name: "Block actions" }));
+  const press = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 };
+  await page.mouse.click(press.x, press.y);
   await expect(menu(page)).toHaveAttribute("data-placed", "");
   const viewport = page.viewportSize();
   if (!viewport) throw new Error("No viewport");
-  return { handle: await boxOf(handle(page)), block: await boxOf(target), menu: await boxOf(menu(page)), viewport };
+  return { handle: await boxOf(handle(page)), block: await boxOf(target), menu: await boxOf(menu(page)), viewport, press };
 }
 
 type Opened = Awaited<ReturnType<typeof openFrom>>;
@@ -186,10 +188,16 @@ test.describe("block menu placement on a narrow window", () => {
     expect(opened.menu.y + opened.menu.height).toBeLessThanOrEqual(opened.viewport.height - edge + 1);
     expect(overlaps(opened.menu, opened.handle)).toBe(false);
     expect(overlaps(opened.menu, opened.block)).toBe(false);
-    // The page moved under the pointer: the menu ignores presses until the pointer moves, then works as usual.
-    await expect(menu(page)).toHaveCSS("pointer-events", "none");
-    await page.mouse.move(opened.menu.x + 40, opened.menu.y + 60, { steps: 4 });
-    await expect(menu(page)).toHaveCSS("pointer-events", "auto");
+    // The page moved under a still pointer, so the menu now lies under the opening press. A second click
+    // there (a double-click on the grip) must not run the row it lands on; a click anywhere else works at once.
+    expect(overlaps(opened.menu, { x: opened.press.x, y: opened.press.y, width: 1, height: 1 })).toBe(true);
+    const saved = await page.getByTestId("fixture-markdown").textContent();
+    await page.mouse.click(opened.press.x, opened.press.y);
+    await expect(menu(page)).toBeVisible();
+    await expect(changeMenu(page)).toBeHidden();
+    expect(await page.getByTestId("fixture-markdown").textContent()).toBe(saved);
+    await menu(page).getByRole("menuitem", { name: "Duplicate" }).click();
+    await expect.poll(async () => ((await page.getByTestId("fixture-markdown").textContent()) ?? "").split("Filler paragraph 30 ").length - 1).toBe(2);
   });
 });
 

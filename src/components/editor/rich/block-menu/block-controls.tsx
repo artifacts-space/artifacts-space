@@ -16,14 +16,14 @@ import { BlockMenuExtension, setBlockMenuHost, setMenuTarget } from "./block-men
 import { blockCounts, blockShape, blockTargetAt, blockTargetFrom, canMoveBlock, documentBlocks } from "./block-target";
 import { blockTypeName, currentBlockType } from "./block-types";
 import { useBlockPlaces, useEditorState, useHoveredBlock } from "./use-block-places";
-import { makeRoomBelow, type MenuAnchor } from "./use-floating-menu";
+import { makeRoomBelow, type MenuAnchor, type MenuPoint } from "./use-floating-menu";
 
 interface OpenMenu {
   pos: number;
   anchor: MenuAnchor;
   grip: HTMLElement | null;
-  /** Opening scrolled the page to make room below the block. */
-  moved: boolean;
+  /** Where the opening press was, when opening then scrolled the page to make room below the block (makeRoomBelow). */
+  still: MenuPoint | null;
 }
 
 /** What the menu shows for the block at `pos`, or null when no block starts there any more. */
@@ -139,8 +139,8 @@ function BlockControls({ editor, frame }: BlockControlsProps) {
   const shown = menu?.pos ?? hovered;
   const places = useBlockPlaces(editor, frame, handlePositions(state.doc, touch, shown), state.doc, touch);
 
-  const open = useCallback((pos: number, anchor: MenuAnchor, grip: HTMLElement | null = null) => {
-    setMenu({ pos, anchor, grip, moved: makeRoomBelow(anchor) });
+  const open = useCallback((pos: number, anchor: MenuAnchor, grip: HTMLElement | null = null, press: MenuPoint | null = null) => {
+    setMenu({ pos, anchor, grip, still: makeRoomBelow(anchor) ? press : null });
     setMenuTarget(editor.view, pos);
   }, [editor]);
 
@@ -181,7 +181,7 @@ function BlockControls({ editor, frame }: BlockControlsProps) {
           open={menu?.pos === place.pos}
           shown={!touch && shown === place.pos}
           gripRef={place.pos === (menu?.pos ?? shown) ? gripRef : undefined}
-          onOpen={(grip) => { if (menu?.pos === place.pos) close("outside"); else open(place.pos, { kind: "element", element: handleOf(grip), block: () => blockElement(editor, place.pos) }, grip); }}
+          onOpen={(grip, press) => { if (menu?.pos === place.pos) close("outside"); else open(place.pos, { kind: "element", element: handleOf(grip), block: () => blockElement(editor, place.pos) }, grip, press); }}
           onAdd={() => { insertBelow(editor, place.pos); }}
           onDragStart={(event) => {
             const target = blockTargetFrom(editor.state.doc, place.pos);
@@ -200,7 +200,7 @@ function BlockControls({ editor, frame }: BlockControlsProps) {
           mac={mac}
           anchor={menu.anchor}
           keepOpenOn={menu.grip}
-          moved={menu.moved}
+          still={menu.still}
           onCommand={onCommand}
           onClose={close}
         />
