@@ -24,20 +24,33 @@ function textRoot(surface: HTMLElement): Element {
   return surface.querySelector("[data-comment-root]") ?? surface;
 }
 
+/** The two highlights one surface drew, so it only ever takes away its own. */
+interface Painted {
+  marked: Highlight;
+  active: Highlight;
+}
+
+function canPaint(): boolean {
+  return typeof CSS !== "undefined" && "highlights" in CSS;
+}
+
 /** Draws the highlights: the open comment's words stand out from the rest. Browsers without CSS highlights draw none. */
-function paint(ranges: ReadonlyMap<string, Range>, activeKey: string | null) {
-  if (typeof CSS === "undefined" || !("highlights" in CSS)) return;
+function paint(ranges: ReadonlyMap<string, Range>, activeKey: string | null): Painted | null {
+  if (!canPaint()) return null;
   const active: Range[] = [];
   const rest: Range[] = [];
   for (const [key, range] of ranges) (key === activeKey ? active : rest).push(range);
-  CSS.highlights.set(MARK, new Highlight(...rest));
-  CSS.highlights.set(MARK_ACTIVE, new Highlight(...active));
+  const painted = { marked: new Highlight(...rest), active: new Highlight(...active) };
+  CSS.highlights.set(MARK, painted.marked);
+  CSS.highlights.set(MARK_ACTIVE, painted.active);
+  return painted;
 }
 
-function clearPaint() {
-  if (typeof CSS === "undefined" || !("highlights" in CSS)) return;
-  CSS.highlights.delete(MARK);
-  CSS.highlights.delete(MARK_ACTIVE);
+/** Takes away the highlights this surface drew, unless another surface has drawn its own since. */
+function clearPaint(painted: Painted | null) {
+  if (!painted || !canPaint()) return;
+  if (CSS.highlights.get(MARK) === painted.marked) CSS.highlights.delete(MARK);
+  if (CSS.highlights.get(MARK_ACTIVE) === painted.active) CSS.highlights.delete(MARK_ACTIVE);
 }
 
 /** Where each anchor's words are on the page now. */
@@ -60,45 +73,65 @@ function sameKeys(left: ReadonlySet<string>, right: ReadonlyMap<string, Range>):
   return true;
 }
 
+/** How long the text rests before the words are found again. Between passes each highlight follows its words by itself. */
+const RELOCATE_AFTER_MS = 150;
+
+const NONE_LOCATED: ReadonlySet<string> = new Set();
+
 /**
  * Finds each anchor's words in the surface's text, highlights them, and
- * finds them again whenever the text changes (typing, a save from elsewhere,
- * the editor replacing the read view). It reads the page and never changes
- * it: the highlights are CSS highlights, not elements.
+ * finds them again once the text changed and rests (typing, a save from
+ * elsewhere, the editor replacing the read view). Reading the whole text on
+ * every keystroke would slow typing in a long document, and is not needed:
+ * a highlight is a live range, so it moves with its words between passes.
+ * It reads the page and never changes it: the highlights are CSS
+ * highlights, not elements.
  */
 export function useLocatedAnchors(surface: HTMLElement | null, anchors: readonly AnchorToLocate[], activeKey: string | null) {
   const ranges = useRef<ReadonlyMap<string, Range>>(new Map());
+  const painted = useRef<Painted | null>(null);
   const active = useRef(activeKey);
-  const [located, setLocated] = useState<ReadonlySet<string>>(() => new Set());
+  const [located, setLocated] = useState<ReadonlySet<string>>(NONE_LOCATED);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     active.current = activeKey;
-    paint(ranges.current, activeKey);
+    painted.current = paint(ranges.current, activeKey);
   }, [activeKey]);
+
+  // The highlights stay while the anchors change (a reload), so they do not blink; they go only with the surface.
+  useEffect(() => {
+    if (!surface) return;
+    return () => {
+      ranges.current = new Map();
+      clearPaint(painted.current);
+      painted.current = null;
+    };
+  }, [surface]);
 
   useEffect(() => {
     if (!surface) return;
     let frame = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const run = () => {
       frame = 0;
       const found = locate(surface, anchors);
       ranges.current = found;
-      paint(found, active.current);
+      painted.current = paint(found, active.current);
       setLocated((previous) => (sameKeys(previous, found) ? previous : new Set(found.keys())));
       setReady(true);
     };
-    const schedule = () => {
-      if (frame === 0) frame = requestAnimationFrame(run);
+    const whenTextRests = () => {
+      clearTimeout(timer);
+      timer = setTimeout(run, RELOCATE_AFTER_MS);
     };
-    schedule();
-    const observer = new MutationObserver(schedule);
+    frame = requestAnimationFrame(run);
+    const observer = new MutationObserver(whenTextRests);
     observer.observe(surface, { childList: true, subtree: true, characterData: true });
     return () => {
       observer.disconnect();
+      clearTimeout(timer);
       if (frame !== 0) cancelAnimationFrame(frame);
-      ranges.current = new Map();
-      clearPaint();
     };
   }, [surface, anchors]);
 
@@ -123,5 +156,6 @@ export function useLocatedAnchors(surface: HTMLElement | null, anchors: readonly
     return hits.sort((left, right) => left.length - right.length).map((hit) => hit.key);
   }, []);
 
-  return { located, ready, boxOf, scrollTo, keysAt };
+  // Without a surface (the source view is open) nothing is on the page, and nothing is known about the words.
+  return { located: surface ? located : NONE_LOCATED, ready: surface !== null && ready, boxOf, scrollTo, keysAt };
 }

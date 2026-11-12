@@ -1,7 +1,7 @@
 "use client";
 
 import { IconChevronRight, IconLoader2, IconMessage } from "@tabler/icons-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ThreadData } from "@/app/(workspace)/threads/actions";
 import { PixelAvatar } from "@/components/pixel-avatar";
@@ -266,14 +266,17 @@ function OwnThread({ publicId, className, raised }: { publicId: string; classNam
 /**
  * The thread the artifact's inline comments already loaded: the same data as
  * the highlights in the text, so a comment made at the text shows here at
- * once. Opening the list marks the thread read, as loading it used to.
+ * once. Opening the list marks the thread read, as loading it used to, and
+ * a list opened after the thread loaded (the Comments dialog) loads it again
+ * first, so it shows comments made since.
  */
 function SharedThread({ inline, className, raised }: { inline: InlineComments; className?: string | undefined; raised: boolean }) {
   const { thread, ready, located, reveal } = inline;
-  const { markRead } = thread;
+  const { markRead, reload } = thread;
+  const loadedBefore = useRef(thread.state.status === "ready");
   useEffect(() => {
-    void markRead();
-  }, [markRead]);
+    void (loadedBefore.current ? reload().then(markRead) : markRead());
+  }, [markRead, reload]);
   const anchors = useMemo<AnchorLookup>(
     () => ({
       placeOf: (comment) => {

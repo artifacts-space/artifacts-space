@@ -57,7 +57,7 @@ function draftFor(surface: HTMLElement, range: Range): InlineDraft | null {
  * (InlineCommentSurface marks where the text is), and shows a thread or a
  * new comment in a card at its words. The Comments list inside reads the
  * same thread. For other formats, a new artifact not saved yet, or a viewer
- * who may not comment, it only renders its children.
+ * who may not comment, it gives its children no inline comments.
  */
 export function InlineCommentsProvider({ publicId, kind, canComment, stored = true, api, children }: InlineCommentsProviderProps) {
   const enabled = canComment && stored && kind === "markdown";
@@ -104,11 +104,13 @@ export function InlineCommentsProvider({ publicId, kind, canComment, stored = tr
       open: (commentId) => {
         setDraft(null);
         setActiveId(commentId);
+        void thread.markRead();
       },
       reveal: (commentId) => {
         if (!scrollTo(commentId)) return false;
         setDraft(null);
         setActiveId(commentId);
+        void thread.markRead();
         return true;
       },
       close: () => {
@@ -124,11 +126,11 @@ export function InlineCommentsProvider({ publicId, kind, canComment, stored = tr
     [publicId, thread, ready, located, activeId, draft, startComment, surface, boxOf, scrollTo, keysAt, attachSurface],
   );
 
-  if (!enabled) return children;
+  // One tree shape on or off: turning inline comments on (a new artifact's first save) must not remount the editor inside.
   return (
-    <InlineCommentsContext value={value}>
+    <InlineCommentsContext value={enabled ? value : null}>
       {children}
-      <InlineCommentCards />
+      {enabled ? <InlineCommentCards /> : null}
     </InlineCommentsContext>
   );
 }

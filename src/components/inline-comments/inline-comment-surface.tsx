@@ -71,7 +71,7 @@ interface InlineCommentSurfaceProps {
  * comments are on: their words are highlighted in it, a click on highlighted
  * words opens the thread there, and selected words can be commented on.
  * Where the artifact has no inline comments (another format, or no access
- * to comments) it adds nothing around its children.
+ * to comments) it does nothing and takes no part in layout.
  */
 export function InlineCommentSurface({ children, className }: InlineCommentSurfaceProps) {
   const inline = useInlineComments();
@@ -79,8 +79,6 @@ export function InlineCommentSurface({ children, className }: InlineCommentSurfa
   const attachSurface = inline?.attachSurface;
 
   useEffect(() => (attachSurface && surface ? attachSurface(surface) : undefined), [attachSurface, surface]);
-
-  if (!inline) return children;
 
   /** A click on highlighted words (not the end of a drag that selected text) opens their thread. */
   function openAt(event: MouseEvent) {
@@ -97,9 +95,16 @@ export function InlineCommentSurface({ children, className }: InlineCommentSurfa
   }
 
   return (
-    <div ref={setElement} data-slot="inline-comment-surface" className={cn("data-over-comment:cursor-pointer data-over-comment:**:cursor-pointer", className)} onClick={openAt} onMouseMove={pointAt}>
+    // The same element with or without inline comments, so turning them on never remounts the editor inside. Without them it takes no part in layout.
+    <div
+      ref={setElement}
+      data-slot={inline ? "inline-comment-surface" : undefined}
+      className={cn(inline ? "data-over-comment:cursor-pointer data-over-comment:**:cursor-pointer" : "contents", className)}
+      onClick={inline ? openAt : undefined}
+      onMouseMove={inline ? pointAt : undefined}
+    >
       {children}
-      {surface ? <SelectionComment surface={surface} inline={inline} /> : null}
+      {surface && inline ? <SelectionComment surface={surface} inline={inline} /> : null}
     </div>
   );
 }

@@ -81,6 +81,9 @@ describe.runIf(Boolean(databaseUrl))("inline comments with a database", async ()
     const again = await resolveComment({ actorId: ids.author, commentId: created.comment.id, resolved: true });
     expect(first.resolved?.by).toBe(ids.reader);
     expect(again.resolved).toEqual(first.resolved);
+    // The first resolver stays on the row itself, whatever label the view shows.
+    const [kept] = await getDb().select({ resolvedBy: comment.resolvedBy }).from(comment).where(eq(comment.id, created.comment.id));
+    expect(kept?.resolvedBy).toBe(ids.reader);
     expect(again.edited).toBe(false);
     expect(again.updatedAt).toBe(created.comment.updatedAt);
 

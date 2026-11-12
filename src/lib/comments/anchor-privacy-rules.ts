@@ -21,8 +21,11 @@ export type AnchorGate = (stored: CommentAnchor) => CommentAnchor | null;
 /** A gate that shows no anchor: for viewers whose served content could not be loaded. */
 export const hideAnchors: AnchorGate = () => null;
 
-/** A list or task line's marks, a heading's hashes, and blockquote marks at the start of a line. */
-const blockMarks = /^\s{0,3}(?:>\s?)*(?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)?/;
+/** A list or task line's marks, a heading's hashes, and blockquote marks at the start of a line, at any depth of nesting. */
+const blockMarks = /^\s*(?:>\s?)*(?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)?/;
+
+/** Lines a reader never sees as words: a code fence, a table's divider row, a rule. */
+const markOnlyLine = /^\s*(?:(?:```|~~~).*|\|?[\s:|-]*-[\s:|-]*\|?|[*_]{3,})\s*$/;
 
 /**
  * Markdown as a reader sees it, line by line: block and inline marks
@@ -32,14 +35,15 @@ const blockMarks = /^\s{0,3}(?:>\s?)*(?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[
 export function readableText(markdown: string): string {
   return markdown
     .split(/\r?\n/)
-    .map((line) => stripInlineMarkdown(line.replace(blockMarks, "")))
+    .map((line) => (markOnlyLine.test(line) ? "" : stripInlineMarkdown(line.replace(blockMarks, ""))))
     .join("\n");
 }
 
 /**
  * A finder over the content a viewer is served: give it an anchor and it
- * returns the anchor as that content holds it (the same quote, and the text
- * around its place in the content), or null when the words are not there.
+ * returns the anchor as that content holds it (the quote's words and the
+ * text around them, all read from the content), or null when the words are
+ * not there.
  * It looks in the readable text first, then in the source.
  */
 export function servedAnchorFinder(content: string): AnchorGate {
@@ -49,7 +53,8 @@ export function servedAnchorFinder(content: string): AnchorGate {
       const span = locate(stored);
       if (!span) continue;
       const around = anchorAt(text, span);
-      return around ? { quote: stored.quote, prefix: around.prefix, suffix: around.suffix } : null;
+      // Every part comes from the served content: matching ignores spaces, so even the stored quote's spacing could tell of unapproved words.
+      return around;
     }
     return null;
   };

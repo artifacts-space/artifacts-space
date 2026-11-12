@@ -5,13 +5,14 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { artifact, comment, mention, type CommentRecord } from "@/db/schema";
+import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { loadActors } from "@/lib/agents/queries";
 import { notifyComment } from "@/lib/notifications/create";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { anchorToStore, assertTopLevelAnchor } from "./anchor-input";
 import type { CommentAnchor } from "./anchor-rules";
-import { COMMENT_MAX_LENGTH } from "./config";
+import { COMMENT_MAX_LENGTH, RESOLVE_RATE_LIMITS } from "./config";
 import { notifiedHandles, processMentions, type MentionOutcome } from "./delivery";
 import { resolvedMentions } from "./mentionables";
 import { canChangeComment, isLoopLimited, resolveRefusal } from "./rules";
@@ -192,6 +193,7 @@ export async function resolveComment(input: { actorId: string; commentId: string
   const thread = await requireThread(input.actorId, row.publicId);
   const refusal = resolveRefusal({ viewerKind: thread.actor.kind, canUseThread: true, comment: row.record });
   if (refusal) throw new UserFacingError(refusal);
+  for (const name of RESOLVE_RATE_LIMITS) await enforceRateLimit(name, thread.actor.userId);
   const live = and(eq(comment.id, row.record.id), isNull(comment.parentId), isNull(comment.deletedAt));
   if (resolved) {
     await getDb().update(comment).set({ resolvedAt: sql`now()`, resolvedBy: thread.actor.userId }).where(and(live, isNull(comment.resolvedAt)));

@@ -55,7 +55,7 @@ export function MarkdownDiagramBody({ code, state, withSource = true }: { code: 
  * muted text below the block. Plain text only.
  */
 export function BlockCaption({ caption }: { caption: string }) {
-  return <figcaption data-block-caption="" className="mt-2 text-sm text-muted-foreground">{caption}</figcaption>;
+  return <figcaption data-block-caption="" data-comment-skip="" className="mt-2 text-sm text-muted-foreground">{caption}</figcaption>;
 }
 
 /**

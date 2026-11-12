@@ -57,6 +57,14 @@ async function anchorForAgentQuote(thread: Thread, quote: string): Promise<Comme
  * autosave may not have stored the words they selected yet.
  */
 export async function anchorToStore(thread: Thread, input: { anchor?: CommentAnchor | undefined; quote?: string | undefined }): Promise<CommentAnchor | null> {
+  if (input.quote === undefined && !input.anchor) return null;
+  // Only a Markdown artifact shows a comment at its words; on another format the quote would point nowhere.
+  if (thread.artifact.kind !== "markdown") {
+    throw new UserFacingError(
+      "Only a Markdown artifact takes a comment on words. Leave out quote to comment on the whole artifact.",
+      "Only a Markdown artifact takes a comment on words. Comment on the whole artifact instead.",
+    );
+  }
   if (input.quote !== undefined) return anchorForAgentQuote(thread, input.quote);
   if (!input.anchor) return null;
   return storedAnchor(anchorInputSchema.parse(input.anchor));

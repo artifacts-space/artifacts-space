@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 export function ViewNotice({ tone = "info", title, children, className }: { tone?: "info" | "warning"; title: string; children?: ReactNode; className?: string }) {
   const Icon = tone === "warning" ? IconAlertTriangle : IconInfoCircle;
   return (
-    <div role="note" className={cn("flex gap-2.5 rounded-md border bg-muted/50 px-3.5 py-2.5 text-sm leading-6", className)}>
+    <div role="note" data-comment-skip="" className={cn("flex gap-2.5 rounded-md border bg-muted/50 px-3.5 py-2.5 text-sm leading-6", className)}>
       <Icon aria-hidden className={cn("mt-1 size-4 shrink-0", tone === "warning" ? "text-tone-warning" : "text-muted-foreground")} />
       <div className="min-w-0">
         <p className="font-medium">{title}</p>

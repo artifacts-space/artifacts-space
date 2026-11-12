@@ -12,8 +12,10 @@ const { anchorToStore, assertTopLevelAnchor, QUOTE_NOT_FOUND_MESSAGE } = await i
 
 const thread = {
   actor: { kind: "agent", userId: "agent-1" },
-  artifact: { publicId: "a".repeat(22) },
+  artifact: { publicId: "a".repeat(22), kind: "markdown" },
 } as unknown as Thread;
+
+const sheetThread = { ...thread, artifact: { publicId: "b".repeat(22), kind: "csv" } } as unknown as Thread;
 
 describe("assertTopLevelAnchor", () => {
   it("should refuse words when the comment is a reply", () => {
@@ -53,6 +55,16 @@ describe("anchorToStore", () => {
 
   it("should reject a selection when it is not text", async () => {
     await expect(anchorToStore(thread, { anchor: { quote: 42, prefix: "", suffix: "" } as unknown as { quote: string; prefix: string; suffix: string } })).rejects.toThrow();
+  });
+
+  it("should refuse words when the artifact is not Markdown", async () => {
+    await expect(anchorToStore(sheetThread, { anchor: { quote: "Total", prefix: "", suffix: "" } })).rejects.toThrow(/Only a Markdown artifact/);
+    await expect(anchorToStore(sheetThread, { quote: "Total" })).rejects.toThrow(UserFacingError);
+    expect(access.getViewableArtifact).not.toHaveBeenCalled();
+  });
+
+  it("should save a comment on the whole artifact when another format gets no words", async () => {
+    expect(await anchorToStore(sheetThread, {})).toBeNull();
   });
 
   it("should save no place when the selection holds no words", async () => {

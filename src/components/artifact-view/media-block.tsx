@@ -62,7 +62,7 @@ const failedCopy: Record<MediaKind, string> = {
 export function MediaNotice({ kind, children, href, onRetry }: { kind: MediaKind; children: ReactNode; href?: string | undefined; onRetry?: (() => void) | undefined }) {
   const Icon = kind === "image" ? IconPhotoOff : IconFileOff;
   return (
-    <div role="note" className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-dashed bg-muted/50 px-3 py-2.5 text-sm text-muted-foreground">
+    <div role="note" data-comment-skip="" className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-dashed bg-muted/50 px-3 py-2.5 text-sm text-muted-foreground">
       <Icon aria-hidden className="size-4 shrink-0" />
       <span className="min-w-0">{children}</span>
       {onRetry ? <Button type="button" variant="link" size="sm" className="h-auto px-0 text-foreground" onClick={onRetry}>Try again</Button> : null}
@@ -153,7 +153,7 @@ function MediaBody(props: MediaBlockProps) {
 /** See the notes at the top of this file. */
 export function MediaBlock(props: MediaBlockProps) {
   return (
-    <figure className={cn("artifact-media flex min-w-0 flex-col items-start gap-2", props.className)} data-media-kind={props.kind}>
+    <figure className={cn("artifact-media flex min-w-0 flex-col items-start gap-2", props.className)} data-media-kind={props.kind} data-comment-skip="">
       <MediaBody {...props} />
       {props.caption ? <figcaption className="w-full text-sm leading-5 text-muted-foreground">{props.caption}</figcaption> : null}
     </figure>

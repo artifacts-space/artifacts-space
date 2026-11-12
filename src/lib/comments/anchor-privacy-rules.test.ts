@@ -10,6 +10,14 @@ describe("readableText", () => {
     expect(readableText(approvedContent)).toBe("Launch plan\n\nWe ship the beta on Monday.\n\nTell the team\n");
   });
 
+  it("should drop the marks of a nested list when its lines are indented", () => {
+    expect(readableText("- One\n  - Two\n    - Three\n      1. Four")).toBe("One\nTwo\nThree\nFour");
+  });
+
+  it("should leave out lines a reader never sees as words when the source has a fence, a table divider, or a rule", () => {
+    expect(readableText("```ts\nconst a = 1;\n```\n\n| Day | Plan |\n| --- | :-: |\n\n---\n\nEnd")).toBe("\nconst a = 1;\n\n\nDay Plan\n\n\n\n\nEnd");
+  });
+
   it("should keep link text and drop the address when a line has a link", () => {
     expect(readableText("See [the brief](https://example.com/brief).")).toBe("See the brief.");
   });
@@ -36,6 +44,12 @@ describe("anchorGate", () => {
     expect(shown).not.toBeNull();
     expect(JSON.stringify(shown)).not.toMatch(/Northwind|fire the board|Secret/);
     expect(shown?.prefix).toBe("Launch plan We ship the beta on");
+  });
+
+  it("should return the quote as the approved version spells it when the stored quote spaces its letters another way", () => {
+    // Matching ignores spaces, so the stored spacing could tell of words that were never approved.
+    const shown = anchorGate({ source: "approved", content: "We are nowhere near done." })({ quote: "now here", prefix: "We are ", suffix: " near" });
+    expect(shown?.quote).toBe("nowhere");
   });
 
   it("should withhold the anchor when the approved version is empty", () => {

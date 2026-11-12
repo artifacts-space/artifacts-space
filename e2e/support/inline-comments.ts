@@ -54,3 +54,28 @@ export function pointOn(scope: Locator, words: string) {
     throw new Error(`"${text}" is not on the page`);
   }, words);
 }
+
+/** Selects from the start of `from` to the end of `to` inside `scope`: a selection across marks, links, or blocks. */
+export async function selectAcross(scope: Locator, from: string, to: string) {
+  await scope.evaluate(
+    (root, [first, last]) => {
+      const find = (text: string) => {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          const at = (node as Text).data.indexOf(text);
+          if (at !== -1) return { node, at };
+        }
+        throw new Error(`"${text}" is not in one text node`);
+      };
+      const start = find(first);
+      const end = find(last);
+      const range = document.createRange();
+      range.setStart(start.node, start.at);
+      range.setEnd(end.node, end.at + last.length);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    },
+    [from, to] as const,
+  );
+}

@@ -26,5 +26,8 @@ export const COMMENT_RATE_LIMITS = {
   person: ["personCommentMinute", "personCommentHour"],
 } as const;
 
+/** Rate limits on resolving or reopening a thread, per person, by name in src/lib/abuse/limits.ts: 30 a minute and 300 an hour. */
+export const RESOLVE_RATE_LIMITS = ["commentResolveMinute", "commentResolveHour"] as const;
+
 /** How many earlier comments inbox_list returns with each mention, for context. */
 export const INBOX_CONTEXT_COMMENTS = 5;

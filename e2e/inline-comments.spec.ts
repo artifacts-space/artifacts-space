@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { card, highlighted, pointOn, select } from "./support/inline-comments";
+import { card, highlighted, pointOn, select, selectAcross } from "./support/inline-comments";
 
 /*
  * Inline comments on a Markdown artifact, on the dev fixture
@@ -109,6 +109,26 @@ test.describe("in the editor", () => {
     await expect.poll(async () => (await highlighted(page)).marked).toEqual(["A person's lock beats a supplier close."]);
   });
 
+  test("should keep the words as they read when a selection crosses a link or two blocks", async ({ page }) => {
+    await openEditor(page);
+    const anchorsInList = list(page).locator("[data-slot=comment-anchor]");
+
+    await editor(page).focus();
+    await selectAcross(editor(page), "Read the", "before you");
+    await page.getByRole("toolbar", { name: "Format text" }).getByRole("button", { name: "Comment" }).click();
+    await card(page).getByRole("textbox", { name: "Write a comment" }).fill("Which notes?");
+    await card(page).getByRole("button", { name: "Comment", exact: true }).click();
+    await expect(anchorsInList.filter({ hasText: "Read the cutover notes before you" })).toHaveAttribute("data-anchor-place", "here");
+
+    // The last word of one list item and the first of the next stay two words.
+    await editor(page).focus();
+    await selectAcross(editor(page), "goes first", "Then Sunset");
+    await page.getByRole("toolbar", { name: "Format text" }).getByRole("button", { name: "Comment" }).click();
+    await card(page).getByRole("textbox", { name: "Write a comment" }).fill("In this order?");
+    await card(page).getByRole("button", { name: "Comment", exact: true }).click();
+    await expect(anchorsInList.filter({ hasText: "goes first Then Sunset" })).toHaveAttribute("data-anchor-place", "here");
+  });
+
   test("should go from a comment in the list to its words and open the thread there", async ({ page }) => {
     await openEditor(page, true);
     await expect.poll(async () => (await highlighted(page)).marked).toEqual(["single writer"]);
@@ -139,5 +159,21 @@ test.describe("in the read view", () => {
     const words = await pointOn(article(page), "still on the feed");
     await page.mouse.click(words.x, words.y);
     await expect(card(page)).toContainText("Until when?");
+  });
+
+  test("should leave a link's screen reader text out of the words when a selection crosses the link", async ({ page }) => {
+    await page.goto("/dev/inline-comments?as=reader");
+    await expect(article(page).getByRole("heading", { name: "Moving off the feed" })).toBeVisible();
+
+    await selectAcross(article(page), "Read the", "before you");
+    await page.locator("[data-slot=selection-comment]").click();
+    await card(page).getByRole("textbox", { name: "Write a comment" }).fill("Which notes?");
+    await card(page).getByRole("button", { name: "Comment", exact: true }).click();
+
+    // The same words the editor reads, so the comment is found on both: no "(opens in a new tab)" inside the quote.
+    const anchor = list(page).locator("[data-slot=comment-anchor]");
+    await expect(anchor).toHaveAttribute("data-anchor-place", "here");
+    await expect(anchor).toContainText("Read the cutover notes before you");
+    await expect(anchor).not.toContainText("opens in a new tab");
   });
 });

@@ -117,6 +117,9 @@ export const rateLimits = {
   /** Comments per person per minute and per hour. */
   personCommentMinute: { limit: 20, windowSeconds: 60 },
   personCommentHour: { limit: 300, windowSeconds: hour },
+  /** Threads resolved or reopened per person per minute and per hour, so nobody hides a team's comments in a loop. */
+  commentResolveMinute: { limit: 30, windowSeconds: 60 },
+  commentResolveHour: { limit: 300, windowSeconds: hour },
   /** Team invitations per inviting person per hour and per day, and per team per day. Each one sends an email. */
   teamInviteByUserHour: { limit: 20, windowSeconds: hour },
   teamInviteByUserDay: { limit: 50, windowSeconds: day },
@@ -191,6 +194,8 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   agentCommentHour: "You have posted a lot of comments in the last hour.",
   personCommentMinute: "You have posted a lot of comments in the last minute.",
   personCommentHour: "You have posted a lot of comments in the last hour.",
+  commentResolveMinute: "You have resolved or reopened a lot of comments in the last minute.",
+  commentResolveHour: "You have resolved or reopened a lot of comments in the last hour.",
   teamInviteByUserHour: "You have sent a lot of invitations in the last hour.",
   teamInviteByUserDay: "You have sent a lot of invitations today.",
   teamInviteByTeamDay: "This team has sent a lot of invitations today.",

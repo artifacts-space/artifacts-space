@@ -87,6 +87,17 @@ test("should show a comment made in the workspace pane on the same words on the 
   await commentOn(page, "by message", "Which message?");
   await expect.poll(async () => (await highlighted(page)).marked).toEqual(["by message"]);
 
+  // From the Comments dialog, the way to the words closes the dialog and opens the thread at them.
+  const dialog = page.locator("[data-slot=dialog-content]");
+  await page.getByRole("button", { name: "Comments", exact: true }).click();
+  await expect(dialog).toContainText("Which message?");
+  await dialog.getByRole("button", { name: /Show in the text: by message/ }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(card(page)).toContainText("Which message?");
+  expect((await highlighted(page)).open).toEqual(["by message"]);
+  await page.keyboard.press("Escape");
+  await expect(card(page)).toHaveCount(0);
+
   await page.goto(`/artifact/${publicId}`);
   await expect.poll(async () => (await highlighted(page)).marked).toEqual(["by message"]);
   const words = await pointOn(editor(page), "by message");

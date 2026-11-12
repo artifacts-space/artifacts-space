@@ -39,7 +39,7 @@ The Supasync agent is the single writer, so nobody overwrites anybody. The Supah
 
 > A person's lock beats a supplier close.
 
-Do not add a rate plan to a property that is still on the feed.
+Do not add a rate plan to a property that is still on the feed. Read the [cutover notes](https://example.com/cutover) before you start.
 `;
 
 const viewer = { userId: "fixture", handle: "charles", name: "Charles", kind: "person" as const, ownerName: null, label: "@charles" };

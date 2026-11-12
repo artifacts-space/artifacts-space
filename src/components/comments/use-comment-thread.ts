@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   createCommentAction,
@@ -77,15 +77,19 @@ interface ThreadOptions {
  */
 export function useCommentThread(publicId: string, { api = serverThreadApi, markAsRead = true, enabled = true }: ThreadOptions = {}) {
   const [state, setState] = useState<ThreadState>({ status: "loading" });
+  /** True once the viewer's notifications were marked read for what is loaded; a reload may bring new ones. */
+  const markedRead = useRef(false);
 
   const reload = useCallback(async () => {
     const result = await settle(() => api.load(publicId, false));
+    markedRead.current = false;
     setState(result.success ? { status: "ready", data: result.data } : { status: "error", error: result.error });
   }, [api, publicId]);
 
   useEffect(() => {
     if (!enabled) return;
     let active = true;
+    markedRead.current = false;
     void settle(() => api.load(publicId, markAsRead)).then((result) => {
       if (!active) return;
       setState(result.success ? { status: "ready", data: result.data } : { status: "error", error: result.error });
@@ -107,10 +111,13 @@ export function useCommentThread(publicId: string, { api = serverThreadApi, mark
     [reload],
   );
 
-  /** Marks the viewer's notifications on this thread read, once they open it. A failure only leaves them unread. */
+  /** Marks the viewer's notifications on this thread read, once per load, when they open it. A failure only leaves them unread. */
   const markRead = useCallback(async () => {
+    if (markedRead.current) return;
+    markedRead.current = true;
     const result = await settle(() => api.markRead(publicId));
     if (result.success) announceNotificationsChanged();
+    else markedRead.current = false;
   }, [api, publicId]);
 
   return useMemo(
