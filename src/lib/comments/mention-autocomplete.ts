@@ -60,12 +60,32 @@ export function matchMentionables(candidates: readonly Mentionable[], query: str
  * the handle is reused, and punctuation right after it ("@x,") gets no space.
  */
 export function insertMention(text: string, mention: MentionQuery, caret: number, handle: string): { text: string; caret: number } {
+  const edit = mentionReplacement(text, mention, caret, handle);
+  return { text: text.slice(0, edit.from) + edit.insert + text.slice(edit.to), caret: edit.caret };
+}
+
+/** One edit that puts a picked mention in the text: replace `from`..`to` with `insert`, then put the caret at `caret`. */
+export interface MentionEdit {
+  from: number;
+  to: number;
+  insert: string;
+  caret: number;
+}
+
+/**
+ * The smallest edit insertMention makes, for editors that apply changes as
+ * steps rather than replacing the whole text (the rich comment box). Same
+ * rules: the rest of the handle after the caret goes, a space follows when
+ * nothing does, and an existing space is stepped over.
+ */
+export function mentionReplacement(text: string, mention: MentionQuery, caret: number, handle: string): MentionEdit {
   const tail = handleTail.exec(text.slice(caret))?.[0] ?? "";
-  const after = text.slice(caret + tail.length);
-  const inserted = `${text.slice(0, mention.start)}@${handle}`;
-  if (after === "") return { text: `${inserted} `, caret: inserted.length + 1 };
-  const nextCaret = /^\s/.test(after) ? inserted.length + 1 : inserted.length;
-  return { text: inserted + after, caret: nextCaret };
+  const to = caret + tail.length;
+  const after = text.slice(to);
+  const insert = after === "" ? `@${handle} ` : `@${handle}`;
+  const end = mention.start + `@${handle}`.length;
+  const nextCaret = after === "" || /^\s/.test(after) ? end + 1 : end;
+  return { from: mention.start, to, insert, caret: nextCaret };
 }
 
 /** Who the viewer can mention on an artifact, and the viewer themself. */

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { formatInfo } from "@/lib/artifact-formats";
-import { kindColors, kindIcons } from "@/lib/artifact-kinds";
+import { kindColors, kindIcons, showsFormatChip } from "@/lib/artifact-kinds";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +15,7 @@ interface ArtifactOrganizersProps {
   artifact: ArtifactDto;
   /** The format the editor shows now: the draft's, which can run ahead of the stored one. */
   kind: ArtifactKind;
-  /** Opens Format and language. */
+  /** Opens Format and language, from the format chip. Markdown shows no chip; the More menu opens it for every format. */
   onChangeFormat: () => void;
   onUpdated: (artifact: ArtifactDto) => void;
   /** The content's column (previewColumnClass), so the chips line up with the title. */
@@ -39,8 +39,8 @@ export function KindChip({ kind, onChange }: { kind: ArtifactKind; onChange?: ()
 }
 
 /**
- * The chips under an artifact's title in the workspace editor: its format,
- * its project, and its tags. Project and tag changes save at once and never
+ * The chips under an artifact's title in the workspace editor: its format
+ * (not for Markdown, showsFormatChip), its project, and its tags. Project and tag changes save at once and never
  * touch the editor's draft or history.
  */
 export function ArtifactOrganizers({ artifact, kind, onChangeFormat, onUpdated, column, className, hidden = false }: ArtifactOrganizersProps) {
@@ -51,7 +51,7 @@ export function ArtifactOrganizers({ artifact, kind, onChangeFormat, onUpdated, 
   return (
     <div className={cn("pt-3 pb-1", className)}>
       <div className={cn("flex flex-wrap items-center gap-2", column)}>
-        <KindChip kind={kind} onChange={onChangeFormat} />
+        {showsFormatChip(kind) ? <KindChip kind={kind} onChange={onChangeFormat} /> : null}
         <ProjectPicker artifactId={artifact.id} value={artifact.project} appearance="chip" onChange={(project) => { onUpdated({ ...latest.current, project }); }} />
         <TagsInput artifactId={artifact.id} value={artifact.tags} appearance="chip" onChange={(tags) => { onUpdated({ ...latest.current, tags }); }} />
       </div>

@@ -47,7 +47,9 @@ for (const { name, size } of viewports) {
     const text = await edgesOf(page.getByRole("textbox", { name: "Artifact content" }).locator(":scope > *").first());
     const title = await edgesOf(page.getByRole("textbox", { name: "Artifact title" }));
     const summary = await edgesOf(page.getByRole("textbox", { name: "Artifact summary" }));
-    const chip = await edgesOf(page.getByRole("button", { name: /^Format: / }));
+    // A Markdown page shows no format chip, so the row starts with its project.
+    await expect(page.getByRole("button", { name: /^Format: / }), "Markdown has no format chip").toHaveCount(0);
+    const chip = await edgesOf(page.getByRole("button", { name: /^(Add to project|Project: )/ }));
     const meta = await edgesOf(slot(page, "save-status").locator(":scope > div"));
 
     expect(Math.abs(title.left - text.left), "the title starts where the body's text does").toBeLessThanOrEqual(0.5);
@@ -83,3 +85,31 @@ test("should wrap the title and the summary inside the column when they are long
   await expect(page.getByRole("textbox", { name: "Artifact content" })).toBeFocused();
   expect(await title.inputValue()).not.toMatch(/[\r\n]/);
 });
+
+/** A teammate's page shared by link, read only for the viewer, with tags and without. */
+const sharedPages = [
+  { name: "with tags", publicId: "fixtureteammatetagged1", tags: ["launch", "rates"] },
+  { name: "without tags", publicId: "fixtureteammatenotags1", tags: [] },
+];
+
+for (const { name, publicId, tags } of sharedPages) {
+  test(`should line the chips and meta line up with the title in a read-only shared page ${name}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`/dev/workspace?artifact=${publicId}`);
+    const heading = page.getByRole("heading", { name: "Teammate's plan", level: 2 });
+    await expect(heading).toBeVisible();
+    await expect(slot(page, "panel-meta")).toContainText("Read only");
+    await expect(page.getByRole("button", { name: /^Format: / }), "Markdown has no format chip").toHaveCount(0);
+
+    const title = await edgesOf(heading);
+    const meta = await edgesOf(slot(page, "panel-meta"));
+    expect(Math.abs(meta.left - title.left), "the meta line starts with the title").toBeLessThanOrEqual(0.5);
+    if (tags.length === 0) {
+      await expect(slot(page, "panel-chips"), "no empty chip row").toHaveCount(0);
+      return;
+    }
+    await expect(slot(page, "panel-chips")).toHaveText(tags.join(""));
+    const chips = await edgesOf(slot(page, "panel-chips").locator(":scope > *").first());
+    expect(Math.abs(chips.left - title.left), "the first tag starts with the title").toBeLessThanOrEqual(0.5);
+  });
+}

@@ -8,6 +8,8 @@ import { PageEditorChromeProvider } from "@/components/artifact-page/page-editor
 import { PageInlineEditor } from "@/components/artifact-page/page-inline-editor";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CommentThread } from "@/components/comments/comment-thread";
+import { CommentsDialog } from "@/components/comments/comments-dialog";
+import { MentionablesLoader, type LoadMentionables } from "@/components/comments/mentionables-context";
 import type { ThreadApi } from "@/components/comments/use-comment-thread";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
 import { InlineCommentSurface } from "@/components/inline-comments/inline-comment-surface";
@@ -26,8 +28,25 @@ import { fixtureArtifact } from "./fixture-content";
  * live in memory behind the same calls the app makes (ThreadApi), so the
  * highlights, the cards at the text, and the Comments list are the real
  * ones. `?seed=1` starts with one open inline comment, one on words that are
- * no longer in the text, and one resolved.
+ * no longer in the text, and one resolved; `?seed=escaped` starts with one
+ * comment whose Markdown keeps "@dana" and "&copy;" from being read. `?dialog=1` puts the thread in
+ * the Comments dialog instead of under the text.
+ *
+ * Every comment body the thread writes is kept, as sent, in
+ * `window.fixtureCommentWrites`, so a test can check the Markdown a box
+ * posts. A comment that says "please fail" is refused, as a server error
+ * would be.
  */
+
+declare global {
+  interface Window {
+    /** The bodies the fixture's thread was sent, oldest first. */
+    fixtureCommentWrites?: string[];
+  }
+}
+
+/** Words that make the fixture refuse a comment, for the failed-post test. */
+const REFUSED_WORDS = "please fail";
 
 export const inlineCommentsFixtureMarkdown = `# Moving off the feed
 
@@ -75,8 +94,36 @@ const seedComments: CommentView[] = [
   fixtureComment({ id: "seed-resolved", body: "Which one goes second?", anchor: { quote: "Then Sunset Pointe", prefix: "goes first", suffix: "" }, resolved: true }),
 ];
 
+/** A comment whose first line keeps "@dana" from being a mention, and whose last keeps "&copy;" as letters. */
+const escapedSeed: CommentView[] = [
+  fixtureComment({ id: "seed-escaped", body: "\\@dana please\n\nQ&A at 3 < 4pm for snake_case\n\nWrite &amp;copy; for ©" }),
+];
+
+/** The comments `?seed=` starts with. */
+function seedFor(seed: string | undefined): readonly CommentView[] {
+  if (seed === "1") return seedComments;
+  if (seed === "escaped") return escapedSeed;
+  return [];
+}
+
 const done = <T,>(data: T) => Promise.resolve({ success: true as const, data });
+
+/** Teammates to mention, so the comment box's suggestions run without a database. */
+const loadFixtureMentionables: LoadMentionables = () => done({
+  candidates: [
+    { userId: "fixture-dana", handle: "dana", name: "Dana Reyes", kind: "person" as const },
+    { userId: "fixture-leah", handle: "leah", name: "Leah Park", kind: "person" as const },
+    { userId: "fixture-agent", handle: "claude-code", name: "Claude Code", kind: "agent" as const },
+  ],
+  self: { userId: viewer.userId, handle: viewer.handle, name: viewer.name, kind: "person" as const },
+});
 const noMentions = { mentions: { notified: [], refused: [] } };
+
+/** Keeps a body as sent, or refuses it when it asks to fail. */
+function recordWrite(body: string): string | null {
+  window.fixtureCommentWrites = [...(window.fixtureCommentWrites ?? []), body];
+  return body.includes(REFUSED_WORDS) ? "The comment could not be saved. Try again." : null;
+}
 
 /** A thread kept in memory, behind the calls the app makes to the server. */
 function memoryThreadApi(seed: readonly CommentView[]): ThreadApi {
@@ -88,11 +135,15 @@ function memoryThreadApi(seed: readonly CommentView[]): ThreadApi {
   return {
     load: () => done({ comments, agents: [], viewerId: viewer.userId }),
     create: (_publicId, body, parentId, anchor) => {
+      const refused = recordWrite(body);
+      if (refused) return Promise.resolve({ success: false as const, error: refused });
       created += 1;
       comments = [...comments, fixtureComment({ id: `made-${String(created)}`, body, parentId, anchor })];
       return done(noMentions);
     },
     update: (id, body) => {
+      const refused = recordWrite(body);
+      if (refused) return Promise.resolve({ success: false as const, error: refused });
       change(id, (comment) => ({ ...comment, body, edited: true }));
       return done(noMentions);
     },
@@ -142,17 +193,23 @@ function FixtureBody({ reader }: { reader: boolean }) {
 }
 
 /** See the notes at the top of this file. */
-export function InlineCommentsFixture({ reader, seeded }: { reader: boolean; seeded: boolean }) {
-  const api = useMemo(() => memoryThreadApi(seeded ? seedComments : []), [seeded]);
+export function InlineCommentsFixture({ reader, seed, dialog }: { reader: boolean; seed: string | undefined; dialog: boolean }) {
+  const api = useMemo(() => memoryThreadApi(seedFor(seed)), [seed]);
   return (
     <PageEditorChromeProvider>
+      <MentionablesLoader load={loadFixtureMentionables}>
       <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
         <InlineCommentsProvider publicId={artifact.publicId} kind="markdown" canComment api={api}>
           <h1 className="text-4xl font-medium">{artifact.title}</h1>
           <FixtureBody reader={reader} />
-          <CommentThread publicId={artifact.publicId} className="mt-12 border-t pt-8" raised />
+          {dialog ? (
+            <CommentsDialog publicId={artifact.publicId} title={artifact.title} seesComments offNotice="" className="mt-12" />
+          ) : (
+            <CommentThread publicId={artifact.publicId} className="mt-12 border-t pt-8" raised />
+          )}
         </InlineCommentsProvider>
       </main>
+      </MentionablesLoader>
     </PageEditorChromeProvider>
   );
 }

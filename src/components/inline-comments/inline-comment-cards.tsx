@@ -70,6 +70,7 @@ function DraftCard({ inline }: { inline: InlineComments }) {
         placeholder="Write a comment"
         submitLabel="Comment"
         autoFocus
+        compact
         onCancel={close}
         onSubmit={async (body) => {
           const outcome = await thread.post(body, null, anchor);
@@ -112,10 +113,10 @@ function ThreadCard({ inline, group, agents }: { inline: InlineComments; group: 
     <CardAtText inline={inline} anchorKey={root.id} title={replies.length === 0 ? "Comment" : `Comment and ${String(replies.length)} ${replies.length === 1 ? "reply" : "replies"}`} takesFocus={false}>
       <div className="max-h-[min(50dvh,24rem)] divide-y overflow-y-auto overscroll-contain">
         {[root, ...replies].map((item) => (
-          <CommentItem key={item.id} comment={item} agent={agentFor(item.author?.kind === "agent" ? item.author.userId : undefined)} handlers={handlers} reply={item.id !== root.id} showAnchor={false} />
+          <CommentItem key={item.id} comment={item} agent={agentFor(item.author?.kind === "agent" ? item.author.userId : undefined)} handlers={handlers} reply={item.id !== root.id} showAnchor={false} compact />
         ))}
       </div>
-      <CommentComposer key={replying} label="Write a reply" placeholder="Reply" submitLabel="Reply" autoFocus={replying > 0} onSubmit={async (body) => noted(await thread.post(body, root.id))} />
+      <CommentComposer key={replying} label="Write a reply" placeholder="Reply" submitLabel="Reply" autoFocus={replying > 0} compact onSubmit={async (body) => noted(await thread.post(body, root.id))} />
       <MentionNotices outcome={notices} />
     </CardAtText>
   );

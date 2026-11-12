@@ -22,6 +22,8 @@ interface TextBubbleMenuProps {
   editor: Editor;
   linkOpen: boolean;
   onLinkOpenChange: (open: boolean) => void;
+  /** Comment on the selected words, where the artifact has inline comments. Off inside a comment box. */
+  commentButton?: boolean;
 }
 
 /** True when a selection of text can take marks: not in code, not a whole block. */
@@ -37,7 +39,7 @@ function selectionTakesMarks(editor: Editor, from: number, to: number): boolean 
  * It turns into the link field while a link is edited. Hidden on touch
  * screens, which get the toolbar instead.
  */
-export function TextBubbleMenu({ editor, linkOpen, onLinkOpenChange }: TextBubbleMenuProps) {
+export function TextBubbleMenu({ editor, linkOpen, onLinkOpenChange, commentButton = true }: TextBubbleMenuProps) {
   const linkOpenRef = useRef(linkOpen);
   useEffect(() => {
     linkOpenRef.current = linkOpen;
@@ -63,7 +65,7 @@ export function TextBubbleMenu({ editor, linkOpen, onLinkOpenChange }: TextBubbl
       ) : (
         <div className="flex items-center gap-0.5">
           <FormatButtons editor={editor} onLink={() => { onLinkOpenChange(true); }} />
-          <CommentButton />
+          {commentButton ? <CommentButton /> : null}
         </div>
       )}
     </BubbleMenu>
