@@ -8,9 +8,12 @@ import { cleanUp, deleteRegisteredOAuthClients, deleteReviewerAccounts, localDat
 /**
  * A reviewer account end to end, against the real route and a local
  * throwaway database: the owner's script creates it and prints a password,
- * the reviewer signs in through the real sign-in page with it, lands in the
- * workspace with the sample artifacts, and signs out. A wrong password and
- * an unknown email get the same refusal. Each test uses its own network
+ * the reviewer signs in with it on the unlisted reviewer page, lands in the
+ * workspace with the sample artifacts, and signs out; and an MCP client's
+ * OAuth request sends a signed-out reviewer to the normal sign-in page, where
+ * typing the reviewer address reveals the password field and signing in
+ * reaches the approval screen. A wrong password and an unknown email get the
+ * same refusal. Each test uses its own network
  * address (the dev server trusts x-forwarded-for) and its own @example.com
  * account. Skipped without a local database (support/local-db.ts).
  */
@@ -43,15 +46,15 @@ function createReviewer(label: string) {
   return { email, password };
 }
 
-async function openPasswordForm(page: Page, path = "/sign-in") {
-  await page.setExtraHTTPHeaders({ "x-forwarded-for": `198.18.${String(randomInt(0, 256))}.${String(randomInt(1, 255))}` });
-  await page.goto(path);
-  await page.getByRole("button", { name: "Sign in with a password" }).click();
-  return page.getByRole("dialog", { name: "Sign in with a password" }).getByRole("form", { name: "Sign in with a password" });
+function setFreshNetwork(page: Page) {
+  return page.setExtraHTTPHeaders({ "x-forwarded-for": `198.18.${String(randomInt(0, 256))}.${String(randomInt(1, 255))}` });
 }
 
-async function signIn(page: Page, email: string, password: string, path?: string) {
-  const form = await openPasswordForm(page, path);
+/** Signs in on the unlisted reviewer page, `next` kept as on the normal sign-in page. */
+async function signIn(page: Page, email: string, password: string, path = "/sign-in/reviewer") {
+  await setFreshNetwork(page);
+  await page.goto(path);
+  const form = page.getByRole("form", { name: "Sign in with a password" });
   await form.getByLabel("Email").fill(email);
   await form.getByLabel("Password").fill(password);
   await form.getByRole("button", { name: "Sign in" }).click();
@@ -77,7 +80,7 @@ test("should sign a reviewer in with the printed password, show the sample artif
 test("should return to the page the reviewer came from when sign-in started there", async ({ page }) => {
   const { email, password } = createReviewer("next");
 
-  await signIn(page, email, password, "/sign-in?next=%2Fapp%2Fsettings");
+  await signIn(page, email, password, "/sign-in/reviewer?next=%2Fapp%2Fsettings");
 
   await page.waitForURL(/\/app\/settings/);
 });
@@ -94,7 +97,7 @@ test("should refuse a wrong password and an unknown email with the same words", 
   await expect(page).toHaveURL(/\/sign-in/);
 });
 
-test("should let a reviewer approve an MCP client's connection after signing in with a password", async ({ page, request }) => {
+test("should let a signed-out reviewer start from an MCP client's request, sign in with the password on the sign-in page, and approve it", async ({ page, request }) => {
   const { email, password } = createReviewer("oauth");
   const redirectUri = "http://127.0.0.1:9/callback";
   const registered = await request.post("/api/auth/oauth2/register", {
@@ -116,14 +119,13 @@ test("should let a reviewer approve an MCP client's connection after signing in 
   const callback = page.waitForRequest((candidate) => candidate.url().startsWith(redirectUri));
   await page.route(`${redirectUri}**`, (route) => route.fulfill({ status: 200, body: "done" }));
 
-  await page.setExtraHTTPHeaders({ "x-forwarded-for": `198.18.${String(randomInt(0, 256))}.${String(randomInt(1, 255))}` });
+  await setFreshNetwork(page);
   await page.goto(`/api/auth/oauth2/authorize?${authorize.toString()}`);
   await page.waitForURL(/\/sign-in\?next=/);
-  await page.getByRole("button", { name: "Sign in with a password" }).click();
-  const form = page.getByRole("dialog", { name: "Sign in with a password" }).getByRole("form", { name: "Sign in with a password" });
-  await form.getByLabel("Email").fill(email);
-  await form.getByLabel("Password").fill(password);
-  await form.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.locator("input[type=password]")).toHaveCount(0);
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Sign in with password" }).click();
 
   await page.waitForURL(/\/oauth\/consent/);
   await expect(page.getByRole("heading", { name: `Connect ${clientName}` })).toBeVisible();

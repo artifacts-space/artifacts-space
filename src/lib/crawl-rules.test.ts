@@ -93,3 +93,12 @@ describe("crawlOrigin", () => {
     expect(crawlOrigin({ NODE_ENV: "production" })).toBe("http://localhost:3000");
   });
 });
+
+describe("the unlisted reviewer sign-in page", () => {
+  it("should appear nowhere in the sitemap or robots.txt, so no crawler is pointed at it", () => {
+    const origin = "https://artifacts.space";
+    expect(JSON.stringify(sitemapFor(origin))).not.toContain("reviewer");
+    expect(JSON.stringify(robotsFor(origin))).not.toContain("reviewer");
+    expect(publicPaths()).not.toContain("/sign-in/reviewer");
+  });
+});

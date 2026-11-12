@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
 import { GoogleMark } from "@/components/auth/google-mark";
+import { ReviewerPasswordField } from "@/components/auth/reviewer-password-field";
 import { ConsentNotice } from "@/components/legal-links";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -236,6 +237,7 @@ export function AuthForm({ mode, googleEnabled }: { mode: AuthMode; googleEnable
           <Label htmlFor="email">Email</Label>
           <Input id="email" name="email" type="email" autoComplete="email" required value={email} onChange={(event) => { setEmail(event.target.value); }} className="h-10" />
         </div>
+        {mode === "sign-in" ? <ReviewerPasswordField email={email} /> : null}
         <ErrorMessage message={error} />
         <Button type="submit" disabled={pending !== null} className="h-10 w-full text-sm">
           {pending === "email" ? <IconLoader2 className="animate-spin" /> : null}
