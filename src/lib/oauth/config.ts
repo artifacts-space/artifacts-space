@@ -41,6 +41,15 @@ export const oauthLimits = {
    * cannot hold more than a twentieth of the pool.
    */
   maxUnapprovedClientsPerNetwork: 100,
+  /**
+   * The network an app was registered from (oauth_client.registered_network,
+   * a keyed hash used only for the cap above) is cleared once the app is
+   * approved, and for every app after this many hours. The cleanup job runs
+   * every 6 hours, so no tag outlives 24 hours, as the privacy page promises
+   * for rate-limit data. The cap therefore counts a network's apps from the
+   * last 18 hours.
+   */
+  registeredNetworkHours: 18,
 } as const;
 
 /**

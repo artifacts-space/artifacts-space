@@ -7,7 +7,7 @@ import { oauthTokenPrefixes } from "./config";
 /**
  * Pure rules for the token endpoint's limits (src/lib/oauth/token-limits.ts):
  * what the limits read from a request, what counts as a failure, whether the
- * request presents a credential that is valid now, and which connection a
+ * request presents a credential this server issued, and which connection a
  * refresh belongs to. No database, so they test alone.
  */
 
@@ -17,6 +17,8 @@ export interface TokenRequestFields {
   refreshToken: string | null;
   code: string | null;
   clientId: string | null;
+  /** True when the body carries a client assertion (private_key_jwt). */
+  clientAssertion: boolean;
 }
 
 const fieldSchema = z.string().min(1).max(4096);
@@ -31,8 +33,21 @@ function isJson(contentType: string | null): boolean {
   return contentType?.split(";")[0]?.trim().toLowerCase() === "application/json";
 }
 
+/**
+ * Form values, with client_id read as Better Auth reads it
+ * (normalizeClientAuthenticationParameters): the one non-empty value, or
+ * none when it is repeated, which Better Auth refuses.
+ */
+function formValues(body: string): Record<string, unknown> {
+  const params = new URLSearchParams(body);
+  const values: Record<string, unknown> = Object.fromEntries(params);
+  const clientIds = params.getAll("client_id").filter((value) => value.length > 0);
+  values.client_id = clientIds.length === 1 ? clientIds[0] : undefined;
+  return values;
+}
+
 function bodyValues(body: string, contentType: string | null): Record<string, unknown> {
-  if (!isJson(contentType)) return Object.fromEntries(new URLSearchParams(body));
+  if (!isJson(contentType)) return formValues(body);
   try {
     const parsed = jsonBodySchema.safeParse(JSON.parse(body));
     return parsed.success ? parsed.data : {};
@@ -48,26 +63,47 @@ function bodyValues(body: string, contentType: string | null): Record<string, un
  */
 export function tokenRequestFields(body: string, contentType: string | null): TokenRequestFields {
   const values = bodyValues(body, contentType);
-  return { grantType: field(values.grant_type), refreshToken: field(values.refresh_token), code: field(values.code), clientId: field(values.client_id) };
+  return {
+    grantType: field(values.grant_type),
+    refreshToken: field(values.refresh_token),
+    code: field(values.code),
+    clientId: field(values.client_id),
+    clientAssertion: field(values.client_assertion) !== null || field(values.client_assertion_type) !== null,
+  };
 }
 
-/** The client id from an HTTP Basic `Authorization` header (RFC 6749 §2.3.1), or null. */
+const basicPattern = /^Basic +(.*)$/i;
+
+/** One application/x-www-form-urlencoded value, as Better Auth decodes it ("+" and "%20" are spaces). */
+function formUrlDecode(value: string): string {
+  return new URLSearchParams(`v=${value}`).get("v") ?? "";
+}
+
+/**
+ * The client id from an HTTP Basic `Authorization` header, decoded as Better
+ * Auth decodes it (RFC 6749 §2.3.1: base64, split on the first ":", each half
+ * form-decoded, both halves non-empty), or null when it would refuse it.
+ */
 export function basicAuthClientId(authorization: string | null): string | null {
-  const match = /^Basic\s+([A-Za-z0-9+/=]+)\s*$/i.exec(authorization ?? "");
-  if (!match?.[1]) return null;
+  const match = basicPattern.exec(authorization ?? "");
+  if (match?.[1] === undefined) return null;
   const decoded = Buffer.from(match[1], "base64").toString("utf8");
   const separator = decoded.indexOf(":");
-  if (separator <= 0) return null;
-  try {
-    return field(decodeURIComponent(decoded.slice(0, separator).replace(/\+/g, " ")));
-  } catch {
-    return null;
-  }
+  if (separator <= 0 || separator === decoded.length - 1) return null;
+  return field(formUrlDecode(decoded.slice(0, separator)));
 }
 
-/** The client a token request names: client_id in the body, else the Basic header's. */
+/**
+ * The client a token request names, read in Better Auth's order
+ * (extractClientCredentials): any Authorization header wins, and only a
+ * well-formed Basic one names a client; without the header, the body's
+ * client_id. A client assertion names no client here, so the request counts
+ * as presenting no known credential.
+ */
 export function presentedClientId(fields: TokenRequestFields, authorization: string | null): string | null {
-  return fields.clientId ?? basicAuthClientId(authorization);
+  if (fields.clientAssertion) return null;
+  if (authorization) return basicAuthClientId(authorization);
+  return fields.clientId;
 }
 
 /** The secret part of a refresh token this server issued (after its prefix), or null for anything else. */
@@ -89,10 +125,15 @@ export function isCountedTokenFailure(status: number): boolean {
   return status >= 400 && status < 500 && status !== 429;
 }
 
-/** What the limits need from a stored authorization code (Better Auth's verification row). */
-export interface StoredCodeGrant {
-  value: string;
-  expiresAt: Date;
+/**
+ * What the database holds for a presented code: the values of Better Auth's
+ * verification rows under its hash (the code, used or not yet, expired or
+ * not; Better Auth deletes the row when the code is used), and the clients of
+ * tokens issued from it (a used code).
+ */
+export interface StoredCodeTrace {
+  values: readonly string[];
+  tokenClientIds: readonly string[];
 }
 
 const codeValueSchema = z.object({ type: z.literal("authorization_code"), query: z.object({ client_id: z.string() }) });
@@ -107,13 +148,16 @@ function codeClientId(value: string): string | null {
 }
 
 /**
- * Whether a stored authorization code is valid now for the client presenting
- * it: unexpired, and issued to that client. Better Auth deletes a code when
- * it is used, so a used code is not found at all. The PKCE verifier and the
- * redirect are still Better Auth's to check.
+ * Whether a presented code is one this server issued to the presenting
+ * client, in any state: waiting, expired, or already used. Each goes on to
+ * Better Auth, which must see it: an expired code gets invalid_grant (so the
+ * app asks the person again), and a used one makes it revoke the tokens that
+ * code issued (RFC 6749 §4.1.2). The PKCE verifier and the redirect are
+ * Better Auth's to check.
  */
-export function isUsableCodeGrant(row: StoredCodeGrant, clientId: string | null, now: Date): boolean {
-  return clientId !== null && row.expiresAt > now && codeClientId(row.value) === clientId;
+export function isKnownCode(stored: StoredCodeTrace, clientId: string | null): boolean {
+  if (clientId === null) return false;
+  return stored.tokenClientIds.includes(clientId) || stored.values.some((value) => codeClientId(value) === clientId);
 }
 
 /** What the limits need from a stored refresh token. */
@@ -123,6 +167,16 @@ export interface StoredRefreshGrant {
   expiresAt: Date | null;
   revoked: Date | null;
   rotationReplayExpiresAt: Date | null;
+}
+
+/**
+ * Whether a stored refresh token was issued to the presenting client. In any
+ * state (live, rotated, expired, revoked) it goes on to Better Auth: a
+ * replayed rotated token must reach it so it revokes the whole family, and a
+ * dead one must get invalid_grant so the app asks the person to reconnect.
+ */
+export function isKnownRefreshToken(row: StoredRefreshGrant, clientId: string | null): boolean {
+  return clientId !== null && row.clientId === clientId;
 }
 
 /**
@@ -138,12 +192,12 @@ export function isUsableRefreshGrant(row: StoredRefreshGrant, now: Date): boolea
 
 /**
  * The connection (person and app) a refresh is limited under, or null when
- * the connection limit does not apply: the token is not usable, or it was
- * issued to another client than the one presenting it. Those requests go on
- * to Better Auth, which refuses them (and revokes the whole family when a
- * rotated token is replayed), and they count as failures. So the connection
- * limit can only answer for a refresh that would otherwise succeed, and its
- * refusal says nothing a success would not.
+ * the connection limit does not apply: the token is not usable now, or it
+ * was issued to another client than the one presenting it. Those requests
+ * go on to Better Auth (or meet the failure limits), which refuses them, and
+ * they count as failures. So the connection limit can only answer for a
+ * refresh that would otherwise succeed, and its refusal says nothing a
+ * success would not.
  */
 export function refreshConnection(row: StoredRefreshGrant, clientId: string | null, now: Date): { userId: string; clientId: string } | null {
   if (clientId !== row.clientId || !isUsableRefreshGrant(row, now)) return null;
@@ -159,4 +213,16 @@ export function refreshConnection(row: StoredRefreshGrant, clientId: string | nu
  */
 export function oauthConnectionKey(userId: string, clientId: string, secret: string): string {
   return createHmac("sha256", secret).update(JSON.stringify(["oauth-connection", userId, clientId])).digest("hex").slice(0, 32);
+}
+
+/**
+ * The counter key for one presented credential from one network address
+ * (oauthTokenAttemptsByCredential): an HMAC under the server secret of its
+ * kind, its stored hash, and the address's network key, never the token or
+ * a plain hash of it. Per address, so someone holding a stolen token cannot
+ * use up its tries where the rightful app sends it: the app's replay of a
+ * rotated token still reaches Better Auth, which revokes the family.
+ */
+export function oauthCredentialKey(kind: "code" | "refresh_token", storedHash: string, network: string, secret: string): string {
+  return createHmac("sha256", secret).update(JSON.stringify(["oauth-credential", kind, storedHash, network])).digest("hex").slice(0, 32);
 }

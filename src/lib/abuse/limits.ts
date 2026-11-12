@@ -172,30 +172,35 @@ export const rateLimits = {
    */
   oauthToken: { limit: 36_000, windowSeconds: hour },
   /**
-   * Failed OAuth token requests (any 4xx answer from the token endpoint:
-   * a bad code, refresh token, client, or request) per network address,
-   * counted after the answer. Over the limit, a request that presents no
-   * currently valid code or refresh token for its client is refused before
-   * Better Auth runs; one that does always goes on, so failures from a
-   * hosted app's shared address never stop its other users. This caps the
-   * error work and noise from one address. Guessing is stopped by the size
-   * of the secrets (about 182 bits or more) and the oauthToken backstop.
+   * Failed OAuth token requests per network address. A request that
+   * presents no code or refresh token this server issued to its client is
+   * counted when it arrives, refused or not, and refused once the address is
+   * over the limit, before Better Auth runs. A request with one always goes
+   * on (within oauthTokenAttemptsByCredential), and counts here only when
+   * Better Auth refuses it, so failures from a hosted app's shared address
+   * never stop its other users. This caps the error work and noise from one
+   * address. Guessing is stopped by the size of the secrets (about 182 bits
+   * or more) and the oauthToken backstop.
    */
   oauthTokenFailuresByNetwork: { limit: 60, windowSeconds: quarterHour },
+  /**
+   * Token requests per presented code or refresh token this server issued,
+   * per network address, counted on arrival. A working app uses each one
+   * once (codes are single-use and refresh tokens rotate), or a few times
+   * when it retries within the reuse window. Over the limit, the credential
+   * is treated as unknown and meets oauthTokenFailuresByNetwork, so a token
+   * someone holds cannot be failed with forever (for example with a bad
+   * scope) to dodge the failure limit. Per address, so a thief cannot use up
+   * a token's tries where the rightful app sends it, and the app's replay of
+   * a rotated token still reaches Better Auth, which revokes the family.
+   */
+  oauthTokenAttemptsByCredential: { limit: 5, windowSeconds: quarterHour },
   /**
    * Successful refreshes per connection (one person and one app) per hour,
    * from any address. A connection refreshes about once an hour per open
    * session; this stops one in a loop without touching the app's other users.
    */
   oauthRefreshByConnection: { limit: 60, windowSeconds: hour },
-  /**
-   * Apps a network registered that were evicted unapproved to make room in
-   * the full pool (src/lib/oauth/registration-limits.ts), per day. A counter,
-   * not a refusal of its own: evicted apps keep counting toward the
-   * network's cap of unapproved apps (oauthLimits.maxUnapprovedClientsPerNetwork,
-   * equal to this limit), so eviction never hands a network fresh room.
-   */
-  oauthEvictedByNetwork: { limit: 100, windowSeconds: day },
 } as const satisfies Record<string, { limit: number; windowSeconds: number }>;
 
 export type RateLimitName = keyof typeof rateLimits;
@@ -252,5 +257,5 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   oauthToken: "Your network has asked for a lot of access tokens in the last hour.",
   oauthTokenFailuresByNetwork: "Your network has sent a lot of token requests that failed in the last few minutes. Requests with a valid code or refresh token still go through.",
   oauthRefreshByConnection: "This connection has refreshed its access a lot in the last hour.",
-  oauthEvictedByNetwork: "Your network has registered a lot of apps that nobody has approved yet.",
+  oauthTokenAttemptsByCredential: "This code or refresh token has been tried a lot in the last few minutes.",
 };

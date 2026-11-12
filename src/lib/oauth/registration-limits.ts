@@ -1,19 +1,21 @@
 import { networkKey } from "@/lib/abuse/network-key";
-import { countRateLimitHit, hitRateLimit } from "@/lib/abuse/rate-limit";
+import { hitRateLimit } from "@/lib/abuse/rate-limit";
 
 import { oauthLimits } from "./config";
-import { dropIfPoolOverCap, evictOldestUnapproved, markClientNetwork, unapprovedClientCounts } from "./limit-store";
-import { fullPoolRefusal, registeredClientId, registrationPoolRefusal, type PoolRefusal } from "./registration-limit-rules";
+import { forgetApprovedClientNetworks, markClientNetwork, trimUnapproved, unapprovedClientCounts } from "./limit-store";
+import { fullPoolRefusal, networkShareRefusal, registeredClientId, registrationPoolRefusal, type PoolRefusal } from "./registration-limit-rules";
 import { oauthErrorResponse, oauthRateLimited } from "./request-policy";
 
 /**
  * The auth route's limits on `/api/auth/oauth2/register`
  * (src/app/api/auth/[...all]/route.ts): a per-network hourly limit, a cap on
- * the apps one network registered that nobody approved yet (evicted ones
- * included), and the cap on all unapproved apps. Each successful
- * registration is tagged with the network that made it, and when the pool is
- * over its cap the oldest unapproved app past the grace period is evicted to
- * make room. Its client id then fails like any unknown client.
+ * the apps one network registered that nobody approved yet (its share), and
+ * the cap on all unapproved apps (the pool). Each successful registration is
+ * tagged with the network that made it; when its share is over the cap, the
+ * network's own oldest unapproved app past the grace period is evicted, and
+ * then the pool's oldest when the pool is over. An evicted client id then
+ * fails like any unknown client. The registration is refused only when
+ * nothing is old enough to evict.
  */
 
 function poolResponse(refusal: PoolRefusal): Response {
@@ -27,14 +29,7 @@ async function refuseRegistration(network: string): Promise<Response | null> {
   return refusal ? poolResponse(refusal) : null;
 }
 
-/** Evicts what the new app pushed over the cap; returns false when nothing could go and the new app was dropped instead. */
-async function makeRoom(clientId: string): Promise<boolean> {
-  const evicted = await evictOldestUnapproved(clientId);
-  for (const { network } of evicted) {
-    if (network) await countRateLimitHit("oauthEvictedByNetwork", network);
-  }
-  return !(await dropIfPoolOverCap(clientId));
-}
+const graceSeconds = oauthLimits.unapprovedEvictionGraceMinutes * 60;
 
 /** Tags the new app with its network and makes room for it. Returns a refusal to send instead of Better Auth's answer, or null. */
 async function settleRegistration(response: Response, network: string): Promise<Response | null> {
@@ -42,12 +37,34 @@ async function settleRegistration(response: Response, network: string): Promise<
     const clientId = registeredClientId(await response.clone().json());
     if (!clientId) return null;
     await markClientNetwork(clientId, network);
-    if (await makeRoom(clientId)) return null;
-    return poolResponse(fullPoolRefusal(oauthLimits.unapprovedEvictionGraceMinutes * 60));
+    if ((await trimUnapproved(clientId, { kind: "network", network })).dropped) return poolResponse(networkShareRefusal(graceSeconds));
+    if ((await trimUnapproved(clientId, { kind: "pool" })).dropped) return poolResponse(fullPoolRefusal(graceSeconds));
+    return null;
   } catch (error) {
     console.error("[oauth] Settling a registration failed", error instanceof Error ? error.name : "unknown error");
     return null;
   }
+}
+
+/** Whether a POST path is the consent decision the approval page sends (src/components/oauth/consent-form.tsx). */
+export function isConsentDecision(pathname: string): boolean {
+  return pathname.replace(/\/+$/, "") === "/api/auth/oauth2/consent";
+}
+
+/**
+ * Answers a consent decision through `answer` (Better Auth's handler), then
+ * forgets the registering network of apps now approved: the tag only serves
+ * the cap on unapproved apps. Fails open.
+ */
+export async function handleConsent(request: Request, answer: (request: Request) => Promise<Response>): Promise<Response> {
+  const response = await answer(request);
+  if (!response.ok) return response;
+  try {
+    await forgetApprovedClientNetworks();
+  } catch (error) {
+    console.error("[oauth] Clearing approved app networks failed", error instanceof Error ? error.name : "unknown error");
+  }
+  return response;
 }
 
 /**

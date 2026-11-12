@@ -12,7 +12,7 @@ export type RefusalShape = "mcp-429" | "tool-error" | "http-429" | "form" | "not
 
 interface LimitPlacement {
   /** Who is counted: a user, a token, a team, or a network address. */
-  per: "user" | "token" | "team" | "network" | "email address" | "connection";
+  per: "user" | "token" | "team" | "network" | "email address" | "connection" | "code or refresh token";
   /** Where the limit is checked, in words. */
   where: string;
   refusal: RefusalShape;
@@ -68,8 +68,8 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   oauthRegister: { per: "network", where: "OAuth app registration (MCP clients)", refusal: "http-429", group: "Sign-in and OAuth" },
   oauthAuthorize: { per: "network", where: "OAuth authorization requests", refusal: "http-429", group: "Sign-in and OAuth" },
   oauthToken: { per: "network", where: "Every OAuth token request: a load backstop, high so hosted apps that serve many people from one address are not slowed", refusal: "http-429", group: "Sign-in and OAuth" },
-  oauthTokenFailuresByNetwork: { per: "network", where: "Failed OAuth token requests (only failures count); over it, requests without a currently valid code or refresh token wait, and valid ones still go through", refusal: "http-429", group: "Sign-in and OAuth" },
-  oauthEvictedByNetwork: { per: "network", where: "Unapproved apps removed from the full pool to make room; they still count toward the network's unapproved apps for a day", refusal: "http-429", group: "Sign-in and OAuth" },
+  oauthTokenFailuresByNetwork: { per: "network", where: "Failed OAuth token requests; over it, requests with a code or refresh token this site never gave the app wait, and the rest still go through", refusal: "http-429", group: "Sign-in and OAuth" },
+  oauthTokenAttemptsByCredential: { per: "code or refresh token", where: "OAuth token requests with one code or refresh token from one network; over it, the request counts as one with an unknown code or token", refusal: "http-429", group: "Sign-in and OAuth" },
   oauthRefreshByConnection: { per: "connection", where: "Successful OAuth refreshes for one person and one app, from any network", refusal: "http-429", group: "Sign-in and OAuth" },
 };
 

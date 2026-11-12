@@ -1,13 +1,11 @@
-import { and, count, desc, eq, gt, gte, isNull, lt, notExists, or, sql } from "drizzle-orm";
+import { and, count, eq, gt, gte, isNull, lt, notExists, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
 import { oauthClient, oauthConsent, oauthRefreshToken } from "@/db/oauth-schema";
-import { verification } from "@/db/schema";
-import { slidingRateLimitCount } from "@/lib/abuse/rate-limit";
 
 import { oauthLimits } from "./config";
-import type { StoredCodeGrant, StoredRefreshGrant } from "./token-limit-rules";
+import type { StoredCodeTrace, StoredRefreshGrant } from "./token-limit-rules";
 import type { UnapprovedClientCounts } from "./registration-limit-rules";
 
 /**
@@ -34,19 +32,23 @@ export async function findRefreshGrant(tokenHash: string): Promise<StoredRefresh
   return row ?? null;
 }
 
+const codeTraceSchema = z.object({ kind: z.enum(["code", "token"]), value: z.string() });
+
 /**
- * The stored authorization code with this hash (hashOAuthToken of the code),
- * or null. Better Auth keeps codes as verification rows whose identifier is
- * that hash, and deletes the row when the code is used.
+ * What the database holds for a presented code, by its hash (hashOAuthToken
+ * of the code): Better Auth's verification rows under that identifier, and
+ * the clients of tokens issued from it. Indexed lookups only.
  */
-export async function findCodeGrant(codeHash: string): Promise<StoredCodeGrant | null> {
-  const [row] = await getDb()
-    .select({ value: verification.value, expiresAt: verification.expiresAt })
-    .from(verification)
-    .where(eq(verification.identifier, codeHash))
-    .orderBy(desc(verification.createdAt))
-    .limit(1);
-  return row ?? null;
+export async function findCodeTrace(codeHash: string): Promise<StoredCodeTrace> {
+  const result = await getDb().execute(sql`
+    (select 'code' as kind, v.value as value from verification v where v.identifier = ${codeHash} limit 5)
+    union all
+    (select 'token', r.client_id from oauth_refresh_token r where r.authorization_code_id = ${codeHash} limit 1)
+    union all
+    (select 'token', a.client_id from oauth_access_token a where a.authorization_code_id = ${codeHash} limit 1)
+  `);
+  const rows = z.array(codeTraceSchema).parse(result.rows);
+  return { values: rows.filter((row) => row.kind === "code").map((row) => row.value), tokenClientIds: rows.filter((row) => row.kind === "token").map((row) => row.value) };
 }
 
 function poolWindow(now: number) {
@@ -57,23 +59,25 @@ function poolWindow(now: number) {
 }
 
 /**
- * Registered apps nobody approved within the cleanup window: how many there
- * are in all, how many this network registered and when the oldest of those
- * was registered, how many a new registration could evict, and when the
- * oldest one still inside the grace period was registered.
+ * Registered apps nobody approved within the cleanup window, for the pool
+ * and for this network: how many, how many a new registration could evict
+ * (past the grace period, not from a metadata document, holding no tokens),
+ * and when the oldest one still inside the grace period was registered.
  */
 export function unapprovedClientCountsQuery(network: string, now = Date.now()) {
   const { since, graceCutoff } = poolWindow(now);
   const fromNetwork = eq(oauthClient.registeredNetwork, network);
-  const pastGrace = and(lt(oauthClient.createdAt, graceCutoff), isNull(oauthClient.clientDiscoveryId));
+  const holdsTokens = sql`(exists (select 1 from oauth_refresh_token r where r.client_id = ${oauthClient.clientId}) or exists (select 1 from oauth_access_token a where a.client_id = ${oauthClient.clientId}))`;
+  const pastGrace = and(lt(oauthClient.createdAt, graceCutoff), isNull(oauthClient.clientDiscoveryId), sql`not ${holdsTokens}`);
   const inGrace = gte(oauthClient.createdAt, graceCutoff);
   return getDb()
     .select({
       total: count(),
-      fromNetwork: sql<number>`count(*) filter (where ${fromNetwork})`.mapWith(Number),
-      oldestFromNetwork: sql<Date | null>`min(${oauthClient.createdAt}) filter (where ${fromNetwork})`.mapWith(oauthClient.createdAt),
       evictable: sql<number>`count(*) filter (where ${pastGrace})`.mapWith(Number),
       oldestInGrace: sql<Date | null>`min(${oauthClient.createdAt}) filter (where ${inGrace})`.mapWith(oauthClient.createdAt),
+      fromNetwork: sql<number>`count(*) filter (where ${fromNetwork})`.mapWith(Number),
+      evictableFromNetwork: sql<number>`count(*) filter (where ${and(fromNetwork, pastGrace)})`.mapWith(Number),
+      oldestInGraceFromNetwork: sql<Date | null>`min(${oauthClient.createdAt}) filter (where ${and(fromNetwork, inGrace)})`.mapWith(oauthClient.createdAt),
     })
     .from(oauthClient)
     .where(
@@ -84,70 +88,124 @@ export function unapprovedClientCountsQuery(network: string, now = Date.now()) {
     );
 }
 
-/** Runs unapprovedClientCountsQuery, with this network's apps evicted in the last day. */
+/** Runs unapprovedClientCountsQuery. */
 export async function unapprovedClientCounts(network: string, now = Date.now()): Promise<UnapprovedClientCounts> {
-  const [[row], evicted] = await Promise.all([unapprovedClientCountsQuery(network, now), slidingRateLimitCount("oauthEvictedByNetwork", network, now)]);
-  const stored = row ?? { total: 0, fromNetwork: 0, oldestFromNetwork: null, evictable: 0, oldestInGrace: null };
-  return { ...stored, evictedFromNetwork: Math.ceil(evicted) };
+  const [row] = await unapprovedClientCountsQuery(network, now);
+  return row ?? { total: 0, evictable: 0, oldestInGrace: null, fromNetwork: 0, evictableFromNetwork: 0, oldestInGraceFromNetwork: null };
 }
 
-const evictedRowSchema = z.object({ client_id: z.string(), registered_network: z.string().nullable() });
+/** Which unapproved apps an eviction works on: the whole pool, or one network's share of it. */
+export type EvictionScope = { kind: "pool" } | { kind: "network"; network: string };
+
+function scopeFilter(scope: EvictionScope) {
+  return scope.kind === "network" ? sql`and c.registered_network = ${scope.network}` : sql``;
+}
+
+function scopeCap(scope: EvictionScope): number {
+  return scope.kind === "network" ? oauthLimits.maxUnapprovedClientsPerNetwork : oauthLimits.maxUnapprovedClients;
+}
+
+/** Unapproved apps in a scope, as SQL over `oauth_client c`. */
+function unapprovedIn(scope: EvictionScope, since: Date) {
+  return sql`
+    select c.id, c.client_id, c.created_at, c.client_discovery_id
+    from oauth_client c
+    where (c.created_at > ${since.toISOString()}::timestamp or c.created_at is null)
+      and not exists (select 1 from oauth_consent k where k.client_id = c.client_id)
+      ${scopeFilter(scope)}`;
+}
+
+/** What trimming a scope did: how many older apps it evicted, and whether it dropped the new app instead. */
+export interface TrimResult {
+  evicted: number;
+  dropped: boolean;
+}
 
 /**
- * Brings the pool of unapproved apps back to its cap after a registration,
- * in one statement: deletes as many of the oldest unapproved apps as the pool
- * is over, among those past the grace period that hold no tokens, came from
- * no metadata document, and are not `keepClientId`. Concurrent calls cannot
- * leave the pool over the cap: the last one to start sees every committed
- * registration, and rows another call is deleting are skipped once it
- * commits. Returns the evicted apps and the network that registered each.
+ * Brings a scope (the pool, or one network's share) back to its cap after
+ * `newClientId` registered, in one statement. Apps that can be evicted are
+ * those past the grace period that hold no tokens and came from no metadata
+ * document, never the new app. The statement keeps the newest of them, as
+ * many as the cap leaves room for beside the apps that cannot be evicted,
+ * and deletes the rest; when the apps that cannot be evicted already exceed
+ * the cap, it deletes the new app instead.
+ *
+ * Concurrent registrations cannot leave the scope over its cap: each
+ * registration is stored before its own trim starts, so the trim that
+ * starts last sees every one of them, and keeping the newest (rather than
+ * deleting a count) means an earlier trim deletes only rows a later one
+ * would. Under a tight race at the cap a trim may count an app another trim
+ * is deleting and refuse one registration too many; it never lets one too
+ * many through.
  */
-export async function evictOldestUnapproved(keepClientId: string, now = Date.now()): Promise<{ clientId: string; network: string | null }[]> {
+export async function trimUnapproved(newClientId: string, scope: EvictionScope, now = Date.now()): Promise<TrimResult> {
   const { since, graceCutoff } = poolWindow(now);
   const result = await getDb().execute(sql`
-    with unapproved as (
-      select c.id, c.client_id, c.created_at, c.client_discovery_id
-      from oauth_client c
-      where (c.created_at > ${since.toISOString()}::timestamp or c.created_at is null)
-        and not exists (select 1 from oauth_consent k where k.client_id = c.client_id)
+    with unapproved as (${unapprovedIn(scope, since)}),
+    flagged as (
+      select u.id, u.client_id, u.created_at, coalesce(
+        u.created_at < ${graceCutoff.toISOString()}::timestamp
+          and u.client_discovery_id is null
+          and u.client_id <> ${newClientId}
+          and not exists (select 1 from oauth_refresh_token r where r.client_id = u.client_id)
+          and not exists (select 1 from oauth_access_token a where a.client_id = u.client_id),
+        false) as evictable
+      from unapproved u
     ),
-    excess as (select greatest(count(*) - ${oauthLimits.maxUnapprovedClients}, 0) as n from unapproved),
+    room as (select ${scopeCap(scope)} - count(*) filter (where not f.evictable) as keep from flagged f),
+    ranked as (
+      select f.id, row_number() over (order by f.created_at desc, f.id desc) as position
+      from flagged f where f.evictable
+    ),
     victims as (
-      select u.id from unapproved u
-      where u.created_at < ${graceCutoff.toISOString()}::timestamp
-        and u.client_discovery_id is null
-        and u.client_id <> ${keepClientId}
-        and not exists (select 1 from oauth_refresh_token r where r.client_id = u.client_id)
-        and not exists (select 1 from oauth_access_token a where a.client_id = u.client_id)
-      order by u.created_at, u.id
-      limit (select n from excess)
+      select r.id from ranked r, room where r.position > greatest(room.keep, 0)
+      union all
+      select f.id from flagged f, room where f.client_id = ${newClientId} and room.keep < 0
     )
     delete from oauth_client d using victims v
     where d.id = v.id and not exists (select 1 from oauth_consent k where k.client_id = d.client_id)
-    returning d.client_id, d.registered_network
+    returning d.client_id
   `);
-  return z.array(evictedRowSchema).parse(result.rows).map((row) => ({ clientId: row.client_id, network: row.registered_network }));
+  const deleted = z.array(z.object({ client_id: z.string() })).parse(result.rows).map((row) => row.client_id);
+  const dropped = deleted.includes(newClientId);
+  return { evicted: deleted.length - (dropped ? 1 : 0), dropped };
 }
 
 /**
- * Deletes the app just registered when the pool is still over its cap (no
- * app was old enough to evict). Returns whether it was deleted; the route
- * then refuses the registration instead.
+ * Forgets which network registered an app once nobody needs it: when the app
+ * is approved, and for every app before its registration is a day old (the
+ * cleanup job runs every 6 hours and clears tags past
+ * oauthLimits.registeredNetworkHours, so none lives past 24 hours). The
+ * privacy page promises rate-limit data goes within a day. Returns how many
+ * tags it cleared.
  */
-export async function dropIfPoolOverCap(clientId: string, now = Date.now()): Promise<boolean> {
-  const { since } = poolWindow(now);
+export async function clearRegisteredNetworks(now = Date.now()): Promise<number> {
+  const cutoff = new Date(now - oauthLimits.registeredNetworkHours * hourMs);
   const result = await getDb().execute(sql`
-    delete from oauth_client d
-    where d.client_id = ${clientId}
-      and not exists (select 1 from oauth_consent k where k.client_id = d.client_id)
-      and (
-        select count(*) from oauth_client c
-        where (c.created_at > ${since.toISOString()}::timestamp or c.created_at is null)
-          and not exists (select 1 from oauth_consent k2 where k2.client_id = c.client_id)
-      ) > ${oauthLimits.maxUnapprovedClients}
-    returning d.client_id
+    update oauth_client c set registered_network = null
+    where c.registered_network is not null
+      and (c.created_at is null or c.created_at < ${cutoff.toISOString()}::timestamp
+        or exists (select 1 from oauth_consent k where k.client_id = c.client_id))
+    returning c.client_id
   `);
-  return result.rows.length > 0;
+  return result.rows.length;
+}
+
+/**
+ * Clears the registering network of apps approved since they registered,
+ * among apps young enough to still carry one. Runs after each approval, so a
+ * tag is gone as soon as nobody needs it. Returns how many it cleared.
+ */
+export async function forgetApprovedClientNetworks(now = Date.now()): Promise<number> {
+  const since = new Date(now - oauthLimits.registeredNetworkHours * hourMs);
+  const result = await getDb().execute(sql`
+    update oauth_client c set registered_network = null
+    where c.created_at > ${since.toISOString()}::timestamp
+      and c.registered_network is not null
+      and exists (select 1 from oauth_consent k where k.client_id = c.client_id)
+    returning c.client_id
+  `);
+  return result.rows.length;
 }
 
 /** Records which network registered an app, once, right after Better Auth stored it. */

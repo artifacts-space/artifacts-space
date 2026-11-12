@@ -3,11 +3,13 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 /*
- * The OAuth token and registration limits end to end: the real auth route,
- * the real Better Auth OAuth provider, and the real Postgres counters, with
- * connections stored the way Better Auth stores them. One hosted app serves
- * many people from one address; these show that ordinary use is never
- * throttled while guessing and loops are. Runs only when TEST_DATABASE_URL
+ * The OAuth token limits end to end: the real auth route, the real Better
+ * Auth OAuth provider, and the real Postgres counters, with connections
+ * stored the way Better Auth stores them. One hosted app serves many people
+ * from one address; these show that ordinary use is never throttled while
+ * guessing and loops are, and that Better Auth still sees every replayed
+ * token and code. Registration limits are in
+ * route-oauth-registration-limits.db.test.ts. Runs only when TEST_DATABASE_URL
  * names a throwaway local database with the migrations applied; never point
  * it at a shared one.
  */
@@ -19,14 +21,13 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
   vi.stubEnv("BETTER_AUTH_SECRET", "oauth-limits-db-test-secret-0123456789abcdef");
   vi.stubEnv("BETTER_AUTH_URL", "https://artifacts.space");
 
-  const { eq, inArray, like } = await import("drizzle-orm");
+  const { and, eq, inArray } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
   const { session, user, verification } = await import("@/db/schema");
-  const { oauthClient, oauthClientResource, oauthConsent, oauthRefreshToken } = await import("@/db/oauth-schema");
+  const { oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken } = await import("@/db/oauth-schema");
   const { rateLimits } = await import("@/lib/abuse/limits");
   const { networkKey } = await import("@/lib/abuse/network-key");
   const { hashOAuthToken, mcpResource, oauthLimits } = await import("@/lib/oauth/config");
-  const { unapprovedClientCounts } = await import("@/lib/oauth/limit-store");
   const { POST } = await import("./route");
 
   const site = "https://artifacts.space";
@@ -35,13 +36,19 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
   const made = { users: [] as string[], clients: [] as string[] };
   let addressCounter = 0;
 
-  /** A fresh address per case, so cases never share a counter. */
+  const [runA = 0, runB = 0] = randomBytes(2);
+
+  /** A fresh address per case, so cases never share a counter, and a fresh range per run, so reruns on one database within the hour do not either. */
   function newAddress(): string {
     addressCounter += 1;
-    return `10.${String(randomBytes(1)[0] ?? 0)}.${String(Math.floor(addressCounter / 250))}.${String(addressCounter % 250)}`;
+    return `10.${String(runA)}.${String((runB + Math.floor(addressCounter / 250)) % 256)}.${String(addressCounter % 250)}`;
   }
 
-  /** A public app, like a hosted assistant's metadata-document client: one client id for all its people. */
+  /**
+   * A public app, like a hosted assistant's metadata-document client: one
+   * client id for all its people. Stored as registered two days ago, outside
+   * the pool of unapproved apps that the registration tests fill.
+   */
   async function newClient(): Promise<string> {
     const clientId = `https://assistant-${tag}-${String(made.clients.length)}.example/oauth/metadata.json`;
     await getDb().insert(oauthClient).values({
@@ -54,7 +61,7 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
       responseTypes: ["code"],
       scopes,
       requirePKCE: true,
-      createdAt: new Date(),
+      createdAt: new Date(Date.now() - 2 * 86_400_000),
       updatedAt: new Date(),
     });
     made.clients.push(clientId);
@@ -124,21 +131,28 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
     return { status: response.status, body, retryAfter: response.headers.get("retry-after"), next: typeof body.refresh_token === "string" ? body.refresh_token : refreshToken };
   }
 
-  async function register(address: string) {
-    const response = await POST(new Request(`${site}/api/auth/oauth2/register`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": address },
-      body: JSON.stringify({
-        client_name: `Registered ${tag}`,
-        redirect_uris: ["https://assistant.example/callback"],
-        token_endpoint_auth_method: "none",
-        grant_types: ["authorization_code", "refresh_token"],
-        response_types: ["code"],
-      }),
-    }));
-    const body = (await response.json()) as Record<string, unknown>;
-    if (typeof body.client_id === "string") made.clients.push(body.client_id);
-    return { status: response.status, body, retryAfter: response.headers.get("retry-after") };
+  async function bucketTotal(key: string): Promise<number> {
+    const { rateLimitBucket } = await import("@/db/schema");
+    const rows = await getDb().select({ count: rateLimitBucket.count }).from(rateLimitBucket).where(eq(rateLimitBucket.key, key));
+    return rows.reduce((sum, row) => sum + row.count, 0);
+  }
+
+  /** Bogus refreshes from `address` until it is over its failure limit. */
+  async function overFailureLimit(clientId: string, address: string): Promise<void> {
+    for (let attempt = 0; attempt < rateLimits.oauthTokenFailuresByNetwork.limit; attempt += 1) {
+      await refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, address);
+    }
+    expect((await refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, address)).status).toBe(429);
+  }
+
+  async function familyOf(refreshToken: string) {
+    const [row] = await getDb().select({ userId: oauthRefreshToken.userId }).from(oauthRefreshToken).where(eq(oauthRefreshToken.token, hashOAuthToken(refreshToken.replace("artifacts_ort_", ""))));
+    return row?.userId ?? "";
+  }
+
+  async function liveFamilyTokens(userId: string, clientId: string): Promise<number> {
+    const rows = await getDb().select({ id: oauthRefreshToken.id }).from(oauthRefreshToken).where(and(eq(oauthRefreshToken.userId, userId), eq(oauthRefreshToken.clientId, clientId)));
+    return rows.length;
   }
 
   beforeAll(() => {
@@ -224,10 +238,9 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
     expect(exchanged.status).toBe(200);
     expect(await exchanged.json()).toMatchObject({ token_type: "Bearer" });
 
-    // (c) Further bad requests get 429 with Retry-After, and Better Auth never sees them: a bogus code leaves no trace.
-    const { rateLimitBucket } = await import("@/db/schema");
+    // (c) Further bad requests get 429 with Retry-After before Better Auth runs (it would answer 400), and still count.
     const failureKey = `oauthTokenFailuresByNetwork:${networkKey(new Headers({ "x-forwarded-for": address }))}`;
-    const countedBefore = (await getDb().select({ count: rateLimitBucket.count }).from(rateLimitBucket).where(eq(rateLimitBucket.key, failureKey))).reduce((sum, row) => sum + row.count, 0);
+    const countedBefore = await bucketTotal(failureKey);
     const badRefresh = await refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, address);
     const badCode = await exchange({ code: randomBytes(24).toString("base64url"), verifier: "v".repeat(43) }, clientId, address);
     for (const refused of [badRefresh, { status: badCode.status, body: (await badCode.json()) as Record<string, unknown>, retryAfter: badCode.headers.get("retry-after") }]) {
@@ -235,13 +248,101 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
       expect(refused.body).toMatchObject({ error: "rate_limited" });
       expect(Number(refused.retryAfter)).toBeGreaterThan(0);
     }
-    const countedAfter = (await getDb().select({ count: rateLimitBucket.count }).from(rateLimitBucket).where(eq(rateLimitBucket.key, failureKey))).reduce((sum, row) => sum + row.count, 0);
-    expect(countedAfter).toBe(countedBefore);
+    expect(await bucketTotal(failureKey)).toBe(countedBefore + 2);
 
     // (d) Another address is unaffected: its bad request reaches Better Auth and gets the ordinary answer.
     const elsewhere = await refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, newAddress());
     expect(elsewhere.status).toBe(400);
     expect(elsewhere.body.error).toBe("invalid_grant");
+  }, 60_000);
+
+  it("should send a replayed rotated token to Better Auth from an address over its failure limit, which revokes the family", async () => {
+    const appAddress = newAddress();
+    const clientId = await newClient();
+    const stolen = await newConnection(clientId);
+    const userId = await familyOf(stolen);
+    const rotated = await refresh(stolen, clientId, newAddress());
+    expect(rotated.status).toBe(200);
+    // Past the reuse window, a replay of the old token is theft.
+    await getDb().update(oauthRefreshToken).set({ rotationReplayExpiresAt: new Date(Date.now() - 1000) }).where(eq(oauthRefreshToken.token, hashOAuthToken(stolen.replace("artifacts_ort_", ""))));
+    await overFailureLimit(clientId, appAddress);
+
+    const replayed = await refresh(stolen, clientId, appAddress);
+
+    expect(replayed).toMatchObject({ status: 400, body: { error: "invalid_grant" } });
+    expect(await liveFamilyTokens(userId, clientId)).toBe(0);
+  }, 60_000);
+
+  it("should still revoke the family on the app's replay when a thief used up the stolen token's tries from another address", async () => {
+    const appAddress = newAddress();
+    const thiefAddress = newAddress();
+    const clientId = await newClient();
+    const stolen = await newConnection(clientId);
+    const userId = await familyOf(stolen);
+    const badScope = { grant_type: "refresh_token", refresh_token: stolen, client_id: clientId, scope: "admin:everything" };
+    for (let attempt = 0; attempt <= rateLimits.oauthTokenAttemptsByCredential.limit; attempt += 1) expect((await tokenRequest(badScope, thiefAddress)).status).toBe(400);
+    const thiefRefresh = await refresh(stolen, clientId, thiefAddress);
+    expect(thiefRefresh.status).toBe(200);
+    await getDb().update(oauthRefreshToken).set({ rotationReplayExpiresAt: new Date(Date.now() - 1000) }).where(eq(oauthRefreshToken.token, hashOAuthToken(stolen.replace("artifacts_ort_", ""))));
+    await overFailureLimit(clientId, appAddress);
+
+    const appReplay = await refresh(stolen, clientId, appAddress);
+
+    expect(appReplay).toMatchObject({ status: 400, body: { error: "invalid_grant" } });
+    expect(await liveFamilyTokens(userId, clientId)).toBe(0);
+  }, 60_000);
+
+  it("should send a used code to Better Auth from an address over its failure limit, which revokes the tokens it issued", async () => {
+    const address = newAddress();
+    const clientId = await newClient();
+    const grant = await newCode(clientId);
+    const first = await exchange(grant, clientId, newAddress());
+    expect(first.status).toBe(200);
+    const issued = (await first.json()) as Record<string, unknown>;
+    const userId = await familyOf(String(issued.refresh_token));
+    expect(await liveFamilyTokens(userId, clientId)).toBe(1);
+    await overFailureLimit(clientId, address);
+
+    const replayed = await exchange(grant, clientId, address);
+
+    expect({ status: replayed.status, error: ((await replayed.json()) as Record<string, unknown>).error }).toEqual({ status: 400, error: "invalid_grant" });
+    expect(await liveFamilyTokens(userId, clientId)).toBe(0);
+    const accessTokens = await getDb().select({ id: oauthAccessToken.id }).from(oauthAccessToken).where(eq(oauthAccessToken.authorizationCodeId, hashOAuthToken(grant.code)));
+    expect(accessTokens).toHaveLength(0);
+  }, 60_000);
+
+  it("should answer an expired connection with invalid_grant, not a wait, from an address over its failure limit", async () => {
+    const address = newAddress();
+    const clientId = await newClient();
+    const expired = await newConnection(clientId);
+    await getDb().update(oauthRefreshToken).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(oauthRefreshToken.token, hashOAuthToken(expired.replace("artifacts_ort_", ""))));
+    await overFailureLimit(clientId, address);
+
+    expect(await refresh(expired, clientId, address)).toMatchObject({ status: 400, body: { error: "invalid_grant" } });
+  }, 60_000);
+
+  it("should stop a valid token failed with over and over once its tries run out, from an address over its failure limit", async () => {
+    const address = newAddress();
+    const clientId = await newClient();
+    const mine = await newConnection(clientId);
+    await overFailureLimit(clientId, address);
+    const badScope = () => tokenRequest({ grant_type: "refresh_token", refresh_token: mine, client_id: clientId, scope: "admin:everything" }, address);
+
+    const answers: number[] = [];
+    for (let attempt = 0; attempt <= rateLimits.oauthTokenAttemptsByCredential.limit; attempt += 1) answers.push((await badScope()).status);
+
+    expect(answers.slice(0, -1).every((status) => status === 400)).toBe(true);
+    expect(answers.at(-1)).toBe(429);
+  }, 60_000);
+
+  it("should let at most the failure limit through to Better Auth when many unknown requests arrive at once", async () => {
+    const address = newAddress();
+    const clientId = await newClient();
+
+    const statuses = await Promise.all(Array.from({ length: 200 }, () => refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, address).then((settled) => settled.status)));
+
+    expect(statuses.filter((status) => status === 400)).toHaveLength(rateLimits.oauthTokenFailuresByNetwork.limit);
+    expect(statuses.filter((status) => status === 429)).toHaveLength(200 - rateLimits.oauthTokenFailuresByNetwork.limit);
   }, 60_000);
 
   it("should count malformed and wrong-client requests as failures", async () => {
@@ -259,148 +360,7 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
       expect(status).toBeGreaterThanOrEqual(400);
       expect(status).toBeLessThan(500);
     }
-    const { rateLimitBucket } = await import("@/db/schema");
-    const key = `oauthTokenFailuresByNetwork:${networkKey(new Headers({ "x-forwarded-for": address }))}`;
-    const rows = await getDb().select({ count: rateLimitBucket.count }).from(rateLimitBucket).where(eq(rateLimitBucket.key, key));
-    expect(rows.reduce((sum, row) => sum + row.count, 0)).toBe(attempts.length);
+    expect(await bucketTotal(`oauthTokenFailuresByNetwork:${networkKey(new Headers({ "x-forwarded-for": address }))}`)).toBe(attempts.length);
   }, 60_000);
 
-  it("should register up to the per-address cap of unapproved apps, then go on to the hourly ceiling once people approve them", async () => {
-    const address = newAddress();
-    const share = oauthLimits.maxUnapprovedClientsPerNetwork;
-    const registered: string[] = [];
-    for (let attempt = 0; attempt < share; attempt += 1) {
-      const settled = await register(address);
-      expect(settled.status).toBe(201);
-      if (typeof settled.body.client_id === "string") registered.push(settled.body.client_id);
-    }
-
-    const network = networkKey(new Headers({ "x-forwarded-for": address }));
-    const tagged = await getDb().select({ clientId: oauthClient.clientId }).from(oauthClient).where(eq(oauthClient.registeredNetwork, network));
-    expect(tagged).toHaveLength(share);
-    const links = await getDb().select({ clientId: oauthClientResource.clientId }).from(oauthClientResource).where(inArray(oauthClientResource.clientId, registered));
-    // What a registration costs: one app row and one link to the MCP resource.
-    expect(links).toHaveLength(share);
-
-    const capped = await register(address);
-    expect(capped.status).toBe(429);
-    expect(capped.body.error).toBe("rate_limited");
-    expect(Number(capped.retryAfter)).toBeGreaterThan(3600);
-
-    // People finish connecting: approved apps no longer count toward the address's cap.
-    const approver = `oal-${tag}-approver`;
-    await getDb().insert(user).values({ id: approver, name: approver, email: `${approver}@example.com` });
-    made.users.push(approver);
-    await getDb().insert(oauthConsent).values(registered.map((clientId) => ({ id: randomUUID(), clientId, userId: approver, scopes, createdAt: new Date(), updatedAt: new Date() })));
-
-    let accepted = share;
-    for (;;) {
-      const settled = await register(address);
-      if (settled.status !== 201) break;
-      accepted += 1;
-      if (typeof settled.body.client_id === "string") {
-        await getDb().insert(oauthConsent).values({ id: randomUUID(), clientId: settled.body.client_id, userId: approver, scopes, createdAt: new Date(), updatedAt: new Date() });
-      }
-    }
-    // The hourly limit counts every registration it lets past, the one the cap refused included.
-    expect(accepted + 1).toBe(rateLimits.oauthRegister.limit);
-
-    const ceiling = await register(address);
-    expect(ceiling.status).toBe(429);
-    expect(ceiling.body).toMatchObject({ error: "rate_limited" });
-    expect(String(ceiling.body.error_description)).toContain("registered a lot of apps in the last hour");
-    expect(Number(ceiling.retryAfter)).toBeGreaterThan(0);
-    // Another address can still register.
-    expect((await register(newAddress())).status).toBe(201);
-  }, 180_000);
-
-  describe("a full pool of unapproved apps", () => {
-    const fillPrefix = `fill-${tag}-`;
-    const fillAddress = "192.0.2.77";
-    const fillNetwork = networkKey(new Headers({ "x-forwarded-for": fillAddress }));
-    const minute = 60_000;
-
-    async function poolSize(): Promise<number> {
-      return (await unapprovedClientCounts("none")).total;
-    }
-
-    /** Unapproved apps registered `ageMs` ago until the pool is full; returns their ids, oldest first when ages differ. */
-    async function fillPool(ageMs: number, count?: number): Promise<string[]> {
-      const missing = count ?? oauthLimits.maxUnapprovedClients - (await poolSize());
-      const createdAt = new Date(Date.now() - ageMs);
-      const rows = Array.from({ length: missing }, (_, index) => ({
-        id: randomUUID(),
-        clientId: `${fillPrefix}${randomUUID()}`,
-        redirectUris: ["https://assistant.example/callback"],
-        tokenEndpointAuthMethod: "none",
-        registeredNetwork: fillNetwork,
-        createdAt: new Date(createdAt.getTime() - index),
-        updatedAt: createdAt,
-      }));
-      for (let start = 0; start < rows.length; start += 500) await getDb().insert(oauthClient).values(rows.slice(start, start + 500));
-      return rows.map((row) => row.clientId);
-    }
-
-    async function stillThere(clientIds: string[]): Promise<number> {
-      return (await getDb().select({ clientId: oauthClient.clientId }).from(oauthClient).where(inArray(oauthClient.clientId, clientIds))).length;
-    }
-
-    afterEach(async () => {
-      await getDb().delete(oauthClient).where(like(oauthClient.clientId, `${fillPrefix}%`));
-      if (made.clients.length > 0) await getDb().delete(oauthClient).where(inArray(oauthClient.clientId, made.clients));
-      made.clients.length = 0;
-    });
-
-    it("should register a new app, evict the oldest unapproved one, and still count it for its network when the pool is full of old apps", async () => {
-      const [oldest] = await fillPool(2 * 60 * minute, 1);
-      await fillPool(60 * minute);
-      expect(await poolSize()).toBe(oauthLimits.maxUnapprovedClients);
-      const before = await unapprovedClientCounts(fillNetwork);
-
-      const registered = await register(newAddress());
-
-      expect(registered.status).toBe(201);
-      expect(await stillThere([oldest ?? ""])).toBe(0);
-      expect(await poolSize()).toBe(oauthLimits.maxUnapprovedClients);
-      const after = await unapprovedClientCounts(fillNetwork);
-      expect(after.fromNetwork + after.evictedFromNetwork).toBe(before.fromNetwork + before.evictedFromNetwork);
-      // The evicted client id now fails like any unknown client.
-      const evictedUse = await tokenRequest({ grant_type: "authorization_code", code: "c", code_verifier: "v".repeat(43), client_id: oldest ?? "", redirect_uri: "https://assistant.example/callback" }, newAddress());
-      const evictedBody = (await evictedUse.json()) as Record<string, unknown>;
-      expect({ status: evictedUse.status, error: evictedBody.error }).toEqual({ status: 400, error: "invalid_client" });
-    }, 120_000);
-
-    it("should never evict an approved app when the oldest app in the table is approved", async () => {
-      const approved = await newClient();
-      await getDb().update(oauthClient).set({ createdAt: new Date(Date.now() - 3 * 60 * minute) }).where(eq(oauthClient.clientId, approved));
-      await newConnection(approved);
-      await fillPool(60 * minute);
-
-      expect((await register(newAddress())).status).toBe(201);
-      expect(await stillThere([approved])).toBe(1);
-      expect(await poolSize()).toBe(oauthLimits.maxUnapprovedClients);
-    }, 120_000);
-
-    it("should answer 503 with Retry-After and store nothing when every unapproved app is inside the grace period", async () => {
-      await fillPool(minute);
-      const before = await poolSize();
-
-      const refused = await register(newAddress());
-
-      expect(refused.status).toBe(503);
-      expect(refused.body).toMatchObject({ error: "temporarily_unavailable" });
-      expect(Number(refused.retryAfter)).toBeGreaterThanOrEqual(60);
-      expect(Number(refused.retryAfter)).toBeLessThanOrEqual(oauthLimits.unapprovedEvictionGraceMinutes * 60);
-      expect(await poolSize()).toBe(before);
-    }, 120_000);
-
-    it("should leave the pool at its cap when two registrations arrive at once at a full pool", async () => {
-      await fillPool(60 * minute);
-
-      const both = await Promise.all([register(newAddress()), register(newAddress())]);
-
-      expect(both.map((settled) => settled.status)).toEqual([201, 201]);
-      expect(await poolSize()).toBe(oauthLimits.maxUnapprovedClients);
-    }, 120_000);
-  });
 });

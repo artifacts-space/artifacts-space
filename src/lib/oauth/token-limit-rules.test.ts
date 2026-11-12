@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   basicAuthClientId,
   isCountedTokenFailure,
-  isUsableCodeGrant,
+  isKnownCode,
+  isKnownRefreshToken,
   isUsableRefreshGrant,
   oauthConnectionKey,
+  oauthCredentialKey,
   presentedClientId,
   refreshConnection,
   refreshTokenSecret,
@@ -33,39 +35,61 @@ describe("isCountedTokenFailure", () => {
 describe("tokenRequestFields", () => {
   it("should read the grant, refresh token, and client when the body is form-encoded", () => {
     const fields = tokenRequestFields("grant_type=refresh_token&refresh_token=artifacts_ort_abc&client_id=https%3A%2F%2Fapp.example%2Fmeta", form);
-    expect(fields).toEqual({ grantType: "refresh_token", refreshToken: "artifacts_ort_abc", code: null, clientId: "https://app.example/meta" });
+    expect(fields).toEqual({ grantType: "refresh_token", refreshToken: "artifacts_ort_abc", code: null, clientId: "https://app.example/meta", clientAssertion: false });
     expect(tokenRequestFields("grant_type=authorization_code&code=c1", form).code).toBe("c1");
   });
 
   it("should read the same fields when the body is JSON", () => {
     const fields = tokenRequestFields(JSON.stringify({ grant_type: "refresh_token", refresh_token: "artifacts_ort_abc", client_id: "c" }), "application/json; charset=utf-8");
-    expect(fields).toEqual({ grantType: "refresh_token", refreshToken: "artifacts_ort_abc", code: null, clientId: "c" });
+    expect(fields).toEqual({ grantType: "refresh_token", refreshToken: "artifacts_ort_abc", code: null, clientId: "c", clientAssertion: false });
   });
 
   it("should read nothing when the body is broken, empty, or the wrong type", () => {
-    const empty = { grantType: null, refreshToken: null, code: null, clientId: null };
+    const empty = { grantType: null, refreshToken: null, code: null, clientId: null, clientAssertion: false };
     expect(tokenRequestFields("{not json", "application/json")).toEqual(empty);
     expect(tokenRequestFields("[1,2]", "application/json")).toEqual(empty);
     expect(tokenRequestFields(JSON.stringify({ grant_type: 7, refresh_token: ["x"] }), "application/json")).toEqual(empty);
     expect(tokenRequestFields("", form)).toEqual(empty);
   });
+
+  it("should drop the client and note an assertion when Better Auth would read the body differently", () => {
+    expect(tokenRequestFields("client_id=a&client_id=b", form).clientId).toBeNull();
+    expect(tokenRequestFields("client_id=a&client_id=", form).clientId).toBe("a");
+    expect(tokenRequestFields("client_assertion=x&client_id=a", form).clientAssertion).toBe(true);
+  });
 });
 
 describe("presentedClientId", () => {
-  it("should take the body's client when it names one", () => {
-    expect(presentedClientId({ grantType: null, refreshToken: null, code: null, clientId: "body" }, `Basic ${btoa("basic:secret")}`)).toBe("body");
+  const body = (clientId: string | null) => ({ grantType: null, refreshToken: null, code: null, clientId, clientAssertion: false });
+
+  it("should take the Basic header's client over the body's when both name one, as Better Auth does", () => {
+    expect(presentedClientId(body("body"), `Basic ${btoa("basic:secret")}`)).toBe("basic");
+    expect(presentedClientId(body("body"), `basic   ${btoa("basic:secret")}`)).toBe("basic");
   });
 
-  it("should take the Basic header's client, form-decoded, when the body names none", () => {
+  it("should take the body's client when there is no Authorization header", () => {
+    expect(presentedClientId(body("body"), null)).toBe("body");
+  });
+
+  it("should find no client when the header is there but Better Auth would refuse it", () => {
+    expect(presentedClientId(body("body"), "Bearer abc")).toBeNull();
+    expect(presentedClientId(body("body"), `Basic ${btoa("basic:")}`)).toBeNull();
+    expect(presentedClientId(body("body"), `Basic ${btoa(":secret")}`)).toBeNull();
+  });
+
+  it("should find no client when the request carries a client assertion", () => {
+    expect(presentedClientId({ ...body("body"), clientAssertion: true }, null)).toBeNull();
+  });
+
+  it("should form-decode the Basic header's client and split it at the first colon", () => {
     expect(basicAuthClientId(`Basic ${btoa("my%20app:secret")}`)).toBe("my app");
-    expect(presentedClientId({ grantType: null, refreshToken: null, code: null, clientId: null }, `Basic ${btoa("basic:secret")}`)).toBe("basic");
+    expect(basicAuthClientId(`Basic ${btoa("app:se:cret")}`)).toBe("app");
   });
 
   it("should find no client when the header is missing, not Basic, or malformed", () => {
     expect(basicAuthClientId(null)).toBeNull();
     expect(basicAuthClientId("Bearer abc")).toBeNull();
     expect(basicAuthClientId(`Basic ${btoa("no-separator")}`)).toBeNull();
-    expect(basicAuthClientId(`Basic ${btoa("%E0%A4%A:secret")}`)).toBeNull();
   });
 });
 
@@ -136,21 +160,52 @@ describe("oauthConnectionKey", () => {
   });
 });
 
-describe("isUsableCodeGrant", () => {
+describe("isKnownRefreshToken", () => {
+  it("should know a token in any state when the client it was issued to presents it", () => {
+    expect(isKnownRefreshToken(live, "client-1")).toBe(true);
+    expect(isKnownRefreshToken({ ...live, revoked: earlier }, "client-1")).toBe(true);
+    expect(isKnownRefreshToken({ ...live, expiresAt: earlier }, "client-1")).toBe(true);
+  });
+
+  it("should not know a token when another client or no client presents it", () => {
+    expect(isKnownRefreshToken(live, "client-2")).toBe(false);
+    expect(isKnownRefreshToken(live, null)).toBe(false);
+  });
+});
+
+describe("isKnownCode", () => {
   const value = JSON.stringify({ type: "authorization_code", query: { client_id: "client-1", redirect_uri: "https://app.example/cb" }, userId: "u" });
 
-  it("should accept an unexpired code when the client it was issued to presents it", () => {
-    expect(isUsableCodeGrant({ value, expiresAt: later }, "client-1", now)).toBe(true);
+  it("should know a stored code, expired or not, when the client it was issued to presents it", () => {
+    expect(isKnownCode({ values: [value], tokenClientIds: [] }, "client-1")).toBe(true);
   });
 
-  it("should refuse a code for another client, an expired code, or a code with no client", () => {
-    expect(isUsableCodeGrant({ value, expiresAt: later }, "client-2", now)).toBe(false);
-    expect(isUsableCodeGrant({ value, expiresAt: now }, "client-1", now)).toBe(false);
-    expect(isUsableCodeGrant({ value, expiresAt: later }, null, now)).toBe(false);
+  it("should know a used code when tokens issued from it belong to the presenting client", () => {
+    expect(isKnownCode({ values: [], tokenClientIds: ["client-1"] }, "client-1")).toBe(true);
   });
 
-  it("should refuse a stored row that is not an authorization code when another flow wrote it", () => {
-    expect(isUsableCodeGrant({ value: "not json", expiresAt: later }, "client-1", now)).toBe(false);
-    expect(isUsableCodeGrant({ value: JSON.stringify({ type: "magic-link", query: { client_id: "client-1" } }), expiresAt: later }, "client-1", now)).toBe(false);
+  it("should not know a code for another client, with no client, or with nothing stored", () => {
+    expect(isKnownCode({ values: [value], tokenClientIds: ["client-1"] }, "client-2")).toBe(false);
+    expect(isKnownCode({ values: [value], tokenClientIds: [] }, null)).toBe(false);
+    expect(isKnownCode({ values: [], tokenClientIds: [] }, "client-1")).toBe(false);
+  });
+
+  it("should not know a stored row that is not an authorization code when another flow wrote it", () => {
+    expect(isKnownCode({ values: ["not json"], tokenClientIds: [] }, "client-1")).toBe(false);
+    expect(isKnownCode({ values: [JSON.stringify({ type: "magic-link", query: { client_id: "client-1" } })], tokenClientIds: [] }, "client-1")).toBe(false);
+  });
+});
+
+describe("oauthCredentialKey", () => {
+  it("should keep codes and refresh tokens with the same hash apart and never show the hash", () => {
+    const key = oauthCredentialKey("code", "hash-1", "net-1", "s");
+    expect(key).not.toBe(oauthCredentialKey("refresh_token", "hash-1", "net-1", "s"));
+    expect(key).not.toBe(oauthCredentialKey("code", "hash-1", "net-1", "t"));
+    expect(key).toMatch(/^[0-9a-f]{32}$/);
+    expect(key).not.toContain("hash-1");
+  });
+
+  it("should give the same token a separate count on each network so a thief cannot use up the app's tries", () => {
+    expect(oauthCredentialKey("refresh_token", "hash-1", "net-1", "s")).not.toBe(oauthCredentialKey("refresh_token", "hash-1", "net-2", "s"));
   });
 });

@@ -6,7 +6,7 @@ import { rateLimitBucket } from "@/db/schema";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { rateLimitMessages, rateLimits, type RateLimitName } from "./limits";
-import { decideRateLimit, describeWait, slidingCount, windowStart, type RateLimitDecision } from "./rate-limit-window";
+import { decideRateLimit, describeWait, windowStart, type RateLimitDecision } from "./rate-limit-window";
 
 /**
  * Buckets older than this are deleted now and then. The longest window is a
@@ -148,19 +148,4 @@ export async function enforceRateLimit(name: RateLimitName, subject: string): Pr
 /** Throws a RateLimitError for the first limit that refuses, checking them in order and stopping there. */
 export async function enforceRateLimits(checks: readonly RateLimitCheck[]): Promise<void> {
   for (const check of checks) await enforceRateLimit(check.name, check.subject);
-}
-
-/**
- * How many hits `subject` has under a named limit in its sliding window, for
- * counters that feed another rule as a number rather than refusing on their
- * own (such as apps evicted from the OAuth registration pool).
- */
-export async function slidingRateLimitCount(name: RateLimitName, subject: string, nowMs = Date.now()): Promise<number> {
-  const bucket = bucketWindowsFor(name, subject, nowMs);
-  const rows = await getDb()
-    .select({ windowStart: rateLimitBucket.windowStart, count: rateLimitBucket.count })
-    .from(rateLimitBucket)
-    .where(and(eq(rateLimitBucket.key, bucket.key), inArray(rateLimitBucket.windowStart, [bucket.previous, bucket.current])));
-  const countAt = (start: Date) => rows.find((row) => row.windowStart.getTime() === start.getTime())?.count ?? 0;
-  return slidingCount({ previous: countAt(bucket.previous), current: countAt(bucket.current), nowMs, windowMs: bucket.windowMs });
 }

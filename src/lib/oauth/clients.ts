@@ -6,6 +6,7 @@ import { oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken } from "
 import { toConnectionHarness, type ConnectionHarnessDto } from "@/lib/harness/connection-store";
 
 import { hashOAuthToken, oauthLimits } from "./config";
+import { clearRegisteredNetworks } from "./limit-store";
 import { accessFromScopes, type McpAccess } from "./scopes";
 import { oauthAccessTokenSecret, oauthTokenGrant } from "./token-rules";
 
@@ -136,7 +137,9 @@ export async function countUnapprovedClients(now = Date.now()): Promise<number> 
 /**
  * Deletes registered apps nobody approved within the window (and that hold no
  * tokens), expired access tokens, and refresh tokens that expired or were
- * rotated out a week ago. Returns how many rows of each went.
+ * rotated out a week ago, and forgets the registering network of approved
+ * apps and of apps past oauthLimits.registeredNetworkHours. Returns how many
+ * rows of each went.
  */
 export async function cleanupOAuth(now = Date.now()) {
   const db = getDb();
@@ -160,5 +163,7 @@ export async function cleanupOAuth(now = Date.now()) {
     .where(or(lt(oauthRefreshToken.expiresAt, dayAgo), and(isNotNull(oauthRefreshToken.revoked), lt(oauthRefreshToken.revoked, weekAgo))))
     .returning();
 
-  return { clients: clients.length, accessTokens: accessTokens.length, refreshTokens: refreshTokens.length };
+  const networkTags = await clearRegisteredNetworks(now);
+
+  return { clients: clients.length, accessTokens: accessTokens.length, refreshTokens: refreshTokens.length, networkTags };
 }

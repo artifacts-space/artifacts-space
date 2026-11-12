@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 
-import { rateLimits } from "@/lib/abuse/limits";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+
 import { fakeDatabaseUrl } from "@/test/fake-database-url";
 
 import { oauthLimits } from "./config";
@@ -11,11 +13,11 @@ const perNetwork = oauthLimits.maxUnapprovedClientsPerNetwork;
 
 const counts = (overrides: Partial<UnapprovedClientCounts>): UnapprovedClientCounts => ({
   total: 0,
-  fromNetwork: 0,
-  evictedFromNetwork: 0,
-  oldestFromNetwork: null,
   evictable: 0,
   oldestInGrace: null,
+  fromNetwork: 0,
+  evictableFromNetwork: 0,
+  oldestInGraceFromNetwork: null,
   ...overrides,
 });
 const pool = oauthLimits.maxUnapprovedClients;
@@ -26,23 +28,16 @@ describe("registrationPoolRefusal", () => {
     expect(registrationPoolRefusal(counts({ total: pool - 1, fromNetwork: perNetwork - 1 }), nowMs)).toBeNull();
   });
 
-  it("should refuse with 429 until the network's oldest unapproved app leaves the window when the network holds its share", () => {
-    const oldest = new Date(nowMs - 23 * 3_600_000);
-    const refusal = registrationPoolRefusal(counts({ total: perNetwork, fromNetwork: perNetwork, oldestFromNetwork: oldest }), nowMs);
-    expect(refusal?.status).toBe(429);
-    expect(refusal?.error).toBe("rate_limited");
-    expect(refusal?.retryAfterSeconds).toBe(3600);
+  it("should let a registration through to evict the network's own oldest app when its share is full but one is past the grace period", () => {
+    expect(registrationPoolRefusal(counts({ total: perNetwork, fromNetwork: perNetwork, evictableFromNetwork: 1 }), nowMs)).toBeNull();
+  });
+
+  it("should refuse with 429 until the network's oldest app leaves the grace period when its full share holds only newer apps", () => {
+    const oldest = new Date(nowMs - 10 * 60_000);
+    const refusal = registrationPoolRefusal(counts({ total: perNetwork, fromNetwork: perNetwork, oldestInGraceFromNetwork: oldest }), nowMs);
+    expect(refusal).toMatchObject({ status: 429, error: "rate_limited" });
+    expect(refusal?.retryAfterSeconds).toBe(graceSeconds - 10 * 60);
     expect(refusal?.description).toContain("nobody has approved yet");
-  });
-
-  it("should keep counting a network's evicted apps toward its share when the pool made room by evicting them", () => {
-    expect(registrationPoolRefusal(counts({ total: 10, fromNetwork: 10, evictedFromNetwork: perNetwork - 10 }), nowMs)?.status).toBe(429);
-    expect(registrationPoolRefusal(counts({ total: 10, fromNetwork: 10, evictedFromNetwork: perNetwork - 11 }), nowMs)).toBeNull();
-  });
-
-  it("should wait at least a minute when the oldest app is about to leave the window", () => {
-    const oldest = new Date(nowMs - oauthLimits.unapprovedClientHours * 3_600_000 + 1000);
-    expect(registrationPoolRefusal(counts({ total: perNetwork, fromNetwork: perNetwork, oldestFromNetwork: oldest }), nowMs)?.retryAfterSeconds).toBe(60);
   });
 
   it("should let a registration through to evict when the pool is full but holds an app past the grace period", () => {
@@ -65,9 +60,10 @@ describe("registrationPoolRefusal", () => {
     expect(oauthLimits.maxUnapprovedClients / perNetwork).toBeGreaterThanOrEqual(20);
   });
 
-  it("should count evictions over the same day and share as the per-network cap", () => {
-    expect(rateLimits.oauthEvictedByNetwork.limit).toBe(perNetwork);
-    expect(rateLimits.oauthEvictedByNetwork.windowSeconds).toBe(oauthLimits.unapprovedClientHours * 3600);
+  it("should clear every network tag within a day when the cleanup job runs on its schedule", () => {
+    const vercel = z.object({ crons: z.array(z.object({ path: z.string(), schedule: z.string() })) }).parse(JSON.parse(readFileSync("vercel.json", "utf8")));
+    expect(vercel.crons.find((cron) => cron.path === "/api/cron/cleanup-oauth")?.schedule).toBe("24 */6 * * *");
+    expect(oauthLimits.registeredNetworkHours + 6).toBeLessThanOrEqual(24);
   });
 });
 

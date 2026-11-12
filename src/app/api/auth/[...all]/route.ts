@@ -3,7 +3,7 @@ import { hitRateLimit, hitRateLimits, rateLimitMessage } from "@/lib/abuse/rate-
 import { isMagicLinkRequest, magicLinkChecks, magicLinkEmail } from "@/lib/auth/magic-link-limits";
 import { getAuth } from "@/lib/auth/server";
 import { corsOAuthEndpoint, corsPreflightResponse, withCorsHeaders, withoutCookies } from "@/lib/oauth/cors-rules";
-import { handleRegistration } from "@/lib/oauth/registration-limits";
+import { handleConsent, handleRegistration, isConsentDecision } from "@/lib/oauth/registration-limits";
 import { authorizeRateLimit, oauthRateLimited, publicOAuthEndpoint, withPolicyScope } from "@/lib/oauth/request-policy";
 import { handleTokenRequest } from "@/lib/oauth/token-limits";
 
@@ -82,6 +82,7 @@ export function GET(request: Request) {
 export function POST(request: Request) {
   const { pathname } = new URL(request.url);
   if (corsOAuthEndpoint(pathname)) return handleCors(request);
+  if (isConsentDecision(pathname)) return handleConsent(request, handle);
   return publicOAuthEndpoint(request.method, pathname) === "register" ? handleRegistration(request, handle) : handle(request);
 }
 

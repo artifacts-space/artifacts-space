@@ -296,36 +296,47 @@ catch this, so test the generated SQL with `.toSQL()`, as
   - Token endpoint (`src/lib/oauth/token-limits.ts`, rules in
     `token-limit-rules.ts`): before Better Auth runs, the backstop is counted
     (`oauthToken`), and one indexed lookup decides whether the request
-    presents a credential valid now for its client (an unexpired code, or a
-    usable refresh token). Only a request without one meets the address's
-    failure limit (`oauthTokenFailuresByNetwork`); a valid one always goes
-    on, so failures from a hosted app's shared address (expired or revoked
-    connections, bogus codes pushed through its callback) never lock out
-    its other users. A valid refresh also meets its connection's limit
-    (`oauthRefreshByConnection`). After the answer, a 4xx counts a failure
-    for the address and a 200 to a refresh counts for the connection. The
-    failure limit only caps error work from one address: codes (about 190
-    bits), refresh tokens and client secrets (about 182 bits) are what stop
-    guessing, with the backstop. Do not add a per-client failure lockout:
-    client ids are public, so anyone could trigger it. A connection is the
-    person and the app (Better Auth's refresh-token family), keyed with
-    HMAC under the server secret: never
-    the presented token (it rotates) and never the client id alone (a
-    metadata-document app uses one for all its users).
+    presents a code or refresh token this server issued to its client, in
+    any state (waiting, used, rotated, expired, revoked). Read the client id
+    exactly as Better Auth does (`presentedClientId`: any Authorization
+    header first, then the body). A known credential goes on to Better
+    Auth, so a replayed rotated token revokes its family, a used code
+    revokes what it issued, and a dead connection gets `invalid_grant`, not
+    a 429. Each known credential gets `oauthTokenAttemptsByCredential`
+    attempts per address, counted on arrival; past that it is treated as
+    unknown. Keep the address in that key: a thief must not be able to use
+    up a token's tries where the rightful app sends it. An
+    unknown one reserves a failure for its address on arrival
+    (`oauthTokenFailuresByNetwork`, one atomic upsert, so floods cannot
+    overshoot) and waits once the address is over. A usable refresh also
+    meets its connection's limit (`oauthRefreshByConnection`). After the
+    answer, a 4xx to a known credential counts a failure for the address,
+    and a 200 to a refresh counts for the connection. The failure limit
+    only caps error work: codes (about 190 bits), refresh tokens and client
+    secrets (about 182 bits) are what stop guessing, with the backstop. Do
+    not add a per-client failure lockout: client ids are public, so anyone
+    could trigger it. Counter keys are HMACs under the server secret, never
+    a token or a plain hash of one. A connection is the person and the app
+    (Better Auth's refresh-token family): never the presented token (it
+    rotates) and never the client id alone (a metadata-document app uses
+    one for all its users).
   - Registration (`src/lib/oauth/registration-limits.ts`): `oauthRegister`
-    per address per hour, and at most `maxUnapprovedClientsPerNetwork`
-    unapproved apps per address in a day (stored ones by
-    `oauth_client.registered_network`, which the route sets after Better
-    Auth answers 201, plus evicted ones by `oauthEvictedByNetwork`, so
-    eviction never gives an address fresh room). The pool of unapproved
-    apps is capped at `maxUnapprovedClients` (`src/lib/oauth/config.ts`):
-    over it, the route evicts the oldest unapproved apps past
-    `unapprovedEvictionGraceMinutes` that hold no tokens and came from no
-    metadata document (`evictOldestUnapproved`, one statement, so
-    concurrent registrations cannot leave the pool over the cap). An
-    evicted client id fails like an unknown one. When every unapproved app
-    is inside the grace period, registration answers 503 with
-    `Retry-After` until the oldest leaves it.
+    per address per hour, a share of `maxUnapprovedClientsPerNetwork`
+    unapproved apps per address, and a pool of `maxUnapprovedClients`
+    (`src/lib/oauth/config.ts`). The route tags each new app with its
+    address (`oauth_client.registered_network`) after Better Auth answers
+    201, then trims the address's share and then the pool in one statement
+    each (`trimUnapproved` keeps the newest evictable apps, or drops the
+    new one, so concurrent registrations cannot leave either over its
+    cap). Only apps past `unapprovedEvictionGraceMinutes` that were never
+    approved, hold no
+    tokens, and came from no metadata document are evicted; an evicted
+    client id fails like an unknown one. A registration is refused only when
+    nothing in the full share (429) or full pool (503) is old enough, with
+    `Retry-After` until the oldest leaves the grace period. The tag is
+    cleared on approval and by the cleanup job after
+    `registeredNetworkHours`, so it never outlives the privacy page's one
+    day for rate-limit data.
   - Better Auth's own in-memory limits on these two endpoints are raised far
     above ours (`betterAuthEndpointBursts`); keep them there, or they
     throttle hosted apps first. Refusals are 429s in the OAuth error shape
