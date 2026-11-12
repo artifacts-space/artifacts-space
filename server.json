@@ -1,0 +1,19 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "space.artifacts/artifacts-space",
+  "title": "artifacts.space",
+  "description": "Save plans, specs, and reports as artifacts people and agents read, comment on, and share.",
+  "version": "1.0.0",
+  "websiteUrl": "https://artifacts.space",
+  "repository": {
+    "url": "https://github.com/artifacts-space/artifacts-space",
+    "source": "github"
+  },
+  "icons": [
+    { "src": "https://artifacts.space/artifacts-space-icon.png", "mimeType": "image/png", "sizes": ["1254x1254"] },
+    { "src": "https://artifacts.space/icon.svg", "mimeType": "image/svg+xml", "sizes": ["any"] }
+  ],
+  "remotes": [
+    { "type": "streamable-http", "url": "https://artifacts.space/api/mcp" }
+  ]
+}
