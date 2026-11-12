@@ -19,13 +19,14 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
   vi.stubEnv("BETTER_AUTH_SECRET", "oauth-limits-db-test-secret-0123456789abcdef");
   vi.stubEnv("BETTER_AUTH_URL", "https://artifacts.space");
 
-  const { eq, inArray } = await import("drizzle-orm");
+  const { eq, inArray, like } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
   const { session, user, verification } = await import("@/db/schema");
   const { oauthClient, oauthClientResource, oauthConsent, oauthRefreshToken } = await import("@/db/oauth-schema");
   const { rateLimits } = await import("@/lib/abuse/limits");
   const { networkKey } = await import("@/lib/abuse/network-key");
   const { hashOAuthToken, mcpResource, oauthLimits } = await import("@/lib/oauth/config");
+  const { unapprovedClientCounts } = await import("@/lib/oauth/limit-store");
   const { POST } = await import("./route");
 
   const site = "https://artifacts.space";
@@ -312,4 +313,94 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
     // Another address can still register.
     expect((await register(newAddress())).status).toBe(201);
   }, 180_000);
+
+  describe("a full pool of unapproved apps", () => {
+    const fillPrefix = `fill-${tag}-`;
+    const fillAddress = "192.0.2.77";
+    const fillNetwork = networkKey(new Headers({ "x-forwarded-for": fillAddress }));
+    const minute = 60_000;
+
+    async function poolSize(): Promise<number> {
+      return (await unapprovedClientCounts("none")).total;
+    }
+
+    /** Unapproved apps registered `ageMs` ago until the pool is full; returns their ids, oldest first when ages differ. */
+    async function fillPool(ageMs: number, count?: number): Promise<string[]> {
+      const missing = count ?? oauthLimits.maxUnapprovedClients - (await poolSize());
+      const createdAt = new Date(Date.now() - ageMs);
+      const rows = Array.from({ length: missing }, (_, index) => ({
+        id: randomUUID(),
+        clientId: `${fillPrefix}${randomUUID()}`,
+        redirectUris: ["https://assistant.example/callback"],
+        tokenEndpointAuthMethod: "none",
+        registeredNetwork: fillNetwork,
+        createdAt: new Date(createdAt.getTime() - index),
+        updatedAt: createdAt,
+      }));
+      for (let start = 0; start < rows.length; start += 500) await getDb().insert(oauthClient).values(rows.slice(start, start + 500));
+      return rows.map((row) => row.clientId);
+    }
+
+    async function stillThere(clientIds: string[]): Promise<number> {
+      return (await getDb().select({ clientId: oauthClient.clientId }).from(oauthClient).where(inArray(oauthClient.clientId, clientIds))).length;
+    }
+
+    afterEach(async () => {
+      await getDb().delete(oauthClient).where(like(oauthClient.clientId, `${fillPrefix}%`));
+      if (made.clients.length > 0) await getDb().delete(oauthClient).where(inArray(oauthClient.clientId, made.clients));
+      made.clients.length = 0;
+    });
+
+    it("should register a new app, evict the oldest unapproved one, and still count it for its network when the pool is full of old apps", async () => {
+      const [oldest] = await fillPool(2 * 60 * minute, 1);
+      await fillPool(60 * minute);
+      expect(await poolSize()).toBe(oauthLimits.maxUnapprovedClients);
+      const before = await unapprovedClientCounts(fillNetwork);
+
+      const registered = await register(newAddress());
+
+      expect(registered.status).toBe(201);
+      expect(await stillThere([oldest ?? ""])).toBe(0);
+      expect(await poolSize()).toBe(oauthLimits.maxUnapprovedClients);
+      const after = await unapprovedClientCounts(fillNetwork);
+      expect(after.fromNetwork + after.evictedFromNetwork).toBe(before.fromNetwork + before.evictedFromNetwork);
+      // The evicted client id now fails like any unknown client.
+      const evictedUse = await tokenRequest({ grant_type: "authorization_code", code: "c", code_verifier: "v".repeat(43), client_id: oldest ?? "", redirect_uri: "https://assistant.example/callback" }, newAddress());
+      const evictedBody = (await evictedUse.json()) as Record<string, unknown>;
+      expect({ status: evictedUse.status, error: evictedBody.error }).toEqual({ status: 400, error: "invalid_client" });
+    }, 120_000);
+
+    it("should never evict an approved app when the oldest app in the table is approved", async () => {
+      const approved = await newClient();
+      await getDb().update(oauthClient).set({ createdAt: new Date(Date.now() - 3 * 60 * minute) }).where(eq(oauthClient.clientId, approved));
+      await newConnection(approved);
+      await fillPool(60 * minute);
+
+      expect((await register(newAddress())).status).toBe(201);
+      expect(await stillThere([approved])).toBe(1);
+      expect(await poolSize()).toBe(oauthLimits.maxUnapprovedClients);
+    }, 120_000);
+
+    it("should answer 503 with Retry-After and store nothing when every unapproved app is inside the grace period", async () => {
+      await fillPool(minute);
+      const before = await poolSize();
+
+      const refused = await register(newAddress());
+
+      expect(refused.status).toBe(503);
+      expect(refused.body).toMatchObject({ error: "temporarily_unavailable" });
+      expect(Number(refused.retryAfter)).toBeGreaterThanOrEqual(60);
+      expect(Number(refused.retryAfter)).toBeLessThanOrEqual(oauthLimits.unapprovedEvictionGraceMinutes * 60);
+      expect(await poolSize()).toBe(before);
+    }, 120_000);
+
+    it("should leave the pool at its cap when two registrations arrive at once at a full pool", async () => {
+      await fillPool(60 * minute);
+
+      const both = await Promise.all([register(newAddress()), register(newAddress())]);
+
+      expect(both.map((settled) => settled.status)).toEqual([201, 201]);
+      expect(await poolSize()).toBe(oauthLimits.maxUnapprovedClients);
+    }, 120_000);
+  });
 });

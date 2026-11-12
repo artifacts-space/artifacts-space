@@ -69,6 +69,7 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   oauthAuthorize: { per: "network", where: "OAuth authorization requests", refusal: "http-429", group: "Sign-in and OAuth" },
   oauthToken: { per: "network", where: "Every OAuth token request: a load backstop, high so hosted apps that serve many people from one address are not slowed", refusal: "http-429", group: "Sign-in and OAuth" },
   oauthTokenFailuresByNetwork: { per: "network", where: "Failed OAuth token requests (only failures count); over it, requests without a currently valid code or refresh token wait, and valid ones still go through", refusal: "http-429", group: "Sign-in and OAuth" },
+  oauthEvictedByNetwork: { per: "network", where: "Unapproved apps removed from the full pool to make room; they still count toward the network's unapproved apps for a day", refusal: "http-429", group: "Sign-in and OAuth" },
   oauthRefreshByConnection: { per: "connection", where: "Successful OAuth refreshes for one person and one app, from any network", refusal: "http-429", group: "Sign-in and OAuth" },
 };
 

@@ -36,7 +36,9 @@ const store = vi.hoisted(() => ({
   calls: [] as string[],
   grants: new Map<string, StoredRefreshGrant>(),
   codes: new Map<string, StoredCodeGrant>(),
-  pool: { total: 0, fromNetwork: 0, oldestFromNetwork: null as Date | null },
+  pool: { total: 0, fromNetwork: 0, evictedFromNetwork: 0, oldestFromNetwork: null as Date | null, evictable: 0, oldestInGrace: null as Date | null },
+  evict: [] as { clientId: string; network: string | null }[],
+  overCap: false,
   marked: [] as { clientId: string; network: string }[],
   handler: vi.fn<(request: Request) => Promise<Response>>(),
   failCounters: false,
@@ -47,6 +49,8 @@ vi.mock("@/lib/oauth/limit-store", () => ({
   findRefreshGrant: (hash: string) => Promise.resolve(store.grants.get(hash) ?? null),
   findCodeGrant: (hash: string) => Promise.resolve(store.codes.get(hash) ?? null),
   unapprovedClientCounts: () => Promise.resolve(store.pool),
+  evictOldestUnapproved: () => Promise.resolve(store.evict),
+  dropIfPoolOverCap: () => Promise.resolve(store.overCap),
   markClientNetwork: (clientId: string, network: string) => {
     store.marked.push({ clientId, network });
     return Promise.resolve();
@@ -141,7 +145,9 @@ beforeEach(() => {
   store.grants.clear();
   store.codes.clear();
   store.marked.length = 0;
-  store.pool = { total: 0, fromNetwork: 0, oldestFromNetwork: null };
+  store.pool = { total: 0, fromNetwork: 0, evictedFromNetwork: 0, oldestFromNetwork: null, evictable: 0, oldestInGrace: null };
+  store.evict = [];
+  store.overCap = false;
   store.failCounters = false;
   store.handler.mockReset();
   store.handler.mockImplementation(betterAuth);
@@ -285,7 +291,7 @@ describe("auth route registration limits", () => {
   });
 
   it("should refuse with 429 and Retry-After when the network holds its share of unapproved apps", async () => {
-    store.pool = { total: 100, fromNetwork: 100, oldestFromNetwork: new Date(Date.now() - 23 * 3_600_000) };
+    store.pool = { ...store.pool, total: 100, fromNetwork: 100, oldestFromNetwork: new Date(Date.now() - 23 * 3_600_000) };
     const refused = await answer(register());
     expect(refused.status).toBe(429);
     expect(refused.body.error).toBe("rate_limited");
@@ -293,9 +299,28 @@ describe("auth route registration limits", () => {
     expect(store.handler).not.toHaveBeenCalled();
   });
 
-  it("should refuse with 503 when the whole pool of unapproved apps is full", async () => {
-    store.pool = { total: 2000, fromNetwork: 0, oldestFromNetwork: null };
-    expect((await answer(register())).status).toBe(503);
+  it("should refuse with 503 and Retry-After when the whole pool is full of apps inside the grace period", async () => {
+    store.pool = { ...store.pool, total: 2000, oldestInGrace: new Date(Date.now() - 60_000) };
+    const refused = await answer(register());
+    expect(refused.status).toBe(503);
+    expect(Number(refused.retryAfter)).toBeLessThanOrEqual(15 * 60);
+    expect(store.handler).not.toHaveBeenCalled();
+  });
+
+  it("should register and count the evicted app against its own network when the full pool makes room", async () => {
+    store.pool = { ...store.pool, total: 2000, evictable: 5 };
+    store.evict = [{ clientId: "old-client", network: "other-network" }];
+    expect((await answer(register())).status).toBe(201);
+    expect(store.calls).toEqual(["hit:oauthRegister", "count:oauthEvictedByNetwork"]);
+  });
+
+  it("should answer 503 instead when nothing could be evicted and the new app was dropped", async () => {
+    store.pool = { ...store.pool, total: 2000, evictable: 1 };
+    store.overCap = true;
+    const refused = await answer(register());
+    expect(refused.status).toBe(503);
+    expect(refused.body.error).toBe("temporarily_unavailable");
+    expect(Number(refused.retryAfter)).toBeGreaterThan(0);
   });
 
   it("should refuse at the hourly limit with the OAuth error shape", async () => {

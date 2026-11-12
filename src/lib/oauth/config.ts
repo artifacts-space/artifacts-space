@@ -22,11 +22,18 @@ export const oauthLimits = {
   /** Registered apps nobody approved are deleted after this long. */
   unapprovedClientHours: 24,
   /**
-   * Most unapproved apps stored at once. Registration pauses above this.
-   * Each one is two small rows (the app and its resource link), so this
-   * bounds the table, not the cost of a row.
+   * Most unapproved apps stored at once. Each one is two small rows (the app
+   * and its resource link), so this bounds the table. When the pool is full,
+   * a new registration evicts the oldest unapproved app past the grace below
+   * instead of being refused (src/lib/oauth/registration-limits.ts).
    */
   maxUnapprovedClients: 2000,
+  /**
+   * An unapproved app younger than this is never evicted: the time a person
+   * takes from registration to approval, including signing in with an
+   * emailed link, which itself stays valid for 10 minutes.
+   */
+  unapprovedEvictionGraceMinutes: 15,
   /**
    * Most unapproved apps one network address may have within the window
    * above. Approved apps never count, so a hosted app whose people finish

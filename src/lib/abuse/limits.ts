@@ -188,6 +188,14 @@ export const rateLimits = {
    * session; this stops one in a loop without touching the app's other users.
    */
   oauthRefreshByConnection: { limit: 60, windowSeconds: hour },
+  /**
+   * Apps a network registered that were evicted unapproved to make room in
+   * the full pool (src/lib/oauth/registration-limits.ts), per day. A counter,
+   * not a refusal of its own: evicted apps keep counting toward the
+   * network's cap of unapproved apps (oauthLimits.maxUnapprovedClientsPerNetwork,
+   * equal to this limit), so eviction never hands a network fresh room.
+   */
+  oauthEvictedByNetwork: { limit: 100, windowSeconds: day },
 } as const satisfies Record<string, { limit: number; windowSeconds: number }>;
 
 export type RateLimitName = keyof typeof rateLimits;
@@ -244,4 +252,5 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   oauthToken: "Your network has asked for a lot of access tokens in the last hour.",
   oauthTokenFailuresByNetwork: "Your network has sent a lot of token requests that failed in the last few minutes. Requests with a valid code or refresh token still go through.",
   oauthRefreshByConnection: "This connection has refreshed its access a lot in the last hour.",
+  oauthEvictedByNetwork: "Your network has registered a lot of apps that nobody has approved yet.",
 };

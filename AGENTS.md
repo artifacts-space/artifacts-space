@@ -313,10 +313,19 @@ catch this, so test the generated SQL with `.toSQL()`, as
     the presented token (it rotates) and never the client id alone (a
     metadata-document app uses one for all its users).
   - Registration (`src/lib/oauth/registration-limits.ts`): `oauthRegister`
-    per address per hour, at most `maxUnapprovedClientsPerNetwork`
-    unapproved apps per address (counted by `oauth_client.registered_network`,
-    which the route sets after Better Auth answers 201), and the pool cap
-    `maxUnapprovedClients` (`src/lib/oauth/config.ts`).
+    per address per hour, and at most `maxUnapprovedClientsPerNetwork`
+    unapproved apps per address in a day (stored ones by
+    `oauth_client.registered_network`, which the route sets after Better
+    Auth answers 201, plus evicted ones by `oauthEvictedByNetwork`, so
+    eviction never gives an address fresh room). The pool of unapproved
+    apps is capped at `maxUnapprovedClients` (`src/lib/oauth/config.ts`):
+    over it, the route evicts the oldest unapproved apps past
+    `unapprovedEvictionGraceMinutes` that hold no tokens and came from no
+    metadata document (`evictOldestUnapproved`, one statement, so
+    concurrent registrations cannot leave the pool over the cap). An
+    evicted client id fails like an unknown one. When every unapproved app
+    is inside the grace period, registration answers 503 with
+    `Retry-After` until the oldest leaves it.
   - Better Auth's own in-memory limits on these two endpoints are raised far
     above ours (`betterAuthEndpointBursts`); keep them there, or they
     throttle hosted apps first. Refusals are 429s in the OAuth error shape
