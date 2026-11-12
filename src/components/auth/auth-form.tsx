@@ -4,8 +4,11 @@ import Link from "next/link";
 import { IconBrandGithub, IconLoader2, IconMailCheck } from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import { flushSync } from "react-dom";
 
+import { ErrorMessage, workspaceUrl } from "@/components/auth/auth-parts";
 import { GoogleMark } from "@/components/auth/google-mark";
+import { offersReviewerPassword, REVIEWER_PASSWORD_ID, ReviewerPasswordField } from "@/components/auth/reviewer-password-field";
 import { ConsentNotice } from "@/components/legal-links";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +16,9 @@ import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth/client";
 import { isDevSignInEnabled } from "@/lib/auth/dev-user";
 import { signInErrorMessage } from "@/lib/auth/sign-in-error-rules";
+import { genericError, validateEmail } from "@/lib/auth/sign-in-form-rules";
 import { undeliverableAddressMessage } from "@/lib/auth/undeliverable-address";
 import { safeNextPath, withNextPath } from "@/lib/safe-next";
-import { cn } from "@/lib/utils";
 
 type AuthMode = "sign-in" | "sign-up";
 type SocialProvider = "github" | "google";
@@ -38,29 +41,21 @@ const copy = {
   },
 } as const;
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const genericError = "Something went wrong. Check your connection and try again.";
-
-/** Returns a problem with the email address, or null when it can be sent. */
-export function validateEmail(email: string): string | null {
-  if (!email.trim()) return "Enter your email address.";
-  if (!emailPattern.test(email.trim())) return "Enter a valid email address.";
-  return null;
-}
-
-/** Where to land after sign-in, as an absolute URL on this site. */
-function workspaceUrl() {
-  const next = safeNextPath(new URLSearchParams(window.location.search).get("next"));
-  return new URL(next ?? "/app", window.location.origin).href;
-}
-
 /** Where GitHub or Google sends a refused sign-in: this page, keeping `?next=`. Better Auth adds `?error=`. */
 function errorReturnUrl() {
   const next = new URLSearchParams(window.location.search).get("next");
   return new URL(withNextPath(window.location.pathname, next), window.location.origin).href;
 }
 
-function CheckEmail({ email, onBack }: { email: string; onBack: () => void }) {
+const textButtonClass = "text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground";
+
+/**
+ * After a link was sent. On the sign-in page, for an address under a reviewer
+ * domain, it also says that a password account signs in with its password
+ * (such accounts get no link); the domain alone decides, so it says nothing
+ * about who has one. `onUsePassword` is null where no password field exists.
+ */
+function CheckEmail({ email, onBack, onUsePassword }: { email: string; onBack: () => void; onUsePassword: (() => void) | null }) {
   return (
     <div className="space-y-3">
       <IconMailCheck className="size-6 text-muted-foreground" />
@@ -68,7 +63,13 @@ function CheckEmail({ email, onBack }: { email: string; onBack: () => void }) {
       <p className="text-md leading-6 text-muted-foreground">
         We sent a sign-in link to <span className="text-foreground">{email}</span>. Open it on this device to continue.
       </p>
-      <button type="button" onClick={onBack} className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
+      {onUsePassword && offersReviewerPassword(email) ? (
+        <p data-slot="password-instead" className="text-md leading-6 text-muted-foreground">
+          If this account has a password, sign in with that instead.{" "}
+          <button type="button" onClick={onUsePassword} className={textButtonClass}>Enter your password</button>
+        </p>
+      ) : null}
+      <button type="button" onClick={onBack} className={textButtonClass}>
         Use a different email
       </button>
     </div>
@@ -122,15 +123,6 @@ function InvitationHint() {
     <Suspense fallback={null}>
       <InvitationHintFromQuery />
     </Suspense>
-  );
-}
-
-function ErrorMessage({ message, className }: { message: string; className?: string }) {
-  if (!message) return null;
-  return (
-    <p role="alert" className={cn("rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive", className)}>
-      {message}
-    </p>
   );
 }
 
@@ -212,7 +204,15 @@ export function AuthForm({ mode, googleEnabled }: { mode: AuthMode; googleEnable
     }
   }
 
-  if (sentTo) return <div className="w-full max-w-[360px]"><CheckEmail email={sentTo} onBack={() => { setSentTo(""); }} /></div>;
+  /** Back to the form with the same address, and the cursor in the password field. */
+  function returnToPassword() {
+    flushSync(() => { setSentTo(""); });
+    document.getElementById(REVIEWER_PASSWORD_ID)?.focus();
+  }
+
+  if (sentTo) return <div className="w-full max-w-[360px]"><CheckEmail email={sentTo} onBack={() => { setSentTo(""); }} onUsePassword={mode === "sign-in" ? returnToPassword : null} /></div>;
+
+  const passwordIsPrimary = mode === "sign-in" && offersReviewerPassword(email);
 
   return (
     <div className="w-full max-w-[360px]">
@@ -240,8 +240,9 @@ export function AuthForm({ mode, googleEnabled }: { mode: AuthMode; googleEnable
           <Label htmlFor="email">Email</Label>
           <Input id="email" name="email" type="email" autoComplete="email" required value={email} onChange={(event) => { setEmail(event.target.value); }} className="h-10" />
         </div>
+        {mode === "sign-in" ? <ReviewerPasswordField email={email} /> : null}
         <ErrorMessage message={error} />
-        <Button type="submit" disabled={pending !== null} className="h-10 w-full text-sm">
+        <Button type="submit" variant={passwordIsPrimary ? "outline" : "default"} disabled={pending !== null} className="h-10 w-full text-sm">
           {pending === "email" ? <IconLoader2 className="animate-spin" /> : null}
           Email me a sign-in link
         </Button>

@@ -124,6 +124,33 @@ describe("sign-in link limits", () => {
   });
 });
 
+describe("password sign-in limits", () => {
+  it("should let one network try one address at most 10 times in 15 minutes", () => {
+    expect(allowedOnceFull(["passwordSignInByNetworkEmail"], 15 * 60)).toBeLessThanOrEqual(10);
+  });
+
+  it("should let one network try at most 100 passwords a day when it guesses across addresses", () => {
+    expect(allowedOnceFull(["passwordSignInByNetwork", "passwordSignInByNetworkDay"], daySeconds)).toBeLessThanOrEqual(100);
+  });
+
+  it("should need at least five networks failing within the hour to reach one address's failure ceiling", () => {
+    const perNetworkHour = allowedOnceFull(["passwordSignInByNetwork", "passwordSignInByNetworkDay"], hourSeconds);
+    expect(rateLimits.passwordSignInFailuresByEmail.limit / perNetworkHour).toBeGreaterThanOrEqual(5);
+  });
+
+  it("should end an address's failure lockout within an hour so a review is never blocked for the day", () => {
+    expect(rateLimits.passwordSignInFailuresByEmail.windowSeconds).toBeLessThanOrEqual(hourSeconds);
+  });
+
+  it("should let a reviewer who mistypes a few times still sign in within the short window", () => {
+    expect(rateLimits.passwordSignInByNetworkEmail.limit).toBeGreaterThanOrEqual(5);
+  });
+
+  it("should make a refused reviewer wait under 20 minutes when their own network hit the short window", () => {
+    expect(longestWait("passwordSignInByNetworkEmail")).toBeLessThanOrEqual(20 * 60);
+  });
+});
+
 describe("report limits", () => {
   it("should let one network report one artifact at most 3 times an hour when it floods", () => {
     expect(allowedOnceFull(["reportByNetworkArtifact"], hourSeconds)).toBeLessThanOrEqual(3);
