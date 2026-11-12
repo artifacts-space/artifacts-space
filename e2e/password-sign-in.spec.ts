@@ -7,15 +7,17 @@ import { expect, test, type Page } from "@playwright/test";
  *   shows no password control to anyone who has not typed a reviewer-domain
  *   address, and nothing on it moves for an ordinary address.
  * - Typing an address under a reviewer domain (@artifacts.space; also
- *   @example.com outside production builds) reveals a password field, while
- *   the emailed link stays available.
+ *   @example.com outside production builds) reveals a password field with
+ *   "Sign in" as the first action, while the emailed link stays available
+ *   below it; after a link is asked for, the same domain alone (never an
+ *   account) adds a way back to the password.
  * - The unlisted reviewer page signs in with a password, says what is wrong
  *   inline, and is never indexed or listed for crawlers.
  */
 
 const linkButton = (page: Page) => page.getByRole("button", { name: "Email me a sign-in link" });
 const passwordField = (page: Page) => page.getByLabel("Password", { exact: true });
-const passwordButton = (page: Page) => page.getByRole("button", { name: "Sign in with password" });
+const passwordButton = (page: Page) => page.getByRole("button", { name: "Sign in", exact: true });
 
 async function pageOverflow(page: Page) {
   return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -61,6 +63,11 @@ test.describe("the public sign-in page", () => {
       await expect(linkButton(page)).toBeVisible();
       expect(await pageOverflow(page), address).toBeLessThanOrEqual(0);
     }
+    // Password sign-in is the first, full-width action; the emailed link follows it.
+    const signIn = await passwordButton(page).boundingBox();
+    const link = await linkButton(page).boundingBox();
+    expect(signIn && link && signIn.y < link.y).toBe(true);
+    expect(signIn?.width).toBe(link?.width);
     await page.getByLabel("Email").fill("reviewer@gmail.com");
     await expect(page.locator("input[type=password]")).toHaveCount(0);
   });
@@ -86,6 +93,47 @@ test.describe("the public sign-in page", () => {
     await page.getByLabel("Email").press("Enter");
     await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
     expect(asked).toEqual(["password", "link"]);
+  });
+
+  test("should send one sign-in when Enter is pressed twice while the first is pending", async ({ page }) => {
+    let sent = 0;
+    let answer: (() => void) | undefined;
+    const answered = new Promise<void>((resolve) => { answer = resolve; });
+    await page.route("**/api/auth/sign-in/email", async (route) => {
+      sent += 1;
+      await answered;
+      return route.fulfill({ status: 401, json: { code: "INVALID_EMAIL_OR_PASSWORD", message: "Invalid email or password" } });
+    });
+    await page.goto("/dev/sign-in");
+    await page.getByLabel("Email").fill("reviewer@artifacts.space");
+    await passwordField(page).fill("not-the-password");
+    await passwordField(page).press("Enter");
+    await passwordField(page).press("Enter");
+    await expect.poll(() => sent).toBe(1);
+    answer?.();
+
+    await expect(page.getByRole("alert").filter({ hasText: "That email and password do not match." })).toBeVisible();
+    expect(sent).toBe(1);
+    await expect(page.getByRole("heading", { name: "Check your email" })).toHaveCount(0);
+  });
+
+  test("should point a reviewer-domain address back to its password after a link was asked for, and nobody else", async ({ page }) => {
+    await page.route("**/api/auth/sign-in/magic-link", (route) => route.fulfill({ status: 200, json: { status: true } }));
+    await page.goto("/dev/sign-in");
+    await page.getByLabel("Email").fill("someone@gmail.com");
+    await linkButton(page).click();
+    await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+    await expect(page.getByText("If this account has a password, sign in with that instead.")).toHaveCount(0);
+    await page.getByRole("button", { name: "Use a different email" }).click();
+
+    await page.getByLabel("Email").fill("reviewer@artifacts.space");
+    await linkButton(page).click();
+    await expect(page.getByText("If this account has a password, sign in with that instead.")).toBeVisible();
+    expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
+    await page.getByRole("button", { name: "Enter your password" }).click();
+
+    await expect(passwordField(page)).toBeFocused();
+    await expect(page.getByLabel("Email")).toHaveValue("reviewer@artifacts.space");
   });
 
   test("should ask for the password inline without sending anything when it is empty", async ({ page }) => {

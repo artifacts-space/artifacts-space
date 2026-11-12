@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { workspaceUrl } from "@/components/auth/auth-parts";
 import { authClient } from "@/lib/auth/client";
@@ -15,26 +15,34 @@ import { genericError, passwordFailureMessage, passwordFormProblem } from "@/lib
 export function usePasswordSignIn() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  // Set before the first render that shows `pending`, so two quick submits never send two tries (each one counts toward the limits).
+  const inFlight = useRef(false);
+
+  function settle(message: string) {
+    setError(message);
+    setPending(false);
+    inFlight.current = false;
+  }
 
   async function submit(email: string, password: string) {
+    if (inFlight.current) return;
     const problem = passwordFormProblem(email, password);
     if (problem) {
       setError(problem);
       return;
     }
+    inFlight.current = true;
     setPending(true);
     setError("");
     try {
       const { error: failure } = await authClient.signIn.email({ email: email.trim(), password });
       if (failure) {
-        setError(passwordFailureMessage(failure));
-        setPending(false);
+        settle(passwordFailureMessage(failure));
         return;
       }
       window.location.assign(workspaceUrl());
     } catch {
-      setError(genericError);
-      setPending(false);
+      settle(genericError);
     }
   }
 

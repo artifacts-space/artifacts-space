@@ -125,7 +125,7 @@ test("should let a signed-out reviewer start from an MCP client's request, sign 
   await expect(page.locator("input[type=password]")).toHaveCount(0);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Sign in with password" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   await page.waitForURL(/\/oauth\/consent/);
   await expect(page.getByRole("heading", { name: `Connect ${clientName}` })).toBeVisible();
