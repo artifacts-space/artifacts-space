@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   changeMemberRole: vi.fn(),
   openInvitationRole: vi.fn(),
   isEmailInTeam: vi.fn(),
+  deleteUnsentInvitation: vi.fn(),
   assertCanInvite: vi.fn(),
   assertCanInviteAs: vi.fn(),
   precheckedDuringCreate: vi.fn(),
@@ -58,7 +59,7 @@ vi.mock("@/lib/teams/queries", () => ({
   getInvitationTeamId: mocks.invitationTeamId,
 }));
 vi.mock("@/lib/teams/role-store", () => ({ changeMemberRole: mocks.changeMemberRole }));
-vi.mock("@/lib/teams/invitation-queries", () => ({ openInvitationRole: mocks.openInvitationRole, isEmailInTeam: mocks.isEmailInTeam }));
+vi.mock("@/lib/teams/invitation-queries", () => ({ openInvitationRole: mocks.openInvitationRole, isEmailInTeam: mocks.isEmailInTeam, deleteUnsentInvitation: mocks.deleteUnsentInvitation }));
 vi.mock("@/lib/teams/invitation-limits", () => ({ assertCanInvite: mocks.assertCanInvite }));
 vi.mock("@/lib/teams/guards", () => ({ assertCanInviteAs: mocks.assertCanInviteAs }));
 
@@ -117,6 +118,7 @@ beforeEach(() => {
   mocks.invitationTeamId.mockResolvedValue("team-1");
   mocks.openInvitationRole.mockResolvedValue(null);
   mocks.isEmailInTeam.mockResolvedValue(false);
+  mocks.deleteUnsentInvitation.mockResolvedValue(undefined);
   mocks.assertCanInvite.mockResolvedValue(undefined);
   mocks.assertCanInviteAs.mockResolvedValue(undefined);
 });
@@ -230,6 +232,59 @@ describe("inviteMemberAction", () => {
     signInAs(viewer("owner"));
     mocks.createInvitation.mockRejectedValue(APIError.from("BAD_REQUEST", { code: "USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION", message: "User is already a member of this organization" }));
     await expect(actions.inviteMemberAction("team-1", { email: "Ann@example.com", role: "member" })).resolves.toEqual({ success: false, error: "ann@example.com is already in this team." });
+  });
+
+  describe("when the invitation email is refused", () => {
+    /** Better Auth creates the row and swallows the refused email; the teams plugin notes the refusal. */
+    async function refuseTheEmail(refusal: APIError) {
+      const { noteInvitationSendRefusal } = await import("@/lib/teams/invitation-send-refusal");
+      mocks.createInvitation.mockImplementation(() => {
+        noteInvitationSendRefusal(refusal);
+        return Promise.resolve({ id: "invite-new" });
+      });
+    }
+
+    const undeliverable = () => new APIError("UNPROCESSABLE_ENTITY", { code: "EMAIL_UNDELIVERABLE", message: "We can't send email to this address. Check it for a typo." });
+
+    it("should name the address to check and delete the new invitation when the address cannot receive mail", async () => {
+      signInAs(viewer("owner"));
+      await refuseTheEmail(undeliverable());
+      await expect(actions.inviteMemberAction("team-1", { email: "Ann@Exmaple.com", role: "member" })).resolves.toEqual({ success: false, error: "We can't send email to ann@exmaple.com. Check it for a typo." });
+      expect(mocks.deleteUnsentInvitation).toHaveBeenCalledWith("invite-new");
+    });
+
+    it("should delete the replacement when the role changed and its email is refused", async () => {
+      signInAs(viewer("owner"));
+      mocks.openInvitationRole.mockResolvedValue("member");
+      await refuseTheEmail(undeliverable());
+      await expect(actions.inviteMemberAction("team-1", { email: "ann@exmaple.com", role: "admin" })).resolves.toMatchObject({ success: false });
+      expect(mocks.deleteUnsentInvitation).toHaveBeenCalledWith("invite-new");
+    });
+
+    it("should keep the open invitation when a resend is refused", async () => {
+      signInAs(viewer("owner"));
+      mocks.openInvitationRole.mockResolvedValue("member");
+      await refuseTheEmail(undeliverable());
+      await expect(actions.inviteMemberAction("team-1", { email: "ann@exmaple.com", role: "member" })).resolves.toEqual({ success: false, error: "We can't send email to ann@exmaple.com. Check it for a typo." });
+      expect(mocks.deleteUnsentInvitation).not.toHaveBeenCalled();
+    });
+
+    it("should show the budget message and delete the new invitation when the daily email budget is used up", async () => {
+      signInAs(viewer("owner"));
+      await refuseTheEmail(new APIError("TOO_MANY_REQUESTS", { message: "Invitations are paused for today." }));
+      await expect(actions.inviteMemberAction("team-1", { email: "ann@example.com", role: "member" })).resolves.toEqual({ success: false, error: "Invitations are paused for today." });
+      expect(mocks.deleteUnsentInvitation).toHaveBeenCalledWith("invite-new");
+    });
+
+    it("should still report the refusal when deleting the unsent invitation fails", async () => {
+      signInAs(viewer("owner"));
+      await refuseTheEmail(undeliverable());
+      mocks.deleteUnsentInvitation.mockRejectedValue(new Error("connection lost"));
+      const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      await expect(actions.inviteMemberAction("team-1", { email: "ann@exmaple.com", role: "member" })).resolves.toEqual({ success: false, error: "We can't send email to ann@exmaple.com. Check it for a typo." });
+      expect(JSON.stringify(log.mock.calls)).not.toContain("exmaple");
+      log.mockRestore();
+    });
   });
 
   it("should refuse an invitation as Owner, whatever the viewer's role", async () => {

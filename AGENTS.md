@@ -312,6 +312,17 @@ catch this, so test the generated SQL with `.toSQL()`, as
   Markdown and raw versions, preview images, and files always do. Agents
   cannot change the setting, and it turns off when the artifact stops being
   public or changes owner.
+- An address that cannot receive mail (Sendir's 422 `recipient_undeliverable`
+  or `recipient_suppressed`) is refused with the code `EMAIL_UNDELIVERABLE`
+  (`src/lib/auth/undeliverable-address.ts`), and the sign-in form and the
+  invite dialog name the typed address. The refusal is about the address
+  alone: Better Auth calls the magic-link send hook for every address, with
+  or without an account, and only after the sign-in limits passed
+  (`src/app/api/auth/[...all]/undeliverable-address.test.ts` fails if a known
+  and an unknown address ever get different answers). Never log the address.
+  Better Auth swallows what `sendInvitationEmail` throws, so a refused
+  invitation email reaches `inviteMemberAction` through
+  `invitation-send-refusal.ts`; the action then deletes the new invitation.
 
 ## Testing
 
