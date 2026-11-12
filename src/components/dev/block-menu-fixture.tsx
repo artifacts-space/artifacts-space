@@ -27,7 +27,7 @@ import { fixtureArtifact } from "./fixture-content";
 
 export const blockMenuFixtureMarkdown = `# Four items waiting for you
 
-Written November 11, 2026 by the Supahost agent. Write your answer under each item.
+Written November 11, 2026 by the Supahost agent. Write your answer under each item. <!-- background: yellow -->
 
 ## Rate plan writes
 

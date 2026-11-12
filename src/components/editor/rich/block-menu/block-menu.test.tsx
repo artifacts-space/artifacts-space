@@ -4,15 +4,16 @@ import { describe, expect, it } from "vitest";
 
 import type { MenuContext } from "./block-actions";
 import { hoverSubmenu, MenuList } from "./block-menu";
-import { ChangeSubmenu, MenuFooter, SearchRow } from "./block-menu-parts";
+import { MenuFooter, SearchRow } from "./block-menu-parts";
 import { menuReducer, openedMenu, rowsFor, type MenuState } from "./block-menu-state";
+import { ChangeSubmenu, ColorSubmenu } from "./block-submenus";
 
-const context: MenuContext = { changeable: true, currentType: "h2", canMoveUp: true, canMoveDown: false, canLink: true, canComment: true };
+const context: MenuContext = { changeable: true, currentType: "h2", colorable: true, colors: { color: null, background: null }, canMoveUp: true, canMoveDown: false, canLink: true, canComment: true };
 const noop = () => undefined;
 
 function list(state: MenuState) {
   return renderToStaticMarkup(
-    <MenuList menuId="m" typeName="Heading 2" rows={rowsFor(state, context)} state={state} mac onChangeRow={noop} onHover={noop} onChoose={noop} />,
+    <MenuList menuId="m" typeName="Heading 2" rows={rowsFor(state, context)} state={state} mac submenuRows={{ change: noop, color: noop }} onHover={noop} onChoose={noop} />,
   );
 }
 
@@ -29,7 +30,7 @@ describe("the block menu", () => {
   it("should be a labelled menu of menu items, with the block's type over the first group", () => {
     const html = list(openedMenu);
     expect(html).toContain('role="menu" aria-label="Heading 2 block"');
-    expect(html.match(/role="menuitem"/g)).toHaveLength(7);
+    expect(html.match(/role="menuitem"/g)).toHaveLength(8);
     expect(html).toContain('aria-haspopup="menu" aria-expanded="false"');
     expect(html.match(/role="separator"/g)).toHaveLength(2);
     expect(html).toContain(">Heading 2</div>");
@@ -63,6 +64,20 @@ describe("the block menu", () => {
     expect(html.match(/role="menuitemradio"/g)).toHaveLength(9);
     expect(html.match(/aria-checked="true"/g)).toHaveLength(1);
     expect(html).toMatch(/aria-checked="true"[^>]*>.*?Heading 2/);
+  });
+
+  it("should check the block's current colors in Color, with an A in each hue", () => {
+    const html = renderToStaticMarkup(<ColorSubmenu panelRef={createRef()} className="" colors={{ color: "red", background: null }} focused={false} sheet={false} onPick={noop} onBack={noop} onCloseAll={noop} />);
+    expect(html.match(/role="menuitemradio"/g)).toHaveLength(20);
+    expect(html.match(/aria-checked="true"/g)).toHaveLength(2);
+    expect(html).toMatch(/aria-checked="true"[^>]*><span aria-hidden="true" data-block-color="red"[^>]*>A<\/span><span[^>]*>Red</);
+    expect(html).toMatch(/aria-checked="true"[^>]*><span aria-hidden="true" class[^>]*><\/span><span[^>]*>Default</);
+    expect(html).toContain('data-block-background="blue"');
+    expect(html).toContain('aria-label="Default text"');
+    expect(html).toContain('aria-label="Default background"');
+    expect(html).toContain('aria-label="Red text"');
+    expect(html).toContain('aria-label="Text color"');
+    expect(html).toContain('aria-label="Background"');
   });
 
   it("should show who edited last and the block's size in the footer", () => {

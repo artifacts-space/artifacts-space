@@ -92,6 +92,23 @@ export const blockCorpus: Readonly<Record<string, BlockSamples>> = {
       externalSpaces: "![Diagram](<https://example.com/a b.png> \"Spaced\")\n",
     },
   },
+  blockColors: {
+    node: "paragraph",
+    rich: true,
+    samples: {
+      colorText: "Plain line.\n\nA red line <!-- color: red -->\n",
+      colorBoth: "Read this first <!-- color: red; background: yellow -->\n",
+      colorBackgroundOnly: "Shaded line <!-- background: gray -->\n",
+      colorHeading: "## Status <!-- background: green -->\n\nBody.\n",
+      colorListItem: "- one <!-- color: blue -->\n- two\n",
+      colorTaskItem: "- [ ] call back <!-- color: purple -->\n- [x] done\n",
+      colorInQuote: "> Quoted line <!-- background: pink -->\n",
+      colorTwoLines: "First line\nsecond line <!-- color: brown -->\n",
+      colorAfterBold: "Ends in **bold** <!-- color: orange -->\n",
+      colorUnknownHue: "Teal is not a hue <!-- color: teal -->\n",
+      colorLoose: "Loose spacing <!--background:blue;color:green-->\n",
+    },
+  },
   rawMarkdown: {
     node: "rawMarkdown",
     rich: false,
@@ -107,6 +124,8 @@ export const blockCorpus: Readonly<Record<string, BlockSamples>> = {
       imageQuery: `![Chart](/api/files/${fileA}?download=1)\n`,
       imageRelativePath: "![Chart](./chart.png)\n",
       imageInList: `- ![Chart](/api/files/${fileA})\n`,
+      otherComment: "A note <!-- TODO: check this -->\n",
+      colorMidText: "Red <!-- color: red --> then more text\n",
     },
   },
 };

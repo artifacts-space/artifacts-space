@@ -16,6 +16,7 @@ export function squash(text: string): string {
 
 const fence = /^\s*(```|~~~)/;
 const inlineRules: readonly [RegExp, string][] = [
+  [/<!--[\s\S]*?-->/g, ""],
   [/!\[([^\]]*)\]\([^)]*\)/g, "$1"],
   [/\[([^\]]+)\]\([^)]*\)/g, "$1"],
   [/\[([^\]]+)\]\[[^\]]*\]/g, "$1"],

@@ -43,6 +43,7 @@ disagree, the editor keeps the source as written (see "Raw blocks").
 | Table | GFM pipe table with optional alignment | `table` |
 | Divider | `---` | `horizontalRule` |
 | Media: image, video, audio, PDF, file | Image syntax alone in its paragraph (below) | `media` |
+| Block colors on a paragraph or heading (also in lists and quotes) | A color comment at the end of its text (below) | `color` and `background` attributes |
 | Anything else | As written | `rawMarkdown` |
 
 ### Media
@@ -234,6 +235,70 @@ flowchart TD
   any code block into one, or back.
 - **The Markdown version** keeps the fenced source. **Link previews** skip
   it like any code block.
+
+### Block colors
+
+A paragraph or heading can have a text color, a background, or both. They
+are a block attribute, written as an HTML comment at the end of the line's
+text:
+
+```md
+Ship it on Friday <!-- color: red -->
+
+## Open questions <!-- background: yellow -->
+
+- [ ] Call the venue <!-- color: blue; background: gray -->
+
+> Quoted and shaded <!-- background: green -->
+```
+
+- **Hues:** `gray`, `brown`, `orange`, `yellow`, `green`, `blue`, `purple`,
+  `pink`, `red` (`blockHues` in `src/lib/block-colors/block-color-rules.ts`).
+  Each is a pair of tokens in `globals.css`, `--block-<hue>` for text and
+  `--block-<hue>-bg` for backgrounds, with light and dark values. Any text
+  color can sit on any background, so every text hue reads at WCAG AA on
+  the page, a card, and every hue's background, and body text reads at AA
+  on every background (`block-color-tokens.test.ts`). An artifact theme
+  derives its own pairs from the same hues (`blockColorTokens` in
+  `src/lib/themes/derive.ts`): each background tints the theme's card and
+  stays visibly apart from it, and each text color is re-lit to keep the
+  same guarantee on the theme's surfaces. The one limit: on a card so light
+  or so dark that body text close to 4.5:1 leaves no room on the card's
+  side of the text (near white, or darker than about oklch 0.1), a
+  background sits only as far off the card as the body text allows, and on
+  the card itself (no visible background) when even that is out of reach.
+  A background never moves to the other side of the body text, because the
+  colored text could not then read on both it and the card. A line with a background and no text color is drawn in the
+  body text color, even in a quote or a small heading that is otherwise
+  muted, so it stays readable on its background.
+- **The comment** holds `name: value` declarations split by `;`. `color` is
+  the text color and `background` the background. The editor writes
+  `<!-- color: <hue>; background: <hue> -->`, color first, with the
+  default left out, and no comment at all for a line with no colors.
+- **Why a comment:** it stays inside the block, so a colored line is still
+  one block for the round trip, and every other Markdown reader (GitHub,
+  editors, agents' renderers) hides it. Rule 1's forms all show up as text
+  or structure in plain GFM; a color should not.
+- **What colors:** the comment must be the last thing in a paragraph's or
+  heading's text (only spaces may follow it). A list item's colors are those
+  of its first line (items nested under it keep their own). In the block
+  menu, Color on a quote colors every line in it; code blocks, tables,
+  dividers, media, and raw blocks have no Color.
+- **Unknown hues and names are ignored:** a color comment that names
+  `color` or `background` with a value that is not a hue colors nothing
+  (`<!-- color: teal -->`), and unknown names in it are ignored. Loading
+  keeps it as written, but once that line is edited, the editor writes only
+  the colors it knows, so the comment is removed (or rewritten without the
+  unknown parts). Any other comment, or a color comment in the middle of
+  text, is raw HTML: the block stays a raw block, as written.
+- **An empty line** cannot keep colors: with no text, the comment would
+  start the line and turn it into an HTML block.
+- **Surfaces:** the editor sets `data-block-color` and
+  `data-block-background` on the paragraph or heading
+  (`block-color-nodes.ts`); the read view does the same
+  (`remark-block-colors.ts`), on a span around the line for the first line
+  of an item in a tight list, which has no `<p>`. The Markdown version keeps
+  the comment as written, and link preview text leaves it out.
 
 ### Raw blocks
 

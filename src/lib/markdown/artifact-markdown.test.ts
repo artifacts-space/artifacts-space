@@ -67,6 +67,10 @@ describe("contentToMarkdown", () => {
     expect(content("file", "Notes")).toBe("Notes");
   });
 
+  it("should keep block color comments as written when Markdown has colored lines", () => {
+    expect(content("markdown", "Ship it <!-- color: red; background: yellow -->\n")).toBe("Ship it <!-- color: red; background: yellow -->\n");
+  });
+
   it("should link uploaded media absolutely when Markdown embeds files", () => {
     const id = "0f8fad5b-d9cb-469f-a165-70867728950e";
     expect(content("markdown", `![Chart](/api/files/${id}#width=50 "Q3")`)).toBe(`![Chart](https://artifacts.space/api/files/${id}#width=50 "Q3")`);

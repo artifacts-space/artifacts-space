@@ -5,8 +5,10 @@ import { toast } from "sonner";
 import { copyBlockLink } from "@/components/block-links/copy-block-link";
 import { quotedCommentBody, requestQuotedComment } from "@/components/comments/quote-request";
 import { blockLink } from "@/lib/block-links/anchor-rules";
+import type { BlockColorPart, BlockHue } from "@/lib/block-colors/block-color-rules";
 
 import type { BlockActionId } from "./block-actions";
+import { colorBlock } from "./block-color";
 import { anchorForBlockAt } from "./block-links";
 import type { BlockMenuPage } from "./block-menu-context";
 import { blockTypes, currentBlockType } from "./block-types";
@@ -103,4 +105,10 @@ export function insertBelow(editor: Editor, pos: number): boolean {
   // Inside the new line's paragraph, after the "/" when there is one: two steps in either way.
   tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(end + 2, tr.doc.content.size))));
   return apply(editor, tr.scrollIntoView());
+}
+
+/** Sets the text color or background of the block that starts at `pos`. False when it has no lines to color. */
+export function colorBlockAt(editor: Editor, pos: number, part: BlockColorPart, hue: BlockHue | null): boolean {
+  const target = blockTargetFrom(editor.state.doc, pos);
+  return target ? apply(editor, colorBlock(editor.state, target, part, hue)) : false;
 }

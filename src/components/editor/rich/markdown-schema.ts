@@ -7,6 +7,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { isSafeHref } from "@/lib/link-policy";
 import { fenceInfoOfLine, fenceLanguage } from "@/lib/markdown/fence-info";
 
+import { BlockColorComment, withColorableText } from "./block-color-nodes";
 import { MediaNode } from "./media-node";
 import { RawMarkdown } from "./raw-markdown-node";
 
@@ -101,6 +102,13 @@ export const MarkdownTable = Table.extend({
   renderMarkdown: (node, helpers) => renderTableToMarkdown(node, helpers).replace(/^\n+|\n+$/g, ""),
 }).configure({ resizable: false });
 
+/** StarterKit with paragraphs and headings that keep block colors (block-color-nodes.ts). */
+const ColorableStarterKit = StarterKit.extend({
+  addExtensions() {
+    return withColorableText(this.parent?.() ?? []);
+  },
+});
+
 /** Node views the editor adds; the round-trip runs without them. */
 export interface SchemaViews {
   codeBlock?: NodeViewRenderer;
@@ -111,14 +119,14 @@ export interface SchemaViews {
 /**
  * The document model shared by the editor and the Markdown round-trip: the
  * GitHub-flavored Markdown that artifacts use, media blocks for uploaded
- * files (markdown-dialect.md), and nothing that Markdown cannot store
+ * files and block colors (markdown-dialect.md), and nothing that Markdown cannot store
  * (underline is off). The editor swaps in node views for code blocks, media,
  * and raw blocks; names and Markdown rules stay the same.
  */
 export function markdownSchemaExtensions(views: SchemaViews = {}): AnyExtension[] {
   const { codeBlock, rawMarkdown, media } = views;
   return [
-    StarterKit.configure({
+    ColorableStarterKit.configure({
       underline: false,
       trailingNode: false,
       link: {
@@ -140,5 +148,6 @@ export function markdownSchemaExtensions(views: SchemaViews = {}): AnyExtension[
     TableCell,
     media ? MediaNode.extend({ addNodeView: () => media }) : MediaNode,
     rawMarkdown ? RawMarkdown.extend({ addNodeView: () => rawMarkdown }) : RawMarkdown,
+    BlockColorComment,
   ];
 }

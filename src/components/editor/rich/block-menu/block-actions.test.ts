@@ -3,23 +3,23 @@ import { describe, expect, it } from "vitest";
 import { firstRunnable, menuEntries, nextRunnable, searchMenu, shortcutFor, type MenuContext } from "./block-actions";
 import { blockTypeName, blockTypes, currentBlockType } from "./block-types";
 
-const paragraph: MenuContext = { changeable: true, currentType: "text", canMoveUp: true, canMoveDown: true, canLink: true, canComment: true };
+const paragraph: MenuContext = { changeable: true, currentType: "text", colorable: true, colors: { color: null, background: null }, canMoveUp: true, canMoveDown: true, canLink: true, canComment: true };
 
 const labels = (context: MenuContext, query = "") => searchMenu(query, context).map((entry) => entry.label);
 
 describe("menuEntries", () => {
-  it("should list Change, the block actions, then Comment when nothing is typed", () => {
-    expect(labels(paragraph)).toEqual(["Change", "Copy link to block", "Duplicate", "Move up", "Move down", "Delete", "Comment"]);
-    expect(menuEntries(paragraph).map((entry) => entry.group)).toEqual([0, 1, 1, 1, 1, 1, 2]);
+  it("should list Change, Color, the block actions, then Comment when nothing is typed", () => {
+    expect(labels(paragraph)).toEqual(["Change", "Color", "Copy link to block", "Duplicate", "Move up", "Move down", "Delete", "Comment"]);
+    expect(menuEntries(paragraph).map((entry) => entry.group)).toEqual([0, 0, 1, 1, 1, 1, 1, 2]);
   });
 
-  it("should leave out Change for blocks it cannot change, and link and comment when the page does not allow them", () => {
-    expect(labels({ ...paragraph, changeable: false, currentType: null, canLink: false, canComment: false })).toEqual(["Duplicate", "Move up", "Move down", "Delete"]);
+  it("should leave out Change and Color for blocks without them, and link and comment when the page does not allow them", () => {
+    expect(labels({ ...paragraph, changeable: false, currentType: null, colorable: false, canLink: false, canComment: false })).toEqual(["Duplicate", "Move up", "Move down", "Delete"]);
   });
 
-  it("should never offer Ask AI, Suggest edits, Move to, or Color yet", () => {
+  it("should never offer Ask AI, Suggest edits, or Move to", () => {
     const all = labels(paragraph).join(" ").toLowerCase();
-    for (const missing of ["ask", "suggest", "move to", "color", "synced", "page"]) expect(all).not.toContain(missing);
+    for (const missing of ["ask", "suggest", "move to", "synced", "page"]) expect(all).not.toContain(missing);
   });
 
   it("should disable Move up on the first block and Move down on the last", () => {
@@ -69,9 +69,9 @@ describe("firstRunnable and nextRunnable", () => {
 
   it("should skip disabled rows and wrap around", () => {
     expect(firstRunnable(entries)).toBe(0);
-    expect(nextRunnable(entries, 2, 1)).toBe(4);
-    expect(nextRunnable(entries, 6, 1)).toBe(0);
-    expect(nextRunnable(entries, -1, -1)).toBe(6);
+    expect(nextRunnable(entries, 3, 1)).toBe(5);
+    expect(nextRunnable(entries, 7, 1)).toBe(0);
+    expect(nextRunnable(entries, -1, -1)).toBe(7);
     expect(nextRunnable([], -1, 1)).toBe(-1);
   });
 });
@@ -108,5 +108,34 @@ describe("blockTypes", () => {
     expect(blockTypeName({ node: "rawMarkdown" })).toBe("Markdown");
     expect(blockTypeName({ node: "heading", level: 5 })).toBe("Block");
     expect(blockTypeName({ node: "blockquote" })).toBe("Quote");
+  });
+});
+
+describe("color search", () => {
+  it("should find text colors and backgrounds by hue when typing", () => {
+    expect(labels(paragraph, "pink")).toEqual(["Pink text", "Pink background"]);
+    expect(searchMenu("pink background", paragraph)[0]?.command).toEqual({ kind: "color", part: "background", hue: "pink" });
+  });
+
+  it("should list every background when typing background, so Enter applies the first one", () => {
+    const found = searchMenu("background", paragraph);
+    expect(found.map((entry) => entry.label)).toHaveLength(9);
+    expect(found[firstRunnable(found)]?.command).toEqual({ kind: "color", part: "background", hue: "gray" });
+  });
+
+  it("should find the Color row itself by its name or by colour and highlight", () => {
+    expect(labels(paragraph, "colour")[0]).toBe("Color");
+    expect(labels(paragraph, "highlight")[0]).toBe("Color");
+  });
+
+  it("should leave out the current colors, and offer Default only to remove one", () => {
+    const pink = { ...paragraph, colors: { color: "pink", background: null } } as const;
+    expect(labels(pink, "pink")).toEqual(["Pink background"]);
+    expect(labels(pink, "default")).toEqual(["Default text"]);
+    expect(labels(paragraph, "default")).toEqual([]);
+  });
+
+  it("should find no colors for blocks without text to color", () => {
+    expect(labels({ ...paragraph, colorable: false }, "pink")).toEqual([]);
   });
 });

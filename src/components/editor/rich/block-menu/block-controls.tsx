@@ -7,7 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 
 import { useCoarsePointer } from "../use-coarse-pointer";
 import { isApplePlatform, type MenuCommand, type MenuContext } from "./block-actions";
-import { changeBlockType, insertBelow, runBlockAction } from "./block-commands";
+import { blockColors, colorLines } from "./block-color";
+import { changeBlockType, colorBlockAt, insertBelow, runBlockAction } from "./block-commands";
 import { endBlockDrag, startBlockDrag } from "./block-drag";
 import { BlockHandle } from "./block-handle";
 import { BlockMenu, type MenuCloseReason } from "./block-menu";
@@ -34,6 +35,8 @@ function menuView(doc: PMNode, pos: number, page: BlockMenuPage | null) {
   const context: MenuContext = {
     changeable: current !== null,
     currentType: current?.id ?? null,
+    colorable: colorLines(target).length > 0,
+    colors: blockColors(doc, target),
     canMoveUp: canMoveBlock(doc, target, -1),
     canMoveDown: canMoveBlock(doc, target, 1),
     canLink: Boolean(page?.publicId),
@@ -155,6 +158,7 @@ function BlockControls({ editor, frame }: BlockControlsProps) {
     const { pos } = menu;
     close("command");
     if (command.kind === "change") changeBlockType(editor, pos, command.typeId);
+    else if (command.kind === "color") colorBlockAt(editor, pos, command.part, command.hue);
     else runBlockAction(editor, pos, command.id, page);
   };
 

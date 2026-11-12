@@ -1,3 +1,6 @@
+import { siteBlockColors } from "@/lib/block-colors/block-color-palette";
+import { blockHues } from "@/lib/block-colors/block-color-rules";
+
 import { contrastRatio, ensureContrast, formatOklch, mixOklch, parseColor, relativeLuminance, type Oklch } from "./color";
 import type { ThemeColors } from "./schema";
 
@@ -140,6 +143,60 @@ export function mentionTokens(mode: PaletteMode, colors: ThemeColors): Record<st
   return { ...chip(siteMentionInk[mode].person, "--mention"), ...chip(siteMentionInk[mode].agent, "--mention-agent") };
 }
 
+/** How far a block background leans from the card toward its hue's text: a tint that reads as that hue. */
+const blockFillTint: Record<PaletteMode, number> = { light: 0.1, dark: 0.13 };
+
+/** How far a block background's lightness stays from the card's, so it shows as a block even when its hue is faint (gray). */
+export const blockFillGap = 0.03;
+
+/**
+ * One hue's background: the card tinted toward the hue, then kept at AA
+ * under the ink. When the ink sits near the AA floor on the card, that push
+ * lands the tint back on the card; it then steps the gap to the far side of
+ * the card from the ink, which only raises the ink's contrast. A near-white
+ * card has no room on that side and keeps the pushed fill, apart from the
+ * card by less than the gap. When the ink is too close to the floor for any
+ * fill on the card's side, the push crosses to the ink's other side (a
+ * near-black block under dark ink on a white card, or a near-white one on a
+ * card darker than about oklch 0.1); the fill is then the card itself, since
+ * no colored text could read on both that block and the card.
+ */
+function blockFill(mode: PaletteMode, card: Oklch, ink: Oklch, hueInk: Oklch): Oklch {
+  const fill = ensureContrast(mixOklch(card, hueInk, blockFillTint[mode]), ink, 4.55);
+  const crossedInk = (fill.l >= ink.l) !== (card.l >= ink.l);
+  if (crossedInk) return card;
+  if (Math.abs(fill.l - card.l) >= blockFillGap) return fill;
+  const l = card.l + (card.l >= ink.l ? blockFillGap : -blockFillGap);
+  if (l < 0 || l > 1) return fill;
+  const apart = { ...fill, l };
+  return contrastRatio(ink, apart) >= 4.55 ? apart : fill;
+}
+
+/**
+ * Block colors (markdown-dialect.md, "Block colors") for a themed card and
+ * page. Each background is the card tinted toward the hue, kept readable
+ * under the theme's ink, which every line with a background and no text
+ * color uses (globals.css). Any text color can sit on any background, so each
+ * keeps the site's hue and chroma and is re-lit until it reads at AA on the
+ * card, the page, and every hue's background.
+ */
+export function blockColorTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
+  const card = read(colors.card);
+  const ink = read(colors.foreground);
+  const tokens: Record<string, string> = {};
+  const fills = blockHues.map((hue) => {
+    const fill = blockFill(mode, card, ink, read(siteBlockColors[mode][hue].text));
+    tokens[`--block-${hue}-bg`] = formatOklch(fill);
+    return fill;
+  });
+  const surfaces = [card, read(colors.background), ...fills];
+  for (const hue of blockHues) {
+    const text = surfaces.reduce((color, surface) => ensureContrast(color, surface, 4.55), read(siteBlockColors[mode][hue].text));
+    tokens[`--block-${hue}`] = formatOklch(text);
+  }
+  return tokens;
+}
+
 /** The site's switch colors per mode, from globals.css: the on track and both thumbs. */
 const siteSwitch: Record<PaletteMode, { on: string; onThumb: string; offThumb: string }> = {
   light: { on: "oklch(0.56 0.15 150)", onThumb: "oklch(1 0 0)", offThumb: "oklch(0.56 0.008 65)" },
@@ -246,5 +303,5 @@ export function ringTokens(mode: PaletteMode, colors: ThemeColors): Record<strin
 
 /** Every CSS token a palette sets, keyed by custom property name, with canonical color values. */
 export function paletteTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
-  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors), ...switchTokens(mode, colors), ...ringTokens(mode, colors) };
+  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors), ...switchTokens(mode, colors), ...ringTokens(mode, colors), ...blockColorTokens(mode, colors) };
 }

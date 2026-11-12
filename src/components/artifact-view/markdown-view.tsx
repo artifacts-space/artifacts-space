@@ -5,6 +5,8 @@ import remarkGfm from "remark-gfm";
 import { highlightCode } from "#syntax-highlight";
 
 import { CodeBlock } from "@/components/code/code-block";
+import { blockColorAttributes, readBlockHue } from "@/lib/block-colors/block-color-rules";
+import { remarkBlockColors } from "@/lib/block-colors/remark-block-colors";
 import type { MentionKind } from "@/lib/comments/mentions";
 import { remarkMentions } from "@/lib/comments/remark-mentions";
 import { isFileLinkPath, isFileMediaUrl } from "@/lib/files/media-rules";
@@ -96,6 +98,12 @@ function mediaImageOf(node: ExtraProps["node"]): { src: string; alt: string; tit
   return { src, alt: stringProperty(only.properties.alt) ?? "", title: stringProperty(only.properties.title) };
 }
 
+/** The block color attributes the color plugin put on an element (remark-block-colors.ts), checked again. */
+function blockColorProps(node: ExtraProps["node"]): Record<string, string> {
+  const properties = node?.properties;
+  return blockColorAttributes({ color: readBlockHue(properties?.dataBlockColor), background: readBlockHue(properties?.dataBlockBackground) });
+}
+
 /**
  * Element overrides. Links follow the link policy. Images never load from
  * other sites: they could track readers, so an image shows as its alt text
@@ -108,7 +116,7 @@ const components: Components = {
   img: ({ alt }) => <ImageAltText alt={alt} />,
   span: ({ node, children }) => {
     const kind = node?.properties.dataMention;
-    if (kind !== "person" && kind !== "agent") return <span>{children}</span>;
+    if (kind !== "person" && kind !== "agent") return <span {...blockColorProps(node)}>{children}</span>;
     return <MentionChip kind={kind}>{children}</MentionChip>;
   },
 };
@@ -124,7 +132,7 @@ const mediaComponents: Components = {
   ...components,
   p: ({ node, children }) => {
     const media = mediaImageOf(node);
-    return media ? <MarkdownMedia {...media} /> : <p>{children}</p>;
+    return media ? <MarkdownMedia {...media} /> : <p {...blockColorProps(node)}>{children}</p>;
   },
   a: ({ href, children }) => (typeof href === "string" && isFileLinkPath(href) ? <a href={href} className="underline decoration-border underline-offset-[3px] hover:decoration-foreground">{children}</a> : <ExternalLink href={href}>{children}</ExternalLink>),
   img: ({ src, alt }) => (typeof src === "string" && isFileMediaUrl(src) ? <InlineFileImage src={src} alt={alt ?? ""} /> : <ImageAltText alt={alt} />),
@@ -162,7 +170,7 @@ const noMentions: ReadonlyMap<string, MentionKind> = new Map();
 export function MarkdownView({ content, className, mentions = noMentions, media = false, diagrams = false }: { content: string; className?: string; mentions?: ReadonlyMap<string, MentionKind>; media?: boolean; diagrams?: boolean }) {
   return (
     <div className={cn("artifact-prose", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkFenceInfo, remarkMentions(mentions)]} skipHtml urlTransform={urlTransform} components={componentsFor(media, diagrams)}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkFenceInfo, remarkBlockColors, remarkMentions(mentions)]} skipHtml urlTransform={urlTransform} components={componentsFor(media, diagrams)}>
         {content}
       </ReactMarkdown>
     </div>
