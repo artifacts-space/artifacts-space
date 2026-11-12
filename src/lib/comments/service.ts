@@ -16,7 +16,7 @@ import { COMMENT_MAX_LENGTH, RESOLVE_RATE_LIMITS } from "./config";
 import { notifiedHandles, processMentions, type MentionOutcome } from "./delivery";
 import { resolvedMentions } from "./mentionables";
 import { canChangeComment, isLoopLimited, resolveRefusal } from "./rules";
-import { anchorGateFor } from "./served-anchors";
+import { anchorGateFor, type ServedAnchors } from "./served-anchors";
 import { agentStreakBefore, assertNotMuted, assertWithinRateLimit, requireThread, threadMutedAgentIds, type Thread } from "./thread";
 import { actorIdsOf, toCommentView, type CommentView, type CommentViewContext } from "./views";
 
@@ -46,16 +46,16 @@ const MAX_THREAD_COMMENTS = 500;
  * What the thread's actor may see of comments: their kind (for resolving)
  * and the anchors whose words are in the version they are served.
  */
-async function viewContext(thread: Thread, records: readonly CommentRecord[]): Promise<CommentViewContext> {
-  const anchorFor = await anchorGateFor({ publicId: thread.artifact.publicId, viewerId: thread.actor.userId, records, source: thread.version.source });
+async function viewContext(thread: Thread, records: readonly CommentRecord[], served?: ServedAnchors): Promise<CommentViewContext> {
+  const anchorFor = await anchorGateFor({ publicId: thread.artifact.publicId, viewerId: thread.actor.userId, records, source: thread.version.source, served });
   return { viewerKind: thread.actor.kind, anchorFor };
 }
 
-/** Every comment on an artifact the viewer can read, oldest first. */
-export async function listComments(viewerId: string, publicId: string): Promise<{ thread: Thread; comments: CommentView[] }> {
+/** Every comment on an artifact the viewer can read, oldest first. `served` shares the served content with a later check in the same request. */
+export async function listComments(viewerId: string, publicId: string, served?: ServedAnchors): Promise<{ thread: Thread; comments: CommentView[] }> {
   const thread = await requireThread(viewerId, publicId);
   const rows = await getDb().select().from(comment).where(eq(comment.artifactId, thread.artifact.id)).orderBy(asc(comment.createdAt)).limit(MAX_THREAD_COMMENTS);
-  const [authors, mentions, context] = await Promise.all([loadActors(actorIdsOf(rows)), resolvedMentions(rows.map((row) => row.id)), viewContext(thread, rows)]);
+  const [authors, mentions, context] = await Promise.all([loadActors(actorIdsOf(rows)), resolvedMentions(rows.map((row) => row.id)), viewContext(thread, rows, served)]);
   return { thread, comments: rows.map((row) => toCommentView(row, authors, viewerId, mentions.get(row.id), context)) };
 }
 

@@ -8,7 +8,7 @@ import { QUOTE_MAX_LENGTH } from "@/lib/comments/anchor-rules";
 import { COMMENT_MAX_LENGTH } from "@/lib/comments/config";
 import { listInbox, markInboxRead, threadContext, type InboxEntryView } from "@/lib/comments/inbox";
 import { threadUrl } from "@/lib/comments/mention-email";
-import { textChangedCheck } from "@/lib/comments/served-anchors";
+import { servedAnchors, textChangedCheck, type ServedAnchors } from "@/lib/comments/served-anchors";
 import { createComment, deleteComment, listComments, updateComment } from "@/lib/comments/service";
 import type { CommentView } from "@/lib/comments/views";
 import type { McpAccess } from "@/lib/oauth/scopes";
@@ -63,8 +63,8 @@ export function toMcpComment(view: CommentView, onTextThatChanged = view.anchore
 }
 
 /** Comments for an agent, each told whether its words are still in the content the agent is served. */
-async function toMcpComments(publicId: string, viewerId: string, views: readonly CommentView[]) {
-  const changed = await textChangedCheck(publicId, viewerId, views);
+async function toMcpComments(publicId: string, viewerId: string, views: readonly CommentView[], served?: ServedAnchors) {
+  const changed = await textChangedCheck(publicId, viewerId, views, served);
   return views.map((view) => toMcpComment(view, changed(view)));
 }
 
@@ -90,11 +90,12 @@ async function commentPlace(commentId: string) {
   return row ?? null;
 }
 
-async function toMcpInboxEntry(entry: InboxEntryView, viewerId: string) {
+/** One mention for an agent. `served` is the request's loader, so each artifact's content is read once however many mentions are on it. */
+async function toMcpInboxEntry(entry: InboxEntryView, viewerId: string, served: ServedAnchors) {
   const { publicId } = entry.artifact;
   const place = await commentPlace(entry.comment.id);
-  const context = place ? await threadContext({ artifactId: place.artifactId, publicId, upTo: place.createdAt, viewerId }) : [];
-  const [mentioned, ...recentThread] = await toMcpComments(publicId, viewerId, [entry.comment, ...context]);
+  const context = place ? await threadContext({ artifactId: place.artifactId, publicId, upTo: place.createdAt, viewerId, served }) : [];
+  const [mentioned, ...recentThread] = await toMcpComments(publicId, viewerId, [entry.comment, ...context], served);
   return {
     id: entry.id,
     read: entry.readAt !== null,
@@ -121,8 +122,9 @@ function registerInboxTools(server: ToolServer, userId: string) {
     },
     ({ includeRead, limit }) =>
       respond(async () => {
-        const entries = await listInbox(userId, { unreadOnly: !includeRead, limit });
-        const mentions = await Promise.all(entries.map((entry) => toMcpInboxEntry(entry, userId)));
+        const served = servedAnchors(userId);
+        const entries = await listInbox(userId, { unreadOnly: !includeRead, limit, served });
+        const mentions = await Promise.all(entries.map((entry) => toMcpInboxEntry(entry, userId, served)));
         return { untrustedContentNotice: UNTRUSTED_NOTICE, mentions };
       }),
   );
@@ -158,12 +160,13 @@ function registerCommentTools(server: ToolServer, userId: string) {
     },
     ({ artifact, limit }) =>
       respond(async () => {
-        const { thread, comments } = await listComments(userId, artifact);
+        const served = servedAnchors(userId);
+        const { thread, comments } = await listComments(userId, artifact, served);
         return {
           untrustedContentNotice: UNTRUSTED_NOTICE,
           artifact: { id: thread.artifact.publicId, title: thread.title, url: siteUrl(`/artifact/${thread.artifact.publicId}`) },
           total: comments.length,
-          comments: await toMcpComments(thread.artifact.publicId, userId, comments.slice(-limit)),
+          comments: await toMcpComments(thread.artifact.publicId, userId, comments.slice(-limit), served),
         };
       }),
   );

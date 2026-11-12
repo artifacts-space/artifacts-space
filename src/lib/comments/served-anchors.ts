@@ -18,30 +18,64 @@ function hasLiveAnchor(records: readonly AnchorRow[]) {
   return records.some((record) => record.quote !== null && record.parentId === null && record.deletedAt === null);
 }
 
-async function servedSource(publicId: string, viewerId: string, known: "latest" | "approved" | undefined) {
-  if (known) return known;
-  return (await getArtifactAccess(publicId, viewerId))?.version.source ?? null;
+/**
+ * One viewer's served versions and the finders over the content they are
+ * served, each loaded at most once per artifact. A request that reads the
+ * comments of one artifact several times (the inbox, an agent's comment
+ * list) makes one and hands it to every call, so the content is loaded and
+ * read once, not once per comment.
+ */
+export interface ServedAnchors {
+  /** Which version the viewer is served, or null when they may not read the artifact. */
+  source: (publicId: string) => Promise<"latest" | "approved" | null>;
+  /** A finder over the content the viewer is served, or null when they may not read the artifact. */
+  finder: (publicId: string) => Promise<AnchorGate | null>;
 }
 
-/** The content this viewer is served, or null when they may not read the artifact. */
-async function servedContent(publicId: string, viewerId: string): Promise<string | null> {
-  return (await getViewableArtifact(publicId, viewerId))?.view.content ?? null;
+function once<T>(loaded: Map<string, Promise<T>>, publicId: string, load: () => Promise<T>): Promise<T> {
+  let value = loaded.get(publicId);
+  if (!value) {
+    value = load();
+    loaded.set(publicId, value);
+  }
+  return value;
+}
+
+/** A loader for one viewer and one request. See ServedAnchors. */
+export function servedAnchors(viewerId: string): ServedAnchors {
+  const sources = new Map<string, Promise<"latest" | "approved" | null>>();
+  const finders = new Map<string, Promise<AnchorGate | null>>();
+  return {
+    source: (publicId) => once(sources, publicId, async () => (await getArtifactAccess(publicId, viewerId))?.version.source ?? null),
+    finder: (publicId) =>
+      once(finders, publicId, async () => {
+        const content = (await getViewableArtifact(publicId, viewerId))?.view.content ?? null;
+        return content === null ? null : servedAnchorFinder(content);
+      }),
+  };
+}
+
+function logFailure(error: unknown) {
+  console.error("[comments] Loading the served content for anchors failed", error instanceof Error ? error.name : "unknown error");
 }
 
 /**
  * The anchor gate for a viewer of one artifact's comments (`records`).
  * `source` is the version the viewer is served, when the caller already ran
- * the access check; otherwise it is checked here, only when needed.
+ * the access check; otherwise it is checked here, only when needed. Pass
+ * `served` when the request reads this artifact's comments more than once.
  */
-export async function anchorGateFor(input: { publicId: string; viewerId: string; records: readonly AnchorRow[]; source?: "latest" | "approved" }): Promise<AnchorGate> {
+export async function anchorGateFor(input: { publicId: string; viewerId: string; records: readonly AnchorRow[]; source?: "latest" | "approved" | undefined; served?: ServedAnchors | undefined }): Promise<AnchorGate> {
   if (!hasLiveAnchor(input.records)) return hideAnchors;
+  const served = input.served ?? servedAnchors(input.viewerId);
   try {
-    const source = await servedSource(input.publicId, input.viewerId, input.source);
+    const source = input.source ?? (await served.source(input.publicId));
     if (source === "latest") return anchorGate({ source });
-    const content = source ? await servedContent(input.publicId, input.viewerId) : null;
-    return content === null ? hideAnchors : anchorGate({ source: "approved", content });
+    // Served the approved version: only anchors whose words are in its content, read from it.
+    const find = source ? await served.finder(input.publicId) : null;
+    return find ?? hideAnchors;
   } catch (error) {
-    console.error("[comments] Loading the served content for anchors failed", error instanceof Error ? error.name : "unknown error");
+    logFailure(error);
     return hideAnchors;
   }
 }
@@ -51,14 +85,13 @@ export async function anchorGateFor(input: { publicId: string; viewerId: string;
  * no longer in the content the agent is served. Loads the content only when
  * a comment shows its anchor; a withheld anchor counts as changed text.
  */
-export async function textChangedCheck(publicId: string, viewerId: string, views: readonly AnchoredView[]): Promise<(view: AnchoredView) => boolean> {
+export async function textChangedCheck(publicId: string, viewerId: string, views: readonly AnchoredView[], served: ServedAnchors = servedAnchors(viewerId)): Promise<(view: AnchoredView) => boolean> {
   if (!views.some((view) => view.anchor !== null)) return (view) => textChanged(view, null);
   try {
-    const content = await servedContent(publicId, viewerId);
-    const find = content === null ? null : servedAnchorFinder(content);
+    const find = await served.finder(publicId);
     return (view) => textChanged(view, find);
   } catch (error) {
-    console.error("[comments] Loading the served content for anchors failed", error instanceof Error ? error.name : "unknown error");
+    logFailure(error);
     return (view) => textChanged(view, null);
   }
 }

@@ -11,7 +11,7 @@ import { listTeamIdsForUser } from "@/lib/teams/queries";
 
 import type { AnchorGate } from "./anchor-privacy-rules";
 import { INBOX_CONTEXT_COMMENTS } from "./config";
-import { anchorGateFor } from "./served-anchors";
+import { anchorGateFor, type ServedAnchors } from "./served-anchors";
 import { canSeeComments } from "./setting-rules";
 import { actorIdsOf, toCommentView, type CommentView } from "./views";
 
@@ -87,14 +87,14 @@ async function visibleArtifacts(userId: string, publicIds: readonly string[]) {
 }
 
 /** Inbox entries for a user, newest first. Unread only unless `unreadOnly` is false. */
-export async function listInbox(userId: string, options: { unreadOnly?: boolean; limit?: number } = {}): Promise<InboxEntryView[]> {
+export async function listInbox(userId: string, options: { unreadOnly?: boolean; limit?: number; served?: ServedAnchors } = {}): Promise<InboxEntryView[]> {
   const limit = Math.min(Math.max(options.limit ?? INBOX_MAX, 1), INBOX_MAX);
   const rows = await inboxRows(userId, options.unreadOnly ?? true, limit);
   const artifacts = await visibleArtifacts(userId, [...new Set(rows.map((row) => row.artifact.publicId))]);
   const visible = rows.filter((row) => artifacts.has(row.artifact.publicId));
   // One anchor gate per artifact, each through the version this user is served there.
   const gated = [...artifacts].map(([publicId, served]) =>
-    anchorGateFor({ publicId, viewerId: userId, records: visible.filter((row) => row.artifact.publicId === publicId).map((row) => row.record), source: served.source }).then((gate) => [publicId, gate] as const),
+    anchorGateFor({ publicId, viewerId: userId, records: visible.filter((row) => row.artifact.publicId === publicId).map((row) => row.record), source: served.source, served: options.served }).then((gate) => [publicId, gate] as const),
   );
   const [actors, gates] = await Promise.all([loadActors([userId, ...actorIdsOf(visible.map((row) => row.record))]), Promise.all(gated)]);
   const anchorGates = new Map<string, AnchorGate>(gates);
@@ -145,14 +145,14 @@ export async function markArtifactMentionsRead(userId: string, artifactId: strin
  * The caller checked that the viewer may read this artifact's comments;
  * quotes still follow the version the viewer is served.
  */
-export async function threadContext(input: { artifactId: string; publicId: string; upTo: Date; viewerId: string; limit?: number }): Promise<CommentView[]> {
+export async function threadContext(input: { artifactId: string; publicId: string; upTo: Date; viewerId: string; limit?: number; served?: ServedAnchors }): Promise<CommentView[]> {
   const rows = await getDb()
     .select()
     .from(comment)
     .where(and(eq(comment.artifactId, input.artifactId), lte(comment.createdAt, input.upTo)))
     .orderBy(desc(comment.createdAt))
     .limit(input.limit ?? INBOX_CONTEXT_COMMENTS);
-  const [actors, anchorFor] = await Promise.all([loadActors([input.viewerId, ...actorIdsOf(rows)]), anchorGateFor({ publicId: input.publicId, viewerId: input.viewerId, records: rows })]);
+  const [actors, anchorFor] = await Promise.all([loadActors([input.viewerId, ...actorIdsOf(rows)]), anchorGateFor({ publicId: input.publicId, viewerId: input.viewerId, records: rows, served: input.served })]);
   const context = { viewerKind: actors.get(input.viewerId)?.kind ?? null, anchorFor };
   return rows.reverse().map((row) => toCommentView(row, actors, input.viewerId, [], context));
 }

@@ -67,5 +67,8 @@ export async function anchorToStore(thread: Thread, input: { anchor?: CommentAnc
   }
   if (input.quote !== undefined) return anchorForAgentQuote(thread, input.quote);
   if (!input.anchor) return null;
-  return storedAnchor(anchorInputSchema.parse(input.anchor));
+  const anchor = storedAnchor(anchorInputSchema.parse(input.anchor));
+  // A selection with no words would save as a comment on the whole artifact while its writer believes it is on words.
+  if (!anchor) throw new UserFacingError("Those words could not be read. Select the text again, or comment on the whole artifact.");
+  return anchor;
 }

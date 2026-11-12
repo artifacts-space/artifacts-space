@@ -67,8 +67,9 @@ describe("anchorToStore", () => {
     expect(await anchorToStore(sheetThread, {})).toBeNull();
   });
 
-  it("should save no place when the selection holds no words", async () => {
-    expect(await anchorToStore(thread, { anchor: { quote: "  \n ", prefix: "", suffix: "" } })).toBeNull();
+  it("should refuse the comment when the selection holds no words", async () => {
+    // Saving it without a place would make a comment on the whole artifact that its writer believes is on words.
+    await expect(anchorToStore(thread, { anchor: { quote: "  \n ", prefix: "", suffix: "" } })).rejects.toThrow(/could not be read/);
   });
 
   it("should anchor an agent's quote in the content it is served", async () => {

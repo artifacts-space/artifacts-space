@@ -5,7 +5,7 @@ import type { CommentView } from "./views";
 const access = vi.hoisted(() => ({ getArtifactAccess: vi.fn(), getViewableArtifact: vi.fn() }));
 vi.mock("@/lib/access", () => access);
 
-const { anchorGateFor, textChangedCheck } = await import("./served-anchors");
+const { anchorGateFor, servedAnchors, textChangedCheck } = await import("./served-anchors");
 
 const publicId = "a".repeat(22);
 const anchored = { quote: "acquire Northwind", parentId: null, deletedAt: null };
@@ -83,5 +83,35 @@ describe("textChangedCheck", () => {
     const changed = await textChangedCheck(publicId, "agent", [withheld]);
     expect(changed(withheld)).toBe(true);
     expect(access.getViewableArtifact).not.toHaveBeenCalled();
+  });
+});
+
+describe("servedAnchors", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("should load an artifact's served content once when one request gates and checks its comments several times", async () => {
+    // Fails if the inbox reads the whole artifact again for every mention on it.
+    access.getViewableArtifact.mockResolvedValue(served("We ship the beta on Monday."));
+    const shared = servedAnchors("outsider");
+    const beta = { quote: "the beta", prefix: "", suffix: "" };
+
+    const gates = await Promise.all([1, 2, 3].map(() => anchorGateFor({ publicId, viewerId: "outsider", records: [anchored], source: "approved", served: shared })));
+    const checks = await Promise.all([1, 2, 3].map(() => textChangedCheck(publicId, "outsider", [{ anchored: true, anchor: beta }], shared)));
+
+    expect(gates.map((gate) => gate(beta)?.quote)).toEqual(["the beta", "the beta", "the beta"]);
+    expect(checks.map((changed) => changed({ anchored: true, anchor: beta }))).toEqual([false, false, false]);
+    expect(access.getViewableArtifact).toHaveBeenCalledTimes(1);
+  });
+
+  it("should load each artifact by itself when one request reads two", async () => {
+    access.getViewableArtifact.mockImplementation((id: string) => Promise.resolve(served(id === publicId ? "We ship the beta." : "Nothing here.")));
+    const shared = servedAnchors("outsider");
+    const beta = { quote: "the beta", prefix: "", suffix: "" };
+    const first = await anchorGateFor({ publicId, viewerId: "outsider", records: [anchored], source: "approved", served: shared });
+    const second = await anchorGateFor({ publicId: "b".repeat(22), viewerId: "outsider", records: [anchored], source: "approved", served: shared });
+    expect(first(beta)).not.toBeNull();
+    expect(second(beta)).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { IconMessage } from "@tabler/icons-react";
-import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { Button } from "@/components/ui/button";
@@ -35,9 +35,12 @@ function SelectionComment({ surface, inline }: { surface: HTMLElement; inline: I
 
   useEffect(() => {
     const update = () => { setBox(isEditor(surface) ? null : selectionBoxIn(surface)); };
+    // Words selected before this ran (the page was still loading its script) get the button too.
+    const first = requestAnimationFrame(update);
     document.addEventListener("selectionchange", update);
     window.addEventListener("scroll", update, { capture: true, passive: true });
     return () => {
+      cancelAnimationFrame(first);
       document.removeEventListener("selectionchange", update);
       window.removeEventListener("scroll", update, { capture: true });
     };
@@ -77,8 +80,13 @@ export function InlineCommentSurface({ children, className }: InlineCommentSurfa
   const inline = useInlineComments();
   const [surface, setElement] = useState<HTMLDivElement | null>(null);
   const attachSurface = inline?.attachSurface;
+  const pointer = useRef({ x: 0, y: 0, frame: 0 });
 
   useEffect(() => (attachSurface && surface ? attachSurface(surface) : undefined), [attachSurface, surface]);
+  useEffect(() => {
+    const last = pointer.current;
+    return () => { cancelAnimationFrame(last.frame); };
+  }, []);
 
   /** A click on highlighted words (not the end of a drag that selected text) opens their thread. */
   function openAt(event: MouseEvent) {
@@ -87,11 +95,18 @@ export function InlineCommentSurface({ children, className }: InlineCommentSurfa
     if (id) inline.open(id);
   }
 
-  /** The pointer shows a hand over highlighted words, so they read as something to open. */
+  /** The pointer shows a hand over highlighted words, so they read as something to open. Checked once per frame, at the pointer's latest place. */
   function pointAt(event: MouseEvent<HTMLDivElement>) {
     if (!inline) return;
-    const over = inline.commentsAt(event.clientX, event.clientY).length > 0;
-    event.currentTarget.toggleAttribute("data-over-comment", over);
+    const element = event.currentTarget;
+    const { commentsAt } = inline;
+    pointer.current.x = event.clientX;
+    pointer.current.y = event.clientY;
+    if (pointer.current.frame !== 0) return;
+    pointer.current.frame = requestAnimationFrame(() => {
+      pointer.current.frame = 0;
+      element.toggleAttribute("data-over-comment", commentsAt(pointer.current.x, pointer.current.y).length > 0);
+    });
   }
 
   return (
