@@ -70,7 +70,7 @@ async function signInOwner(auth: TestAuth, tables: Tables) {
 function stubSendir(status: number, body: unknown) {
   return vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
     const url = input instanceof Request ? input.url : String(input);
-    if (!url.startsWith(sendirUrl)) return Promise.reject(new Error(`Unexpected request to ${url}`));
+    if (new URL(url).origin !== sendirUrl) return Promise.reject(new Error(`Unexpected request to ${url}`));
     return Promise.resolve(Response.json(body, { status }));
   });
 }

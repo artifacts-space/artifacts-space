@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { APIError } from "better-auth/api";
 
 import { reserveBudgetedEmail } from "@/lib/email/budget";
-import { INVITATION_BUDGET_MESSAGE } from "@/lib/email/budget-rules";
+import { INVITATION_BUDGET_CODE, INVITATION_BUDGET_MESSAGE } from "@/lib/email/budget-rules";
 import { html, renderEmail } from "@/lib/email/layout";
 import { refuseUndeliverableAddress } from "@/lib/email/undeliverable-refusal";
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
@@ -60,7 +60,7 @@ export function renderTeamInvitationEmail(url: string, teamName: string, inviter
  */
 export async function sendTeamInvitationEmail(input: TeamInvitationEmail) {
   const url = invitationUrl(input.invitationId);
-  if (!(await reserveBudgetedEmail("team-invitation"))) throw new APIError("TOO_MANY_REQUESTS", { message: INVITATION_BUDGET_MESSAGE });
+  if (!(await reserveBudgetedEmail("team-invitation"))) throw new APIError("TOO_MANY_REQUESTS", { code: INVITATION_BUDGET_CODE, message: INVITATION_BUDGET_MESSAGE });
   if (!isSendirConfigured()) {
     if (process.env.NODE_ENV === "production") throw new Error("Sendir is not configured, so invitations cannot be sent.");
     console.info(`[teams] Invitation to ${input.teamName} for ${input.email}: ${url}`);

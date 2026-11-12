@@ -271,9 +271,16 @@ describe("inviteMemberAction", () => {
 
     it("should show the budget message and delete the new invitation when the daily email budget is used up", async () => {
       signInAs(viewer("owner"));
-      await refuseTheEmail(new APIError("TOO_MANY_REQUESTS", { message: "Invitations are paused for today." }));
+      await refuseTheEmail(new APIError("TOO_MANY_REQUESTS", { code: "INVITATION_EMAIL_BUDGET", message: "Invitations are paused for today." }));
       await expect(actions.inviteMemberAction("team-1", { email: "ann@example.com", role: "member" })).resolves.toEqual({ success: false, error: "Invitations are paused for today." });
       expect(mocks.deleteUnsentInvitation).toHaveBeenCalledWith("invite-new");
+    });
+
+    it("should keep the invitation and report success when the send failed for a reason the inviter cannot fix", async () => {
+      signInAs(viewer("owner"));
+      await refuseTheEmail(new APIError("FORBIDDEN", { code: "SOMETHING_ELSE", message: "An internal refusal." }));
+      await expect(actions.inviteMemberAction("team-1", { email: "ann@example.com", role: "member" })).resolves.toMatchObject({ success: true });
+      expect(mocks.deleteUnsentInvitation).not.toHaveBeenCalled();
     });
 
     it("should still report the refusal when deleting the unsent invitation fails", async () => {
