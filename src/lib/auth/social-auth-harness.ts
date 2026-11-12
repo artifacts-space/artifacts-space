@@ -2,9 +2,12 @@ import { generateKeyPairSync, sign } from "node:crypto";
 
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
+import { hashPassword } from "better-auth/crypto";
 import { magicLink } from "better-auth/plugins";
 import { expect, vi } from "vitest";
 
+import { passwordSignInGuard } from "./password-sign-in-options";
+import { credentialProviderId, emailAndPasswordOptions, passwordPathsDisabledOverHttp } from "./password-sign-in-rules";
 import { accountHooks, accountLinking, socialProviders, socialSignInGuard, validateUserInfo } from "./social-auth-options";
 
 /*
@@ -45,18 +48,19 @@ export function emptyTables(): Tables {
 /** Every magic link the test instances "emailed", newest last. */
 const sentLinks: string[] = [];
 
-/** Better Auth with the same social options as src/lib/auth/server.ts. */
+/** Better Auth with the same social and password options as src/lib/auth/server.ts. */
 export function createTestAuth(tables: Tables) {
   return betterAuth({
     baseURL: origin,
     secret: "social-linking-test-secret-0123456789abcdef",
     database: memoryAdapter(tables),
-    emailAndPassword: { enabled: false },
+    emailAndPassword: emailAndPasswordOptions,
     socialProviders: socialProviders(env),
     account: { accountLinking },
     user: { validateUserInfo },
     databaseHooks: { account: accountHooks },
-    plugins: [magicLink({ sendMagicLink: ({ url }) => { sentLinks.push(url); } }), socialSignInGuard()],
+    disabledPaths: passwordPathsDisabledOverHttp,
+    plugins: [magicLink({ sendMagicLink: ({ url }) => { sentLinks.push(url); } }), socialSignInGuard(), passwordSignInGuard()],
     // Vitest runs count as tests, where Better Auth skips its callbackURL check unless told otherwise.
     advanced: { disableOriginCheck: false },
   });
@@ -180,4 +184,21 @@ export function existingUser(tables: Tables, { verified, github = false, address
   tables.user.push({ id: userId, email: address, emailVerified: verified, name: "Sam", image: null, createdAt: now, updatedAt: now });
   if (github) tables.account.push({ id: "existing-github", userId, providerId: "github", accountId: "4242", accessToken: "github-old", createdAt: now, updatedAt: now });
   return userId;
+}
+
+/**
+ * An account the owner's script gave a password, as the script writes it:
+ * a confirmed user and a credential login whose account id is the user's id,
+ * with the password hashed by Better Auth's own hasher.
+ */
+export async function passwordUser(tables: Tables, { password, address = email, userId = "password-user" }: { password: string; address?: string; userId?: string }) {
+  const now = new Date();
+  tables.user.push({ id: userId, email: address, emailVerified: true, name: "Reviewer", image: null, createdAt: now, updatedAt: now });
+  tables.account.push({ id: `${userId}-credential`, userId, providerId: credentialProviderId, accountId: userId, password: await hashPassword(password), createdAt: now, updatedAt: now });
+  return userId;
+}
+
+/** Cookies a response set, as one Cookie header. */
+export function cookieHeader(response: Response) {
+  return cookiesFrom(response).join("; ");
 }

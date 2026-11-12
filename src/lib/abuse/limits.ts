@@ -145,6 +145,21 @@ export const rateLimits = {
    */
   magicLinkByEmailMinute: { limit: 1, windowSeconds: 60 },
   magicLinkByEmail: { limit: 5, windowSeconds: hour },
+  /**
+   * Password sign-in tries per network address (password-sign-in-rules.ts).
+   * Only accounts the owner gave a password can sign in this way, so real
+   * use is a handful a day; each try also costs a password hash, which these
+   * cap. Refused tries count too, so a guessing script stays refused.
+   */
+  passwordSignInByNetwork: { limit: 20, windowSeconds: quarterHour },
+  passwordSignInByNetworkDay: { limit: 100, windowSeconds: day },
+  /**
+   * Password sign-in tries per email address, from any network. Counted the
+   * same whether or not the address has an account, so a refusal says
+   * nothing about who has one.
+   */
+  passwordSignInByEmail: { limit: 10, windowSeconds: quarterHour },
+  passwordSignInByEmailDay: { limit: 30, windowSeconds: day },
   /** New teams, agents, and access tokens per person per hour. Each agent gets its own limits, so agents are capped too. */
   teamCreate: { limit: 10, windowSeconds: hour },
   agentCreate: { limit: 20, windowSeconds: hour },
@@ -204,6 +219,10 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   magicLinkByNetworkDay: "Your network has asked for a lot of sign-in links today.",
   magicLinkByEmailMinute: "This email address asked for a sign-in link in the last minute. Check your inbox and spam folder for it.",
   magicLinkByEmail: "This email address has asked for a lot of sign-in links in the last hour.",
+  passwordSignInByNetwork: "Your network has tried to sign in with a password a lot in the last few minutes.",
+  passwordSignInByNetworkDay: "Your network has tried to sign in with a password a lot today.",
+  passwordSignInByEmail: "This email address has had a lot of password sign-in tries in the last few minutes.",
+  passwordSignInByEmailDay: "This email address has had a lot of password sign-in tries today.",
   teamCreate: "You have created a lot of teams in the last hour.",
   agentCreate: "You have added a lot of agents in the last hour.",
   tokenCreate: "You have created a lot of access tokens in the last hour.",

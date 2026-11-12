@@ -5,7 +5,9 @@ import { IconBrandGithub, IconLoader2, IconMailCheck } from "@tabler/icons-react
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
+import { ErrorMessage, workspaceUrl } from "@/components/auth/auth-parts";
 import { GoogleMark } from "@/components/auth/google-mark";
+import { PasswordSignIn } from "@/components/auth/password-sign-in";
 import { ConsentNotice } from "@/components/legal-links";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +15,8 @@ import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth/client";
 import { isDevSignInEnabled } from "@/lib/auth/dev-user";
 import { signInErrorMessage } from "@/lib/auth/sign-in-error-rules";
+import { genericError, validateEmail } from "@/lib/auth/sign-in-form-rules";
 import { safeNextPath, withNextPath } from "@/lib/safe-next";
-import { cn } from "@/lib/utils";
 
 type AuthMode = "sign-in" | "sign-up";
 type SocialProvider = "github" | "google";
@@ -36,22 +38,6 @@ const copy = {
     switchHref: "/sign-up",
   },
 } as const;
-
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const genericError = "Something went wrong. Check your connection and try again.";
-
-/** Returns a problem with the email address, or null when it can be sent. */
-export function validateEmail(email: string): string | null {
-  if (!email.trim()) return "Enter your email address.";
-  if (!emailPattern.test(email.trim())) return "Enter a valid email address.";
-  return null;
-}
-
-/** Where to land after sign-in, as an absolute URL on this site. */
-function workspaceUrl() {
-  const next = safeNextPath(new URLSearchParams(window.location.search).get("next"));
-  return new URL(next ?? "/app", window.location.origin).href;
-}
 
 /** Where GitHub or Google sends a refused sign-in: this page, keeping `?next=`. Better Auth adds `?error=`. */
 function errorReturnUrl() {
@@ -124,15 +110,6 @@ function InvitationHint() {
   );
 }
 
-function ErrorMessage({ message, className }: { message: string; className?: string }) {
-  if (!message) return null;
-  return (
-    <p role="alert" className={cn("rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive", className)}>
-      {message}
-    </p>
-  );
-}
-
 /** Why GitHub or Google sent the person back here (`?error=`), in the page's own words. */
 function ProviderErrorFromQuery() {
   const message = signInErrorMessage(useSearchParams().get("error"));
@@ -161,7 +138,9 @@ function SocialButton({ provider, pending, onClick }: { provider: SocialProvider
 /**
  * Sign in or sign up with GitHub, Google, or an emailed magic link. Google
  * shows only when the page says it is configured (`isGoogleSignInEnabled`),
- * so a deploy without it never offers a button that cannot work.
+ * so a deploy without it never offers a button that cannot work. Sign-in
+ * also offers a quiet password option at the bottom, for accounts the owner
+ * gave a password (PasswordSignIn).
  */
 export function AuthForm({ mode, googleEnabled }: { mode: AuthMode; googleEnabled: boolean }) {
   const text = copy[mode];
@@ -248,6 +227,7 @@ export function AuthForm({ mode, googleEnabled }: { mode: AuthMode; googleEnable
         {text.switchPrompt}{" "}
         <SwitchLink href={text.switchHref} label={text.switchLabel} />
       </p>
+      {mode === "sign-in" ? <PasswordSignIn /> : null}
     </div>
   );
 }

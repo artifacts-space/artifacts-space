@@ -9,6 +9,8 @@ import * as schema from "@/db/schema";
 import { sessionHooks } from "@/lib/auth/agent-guards";
 import { sendMagicLinkEmail } from "@/lib/auth/magic-link-email";
 import { oauthPlugins } from "@/lib/auth/oauth-plugins";
+import { passwordSignInGuard } from "@/lib/auth/password-sign-in-options";
+import { emailAndPasswordOptions, passwordPathsDisabledOverHttp } from "@/lib/auth/password-sign-in-rules";
 import { sessionConfig } from "@/lib/auth/session-config";
 import { accountHooks, accountLinking, socialAuthEnv, socialProviders, socialSignInGuard, validateUserInfo } from "@/lib/auth/social-auth-options";
 import { teamDepartureHook } from "@/lib/auth/team-departure";
@@ -44,8 +46,10 @@ function createAuth() {
     ...(process.env.BETTER_AUTH_URL ? { baseURL: process.env.BETTER_AUTH_URL } : {}),
     database: drizzleAdapter(getDb(), { provider: "pg", schema: authSchema }),
     session: sessionConfig,
-    // Sign-in is GitHub, Google, or an emailed link. There are no passwords.
-    emailAndPassword: { enabled: false },
+    // Sign-in is GitHub, Google, or an emailed link. A password signs in only
+    // to an account the owner's script gave one (password-sign-in-rules.ts):
+    // no sign-up, and no way to set, change, or reset a password.
+    emailAndPassword: emailAndPasswordOptions,
     socialProviders: socialProviders(socialAuthEnv()),
     account: { accountLinking },
     user: {
@@ -58,7 +62,7 @@ function createAuth() {
     },
     databaseHooks: { user: userHooks, session: sessionHooks, account: accountHooks },
     hooks: { before: closedTeamRoutesHook, after: teamDepartureHook },
-    disabledPaths: teamRoutesClosedOverHttp,
+    disabledPaths: [...teamRoutesClosedOverHttp, ...passwordPathsDisabledOverHttp],
     plugins: [
       magicLink({
         expiresIn: tenMinutes,
@@ -66,6 +70,7 @@ function createAuth() {
       }),
       teamsPlugin(),
       socialSignInGuard(),
+      passwordSignInGuard(),
       ...oauthPlugins(),
       // Must stay last so server actions can set auth cookies.
       nextCookies(),
