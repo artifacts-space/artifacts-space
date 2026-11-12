@@ -73,7 +73,9 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
   const commenter = { email: emailOf("b"), handle: handleOf("b"), id: "" };
   /** An ordinary person with an artifact, a project, and an inbox entry of their own, whom no run may touch. */
   const bystander = { email: emailOf("bystander"), handle: handleOf("bystander"), id: `sd-${tag}-bystander` };
-  const seedRequest = { email: reviewer.email, commenterEmail: commenter.email, reset: false };
+  const seedRequest = { email: reviewer.email, commenterEmail: commenter.email, reset: false, preview: false };
+  /** The test database is on this machine, so the reserved test domain counts as a reviewer domain. */
+  const local = { allowTestDomain: true };
   let mcp: Client;
 
   async function makeReviewer(name: string) {
@@ -135,9 +137,9 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
     reviewer.id = await makeReviewer("a");
     commenter.id = await makeReviewer("b");
     await makeBystander();
-    await seedReviewerDemo(seedRequest);
+    await seedReviewerDemo(seedRequest, local);
     await settle();
-    await assertSeedLanded(seedRequest);
+    await assertSeedLanded(seedRequest, local);
     seededState = await stateOf(reviewer.id);
     const server = new McpServer({ name: "test", version: "1.0.0" });
     registerAllTools(server, reviewer.id, "full");
@@ -202,7 +204,7 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
   });
 
   it("should create nothing a second time when the seed runs again without reset", async () => {
-    const outcome = await seedReviewerDemo(seedRequest);
+    const outcome = await seedReviewerDemo(seedRequest, local);
     await settle();
 
     expect(outcome.alreadySeeded).toBe(true);
@@ -252,15 +254,23 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
     const commenterBefore = await stateOf(commenter.id);
     const bystanderBefore = await stateOf(bystander.id);
     // The reply marked the inbox entry read, so the account is no longer at its starting state.
-    await expect(assertSeedLanded(seedRequest)).rejects.toBeInstanceOf(ReviewerDemoRefusal);
-    const plans: { artifacts: number; projects: number }[] = [];
+    await expect(assertSeedLanded(seedRequest, local)).rejects.toBeInstanceOf(ReviewerDemoRefusal);
+    const plans: unknown[] = [];
+    const onRemoving = (plan: unknown) => plans.push(plan);
+    const beforeReset = await stateOf(reviewer.id);
 
-    const outcome = await seedReviewerDemo({ ...seedRequest, reset: true }, { onRemoving: (plan) => plans.push(plan) });
+    // A preview hands over the same plan and changes nothing.
+    const preview = await seedReviewerDemo({ ...seedRequest, reset: true, preview: true }, { ...local, onRemoving });
     await settle();
-    await assertSeedLanded(seedRequest);
+    expect(preview).toMatchObject({ previewed: true, counts: zeroCounts() });
+    expect(await stateOf(reviewer.id)).toEqual(beforeReset);
 
-    // Said once, before anything went: the ten seeded artifacts and the one the first prompt saved, and the Launch project.
-    expect(plans).toEqual([{ artifacts: 11, projects: 1 }]);
+    const outcome = await seedReviewerDemo({ ...seedRequest, reset: true }, { ...local, onRemoving });
+    await settle();
+    await assertSeedLanded(seedRequest, local);
+
+    // Said before anything went, by the preview and by the reset: the ten seeded artifacts and the one the first prompt saved (not demo data), and the Launch project.
+    expect(plans).toEqual([{ artifacts: 11, otherArtifacts: 1, projects: 1 }, { artifacts: 11, otherArtifacts: 1, projects: 1 }]);
     expect(outcome.alreadySeeded).toBe(false);
     expect(await stateOf(reviewer.id)).toEqual(seededState);
     // A reset removes the reviewer's rows only: the other reviewer and an ordinary person keep theirs.
@@ -279,8 +289,8 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
     const ordinaryId = `sd-${tag}-ordinary`;
     await getDb().insert(user).values({ id: ordinaryId, name: "Ordinary", email: emailOf("ordinary"), emailVerified: true, username: handleOf("ordinary") });
 
-    await expect(seedReviewerDemo({ ...seedRequest, email: emailOf("ordinary"), reset: true })).rejects.toBeInstanceOf(ReviewerDemoRefusal);
-    await expect(seedReviewerDemo({ ...seedRequest, commenterEmail: emailOf("ordinary"), reset: true })).rejects.toBeInstanceOf(ReviewerDemoRefusal);
+    await expect(seedReviewerDemo({ ...seedRequest, email: emailOf("ordinary"), reset: true }, local)).rejects.toBeInstanceOf(ReviewerDemoRefusal);
+    await expect(seedReviewerDemo({ ...seedRequest, commenterEmail: emailOf("ordinary"), reset: true }, local)).rejects.toBeInstanceOf(ReviewerDemoRefusal);
 
     expect(await getDb().select({ id: artifact.id }).from(artifact).where(eq(artifact.userId, ordinaryId))).toEqual([]);
     expect(await stateOf(reviewer.id)).toEqual(seededState);
@@ -308,7 +318,7 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
     expect(run.stdout).toBe("");
     // The lines that matter, in order; a warning from Node or a dependency on stderr is not this test's business.
     const lines = run.stderr.trim().split("\n");
-    const notice = lines.indexOf("Reset: removing everything this account owns (10 artifacts and 1 project), then its inbox and notifications.");
+    const notice = lines.indexOf("Reset: removing everything this account owns (10 artifacts, all of them demo data, and 1 project), then its inbox and notifications.");
     const report = lines.indexOf("Removed 10 artifacts, 1 project, 1 inbox entry, and 1 notification. Created 10 artifacts, 2 later versions, and 1 comment.");
     expect(notice).toBeGreaterThanOrEqual(0);
     expect(report).toBeGreaterThan(notice);
@@ -318,18 +328,18 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
 
   it("should stop and seed nothing when a reset cannot remove an artifact, then finish on the next reset", async () => {
     boundary.refuseDeletes = true;
-    const refused = seedReviewerDemo({ ...seedRequest, reset: true });
+    const refused = seedReviewerDemo({ ...seedRequest, reset: true }, local);
 
     await expect(refused).rejects.toBeInstanceOf(ReviewerDemoRefusal);
     await expect(refused).rejects.toThrow("0 of 10");
     boundary.refuseDeletes = false;
     await settle();
-    // Every artifact is still there, once: nothing was seeded on top of what could not be removed.
-    expect((await stateOf(reviewer.id)).artifacts).toEqual(seededState.artifacts);
+    // Nothing was seeded on top of what could not be removed, and the inbox was not touched: artifacts go first.
+    expect(await stateOf(reviewer.id)).toEqual(seededState);
 
-    await seedReviewerDemo({ ...seedRequest, reset: true });
+    await seedReviewerDemo({ ...seedRequest, reset: true }, local);
     await settle();
-    await assertSeedLanded(seedRequest);
+    await assertSeedLanded(seedRequest, local);
     expect(await stateOf(reviewer.id)).toEqual(seededState);
   });
 
@@ -338,13 +348,13 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
     await getDb().delete(artifact).where(eq(artifact.id, checklist?.id ?? ""));
     const partial = await stateOf(reviewer.id);
 
-    const refused = seedReviewerDemo(seedRequest);
+    const refused = seedReviewerDemo(seedRequest, local);
 
     await expect(refused).rejects.toBeInstanceOf(ReviewerDemoRefusal);
     await expect(refused).rejects.toThrow('lacks "Release checklist"');
     expect(await stateOf(reviewer.id)).toEqual(partial);
 
-    await seedReviewerDemo({ ...seedRequest, reset: true });
+    await seedReviewerDemo({ ...seedRequest, reset: true }, local);
     await settle();
     expect(await stateOf(reviewer.id)).toEqual(seededState);
   });
@@ -362,7 +372,20 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
 
     expect(boundary.sendEmail).toHaveBeenCalledTimes(1);
     expect(boundary.sendPush).toHaveBeenCalledTimes(1);
-    // Back to what the seed leaves, so a test added after this one starts from the seeded settings.
+    // Back to the seeded state (settings, the read inbox entry, and the extra comment), so a test added after this one starts where the others do.
     await savePreferences(reviewer.id, quietPreferences());
+    await seedReviewerDemo({ ...seedRequest, reset: true }, local);
+    await settle();
+    expect(await stateOf(reviewer.id)).toEqual(seededState);
+  });
+
+  it("should refuse an address outside the reviewer domains before it reads or removes anything, even one with a password login", async () => {
+    // The same account, asked for as it would be on a shared database, where the reserved test domain does not count.
+    const refused = seedReviewerDemo({ ...seedRequest, reset: true }, { allowTestDomain: false });
+
+    await expect(refused).rejects.toBeInstanceOf(ReviewerDemoRefusal);
+    await expect(refused).rejects.toThrow("not under a reviewer domain");
+    await expect(assertSeedLanded(seedRequest, { allowTestDomain: false })).rejects.toThrow("not under a reviewer domain");
+    expect(await stateOf(reviewer.id)).toEqual(seededState);
   });
 });

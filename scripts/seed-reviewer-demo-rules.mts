@@ -7,16 +7,17 @@ import { parseArgs } from "node:util";
 
 import { z } from "zod";
 
-import { ALLOW_SHARED_REVIEWER_ACCOUNT } from "./create-reviewer-account-rules.mts";
+import { ALLOW_SHARED_REVIEWER_ACCOUNT, sampleArtifacts } from "./create-reviewer-account-rules.mts";
 
 export const seedUsage = [
-  "Usage: node scripts/seed-reviewer-demo.mts --email <reviewer address> --commenter-email <other reviewer address> [--reset]",
+  "Usage: node scripts/seed-reviewer-demo.mts --email <reviewer address> --commenter-email <other reviewer address> [--reset [--preview]]",
   "",
   "Fills a reviewer account (made with reviewer:create) with the demo data the directory test cases need.",
   "The other reviewer account writes the one comment that waits in the first account's inbox.",
   "Without --reset an account that already holds the demo data is left as it is.",
   "With --reset EVERYTHING the account owns is removed first (every artifact, project, inbox entry, and notification, not only the demo data), so it is back at the starting state.",
-  "There is no prompt: the run says how many artifacts and projects will go, then removes them.",
+  "There is no prompt: the run says how many artifacts and projects will go, and how many of the artifacts are not demo data, then removes them.",
+  "With --reset --preview it says the same and stops there: nothing is removed or created.",
   "The database comes from DATABASE_URL_UNPOOLED or DATABASE_URL set for this run; .env.local is never read.",
   `A database that is not on this machine needs ${ALLOW_SHARED_REVIEWER_ACCOUNT}=1 for that one run.`,
 ].join("\n");
@@ -26,13 +27,16 @@ export interface SeedRequest {
   email: string;
   commenterEmail: string;
   reset: boolean;
+  /** With `reset`: say what would be removed and change nothing. */
+  preview: boolean;
 }
 
 const emailField = (flag: string) => z.string().trim().toLowerCase().pipe(z.email(`Give a reviewer address with ${flag}.`));
 
 const seedRequestSchema = z
-  .object({ email: emailField("--email"), commenterEmail: emailField("--commenter-email"), reset: z.boolean() })
-  .refine((request) => request.email !== request.commenterEmail, "The commenter must be another reviewer account, not the same one.");
+  .object({ email: emailField("--email"), commenterEmail: emailField("--commenter-email"), reset: z.boolean(), preview: z.boolean() })
+  .refine((request) => request.email !== request.commenterEmail, "The commenter must be another reviewer account, not the same one.")
+  .refine((request) => request.reset || !request.preview, "--preview shows what --reset would remove, so give both.");
 
 /** Reads the arguments. Returns the request, or the problems to print with the usage. */
 export function parseSeedArgs(argv: readonly string[]): { ok: true; request: SeedRequest } | { ok: false; error: string } {
@@ -40,14 +44,14 @@ export function parseSeedArgs(argv: readonly string[]): { ok: true; request: See
   try {
     ({ values } = parseArgs({
       args: [...argv],
-      options: { email: { type: "string" }, "commenter-email": { type: "string" }, reset: { type: "boolean" } },
+      options: { email: { type: "string" }, "commenter-email": { type: "string" }, reset: { type: "boolean" }, preview: { type: "boolean" } },
       strict: true,
       allowPositionals: false,
     }));
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "The arguments could not be read." };
   }
-  const parsed = seedRequestSchema.safeParse({ email: values.email ?? "", commenterEmail: values["commenter-email"] ?? "", reset: values.reset === true });
+  const parsed = seedRequestSchema.safeParse({ email: values.email ?? "", commenterEmail: values["commenter-email"] ?? "", reset: values.reset === true, preview: values.preview === true });
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((issue) => issue.message).join("\n") };
   return { ok: true, request: parsed.data };
 }
@@ -154,7 +158,7 @@ export const roadmapVersions: readonly string[] = [
   lines("# Q4 roadmap", "", "- October: finish the billing page", "- November: ship the mobile app beta", "- December: plan next year with the team"),
 ];
 
-/** Titles that only the demo data uses. An account holding any of them already has the demo data. */
+/** Titles that only the demo data uses. An account holding all of them has the demo data; one holding only some is partly seeded (seededTitles). */
 export const demoTitles: readonly string[] = [launchTimeline.title, ...onboardingArtifacts.map((item) => item.title), releaseChecklist.title, apiSpec.title, roadmapTitle];
 
 /** Which demo titles an account holds: none (seed it), all (leave it), or some (it needs a reset). */
@@ -182,9 +186,28 @@ export function inboxRefusal(found: number): string {
   return `The seed did not finish: the reviewer's inbox should hold one unread comment on "${apiSpec.title}" and holds ${String(found)}. Run with --reset.`;
 }
 
-/** The line a reset prints before it removes anything: counts only. */
-export function removalNotice(artifacts: number, projects: number): string {
-  return `Reset: removing everything this account owns (${count(artifacts, "artifact", "artifacts")} and ${count(projects, "project", "projects")}), then its inbox and notifications.`;
+/** What a reset removes: everything the account owns. `otherArtifacts` are the ones that are neither demo data nor reviewer:create's samples. */
+export interface RemovalPlan {
+  artifacts: number;
+  otherArtifacts: number;
+  projects: number;
+}
+
+/** How many of these titles are not the script's own: neither demo data nor one of reviewer:create's samples. */
+export function otherArtifactCount(titles: readonly string[]): number {
+  const known = new Set([...demoTitles, ...sampleArtifacts.map((sample) => sample.title)]);
+  return titles.filter((title) => !known.has(title)).length;
+}
+
+/**
+ * The line a reset prints before it removes anything (or, with --preview,
+ * instead of removing anything): counts only. It says how many artifacts are
+ * not demo data, so an account that is more than a review account shows.
+ */
+export function removalNotice(plan: RemovalPlan, preview: boolean): string {
+  const others = plan.otherArtifacts === 0 ? "all of them demo data" : `${String(plan.otherArtifacts)} of them not demo data`;
+  const what = `everything this account owns (${count(plan.artifacts, "artifact", "artifacts")}, ${others}, and ${count(plan.projects, "project", "projects")}), then its inbox and notifications`;
+  return preview ? `Preview: a reset would remove ${what}. Nothing was removed or created.` : `Reset: removing ${what}.`;
 }
 
 /** What a run removed and created, for its one-line report. */

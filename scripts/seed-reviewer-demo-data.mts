@@ -13,6 +13,7 @@ import { account, artifact, mention, user } from "@/db/schema";
 import { authoredByViewerCondition } from "@/lib/agents/owner-access";
 import { createArtifact, deleteArtifact, updateArtifact } from "@/lib/artifacts";
 import { credentialProviderId } from "@/lib/auth/password-sign-in-rules";
+import { isReviewerDomainEmail } from "@/lib/auth/reviewer-domains";
 import { createComment } from "@/lib/comments/service";
 import { notificationEvents } from "@/lib/notifications/types";
 import { defaultPreferences, type NotificationPreferences } from "@/lib/notifications/preference-rules";
@@ -31,6 +32,7 @@ import {
   launchTimeline,
   leftoverRefusal,
   onboardingArtifacts,
+  otherArtifactCount,
   partlySeededRefusal,
   releaseChecklist,
   roadmapSummary,
@@ -38,6 +40,7 @@ import {
   roadmapVersions,
   seededTitles,
   type DemoArtifact,
+  type RemovalPlan,
   type SeedCounts,
   type SeedRequest,
 } from "./seed-reviewer-demo-rules.mts";
@@ -51,32 +54,39 @@ interface ReviewerAccount {
   username: string;
 }
 
-/** What a run did. */
+/** What a run did. `previewed` is true when a reset only said what it would remove. */
 export interface SeedOutcome {
   counts: SeedCounts;
   alreadySeeded: boolean;
+  previewed: boolean;
 }
 
-/** What a reset is about to remove: everything the account owns. */
-export interface RemovalPlan {
-  artifacts: number;
-  projects: number;
-}
-
-/** Hooks a caller may pass: `onRemoving` runs once, before a reset deletes anything. */
-export interface SeedHooks {
+/**
+ * What the caller decides for a run. `allowTestDomain` is the database's
+ * answer (reviewerDatabase): the reserved test domain counts as a reviewer
+ * domain only on a database on this machine. `onRemoving` runs once, before a
+ * reset deletes anything.
+ */
+export interface SeedOptions {
+  allowTestDomain: boolean;
   onRemoving?: (plan: RemovalPlan) => void;
 }
 
-/** The account behind this address when it is a reviewer account (it has a password login), or a refusal. */
-async function reviewerAccount(email: string, role: "reviewer" | "commenter"): Promise<ReviewerAccount> {
+/**
+ * The account behind this address when it is a reviewer account, or a
+ * refusal. Two gates, here beside the deletes that need them and not only in
+ * the command: the address is under a reviewer domain, and the account has
+ * the password login that only reviewer:create gives.
+ */
+async function reviewerAccount(email: string, role: "reviewer" | "commenter", allowTestDomain: boolean): Promise<ReviewerAccount> {
+  const who = role === "reviewer" ? "--email" : "--commenter-email";
+  if (!isReviewerDomainEmail(email, allowTestDomain)) throw new ReviewerDemoRefusal(`${who} is not under a reviewer domain, so the script does not touch it.`);
   const [row] = await getDb()
     .select({ id: user.id, username: user.username })
     .from(user)
     .innerJoin(account, and(eq(account.userId, user.id), eq(account.providerId, credentialProviderId), eq(account.accountId, user.id)))
     .where(eq(sql`lower(${user.email})`, email))
     .limit(1);
-  const who = role === "reviewer" ? "--email" : "--commenter-email";
   if (!row) throw new ReviewerDemoRefusal(`${who} does not name a reviewer account. The script only touches accounts made with reviewer:create (they have a password login).`);
   if (!row.username) throw new ReviewerDemoRefusal(`${who} names a reviewer account without a username, so it cannot be mentioned.`);
   return { id: row.id, username: row.username };
@@ -87,9 +97,8 @@ async function reviewerAccount(email: string, role: "reviewer" | "commenter"): P
  * added in a team they still belong to. It is the app's own author scope
  * (authoredByViewerCondition), so it lists exactly what deleteArtifact allows.
  */
-async function ownedArtifactIds(userId: string): Promise<string[]> {
-  const rows = await getDb().select({ id: artifact.id }).from(artifact).where(authoredByViewerCondition(getDb(), userId));
-  return rows.map((row) => row.id);
+async function ownedArtifacts(userId: string): Promise<{ id: string; title: string }[]> {
+  return getDb().select({ id: artifact.id, title: artifact.title }).from(artifact).where(authoredByViewerCondition(getDb(), userId));
 }
 
 /**
@@ -97,29 +106,39 @@ async function ownedArtifactIds(userId: string): Promise<string[]> {
  * account exists only for a directory review, and the test prompts create and
  * change artifacts of their own. It is deliberate and has no prompt (the
  * script runs unattended); the gates are that both addresses are under a
- * reviewer domain and have the password login only reviewer:create gives, and
- * `onRemoving` says how much will go before anything does.
+ * reviewer domain and have the password login only reviewer:create gives.
+ * `onRemoving` gets the plan before anything goes, with how many artifacts
+ * are not demo data, and a preview stops there.
  *
- * It removes the reviewer's inbox entries and notifications (nothing refers
- * to either), then their artifacts through deleteArtifact (files included;
+ * It removes the reviewer's artifacts through deleteArtifact (files included;
  * the foreign keys cascade to versions, comments and replies, mentions,
  * notifications, sharing requests, views, mutes, and edit leases), then their
- * own projects. An artifact deleteArtifact refuses stops the run: seeding on
- * top of leftovers would hide them.
+ * own projects, then the inbox entries and notifications still left for them
+ * (nothing refers to either). Artifacts go first, so a run that stops because
+ * deleteArtifact refused one has not yet touched the inbox; seeding on top of
+ * leftovers would hide them, so it stops.
  */
-async function removeDemoState(userId: string, counts: SeedCounts, hooks: SeedHooks): Promise<void> {
-  const [artifactIds, projects] = await Promise.all([ownedArtifactIds(userId), listScopeProjects({ kind: "user", userId })]);
-  hooks.onRemoving?.({ artifacts: artifactIds.length, projects: projects.length });
-  counts.removedInboxEntries += (await getDb().delete(mention).where(eq(mention.recipientId, userId)).returning()).length;
-  counts.removedNotifications += (await getDb().delete(notification).where(eq(notification.recipientId, userId)).returning()).length;
-  for (const id of artifactIds) {
-    if (!(await deleteArtifact(userId, id))) throw new ReviewerDemoRefusal(leftoverRefusal(counts.removedArtifacts, artifactIds.length));
+async function removeDemoState(userId: string, counts: SeedCounts, request: SeedRequest, options: SeedOptions): Promise<void> {
+  const [artifacts, projects] = await Promise.all([ownedArtifacts(userId), listScopeProjects({ kind: "user", userId })]);
+  options.onRemoving?.({ artifacts: artifacts.length, otherArtifacts: otherArtifactCount(artifacts.map((item) => item.title)), projects: projects.length });
+  if (request.preview) return;
+  // Counted first: most of these rows go with their artifact, and the report should still say how many there were.
+  const [inbox, notifications] = await Promise.all([
+    getDb().select({ id: mention.id }).from(mention).where(eq(mention.recipientId, userId)),
+    getDb().select({ id: notification.id }).from(notification).where(eq(notification.recipientId, userId)),
+  ]);
+  for (const item of artifacts) {
+    if (!(await deleteArtifact(userId, item.id))) throw new ReviewerDemoRefusal(leftoverRefusal(counts.removedArtifacts, artifacts.length));
     counts.removedArtifacts += 1;
   }
   for (const project of projects) {
     await deleteProject(userId, project.id);
     counts.removedProjects += 1;
   }
+  await getDb().delete(mention).where(eq(mention.recipientId, userId));
+  await getDb().delete(notification).where(eq(notification.recipientId, userId));
+  counts.removedInboxEntries += inbox.length;
+  counts.removedNotifications += notifications.length;
 }
 
 /** The titles of the reviewer's own artifacts. */
@@ -193,8 +212,8 @@ async function createDemoState(reviewer: ReviewerAccount, commenter: ReviewerAcc
  * on their API spec. The notification work logs its failures and never
  * throws, so a seed that left the inbox empty would otherwise look done.
  */
-export async function assertSeedLanded(request: SeedRequest): Promise<void> {
-  const reviewer = await reviewerAccount(request.email, "reviewer");
+export async function assertSeedLanded(request: SeedRequest, options: SeedOptions): Promise<void> {
+  const reviewer = await reviewerAccount(request.email, "reviewer", options.allowTestDomain);
   const waiting = await getDb()
     .select({ id: mention.id })
     .from(mention)
@@ -216,24 +235,26 @@ export function zeroCounts(): SeedCounts {
 
 /**
  * Seeds the reviewer account's demo data, or with `reset` removes the
- * account's state first and seeds it again. Without `reset`, an account that
- * already holds every demo title is left as it is. Both addresses must be
+ * account's state first and seeds it again; with `preview` too it only hands
+ * the plan to `onRemoving` and changes nothing. Without `reset`, an account
+ * that already holds every demo title is left as it is. Both addresses must be
  * reviewer accounts. Throws a ReviewerDemoRefusal (safe to print) when the
  * request is refused: an account that is not a reviewer account, an artifact
  * a reset could not remove, or an account that holds only some of the demo
  * titles. Background work the services schedule (the comment's
  * notifications) is the caller's to wait for; assertSeedLanded then checks it.
  */
-export async function seedReviewerDemo(request: SeedRequest, hooks: SeedHooks = {}): Promise<SeedOutcome> {
-  const [reviewer, commenter] = await Promise.all([reviewerAccount(request.email, "reviewer"), reviewerAccount(request.commenterEmail, "commenter")]);
+export async function seedReviewerDemo(request: SeedRequest, options: SeedOptions): Promise<SeedOutcome> {
+  const [reviewer, commenter] = await Promise.all([reviewerAccount(request.email, "reviewer", options.allowTestDomain), reviewerAccount(request.commenterEmail, "commenter", options.allowTestDomain)]);
   if (reviewer.id === commenter.id) throw new ReviewerDemoRefusal("The commenter must be another reviewer account, not the same one.");
   const counts = zeroCounts();
-  if (request.reset) await removeDemoState(reviewer.id, counts, hooks);
+  if (request.reset) await removeDemoState(reviewer.id, counts, request, options);
+  if (request.preview) return { counts, alreadySeeded: false, previewed: true };
   const held = seededTitles(await ownTitles(reviewer.id));
-  if (held.state === "all") return { counts, alreadySeeded: true };
+  if (held.state === "all") return { counts, alreadySeeded: true, previewed: false };
   if (held.state === "some") throw new ReviewerDemoRefusal(partlySeededRefusal(held.has, held.missing));
   // Before anything that notifies: the reviewer gets the comment's mention in the app only.
   await savePreferences(reviewer.id, quietPreferences());
   await createDemoState(reviewer, commenter, counts);
-  return { counts, alreadySeeded: false };
+  return { counts, alreadySeeded: false, previewed: false };
 }

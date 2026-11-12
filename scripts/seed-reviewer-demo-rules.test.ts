@@ -8,6 +8,7 @@ import {
   launchTimeline,
   leftoverRefusal,
   onboardingArtifacts,
+  otherArtifactCount,
   parseSeedArgs,
   partlySeededRefusal,
   releaseChecklist,
@@ -26,8 +27,14 @@ describe("parseSeedArgs", () => {
   it("should read both addresses in lowercase and the reset flag when they are given", () => {
     expect(parseSeedArgs(["--email", " Rev@Artifacts.Space ", "--commenter-email", "other@artifacts.space", "--reset"])).toEqual({
       ok: true,
-      request: { email: "rev@artifacts.space", commenterEmail: "other@artifacts.space", reset: true },
+      request: { email: "rev@artifacts.space", commenterEmail: "other@artifacts.space", reset: true, preview: false },
     });
+  });
+
+  it("should take --preview only together with --reset", () => {
+    const both = ["--email", "rev@artifacts.space", "--commenter-email", "other@artifacts.space", "--reset", "--preview"];
+    expect(parseSeedArgs(both)).toMatchObject({ ok: true, request: { reset: true, preview: true } });
+    expect(parseSeedArgs(both.filter((flag) => flag !== "--reset"))).toMatchObject({ ok: false });
   });
 
   it("should refuse when the commenter is the reviewer", () => {
@@ -87,9 +94,21 @@ describe("reset wording", () => {
     expect(seedUsage).toContain("There is no prompt");
   });
 
-  it("should count what will go, with singular and plural, when a reset starts", () => {
-    expect(removalNotice(11, 1)).toBe("Reset: removing everything this account owns (11 artifacts and 1 project), then its inbox and notifications.");
-    expect(removalNotice(1, 0)).toContain("(1 artifact and 0 projects)");
+  it("should count what will go, and how much of it is not demo data, when a reset starts", () => {
+    expect(removalNotice({ artifacts: 11, otherArtifacts: 1, projects: 1 }, false)).toBe("Reset: removing everything this account owns (11 artifacts, 1 of them not demo data, and 1 project), then its inbox and notifications.");
+    expect(removalNotice({ artifacts: 1, otherArtifacts: 0, projects: 0 }, false)).toContain("(1 artifact, all of them demo data, and 0 projects)");
+  });
+
+  it("should say nothing was removed when the reset is only a preview", () => {
+    const line = removalNotice({ artifacts: 11, otherArtifacts: 1, projects: 1 }, true);
+
+    expect(line).toMatch(/^Preview: a reset would remove everything this account owns \(11 artifacts, 1 of them not demo data, and 1 project\)/);
+    expect(line).toContain("Nothing was removed or created.");
+  });
+
+  it("should count as not demo data every title that is neither a demo title nor a sample", () => {
+    expect(otherArtifactCount([...demoTitles, ...sampleArtifacts.map((sample) => sample.title)])).toBe(0);
+    expect(otherArtifactCount(["Launch plan", "API spec", "My own notes"])).toBe(2);
   });
 
   it("should say how far a stopped reset got and that nothing was seeded", () => {

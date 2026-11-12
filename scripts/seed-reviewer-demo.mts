@@ -5,7 +5,7 @@
  * scripts/create-reviewer-account.mts.
  *
  *   DATABASE_URL=<database> node scripts/seed-reviewer-demo.mts \
- *     --email <reviewer>@artifacts.space --commenter-email <other reviewer>@artifacts.space [--reset]
+ *     --email <reviewer>@artifacts.space --commenter-email <other reviewer>@artifacts.space [--reset [--preview]]
  *
  * What it seeds, through the app's own services (artifact create and save,
  * projects, sharing, comments, notification settings):
@@ -31,8 +31,10 @@
  * script is only for accounts that exist for a review: both addresses must be
  * under a reviewer domain and have the password login that only
  * reviewer:create gives. There is no prompt, since the script runs
- * unattended; a reset prints how many artifacts and projects it will remove
- * before it removes any, and stops if one cannot be removed. It keeps the
+ * unattended; a reset prints how many artifacts and projects it will remove,
+ * and how many of the artifacts are not demo data, before it removes any, and
+ * stops if one cannot be removed. --reset --preview prints that line and
+ * changes nothing, for a look before the real run. It keeps the
  * account, its login, sessions, connected apps and tokens, its teams, and
  * comments it wrote on other people's artifacts (such as its comment on the
  * other reviewer's API spec).
@@ -60,7 +62,7 @@ import { fileURLToPath } from "node:url";
 
 import { reviewerDatabase, reviewerEmailProblem } from "./create-reviewer-account-rules.mts";
 import { describeError, redact, secretsFrom } from "./migrate-on-deploy.mts";
-import { parseSeedArgs, removalNotice, seedReport, seedUsage, type SeedRequest } from "./seed-reviewer-demo-rules.mts";
+import { parseSeedArgs, removalNotice, seedReport, seedUsage, type RemovalPlan, type SeedRequest } from "./seed-reviewer-demo-rules.mts";
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -96,16 +98,17 @@ async function failureLine(error: unknown, env: Env): Promise<string> {
  * that the work landed, and closes the database. A reset says what it will
  * remove before it removes anything.
  */
-async function seedWithApp(request: SeedRequest) {
+async function seedWithApp(request: SeedRequest, allowTestDomain: boolean) {
   const { registerAppModuleHooks, settleAfterTasks } = await import("./app-module-hooks.mts");
   registerAppModuleHooks();
   const { assertSeedLanded, closeDatabase, seedReviewerDemo } = await import("./seed-reviewer-demo-data.mts");
   let failedTasks = 0;
   try {
-    const outcome = await seedReviewerDemo(request, { onRemoving: (plan) => { console.error(removalNotice(plan.artifacts, plan.projects)); } });
+    const options = { allowTestDomain, onRemoving: (plan: RemovalPlan) => { console.error(removalNotice(plan, request.preview)); } };
+    const outcome = await seedReviewerDemo(request, options);
     failedTasks = await settleAfterTasks();
     if (failedTasks > 0) throw new Error(`${String(failedTasks)} background task(s) failed. Run with --reset.`);
-    if (!outcome.alreadySeeded) await assertSeedLanded(request);
+    if (!outcome.alreadySeeded && !outcome.previewed) await assertSeedLanded(request, options);
     return outcome;
   } finally {
     await settleAfterTasks();
@@ -137,8 +140,8 @@ export async function runSeed(argv: readonly string[], env: Env): Promise<number
   prepareAppEnvironment(database.url);
   quietOutsideRequestNotices();
   try {
-    const outcome = await seedWithApp(request);
-    console.error(seedReport(outcome.counts, outcome.alreadySeeded));
+    const outcome = await seedWithApp(request, database.allowTestDomain);
+    if (!outcome.previewed) console.error(seedReport(outcome.counts, outcome.alreadySeeded));
     return 0;
   } catch (error) {
     console.error(await failureLine(error, env));
