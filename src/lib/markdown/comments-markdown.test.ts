@@ -49,4 +49,21 @@ describe("commentsToMarkdown", () => {
   it("should show only the reason when the reader may not see the comments", () => {
     expect(commentsToMarkdown({ status: "unavailable", message: "Comments are off for this artifact." })).toBe("## Comments\n\n_Comments are off for this artifact._");
   });
+
+  it("should show the words in an untrusted block when the reader may read the quote", () => {
+    const markdown = commentsToMarkdown({ status: "shown", comments: [view({ anchored: true, anchor: { quote: "ship on Monday", prefix: "We", suffix: "." } })] });
+    expect(markdown).toContain("On these words:\n\n```untrusted-quote\nship on Monday\n```\n\n```untrusted-comment\nLooks good.\n```");
+    expect(UNTRUSTED_COMMENTS_NOTICE).toContain("untrusted-quote");
+  });
+
+  it("should say the words are not in this version when the quote was withheld", () => {
+    const markdown = commentsToMarkdown({ status: "shown", comments: [view({ anchored: true, anchor: null })] });
+    expect(markdown).toContain("_Made on words that are not in this version._");
+    expect(markdown).not.toContain("untrusted-quote\n");
+  });
+
+  it("should mark a thread resolved when a person resolved it", () => {
+    const markdown = commentsToMarkdown({ status: "shown", comments: [view({ resolved: { at: "2026-11-08T10:00:00.000Z", by: "@dana" } })] });
+    expect(markdown).toContain("### Comment 1 by @dana · 2026-11-07T10:00:00.000Z · resolved");
+  });
 });

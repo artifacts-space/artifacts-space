@@ -7,10 +7,12 @@ import {
   agentStreak,
   canChangeComment,
   canMuteInThread,
+  canResolveComment,
   canUseComments,
   decideMentions,
   isAgentMuted,
   isLoopLimited,
+  resolveRefusal,
   type MentionCandidate,
 } from "./rules";
 
@@ -155,5 +157,37 @@ describe("comment rate limits", () => {
     for (const names of Object.values(COMMENT_RATE_LIMITS)) {
       expect(names.map((name) => rateLimits[name].windowSeconds)).toEqual([60, 3600]);
     }
+  });
+});
+
+describe("resolving a thread", () => {
+  const topLevel = { parentId: null, deletedAt: null };
+  const person = { viewerKind: "person" as const, canUseThread: true, comment: topLevel };
+
+  it("should allow a person who may use the thread when the comment is top-level and not deleted", () => {
+    expect(canResolveComment(person)).toBe(true);
+    expect(resolveRefusal(person)).toBeNull();
+  });
+
+  it("should refuse an agent when it may use the thread", () => {
+    expect(canResolveComment({ ...person, viewerKind: "agent" })).toBe(false);
+    expect(resolveRefusal({ ...person, viewerKind: "agent" })).toMatch(/Only people/);
+  });
+
+  it("should refuse when the viewer is unknown", () => {
+    expect(canResolveComment({ ...person, viewerKind: null })).toBe(false);
+  });
+
+  it("should refuse a person when they may not use the thread", () => {
+    expect(canResolveComment({ ...person, canUseThread: false })).toBe(false);
+  });
+
+  it("should refuse when the comment is a reply", () => {
+    expect(canResolveComment({ ...person, comment: { parentId: "c1", deletedAt: null } })).toBe(false);
+    expect(resolveRefusal({ ...person, comment: { parentId: "c1", deletedAt: null } })).toMatch(/first comment/);
+  });
+
+  it("should refuse when the comment was deleted", () => {
+    expect(canResolveComment({ ...person, comment: { parentId: null, deletedAt: new Date() } })).toBe(false);
   });
 });

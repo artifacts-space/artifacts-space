@@ -9,7 +9,7 @@ import { markArtifactMentionsRead } from "@/lib/comments/inbox";
 import type { MentionDirectory } from "@/lib/comments/mention-autocomplete";
 import { mentionDirectory } from "@/lib/comments/mentionables";
 import { listThreadAgents, setThreadMute, type ThreadAgentView } from "@/lib/comments/mutes";
-import { createComment, deleteComment, listComments, updateComment, type CommentWriteResult } from "@/lib/comments/service";
+import { createComment, deleteComment, listComments, resolveComment, updateComment, type CommentWriteResult } from "@/lib/comments/service";
 import { requireThread } from "@/lib/comments/thread";
 import type { CommentView } from "@/lib/comments/views";
 import { markArtifactNotificationsRead } from "@/lib/notifications/feed";
@@ -143,15 +143,13 @@ export async function markThreadReadAction(publicId: string): Promise<ActionResu
   }
 }
 
-/** Resolves a thread, or reopens it, by its top-level comment. */
+/** Resolves a thread, or reopens it, by its top-level comment. People only; nobody is notified. */
 export async function resolveCommentAction(commentId: string, resolved: boolean): Promise<ActionResult<null>> {
   try {
     const userId = await viewerId();
     if (!userId) return { success: false, error: signInMessage };
-    // CONTRACT STUB: the comment service's resolve replaces this body.
-    idSchema.parse(commentId);
-    z.boolean().parse(resolved);
-    return { success: false, error: "Resolving comments is not available yet." };
+    await resolveComment({ actorId: userId, commentId: idSchema.parse(commentId), resolved: z.boolean().parse(resolved) });
+    return { success: true, data: null };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The comment could not be changed. Please try again.") };
   }
