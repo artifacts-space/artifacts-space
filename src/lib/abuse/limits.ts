@@ -174,8 +174,12 @@ export const rateLimits = {
   /**
    * Failed OAuth token requests (any 4xx answer from the token endpoint:
    * a bad code, refresh token, client, or request) per network address,
-   * counted after the answer. Over the limit, every token request from the
-   * address is refused before it is checked, so guessing gets nowhere.
+   * counted after the answer. Over the limit, a request that presents no
+   * currently valid code or refresh token for its client is refused before
+   * Better Auth runs; one that does always goes on, so failures from a
+   * hosted app's shared address never stop its other users. This caps the
+   * error work and noise from one address. Guessing is stopped by the size
+   * of the secrets (about 182 bits or more) and the oauthToken backstop.
    */
   oauthTokenFailuresByNetwork: { limit: 60, windowSeconds: quarterHour },
   /**
@@ -238,6 +242,6 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   oauthRegister: "Your network has registered a lot of apps in the last hour.",
   oauthAuthorize: "Your network has started a lot of app connections in the last hour.",
   oauthToken: "Your network has asked for a lot of access tokens in the last hour.",
-  oauthTokenFailuresByNetwork: "Your network has sent a lot of token requests that failed in the last few minutes.",
+  oauthTokenFailuresByNetwork: "Your network has sent a lot of token requests that failed in the last few minutes. Requests with a valid code or refresh token still go through.",
   oauthRefreshByConnection: "This connection has refreshed its access a lot in the last hour.",
 };

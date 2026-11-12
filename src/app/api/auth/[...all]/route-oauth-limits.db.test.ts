@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -21,7 +21,7 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
 
   const { eq, inArray } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
-  const { user } = await import("@/db/schema");
+  const { session, user, verification } = await import("@/db/schema");
   const { oauthClient, oauthClientResource, oauthConsent, oauthRefreshToken } = await import("@/db/oauth-schema");
   const { rateLimits } = await import("@/lib/abuse/limits");
   const { networkKey } = await import("@/lib/abuse/network-key");
@@ -79,6 +79,34 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
       createdAt: new Date(),
     });
     return `artifacts_ort_${secret}`;
+  }
+
+  /**
+   * A person who just approved the app in the browser: their session and the
+   * authorization code Better Auth would store, bound to a PKCE challenge.
+   */
+  async function newCode(clientId: string): Promise<{ code: string; verifier: string }> {
+    const userId = `oal-${tag}-${randomUUID().slice(0, 8)}`;
+    const db = getDb();
+    await db.insert(user).values({ id: userId, name: userId, email: `${userId}@example.com` });
+    made.users.push(userId);
+    const sessionId = randomUUID();
+    await db.insert(session).values({ id: sessionId, token: randomBytes(24).toString("base64url"), userId, expiresAt: new Date(Date.now() + 86_400_000) });
+    const code = randomBytes(24).toString("base64url");
+    const verifier = randomBytes(32).toString("base64url");
+    const challenge = createHash("sha256").update(verifier).digest("base64url");
+    const query = { response_type: "code", client_id: clientId, redirect_uri: "https://assistant.example/callback", scope: scopes.join(" "), state: "s", code_challenge: challenge, code_challenge_method: "S256" };
+    await db.insert(verification).values({
+      id: randomUUID(),
+      identifier: hashOAuthToken(code),
+      value: JSON.stringify({ type: "authorization_code", query, userId, sessionId, resource: [mcpResource()] }),
+      expiresAt: new Date(Date.now() + 600_000),
+    });
+    return { code, verifier };
+  }
+
+  function exchange(grant: { code: string; verifier: string }, clientId: string, address: string) {
+    return tokenRequest({ grant_type: "authorization_code", code: grant.code, code_verifier: grant.verifier, client_id: clientId, redirect_uri: "https://assistant.example/callback" }, address);
   }
 
   function tokenRequest(body: Record<string, string>, address: string) {
@@ -167,28 +195,52 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
     expect(stored?.revoked).toBeNull();
   }, 60_000);
 
-  it("should refuse every token request from an address at its failure limit, a correct one too, until the window passes", async () => {
+  it("should keep valid refreshes and code exchanges working from an address far over its failure limit, and refuse its bad requests unseen", async () => {
     const address = newAddress();
     const clientId = await newClient();
-    const good = await newConnection(clientId);
+    const existing = await newConnection(clientId);
+    const fresh = await newCode(clientId);
+    const failureLimit = rateLimits.oauthTokenFailuresByNetwork.limit;
 
-    for (let attempt = 0; attempt < rateLimits.oauthTokenFailuresByNetwork.limit; attempt += 1) {
-      const settled = await refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, address);
-      expect(settled.status).toBe(400);
-      expect(settled.body.error).toBe("invalid_grant");
+    // Expired, revoked, or bogus credentials: refresh tokens and codes, mixed, three times the limit.
+    for (let attempt = 0; attempt < 3 * failureLimit; attempt += 1) {
+      const bogus = randomBytes(24).toString("base64url");
+      const settled = attempt % 2 === 0
+        ? await refresh(`artifacts_ort_${bogus}`, clientId, address)
+        : await exchange({ code: bogus, verifier: "v".repeat(43) }, clientId, address);
+      expect(settled.status === 400 || settled.status === 429).toBe(true);
     }
-    const refused = await refresh(good, clientId, address);
-    expect(refused.status).toBe(429);
-    expect(refused.body).toMatchObject({ error: "rate_limited" });
-    expect(String(refused.body.error_description)).toContain("failed");
-    expect(Number(refused.retryAfter)).toBeGreaterThan(0);
-    // Another address is not affected.
-    expect((await refresh(good, clientId, newAddress())).status).toBe(200);
 
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(Date.now() + (Number(refused.retryAfter) + 1) * 1000);
-    const fresh = await newConnection(clientId);
-    expect((await refresh(fresh, clientId, address)).status).toBe(200);
+    // (a) A correct refresh for an existing connection succeeds.
+    const refreshed = await refresh(existing, clientId, address);
+    expect(refreshed.status).toBe(200);
+    // Issued secrets are 32 random letters (about 182 bits), far past guessing at the backstop's rate.
+    expect(String(refreshed.body.access_token)).toMatch(/^artifacts_oat_[A-Za-z]{32}$/);
+    expect(String(refreshed.body.refresh_token)).toMatch(/^artifacts_ort_[A-Za-z]{32}$/);
+
+    // (b) A correct code exchange for a new connection succeeds.
+    const exchanged = await exchange(fresh, clientId, address);
+    expect(exchanged.status).toBe(200);
+    expect(await exchanged.json()).toMatchObject({ token_type: "Bearer" });
+
+    // (c) Further bad requests get 429 with Retry-After, and Better Auth never sees them: a bogus code leaves no trace.
+    const { rateLimitBucket } = await import("@/db/schema");
+    const failureKey = `oauthTokenFailuresByNetwork:${networkKey(new Headers({ "x-forwarded-for": address }))}`;
+    const countedBefore = (await getDb().select({ count: rateLimitBucket.count }).from(rateLimitBucket).where(eq(rateLimitBucket.key, failureKey))).reduce((sum, row) => sum + row.count, 0);
+    const badRefresh = await refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, address);
+    const badCode = await exchange({ code: randomBytes(24).toString("base64url"), verifier: "v".repeat(43) }, clientId, address);
+    for (const refused of [badRefresh, { status: badCode.status, body: (await badCode.json()) as Record<string, unknown>, retryAfter: badCode.headers.get("retry-after") }]) {
+      expect(refused.status).toBe(429);
+      expect(refused.body).toMatchObject({ error: "rate_limited" });
+      expect(Number(refused.retryAfter)).toBeGreaterThan(0);
+    }
+    const countedAfter = (await getDb().select({ count: rateLimitBucket.count }).from(rateLimitBucket).where(eq(rateLimitBucket.key, failureKey))).reduce((sum, row) => sum + row.count, 0);
+    expect(countedAfter).toBe(countedBefore);
+
+    // (d) Another address is unaffected: its bad request reaches Better Auth and gets the ordinary answer.
+    const elsewhere = await refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, newAddress());
+    expect(elsewhere.status).toBe(400);
+    expect(elsewhere.body.error).toBe("invalid_grant");
   }, 60_000);
 
   it("should count malformed and wrong-client requests as failures", async () => {

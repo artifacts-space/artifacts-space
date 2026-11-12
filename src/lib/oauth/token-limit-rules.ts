@@ -6,14 +6,16 @@ import { oauthTokenPrefixes } from "./config";
 
 /**
  * Pure rules for the token endpoint's limits (src/lib/oauth/token-limits.ts):
- * what the limits read from a request, what counts as a failure, and which
- * connection a refresh belongs to. No database, so they test alone.
+ * what the limits read from a request, what counts as a failure, whether the
+ * request presents a credential that is valid now, and which connection a
+ * refresh belongs to. No database, so they test alone.
  */
 
 /** The parts of a token request body the limits read. Each is null when missing or unreadable. */
 export interface TokenRequestFields {
   grantType: string | null;
   refreshToken: string | null;
+  code: string | null;
   clientId: string | null;
 }
 
@@ -40,13 +42,13 @@ function bodyValues(body: string, contentType: string | null): Record<string, un
 }
 
 /**
- * Reads grant_type, refresh_token, and client_id from a token request body,
+ * Reads grant_type, refresh_token, code, and client_id from a token request body,
  * form-encoded (what OAuth clients send) or JSON (which Better Auth also
  * takes). Anything else reads as empty; Better Auth then refuses it.
  */
 export function tokenRequestFields(body: string, contentType: string | null): TokenRequestFields {
   const values = bodyValues(body, contentType);
-  return { grantType: field(values.grant_type), refreshToken: field(values.refresh_token), clientId: field(values.client_id) };
+  return { grantType: field(values.grant_type), refreshToken: field(values.refresh_token), code: field(values.code), clientId: field(values.client_id) };
 }
 
 /** The client id from an HTTP Basic `Authorization` header (RFC 6749 §2.3.1), or null. */
@@ -85,6 +87,33 @@ export function refreshTokenSecret(token: string | null): string | null {
  */
 export function isCountedTokenFailure(status: number): boolean {
   return status >= 400 && status < 500 && status !== 429;
+}
+
+/** What the limits need from a stored authorization code (Better Auth's verification row). */
+export interface StoredCodeGrant {
+  value: string;
+  expiresAt: Date;
+}
+
+const codeValueSchema = z.object({ type: z.literal("authorization_code"), query: z.object({ client_id: z.string() }) });
+
+function codeClientId(value: string): string | null {
+  try {
+    const parsed = codeValueSchema.safeParse(JSON.parse(value));
+    return parsed.success ? parsed.data.query.client_id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether a stored authorization code is valid now for the client presenting
+ * it: unexpired, and issued to that client. Better Auth deletes a code when
+ * it is used, so a used code is not found at all. The PKCE verifier and the
+ * redirect are still Better Auth's to check.
+ */
+export function isUsableCodeGrant(row: StoredCodeGrant, clientId: string | null, now: Date): boolean {
+  return clientId !== null && row.expiresAt > now && codeClientId(row.value) === clientId;
 }
 
 /** What the limits need from a stored refresh token. */

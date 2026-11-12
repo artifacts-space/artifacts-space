@@ -294,15 +294,22 @@ catch this, so test the generated SQL with `.toSQL()`, as
   shared addresses, so nothing that succeeds is limited per address except a
   load backstop:
   - Token endpoint (`src/lib/oauth/token-limits.ts`, rules in
-    `token-limit-rules.ts`): before Better Auth runs, the address's failure
-    limit is checked (`oauthTokenFailuresByNetwork`; over it, every token
-    request from the address is refused, a correct one too, until the window
-    passes), the backstop counted (`oauthToken`), and for a refresh whose
-    token Better Auth would accept from that client, the connection's limit
-    checked (`oauthRefreshByConnection`). After the answer, a 4xx counts a
-    failure for the address and a 200 to a refresh counts for the
-    connection. A connection is the person and the app (Better Auth's
-    refresh-token family), keyed with HMAC under the server secret: never
+    `token-limit-rules.ts`): before Better Auth runs, the backstop is counted
+    (`oauthToken`), and one indexed lookup decides whether the request
+    presents a credential valid now for its client (an unexpired code, or a
+    usable refresh token). Only a request without one meets the address's
+    failure limit (`oauthTokenFailuresByNetwork`); a valid one always goes
+    on, so failures from a hosted app's shared address (expired or revoked
+    connections, bogus codes pushed through its callback) never lock out
+    its other users. A valid refresh also meets its connection's limit
+    (`oauthRefreshByConnection`). After the answer, a 4xx counts a failure
+    for the address and a 200 to a refresh counts for the connection. The
+    failure limit only caps error work from one address: codes (about 190
+    bits), refresh tokens and client secrets (about 182 bits) are what stop
+    guessing, with the backstop. Do not add a per-client failure lockout:
+    client ids are public, so anyone could trigger it. A connection is the
+    person and the app (Better Auth's refresh-token family), keyed with
+    HMAC under the server secret: never
     the presented token (it rotates) and never the client id alone (a
     metadata-document app uses one for all its users).
   - Registration (`src/lib/oauth/registration-limits.ts`): `oauthRegister`

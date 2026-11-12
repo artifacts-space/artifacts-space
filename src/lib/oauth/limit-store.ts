@@ -1,10 +1,11 @@
-import { and, count, eq, gt, isNull, notExists, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, isNull, notExists, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { oauthClient, oauthConsent, oauthRefreshToken } from "@/db/oauth-schema";
+import { verification } from "@/db/schema";
 
 import { oauthLimits } from "./config";
-import type { StoredRefreshGrant } from "./token-limit-rules";
+import type { StoredCodeGrant, StoredRefreshGrant } from "./token-limit-rules";
 import type { UnapprovedClientCounts } from "./registration-limit-rules";
 
 /**
@@ -27,6 +28,21 @@ export async function findRefreshGrant(tokenHash: string): Promise<StoredRefresh
     })
     .from(oauthRefreshToken)
     .where(eq(oauthRefreshToken.token, tokenHash))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * The stored authorization code with this hash (hashOAuthToken of the code),
+ * or null. Better Auth keeps codes as verification rows whose identifier is
+ * that hash, and deletes the row when the code is used.
+ */
+export async function findCodeGrant(codeHash: string): Promise<StoredCodeGrant | null> {
+  const [row] = await getDb()
+    .select({ value: verification.value, expiresAt: verification.expiresAt })
+    .from(verification)
+    .where(eq(verification.identifier, codeHash))
+    .orderBy(desc(verification.createdAt))
     .limit(1);
   return row ?? null;
 }

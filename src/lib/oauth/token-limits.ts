@@ -2,9 +2,18 @@ import { networkKey, networkKeySecret } from "@/lib/abuse/network-key";
 import { countRateLimitHit, hitRateLimit, peekRateLimit } from "@/lib/abuse/rate-limit";
 
 import { hashOAuthToken } from "./config";
-import { findRefreshGrant } from "./limit-store";
+import { findCodeGrant, findRefreshGrant } from "./limit-store";
 import { oauthRateLimited } from "./request-policy";
-import { isCountedTokenFailure, oauthConnectionKey, presentedClientId, refreshConnection, refreshTokenSecret, tokenRequestFields } from "./token-limit-rules";
+import {
+  isCountedTokenFailure,
+  isUsableCodeGrant,
+  oauthConnectionKey,
+  presentedClientId,
+  refreshConnection,
+  refreshTokenSecret,
+  tokenRequestFields,
+  type TokenRequestFields,
+} from "./token-limit-rules";
 
 /**
  * The auth route's limits on `/api/auth/oauth2/token`
@@ -12,12 +21,22 @@ import { isCountedTokenFailure, oauthConnectionKey, presentedClientId, refreshCo
  * limits: checked before Better Auth runs, with outcomes counted after it
  * answers.
  *
- * Before: the network's failure limit (peeked, not counted), the network's
- * load backstop (counted on every request), and, for a refresh with a usable
- * token, the connection's limit (peeked). After: a 4xx answer counts one
- * failure for the network; a 200 to a refresh counts one for the connection.
- * Hosted apps send every user's refreshes from a few shared addresses, so
- * nothing that succeeds is limited per address except the backstop.
+ * Before: the network's load backstop is counted on every request. Then one
+ * indexed lookup decides whether the request presents a credential that is
+ * valid now: an unexpired authorization code or a usable refresh token,
+ * issued to the client presenting it. A request without one is refused while
+ * its network is over the failure limit; a request with one always goes on,
+ * so failures from a hosted app's shared address (expired or revoked
+ * connections, or bogus codes anyone can push through the app's callback)
+ * never stop that app's other users. A valid refresh also meets its
+ * connection's limit. After: a 4xx answer counts one failure for the
+ * network; a 200 to a refresh counts one for the connection.
+ *
+ * The failure limit caps the error work and noise one address causes. It is
+ * not what stops guessing: codes (32 characters of [a-zA-Z0-9], about 190
+ * bits), refresh tokens and client secrets (32 of [a-zA-Z], about 182 bits)
+ * cannot be guessed at the backstop's rate, and codes and tokens are stored
+ * only as SHA-256 hashes (client secrets encrypted).
  */
 
 /** What to count once Better Auth answers. */
@@ -28,29 +47,51 @@ interface TokenOutcomeKeys {
 
 type TokenPlan = { refused: Response } | TokenOutcomeKeys;
 
-/** The connection key for a refresh whose token Better Auth would accept from this client, or null. */
-async function connectionFor(request: Request): Promise<string | null> {
-  const fields = tokenRequestFields(await request.clone().text(), request.headers.get("content-type"));
-  if (fields.grantType !== "refresh_token") return null;
+/** Whether the request presents a credential valid now, and for a refresh, its connection key. */
+interface PresentedCredential {
+  valid: boolean;
+  connection: string | null;
+}
+
+const noCredential: PresentedCredential = { valid: false, connection: null };
+
+async function presentedRefresh(fields: TokenRequestFields, clientId: string | null): Promise<PresentedCredential> {
   const secret = refreshTokenSecret(fields.refreshToken);
-  if (!secret) return null;
+  if (!secret) return noCredential;
   const row = await findRefreshGrant(hashOAuthToken(secret));
-  const connection = row ? refreshConnection(row, presentedClientId(fields, request.headers.get("authorization")), new Date()) : null;
-  return connection ? oauthConnectionKey(connection.userId, connection.clientId, networkKeySecret()) : null;
+  const connection = row ? refreshConnection(row, clientId, new Date()) : null;
+  if (!connection) return noCredential;
+  return { valid: true, connection: oauthConnectionKey(connection.userId, connection.clientId, networkKeySecret()) };
+}
+
+async function presentedCode(fields: TokenRequestFields, clientId: string | null): Promise<PresentedCredential> {
+  if (!fields.code) return noCredential;
+  const row = await findCodeGrant(hashOAuthToken(fields.code));
+  return { valid: row !== null && isUsableCodeGrant(row, clientId, new Date()), connection: null };
+}
+
+async function presentedCredential(request: Request): Promise<PresentedCredential> {
+  const fields = tokenRequestFields(await request.clone().text(), request.headers.get("content-type"));
+  const clientId = presentedClientId(fields, request.headers.get("authorization"));
+  if (fields.grantType === "refresh_token") return presentedRefresh(fields, clientId);
+  if (fields.grantType === "authorization_code") return presentedCode(fields, clientId);
+  return noCredential;
 }
 
 async function planTokenRequest(request: Request): Promise<TokenPlan> {
   const network = networkKey(request.headers);
-  const failures = await peekRateLimit("oauthTokenFailuresByNetwork", network);
-  if (!failures.allowed) return { refused: oauthRateLimited("oauthTokenFailuresByNetwork", failures.retryAfterSeconds) };
   const load = await hitRateLimit("oauthToken", network);
   if (!load.allowed) return { refused: oauthRateLimited("oauthToken", load.retryAfterSeconds) };
-  const connection = await connectionFor(request);
-  if (connection) {
-    const decision = await peekRateLimit("oauthRefreshByConnection", connection);
+  const credential = await presentedCredential(request);
+  if (!credential.valid) {
+    const failures = await peekRateLimit("oauthTokenFailuresByNetwork", network);
+    if (!failures.allowed) return { refused: oauthRateLimited("oauthTokenFailuresByNetwork", failures.retryAfterSeconds) };
+  }
+  if (credential.connection) {
+    const decision = await peekRateLimit("oauthRefreshByConnection", credential.connection);
     if (!decision.allowed) return { refused: oauthRateLimited("oauthRefreshByConnection", decision.retryAfterSeconds) };
   }
-  return { network, connection };
+  return { network, connection: credential.connection };
 }
 
 async function countOutcome(keys: TokenOutcomeKeys, status: number): Promise<void> {

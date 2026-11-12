@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   basicAuthClientId,
   isCountedTokenFailure,
+  isUsableCodeGrant,
   isUsableRefreshGrant,
   oauthConnectionKey,
   presentedClientId,
@@ -32,16 +33,17 @@ describe("isCountedTokenFailure", () => {
 describe("tokenRequestFields", () => {
   it("should read the grant, refresh token, and client when the body is form-encoded", () => {
     const fields = tokenRequestFields("grant_type=refresh_token&refresh_token=artifacts_ort_abc&client_id=https%3A%2F%2Fapp.example%2Fmeta", form);
-    expect(fields).toEqual({ grantType: "refresh_token", refreshToken: "artifacts_ort_abc", clientId: "https://app.example/meta" });
+    expect(fields).toEqual({ grantType: "refresh_token", refreshToken: "artifacts_ort_abc", code: null, clientId: "https://app.example/meta" });
+    expect(tokenRequestFields("grant_type=authorization_code&code=c1", form).code).toBe("c1");
   });
 
   it("should read the same fields when the body is JSON", () => {
     const fields = tokenRequestFields(JSON.stringify({ grant_type: "refresh_token", refresh_token: "artifacts_ort_abc", client_id: "c" }), "application/json; charset=utf-8");
-    expect(fields).toEqual({ grantType: "refresh_token", refreshToken: "artifacts_ort_abc", clientId: "c" });
+    expect(fields).toEqual({ grantType: "refresh_token", refreshToken: "artifacts_ort_abc", code: null, clientId: "c" });
   });
 
   it("should read nothing when the body is broken, empty, or the wrong type", () => {
-    const empty = { grantType: null, refreshToken: null, clientId: null };
+    const empty = { grantType: null, refreshToken: null, code: null, clientId: null };
     expect(tokenRequestFields("{not json", "application/json")).toEqual(empty);
     expect(tokenRequestFields("[1,2]", "application/json")).toEqual(empty);
     expect(tokenRequestFields(JSON.stringify({ grant_type: 7, refresh_token: ["x"] }), "application/json")).toEqual(empty);
@@ -51,12 +53,12 @@ describe("tokenRequestFields", () => {
 
 describe("presentedClientId", () => {
   it("should take the body's client when it names one", () => {
-    expect(presentedClientId({ grantType: null, refreshToken: null, clientId: "body" }, `Basic ${btoa("basic:secret")}`)).toBe("body");
+    expect(presentedClientId({ grantType: null, refreshToken: null, code: null, clientId: "body" }, `Basic ${btoa("basic:secret")}`)).toBe("body");
   });
 
   it("should take the Basic header's client, form-decoded, when the body names none", () => {
     expect(basicAuthClientId(`Basic ${btoa("my%20app:secret")}`)).toBe("my app");
-    expect(presentedClientId({ grantType: null, refreshToken: null, clientId: null }, `Basic ${btoa("basic:secret")}`)).toBe("basic");
+    expect(presentedClientId({ grantType: null, refreshToken: null, code: null, clientId: null }, `Basic ${btoa("basic:secret")}`)).toBe("basic");
   });
 
   it("should find no client when the header is missing, not Basic, or malformed", () => {
@@ -131,5 +133,24 @@ describe("oauthConnectionKey", () => {
     expect(key).not.toBe(oauthConnectionKey("user-1", "client-1", "t"));
     expect(key).toMatch(/^[0-9a-f]{32}$/);
     expect(key).not.toContain("user-1");
+  });
+});
+
+describe("isUsableCodeGrant", () => {
+  const value = JSON.stringify({ type: "authorization_code", query: { client_id: "client-1", redirect_uri: "https://app.example/cb" }, userId: "u" });
+
+  it("should accept an unexpired code when the client it was issued to presents it", () => {
+    expect(isUsableCodeGrant({ value, expiresAt: later }, "client-1", now)).toBe(true);
+  });
+
+  it("should refuse a code for another client, an expired code, or a code with no client", () => {
+    expect(isUsableCodeGrant({ value, expiresAt: later }, "client-2", now)).toBe(false);
+    expect(isUsableCodeGrant({ value, expiresAt: now }, "client-1", now)).toBe(false);
+    expect(isUsableCodeGrant({ value, expiresAt: later }, null, now)).toBe(false);
+  });
+
+  it("should refuse a stored row that is not an authorization code when another flow wrote it", () => {
+    expect(isUsableCodeGrant({ value: "not json", expiresAt: later }, "client-1", now)).toBe(false);
+    expect(isUsableCodeGrant({ value: JSON.stringify({ type: "magic-link", query: { client_id: "client-1" } }), expiresAt: later }, "client-1", now)).toBe(false);
   });
 });
