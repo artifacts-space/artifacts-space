@@ -85,6 +85,16 @@ function useInBrowser(): boolean {
 /** Someone else's artifact shared by link: outside the list, so only a link (n6 in the bell) opens it, pinned to the top. */
 const linkOnlyArtifact: ArtifactDto = fixtureArtifact({ id: "fixture-link-only", kind: "text", title: "Shared by link fixture", content: "Opened from a link.", publicId: LINK_ONLY_PUBLIC_ID });
 
+/** A teammate's Markdown page shared by link, read only for the fixture's viewer: the shared pane, with tags and without (`?artifact=<publicId>`). */
+function teammatePage(id: string, publicId: string, tags: string[]): ArtifactDto {
+  const page = fixtureArtifact({ id, kind: "markdown", title: "Teammate's plan", content: "# Plan\n\nRead only for you.", publicId });
+  return { ...page, authorId: "fixture-teammate", visibility: "link", tags };
+}
+const teammatePages: readonly ArtifactDto[] = [
+  teammatePage("fixture-teammate-plain", "fixtureteammatenotags1", []),
+  teammatePage("fixture-teammate-tagged", "fixtureteammatetagged1", ["launch", "rates"]),
+];
+
 /** The artifact `slowLoad` leaves to load on open: the one the bell's comment rows link to. */
 const SLOW_ARTIFACT_ID = "fixture-markdown";
 const slowPublicIds: ReadonlySet<string> = new Set(["fixtureworkspace000md"]);
@@ -165,7 +175,7 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
   const facets = useMemo(() => fixtureFacets(artifacts), [artifacts]);
   const notifications = useMemo(() => fixtureNotifications(), []);
   // As on /app: what the link finds, in the list or not (the workspace pins it to the top), or null when it is gone.
-  const full = useMemo(() => [...artifacts, linkOnlyArtifact], [artifacts]);
+  const full = useMemo(() => [...artifacts, linkOnlyArtifact, ...teammatePages], [artifacts]);
   // Kept from the first load: a bell link drops `?slowload=1` from the URL, and the slow artifact must stay slow.
   const [slow] = useState(slowLoad);
   const controls = useFixtureControls(slow, full, slowPublicIds);

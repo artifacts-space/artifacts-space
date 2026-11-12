@@ -96,12 +96,15 @@ function MentionMenu({ listId, items, query, self, hasCandidates, command, onAct
   return <MentionSuggestionList id={listId} options={items} activeIndex={active} optionId={(index) => `${listId}-${String(index)}`} onPick={command} onHover={setActive} />;
 }
 
-/** The box's combobox state for screen readers: open, which list, and the highlighted option. */
+/**
+ * Which list the box's suggestions are in and which one is highlighted, for
+ * screen readers. The box keeps the textbox role (a combobox cannot hold
+ * rich text), which supports `aria-autocomplete`, `aria-controls`, and
+ * `aria-activedescendant` but not `aria-expanded`.
+ */
 function setComboboxState(editor: Editor, listId: string, activeIndex: number | null) {
   const dom = editor.view.dom;
-  const open = activeIndex !== null && activeIndex >= 0;
-  dom.setAttribute("aria-expanded", String(open));
-  if (open) {
+  if (activeIndex !== null && activeIndex >= 0) {
     dom.setAttribute("aria-controls", listId);
     dom.setAttribute("aria-activedescendant", `${listId}-${String(activeIndex)}`);
     return;

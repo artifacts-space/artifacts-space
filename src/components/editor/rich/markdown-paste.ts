@@ -1,7 +1,8 @@
-import { Extension } from "@tiptap/core";
+import { Extension, type JSONContent } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 import { parseMarkdownFragment } from "./markdown-roundtrip";
+import { isAllowedEditorUri } from "./markdown-schema";
 
 /** Line starts and inline syntax that mark text as Markdown. */
 const markdownSignals: readonly RegExp[] = [
@@ -34,7 +35,26 @@ export function shouldPasteAsMarkdown(text: string, html: string): boolean {
   return looksLikeMarkdown(text);
 }
 
-/** Pasting Markdown text inserts formatted blocks, outside code blocks. */
+function isSafeLinkMark(mark: { type: string; attrs?: Record<string, unknown> }): boolean {
+  if (mark.type !== "link") return true;
+  const href = mark.attrs?.href;
+  return typeof href === "string" && isAllowedEditorUri(href);
+}
+
+/**
+ * Pasted nodes with every link whose address the link policy refuses
+ * (`javascript:` and the like) turned back into its words, as the link menu
+ * refuses them.
+ */
+export function withoutUnsafeLinks(nodes: readonly JSONContent[]): JSONContent[] {
+  return nodes.map((node) => ({
+    ...node,
+    ...(node.marks ? { marks: node.marks.filter(isSafeLinkMark) } : {}),
+    ...(node.content ? { content: withoutUnsafeLinks(node.content) } : {}),
+  }));
+}
+
+/** Pasting Markdown text inserts formatted blocks, outside code blocks. Unsafe links paste as their words. */
 export const MarkdownPaste = Extension.create({
   name: "markdownPaste",
 
@@ -49,7 +69,7 @@ export const MarkdownPaste = Extension.create({
             const text = event.clipboardData?.getData("text/plain") ?? "";
             const html = event.clipboardData?.getData("text/html") ?? "";
             if (!shouldPasteAsMarkdown(text, html)) return false;
-            const nodes = parseMarkdownFragment(text);
+            const nodes = withoutUnsafeLinks(parseMarkdownFragment(text));
             if (nodes.length === 0) return false;
             return editor.commands.insertContent(nodes);
           },

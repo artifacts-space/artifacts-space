@@ -1,71 +1,52 @@
 "use client";
 
-import { Extension, type Editor } from "@tiptap/core";
+import type { Editor } from "@tiptap/core";
+import { TextSelection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { TableBubbleMenu, TextBubbleMenu } from "@/components/editor/rich/bubble-menus";
 import { richEditorExtensions } from "@/components/editor/rich/editor-extensions";
+import { MarkdownLinkInput } from "@/components/editor/rich/markdown-link-input";
 import { parseMarkdown, serializeMarkdown, type SourceMap } from "@/components/editor/rich/markdown-roundtrip";
 import { useCoarsePointer } from "@/components/editor/rich/use-coarse-pointer";
 import { cn } from "@/lib/utils";
 
-import { commentBoxClass, commentBoxHeight, commentTextClass } from "./comment-box";
+import { positionForOffset } from "./caret-handoff";
+import { commentBoxClass, commentBoxHeight, commentBoxMaxHeight, commentFocusClass, commentTextClass, isSubmitShortcut } from "./comment-box";
 import { CommentMentions, type MentionSource } from "./comment-mentions";
 
+/** What the composer does with the rich box once it is ready. */
+export interface CommentEditorApi {
+  /**
+   * Takes over from the plain box: its Markdown, and when the plain box had
+   * focus, the caret's offset in its text.
+   */
+  load: (markdown: string, caret: number | null) => void;
+}
+
 export interface CommentEditorProps {
-  /** The Markdown the box starts with: empty, a quote, or the comment being edited. */
-  initialValue: string;
   onChange: (markdown: string) => void;
   label: string;
   placeholder: string;
-  autoFocus: boolean;
+  /** Hidden until it has taken over from the plain box. */
+  hidden: boolean;
+  /** Called once the editor exists, so the composer can hand it the plain box's text. */
+  onReady: (api: CommentEditorApi) => void;
   /** Changes when the composer posted: the box empties and starts a fresh Markdown map. */
   clearSignal: number;
-  /** ⌘↵ or Ctrl+↵. */
+  /** ⌘↵ or Ctrl+↵, from anywhere in the box: text, a code block, or Markdown kept as written. */
   onSubmitShortcut: () => void;
   mentions: MentionSource;
   /** A short box, for the card at an inline comment's words. */
   compact: boolean;
 }
 
-/** The DOM event the box sends for ⌘↵ or Ctrl+↵. */
-const SUBMIT_EVENT = "comment-submit";
-
 const FILES_REFUSED = "Comments hold text only. To share a file, add it to the artifact.";
-
-/** ⌘↵ or Ctrl+↵ posts the comment from anywhere in the box. */
-const SubmitShortcut = Extension.create({
-  name: "commentSubmit",
-  addKeyboardShortcuts() {
-    return {
-      "Mod-Enter": () => {
-        this.editor.view.dom.dispatchEvent(new CustomEvent(SUBMIT_EVENT));
-        return true;
-      },
-    };
-  },
-});
 
 /** True when there is something to link: a selection, or a link under the cursor. */
 function canEditLink(editor: Editor): boolean {
   return !editor.state.selection.empty || editor.isActive("link");
-}
-
-/** A comment started with text (a quote) opens with the cursor after it, in view. */
-function revealStart(editor: Editor) {
-  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  editor.view.dom.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
-}
-
-/** Runs the composer's submit when the box asks for it. */
-function useSubmitShortcut(editor: Editor | null, onSubmit: () => void) {
-  useEffect(() => {
-    if (!editor) return;
-    const dom = editor.view.dom;
-    dom.addEventListener(SUBMIT_EVENT, onSubmit);
-    return () => { dom.removeEventListener(SUBMIT_EVENT, onSubmit); };
-  }, [editor, onSubmit]);
 }
 
 /** Empties the box after a post, with a fresh Markdown map so the next comment starts clean. */
@@ -74,24 +55,63 @@ function useClearOnSignal(editor: Editor | null, signal: number, sourceRef: Reac
   useEffect(() => {
     if (!editor || seen.current === signal) return;
     seen.current = signal;
-    sourceRef.current = parseMarkdown("").source;
+    sourceRef.current = parseMarkdown("", "comment").source;
     editor.commands.clearContent(false);
   }, [editor, signal, sourceRef]);
 }
 
 /**
- * The rich comment box: the artifact editor's schema, Markdown shortcuts,
- * Markdown paste, and menu over selected text, in a box that grows with
- * its text. It reads and writes Markdown with the same round trip as the
- * artifact editor, so an edited comment keeps every part nobody touched
- * exactly as written. Text only: no slash menu, no media, no block handles.
- * Loaded on demand (comment-composer.tsx).
+ * Puts the caret at `position` and focuses the box, now: the editor's own
+ * focus command waits a frame, and a phone's browser can move the caret to
+ * the start meanwhile.
  */
-export default function CommentEditor({ initialValue, onChange, label, placeholder, autoFocus, clearSignal, onSubmitShortcut, mentions, compact }: CommentEditorProps) {
-  const [loaded] = useState(() => parseMarkdown(initialValue));
+function focusAt(editor: Editor, position: number) {
+  const { state, view } = editor;
+  view.dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(position))));
+  view.focus();
+}
+
+/**
+ * Hands the composer the box's `load` once the editor exists. `load` takes
+ * over in one step: the text goes in, the box shows, and the caret goes
+ * where it was in the plain box, so no key typed meanwhile goes astray.
+ */
+function useHandoff(editor: Editor | null, root: React.RefObject<HTMLDivElement | null>, onReady: (api: CommentEditorApi) => void, sourceRef: React.RefObject<SourceMap>) {
+  useEffect(() => {
+    if (!editor) return;
+    const api: CommentEditorApi = {
+      load: (markdown, caret) => {
+        const loaded = parseMarkdown(markdown, "comment");
+        sourceRef.current = loaded.source;
+        editor.commands.setContent(loaded.doc, { emitUpdate: false });
+        // Shown at once, ahead of the composer's next render, which keeps it shown.
+        if (root.current) root.current.hidden = false;
+        if (caret !== null) focusAt(editor, positionForOffset(editor.state.doc, caret));
+      },
+    };
+    let current = true;
+    // After React's commit, where the editor's node views may render, and before any key typed next is handled.
+    queueMicrotask(() => {
+      if (current && !editor.isDestroyed) onReady(api);
+    });
+    return () => { current = false; };
+  }, [editor, onReady, root, sourceRef]);
+}
+
+/**
+ * The rich comment box: the artifact editor's schema, Markdown shortcuts,
+ * Markdown paste, typed Markdown links, and the menu over selected text, in
+ * a box that grows with its text. It reads and writes a comment's Markdown
+ * (markdown-roundtrip.ts, "comment"): text stays as typed, and every part
+ * nobody touched is written back exactly. Text only: no slash menu, no
+ * media, no block handles. Loaded on demand; the composer shows a plain box
+ * until it is ready (comment-composer.tsx).
+ */
+export default function CommentEditor({ onChange, label, placeholder, hidden, onReady, clearSignal, onSubmitShortcut, mentions, compact }: CommentEditorProps) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [filesRefused, setFilesRefused] = useState(false);
-  const sourceRef = useRef<SourceMap>(loaded.source);
+  const sourceRef = useRef<SourceMap>(parseMarkdown("", "comment").source);
+  const root = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
   const coarse = useCoarsePointer();
 
@@ -109,34 +129,28 @@ export default function CommentEditor({ initialValue, onChange, label, placehold
         onMediaRefused: () => { setFilesRefused(true); },
         boxPlaceholder: placeholder,
       }),
+      MarkdownLinkInput,
       CommentMentions,
-      SubmitShortcut,
     ],
     [placeholder],
   );
 
   const editor = useEditor({
     extensions,
-    content: loaded.doc,
     immediatelyRender: false,
-    autofocus: autoFocus ? "end" : false,
     editorProps: {
       attributes: {
-        class: cn("artifact-prose rich-editor-content max-w-none overflow-y-auto px-2.5 py-2 outline-none", commentTextClass, commentBoxHeight(compact), compact ? "max-h-40" : "max-h-96"),
+        class: cn("artifact-prose rich-editor-content max-w-none overflow-y-auto px-2.5 py-2 outline-none", commentTextClass, commentBoxHeight(compact), commentBoxMaxHeight(compact)),
         role: "textbox",
         "aria-label": label,
         "aria-multiline": "true",
         "aria-autocomplete": "list",
-        "aria-expanded": "false",
         spellcheck: "true",
       },
     },
-    onCreate: ({ editor: current }) => {
-      if (autoFocus && initialValue) revealStart(current);
-    },
     onUpdate: ({ editor: current }) => {
       setFilesRefused(false);
-      onChangeRef.current(serializeMarkdown(current.getJSON(), sourceRef.current));
+      onChangeRef.current(serializeMarkdown(current.getJSON(), sourceRef.current, "comment"));
     },
     onSelectionUpdate: () => { setLinkOpen(false); },
   });
@@ -145,12 +159,20 @@ export default function CommentEditor({ initialValue, onChange, label, placehold
   useEffect(() => {
     if (editor && !editor.isDestroyed) editor.commands.setMentionSource(mentions);
   }, [editor, mentions]);
-  useSubmitShortcut(editor, onSubmitShortcut);
+  useHandoff(editor, root, onReady, sourceRef);
   useClearOnSignal(editor, clearSignal, sourceRef);
 
+  function onKeyDownCapture(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (!isSubmitShortcut(event)) return;
+    // Before the editor and its blocks see it: a code block would leave the block, and Markdown kept as written would add a line.
+    event.preventDefault();
+    event.stopPropagation();
+    onSubmitShortcut();
+  }
+
   return (
-    <>
-      <div data-slot="comment-editor" className={cn(commentBoxClass, "focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50")}>
+    <div ref={root} hidden={hidden}>
+      <div data-slot="comment-editor" onKeyDownCapture={onKeyDownCapture} className={cn(commentBoxClass, commentFocusClass)}>
         {editor && !coarse ? (
           <>
             <TextBubbleMenu editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} commentButton={false} />
@@ -161,6 +183,6 @@ export default function CommentEditor({ initialValue, onChange, label, placehold
       </div>
       {/* Kept in the page, so screen readers hear the note when it appears. */}
       <p role="status" className={cn("mt-2 text-xs text-muted-foreground", !filesRefused && "sr-only")}>{filesRefused ? FILES_REFUSED : ""}</p>
-    </>
+    </div>
   );
 }

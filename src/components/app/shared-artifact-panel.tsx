@@ -75,7 +75,7 @@ function PanelChips({ kind, tags }: { kind: ArtifactDto["kind"]; tags: readonly 
   const format = showsFormatChip(kind);
   if (!format && tags.length === 0) return null;
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
+    <div data-slot="panel-chips" className="mt-3 flex flex-wrap items-center gap-2">
       {format ? <KindChip kind={kind} /> : null}
       {tags.map((tag) => <span key={tag} className="inline-flex h-7 items-center rounded-lg border px-2 text-sm text-muted-foreground">{tag}</span>)}
     </div>
@@ -94,7 +94,7 @@ function PanelHeader({ artifact, column, status }: { artifact: ArtifactDto; colu
         </h2>
         {artifact.summary ? <p className="mt-2 text-md leading-6 text-muted-foreground">{artifact.summary}</p> : null}
         <PanelChips kind={artifact.kind} tags={artifact.tags} />
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-3 text-xs text-muted-foreground">
+        <div data-slot="panel-meta" className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-3 text-xs text-muted-foreground">
           <LastEdited editor={artifact.updatedBy} at={artifact.updatedAt} />
           <HarnessByline harness={artifact.harness} className="text-xs" />
           <span aria-hidden>·</span>
