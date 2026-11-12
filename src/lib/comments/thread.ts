@@ -4,7 +4,7 @@ import { getDb } from "@/db";
 import { agent, comment, threadMute } from "@/db/schema";
 import type { ArtifactMetaRecord } from "@/lib/artifact-columns";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
-import { getArtifactAccess } from "@/lib/access";
+import { getArtifactAccess, type ArtifactAccess } from "@/lib/access";
 import type { Actor } from "@/lib/agents/identity";
 import { loadActor } from "@/lib/agents/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -25,6 +25,8 @@ export interface Thread {
   artifact: ArtifactMetaRecord;
   /** The title this actor may read (the approved one for readers outside the team). */
   title: string;
+  /** Which version this actor is served: inline comment quotes follow it (anchor-privacy-rules.ts). */
+  version: ArtifactAccess["version"];
 }
 
 /**
@@ -39,7 +41,7 @@ export async function requireThread(actorId: string, publicId: string): Promise<
   const { record } = viewable;
   const allowed = canUseComments({ signedIn: true, setting: record.comments, canViewArtifact: true, isAuthor: record.userId === actorId, isTeamMember: viewable.isTeamMember });
   if (!allowed) throw new UserFacingError(hiddenCommentsMessage(record.comments));
-  return { actor, artifact: record, title: viewable.served.title };
+  return { actor, artifact: record, title: viewable.served.title, version: viewable.version };
 }
 
 /** Agent ids muted in this artifact's thread. */

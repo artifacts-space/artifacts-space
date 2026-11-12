@@ -16,6 +16,7 @@ import { BlockMenuFor } from "@/components/editor/rich/block-menu/block-menu-con
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { VersionHistory } from "@/components/history/version-history";
 import { ViewsDialog } from "@/components/views/views-dialog";
+import { InlineCommentsProvider } from "@/components/inline-comments/inline-comments-provider";
 import { ArtifactOrganizers } from "@/components/projects/artifact-organizers";
 import { useArtifactHarness, type HarnessControl } from "@/components/harness/use-artifact-harness";
 import type { ArtifactDto } from "@/lib/artifact-types";
@@ -171,6 +172,8 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   };
 
   return (
+    // A stored Markdown artifact takes comments on its words: highlights in the text, threads in cards at them.
+    <InlineCommentsProvider publicId={artifact.publicId} kind={draft.kind} canComment={seesComments} stored={!page.blank}>
     <section ref={sectionRef} className={detailSection} aria-label={page.label}>
       {page.blank ? <BlankToolbar kind={draft.kind} notice={notice} onChangeFormat={() => { setFormatOpen(true); }} /> : (
         <ArtifactToolbar
@@ -268,5 +271,6 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
         pending={deleting}
       />
     </section>
+    </InlineCommentsProvider>
   );
 }

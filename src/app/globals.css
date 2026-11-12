@@ -673,6 +673,25 @@
     }
   }
 
+  /*
+   * Inline comments: the words a comment is on, drawn as CSS highlights
+   * (src/components/inline-comments), so the text itself is never changed.
+   * The colors are the yellow block pair, which every artifact theme
+   * re-lights for its own surface; the underline keeps the mark readable
+   * without relying on the fill alone. The open thread's words are stronger.
+   */
+  ::highlight(inline-comment) {
+    background-color: var(--block-yellow-bg);
+    text-decoration: underline 2px color-mix(in oklch, var(--block-yellow) 55%, transparent);
+    text-underline-offset: 3px;
+  }
+
+  ::highlight(inline-comment-active) {
+    background-color: color-mix(in oklch, var(--block-yellow) 30%, var(--block-yellow-bg));
+    text-decoration: underline 2px var(--block-yellow);
+    text-underline-offset: 3px;
+  }
+
   ::selection {
     background: color-mix(in oklch, var(--brand) 22%, transparent);
   }

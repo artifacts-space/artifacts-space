@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
+import { CommentButton } from "./comment-button";
 import { FormatButtons, LinkEditor, ToolButton } from "./format-controls";
 import { insertBlock, slashCommands } from "./slash-commands";
 
@@ -52,7 +53,7 @@ function useStickyOffset(ref: React.RefObject<HTMLElement | null>): number {
 /**
  * A slim toolbar for touch screens, where a menu over the selection fights
  * the system's own selection menu: insert a block, format the selection,
- * add a link, undo, and redo. It sticks under the editing bar while you scroll.
+ * add a link, comment on the selection, undo, and redo. It sticks under the editing bar while you scroll.
  */
 export function TouchToolbar({ editor, linkOpen, onLinkOpenChange }: TouchToolbarProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -70,6 +71,7 @@ export function TouchToolbar({ editor, linkOpen, onLinkOpenChange }: TouchToolba
           <InsertMenu editor={editor} />
           <span aria-hidden className="mx-0.5 h-5 w-px shrink-0 bg-border" />
           <FormatButtons editor={editor} onLink={() => { onLinkOpenChange(true); }} />
+          <CommentButton />
           <span aria-hidden className="mx-0.5 h-5 w-px shrink-0 bg-border" />
           <ToolButton icon={IconArrowBackUp} label="Undo" disabled={!history.undo} onPress={() => { editor.chain().focus().undo().run(); }} />
           <ToolButton icon={IconArrowForwardUp} label="Redo" disabled={!history.redo} onPress={() => { editor.chain().focus().redo().run(); }} />

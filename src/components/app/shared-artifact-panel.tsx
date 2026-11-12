@@ -14,6 +14,8 @@ import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { CommentsControl } from "@/components/app/comments-picker";
 import { CopyButton } from "@/components/copy-button";
 import { HarnessByline } from "@/components/harness/harness-byline";
+import { InlineCommentSurface } from "@/components/inline-comments/inline-comment-surface";
+import { InlineCommentsProvider } from "@/components/inline-comments/inline-comments-provider";
 import { LastEdited } from "@/components/history/last-edited";
 import { VersionHistory } from "@/components/history/version-history";
 import { Button } from "@/components/ui/button";
@@ -112,6 +114,8 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
   useScrollbarRoom(outerRef, bodyRef);
 
   return (
+    // A Markdown artifact takes comments on its words: highlights in the text, threads in cards at them.
+    <InlineCommentsProvider publicId={artifact.publicId} kind={artifact.kind} canComment={seesComments}>
     <section className={detailSection} aria-label={artifact.title}>
       <div className="flex min-h-14 flex-wrap items-center gap-2 border-b px-4 py-2 max-md:sticky max-md:top-14 max-md:z-10 max-md:bg-card sm:px-5">
         <ShowSidebarButton />
@@ -150,7 +154,9 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
               <CsvExportContext value={exportable}>
                 <ArtifactSheetFormat artifactId={null} stored={artifact.sheetFormat}>
                   <ReaderBlockMenu publicId={artifact.publicId} enabled={artifact.kind === "markdown"}>
-                    <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
+                    <InlineCommentSurface>
+                      <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
+                    </InlineCommentSurface>
                   </ReaderBlockMenu>
                 </ArtifactSheetFormat>
               </CsvExportContext>
@@ -159,5 +165,6 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
         </div>
       </div>
     </section>
+    </InlineCommentsProvider>
   );
 }

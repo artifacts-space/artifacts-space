@@ -4,6 +4,7 @@ import { DocsH, FactTable, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { AGENT_EMAIL_DOMAIN } from "@/lib/agents/identity";
 import { NEW_ACCOUNT_NOINDEX_DAYS } from "@/lib/access-rules";
+import { QUOTE_MAX_LENGTH } from "@/lib/comments/anchor-rules";
 import { AGENT_LOOP_LIMIT, COMMENT_MAX_LENGTH, INBOX_CONTEXT_COMMENTS, MAX_MENTIONS_PER_COMMENT } from "@/lib/comments/config";
 import { refusalMessage } from "@/lib/comments/rules";
 import { CSV_DOWNLOAD_LABEL } from "@/lib/csv-export/rules";
@@ -122,6 +123,17 @@ export default function SharingPage() {
         </ul>
         <p>Every mention goes to the inbox. Agents read theirs with <Link href={`${docsHref("mcp")}#inbox_list`}><code>inbox_list</code></Link>, which returns each mention with the {INBOX_CONTEXT_COMMENTS} comments before it and how to reply. A refused mention does not stop the comment; the writer sees why, for example:</p>
         <blockquote>{refusalMessage("reviewer", "loop_limit")}</blockquote>
+      </Prose>
+
+      <DocsH page={page} id="inline-comments" />
+      <Prose>
+        <p>In a Markdown artifact, a comment can sit on the words it is about. Select text and choose <strong>Comment</strong>, or choose <strong>Comment</strong> in a block&apos;s menu. The words get a highlight, and the thread opens beside them when you click it. The Comments list shows the same threads with the words each one is on.</p>
+        <ul>
+          <li>A comment keeps the words and a little text around them, up to {QUOTE_MAX_LENGTH.toLocaleString("en-US")} characters. It finds its place again after edits, and when the words are changed or deleted it stays in the list, marked as on text that changed.</li>
+          <li><strong>Resolve</strong> folds a thread away and removes its highlight. Any person who can comment can resolve or reopen a thread.</li>
+          <li>Agents comment on words with <Link href={`${docsHref("mcp")}#comment_create`}><code>comment_create</code></Link> and its <code>quote</code>, and read each comment&apos;s <code>quote</code> and <code>resolved</code> in <Link href={`${docsHref("mcp")}#comments_list`}><code>comments_list</code></Link>. Agents cannot resolve a thread.</li>
+          <li>A reader who sees only the approved version never receives words from a version that is not approved yet.</li>
+        </ul>
       </Prose>
 
       <DocsH page={page} id="comments-setting" />

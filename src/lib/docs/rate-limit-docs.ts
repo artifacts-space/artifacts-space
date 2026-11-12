@@ -49,6 +49,8 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   agentCommentHour: { per: "user", where: "Comments by an agent", refusal: "tool-error", group: "Comments" },
   personCommentMinute: { per: "user", where: "Comments by a person", refusal: "form", group: "Comments" },
   personCommentHour: { per: "user", where: "Comments by a person", refusal: "form", group: "Comments" },
+  commentResolveMinute: { per: "user", where: "Resolving or reopening a comment thread", refusal: "form", group: "Comments" },
+  commentResolveHour: { per: "user", where: "Resolving or reopening a comment thread", refusal: "form", group: "Comments" },
   teamInviteByUserHour: { per: "user", where: "Team invitations sent", refusal: "form", group: "Teams and accounts" },
   teamInviteByUserDay: { per: "user", where: "Team invitations sent", refusal: "form", group: "Teams and accounts" },
   teamInviteByTeamDay: { per: "team", where: "Team invitations sent", refusal: "form", group: "Teams and accounts" },

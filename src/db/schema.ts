@@ -422,6 +422,13 @@ export const comment = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     // Soft delete keeps replies in place and rate limits honest.
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    // An inline comment's words (src/lib/comments/anchor-rules.ts). Null for a comment on the whole artifact and for replies.
+    quote: text("quote"),
+    quotePrefix: text("quote_prefix"),
+    quoteSuffix: text("quote_suffix"),
+    // A resolved thread (top-level comments only). Never touches updated_at, which drives "edited".
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedBy: text("resolved_by").references(() => user.id, { onDelete: "set null" }),
   },
   (table) => [
     index("comment_artifact_created_idx").on(table.artifactId, table.createdAt),

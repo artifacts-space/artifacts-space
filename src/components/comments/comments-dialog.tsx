@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useInlineComments } from "@/components/inline-comments/inline-comments-context";
 
 import { CommentThread } from "./comment-thread";
 import { useLinkedComments } from "./linked-comments";
@@ -18,6 +19,12 @@ interface CommentsDialogProps {
   /** What to say when comments are off, for example where to turn them on. */
   offNotice: string;
   className?: string;
+}
+
+/** True while a thread or a new comment is open at this artifact's text (its inline comments). */
+function useAtText(publicId: string): boolean {
+  const inline = useInlineComments();
+  return inline?.publicId === publicId && (inline.activeId !== null || inline.draft !== null);
 }
 
 /**
@@ -42,6 +49,13 @@ export function CommentsDialog({ publicId, title, seesComments, offNotice, class
   if (quote !== quoteSeen) {
     setQuoteSeen(quote);
     if (quote !== null && seesComments) setOpen(true);
+  }
+  // "Show in the text" on an inline comment opens its thread at its words; the dialog gets out of the way.
+  const atText = useAtText(publicId);
+  const [wasAtText, setWasAtText] = useState(atText);
+  if (atText !== wasAtText) {
+    setWasAtText(atText);
+    if (atText) setOpen(false);
   }
   useEffect(() => {
     if (linked) consume();

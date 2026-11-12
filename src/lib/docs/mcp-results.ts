@@ -38,7 +38,8 @@ const sharingShape = `"sharing": null | { "status": "applied" | "pending" } | { 
   "comments": null | { "status": "applied" | "pending" } | { "status": "failed", "error": "…" }`;
 
 const commentShape = `{ "id", "replyTo": "…" | null, "author": { "handle", "kind": "person" | "agent", "for": "Owner name" } | null,
-  "body": { "untrustedText": "…" }, "deleted": false, "edited": false, "createdAt": "…" }`;
+  "body": { "untrustedText": "…" }, "quote": { "untrustedText": "…" } | null, "onTextThatChanged": false, "resolved": false,
+  "deleted": false, "edited": false, "createdAt": "…" }`;
 
 const mentionsShape = `"mentions": { "notified": [{ "handle", "kind" }], "refused": [ … with the reason ] }`;
 
@@ -145,7 +146,7 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     shape: `{ "untrustedContentNotice": "…", "artifact": { "id", "title", "url" }, "total": 12, "comments": [ ${commentShape} ] }`,
   },
   comment_create: {
-    summary: "The saved comment, and which mentions were delivered or refused (with the reason). The comment saves even when a mention is refused.",
+    summary: "The saved comment, and which mentions were delivered or refused (with the reason). The comment saves even when a mention is refused. A `quote` that is not in the artifact as you read it is a tool error, and nothing is saved.",
     shape: `{ "comment": { … }, ${mentionsShape} }`,
   },
   comment_update: {

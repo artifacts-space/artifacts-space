@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { copyBlockLink } from "@/components/block-links/copy-block-link";
 import { quotedCommentBody, requestQuotedComment } from "@/components/comments/quote-request";
+import { startInlineComment } from "@/components/inline-comments/inline-comments-context";
 import { blockLink } from "@/lib/block-links/anchor-rules";
 import type { BlockColorPart, BlockHue } from "@/lib/block-colors/block-color-rules";
 
@@ -42,8 +43,27 @@ function copyLink(editor: Editor, target: BlockTarget, publicId: string): boolea
   return true;
 }
 
-/** Opens the artifact's comments with a new comment quoting the block. */
+/** The stretch of the page a block's text covers, or null for a block without text. */
+function blockTextOnPage(editor: Editor, target: BlockTarget): Range | null {
+  const { from, to } = blockTextRange(target);
+  if (to <= from || blockText(target.node).trim() === "") return null;
+  const start = editor.view.domAtPos(from);
+  const end = editor.view.domAtPos(to);
+  const range = document.createRange();
+  range.setStart(start.node, start.offset);
+  range.setEnd(end.node, end.offset);
+  return range;
+}
+
+/**
+ * Starts a comment on the block: an inline comment on its words, in a card
+ * at the block. A block without words (an image, a divider), or an editor
+ * whose artifact has no inline comments, opens the artifact's comments with
+ * a new comment that links to the block instead.
+ */
 function comment(editor: Editor, target: BlockTarget, publicId: string): boolean {
+  const words = blockTextOnPage(editor, target);
+  if (words && startInlineComment(publicId, words)) return true;
   const link = linkToBlock(editor, target, publicId) ?? `${window.location.origin}/artifact/${encodeURIComponent(publicId)}`;
   requestQuotedComment(publicId, quotedCommentBody(blockText(target.node), link));
   return true;

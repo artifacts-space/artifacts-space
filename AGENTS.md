@@ -461,6 +461,59 @@ blocks the same way (each top-level block that is not a list, then every list
 item, in document order), so a link built on one surface finds its block on
 the other; `BlockLinkTarget` on the page scrolls to it and highlights it.
 
+### Inline comments
+
+A top-level comment on a Markdown artifact can sit on words in the text.
+It stores no position: it keeps the words (`quote`, up to 1,000 characters)
+and up to 64 characters before and after them (`quote_prefix`,
+`quote_suffix`), and each surface finds the words again in the text it
+shows (`src/lib/comments/anchor-rules.ts`, pure and shared by browser and
+server). Matching ignores every space and line break, so the same quote
+matches in the editor, the read view, and the Markdown an agent reads.
+When the words are gone the comment stays in the list, marked as on text
+that changed; nothing is deleted or moved by an edit.
+
+The browser side is `src/components/inline-comments`. A provider per page
+(`InlineCommentsProvider`: `/app` editor, the shared pane, the artifact
+page) loads the thread once and shares it with the Comments list, so both
+show one state. `InlineCommentSurface` wraps the document; it reads the
+page's text (`dom-text.ts`) and paints the words with the CSS Custom
+Highlight API (`::highlight(inline-comment)` in `globals.css`, block
+yellow tokens), so it never changes the document's DOM or the editor's
+content. The thread opens in a card at the words. The editor and the read
+view must read the same words, so interface text inside the document is
+left out (`SKIPPED` in `dom-text.ts`): an `svg`, a button, `.sr-only` text
+(a link's "opens in a new tab"), an editor block's non-editable controls,
+and anything under `[data-comment-skip]`. Put `data-comment-skip` on any
+new label, caption, or notice you render inside a document. The words are
+found again 150ms after the text last changed, not on every keystroke;
+between passes a highlight is a live range and moves with its words. The
+provider and the surface keep one tree shape whether inline comments are on
+or off, so turning them on (a new artifact's first save) never remounts the
+editor: keep it that way. The provider is on only for Markdown artifacts
+that are saved and whose comments the viewer may write; everywhere else
+Comment in the block menu opens the Comments dialog as before, and the
+server refuses a quote on any other format. Highlights are not exposed to assistive technology: the
+Comments list is the accessible way to every thread, so keep it complete.
+
+Privacy rule: a quote is text of the artifact. A reader who is served the
+approved version must never receive a quote, prefix, or suffix made on a
+version that is not approved. `anchor-privacy-rules.ts` and
+`served-anchors.ts` gate every path that returns comments (web thread,
+inbox, `?comments=1` Markdown, MCP): the quote is returned only when it is
+found in the text that reader is served, and the quote, prefix, and suffix
+they get are all read from that text, never from the stored anchor. Add any new path that returns comments to that
+gate. An agent's `quote` on `comment_create` must be in the text the agent
+can read, or the call fails and saves nothing.
+
+Resolve (`resolveComment`, `rules.ts`): people who can comment resolve and
+reopen top-level threads; agents cannot. It is rate limited per person
+(`RESOLVE_RATE_LIMITS`), because anyone who may comment may resolve.
+Resolving twice keeps the first resolver. A deleted comment loses its quote. The UI takes its data through
+a `ThreadApi` (`use-comment-thread.ts`), so `/dev/inline-comments`
+(`?seed=1`, `?as=reader`) and `e2e/inline-comments.spec.ts` run without a
+database; `inline-comments.db.test.ts` covers the server rules.
+
 ### Replaced files
 
 Replace (the Files section, MCP `files_replace`, `src/lib/files/replace.ts`)

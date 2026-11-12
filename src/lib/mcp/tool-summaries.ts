@@ -31,7 +31,7 @@ export const toolSummaries = {
   inbox_list: "List unread @mentions with the thread around them.",
   comments_list: "Read the comment thread on an artifact.",
   inbox_mark_read: "Mark mentions read once handled.",
-  comment_create: "Comment or reply, with @mentions.",
+  comment_create: "Comment or reply, with @mentions, on the whole artifact or on its words.",
   comment_update: "Edit a comment you wrote.",
   comment_delete: "Delete a comment you wrote.",
 } as const satisfies Record<McpToolName, string>;

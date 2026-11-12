@@ -31,6 +31,8 @@ import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scop
 import { PageOrganizers } from "@/components/projects/page-organizers";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { HarnessByline } from "@/components/harness/harness-byline";
+import { InlineCommentSurface } from "@/components/inline-comments/inline-comment-surface";
+import { InlineCommentsProvider } from "@/components/inline-comments/inline-comments-provider";
 import { LastEdited } from "@/components/history/last-edited";
 import { ViewBeacon } from "@/components/views/view-beacon";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
@@ -282,7 +284,8 @@ function SignUpAndReport({ copy, publicId, visibility }: { copy: VisibilityCopy;
  */
 function BodyReadView({ viewable, files }: { viewable: ViewableArtifact; files: FileDto[] }) {
   const body = <ArtifactBody viewable={viewable} files={files} />;
-  if (!viewable.canEdit) return body;
+  // Readers comment on a Markdown artifact's words here; editors get the same in the editor that replaces this view.
+  if (!viewable.canEdit) return <InlineCommentSurface>{body}</InlineCommentSurface>;
   if (viewable.view.kind === "markdown") return <div data-editor-space="" className="pointer-coarse:pt-12"><div className="min-h-[50dvh] pb-24">{body}</div></div>;
   if (viewable.view.kind === "text") return <div data-editor-space="" className="min-h-[50dvh]">{body}</div>;
   return body;
@@ -411,6 +414,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
             </ThemeScope>
           ) : null}
           <main className={cn("mx-auto w-full py-12 sm:py-16", column, mainTopClass(view))} data-full-width={fullWidth}>
+            {/* A Markdown artifact takes comments on its words: highlights in the text, threads in cards at them, and the list below. */}
+            <InlineCommentsProvider publicId={record.publicId} kind={view.kind} canComment={canComment}>
             {/* The reading measure covers the artifact and its in-place editor, not the comments under it. */}
             <div className={readingMeasureClass(fullWidth)}>
               <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
@@ -434,6 +439,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
             <SignUpAndReport copy={copy} publicId={record.publicId} visibility={record.visibility} />
             {/* Comments are for signed-in readers the comments setting lets in; the thread checks access itself too. */}
             {canComment ? <CommentThread publicId={record.publicId} className="mt-12 border-t pt-8" raised /> : null}
+            </InlineCommentsProvider>
           </main>
         </ThemeBackdrop>
       </PageEditorChromeProvider>

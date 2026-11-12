@@ -26,6 +26,24 @@ export function canChangeComment(comment: { authorId: string | null; deletedAt: 
   return comment.authorId !== null && comment.authorId === viewerId && comment.deletedAt === null;
 }
 
+/**
+ * Why a viewer may not resolve or reopen a comment's thread, or null when
+ * they may. Only a top-level comment that is not deleted carries a thread's
+ * state, and only a person (never an agent) who may use the thread changes it.
+ */
+export function resolveRefusal(input: { viewerKind: AuthorKind | null; canUseThread: boolean; comment: { parentId: string | null; deletedAt: Date | null } }): string | null {
+  if (!input.canUseThread) return "Artifact not found.";
+  if (input.viewerKind !== "person") return "Only people can resolve or reopen comments.";
+  if (input.comment.parentId !== null) return "Resolve the thread from its first comment, not from a reply.";
+  if (input.comment.deletedAt !== null) return "This comment was deleted, so its thread cannot be resolved or reopened.";
+  return null;
+}
+
+/** Whether a viewer may resolve or reopen a comment's thread. See resolveRefusal. */
+export function canResolveComment(input: Parameters<typeof resolveRefusal>[0]): boolean {
+  return resolveRefusal(input) === null;
+}
+
 /** An agent is muted for a thread when its team muted it, or someone muted it in this thread. */
 export function isAgentMuted(input: { teamMuted: boolean; threadMuted: boolean }): boolean {
   return input.teamMuted || input.threadMuted;

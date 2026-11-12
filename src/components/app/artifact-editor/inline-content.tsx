@@ -6,7 +6,8 @@ import { CsvContentEditor } from "@/components/artifact-page/csv-content-editor"
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ThemeScope } from "@/components/artifact-view/theme-scope";
 import { ContentStatus } from "@/components/editor/content-status";
-import { DocumentEditor, isDocumentKind } from "@/components/editor/document-editor";
+import { DocumentEditor, isDocumentKind, type DocumentKind } from "@/components/editor/document-editor";
+import { InlineCommentSurface } from "@/components/inline-comments/inline-comment-surface";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { canEditBlocks, UiBlockEditor } from "@/components/ui-editor/ui-block-editor";
@@ -128,19 +129,23 @@ export function hasInlineField(kind: ArtifactKind, sourceOpen: boolean): boolean
   return sourceOpen || kind === "code" || kind === "csv" || kind === "ui" || isDocumentKind(kind);
 }
 
+/**
+ * A Markdown or Text artifact as a document you type into. A Markdown
+ * document's words take inline comments; plain text is a native field,
+ * whose text cannot be highlighted.
+ */
+function DocumentContent({ kind, content, revision, place, onChange, onShowSource }: Pick<InlineContentProps, "content" | "revision" | "onChange" | "onShowSource"> & { kind: DocumentKind; place: Placement }) {
+  const document = <DocumentEditor key={revision} kind={kind} value={content} onChange={onChange} label="Artifact content" sourceToggle={false} onEditSource={onShowSource} />;
+  return <ContentFrame place={place}>{kind === "markdown" ? <InlineCommentSurface>{document}</InlineCommentSurface> : document}</ContentFrame>;
+}
+
 /** See the notes at the top of this file. */
 export function InlineContent(props: InlineContentProps) {
   const { kind, content, title, files, revision, sourceOpen, surface = "pane", fullWidth = false, theme = null, onChange, onShowSource } = props;
   const place: Placement = { surface, fullWidth, theme };
   if (sourceOpen) return <SourceEditor kind={kind} content={content} label="Artifact source" place={place} onChange={onChange} />;
   if (kind === "code") return <SourceEditor kind={kind} content={content} label="Artifact content" place={place} onChange={onChange} />;
-  if (isDocumentKind(kind)) {
-    return (
-      <ContentFrame place={place}>
-        <DocumentEditor key={revision} kind={kind} value={content} onChange={onChange} label="Artifact content" sourceToggle={false} onEditSource={onShowSource} />
-      </ContentFrame>
-    );
-  }
+  if (isDocumentKind(kind)) return <DocumentContent kind={kind} content={content} revision={revision} place={place} onChange={onChange} onShowSource={onShowSource} />;
   if (kind === "csv") {
     return (
       <ContentFrame place={place}>

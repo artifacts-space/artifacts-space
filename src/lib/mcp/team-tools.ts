@@ -3,10 +3,12 @@ import { eq } from "drizzle-orm";
 import { z, ZodError } from "zod";
 
 import { getDb } from "@/db";
-import { comment } from "@/db/schema";
+import { artifact as artifactTable, comment } from "@/db/schema";
+import { QUOTE_MAX_LENGTH } from "@/lib/comments/anchor-rules";
 import { COMMENT_MAX_LENGTH } from "@/lib/comments/config";
 import { listInbox, markInboxRead, threadContext, type InboxEntryView } from "@/lib/comments/inbox";
 import { threadUrl } from "@/lib/comments/mention-email";
+import { servedAnchors, textChangedCheck, type ServedAnchors } from "@/lib/comments/served-anchors";
 import { createComment, deleteComment, listComments, updateComment } from "@/lib/comments/service";
 import type { CommentView } from "@/lib/comments/views";
 import type { McpAccess } from "@/lib/oauth/scopes";
@@ -39,17 +41,31 @@ function untrusted(text: string) {
   return { untrustedText: text };
 }
 
-/** A comment as agents see it, with its body labelled as untrusted. */
-export function toMcpComment(view: CommentView) {
+/**
+ * A comment as agents see it, with its body and quote labelled as untrusted.
+ * `onTextThatChanged` says an inline comment's words are no longer in the
+ * content the agent is served (textChangedCheck); by default only a withheld
+ * quote counts.
+ */
+export function toMcpComment(view: CommentView, onTextThatChanged = view.anchored && view.anchor === null) {
   return {
     id: view.id,
     replyTo: view.parentId,
     author: view.author ? { handle: view.author.handle, kind: view.author.kind, for: view.author.ownerName } : null,
     body: untrusted(view.body),
+    quote: view.anchor ? untrusted(view.anchor.quote) : null,
+    onTextThatChanged,
+    resolved: view.resolved !== null,
     deleted: view.deleted,
     edited: view.edited,
     createdAt: view.createdAt,
   };
+}
+
+/** Comments for an agent, each told whether its words are still in the content the agent is served. */
+async function toMcpComments(publicId: string, viewerId: string, views: readonly CommentView[], served?: ServedAnchors) {
+  const changed = await textChangedCheck(publicId, viewerId, views, served);
+  return views.map((view) => toMcpComment(view, changed(view)));
 }
 
 async function respond(run: () => Promise<unknown>) {
@@ -63,21 +79,30 @@ async function respond(run: () => Promise<unknown>) {
   }
 }
 
-async function commentCreatedAt(commentId: string) {
-  const [row] = await getDb().select({ createdAt: comment.createdAt, artifactId: comment.artifactId }).from(comment).where(eq(comment.id, commentId)).limit(1);
+/** Where a comment sits: its artifact (internal and public ids) and when it was made. Null when it is gone. */
+async function commentPlace(commentId: string) {
+  const [row] = await getDb()
+    .select({ createdAt: comment.createdAt, artifactId: comment.artifactId, publicId: artifactTable.publicId })
+    .from(comment)
+    .innerJoin(artifactTable, eq(artifactTable.id, comment.artifactId))
+    .where(eq(comment.id, commentId))
+    .limit(1);
   return row ?? null;
 }
 
-async function toMcpInboxEntry(entry: InboxEntryView, viewerId: string) {
-  const anchor = await commentCreatedAt(entry.comment.id);
-  const context = anchor ? await threadContext({ artifactId: anchor.artifactId, upTo: anchor.createdAt, viewerId }) : [];
+/** One mention for an agent. `served` is the request's loader, so each artifact's content is read once however many mentions are on it. */
+async function toMcpInboxEntry(entry: InboxEntryView, viewerId: string, served: ServedAnchors) {
+  const { publicId } = entry.artifact;
+  const place = await commentPlace(entry.comment.id);
+  const context = place ? await threadContext({ artifactId: place.artifactId, publicId, upTo: place.createdAt, viewerId, served }) : [];
+  const [mentioned, ...recentThread] = await toMcpComments(publicId, viewerId, [entry.comment, ...context], served);
   return {
     id: entry.id,
     read: entry.readAt !== null,
     mentionedAt: entry.createdAt,
-    artifact: { id: entry.artifact.publicId, title: entry.artifact.title, url: siteUrl(`/artifact/${entry.artifact.publicId}`), threadUrl: threadUrl(entry.artifact.publicId) },
-    comment: toMcpComment(entry.comment),
-    recentThread: context.map(toMcpComment),
+    artifact: { id: publicId, title: entry.artifact.title, url: siteUrl(`/artifact/${publicId}`), threadUrl: threadUrl(publicId) },
+    comment: mentioned ?? toMcpComment(entry.comment),
+    recentThread,
     reply: { tool: "comment_create", artifact: entry.artifact.publicId, replyTo: entry.comment.parentId ?? entry.comment.id },
   };
 }
@@ -97,8 +122,9 @@ function registerInboxTools(server: ToolServer, userId: string) {
     },
     ({ includeRead, limit }) =>
       respond(async () => {
-        const entries = await listInbox(userId, { unreadOnly: !includeRead, limit });
-        const mentions = await Promise.all(entries.map((entry) => toMcpInboxEntry(entry, userId)));
+        const served = servedAnchors(userId);
+        const entries = await listInbox(userId, { unreadOnly: !includeRead, limit, served });
+        const mentions = await Promise.all(entries.map((entry) => toMcpInboxEntry(entry, userId, served)));
         return { untrustedContentNotice: UNTRUSTED_NOTICE, mentions };
       }),
   );
@@ -128,18 +154,19 @@ function registerCommentTools(server: ToolServer, userId: string) {
     {
       title: "List comments",
       description:
-        "The comment thread on an artifact you can read, oldest first. Replies point at their top-level comment with replyTo. Refused when the artifact's comments setting hides comments from you (off, or team-only and you are outside its team)." +
+        "The comment thread on an artifact you can read, oldest first. Replies point at their top-level comment with replyTo. An inline comment was made on words in the artifact: quote holds those words, and onTextThatChanged is true when they are no longer in the artifact as you read it. resolved is true when a person marked the thread done. Refused when the artifact's comments setting hides comments from you (off, or team-only and you are outside its team)." +
         untrustedDescription,
       inputSchema: { artifact: publicIdField, limit: z.number().int().min(1).max(200).optional().default(50).describe("Most recent comments to return") },
     },
     ({ artifact, limit }) =>
       respond(async () => {
-        const { thread, comments } = await listComments(userId, artifact);
+        const served = servedAnchors(userId);
+        const { thread, comments } = await listComments(userId, artifact, served);
         return {
           untrustedContentNotice: UNTRUSTED_NOTICE,
           artifact: { id: thread.artifact.publicId, title: thread.title, url: siteUrl(`/artifact/${thread.artifact.publicId}`) },
           total: comments.length,
-          comments: comments.slice(-limit).map(toMcpComment),
+          comments: await toMcpComments(thread.artifact.publicId, userId, comments.slice(-limit), served),
         };
       }),
   );
@@ -149,16 +176,23 @@ function registerCommentTools(server: ToolServer, userId: string) {
     {
       title: "Create comment",
       description:
-        "Posts a markdown comment on an artifact you can read and whose comments setting lets you in (see `comments` in artifacts_get), or a reply with replyTo. Mention people or agents with @handle. A mention lands only for the artifact's author or your teammates who can see the artifact; others are listed under mentions.refused with the reason. Agent-to-agent mentions stop after several agent replies in a row until a person posts, and muted agents cannot post.",
+        "Posts a markdown comment on an artifact you can read and whose comments setting lets you in (see `comments` in artifacts_get), or a reply with replyTo. To comment on specific words, pass quote: people then see your comment at those words. Copy the words exactly as they read in the artifact, without Markdown marks; words that are not there are refused. A reply cannot have a quote. Mention people or agents with @handle. A mention lands only for the artifact's author or your teammates who can see the artifact; others are listed under mentions.refused with the reason. Agent-to-agent mentions stop after several agent replies in a row until a person posts, and muted agents cannot post.",
       inputSchema: {
         artifact: publicIdField,
         body: z.string().min(1).max(COMMENT_MAX_LENGTH).describe("Markdown. No raw HTML; links must be http, https, or mailto."),
         replyTo: z.string().min(1).max(200).optional().describe("Comment id to reply to"),
+        quote: z
+          .string()
+          .min(1)
+          .max(QUOTE_MAX_LENGTH)
+          .optional()
+          .describe("The exact words the comment is about, as they read in the artifact, without Markdown marks. Leave out to comment on the whole artifact. Not allowed with replyTo."),
       },
     },
-    ({ artifact, body, replyTo }) =>
+    ({ artifact, body, replyTo, quote }) =>
       respond(async () => {
-        const result = await createComment({ actorId: userId, publicId: artifact, body, parentId: replyTo });
+        if (replyTo && quote !== undefined) throw new UserFacingError("A reply cannot have a quote. Leave out quote to reply, or leave out replyTo to start a new comment on those words.");
+        const result = await createComment({ actorId: userId, publicId: artifact, body, parentId: replyTo, quote });
         return { comment: toMcpComment(result.comment), mentions: result.mentions };
       }),
   );
@@ -184,7 +218,9 @@ function registerCommentChangeTools(server: ToolServer, userId: string) {
     ({ comment: commentId, body }) =>
       respond(async () => {
         const result = await updateComment({ actorId: userId, commentId, body });
-        return { comment: toMcpComment(result.comment), mentions: result.mentions };
+        const place = result.comment.anchor ? await commentPlace(result.comment.id) : null;
+        const [updated] = place ? await toMcpComments(place.publicId, userId, [result.comment]) : [];
+        return { comment: updated ?? toMcpComment(result.comment), mentions: result.mentions };
       }),
   );
 

@@ -3,15 +3,17 @@ import { and, desc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { getDb } from "@/db";
 import { artifact, comment, mention } from "@/db/schema";
 import type { ArtifactMetaRecord } from "@/lib/artifact-columns";
-import { getArtifactAccess } from "@/lib/access";
+import { getArtifactAccess, type ArtifactAccess } from "@/lib/access";
 import { canViewArtifact } from "@/lib/access-rules";
 import { loadActors } from "@/lib/agents/queries";
 import { markMentionNotificationsRead } from "@/lib/notifications/feed";
 import { listTeamIdsForUser } from "@/lib/teams/queries";
 
+import type { AnchorGate } from "./anchor-privacy-rules";
 import { INBOX_CONTEXT_COMMENTS } from "./config";
+import { anchorGateFor, type ServedAnchors } from "./served-anchors";
 import { canSeeComments } from "./setting-rules";
-import { toCommentView, type CommentView } from "./views";
+import { actorIdsOf, toCommentView, type CommentView } from "./views";
 
 /**
  * The inbox: mentions that landed for a person or an agent. Entries are
@@ -71,27 +73,44 @@ function inboxRows(userId: string, unreadOnly: boolean, limit: number) {
     .limit(limit);
 }
 
+/** The served title and icon, and the version, of each artifact whose comments the user can still see. */
+async function visibleArtifacts(userId: string, publicIds: readonly string[]) {
+  const viewable = await Promise.all(publicIds.map((publicId) => getArtifactAccess(publicId, userId)));
+  const visible = new Map<string, { title: string; icon: string | null; source: ArtifactAccess["version"]["source"] }>();
+  publicIds.forEach((publicId, index) => {
+    const view = viewable[index];
+    if (!view) return;
+    const seesComments = canSeeComments(view.record.comments, { canViewArtifact: true, isAuthor: view.record.userId === userId, isTeamMember: view.isTeamMember });
+    if (seesComments) visible.set(publicId, { title: view.served.title, icon: view.served.icon, source: view.version.source });
+  });
+  return visible;
+}
+
 /** Inbox entries for a user, newest first. Unread only unless `unreadOnly` is false. */
-export async function listInbox(userId: string, options: { unreadOnly?: boolean; limit?: number } = {}): Promise<InboxEntryView[]> {
+export async function listInbox(userId: string, options: { unreadOnly?: boolean; limit?: number; served?: ServedAnchors } = {}): Promise<InboxEntryView[]> {
   const limit = Math.min(Math.max(options.limit ?? INBOX_MAX, 1), INBOX_MAX);
   const rows = await inboxRows(userId, options.unreadOnly ?? true, limit);
-  const publicIds = [...new Set(rows.map((row) => row.artifact.publicId))];
-  const viewable = await Promise.all(publicIds.map((publicId) => getArtifactAccess(publicId, userId)));
-  const titles = new Map(publicIds.flatMap((publicId, index) => {
-    const view = viewable[index];
-    if (!view) return [];
-    const seesComments = canSeeComments(view.record.comments, { canViewArtifact: true, isAuthor: view.record.userId === userId, isTeamMember: view.isTeamMember });
-    return seesComments ? [[publicId, { title: view.served.title, icon: view.served.icon }] as const] : [];
-  }));
-  const visible = rows.filter((row) => titles.has(row.artifact.publicId));
-  const authors = await loadActors(visible.flatMap((row) => (row.record.authorId ? [row.record.authorId] : [])));
-  return visible.map((row) => ({
-    id: row.entry.id,
-    createdAt: row.entry.createdAt.toISOString(),
-    readAt: row.entry.readAt?.toISOString() ?? null,
-    artifact: { publicId: row.artifact.publicId, title: "", icon: null, ...titles.get(row.artifact.publicId) },
-    comment: toCommentView(row.record, authors, userId),
-  }));
+  const artifacts = await visibleArtifacts(userId, [...new Set(rows.map((row) => row.artifact.publicId))]);
+  const visible = rows.filter((row) => artifacts.has(row.artifact.publicId));
+  // One anchor gate per artifact, each through the version this user is served there.
+  const gated = [...artifacts].map(([publicId, served]) =>
+    anchorGateFor({ publicId, viewerId: userId, records: visible.filter((row) => row.artifact.publicId === publicId).map((row) => row.record), source: served.source, served: options.served }).then((gate) => [publicId, gate] as const),
+  );
+  const [actors, gates] = await Promise.all([loadActors([userId, ...actorIdsOf(visible.map((row) => row.record))]), Promise.all(gated)]);
+  const anchorGates = new Map<string, AnchorGate>(gates);
+  const viewerKind = actors.get(userId)?.kind ?? null;
+  return visible.flatMap((row) => {
+    const served = artifacts.get(row.artifact.publicId);
+    const anchorFor = anchorGates.get(row.artifact.publicId);
+    if (!served || !anchorFor) return [];
+    return [{
+      id: row.entry.id,
+      createdAt: row.entry.createdAt.toISOString(),
+      readAt: row.entry.readAt?.toISOString() ?? null,
+      artifact: { publicId: row.artifact.publicId, title: served.title, icon: served.icon },
+      comment: toCommentView(row.record, actors, userId, [], { viewerKind, anchorFor }),
+    }];
+  });
 }
 
 /** How many unread mentions a user can still see, up to the inbox limit. */
@@ -121,14 +140,19 @@ export async function markArtifactMentionsRead(userId: string, artifactId: strin
     .where(and(eq(mention.recipientId, userId), eq(mention.artifactId, artifactId), isNull(mention.readAt)));
 }
 
-/** The comments up to and including one comment, oldest first, for context. */
-export async function threadContext(input: { artifactId: string; upTo: Date; viewerId: string; limit?: number }): Promise<CommentView[]> {
+/**
+ * The comments up to and including one comment, oldest first, for context.
+ * The caller checked that the viewer may read this artifact's comments;
+ * quotes still follow the version the viewer is served.
+ */
+export async function threadContext(input: { artifactId: string; publicId: string; upTo: Date; viewerId: string; limit?: number; served?: ServedAnchors }): Promise<CommentView[]> {
   const rows = await getDb()
     .select()
     .from(comment)
     .where(and(eq(comment.artifactId, input.artifactId), lte(comment.createdAt, input.upTo)))
     .orderBy(desc(comment.createdAt))
     .limit(input.limit ?? INBOX_CONTEXT_COMMENTS);
-  const authors = await loadActors(rows.flatMap((row) => (row.authorId ? [row.authorId] : [])));
-  return rows.reverse().map((row) => toCommentView(row, authors, input.viewerId));
+  const [actors, anchorFor] = await Promise.all([loadActors([input.viewerId, ...actorIdsOf(rows)]), anchorGateFor({ publicId: input.publicId, viewerId: input.viewerId, records: rows, served: input.served })]);
+  const context = { viewerKind: actors.get(input.viewerId)?.kind ?? null, anchorFor };
+  return rows.reverse().map((row) => toCommentView(row, actors, input.viewerId, [], context));
 }

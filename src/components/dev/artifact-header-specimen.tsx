@@ -30,7 +30,7 @@ const sampleComment: CommentView = {
   edited: false,
   author: { userId: "fixture-sam", handle: "sam", name: "Sam", kind: "person", ownerName: null, label: "@sam" },
   mentions: [{ handle: "claude-code", kind: "agent" }, { handle: "dana", kind: "person" }],
-  canChange: true,
+  canChange: true, anchored: false, anchor: null, resolved: null, canResolve: false,
   createdAt: "2026-11-02T15:04:00.000Z",
   updatedAt: "2026-11-02T15:04:00.000Z",
 };
