@@ -13,7 +13,7 @@ function view(overrides: Partial<CommentView> = {}): CommentView {
     edited: false,
     author: { userId: "u1", handle: "dana", name: "Dana", kind: "person", ownerName: null, label: "@dana" },
     mentions: [],
-    canChange: false,
+    canChange: false, anchored: false, anchor: null, resolved: null, canResolve: false,
     createdAt: "2026-11-07T10:00:00.000Z",
     updatedAt: "2026-11-07T10:00:00.000Z",
     ...overrides,

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult } from "@/lib/artifact-types";
+import type { CommentAnchor } from "@/lib/comments/anchor-rules";
 import { markArtifactMentionsRead } from "@/lib/comments/inbox";
 import type { MentionDirectory } from "@/lib/comments/mention-autocomplete";
 import { mentionDirectory } from "@/lib/comments/mentionables";
@@ -45,14 +46,18 @@ export interface ThreadData {
   viewerId: string;
 }
 
-/** The comments on an artifact, with the agents the viewer may mute there. */
-export async function loadThreadAction(publicId: string): Promise<ActionResult<ThreadData>> {
+/**
+ * The comments on an artifact, with the agents the viewer may mute there.
+ * `markAsRead` false loads them without marking anything read, for the
+ * highlights in the artifact's text; opening a thread marks it read.
+ */
+export async function loadThreadAction(publicId: string, markAsRead = true): Promise<ActionResult<ThreadData>> {
   try {
     const userId = await viewerId();
     if (!userId) return { success: false, error: signInMessage };
     const { thread, comments } = await listComments(userId, idSchema.parse(publicId));
     const authorIds = comments.flatMap((item) => (item.author?.kind === "agent" ? [item.author.userId] : []));
-    const [agents] = await Promise.all([listThreadAgents(thread, authorIds), markRead(userId, thread.artifact.id)]);
+    const [agents] = await Promise.all([listThreadAgents(thread, authorIds), markAsRead ? markRead(userId, thread.artifact.id) : null]);
     return { success: true, data: { comments, agents, viewerId: userId } };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The comments could not be loaded. Please try again.") };
@@ -75,12 +80,15 @@ export async function loadMentionablesAction(publicId: string): Promise<ActionRe
   }
 }
 
-/** Posts a comment or a reply. Refused mentions come back in the result. */
-export async function createCommentAction(publicId: string, body: string, parentId: string | null): Promise<ActionResult<CommentWriteResult>> {
+/**
+ * Posts a comment or a reply. Refused mentions come back in the result.
+ * `anchor` makes a new top-level comment an inline one, on those words.
+ */
+export async function createCommentAction(publicId: string, body: string, parentId: string | null, anchor?: CommentAnchor | null): Promise<ActionResult<CommentWriteResult>> {
   try {
     const userId = await viewerId();
     if (!userId) return { success: false, error: signInMessage };
-    const result = await createComment({ actorId: userId, publicId: idSchema.parse(publicId), body: z.string().parse(body), parentId: parentId ?? undefined });
+    const result = await createComment({ actorId: userId, publicId: idSchema.parse(publicId), body: z.string().parse(body), parentId: parentId ?? undefined, anchor: anchor ?? undefined });
     return { success: true, data: result };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The comment could not be posted. Please try again.") };
@@ -132,5 +140,19 @@ export async function markThreadReadAction(publicId: string): Promise<ActionResu
     return { success: true, data: null };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "The mentions could not be marked read.") };
+  }
+}
+
+/** Resolves a thread, or reopens it, by its top-level comment. */
+export async function resolveCommentAction(commentId: string, resolved: boolean): Promise<ActionResult<null>> {
+  try {
+    const userId = await viewerId();
+    if (!userId) return { success: false, error: signInMessage };
+    // CONTRACT STUB: the comment service's resolve replaces this body.
+    idSchema.parse(commentId);
+    z.boolean().parse(resolved);
+    return { success: false, error: "Resolving comments is not available yet." };
+  } catch (error) {
+    return { success: false, error: actionErrorMessage(error, "The comment could not be changed. Please try again.") };
   }
 }

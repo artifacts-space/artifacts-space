@@ -1,6 +1,7 @@
 import type { CommentRecord } from "@/db/schema";
 import { attribution, type Actor } from "@/lib/agents/identity";
 
+import type { CommentAnchor } from "./anchor-rules";
 import type { ResolvedMention } from "./mentions";
 import { canChangeComment, type AuthorKind } from "./rules";
 
@@ -30,6 +31,19 @@ export interface CommentView {
   mentions: ResolvedMention[];
   /** The viewer wrote it and may edit or delete it. */
   canChange: boolean;
+  /** True for a top-level comment that was made on words in the artifact (an inline comment), even when `anchor` is withheld. */
+  anchored: boolean;
+  /**
+   * The words an inline comment was made on, with the text around them. Null
+   * for a comment on the whole artifact, for replies, for deleted comments,
+   * and when this viewer may not read the words (they are not in the version
+   * of the artifact the viewer is served).
+   */
+  anchor: CommentAnchor | null;
+  /** Set on a top-level comment whose thread was resolved: when, and by whom (a label such as "@charles", null when they are gone). */
+  resolved: { at: string; by: string | null } | null;
+  /** The viewer may resolve or reopen this thread. Always false for replies and deleted comments. */
+  canResolve: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,6 +78,10 @@ export function toCommentView(record: CommentRecord, authors: ReadonlyMap<string
     author: actor ? toAuthorView(actor) : null,
     mentions: deleted ? [] : [...mentions],
     canChange: canChangeComment(record, viewerId),
+    anchored: false,
+    anchor: null,
+    resolved: null,
+    canResolve: false,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };

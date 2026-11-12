@@ -9,6 +9,7 @@ import { loadActors } from "@/lib/agents/queries";
 import { notifyComment } from "@/lib/notifications/create";
 import { UserFacingError } from "@/lib/user-facing-error";
 
+import type { CommentAnchor } from "./anchor-rules";
 import { COMMENT_MAX_LENGTH } from "./config";
 import { notifiedHandles, processMentions, type MentionOutcome } from "./delivery";
 import { resolvedMentions } from "./mentionables";
@@ -71,7 +72,7 @@ async function viewOf(record: CommentRecord, viewerId: string) {
  * are refused. The comment always saves when allowed; mentions that may not
  * land are refused with a notice in the result.
  */
-export async function createComment(input: { actorId: string; publicId: string; body: string; parentId?: string | undefined }): Promise<CommentWriteResult> {
+export async function createComment(input: { actorId: string; publicId: string; body: string; parentId?: string | undefined; anchor?: CommentAnchor | undefined }): Promise<CommentWriteResult> {
   const body = bodySchema.parse(input.body);
   const thread = await requireThread(input.actorId, input.publicId);
   await assertNotMuted(thread);
