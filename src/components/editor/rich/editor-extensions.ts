@@ -3,7 +3,7 @@ import { Placeholder } from "@tiptap/extensions";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 
 import { CodeBlockView } from "./code-block-view";
-import { MarkdownPaste } from "./markdown-paste";
+import { MarkdownPaste, type PastedLinkRule } from "./markdown-paste";
 import { markdownSchemaExtensions } from "./markdown-schema";
 import { MediaInput, MediaRefusal } from "./media-input";
 import { MediaOffView } from "./media-off-view";
@@ -41,6 +41,11 @@ export interface RichEditorOptions {
    * stays text. Unset for a document.
    */
   boxPlaceholder?: string | undefined;
+  /**
+   * Which pasted Markdown links stay links: those the content's renderer
+   * shows as links. Default: an artifact's (artifactShowsLink).
+   */
+  pastedLinks?: PastedLinkRule | undefined;
 }
 
 /** The placeholder rule: a document's hints, or a box's single hint. */
@@ -68,7 +73,7 @@ export function richEditorExtensions(options: RichEditorOptions): AnyExtension[]
     Placeholder.configure({ placeholder: placeholderRule(options.boxPlaceholder), showOnlyCurrent: true, includeChildren: false }),
     ...(box ? [] : [SlashCommandExtension.configure({ commands: slashCommandsFor(media) })]),
     media ? MediaInput : MediaRefusal.configure({ onRefuse: options.onMediaRefused ?? (() => undefined) }),
-    MarkdownPaste,
+    options.pastedLinks ? MarkdownPaste.configure({ keepsLink: options.pastedLinks }) : MarkdownPaste,
     Extension.create({
       name: "linkShortcut",
       addKeyboardShortcuts() {

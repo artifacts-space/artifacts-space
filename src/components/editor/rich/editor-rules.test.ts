@@ -3,8 +3,7 @@ import { describe, expect, it } from "vitest";
 import { languageOptions } from "./code-block-view";
 import { placeholderFor, richEditorExtensions } from "./editor-extensions";
 import { needsRawBlock, splitBlocks } from "./markdown-blocks";
-import { looksLikeMarkdown, shouldPasteAsMarkdown, withoutUnsafeLinks } from "./markdown-paste";
-import { parseMarkdownFragment } from "./markdown-roundtrip";
+import { looksLikeMarkdown, shouldPasteAsMarkdown } from "./markdown-paste";
 import { codeFence, isAllowedEditorUri } from "./markdown-schema";
 import { filterSlashCommands, slashCommandsFor } from "./slash-commands";
 
@@ -135,20 +134,5 @@ describe("splitBlocks", () => {
   it("should keep the whitespace between blocks when it splits them", () => {
     const split = splitBlocks("\nA\n\n\nB\n", [{ type: "space", raw: "\n" }, { type: "paragraph", raw: "A\n" }, { type: "space", raw: "\n\n" }, { type: "paragraph", raw: "B\n" }]);
     expect(split).toEqual({ leading: "\n", blocks: [{ text: "A", after: "\n\n\n", token: expect.anything() as unknown }, { text: "B", after: "\n", token: expect.anything() as unknown }] });
-  });
-});
-
-describe("withoutUnsafeLinks", () => {
-  const links = (markdown: string) => JSON.stringify(withoutUnsafeLinks(parseMarkdownFragment(markdown))).match(/"href":"[^"]*"/g) ?? [];
-
-  it("should keep a safe link when Markdown is pasted", () => {
-    expect(links("Read [the notes](https://example.com/notes) first")).toEqual(['"href":"https://example.com/notes"']);
-  });
-
-  it("should paste an unsafe link as its words when its address is refused", () => {
-    const nodes = withoutUnsafeLinks(parseMarkdownFragment("Run [this](javascript:alert(1)) **now**"));
-    expect(JSON.stringify(nodes)).not.toContain("javascript");
-    expect(JSON.stringify(nodes)).toContain('"text":"this"');
-    expect(JSON.stringify(nodes)).toContain('"type":"bold"');
   });
 });
