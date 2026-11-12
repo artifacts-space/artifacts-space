@@ -6,14 +6,20 @@ import { legalContact, WEBRENEW_URL } from "@/lib/legal/contact";
 import { PrivacyRights } from "@/components/legal/privacy-rights";
 import { TermsConduct } from "@/components/legal/terms-conduct";
 
-import { SiteFooter } from "./site-footer";
+import { SiteFooter, siteFooterLinks } from "./site-footer";
 
 describe("SiteFooter", () => {
   const html = renderToStaticMarkup(<SiteFooter />);
 
-  it("should link to the Privacy Policy and the Terms when rendered", () => {
+  it("should link to Support, the Privacy Policy, and the Terms when rendered", () => {
+    expect(html).toContain('href="/support"');
     expect(html).toContain('href="/privacy"');
     expect(html).toContain('href="/terms"');
+  });
+
+  it("should place Support beside Privacy and Terms when rendered", () => {
+    const labels = siteFooterLinks.map((link) => link.label);
+    expect(labels.slice(labels.indexOf("Support"))).toEqual(["Support", "Privacy", "Terms"]);
   });
 
   it("should credit Webrenew with a labelled link that opens safely in a new tab", () => {

@@ -15,3 +15,6 @@ export const OG_DESCRIPTION =
 
 /** The public source repository, linked from the site headers. */
 export const REPO_URL = "https://github.com/artifacts-space/artifacts-space";
+
+/** The public issue tracker, linked from the Support page. */
+export const ISSUES_URL = `${REPO_URL}/issues`;
