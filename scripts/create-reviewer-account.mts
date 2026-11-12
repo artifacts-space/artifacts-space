@@ -99,7 +99,8 @@ const accessGrants = [
   [`delete from oauth_consent where user_id = $1`, "user"],
   [`delete from api_token where user_id = $1 or user_id in (select user_id from agent where owner_id = $1)`, "user"],
   [`delete from mcp_connection where user_id = $1`, "user"],
-  [`delete from verification where (case when left(value, 1) = '{' then value::jsonb ->> 'email' end) = $1`, "email"],
+  // Sign-in links store `{"type":"magic-link","email":<as typed>}`; a row whose value is not JSON is skipped, never an error that undoes the reset.
+  [`delete from verification where lower(case when left(value, 1) = '{' and pg_input_is_valid(value, 'jsonb') then value::jsonb ->> 'email' end) = $1`, "email"],
 ] as const;
 
 async function resetPassword(client: pg.ClientBase, request: ReviewerRequest, passwordHash: string, authSecret: string | null) {

@@ -154,14 +154,14 @@ describe("auth route password sign-in", () => {
     expect((await answer(signIn(reviewer, reviewerPassword, "2001:db8:1:3::1"))).status).toBe(200);
   });
 
-  it("should refuse every network once an address passes its daily failure ceiling", async () => {
+  it("should refuse every network once an address passes its hourly failure ceiling", async () => {
     const ceiling = rateLimits.passwordSignInFailuresByEmail.limit;
     for (let attempt = 0; attempt < ceiling; attempt += 1) await signIn(reviewer, "wrong", `10.${String(Math.floor(attempt / 200))}.${String(Math.floor(attempt / 9) % 200)}.${String(attempt % 9)}`);
 
     const refused = await answer(signIn(reviewer, reviewerPassword, "203.0.113.9"));
 
     expect(refused.status).toBe(429);
-    expect(refused.body).toContain("failed password sign-ins today");
+    expect(refused.body).toContain("failed password sign-ins in the last hour");
   });
 
   it("should refuse a form post so the per-address limits cannot be skipped", async () => {

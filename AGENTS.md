@@ -318,10 +318,14 @@ catch this, so test the generated SQL with `.toSQL()`, as
     Auth runs (`src/lib/auth/password-sign-in-route.ts`): per network (IPv6
     by its /64, `networkPrefixKey`; other limits keep one address) 20 per 15
     minutes and 100 a day, per network and address together 10 per 15
-    minutes, and per address 500 failures a day, counted only when Better
+    minutes, and per address 500 failures an hour, counted only when Better
     Auth answers 401. So someone else failing from their own network cannot
-    lock a reviewer out. Addresses are keyed with HMAC under the server
-    secret. The route takes JSON only and fails closed.
+    lock a reviewer out. The address ceiling caps noise, not guessing:
+    reviewer passwords come only from the owner's script, from random bytes
+    far beyond guessing range, so its window is an hour, which bounds how
+    long someone who knows a reviewer address can keep it locked during a
+    review. Addresses are keyed with HMAC under the server secret. The route
+    takes JSON only and fails closed.
   - Accounts with a password get no sign-in link: `sendMagicLink` skips them
     silently (`skipLinksForPasswordAccounts`), with the same answer as any
     address. The reset script is their recovery.
@@ -342,7 +346,7 @@ catch this, so test the generated SQL with `.toSQL()`, as
     agents it added, its MCP connection records, and unused sign-in links.
     Run with the site's `BETTER_AUTH_SECRET` set, it also deletes the
     address's failure count (`passwordFailureBucketKey`), so a reviewer locked
-    out by the 500-a-day ceiling can sign in with the new password at once;
+    out by the 500-an-hour ceiling can sign in with the new password at once;
     without it the reset says the count was not cleared.
     A browser that already holds the session may keep the 5-minute session
     cookie cache until it expires. Emails must be under a reviewer domain;

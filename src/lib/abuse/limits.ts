@@ -162,12 +162,15 @@ export const rateLimits = {
   passwordSignInByNetworkEmail: { limit: 10, windowSeconds: quarterHour },
   /**
    * Failed password sign-ins for one email address from every network,
-   * counted after the answer (a refused try never counts). A cost backstop
-   * set high, so scattered guessing cannot lock the address for long; the
-   * 24-character random passwords are what stop guessing. Known and unknown
-   * addresses are counted alike.
+   * counted after the answer (a refused try never counts). Reviewer passwords
+   * are set only by the owner's script, from random bytes far beyond guessing
+   * range, and no person chooses one, so this ceiling caps noise, not
+   * guessing. The real harm is someone who knows a reviewer address keeping
+   * the account locked through a review, so the window is an hour: that
+   * bounds the lockout. The per-network limits above do the fast refusals.
+   * Known and unknown addresses are counted alike.
    */
-  passwordSignInFailuresByEmail: { limit: 500, windowSeconds: day },
+  passwordSignInFailuresByEmail: { limit: 500, windowSeconds: hour },
   /** New teams, agents, and access tokens per person per hour. Each agent gets its own limits, so agents are capped too. */
   teamCreate: { limit: 10, windowSeconds: hour },
   agentCreate: { limit: 20, windowSeconds: hour },
@@ -230,7 +233,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   passwordSignInByNetwork: "Your network has tried to sign in with a password a lot in the last few minutes.",
   passwordSignInByNetworkDay: "Your network has tried to sign in with a password a lot today.",
   passwordSignInByNetworkEmail: "You have tried to sign in to this email address a lot in the last few minutes.",
-  passwordSignInFailuresByEmail: "This email address has had a lot of failed password sign-ins today.",
+  passwordSignInFailuresByEmail: "This email address has had a lot of failed password sign-ins in the last hour.",
   teamCreate: "You have created a lot of teams in the last hour.",
   agentCreate: "You have added a lot of agents in the last hour.",
   tokenCreate: "You have created a lot of access tokens in the last hour.",

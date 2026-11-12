@@ -167,24 +167,69 @@ describe.runIf(Boolean(databaseUrl))("reviewer accounts with a database", async 
     expect(await session.json()).toBeNull();
   });
 
-  it("should lift the address's failure ceiling when the password is reset with the site's secret", async () => {
+  it("should delete the address's unused sign-in links on reset and keep going past a row that is not JSON", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { sql } = await import("drizzle-orm");
+    const reviewer = request("links");
+    await writeAccount(url, reviewer, await hashPassword("old-password-0123456789abcdef"));
+    // The real route stores a link for the address as typed (no email goes out to a password account).
+    const asked = await POST(new Request(`${origin}/api/auth/sign-in/magic-link`, { method: "POST", headers: headers({ "content-type": "application/json" }), body: JSON.stringify({ email: reviewer.email.toUpperCase(), callbackURL: "/app" }) }));
+    expect(asked.status).toBe(200);
+    const linkRows = sql`select identifier from verification where identifier like 'magic-link:%' and lower(case when pg_input_is_valid(value, 'jsonb') then value::jsonb ->> 'email' end) = ${reviewer.email}`;
+    const stored = await getDb().execute<{ identifier: string }>(linkRows);
+    expect(stored.rows).toHaveLength(1);
+    const token = stored.rows[0]?.identifier.slice("magic-link:".length) ?? "";
+    const strayId = `rv-stray-${tag}`;
+    await getDb().execute(sql`insert into verification (id, identifier, value, expires_at) values (${strayId}, ${strayId}, ${"{not json"}, now() + interval '10 minutes')`);
+
+    try {
+      await writeAccount(url, { ...reviewer, resetPassword: true }, await hashPassword("new-password-0123456789abcdef"));
+
+      expect((await getDb().execute(linkRows)).rows).toHaveLength(0);
+      const opened = await GET(new Request(`${origin}/api/auth/magic-link/verify?token=${encodeURIComponent(token)}&callbackURL=%2Fapp`, { headers: headers() }));
+      expect(cookieOf(opened)).not.toContain("session_token");
+      expect((await signIn(reviewer.email, "new-password-0123456789abcdef")).status).toBe(200);
+    } finally {
+      await getDb().execute(sql`delete from verification where id = ${strayId}`);
+    }
+  });
+
+  /** Fills the address's failure ceiling as many networks failing would, in this window and the one before. Returns its bucket key. */
+  async function fillFailureCeiling(email: string) {
     const { rateLimitBucket } = await import("@/db/schema");
     const { rateLimits } = await import("@/lib/abuse/limits");
     const { windowStart } = await import("@/lib/abuse/rate-limit-window");
     const { passwordFailureBucketKey } = await import("@/lib/auth/password-sign-in-limits");
-    const reviewer = request("ceiling");
-    const secret = process.env.BETTER_AUTH_SECRET ?? "";
-    await writeAccount(url, reviewer, await hashPassword("old-password-0123456789abcdef"));
-    // A day of failures from many networks, as the ceiling stores them.
     const { limit, windowSeconds } = rateLimits.passwordSignInFailuresByEmail;
     const windowMs = windowSeconds * 1000;
     const current = windowStart(Date.now(), windowMs);
-    const key = passwordFailureBucketKey(reviewer.email, secret);
+    const key = passwordFailureBucketKey(email, process.env.BETTER_AUTH_SECRET ?? "");
     await getDb().insert(rateLimitBucket).values([
       { key, windowStart: new Date(current), count: limit },
       { key, windowStart: new Date(current - windowMs), count: limit },
     ]);
+    return { key, windowMs };
+  }
+
+  it("should refuse the right password while the failure ceiling is full and let it in once the hour has passed", async () => {
+    const { sql } = await import("drizzle-orm");
+    const reviewer = request("hour");
+    await writeAccount(url, reviewer, await hashPassword("the-password-0123456789abcdef"));
+    const { key, windowMs } = await fillFailureCeiling(reviewer.email);
+    expect((await signIn(reviewer.email, "the-password-0123456789abcdef")).status).toBe(429);
+
+    // An hour and more later: both stored windows are older than the one the limit reads.
+    await getDb().execute(sql`update rate_limit_bucket set window_start = window_start - make_interval(secs => ${(2 * windowMs) / 1000}) where key = ${key}`);
+    expect((await signIn(reviewer.email, "the-password-0123456789abcdef")).status).toBe(200);
+    await getDb().execute(sql`delete from rate_limit_bucket where key = ${key}`);
+  });
+
+  it("should lift the address's failure ceiling when the password is reset with the site's secret", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const reviewer = request("ceiling");
+    const secret = process.env.BETTER_AUTH_SECRET ?? "";
+    await writeAccount(url, reviewer, await hashPassword("old-password-0123456789abcdef"));
+    await fillFailureCeiling(reviewer.email);
 
     await writeAccount(url, { ...reviewer, resetPassword: true }, await hashPassword("mid-password-0123456789abcdef"));
     expect((await signIn(reviewer.email, "mid-password-0123456789abcdef")).status).toBe(429);

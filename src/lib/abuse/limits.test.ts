@@ -133,8 +133,13 @@ describe("password sign-in limits", () => {
     expect(allowedOnceFull(["passwordSignInByNetwork", "passwordSignInByNetworkDay"], daySeconds)).toBeLessThanOrEqual(100);
   });
 
-  it("should need at least five networks failing all day to reach one address's failure ceiling", () => {
-    expect(rateLimits.passwordSignInFailuresByEmail.limit / rateLimits.passwordSignInByNetworkDay.limit).toBeGreaterThanOrEqual(5);
+  it("should need at least five networks failing within the hour to reach one address's failure ceiling", () => {
+    const perNetworkHour = allowedOnceFull(["passwordSignInByNetwork", "passwordSignInByNetworkDay"], hourSeconds);
+    expect(rateLimits.passwordSignInFailuresByEmail.limit / perNetworkHour).toBeGreaterThanOrEqual(5);
+  });
+
+  it("should end an address's failure lockout within an hour so a review is never blocked for the day", () => {
+    expect(rateLimits.passwordSignInFailuresByEmail.windowSeconds).toBeLessThanOrEqual(hourSeconds);
   });
 
   it("should let a reviewer who mistypes a few times still sign in within the short window", () => {
