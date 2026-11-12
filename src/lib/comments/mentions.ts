@@ -18,7 +18,7 @@ const inlineCode = /(`+)[\s\S]*?\1/g;
 const mentionPattern = /(?<![a-z0-9@./\\`-])@([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)(?![a-z0-9@]|-[a-z0-9])/gi;
 
 /** Removes code so mentions inside it never count. Keeps newlines so positions stay roughly stable. */
-function stripCode(body: string) {
+export function stripCode(body: string): string {
   return body.replace(fencedBlock, (match) => match.replace(/[^\n]/g, " ")).replace(inlineCode, (match) => " ".repeat(match.length));
 }
 

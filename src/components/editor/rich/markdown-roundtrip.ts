@@ -3,6 +3,8 @@ import { MarkdownManager } from "@tiptap/markdown";
 import type { Schema } from "@tiptap/pm/model";
 
 import { liftBlockColors } from "./block-color-nodes";
+import { boundedMemo, type BoundedMemo } from "./bounded-memo";
+import { commentKeepsAsWritten, commentLiteralMarkdown, commentTextMarkdown } from "./comment-text-markdown";
 import { needsRawBlock, splitBlocks, type LooseToken, type SourceBlock, type SplitSource } from "./markdown-blocks";
 import { markdownSchemaExtensions } from "./markdown-schema";
 import { RAW_MARKDOWN } from "./raw-markdown-node";
@@ -15,7 +17,42 @@ interface Engine {
   manager: MarkdownManager;
 }
 
+/**
+ * How a comment's Markdown is judged: `shows` says whether the comment
+ * thread renders `markdown` as the box shows `nodes` (same blocks, marks,
+ * and text). src/components/comments/comment-markdown.ts supplies it.
+ */
+export interface CommentFlavor {
+  shows: (markdown: string, nodes: readonly JSONContent[]) => boolean;
+}
+
+/**
+ * Whose Markdown it is. A document (an artifact) is written with the editor's
+ * full escaping, as it always was. A comment keeps what the person typed
+ * (comment-text-markdown.ts), checks every block it writes by how the
+ * thread renders it, and keeps blocks the box would show differently from
+ * the thread as written.
+ */
+export type MarkdownFlavor = "document" | CommentFlavor;
+
+type TextEncoder = (text: string, node: JSONContent, parent: JSONContent | undefined) => string;
+
 let engine: Engine | null = null;
+/** The text encoder while a comment's block is written; null writes with the manager's own. */
+let textEncoder: TextEncoder | null = null;
+
+/**
+ * Lets a comment's text be written with its own encoder, on the one shared
+ * manager. `encodeTextForMarkdown` is not part of the manager's public API:
+ * if an upgrade renames or drops it, comments go back to the manager's full
+ * escaping. comment-markdown.test.ts ("the comment text encoder") fails then.
+ */
+function hookTextEncoder(manager: MarkdownManager) {
+  const base: unknown = Reflect.get(manager, "encodeTextForMarkdown");
+  if (typeof base !== "function") return;
+  const own = (text: string, node: JSONContent, parent: JSONContent | undefined): unknown => Reflect.apply(base, manager, [text, node, parent]);
+  Reflect.set(manager, "encodeTextForMarkdown", (text: string, node: JSONContent, parent: JSONContent | undefined) => (textEncoder ? textEncoder(text, node, parent) : own(text, node, parent)));
+}
 
 /**
  * One schema and one Markdown manager per page. The manager registers its
@@ -24,8 +61,40 @@ let engine: Engine | null = null;
 function getEngine(): Engine {
   if (engine) return engine;
   const extensions = markdownSchemaExtensions();
-  engine = { schema: getSchema(extensions), manager: new MarkdownManager({ extensions }) };
+  const manager = new MarkdownManager({ extensions });
+  hookTextEncoder(manager);
+  engine = { schema: getSchema(extensions), manager };
   return engine;
+}
+
+const CODE = "code";
+
+/** True when the text sits where Markdown reads characters literally: a code span or a code block. */
+function inCode(node: JSONContent, parent: JSONContent | undefined): boolean {
+  return parent?.type === "codeBlock" || (node.marks ?? []).some((mark) => mark.type === CODE);
+}
+
+/** True when the text starts a line: the start of its block, or right after a line break. */
+function startsLine(node: JSONContent, parent: JSONContent | undefined): boolean {
+  const siblings = parent?.content ?? [];
+  const index = siblings.indexOf(node);
+  return index <= 0 || siblings[index - 1]?.type === "hardBreak";
+}
+
+/** A comment's text, escaped only where Markdown needs it. */
+const commentEncoder: TextEncoder = (text, node, parent) => (inCode(node, parent) ? text : commentTextMarkdown(text, startsLine(node, parent)));
+
+/** A comment's text with every mark escaped, for when the light escaping reads differently. */
+const literalEncoder: TextEncoder = (text, node, parent) => (inCode(node, parent) ? text : commentLiteralMarkdown(text, startsLine(node, parent)));
+
+/** Runs `write` with a comment's text encoder in place. */
+function asComment<T>(write: () => T, encoder: TextEncoder = commentEncoder): T {
+  textEncoder = encoder;
+  try {
+    return write();
+  } finally {
+    textEncoder = null;
+  }
 }
 
 /** A block of the loaded source and the key of the nodes it became. */
@@ -114,17 +183,36 @@ function renderNodes(nodes: JSONContent[], current: Engine): string {
  * The nodes for one block, if the editor can show the block and write it
  * back with the same meaning. Anything else stays a raw block.
  */
-function richNodes(block: SourceBlock, definitions: string, current: Engine): JSONContent[] | null {
-  if (needsRawBlock(block.token)) return null;
-  const nodes = parseNodes(definitions ? `${block.text}\n\n${definitions}` : block.text, current);
-  if (!nodes) return null;
-  const again = parseNodes(renderNodes(nodes, current), current);
-  if (!again || nodeKey({ content: again }) !== nodeKey({ content: nodes })) return null;
-  return nodes;
+/** True when the editor reads `written` back as `nodes`. */
+function readsBack(written: string, nodes: JSONContent[], current: Engine): boolean {
+  const again = parseNodes(written, current);
+  return again !== null && nodeKey({ content: again }) === nodeKey({ content: nodes });
 }
 
-function blockNodes(block: SourceBlock, definitions: string, current: Engine): { nodes: JSONContent[]; raw: boolean } {
-  const nodes = richNodes(block, definitions, current);
+function richDocumentNodes(text: string, current: Engine): JSONContent[] | null {
+  const nodes = parseNodes(text, current);
+  return nodes && readsBack(renderNodes(nodes, current), nodes, current) ? nodes : null;
+}
+
+/**
+ * A comment's block in the box only when the box shows it as the thread
+ * does, and \@handle or an entity the editor cannot read never loads as text.
+ */
+function richCommentNodes(source: string, text: string, current: Engine, comment: CommentFlavor): JSONContent[] | null {
+  if (commentKeepsAsWritten(source)) return null;
+  const nodes = parseNodes(text, current);
+  if (!nodes || !readsBack(asComment(() => renderNodes(nodes, current)), nodes, current)) return null;
+  return comment.shows(text, nodes) ? nodes : null;
+}
+
+function richNodes(block: SourceBlock, definitions: string, current: Engine, flavor: MarkdownFlavor): JSONContent[] | null {
+  if (needsRawBlock(block.token)) return null;
+  const text = definitions ? `${block.text}\n\n${definitions}` : block.text;
+  return flavor === "document" ? richDocumentNodes(text, current) : richCommentNodes(block.text, text, current, flavor);
+}
+
+function blockNodes(block: SourceBlock, definitions: string, current: Engine, flavor: MarkdownFlavor): { nodes: JSONContent[]; raw: boolean } {
+  const nodes = richNodes(block, definitions, current, flavor);
   if (nodes) return { nodes, raw: false };
   const raw = canonicalNodes([rawNode(block.text)], current.schema) ?? [rawNode(block.text)];
   return { nodes: raw, raw: true };
@@ -182,7 +270,7 @@ function isDefinition(token: unknown): boolean {
  * their source exactly. The returned map lets `serializeMarkdown` write
  * untouched blocks back byte for byte.
  */
-export function parseMarkdown(markdown: string): LoadedMarkdown {
+export function parseMarkdown(markdown: string, flavor: MarkdownFlavor = "document"): LoadedMarkdown {
   const current = getEngine();
   const normalized = normalizeNewlines(markdown);
   const split = lexBlocks(normalized, current);
@@ -192,7 +280,7 @@ export function parseMarkdown(markdown: string): LoadedMarkdown {
   const blocks: MappedBlock[] = [];
   let rawBlocks = 0;
   for (const block of split.blocks) {
-    const { nodes, raw } = blockNodes(block, definitions, current);
+    const { nodes, raw } = blockNodes(block, definitions, current, flavor);
     if (raw) rawBlocks += 1;
     content.push(...nodes);
     blocks.push({ key: nodeKey({ content: nodes }), nodeCount: nodes.length, text: block.text, after: block.after });
@@ -205,6 +293,77 @@ export function parseMarkdown(markdown: string): LoadedMarkdown {
     rawBlocks: rawBlocks + review.addedRaw,
     rawKinds: review.rawKinds,
   };
+}
+
+/** Blocks the box keeps as Markdown, which are written as they are, never judged. */
+const writtenAsIs: ReadonlySet<string> = new Set([RAW_MARKDOWN, "media"]);
+
+/** A textblock's text as lines (split at line breaks), marks left out. */
+function textLines(node: JSONContent): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const child of node.content ?? []) {
+    if (child.type !== "hardBreak") {
+      line += child.text ?? "";
+      continue;
+    }
+    lines.push(line);
+    line = "";
+  }
+  return [...lines, line];
+}
+
+function textblocksOf(node: JSONContent): JSONContent[] {
+  if ((node.content ?? []).some((child) => child.type === "text" || child.type === "hardBreak")) return [node];
+  return (node.content ?? []).flatMap(textblocksOf);
+}
+
+/**
+ * The last resort: every textblock as a paragraph of literal text (every
+ * mark escaped, line breaks kept, an empty line as an escaped space), so the
+ * person's words post as words, never as a structure they did not see.
+ */
+function literalParagraphs(node: JSONContent): string {
+  return textblocksOf(node)
+    .map((block) => textLines(block).map((line) => commentLiteralMarkdown(line, true) || "&#32;").join("\\\n"))
+    .join("\n\n");
+}
+
+/**
+ * A comment's new or edited block: with only the escapes it needs when the
+ * thread shows that as the box does; else with every mark escaped, when
+ * that shows the same; else (no generated case in
+ * comment-markdown-fuzz.test.tsx gets here) its words as literal
+ * paragraphs, which drop marks rather than post a structure nobody saw.
+ * Each candidate is judged by the thread's renderer.
+ */
+function renderCommentNode(node: JSONContent, current: Engine, comment: CommentFlavor): string {
+  if (writtenAsIs.has(node.type ?? "")) return renderNodes([node], current);
+  for (const encoder of [commentEncoder, literalEncoder]) {
+    const written = asComment(() => renderNodes([node], current), encoder);
+    if (comment.shows(written, [node])) return written;
+  }
+  return literalParagraphs(node);
+}
+
+/**
+ * Characters of written comment blocks kept per flavor: well over the
+ * longest comment (COMMENT_MAX_LENGTH) with its blocks' JSON keys.
+ */
+const COMMENT_WRITES_BUDGET = 500_000;
+const commentWrites = new WeakMap<CommentFlavor, BoundedMemo>();
+
+/**
+ * `renderCommentNode`, remembered by the node's key. The box writes the
+ * whole comment on every keystroke, and a new comment has no loaded blocks
+ * to match, so without this every block would be judged by the thread's
+ * renderer again each time. A block's Markdown depends only on the block.
+ */
+function writtenCommentNode(node: JSONContent, current: Engine, comment: CommentFlavor): string {
+  const known = commentWrites.get(comment);
+  const memo = known ?? boundedMemo(COMMENT_WRITES_BUDGET);
+  if (!known) commentWrites.set(comment, memo);
+  return memo(nodeKey(node), () => renderCommentNode(node, current, comment));
 }
 
 /** A piece of output: source text and the loaded block it came from, if any. */
@@ -243,7 +402,7 @@ function matchBlock(nodes: JSONContent[], start: number, source: SourceMap, inde
   return candidates.find((candidate) => !used.has(candidate)) ?? -1;
 }
 
-function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine): Chunk[] {
+function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine, flavor: MarkdownFlavor): Chunk[] {
   const index = indexBlocks(source);
   const chunks: Chunk[] = [];
   let position = 0;
@@ -270,7 +429,7 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine): Chu
     }
     position += 1;
     if (!node || isEmptyParagraph(node)) continue;
-    const text = renderNodes([node], current);
+    const text = flavor === "document" ? renderNodes([node], current) : writtenCommentNode(node, current, flavor);
     // A block with no Markdown yet (an empty or uploading media block) is left out.
     if (text) chunks.push({ text, block: -1 });
   }
@@ -311,8 +470,8 @@ function joinChunks(chunks: Chunk[], source: SourceMap): string {
  * keep their original source and spacing; new or edited blocks are rendered
  * fresh. An unedited document returns the loaded string exactly.
  */
-export function serializeMarkdown(doc: JSONContent, source: SourceMap): string {
-  const chunks = toChunks(doc.content ?? [], source, getEngine());
+export function serializeMarkdown(doc: JSONContent, source: SourceMap, flavor: MarkdownFlavor = "document"): string {
+  const chunks = toChunks(doc.content ?? [], source, getEngine(), flavor);
   if (isUnchanged(chunks, source)) return source.original;
   return joinChunks(chunks, source);
 }

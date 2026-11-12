@@ -16,18 +16,132 @@ const markdownPatterns: readonly [RegExp, string][] = [
   [/!\[([^\]]*)\]\([^)]*\)/g, "$1"],
   [/\[([^\]]*)\]\([^)]*\)/g, "$1"],
   [/^\s{0,3}(?:#{1,6}|>|[-*+]|\d+[.)])\s+/gm, ""],
-  [/[*_~`]+/g, ""],
+  [/`+/g, ""],
   [/<[^>]*>/g, ""],
 ];
 
+const EMPHASIS_RUN = /\*+|_+|~+/g;
+const SPACE = /\s/;
+const WORD = /[\p{L}\p{N}]/u;
+/** A blank line: emphasis never reaches across one. */
+const BLANK_LINE = /(\n[ \t]*\n)/;
+
+/** A run of one emphasis character, and whether Markdown lets it open or close emphasis there. */
+interface EmphasisRun {
+  start: number;
+  end: number;
+  char: string;
+  opens: boolean;
+  closes: boolean;
+}
+
+/**
+ * The runs of `*`, `_`, and `~` in `text`. A run opens when text follows it
+ * and closes when text comes before it; an underscore inside a word
+ * ("snake_case") does neither.
+ */
+function emphasisRuns(text: string): EmphasisRun[] {
+  return [...text.matchAll(EMPHASIS_RUN)].map((match) => {
+    const run = match[0];
+    const start = match.index;
+    const before = text.charAt(start - 1);
+    const after = text.charAt(start + run.length);
+    const inWord = run.startsWith("_") && WORD.test(before) && WORD.test(after);
+    return {
+      start,
+      end: start + run.length,
+      char: run.charAt(0),
+      opens: !inWord && after !== "" && !SPACE.test(after),
+      closes: !inWord && before !== "" && !SPACE.test(before),
+    };
+  });
+}
+
+/** The runs that are marks: each closing run with the nearest earlier opening run of its character. */
+function pairedRuns(runs: readonly EmphasisRun[]): Set<EmphasisRun> {
+  const open = new Map<string, EmphasisRun[]>();
+  const paired = new Set<EmphasisRun>();
+  for (const run of runs) {
+    const openers = open.get(run.char) ?? [];
+    open.set(run.char, openers);
+    const opener = run.closes ? openers.pop() : undefined;
+    if (opener) {
+      paired.add(opener);
+      paired.add(run);
+    } else if (run.opens) {
+      openers.push(run);
+    }
+  }
+  return paired;
+}
+
+function stripParagraphEmphasis(text: string): string {
+  const runs = emphasisRuns(text);
+  const marks = pairedRuns(runs);
+  let stripped = "";
+  let at = 0;
+  for (const run of runs) {
+    if (!marks.has(run)) continue;
+    stripped += text.slice(at, run.start);
+    at = run.end;
+  }
+  return stripped + text.slice(at);
+}
+
+/**
+ * Emphasis marks off, literal characters kept. A run of `*`, `_`, or `~` is
+ * a mark only when it pairs with another, as Markdown reads it: "2 * 3",
+ * "2*3", "file*", and "snake_case" keep their characters, and "*done*"
+ * loses its marks.
+ */
+function stripEmphasis(text: string): string {
+  return text.split(BLANK_LINE).map(stripParagraphEmphasis).join("");
+}
+
+/** A backslash escape in Markdown: a backslash before ASCII punctuation, which stands for that character. */
+const BACKSLASH_ESCAPE = /\\([!-/:-@[-`{-~])/g;
+/** Private-use characters stand in for escaped punctuation while the Markdown marks come off. */
+const PRIVATE_USE = /[\uE000-\uE07F]/g;
+const STAND_IN = 0xe000;
+
+const NAMED_ENTITIES: Readonly<Record<string, string>> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+const ENTITY = /&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|(amp|lt|gt|quot|apos|nbsp));/g;
+
+/** One character for a numeric entity, or the replacement character for one that names no character. */
+function fromCodePoint(codePoint: number): string {
+  const valid = codePoint > 0 && codePoint <= 0x10ffff && (codePoint < 0xd800 || codePoint > 0xdfff);
+  return valid ? String.fromCodePoint(codePoint) : "\uFFFD";
+}
+
+/** The basic entities as their characters, in one pass so `&amp;lt;` reads "&lt;", not "<". */
+function decodeEntities(text: string): string {
+  return text.replace(ENTITY, (_match, decimal: string | undefined, hex: string | undefined, name: string | undefined) => {
+    if (decimal !== undefined) return fromCodePoint(Number(decimal));
+    if (hex !== undefined) return fromCodePoint(Number.parseInt(hex, 16));
+    return NAMED_ENTITIES[name ?? ""] ?? "";
+  });
+}
+
 /**
  * A short plain-text excerpt of a comment: Markdown marks, links' addresses,
- * and tags removed, whitespace collapsed, cut at EXCERPT_MAX. Comment text is
- * untrusted; the bell renders this as plain text, never as HTML or Markdown.
+ * and tags removed, escapes and basic entities read as the characters the
+ * writer typed (`\\*` is "*", `&amp;` is "&"), whitespace collapsed, cut at
+ * EXCERPT_MAX.
+ *
+ * Contract: the result is plain text and may hold `<`, `>`, and `&` as
+ * characters; a stored `&lt;img onerror=…&gt;` comes back as the text
+ * `<img onerror=…>`. Every consumer must treat it as text, never as HTML or
+ * Markdown. Today: the bell (feed.ts → notification-list.tsx, a React text
+ * node) and browser notifications (push/notify.ts → pushMessage → the
+ * service worker's showNotification body, which is text). A consumer that
+ * builds HTML, such as an email, must escape it (email/layout.ts `html`).
  */
 export function commentExcerpt(body: string, max: number = EXCERPT_MAX): string {
-  let text = body;
+  // Escaped characters are not marks: they stand aside as private-use characters while the marks come off.
+  let text = body.replace(PRIVATE_USE, "").replace(BACKSLASH_ESCAPE, (_match, char: string) => String.fromCharCode(STAND_IN + char.charCodeAt(0) - 0x20));
   for (const [pattern, replacement] of markdownPatterns) text = text.replace(pattern, replacement);
+  text = stripEmphasis(text);
+  text = decodeEntities(text.replace(PRIVATE_USE, (char) => String.fromCharCode(char.charCodeAt(0) - STAND_IN + 0x20)));
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 }

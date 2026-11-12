@@ -1,23 +1,21 @@
 import { IconRobot } from "@tabler/icons-react";
 import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
-import remarkGfm from "remark-gfm";
 
 import { highlightCode } from "#syntax-highlight";
 
 import { CodeBlock } from "@/components/code/code-block";
 import { blockColorAttributes, readBlockHue } from "@/lib/block-colors/block-color-rules";
-import { remarkBlockColors } from "@/lib/block-colors/remark-block-colors";
 import type { MentionKind } from "@/lib/comments/mentions";
 import { remarkMentions } from "@/lib/comments/remark-mentions";
 import { isFileLinkPath, isFileMediaUrl } from "@/lib/files/media-rules";
-import { safeHref } from "@/lib/link-policy";
 import { parseFenceInfo, type FenceInfo } from "@/lib/markdown/fence-info";
+import { artifactLinkHref } from "@/lib/markdown/link-href";
 import { isMermaidLanguage } from "@/lib/markdown/mermaid-fence";
-import { remarkFenceInfo } from "@/lib/markdown/remark-fence-info";
 import { cn } from "@/lib/utils";
 
 import { ExternalLink } from "./external-link";
 import { InlineFileImage, MarkdownMedia } from "./markdown-media";
+import { markdownSyntaxPlugins } from "./markdown-syntax";
 import { BlockCaption, MarkdownMermaid } from "./markdown-mermaid";
 
 /** A resolved @mention: a subtle chip. Agents get a robot icon and their own hue. */
@@ -151,9 +149,9 @@ function componentsFor(media: boolean, diagrams: boolean): Components {
   return media ? componentSets.media : componentSets.plain;
 }
 
-/** Keeps only URLs the link policy allows, and links to this site's uploads. Everything else becomes an empty href. */
+/** Keeps only URLs the link policy allows, and links to this site's uploads (artifactLinkHref). Everything else becomes an empty href. */
 function urlTransform(url: string): string {
-  return safeHref(url) ?? (isFileLinkPath(url) ? url : "");
+  return artifactLinkHref(url) ?? "";
 }
 
 const noMentions: ReadonlyMap<string, MentionKind> = new Map();
@@ -170,7 +168,7 @@ const noMentions: ReadonlyMap<string, MentionKind> = new Map();
 export function MarkdownView({ content, className, mentions = noMentions, media = false, diagrams = false }: { content: string; className?: string; mentions?: ReadonlyMap<string, MentionKind>; media?: boolean; diagrams?: boolean }) {
   return (
     <div className={cn("artifact-prose", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkFenceInfo, remarkBlockColors, remarkMentions(mentions)]} skipHtml urlTransform={urlTransform} components={componentsFor(media, diagrams)}>
+      <ReactMarkdown remarkPlugins={[...markdownSyntaxPlugins, remarkMentions(mentions)]} skipHtml urlTransform={urlTransform} components={componentsFor(media, diagrams)}>
         {content}
       </ReactMarkdown>
     </div>

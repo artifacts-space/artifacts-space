@@ -55,6 +55,12 @@ describe("pushMessage", () => {
     expect(pushMessage({ type: "share_request", requestKind: "sharing", actorLabel: null, artifactTitle: "Plan", publicId: "p1", excerpt: null, href: "/teams/core" }).body).toBe("");
   });
 
+  it("should carry an excerpt's characters as plain text when the comment held a tag", () => {
+    // The service worker hands the body to showNotification, which shows text and never reads HTML (public/sw.js).
+    const message = pushMessage({ type: "comment", requestKind: null, actorLabel: "@ada", artifactTitle: "Plan", publicId: "p1", excerpt: "<img src=x onerror=alert(1)>", href: "/app" });
+    expect(message.body).toBe("<img src=x onerror=alert(1)>");
+  });
+
   it("should open settings from the test message", () => {
     expect(testPushMessage().url).toBe("/app/settings");
   });

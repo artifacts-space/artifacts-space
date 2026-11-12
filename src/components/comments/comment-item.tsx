@@ -145,10 +145,12 @@ interface CommentItemProps {
   anchors?: AnchorLookup | undefined;
   /** False where the comment already sits at its words (the card at the text), so they are not repeated. */
   showAnchor?: boolean;
+  /** A shorter edit box, for the card at the text. */
+  compact?: boolean;
 }
 
 /** A comment that is not deleted: its text and actions, or the box to edit it. */
-function LiveComment({ comment, agent, handlers }: Pick<CommentItemProps, "comment" | "agent" | "handlers">) {
+function LiveComment({ comment, agent, handlers, compact = false }: Pick<CommentItemProps, "comment" | "agent" | "handlers" | "compact">) {
   const [editing, setEditing] = useState(false);
   const mentions = useMemo(() => postedMentionMap(comment.mentions, comment.author), [comment.mentions, comment.author]);
   if (editing) {
@@ -159,6 +161,7 @@ function LiveComment({ comment, agent, handlers }: Pick<CommentItemProps, "comme
         submitLabel="Save"
         initialBody={comment.body}
         autoFocus
+        compact={compact}
         onCancel={() => { setEditing(false); }}
         onSubmit={async (body) => {
           const outcome = await handlers.onEdit(comment.id, body);
@@ -177,12 +180,12 @@ function LiveComment({ comment, agent, handlers }: Pick<CommentItemProps, "comme
 }
 
 /** One comment: author, the words it was made on (an inline comment), markdown body, and the viewer's actions. */
-export function CommentItem({ comment, agent, handlers, reply = false, anchors, showAnchor = true }: CommentItemProps) {
+export function CommentItem({ comment, agent, handlers, reply = false, anchors, showAnchor = true, compact = false }: CommentItemProps) {
   return (
     <article id={`comment-${comment.id}`} className={cn("scroll-mt-20 space-y-1.5 py-3", reply && "border-l pl-4")}>
       <AuthorLine comment={comment} agent={agent} />
       {showAnchor ? <AnchorQuote comment={comment} lookup={anchors} /> : null}
-      {comment.deleted ? <p className="text-md text-muted-foreground italic">This comment was deleted.</p> : <LiveComment comment={comment} agent={agent} handlers={handlers} />}
+      {comment.deleted ? <p className="text-md text-muted-foreground italic">This comment was deleted.</p> : <LiveComment comment={comment} agent={agent} handlers={handlers} compact={compact} />}
     </article>
   );
 }

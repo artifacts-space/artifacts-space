@@ -6,6 +6,8 @@ import { highlightDraft, type HighlightToken } from "@/lib/comments/composer-hig
 import type { MentionKind } from "@/lib/comments/mentions";
 import { cn } from "@/lib/utils";
 
+import { mentionClasses } from "./mention-classes";
+
 /**
  * Every property that moves a glyph, shared by the textarea and the layer under
  * it so their text lines up exactly. Kerning and ligatures are off in both, so
@@ -32,10 +34,6 @@ const styleClasses = {
   mention: "",
 } as const;
 
-const mentionClasses: Record<MentionKind, string> = {
-  person: "rounded-xs bg-mention text-mention-foreground ring-2 ring-mention",
-  agent: "rounded-xs bg-mention-agent text-mention-agent-foreground ring-2 ring-mention-agent",
-};
 
 function tokenClass(token: HighlightToken) {
   return cn(token.styles.map((style) => styleClasses[style]), token.mention ? mentionClasses[token.mention] : null);
@@ -76,7 +74,7 @@ interface HighlightedTextareaProps extends Omit<React.ComponentProps<"textarea">
  * you type. The textarea's own text is transparent; a layer under it draws the
  * same text with styles. Typing, selection, IME, undo, spellcheck, and mobile
  * keyboards all stay native, because the textarea is still what you type in.
- * Comments and the artifact editor share it; `className` sets the size.
+ * The artifact editor's Markdown source uses it; `className` sets the size.
  */
 export function HighlightedTextarea({ value, resolved = noMentions, markdown = true, textareaRef, className, onScroll, ...props }: HighlightedTextareaProps) {
   const layerRef = useRef<HTMLDivElement>(null);

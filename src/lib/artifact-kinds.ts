@@ -40,3 +40,13 @@ export const kindColors: Record<FormatKind, string> = {
   ui: "text-kind-ui",
   file: "text-kind-file",
 };
+
+/**
+ * Whether the header shows the format as a chip under the summary. Markdown
+ * is what a page is unless it says otherwise, so "Markdown" there tells a
+ * reader nothing; a sheet, code, an interface, or a diagram says what the
+ * page holds. Changing the format stays in the More menu either way.
+ */
+export function showsFormatChip(kind: ArtifactKind): boolean {
+  return kind !== "markdown";
+}

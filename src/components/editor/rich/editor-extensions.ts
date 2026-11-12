@@ -3,7 +3,7 @@ import { Placeholder } from "@tiptap/extensions";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 
 import { CodeBlockView } from "./code-block-view";
-import { MarkdownPaste } from "./markdown-paste";
+import { MarkdownPaste, type PastedLinkRule } from "./markdown-paste";
 import { markdownSchemaExtensions } from "./markdown-schema";
 import { MediaInput, MediaRefusal } from "./media-input";
 import { MediaOffView } from "./media-off-view";
@@ -35,26 +35,45 @@ export interface RichEditorOptions {
    */
   media?: boolean | undefined;
   onMediaRefused?: () => void;
+  /**
+   * A short box such as a comment: this hint in the empty box and none on
+   * other empty lines, and no slash menu, so a "/" in a path or "and/or"
+   * stays text. Unset for a document.
+   */
+  boxPlaceholder?: string | undefined;
+  /**
+   * Which pasted Markdown links stay links: those the content's renderer
+   * shows as links. Default: an artifact's (artifactShowsLink).
+   */
+  pastedLinks?: PastedLinkRule | undefined;
+}
+
+/** The placeholder rule: a document's hints, or a box's single hint. */
+function placeholderRule(boxPlaceholder: string | undefined): (context: PlaceholderContext) => string {
+  if (boxPlaceholder === undefined) return placeholderFor;
+  return ({ editor }) => (editor.isEmpty ? boxPlaceholder : "");
 }
 
 /**
  * Everything the rich editor runs: the shared Markdown schema with node views
- * for code, media, and raw blocks, the placeholder, the slash menu, file
+ * for code, media, and raw blocks, the placeholder, the slash menu (not in a
+ * box such as a comment), file
  * paste and drop (before Markdown paste, so a pasted screenshot uploads),
  * Markdown paste, and ⌘K or Ctrl+K for links.
  */
 export function richEditorExtensions(options: RichEditorOptions): AnyExtension[] {
   const media = options.media ?? true;
+  const box = options.boxPlaceholder !== undefined;
   return [
     ...markdownSchemaExtensions({
       codeBlock: ReactNodeViewRenderer(CodeBlockView),
       rawMarkdown: ReactNodeViewRenderer(RawBlockView),
       media: ReactNodeViewRenderer(media ? MediaView : MediaOffView),
     }),
-    Placeholder.configure({ placeholder: placeholderFor, showOnlyCurrent: true, includeChildren: false }),
-    SlashCommandExtension.configure({ commands: slashCommandsFor(media) }),
+    Placeholder.configure({ placeholder: placeholderRule(options.boxPlaceholder), showOnlyCurrent: true, includeChildren: false }),
+    ...(box ? [] : [SlashCommandExtension.configure({ commands: slashCommandsFor(media) })]),
     media ? MediaInput : MediaRefusal.configure({ onRefuse: options.onMediaRefused ?? (() => undefined) }),
-    MarkdownPaste,
+    options.pastedLinks ? MarkdownPaste.configure({ keepsLink: options.pastedLinks }) : MarkdownPaste,
     Extension.create({
       name: "linkShortcut",
       addKeyboardShortcuts() {

@@ -24,6 +24,7 @@ import { OpenPageButton } from "@/components/page-width/open-page-button";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { mayExportCsv } from "@/lib/csv-export/rules";
 import { previewColumnClass, usesFullWidth } from "@/lib/page-width/rules";
+import { showsFormatChip } from "@/lib/artifact-kinds";
 import { artifactPageHref } from "@/lib/artifact-page-href";
 import { cn } from "@/lib/utils";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
@@ -69,6 +70,18 @@ function PanelCopy({ content, shown }: { content: string; shown: boolean }) {
   return shown ? <CopyButton value={content} variant="ghost" size="icon" /> : null;
 }
 
+/** The format (not for Markdown, showsFormatChip) and the tags; nothing at all, not an empty row, when neither shows. */
+function PanelChips({ kind, tags }: { kind: ArtifactDto["kind"]; tags: readonly string[] }) {
+  const format = showsFormatChip(kind);
+  if (!format && tags.length === 0) return null;
+  return (
+    <div data-slot="panel-chips" className="mt-3 flex flex-wrap items-center gap-2">
+      {format ? <KindChip kind={kind} /> : null}
+      {tags.map((tag) => <span key={tag} className="inline-flex h-7 items-center rounded-lg border px-2 text-sm text-muted-foreground">{tag}</span>)}
+    </div>
+  );
+}
+
 /** The title (a link to its page), summary, format and tags, and the meta line, in the content's column. */
 function PanelHeader({ artifact, column, status }: { artifact: ArtifactDto; column: string; status: React.ReactNode }) {
   const length = artifact.content.length;
@@ -80,11 +93,8 @@ function PanelHeader({ artifact, column, status }: { artifact: ArtifactDto; colu
           <a href={artifactPageHref(artifact.publicId)} target="_blank" rel="noopener noreferrer" className="hover:underline">{artifact.title}</a>
         </h2>
         {artifact.summary ? <p className="mt-2 text-md leading-6 text-muted-foreground">{artifact.summary}</p> : null}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <KindChip kind={artifact.kind} />
-          {artifact.tags.map((tag) => <span key={tag} className="inline-flex h-7 items-center rounded-lg border px-2 text-sm text-muted-foreground">{tag}</span>)}
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-3 text-xs text-muted-foreground">
+        <PanelChips kind={artifact.kind} tags={artifact.tags} />
+        <div data-slot="panel-meta" className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-3 text-xs text-muted-foreground">
           <LastEdited editor={artifact.updatedBy} at={artifact.updatedAt} />
           <HarnessByline harness={artifact.harness} className="text-xs" />
           <span aria-hidden>·</span>
