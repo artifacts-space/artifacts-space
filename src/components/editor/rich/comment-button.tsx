@@ -16,7 +16,7 @@ export function CommentButton() {
   if (!inline) return null;
   return (
     <>
-      <span aria-hidden className="mx-0.5 h-4 w-px bg-border" />
+      <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-border" />
       <ToolButton icon={IconMessage} label="Comment" onPress={() => { inline.startComment(); }} />
     </>
   );

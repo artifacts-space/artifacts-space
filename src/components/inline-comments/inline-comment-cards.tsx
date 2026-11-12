@@ -33,8 +33,9 @@ interface CardProps {
 
 /** A card at a comment's words: it follows them as the page scrolls, and closes on Escape or a click elsewhere. */
 function CardAtText({ inline, anchorKey, title, takesFocus, children }: CardProps) {
-  const { boxOf, close } = inline;
-  const anchor = useMemo(() => ({ getBoundingClientRect: () => boxOf(anchorKey) ?? fallbackBox() }), [boxOf, anchorKey]);
+  const { boxOf, close, surface } = inline;
+  // The words are not an element, so the anchor is their box; naming the text's element lets the card follow it when a pane around it scrolls.
+  const anchor = useMemo(() => ({ getBoundingClientRect: () => boxOf(anchorKey) ?? fallbackBox(), ...(surface ? { contextElement: surface } : {}) }), [boxOf, anchorKey, surface]);
   return (
     <Popover open onOpenChange={(open) => { if (!open) close(); }}>
       <PopoverContent

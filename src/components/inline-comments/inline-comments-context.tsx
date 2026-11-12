@@ -34,6 +34,8 @@ export interface InlineComments {
   close: () => void;
   /** Starts a comment on a stretch of the page, or on the current selection. False when it holds no words of this artifact. */
   startComment: (range?: Range) => boolean;
+  /** The element whose text the comments are on, once the page has it. */
+  surface: HTMLElement | null;
   /** The box on screen of a thread's words (`id`), or of the new comment's (`"draft"`). */
   boxOf: (key: string) => DOMRect | null;
   /** Ids of the inline comments whose words are at a point on screen, shortest stretch first. */

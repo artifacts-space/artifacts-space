@@ -116,11 +116,12 @@ export function InlineCommentsProvider({ publicId, kind, canComment, stored = tr
         setActiveId(null);
       },
       startComment,
+      surface,
       boxOf: (key) => boxOf(key) ?? (key === DRAFT_KEY ? (draft?.box ?? null) : null),
       commentsAt: keysAt,
       attachSurface,
     }),
-    [publicId, thread, ready, located, activeId, draft, startComment, boxOf, scrollTo, keysAt, attachSurface],
+    [publicId, thread, ready, located, activeId, draft, startComment, surface, boxOf, scrollTo, keysAt, attachSurface],
   );
 
   if (!enabled) return children;
