@@ -25,8 +25,9 @@ export const panelClass =
  * Floating beside its anchor on wider screens; a sheet from the bottom on
  * phones. Neither slides, zooms, or moves as it opens: the floating menu
  * stays transparent until it is placed, then fades in over 100ms, and the
- * sheet only fades. No fade at all under reduced motion. The width is set
- * as a style from one constant (panelWidth), never as a class here.
+ * sheet only fades. No fade at all under reduced motion. Widths are inline
+ * styles from the `menuWidth` and `submenuWidth` constants in
+ * menu-placement.ts, never a class here.
  */
 export function placementClass(sheet: boolean): string {
   if (sheet) return "fixed inset-x-0 bottom-0 max-h-[72dvh] rounded-t-xl px-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] animate-in fade-in-0 duration-100 motion-reduce:animate-none";
