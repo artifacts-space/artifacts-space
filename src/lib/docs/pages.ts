@@ -303,6 +303,7 @@ export const docsPages = [
       h2("agents", "Agent teammates"),
       h3("agent-tokens", "Agent tokens"),
       h2("mentions", "Mentions and the inbox"),
+      h2("inline-comments", "Comments on the text"),
       h2("comments-setting", "Who can comment"),
       h2("history", "Version history and restore"),
     ],

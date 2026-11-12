@@ -1,4 +1,6 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+import { card, highlighted, pointOn, select } from "./support/inline-comments";
 
 /*
  * Inline comments on a Markdown artifact, on the dev fixture
@@ -10,55 +12,9 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
  */
 
 const editor = (page: Page) => page.getByRole("textbox", { name: "Artifact content" });
-const card = (page: Page) => page.locator("[data-slot=inline-comment-card]");
 const list = (page: Page) => page.getByRole("region", { name: "Comments" });
 /** A modal dialog over the page, as the Comments dialog is. The card at the text is not one. */
 const commentsDialog = (page: Page) => page.locator("[data-slot=dialog-content]");
-
-/** The text each highlight covers: every open inline comment's words, and the open thread's. */
-function highlighted(page: Page) {
-  return page.evaluate(() => {
-    const words = (name: string) => [...(CSS.highlights.get(name) ?? [])].map((range) => (range as Range).toString().replace(/\s+/g, " "));
-    return { marked: words("inline-comment"), open: words("inline-comment-active") };
-  });
-}
-
-/** Selects `words` inside `scope` with the mouse's result: a selection over exactly those words. */
-async function select(scope: Locator, words: string) {
-  await scope.evaluate((root, text) => {
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      const at = (node as Text).data.indexOf(text);
-      if (at === -1) continue;
-      const range = document.createRange();
-      range.setStart(node, at);
-      range.setEnd(node, at + text.length);
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-      return;
-    }
-    throw new Error(`"${text}" is not in one text node`);
-  }, words);
-}
-
-/** The middle of the first line box of `words` in `scope`, to click on the words themselves. */
-function pointOn(scope: Locator, words: string) {
-  return scope.evaluate((root, text) => {
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      const at = (node as Text).data.indexOf(text);
-      if (at === -1) continue;
-      const range = document.createRange();
-      range.setStart(node, at);
-      range.setEnd(node, at + text.length);
-      const box = range.getClientRects().item(0);
-      if (!box) break;
-      return { x: box.left + box.width / 2, y: box.top + box.height / 2, bottom: box.bottom, left: box.left };
-    }
-    throw new Error(`"${text}" is not on the page`);
-  }, words);
-}
 
 async function openEditor(page: Page, seeded = false) {
   await page.goto(`/dev/inline-comments${seeded ? "?seed=1" : ""}`);
