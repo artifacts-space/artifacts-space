@@ -412,6 +412,15 @@ catch this, so test the generated SQL with `.toSQL()`, as
     cleared on approval and by the cleanup job after
     `registeredNetworkHours`, so it never outlives the privacy page's one
     day for rate-limit data.
+  - Known limit: a thief who holds a rotated refresh token and sends from
+    the app's own address or IPv6 /64 can spend the token's tries with
+    requests Better Auth refuses before its reuse check (a bad scope, say),
+    then push the address over its failure limit with about 60 bogus
+    requests. While that lasts, the app's replay gets a 429 and reuse
+    detection does not fire. From any other network the replay still
+    revokes the family. Before these limits the same thief could do this
+    more cheaply by using up the address's 300 token requests an hour. Do
+    not add a mechanism for it without a decision.
   - Better Auth's own in-memory limits on these two endpoints are raised far
     above ours (`betterAuthEndpointBursts`); keep them there, or they
     throttle hosted apps first. Refusals are 429s in the OAuth error shape

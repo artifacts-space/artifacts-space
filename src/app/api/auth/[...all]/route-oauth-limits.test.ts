@@ -312,8 +312,9 @@ describe("auth route token limits", () => {
     const madeUp = await answer(refresh("made-up"));
 
     vi.useRealTimers();
-    // Every refused try is counted, so only Retry-After moves between the two.
-    expect({ status: theirs.status, body: theirs.body }).toEqual({ status: madeUp.status, body: madeUp.body });
+    // Every refused try is counted, so only the wait moves between the two.
+    const withoutWait = (settled: typeof theirs) => ({ status: settled.status, error: settled.body.error, message: String(settled.body.error_description).replace(/ Try again in .*$/, "") });
+    expect(withoutWait(theirs)).toEqual(withoutWait(madeUp));
   });
 
   it("should leave other networks alone when one network is over its failure limit", async () => {

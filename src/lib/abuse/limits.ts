@@ -220,6 +220,15 @@ export const rateLimits = {
    * scope) to dodge the failure limit. Per address, so a thief cannot use up
    * a token's tries where the rightful app sends it, and the app's replay of
    * a rotated token still reaches Better Auth, which revokes the family.
+   *
+   * Known limit: a thief who holds a rotated refresh token and sends from the
+   * app's own address (or IPv6 /64) can spend its tries with requests Better
+   * Auth refuses before its reuse check (a bad scope, say), then push the
+   * address over oauthTokenFailuresByNetwork with about 60 bogus requests.
+   * While that lasts, the app's replay gets a 429 and the family is not
+   * revoked. From any other network, the replay still revokes it. Before
+   * these limits, the same thief could do the same more cheaply by using up
+   * the address's 300 token requests an hour.
    */
   oauthTokenAttemptsByCredential: { limit: 5, windowSeconds: quarterHour },
   /**

@@ -58,9 +58,18 @@ function ipv6Hextets(address: string): string[] | null {
   return all.every((part) => hextet.test(part)) ? all : null;
 }
 
+/** The IPv4 address an IPv4-mapped IPv6 address (::ffff:0:0/96) carries in its last two hextets, or null. */
+function mappedIpv4(hextets: readonly string[]): string | null {
+  const [high, low] = hextets.slice(6).map((part) => Number.parseInt(part, 16));
+  if (high === undefined || low === undefined) return null;
+  if (hextets[5] !== "ffff" || !hextets.slice(0, 5).every((part) => Number.parseInt(part, 16) === 0)) return null;
+  return [high >> 8, high & 255, low >> 8, low & 255].join(".");
+}
+
 /**
  * The part of a client address one subscriber controls: an IPv4 address as
- * is (an IPv4-mapped IPv6 address counts as IPv4), and an IPv6 address as its
+ * is (an IPv4-mapped IPv6 address counts as IPv4, written dotted or in hex),
+ * and an IPv6 address as its
  * /64, because one home or phone line is usually handed a whole /64 and can
  * pick a fresh address in it for every request. Anything else is unchanged.
  */
@@ -70,6 +79,8 @@ export function addressPrefix(address: string): string {
   if (!address.includes(":")) return address;
   const hextets = ipv6Hextets(address);
   if (!hextets) return address;
+  const ipv4 = mappedIpv4(hextets);
+  if (ipv4) return ipv4;
   return `${hextets.slice(0, 4).map((part) => part.padStart(4, "0")).join(":")}::/64`;
 }
 
