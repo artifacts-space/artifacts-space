@@ -20,9 +20,10 @@ const origin = "https://artifacts.space";
  * endpoint over Streamable HTTP, signed in with OAuth in the browser, with
  * tokens only for headless use. The steps follow each client's own docs:
  * - Cursor: https://cursor.com/docs/context/mcp/install-links and https://cursor.com/docs/context/mcp
- * - Claude: https://support.claude.com/en/articles/11175166-getting-started-with-custom-connectors-using-remote-mcp
+ * - Claude: https://support.claude.com/en/articles/11175166-getting-started-with-custom-connectors-using-remote-mcp and https://claude.com/docs/connectors/building/directory-vs-custom
  * - ChatGPT: https://developers.openai.com/api/docs/guides/custom-mcp-server and https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt
- * - Codex: https://learn.chatgpt.com/docs/extend/mcp?surface=cli
+ * - Codex: https://learn.chatgpt.com/docs/extend/mcp?surface=cli and https://learn.chatgpt.com/docs/reference/commands
+ * - Grok Bot: https://docs.x.ai/grok-bot/computer-and-apps and https://docs.x.ai/grok/connectors
  * - OpenCode: https://opencode.ai/docs/mcp-servers/
  * - Devin: https://docs.devin.ai/work-with-devin/mcp
  * - Kimi Code CLI: https://moonshotai.github.io/kimi-code/en/customization/mcp.html
@@ -34,7 +35,7 @@ export default function ClientsPage() {
     <RegistryPage slug={page}>
       <Prose className="mt-0">
         <p>
-          Every client connects to the same endpoint. Cursor has a one-click button. The others take a command, a config file, or a short form, and none of them needs a token: you sign in and approve in your browser.
+          Every client connects to the same endpoint. Cursor has a one-click button, and Claude has a button that fills in its form for you. The others take a command, a config file, or a short form, and none of them needs a token: you sign in and approve in your browser.
         </p>
       </Prose>
 

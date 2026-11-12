@@ -3,10 +3,10 @@
 import { IconUpload } from "@tabler/icons-react";
 import { useEffect, useRef, type RefObject } from "react";
 
+import { gutterRoom } from "@/components/app/artifact-editor/detail-scroll";
 import { FileUploader, UploadList } from "@/components/files/file-uploader";
 import type { UploadItem } from "@/components/files/use-file-uploads";
 import { Button } from "@/components/ui/button";
-import { gutterRoom } from "@/components/app/artifact-editor/detail-scroll";
 import { cn } from "@/lib/utils";
 
 const fieldSelector = '[contenteditable="true"], textarea, input:not([type="file"])';

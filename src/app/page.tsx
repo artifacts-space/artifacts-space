@@ -36,7 +36,7 @@ export default function Home() {
             </Button>
           </div>
           <p className="animate-enter mt-5 text-sm text-muted-foreground" style={{ animationDelay: "160ms" }}>
-            Works with Claude Code, Codex, Cursor, ChatGPT, OpenCode, Kimi Code, Claude Desktop, Devin, fx, and any MCP client.
+            Works with Claude Code, Codex, Cursor, ChatGPT, Grok Bot, OpenCode, Kimi Code, Claude Desktop, Devin, fx, and any MCP client.
           </p>
         </section>
 

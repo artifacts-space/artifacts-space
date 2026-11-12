@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 const endpoint = "https://artifacts.space/api/mcp";
-const clients = ["Claude Code", "Cursor", "Claude Desktop and claude.ai", "ChatGPT", "Codex", "OpenCode", "Devin", "Kimi Code CLI", "fx", "Other clients"];
+const clients = ["Claude Code", "Cursor", "Claude Desktop and claude.ai", "ChatGPT", "Codex", "Grok Bot", "OpenCode", "Devin", "Kimi Code CLI", "fx", "Other clients"];
 
 /** A section heading's accessible name: its title, then the hidden "Link to this section". */
 function headingName(title: string): RegExp {
