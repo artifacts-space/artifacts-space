@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { closeInlineEditDb, saveAsSomeoneElse, storedText, versionKinds } from "./support/inline-edit-db";
+import { closeInlineEditDb, saveAsAgent, saveAsSomeoneElse, storedText, versionKinds, versionSources } from "./support/inline-edit-db";
 import { cleanUp, createTestArtifact, localDatabaseEnabled, localDatabaseSkipReason, readyDevUser } from "./support/local-db";
 
 /** Autosave sends at most one save every 5 seconds (autosave-rules.ts), so "Saved" can take a little over that. */
@@ -98,6 +98,26 @@ test("should refuse to overwrite someone else's newer content and offer their ve
   await page.getByRole("button", { name: "Load their version" }).click();
   await expect(page.getByRole("textbox", { name: "Artifact content" })).toContainText("Theirs instead.");
   await expect(page.getByText(/saved a newer version while you were editing/)).toHaveCount(0);
+});
+
+test("should save the person's typing over an agent's newer save, say so, and keep the agent's version in History", async ({ page }, testInfo) => {
+  const title = `Inline agent ${testInfo.project.name} ${String(Date.now())}`;
+  const publicId = await openSeeded(page, title, "# Answers\n\nQ1:");
+  await typeAfter(page, "Q1:", " first.");
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
+
+  await saveAsAgent(publicId, "# Answers\n\nQ1: the agent's rewrite.");
+  await typeAfter(page, "first.", " Still mine.");
+  await expect(page.locator("[data-slot=agent-save-notice]")).toContainText("An agent saved changes while you were editing. Your version is saved; theirs is in History.", savedWithin);
+  // What the person typed stays in the editor and is what is saved.
+  await expect(page.getByRole("textbox", { name: "Artifact content" })).toContainText("Q1: first. Still mine.");
+  expect((await storedText(publicId)).content).toBe("# Answers\n\nQ1: first. Still mine.");
+  const sources = await versionSources(publicId);
+  expect(sources.map((version) => version.harness)).toEqual([null, null, "claude-code", null]);
+  expect(sources[2]?.content, "the agent's version stays in History").toBe("# Answers\n\nQ1: the agent's rewrite.");
+
+  await page.locator("[data-slot=agent-save-notice]").getByRole("button", { name: "Open History" }).click();
+  await expect(page.getByRole("dialog", { name: /^History of / }).getByRole("list", { name: "Versions" }).getByRole("listitem")).toHaveCount(4);
 });
 
 test("should unlock Markdown in place on the artifact's own page and save it on its own", async ({ page }, testInfo) => {

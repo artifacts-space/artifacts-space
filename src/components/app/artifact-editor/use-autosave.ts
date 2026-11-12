@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { updateArtifactAction } from "@/app/(workspace)/app/actions";
 import type { ArtifactDto, SaveArtifactResult } from "@/lib/artifact-types";
+import { signalEditingAction } from "@/lib/edits/actions";
 import type { EditSessionStep } from "@/lib/versions/history-rules";
 
-import { changedFields, closedSession, draftProblem, hasChanges, keepMineOver, mergeDrafts, nextSaveDelay, sessionStep, type EditSession } from "./autosave-rules";
+import { changedFields, closedSession, draftProblem, hasChanges, keepMineOver, mergeDrafts, nextSaveDelay, replacesContentUnderEdits, sessionStep, type EditSession } from "./autosave-rules";
+import { useEditingSignal, type SignalEditing } from "./use-editing-signal";
 import { draftFrom, type ArtifactDraft } from "./use-artifact-draft";
 
 /** What the editor shows about saving, beside the character count. */
@@ -37,6 +39,8 @@ interface AutosaveOptions {
   problem?: ((draft: ArtifactDraft, base: ArtifactDraft) => string | null) | undefined;
   /** True while there is nothing worth saving (a blank new page): no save, no status, nothing to guard on leaving. */
   idle?: ((draft: ArtifactDraft) => boolean) | undefined;
+  /** Sends "I'm editing" (src/lib/edits); the default is the web action, the dev fixtures pass a stand-in. */
+  signalEditing?: SignalEditing | undefined;
 }
 
 const neverIdle = () => false;
@@ -54,14 +58,21 @@ function isNewerOrSame(next: ArtifactDto, current: ArtifactDto) {
  * version the draft is based on, so it is refused instead of overwriting a
  * newer save by someone else; then the draft merges with theirs when the two
  * changed different fields, or the editor shows a notice to load their
- * version or keep these changes. Saves in one editing session file one
+ * version or keep these changes. A save over agents' newer saves goes
+ * through (the person's work wins) and `agentSaved` says so; an agent's
+ * change to a field the person did not touch stays. Incoming content never
+ * replaces content the person changed and has not saved. While the person types, the
+ * editor tells the server it is editing (useEditingSignal), so agents that
+ * name no base version wait. Saves in one editing session file one
  * version (see autosave-rules.ts and src/lib/versions/history-rules.ts).
  * Switching to another artifact or tab saves what is left; closing or
  * reloading the tab with unsaved changes asks first (useLeaveGuard), since a
  * save sent while the page unloads may not arrive.
  */
-export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = updateArtifactAction, problem: problemOf = draftProblem, idle = neverIdle }: AutosaveOptions) {
+export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = updateArtifactAction, problem: problemOf = draftProblem, idle = neverIdle, signalEditing = signalEditingAction }: AutosaveOptions) {
   const [status, setStatus] = useState<AutosaveStatus>({ kind: "idle" });
+  /** An agent saved while this editor had changes; this editor's save went through and theirs is in History. */
+  const [agentSaved, setAgentSaved] = useState(false);
   const [retry, setRetry] = useState(0);
   const baseRef = useRef(artifact);
   const draftRef = useRef(draft);
@@ -97,7 +108,8 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
     sessionRef.current = closedSession;
     const mine = draftRef.current;
     const outcome = mergeDrafts(draftFrom(base), mine, draftFrom(theirs));
-    if (outcome.kind === "conflict") {
+    // Their content never replaces the editor's while the person has unsaved changes: they choose in the notice.
+    if (outcome.kind === "conflict" || replacesContentUnderEdits(draftFrom(base), mine, outcome.draft)) {
       setStatus({ kind: "conflict", theirs, base });
       return;
     }
@@ -112,10 +124,9 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
     sessionRef.current = closedSession;
     const mine = draftRef.current;
     const outcome = mergeDrafts(draftFrom(base), mine, draftFrom(artifact));
-    if (outcome.kind === "conflict") {
-      // Leave the base alone: the next save is refused and offers their version, as for any conflict.
-      return;
-    }
+    // Leave the base alone on a conflict, and whenever their content would replace what the person is typing:
+    // the next save goes through over an agent's save, or is refused and offers their version.
+    if (outcome.kind === "conflict" || replacesContentUnderEdits(draftFrom(base), mine, outcome.draft)) return;
     baseRef.current = artifact;
     if (hasChanges(mine, outcome.draft)) callbacksRef.current.replaceDraft(outcome.draft, outcome.draft.content !== mine.content);
   }, [artifact]);
@@ -126,6 +137,14 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
       sessionRef.current = { open: true, lastSavedAt: Date.now() };
       setStatus({ kind: "saved", waitingForApproval: Boolean(result.data.pendingEdit) });
       callbacksRef.current.onUpdated(result.data);
+      if (result.savedOverAgents === true) {
+        // The person's changes won. An agent's change to a field the person never touched stays: the editor takes
+        // it (keepMineOver keeps every field the person changed from their base, including typing since the send).
+        setAgentSaved(true);
+        const mine = draftRef.current;
+        const next = keepMineOver(draftFrom(base), mine, draftFrom(result.data));
+        if (hasChanges(mine, next)) callbacksRef.current.replaceDraft(next, next.content !== mine.content);
+      }
       return;
     }
     if (result.latest) {
@@ -177,6 +196,7 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
 
   const dirty = hasChanges(draftFrom(artifact), draft) && !idle(draft);
   const paused = status.kind === "conflict";
+  useEditingSignal({ artifactId: artifact.id, draft, dirty, signal: signalEditing });
   useEffect(() => { pausedRef.current = paused; }, [paused]);
 
   useEffect(() => {
@@ -222,6 +242,7 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
     callbacksRef.current.onUpdated(status.theirs);
     callbacksRef.current.replaceDraft(draftFrom(status.theirs), true);
     setStatus({ kind: "idle" });
+    setAgentSaved(false);
   }, [status]);
 
   /** Saves the editor's changes over the newer version. Theirs stays in the history. */
@@ -232,8 +253,9 @@ export function useAutosave({ artifact, draft, replaceDraft, onUpdated, save = u
   }, [status, adopt]);
 
   const retryNow = useCallback(() => { void saveNow(); }, [saveNow]);
+  const dismissAgentSaved = useCallback(() => { setAgentSaved(false); }, []);
 
   // A held change undone by hand (the draft is back to the saved version) has nothing left to hold.
   const shown: AutosaveStatus = !dirty && status.kind === "held" ? { kind: "idle" } : status;
-  return { status: shown, dirty, loadTheirs, keepMine, retryNow };
+  return { status: shown, dirty, loadTheirs, keepMine, retryNow, agentSaved, dismissAgentSaved };
 }

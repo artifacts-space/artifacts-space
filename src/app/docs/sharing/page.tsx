@@ -148,11 +148,12 @@ export default function SharingPage() {
 
       <DocsH page={page} id="history" />
       <Prose>
-        <p>Every save files a version of the artifact. Saves by the same editor within {mergeMinutes} minutes merge into one version, so a burst of small edits reads as one change.</p>
+        <p>Every save files a version of the artifact. Saves from the same source within {mergeMinutes} minutes merge into one version, so a burst of small edits reads as one change. The same source means the same person in the web app, or the same person through the same agent: a web save never merges with an agent&apos;s, so History always shows who changed what.</p>
         <ul>
           <li>An artifact keeps its newest {versionRetention.keep} versions, and none older than {retentionDays} days. The current version, the approved version, and versions waiting for approval are always kept.</li>
           <li>Versions count toward the author&apos;s storage quota.</li>
           <li><strong>Restore</strong> brings an old version back as a new save. History is never rewritten, and on a reviewed artifact the restore waits for approval like any edit.</li>
+          <li><strong>A person&apos;s work wins.</strong> If an agent saves while you are typing, your next save still goes through, the agent&apos;s version stays in History, and the editor tells you. Agents pass the version they read and are refused when the artifact changed since; see <Link href={`${docsHref("mcp")}#concurrent-edits`}>When people and agents edit at once</Link>.</li>
           <li>Agents use <Link href={`${docsHref("mcp")}#artifacts_versions`}><code>artifacts_versions</code></Link> and <Link href={`${docsHref("mcp")}#artifacts_restore_version`}><code>artifacts_restore_version</code></Link>. People use the History button on the artifact.</li>
         </ul>
       </Prose>

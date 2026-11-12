@@ -35,6 +35,7 @@ vi.mock("@/lib/sharing/comments", () => ({ setArtifactComments: vi.fn() }));
 vi.mock("@/lib/sharing/service", () => ({ requestArtifactSharing: vi.fn() }));
 vi.mock("@/lib/site-origin", () => ({ siteUrl: (path: string) => `https://artifacts.space${path}` }));
 
+vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }), versionAt: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }) }));
 const { registerArtifactTools } = await import("./artifact-tools");
 const { registerThemeTools } = await import("./theme-tools");
 
@@ -83,7 +84,7 @@ describe("artifacts_create with cover", () => {
     data.createArtifact.mockResolvedValue(dto("mist"));
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", cover: "mist" });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ cover: "mist" }), { harness: null });
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ cover: "mist" }), { harness: null, actor: "agent" });
     expect(JSON.parse(result.text)).toMatchObject({ artifact: { cover: "mist", coverPosition: null } });
   });
 
@@ -91,7 +92,7 @@ describe("artifacts_create with cover", () => {
     data.createArtifact.mockResolvedValue(dto(`file:${fileId}@20`));
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", cover: `file:${fileId}`, coverPosition: 20 });
     expect(result.isError).toBe(false);
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ cover: `file:${fileId}@20` }), { harness: null });
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ cover: `file:${fileId}@20` }), { harness: null, actor: "agent" });
     expect(JSON.parse(result.text)).toMatchObject({ artifact: { cover: `file:${fileId}`, coverPosition: 20 } });
   });
 

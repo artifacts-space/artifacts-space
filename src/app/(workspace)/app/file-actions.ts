@@ -62,7 +62,7 @@ export async function finalizeUploadAction(fileId: string): Promise<ActionResult
 /** Deletes one of the person's own uploads, or a file from an artifact they may edit. */
 export async function deleteFileAction(fileId: string): Promise<ActionResult<ArtifactDto | null>> {
   return run("The file could not be removed. Try again.", async (userId) => {
-    const artifactId = await deleteOwnFile(userId, fileId, "person");
+    const { artifactId } = await deleteOwnFile(userId, fileId, "person");
     if (!artifactId) return null;
     revalidatePath("/app");
     return editableArtifactDto(userId, artifactId);

@@ -8,8 +8,9 @@ import type { EditSessionStep } from "@/lib/versions/history-rules";
 /**
  * The base-version check every web save runs. An editor sends the
  * `updatedAt` of the version its draft started from; the update only matches
- * while the row still has it, so a save never overwrites someone else's newer
- * save. The check and the write are one statement.
+ * while the row still has it, or while every save since was an agent's (a
+ * person's work wins: src/lib/artifact-save.ts), so a save never overwrites
+ * another person's newer save. The check and the write are one statement.
  */
 
 /** Options for one save. */
@@ -24,9 +25,15 @@ export interface SaveOptions {
   session?: EditSessionStep | undefined;
   /** For a save over MCP: the harness of the connection it came through (src/lib/harness). Undefined for web saves. */
   harness?: HarnessStamp | null | undefined;
+  /**
+   * For an agent's save: the `baseVersion` token it got with the content it
+   * read (src/lib/edits). When the artifact changed since, the save is
+   * refused. Ignored for people's saves, which use `expectedUpdatedAt`.
+   */
+  baseVersion?: string | undefined;
 }
 
-/** The message when a save would overwrite someone else's newer save. */
+/** The message when a save would overwrite another person's newer save. */
 export const STALE_SAVE_MESSAGE = "Someone saved a newer version while you were editing, so your change was not saved.";
 
 /** A save refused because the artifact changed since the editor's base version. */

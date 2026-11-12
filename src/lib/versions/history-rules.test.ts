@@ -4,8 +4,10 @@ import {
   canDropSuperseded,
   EDIT_SESSION_IDLE_MS,
   selectPrunableVersions,
+  saveSourceKey,
   shouldMergeInto,
   VERSION_MERGE_WINDOW_MS,
+  versionByAgent,
   versionBytes,
   versionRetention,
   type MergeTarget,
@@ -13,46 +15,101 @@ import {
 
 const now = new Date("2026-11-06T12:00:00Z");
 const secondsAgo = (seconds: number) => new Date(now.getTime() - seconds * 1000);
-const latest = (overrides: Partial<MergeTarget> = {}): MergeTarget => ({ id: "v1", createdBy: "ann", savedAt: secondsAgo(30), saveKind: "edit", ...overrides });
+const latest = (overrides: Partial<MergeTarget> = {}): MergeTarget => ({ id: "v1", createdBy: "ann", savedAt: secondsAgo(30), saveKind: "edit", harness: null, byAgent: null, ...overrides });
 const none = new Set<string>();
 
 describe("shouldMergeInto", () => {
   it("should merge when the same editor saves again within the window", () => {
-    expect(shouldMergeInto(latest(), { editorId: "ann", saveKind: "edit", now }, none)).toBe(true);
+    expect(shouldMergeInto(latest(), { editorId: "ann", saveKind: "edit", now, byAgent: false }, none)).toBe(true);
   });
 
   it("should not merge when another editor saves", () => {
-    expect(shouldMergeInto(latest(), { editorId: "bob", saveKind: "edit", now }, none)).toBe(false);
+    expect(shouldMergeInto(latest(), { editorId: "bob", saveKind: "edit", now, byAgent: false }, none)).toBe(false);
   });
 
   it("should not merge when the window has passed", () => {
     const old = latest({ savedAt: new Date(now.getTime() - VERSION_MERGE_WINDOW_MS - 1) });
-    expect(shouldMergeInto(old, { editorId: "ann", saveKind: "edit", now }, none)).toBe(false);
+    expect(shouldMergeInto(old, { editorId: "ann", saveKind: "edit", now, byAgent: false }, none)).toBe(false);
   });
 
   it("should not merge into the approved version or one waiting for approval", () => {
-    expect(shouldMergeInto(latest(), { editorId: "ann", saveKind: "edit", now }, new Set(["v1"]))).toBe(false);
+    expect(shouldMergeInto(latest(), { editorId: "ann", saveKind: "edit", now, byAgent: false }, new Set(["v1"]))).toBe(false);
   });
 
   it("should never merge a restore, or into a restore or snapshot", () => {
-    expect(shouldMergeInto(latest(), { editorId: "ann", saveKind: "restore", now }, none)).toBe(false);
-    expect(shouldMergeInto(latest({ saveKind: "restore" }), { editorId: "ann", saveKind: "edit", now }, none)).toBe(false);
-    expect(shouldMergeInto(latest({ saveKind: "snapshot" }), { editorId: "ann", saveKind: "edit", now }, none)).toBe(false);
+    expect(shouldMergeInto(latest(), { editorId: "ann", saveKind: "restore", now, byAgent: false }, none)).toBe(false);
+    expect(shouldMergeInto(latest({ saveKind: "restore" }), { editorId: "ann", saveKind: "edit", now, byAgent: false }, none)).toBe(false);
+    expect(shouldMergeInto(latest({ saveKind: "snapshot" }), { editorId: "ann", saveKind: "edit", now, byAgent: false }, none)).toBe(false);
   });
 
   it("should merge a quick fix into the first version and file changes into an edit", () => {
-    expect(shouldMergeInto(latest({ saveKind: "create" }), { editorId: "ann", saveKind: "edit", now }, none)).toBe(true);
-    expect(shouldMergeInto(latest(), { editorId: "ann", saveKind: "files", now }, none)).toBe(true);
+    expect(shouldMergeInto(latest({ saveKind: "create" }), { editorId: "ann", saveKind: "edit", now, byAgent: false }, none)).toBe(true);
+    expect(shouldMergeInto(latest(), { editorId: "ann", saveKind: "files", now, byAgent: false }, none)).toBe(true);
   });
 
   it("should not merge when there is no version yet or the editor is unknown", () => {
-    expect(shouldMergeInto(null, { editorId: "ann", saveKind: "edit", now }, none)).toBe(false);
-    expect(shouldMergeInto(latest({ createdBy: null }), { editorId: "ann", saveKind: "edit", now }, none)).toBe(false);
+    expect(shouldMergeInto(null, { editorId: "ann", saveKind: "edit", now, byAgent: false }, none)).toBe(false);
+    expect(shouldMergeInto(latest({ createdBy: null }), { editorId: "ann", saveKind: "edit", now, byAgent: false }, none)).toBe(false);
+  });
+});
+
+describe("shouldMergeInto across sources", () => {
+  const claude = { harness: "claude-code" };
+
+  it("should merge an agent's quick follow-up into its own version when the harness matches", () => {
+    expect(shouldMergeInto(latest({ harness: "claude-code" }), { editorId: "ann", saveKind: "edit", now, harness: claude, byAgent: true }, none)).toBe(true);
+  });
+
+  it("should never merge a web save into an agent's version when the same person connected the agent", () => {
+    expect(shouldMergeInto(latest({ harness: "claude-code" }), { editorId: "ann", saveKind: "edit", now, byAgent: false }, none)).toBe(false);
+    expect(shouldMergeInto(latest({ harness: "claude-code", savedAt: secondsAgo(5) }), { editorId: "ann", saveKind: "edit", now, session: "continue", byAgent: false }, none)).toBe(false);
+  });
+
+  it("should never merge an agent save into a web version when the same person saved it", () => {
+    expect(shouldMergeInto(latest(), { editorId: "ann", saveKind: "edit", now, harness: claude, byAgent: true }, none)).toBe(false);
+  });
+
+  it("should never merge saves from two different agent harnesses", () => {
+    expect(shouldMergeInto(latest({ harness: "cursor" }), { editorId: "ann", saveKind: "edit", now, harness: claude, byAgent: true }, none)).toBe(false);
+  });
+});
+
+describe("saveSourceKey", () => {
+  it("should be equal only for the same person and the same source, with a person's own saves as their own source", () => {
+    expect(saveSourceKey("ann", false, null)).toBe(saveSourceKey("ann", false, undefined));
+    expect(saveSourceKey("ann", false, null)).not.toBe(saveSourceKey("ann", true, "claude-code"));
+    expect(saveSourceKey("ann", true, "claude-code")).not.toBe(saveSourceKey("bob", true, "claude-code"));
+    expect(saveSourceKey("ann", true, "web")).not.toBe(saveSourceKey("ann", false, null));
+  });
+
+  it("should keep an agent whose harness is unknown apart from the person, keyed on who saved", () => {
+    expect(saveSourceKey("ann", true, null)).not.toBe(saveSourceKey("ann", false, null));
+    expect(saveSourceKey("ann", true, undefined)).toBe(saveSourceKey("ann", true, null));
+  });
+});
+
+describe("shouldMergeInto by who saved", () => {
+  it("should never merge an agent's save with no known harness into the person's own version", () => {
+    expect(shouldMergeInto(latest({ byAgent: false }), { editorId: "ann", saveKind: "edit", now, byAgent: true }, none)).toBe(false);
+  });
+
+  it("should never merge a person's save into an agent's version that recorded no harness", () => {
+    expect(shouldMergeInto(latest({ byAgent: true }), { editorId: "ann", saveKind: "edit", now, byAgent: false }, none)).toBe(false);
+  });
+
+  it("should merge quick saves by the same agent with no known harness", () => {
+    expect(shouldMergeInto(latest({ byAgent: true }), { editorId: "ann", saveKind: "edit", now, byAgent: true }, none)).toBe(true);
+  });
+
+  it("should read an older version with no byAgent by its harness", () => {
+    expect(versionByAgent({ byAgent: null, harness: "claude-code" })).toBe(true);
+    expect(versionByAgent({ byAgent: null, harness: null })).toBe(false);
+    expect(versionByAgent({ byAgent: true, harness: null })).toBe(true);
   });
 });
 
 describe("shouldMergeInto for editing sessions", () => {
-  const save = (session: "start" | "continue", editorId = "ann") => ({ editorId, saveKind: "edit" as const, now, session });
+  const save = (session: "start" | "continue", editorId = "ann") => ({ editorId, saveKind: "edit" as const, now, session, byAgent: false });
 
   it("should merge every save of one session into one version when the pauses are short", () => {
     const sessionVersion = latest({ savedAt: secondsAgo(4 * 60) });
@@ -74,12 +131,12 @@ describe("shouldMergeInto for editing sessions", () => {
 
   it("should keep the plain merge window for saves outside a session, such as agents", () => {
     const threeMinutes = latest({ savedAt: secondsAgo(3 * 60) });
-    expect(shouldMergeInto(threeMinutes, { editorId: "ann", saveKind: "edit", now }, none)).toBe(false);
+    expect(shouldMergeInto(threeMinutes, { editorId: "ann", saveKind: "edit", now, byAgent: false }, none)).toBe(false);
   });
 });
 
 describe("canDropSuperseded", () => {
-  const save = { editorId: "ann", saveKind: "edit" as const, now, session: "continue" as const };
+  const save = { editorId: "ann", saveKind: "edit" as const, now, session: "continue" as const, byAgent: false };
   const state = (references: { status: string; requestedBy: string | null; decidedBy: string | null }[] = [], approvedVersionId: string | null = "v2") => ({ newVersionId: "v2", approvedVersionId, references });
   const own = latest({ id: "v1", savedAt: secondsAgo(30) });
 

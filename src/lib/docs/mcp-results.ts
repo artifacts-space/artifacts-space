@@ -48,8 +48,9 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     shape: "[ { …artifact without content, \"preview\": \"First 280 characters…\" } ]",
   },
   artifacts_get: {
-    summary: "The full artifact, plus `version` (\"latest\", or \"approved\" when you read a link or public artifact from outside its team) and `editPending` (true when newer changes wait for approval).",
-    shape: `{ …artifact, "version": "latest" | "approved", "editPending": false }\n\n// artifact:\n${artifactShape}`,
+    summary: "The full artifact, plus `version` (\"latest\", or \"approved\" when you read a link or public artifact from outside its team) and `editPending` (true when newer changes wait for approval). When you can edit it: `versionId`, the version you read, and `baseVersion`, which you pass back to artifacts_update.",
+    shape: `{ …artifact, "version": "latest" | "approved", "editPending": false,
+  "versionId": "<version id>", "baseVersion": "<version id>.<ms>" }   // editors only\n\n// artifact:\n${artifactShape}`,
   },
   teams_list: {
     summary: "Your teams with their slugs. Use a slug as `scope` in artifacts_list, or as `team` when you share.",
@@ -68,8 +69,14 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     shape: `{ "artifact": { … }, ${sharingShape} }`,
   },
   artifacts_update: {
-    summary: "The artifact after the save. `edit` is \"pending\" when the change waits for approval (link or public artifacts shared through a team); readers outside the team keep the last approved version. `edit` is \"unchanged\" when you sent no content or fields (only `project`, tags, sharing, or comments): nothing was saved to the history.",
-    shape: `{ "artifact": { … }, "edit": "applied" | "pending" | "unchanged", ${sharingShape} }`,
+    summary: "The artifact after the save, with its new `baseVersion` for your next update. `edit` is \"pending\" when the change waits for approval (link or public artifacts shared through a team); readers outside the team keep the last approved version. `edit` is \"unchanged\" when you sent no content or fields (only `project`, tags, sharing, or comments): nothing was saved to the history, and the result has no `baseVersion`, so keep the one you have. A refused save is a tool error (`isError`) whose `structuredContent.error.code` is \"artifact_changed\" (someone saved since your `baseVersion`), \"base_version_required\" (no `baseVersion`, and a person saved it last), or \"artifact_being_edited\" (no `baseVersion`, and a person is typing in it): nothing was saved, so read it with artifacts_get, merge, and save with its `baseVersion`.",
+    shape: `{ "artifact": { …, "versionId": "…", "baseVersion": "…" }, "edit": "applied" | "pending" | "unchanged", ${sharingShape} }
+// "unchanged": the artifact has no versionId or baseVersion.
+
+// refused:
+{ "isError": true, "content": [{ "type": "text", "text": "This artifact changed since you read it (by @ann via the web). …" }],
+  "structuredContent": { "error": { "code": "artifact_changed" | "base_version_required" | "artifact_being_edited", "message": "…",
+    "changedBy": { "handle": "ann", "via": "web" | "Claude Code" } | null, "nextStep": "artifacts_get" } } }`,
   },
   artifacts_delete: { summary: "Confirms the delete. Only the author can delete.", shape: `{ "deleted": true, "id": "…" }` },
   artifacts_versions: {
@@ -80,8 +87,8 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     "savedBy": { "handle", "kind": "person" | "agent" } | null } ]`,
   },
   artifacts_restore_version: {
-    summary: "Confirms the restore. The old version comes back as a new save; history is never rewritten.",
-    shape: `{ "id": "…", "restoredFrom": "<version id>", "edit": "applied" | "pending", "updatedAt": "…" }`,
+    summary: "Confirms the restore. The old version comes back as a new save; history is never rewritten. Pass `baseVersion` as for artifacts_update; a refused restore is the same typed error.",
+    shape: `{ "id": "…", "restoredFrom": "<version id>", "edit": "applied" | "pending", "updatedAt": "…", "versionId": "…", "baseVersion": "…" }`,
   },
   artifacts_views: {
     summary: "Views and daily unique visitors over the range, one entry per day (oldest first, zeros included), and the top referring domains. `counting` is false unless the artifact is public.",
@@ -112,14 +119,17 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     summary: "The checked, ready file. A file whose size, type, or content does not match its request is deleted instead.",
     shape: `{ "file": { … }, "next": "Use the id in files_create_artifact, files_attach, files_replace, or an Image or File element of a ui artifact." }`,
   },
-  files_create_artifact: { summary: "The new private file artifact, with its files." },
-  files_attach: { summary: "The artifact with its files after the attach." },
-  files_replace: { summary: "The artifact with its files after the replace. The replaced file keeps its id; `replacedAt` says when." },
+  files_create_artifact: { summary: "The new private file artifact, with its files and the `baseVersion` of this save." },
+  files_attach: { summary: "The artifact as the attach saved it, with its files and the `baseVersion` of this save." },
+  files_replace: { summary: "The artifact as the replace saved it, with its files and the `baseVersion` of this save. The replaced file keeps its id; `replacedAt` says when." },
   files_get_download_url: {
     summary: "A short-lived signed URL for the file.",
     shape: `{ "id", "filename", "contentType", "size", "url": "…", "expiresAt": "…" }`,
   },
-  files_delete: { summary: "Confirms the delete.", shape: `{ "deleted": true, "fileId": "…" }` },
+  files_delete: {
+    summary: "Confirms the delete. A file deleted from an artifact saves the artifact: the result names it with the `baseVersion` of this save.",
+    shape: `{ "deleted": true, "fileId": "…", "artifact": "<22-character id>", "versionId": "…", "baseVersion": "…" }`,
+  },
   inbox_list: {
     summary: "Your mentions, newest first, each with the comment, the comments just before it, and how to reply. Every comment body is wrapped as untrusted text.",
     shape: `{ "untrustedContentNotice": "…",

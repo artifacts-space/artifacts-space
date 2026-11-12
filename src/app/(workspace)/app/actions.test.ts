@@ -11,7 +11,7 @@ import { StaleSaveError } from "@/lib/save-guard";
 
 const mocks = vi.hoisted(() => ({
   session: vi.fn(),
-  updateArtifact: vi.fn(),
+  saveArtifactUpdate: vi.fn(),
   loadArtifactForViewer: vi.fn(),
 }));
 
@@ -24,7 +24,7 @@ vi.mock("@/lib/artifacts", () => ({
   createArtifact: vi.fn(),
   deleteArtifact: vi.fn(),
   listArtifacts: vi.fn(),
-  updateArtifact: mocks.updateArtifact,
+  saveArtifactUpdate: mocks.saveArtifactUpdate,
 }));
 
 const { updateArtifactAction } = await import("./actions");
@@ -41,26 +41,32 @@ describe("updateArtifactAction", () => {
   it("should refuse a save that names no base version without touching the artifact", async () => {
     const result = await updateArtifactAction("artifact-1", { content: "# Mine" }, {});
     expect(result.success).toBe(false);
-    expect(mocks.updateArtifact).not.toHaveBeenCalled();
+    expect(mocks.saveArtifactUpdate).not.toHaveBeenCalled();
   });
 
   it("should pass the base version and the editing-session step to the store when a person autosaves", async () => {
-    mocks.updateArtifact.mockResolvedValue({ ...theirs, content: "# Mine" });
+    mocks.saveArtifactUpdate.mockResolvedValue({ artifact: { ...theirs, content: "# Mine" }, savedOverAgents: false });
     const result = await updateArtifactAction("artifact-1", { content: "# Mine" }, { expectedUpdatedAt: base, session: "continue" });
     expect(result.success).toBe(true);
-    expect(mocks.updateArtifact).toHaveBeenCalledWith("user-1", "artifact-1", { content: "# Mine" }, "person", { expectedUpdatedAt: base, session: "continue" });
+    expect(mocks.saveArtifactUpdate).toHaveBeenCalledWith("user-1", "artifact-1", { content: "# Mine" }, "person", { expectedUpdatedAt: base, session: "continue" });
   });
 
   it("should hand back the newest version and overwrite nothing when someone saved since the base version", async () => {
-    mocks.updateArtifact.mockRejectedValue(new StaleSaveError(theirs.publicId));
+    mocks.saveArtifactUpdate.mockRejectedValue(new StaleSaveError(theirs.publicId));
     mocks.loadArtifactForViewer.mockResolvedValue({ dto: theirs });
     const result = await updateArtifactAction("artifact-1", { content: "# Mine" }, { expectedUpdatedAt: base });
     expect(result).toMatchObject({ success: false, latest: theirs });
     expect(mocks.loadArtifactForViewer).toHaveBeenCalledWith(theirs.publicId, "user-1");
   });
 
+  it("should say the save went over an agent's newer save when the store reports it", async () => {
+    mocks.saveArtifactUpdate.mockResolvedValue({ artifact: { ...theirs, content: "# Mine" }, savedOverAgents: true });
+    const result = await updateArtifactAction("artifact-1", { content: "# Mine" }, { expectedUpdatedAt: base });
+    expect(result).toMatchObject({ success: true, savedOverAgents: true, data: { content: "# Mine" } });
+  });
+
   it("should report not found when the person may not edit the artifact", async () => {
-    mocks.updateArtifact.mockResolvedValue(null);
+    mocks.saveArtifactUpdate.mockResolvedValue(null);
     const result = await updateArtifactAction("artifact-1", { content: "# Mine" }, { expectedUpdatedAt: base });
     expect(result).toEqual({ success: false, error: "Artifact not found." });
   });

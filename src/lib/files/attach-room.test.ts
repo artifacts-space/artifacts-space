@@ -17,7 +17,7 @@ vi.mock("./copies", () => ({ removeCopiesOf: vi.fn() }));
 const access = vi.hoisted(() => ({ canEditRecord: vi.fn() }));
 vi.mock("@/lib/access", () => access);
 vi.mock("@/db", () => ({ getDb: () => ({ select: () => ({ from: () => ({ where: () => ({ limit: () => Promise.resolve([{ id: "a1" }]) }) }) }) }) }));
-vi.mock("@/lib/versions/service", () => versions);
+vi.mock("@/lib/versions/save-write", () => versions);
 vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
 
 const { assertUsableFiles, attachFiles, checkContentFiles, deleteOwnFile } = await import("./attach");
@@ -28,6 +28,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   store.getFileRows.mockResolvedValue([{ id: upload, status: "ready", uploaderId: "author", artifactId: null }]);
   store.usableFileRows.mockResolvedValue([{ id: upload, status: "ready", uploaderId: "author", artifactId: null }]);
+  versions.recordArtifactChange.mockResolvedValue({ status: "applied", record: null });
 });
 
 describe("assertUsableFiles", () => {

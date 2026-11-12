@@ -142,3 +142,17 @@ export function keepMineOver(base: ArtifactDraft, mine: ArtifactDraft, theirs: A
   }
   return draft;
 }
+
+/**
+ * True when taking `next` would replace content the person changed and has
+ * not saved yet: the editor never swaps what they typed under the cursor.
+ * Someone else's content then waits for the person's choice (the conflict
+ * notice), or for their save, which wins over agents' saves
+ * (src/lib/artifact-save.ts). Only the fields the person changed from
+ * `base` count: a person who changed only the title takes someone else's
+ * new body as it is. Content and format count together.
+ */
+export function replacesContentUnderEdits(base: ArtifactDraft, mine: ArtifactDraft, next: ArtifactDraft): boolean {
+  const changedBody = mine.content !== base.content || mine.kind !== base.kind;
+  return changedBody && (next.content !== mine.content || next.kind !== mine.kind);
+}

@@ -36,25 +36,41 @@ const keepFormatInMemory: SheetFormatSaver = (next) => Promise.resolve(next);
 /** A formatting save that always fails, as when the connection drops: the failing-save test uses it. */
 const failFormatSave: SheetFormatSaver = () => Promise.reject(new Error("The fixture is offline."));
 
-/** A save that keeps the change in memory, so autosave runs end to end without a database. */
-function useMemorySave(initial: ArtifactDto): SaveArtifact {
+/** The summary an "agent" saves in the fixture's agent mode, just before the person's first save lands. */
+const FIXTURE_AGENT_SUMMARY = "An agent rewrote this summary.";
+
+/**
+ * A save that keeps the change in memory, so autosave runs end to end
+ * without a database. With `agentFirst`, an agent saves a new summary just
+ * before the person's first save, which goes through over it, as the server
+ * does (src/lib/artifact-save.ts).
+ */
+function useMemorySave(initial: ArtifactDto, agentFirst: boolean): SaveArtifact {
   const saved = useRef(initial);
+  const agentPending = useRef(agentFirst);
   return useCallback((_id, changes) => {
-    saved.current = { ...saved.current, ...changes, updatedAt: new Date().toISOString() };
-    return Promise.resolve({ success: true, data: saved.current });
+    const overAgents = agentPending.current;
+    agentPending.current = false;
+    const before = overAgents ? { ...saved.current, summary: FIXTURE_AGENT_SUMMARY } : saved.current;
+    saved.current = { ...before, ...changes, updatedAt: new Date().toISOString() };
+    return Promise.resolve({ success: true, data: saved.current, savedOverAgents: overAgents });
   }, []);
 }
+
+/** "I'm editing" stays in the tab: the fixture has no database. */
+const keepSignalInTab = () => Promise.resolve(null);
 
 /**
  * Development only: the artifact page's layout (pinned header,
  * heading, content, footer) around the real in-place page editor, with a
  * long artifact and no database. Saves stay in memory, or fail on purpose
- * (`failingSaves`) for the test of a save that does not go through. The
+ * (`failingSaves`) for the test of a save that does not go through, or go
+ * over an agent's save first (`agentSaves`) for the notice that says so. The
  * layout e2e test edits here.
  */
-export function EditorFixture({ kind, failingSaves = false }: { kind: EditorFixtureKind; failingSaves?: boolean }) {
+export function EditorFixture({ kind, failingSaves = false, agentSaves = false }: { kind: EditorFixtureKind; failingSaves?: boolean; agentSaves?: boolean }) {
   const artifact = useMemo(() => fixtureArtifact({ id: `fixture-${kind}`, kind: samples[kind].kind, title: `Long ${kind} fixture`, content: samples[kind].content() }), [kind]);
-  const save = useMemorySave(artifact);
+  const save = useMemorySave(artifact, agentSaves);
   const onSaved = useCallback(() => undefined, []);
   return (
     <div className="min-h-screen">
@@ -64,7 +80,7 @@ export function EditorFixture({ kind, failingSaves = false }: { kind: EditorFixt
         </StickyChrome>
         <main className={`mx-auto w-full py-12 sm:py-16 ${pageColumnClass(usesFullWidth(artifact.kind, false))}`}>
           <ConfirmationsProvider initial={[]}>
-            <PageInlineEditor artifact={artifact} reviewed={false} onSaved={onSaved} save={save}>
+            <PageInlineEditor artifact={artifact} reviewed={false} onSaved={onSaved} save={save} signalEditing={keepSignalInTab}>
               <InlineTitle>{artifact.title}</InlineTitle>
               <InlineSummary><p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{artifact.summary}</p></InlineSummary>
               <PageConflictNotice />

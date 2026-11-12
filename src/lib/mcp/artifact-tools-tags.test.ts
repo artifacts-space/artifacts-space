@@ -37,6 +37,7 @@ vi.mock("@/lib/sharing/comments", () => ({ setArtifactComments: vi.fn() }));
 vi.mock("@/lib/sharing/service", () => ({ requestArtifactSharing: vi.fn() }));
 vi.mock("@/lib/site-origin", () => ({ siteUrl: (path: string) => `https://artifacts.space${path}` }));
 
+vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }), versionAt: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }) }));
 const { registerArtifactTools } = await import("./artifact-tools");
 
 const publicId = "4fXkP9qR2sT7vW1yZ3aB5c";
@@ -77,7 +78,7 @@ describe("artifacts_create with tags", () => {
   it("should pass the tags to the create and return them", async () => {
     data.createArtifact.mockResolvedValue(dto(null, ["launch"]));
     const result = await call("artifacts_create", { title: "Plan", content: "# Plan", tags: ["Launch"] });
-    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ tags: ["Launch"] }), { harness: null });
+    expect(data.createArtifact).toHaveBeenCalledWith("agent-1", expect.objectContaining({ tags: ["Launch"] }), { harness: null, actor: "agent" });
     expect(JSON.parse(result.text)).toMatchObject({ artifact: { tags: ["launch"] } });
   });
 });

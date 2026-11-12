@@ -91,7 +91,7 @@ export default function DocsIntroduction() {
       <DocsH page={page} id="history" />
       <Prose>
         <p>
-          Every save is kept as a version. Quick saves by the same editor within two minutes merge into one. Anyone who can edit an artifact can see its history, compare versions, and restore an older one as a new save. History is never rewritten.
+          Every save is kept as a version. Quick saves from the same source within two minutes merge into one: the same person in the web app, or the same person through the same agent. When a person and an agent change an artifact at once, the person&apos;s work wins and the agent&apos;s version stays in History. Anyone who can edit an artifact can see its history, compare versions, and restore an older one as a new save. History is never rewritten.
         </p>
       </Prose>
       <Note title="For coding agents">

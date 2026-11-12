@@ -25,6 +25,7 @@ vi.mock("@/lib/comments/service", () => ({ listComments: mocks.listComments }));
 vi.mock("@/lib/files/download", () => ({ filesForViewer: mocks.filesForViewer }));
 vi.mock("@/lib/artifact-byline", () => ({ loadArtifactByline: mocks.loadArtifactByline }));
 vi.mock("@/lib/artifacts", () => ({ lastEditorsFor: mocks.lastEditorsFor }));
+vi.mock("@/lib/versions/history", () => ({ latestVersion: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }), versionAt: () => Promise.resolve({ id: "0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f" }) }));
 vi.mock("@/db", () => {
   const chain = { from: () => chain, where: () => mocks.versionCount() as unknown };
   return { getDb: () => ({ select: () => chain }) };
@@ -97,6 +98,14 @@ afterEach(() => {
 });
 
 describe("artifactMarkdownResponse", () => {
+  it("should give an editor the baseVersion to send with artifacts_update, and nobody else", async () => {
+    mocks.getViewableArtifact.mockResolvedValue(viewable({ canEdit: true }));
+    const forEditor = await (await artifactMarkdownResponse(request(`/artifact/${publicId}.md`), publicId)).text();
+    expect(forEditor).toContain(`- Base version: 0b6f3c1e-5a4d-4c2b-9e8f-1a2b3c4d5e6f.${String(savedAt.getTime())} (send it as baseVersion with artifacts_update)`);
+    mocks.getViewableArtifact.mockResolvedValue(viewable());
+    expect(await (await artifactMarkdownResponse(request(`/artifact/${publicId}.md`), publicId)).text()).not.toContain("Base version");
+  });
+
   it("should answer with Markdown, Vary: Accept, noindex, and the share page's cache policy when a public artifact is read signed out", async () => {
     mocks.getViewableArtifact.mockResolvedValue(viewable());
     const response = await artifactMarkdownResponse(request(`/artifact/${publicId}.md`), publicId);

@@ -190,9 +190,9 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
 
 - The schema is in `src/db/schema.ts`, `src/db/oauth-schema.ts`,
   `src/db/views-schema.ts`, `src/db/notification-schema.ts`,
-  `src/db/connection-schema.ts`, `src/db/file-copy-schema.ts`, and
-  `src/db/team-welcome-schema.ts`. Change it, then run `pnpm db:generate` and
-  commit the migration in `drizzle/`.
+  `src/db/connection-schema.ts`, `src/db/file-copy-schema.ts`,
+  `src/db/team-welcome-schema.ts`, and `src/db/edit-lease-schema.ts`. Change
+  it, then run `pnpm db:generate` and commit the migration in `drizzle/`.
 - Migrations apply automatically when a production deploy builds:
   `pnpm build` runs `scripts/migrate-on-deploy.mts` before `next build`, under
   an advisory lock. A failed migration fails the build, and the old deployment
@@ -407,8 +407,8 @@ rules above: a save attaches the editor's own uploads it names, a save that
 drops one files its own version so Restore brings it back, and readers of the
 approved version never load a file that version does not show
 (`served-images.ts`). Only content media, files a content save itself
-attached (`artifact_file.attached_by_content`, set by `attachFileRows(…, {
-byContent: true })`), follows these rules: hidden from readers of a version
+attached (`artifact_file.attached_by_content`, set in the save's own
+statement by `writeAndAttach`), follows these rules: hidden from readers of a version
 that does not show it, not counted toward the file limit while only older
 versions name it, and deleted once none does (`icon-cleanup.ts`). Files
 attached any other way (`files_attach`, the Files panel, and all files from
@@ -445,7 +445,7 @@ puts an editor's finished upload in place of a plain attachment. The
 `artifact_file` row keeps its id, place, and name, so links and embeds open
 the new file; what it held moves to `artifact_file_copy`. The swap is one SQL
 statement, guarded on the key the editor saw, that also files the replace's
-version and writes its approval outcome (the edit request, or the new approved
+version (copied from the artifact row the statement locked) and writes its approval outcome (the edit request, or the new approved
 version), so the file, its History entry, and its approval land together or
 not at all. The approval is decided before the statement, which runs only
 while the artifact keeps that visibility and team. A refused replace leaves
@@ -465,6 +465,73 @@ open only at `/api/files/<id>/copies/<copyId>`, for people who may edit, and
 never cached. A copy is kept while any version in the history was saved while
 it was current (`copies.ts`), goes with its file or artifact, and counts
 toward its uploader's file storage quota.
+
+### Concurrent edits
+
+A person's work wins over an agent's (`src/lib/edits`, rules in
+`edit-conflict-rules.ts`, the write in `src/lib/artifact-save.ts`). Every
+tool that hands an agent an artifact it may edit also hands it `versionId`
+and `baseVersion` (`src/lib/mcp/edit-conflict-tools.ts`); `artifacts_update`
+and `artifacts_restore_version` take `baseVersion` back. The checks live in
+the UPDATE itself, one statement, never a read-then-write:
+
+- An agent save with a `baseVersion` matches only while the artifact's
+  `updated_at` is still that one; otherwise it throws `EditConflictError`,
+  a typed tool error (`artifact_changed`). Without one, any change matches
+  only while the artifact's newest save is not a person's (`personSavedLast`:
+  `person_saved_at` is the row's save time, or the newest version is a
+  person's), or it is refused with `base_version_required`, whose message
+  tells the agent to read it and pass its `baseVersion`; artifacts agents
+  saved last still take saves without one. A title, content, or format
+  change also matches only while no person's edit lease is live
+  (`artifact_being_edited`). Leases come only from the web editor's "I'm
+  editing" signal (`src/lib/edits/actions.ts`): on input, at most every 20 s,
+  about 60 s long, never on a timer; a closing editor cuts its lease to one
+  signal interval (leases are per person, so another open tab keeps it).
+- A save attaches its uploads (content media, icon, cover) in the same
+  statement as its guarded write (`writeAndAttach`, a CTE), so a refused save
+  attaches nothing and a landed one never names an upload it did not attach.
+- A person's web save with `expectedUpdatedAt` falls back, when the artifact
+  moved on, to "only agents saved since" (`onlyAgentsSavedSince`): the base is
+  not later than the row's last save, no person's save is later by
+  `artifact.person_saved_at` (set by every person's save in its own UPDATE,
+  never by an agent's), and no version a person saved is later. The versions
+  cover saves the column never saw (older rows, and the previous deployment
+  during a rollout); there is no backfill. It lands over agents' saves and
+  reports `savedOverAgents`; another person's newer save still refuses it.
+- Save times come from the database clock in whole milliseconds, a
+  millisecond or more after the row's last save (`src/lib/edits/save-time.ts`),
+  never from an app server's clock. Every write of `artifact.updated_at` uses
+  `nextSaveTime`/`firstSaveTime`, so a base names exactly one save.
+- On a link or public artifact, a save (and a files change,
+  `recordArtifactChange`) decides its approval before its UPDATE, for exactly
+  the row it changes, and writes its version and approval (approved version,
+  edit request, canceled requests, an approver's audit row) in the same
+  statement (`src/lib/versions/save-write.ts`, like a replaced file). The
+  UPDATE runs only while the row keeps the save time, visibility, team, and
+  approved version the plan was made for, read from the row's own columns;
+  when another save or decision moved it on, the save is planned again on the
+  new row. So no save can land between another save and its approval. On
+  private and team artifacts the version is filed just after the UPDATE:
+  dated at its save and placed before any newer one, and merges and restamps
+  run only while the row is still at that save (`artifactStillAt`). History's
+  newest version and the approved version are always the newest save's.
+- Snapshots (`versionMatching`, `ensureHistoryStart`) reuse the version a
+  save filed when one shows the row, and are credited by `snapshotSource`: a
+  person when `person_saved_at` is the row's save time, never the artifact's
+  last agent.
+- History merges quick saves only with the same source key (the person, and
+  for an agent's save its harness, or "agent" when unknown: `saveSourceKey`).
+  Whether a save is an agent's comes from who saved it
+  (`artifact_version.by_agent`; older versions read their harness), never
+  from the harness alone, so a web save never folds into an agent's version
+  or the reverse.
+- The editor never swaps incoming content under content the person changed
+  and has not saved (`replacesContentUnderEdits`). After a save over agents,
+  it keeps the agents' changes to fields the person never touched. Keep every
+  new agent write path for content, title, or format on `writeArtifactSave`.
+- Every result an agent gets after its own save carries the `baseVersion` of
+  that save and shows what it wrote (`asSaved`), never a later read.
 
 ### Agent harnesses
 
