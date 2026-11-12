@@ -137,12 +137,25 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
     return rows.reduce((sum, row) => sum + row.count, 0);
   }
 
+  function bogusToken(): string {
+    return `artifacts_ort_${randomBytes(24).toString("base64url")}`;
+  }
+
+  /** A refresh that names no client: Better Auth answers 400, and it is one of the requests that wait once the address is over its failure limit. */
+  function unnamedRefresh(address: string) {
+    return tokenRequest({ grant_type: "refresh_token", refresh_token: bogusToken() }, address);
+  }
+
   /** Bogus refreshes from `address` until it is over its failure limit. */
   async function overFailureLimit(clientId: string, address: string): Promise<void> {
     for (let attempt = 0; attempt < rateLimits.oauthTokenFailuresByNetwork.limit; attempt += 1) {
-      await refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, address);
+      await refresh(bogusToken(), clientId, address);
     }
-    expect((await refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, address)).status).toBe(429);
+    expect((await unnamedRefresh(address)).status).toBe(429);
+  }
+
+  function failureKey(address: string): string {
+    return `oauthTokenFailuresByNetwork:${networkPrefixKey(new Headers({ "x-forwarded-for": address }))}`;
   }
 
   async function familyOf(refreshToken: string) {
@@ -210,7 +223,7 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
     expect(stored?.revoked).toBeNull();
   }, 60_000);
 
-  it("should keep valid refreshes and code exchanges working from an address far over its failure limit, and refuse its bad requests unseen", async () => {
+  it("should keep valid refreshes and code exchanges working from an address far over its failure limit, and make only requests it cannot look up wait", async () => {
     const address = newAddress();
     const clientId = await newClient();
     const existing = await newConnection(clientId);
@@ -219,11 +232,10 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
 
     // Expired, revoked, or bogus credentials: refresh tokens and codes, mixed, three times the limit.
     for (let attempt = 0; attempt < 3 * failureLimit; attempt += 1) {
-      const bogus = randomBytes(24).toString("base64url");
       const settled = attempt % 2 === 0
-        ? await refresh(`artifacts_ort_${bogus}`, clientId, address)
-        : await exchange({ code: bogus, verifier: "v".repeat(43) }, clientId, address);
-      expect(settled.status === 400 || settled.status === 429).toBe(true);
+        ? await refresh(bogusToken(), clientId, address)
+        : await exchange({ code: randomBytes(24).toString("base64url"), verifier: "v".repeat(43) }, clientId, address);
+      expect(settled.status).toBe(400);
     }
 
     // (a) A correct refresh for an existing connection succeeds.
@@ -238,22 +250,65 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
     expect(exchanged.status).toBe(200);
     expect(await exchanged.json()).toMatchObject({ token_type: "Bearer" });
 
-    // (c) Further bad requests get 429 with Retry-After before Better Auth runs (it would answer 400), and still count.
-    const failureKey = `oauthTokenFailuresByNetwork:${networkPrefixKey(new Headers({ "x-forwarded-for": address }))}`;
-    const countedBefore = await bucketTotal(failureKey);
-    const badRefresh = await refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, address);
-    const badCode = await exchange({ code: randomBytes(24).toString("base64url"), verifier: "v".repeat(43) }, clientId, address);
-    for (const refused of [badRefresh, { status: badCode.status, body: (await badCode.json()) as Record<string, unknown>, retryAfter: badCode.headers.get("retry-after") }]) {
+    // (c) Requests Better Auth cannot answer by lookup wait, with Retry-After, before it runs (it would answer 400), and still count.
+    const countedBefore = await bucketTotal(failureKey(address));
+    const waiting = [
+      await unnamedRefresh(address),
+      await tokenRequest({ grant_type: "refresh_token", client_id: clientId }, address),
+      await tokenRequest({ grant_type: "password", username: "a", password: "b", client_id: clientId }, address),
+      // A metadata-document app we have never stored: Better Auth would fetch its document.
+      await tokenRequest({ grant_type: "refresh_token", refresh_token: bogusToken(), client_id: `https://unseen-${tag}.example/oauth/metadata.json` }, address),
+    ];
+    for (const refused of waiting) {
       expect(refused.status).toBe(429);
-      expect(refused.body).toMatchObject({ error: "rate_limited" });
-      expect(Number(refused.retryAfter)).toBeGreaterThan(0);
+      expect(await refused.json()).toMatchObject({ error: "rate_limited" });
+      expect(Number(refused.headers.get("retry-after"))).toBeGreaterThan(0);
     }
-    expect(await bucketTotal(failureKey)).toBe(countedBefore + 2);
+    expect(await bucketTotal(failureKey(address))).toBe(countedBefore + waiting.length);
 
-    // (d) Another address is unaffected: its bad request reaches Better Auth and gets the ordinary answer.
-    const elsewhere = await refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, newAddress());
+    // (d) Another address is unaffected: the same request reaches Better Auth and gets the ordinary answer.
+    const elsewhere = await unnamedRefresh(newAddress());
     expect(elsewhere.status).toBe(400);
-    expect(elsewhere.body.error).toBe("invalid_grant");
+    expect(await elsewhere.json()).toMatchObject({ error: "invalid_request" });
+  }, 60_000);
+
+  it("should tell a connection we no longer hold to connect again, 500 times in a row, from an address far over its failure limit", async () => {
+    const address = newAddress();
+    const clientId = await newClient();
+    // A connection the person ended: the cleanup or the revocation deleted its refresh token.
+    const ended = await newConnection(clientId);
+    await getDb().delete(oauthRefreshToken).where(eq(oauthRefreshToken.token, hashOAuthToken(ended.replace("artifacts_ort_", ""))));
+    // A code that expired and was deleted before the app exchanged it.
+    const lapsed = await newCode(clientId);
+    await getDb().delete(verification).where(eq(verification.identifier, hashOAuthToken(lapsed.code)));
+    await overFailureLimit(clientId, address);
+
+    for (let attempt = 0; attempt < 250; attempt += 1) {
+      const refreshed = await refresh(ended, clientId, address);
+      expect(refreshed).toMatchObject({ status: 400, body: { error: "invalid_grant" }, retryAfter: null });
+      const exchanged = await exchange(lapsed, clientId, address);
+      expect({ status: exchanged.status, error: ((await exchanged.json()) as Record<string, unknown>).error, retryAfter: exchanged.headers.get("retry-after") }).toEqual({ status: 400, error: "invalid_grant", retryAfter: null });
+    }
+  }, 120_000);
+
+  it("should give the answer Better Auth gives under the limit, word for word, when the address is over it", async () => {
+    const calm = newAddress();
+    const busy = newAddress();
+    const clientId = await newClient();
+    const ended = bogusToken();
+    const body = async (response: Response) => ({ status: response.status, body: (await response.json()) as Record<string, unknown>, challenge: response.headers.get("www-authenticate") });
+    const requests = [
+      { grant_type: "refresh_token", refresh_token: ended, client_id: clientId },
+      { grant_type: "authorization_code", code: "gone", code_verifier: "v".repeat(43), client_id: clientId, redirect_uri: "https://assistant.example/callback" },
+      // An app whose registration is gone (not a metadata-document address): Better Auth answers invalid_client.
+      { grant_type: "refresh_token", refresh_token: ended, client_id: `removed-app-${tag}` },
+    ];
+    const expected = [];
+    for (const request of requests) expected.push(await body(await tokenRequest(request, calm)));
+    await overFailureLimit(clientId, busy);
+
+    for (const [index, request] of requests.entries()) expect(await body(await tokenRequest(request, busy))).toEqual(expected[index]);
+    expect(expected.map((answer) => answer.body.error)).toEqual(["invalid_grant", "invalid_grant", "invalid_client"]);
   }, 60_000);
 
   it("should send a replayed rotated token to Better Auth from an address over its failure limit, which revokes the family", async () => {
@@ -273,23 +328,25 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
     expect(await liveFamilyTokens(userId, clientId)).toBe(0);
   }, 60_000);
 
-  it("should still revoke the family on the app's replay when a thief used up the stolen token's tries from another address", async () => {
+  it("should still revoke the family on the app's replay when a thief failed with the stolen token from the app's own address and pushed it over its failure limit", async () => {
     const appAddress = newAddress();
-    const thiefAddress = newAddress();
     const clientId = await newClient();
     const stolen = await newConnection(clientId);
     const userId = await familyOf(stolen);
-    const badScope = { grant_type: "refresh_token", refresh_token: stolen, client_id: clientId, scope: "admin:everything" };
-    for (let attempt = 0; attempt <= rateLimits.oauthTokenAttemptsByCredential.limit; attempt += 1) expect((await tokenRequest(badScope, thiefAddress)).status).toBe(400);
-    const thiefRefresh = await refresh(stolen, clientId, thiefAddress);
+    const thiefRefresh = await refresh(stolen, clientId, newAddress());
     expect(thiefRefresh.status).toBe(200);
     await getDb().update(oauthRefreshToken).set({ rotationReplayExpiresAt: new Date(Date.now() - 1000) }).where(eq(oauthRefreshToken.token, hashOAuthToken(stolen.replace("artifacts_ort_", ""))));
+    // Better Auth refuses a bad scope before its reuse check, so these revoke nothing.
+    const badScope = { grant_type: "refresh_token", refresh_token: stolen, client_id: clientId, scope: "admin:everything" };
+    for (let attempt = 0; attempt < 20; attempt += 1) expect((await tokenRequest(badScope, appAddress)).status).toBe(400);
+    expect(await liveFamilyTokens(userId, clientId)).toBeGreaterThan(0);
     await overFailureLimit(clientId, appAddress);
 
     const appReplay = await refresh(stolen, clientId, appAddress);
 
     expect(appReplay).toMatchObject({ status: 400, body: { error: "invalid_grant" } });
     expect(await liveFamilyTokens(userId, clientId)).toBe(0);
+    expect((await refresh(thiefRefresh.next, clientId, newAddress())).status).toBe(400);
   }, 60_000);
 
   it("should send a used code to Better Auth from an address over its failure limit, which revokes the tokens it issued", async () => {
@@ -321,25 +378,24 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
     expect(await refresh(expired, clientId, address)).toMatchObject({ status: 400, body: { error: "invalid_grant" } });
   }, 60_000);
 
-  it("should stop a valid token failed with over and over once its tries run out, from an address over its failure limit", async () => {
+  it("should count each failure of a valid token that is failed with over and over, and keep its connection working", async () => {
     const address = newAddress();
     const clientId = await newClient();
     const mine = await newConnection(clientId);
     await overFailureLimit(clientId, address);
+    const countedBefore = await bucketTotal(failureKey(address));
     const badScope = () => tokenRequest({ grant_type: "refresh_token", refresh_token: mine, client_id: clientId, scope: "admin:everything" }, address);
 
-    const answers: number[] = [];
-    for (let attempt = 0; attempt <= rateLimits.oauthTokenAttemptsByCredential.limit; attempt += 1) answers.push((await badScope()).status);
+    for (let attempt = 0; attempt < 12; attempt += 1) expect((await badScope()).status).toBe(400);
 
-    expect(answers.slice(0, -1).every((status) => status === 400)).toBe(true);
-    expect(answers.at(-1)).toBe(429);
+    expect(await bucketTotal(failureKey(address))).toBe(countedBefore + 12);
+    expect((await refresh(mine, clientId, address)).status).toBe(200);
   }, 60_000);
 
-  it("should let at most the failure limit through to Better Auth when many unknown requests arrive at once", async () => {
+  it("should let at most the failure limit through to Better Auth when many requests it cannot look up arrive at once", async () => {
     const address = newAddress();
-    const clientId = await newClient();
 
-    const statuses = await Promise.all(Array.from({ length: 200 }, () => refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, address).then((settled) => settled.status)));
+    const statuses = await Promise.all(Array.from({ length: 200 }, () => unnamedRefresh(address).then((settled) => settled.status)));
 
     expect(statuses.filter((status) => status === 400)).toHaveLength(rateLimits.oauthTokenFailuresByNetwork.limit);
     expect(statuses.filter((status) => status === 429)).toHaveLength(200 - rateLimits.oauthTokenFailuresByNetwork.limit);
@@ -360,7 +416,7 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
       expect(status).toBeGreaterThanOrEqual(400);
       expect(status).toBeLessThan(500);
     }
-    expect(await bucketTotal(`oauthTokenFailuresByNetwork:${networkPrefixKey(new Headers({ "x-forwarded-for": address }))}`)).toBe(attempts.length);
+    expect(await bucketTotal(failureKey(address))).toBe(attempts.length);
   }, 60_000);
 
 });

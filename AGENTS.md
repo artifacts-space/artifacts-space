@@ -364,10 +364,10 @@ catch this, so test the generated SQL with `.toSQL()`, as
 - OAuth endpoint limits (`src/lib/abuse/limits.ts`). Hosted apps (assistants
   on the web, desktop, and phones) reach us for all their users from a few
   shared addresses, so nothing that succeeds is limited per address except a
-  load backstop. Every per-address key here (backstop, failures, the
-  address part of the per-credential key, registration, and the stored
-  `registered_network`) uses `networkPrefixKey`: IPv6 by /64, IPv4 per
-  address, like the password sign-in limits:
+  load backstop. Every per-address key here (backstop, failures,
+  registration, and the stored `registered_network`) uses
+  `networkPrefixKey`: IPv6 by /64, IPv4 per address, like the password
+  sign-in limits:
   - Token endpoint (`src/lib/oauth/token-limits.ts`, rules in
     `token-limit-rules.ts`): before Better Auth runs, the backstop is counted
     (`oauthToken`), and one indexed lookup decides whether the request
@@ -377,18 +377,32 @@ catch this, so test the generated SQL with `.toSQL()`, as
     header first, then the body). A known credential goes on to Better
     Auth, so a replayed rotated token revokes its family, a used code
     revokes what it issued, and a dead connection gets `invalid_grant`, not
-    a 429. Each known credential gets `oauthTokenAttemptsByCredential`
-    attempts per address, counted on arrival; past that it is treated as
-    unknown. Keep the address in that key: a thief must not be able to use
-    up a token's tries where the rightful app sends it. An
-    unknown one reserves a failure for its address on arrival
+    a 429, however many times it fails. A request with no known credential
+    reserves a failure for its address on arrival
     (`oauthTokenFailuresByNetwork`, one atomic upsert, so floods cannot
-    overshoot) and waits once the address is over. A usable refresh also
+    overshoot). Once the address is over that limit, such a request still
+    goes on to Better Auth when Better Auth can answer it with lookups
+    alone (`unknownCredentialRoute`): it carries a code or refresh token
+    and names its client the plain way (body or Basic header). A hosted
+    app's shared address is often over the limit, and a connection whose
+    token or app we no longer hold must hear `invalid_grant` or
+    `invalid_client` and ask the person to connect again; a 429 would be
+    retried forever. The answer is Better Auth's own, word for word what it
+    says under the limit, so the limit tells a caller nothing new. Do not
+    answer these requests ourselves: client checks come before the grant
+    lookup in Better Auth, and a copy of them would drift. Only costly
+    requests wait with a 429: no code or refresh token, no plainly named
+    client, a client assertion (it must be verified), or a
+    metadata-document client id we have not stored (`isStoredClient`;
+    Better Auth would fetch its document). A usable refresh also
     meets its connection's limit (`oauthRefreshByConnection`). After the
     answer, a 4xx to a known credential counts a failure for the address,
     and a 200 to a refresh counts for the connection. The failure limit
-    only caps error work: codes (about 190 bits), refresh tokens and client
-    secrets (about 182 bits) are what stop guessing, with the backstop. Do
+    only caps costly error work, and the backstop bounds the lookups: codes
+    (about 190 bits), refresh tokens and client secrets (about 182 bits)
+    are what stop guessing. Do not add a per-credential or per-address
+    lockout for known credentials: a thief with a rotated token could use
+    it to keep the app's replay from reaching reuse detection. Do
     not add a per-client failure lockout: client ids are public, so anyone
     could trigger it. Counter keys are HMACs under the server secret, never
     a token or a plain hash of one. A connection is the person and the app
@@ -399,28 +413,22 @@ catch this, so test the generated SQL with `.toSQL()`, as
     per address per hour, a share of `maxUnapprovedClientsPerNetwork`
     unapproved apps per address, and a pool of `maxUnapprovedClients`
     (`src/lib/oauth/config.ts`). The route tags each new app with its
-    address (`oauth_client.registered_network`) after Better Auth answers
-    201, then trims the address's share and then the pool in one statement
-    each (`trimUnapproved` keeps the newest evictable apps, or drops the
-    new one, so concurrent registrations cannot leave either over its
-    cap). Only apps past `unapprovedEvictionGraceMinutes` that were never
-    approved, hold no
+    address (`oauth_client.registered_network`) after any success answer
+    that names a `client_id` (not only a 201), then trims the address's
+    share and then the pool in one statement each (`trimUnapproved` keeps
+    the newest evictable apps, or drops the new one, so concurrent
+    registrations cannot leave either over its cap; its SQL is tested
+    directly in `src/lib/oauth/limit-store.db.test.ts`). Only apps past
+    `unapprovedEvictionGraceMinutes` that were never approved, hold no
     tokens, and came from no metadata document are evicted; an evicted
     client id fails like an unknown one. A registration is refused only when
     nothing in the full share (429) or full pool (503) is old enough, with
     `Retry-After` until the oldest leaves the grace period. The tag is
     cleared on approval and by the cleanup job after
-    `registeredNetworkHours`, so it never outlives the privacy page's one
-    day for rate-limit data.
-  - Known limit: a thief who holds a rotated refresh token and sends from
-    the app's own address or IPv6 /64 can spend the token's tries with
-    requests Better Auth refuses before its reuse check (a bad scope, say),
-    then push the address over its failure limit with about 60 bogus
-    requests. While that lasts, the app's replay gets a 429 and reuse
-    detection does not fire. From any other network the replay still
-    revokes the family. Before these limits the same thief could do this
-    more cheaply by using up the address's 300 token requests an hour. Do
-    not add a mechanism for it without a decision.
+    `registeredNetworkHours`, so it is gone within a day, well inside what
+    the privacy page states for rate-limit data. That page reads its number
+    from `rateLimitRetentionDays` (`src/lib/abuse/limits.ts`), which also
+    sets the counter cleanup age; change the constant, never the sentence.
   - Better Auth's own in-memory limits on these two endpoints are raised far
     above ours (`betterAuthEndpointBursts`); keep them there, or they
     throttle hosted apps first. Refusals are 429s in the OAuth error shape

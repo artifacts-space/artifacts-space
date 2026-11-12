@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 
+import { isCimdClientIdUrlCandidate } from "@better-auth/cimd";
 import { z } from "zod";
 
 import { oauthTokenPrefixes } from "./config";
@@ -216,13 +217,32 @@ export function oauthConnectionKey(userId: string, clientId: string, secret: str
 }
 
 /**
- * The counter key for one presented credential from one network address
- * (oauthTokenAttemptsByCredential): an HMAC under the server secret of its
- * kind, its stored hash, and the address's network key, never the token or
- * a plain hash of it. Per address, so someone holding a stolen token cannot
- * use up its tries where the rightful app sends it: the app's replay of a
- * rotated token still reaches Better Auth, which revokes the family.
+ * How a token request that presents no known credential is answered once its
+ * network is over the failure limit (oauthTokenFailuresByNetwork):
+ *
+ * - "answer": Better Auth can answer it with database lookups alone, so it
+ *   goes on. This is what tells a dead connection it is dead: a refresh token
+ *   or code we no longer hold gets invalid_grant, and an app we no longer
+ *   hold gets invalid_client, so the app asks the person to connect again
+ *   instead of retrying a 429 forever.
+ * - "answer-if-stored": the client id is a metadata-document address (an
+ *   https URL, by the plugin's own test). Better Auth fetches the document
+ *   of one it has not stored, so the request goes on only when the app is
+ *   stored.
+ * - "wait": nothing to answer cheaply. It carries no refresh token or code
+ *   for its grant type, or names no client the plain way (none at all, an
+ *   Authorization header that is not a well-formed Basic one, or a client
+ *   assertion, which must be verified).
  */
-export function oauthCredentialKey(kind: "code" | "refresh_token", storedHash: string, network: string, secret: string): string {
-  return createHmac("sha256", secret).update(JSON.stringify(["oauth-credential", kind, storedHash, network])).digest("hex").slice(0, 32);
+export type UnknownCredentialRoute = "answer" | "answer-if-stored" | "wait";
+
+function carriesGrant(fields: TokenRequestFields): boolean {
+  if (fields.grantType === "refresh_token") return fields.refreshToken !== null;
+  return fields.grantType === "authorization_code" && fields.code !== null;
+}
+
+/** Decides the route above from the request's fields and the client it names (presentedClientId). */
+export function unknownCredentialRoute(fields: TokenRequestFields, clientId: string | null): UnknownCredentialRoute {
+  if (clientId === null || !carriesGrant(fields)) return "wait";
+  return isCimdClientIdUrlCandidate(clientId) ? "answer-if-stored" : "answer";
 }

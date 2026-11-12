@@ -3,14 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { rateLimits, type RateLimitName } from "@/lib/abuse/limits";
 import type * as RateLimitModule from "@/lib/abuse/rate-limit";
 import { decideRateLimit, windowStart } from "@/lib/abuse/rate-limit-window";
-import type { EvictionScope } from "@/lib/oauth/limit-store";
-import type { UnapprovedClientCounts } from "@/lib/oauth/registration-limit-rules";
 import type { StoredCodeTrace, StoredRefreshGrant } from "@/lib/oauth/token-limit-rules";
 
 /*
- * OAuth token and registration limits on the auth route. The Postgres
- * counters are replaced by an in-memory store that uses the real limits and
- * the real sliding-window decision, the code and refresh-token lookups by maps, and
+ * OAuth token limits on the auth route (registration and consent are in
+ * route-oauth-registration-limits.test.ts). The Postgres counters are
+ * replaced by an in-memory store that uses the real limits and the real
+ * sliding-window decision, the code and refresh-token lookups by maps, and
  * Better Auth by a stub, so these show which checks run for which request
  * and what is counted after the answer. The same flows against a real
  * database are in route-oauth-limits.db.test.ts.
@@ -34,18 +33,12 @@ function count(name: RateLimitName, subject: string, nowMs = Date.now()) {
   counts.set(key(current), (counts.get(key(current)) ?? 0) + 1);
 }
 
-const emptyPool: UnapprovedClientCounts = { total: 0, evictable: 0, oldestInGrace: null, fromNetwork: 0, evictableFromNetwork: 0, oldestInGraceFromNetwork: null };
-
 const store = vi.hoisted(() => ({
   calls: [] as string[],
   subjects: new Map<string, string[]>(),
   grants: new Map<string, StoredRefreshGrant>(),
   codes: new Map<string, StoredCodeTrace>(),
-  pool: null as UnapprovedClientCounts | null,
-  evicted: [] as EvictionScope["kind"][],
-  overCap: new Set<EvictionScope["kind"]>(),
-  marked: [] as { clientId: string; network: string }[],
-  forgotten: 0,
+  clients: new Set<string>(),
   handler: vi.fn<(request: Request) => Promise<Response>>(),
   failCounters: false,
 }));
@@ -54,18 +47,9 @@ vi.mock("@/lib/auth/server", () => ({ getAuth: () => ({ handler: store.handler }
 vi.mock("@/lib/oauth/limit-store", () => ({
   findRefreshGrant: (hash: string) => Promise.resolve(store.grants.get(hash) ?? null),
   findCodeTrace: (hash: string) => Promise.resolve(store.codes.get(hash) ?? { values: [], tokenClientIds: [] }),
-  unapprovedClientCounts: () => Promise.resolve(store.pool),
-  trimUnapproved: (_clientId: string, scope: EvictionScope) => {
-    store.evicted.push(scope.kind);
-    return Promise.resolve({ evicted: 0, dropped: store.overCap.has(scope.kind) });
-  },
-  forgetApprovedClientNetworks: () => {
-    store.forgotten += 1;
-    return Promise.resolve(0);
-  },
-  markClientNetwork: (clientId: string, network: string) => {
-    store.marked.push({ clientId, network });
-    return Promise.resolve();
+  isStoredClient: (clientId: string) => {
+    store.calls.push("lookup:client");
+    return Promise.resolve(store.clients.has(clientId));
   },
 }));
 vi.mock("@/lib/abuse/rate-limit", async (importActual) => {
@@ -121,14 +105,6 @@ function refresh(secret: string, clientId = "client-1", address?: string) {
   return tokenRequest({ grant_type: "refresh_token", refresh_token: `artifacts_ort_${secret}`, client_id: clientId }, address);
 }
 
-function register(address = "198.51.100.20") {
-  return POST(new Request(`${site}/api/auth/oauth2/register`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-forwarded-for": address },
-    body: JSON.stringify({ client_name: "App", redirect_uris: ["https://app.example/callback"] }),
-  }));
-}
-
 function code(value: string, clientId = "client-1") {
   store.codes.set(hashOAuthToken(value), { values: [JSON.stringify({ type: "authorization_code", query: { client_id: clientId } })], tokenClientIds: [] });
 }
@@ -149,9 +125,6 @@ function refreshAnswer(secret: string): Response {
 
 /** Better Auth's answers: a live token refreshes, a waiting code is used up, anything else is invalid_grant. */
 async function betterAuth(request: Request): Promise<Response> {
-  const path = new URL(request.url).pathname;
-  if (path.endsWith("/register")) return Response.json({ client_id: "new-client" }, { status: 201 });
-  if (path.endsWith("/consent")) return Response.json({ url: "https://app.example/cb?code=x" });
   const body = new URLSearchParams(await request.text());
   if (body.get("grant_type") !== "authorization_code") return refreshAnswer(body.get("refresh_token")?.replace("artifacts_ort_", "") ?? "");
   const trace = store.codes.get(hashOAuthToken(body.get("code") ?? ""));
@@ -171,11 +144,7 @@ beforeEach(() => {
   store.subjects.clear();
   store.grants.clear();
   store.codes.clear();
-  store.marked.length = 0;
-  store.pool = emptyPool;
-  store.evicted.length = 0;
-  store.overCap.clear();
-  store.forgotten = 0;
+  store.clients.clear();
   store.failCounters = false;
   store.handler.mockReset();
   store.handler.mockImplementation(betterAuth);
@@ -201,10 +170,10 @@ describe("auth route token limits", () => {
     store.handler.mockClear();
   }
 
-  it("should count the backstop and one attempt for the code when a valid code is exchanged", async () => {
+  it("should count only the backstop when a valid code is exchanged", async () => {
     code("good-code");
     expect((await answer(exchange("good-code"))).status).toBe(200);
-    expect(store.calls).toEqual(["hit:oauthToken", "reserve:oauthTokenAttemptsByCredential"]);
+    expect(store.calls).toEqual(["hit:oauthToken"]);
   });
 
   it("should reserve a failure for the network on arrival when a code is unknown, and count nothing after", async () => {
@@ -221,7 +190,7 @@ describe("auth route token limits", () => {
   it("should check and then count the connection when a usable refresh token succeeds", async () => {
     grant("good", "user-1");
     expect((await answer(refresh("good"))).status).toBe(200);
-    expect(store.calls).toEqual(["hit:oauthToken", "reserve:oauthTokenAttemptsByCredential", "peek:oauthRefreshByConnection", "count:oauthRefreshByConnection"]);
+    expect(store.calls).toEqual(["hit:oauthToken", "peek:oauthRefreshByConnection", "count:oauthRefreshByConnection"]);
   });
 
   it("should reserve a failure for the network and nothing for any connection when the refresh token is unknown", async () => {
@@ -232,7 +201,7 @@ describe("auth route token limits", () => {
   it("should count a failure for the network after the answer when Better Auth refuses a known token", async () => {
     grant("expired", "user-1", "client-1", { expiresAt: new Date(Date.now() - 1000) });
     expect((await answer(refresh("expired"))).status).toBe(400);
-    expect(store.calls).toEqual(["hit:oauthToken", "reserve:oauthTokenAttemptsByCredential", "count:oauthTokenFailuresByNetwork"]);
+    expect(store.calls).toEqual(["hit:oauthToken", "count:oauthTokenFailuresByNetwork"]);
   });
 
   it("should treat someone's token as unknown when another client presents it", async () => {
@@ -251,7 +220,7 @@ describe("auth route token limits", () => {
       body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: "artifacts_ort_good", client_id: "client-2" }).toString(),
     }));
     expect(response.status).toBe(200);
-    expect(store.calls).toContain("reserve:oauthTokenAttemptsByCredential");
+    expect(store.calls).toEqual(["hit:oauthToken", "peek:oauthRefreshByConnection", "count:oauthRefreshByConnection"]);
   });
 
   it("should keep valid refreshes and code exchanges working from a network far over its failure limit", async () => {
@@ -275,46 +244,88 @@ describe("auth route token limits", () => {
     expect(store.handler).toHaveBeenCalledTimes(3);
   });
 
-  it("should refuse requests with unknown credentials over the failure limit, before Better Auth runs", async () => {
+  it("should still send a refresh token and a code we no longer hold to Better Auth when the network is over its failure limit, so a dead connection hears invalid_grant", async () => {
     await overFailureLimit();
 
-    const badRefresh = await answer(refresh("still-guessing"));
-    const badCode = await answer(exchange("still-bogus"));
-
-    for (const refused of [badRefresh, badCode]) {
-      expect(refused.status).toBe(429);
-      expect(refused.body.error).toBe("rate_limited");
-      expect(String(refused.body.error_description)).toContain("failed");
-      expect(Number(refused.retryAfter)).toBeGreaterThan(0);
+    for (let attempt = 0; attempt < 500; attempt += 1) {
+      const gone = attempt % 2 === 0 ? refresh(`deleted-${String(attempt)}`) : exchange(`expired-and-deleted-${String(attempt)}`);
+      expect(await answer(gone)).toMatchObject({ status: 400, body: { error: "invalid_grant" }, retryAfter: null });
     }
+    expect(store.handler).toHaveBeenCalledTimes(500);
+    expect(store.calls).not.toContain("lookup:client");
+  });
+
+  it("should send it on for a metadata-document app only when the app is stored, since Better Auth would fetch the document of one it does not hold", async () => {
+    const stored = "https://assistant.example/oauth/metadata.json";
+    const unseen = "https://unseen.example/oauth/metadata.json";
+    store.clients.add(stored);
+    await overFailureLimit();
+
+    expect(await answer(refresh("deleted", stored))).toMatchObject({ status: 400, body: { error: "invalid_grant" } });
+    expect(store.handler).toHaveBeenCalledOnce();
+
+    const refused = await answer(refresh("deleted", unseen));
+    expect(refused).toMatchObject({ status: 429, body: { error: "rate_limited" } });
+    expect(Number(refused.retryAfter)).toBeGreaterThan(0);
+    expect(store.handler).toHaveBeenCalledOnce();
+  });
+
+  it("should look up no client and fetch nothing while the network is under its failure limit", async () => {
+    expect((await answer(refresh("deleted", "https://unseen.example/oauth/metadata.json"))).status).toBe(400);
+    expect(store.calls).toEqual(["hit:oauthToken", "reserve:oauthTokenFailuresByNetwork"]);
+  });
+
+  it.each<[string, Record<string, string>, Record<string, string>]>([
+    ["names no client", { grant_type: "refresh_token", refresh_token: "artifacts_ort_x" }, {}],
+    ["carries no refresh token", { grant_type: "refresh_token", client_id: "client-1" }, {}],
+    ["carries no code", { grant_type: "authorization_code", code_verifier: "v", client_id: "client-1" }, {}],
+    ["asks for a grant type we do not give", { grant_type: "client_credentials", client_id: "client-1" }, {}],
+    ["proves its client with an assertion", { grant_type: "refresh_token", refresh_token: "artifacts_ort_x", client_id: "client-1", client_assertion: "jwt", client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" }, {}],
+    ["sends an Authorization header that is not Basic", { grant_type: "refresh_token", refresh_token: "artifacts_ort_x", client_id: "client-1" }, { authorization: "Bearer abc" }],
+  ])("should make a request wait over the failure limit, before Better Auth runs, when it %s", async (_label, body, headers) => {
+    await overFailureLimit();
+
+    const response = await POST(new Request(`${site}/api/auth/oauth2/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": "203.0.113.10", ...headers },
+      body: new URLSearchParams(body).toString(),
+    }));
+    const refused = await answer(Promise.resolve(response));
+
+    expect(refused.status).toBe(429);
+    expect(refused.body.error).toBe("rate_limited");
+    expect(String(refused.body.error_description)).toContain("failed");
+    expect(Number(refused.retryAfter)).toBeGreaterThan(0);
     expect(store.handler).not.toHaveBeenCalled();
   });
 
-  it("should treat a known token as unknown after its attempts run out, so it cannot be failed with forever", async () => {
+  it("should count every failure of a token someone holds, and keep sending it to Better Auth, when it is failed with over and over", async () => {
     grant("mine", "user-1");
     await overFailureLimit();
+    store.calls.length = 0;
     store.handler.mockImplementation(() => Promise.resolve(Response.json({ error: "invalid_scope" }, { status: 400 })));
 
-    for (let attempt = 0; attempt < rateLimits.oauthTokenAttemptsByCredential.limit; attempt += 1) expect((await answer(refresh("mine"))).status).toBe(400);
-    const refused = await answer(refresh("mine"));
+    for (let attempt = 0; attempt < 20; attempt += 1) expect((await answer(refresh("mine"))).status).toBe(400);
 
-    expect(refused.status).toBe(429);
-    expect(store.handler).toHaveBeenCalledTimes(rateLimits.oauthTokenAttemptsByCredential.limit);
+    expect(store.handler).toHaveBeenCalledTimes(20);
+    expect(store.calls.filter((call) => call === "count:oauthTokenFailuresByNetwork")).toHaveLength(20);
   });
 
-  it("should give a token another client holds the same refusal as a made-up one when the network is over its failure limit", async () => {
+  it("should treat a token another client holds like a made-up one when the network is over its failure limit, and leave the answer to Better Auth", async () => {
     grant("theirs", "user-1", "client-2");
     await overFailureLimit();
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(Date.now());
+    const checksFor = async (secret: string) => {
+      store.calls.length = 0;
+      await refresh(secret);
+      return [...store.calls];
+    };
 
-    const theirs = await answer(refresh("theirs"));
-    const madeUp = await answer(refresh("made-up"));
+    const theirs = await checksFor("theirs");
+    const madeUp = await checksFor("made-up");
 
-    vi.useRealTimers();
-    // Every refused try is counted, so only the wait moves between the two.
-    const withoutWait = (settled: typeof theirs) => ({ status: settled.status, error: settled.body.error, message: String(settled.body.error_description).replace(/ Try again in .*$/, "") });
-    expect(withoutWait(theirs)).toEqual(withoutWait(madeUp));
+    expect(theirs).toEqual(madeUp);
+    expect(theirs).toEqual(["hit:oauthToken", "reserve:oauthTokenFailuresByNetwork"]);
+    expect(store.handler).toHaveBeenCalledTimes(2);
   });
 
   it("should leave other networks alone when one network is over its failure limit", async () => {
@@ -347,74 +358,6 @@ describe("auth route token limits", () => {
   });
 });
 
-describe("auth route registration limits", () => {
-  it("should count the hourly limit and tag the new app with the network when registration succeeds", async () => {
-    const response = await answer(register());
-    expect(response.status).toBe(201);
-    expect(store.calls).toEqual(["hit:oauthRegister"]);
-    expect(store.marked).toHaveLength(1);
-    expect(store.marked[0]?.clientId).toBe("new-client");
-    expect(store.marked[0]?.network).not.toContain("198.51.100.20");
-  });
-
-  it("should not tag anything when Better Auth refuses the registration", async () => {
-    store.handler.mockResolvedValueOnce(Response.json({ error: "invalid_client_metadata" }, { status: 400 }));
-    await register();
-    expect(store.marked).toHaveLength(0);
-  });
-
-  it("should refuse with 429 and Retry-After when the network's full share holds only apps inside the grace period", async () => {
-    store.pool = { ...emptyPool, total: 100, fromNetwork: 100, oldestInGraceFromNetwork: new Date(Date.now() - 60_000) };
-    const refused = await answer(register());
-    expect(refused.status).toBe(429);
-    expect(refused.body.error).toBe("rate_limited");
-    expect(Number(refused.retryAfter)).toBeLessThanOrEqual(15 * 60);
-    expect(store.handler).not.toHaveBeenCalled();
-  });
-
-  it("should register and trim the network's share and then the pool when the network's share is full of older apps", async () => {
-    store.pool = { ...emptyPool, total: 100, fromNetwork: 100, evictableFromNetwork: 100 };
-    expect((await answer(register())).status).toBe(201);
-    expect(store.evicted).toEqual(["network", "pool"]);
-  });
-
-  it("should refuse with 503 and Retry-After when the whole pool is full of apps inside the grace period", async () => {
-    store.pool = { ...emptyPool, total: 2000, oldestInGrace: new Date(Date.now() - 60_000) };
-    const refused = await answer(register());
-    expect(refused.status).toBe(503);
-    expect(Number(refused.retryAfter)).toBeLessThanOrEqual(15 * 60);
-    expect(store.handler).not.toHaveBeenCalled();
-  });
-
-  it("should answer 429 when the network's share stayed over the cap and the new app was dropped", async () => {
-    store.overCap.add("network");
-    const refused = await answer(register());
-    expect(refused).toMatchObject({ status: 429, body: { error: "rate_limited" } });
-    expect(store.evicted).toEqual(["network"]);
-  });
-
-  it("should answer 503 when the pool stayed over the cap and the new app was dropped", async () => {
-    store.overCap.add("pool");
-    const refused = await answer(register());
-    expect(refused.status).toBe(503);
-    expect(refused.body.error).toBe("temporarily_unavailable");
-    expect(Number(refused.retryAfter)).toBeGreaterThan(0);
-  });
-
-  it("should refuse at the hourly limit with the OAuth error shape", async () => {
-    for (let attempt = 0; attempt < rateLimits.oauthRegister.limit; attempt += 1) await register();
-    const refused = await answer(register());
-    expect(refused.status).toBe(429);
-    expect(refused.body).toMatchObject({ error: "rate_limited" });
-    expect(Number(refused.retryAfter)).toBeGreaterThan(0);
-  });
-
-  it("should let the registration through when the counters fail", async () => {
-    store.failCounters = true;
-    expect((await answer(register())).status).toBe(201);
-  });
-});
-
 describe("auth route OAuth limits by network", () => {
   const sameLine = ["2001:db8:1:1::a", "2001:db8:1:1:ffff:0:0:b"];
   const otherLine = "2001:db8:1:2::a";
@@ -429,8 +372,6 @@ describe("auth route OAuth limits by network", () => {
   const budgets: [string, (address: string) => Promise<Response>][] = [
     ["hit:oauthToken", (address) => refresh("guess", "client-1", address)],
     ["reserve:oauthTokenFailuresByNetwork", (address) => refresh("guess", "client-1", address)],
-    ["reserve:oauthTokenAttemptsByCredential", (address) => refresh("good", "client-1", address)],
-    ["hit:oauthRegister", (address) => register(address)],
   ];
 
   it.each(budgets)("should share %s within one IPv6 /64 and not with another /64 or a second IPv4 address", async (label, send) => {
@@ -443,36 +384,12 @@ describe("auth route OAuth limits by network", () => {
     expect(v4a).not.toBe(v4b);
   });
 
-  it("should tag apps registered from one IPv6 /64 with one network, so they share the cap on unapproved apps", async () => {
-    for (const address of [...sameLine, otherLine, ...ipv4Pair]) await register(address);
-    const [first, second, third, v4a, v4b] = store.marked.map((mark) => mark.network);
-    expect(first).toBe(second);
-    expect(third).not.toBe(first);
-    expect(v4a).not.toBe(v4b);
-  });
-
-  it("should refuse an unknown credential from a neighbour in the same /64 once the line is over its failure limit", async () => {
+  it("should make a request that names no client wait from a neighbour in the same /64 once the line is over its failure limit", async () => {
     for (let attempt = 0; attempt < rateLimits.oauthTokenFailuresByNetwork.limit; attempt += 1) await refresh(`guess-${String(attempt)}`, "client-1", sameLine[0]);
+    const unnamed = (address: string) => tokenRequest({ grant_type: "refresh_token", refresh_token: "artifacts_ort_next" }, address);
 
-    expect((await refresh("next", "client-1", sameLine[1])).status).toBe(429);
-    expect((await refresh("next", "client-1", otherLine)).status).toBe(400);
-  });
-});
-
-describe("auth route consent", () => {
-  function decide(status = 200) {
-    store.handler.mockResolvedValueOnce(Response.json({}, { status }));
-    return POST(new Request(`${site}/api/auth/oauth2/consent`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accept: true }) }));
-  }
-
-  it("should forget the registering network of approved apps when a consent decision succeeds", async () => {
-    expect((await decide()).status).toBe(200);
-    expect(store.forgotten).toBe(1);
-  });
-
-  it("should forget nothing when Better Auth refuses the decision", async () => {
-    expect((await decide(401)).status).toBe(401);
-    expect(store.forgotten).toBe(0);
+    expect((await unnamed(sameLine[1] ?? "")).status).toBe(429);
+    expect((await unnamed(otherLine)).status).toBe(400);
   });
 });
 

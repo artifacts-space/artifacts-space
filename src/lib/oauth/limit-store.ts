@@ -51,6 +51,12 @@ export async function findCodeTrace(codeHash: string): Promise<StoredCodeTrace> 
   return { values: rows.filter((row) => row.kind === "code").map((row) => row.value), tokenClientIds: rows.filter((row) => row.kind === "token").map((row) => row.value) };
 }
 
+/** Whether an app with this client id is stored. One indexed lookup. */
+export async function isStoredClient(clientId: string): Promise<boolean> {
+  const rows = await getDb().select({ id: oauthClient.id }).from(oauthClient).where(eq(oauthClient.clientId, clientId)).limit(1);
+  return rows.length > 0;
+}
+
 function poolWindow(now: number) {
   return {
     since: new Date(now - oauthLimits.unapprovedClientHours * hourMs),
@@ -175,9 +181,9 @@ export async function trimUnapproved(newClientId: string, scope: EvictionScope, 
  * Forgets which network registered an app once nobody needs it: when the app
  * is approved, and for every app before its registration is a day old (the
  * cleanup job runs every 6 hours and clears tags past
- * oauthLimits.registeredNetworkHours, so none lives past 24 hours). The
- * privacy page promises rate-limit data goes within a day. Returns how many
- * tags it cleared.
+ * oauthLimits.registeredNetworkHours, so none lives past 24 hours). That is
+ * well inside the time the privacy page gives rate-limit data
+ * (rateLimitRetentionDays). Returns how many tags it cleared.
  */
 export async function clearRegisteredNetworks(now = Date.now()): Promise<number> {
   const cutoff = new Date(now - oauthLimits.registeredNetworkHours * hourMs);

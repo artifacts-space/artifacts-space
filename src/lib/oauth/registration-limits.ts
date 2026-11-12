@@ -31,11 +31,20 @@ async function refuseRegistration(network: string): Promise<Response | null> {
 
 const graceSeconds = oauthLimits.unapprovedEvictionGraceMinutes * 60;
 
-/** Tags the new app with its network and makes room for it. Returns a refusal to send instead of Better Auth's answer, or null. */
+/**
+ * Tags the new app with its network and makes room for it. Returns a refusal
+ * to send instead of Better Auth's answer, or null. The new app is read from
+ * the answer's client_id, not from its status code: any success that names a
+ * stored app is settled, and one that names none is logged, because that app
+ * would count toward no network's share.
+ */
 async function settleRegistration(response: Response, network: string): Promise<Response | null> {
   try {
     const clientId = registeredClientId(await response.clone().json());
-    if (!clientId) return null;
+    if (!clientId) {
+      console.error("[oauth] A successful registration answer named no client, so it was not counted", response.status);
+      return null;
+    }
     await markClientNetwork(clientId, network);
     if ((await trimUnapproved(clientId, { kind: "network", network })).dropped) return poolResponse(networkShareRefusal(graceSeconds));
     if ((await trimUnapproved(clientId, { kind: "pool" })).dropped) return poolResponse(fullPoolRefusal(graceSeconds));
@@ -83,6 +92,6 @@ export async function handleRegistration(request: Request, answer: (request: Req
     console.error("[oauth] Registration limit check failed", error instanceof Error ? error.name : "unknown error");
   }
   const response = await answer(request);
-  if (!network || response.status !== 201) return response;
+  if (!network || !response.ok) return response;
   return (await settleRegistration(response, network)) ?? response;
 }

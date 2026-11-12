@@ -10,6 +10,14 @@ const quarterHour = 900;
 const hour = 3600;
 const day = 86_400;
 
+/**
+ * Rate-limit counters (rate_limit_bucket rows) older than this many days are
+ * deleted. The longest window is a day, and a sliding window also reads the
+ * window before, so three days keeps every count a decision can need. The
+ * privacy page states this number.
+ */
+export const rateLimitRetentionDays = 3;
+
 export const rateLimits = {
   /** New artifacts per user per hour, from the web app and MCP together. */
   artifactCreate: { limit: 120, windowSeconds: hour },
@@ -193,44 +201,27 @@ export const rateLimits = {
    * counts by its /64, as for every OAuth token and registration limit): a
    * load backstop only. Hosted apps send every user's refreshes from a few shared
    * addresses, about one per person per hour, so this covers some 30,000
-   * active people behind one address (10 a second on average). Guessing is
-   * stopped by oauthTokenFailuresByNetwork, and a looping connection by
-   * oauthRefreshByConnection.
+   * active people behind one address (10 a second on average). A looping
+   * connection is stopped by oauthRefreshByConnection, and costly failures
+   * by oauthTokenFailuresByNetwork.
    */
   oauthToken: { limit: 36_000, windowSeconds: hour },
   /**
-   * Failed OAuth token requests per network address. A request that
-   * presents no code or refresh token this server issued to its client is
-   * counted when it arrives, refused or not, and refused once the address is
-   * over the limit, before Better Auth runs. A request with one always goes
-   * on (within oauthTokenAttemptsByCredential), and counts here only when
-   * Better Auth refuses it, so failures from a hosted app's shared address
-   * never stop its other users. This caps the error work and noise from one
-   * address. Guessing is stopped by the size of the secrets (about 182 bits
-   * or more) and the oauthToken backstop.
+   * OAuth token requests per network address that present no code or
+   * refresh token this server issued to their client, counted when they
+   * arrive, plus requests with one that Better Auth then refuses. Over the
+   * limit, a request waits only when answering it costs more than a few
+   * lookups: it carries no code or refresh token, names no client the plain
+   * way (a client assertion must be verified), or names a metadata-document
+   * app we have not stored (its document would be fetched). Every other
+   * request still goes on to Better Auth (src/lib/oauth/token-limits.ts), so
+   * a connection whose token we no longer hold hears invalid_grant and asks
+   * the person to connect again; a hosted app's shared address is often over
+   * this limit, and a 429 would only be retried. Guessing is stopped by the
+   * size of the secrets (about 182 bits or more) and the oauthToken
+   * backstop, which also bounds the lookups.
    */
   oauthTokenFailuresByNetwork: { limit: 60, windowSeconds: quarterHour },
-  /**
-   * Token requests per presented code or refresh token this server issued,
-   * per network address, counted on arrival. A working app uses each one
-   * once (codes are single-use and refresh tokens rotate), or a few times
-   * when it retries within the reuse window. Over the limit, the credential
-   * is treated as unknown and meets oauthTokenFailuresByNetwork, so a token
-   * someone holds cannot be failed with forever (for example with a bad
-   * scope) to dodge the failure limit. Per address, so a thief cannot use up
-   * a token's tries where the rightful app sends it, and the app's replay of
-   * a rotated token still reaches Better Auth, which revokes the family.
-   *
-   * Known limit: a thief who holds a rotated refresh token and sends from the
-   * app's own address (or IPv6 /64) can spend its tries with requests Better
-   * Auth refuses before its reuse check (a bad scope, say), then push the
-   * address over oauthTokenFailuresByNetwork with about 60 bogus requests.
-   * While that lasts, the app's replay gets a 429 and the family is not
-   * revoked. From any other network, the replay still revokes it. Before
-   * these limits, the same thief could do the same more cheaply by using up
-   * the address's 300 token requests an hour.
-   */
-  oauthTokenAttemptsByCredential: { limit: 5, windowSeconds: quarterHour },
   /**
    * Successful refreshes per connection (one person and one app) per hour,
    * from any address. A connection refreshes about once an hour per open
@@ -295,7 +286,6 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   oauthRegister: "Your network has registered a lot of apps in the last hour.",
   oauthAuthorize: "Your network has started a lot of app connections in the last hour.",
   oauthToken: "Your network has asked for a lot of access tokens in the last hour.",
-  oauthTokenFailuresByNetwork: "Your network has sent a lot of token requests that failed in the last few minutes. Requests with a valid code or refresh token still go through.",
+  oauthTokenFailuresByNetwork: "Your network has sent a lot of token requests that failed in the last few minutes. Requests that name a registered app and carry a code or refresh token still get an answer.",
   oauthRefreshByConnection: "This connection has refreshed its access a lot in the last hour.",
-  oauthTokenAttemptsByCredential: "This code or refresh token has been tried a lot in the last few minutes.",
 };

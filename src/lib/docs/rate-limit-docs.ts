@@ -72,8 +72,7 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   oauthRegister: { per: "network", where: "OAuth app registration (MCP clients; IPv6 counts by /64)", refusal: "http-429", group: "Sign-in and OAuth" },
   oauthAuthorize: { per: "network", where: "OAuth authorization requests", refusal: "http-429", group: "Sign-in and OAuth" },
   oauthToken: { per: "network", where: "Every OAuth token request: a load backstop, high so hosted apps that serve many people from one address are not slowed (IPv6 counts by /64)", refusal: "http-429", group: "Sign-in and OAuth" },
-  oauthTokenFailuresByNetwork: { per: "network", where: "Failed OAuth token requests (IPv6 counts by /64); over it, requests with a code or refresh token this site never gave the app wait, and the rest still go through", refusal: "http-429", group: "Sign-in and OAuth" },
-  oauthTokenAttemptsByCredential: { per: "code or refresh token", where: "OAuth token requests with one code or refresh token from one network; over it, the request counts as one with an unknown code or token", refusal: "http-429", group: "Sign-in and OAuth" },
+  oauthTokenFailuresByNetwork: { per: "network", where: "Failed OAuth token requests (IPv6 counts by /64); over it, only requests that carry no code or refresh token, or name no app this site can look up, wait", refusal: "http-429", group: "Sign-in and OAuth" },
   oauthRefreshByConnection: { per: "connection", where: "Successful OAuth refreshes for one person and one app, from any network", refusal: "http-429", group: "Sign-in and OAuth" },
 };
 

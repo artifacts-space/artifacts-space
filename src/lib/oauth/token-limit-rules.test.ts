@@ -7,11 +7,11 @@ import {
   isKnownRefreshToken,
   isUsableRefreshGrant,
   oauthConnectionKey,
-  oauthCredentialKey,
   presentedClientId,
   refreshConnection,
   refreshTokenSecret,
   tokenRequestFields,
+  unknownCredentialRoute,
   type StoredRefreshGrant,
 } from "./token-limit-rules";
 
@@ -196,16 +196,36 @@ describe("isKnownCode", () => {
   });
 });
 
-describe("oauthCredentialKey", () => {
-  it("should keep codes and refresh tokens with the same hash apart and never show the hash", () => {
-    const key = oauthCredentialKey("code", "hash-1", "net-1", "s");
-    expect(key).not.toBe(oauthCredentialKey("refresh_token", "hash-1", "net-1", "s"));
-    expect(key).not.toBe(oauthCredentialKey("code", "hash-1", "net-1", "t"));
-    expect(key).toMatch(/^[0-9a-f]{32}$/);
-    expect(key).not.toContain("hash-1");
+describe("unknownCredentialRoute", () => {
+  const refreshFields = tokenRequestFields("grant_type=refresh_token&refresh_token=artifacts_ort_gone&client_id=client-1", form);
+  const codeFields = tokenRequestFields("grant_type=authorization_code&code=gone&code_verifier=v&client_id=client-1", form);
+
+  it("should send a refresh token or code we no longer hold on to Better Auth when a plain client id presents it", () => {
+    expect(unknownCredentialRoute(refreshFields, "client-1")).toBe("answer");
+    expect(unknownCredentialRoute(codeFields, "client-1")).toBe("answer");
   });
 
-  it("should give the same token a separate count on each network so a thief cannot use up the app's tries", () => {
-    expect(oauthCredentialKey("refresh_token", "hash-1", "net-1", "s")).not.toBe(oauthCredentialKey("refresh_token", "hash-1", "net-2", "s"));
+  it("should send it on only for a stored app when the client id is a metadata-document address", () => {
+    expect(unknownCredentialRoute(refreshFields, "https://assistant.example/oauth/metadata.json")).toBe("answer-if-stored");
+    expect(unknownCredentialRoute(codeFields, "https://assistant.example/client")).toBe("answer-if-stored");
+  });
+
+  it("should not take an http address for a metadata document when the plugin would not fetch it", () => {
+    expect(unknownCredentialRoute(refreshFields, "http://assistant.example/client")).toBe("answer");
+  });
+
+  it("should make the request wait when it names no client the plain way", () => {
+    expect(unknownCredentialRoute(refreshFields, null)).toBe("wait");
+    const asserted = tokenRequestFields("grant_type=refresh_token&refresh_token=artifacts_ort_gone&client_id=client-1&client_assertion=jwt&client_assertion_type=t", form);
+    expect(unknownCredentialRoute(asserted, presentedClientId(asserted, null))).toBe("wait");
+    expect(unknownCredentialRoute(refreshFields, presentedClientId(refreshFields, "Bearer abc"))).toBe("wait");
+  });
+
+  it("should make the request wait when it carries no refresh token or code for its grant type", () => {
+    expect(unknownCredentialRoute(tokenRequestFields("grant_type=refresh_token&client_id=client-1", form), "client-1")).toBe("wait");
+    expect(unknownCredentialRoute(tokenRequestFields("grant_type=authorization_code&refresh_token=artifacts_ort_x&client_id=client-1", form), "client-1")).toBe("wait");
+    expect(unknownCredentialRoute(tokenRequestFields("grant_type=client_credentials&client_id=client-1", form), "client-1")).toBe("wait");
+    expect(unknownCredentialRoute(tokenRequestFields("grant_type=password&code=x&client_id=client-1", form), "client-1")).toBe("wait");
+    expect(unknownCredentialRoute(tokenRequestFields("{not json", "application/json"), null)).toBe("wait");
   });
 });

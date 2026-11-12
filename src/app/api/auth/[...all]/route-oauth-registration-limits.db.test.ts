@@ -8,9 +8,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
  * app for each connection from a few shared addresses; these show that it
  * makes room for itself instead of being locked out, that nothing approved
  * or in use is ever evicted, that concurrent registrations never overshoot a
- * cap, and that the registering address is forgotten on time. They fill the
- * shared pool, so they are kept apart from every other test's apps (the token
- * tests store theirs outside the pool's window). Runs only when
+ * cap. They fill the shared pool, so they are kept apart from every other
+ * test's apps (the token tests and src/lib/oauth/limit-store.db.test.ts store
+ * theirs outside the pool's window; the latter also shows when the
+ * registering address is forgotten). Runs only when
  * TEST_DATABASE_URL names a throwaway local database with the migrations
  * applied; never point it at a shared one.
  */
@@ -29,7 +30,7 @@ describe.runIf(Boolean(databaseUrl))("OAuth registration limits with a database"
   const { rateLimits } = await import("@/lib/abuse/limits");
   const { networkPrefixKey } = await import("@/lib/abuse/network-key");
   const { oauthLimits } = await import("@/lib/oauth/config");
-  const { clearRegisteredNetworks, forgetApprovedClientNetworks, unapprovedClientCounts } = await import("@/lib/oauth/limit-store");
+  const { unapprovedClientCounts } = await import("@/lib/oauth/limit-store");
   const { POST } = await import("./route");
 
   const site = "https://artifacts.space";
@@ -366,25 +367,5 @@ describe.runIf(Boolean(databaseUrl))("OAuth registration limits with a database"
       expect(youngStored).toBe(share - 20 + fromYoung.filter((settled) => settled.status === 201).length);
       expect(fromYoung.filter((settled) => settled.status !== 201).every((settled) => settled.status === 429)).toBe(true);
     }, 120_000);
-
-    it("should forget the address of approved apps and of apps past the tag lifetime, and keep it for young unapproved ones", async () => {
-      const address = newAddress();
-      const [approvedApp, oldApp, youngApp] = await fillShare(address, minute, 3);
-      await getDb().update(oauthClient).set({ createdAt: new Date(Date.now() - (oauthLimits.registeredNetworkHours + 1) * 3_600_000) }).where(eq(oauthClient.clientId, oldApp ?? ""));
-      const approver = `oal-${tag}-${randomUUID().slice(0, 8)}`;
-      await getDb().insert(user).values({ id: approver, name: approver, email: `${approver}@example.com` });
-      made.users.push(approver);
-      await getDb().insert(oauthConsent).values({ id: randomUUID(), clientId: approvedApp ?? "", userId: approver, scopes, createdAt: new Date(), updatedAt: new Date() });
-
-      expect(await forgetApprovedClientNetworks()).toBeGreaterThanOrEqual(1);
-      // What the cleanup job runs every 6 hours (cleanupOAuth).
-      await clearRegisteredNetworks();
-
-      const tags = await getDb().select({ clientId: oauthClient.clientId, network: oauthClient.registeredNetwork }).from(oauthClient).where(inArray(oauthClient.clientId, [approvedApp ?? "", oldApp ?? "", youngApp ?? ""]));
-      const tagOf = new Map(tags.map((row) => [row.clientId, row.network]));
-      expect(tagOf.get(approvedApp ?? "")).toBeNull();
-      expect(tagOf.get(oldApp ?? "")).toBeNull();
-      expect(tagOf.get(youngApp ?? "")).toBe(networkOf(address));
-    }, 60_000);
   });
 });
