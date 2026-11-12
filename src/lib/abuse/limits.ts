@@ -180,7 +180,7 @@ export const rateLimits = {
   pushTest: { limit: 10, windowSeconds: hour },
   /**
    * MCP app registrations (OAuth dynamic client registration) per network
-   * address per hour. Hosted apps register from a few shared addresses, often
+   * address per hour (an IPv6 client counts by its /64). Hosted apps register from a few shared addresses, often
    * once per connection, so this is high. Registrations nobody approved are
    * capped per address as well (oauthLimits.maxUnapprovedClientsPerNetwork),
    * so one address cannot fill the shared pool of unapproved apps.
@@ -189,8 +189,9 @@ export const rateLimits = {
   /** OAuth authorization requests per network address per hour. */
   oauthAuthorize: { limit: 60, windowSeconds: hour },
   /**
-   * Every OAuth token request per network address per hour: a load backstop
-   * only. Hosted apps send every user's refreshes from a few shared
+   * Every OAuth token request per network address per hour (an IPv6 client
+   * counts by its /64, as for every OAuth token and registration limit): a
+   * load backstop only. Hosted apps send every user's refreshes from a few shared
    * addresses, about one per person per hour, so this covers some 30,000
    * active people behind one address (10 a second on average). Guessing is
    * stopped by oauthTokenFailuresByNetwork, and a looping connection by

@@ -38,6 +38,7 @@ const emptyPool: UnapprovedClientCounts = { total: 0, evictable: 0, oldestInGrac
 
 const store = vi.hoisted(() => ({
   calls: [] as string[],
+  subjects: new Map<string, string[]>(),
   grants: new Map<string, StoredRefreshGrant>(),
   codes: new Map<string, StoredCodeTrace>(),
   pool: null as UnapprovedClientCounts | null,
@@ -69,15 +70,16 @@ vi.mock("@/lib/oauth/limit-store", () => ({
 }));
 vi.mock("@/lib/abuse/rate-limit", async (importActual) => {
   const actual = await importActual<typeof RateLimitModule>();
-  const guard = (label: string) => {
+  const guard = (label: string, subject = "") => {
     store.calls.push(label);
+    store.subjects.set(label, [...(store.subjects.get(label) ?? []), subject]);
     if (store.failCounters) throw new Error("database down");
   };
   return {
     ...actual,
     hitRateLimits: (checks: readonly RateLimitModule.RateLimitCheck[]) => {
       for (const check of checks) {
-        guard(`reserve:${check.name}`);
+        guard(`reserve:${check.name}`, check.subject);
         const decision = decide(check.name, check.subject);
         count(check.name, check.subject);
         if (!decision.allowed) return Promise.resolve({ name: check.name, retryAfterSeconds: decision.retryAfterSeconds });
@@ -85,7 +87,7 @@ vi.mock("@/lib/abuse/rate-limit", async (importActual) => {
       return Promise.resolve(null);
     },
     hitRateLimit: (name: RateLimitName, subject: string) => {
-      guard(`hit:${name}`);
+      guard(`hit:${name}`, subject);
       const decision = decide(name, subject);
       if (decision.allowed) count(name, subject);
       return Promise.resolve(decision);
@@ -166,6 +168,7 @@ async function answer(response: Promise<Response>) {
 beforeEach(() => {
   counts.clear();
   store.calls.length = 0;
+  store.subjects.clear();
   store.grants.clear();
   store.codes.clear();
   store.marked.length = 0;
@@ -408,6 +411,50 @@ describe("auth route registration limits", () => {
   it("should let the registration through when the counters fail", async () => {
     store.failCounters = true;
     expect((await answer(register())).status).toBe(201);
+  });
+});
+
+describe("auth route OAuth limits by network", () => {
+  const sameLine = ["2001:db8:1:1::a", "2001:db8:1:1:ffff:0:0:b"];
+  const otherLine = "2001:db8:1:2::a";
+  const ipv4Pair = ["203.0.113.10", "203.0.113.11"];
+
+  /** The subject each address was counted under for `label`, in order. */
+  async function subjectsFor(label: string, addresses: string[], send: (address: string) => Promise<Response>) {
+    for (const address of addresses) await send(address);
+    return store.subjects.get(label) ?? [];
+  }
+
+  const budgets: [string, (address: string) => Promise<Response>][] = [
+    ["hit:oauthToken", (address) => refresh("guess", "client-1", address)],
+    ["reserve:oauthTokenFailuresByNetwork", (address) => refresh("guess", "client-1", address)],
+    ["reserve:oauthTokenAttemptsByCredential", (address) => refresh("good", "client-1", address)],
+    ["hit:oauthRegister", (address) => register(address)],
+  ];
+
+  it.each(budgets)("should share %s within one IPv6 /64 and not with another /64 or a second IPv4 address", async (label, send) => {
+    grant("good", "user-1");
+    const [first, second, third] = await subjectsFor(label, [...sameLine, otherLine], send);
+    expect(first).toBe(second);
+    expect(third).not.toBe(first);
+    store.subjects.clear();
+    const [v4a, v4b] = await subjectsFor(label, ipv4Pair, send);
+    expect(v4a).not.toBe(v4b);
+  });
+
+  it("should tag apps registered from one IPv6 /64 with one network, so they share the cap on unapproved apps", async () => {
+    for (const address of [...sameLine, otherLine, ...ipv4Pair]) await register(address);
+    const [first, second, third, v4a, v4b] = store.marked.map((mark) => mark.network);
+    expect(first).toBe(second);
+    expect(third).not.toBe(first);
+    expect(v4a).not.toBe(v4b);
+  });
+
+  it("should refuse an unknown credential from a neighbour in the same /64 once the line is over its failure limit", async () => {
+    for (let attempt = 0; attempt < rateLimits.oauthTokenFailuresByNetwork.limit; attempt += 1) await refresh(`guess-${String(attempt)}`, "client-1", sameLine[0]);
+
+    expect((await refresh("next", "client-1", sameLine[1])).status).toBe(429);
+    expect((await refresh("next", "client-1", otherLine)).status).toBe(400);
   });
 });
 

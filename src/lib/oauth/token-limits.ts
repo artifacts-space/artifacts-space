@@ -1,4 +1,4 @@
-import { networkKey, networkKeySecret } from "@/lib/abuse/network-key";
+import { networkKeySecret, networkPrefixKey } from "@/lib/abuse/network-key";
 import { countRateLimitHit, hitRateLimit, hitRateLimits, peekRateLimit } from "@/lib/abuse/rate-limit";
 
 import { hashOAuthToken } from "./config";
@@ -113,7 +113,7 @@ async function withinCredentialAttempts(credential: string | null): Promise<bool
 }
 
 async function planTokenRequest(request: Request): Promise<TokenPlan> {
-  const network = networkKey(request.headers);
+  const network = networkPrefixKey(request.headers);
   const load = await hitRateLimit("oauthToken", network);
   if (!load.allowed) return { refused: oauthRateLimited("oauthToken", load.retryAfterSeconds) };
   const presented = await presentedCredential(request, network);

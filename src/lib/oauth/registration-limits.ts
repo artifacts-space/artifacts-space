@@ -1,4 +1,4 @@
-import { networkKey } from "@/lib/abuse/network-key";
+import { networkPrefixKey } from "@/lib/abuse/network-key";
 import { hitRateLimit } from "@/lib/abuse/rate-limit";
 
 import { oauthLimits } from "./config";
@@ -76,7 +76,7 @@ export async function handleConsent(request: Request, answer: (request: Request)
 export async function handleRegistration(request: Request, answer: (request: Request) => Promise<Response>): Promise<Response> {
   let network: string | null = null;
   try {
-    network = networkKey(request.headers);
+    network = networkPrefixKey(request.headers);
     const refusal = await refuseRegistration(network);
     if (refusal) return refusal;
   } catch (error) {

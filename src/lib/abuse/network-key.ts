@@ -75,9 +75,10 @@ export function addressPrefix(address: string): string {
 
 /**
  * Like networkKey, but an IPv6 client is keyed by its /64 (addressPrefix).
- * Used only by the password sign-in limits, where one line rotating through
- * its addresses must not get a fresh budget each time. The other limits keep
- * networkKey's single address, so nothing they count changes.
+ * Used by the password sign-in limits and the OAuth token and registration
+ * limits (src/lib/oauth/token-limits.ts, registration-limits.ts), where one
+ * line rotating through its addresses must not get a fresh budget each time.
+ * The other limits keep networkKey's single address.
  */
 export function networkPrefixKey(headers: Pick<Headers, "get">, secret?: string): string {
   const key = secret ?? networkKeySecret();

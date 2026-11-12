@@ -364,7 +364,10 @@ catch this, so test the generated SQL with `.toSQL()`, as
 - OAuth endpoint limits (`src/lib/abuse/limits.ts`). Hosted apps (assistants
   on the web, desktop, and phones) reach us for all their users from a few
   shared addresses, so nothing that succeeds is limited per address except a
-  load backstop:
+  load backstop. Every per-address key here (backstop, failures, the
+  address part of the per-credential key, registration, and the stored
+  `registered_network`) uses `networkPrefixKey`: IPv6 by /64, IPv4 per
+  address, like the password sign-in limits:
   - Token endpoint (`src/lib/oauth/token-limits.ts`, rules in
     `token-limit-rules.ts`): before Better Auth runs, the backstop is counted
     (`oauthToken`), and one indexed lookup decides whether the request

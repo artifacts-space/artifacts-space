@@ -26,7 +26,7 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
   const { session, user, verification } = await import("@/db/schema");
   const { oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken } = await import("@/db/oauth-schema");
   const { rateLimits } = await import("@/lib/abuse/limits");
-  const { networkKey } = await import("@/lib/abuse/network-key");
+  const { networkPrefixKey } = await import("@/lib/abuse/network-key");
   const { hashOAuthToken, mcpResource, oauthLimits } = await import("@/lib/oauth/config");
   const { POST } = await import("./route");
 
@@ -239,7 +239,7 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
     expect(await exchanged.json()).toMatchObject({ token_type: "Bearer" });
 
     // (c) Further bad requests get 429 with Retry-After before Better Auth runs (it would answer 400), and still count.
-    const failureKey = `oauthTokenFailuresByNetwork:${networkKey(new Headers({ "x-forwarded-for": address }))}`;
+    const failureKey = `oauthTokenFailuresByNetwork:${networkPrefixKey(new Headers({ "x-forwarded-for": address }))}`;
     const countedBefore = await bucketTotal(failureKey);
     const badRefresh = await refresh(`artifacts_ort_${randomBytes(24).toString("base64url")}`, clientId, address);
     const badCode = await exchange({ code: randomBytes(24).toString("base64url"), verifier: "v".repeat(43) }, clientId, address);
@@ -360,7 +360,7 @@ describe.runIf(Boolean(databaseUrl))("OAuth endpoint limits with a database", as
       expect(status).toBeGreaterThanOrEqual(400);
       expect(status).toBeLessThan(500);
     }
-    expect(await bucketTotal(`oauthTokenFailuresByNetwork:${networkKey(new Headers({ "x-forwarded-for": address }))}`)).toBe(attempts.length);
+    expect(await bucketTotal(`oauthTokenFailuresByNetwork:${networkPrefixKey(new Headers({ "x-forwarded-for": address }))}`)).toBe(attempts.length);
   }, 60_000);
 
 });

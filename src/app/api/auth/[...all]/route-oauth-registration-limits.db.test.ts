@@ -27,7 +27,7 @@ describe.runIf(Boolean(databaseUrl))("OAuth registration limits with a database"
   const { user } = await import("@/db/schema");
   const { oauthAccessToken, oauthClient, oauthClientResource, oauthConsent, oauthRefreshToken } = await import("@/db/oauth-schema");
   const { rateLimits } = await import("@/lib/abuse/limits");
-  const { networkKey } = await import("@/lib/abuse/network-key");
+  const { networkPrefixKey } = await import("@/lib/abuse/network-key");
   const { oauthLimits } = await import("@/lib/oauth/config");
   const { clearRegisteredNetworks, forgetApprovedClientNetworks, unapprovedClientCounts } = await import("@/lib/oauth/limit-store");
   const { POST } = await import("./route");
@@ -114,7 +114,7 @@ describe.runIf(Boolean(databaseUrl))("OAuth registration limits with a database"
       if (typeof settled.body.client_id === "string") registered.push(settled.body.client_id);
     }
 
-    const network = networkKey(new Headers({ "x-forwarded-for": address }));
+    const network = networkPrefixKey(new Headers({ "x-forwarded-for": address }));
     const tagged = await getDb().select({ clientId: oauthClient.clientId }).from(oauthClient).where(eq(oauthClient.registeredNetwork, network));
     expect(tagged).toHaveLength(share);
     const links = await getDb().select({ clientId: oauthClientResource.clientId }).from(oauthClientResource).where(inArray(oauthClientResource.clientId, registered));
@@ -158,7 +158,7 @@ describe.runIf(Boolean(databaseUrl))("OAuth registration limits with a database"
   describe("a full pool of unapproved apps", () => {
     const fillPrefix = `fill-${tag}-`;
     const fillAddress = "192.0.2.77";
-    const fillNetwork = networkKey(new Headers({ "x-forwarded-for": fillAddress }));
+    const fillNetwork = networkPrefixKey(new Headers({ "x-forwarded-for": fillAddress }));
     const minute = 60_000;
 
     async function poolSize(): Promise<number> {
@@ -283,7 +283,7 @@ describe.runIf(Boolean(databaseUrl))("OAuth registration limits with a database"
     const minute = 60_000;
 
     function networkOf(address: string): string {
-      return networkKey(new Headers({ "x-forwarded-for": address }));
+      return networkPrefixKey(new Headers({ "x-forwarded-for": address }));
     }
 
     /** `count` unapproved apps this address registered `ageMs` ago; returns their ids, newest first. */
@@ -333,6 +333,19 @@ describe.runIf(Boolean(databaseUrl))("OAuth registration limits with a database"
       expect(refused).toMatchObject({ status: 429, body: { error: "rate_limited" } });
       expect(Number(refused.retryAfter)).toBeLessThanOrEqual(oauthLimits.unapprovedEvictionGraceMinutes * 60);
       expect((await unapprovedClientCounts(networkOf(address))).fromNetwork).toBe(share);
+    }, 60_000);
+
+    it("should hold one IPv6 /64 to one share while another /64 and another IPv4 address keep theirs", async () => {
+      const prefix = `2001:db8:${String(runA)}:${String(runB)}`;
+      await fillShare(`${prefix}::1`, minute, share);
+      const ipv4 = newAddress();
+      await fillShare(ipv4, minute, share);
+
+      expect((await register(`${prefix}::2`)).status).toBe(429);
+      expect((await register(`2001:db8:${String(runA)}:${String((runB + 1) % 256)}::1`)).status).toBe(201);
+      // The IPv4 address's share is full, but its neighbour's is not.
+      expect((await register(ipv4)).status).toBe(429);
+      expect((await register(newAddress())).status).toBe(201);
     }, 60_000);
 
     it("should never leave an address over its share when 40 registrations from it arrive at once", async () => {
