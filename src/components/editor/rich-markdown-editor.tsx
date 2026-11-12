@@ -114,7 +114,7 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
     immediatelyRender: false,
     autofocus: autoFocus ? "start" : false,
     editorProps: {
-      attributes: { class: "artifact-prose rich-editor-content", "aria-label": label, role: "textbox", "aria-multiline": "true", spellcheck: "true" },
+      attributes: { class: "artifact-prose rich-editor-content", "data-comment-root": "", "aria-label": label, role: "textbox", "aria-multiline": "true", spellcheck: "true" },
     },
     onUpdate: ({ editor: current }) => {
       setMediaRefused(false);

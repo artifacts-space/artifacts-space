@@ -14,6 +14,7 @@ import { NodeSelection } from "@tiptap/pm/state";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { useEffect, useRef } from "react";
 
+import { CommentButton } from "./comment-button";
 import { FormatButtons, LinkEditor, ToolButton } from "./format-controls";
 import { floatingMenuClass } from "./slash-menu";
 
@@ -31,7 +32,8 @@ function selectionTakesMarks(editor: Editor, from: number, to: number): boolean 
 }
 
 /**
- * The menu over selected text: bold, italic, strikethrough, code, and link.
+ * The menu over selected text: bold, italic, strikethrough, code, link, and
+ * Comment where the artifact has inline comments.
  * It turns into the link field while a link is edited. Hidden on touch
  * screens, which get the toolbar instead.
  */
@@ -61,6 +63,7 @@ export function TextBubbleMenu({ editor, linkOpen, onLinkOpenChange }: TextBubbl
       ) : (
         <div className="flex items-center gap-0.5">
           <FormatButtons editor={editor} onLink={() => { onLinkOpenChange(true); }} />
+          <CommentButton />
         </div>
       )}
     </BubbleMenu>
