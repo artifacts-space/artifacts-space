@@ -7,6 +7,7 @@ import { assertCanInviteAs, assertInvitableRole, assertNotPersonal, assertTeamCa
 import { sendTeamInvitationEmail } from "@/lib/teams/invitation-email";
 import { assertCanCreateTeam, assertCanInvite } from "@/lib/teams/invitation-limits";
 import { cancelOlderOpenInvitations } from "@/lib/teams/invitation-queries";
+import { noteInvitationSendRefusal } from "@/lib/teams/invitation-send-refusal";
 import { wasPrechecked } from "@/lib/teams/invite-precheck";
 import { teamLimits } from "@/lib/teams/limits";
 import { seedBuiltInRoles } from "@/lib/teams/role-store";
@@ -56,6 +57,7 @@ export function teamsPlugin() {
     invitationExpiresIn: sevenDays,
     cancelPendingInvitationsOnReInvite: true,
     requireEmailVerificationOnInvitation: true,
+    // Better Auth swallows what this throws, so a refusal is also noted for the caller (invitation-send-refusal.ts).
     sendInvitationEmail: async (data) => {
       await sendTeamInvitationEmail({
         invitationId: data.id,
@@ -63,6 +65,9 @@ export function teamsPlugin() {
         teamName: data.organization.name,
         inviterName: data.inviter.user.name || data.inviter.user.email,
         expiresAt: new Date(data.invitation.expiresAt),
+      }).catch((error: unknown) => {
+        noteInvitationSendRefusal(error);
+        throw error;
       });
     },
     schema: {

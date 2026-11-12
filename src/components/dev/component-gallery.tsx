@@ -20,13 +20,14 @@ import { ThemePickerSpecimen } from "@/components/dev/theme-picker-specimen";
 import { ViewsSpecimen } from "@/components/dev/views-specimen";
 import { UiView } from "@/components/artifact-view/ui-view";
 import { ClientLogo } from "@/components/setup/client-logos";
+import { DesktopAppInstalls } from "@/components/setup/desktop-app-installs";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { uiComponentNames } from "@/lib/ui/catalog";
 import { componentFixtures, fixtureFiles, fixtureSpec } from "@/lib/ui/fixtures/components";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
 import { formatFixtures, mediaFormatFixtures, type FormatFixture } from "@/lib/ui/fixtures/formats";
 import { deepSpec, invalidPropsSpec, javascriptLinkSpec, manyElementsSpec, repeatSpec, unknownTypeSpec } from "@/lib/ui/fixtures/specs";
-import { mcpClients } from "@/lib/setup/client-installs";
+import { desktopApps, mcpClients } from "@/lib/setup/client-installs";
 import { presetTheme } from "@/lib/themes/resolve";
 
 const specFixtures: { name: string; spec: unknown }[] = [
@@ -183,6 +184,9 @@ export function ComponentGallery() {
                 </li>
               ))}
             </ul>
+          </Specimen>
+          <Specimen name="add to a desktop app">
+            <DesktopAppInstalls origin="https://artifacts.space" apps={desktopApps} />
           </Specimen>
         </Group>
         <Group id="harnesses" title="Agent harnesses">

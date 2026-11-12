@@ -22,6 +22,8 @@ test.afterAll(async () => {
 });
 
 const line = "A long line of plain prose that runs well past one line, so the column decides where it ends. ".repeat(8).trim();
+/** A summary long enough to wrap, so the column decides where it ends too. */
+const summary = "A summary that says who writes this page, who reads it, and what it decides, long enough to wrap in the column at every window width. ".repeat(3).trim();
 
 /** The text's own edges: an element's box inside its side padding. */
 const textEdges = (box: Locator) => box.first().evaluate((element) => {
@@ -34,11 +36,19 @@ const textEdges = (box: Locator) => box.first().evaluate((element) => {
 async function openAsReader(page: Page, input: { title: string; content: string; kind: "markdown" | "text" }) {
   await page.goto("/api/dev/sign-in");
   await page.waitForURL(/\/app/);
-  const publicId = await createTestArtifact({ userId: await readyDevUser(), title: input.title, content: input.content, visibility: "public", theme: null, kind: input.kind });
+  const publicId = await createTestArtifact({ userId: await readyDevUser(), title: input.title, content: input.content, visibility: "public", theme: null, kind: input.kind, summary });
   created.push(publicId);
   await page.context().clearCookies();
   await page.goto(`/artifact/${publicId}`);
   await expect(page.locator("main h1")).toHaveText(input.title);
+}
+
+/** The reader's summary, on the real page, ends where the title ends: it has no narrower width of its own. */
+async function expectSummaryInColumn(page: Page) {
+  const title = await textEdges(page.locator("main h1"));
+  const edges = await textEdges(page.locator("main p").filter({ hasText: summary.slice(0, 40) }));
+  expect(Math.abs(edges.left - title.left), "the summary starts where the title starts").toBeLessThanOrEqual(0.5);
+  expect(Math.abs(edges.right - title.right), "the summary ends where the title ends").toBeLessThanOrEqual(0.5);
 }
 
 for (const size of [{ width: 1720, height: 900 }, { width: 1280, height: 800 }, { width: 960, height: 800 }]) {
@@ -51,6 +61,7 @@ for (const size of [{ width: 1720, height: 900 }, { width: 1280, height: 800 }, 
       expect(Math.abs(edges.left - title.left), "the body starts where the title starts").toBeLessThanOrEqual(0.5);
       expect(Math.abs(edges.right - title.right), "the body ends where the title ends").toBeLessThanOrEqual(0.5);
     }
+    await expectSummaryInColumn(page);
   });
 
   test(`should end a plain text body where the title ends for a reader, at ${String(size.width)}px`, async ({ page }, testInfo) => {
@@ -60,6 +71,7 @@ for (const size of [{ width: 1720, height: 900 }, { width: 1280, height: 800 }, 
     const edges = await textEdges(page.locator("main article").filter({ hasText: line.slice(0, 40) }).last());
     expect(Math.abs(edges.left - title.left), "the text starts where the title starts").toBeLessThanOrEqual(0.5);
     expect(Math.abs(edges.right - title.right), "the text ends where the title ends").toBeLessThanOrEqual(0.5);
+    await expectSummaryInColumn(page);
   });
 }
 

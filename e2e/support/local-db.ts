@@ -42,11 +42,11 @@ export async function devUserId(): Promise<string> {
 }
 
 /** Inserts an artifact (Markdown unless `kind` says otherwise) with an optional theme (a preset id or theme JSON), cover, and icon and returns its public id. */
-export async function createTestArtifact(input: { userId: string; title: string; content: string; visibility: "private" | "public"; theme: unknown; cover?: string | null; icon?: string | null; kind?: "markdown" | "text" | "ui" | "csv" }): Promise<string> {
+export async function createTestArtifact(input: { userId: string; title: string; content: string; visibility: "private" | "public"; theme: unknown; cover?: string | null; icon?: string | null; kind?: "markdown" | "text" | "ui" | "csv"; summary?: string }): Promise<string> {
   const result = await db().query<{ public_id: string }>(
-    `insert into artifact (id, user_id, title, content, kind, visibility, comments, share_id, theme, cover, icon, updated_by)
-     values ($1, $2, $3, $4, $9, $5, 'team', $6, $7::jsonb, $8, $10, $2) returning public_id`,
-    [randomUUID(), input.userId, input.title, input.content, input.visibility, randomUUID().replaceAll("-", ""), input.theme === null ? null : JSON.stringify(input.theme), input.cover ?? null, input.kind ?? "markdown", input.icon ?? null],
+    `insert into artifact (id, user_id, title, content, kind, visibility, comments, share_id, theme, cover, icon, updated_by, summary)
+     values ($1, $2, $3, $4, $9, $5, 'team', $6, $7::jsonb, $8, $10, $2, $11) returning public_id`,
+    [randomUUID(), input.userId, input.title, input.content, input.visibility, randomUUID().replaceAll("-", ""), input.theme === null ? null : JSON.stringify(input.theme), input.cover ?? null, input.kind ?? "markdown", input.icon ?? null, input.summary ?? ""],
   );
   const publicId = result.rows[0]?.public_id;
   if (!publicId) throw new Error("The test artifact was not created.");
@@ -282,6 +282,24 @@ export async function deleteSignInLinks(emails: readonly string[]): Promise<void
   const testEmails = emails.filter((email) => email.endsWith("@example.com"));
   if (!localDatabaseEnabled() || testEmails.length === 0) return;
   await db().query(`delete from verification where value::jsonb ->> 'email' = any($1)`, [testEmails]);
+}
+
+/**
+ * Deletes accounts that scripts/create-reviewer-account.mts made in a test:
+ * the personal team first (its slug outlives the user otherwise), then the
+ * user, whose artifacts, logins, and sessions cascade. @example.com only.
+ */
+export async function deleteReviewerAccounts(emails: readonly string[]): Promise<void> {
+  const testEmails = emails.filter((email) => email.endsWith("@example.com"));
+  if (!localDatabaseEnabled() || testEmails.length === 0) return;
+  await db().query(`delete from team where personal and created_by in (select id from "user" where email = any($1))`, [testEmails]);
+  await db().query(`delete from "user" where email = any($1)`, [testEmails]);
+}
+
+/** Deletes OAuth apps a test registered through the real endpoint, by id and the name it gave (their consents and tokens cascade). */
+export async function deleteRegisteredOAuthClients(clientIds: readonly string[], name: string): Promise<void> {
+  if (!localDatabaseEnabled() || clientIds.length === 0) return;
+  await db().query(`delete from oauth_client where client_id = any($1) and name = $2`, [clientIds, name]);
 }
 
 /** Adds a user to a team at a built-in role. */

@@ -18,7 +18,7 @@ describe.runIf(Boolean(databaseUrl))("invitation queries with a database", async
   const { inArray } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
   const { team, teamInvitation, teamMember, user } = await import("@/db/schema");
-  const { cancelOlderOpenInvitations, getInvitationRecord, isEmailInTeam, isInTeam, openInvitationRole } = await import("./invitation-queries");
+  const { cancelOlderOpenInvitations, deleteUnsentInvitation, getInvitationRecord, isEmailInTeam, isInTeam, openInvitationRole } = await import("./invitation-queries");
   const { listPendingInvitations } = await import("./queries");
 
   const tag = randomUUID().slice(0, 8);
@@ -128,5 +128,18 @@ describe.runIf(Boolean(databaseUrl))("invitation queries with a database", async
       "dup-other-team": "pending",
     });
     expect((await listPendingInvitations(teamId, new Date(now))).filter((row) => row.email.toLowerCase() === "dup@example.com")).toHaveLength(2);
+  });
+
+  it("should delete an unsent invitation only while it is pending", async () => {
+    await getDb().insert(teamInvitation).values([
+      { id: id("unsent"), teamId: otherTeam, email: "typo@example.com", role: "member", status: "pending", expiresAt: at(7), inviterId: owner },
+      { id: id("unsent-used"), teamId: otherTeam, email: "used@example.com", role: "member", status: "accepted", expiresAt: at(7), inviterId: owner },
+    ]);
+
+    await deleteUnsentInvitation(id("unsent"));
+    await deleteUnsentInvitation(id("unsent-used"));
+
+    const left = await getDb().select({ id: teamInvitation.id }).from(teamInvitation).where(inArray(teamInvitation.id, [id("unsent"), id("unsent-used"), id("elsewhere")]));
+    expect(left.map((row) => row.id).sort()).toEqual([id("elsewhere"), id("unsent-used")].sort());
   });
 });

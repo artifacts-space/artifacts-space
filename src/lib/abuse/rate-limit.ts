@@ -31,26 +31,35 @@ async function cleanUpOldBuckets(nowMs: number) {
   await getDb().delete(rateLimitBucket).where(lt(rateLimitBucket.windowStart, new Date(nowMs - CLEANUP_AGE_MS)));
 }
 
-/**
- * Counts one hit for `subject` (a user id or hashed network key) against a
- * named limit, and returns whether it was allowed. Refused hits are not
- * counted, so waiting is enough to recover.
- */
-export async function hitRateLimit(name: RateLimitName, subject: string, nowMs = Date.now()): Promise<RateLimitDecision> {
+function bucketWindowsFor(name: RateLimitName, subject: string, nowMs: number) {
   const { limit, windowSeconds } = rateLimits[name];
   const windowMs = windowSeconds * 1000;
-  const key = `${name}:${subject}`;
   const current = new Date(windowStart(nowMs, windowMs));
-  const previous = new Date(current.getTime() - windowMs);
+  return { key: `${name}:${subject}`, limit, windowMs, current, previous: new Date(current.getTime() - windowMs) };
+}
 
+async function decideFromStoredCounts(name: RateLimitName, subject: string, nowMs: number) {
+  const bucket = bucketWindowsFor(name, subject, nowMs);
   const rows = await getDb()
     .select({ windowStart: rateLimitBucket.windowStart, count: rateLimitBucket.count })
     .from(rateLimitBucket)
-    .where(and(eq(rateLimitBucket.key, key), inArray(rateLimitBucket.windowStart, [previous, current])));
+    .where(and(eq(rateLimitBucket.key, bucket.key), inArray(rateLimitBucket.windowStart, [bucket.previous, bucket.current])));
   const countAt = (start: Date) => rows.find((row) => row.windowStart.getTime() === start.getTime())?.count ?? 0;
-  const decision = decideRateLimit({ previous: countAt(previous), current: countAt(current), nowMs, windowMs, limit });
-  if (!decision.allowed) return decision;
+  return decideRateLimit({ previous: countAt(bucket.previous), current: countAt(bucket.current), nowMs, windowMs: bucket.windowMs, limit: bucket.limit });
+}
 
+/**
+ * Whether one more hit for `subject` would be allowed, without counting it.
+ * With countRateLimitHit, for limits that count only some outcomes (such as
+ * failed password sign-ins), decided after the request is answered.
+ */
+export function peekRateLimit(name: RateLimitName, subject: string, nowMs = Date.now()): Promise<RateLimitDecision> {
+  return decideFromStoredCounts(name, subject, nowMs);
+}
+
+/** Counts one hit for `subject` against a named limit, without deciding anything. */
+export async function countRateLimitHit(name: RateLimitName, subject: string, nowMs = Date.now()): Promise<void> {
+  const { key, current } = bucketWindowsFor(name, subject, nowMs);
   await getDb()
     .insert(rateLimitBucket)
     .values({ key, windowStart: current, count: 1 })
@@ -58,6 +67,16 @@ export async function hitRateLimit(name: RateLimitName, subject: string, nowMs =
   await cleanUpOldBuckets(nowMs).catch((error: unknown) => {
     console.error("[rate-limit] Cleanup failed", error instanceof Error ? error.name : "unknown error");
   });
+}
+
+/**
+ * Counts one hit for `subject` (a user id or hashed network key) against a
+ * named limit, and returns whether it was allowed. Refused hits are not
+ * counted, so waiting is enough to recover.
+ */
+export async function hitRateLimit(name: RateLimitName, subject: string, nowMs = Date.now()): Promise<RateLimitDecision> {
+  const decision = await decideFromStoredCounts(name, subject, nowMs);
+  if (decision.allowed) await countRateLimitHit(name, subject, nowMs);
   return decision;
 }
 

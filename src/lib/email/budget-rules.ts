@@ -36,6 +36,9 @@ export function budgetScope(env: { VERCEL_ENV?: string | undefined }): "sendir" 
   return env.VERCEL_ENV === "production" || env.VERCEL_ENV === "preview" ? "sendir" : "local";
 }
 
+/** The stable code the invitation email's budget refusal carries, so callers match on it, never on the message. */
+export const INVITATION_BUDGET_CODE = "INVITATION_EMAIL_BUDGET";
+
 /** The refusal shown to a person whose invitation hit the daily budget. */
 export const INVITATION_BUDGET_MESSAGE =
   "We have sent a lot of email today, so new invitations are paused until midnight UTC. Sign-in links still work. Try again tomorrow, or share the team link another way.";

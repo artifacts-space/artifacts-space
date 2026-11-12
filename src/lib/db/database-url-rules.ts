@@ -7,6 +7,8 @@
  * scripts/migrate-on-deploy.mts, which uses neither.
  */
 
+import pg from "pg";
+
 type Env = Readonly<Record<string, string | undefined>>;
 
 /** The variable that lets `drizzle-kit migrate` or `push` change a database that is not on this machine. */
@@ -23,12 +25,34 @@ function present(value: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-/** True when `url` is a Postgres URL on this machine (localhost or 127.0.0.1). A malformed URL is not. */
+const localHosts: ReadonlySet<string> = new Set(["localhost", "127.0.0.1"]);
+
+/**
+ * The host `pg` connects to for this URL: a `?host=` parameter wins over the
+ * URL's own host, and a URL without one falls back to PGHOST or localhost.
+ * Read from pg's public Client, which parses the URL in its constructor and
+ * connects only when `connect()` is called, so nothing is opened here.
+ */
+function pgHost(url: string): string | undefined {
+  return new pg.Client({ connectionString: url }).host;
+}
+
+/**
+ * True when `url` is a Postgres URL on this machine (localhost or
+ * 127.0.0.1). Decided from the host as `pg` reads it (pg-connection-string,
+ * through pg's own Client), not only from the URL's host:
+ * `postgres://u:p@localhost/db?host=db.example.net` connects to
+ * db.example.net. A socket path, a list of hosts, any `hostaddr` that is
+ * not local, and a malformed URL all count as not local.
+ */
 export function isLocalDatabaseUrl(url: string | undefined): url is string {
   if (!url) return false;
   try {
-    const host = new URL(url).hostname;
-    return host === "localhost" || host === "127.0.0.1";
+    const parsed = new URL(url);
+    if (!localHosts.has(parsed.hostname)) return false;
+    const hostaddrs = parsed.searchParams.getAll("hostaddr");
+    if (hostaddrs.some((address) => !localHosts.has(address))) return false;
+    return localHosts.has(pgHost(url) ?? "");
   } catch {
     return false;
   }

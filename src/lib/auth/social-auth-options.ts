@@ -2,6 +2,7 @@ import type { Account, BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 
 import { googleCredentials, googleIdentityProblem, isRealCredential, type GoogleSignInEnv } from "@/lib/auth/google-sign-in-rules";
+import { assertNoPasswordWrite, passwordAccountLinkProblem } from "@/lib/auth/password-sign-in-options";
 import { forbiddenSocialField, socialStartPaths } from "@/lib/auth/social-request-rules";
 
 /** The environment values the social sign-in providers read. */
@@ -77,13 +78,15 @@ export const accountLinking = {
 } satisfies NonNullable<NonNullable<BetterAuthOptions["account"]>["accountLinking"]>;
 
 /**
- * Better Auth's `user.validateUserInfo` gate (googleIdentityProblem). It
- * refuses a Google identity whose email Google has not verified, at every
- * step, and one whose address Google is not the authority for when it would
- * create or join an account. Everything else passes.
+ * Better Auth's `user.validateUserInfo` gate. It refuses a Google identity
+ * whose email Google has not verified, at every step, and one whose address
+ * Google is not the authority for when it would create or join an account
+ * (googleIdentityProblem). It also refuses any GitHub or Google login that
+ * would join an account with a password (passwordAccountLinkProblem).
+ * Everything else passes.
  */
-export const validateUserInfo: NonNullable<NonNullable<BetterAuthOptions["user"]>["validateUserInfo"]> = (data) =>
-  googleIdentityProblem(data);
+export const validateUserInfo: NonNullable<NonNullable<BetterAuthOptions["user"]>["validateUserInfo"]> = async (data, ctx) =>
+  googleIdentityProblem(data) ?? (await passwordAccountLinkProblem(data, ctx));
 
 /**
  * Refuses a GitHub or Google sign-in or link request that asks the provider
@@ -122,8 +125,20 @@ function withoutGoogleTokens<T extends { providerId?: string | undefined }>(acco
  * people in and never calls a Google API, so it keeps none of the tokens
  * Google issues: they are dropped before the row is written, on the first
  * sign-in and on every later one. GitHub rows keep theirs, as before.
+ * Better Auth never writes a password login or a password: only the owner's
+ * script does (assertNoPasswordWrite).
  */
 export const accountHooks = {
-  create: { before: (account: Account) => Promise.resolve({ data: withoutGoogleTokens(account) }) },
-  update: { before: (account: Partial<Account> & Record<string, unknown>) => Promise.resolve({ data: withoutGoogleTokens(account) }) },
+  create: {
+    before: (account: Account) => {
+      assertNoPasswordWrite(account);
+      return Promise.resolve({ data: withoutGoogleTokens(account) });
+    },
+  },
+  update: {
+    before: (account: Partial<Account> & Record<string, unknown>) => {
+      assertNoPasswordWrite(account);
+      return Promise.resolve({ data: withoutGoogleTokens(account) });
+    },
+  },
 };

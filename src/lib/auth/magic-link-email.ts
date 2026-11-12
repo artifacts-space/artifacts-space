@@ -2,7 +2,10 @@ import { createHash } from "node:crypto";
 
 import { isAgentEmail } from "@/lib/agents/identity";
 import { html, renderEmail } from "@/lib/email/layout";
+import { refuseUndeliverableAddress } from "@/lib/email/undeliverable-refusal";
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
+
+const TEN_MINUTES = 60 * 10;
 
 interface MagicLinkEmail {
   email: string;
@@ -43,6 +46,10 @@ function idempotencyKey(token: string) {
 /**
  * Sends the magic sign-in link with Sendir. In local development without
  * Sendir keys, it prints the link to the server log so sign-in still works.
+ * An address Sendir says cannot receive mail is refused with a 422 and the
+ * `EMAIL_UNDELIVERABLE` code (undeliverable-address.ts); every other failure
+ * is a plain error. Better Auth calls this for every address, with or
+ * without an account, so the answer reveals nothing about who signed up.
  */
 export async function sendMagicLinkEmail({ email, url, token }: MagicLinkEmail) {
   // Agents never sign in, and their addresses cannot receive mail. Answer as usual so nothing is revealed.
@@ -58,5 +65,15 @@ export async function sendMagicLinkEmail({ email, url, token }: MagicLinkEmail) 
     { to: email, fromName: "artifacts.space", subject: "Sign in to artifacts.space", ...renderMagicLinkEmail(url) },
     { idempotencyKey: idempotencyKey(token) },
   );
+  refuseUndeliverableAddress(error);
   if (error) throw new Error(`Sendir could not send the sign-in link: ${error.name} (${String(error.statusCode ?? "no answer")})`);
 }
+
+/**
+ * The magic-link plugin's options, used by the app (server.ts) and by the
+ * tests that run Better Auth in memory, so both send links the same way.
+ */
+export const magicLinkPluginOptions = {
+  expiresIn: TEN_MINUTES,
+  sendMagicLink: ({ email, url, token }: MagicLinkEmail) => sendMagicLinkEmail({ email, url, token }),
+};
