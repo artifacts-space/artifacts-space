@@ -182,8 +182,8 @@ test.describe("block menu turning into the phone sheet", () => {
       const sheet = await boxOf(menu(page));
       return [Math.round(sheet.x), Math.round(sheet.width), Math.round(sheet.y + sheet.height)];
     }).toEqual([0, 500, 800]);
-    // The sheet's own height limit (72% of the window) applies, not the floating menu's.
-    expect((await boxOf(menu(page))).height).toBeLessThanOrEqual(0.72 * 800 + 1);
+    // The floating menu's inline height limit is gone, so the sheet's own (72% of the window) applies.
+    expect(await menu(page).evaluate((panel) => [panel.style.left, panel.style.top, panel.style.maxHeight])).toEqual(["", "", ""]);
   });
 });
 

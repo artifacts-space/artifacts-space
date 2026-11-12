@@ -22,8 +22,9 @@ describe("choosePlacement", () => {
     expect(choosePlacement(pointMenuRule, cramped, 400, 400)).toBe("left-start");
   });
 
-  it("should fit on the left from a 1588px window with the contained page column, as AGENTS.md says", () => {
+  it("should fit on the left from a 1588px page area with the contained page column, as AGENTS.md says", () => {
     // The contained column is max-w-5xl (1024px) with px-6 (24px); the grip sits 24px left of the block ("+" 22px, then 2px).
+    // Widths here are the page area (clientWidth): the window minus any classic scrollbar.
     expect(pageColumnClass(false)).toBe("max-w-5xl px-6");
     const gripAt = (windowWidth: number) => {
       const left = (windowWidth - 1024) / 2 + 24 - 24;

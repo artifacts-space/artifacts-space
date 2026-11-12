@@ -431,7 +431,8 @@ artifact's Markdown block) get no handles. The menu opens in one place
 (`menu-placement.ts`): 265px wide, to the left of the grip, or to its right
 over the block's text when the window has no room on the left (the left
 needs 282px beside the grip, so with the contained page column it fits from
-a 1588px window), centered on the grip and kept 12px inside the window. It slides up or down to stay
+a 1588px-wide page area: a 1588px window with overlay scrollbars, about
+1605px with a classic 17px one), centered on the grip and kept 12px inside the window. It slides up or down to stay
 inside, never flips above or below, and never scrolls the page. Change and
 Color open on hover, 220px wide, to the right of the menu (overlapping it
 4px), or to its left near the window's right edge. The menu stays
