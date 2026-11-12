@@ -13,11 +13,12 @@ import { can, type TeamCapability } from "@/lib/teams/capability-rules";
 import { assignRoleProblem, countOwners, inviteProblem, leaveProblem, removeMemberProblem } from "@/lib/teams/role-admin-rules";
 import { changeMemberRole } from "@/lib/teams/role-store";
 import { getInvitationTeamId, listTeamMemberActors, type TeamMemberActor, type TeamMembership } from "@/lib/teams/queries";
-import { assignableRoles, type TeamRole } from "@/lib/teams/roles";
-import { isEmailInTeam, openInvitationRole } from "@/lib/teams/invitation-queries";
+import { assignableRoles, type AssignableRole, type TeamRole } from "@/lib/teams/roles";
+import { deleteUnsentInvitation, isEmailInTeam, openInvitationRole } from "@/lib/teams/invitation-queries";
 import { invitationRefusal, inviteMode } from "@/lib/teams/invitation-rules";
 import { assertCanInvite } from "@/lib/teams/invitation-limits";
 import { assertCanInviteAs } from "@/lib/teams/guards";
+import { withInvitationSendRefusal } from "@/lib/teams/invitation-send-refusal";
 import { withPrecheckedInvite } from "@/lib/teams/invite-precheck";
 import { UserFacingError } from "@/lib/user-facing-error";
 
@@ -59,6 +60,29 @@ const inviteSchema = z.object({
 });
 
 /**
+ * Creates the invitation through Better Auth, which sends its email. Better
+ * Auth swallows a refused email (invitation-send-refusal.ts), so a refusal is
+ * read back here and thrown: an address that cannot receive mail, or the
+ * daily budget. A new invitation whose email was refused is deleted, so no
+ * link exists that nobody received; a resend keeps the open invitation it
+ * sent again, as it was already listed for the inviter.
+ */
+async function createAndSendInvitation(scope: { inviterId: string; teamId: string }, body: { email: string; role: AssignableRole; resend: boolean }) {
+  const requestHeaders = await headers();
+  const { result, refusal } = await withInvitationSendRefusal(() => withPrecheckedInvite(scope, () => getAuth().api.createInvitation({
+    body: { ...body, organizationId: scope.teamId },
+    headers: requestHeaders,
+  })));
+  if (!refusal) return;
+  if (!body.resend) {
+    await deleteUnsentInvitation(result.id).catch((error: unknown) => {
+      console.error("[teams] Deleting an unsent invitation failed", error instanceof Error ? error.name : "unknown error");
+    });
+  }
+  throw refusal;
+}
+
+/**
  * Invites someone by email, to a role that does no more than the inviter's.
  * Never to a personal team. Inviting an address that already has an open
  * invitation sends it again (same link, fresh expiry), or replaces it when
@@ -86,11 +110,7 @@ export async function inviteMemberAction(teamId: string, input: z.input<typeof i
     // Its resend path skips the hook entirely. The marker stops the hook counting the limits twice.
     await assertCanInviteAs(scope.inviterId, scope.teamId, role);
     await assertCanInvite(scope.inviterId, scope.teamId);
-    const requestHeaders = await headers();
-    await withPrecheckedInvite(scope, () => getAuth().api.createInvitation({
-      body: { email, role, organizationId: scope.teamId, resend: mode === "resend" },
-      headers: requestHeaders,
-    }));
+    await createAndSendInvitation(scope, { email, role, resend: mode === "resend" });
     revalidatePath(`/teams/${checked.membership.slug}`);
     return { success: true, data: { email, resent: mode === "resend" } };
   } catch (error) {

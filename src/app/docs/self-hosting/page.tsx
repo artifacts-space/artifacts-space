@@ -69,7 +69,7 @@ export default function SelfHostingPage() {
 
       <DocsH page={page} id="auth" />
       <Prose>
-        <p>Sign-in is Better Auth, self-hosted: email links and, optionally, GitHub and Google. There are no passwords. Better Auth is also the OAuth 2.1 server MCP clients connect through, at <code>{"<BETTER_AUTH_URL>"}/api/auth</code>.</p>
+        <p>Sign-in is Better Auth, self-hosted: email links and, optionally, GitHub and Google. Nobody can sign up with a password or set one on the web: a password signs in only to an account you gave one with <code>pnpm reviewer:create</code> (<code>scripts/create-reviewer-account.mts</code>), such as a test login for a directory review. Better Auth is also the OAuth 2.1 server MCP clients connect through, at <code>{"<BETTER_AUTH_URL>"}/api/auth</code>.</p>
         <ul>
           <li>Set <code>BETTER_AUTH_URL</code> to the public origin. OAuth tokens are bound to <code>{"<BETTER_AUTH_URL>"}/api/mcp</code>, so a wrong origin breaks MCP sign-in.</li>
           <li>For GitHub, create an OAuth app with the callback URL <code>{"<BETTER_AUTH_URL>"}/api/auth/callback/github</code>. The GitHub login becomes the preferred username.</li>

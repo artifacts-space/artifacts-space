@@ -1,6 +1,8 @@
 import { networkKey } from "@/lib/abuse/network-key";
 import { hitRateLimit, hitRateLimits, rateLimitMessage } from "@/lib/abuse/rate-limit";
 import { isMagicLinkRequest, magicLinkChecks, magicLinkEmail } from "@/lib/auth/magic-link-limits";
+import { isPasswordSignInRequest } from "@/lib/auth/password-sign-in-limits";
+import { handlePasswordSignIn } from "@/lib/auth/password-sign-in-route";
 import { getAuth } from "@/lib/auth/server";
 import { corsOAuthEndpoint, corsPreflightResponse, withCorsHeaders, withoutCookies } from "@/lib/oauth/cors-rules";
 import { handleConsent, handleRegistration, isConsentDecision } from "@/lib/oauth/registration-limits";
@@ -58,6 +60,7 @@ async function prepare(request: Request): Promise<Request | Response> {
 }
 
 async function handle(request: Request) {
+  if (isPasswordSignInRequest(request.method, new URL(request.url).pathname)) return handlePasswordSignIn(request, (signIn) => getAuth().handler(signIn));
   const prepared = await prepare(request);
   if (prepared instanceof Response) return prepared;
   return getAuth().handler(prepared);
@@ -74,7 +77,7 @@ async function handleCors(request: Request) {
   return withCorsHeaders(isToken ? await handleTokenRequest(bare, handle) : await handle(bare));
 }
 
-/** Better Auth endpoints: GitHub OAuth, magic links, sessions, and the OAuth server for MCP clients. */
+/** Better Auth endpoints: GitHub and Google sign-in, magic links, password sign-in for accounts given one, sessions, and the OAuth server for MCP clients. */
 export function GET(request: Request) {
   return handle(request);
 }

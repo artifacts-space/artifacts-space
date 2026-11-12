@@ -284,6 +284,24 @@ export async function deleteSignInLinks(emails: readonly string[]): Promise<void
   await db().query(`delete from verification where value::jsonb ->> 'email' = any($1)`, [testEmails]);
 }
 
+/**
+ * Deletes accounts that scripts/create-reviewer-account.mts made in a test:
+ * the personal team first (its slug outlives the user otherwise), then the
+ * user, whose artifacts, logins, and sessions cascade. @example.com only.
+ */
+export async function deleteReviewerAccounts(emails: readonly string[]): Promise<void> {
+  const testEmails = emails.filter((email) => email.endsWith("@example.com"));
+  if (!localDatabaseEnabled() || testEmails.length === 0) return;
+  await db().query(`delete from team where personal and created_by in (select id from "user" where email = any($1))`, [testEmails]);
+  await db().query(`delete from "user" where email = any($1)`, [testEmails]);
+}
+
+/** Deletes OAuth apps a test registered through the real endpoint, by id and the name it gave (their consents and tokens cascade). */
+export async function deleteRegisteredOAuthClients(clientIds: readonly string[], name: string): Promise<void> {
+  if (!localDatabaseEnabled() || clientIds.length === 0) return;
+  await db().query(`delete from oauth_client where client_id = any($1) and name = $2`, [clientIds, name]);
+}
+
 /** Adds a user to a team at a built-in role. */
 export async function addTestMember(teamId: string, userId: string, role: "owner" | "admin" | "member"): Promise<void> {
   await db().query(`insert into team_member (id, team_id, user_id, role) values ($1, $2, $3, $4)`, [randomUUID(), teamId, userId, role]);

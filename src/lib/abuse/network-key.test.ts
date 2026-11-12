@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { clientAddress, MissingNetworkKeySecretError, networkKey, networkKeySecret } from "./network-key";
+import { addressPrefix, clientAddress, MissingNetworkKeySecretError, networkKey, networkKeySecret, networkPrefixKey } from "./network-key";
 
 describe("clientAddress", () => {
   it("should use the first forwarded address when a proxy chain is listed", () => {
@@ -62,5 +62,49 @@ describe("network-key module", () => {
     vi.resetModules();
     await expect(import("./network-key")).resolves.toHaveProperty("networkKey");
     vi.unstubAllEnvs();
+  });
+});
+
+describe("addressPrefix", () => {
+  it("should keep an IPv4 address and unwrap an IPv4-mapped IPv6 one", () => {
+    expect(addressPrefix("203.0.113.7")).toBe("203.0.113.7");
+    expect(addressPrefix("::ffff:203.0.113.7")).toBe("203.0.113.7");
+  });
+
+  it("should give every address in one IPv6 /64 the same prefix, however it is written", () => {
+    const prefix = "2001:0db8:0001:0002::/64";
+    expect(addressPrefix("2001:db8:1:2::1")).toBe(prefix);
+    expect(addressPrefix("2001:db8:1:2:aaaa:bbbb:cccc:dddd")).toBe(prefix);
+    expect(addressPrefix("[2001:DB8:1:2::ffff]")).toBe(prefix);
+    expect(addressPrefix("2001:db8:1:2::1%eth0")).toBe(prefix);
+  });
+
+  it("should give the next /64 a different prefix", () => {
+    expect(addressPrefix("2001:db8:1:3::1")).not.toBe(addressPrefix("2001:db8:1:2::1"));
+  });
+
+  it("should leave anything that is not an address unchanged", () => {
+    expect(addressPrefix("unknown")).toBe("unknown");
+    expect(addressPrefix("1:2:3")).toBe("1:2:3");
+    expect(addressPrefix("1::2::3")).toBe("1::2::3");
+  });
+});
+
+describe("networkPrefixKey", () => {
+  const headers = (address: string) => new Headers({ "x-forwarded-for": address });
+
+  it("should key two addresses in one IPv6 /64 the same and keep them apart in networkKey", () => {
+    expect(networkPrefixKey(headers("2001:db8::1"), "s")).toBe(networkPrefixKey(headers("2001:db8::2"), "s"));
+    expect(networkKey(headers("2001:db8::1"), "s")).not.toBe(networkKey(headers("2001:db8::2"), "s"));
+  });
+
+  it("should key different IPv4 addresses apart and never show the address", () => {
+    const key = networkPrefixKey(headers("203.0.113.7"), "s");
+    expect(key).not.toBe(networkPrefixKey(headers("203.0.113.8"), "s"));
+    expect(key).not.toContain("203");
+  });
+
+  it("should refuse to key without a secret", () => {
+    expect(() => networkPrefixKey(headers("203.0.113.7"), " ")).toThrow(MissingNetworkKeySecretError);
   });
 });
