@@ -14,7 +14,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
  * as commenter, and the directory's test prompts are then run through the MCP
  * tool handlers themselves (the real server and client over an in-memory
  * transport), acting as the reviewer. After the prompts' writes, --reset must
- * bring back the first seeded state exactly. Email and push are spied on at
+ * bring back the first seeded state exactly. Every test leaves the reviewer
+ * at that state and with the seed's quiet settings, so they can be reordered. Email and push are spied on at
  * their boundaries (Sendir's send and the push sender), switched on, so a
  * send would be seen. Runs only when TEST_DATABASE_URL names a throwaway
  * local database with the migrations applied; never point it at a shared one.
@@ -27,7 +28,12 @@ if (databaseUrl) {
   process.env.BETTER_AUTH_SECRET ??= "db-test-only-secret-0123456789abcdef";
 }
 
-const boundary = vi.hoisted(() => ({ sendEmail: vi.fn(), sendPush: vi.fn(), afterTasks: [] as Promise<void>[] }));
+const boundary = vi.hoisted(() => ({ sendEmail: vi.fn(), sendPush: vi.fn(), afterTasks: [] as Promise<void>[], refuseDeletes: false }));
+// The real deleteArtifact, which one test makes refuse, as it would when another change takes an artifact out of the account's reach mid-run.
+vi.mock("@/lib/artifacts", async (importOriginal) => {
+  const real = await importOriginal<{ deleteArtifact: (userId: string, id: string) => Promise<boolean> }>();
+  return { ...real, deleteArtifact: (userId: string, id: string) => (boundary.refuseDeletes ? Promise.resolve(false) : real.deleteArtifact(userId, id)) };
+});
 vi.mock("@/lib/sendir", async (importOriginal) => ({ ...(await importOriginal<object>()), isSendirConfigured: () => true, sendEmail: boundary.sendEmail }));
 vi.mock("@/lib/notifications/push/send", async (importOriginal) => ({ ...(await importOriginal<object>()), pushConfigured: () => true, sendPushMessages: boundary.sendPush }));
 // Next's `after` has no request here: keep the notification work so the test can wait for it, as the script does.
@@ -55,7 +61,7 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
   const { savePreferences } = await import("@/lib/notifications/preferences");
   const { defaultPreferences } = await import("@/lib/notifications/preference-rules");
   const { writeAccount } = await import("./create-reviewer-account.mts");
-  const { ReviewerDemoRefusal, seedReviewerDemo, zeroCounts } = await import("./seed-reviewer-demo-data.mts");
+  const { assertSeedLanded, quietPreferences, ReviewerDemoRefusal, seedReviewerDemo, zeroCounts } = await import("./seed-reviewer-demo-data.mts");
   const { runSeed } = await import("./seed-reviewer-demo.mts");
   const rules = await import("./seed-reviewer-demo-rules.mts");
 
@@ -131,6 +137,7 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
     await makeBystander();
     await seedReviewerDemo(seedRequest);
     await settle();
+    await assertSeedLanded(seedRequest);
     seededState = await stateOf(reviewer.id);
     const server = new McpServer({ name: "test", version: "1.0.0" });
     registerAllTools(server, reviewer.id, "full");
@@ -244,10 +251,16 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
     expect(await stateOf(reviewer.id)).not.toEqual(seededState);
     const commenterBefore = await stateOf(commenter.id);
     const bystanderBefore = await stateOf(bystander.id);
+    // The reply marked the inbox entry read, so the account is no longer at its starting state.
+    await expect(assertSeedLanded(seedRequest)).rejects.toBeInstanceOf(ReviewerDemoRefusal);
+    const plans: { artifacts: number; projects: number }[] = [];
 
-    const outcome = await seedReviewerDemo({ ...seedRequest, reset: true });
+    const outcome = await seedReviewerDemo({ ...seedRequest, reset: true }, { onRemoving: (plan) => plans.push(plan) });
     await settle();
+    await assertSeedLanded(seedRequest);
 
+    // Said once, before anything went: the ten seeded artifacts and the one the first prompt saved, and the Launch project.
+    expect(plans).toEqual([{ artifacts: 11, projects: 1 }]);
     expect(outcome.alreadySeeded).toBe(false);
     expect(await stateOf(reviewer.id)).toEqual(seededState);
     // A reset removes the reviewer's rows only: the other reviewer and an ordinary person keep theirs.
@@ -288,11 +301,51 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
     const scripts = (JSON.parse(readFileSync("package.json", "utf8")) as { scripts: Record<string, string> }).scripts;
     const [, ...nodeArgs] = (scripts["reviewer:seed"] ?? "").split(" ");
 
-    const run = spawnSync(process.execPath, [...nodeArgs, "--email", reviewer.email, "--commenter-email", commenter.email, "--reset"], { env: { PATH: process.env.PATH ?? "", DATABASE_URL: url, NODE_ENV: "test" }, encoding: "utf8", timeout: 60_000 });
+    const run = spawnSync(process.execPath, [...nodeArgs, "--email", reviewer.email, "--commenter-email", commenter.email, "--reset"], { env: { PATH: process.env.PATH ?? "", DATABASE_URL: url, NODE_ENV: "test" }, encoding: "utf8", timeout: 180_000 });
 
-    expect(run.status).toBe(0);
+    // The message carries what the child said, so a bad flag or a timeout (status null) explains itself.
+    expect(run.status, `signal ${String(run.signal)}: ${run.stderr}`).toBe(0);
     expect(run.stdout).toBe("");
-    expect(run.stderr.trim().split("\n")).toEqual(["Removed 10 artifacts, 1 project, 1 inbox entry, and 1 notification. Created 10 artifacts, 2 later versions, and 1 comment."]);
+    // The lines that matter, in order; a warning from Node or a dependency on stderr is not this test's business.
+    const lines = run.stderr.trim().split("\n");
+    const notice = lines.indexOf("Reset: removing everything this account owns (10 artifacts and 1 project), then its inbox and notifications.");
+    const report = lines.indexOf("Removed 10 artifacts, 1 project, 1 inbox entry, and 1 notification. Created 10 artifacts, 2 later versions, and 1 comment.");
+    expect(notice).toBeGreaterThanOrEqual(0);
+    expect(report).toBeGreaterThan(notice);
+    expect(run.stderr).not.toMatch(/failed|Error/);
+    expect(await stateOf(reviewer.id)).toEqual(seededState);
+  });
+
+  it("should stop and seed nothing when a reset cannot remove an artifact, then finish on the next reset", async () => {
+    boundary.refuseDeletes = true;
+    const refused = seedReviewerDemo({ ...seedRequest, reset: true });
+
+    await expect(refused).rejects.toBeInstanceOf(ReviewerDemoRefusal);
+    await expect(refused).rejects.toThrow("0 of 10");
+    boundary.refuseDeletes = false;
+    await settle();
+    // Every artifact is still there, once: nothing was seeded on top of what could not be removed.
+    expect((await stateOf(reviewer.id)).artifacts).toEqual(seededState.artifacts);
+
+    await seedReviewerDemo({ ...seedRequest, reset: true });
+    await settle();
+    await assertSeedLanded(seedRequest);
+    expect(await stateOf(reviewer.id)).toEqual(seededState);
+  });
+
+  it("should refuse and name the titles when the account holds only some of the demo data, until a reset", async () => {
+    const [checklist] = await getDb().select({ id: artifact.id }).from(artifact).where(and(eq(artifact.userId, reviewer.id), eq(artifact.title, "Release checklist"))).limit(1);
+    await getDb().delete(artifact).where(eq(artifact.id, checklist?.id ?? ""));
+    const partial = await stateOf(reviewer.id);
+
+    const refused = seedReviewerDemo(seedRequest);
+
+    await expect(refused).rejects.toBeInstanceOf(ReviewerDemoRefusal);
+    await expect(refused).rejects.toThrow('lacks "Release checklist"');
+    expect(await stateOf(reviewer.id)).toEqual(partial);
+
+    await seedReviewerDemo({ ...seedRequest, reset: true });
+    await settle();
     expect(await stateOf(reviewer.id)).toEqual(seededState);
   });
 
@@ -309,5 +362,7 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
 
     expect(boundary.sendEmail).toHaveBeenCalledTimes(1);
     expect(boundary.sendPush).toHaveBeenCalledTimes(1);
+    // Back to what the seed leaves, so a test added after this one starts from the seeded settings.
+    await savePreferences(reviewer.id, quietPreferences());
   });
 });

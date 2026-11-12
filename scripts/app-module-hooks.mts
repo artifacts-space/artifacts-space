@@ -13,6 +13,16 @@
  * Nothing here changes what the app code does: outside a request, React's
  * `cache` runs the function each time and Next's `after` is not available,
  * which the app already handles (src/lib/notifications/after-response.ts).
+ *
+ * What a module a script loads this way (and everything it imports) must keep
+ * to, or the script stops at import with no database involved:
+ * - TypeScript that Node can strip: no parameter properties, enums, or
+ *   namespaces (Node 26 has no flag that transforms them).
+ * - No `.tsx` and no component import: Node cannot read JSX.
+ * - From Next, only `next/server` and single-name subpaths that work outside
+ *   a request; `next/headers` and `next/cache` calls need a request.
+ * scripts/app-module-hooks.test.ts loads the seed script's modules in a child
+ * process, with no database, so `pnpm check` catches a break.
  */
 import { existsSync, statSync } from "node:fs";
 import { createRequire, registerHooks } from "node:module";
@@ -82,9 +92,18 @@ function nextServerShimSource(): string {
   ].join("\n");
 }
 
-/** Waits until all work handed to `after` has finished, including work that work handed on. */
-export async function settleAfterTasks(): Promise<void> {
-  while (afterTasks.length > 0) await Promise.allSettled(afterTasks.splice(0));
+/**
+ * Waits until all work handed to `after` has finished, including work that
+ * work handed on. Returns how many of those tasks failed, so a script can
+ * fail its run instead of ending as if all went well.
+ */
+export async function settleAfterTasks(): Promise<number> {
+  let failed = 0;
+  while (afterTasks.length > 0) {
+    const results = await Promise.allSettled(afterTasks.splice(0));
+    failed += results.filter((result) => result.status === "rejected").length;
+  }
+  return failed;
 }
 
 /** Registers the hooks for this process. Call it before importing any app module. */

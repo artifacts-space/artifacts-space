@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { apiSpec, apiSpecComment, databaseStep, demoTitles, launchTimeline, onboardingArtifacts, parseSeedArgs, releaseChecklist, roadmapVersions, seedReport, type SeedCounts } from "./seed-reviewer-demo-rules.mts";
+import {
+  apiSpec,
+  apiSpecComment,
+  databaseStep,
+  demoTitles,
+  launchTimeline,
+  leftoverRefusal,
+  onboardingArtifacts,
+  parseSeedArgs,
+  partlySeededRefusal,
+  releaseChecklist,
+  removalNotice,
+  roadmapVersions,
+  seededTitles,
+  seedReport,
+  seedUsage,
+  type SeedCounts,
+} from "./seed-reviewer-demo-rules.mts";
 import { sampleArtifacts } from "./create-reviewer-account-rules.mts";
 
 const counts: SeedCounts = { removedArtifacts: 10, removedProjects: 1, removedInboxEntries: 1, removedNotifications: 1, createdArtifacts: 10, createdVersions: 2, createdComments: 1 };
@@ -44,6 +61,44 @@ describe("demo content", () => {
 
   it("should mention the reviewer by handle when the API spec comment is written", () => {
     expect(apiSpecComment("rev-one")).toMatch(/^@rev-one /);
+  });
+});
+
+describe("seededTitles", () => {
+  it("should say none when the account holds no demo title, whatever else it holds", () => {
+    expect(seededTitles(new Set(["Welcome", "My own notes"]))).toEqual({ state: "none" });
+  });
+
+  it("should say all only when every demo title is there", () => {
+    expect(seededTitles(new Set([...demoTitles, "Extra"]))).toEqual({ state: "all" });
+  });
+
+  it("should name what is there and what is missing when one hand-made title matches", () => {
+    const held = seededTitles(new Set(["API spec"]));
+
+    expect(held).toMatchObject({ state: "some", has: ["API spec"] });
+    expect(held.state === "some" ? held.missing : []).toEqual(demoTitles.filter((title) => title !== "API spec"));
+  });
+});
+
+describe("reset wording", () => {
+  it("should say a reset removes everything the account owns when the usage is printed", () => {
+    expect(seedUsage).toContain("EVERYTHING the account owns");
+    expect(seedUsage).toContain("There is no prompt");
+  });
+
+  it("should count what will go, with singular and plural, when a reset starts", () => {
+    expect(removalNotice(11, 1)).toBe("Reset: removing everything this account owns (11 artifacts and 1 project), then its inbox and notifications.");
+    expect(removalNotice(1, 0)).toContain("(1 artifact and 0 projects)");
+  });
+
+  it("should say how far a stopped reset got and that nothing was seeded", () => {
+    expect(leftoverRefusal(3, 10)).toContain("3 of 10");
+    expect(leftoverRefusal(3, 10)).toContain("Nothing was seeded");
+  });
+
+  it("should name the titles and point to --reset when the account is partly seeded", () => {
+    expect(partlySeededRefusal(["API spec"], ["Q4 roadmap"])).toBe('The account holds only part of the demo data, so nothing was created. It has "API spec" and lacks "Q4 roadmap". Run with --reset to remove everything the account owns and seed it again.');
   });
 });
 

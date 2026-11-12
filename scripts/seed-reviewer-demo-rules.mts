@@ -15,7 +15,8 @@ export const seedUsage = [
   "Fills a reviewer account (made with reviewer:create) with the demo data the directory test cases need.",
   "The other reviewer account writes the one comment that waits in the first account's inbox.",
   "Without --reset an account that already holds the demo data is left as it is.",
-  "With --reset the account's artifacts, projects, inbox, and notifications are removed first, so it is back at the starting state.",
+  "With --reset EVERYTHING the account owns is removed first (every artifact, project, inbox entry, and notification, not only the demo data), so it is back at the starting state.",
+  "There is no prompt: the run says how many artifacts and projects will go, then removes them.",
   "The database comes from DATABASE_URL_UNPOOLED or DATABASE_URL set for this run; .env.local is never read.",
   `A database that is not on this machine needs ${ALLOW_SHARED_REVIEWER_ACCOUNT}=1 for that one run.`,
 ].join("\n");
@@ -49,6 +50,10 @@ export function parseSeedArgs(argv: readonly string[]): { ok: true; request: See
   const parsed = seedRequestSchema.safeParse({ email: values.email ?? "", commenterEmail: values["commenter-email"] ?? "", reset: values.reset === true });
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((issue) => issue.message).join("\n") };
   return { ok: true, request: parsed.data };
+}
+
+function count(value: number, one: string, many: string): string {
+  return `${String(value)} ${value === 1 ? one : many}`;
 }
 
 /** One demo artifact, as the account's owner would have written it in the web app. */
@@ -152,6 +157,36 @@ export const roadmapVersions: readonly string[] = [
 /** Titles that only the demo data uses. An account holding any of them already has the demo data. */
 export const demoTitles: readonly string[] = [launchTimeline.title, ...onboardingArtifacts.map((item) => item.title), releaseChecklist.title, apiSpec.title, roadmapTitle];
 
+/** Which demo titles an account holds: none (seed it), all (leave it), or some (it needs a reset). */
+export function seededTitles(owned: ReadonlySet<string>): { state: "none" } | { state: "all" } | { state: "some"; has: string[]; missing: string[] } {
+  const has = demoTitles.filter((title) => owned.has(title));
+  if (has.length === 0) return { state: "none" };
+  if (has.length === demoTitles.length) return { state: "all" };
+  return { state: "some", has, missing: demoTitles.filter((title) => !owned.has(title)) };
+}
+
+const quoted = (titles: readonly string[]) => titles.map((title) => `"${title}"`).join(", ");
+
+/** The stop for an account that holds some demo titles but not all: a half-finished run, or an artifact someone made by hand. */
+export function partlySeededRefusal(has: readonly string[], missing: readonly string[]): string {
+  return `The account holds only part of the demo data, so nothing was created. It has ${quoted(has)} and lacks ${quoted(missing)}. Run with --reset to remove everything the account owns and seed it again.`;
+}
+
+/** The stop when a reset could not remove an artifact. */
+export function leftoverRefusal(removed: number, listed: number): string {
+  return `The reset stopped: an artifact could not be removed (${String(removed)} of ${String(listed)} were). Nothing was seeded. Run with --reset again, and look at the account if it stops again.`;
+}
+
+/** The stop when the comment's inbox entry is not there after a seed. */
+export function inboxRefusal(found: number): string {
+  return `The seed did not finish: the reviewer's inbox should hold one unread comment on "${apiSpec.title}" and holds ${String(found)}. Run with --reset.`;
+}
+
+/** The line a reset prints before it removes anything: counts only. */
+export function removalNotice(artifacts: number, projects: number): string {
+  return `Reset: removing everything this account owns (${count(artifacts, "artifact", "artifacts")} and ${count(projects, "project", "projects")}), then its inbox and notifications.`;
+}
+
 /** What a run removed and created, for its one-line report. */
 export interface SeedCounts {
   removedArtifacts: number;
@@ -163,11 +198,7 @@ export interface SeedCounts {
   createdComments: number;
 }
 
-function count(value: number, one: string, many: string): string {
-  return `${String(value)} ${value === 1 ? one : many}`;
-}
-
-/** The one line a run prints on stderr: counts only, never content or addresses. */
+/** The line a run prints on stderr when it is done: counts only, never content or addresses. */
 export function seedReport(counts: SeedCounts, alreadySeeded: boolean): string {
   const removed = `Removed ${count(counts.removedArtifacts, "artifact", "artifacts")}, ${count(counts.removedProjects, "project", "projects")}, ${count(counts.removedInboxEntries, "inbox entry", "inbox entries")}, and ${count(counts.removedNotifications, "notification", "notifications")}.`;
   if (alreadySeeded) return `${removed} The account already holds the demo data, so nothing was created. Run with --reset to put it back to the starting state.`;

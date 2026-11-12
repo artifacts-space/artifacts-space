@@ -4,12 +4,13 @@
  * history, bylines, sharing, comments, and the inbox behave as in the product.
  * See the script's header for what a reset removes.
  */
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { Pool } from "pg";
 
 import { getDb } from "@/db";
 import { notification } from "@/db/notification-schema";
-import { account, agent, artifact, mention, user } from "@/db/schema";
+import { account, artifact, mention, user } from "@/db/schema";
+import { authoredByViewerCondition } from "@/lib/agents/owner-access";
 import { createArtifact, deleteArtifact, updateArtifact } from "@/lib/artifacts";
 import { credentialProviderId } from "@/lib/auth/password-sign-in-rules";
 import { createComment } from "@/lib/comments/service";
@@ -25,14 +26,17 @@ import { sampleArtifacts } from "./create-reviewer-account-rules.mts";
 import {
   apiSpec,
   apiSpecComment,
-  demoTitles,
+  inboxRefusal,
   launchProject,
   launchTimeline,
+  leftoverRefusal,
   onboardingArtifacts,
+  partlySeededRefusal,
   releaseChecklist,
   roadmapSummary,
   roadmapTitle,
   roadmapVersions,
+  seededTitles,
   type DemoArtifact,
   type SeedCounts,
   type SeedRequest,
@@ -53,6 +57,17 @@ export interface SeedOutcome {
   alreadySeeded: boolean;
 }
 
+/** What a reset is about to remove: everything the account owns. */
+export interface RemovalPlan {
+  artifacts: number;
+  projects: number;
+}
+
+/** Hooks a caller may pass: `onRemoving` runs once, before a reset deletes anything. */
+export interface SeedHooks {
+  onRemoving?: (plan: RemovalPlan) => void;
+}
+
 /** The account behind this address when it is a reviewer account (it has a password login), or a refusal. */
 async function reviewerAccount(email: string, role: "reviewer" | "commenter"): Promise<ReviewerAccount> {
   const [row] = await getDb()
@@ -67,25 +82,41 @@ async function reviewerAccount(email: string, role: "reviewer" | "commenter"): P
   return { id: row.id, username: row.username };
 }
 
-/** The reviewer's artifacts, and those of agents they added: everything findDeletableArtifact lets them delete. */
+/**
+ * The artifacts a reset removes: the reviewer's own, and those of agents they
+ * added in a team they still belong to. It is the app's own author scope
+ * (authoredByViewerCondition), so it lists exactly what deleteArtifact allows.
+ */
 async function ownedArtifactIds(userId: string): Promise<string[]> {
-  const agents = getDb().select({ id: agent.userId }).from(agent).where(eq(agent.ownerId, userId));
-  const rows = await getDb().select({ id: artifact.id }).from(artifact).where(or(eq(artifact.userId, userId), inArray(artifact.userId, agents)));
+  const rows = await getDb().select({ id: artifact.id }).from(artifact).where(authoredByViewerCondition(getDb(), userId));
   return rows.map((row) => row.id);
 }
 
 /**
- * Removes the reviewer's inbox entries and notifications (nothing refers to
- * either), then their artifacts through deleteArtifact (files included; the
- * foreign keys cascade to versions, comments and replies, mentions,
+ * A reset removes everything the account owns, not only the demo rows: the
+ * account exists only for a directory review, and the test prompts create and
+ * change artifacts of their own. It is deliberate and has no prompt (the
+ * script runs unattended); the gates are that both addresses are under a
+ * reviewer domain and have the password login only reviewer:create gives, and
+ * `onRemoving` says how much will go before anything does.
+ *
+ * It removes the reviewer's inbox entries and notifications (nothing refers
+ * to either), then their artifacts through deleteArtifact (files included;
+ * the foreign keys cascade to versions, comments and replies, mentions,
  * notifications, sharing requests, views, mutes, and edit leases), then their
- * own projects.
+ * own projects. An artifact deleteArtifact refuses stops the run: seeding on
+ * top of leftovers would hide them.
  */
-async function removeDemoState(userId: string, counts: SeedCounts): Promise<void> {
+async function removeDemoState(userId: string, counts: SeedCounts, hooks: SeedHooks): Promise<void> {
+  const [artifactIds, projects] = await Promise.all([ownedArtifactIds(userId), listScopeProjects({ kind: "user", userId })]);
+  hooks.onRemoving?.({ artifacts: artifactIds.length, projects: projects.length });
   counts.removedInboxEntries += (await getDb().delete(mention).where(eq(mention.recipientId, userId)).returning()).length;
   counts.removedNotifications += (await getDb().delete(notification).where(eq(notification.recipientId, userId)).returning()).length;
-  for (const id of await ownedArtifactIds(userId)) if (await deleteArtifact(userId, id)) counts.removedArtifacts += 1;
-  for (const project of await listScopeProjects({ kind: "user", userId })) {
+  for (const id of artifactIds) {
+    if (!(await deleteArtifact(userId, id))) throw new ReviewerDemoRefusal(leftoverRefusal(counts.removedArtifacts, artifactIds.length));
+    counts.removedArtifacts += 1;
+  }
+  for (const project of projects) {
     await deleteProject(userId, project.id);
     counts.removedProjects += 1;
   }
@@ -156,6 +187,22 @@ async function createDemoState(reviewer: ReviewerAccount, commenter: ReviewerAcc
   await createApiSpec(reviewer, commenter, counts);
 }
 
+/**
+ * Checks, once the services' background work has finished, that the seed
+ * landed where the test cases look: one unread inbox entry for the reviewer,
+ * on their API spec. The notification work logs its failures and never
+ * throws, so a seed that left the inbox empty would otherwise look done.
+ */
+export async function assertSeedLanded(request: SeedRequest): Promise<void> {
+  const reviewer = await reviewerAccount(request.email, "reviewer");
+  const waiting = await getDb()
+    .select({ id: mention.id })
+    .from(mention)
+    .innerJoin(artifact, eq(artifact.id, mention.artifactId))
+    .where(and(eq(mention.recipientId, reviewer.id), isNull(mention.readAt), eq(artifact.userId, reviewer.id), eq(artifact.title, apiSpec.title)));
+  if (waiting.length !== 1) throw new ReviewerDemoRefusal(inboxRefusal(waiting.length));
+}
+
 /** Closes the app's database pool so the script can exit. Neon's HTTP driver holds no connection to close. */
 export async function closeDatabase(): Promise<void> {
   const client: unknown = getDb().$client;
@@ -170,18 +217,21 @@ export function zeroCounts(): SeedCounts {
 /**
  * Seeds the reviewer account's demo data, or with `reset` removes the
  * account's state first and seeds it again. Without `reset`, an account that
- * already holds any demo artifact is left as it is. Both addresses must be
+ * already holds every demo title is left as it is. Both addresses must be
  * reviewer accounts. Throws a ReviewerDemoRefusal (safe to print) when the
- * request is refused. Background work the services schedule (the comment's
- * notifications) is the caller's to wait for.
+ * request is refused: an account that is not a reviewer account, an artifact
+ * a reset could not remove, or an account that holds only some of the demo
+ * titles. Background work the services schedule (the comment's
+ * notifications) is the caller's to wait for; assertSeedLanded then checks it.
  */
-export async function seedReviewerDemo(request: SeedRequest): Promise<SeedOutcome> {
+export async function seedReviewerDemo(request: SeedRequest, hooks: SeedHooks = {}): Promise<SeedOutcome> {
   const [reviewer, commenter] = await Promise.all([reviewerAccount(request.email, "reviewer"), reviewerAccount(request.commenterEmail, "commenter")]);
   if (reviewer.id === commenter.id) throw new ReviewerDemoRefusal("The commenter must be another reviewer account, not the same one.");
   const counts = zeroCounts();
-  if (request.reset) await removeDemoState(reviewer.id, counts);
-  const titles = await ownTitles(reviewer.id);
-  if (demoTitles.some((title) => titles.has(title))) return { counts, alreadySeeded: true };
+  if (request.reset) await removeDemoState(reviewer.id, counts, hooks);
+  const held = seededTitles(await ownTitles(reviewer.id));
+  if (held.state === "all") return { counts, alreadySeeded: true };
+  if (held.state === "some") throw new ReviewerDemoRefusal(partlySeededRefusal(held.has, held.missing));
   // Before anything that notifies: the reviewer gets the comment's mention in the app only.
   await savePreferences(reviewer.id, quietPreferences());
   await createDemoState(reviewer, commenter, counts);

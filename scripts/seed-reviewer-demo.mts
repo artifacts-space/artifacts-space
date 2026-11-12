@@ -23,14 +23,21 @@
  * - notification settings with every email and browser notification off
  *   (in-app on), saved before the comment, so the mention never emails.
  *
- * --reset first removes the account's state: every artifact it or an agent
- * it added wrote (with their versions, comments and replies, mentions,
- * notifications, sharing requests, views, and files), its own projects, and
- * every inbox entry and notification left for it. That covers everything the
- * test prompts create or change. It keeps the account, its login, sessions,
- * connected apps and tokens, its teams, and comments it wrote on other
- * people's artifacts (such as its comment on the other reviewer's API spec).
- * Without --reset, an account that already holds demo data is left as it is.
+ * --reset first removes EVERYTHING the account owns, not only the demo data:
+ * every artifact it or an agent it added wrote (with their versions, comments
+ * and replies, mentions, notifications, sharing requests, views, and files),
+ * its own projects, and every inbox entry and notification left for it. That
+ * covers everything the test prompts create or change, and it is why the
+ * script is only for accounts that exist for a review: both addresses must be
+ * under a reviewer domain and have the password login that only
+ * reviewer:create gives. There is no prompt, since the script runs
+ * unattended; a reset prints how many artifacts and projects it will remove
+ * before it removes any, and stops if one cannot be removed. It keeps the
+ * account, its login, sessions, connected apps and tokens, its teams, and
+ * comments it wrote on other people's artifacts (such as its comment on the
+ * other reviewer's API spec).
+ * Without --reset, an account that already holds every demo title is left as
+ * it is, and one that holds only some is refused with the titles named.
  *
  * The services write one by one, as in the product, so a run is not one
  * transaction; if one stops part way, run it again with --reset. A run counts
@@ -42,7 +49,9 @@
  * off first, and this process also drops the Sendir and push keys from its
  * environment before it loads the app.
  *
- * It prints one line of counts on stderr and nothing on stdout. Only the
+ * After a seed it checks that the comment waits unread in the reviewer's
+ * inbox and fails the run if not. It prints counts on stderr (a line before
+ * a reset removes anything, and a line when done) and nothing on stdout. Only the
  * database URL set for this run is used, never `.env.local`; a database that
  * is not on this machine also needs ALLOW_SHARED_REVIEWER_ACCOUNT=1 for that
  * one run.
@@ -51,7 +60,7 @@ import { fileURLToPath } from "node:url";
 
 import { reviewerDatabase, reviewerEmailProblem } from "./create-reviewer-account-rules.mts";
 import { describeError, redact, secretsFrom } from "./migrate-on-deploy.mts";
-import { parseSeedArgs, seedReport, seedUsage, type SeedRequest } from "./seed-reviewer-demo-rules.mts";
+import { parseSeedArgs, removalNotice, seedReport, seedUsage, type SeedRequest } from "./seed-reviewer-demo-rules.mts";
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -82,13 +91,22 @@ async function failureLine(error: unknown, env: Env): Promise<string> {
   return `Failed: ${redact(describeError(error), secretsFrom(env))}`;
 }
 
-/** Runs the seed with the app loaded, waits for the work it scheduled, and closes the database. */
+/**
+ * Runs the seed with the app loaded, waits for the work it scheduled, checks
+ * that the work landed, and closes the database. A reset says what it will
+ * remove before it removes anything.
+ */
 async function seedWithApp(request: SeedRequest) {
   const { registerAppModuleHooks, settleAfterTasks } = await import("./app-module-hooks.mts");
   registerAppModuleHooks();
-  const { closeDatabase, seedReviewerDemo } = await import("./seed-reviewer-demo-data.mts");
+  const { assertSeedLanded, closeDatabase, seedReviewerDemo } = await import("./seed-reviewer-demo-data.mts");
+  let failedTasks = 0;
   try {
-    return await seedReviewerDemo(request);
+    const outcome = await seedReviewerDemo(request, { onRemoving: (plan) => { console.error(removalNotice(plan.artifacts, plan.projects)); } });
+    failedTasks = await settleAfterTasks();
+    if (failedTasks > 0) throw new Error(`${String(failedTasks)} background task(s) failed. Run with --reset.`);
+    if (!outcome.alreadySeeded) await assertSeedLanded(request);
+    return outcome;
   } finally {
     await settleAfterTasks();
     await closeDatabase();
