@@ -20,7 +20,7 @@ test("should offer the four desktop apps with this site's endpoint when a signed
 
   const card = page.locator("section", { has: page.getByRole("heading", { level: 2, name: "Connect a client" }) });
   const apps = card.getByRole("list", { name: "Add to a desktop app" });
-  await expect(apps.getByRole("listitem")).toHaveText(["Add to Cursor", "Add to Claude (opens in a new tab)", "Add to Codex", "Add to Grok Bot"]);
+  await expect(apps.getByRole("listitem")).toHaveText(["Add to Cursor", "Add to Claude Desktop (opens in a new tab)", "Add to Codex", "Add to Grok Bot"]);
   await expect(apps.locator("svg[data-client-logo]")).toHaveCount(4);
   await expect(card.getByText("Codex and Grok Bot have no install link yet, so their buttons show the steps.", { exact: false })).toBeVisible();
 

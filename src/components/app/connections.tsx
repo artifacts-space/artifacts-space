@@ -103,7 +103,7 @@ export function Connections({
               <h3 className="text-sm font-medium text-muted-foreground">Desktop apps</h3>
               <DesktopAppInstalls origin={origin} apps={desktopApps} className="mt-2" />
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Cursor opens with the server filled in. Claude opens claude.ai with the form filled in, and the connector then shows in Claude Desktop too. Codex and Grok Bot have no install link yet, so their buttons show the steps.
+                Cursor opens with the server filled in. Claude Desktop takes its connectors from your Claude account, so its button opens claude.ai with the form filled in. Codex and Grok Bot have no install link yet, so their buttons show the steps.
               </p>
             </div>
             <div className="min-w-0">

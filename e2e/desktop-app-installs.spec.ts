@@ -31,7 +31,7 @@ async function expectInsideWindow(page: Page, dialog: Locator) {
 test("should show the four apps in order, each with its mark, when the row renders", async ({ page }) => {
   await openGallery(page);
   const items = row(page).getByRole("listitem");
-  await expect(items).toHaveText(["Add to Cursor", "Add to Claude (opens in a new tab)", "Add to Codex", "Add to Grok Bot"]);
+  await expect(items).toHaveText(["Add to Cursor", "Add to Claude Desktop (opens in a new tab)", "Add to Codex", "Add to Grok Bot"]);
   for (const item of await items.all()) {
     await expect(item.locator("svg[data-client-logo]")).toHaveCount(1);
     await expect(item.locator("svg[data-client-logo]")).toBeVisible();

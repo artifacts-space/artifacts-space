@@ -21,7 +21,7 @@ describe("DesktopAppInstalls", () => {
   it("should show one button per app, in order, each with the app's mark before its label when the row renders", () => {
     const row = buttons(html);
     expect(row.map((button) => /data-install="([^"]+)"/.exec(button)?.[1])).toEqual(["cursor", "claude-desktop", "codex", "grok-bot"]);
-    expect(row.map((button) => button.replace(/<svg.*?<\/svg>/g, "").replace(/<[^>]+>/g, ""))).toEqual(["Add to Cursor", "Add to Claude (opens in a new tab)", "Add to Codex", "Add to Grok Bot"]);
+    expect(row.map((button) => button.replace(/<svg.*?<\/svg>/g, "").replace(/<[^>]+>/g, ""))).toEqual(["Add to Cursor", "Add to Claude Desktop (opens in a new tab)", "Add to Codex", "Add to Grok Bot"]);
     for (const button of row) {
       expect(button).toMatch(/^<(a|button)[^>]*><svg [^>]*data-client-logo=""/);
     }

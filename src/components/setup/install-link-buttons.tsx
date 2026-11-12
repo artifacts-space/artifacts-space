@@ -39,13 +39,13 @@ export function CursorInstallButton({ origin, className }: InstallButtonProps) {
 }
 
 /**
- * "Add to Claude": opens claude.ai's "Add custom connector" form in a new
- * tab with the name and server URL filled in. A plain link to Claude's
+ * "Add to Claude Desktop": opens claude.ai's "Add custom connector" form in
+ * a new tab with the name and server URL filled in. A plain link to Claude's
  * documented install link; nothing is added until the person confirms in
- * Claude. It opens the website, never the desktop app, so the label does
- * not say Desktop; the connector is saved to the Claude account, and Claude
- * Desktop shows it too.
+ * Claude. Claude publishes no link that opens the desktop app, so the form
+ * opens on the website; the connector is saved to the Claude account, and
+ * Claude Desktop shows it. The line under the buttons says so.
  */
 export function ClaudeInstallButton({ origin, className }: InstallButtonProps) {
-  return <InstallLink app="claude-desktop" href={claudeInstallLink(origin)} newTab className={className}>Add to Claude</InstallLink>;
+  return <InstallLink app="claude-desktop" href={claudeInstallLink(origin)} newTab className={className}>Add to Claude Desktop</InstallLink>;
 }
