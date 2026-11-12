@@ -25,11 +25,12 @@ export const panelClass =
  * Floating beside its anchor on wider screens; a sheet from the bottom on
  * phones. Neither slides, zooms, or moves as it opens: the floating menu
  * stays transparent until it is placed, then fades in over 100ms, and the
- * sheet only fades. No fade at all under reduced motion.
+ * sheet only fades. No fade at all under reduced motion. The width is set
+ * as a style from one constant (panelWidth), never as a class here.
  */
-export function placementClass(sheet: boolean, width: string): string {
+export function placementClass(sheet: boolean): string {
   if (sheet) return "fixed inset-x-0 bottom-0 max-h-[72dvh] rounded-t-xl px-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] animate-in fade-in-0 duration-100 motion-reduce:animate-none";
-  return cn("fixed top-0 left-0 rounded-xl transition-opacity duration-100 not-data-placed:pointer-events-none not-data-placed:opacity-0 motion-reduce:transition-none", width);
+  return "fixed top-0 left-0 rounded-xl transition-opacity duration-100 not-data-placed:pointer-events-none not-data-placed:opacity-0 motion-reduce:transition-none";
 }
 
 /** A floating panel's width in pixels; none in the phone sheet, which spans the screen. */

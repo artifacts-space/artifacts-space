@@ -182,7 +182,7 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
   return createPortal(
     <>
       {sheet && submenu ? null : (
-        <div ref={panelRef} tabIndex={-1} onKeyDown={onKeyDown} data-slot="block-menu" {...settling} className={`${panelClass} ${placementClass(sheet, "")}`} style={panelWidth(sheet, menuWidth)}>
+        <div ref={panelRef} tabIndex={-1} onKeyDown={onKeyDown} data-slot="block-menu" {...settling} className={`${panelClass} ${placementClass(sheet)}`} style={panelWidth(sheet, menuWidth)}>
           <SearchRow inputRef={inputRef} value={state.query} menuId={menuId} activeId={state.active >= 0 ? `${menuId}-row-${String(state.active)}` : undefined} onChange={(query) => { send({ type: "typed", query }); }} />
           <MenuList menuId={menuId} typeName={typeName} rows={rows} state={state} mac={mac} onChangeRow={setChangeRow} onHover={hover} onChoose={(index) => { choose(index, !canHover()); }} />
           {rows.length === 0 ? <p className="px-2 py-2 text-sm text-muted-foreground">No actions match “{state.query.trim()}”.</p> : null}
@@ -192,7 +192,7 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
       {submenu ? (
         <ChangeSubmenu
           panelRef={subRef}
-          className={`${panelClass} ${placementClass(sheet, "")}`}
+          className={`${panelClass} ${placementClass(sheet)}`}
           width={sheet ? undefined : submenuWidth}
           currentType={context.currentType}
           focused={submenu.focused || sheet}

@@ -111,12 +111,15 @@ function near(point: MenuPoint, x: number, y: number): boolean {
 /**
  * After makeRoomBelow moved the page under a pointer that did not move, the
  * menu can open under the opening press. Until the pointer moves or a click
- * lands somewhere else, a click at that same spot (the second half of a
- * double-click on the grip, or a second tap) is swallowed, so it never runs
- * the row now under it. Mouse, pen, and touch alike: any click elsewhere
- * works at once. Spread the result onto the menu's panel.
+ * lands somewhere else, a click on the menu at that same spot (the second
+ * half of a double-click on the grip, or a second tap) is swallowed, so it
+ * never runs the row now under it. A second click there that misses the
+ * menu acts as one on the grip would: it closes the menu. Mouse, pen, and
+ * touch alike: any click elsewhere works at once. Spread the result onto
+ * the menu's panel.
  */
 export function useSettling(still: MenuPoint | null): { onClickCapture: (event: ReactMouseEvent) => void } {
+  // Read once: every open is a fresh BlockMenu (block-controls.tsx keys it by the block), so `still` never changes while mounted.
   const [at, setAt] = useState(still);
   useEffect(() => {
     if (!at) return;
