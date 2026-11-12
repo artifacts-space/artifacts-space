@@ -38,6 +38,11 @@ export function pageColumnClass(fullWidth: boolean): string {
  * them (a version in History, a comment). In a page column the column is
  * the reading width, so this lifts the cap and the body's text ends where
  * the title and summary above it end, contained or full width.
+ *
+ * The /app pane has two more classes for rows that must line up with the
+ * title, `scrollbarRoom` and `gutterRoom`. They read variables that only the
+ * pane's scroll container sets, so they live beside it, in
+ * src/components/app/artifact-editor/detail-scroll.ts.
  */
 export const bodyFillsColumnClass = "[--artifact-measure:none]";
 

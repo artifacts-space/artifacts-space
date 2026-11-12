@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth/client";
 import { isDevSignInEnabled } from "@/lib/auth/dev-user";
 import { signInErrorMessage } from "@/lib/auth/sign-in-error-rules";
+import { undeliverableAddressMessage } from "@/lib/auth/undeliverable-address";
 import { safeNextPath, withNextPath } from "@/lib/safe-next";
 import { cn } from "@/lib/utils";
 
@@ -188,6 +189,7 @@ export function AuthForm({ mode, googleEnabled }: { mode: AuthMode; googleEnable
 
   async function sendLink(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     const problem = validateEmail(email);
     if (problem) {
       setError(problem);
@@ -198,7 +200,9 @@ export function AuthForm({ mode, googleEnabled }: { mode: AuthMode; googleEnable
     try {
       const { error: failure } = await authClient.signIn.magicLink({ email: email.trim(), callbackURL: workspaceUrl() });
       if (failure) {
-        setError(failure.message ?? genericError);
+        const undeliverable = undeliverableAddressMessage(failure.code, email.trim());
+        setError(undeliverable ?? failure.message ?? genericError);
+        if (undeliverable) form.querySelector<HTMLInputElement>("input[name=email]")?.focus();
         return;
       }
       setSentTo(email.trim());

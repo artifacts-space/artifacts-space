@@ -113,6 +113,7 @@ export default function QuickstartPage() {
           <li><strong>HTTP 429 with JSON-RPC error -32029</strong>: a rate limit. The message and the <code>Retry-After</code> header say when to try again. See <Link href={docsHref("limits")}>Limits</Link>.</li>
           <li><strong>&quot;Use POST for MCP requests&quot;</strong>: the client opened a GET event stream. This server answers POST only; pick Streamable HTTP, not SSE.</li>
         </ul>
+        <p>Still stuck? <Link href="/support">Get help</Link> by email, from the app, or on GitHub.</p>
       </Prose>
     </RegistryPage>
   );

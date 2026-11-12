@@ -257,7 +257,11 @@ catch this, so test the generated SQL with `.toSQL()`, as
   A tool missing from that list cannot be registered, and read-only
   connections never see write tools. Its MCP annotations come from the same
   file (`toolAnnotations`): read tools say `readOnlyHint: true`, and every
-  write tool needs a `writeTraits` entry (destructive, idempotent). ChatGPT
+  write tool needs a `writeTraits` entry (destructive, idempotent, open
+  world). Open world is true only for tools that can widen an artifact's
+  audience (`visibility` link or public, `comments` signed_in): today
+  `artifacts_create` and `artifacts_update`; a test fails when a tool takes
+  either input without it. ChatGPT
   asks before every tool without `readOnlyHint`, and Pro offers only those.
 - Agents can request sharing but never approve it.
 - GitHub and Google sign-in (`src/lib/auth/social-auth-options.ts`, rules in
@@ -371,6 +375,12 @@ catch this, so test the generated SQL with `.toSQL()`, as
   editor. Rules and the Slack message live in
   `src/lib/feedback/feedback-rules.ts`; every value a person controls is
   escaped `plain_text`.
+- `/.well-known/openai-apps-challenge` serves OpenAI's plugin domain
+  verification token from `OPENAI_APPS_CHALLENGE_TOKEN`, as the exact token in
+  `text/plain` and nothing else
+  (`src/lib/domain-verification/openai-challenge-rules.ts`). Unset or blank
+  returns 404, never an empty 200. The token is not a secret, but keep it out
+  of code; it is read at request time, so the build needs none.
 - Search engines list an artifact page only when it is public, someone who
   may share it (its author, or the person who added the agent that wrote it,
   while still in the agent's team) turned on "Show in search engines"
@@ -380,6 +390,17 @@ catch this, so test the generated SQL with `.toSQL()`, as
   Markdown and raw versions, preview images, and files always do. Agents
   cannot change the setting, and it turns off when the artifact stops being
   public or changes owner.
+- An address that cannot receive mail (Sendir's 422 `recipient_undeliverable`
+  or `recipient_suppressed`) is refused with the code `EMAIL_UNDELIVERABLE`
+  (`src/lib/auth/undeliverable-address.ts`), and the sign-in form and the
+  invite dialog name the typed address. The refusal is about the address
+  alone: Better Auth calls the magic-link send hook for every address, with
+  or without an account, and only after the sign-in limits passed
+  (`src/app/api/auth/[...all]/undeliverable-address.test.ts` fails if a known
+  and an unknown address ever get different answers). Never log the address.
+  Better Auth swallows what `sendInvitationEmail` throws, so a refused
+  invitation email reaches `inviteMemberAction` through
+  `invitation-send-refusal.ts`; the action then deletes the new invitation.
 
 ## Testing
 

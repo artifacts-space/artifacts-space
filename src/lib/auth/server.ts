@@ -7,7 +7,7 @@ import { getDb } from "@/db";
 import * as oauthSchema from "@/db/oauth-schema";
 import * as schema from "@/db/schema";
 import { sessionHooks } from "@/lib/auth/agent-guards";
-import { sendMagicLinkEmail } from "@/lib/auth/magic-link-email";
+import { magicLinkPluginOptions } from "@/lib/auth/magic-link-email";
 import { oauthPlugins } from "@/lib/auth/oauth-plugins";
 import { passwordSignInGuard, skipLinksForPasswordAccounts } from "@/lib/auth/password-sign-in-options";
 import { emailAndPasswordOptions, passwordPathsDisabledOverHttp } from "@/lib/auth/password-sign-in-rules";
@@ -17,8 +17,6 @@ import { teamDepartureHook } from "@/lib/auth/team-departure";
 import { closedTeamRoutesHook } from "@/lib/auth/closed-team-routes";
 import { teamRoutesClosedOverHttp, teamsPlugin } from "@/lib/auth/teams-plugin";
 import { userHooks } from "@/lib/auth/user-hooks";
-
-const tenMinutes = 60 * 10;
 
 /** Better Auth model names mapped to the app's tables. */
 const authSchema = {
@@ -65,9 +63,9 @@ function createAuth() {
     disabledPaths: [...teamRoutesClosedOverHttp, ...passwordPathsDisabledOverHttp],
     plugins: [
       magicLink({
-        expiresIn: tenMinutes,
+        ...magicLinkPluginOptions,
         // Accounts with a password get no link (skipLinksForPasswordAccounts); the answer is the same.
-        sendMagicLink: skipLinksForPasswordAccounts(({ email, url, token }) => sendMagicLinkEmail({ email, url, token })),
+        sendMagicLink: skipLinksForPasswordAccounts(magicLinkPluginOptions.sendMagicLink),
       }),
       teamsPlugin(),
       socialSignInGuard(),

@@ -37,6 +37,45 @@ export function cursorInstallLink(origin: string): string {
 }
 
 /**
+ * The name Claude shows for the connector. The link below puts it in the
+ * form, and the person can change it there.
+ */
+export const CLAUDE_CONNECTOR_NAME = "artifacts.space";
+
+/**
+ * The Claude install link. It opens claude.ai's "Add custom connector" form
+ * with the name and the server URL filled in; the person checks them and
+ * adds the connector. Connectors live in the Claude account, so one added
+ * here shows in Claude Desktop, on claude.ai, and in the phone apps.
+ * Source: https://claude.com/docs/connectors/building/directory-vs-custom
+ */
+export function claudeInstallLink(origin: string): string {
+  return `https://claude.ai/customize/connectors?${claudeConnectorQuery(origin)}`;
+}
+
+/**
+ * The same link for a Claude Team or Enterprise owner: it opens the form
+ * that adds the connector for the whole organization.
+ * Source: https://claude.com/docs/connectors/building/directory-vs-custom
+ */
+export function claudeTeamInstallLink(origin: string): string {
+  return `https://claude.ai/admin-settings/connectors?${claudeConnectorQuery(origin)}`;
+}
+
+/** The query both Claude install links take: the form to open, and the name and URL to fill in, percent-encoded. */
+function claudeConnectorQuery(origin: string): string {
+  return new URLSearchParams({ modal: "add-custom-connector", connectorName: CLAUDE_CONNECTOR_NAME, connectorUrl: mcpEndpoint(origin) }).toString();
+}
+
+/**
+ * Opens Settings in the ChatGPT desktop app, where Codex keeps its MCP
+ * servers. Codex documents no link that adds a server, so this is as far as
+ * a link can go; the person chooses "MCP servers" and "Add server" there.
+ * Source: https://learn.chatgpt.com/docs/reference/commands
+ */
+export const CODEX_SETTINGS_LINK = "codex://settings";
+
+/**
  * The Codex command that adds the server. `codex mcp add <NAME> --url <URL>`
  * adds a Streamable HTTP server, then starts the OAuth sign-in when the
  * server supports it.
@@ -52,6 +91,16 @@ export function codexMcpAddCommand(origin: string): string {
  */
 export function codexMcpLoginCommand(): string {
   return `codex mcp login ${MCP_SERVER_NAME}`;
+}
+
+/**
+ * The Codex command that lists the configured servers, to check that the
+ * server was added.
+ * Source: https://learn.chatgpt.com/docs/extend/mcp?surface=cli ("Run codex
+ * mcp list to confirm the server is configured")
+ */
+export function codexMcpListCommand(): string {
+  return "codex mcp list";
 }
 
 /**
@@ -82,6 +131,22 @@ export function codexHeadlessConfigToml(origin: string): string {
  * https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt
  */
 export const CHATGPT_PLUGINS_URL = "https://chatgpt.com/plugins";
+
+/**
+ * The message that asks a Grok Bot to add the server. Grok Bot documents no
+ * install link; a Bot can add an MCP server by its URL when asked in chat.
+ * Source: https://docs.x.ai/grok-bot/computer-and-apps
+ */
+export function grokBotAddMessage(origin: string): string {
+  return `Add the MCP server at ${mcpEndpoint(origin)} and name it ${MCP_SERVER_NAME}.`;
+}
+
+/**
+ * Where Grok on the web adds a custom connector: "New Connector", then
+ * "Custom", then the server URL.
+ * Source: https://docs.x.ai/grok/connectors
+ */
+export const GROK_CONNECTORS_URL = "https://grok.com/connectors";
 
 /**
  * The OpenCode command that adds the server to the project config. `--url`
@@ -183,17 +248,29 @@ export function fxConfigJson(origin: string): string {
 
 /** The clients the docs give setup steps for, most used first. Every list of clients reads this order. */
 export const mcpClients = [
-  { id: "claude-code", label: "Claude Code", oneClick: false },
-  { id: "cursor", label: "Cursor", oneClick: true },
-  { id: "claude-desktop", label: "Claude Desktop", oneClick: false },
-  { id: "chatgpt", label: "ChatGPT", oneClick: false },
-  { id: "codex", label: "Codex", oneClick: false },
-  { id: "opencode", label: "OpenCode", oneClick: false },
-  { id: "devin", label: "Devin", oneClick: false },
-  { id: "kimi-code", label: "Kimi Code CLI", oneClick: false },
-  { id: "fx", label: "fx", oneClick: false },
-  { id: "other-clients", label: "Other clients", oneClick: false },
+  { id: "claude-code", label: "Claude Code" },
+  { id: "cursor", label: "Cursor" },
+  { id: "claude-desktop", label: "Claude Desktop" },
+  { id: "chatgpt", label: "ChatGPT" },
+  { id: "codex", label: "Codex" },
+  { id: "grok-bot", label: "Grok Bot" },
+  { id: "opencode", label: "OpenCode" },
+  { id: "devin", label: "Devin" },
+  { id: "kimi-code", label: "Kimi Code CLI" },
+  { id: "fx", label: "fx" },
+  { id: "other-clients", label: "Other clients" },
 ] as const;
 
 /** The id of a client in `mcpClients`, also its heading anchor on the clients page. */
 export type McpClientId = (typeof mcpClients)[number]["id"];
+
+/**
+ * The desktop apps the Connections page gives an "Add to" button, in the
+ * order it shows them: the two with an install link first (Cursor, Claude),
+ * then Codex and Grok Bot, which publish none, so their buttons open the
+ * few steps left.
+ */
+export const desktopApps = ["cursor", "claude-desktop", "codex", "grok-bot"] as const satisfies readonly McpClientId[];
+
+/** The id of a desktop app with an "Add to" button. */
+export type DesktopAppId = (typeof desktopApps)[number];

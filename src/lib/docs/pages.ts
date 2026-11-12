@@ -73,7 +73,7 @@ export const docsPages = [
   {
     slug: "clients",
     title: "Client setup",
-    description: "Connect Claude Code, Cursor, Claude Desktop, ChatGPT, Codex, OpenCode, Devin, Kimi Code CLI, fx, or any MCP client. Most need only the URL and a browser sign-in.",
+    description: "Connect Claude Code, Cursor, Claude Desktop, ChatGPT, Codex, Grok Bot, OpenCode, Devin, Kimi Code CLI, fx, or any MCP client. Most need only the URL and a browser sign-in.",
     section: "Get started",
     source: app("clients/"),
     headings: [
@@ -82,6 +82,7 @@ export const docsPages = [
       h2("claude-desktop", "Claude Desktop and claude.ai"),
       h2("chatgpt", "ChatGPT"),
       h2("codex", "Codex"),
+      h2("grok-bot", "Grok Bot"),
       h2("opencode", "OpenCode"),
       h2("devin", "Devin"),
       h2("kimi-code", "Kimi Code CLI"),

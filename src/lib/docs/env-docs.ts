@@ -24,6 +24,7 @@ export const envDocs: readonly EnvDoc[] = [
   { name: "SENDIR_URL", need: "optional", what: "Overrides https://sendir.ai." },
   { name: "ABUSE_REPORT_EMAIL", need: "for email", what: "The site operator's address. Every reader report on an artifact is emailed here, and only here. Without it, reports are still stored and shown on the team page, and each one logs a warning." },
   { name: "SLACK_FEEDBACK_WEBHOOK_URL", need: "optional", what: "Slack Incoming Webhook for \"Something's not working\" reports from the account menu. Must start with https://hooks.slack.com/. Keep it secret. Without a valid one, the dialog says feedback is not available." },
+  { name: "OPENAI_APPS_CHALLENGE_TOKEN", need: "optional", what: "The domain verification token OpenAI's plugin submission portal shows. Served as plain text at /.well-known/openai-apps-challenge; without it that path returns 404. Not a secret, but set it only on the deployment you submit." },
   { name: "R2_ACCOUNT_ID", need: "for files", what: "Cloudflare account id for R2." },
   { name: "R2_BUCKET", need: "for files", what: "The bucket that holds uploads." },
   { name: "R2_ACCESS_KEY_ID", need: "for files", what: "S3 access key: the id of an API token scoped to the bucket." },

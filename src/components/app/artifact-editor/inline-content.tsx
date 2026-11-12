@@ -83,7 +83,7 @@ function sourcePadding(surface: InlineSurface): string {
 
 /** The side padding of the status line under the source: the source field's own, so the two start at the same place. */
 function statusPadding(surface: InlineSurface): string {
-  return surface === "pane" ? "px-6 sm:px-6" : "px-6 sm:px-8";
+  return surface === "pane" ? "px-6" : "px-6 sm:px-8";
 }
 
 interface InlineContentProps {

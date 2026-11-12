@@ -1,7 +1,7 @@
 /*
  * Who runs artifacts.space and how to reach them. The Privacy Policy, the
- * Terms, and the site footer all read these values, so the owner changes a
- * mailbox or the address here, in one place.
+ * Terms, the Support page, and the site footer all read these values, so the
+ * owner changes a mailbox or the address here, in one place.
  */
 
 /** The company that operates the hosted service, with its postal and email contacts. */
@@ -15,12 +15,14 @@ export const legalContact = {
   privacyEmail: "privacy@artifacts.space",
   /** The Terms, notices, and copyright (DMCA) notices and counter-notices. */
   legalEmail: "legal@artifacts.space",
+  /** Help with using the service: the Support page and the directory listings name it. */
+  supportEmail: "support@artifacts.space",
 } as const;
 
 /** When both documents took effect and last changed. */
 export const legalDates = {
   effective: { label: "November 7, 2026", iso: "2026-11-07" },
-  updated: { label: "November 11, 2026", iso: "2026-11-11" },
+  updated: { label: "November 12, 2026", iso: "2026-11-12" },
 } as const;
 
 /** The year in the footer's copyright line. */
@@ -31,6 +33,9 @@ export const WEBRENEW_URL = "https://webrenew.com";
 
 /** Where the two documents live. */
 export const legalPaths = { privacy: "/privacy", terms: "/terms" } as const;
+
+/** The public Support page: how to get help. */
+export const supportPath = "/support";
 
 /** The operator's postal address on one line. */
 export function postalAddress(): string {

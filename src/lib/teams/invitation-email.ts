@@ -3,8 +3,9 @@ import { createHash } from "node:crypto";
 import { APIError } from "better-auth/api";
 
 import { reserveBudgetedEmail } from "@/lib/email/budget";
-import { INVITATION_BUDGET_MESSAGE } from "@/lib/email/budget-rules";
+import { INVITATION_BUDGET_CODE, INVITATION_BUDGET_MESSAGE } from "@/lib/email/budget-rules";
 import { html, renderEmail } from "@/lib/email/layout";
+import { refuseUndeliverableAddress } from "@/lib/email/undeliverable-refusal";
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
 import { siteUrl } from "@/lib/site-origin";
 
@@ -53,10 +54,13 @@ export function renderTeamInvitationEmail(url: string, teamName: string, inviter
  * keys, it prints the link to the server log instead. Each send uses one
  * email of the shared daily budget, so invitations can never use up the
  * quota sign-in links need; over budget it refuses with a message to show.
+ * An address Sendir says cannot receive mail is refused with a 422 and the
+ * `EMAIL_UNDELIVERABLE` code. Better Auth swallows what this throws, so the
+ * teams plugin hands those refusals to the caller (invitation-send-refusal.ts).
  */
 export async function sendTeamInvitationEmail(input: TeamInvitationEmail) {
   const url = invitationUrl(input.invitationId);
-  if (!(await reserveBudgetedEmail("team-invitation"))) throw new APIError("TOO_MANY_REQUESTS", { message: INVITATION_BUDGET_MESSAGE });
+  if (!(await reserveBudgetedEmail("team-invitation"))) throw new APIError("TOO_MANY_REQUESTS", { code: INVITATION_BUDGET_CODE, message: INVITATION_BUDGET_MESSAGE });
   if (!isSendirConfigured()) {
     if (process.env.NODE_ENV === "production") throw new Error("Sendir is not configured, so invitations cannot be sent.");
     console.info(`[teams] Invitation to ${input.teamName} for ${input.email}: ${url}`);
@@ -72,5 +76,6 @@ export async function sendTeamInvitationEmail(input: TeamInvitationEmail) {
     },
     { idempotencyKey: invitationIdempotencyKey(input.invitationId, input.expiresAt) },
   );
+  refuseUndeliverableAddress(error);
   if (error) throw new Error(`Sendir could not send the invitation: ${error.name} (${String(error.statusCode ?? "no answer")})`);
 }

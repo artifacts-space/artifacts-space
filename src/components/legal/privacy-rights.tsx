@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Prose } from "@/components/docs/docs-content";
 import { LegalH, Mail, PostalAddress } from "@/components/legal/legal-page";
+import { sessionLifetimeSeconds } from "@/lib/auth/session-config";
 import { fileLimits } from "@/lib/files/config";
 import { legalContact, legalPaths } from "@/lib/legal/contact";
 import { oauthLimits } from "@/lib/oauth/config";
@@ -11,6 +12,8 @@ const doc = "privacy" as const;
 const hourMs = 3_600_000;
 const versionDays = Math.round(versionRetention.maxAgeMs / (24 * hourMs));
 const refreshDays = Math.round(oauthLimits.refreshTokenSeconds / 86_400);
+/** Read from the session setting, so the policy and the code cannot disagree. */
+const sessionDays = Math.round(sessionLifetimeSeconds / 86_400);
 
 const providers = [
   { name: "Vercel", role: "hosts the website, the MCP server, and scheduled cleanup jobs, and keeps request logs.", data: "request data, logs, and everything the service handles in transit" },
@@ -65,7 +68,7 @@ export function PrivacyRights() {
           <li><strong>Version history:</strong> each artifact keeps up to {versionRetention.keep} versions, for up to {versionDays} days. The approved version and any version waiting for approval stay until they are replaced.</li>
           <li><strong>Files:</strong> deleted from storage when you delete them or their artifact. Uploads that never finish are deleted after {fileLimits.pendingTtlMs / hourMs} hour, and files never attached to an artifact after {fileLimits.unattachedTtlMs / hourMs} hours.</li>
           <li><strong>Deleted comments:</strong> the text is erased at once. A placeholder stays so replies keep their place.</li>
-          <li><strong>Sessions and sign-in:</strong> a session ends when you sign out or 7 days after you last use it. Sign-in links expire after 10 minutes, and team invitations after 7 days.</li>
+          <li><strong>Sessions and sign-in:</strong> a session ends when you sign out or {sessionDays} days after you last use it. Sign-in links expire after 10 minutes, and team invitations after 7 days.</li>
           <li><strong>Connected apps:</strong> app access tokens last {oauthLimits.accessTokenSeconds / 3600} hour and refresh tokens {refreshDays} days. App registrations nobody approved are deleted after {oauthLimits.unapprovedClientHours} hours.</li>
           <li><strong>Rate-limit counters:</strong> deleted as their window ends, within a day.</li>
           <li><strong>View counts:</strong> visitor hashes are deleted after their day ends (UTC), when the next view is counted. Daily counts and linking domains are kept while the artifact exists and are deleted with it.</li>
