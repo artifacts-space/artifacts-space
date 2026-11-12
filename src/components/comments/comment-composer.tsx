@@ -35,7 +35,7 @@ interface CommentComposerProps {
 function DraftPreview({ body, resolved }: { body: string; resolved: ReadonlyMap<string, MentionKind> }) {
   return (
     <div className="min-h-20 rounded-lg border border-input px-2.5 py-2">
-      {body.trim() ? <MarkdownView content={body} mentions={resolved} className="text-md leading-6" /> : <p className="text-md text-muted-foreground">Nothing to preview yet.</p>}
+      {body.trim() ? <MarkdownView content={body} mentions={resolved} className="max-w-none text-md leading-6" /> : <p className="text-md text-muted-foreground">Nothing to preview yet.</p>}
     </div>
   );
 }

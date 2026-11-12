@@ -10,6 +10,7 @@ import type { ArtifactEditorDto, ArtifactHarnessDto } from "@/lib/artifact-types
 import { cn } from "@/lib/utils";
 
 import type { AutosaveStatus } from "./use-autosave";
+import { scrollbarRoom } from "./detail-scroll";
 
 /** The quiet words for a save status: "Saving…", "Saved", or why it is not saved. Null when there is nothing to say. */
 export function saveStatusLabel(status: AutosaveStatus, dirty: boolean): string | null {
@@ -100,12 +101,39 @@ export function SaveStatusBar({ status, dirty, length, updatedAt, updatedBy, har
   );
 }
 
+interface NoticeBandProps {
+  /** The content's column in the /app pane (previewColumnClass). Without it the notice pads itself, as on the artifact page. */
+  column?: string | undefined;
+  /** Extra classes from the surrounding layout, such as a framed notice on the artifact page. */
+  className?: string | undefined;
+  slot?: string | undefined;
+  children: React.ReactNode;
+}
+
+const noticeRow = "flex flex-wrap items-center gap-x-3 gap-y-2";
+
+/**
+ * A notice above the body. In the /app pane it is a band across the pane
+ * whose words keep to the content's column, so they start where the title
+ * starts; elsewhere it is one padded row.
+ */
+function NoticeBand({ column, className, slot, children }: NoticeBandProps) {
+  if (!column) return <div role="status" data-slot={slot} className={cn(noticeRow, "border-b bg-muted/50 px-5 py-2.5 sm:px-7", className)}>{children}</div>;
+  return (
+    <div role="status" data-slot={slot} className={cn("border-b bg-muted/50 py-2.5", scrollbarRoom, className)}>
+      <div className={cn(column, noticeRow)}>{children}</div>
+    </div>
+  );
+}
+
 interface ConflictNoticeProps {
   status: AutosaveStatus;
   onLoadTheirs: () => void;
   onKeepMine: () => void;
   /** Extra classes from the surrounding layout, such as a framed notice on the artifact page. */
   className?: string;
+  /** The content's column in the /app pane, so the notice lines up with the title. */
+  column?: string;
 }
 
 /**
@@ -114,12 +142,12 @@ interface ConflictNoticeProps {
  * load the newer version, or save its own changes over it. Either way, the
  * other version stays in the history. Nothing shows without a conflict.
  */
-export function ConflictNotice({ status, onLoadTheirs, onKeepMine, className }: ConflictNoticeProps) {
+export function ConflictNotice({ status, onLoadTheirs, onKeepMine, className, column }: ConflictNoticeProps) {
   if (status.kind !== "conflict") return null;
   const editor = status.theirs.updatedBy;
   const who = editor ? editorName(editor) : "Someone";
   return (
-    <div role="status" className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-muted/50 px-5 py-2.5 sm:px-7", className)}>
+    <NoticeBand column={column} className={className}>
       <IconAlertTriangle aria-hidden className="size-4 shrink-0 text-tone-warning" />
       <p className="min-w-0 flex-1 text-sm">
         {who} saved a newer version while you were editing. Your latest changes are not saved yet.
@@ -128,7 +156,7 @@ export function ConflictNotice({ status, onLoadTheirs, onKeepMine, className }: 
         <Button variant="outline" size="sm" onClick={onLoadTheirs}>Load their version</Button>
         <Button variant="ghost" size="sm" onClick={onKeepMine}>Keep my changes</Button>
       </div>
-    </div>
+    </NoticeBand>
   );
 }
 
@@ -140,6 +168,8 @@ interface AgentSaveNoticeProps {
   history?: React.ReactNode;
   /** Extra classes from the surrounding layout, such as a framed notice on the artifact page. */
   className?: string;
+  /** The content's column in the /app pane, so the notice lines up with the title. */
+  column?: string;
 }
 
 /** The words of the notice, kept in one place for the editor and its tests. */
@@ -150,17 +180,17 @@ export const AGENT_SAVE_NOTICE = "An agent saved changes while you were editing.
  * person's work wins, and the agent's version stays in History, where the
  * person can compare or restore it. Nothing shows otherwise.
  */
-export function AgentSaveNotice({ show, onDismiss, history, className }: AgentSaveNoticeProps) {
+export function AgentSaveNotice({ show, onDismiss, history, className, column }: AgentSaveNoticeProps) {
   if (!show) return null;
   return (
-    <div role="status" data-slot="agent-save-notice" className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-muted/50 px-5 py-2.5 sm:px-7", className)}>
+    <NoticeBand column={column} className={className} slot="agent-save-notice">
       <IconInfoCircle aria-hidden className="size-4 shrink-0 text-muted-foreground" />
       <p className="min-w-0 flex-1 text-sm">{AGENT_SAVE_NOTICE}</p>
       <div className="flex shrink-0 items-center gap-1">
         {history}
         <Button variant="ghost" size="sm" onClick={onDismiss}>Dismiss</Button>
       </div>
-    </div>
+    </NoticeBand>
   );
 }
 

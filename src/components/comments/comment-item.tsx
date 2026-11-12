@@ -170,7 +170,7 @@ function LiveComment({ comment, agent, handlers }: Pick<CommentItemProps, "comme
   }
   return (
     <>
-      <MarkdownView content={comment.body} mentions={mentions} className="text-md leading-6" />
+      <MarkdownView content={comment.body} mentions={mentions} className="max-w-none text-md leading-6" />
       <CommentActions comment={comment} agent={agent} handlers={handlers} onEditing={() => { setEditing(true); }} />
     </>
   );

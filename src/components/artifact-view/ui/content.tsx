@@ -30,7 +30,7 @@ export const textSize = { sm: "text-sm leading-6", md: "text-md leading-7", lg: 
 export function TextView({ props }: ViewProps<"Text">) {
   if (!props.text) return null;
   return (
-    <p className={cn("max-w-[72ch] whitespace-pre-line break-words", textSize[props.size ?? "md"], props.tone === "muted" && "text-muted-foreground")}>
+    <p className={cn("max-w-[var(--artifact-measure,72ch)] whitespace-pre-line break-words", textSize[props.size ?? "md"], props.tone === "muted" && "text-muted-foreground")}>
       {props.text}
     </p>
   );
@@ -97,7 +97,7 @@ export function ListView({ props }: ViewProps<"List">) {
   if (props.items.length === 0) return <p className="text-sm text-muted-foreground">No items.</p>;
   const Tag = props.ordered ? "ol" : "ul";
   return (
-    <Tag className={cn("max-w-[72ch] space-y-1 pl-5 text-md leading-7 marker:text-muted-foreground", props.ordered ? "list-decimal" : "list-disc")}>
+    <Tag className={cn("max-w-[var(--artifact-measure,72ch)] space-y-1 pl-5 text-md leading-7 marker:text-muted-foreground", props.ordered ? "list-decimal" : "list-disc")}>
       {props.items.map((item, index) => (
         <li key={`${String(index)}-${item.slice(0, 20)}`} className="break-words">{item}</li>
       ))}

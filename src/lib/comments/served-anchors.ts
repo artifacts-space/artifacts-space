@@ -6,9 +6,11 @@ import type { CommentView } from "./views";
 
 /*
  * Loads what the anchor rules need: the content a viewer is served, only when
- * it decides something. Viewers served the latest version never load it, and
- * neither does a thread without inline comments. Any failure hides the
- * anchors instead of showing words the viewer may not read.
+ * it decides something. The gate never loads it for viewers served the
+ * latest version or for a thread without inline comments; the agents'
+ * changed-text check loads it for any viewer whose comments show a quote.
+ * Any failure hides the anchors instead of showing words the viewer may not
+ * read.
  */
 
 type AnchorRow = Pick<CommentRecord, "quote" | "parentId" | "deletedAt">;
@@ -63,7 +65,9 @@ function logFailure(error: unknown) {
  * The anchor gate for a viewer of one artifact's comments (`records`).
  * `source` is the version the viewer is served, when the caller already ran
  * the access check; otherwise it is checked here, only when needed. Pass
- * `served` when the request reads this artifact's comments more than once.
+ * `served` when the request reads this artifact's comments more than once:
+ * it must be the loader made for this same viewer, and `viewerId` is used
+ * only when none is passed.
  */
 export async function anchorGateFor(input: { publicId: string; viewerId: string; records: readonly AnchorRow[]; source?: "latest" | "approved" | undefined; served?: ServedAnchors | undefined }): Promise<AnchorGate> {
   if (!hasLiveAnchor(input.records)) return hideAnchors;
