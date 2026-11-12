@@ -17,7 +17,7 @@ import { editColumnClass, bodyFillsColumnClass } from "@/lib/page-width/rules";
 import type { Theme } from "@/lib/themes/schema";
 import { cn } from "@/lib/utils";
 
-import { blockGutter } from "./detail-scroll";
+import { gutterRoom } from "./detail-scroll";
 import { isThemed, PreviewSurface, surfaceClass } from "./preview-surface";
 
 /**
@@ -49,14 +49,13 @@ interface Placement {
 
 /**
  * The rendered content's frame: the pane's themed surface with the page
- * column inside it, or the page's own column. `gutter` keeps room on both
- * sides of the pane's column for the interface editor's block handles, which
- * hang left of each block; both sides, so the column stays centered.
+ * column inside it, or the page's own column. In the pane it leaves the
+ * block gutter an interface has (gutterRoom), as the title rows above do.
  */
-function ContentFrame({ place, gutter = false, children }: { place: Placement; gutter?: boolean; children: React.ReactNode }) {
+function ContentFrame({ place, children }: { place: Placement; children: React.ReactNode }) {
   const { surface, fullWidth, theme } = place;
   if (surface === "page") return <div className={cn("min-w-0", bodyFillsColumnClass)} data-full-width={fullWidth}>{children}</div>;
-  return <PreviewSurface theme={theme} fullWidth={fullWidth} className={cn("py-5 sm:py-8", gutter && blockGutter)}>{children}</PreviewSurface>;
+  return <PreviewSurface theme={theme} fullWidth={fullWidth} className={cn("py-5 sm:py-8", gutterRoom)}>{children}</PreviewSurface>;
 }
 
 /** The source field's frame: a card on the artifact page; in /app, the theme across the pane around the page column (the whole pane when full width). */
@@ -64,7 +63,7 @@ function SourceFrame({ place, children }: { place: Placement; children: React.Re
   const { surface, fullWidth, theme } = place;
   if (surface === "page") return <div className="card-surface flex flex-col overflow-hidden" data-full-width={fullWidth}>{children}</div>;
   return (
-    <ThemeScope theme={theme} className={cn("flex flex-[1_0_auto] flex-col text-foreground", isThemed(theme) && "bg-background")} data-content-theme="">
+    <ThemeScope theme={theme} className={cn("flex flex-[1_0_auto] flex-col text-foreground", gutterRoom, isThemed(theme) && "bg-background")} data-content-theme="">
       <div className={cn("flex flex-1 flex-col", editColumnClass(fullWidth))} data-full-width={fullWidth}>{children}</div>
     </ThemeScope>
   );
@@ -82,9 +81,9 @@ function sourcePadding(surface: InlineSurface): string {
   return surface === "pane" ? "px-6 py-6 sm:py-8" : "p-6 sm:p-8";
 }
 
-/** The side padding of the status line under the source: the page column's in the pane, the status line's own on the page. */
+/** The side padding of the status line under the source: the source field's own, so the two start at the same place. */
 function statusPadding(surface: InlineSurface): string {
-  return surface === "pane" ? "px-6 sm:px-6" : "";
+  return surface === "pane" ? "px-6 sm:px-6" : "px-6 sm:px-8";
 }
 
 interface InlineContentProps {
@@ -154,15 +153,6 @@ function DocumentContent({ kind, content, revision, place, onChange, onShowSourc
   return <ContentFrame place={place}>{kind === "markdown" ? <InlineCommentSurface>{document}</InlineCommentSurface> : document}</ContentFrame>;
 }
 
-/**
- * Whether the body is the interface editor, which keeps a gutter beside its
- * column for block handles. The pane's title block asks the same question,
- * so it leaves the same room and lines up with the body.
- */
-export function hasBlockGutter(kind: ArtifactKind, content: string, sourceOpen: boolean): boolean {
-  return !sourceOpen && kind === "ui" && canEditBlocks(content);
-}
-
 /** See the notes at the top of this file. */
 export function InlineContent(props: InlineContentProps) {
   const { kind, content, title, files, revision, sourceOpen, surface = "pane", fullWidth = false, theme = null, onChange, onShowSource } = props;
@@ -177,9 +167,9 @@ export function InlineContent(props: InlineContentProps) {
       </ContentFrame>
     );
   }
-  if (hasBlockGutter(kind, content, sourceOpen)) {
+  if (kind === "ui" && canEditBlocks(content)) {
     return (
-      <ContentFrame place={place} gutter>
+      <ContentFrame place={place}>
         <UiBlockEditor content={content} onChange={onChange} />
       </ContentFrame>
     );

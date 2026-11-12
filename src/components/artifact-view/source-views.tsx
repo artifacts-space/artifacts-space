@@ -9,13 +9,14 @@ import { ViewNotice } from "./view-notice";
 
 const sourceClass = "overflow-x-auto font-mono text-sm leading-7 whitespace-pre-wrap break-words";
 
-/** Plain text, shown as written on a quiet sheet, so it reads as a document. */
+/**
+ * Plain text, shown as written. It has no frame of its own: its lines start
+ * and end with the column around it, in the same type as the field an
+ * editor types in (PlainTextEditor), so nothing moves when that field takes
+ * its place.
+ */
 export function TextView({ content }: { content: string }) {
-  return (
-    <article className="card-nested min-w-0 bg-card px-5 py-5 text-card-foreground sm:px-8 sm:py-7">
-      <div className="max-w-[var(--artifact-measure,72ch)] text-base leading-7 whitespace-pre-wrap break-words">{content}</div>
-    </article>
-  );
+  return <article className="max-w-[var(--artifact-measure,72ch)] min-w-0 text-base leading-7 whitespace-pre-wrap break-words md:text-md">{content}</article>;
 }
 
 /**

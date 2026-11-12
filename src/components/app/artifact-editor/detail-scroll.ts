@@ -29,26 +29,33 @@ export const detailBody = [
 ].join(" ");
 
 /**
- * For each row above `detailBody` that holds the content's column (title,
- * chips, meta line): it leaves the room the body leaves beside its own
- * column, so both columns are centered in the same width and start and end
- * at the same place. That room is the body's scrollbar (useScrollbarRoom)
- * and, around the interface editor, the gutter its block handles hang in
- * (blockGutter).
+ * For each row above `detailBody` that holds the content's column (share
+ * notice, title, chips, meta line, save notices): it leaves the room the
+ * body leaves beside its own column, so both columns are centered in the
+ * same width and start and end at the same place. That room is the body's
+ * scrollbar (useScrollbarRoom) and, for an interface, the block gutter
+ * (detailOuterClass).
  */
 export const scrollbarRoom = "ps-[var(--detail-gutter,0px)] pe-[calc(var(--detail-gutter,0px)_+_var(--detail-scrollbar,0px))]";
 
 /**
- * The room on both sides of the body's column for the interface editor's
- * block handles, which hang left of each block; both sides, so the column
- * stays centered. Phones have no handles beside the blocks, so none there.
+ * For each row inside `detailBody` that holds the content's column (the
+ * body's surface, the source, the Files section): the block gutter on both
+ * sides. The scrollbar is already outside these rows.
  */
-export const blockGutter = "sm:px-14";
+export const gutterRoom = "px-[var(--detail-gutter,0px)]";
 
-/** `detailOuter`, telling the rows above the body whether the body has the block gutter, so they leave the same room (scrollbarRoom). */
-export function detailOuterClass(gutter: boolean): string {
-  // 3.5rem is blockGutter's px-14.
-  return gutter ? `${detailOuter} sm:[--detail-gutter:3.5rem]` : detailOuter;
+/**
+ * `detailOuter` for an artifact of this kind. An interface gets the block
+ * gutter: room on both sides of the column for the block handles its editor
+ * hangs left of each block; both sides, so the column stays centered. It
+ * goes by the kind alone, so the title block never moves when View source
+ * opens or the source stops parsing. Phones have no handles beside the
+ * blocks, so none there. Every row reads the one variable (scrollbarRoom,
+ * gutterRoom), so the title and the body cannot leave different room.
+ */
+export function detailOuterClass(blockGutter: boolean): string {
+  return blockGutter ? `${detailOuter} sm:[--detail-gutter:3.5rem]` : detailOuter;
 }
 
 /** The meta line on short viewports: it sticks to the top of the scroll box, opaque on the pane's card colour. */

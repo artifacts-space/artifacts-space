@@ -76,7 +76,18 @@ test.describe("in the /app pane", () => {
         "the summary": summary(page),
         "a heading block": blocks(page).getByRole("textbox", { name: "Heading" }),
         "a text block": blocks(page).getByRole("textbox", { name: "Text" }),
+        "the Files section under the body": page.locator("[data-slot=attached-files] > div"),
       });
+
+      // The title block stays where it is when the source replaces the blocks: both keep the room the block handles need.
+      const before = await textEdges(title(page));
+      await page.getByRole("button", { name: "More actions" }).click();
+      await page.getByRole("menuitem", { name: "View source" }).click();
+      const source = page.getByRole("textbox", { name: "Artifact source" });
+      await expect(source).toBeVisible();
+      const after = await textEdges(title(page));
+      expect(Math.abs(after.left - before.left) + Math.abs(after.right - before.right), "the title does not move under View source").toBeLessThanOrEqual(0.5);
+      await expectOneColumn(title(page), { "the source": source });
     });
 
     test(`should start and end the source where the title does under View source, in ${name}`, async ({ page }) => {
@@ -88,6 +99,27 @@ test.describe("in the /app pane", () => {
       const source = page.getByRole("textbox", { name: "Artifact source" });
       await expect(source).toBeVisible();
       await expectOneColumn(title(page), { "the source": source });
+    });
+  }
+});
+
+test.describe("in the /app pane, on a new artifact", () => {
+  test.skip(({ isMobile }) => isMobile, "window widths are set here; the phone check is at the end of this file");
+
+  for (const { name, size } of windows) {
+    test(`should start the upload row where the title starts, in ${name}`, async ({ page }) => {
+      await page.setViewportSize(size);
+      await page.goto("/dev/workspace");
+      await page.getByRole("button", { name: "New artifact" }).first().click();
+      const blank = page.getByRole("region", { name: "New artifact" });
+      const title = blank.getByRole("textbox", { name: "Artifact title" });
+      await expect(title).toBeVisible();
+      const upload = blank.getByRole("button", { name: "Upload files" });
+      await expect(upload).toBeVisible();
+      const edges = await textEdges(title);
+      // The button is a box in the row: the box starts at the column's edge, where the title's text starts.
+      const box = await upload.boundingBox();
+      expect(Math.abs((box?.x ?? -1) - edges.left), "the upload row starts where the title starts").toBeLessThanOrEqual(0.5);
     });
   }
 });

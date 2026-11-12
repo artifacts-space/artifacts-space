@@ -339,26 +339,33 @@ catch this, so test the generated SQL with `.toSQL()`, as
 ### Page column
 
 An artifact has one column, and everything in it starts and ends at the
-same place: the title, the summary, the chips and meta line, and the body.
-The column is the reading width: 1024px with 24px side padding when
-contained, the whole window with Full width (`src/lib/page-width/rules.ts`;
-change the width there, once). Never give a part of the page its own
-narrower cap: a body that stops short of where the title ends reads as a
-layout fault. Markdown and plain text keep a 72ch cap only where no page
-column is around them (a version in History, a comment);
-`bodyFillsColumnClass` lifts it inside the column, on the artifact page and
-in the /app panes, and an interface's Text and List blocks follow the same
-cap.
+same place: the title, the summary, the chips and meta line, the notices,
+the body, and the Files section. The column is the reading width: 1024px
+with 24px side padding when contained, the whole window with Full width
+(`src/lib/page-width/rules.ts`; change the width there, once). Never give a
+part of the page its own narrower cap or its own side padding: a body that
+stops short of where the title ends reads as a layout fault. Markdown and
+plain text keep a 72ch cap only where no page column is around them (a
+version in History); `bodyFillsColumnClass` lifts it inside the column, on
+the artifact page and in the /app panes, and an interface's Text and List
+blocks follow the same cap. Plain text has no frame of its own, for readers
+or editors, and a comment's text fills its card.
 
-In the /app pane the title rows sit above the box that scrolls the body, so
-they leave the room the body leaves beside its column (`scrollbarRoom` in
-`detail-scroll.ts`): the body's scrollbar when it takes room, and the
-gutter the interface editor keeps for its block handles (`blockGutter`,
-told to the rows by `detailOuterClass`). Under View source the field's side
-padding is the column's, so the source lines up too. A new part of the
-title block or a new body frame must keep to this; `e2e/title-body-column.spec.ts`
-and `e2e/pane-header-column.spec.ts` measure both edges at several window
-widths, for Markdown, text, and interface artifacts, on both surfaces.
+In the /app pane the rows above the box that scrolls the body (share
+notice, title, chips, meta line, save notices) leave the room the body
+leaves beside its column (`scrollbarRoom` in `detail-scroll.ts`): the
+body's scrollbar when it takes room, and for an interface the gutter its
+block handles hang in. That gutter is one variable, set by
+`detailOuterClass` from the artifact's kind alone, and rows inside the body
+(the body's surface, the source, the Files section) read it through
+`gutterRoom`, so the title never moves when View source opens. A band that
+spans the pane (a notice, the Files section) takes the `column` class for
+its content. Under View source the field's side padding is the column's.
+A new row must keep to this. `e2e/title-body-column.spec.ts` (fixtures:
+the editor in the pane and on the page, for Markdown, text, and interface
+artifacts), `e2e/title-body-column-db.spec.ts` (a reader on the real page,
+and the pane's read-only view), and `e2e/pane-header-column.spec.ts`
+measure both edges at several window widths.
 
 ### Themes
 
