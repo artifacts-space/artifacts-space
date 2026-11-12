@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { listItemsFixtureMarkdown } from "../src/components/dev/list-items-fixture";
 
@@ -6,8 +6,8 @@ import { listItemsFixtureMarkdown } from "../src/components/dev/list-items-fixtu
  * List items that hold blocks, in the rich Markdown editor, on the dev
  * fixture (/dev/editor?kind=lists): task items with a paragraph, a code
  * block, and another paragraph, written with blank lines as agents write
- * them. They load as formatted blocks, and an edit changes only the part
- * edited in the Markdown the editor would save.
+ * them, and numbered steps. They load as formatted blocks, and an edit
+ * changes only the part edited in the Markdown the editor would save.
  */
 
 const editor = (page: Page) => page.getByRole("textbox", { name: "Artifact content" });
@@ -19,14 +19,13 @@ async function expectSaved(page: Page, markdown: string) {
 }
 
 /**
- * Puts the cursor at the end of the code block's text, and waits until the
+ * Puts the cursor at the end of the element's text, and waits until the
  * editor has seen it: keys sent faster than the browser reports the new
  * selection would land where the cursor was before.
  */
-async function cursorAtEndOfCode(page: Page, text: string) {
-  const code = editor(page).locator("pre code", { hasText: text });
-  await code.click();
-  await code.evaluate((element) => {
+async function cursorAtEnd(page: Page, target: Locator, text: string) {
+  await target.click();
+  await target.evaluate((element) => {
     const range = document.createRange();
     range.selectNodeContents(element);
     range.collapse(false);
@@ -57,7 +56,25 @@ test("should format list items that hold code blocks and save only the parts edi
   await expectSaved(page, ticked);
 
   // Editing the code changes only the code line.
-  await cursorAtEndOfCode(page, "Save this as an artifact in my Launch project.");
+  const codeText = "Save this as an artifact in my Launch project.";
+  await cursorAtEnd(page, editor(page).locator("pre code", { hasText: codeText }), codeText);
   await page.keyboard.type(" Now.");
   await expectSaved(page, ticked.replace("my Launch project.\n", "my Launch project. Now.\n"));
+});
+
+test("should format numbered items and number the list again when an item is added", async ({ page }) => {
+  await page.goto("/dev/editor?kind=lists");
+  await page.waitForLoadState("networkidle");
+
+  // Bold text in a numbered item shows as bold, never as stars.
+  const shipped = editor(page).getByRole("listitem").filter({ hasText: "Ship it." });
+  await expect(shipped.locator("strong")).toHaveText("Ship");
+  await expect(editor(page).getByText("**Ship**")).toHaveCount(0);
+  await expect(page.getByRole("note")).toHaveCount(0);
+
+  // A new step after step 2 takes number 3, and the step after it becomes 4. Nothing else changes.
+  await cursorAtEnd(page, editor(page).locator("li p", { hasText: "Run it." }), "Run it.");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Check.");
+  await expectSaved(page, listItemsFixtureMarkdown.replace("2. Run it.\n3. **Ship** it.\n", "2. Run it.\n\n3. Check.\n\n4. **Ship** it.\n"));
 });

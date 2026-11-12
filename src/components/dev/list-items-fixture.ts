@@ -1,7 +1,7 @@
 /**
  * Development only: a document an agent might write, with task items that
- * hold a paragraph, a code block, and another paragraph, a numbered item
- * with a code block, and a bulleted list in `*` style. The list items e2e
+ * hold a paragraph, a code block, and another paragraph, numbered items
+ * with a code block and with bold text, and a bulleted list in `*` style. The list items e2e
  * test (`e2e/editor-list-items.spec.ts`) loads it at `/dev/editor?kind=lists`.
  */
 export const listItemsFixtureMarkdown = [
@@ -28,6 +28,7 @@ export const listItemsFixtureMarkdown = [
   "   ```",
   "",
   "2. Run it.",
+  "3. **Ship** it.",
   "",
   "* one",
   "* two",
