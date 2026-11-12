@@ -55,8 +55,12 @@ class RecordCollector {
   totalRows = 0;
   columnCount = 0;
   private seenHeader = false;
+  // A plain field, not a parameter property: Node's type stripping (the owner scripts load this file) cannot emit one.
+  private readonly maxRows: number;
 
-  constructor(private readonly maxRows: number) {}
+  constructor(maxRows: number) {
+    this.maxRows = maxRows;
+  }
 
   push(record: string[]) {
     this.columnCount = Math.max(this.columnCount, record.length);
