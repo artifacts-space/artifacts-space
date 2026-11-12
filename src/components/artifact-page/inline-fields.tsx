@@ -14,7 +14,7 @@ import { usePageEdit } from "./page-edit-context";
  */
 
 const titleClass = "text-balance text-4xl font-medium leading-[1.08] tracking-[-0.03em] sm:text-5xl";
-const summaryClass = "max-w-2xl text-md leading-7 text-muted-foreground";
+const summaryClass = "text-md leading-7 text-muted-foreground";
 
 /** The page title: a heading for readers, the same heading as a field for editors. */
 export function InlineTitle({ children }: { children: React.ReactNode }) {
@@ -27,17 +27,20 @@ export function InlineTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** The one-line summary under the title. Editors see a field even when it is empty. */
+/**
+ * The one-line summary under the title. Editors see a field even when it is
+ * empty; a long summary wraps inside the column, as it does for readers.
+ */
 export function InlineSummary({ children }: { children: React.ReactNode }) {
   const edit = usePageEdit();
   if (!edit) return children;
   return (
-    <input
+    <LineField
       value={edit.draft.summary}
-      onChange={(event) => { edit.update("summary", event.target.value); }}
+      onValueChange={(summary) => { edit.update("summary", summary); }}
       aria-label="Summary"
       placeholder="Add a one-line summary"
-      className={`mt-4 block w-full bg-transparent outline-none placeholder:text-muted-foreground/60 ${summaryClass}`}
+      className={`mt-4 ${summaryClass}`}
     />
   );
 }

@@ -14,7 +14,7 @@ import { SheetFill } from "@/components/artifact-view/sheet-fill";
 import { SheetFormatProvider, type SheetFormatSaver } from "@/components/artifact-view/sheet-format";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
-import { pageColumnClass, usesFullWidth } from "@/lib/page-width/rules";
+import { bodyFillsColumnClass, pageColumnClass, usesFullWidth } from "@/lib/page-width/rules";
 import { plainSheetFormat } from "@/lib/sheet-format/rules";
 import { sheetAtLimit } from "@/lib/ui/fixtures/formats";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
@@ -82,9 +82,9 @@ export function EditorFixture({ kind, failingSaves = false, agentSaves = false }
           <ConfirmationsProvider initial={[]}>
             <PageInlineEditor artifact={artifact} reviewed={false} onSaved={onSaved} save={save} signalEditing={keepSignalInTab}>
               <InlineTitle>{artifact.title}</InlineTitle>
-              <InlineSummary><p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{artifact.summary}</p></InlineSummary>
+              <InlineSummary><p className="mt-4 text-md leading-7 text-muted-foreground">{artifact.summary}</p></InlineSummary>
               <PageConflictNotice />
-              <article className="mt-10">
+              <article className={`mt-10 ${bodyFillsColumnClass}`}>
                 <SheetFill artifactKey={artifact.publicId}>
                   <SheetFormatProvider stored={plainSheetFormat} save={failingSaves ? failFormatSave : keepFormatInMemory}>
                     <InlineBody>

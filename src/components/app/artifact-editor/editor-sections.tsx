@@ -13,13 +13,15 @@ import type { ArtifactDraft } from "./use-artifact-draft";
 
 type UpdateDraft = <K extends keyof ArtifactDraft>(key: K, value: ArtifactDraft[K]) => void;
 
-/** Notice shown while the artifact is shared by link or publicly. */
-export function ShareBanner({ shareUrl, isPublic }: { shareUrl: string; isPublic: boolean }) {
+/** Notice shown while the artifact is shared by link or publicly: a band across the pane, with its words in the content's column (`column`), above the title they line up with. */
+export function ShareBanner({ shareUrl, isPublic, column }: { shareUrl: string; isPublic: boolean; column: string }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b bg-muted/50 px-5 py-2">
-      <IconLink className="size-3.5 text-muted-foreground" />
-      <span className="text-sm text-muted-foreground">{isPublic ? "Anyone can find and read this artifact." : "Anyone with the link can read this artifact."}</span>
-      <CopyButton value={shareUrl} label="Copy link" variant="ghost" size="sm" className="ml-auto" />
+    <div className={cn("border-b bg-muted/50 py-2", scrollbarRoom)}>
+      <div className={cn(column, "flex flex-wrap items-center gap-3")}>
+        <IconLink className="size-3.5 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">{isPublic ? "Anyone can find and read this artifact." : "Anyone with the link can read this artifact."}</span>
+        <CopyButton value={shareUrl} label="Copy link" variant="ghost" size="sm" className="ml-auto" />
+      </div>
     </div>
   );
 }

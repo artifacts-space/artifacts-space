@@ -1,10 +1,12 @@
 import type { ArtifactKind } from "@/lib/artifact-types";
 
 /**
- * Page width for one artifact, like Notion's "Full width": contained (the
- * default) keeps today's reading width; full width uses the whole window,
- * with side padding that still fits a phone. These are literal class names
- * so Tailwind finds them.
+ * Page width for one artifact, the "Full width" setting: contained (the
+ * default) keeps everything to one centered column; full width uses the
+ * whole window, with side padding that still fits a phone. The title block
+ * (icon, title, summary, chips) and the body share that column: nothing in
+ * the body stops short of where the title ends. These are literal class
+ * names so Tailwind finds them.
  */
 
 /** The menu label for the setting. */
@@ -14,7 +16,7 @@ export const FULL_WIDTH_LABEL = "Full width";
  * The contained column's cap, shared by the page, the /app panes, and the
  * Edit view. Change the reading width here, once. `max-w-5xl` is 64rem:
  * 1024px at the default font size. It is in rem on purpose, so the column
- * grows with a reader's larger font size, as the 72ch prose measure does.
+ * grows with a reader's larger font size.
  */
 const CONTAINED_COLUMN = "max-w-5xl";
 
@@ -30,24 +32,26 @@ export function pageColumnClass(fullWidth: boolean): string {
 }
 
 /**
- * The class for the wrapper around an artifact's body. Full width lifts the
- * 72ch reading measure of Markdown and plain text (`--artifact-measure` in
- * globals.css); contained adds nothing, so it looks exactly as before.
+ * The class for the wrapper around an artifact's body where it sits in a
+ * page column. Markdown and plain text have their own 72ch cap
+ * (`--artifact-measure` in globals.css), for places with no column around
+ * them (a version in History, a comment). In a page column the column is
+ * the reading width, so this lifts the cap and the body's text ends where
+ * the title and summary above it end, contained or full width.
  */
-export function readingMeasureClass(fullWidth: boolean): string {
-  return fullWidth ? "[--artifact-measure:none]" : "";
-}
+export const bodyFillsColumnClass = "[--artifact-measure:none]";
 
 /**
  * The column an artifact's body sits in inside the /app panes. Contained,
  * it is the public page's own column (pageColumnClass): everything (text,
- * callouts, tabs, diagrams) keeps to the centered column readers see.
- * Full width uses the whole pane and lifts the reading measure; it keeps the
- * page's base padding only, because a pane is narrower than the window the
- * page's wider padding is sized for. The pane keeps its top and bottom padding.
+ * callouts, tabs, diagrams) keeps to the centered column readers see, and
+ * fills it. Full width uses the whole pane; it keeps the page's base padding
+ * only, because a pane is narrower than the window the page's wider padding
+ * is sized for. The pane keeps its top and bottom padding.
  */
 export function previewColumnClass(fullWidth: boolean): string {
-  return fullWidth ? "mx-auto w-full min-w-0 max-w-none px-6 [--artifact-measure:none]" : `mx-auto w-full min-w-0 ${pageColumnClass(false)}`;
+  const column = fullWidth ? "max-w-none px-6" : pageColumnClass(false);
+  return `mx-auto w-full min-w-0 ${column} ${bodyFillsColumnClass}`;
 }
 
 /**

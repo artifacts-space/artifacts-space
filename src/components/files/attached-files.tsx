@@ -11,6 +11,7 @@ import type { ActionResult, ArtifactDto } from "@/lib/artifact-types";
 import { fileInputAccept, formatBytes, fileTypeLabel } from "@/lib/files/config";
 import { offersReplace } from "@/lib/files/replace-rules";
 import { fileUrl, type FileDto } from "@/lib/files/types";
+import { cn } from "@/lib/utils";
 
 import { FileUploader } from "./file-uploader";
 import { sendToServer, useFileUploads, type SendFile } from "./use-file-uploads";
@@ -79,7 +80,17 @@ function AttachedRow({ file, showId, removing, replacing, busy, onRemove, onRepl
  * in place of a file, keeping its name, place, and links; the old copy
  * stays in History. In a ui artifact, copy a file's id into an Image or File element.
  */
-export function AttachedFiles({ artifact, onUpdated, api = serverApi }: { artifact: ArtifactDto; onUpdated: (artifact: ArtifactDto) => void; api?: AttachFilesApi | undefined }) {
+interface AttachedFilesProps {
+  artifact: ArtifactDto;
+  onUpdated: (artifact: ArtifactDto) => void;
+  api?: AttachFilesApi | undefined;
+  /** The content's column in the /app pane (previewColumnClass): the section is a band across the pane, and its rows keep to the column, under the body they belong to. */
+  column?: string | undefined;
+  /** Extra classes for the band, such as the room the pane leaves beside the column. */
+  className?: string | undefined;
+}
+
+export function AttachedFiles({ artifact, onUpdated, api = serverApi, column, className }: AttachedFilesProps) {
   const [removing, setRemoving] = useState<string | null>(null);
   const pickerRef = useRef<HTMLInputElement>(null);
   const targetRef = useRef<FileDto | null>(null);
@@ -124,7 +135,8 @@ export function AttachedFiles({ artifact, onUpdated, api = serverApi }: { artifa
   }
 
   return (
-    <section aria-label="Files" data-slot="attached-files" className="flex flex-col gap-3 border-t bg-background/60 px-5 py-4 sm:px-7">
+    <section aria-label="Files" data-slot="attached-files" className={cn("border-t bg-background/60 py-4", column ? null : "px-5 sm:px-7", className)}>
+      <div className={cn(column, "flex flex-col gap-3")}>
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-md font-medium">Files</h2>
         <span className="text-xs text-muted-foreground">{artifact.files.length === 0 ? "None yet" : `${String(artifact.files.length)} attached`}</span>
@@ -147,6 +159,7 @@ export function AttachedFiles({ artifact, onUpdated, api = serverApi }: { artifa
       ) : null}
       <input ref={pickerRef} type="file" accept={fileInputAccept} className="sr-only" tabIndex={-1} aria-hidden data-slot="replace-file-input" onChange={onPicked} />
       <FileUploader items={uploads.items} onFiles={uploads.addFiles} onRemove={(key) => { uploads.remove(key); }} />
+      </div>
     </section>
   );
 }

@@ -6,6 +6,8 @@ import { useEffect, useRef, type RefObject } from "react";
 import { FileUploader, UploadList } from "@/components/files/file-uploader";
 import type { UploadItem } from "@/components/files/use-file-uploads";
 import { Button } from "@/components/ui/button";
+import { gutterRoom } from "@/components/app/artifact-editor/detail-scroll";
+import { cn } from "@/lib/utils";
 
 const fieldSelector = '[contenteditable="true"], textarea, input:not([type="file"])';
 
@@ -69,10 +71,12 @@ interface BlankPageFilesProps {
   dropBox: boolean;
   dragging: boolean;
   filesProblem: string | null;
+  /** The content's column in the /app pane (previewColumnClass), so the row starts where the title starts. */
+  column: string;
 }
 
 /** The blank page's files section, when the page is a new artifact and there is something to show. */
-export function BlankPageFilesSlot({ page, dragging }: { page: { active: boolean; blank: boolean; eligible: boolean; filesProblem: string | null; uploads: { items: readonly UploadItem[] }; removeUpload: (key: string) => void; onContent: (content: { files: File[] }) => void }; dragging: boolean }) {
+export function BlankPageFilesSlot({ page, dragging, column }: { page: { active: boolean; blank: boolean; eligible: boolean; filesProblem: string | null; uploads: { items: readonly UploadItem[] }; removeUpload: (key: string) => void; onContent: (content: { files: File[] }) => void }; dragging: boolean; column: string }) {
   const { active, eligible, filesProblem, uploads, removeUpload, onContent } = page;
   if (!active || (!eligible && uploads.items.length === 0 && !filesProblem)) return null;
   return (
@@ -84,6 +88,7 @@ export function BlankPageFilesSlot({ page, dragging }: { page: { active: boolean
       dropBox={page.blank}
       dragging={dragging}
       filesProblem={filesProblem}
+      column={column}
     />
   );
 }
@@ -93,10 +98,11 @@ export function BlankPageFilesSlot({ page, dragging }: { page: { active: boolean
  * empty, the uploads' progress and errors once files were dropped or picked,
  * and a hint while something is held over the page.
  */
-export function BlankPageFiles({ items, onFiles, onRemove, showUpload, dropBox, dragging, filesProblem }: BlankPageFilesProps) {
+export function BlankPageFiles({ items, onFiles, onRemove, showUpload, dropBox, dragging, filesProblem, column }: BlankPageFilesProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <div className="flex flex-col gap-3 px-5 pb-4 sm:px-7">
+    <div className={cn("pb-4", gutterRoom)}>
+    <div className={cn(column, "flex flex-col gap-3")}>
       {dragging ? (
         <p data-slot="drop-hint" className="card-nested border-dashed px-4 py-6 text-center text-md text-muted-foreground">Drop to add it here</p>
       ) : null}
@@ -123,6 +129,7 @@ export function BlankPageFiles({ items, onFiles, onRemove, showUpload, dropBox, 
       {filesProblem ? <p role="alert" className="text-sm text-tone-danger">{filesProblem}</p> : null}
       {items.length > 0 && dropBox ? <FileUploader items={items} onFiles={onFiles} onRemove={onRemove} /> : null}
       {dropBox ? null : <UploadList items={items} onRemove={onRemove} />}
+    </div>
     </div>
   );
 }

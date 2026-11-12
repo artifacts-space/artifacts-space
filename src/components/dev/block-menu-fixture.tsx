@@ -13,6 +13,7 @@ import { ReaderBlockMenu } from "@/components/block-links/reader-block-menu";
 import { takeQuotedComment, usePendingQuote } from "@/components/comments/quote-request";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
 import type { ArtifactDto } from "@/lib/artifact-types";
+import { bodyFillsColumnClass } from "@/lib/page-width/rules";
 
 import { fixtureArtifact } from "./fixture-content";
 
@@ -90,7 +91,7 @@ function ReaderFixture({ artifact }: { artifact: ArtifactDto }) {
   return (
     <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
       <h1 className="text-4xl font-medium">{artifact.title}</h1>
-      <article className="mt-10" data-block-links="">
+      <article className={`mt-10 ${bodyFillsColumnClass}`} data-block-links="">
         <ReaderBlockMenu publicId={artifact.publicId} enabled>
           <ArtifactView kind="markdown" content={artifact.content} title={artifact.title} language="" files={[]} />
         </ReaderBlockMenu>
@@ -112,7 +113,7 @@ export function BlockMenuFixture({ reader, long }: { reader: boolean; long: bool
         <ConfirmationsProvider initial={[]}>
           <PageInlineEditor artifact={artifact} reviewed={false} onSaved={onSaved} save={save}>
             <h1 className="text-4xl font-medium">{artifact.title}</h1>
-            <article className="mt-10" data-block-links="">
+            <article className={`mt-10 ${bodyFillsColumnClass}`} data-block-links="">
               <InlineBody canComment>
                 <ArtifactView kind="markdown" content={artifact.content} title={artifact.title} language="" files={[]} />
               </InlineBody>
