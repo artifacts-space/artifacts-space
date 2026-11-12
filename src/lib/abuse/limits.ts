@@ -152,12 +152,38 @@ export const rateLimits = {
   /** Browsers turned on for notifications, and test notifications, per person per hour. Each test calls the push services. */
   pushDevice: { limit: 30, windowSeconds: hour },
   pushTest: { limit: 10, windowSeconds: hour },
-  /** MCP app registrations (OAuth dynamic client registration) per network address per hour. */
-  oauthRegister: { limit: 20, windowSeconds: hour },
+  /**
+   * MCP app registrations (OAuth dynamic client registration) per network
+   * address per hour. Hosted apps register from a few shared addresses, often
+   * once per connection, so this is high. Registrations nobody approved are
+   * capped per address as well (oauthLimits.maxUnapprovedClientsPerNetwork),
+   * so one address cannot fill the shared pool of unapproved apps.
+   */
+  oauthRegister: { limit: 300, windowSeconds: hour },
   /** OAuth authorization requests per network address per hour. */
   oauthAuthorize: { limit: 60, windowSeconds: hour },
-  /** OAuth token requests (code exchanges and refreshes) per network address per hour. */
-  oauthToken: { limit: 300, windowSeconds: hour },
+  /**
+   * Every OAuth token request per network address per hour: a load backstop
+   * only. Hosted apps send every user's refreshes from a few shared
+   * addresses, about one per person per hour, so this covers some 30,000
+   * active people behind one address (10 a second on average). Guessing is
+   * stopped by oauthTokenFailuresByNetwork, and a looping connection by
+   * oauthRefreshByConnection.
+   */
+  oauthToken: { limit: 36_000, windowSeconds: hour },
+  /**
+   * Failed OAuth token requests (any 4xx answer from the token endpoint:
+   * a bad code, refresh token, client, or request) per network address,
+   * counted after the answer. Over the limit, every token request from the
+   * address is refused before it is checked, so guessing gets nowhere.
+   */
+  oauthTokenFailuresByNetwork: { limit: 60, windowSeconds: quarterHour },
+  /**
+   * Successful refreshes per connection (one person and one app) per hour,
+   * from any address. A connection refreshes about once an hour per open
+   * session; this stops one in a loop without touching the app's other users.
+   */
+  oauthRefreshByConnection: { limit: 60, windowSeconds: hour },
 } as const satisfies Record<string, { limit: number; windowSeconds: number }>;
 
 export type RateLimitName = keyof typeof rateLimits;
@@ -212,4 +238,6 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   oauthRegister: "Your network has registered a lot of apps in the last hour.",
   oauthAuthorize: "Your network has started a lot of app connections in the last hour.",
   oauthToken: "Your network has asked for a lot of access tokens in the last hour.",
+  oauthTokenFailuresByNetwork: "Your network has sent a lot of token requests that failed in the last few minutes.",
+  oauthRefreshByConnection: "This connection has refreshed its access a lot in the last hour.",
 };

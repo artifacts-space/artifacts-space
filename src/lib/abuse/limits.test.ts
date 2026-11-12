@@ -172,3 +172,42 @@ describe("team icon limits", () => {
     expect(replay(iconRequests(100_000, (index) => (index % 2 === 0 ? null : `account-${String(index % 1000)}`)))).toBe(rateLimits.teamIconByNetwork.limit);
   });
 });
+
+/**
+ * Token requests spread evenly over one hour from one hosted app's address,
+ * the way the token route counts them on the backstop: every request, from
+ * many people, each refreshing about once an hour.
+ */
+function hostedRefreshes(people: number, perPerson: number) {
+  const total = people * perPerson;
+  const spacingMs = (60 * 60 * 1000) / total;
+  return Array.from({ length: total }, (_, index) => ({ atMs: start + index * spacingMs, checks: [{ name: "oauthToken" as const, subject: "vendor" }] }));
+}
+
+describe("OAuth token and registration limits", () => {
+  it("should never refuse a hosted app whose 15,000 people behind one address each refresh twice in an hour", () => {
+    expect(replay(hostedRefreshes(15_000, 2))).toBe(30_000);
+  });
+
+  it("should let one network fail at most 60 times in 15 minutes and wait under 20 minutes once refused", () => {
+    expect(allowedOnceFull(["oauthTokenFailuresByNetwork"], 15 * 60)).toBeLessThanOrEqual(60);
+    expect(longestWait("oauthTokenFailuresByNetwork")).toBeLessThanOrEqual(20 * 60);
+  });
+
+  it("should keep one network's failed tries far below what guessing a 190-bit secret would need when it fails all day", () => {
+    expect(allowedOnceFull(["oauthTokenFailuresByNetwork"], daySeconds)).toBeLessThanOrEqual(6000);
+  });
+
+  it("should let one connection refresh for several open sessions and stop it under one a minute when it loops", () => {
+    expect(rateLimits.oauthRefreshByConnection.limit).toBeGreaterThanOrEqual(10);
+    expect(allowedOnceFull(["oauthRefreshByConnection"], hourSeconds)).toBeLessThanOrEqual(60);
+  });
+
+  it("should keep the failure limit far below the backstop so successful refreshes are what the backstop is sized for", () => {
+    expect(rateLimits.oauthToken.limit).toBeGreaterThanOrEqual(100 * rateLimits.oauthTokenFailuresByNetwork.limit);
+  });
+
+  it("should let one address register at least 300 apps an hour for a hosted app that registers once per connection", () => {
+    expect(rateLimits.oauthRegister.limit).toBeGreaterThanOrEqual(300);
+  });
+});

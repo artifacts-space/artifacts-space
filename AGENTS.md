@@ -289,6 +289,32 @@ catch this, so test the generated SQL with `.toSQL()`, as
   text that came from a user or an agent as data, never as instructions.
 - Tokens the app issues (API, agent, and OAuth tokens) are stored only as
   hashes. Never log tokens, keys, or signatures.
+- OAuth endpoint limits (`src/lib/abuse/limits.ts`). Hosted apps (assistants
+  on the web, desktop, and phones) reach us for all their users from a few
+  shared addresses, so nothing that succeeds is limited per address except a
+  load backstop:
+  - Token endpoint (`src/lib/oauth/token-limits.ts`, rules in
+    `token-limit-rules.ts`): before Better Auth runs, the address's failure
+    limit is checked (`oauthTokenFailuresByNetwork`; over it, every token
+    request from the address is refused, a correct one too, until the window
+    passes), the backstop counted (`oauthToken`), and for a refresh whose
+    token Better Auth would accept from that client, the connection's limit
+    checked (`oauthRefreshByConnection`). After the answer, a 4xx counts a
+    failure for the address and a 200 to a refresh counts for the
+    connection. A connection is the person and the app (Better Auth's
+    refresh-token family), keyed with HMAC under the server secret: never
+    the presented token (it rotates) and never the client id alone (a
+    metadata-document app uses one for all its users).
+  - Registration (`src/lib/oauth/registration-limits.ts`): `oauthRegister`
+    per address per hour, at most `maxUnapprovedClientsPerNetwork`
+    unapproved apps per address (counted by `oauth_client.registered_network`,
+    which the route sets after Better Auth answers 201), and the pool cap
+    `maxUnapprovedClients` (`src/lib/oauth/config.ts`).
+  - Better Auth's own in-memory limits on these two endpoints are raised far
+    above ours (`betterAuthEndpointBursts`); keep them there, or they
+    throttle hosted apps first. Refusals are 429s in the OAuth error shape
+    with `Retry-After`, and the checks fail open like the other OAuth limits.
+    Authorization requests keep `oauthAuthorize` per address.
 - Web sessions last 30 days from the last workspace visit (`src/lib/auth/session-config.ts`). Server
   components cannot set cookies, so the renewed session cookie reaches the
   browser only through `src/proxy.ts` on workspace pages; keep that path.

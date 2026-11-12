@@ -1,4 +1,5 @@
-import type { RateLimitName } from "@/lib/abuse/limits";
+import { rateLimitMessages, type RateLimitName } from "@/lib/abuse/limits";
+import { describeWait } from "@/lib/abuse/rate-limit-window";
 
 import { normalizeRequestedScope } from "./scopes";
 
@@ -17,12 +18,12 @@ export function publicOAuthEndpoint(method: string, pathname: string): PublicOAu
   return match?.method === method ? match.endpoint : null;
 }
 
-/** The per-network rate limit for each public endpoint. */
-export const oauthRateLimits: Record<PublicOAuthEndpoint, RateLimitName> = {
-  register: "oauthRegister",
-  authorize: "oauthAuthorize",
-  token: "oauthToken",
-};
+/**
+ * The per-network rate limit counted on every request to the authorization
+ * endpoint. Registration and token requests have their own limits, some
+ * counted after Better Auth answers (registration-limits.ts, token-limits.ts).
+ */
+export const authorizeRateLimit = "oauthAuthorize" satisfies RateLimitName;
 
 /**
  * The authorization request URL with its scope rewritten to this server's
@@ -37,4 +38,14 @@ export function withPolicyScope(url: URL): URL {
 /** An OAuth-style JSON error (RFC 6749 §5.2 shape) with the given status. */
 export function oauthErrorResponse(status: number, error: string, description: string, headers: Record<string, string> = {}): Response {
   return Response.json({ error, error_description: description }, { status, headers: { "Cache-Control": "no-store", ...headers } });
+}
+
+/**
+ * A rate-limit refusal from a public OAuth endpoint: 429, the OAuth error
+ * shape, the limit's plain message with the wait, and Retry-After. The same
+ * for every client, so it says nothing about any token, code, or app.
+ */
+export function oauthRateLimited(name: RateLimitName, retryAfterSeconds: number): Response {
+  const description = `${rateLimitMessages[name]} Try again in ${describeWait(retryAfterSeconds)}.`;
+  return oauthErrorResponse(429, "rate_limited", description, { "Retry-After": String(retryAfterSeconds) });
 }

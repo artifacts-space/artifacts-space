@@ -11,6 +11,7 @@ import { rateLimitRows, sampleRefusal, type RateLimitRow, type RefusalShape } fr
 import { INVITATION_BUDGET_MESSAGE, NON_SIGN_IN_SHARE, nonSignInDailyLimit, SENDIR_DAILY_RECIPIENTS } from "@/lib/email/budget-rules";
 import { fileLimits, formatBytes } from "@/lib/files/config";
 import { maxMermaidLength } from "@/lib/mermaid-source";
+import { oauthLimits } from "@/lib/oauth/config";
 import { contentQuotaProblem, fileQuotaProblem, storageQuota } from "@/lib/quota/rules";
 import { teamLimits } from "@/lib/teams/limits";
 import { uiLimits } from "@/lib/ui/limits";
@@ -68,6 +69,9 @@ export default function LimitsPage() {
           <GroupTable rows={rateLimitRows().filter((row) => row.group === group)} />
         </section>
       ))}
+      <Prose>
+        <p>Apps that connect with OAuth refresh their access about once an hour. Hosted apps send every person&apos;s refreshes from a few shared addresses, so a successful refresh counts against its connection (one person and one app), and the address only meets a load backstop of {n(rateLimits.oauthToken.limit)} an hour. Failed token requests count against the address: after {rateLimits.oauthTokenFailuresByNetwork.limit} in {rateLimits.oauthTokenFailuresByNetwork.windowSeconds / 60} minutes, every token request from it waits. One address may register {n(rateLimits.oauthRegister.limit)} apps an hour and have at most {oauthLimits.maxUnapprovedClientsPerNetwork} that nobody has approved yet.</p>
+      </Prose>
 
       <DocsH page={page} id="storage" />
       <Prose>

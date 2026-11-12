@@ -48,6 +48,15 @@ export const oauthClient = pgTable(
     dpopBoundAccessTokens: boolean("dpop_bound_access_tokens").default(false),
     referenceId: text("reference_id"),
     metadata: jsonb("metadata"),
+    /**
+     * The hashed network key (src/lib/abuse/network-key.ts) of the address
+     * that registered the app through dynamic client registration, set by the
+     * auth route after Better Auth answers. Null for apps from a metadata
+     * document and for apps registered before the column. Better Auth never
+     * reads it; it caps unapproved apps per address
+     * (src/lib/oauth/registration-limits.ts).
+     */
+    registeredNetwork: text("registered_network"),
   },
   (table) => [
     index("oauth_client_user_idx").on(table.userId),

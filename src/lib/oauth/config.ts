@@ -21,8 +21,31 @@ export const oauthLimits = {
   refreshReuseSeconds: 30,
   /** Registered apps nobody approved are deleted after this long. */
   unapprovedClientHours: 24,
-  /** Most unapproved apps stored at once. Registration pauses above this. */
-  maxUnapprovedClients: 500,
+  /**
+   * Most unapproved apps stored at once. Registration pauses above this.
+   * Each one is two small rows (the app and its resource link), so this
+   * bounds the table, not the cost of a row.
+   */
+  maxUnapprovedClients: 2000,
+  /**
+   * Most unapproved apps one network address may have within the window
+   * above. Approved apps never count, so a hosted app whose people finish
+   * connecting is limited only by the hourly registration limit; one address
+   * cannot hold more than a twentieth of the pool.
+   */
+  maxUnapprovedClientsPerNetwork: 100,
+} as const;
+
+/**
+ * Better Auth's own per-instance, in-memory limits on the token and
+ * registration endpoints (20 and 5 a minute per address by default). The
+ * Postgres limits in src/lib/abuse/limits.ts are the real ones; these are
+ * raised far above any real burst so they never throttle a hosted app that
+ * serves many people from one address.
+ */
+export const betterAuthEndpointBursts = {
+  token: { window: 10, max: 1000 },
+  register: { window: 10, max: 100 },
 } as const;
 
 /**
