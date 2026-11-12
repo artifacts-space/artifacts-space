@@ -20,23 +20,82 @@ const markdownPatterns: readonly [RegExp, string][] = [
   [/<[^>]*>/g, ""],
 ];
 
-const EMPHASIS_RUN = /[*_~]+/g;
+const EMPHASIS_RUN = /\*+|_+|~+/g;
 const SPACE = /\s/;
 const WORD = /[\p{L}\p{N}]/u;
+/** A blank line: emphasis never reaches across one. */
+const BLANK_LINE = /(\n[ \t]*\n)/;
+
+/** A run of one emphasis character, and whether Markdown lets it open or close emphasis there. */
+interface EmphasisRun {
+  start: number;
+  end: number;
+  char: string;
+  opens: boolean;
+  closes: boolean;
+}
 
 /**
- * Emphasis marks off, literal characters kept: a run of `*`, `_`, or `~`
- * with spaces on both sides ("2 * 3") and an underscore inside a word
- * ("snake_case") are text, not marks.
+ * The runs of `*`, `_`, and `~` in `text`. A run opens when text follows it
+ * and closes when text comes before it; an underscore inside a word
+ * ("snake_case") does neither.
+ */
+function emphasisRuns(text: string): EmphasisRun[] {
+  return [...text.matchAll(EMPHASIS_RUN)].map((match) => {
+    const run = match[0];
+    const start = match.index;
+    const before = text.charAt(start - 1);
+    const after = text.charAt(start + run.length);
+    const inWord = run.startsWith("_") && WORD.test(before) && WORD.test(after);
+    return {
+      start,
+      end: start + run.length,
+      char: run.charAt(0),
+      opens: !inWord && after !== "" && !SPACE.test(after),
+      closes: !inWord && before !== "" && !SPACE.test(before),
+    };
+  });
+}
+
+/** The runs that are marks: each closing run with the nearest earlier opening run of its character. */
+function pairedRuns(runs: readonly EmphasisRun[]): Set<EmphasisRun> {
+  const open = new Map<string, EmphasisRun[]>();
+  const paired = new Set<EmphasisRun>();
+  for (const run of runs) {
+    const openers = open.get(run.char) ?? [];
+    open.set(run.char, openers);
+    const opener = run.closes ? openers.pop() : undefined;
+    if (opener) {
+      paired.add(opener);
+      paired.add(run);
+    } else if (run.opens) {
+      openers.push(run);
+    }
+  }
+  return paired;
+}
+
+function stripParagraphEmphasis(text: string): string {
+  const runs = emphasisRuns(text);
+  const marks = pairedRuns(runs);
+  let stripped = "";
+  let at = 0;
+  for (const run of runs) {
+    if (!marks.has(run)) continue;
+    stripped += text.slice(at, run.start);
+    at = run.end;
+  }
+  return stripped + text.slice(at);
+}
+
+/**
+ * Emphasis marks off, literal characters kept. A run of `*`, `_`, or `~` is
+ * a mark only when it pairs with another, as Markdown reads it: "2 * 3",
+ * "2*3", "file*", and "snake_case" keep their characters, and "*done*"
+ * loses its marks.
  */
 function stripEmphasis(text: string): string {
-  return text.replace(EMPHASIS_RUN, (run: string, offset: number) => {
-    const before = text.charAt(offset - 1);
-    const after = text.charAt(offset + run.length);
-    const spaced = SPACE.test(before) && SPACE.test(after);
-    const inWord = run.startsWith("_") && WORD.test(before) && WORD.test(after);
-    return spaced || inWord ? run : "";
-  });
+  return text.split(BLANK_LINE).map(stripParagraphEmphasis).join("");
 }
 
 /** A backslash escape in Markdown: a backslash before ASCII punctuation, which stands for that character. */

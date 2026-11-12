@@ -8,11 +8,12 @@ import { MarkdownView } from "@/components/artifact-view/markdown-view";
 import { markdownSchemaExtensions } from "@/components/editor/rich/markdown-schema";
 import { parseMarkdown, serializeMarkdown } from "@/components/editor/rich/markdown-roundtrip";
 
-import { parseCommentMarkdown, serializeCommentMarkdown } from "./comment-markdown";
+import { commentFlavor, parseCommentMarkdown, serializeCommentMarkdown } from "./comment-markdown";
 import { parseMentions } from "@/lib/comments/mentions";
 
 import { mentionEditAt, mentionMatchAt } from "./mention-match";
 import { quotedCommentBody } from "./quote-request";
+import { threadShows } from "./thread-reading";
 
 /*
  * The rich comment box reads and writes a comment's Markdown with the
@@ -207,5 +208,51 @@ describe("mentionEditAt", () => {
   it("should replace the rest of the handle and step over the space when text follows", () => {
     const match = mentionMatchAt(cursorIn("@daxx please", 3).$position);
     expect(match && mentionEditAt(match, "dana")).toEqual({ from: 1, to: 6, insert: "@dana", caret: 7 });
+  });
+});
+
+describe("writing a comment on every keystroke", () => {
+  function countingFlavor() {
+    const calls = { count: 0 };
+    const flavor = {
+      shows: (markdown: string, nodes: readonly JSONContent[]) => {
+        calls.count += 1;
+        return threadShows(markdown, nodes);
+      },
+    };
+    return { flavor, calls };
+  }
+
+  const blocks = [paragraph(text("First, a plain line.")), paragraph(text("Second, with "), text("bold", ["bold"])), paragraph(text("Third: snake_case"))];
+  const empty = parseCommentMarkdown("").source;
+
+  it("should not judge any block again when the comment is written unchanged", () => {
+    const { flavor, calls } = countingFlavor();
+    const first = serializeMarkdown({ type: "doc", content: blocks }, empty, flavor);
+    const judged = calls.count;
+    expect(serializeMarkdown({ type: "doc", content: blocks }, empty, flavor)).toBe(first);
+    expect(calls.count).toBe(judged);
+  });
+
+  it("should judge only the edited block when one block changes", () => {
+    const { flavor, calls } = countingFlavor();
+    serializeMarkdown({ type: "doc", content: blocks }, empty, flavor);
+    const judged = calls.count;
+    const edited = [blocks[0], paragraph(text("Second, now edited")), blocks[2]].filter((block) => block !== undefined);
+    expect(serializeMarkdown({ type: "doc", content: edited }, empty, flavor)).toBe("First, a plain line.\n\nSecond, now edited\n\nThird: snake_case");
+    expect(calls.count).toBe(judged + 1);
+  });
+});
+
+describe("the comment text encoder", () => {
+  const block = { type: "doc", content: [paragraph(text("rename snake_case_name"))] };
+  const empty = parseCommentMarkdown("").source;
+
+  it("should write a comment with only the escapes it needs when the manager's text encoder is hooked", () => {
+    expect(serializeMarkdown(block, empty, commentFlavor)).toBe("rename snake_case_name");
+  });
+
+  it("should write a document with the manager's own escaping when no comment is being written", () => {
+    expect(serializeMarkdown(block, empty, "document")).toBe("rename snake\\_case\\_name");
   });
 });

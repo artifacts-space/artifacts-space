@@ -3,6 +3,7 @@ import { MarkdownManager } from "@tiptap/markdown";
 import type { Schema } from "@tiptap/pm/model";
 
 import { liftBlockColors } from "./block-color-nodes";
+import { boundedMemo, type BoundedMemo } from "./bounded-memo";
 import { commentKeepsAsWritten, commentLiteralMarkdown, commentTextMarkdown } from "./comment-text-markdown";
 import { needsRawBlock, splitBlocks, type LooseToken, type SourceBlock, type SplitSource } from "./markdown-blocks";
 import { markdownSchemaExtensions } from "./markdown-schema";
@@ -37,7 +38,12 @@ let engine: Engine | null = null;
 /** The text encoder while a comment's block is written; null writes with the manager's own. */
 let textEncoder: TextEncoder | null = null;
 
-/** Lets a comment's text be written with its own encoder, on the one shared manager. */
+/**
+ * Lets a comment's text be written with its own encoder, on the one shared
+ * manager. `encodeTextForMarkdown` is not part of the manager's public API:
+ * if an upgrade renames or drops it, comments go back to the manager's full
+ * escaping. comment-markdown.test.ts ("the comment text encoder") fails then.
+ */
 function hookTextEncoder(manager: MarkdownManager) {
   const base: unknown = Reflect.get(manager, "encodeTextForMarkdown");
   if (typeof base !== "function") return;
@@ -314,6 +320,26 @@ function renderCommentNode(node: JSONContent, current: Engine, comment: CommentF
   return literalParagraphs(node);
 }
 
+/**
+ * Characters of written comment blocks kept per flavor: well over the
+ * longest comment (COMMENT_MAX_LENGTH) with its blocks' JSON keys.
+ */
+const COMMENT_WRITES_BUDGET = 500_000;
+const commentWrites = new WeakMap<CommentFlavor, BoundedMemo>();
+
+/**
+ * `renderCommentNode`, remembered by the node's key. The box writes the
+ * whole comment on every keystroke, and a new comment has no loaded blocks
+ * to match, so without this every block would be judged by the thread's
+ * renderer again each time. A block's Markdown depends only on the block.
+ */
+function writtenCommentNode(node: JSONContent, current: Engine, comment: CommentFlavor): string {
+  const known = commentWrites.get(comment);
+  const memo = known ?? boundedMemo(COMMENT_WRITES_BUDGET);
+  if (!known) commentWrites.set(comment, memo);
+  return memo(nodeKey(node), () => renderCommentNode(node, current, comment));
+}
+
 /** A piece of output: source text and the loaded block it came from, if any. */
 interface Chunk {
   text: string;
@@ -367,7 +393,7 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine, flav
     }
     position += 1;
     if (!node || isEmptyParagraph(node)) continue;
-    const text = flavor === "document" ? renderNodes([node], current) : renderCommentNode(node, current, flavor);
+    const text = flavor === "document" ? renderNodes([node], current) : writtenCommentNode(node, current, flavor);
     // A block with no Markdown yet (an empty or uploading media block) is left out.
     if (text) chunks.push({ text, block: -1 });
   }

@@ -92,6 +92,10 @@ describe("commentExcerpt with what a person typed", () => {
     ["Use C:\\temp", "Use C:\\temp"],
     ["see [docs] page", "see [docs] page"],
     ["2 * 3", "2 * 3"],
+    ["2*3", "2*3"],
+    ["on call 24*7", "on call 24*7"],
+    ["every file* here", "every file* here"],
+    ["a ~ b and x~y", "a ~ b and x~y"],
   ])("should show %j as typed when it is stored as typed", (body, excerpt) => {
     expect(commentExcerpt(body)).toBe(excerpt);
   });
@@ -117,5 +121,14 @@ describe("commentExcerpt with what a person typed", () => {
 
   it("should still take emphasis marks off when they are marks", () => {
     expect(commentExcerpt("**Looks** _good_ ~~old~~")).toBe("Looks good old");
+  });
+
+  it.each([
+    ["2*3 and *done*", "2*3 and done"],
+    ["*done* and 2*3", "done and 2*3"],
+    ["**_both_** marks", "both marks"],
+    ["2*3\n\n4*5", "2*3 4*5"],
+  ])("should take off only the marks that pair when %j mixes marks and characters", (body, excerpt) => {
+    expect(commentExcerpt(body)).toBe(excerpt);
   });
 });
