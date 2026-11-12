@@ -300,6 +300,43 @@ Ship it on Friday <!-- color: red -->
   of an item in a tight list, which has no `<p>`. The Markdown version keeps
   the comment as written, and link preview text leaves it out.
 
+### Lists
+
+Bulleted (`-`, `*`, `+`), numbered (`1.` or `1)`, from any start, or `1.` on
+every item), and task (`- [ ]`, `- [x]`, `- [X]`) lists, tight or loose, as
+CommonMark and GFM read them. An item can hold more than one block: a first
+paragraph, then code blocks, more paragraphs, quotes, tables, and nested
+lists, each indented under the item's text and set off by blank lines:
+
+````md
+- [ ] **Save a new artifact.** Paste:
+
+  ```text
+  Save this as an artifact in my Launch project.
+  ```
+
+  Expect: a new private artifact, with a link.
+
+1. Install:
+
+   ```sh
+   pnpm install
+   ```
+````
+
+- **Numbered lists** are read by marked's own list rule, so the editor and
+  the read view agree on where an item ends: an item's blocks are indented
+  to its text (three spaces under `1.`).
+- **Edits stay in their item.** A list loads as one block, cut into its
+  items (`markdown-list-items.ts`). After an edit, every item nobody touched
+  is written back as it was, with the blank lines between items; the edited
+  item keeps its marker, its indent, and its blocks nobody touched; ticking
+  a task box changes only the mark in the box. A new item takes the list's
+  bullet (`*` stays `*`), delimiter, and numbering (all `1.` stays all `1.`).
+  When the list would not read back the same, it is written fresh instead.
+- **A loose task list** loads as one task list per item, since the task list
+  rule ends a list at a blank line; each item is then a block of its own.
+
 ### Raw blocks
 
 A top-level block the editor cannot show as formatted text, or that would
@@ -307,6 +344,10 @@ not survive a round trip, loads as a `rawMarkdown` node holding its exact
 source. It shows as an editable source box and saves unchanged. Today that is
 raw HTML, footnotes, link reference definitions, images inside text, and any
 block whose fresh rendering would change its meaning.
+
+The note over the editor names only the reasons found in the document
+(`rawKinds` from `parseMarkdown`, copy in `raw-parts-notice.ts`), and stays
+general when a part stays as written for another reason.
 
 ## Block node conventions
 

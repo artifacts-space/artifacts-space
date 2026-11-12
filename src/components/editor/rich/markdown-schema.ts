@@ -1,6 +1,6 @@
 import type { AnyExtension, JSONContent, NodeViewRenderer } from "@tiptap/core";
 import CodeBlock from "@tiptap/extension-code-block";
-import { TaskItem, TaskList } from "@tiptap/extension-list";
+import { OrderedList, TaskItem, TaskList } from "@tiptap/extension-list";
 import { renderTableToMarkdown, Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
 import StarterKit from "@tiptap/starter-kit";
 
@@ -102,6 +102,17 @@ export const MarkdownTable = Table.extend({
   renderMarkdown: (node, helpers) => renderTableToMarkdown(node, helpers).replace(/^\n+|\n+$/g, ""),
 }).configure({ resizable: false });
 
+/**
+ * Numbered lists read by marked's own list rule, as CommonMark reads them.
+ * Tiptap's numbered list rule indents an item's blocks by two spaces, not
+ * by the marker's width, so a code block under `1.` lost its first space
+ * and the item stayed as written. A tokenizer that never matches leaves
+ * every numbered list to marked; Tiptap still turns its tokens into nodes.
+ */
+const MarkdownOrderedList = OrderedList.extend({
+  markdownTokenizer: { name: "orderedList", level: "block", start: () => -1, tokenize: () => undefined },
+});
+
 /** StarterKit with paragraphs and headings that keep block colors (block-color-nodes.ts). */
 const ColorableStarterKit = StarterKit.extend({
   addExtensions() {
@@ -138,7 +149,9 @@ export function markdownSchemaExtensions(views: SchemaViews = {}): AnyExtension[
         HTMLAttributes: { rel: "noopener noreferrer nofollow ugc", target: null },
       },
       codeBlock: false,
+      orderedList: false,
     }),
+    MarkdownOrderedList,
     codeBlock ? MarkdownCodeBlock.extend({ addNodeView: () => codeBlock }) : MarkdownCodeBlock,
     TaskList,
     TaskItem.configure({ nested: true }),

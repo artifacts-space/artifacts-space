@@ -26,25 +26,42 @@ function childValues(node: Record<string, unknown>): unknown[] {
   return children;
 }
 
-/** True when the token, or any token inside it, is a type the editor cannot show. */
-function containsRawToken(value: unknown): boolean {
-  if (Array.isArray(value)) return value.some((item) => containsRawToken(item));
-  if (!isRecord(value)) return false;
-  if (typeof value.type === "string" && rawTokenTypes.has(value.type)) return true;
-  return childValues(value).some((child) => containsRawToken(child));
+/** Why a block stays as written. `other` is anything else the editor would not write back the same. */
+export type RawKind = "html" | "footnote" | "definition" | "image" | "other";
+
+const rawKindOfToken: Readonly<Record<string, RawKind>> = { html: "html", def: "definition", image: "image" };
+
+/** The first token type the editor cannot show in the token or inside it, as a raw kind. */
+function rawTokenKind(value: unknown): RawKind | null {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const kind = rawTokenKind(item);
+      if (kind) return kind;
+    }
+    return null;
+  }
+  if (!isRecord(value)) return null;
+  if (typeof value.type === "string" && rawTokenTypes.has(value.type)) return rawKindOfToken[value.type] ?? "other";
+  return rawTokenKind(childValues(value));
 }
 
 /**
- * True when a top-level block must stay as written: raw HTML (block or
- * inline), images inside text (an image alone in its paragraph is a media
- * block, a token of its own), link reference definitions, and footnotes.
- * The editor keeps these as raw blocks instead of dropping or rewriting them.
+ * Why a top-level block must stay as written, or null when the editor can
+ * try to show it: raw HTML (block or inline), images inside text (an image
+ * alone in its paragraph is a media block, a token of its own), link
+ * reference definitions, and footnotes. The editor keeps these as raw blocks
+ * instead of dropping or rewriting them.
  */
-export function needsRawBlock(token: unknown): boolean {
-  if (!isRecord(token)) return true;
+export function rawBlockKind(token: unknown): RawKind | null {
+  if (!isRecord(token)) return "other";
   const raw = typeof token.raw === "string" ? token.raw : "";
-  if (footnotePattern.test(raw)) return true;
-  return containsRawToken(token);
+  if (footnotePattern.test(raw)) return "footnote";
+  return rawTokenKind(token);
+}
+
+/** True when a top-level block must stay as written (see `rawBlockKind`). */
+export function needsRawBlock(token: unknown): boolean {
+  return rawBlockKind(token) !== null;
 }
 
 /** One top-level block of the source, with the whitespace that follows it. */
@@ -90,6 +107,10 @@ function appendToken(result: SplitSource, token: LooseToken) {
     appendWhitespace(result, token.raw);
     return;
   }
-  const text = token.raw.replace(/\s+$/, "");
-  result.blocks.push({ text, after: token.raw.slice(text.length), token });
+  // Some tokenizers (task lists) take the blank lines before them; those belong between blocks.
+  const blank = /^(?:[ \t]*\n)+/.exec(token.raw)?.[0] ?? "";
+  if (blank) appendWhitespace(result, blank);
+  const body = token.raw.slice(blank.length);
+  const text = body.replace(/\s+$/, "");
+  result.blocks.push({ text, after: body.slice(text.length), token });
 }

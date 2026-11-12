@@ -6,6 +6,8 @@ import { liftBlockColors } from "./block-color-nodes";
 import { needsRawBlock, splitBlocks, type LooseToken, type SourceBlock, type SplitSource } from "./markdown-blocks";
 import { markdownSchemaExtensions } from "./markdown-schema";
 import { RAW_MARKDOWN } from "./raw-markdown-node";
+import { describeBlocks, type RawKind } from "./markdown-block-details";
+import { composeList, isListNode, type ListSource } from "./markdown-list-items";
 
 interface Engine {
   schema: Schema;
@@ -31,6 +33,8 @@ interface MappedBlock {
   nodeCount: number;
   text: string;
   after: string;
+  /** A list block's items, so an edit to one item leaves the others as written. */
+  list?: ListSource<SourceMap>;
 }
 
 /**
@@ -42,6 +46,8 @@ export interface SourceMap {
   leading: string;
   blocks: MappedBlock[];
   endsWithNewline: boolean;
+  /** True for a list item's content: an edited block there keeps the spacing around it, and the list is checked as a whole. */
+  inItem?: boolean;
 }
 
 /** A loaded document: the editor's content and the map back to the source. */
@@ -50,6 +56,8 @@ export interface LoadedMarkdown {
   source: SourceMap;
   /** How many blocks stay as written because the editor cannot show them. */
   rawBlocks: number;
+  /** Why those blocks stay as written, each reason once. */
+  rawKinds: RawKind[];
 }
 
 /** A node's identity for matching: its canonical JSON. */
@@ -121,6 +129,7 @@ function loadAsOneRawBlock(markdown: string): LoadedMarkdown {
     doc: { type: "doc", content: nodes },
     source: { original: markdown, leading: "", blocks, endsWithNewline: markdown.endsWith("\n") },
     rawBlocks: nodes.length,
+    rawKinds: nodes.length > 0 ? ["other"] : [],
   };
 }
 
@@ -174,10 +183,13 @@ export function parseMarkdown(markdown: string): LoadedMarkdown {
     content.push(...nodes);
     blocks.push({ key: nodeKey({ content: nodes }), nodeCount: nodes.length, text: block.text, after: block.after });
   }
+
+  const rawKinds = describeBlocks(split.blocks, blocks, content, { key: nodeKey, itemContent: itemContentMap });
   return {
     doc: { type: "doc", content },
     source: { original: markdown, leading: split.leading, blocks, endsWithNewline: normalized.endsWith("\n") },
     rawBlocks,
+    rawKinds,
   };
 }
 
@@ -185,6 +197,8 @@ export function parseMarkdown(markdown: string): LoadedMarkdown {
 interface Chunk {
   text: string;
   block: number;
+  /** True when the chunk is an edited list written over its loaded block. */
+  edited?: boolean;
 }
 
 function isEmptyParagraph(node: JSONContent): boolean {
@@ -232,6 +246,14 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine): Chu
       previous = matched;
       continue;
     }
+    const listed = listChunk(nodes, position, source, previous, used);
+    if (listed) {
+      used.add(listed.block);
+      chunks.push(listed);
+      previous = listed.block;
+      position += 1;
+      continue;
+    }
     position += 1;
     if (!node || isEmptyParagraph(node)) continue;
     const text = renderNodes([node], current);
@@ -242,13 +264,23 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine): Chu
 }
 
 function isUnchanged(chunks: Chunk[], source: SourceMap): boolean {
-  return chunks.length === source.blocks.length && chunks.every((chunk, position) => chunk.block === position);
+  return chunks.length === source.blocks.length && chunks.every((chunk, position) => chunk.block === position && !chunk.edited);
 }
 
 function separator(previous: Chunk, next: Chunk, source: SourceMap): string {
   const block = source.blocks[previous.block];
   if (block && next.block === previous.block + 1) return block.after;
-  return "\n\n";
+  return source.inItem ? spacingInItem(previous, next, source) : "\n\n";
+}
+
+/**
+ * Inside a list item, an edited block keeps the spacing it had, so a tight
+ * item stays tight. Whether the item still reads the same is checked when
+ * its list is written (`composedList`).
+ */
+function spacingInItem(previous: Chunk, next: Chunk, source: SourceMap): string {
+  const before = previous.block >= 0 && next.block < 0 ? source.blocks[previous.block] : source.blocks[next.block - 1];
+  return previous.block < 0 && next.block < 0 ? "\n\n" : before?.after ?? "\n\n";
 }
 
 function ending(last: Chunk, source: SourceMap): string {
@@ -289,4 +321,46 @@ export function emptySourceMap(): SourceMap {
 /** Parses pasted Markdown into nodes to insert; raw blocks keep what the editor cannot show. */
 export function parseMarkdownFragment(markdown: string): JSONContent[] {
   return parseMarkdown(markdown).doc.content ?? [];
+}
+
+/** An edited list written over its loaded list, when the result reads back as the same list. */
+function composedList(node: JSONContent, list: ListSource<SourceMap>, current: Engine): string | null {
+  const text = composeList(node, list, {
+    key: nodeKey,
+    children: (content, map) => serializeMarkdown({ type: "doc", content }, map),
+    fresh: (fresh) => renderNodes([fresh], current),
+  });
+  if (text === null) return null;
+  const again = parseNodes(text, current);
+  const expected = canonicalNodes([node], current.schema);
+  return again && expected && nodeKey({ content: again }) === nodeKey({ content: expected }) ? text : null;
+}
+
+/** True when a later node still matches the block as loaded, so the block is not the one edited here. */
+function matchedLater(nodes: JSONContent[], position: number, block: MappedBlock): boolean {
+  return nodes.slice(position + 1).some((node) => nodeKey({ content: [node] }) === block.key);
+}
+
+/**
+ * An edited list at `position`, written over the loaded list just after the
+ * previous block (or the one after that, when a block between was removed):
+ * items nobody touched keep their source (markdown-list-items.ts).
+ */
+function listChunk(nodes: JSONContent[], position: number, source: SourceMap, previous: number, used: ReadonlySet<number>): Chunk | null {
+  const node = nodes[position];
+  if (!isListNode(node)) return null;
+  for (const index of [previous + 1, previous + 2]) {
+    const block = source.blocks[index];
+    if (!block?.list || used.has(index) || block.list.type !== node.type || matchedLater(nodes, position, block)) continue;
+    const text = composedList(node, block.list, getEngine());
+    return text === null ? null : { text, block: index, edited: true };
+  }
+  return null;
+}
+
+/** The map of a list item's content, when that Markdown loads as exactly the item's content. */
+function itemContentMap(markdown: string, item: JSONContent): SourceMap | null {
+  const loaded = parseMarkdown(markdown);
+  if (loaded.rawBlocks > 0) return null;
+  return nodeKey({ content: loaded.doc.content ?? [] }) === nodeKey({ content: item.content ?? [] }) ? { ...loaded.source, inItem: true } : null;
 }

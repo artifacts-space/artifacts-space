@@ -48,9 +48,9 @@ function urlFor(fileId: string): string {
   return uploaded.get(fileId) ?? `/dev/missing-file/${fileId}.png`;
 }
 
-/** See the notes at the top of this file. */
-export function MediaEditorFixture() {
-  const [markdown, setMarkdown] = useState(mediaFixtureMarkdown);
+/** See the notes at the top of this file. `initial` loads other Markdown, such as the list items fixture. */
+export function MediaEditorFixture({ initial = mediaFixtureMarkdown }: { initial?: string }) {
+  const [markdown, setMarkdown] = useState(initial);
   return (
     <EditorMediaProvider upload={uploadInMemory} urlFor={urlFor}>
       <main className="mx-auto w-full max-w-[72ch] px-4 py-10">
