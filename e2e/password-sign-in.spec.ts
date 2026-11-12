@@ -47,10 +47,15 @@ test.describe("the public sign-in page", () => {
     expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
   });
 
-  test("should never offer a password on the sign-up page", async ({ page }) => {
+  test("should never offer a password on the sign-up page, before or after a link is asked for", async ({ page }) => {
+    await page.route("**/api/auth/sign-in/magic-link", (route) => route.fulfill({ status: 200, json: { status: true } }));
     await page.goto("/dev/sign-in?mode=sign-up");
     await page.getByLabel("Email").fill("reviewer@artifacts.space");
     await expect(page.locator("input[type=password]")).toHaveCount(0);
+
+    await linkButton(page).click();
+    await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+    await expect(page.getByText("If this account has a password, sign in with that instead.")).toHaveCount(0);
   });
 
   test("should reveal a password field for a reviewer-domain address and keep the emailed link", async ({ page }) => {

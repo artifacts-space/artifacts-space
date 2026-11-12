@@ -50,11 +50,12 @@ function errorReturnUrl() {
 const textButtonClass = "text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground";
 
 /**
- * After a link was sent. For an address under a reviewer domain it also says
- * that a password account signs in with its password (such accounts get no
- * link); the domain alone decides, so it says nothing about who has one.
+ * After a link was sent. On the sign-in page, for an address under a reviewer
+ * domain, it also says that a password account signs in with its password
+ * (such accounts get no link); the domain alone decides, so it says nothing
+ * about who has one. `onUsePassword` is null where no password field exists.
  */
-function CheckEmail({ email, onBack, onUsePassword }: { email: string; onBack: () => void; onUsePassword: () => void }) {
+function CheckEmail({ email, onBack, onUsePassword }: { email: string; onBack: () => void; onUsePassword: (() => void) | null }) {
   return (
     <div className="space-y-3">
       <IconMailCheck className="size-6 text-muted-foreground" />
@@ -62,7 +63,7 @@ function CheckEmail({ email, onBack, onUsePassword }: { email: string; onBack: (
       <p className="text-md leading-6 text-muted-foreground">
         We sent a sign-in link to <span className="text-foreground">{email}</span>. Open it on this device to continue.
       </p>
-      {offersReviewerPassword(email) ? (
+      {onUsePassword && offersReviewerPassword(email) ? (
         <p data-slot="password-instead" className="text-md leading-6 text-muted-foreground">
           If this account has a password, sign in with that instead.{" "}
           <button type="button" onClick={onUsePassword} className={textButtonClass}>Enter your password</button>
@@ -209,7 +210,7 @@ export function AuthForm({ mode, googleEnabled }: { mode: AuthMode; googleEnable
     document.getElementById(REVIEWER_PASSWORD_ID)?.focus();
   }
 
-  if (sentTo) return <div className="w-full max-w-[360px]"><CheckEmail email={sentTo} onBack={() => { setSentTo(""); }} onUsePassword={returnToPassword} /></div>;
+  if (sentTo) return <div className="w-full max-w-[360px]"><CheckEmail email={sentTo} onBack={() => { setSentTo(""); }} onUsePassword={mode === "sign-in" ? returnToPassword : null} /></div>;
 
   const passwordIsPrimary = mode === "sign-in" && offersReviewerPassword(email);
 
