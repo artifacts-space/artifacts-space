@@ -1,6 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 
-import { readsTheSame } from "./markdown-display-shape";
+import { mayReadDifferently, readsTheSame } from "./markdown-display-shape";
 import { isListNode } from "./markdown-list-items";
 
 /*
@@ -53,10 +53,15 @@ export function wideList(list: JSONContent, helpers: FreshListHelpers): string {
   return (list.content ?? []).map((item, position) => wideItem(list, item, position, helpers)).join(between);
 }
 
-/** True when the editor and the read view both read `text` as `node`. */
+/**
+ * True when the editor and the read view both read `text` as `node`. The
+ * read view's parse is paid only for a shape the two readers are known to
+ * read differently, as when a block loads (markdown-display-shape.ts).
+ */
 function readsBack(text: string, expected: JSONContent[], helpers: FreshListHelpers): boolean {
   const again = helpers.parse(text);
-  return again !== null && helpers.key({ content: again }) === helpers.key({ content: expected }) && readsTheSame(text, expected);
+  if (again === null || helpers.key({ content: again }) !== helpers.key({ content: expected })) return false;
+  return !mayReadDifferently(text) || readsTheSame(text, expected);
 }
 
 /** A freshly written list, and whether both readers read it back as the list. */

@@ -8,8 +8,9 @@ import { parseMarkdown, serializeMarkdown } from "./markdown-roundtrip";
  * Generated list documents, the same ones on every run: bulleted, numbered,
  * and task lists, tight and loose, whose items hold paragraphs, code blocks,
  * quotes, and nested lists. Each is loaded, saved untouched, and saved after
- * one edit. The saved text must load as the edited content, and the read
- * view must read it the same way.
+ * one edit. A document that loads formatted must read the same in the read
+ * view, and the saved text must load as the edited content and read the same
+ * way there too.
  *
  * Known limit: about one edit in ten thousand generated ones still saves a
  * list the editor reads differently, three lists deep, where a task list
@@ -142,20 +143,34 @@ const changes: Record<string, Change> = {
   },
 };
 
+type Loaded = ReturnType<typeof parseMarkdown>;
+
+/** What went wrong when the document loaded and was saved untouched, or nothing. */
+function loadProblems(seed: number, markdown: string, loaded: Loaded): string[] {
+  const found: string[] = [];
+  if (serializeMarkdown(structuredClone(loaded.doc), loaded.source) !== markdown) found.push(`seed ${String(seed)}: saved differently with no edit`);
+  if (loaded.rawBlocks === 0 && !readsTheSame(markdown, loaded.doc.content ?? [])) found.push(`seed ${String(seed)}: loads formatted, but the page reads it differently\n${markdown}`);
+  return found;
+}
+
+/** What went wrong after one edit, or nothing. */
+function editProblem(seed: number, name: string, markdown: string, loaded: Loaded, doc: JSONContent): string[] {
+  const saved = serializeMarkdown(doc, loaded.source);
+  const again = parseMarkdown(saved);
+  if (JSON.stringify(outline(again.doc)) !== JSON.stringify(outline(doc))) return [`seed ${String(seed)}: ${name} loads differently\n${markdown}---\n${saved}`];
+  const formatted = loaded.rawBlocks === 0 && again.rawBlocks === 0;
+  return formatted && !readsTheSame(saved, again.doc.content ?? []) ? [`seed ${String(seed)}: ${name} reads differently on the page\n${markdown}---\n${saved}`] : [];
+}
+
 /** What went wrong for one seed, or nothing. */
 function problems(seed: number): string[] {
   const random = seeded(seed);
   const markdown = generated(random);
   const loaded = parseMarkdown(markdown);
-  const found: string[] = [];
-  if (serializeMarkdown(structuredClone(loaded.doc), loaded.source) !== markdown) found.push(`seed ${String(seed)}: saved differently with no edit`);
+  const found = loadProblems(seed, markdown, loaded);
   for (const [name, change] of Object.entries(changes)) {
     const doc = structuredClone(loaded.doc);
-    if (!change(doc, random)) continue;
-    const saved = serializeMarkdown(doc, loaded.source);
-    const again = parseMarkdown(saved);
-    if (JSON.stringify(outline(again.doc)) !== JSON.stringify(outline(doc))) found.push(`seed ${String(seed)}: ${name} loads differently\n${markdown}---\n${saved}`);
-    else if (loaded.rawBlocks === 0 && again.rawBlocks === 0 && !readsTheSame(saved, again.doc.content ?? [])) found.push(`seed ${String(seed)}: ${name} reads differently on the page\n${markdown}---\n${saved}`);
+    if (change(doc, random)) found.push(...editProblem(seed, name, markdown, loaded, doc));
   }
   return found;
 }

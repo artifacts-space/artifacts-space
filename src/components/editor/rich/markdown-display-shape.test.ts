@@ -33,6 +33,15 @@ describe("lists the read view reads differently", () => {
     expect(parseMarkdown("1. a\n2. b\n   continues\n3. c\n").rawBlocks).toBe(0);
   });
 
+  it("should format numbered steps with nested lists without asking the read view", () => {
+    const markdown = "1. a\n   - sub\n     - deep\n2. b\n   1. one\n   2. two\n3. c\n";
+    expect(mayReadDifferently(markdown)).toBe(false);
+    expect(parseMarkdown(markdown).rawBlocks).toBe(0);
+    expect(readsTheSame(markdown, parseMarkdown(markdown).doc.content ?? [])).toBe(true);
+    // A number set further in than the item above it sits inside that item's text.
+    expect(mayReadDifferently("- a\n  2. b\n")).toBe(true);
+  });
+
   it("should keep the task box when a bulleted list has a task item after a plain one", () => {
     const loaded = parseMarkdown("- plain\n- [x] task\n");
     expect(loaded.rawBlocks).toBe(0);

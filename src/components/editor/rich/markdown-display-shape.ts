@@ -160,7 +160,8 @@ const markerLine = /^( *)(?:[-+*]|\d{1,9}[.)])(?:[ \t]|$)/;
 /**
  * A numbered item other than 1 on the line after text: CommonMark lets only
  * 1 start a list inside a paragraph, so the read view may read the line as
- * text. A list item right above at the same indent is its sibling, and fine.
+ * text. Under a list item that sits as far in or further (a sibling, or the
+ * end of a nested list) the line is outside that item's text, and fine.
  */
 function numberUnderText(markdown: string): boolean {
   const lines = markdown.split("\n");
@@ -168,7 +169,8 @@ function numberUnderText(markdown: string): boolean {
     const match = numberedLine.exec(line);
     const before = lines[index - 1];
     if (!match || match[2] === "1" || before === undefined || before.trim() === "") return false;
-    return markerLine.exec(before)?.[1]?.length !== match[1]?.length;
+    const above = markerLine.exec(before)?.[1];
+    return above === undefined || above.length < (match[1]?.length ?? 0);
   });
 }
 

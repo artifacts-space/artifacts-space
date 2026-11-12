@@ -7,9 +7,8 @@ import { needsRawBlock, splitBlocks, type LooseToken, type SourceBlock, type Spl
 import { markdownSchemaExtensions } from "./markdown-schema";
 import { RAW_MARKDOWN } from "./raw-markdown-node";
 import { reviewBlocks, type RawKind } from "./markdown-block-details";
-import { checkedList } from "./markdown-list-check";
-import { freshList, type FreshList } from "./markdown-list-fresh";
-import { isListNode, type ListSource } from "./markdown-list-items";
+import type { ListSource } from "./markdown-list-items";
+import { itemContentMap, listChunk, ownWriting, spacingInItem, withLineEnds, writtenNodes, type ListTools } from "./markdown-roundtrip-lists";
 
 interface Engine {
   schema: Schema;
@@ -84,7 +83,7 @@ function canonicalNodes(nodes: JSONContent[], schema: Schema): JSONContent[] | n
   }
 }
 
-function parseNodes(text: string, current: Engine): JSONContent[] | null {
+function readNodes(text: string, current: Engine): JSONContent[] | null {
   try {
     const parsed = current.manager.parse(text).content ?? [];
     return parsed.length > 0 ? canonicalNodes(liftBlockColors(parsed), current.schema) : null;
@@ -93,9 +92,22 @@ function parseNodes(text: string, current: Engine): JSONContent[] | null {
   }
 }
 
-/** Markdown for nodes, without the blank lines a renderer may add around them. */
+/** The last text a written list was read back from, with its nodes: the block's own check reads that text again right after. */
+let lastRead: { text: string; nodes: JSONContent[] | null } | null = null;
+
+/** The nodes for `text`, to compare only: the same objects are handed out again for the same text. */
+function readBack(text: string, current: Engine): JSONContent[] | null {
+  if (lastRead?.text !== text) lastRead = { text, nodes: readNodes(text, current) };
+  return lastRead.nodes;
+}
+
+function parseNodes(text: string, current: Engine): JSONContent[] | null {
+  return lastRead?.text === text ? structuredClone(lastRead.nodes) : readNodes(text, current);
+}
+
+/** Markdown for nodes; a list on its own is written so that it reads back as the list (markdown-list-fresh.ts). */
 function renderNodes(nodes: JSONContent[], current: Engine): string {
-  return current.manager.serialize({ type: "doc", content: nodes }).replace(/^\n+|\n+$/g, "");
+  return writtenNodes(nodes, listTools, () => ownWriting(current.manager, nodes));
 }
 
 /**
@@ -107,10 +119,8 @@ function richNodes(block: SourceBlock, definitions: string, current: Engine): JS
   const nodes = parseNodes(definitions ? `${block.text}\n\n${definitions}` : block.text, current);
   if (!nodes) return null;
   const again = parseNodes(renderNodes(nodes, current), current);
-  if (again && nodeKey({ content: again }) === nodeKey({ content: nodes })) return nodes;
-  // A list the editor's own writer would misread can still be written wide (markdown-list-fresh.ts).
-  const [only] = nodes;
-  return nodes.length === 1 && isListNode(only) && freshListOf(only, current).sound ? nodes : null;
+  if (!again || nodeKey({ content: again }) !== nodeKey({ content: nodes })) return null;
+  return nodes;
 }
 
 function blockNodes(block: SourceBlock, definitions: string, current: Engine): { nodes: JSONContent[]; raw: boolean } {
@@ -187,8 +197,8 @@ export function parseMarkdown(markdown: string): LoadedMarkdown {
     content.push(...nodes);
     blocks.push({ key: nodeKey({ content: nodes }), nodeCount: nodes.length, text: block.text, after: block.after });
   }
-
-  const review = reviewBlocks(split.blocks, blocks, content, { key: nodeKey, rawNode: canonicalRawNode, itemContent: itemContentMap, definitions });
+  const keptAsWritten = (text: string) => canonicalNodes([rawNode(text)], current.schema)?.[0] ?? rawNode(text);
+  const review = reviewBlocks(split.blocks, blocks, content, { key: nodeKey, rawNode: keptAsWritten, itemContent: (text, item) => itemContentMap(text, item, listTools), definitions });
   return {
     doc: { type: "doc", content },
     source: { original: markdown, leading: split.leading, blocks, endsWithNewline: normalized.endsWith("\n") },
@@ -250,7 +260,7 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine): Chu
       previous = matched;
       continue;
     }
-    const listed = listChunk(nodes, position, source, previous, used);
+    const listed = listChunk(nodes, position, source, previous, used, listTools);
     if (listed) {
       used.add(listed.block);
       chunks.push(listed);
@@ -260,7 +270,7 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine): Chu
     }
     position += 1;
     if (!node || isEmptyParagraph(node)) continue;
-    const text = isListNode(node) ? freshListOf(node, current).text : renderNodes([node], current);
+    const text = renderNodes([node], current);
     // A block with no Markdown yet (an empty or uploading media block) is left out.
     if (text) chunks.push({ text, block: -1 });
   }
@@ -275,17 +285,6 @@ function separator(previous: Chunk, next: Chunk, source: SourceMap): string {
   const block = source.blocks[previous.block];
   if (block && next.block === previous.block + 1) return block.after;
   return source.inItem ? spacingInItem(previous, next, source) : "\n\n";
-}
-
-/**
- * Inside a list item, an edited block keeps the spacing it had, so a tight
- * item stays tight. Whether the item still reads the same is checked when
- * its list is written (`composedList`).
- */
-function spacingInItem(previous: Chunk, next: Chunk, source: SourceMap): string {
-  const spacings = [source.blocks[previous.block]?.after, source.blocks[next.block - 1]?.after].filter((after) => after !== undefined);
-  // With a block removed between two kept ones, the wider spacing keeps them apart.
-  return spacings.reduce((wide, after) => (after.split("\n").length > wide.split("\n").length ? after : wide), spacings[0] ?? "\n\n");
 }
 
 function ending(last: Chunk, source: SourceMap): string {
@@ -304,13 +303,7 @@ function joinChunks(chunks: Chunk[], source: SourceMap): string {
     if (before) output += separator(before, chunk, source);
     output += chunk.text;
   });
-  return withLineEnds(output + ending(last, source), source);
-}
-
-/** A document loaded with Windows line ends (CRLF) on every line is saved with them; one that mixes line ends is saved with LF, as before. */
-function withLineEnds(markdown: string, source: SourceMap): string {
-  const windows = source.original.includes("\r\n") && !/(?:^|[^\r])\n/.test(source.original);
-  return windows ? markdown.replace(/\r?\n/g, "\r\n") : markdown;
+  return withLineEnds(output + ending(last, source), source.original);
 }
 
 /**
@@ -334,57 +327,12 @@ export function parseMarkdownFragment(markdown: string): JSONContent[] {
   return parseMarkdown(markdown).doc.content ?? [];
 }
 
-/** An edited list written over its loaded list, when the result reads back as the same list. */
-function composedList(node: JSONContent, list: ListSource<SourceMap>, current: Engine): string | null {
-  return checkedList(node, list, {
-    key: nodeKey,
-    parse: (markdown) => parseNodes(markdown, current),
-    canonical: (nodes) => canonicalNodes(nodes, current.schema),
-    fresh: (fresh) => renderNodes([fresh], current),
-    children: (content, map, wide) => serializeMarkdown({ type: "doc", content }, wide ? { ...map, inItem: false } : map),
-  });
-}
-
-/** A list with no loaded source to keep, written so that it reads back as the list (markdown-list-fresh.ts). */
-function freshListOf(node: JSONContent, current: Engine): FreshList {
-  return freshList(node, {
-    render: (fresh) => renderNodes([fresh], current),
-    parse: (markdown) => parseNodes(markdown, current),
-    canonical: (nodes) => canonicalNodes(nodes, current.schema),
-    key: nodeKey,
-  });
-}
-
-/** The raw node that keeps `text` as written, in canonical form. */
-function canonicalRawNode(text: string): JSONContent {
-  return canonicalNodes([rawNode(text)], getEngine().schema)?.[0] ?? rawNode(text);
-}
-
-/** True when a later node still matches the block as loaded, so the block is not the one edited here. */
-function matchedLater(nodes: JSONContent[], position: number, block: MappedBlock): boolean {
-  return nodes.slice(position + 1).some((node) => nodeKey({ content: [node] }) === block.key);
-}
-
-/**
- * An edited list at `position`, written over the loaded list just after the
- * previous block (or the one after that, when a block between was removed):
- * items nobody touched keep their source (markdown-list-items.ts).
- */
-function listChunk(nodes: JSONContent[], position: number, source: SourceMap, previous: number, used: ReadonlySet<number>): Chunk | null {
-  const node = nodes[position];
-  if (!isListNode(node)) return null;
-  for (const index of [previous + 1, previous + 2]) {
-    const block = source.blocks[index];
-    if (!block?.list || used.has(index) || block.list.type !== node.type || matchedLater(nodes, position, block)) continue;
-    const text = composedList(node, block.list, getEngine());
-    return text === null ? null : { text, block: index, edited: true };
-  }
-  return null;
-}
-
-/** The map of a list item's content, when that Markdown loads as exactly the item's content. */
-function itemContentMap(markdown: string, item: JSONContent): SourceMap | null {
-  const loaded = parseMarkdown(markdown);
-  if (loaded.rawBlocks > 0) return null;
-  return nodeKey({ content: loaded.doc.content ?? [] }) === nodeKey({ content: item.content ?? [] }) ? { ...loaded.source, inItem: true } : null;
-}
+/** This file's own functions, for the list side of the round trip (markdown-roundtrip-lists.ts). */
+const listTools: ListTools = {
+  key: nodeKey,
+  parse: (markdown) => readBack(markdown, getEngine()),
+  canonical: (nodes) => canonicalNodes(nodes, getEngine().schema),
+  write: (node) => ownWriting(getEngine().manager, [node]),
+  load: (markdown) => parseMarkdown(markdown),
+  save: (content, map) => serializeMarkdown({ type: "doc", content }, map),
+};
