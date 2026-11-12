@@ -14,13 +14,13 @@ import { cn } from "@/lib/utils";
  * - Claude Code, Claude, Cursor, OpenCode, Kimi, Model Context Protocol:
  *   Simple Icons v16.37.0 (https://simpleicons.org), path data under CC0 1.0.
  *   The marks stay trademarks of their owners.
- * - ChatGPT: the OpenAI mark (src/components/harness/openai-mark.ts), the
- *   same mark the landing page and the harness icons already show for Codex.
+ * - ChatGPT and Codex: the OpenAI mark (src/components/harness/openai-mark.ts),
+ *   the same mark the landing page and the harness icons show for both.
  *   Simple Icons has no OpenAI mark. OpenAI's brand guidelines
  *   (https://openai.com/brand/) govern its use; it shows compatibility only.
- * - Codex: a neutral initial in a hairline circle. That choice came before
- *   the site used the OpenAI mark anywhere; moving Codex to the OpenAI mark
- *   is left to its own change.
+ * - Grok Bot: the Grok mark from LobeHub Icons v1.102.0
+ *   (https://github.com/lobehub/lobe-icons, MIT). Simple Icons has no Grok
+ *   mark. The mark stays its owner's trademark; it shows compatibility only.
  * - Devin: no mark at all, by the owner's choice; an empty spacer of the
  *   same size keeps its label in line with the others.
  * - fx: its code is Apache-2.0, which grants no trademark rights, and the
@@ -45,18 +45,6 @@ function Mark({ className, children, viewBox = "0 0 24 24" }: LogoProps & { chil
     >
       {children}
     </svg>
-  );
-}
-
-/** The neutral fallback: the client's initial in a hairline circle. */
-function InitialMark({ initial, className }: LogoProps & { initial: string }) {
-  return (
-    <Mark className={className}>
-      <circle cx="12" cy="12" r="10.75" fill="none" stroke="currentColor" strokeWidth="1.5" />
-      <text x="12" y="12" textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="600" fontFamily="inherit">
-        {initial}
-      </text>
-    </Mark>
   );
 }
 
@@ -114,8 +102,8 @@ function McpLogo({ className }: LogoProps) {
   );
 }
 
-/** ChatGPT. The OpenAI mark, drawn in its source art's own box. */
-function ChatGptLogo({ className }: LogoProps) {
+/** ChatGPT and Codex. The OpenAI mark, drawn in its source art's own box. */
+function OpenAiLogo({ className }: LogoProps) {
   return (
     <Mark className={className} viewBox={openAiMark.viewBox}>
       <path d={openAiMark.path} />
@@ -123,9 +111,13 @@ function ChatGptLogo({ className }: LogoProps) {
   );
 }
 
-/** Codex. A neutral initial; see the note on marks at the top of this file. */
-function CodexLogo({ className }: LogoProps) {
-  return <InitialMark initial="C" className={className} />;
+/** Grok Bot. The Grok mark from LobeHub Icons, MIT; see the note on marks at the top of this file. */
+function GrokLogo({ className }: LogoProps) {
+  return (
+    <Mark className={className}>
+      <path fillRule="evenodd" d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815" />
+    </Mark>
+  );
 }
 
 /** fx. A neutral "fx" monogram, drawn as strokes: no licensed mark found. Matches public/agent-icons/fx.svg on the harness-detection branch. */
@@ -152,8 +144,9 @@ export const clientLogos: Record<McpClientId, (props: LogoProps) => ReactNode> =
   "claude-code": ClaudeCodeLogo,
   cursor: CursorLogo,
   "claude-desktop": ClaudeLogo,
-  chatgpt: ChatGptLogo,
-  codex: CodexLogo,
+  chatgpt: OpenAiLogo,
+  codex: OpenAiLogo,
+  "grok-bot": GrokLogo,
   opencode: OpenCodeLogo,
   devin: DevinLogo,
   "kimi-code": KimiLogo,

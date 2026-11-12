@@ -4,17 +4,21 @@ import { docsHeading } from "@/lib/docs/pages";
 
 import {
   CHATGPT_PLUGINS_URL,
+  claudeInstallLink,
+  claudeTeamInstallLink,
   codexConfigToml,
   codexHeadlessConfigToml,
   codexMcpAddCommand,
   codexMcpLoginCommand,
   cursorInstallLink,
+  desktopApps,
   FX_INSTALL_COMMAND,
   fxConfigJson,
   fxMcpAddCommand,
   fxMcpLoginCommand,
   fxMcpShowCommand,
   fxSkillInstallCommand,
+  grokBotAddMessage,
   kimiMcpLoginCommand,
   mcpClients,
   opencodeConfigJson,
@@ -49,6 +53,35 @@ const stdioKeys = new Set(["command", "args", "env", "cwd"]);
 function stdioKeysIn(value: unknown): string[] {
   return allKeys(value).filter((key) => stdioKeys.has(key));
 }
+
+describe("claudeInstallLink", () => {
+  it("should open Claude's add custom connector form with the name and the endpoint when followed", () => {
+    const url = new URL(claudeInstallLink(origin));
+    expect(url.origin + url.pathname).toBe("https://claude.ai/customize/connectors");
+    expect([...url.searchParams.keys()]).toEqual(["modal", "connectorName", "connectorUrl"]);
+    expect(url.searchParams.get("modal")).toBe("add-custom-connector");
+    expect(url.searchParams.get("connectorName")).toBe("artifacts.space");
+    expect(url.searchParams.get("connectorUrl")).toBe(endpoint);
+  });
+
+  it("should percent-encode the endpoint when it goes in the query", () => {
+    expect(claudeInstallLink(origin)).toContain("connectorUrl=https%3A%2F%2Fartifacts.space%2Fapi%2Fmcp");
+    expect(claudeInstallLink("http://localhost:3000")).toContain("connectorUrl=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fmcp");
+  });
+
+  it("should open the organization's form with the same values when an owner follows the team link", () => {
+    const personal = new URL(claudeInstallLink(origin));
+    const team = new URL(claudeTeamInstallLink(origin));
+    expect(team.origin + team.pathname).toBe("https://claude.ai/admin-settings/connectors");
+    expect(team.search).toBe(personal.search);
+  });
+});
+
+describe("grokBotAddMessage", () => {
+  it("should name the endpoint and the server when asking a Grok Bot to add it", () => {
+    expect(grokBotAddMessage(origin)).toBe(`Add the MCP server at ${endpoint} and name it artifacts.`);
+  });
+});
 
 describe("cursorInstallLink", () => {
   it("should use Cursor's documented deeplink when building the link", () => {
@@ -196,7 +229,9 @@ describe("mcpClients", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("should offer a one-click install only for Cursor when listing clients", () => {
-    expect(mcpClients.filter((client) => client.oneClick).map((client) => client.id)).toEqual(["cursor"]);
+  it("should give Cursor, Claude Desktop, Codex, and Grok Bot an Add to button, install links first, when listing desktop apps", () => {
+    expect(desktopApps).toEqual(["cursor", "claude-desktop", "codex", "grok-bot"]);
+    const known = new Set<string>(mcpClients.map((client) => client.id));
+    expect(desktopApps.filter((app) => !known.has(app))).toEqual([]);
   });
 });

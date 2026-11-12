@@ -2,9 +2,13 @@ import type { ReactNode } from "react";
 
 import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
 import { Prose } from "@/components/docs/docs-content";
-import { CursorInstallButton } from "@/components/setup/cursor-install-button";
+import { ClaudeInstallButton, CursorInstallButton } from "@/components/setup/install-link-buttons";
+import { Button } from "@/components/ui/button";
 import {
   CHATGPT_PLUGINS_URL,
+  CLAUDE_CONNECTOR_NAME,
+  claudeTeamInstallLink,
+  CODEX_SETTINGS_LINK,
   codexConfigToml,
   codexMcpAddCommand,
   codexMcpLoginCommand,
@@ -14,6 +18,8 @@ import {
   fxMcpLoginCommand,
   fxMcpShowCommand,
   fxSkillInstallCommand,
+  GROK_CONNECTORS_URL,
+  grokBotAddMessage,
   kimiMcpLoginCommand,
   opencodeConfigJson,
   opencodeMcpAddCommand,
@@ -96,26 +102,36 @@ export function CursorGuide({ origin, full = false }: ClientGuideProps) {
   );
 }
 
-/** Claude Desktop and claude.ai: a custom connector, added by URL. */
+/** Claude Desktop and claude.ai: the install link that fills in the custom connector form, with the steps by hand as the fallback. */
 export function ClaudeDesktopGuide({ origin, full = false }: ClientGuideProps) {
   return (
     <>
-      <NoOneClick client="Claude Desktop" />
+      <div className="flex flex-wrap items-center gap-3">
+        <ClaudeInstallButton origin={origin} />
+        <span className="text-sm text-muted-foreground">Opens claude.ai with the name and the URL filled in.</span>
+      </div>
+      <Prose className="mt-3">
+        <p>
+          To open the form by hand, open <strong>Customize</strong>, then <strong>Connectors</strong>. Choose <strong>+ Add</strong>, then <strong>Add custom connector</strong>. Name it <code>{CLAUDE_CONNECTOR_NAME}</code> and paste the URL <code>{mcpEndpoint(origin)}</code>.
+        </p>
+      </Prose>
+      <Label>In Claude&apos;s form</Label>
       <Prose className="mt-2">
         <ol>
-          <li>Open <strong>Customize</strong>, then <strong>Connectors</strong>.</li>
-          <li>Choose <strong>+ Add</strong>, then <strong>Add custom connector</strong>.</li>
-          <li>Name it <code>artifacts.space</code> and paste the URL <code>{mcpEndpoint(origin)}</code>. Choose <strong>Continue</strong>.</li>
+          <li>Check the name and the URL, then choose <strong>Continue</strong>.</li>
           <li>Keep the sign-in settings Claude finds, with <strong>Use Claude&apos;s published identity</strong> as the OAuth client. Add the connector.</li>
         </ol>
       </Prose>
       <ApproveSteps opener="Claude asks you to sign in. Your browser opens." />
       <Prose className="mt-4">
-        <p>The connector lives in your Claude account, so it also works on claude.ai and in the mobile apps. Free plans can add one custom connector.</p>
+        <p>The connector lives in your Claude account, so it shows in Claude Desktop, on claude.ai, and in the mobile apps. Free plans can add one custom connector.</p>
         {full ? (
-          <p>
-            On Claude Team and Enterprise plans, an owner adds the connector first, under <strong>Organization settings</strong>, then <strong>Connectors</strong>. Then each person finds it in <strong>Customize</strong>, <strong>Connectors</strong>, and chooses <strong>Connect</strong> to sign in as themselves.
-          </p>
+          <>
+            <p>The button only fills in the form. Nothing is added until you confirm in Claude.</p>
+            <p>
+              On Claude Team and Enterprise plans, an owner adds the connector first: <a href={claudeTeamInstallLink(origin)} target="_blank" rel="noopener noreferrer">open the form for your organization<span className="sr-only"> (opens in a new tab)</span></a>, or go to <strong>Organization settings</strong>, then <strong>Connectors</strong>. Then each person finds it in <strong>Customize</strong>, <strong>Connectors</strong>, and chooses <strong>Connect</strong> to sign in as themselves.
+            </p>
+          </>
         ) : null}
       </Prose>
     </>
@@ -161,9 +177,13 @@ export function CodexGuide({ origin, full = false }: ClientGuideProps) {
       <CommandSnippet command={codexMcpAddCommand(origin)} className="mt-2" />
       <Prose className="mt-2"><p>Codex adds the server, sees that it uses sign-in, and opens your browser.</p></Prose>
       <Label>In the ChatGPT desktop app</Label>
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <Button render={<a href={CODEX_SETTINGS_LINK} />} nativeButton={false} variant="outline" size="sm">Open Codex settings</Button>
+        <span className="text-sm text-muted-foreground">If you have the ChatGPT desktop app, this opens its Settings. Codex has no link that adds a server.</span>
+      </div>
       <Prose className="mt-2">
         <ol>
-          <li>Open <strong>Settings</strong>, then <strong>MCP servers</strong>, then <strong>Add server</strong>.</li>
+          <li>In <strong>Settings</strong>, choose <strong>MCP servers</strong>, then <strong>Add server</strong>.</li>
           <li>Name it <code>artifacts</code>, choose <strong>Streamable HTTP</strong>, and paste <code>{mcpEndpoint(origin)}</code>.</li>
           <li>Save, choose <strong>Restart</strong>, then <strong>Authenticate</strong> next to the server.</li>
         </ol>
@@ -178,6 +198,34 @@ export function CodexGuide({ origin, full = false }: ClientGuideProps) {
       ) : null}
       <ApproveSteps opener="Your browser opens on the sign-in page." />
       <Prose className="mt-4"><p>The ChatGPT desktop app, the Codex CLI, and the IDE extension share one config, so you add the server once.</p></Prose>
+    </>
+  );
+}
+
+/** Grok Bot: a custom connector in the desktop app, or a message that asks a Bot to add it. */
+export function GrokBotGuide({ origin, full = false }: ClientGuideProps) {
+  return (
+    <>
+      <NoOneClick client="Grok Bot" />
+      <Label>In the desktop app</Label>
+      <Prose className="mt-2">
+        <ol>
+          <li>Open <strong>Connect apps</strong>. At the bottom, choose <strong>Add a custom connector</strong>.</li>
+          <li>Name it <code>artifacts</code> and choose <strong>Remote HTTPS</strong>.</li>
+          <li>Paste the server URL <code>{mcpEndpoint(origin)}</code>. Leave the HTTP headers and the Client ID empty.</li>
+          <li>Choose <strong>Add plugin</strong>. When the app shows <strong>Needs auth</strong>, choose <strong>Authenticate</strong>.</li>
+        </ol>
+      </Prose>
+      <Label>Or ask a Bot</Label>
+      <Prose className="mt-2"><p>Send this message in a chat. The Bot adds the server. If it shows a sign-in card, choose <strong>Connect</strong>.</p></Prose>
+      <CodeSnippet title="Message" code={grokBotAddMessage(origin)} wrap className="mt-3" />
+      <ApproveSteps opener="Your browser opens on the sign-in page." />
+      {full ? (
+        <Prose className="mt-4">
+          <p>In a team, an admin&apos;s MCP policy decides which servers you can add. If the app refuses to save the server, ask your admin to allow it.</p>
+          <p>Grok on the web takes the same URL: open <a href={GROK_CONNECTORS_URL}>grok.com/connectors</a>, choose <strong>New Connector</strong>, then <strong>Custom</strong>.</p>
+        </Prose>
+      ) : null}
     </>
   );
 }
@@ -336,6 +384,7 @@ export const clientGuides: Record<McpClientId, (props: ClientGuideProps) => Reac
   "claude-desktop": ClaudeDesktopGuide,
   chatgpt: ChatGptGuide,
   codex: CodexGuide,
+  "grok-bot": GrokBotGuide,
   opencode: OpenCodeGuide,
   devin: DevinGuide,
   "kimi-code": KimiCodeGuide,

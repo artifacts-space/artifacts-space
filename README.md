@@ -28,7 +28,7 @@ Full documentation: https://artifacts.space/docs
 ## Features
 
 - **One MCP server for every agent.** Claude Code, Codex, Cursor, ChatGPT,
-  OpenCode, Kimi Code, Devin, fx, and any other MCP client create, read,
+  Grok Bot, OpenCode, Kimi Code, Devin, fx, and any other MCP client create, read,
   update, and list artifacts at `/api/mcp`, on any artifacts.space account.
   ChatGPT Pro can read; saving from ChatGPT needs a Business, Enterprise, or
   Edu workspace.

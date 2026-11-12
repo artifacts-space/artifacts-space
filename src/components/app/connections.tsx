@@ -16,7 +16,7 @@ import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { ConnectionHarness } from "@/components/harness/connection-harness";
 import { HarnessIcon } from "@/components/harness/harness-icon";
 import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
-import { CursorInstallButton } from "@/components/setup/cursor-install-button";
+import { DesktopAppInstalls } from "@/components/setup/desktop-app-installs";
 import { SkillInstall } from "@/components/setup/skill-install";
 import { TokenRevealDialog } from "@/components/tokens/token-reveal-dialog";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { docsHref } from "@/lib/docs/pages";
 import type { ConnectedApp } from "@/lib/oauth/clients";
+import { desktopApps } from "@/lib/setup/client-installs";
 import { DEFAULT_INSTRUCTION_LINE } from "@/lib/setup/default-routing";
 import { claudeMcpAddOAuthCommand, mcpConfigJson, mcpOAuthConfigJson, TOKEN_PLACEHOLDER } from "@/lib/setup/mcp-config";
 
@@ -95,15 +96,27 @@ export function Connections({
         <section className="card-surface overflow-hidden">
           <div className="border-b px-5 py-4">
             <h2 className="text-md font-medium">Connect a client</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Run this, then approve the app in your browser. No token to copy.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Add it to your app, then approve it in your browser. No token to copy.</p>
           </div>
-          <div className="grid gap-3 p-5">
-            <CommandSnippet command={claudeMcpAddOAuthCommand(origin)} />
-            <div className="flex flex-wrap items-center gap-3">
-              <CursorInstallButton origin={origin} />
-              <p className="text-sm leading-6 text-muted-foreground">Or, for other clients that support OAuth, add this to mcp.json.</p>
+          <div className="grid gap-5 p-5">
+            <div className="min-w-0">
+              <h3 className="text-sm font-medium text-muted-foreground">Desktop apps</h3>
+              <DesktopAppInstalls origin={origin} apps={desktopApps} className="mt-2" />
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Cursor opens with the server filled in. Claude opens claude.ai with the form filled in, and the connector then shows in Claude Desktop too. Codex and Grok Bot have no install link yet, so their buttons show the steps.
+              </p>
             </div>
-            <CodeSnippet title="mcp.json" language="json" code={mcpOAuthConfigJson(origin)} />
+            <div className="min-w-0">
+              <h3 className="text-sm font-medium text-muted-foreground">Claude Code</h3>
+              <CommandSnippet command={claudeMcpAddOAuthCommand(origin)} className="mt-2" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-medium text-muted-foreground">Other clients</h3>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                For any client that supports OAuth, add this to mcp.json. <Link href={docsHref("clients")} className="underline underline-offset-2">Steps for every client</Link>.
+              </p>
+              <CodeSnippet title="mcp.json" language="json" code={mcpOAuthConfigJson(origin)} className="mt-2" />
+            </div>
           </div>
           <div className="border-t px-5 py-4">
             <h3 className="text-md font-medium">CI and headless use</h3>
