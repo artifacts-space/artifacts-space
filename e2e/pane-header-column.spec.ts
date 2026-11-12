@@ -47,7 +47,9 @@ for (const { name, size } of viewports) {
     const text = await edgesOf(page.getByRole("textbox", { name: "Artifact content" }).locator(":scope > *").first());
     const title = await edgesOf(page.getByRole("textbox", { name: "Artifact title" }));
     const summary = await edgesOf(page.getByRole("textbox", { name: "Artifact summary" }));
-    const chip = await edgesOf(page.getByRole("button", { name: /^Format: / }));
+    // A Markdown page shows no format chip, so the row starts with its project.
+    await expect(page.getByRole("button", { name: /^Format: / }), "Markdown has no format chip").toHaveCount(0);
+    const chip = await edgesOf(page.getByRole("button", { name: /^(Add to project|Project: )/ }));
     const meta = await edgesOf(slot(page, "save-status").locator(":scope > div"));
 
     expect(Math.abs(title.left - text.left), "the title starts where the body's text does").toBeLessThanOrEqual(0.5);
