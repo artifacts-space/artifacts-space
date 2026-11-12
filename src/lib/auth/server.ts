@@ -9,7 +9,7 @@ import * as schema from "@/db/schema";
 import { sessionHooks } from "@/lib/auth/agent-guards";
 import { sendMagicLinkEmail } from "@/lib/auth/magic-link-email";
 import { oauthPlugins } from "@/lib/auth/oauth-plugins";
-import { passwordSignInGuard } from "@/lib/auth/password-sign-in-options";
+import { passwordSignInGuard, skipLinksForPasswordAccounts } from "@/lib/auth/password-sign-in-options";
 import { emailAndPasswordOptions, passwordPathsDisabledOverHttp } from "@/lib/auth/password-sign-in-rules";
 import { sessionConfig } from "@/lib/auth/session-config";
 import { accountHooks, accountLinking, socialAuthEnv, socialProviders, socialSignInGuard, validateUserInfo } from "@/lib/auth/social-auth-options";
@@ -66,7 +66,8 @@ function createAuth() {
     plugins: [
       magicLink({
         expiresIn: tenMinutes,
-        sendMagicLink: ({ email, url, token }) => sendMagicLinkEmail({ email, url, token }),
+        // Accounts with a password get no link (skipLinksForPasswordAccounts); the answer is the same.
+        sendMagicLink: skipLinksForPasswordAccounts(({ email, url, token }) => sendMagicLinkEmail({ email, url, token })),
       }),
       teamsPlugin(),
       socialSignInGuard(),

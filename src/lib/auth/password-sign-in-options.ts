@@ -11,11 +11,22 @@ import {
 } from "@/lib/auth/password-sign-in-rules";
 
 /**
+ * A sign-in answer without its `token`: the session lives in the httpOnly
+ * cookie, so the page never needs it and script on the page never sees it.
+ * Null when the answer is not a body with a token (an error, for one).
+ */
+export function withoutSessionToken(returned: unknown): Record<string, unknown> | null {
+  if (typeof returned !== "object" || returned === null || returned instanceof Error || !("token" in returned)) return null;
+  return Object.fromEntries(Object.entries(returned).filter(([key]) => key !== "token"));
+}
+
+/**
  * Locks for password sign-in (password-sign-in-rules.ts). A Better Auth
  * plugin, so it runs on the HTTP route and on direct server calls alike:
  * every route that would create, set, change, reset, or check a password
- * answers "not found", and a sign-in request may carry only an email, a
- * password, and where to go next.
+ * answers "not found", a sign-in request may carry only an email, a
+ * password, and where to go next, and its answer leaves out the session
+ * token (withoutSessionToken).
  */
 export function passwordSignInGuard() {
   return {
@@ -31,6 +42,15 @@ export function passwordSignInGuard() {
           handler: createAuthMiddleware((ctx) => {
             if (isAllowedPasswordSignInBody(ctx.body)) return Promise.resolve();
             return Promise.reject(new APIError("BAD_REQUEST", { code: "INVALID_SIGN_IN_REQUEST", message: "Enter your email and password." }));
+          }),
+        },
+      ],
+      after: [
+        {
+          matcher: (context) => context.path === passwordSignInPath,
+          handler: createAuthMiddleware((ctx) => {
+            const body = withoutSessionToken(ctx.context.returned);
+            return Promise.resolve(body ? ctx.json(body) : undefined);
           }),
         },
       ],
@@ -67,4 +87,24 @@ export async function passwordAccountLinkProblem(data: IncomingLink, ctx: Accoun
 export function assertNoPasswordWrite(account: { providerId?: unknown; password?: unknown }) {
   const problem = passwordWriteProblem(account);
   if (problem) throw new APIError("FORBIDDEN", { code: "PASSWORD_WRITE_REFUSED", message: problem });
+}
+
+/** The part of Better Auth's endpoint context that finds a user by email with their logins. */
+interface UserFinder {
+  context: { internalAdapter: { findUserByEmail: (email: string, options: { includeAccounts: true }) => Promise<{ accounts: { providerId: string }[] } | null> } };
+}
+
+/**
+ * Wraps the sign-in link sender so an address with a password login gets no
+ * link, silently: Better Auth still answers exactly as for any address, so
+ * the answer says nothing about the account. Password accounts sign in only
+ * with their password; the owner's reset script is their recovery. Without
+ * an endpoint context the link is sent as before.
+ */
+export function skipLinksForPasswordAccounts<T extends { email: string }>(send: (data: T) => Promise<void>) {
+  return async (data: T, ctx?: UserFinder): Promise<void> => {
+    const found = ctx ? await ctx.context.internalAdapter.findUserByEmail(data.email.toLowerCase(), { includeAccounts: true }) : null;
+    if (found && hasPasswordLogin(found.accounts)) return;
+    await send(data);
+  };
 }

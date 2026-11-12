@@ -6,7 +6,7 @@ import { hashPassword } from "better-auth/crypto";
 import { magicLink } from "better-auth/plugins";
 import { expect, vi } from "vitest";
 
-import { passwordSignInGuard } from "./password-sign-in-options";
+import { passwordSignInGuard, skipLinksForPasswordAccounts } from "./password-sign-in-options";
 import { credentialProviderId, emailAndPasswordOptions, passwordPathsDisabledOverHttp } from "./password-sign-in-rules";
 import { accountHooks, accountLinking, socialProviders, socialSignInGuard, validateUserInfo } from "./social-auth-options";
 
@@ -46,7 +46,7 @@ export function emptyTables(): Tables {
 }
 
 /** Every magic link the test instances "emailed", newest last. */
-const sentLinks: string[] = [];
+export const sentLinks: string[] = [];
 
 /** Better Auth with the same social and password options as src/lib/auth/server.ts. */
 export function createTestAuth(tables: Tables) {
@@ -60,7 +60,7 @@ export function createTestAuth(tables: Tables) {
     user: { validateUserInfo },
     databaseHooks: { account: accountHooks },
     disabledPaths: passwordPathsDisabledOverHttp,
-    plugins: [magicLink({ sendMagicLink: ({ url }) => { sentLinks.push(url); } }), socialSignInGuard(), passwordSignInGuard()],
+    plugins: [magicLink({ sendMagicLink: skipLinksForPasswordAccounts(({ url }: { email: string; url: string }) => { sentLinks.push(url); return Promise.resolve(); }) }), socialSignInGuard(), passwordSignInGuard()],
     // Vitest runs count as tests, where Better Auth skips its callbackURL check unless told otherwise.
     advanced: { disableOriginCheck: false },
   });

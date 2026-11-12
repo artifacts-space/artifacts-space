@@ -12,6 +12,7 @@ import {
   post,
   signInWith,
   stubProviders,
+  sentLinks,
   type Tables,
   type TestAuth,
 } from "./social-auth-harness";
@@ -53,6 +54,16 @@ describe("password sign-in", () => {
     expect(response.status).toBe(200);
     expect(cookieHeader(response)).toContain("session_token=");
     expect(tables.session).toEqual([expect.objectContaining({ userId: "password-user" })]);
+  });
+
+  it("should leave the session token out of the answer and keep it in the httpOnly cookie", async () => {
+    const response = await signIn({ email, password });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(body).not.toHaveProperty("token");
+    expect(body).toMatchObject({ redirect: false, user: expect.objectContaining({ email }) as unknown });
+    expect(JSON.stringify(body)).not.toContain(tables.session[0]?.token);
+    expect(response.headers.getSetCookie().some((cookie) => cookie.includes("session_token=") && /HttpOnly/i.test(cookie))).toBe(true);
   });
 
   it("should accept the address in any case when the password is right", async () => {
@@ -97,6 +108,22 @@ describe("password sign-in", () => {
 
     expect(response.status).toBe(400);
     expect(tables.session).toEqual([]);
+  });
+
+  describe("sign-in links for an account with a password", () => {
+    it("should send no link, silently, and answer exactly as for an address that gets one", async () => {
+      const ask = (address: string) => post(auth, "/sign-in/magic-link", { email: address, callbackURL: `${origin}/app` });
+      const sentBefore = sentLinks.length;
+
+      const toPasswordAccount = await ask(email);
+      expect(sentLinks.length).toBe(sentBefore);
+      const toOtherAddress = await ask("someone-else@example.com");
+      expect(sentLinks.length).toBe(sentBefore + 1);
+
+      expect(toPasswordAccount.status).toBe(toOtherAddress.status);
+      expect(await toPasswordAccount.text()).toBe(await toOtherAddress.text());
+      expect(toPasswordAccount.headers.getSetCookie()).toEqual(toOtherAddress.headers.getSetCookie());
+    });
   });
 
   describe("routes that would create or change a password", () => {
