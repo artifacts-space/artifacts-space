@@ -13,7 +13,7 @@ import { formatCounts, formatEditedAt } from "./edited-at";
 
 /** One row of the menu: 32px high with tight padding, 44px and roomier on phones, highlighted by hover, the arrow keys, or typing. */
 export const rowClass =
-  "flex h-8 w-full shrink-0 cursor-default items-center gap-2 rounded-lg px-1.5 text-left text-sm outline-none select-none max-sm:h-11 max-sm:gap-2.5 max-sm:px-2 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground aria-disabled:opacity-50 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:data-highlighted:[&_svg]:text-destructive focus-visible:bg-accent";
+  "flex h-8 w-full shrink-0 cursor-default items-center gap-1.5 rounded-lg px-1.5 text-left text-sm outline-none select-none max-sm:h-11 max-sm:gap-2.5 max-sm:px-2 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground aria-disabled:opacity-50 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:data-highlighted:[&_svg]:text-destructive focus-visible:bg-accent";
 
 /** The panel: popover tokens and the menu shadow, with quiet scrollbars. */
 export const panelClass =
@@ -102,7 +102,7 @@ export function MenuRow({ entry, id, highlighted, expanded, mac, rowRef, onHover
       <Icon aria-hidden />
       <span className="min-w-0 flex-1 truncate">{entry.label}</span>
       {submenu ? <IconChevronRight aria-hidden /> : null}
-      {!submenu && entry.shortcut ? <kbd className="ml-auto shrink-0 pl-1 font-mono text-xs text-muted-foreground">{shortcutFor(entry.shortcut, mac).label}</kbd> : null}
+      {!submenu && entry.shortcut ? <kbd className="ml-auto shrink-0 font-mono text-xs text-muted-foreground">{shortcutFor(entry.shortcut, mac).label}</kbd> : null}
     </button>
   );
 }

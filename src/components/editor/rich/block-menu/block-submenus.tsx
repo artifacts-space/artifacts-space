@@ -48,7 +48,7 @@ interface SubmenuSection {
 export interface SubmenuFrame {
   panelRef: RefObject<HTMLDivElement | null>;
   className: string;
-  /** Its width in pixels beside the menu (none in the phone sheet): `submenuWidth`, which the hover check uses too. */
+  /** Its width in pixels beside the menu (`submenuWidth`); none in the phone sheet. */
   width?: number | undefined;
   focused: boolean;
   /** Phones show the submenu in place of the menu, with a way back. */

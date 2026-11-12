@@ -61,7 +61,14 @@ export function useFloatingMenu(floating: RefObject<HTMLElement | null>, anchor:
         })
         .catch(() => undefined);
     };
-    return autoUpdate(reference, element, update);
+    const stop = autoUpdate(reference, element, update);
+    return () => {
+      stop();
+      // Off again (the phone sheet, or a new anchor): drop the old place so the sheet's own layout applies and the next place fades in again.
+      element.style.removeProperty("left");
+      element.style.removeProperty("top");
+      delete element.dataset.placed;
+    };
   }, [floating, anchor, rule, enabled]);
 }
 

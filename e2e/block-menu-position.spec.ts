@@ -171,13 +171,27 @@ test.describe("block menu opening", () => {
   });
 });
 
+test.describe("block menu turning into the phone sheet", () => {
+  test.skip(({ isMobile }) => isMobile, "On phones the menu is a sheet from the start.");
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("should become a sheet along the bottom when the window narrows while it is open", async ({ page }) => {
+    await openFrom(page, middle, "center");
+    await page.setViewportSize({ width: 500, height: 800 });
+    await expect.poll(async () => {
+      const sheet = await boxOf(menu(page));
+      return [Math.round(sheet.x), Math.round(sheet.width), Math.round(sheet.y + sheet.height)];
+    }).toEqual([0, 500, 800]);
+  });
+});
+
 test.describe("block menu width", () => {
   test.skip(({ isMobile }) => isMobile, "On phones the menu is a sheet along the bottom.");
   test.use({ viewport: { width: 1920, height: 900 } });
 
   test("should show every label and shortcut whole in the menu and its submenus", async ({ page }) => {
     await openFrom(page, middle, "center");
-    const cutLabels = (panel: Element) => [...panel.querySelectorAll<HTMLElement>("[role=menuitem] span, [role=menuitemradio] span, kbd")].filter((part) => part.scrollWidth > part.clientWidth).map((part) => part.textContent);
+    const cutLabels = (panel: Element) => [...panel.querySelectorAll<HTMLElement>("[role=menuitem] span, [role=menuitemradio] span, kbd")].filter((part) => part.scrollWidth > part.clientWidth).map((part) => `${part.textContent} needs ${String(part.scrollWidth)}px, has ${String(part.clientWidth)}px`);
     expect(await menu(page).evaluate(cutLabels)).toEqual([]);
     for (const [row, slot] of [["Change", "block-menu-change"], ["Color", "block-menu-color"]] as const) {
       await menu(page).getByRole("menuitem", { name: row }).hover();
