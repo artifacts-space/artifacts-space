@@ -128,7 +128,8 @@ export function anchorAt(text: string, span: TextSpan): CommentAnchor | null {
 
 /**
  * An anchor as it is stored: each part on one line and within its length.
- * Null when there is no quote left, so the comment is saved without a place.
+ * Null when there is no quote left; a new comment with such an anchor is
+ * refused (anchorToStore), never saved without a place.
  */
 export function storedAnchor(anchor: { quote: string; prefix?: string | undefined; suffix?: string | undefined }): CommentAnchor | null {
   const quote = oneLine(anchor.quote).slice(0, QUOTE_MAX_LENGTH).trimEnd();

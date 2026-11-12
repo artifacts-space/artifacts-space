@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { editColumnClass, hasWidthSetting, pageColumnClass, previewColumnClass, readingMeasureClass, usesFullWidth } from "./rules";
+import { editColumnClass, hasWidthSetting, pageColumnClass, previewColumnClass, bodyFillsColumnClass, usesFullWidth } from "./rules";
 
 /** Side padding classes, with or without a breakpoint prefix. */
 const sidePadding = /^(\w+:)?px-/;
@@ -25,13 +25,9 @@ describe("pageColumnClass", () => {
   });
 });
 
-describe("readingMeasureClass", () => {
-  it("should add nothing when the artifact is contained, so it looks as before", () => {
-    expect(readingMeasureClass(false)).toBe("");
-  });
-
-  it("should lift the reading measure when the artifact is full width", () => {
-    expect(readingMeasureClass(true)).toBe("[--artifact-measure:none]");
+describe("bodyFillsColumnClass", () => {
+  it("should lift the 72ch cap of Markdown and plain text when the body sits in a page column", () => {
+    expect(bodyFillsColumnClass).toBe("[--artifact-measure:none]");
   });
 });
 
@@ -39,12 +35,16 @@ describe("previewColumnClass", () => {
   it("should hold the whole preview to the public page's centered 1024px column when the artifact is contained", () => {
     const classes = previewColumnClass(false).split(" ");
     expect(classes).toEqual(expect.arrayContaining(["mx-auto", "w-full", "max-w-5xl", "px-6"]));
-    expect(classes).not.toContain("[--artifact-measure:none]");
   });
 
-  it("should use the whole pane and lift the reading measure when the artifact is full width", () => {
+  it("should let the body's text fill the column when the artifact is contained, so it ends where the title ends", () => {
+    // Fails if Markdown text stops at 72ch while the title and summary above it run to the column's edge.
+    expect(previewColumnClass(false).split(" ")).toContain(bodyFillsColumnClass);
+  });
+
+  it("should use the whole pane and let the body's text fill it when the artifact is full width", () => {
     const classes = previewColumnClass(true).split(" ");
-    expect(classes).toEqual(expect.arrayContaining(["max-w-none", "px-6", "[--artifact-measure:none]"]));
+    expect(classes).toEqual(expect.arrayContaining(["max-w-none", "px-6", bodyFillsColumnClass]));
     expect(classes.some((name) => name.startsWith("max-w-5xl"))).toBe(false);
   });
 

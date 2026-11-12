@@ -34,7 +34,7 @@ export const formatDocs: Record<FormatKind, FormatDoc> = {
   },
   text: {
     checks: "Any non-empty text.",
-    renders: "As written, with line breaks kept, at reading width.",
+    renders: "As written, with line breaks kept, in the page's column.",
     example: "Standup notes, 6 Nov\nShipped: docs shell\nNext: MCP reference",
   },
   json: {

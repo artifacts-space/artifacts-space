@@ -65,7 +65,7 @@ function TextBlock({ id, props }: BlockProps<"Text">) {
       onEmptyBackspace={() => { apply((raw) => removeBlock(raw, id)); }}
       label="Text"
       placeholder="Type, or press / for blocks"
-      className={cn("max-w-[72ch] break-words", textSize[props.size ?? "md"], props.tone === "muted" && "text-muted-foreground")}
+      className={cn("max-w-[var(--artifact-measure,72ch)] break-words", textSize[props.size ?? "md"], props.tone === "muted" && "text-muted-foreground")}
     />
   );
 }
@@ -125,7 +125,7 @@ function ListBlock({ id, props }: BlockProps<"List">) {
   const items = props.items.length > 0 ? props.items : [""];
   const write = (next: string[]) => { setProp(id, "items", next); };
   return (
-    <Tag className={cn("max-w-[72ch] space-y-1 pl-5 text-md leading-7 marker:text-muted-foreground", props.ordered ? "list-decimal" : "list-disc")}>
+    <Tag className={cn("max-w-[var(--artifact-measure,72ch)] space-y-1 pl-5 text-md leading-7 marker:text-muted-foreground", props.ordered ? "list-decimal" : "list-disc")}>
       {items.map((item, index) => (
         // Items have no ids of their own; the index is their identity while typing.
         <li key={index}>

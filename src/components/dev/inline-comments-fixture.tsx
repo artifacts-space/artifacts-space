@@ -15,6 +15,7 @@ import { InlineCommentsProvider } from "@/components/inline-comments/inline-comm
 import type { ArtifactDto } from "@/lib/artifact-types";
 import type { CommentAnchor } from "@/lib/comments/anchor-rules";
 import type { CommentView } from "@/lib/comments/views";
+import { bodyFillsColumnClass } from "@/lib/page-width/rules";
 
 import { fixtureArtifact } from "./fixture-content";
 
@@ -128,11 +129,11 @@ function FixtureBody({ reader }: { reader: boolean }) {
   const save = useMemorySave(artifact);
   const onSaved = useCallback(() => undefined, []);
   const view = <ArtifactView kind="markdown" content={artifact.content} title={artifact.title} language="" files={[]} />;
-  if (reader) return <article className="mt-10"><InlineCommentSurface>{view}</InlineCommentSurface></article>;
+  if (reader) return <article className={`mt-10 ${bodyFillsColumnClass}`}><InlineCommentSurface>{view}</InlineCommentSurface></article>;
   return (
     <ConfirmationsProvider initial={[]}>
       <PageInlineEditor artifact={artifact} reviewed={false} onSaved={onSaved} save={save}>
-        <article className="mt-10" data-block-links="">
+        <article className={`mt-10 ${bodyFillsColumnClass}`} data-block-links="">
           <InlineBody canComment>{view}</InlineBody>
         </article>
       </PageInlineEditor>

@@ -412,7 +412,9 @@ test.describe("full width", () => {
   test.skip(!localDatabaseEnabled(), localDatabaseSkipReason);
 
   const created: string[] = [];
-  const paragraph = "A long line of plain prose that runs well past the reading width, so the page width decides how wide it shows. ".repeat(12);
+  const paragraph = "A long line of plain prose that runs well past one line, so the page width decides how wide it shows. ".repeat(12);
+  /** Wide enough that the pane is wider than the contained column: only then does Full width have room to add. */
+  const widePane = { width: 1920, height: 1000 };
 
   test.afterAll(async () => {
     await cleanUp(created, []);
@@ -434,7 +436,7 @@ test.describe("full width", () => {
     test.skip(testInfo.project.name === "phone", "the /app editor width is measured on desktop; the phone check is below");
     const title = `Full width e2e ${testInfo.project.name}`;
     const publicId = await seed(page, title);
-    await page.setViewportSize(desktop);
+    await page.setViewportSize(widePane);
     await page.goto("/app");
     await slot(page, "artifact-list").getByRole("button", { name: new RegExp(title) }).click();
     await expect(page.getByRole("textbox", { name: "Artifact title" })).toHaveValue(title);
@@ -448,7 +450,7 @@ test.describe("full width", () => {
     await toggle.click();
     await expect(pane).toHaveAttribute("data-full-width", "true");
     const wide = await proseWidth(page);
-    expect(wide, "the text uses the whole pane instead of the reading width").toBeGreaterThan(contained + 100);
+    expect(wide, "the text uses the whole pane instead of the contained column").toBeGreaterThan(contained + 100);
 
     await page.reload();
     await slot(page, "artifact-list").getByRole("button", { name: new RegExp(title) }).click();

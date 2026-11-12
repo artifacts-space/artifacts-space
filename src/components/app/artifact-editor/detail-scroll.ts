@@ -30,10 +30,26 @@ export const detailBody = [
 
 /**
  * For each row above `detailBody` that holds the content's column (title,
- * chips, meta line): it leaves the room the body's scrollbar takes, so its
- * column is centered in the same width as the body's (useScrollbarRoom).
+ * chips, meta line): it leaves the room the body leaves beside its own
+ * column, so both columns are centered in the same width and start and end
+ * at the same place. That room is the body's scrollbar (useScrollbarRoom)
+ * and, around the interface editor, the gutter its block handles hang in
+ * (blockGutter).
  */
-export const scrollbarRoom = "pe-(--detail-scrollbar)";
+export const scrollbarRoom = "ps-[var(--detail-gutter,0px)] pe-[calc(var(--detail-gutter,0px)_+_var(--detail-scrollbar,0px))]";
+
+/**
+ * The room on both sides of the body's column for the interface editor's
+ * block handles, which hang left of each block; both sides, so the column
+ * stays centered. Phones have no handles beside the blocks, so none there.
+ */
+export const blockGutter = "sm:px-14";
+
+/** `detailOuter`, telling the rows above the body whether the body has the block gutter, so they leave the same room (scrollbarRoom). */
+export function detailOuterClass(gutter: boolean): string {
+  // 3.5rem is blockGutter's px-14.
+  return gutter ? `${detailOuter} sm:[--detail-gutter:3.5rem]` : detailOuter;
+}
 
 /** The meta line on short viewports: it sticks to the top of the scroll box, opaque on the pane's card colour. */
 export const stickyModeBar = "shell-short:sticky shell-short:top-0 shell-short:z-10 shell-short:bg-card";

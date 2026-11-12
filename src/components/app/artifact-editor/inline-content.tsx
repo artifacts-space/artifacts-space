@@ -13,10 +13,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { canEditBlocks, UiBlockEditor } from "@/components/ui-editor/ui-block-editor";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
-import { editColumnClass, readingMeasureClass } from "@/lib/page-width/rules";
+import { editColumnClass, bodyFillsColumnClass } from "@/lib/page-width/rules";
 import type { Theme } from "@/lib/themes/schema";
 import { cn } from "@/lib/utils";
 
+import { blockGutter } from "./detail-scroll";
 import { isThemed, PreviewSurface, surfaceClass } from "./preview-surface";
 
 /**
@@ -54,8 +55,8 @@ interface Placement {
  */
 function ContentFrame({ place, gutter = false, children }: { place: Placement; gutter?: boolean; children: React.ReactNode }) {
   const { surface, fullWidth, theme } = place;
-  if (surface === "page") return <div className={cn("min-w-0", readingMeasureClass(fullWidth))} data-full-width={fullWidth}>{children}</div>;
-  return <PreviewSurface theme={theme} fullWidth={fullWidth} className={cn("py-5 sm:py-8", gutter && "sm:px-14")}>{children}</PreviewSurface>;
+  if (surface === "page") return <div className={cn("min-w-0", bodyFillsColumnClass)} data-full-width={fullWidth}>{children}</div>;
+  return <PreviewSurface theme={theme} fullWidth={fullWidth} className={cn("py-5 sm:py-8", gutter && blockGutter)}>{children}</PreviewSurface>;
 }
 
 /** The source field's frame: a card on the artifact page; in /app, the theme across the pane around the page column (the whole pane when full width). */
@@ -69,8 +70,22 @@ function SourceFrame({ place, children }: { place: Placement; children: React.Re
   );
 }
 
-const sourceField =
-  "min-h-[460px] flex-1 resize-y rounded-none border-0 p-6 font-mono text-base leading-7 md:text-sm shadow-none outline-none focus-visible:ring-0 sm:p-8";
+const sourceField = "min-h-[460px] flex-1 resize-y rounded-none border-0 font-mono text-base leading-7 md:text-sm shadow-none outline-none focus-visible:ring-0";
+
+/**
+ * The source field's padding. In the pane its sides are the page column's
+ * own padding (px-6 in pageColumnClass), so the source starts and ends where
+ * the title above it does; on the artifact page the field is a card with
+ * its own room.
+ */
+function sourcePadding(surface: InlineSurface): string {
+  return surface === "pane" ? "px-6 py-6 sm:py-8" : "p-6 sm:p-8";
+}
+
+/** The side padding of the status line under the source: the page column's in the pane, the status line's own on the page. */
+function statusPadding(surface: InlineSurface): string {
+  return surface === "pane" ? "px-6 sm:px-6" : "";
+}
 
 interface InlineContentProps {
   kind: ArtifactKind;
@@ -103,9 +118,9 @@ function SourceEditor({ kind, content, label, place, onChange }: { kind: Artifac
         spellCheck={isDocumentKind(kind)}
         autoCapitalize="off"
         autoCorrect="off"
-        className={cn(sourceField, place.surface === "pane" ? surfaceClass(place.theme) : "bg-card")}
+        className={cn(sourceField, sourcePadding(place.surface), place.surface === "pane" ? surfaceClass(place.theme) : "bg-card")}
       />
-      <ContentStatus kind={kind} content={content} />
+      <ContentStatus kind={kind} content={content} className={statusPadding(place.surface)} />
     </SourceFrame>
   );
 }
@@ -139,6 +154,15 @@ function DocumentContent({ kind, content, revision, place, onChange, onShowSourc
   return <ContentFrame place={place}>{kind === "markdown" ? <InlineCommentSurface>{document}</InlineCommentSurface> : document}</ContentFrame>;
 }
 
+/**
+ * Whether the body is the interface editor, which keeps a gutter beside its
+ * column for block handles. The pane's title block asks the same question,
+ * so it leaves the same room and lines up with the body.
+ */
+export function hasBlockGutter(kind: ArtifactKind, content: string, sourceOpen: boolean): boolean {
+  return !sourceOpen && kind === "ui" && canEditBlocks(content);
+}
+
 /** See the notes at the top of this file. */
 export function InlineContent(props: InlineContentProps) {
   const { kind, content, title, files, revision, sourceOpen, surface = "pane", fullWidth = false, theme = null, onChange, onShowSource } = props;
@@ -153,7 +177,7 @@ export function InlineContent(props: InlineContentProps) {
       </ContentFrame>
     );
   }
-  if (kind === "ui" && canEditBlocks(content)) {
+  if (hasBlockGutter(kind, content, sourceOpen)) {
     return (
       <ContentFrame place={place} gutter>
         <UiBlockEditor content={content} onChange={onChange} />

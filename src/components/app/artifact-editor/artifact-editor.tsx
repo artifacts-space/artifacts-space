@@ -1,7 +1,7 @@
 "use client";
 
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { CommentsControl } from "@/components/app/comments-picker";
 import { ShareControl } from "@/components/app/share-control";
@@ -28,11 +28,11 @@ import type { BlankPageOptions } from "@/components/app/new-artifact/use-blank-p
 import { useBlankEditor } from "@/components/app/new-artifact/use-blank-editor";
 
 import { DetectedNotice } from "./detected-format-chip";
-import { detailBody, detailOuter, detailSection, scrollbarRoom, stickyModeBar, useScrollbarRoom, useScrollPlace } from "./detail-scroll";
+import { detailBody, detailOuterClass, detailSection, scrollbarRoom, stickyModeBar, useScrollbarRoom, useScrollPlace } from "./detail-scroll";
 import { ShareBanner, TitleFields } from "./editor-sections";
 import { BlankToolbar, EditorToolbar, type SourceToggle } from "./editor-toolbar";
 import { FormatDialog } from "./format-dialog";
-import { hasInlineField, InlineContent } from "./inline-content";
+import { hasBlockGutter, hasInlineField, InlineContent } from "./inline-content";
 import { AgentSaveNotice, ConflictNotice, openHistoryButton, SaveStatusBar } from "./save-status";
 import { useArtifactActions } from "./use-artifact-actions";
 import { useArtifactDraft } from "./use-artifact-draft";
@@ -162,6 +162,8 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   const fullWidthShown = usesFullWidth(draft.kind, artifact.fullWidth);
   // The title, chips, and meta line sit in the content's column, so they line up with the body.
   const column = previewColumnClass(fullWidthShown);
+  // The interface editor keeps a gutter beside its column for block handles; the rows above leave the same room.
+  const gutter = useMemo(() => hasBlockGutter(draft.kind, draft.content, sourceOpen), [draft.kind, draft.content, sourceOpen]);
   useLeaveGuard(autosave.dirty || saving);
 
   const toggleSource = () => {
@@ -194,7 +196,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           notice={notice}
         />
       )}
-      <div ref={outerRef} data-slot="detail-outer" className={detailOuter}>
+      <div ref={outerRef} data-slot="detail-outer" className={detailOuterClass(gutter)}>
         {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
         <TitleFields title={draft.title} icon={draft.icon} summary={draft.summary} update={update} titleRef={titleRef} onEnter={focusBody} column={column} />
         <ArtifactOrganizers artifact={artifact} kind={draft.kind} onChangeFormat={() => { setFormatOpen(true); }} onUpdated={onUpdated} column={column} className={scrollbarRoom} hidden={page.blank} />

@@ -47,7 +47,7 @@ import { loadArtifactByline } from "@/lib/artifact-byline";
 import { iconTitlePrefix } from "@/lib/artifact-icons";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
 import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
-import { hasWidthSetting, pageColumnClass, readingMeasureClass, usesFullWidth } from "@/lib/page-width/rules";
+import { hasWidthSetting, bodyFillsColumnClass, pageColumnClass, usesFullWidth } from "@/lib/page-width/rules";
 import { pageOrganizersFor } from "@/lib/projects/page-project";
 import { isReportable } from "@/lib/reports/rules";
 import { isSearchIndexable, pageRobots, showsInSearch } from "@/lib/search/search-rules";
@@ -194,7 +194,7 @@ function HeadingIcon({ viewable, themeChoices }: { viewable: ViewableArtifact; t
  * below moves when editing unlocks.
  */
 function SummaryReadView({ summary, editable }: { summary: string; editable: boolean }) {
-  if (summary) return <p className="mt-4 max-w-2xl text-md leading-7 text-muted-foreground">{summary}</p>;
+  if (summary) return <p className="mt-4 text-md leading-7 text-muted-foreground">{summary}</p>;
   return editable ? <div aria-hidden data-summary-space="" className="mt-4 h-7" /> : null;
 }
 
@@ -416,8 +416,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
           <main className={cn("mx-auto w-full py-12 sm:py-16", column, mainTopClass(view))} data-full-width={fullWidth}>
             {/* A Markdown artifact takes comments on its words: highlights in the text, threads in cards at them, and the list below. */}
             <InlineCommentsProvider publicId={record.publicId} kind={view.kind} canComment={canComment}>
-            {/* The reading measure covers the artifact and its in-place editor, not the comments under it. */}
-            <div className={readingMeasureClass(fullWidth)}>
+            {/* The artifact and its in-place editor fill the page's column, as the title above them does; the comments under them keep their own measure. */}
+            <div className={bodyFillsColumnClass}>
               <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
                 <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={themeIdForReader(presetId, viewable.canEdit)} data-theme-source={source}>
                   <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
