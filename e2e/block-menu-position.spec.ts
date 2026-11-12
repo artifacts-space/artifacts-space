@@ -114,7 +114,7 @@ for (const { width, height, side } of [{ width: 1920, height: 900, side: "left" 
 
     test(`should open to the ${side} of the grip, 12px from the top, for a block at the top of the window`, async ({ page }) => {
       const opened = await openFrom(page, middle, "start");
-      // The grip sits where the window-width figure in AGENTS.md assumes.
+      // Pins the grip's offset from its block (gripInset) against real layout; the 1588px figure itself is derived in menu-placement.test.ts.
       near(opened.grip.x, opened.block.x - gripInset);
       expect(choosePlacement(gripMenuRule, { left: opened.grip.x, right: opened.grip.x + opened.grip.width }, menuWidth, width)).toBe(side);
       expectSide(opened);
