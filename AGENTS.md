@@ -253,7 +253,11 @@ catch this, so test the generated SQL with `.toSQL()`, as
   A tool missing from that list cannot be registered, and read-only
   connections never see write tools. Its MCP annotations come from the same
   file (`toolAnnotations`): read tools say `readOnlyHint: true`, and every
-  write tool needs a `writeTraits` entry (destructive, idempotent). ChatGPT
+  write tool needs a `writeTraits` entry (destructive, idempotent, open
+  world). Open world is true only for tools that can widen an artifact's
+  audience (`visibility` link or public, `comments` signed_in): today
+  `artifacts_create` and `artifacts_update`; a test fails when a tool takes
+  either input without it. ChatGPT
   asks before every tool without `readOnlyHint`, and Pro offers only those.
 - Agents can request sharing but never approve it.
 - GitHub and Google sign-in (`src/lib/auth/social-auth-options.ts`, rules in

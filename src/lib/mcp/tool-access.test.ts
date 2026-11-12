@@ -131,12 +131,28 @@ describe("gateTools", () => {
 });
 
 describe("tool annotations", () => {
-  it("should annotate every tool with a read-only flag and a closed world when access is full", async () => {
+  it("should annotate every tool with explicit read-only, destructive, and open-world flags when access is full", async () => {
     const { tools } = await connect("full");
     expect(tools.length).toBe(Object.keys(toolAccess).length);
     for (const tool of tools) {
       expect(typeof tool.annotations?.readOnlyHint, tool.name).toBe("boolean");
-      expect(tool.annotations?.openWorldHint, tool.name).toBe(false);
+      expect(typeof tool.annotations?.destructiveHint, tool.name).toBe("boolean");
+      expect(typeof tool.annotations?.openWorldHint, tool.name).toBe("boolean");
+    }
+  });
+
+  it("should mark open world exactly the tools that can share an artifact by link or publicly when it is listed", async () => {
+    const { tools } = await connect("full");
+    const openWorld = tools.filter((tool) => tool.annotations?.openWorldHint === true).map((tool) => tool.name).sort();
+    expect(openWorld).toEqual(["artifacts_create", "artifacts_update"]);
+  });
+
+  it("should mark open world every tool whose input sets visibility or comments when it is listed", async () => {
+    const { tools } = await connect("full");
+    for (const tool of tools) {
+      const properties = Object.keys(tool.inputSchema.properties ?? {});
+      const widensAudience = properties.includes("visibility") || properties.includes("comments");
+      expect(tool.annotations?.openWorldHint, tool.name).toBe(widensAudience);
     }
   });
 
@@ -166,11 +182,12 @@ describe("tool annotations", () => {
     expect(idempotent).toEqual(["artifacts_delete", "comment_delete", "files_attach", "files_delete", "files_finalize", "inbox_mark_read"]);
   });
 
-  it("should list only tools marked read-only and not destructive when access is read-only", async () => {
+  it("should list only tools marked read-only, not destructive, and closed world when access is read-only", async () => {
     const { tools } = await connect("read");
     for (const tool of tools) {
       expect(tool.annotations?.readOnlyHint, tool.name).toBe(true);
       expect(tool.annotations?.destructiveHint, tool.name).toBe(false);
+      expect(tool.annotations?.openWorldHint, tool.name).toBe(false);
     }
   });
 });

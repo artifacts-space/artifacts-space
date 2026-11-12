@@ -57,36 +57,47 @@ interface WriteTraits {
   destructive: boolean;
   /** A second call with the same arguments changes nothing more (MCP `idempotentHint`). */
   idempotent: boolean;
+  /**
+   * It can widen who reads the content beyond the person's workspace, to
+   * anyone with a link or the open web (MCP `openWorldHint`): it sets
+   * `visibility` (link, public) or `comments` (signed_in). Writes that only
+   * add to or change an artifact inside the audience it already has stay
+   * false: that audience was chosen by a person or by one of these tools.
+   */
+  openWorld: boolean;
 }
 
 /**
  * How each write tool changes things. The type needs every write tool and no
  * other, so a new write tool cannot ship without saying whether it is
  * destructive. Idempotent is true only where the code makes a repeat a no-op.
+ * Open world is true only for the tools that take `visibility` or `comments`.
  */
 export const writeTraits = {
-  // A new artifact on every call.
-  artifacts_create: { destructive: false, idempotent: false },
+  // A new artifact on every call. `visibility` can make it link-shared or public.
+  artifacts_create: { destructive: false, idempotent: false, openWorld: true },
   // Replaces content, tags, and sharing; a repeat can file a version or a sharing request.
-  artifacts_update: { destructive: true, idempotent: false },
-  artifacts_delete: { destructive: true, idempotent: true },
+  // `visibility` can make it link-shared or public, and `comments` open it to anyone signed in.
+  artifacts_update: { destructive: true, idempotent: false, openWorld: true },
+  artifacts_delete: { destructive: true, idempotent: true, openWorld: false },
   // Replaces the current content with an older version, as a new save each time.
-  artifacts_restore_version: { destructive: true, idempotent: false },
+  artifacts_restore_version: { destructive: true, idempotent: false, openWorld: false },
   // A new pending upload on every call.
-  files_request_upload: { destructive: false, idempotent: false },
+  files_request_upload: { destructive: false, idempotent: false, openWorld: false },
   // Finalizing a ready file returns it unchanged. It removes only an upload that failed its checks, which was never usable.
-  files_finalize: { destructive: false, idempotent: true },
-  files_create_artifact: { destructive: false, idempotent: false },
+  files_finalize: { destructive: false, idempotent: true, openWorld: false },
+  // Always private; sharing it afterwards goes through artifacts_update.
+  files_create_artifact: { destructive: false, idempotent: false, openWorld: false },
   // Attaches only files not yet attached, so a repeat attaches nothing.
-  files_attach: { destructive: false, idempotent: true },
-  files_delete: { destructive: true, idempotent: true },
+  files_attach: { destructive: false, idempotent: true, openWorld: false },
+  files_delete: { destructive: true, idempotent: true, openWorld: false },
   // Replaces the current file; a repeat with a new upload replaces it again.
-  files_replace: { destructive: true, idempotent: false },
-  inbox_mark_read: { destructive: false, idempotent: true },
-  comment_create: { destructive: false, idempotent: false },
+  files_replace: { destructive: true, idempotent: false, openWorld: false },
+  inbox_mark_read: { destructive: false, idempotent: true, openWorld: false },
+  comment_create: { destructive: false, idempotent: false, openWorld: false },
   // Replaces the body. A repeat notifies no one again but still moves updatedAt, so it is not a no-op.
-  comment_update: { destructive: true, idempotent: false },
-  comment_delete: { destructive: true, idempotent: true },
+  comment_update: { destructive: true, idempotent: false, openWorld: false },
+  comment_delete: { destructive: true, idempotent: true, openWorld: false },
 } as const satisfies Record<WriteToolName, WriteTraits>;
 
 const classified = new Map<string, "read" | "write">(Object.entries(toolAccess));
@@ -108,15 +119,16 @@ export function toolAllowed(name: string, access: McpAccess): boolean {
  * The MCP annotations a tool lists with, derived from toolAccess and
  * writeTraits. Read tools say `readOnlyHint: true`, which ChatGPT needs to run
  * them without asking and to offer them at all on plans that allow only
- * read-only tools. Every tool acts only inside artifacts.space, so
- * `openWorldHint` is false. Throws for a tool nobody classified.
+ * read-only tools. Reads look only inside the person's workspace, so their
+ * `openWorldHint` is false; a write's comes from its `openWorld` trait.
+ * Throws for a tool nobody classified.
  */
 export function toolAnnotations(name: string): ToolAnnotations {
   // destructiveHint defaults to true in MCP; say false so no client that resolves defaults asks before a read.
   if (levelOf(name) === "read") return { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
   const write = traits.get(name);
   if (!write) throw new Error(`MCP write tool "${name}" has no traits. Add it to writeTraits in src/lib/mcp/tool-access.ts.`);
-  return { readOnlyHint: false, destructiveHint: write.destructive, idempotentHint: write.idempotent, openWorldHint: false };
+  return { readOnlyHint: false, destructiveHint: write.destructive, idempotentHint: write.idempotent, openWorldHint: write.openWorld };
 }
 
 /** What tool registration needs from an McpServer. */

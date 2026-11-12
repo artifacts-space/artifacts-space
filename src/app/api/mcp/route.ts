@@ -8,6 +8,7 @@ import { registerAllTools } from "@/lib/mcp/register-tools";
 import { connectionHarness, recordRequestClientInfo } from "@/lib/mcp/request-harness";
 import { jsonRpcId, mcpLimitChecks, mcpRateLimitedResponse, mcpToolCalls } from "@/lib/mcp/rate-limits";
 import { SERVER_INSTRUCTIONS } from "@/lib/mcp/routing-copy";
+import { mcpServerInfo } from "@/lib/mcp/server-info";
 import { READ_ONLY_INSTRUCTIONS } from "@/lib/mcp/tool-access";
 import { bearerChallenge } from "@/lib/oauth/metadata";
 
@@ -15,7 +16,7 @@ export const maxDuration = 30;
 
 function createMcpServer({ userId, access }: McpPrincipal, harness: HarnessSource) {
   const server = new McpServer(
-    { name: "artifacts.space", version: "1.0.0" },
+    mcpServerInfo(),
     { instructions: access === "read" ? `${SERVER_INSTRUCTIONS} ${READ_ONLY_INSTRUCTIONS}` : SERVER_INSTRUCTIONS },
   );
 
