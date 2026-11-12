@@ -336,6 +336,10 @@ catch this, so test the generated SQL with `.toSQL()`, as
     password login and, in the same transaction, deletes its sessions, OAuth
     access and refresh tokens and approvals, its access tokens and those of
     agents it added, its MCP connection records, and unused sign-in links.
+    Run with the site's `BETTER_AUTH_SECRET` set, it also deletes the
+    address's failure count (`passwordFailureBucketKey`), so a reviewer locked
+    out by the 500-a-day ceiling can sign in with the new password at once;
+    without it the reset says the count was not cleared.
     A browser that already holds the session may keep the 5-minute session
     cookie cache until it expires. Emails must be under a reviewer domain;
     `@example.com` only for a database on this machine, never with the

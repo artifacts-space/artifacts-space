@@ -32,6 +32,7 @@ import { hashPassword } from "better-auth/crypto";
 import pg from "pg";
 
 import { isStrongEnough, PASSWORD_BYTES, parseReviewerArgs, reviewerDatabase, reviewerEmailProblem, sampleArtifacts, sampleVersionBytes, usage, type ReviewerRequest } from "./create-reviewer-account-rules.mts";
+import { passwordFailureBucketKey } from "../src/lib/auth/password-sign-in-limits.ts";
 import { describeError, redact, secretsFrom } from "./migrate-on-deploy.mts";
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -101,7 +102,7 @@ const accessGrants = [
   [`delete from verification where (case when left(value, 1) = '{' then value::jsonb ->> 'email' end) = $1`, "email"],
 ] as const;
 
-async function resetPassword(client: pg.ClientBase, request: ReviewerRequest, passwordHash: string) {
+async function resetPassword(client: pg.ClientBase, request: ReviewerRequest, passwordHash: string, authSecret: string | null) {
   const userId = await existingUserId(client, request.email);
   const updated = userId
     ? await client.query(`update account set password = $3, updated_at = now() where user_id = $1 and provider_id = 'credential' and account_id = $2`, [userId, userId, passwordHash])
@@ -109,20 +110,25 @@ async function resetPassword(client: pg.ClientBase, request: ReviewerRequest, pa
   if (!userId || !updated?.rowCount) throw new ReviewerAccountRefusal("No reviewer account has this email. --reset-password changes only an account this script created.");
   // A new password cuts every other way in, in the same transaction.
   for (const [statement, subject] of accessGrants) await client.query(statement, [subject === "user" ? userId : request.email]);
+  // And lifts the address's failure ceiling, which is keyed with the site's secret.
+  if (authSecret) await client.query(`delete from rate_limit_bucket where key = $1`, [passwordFailureBucketKey(request.email, authSecret)]);
 }
 
 /**
  * Creates the reviewer account, or with `resetPassword` replaces its password
- * and deletes every session, token, and approval, in one transaction. Throws
- * a ReviewerAccountRefusal (safe to print) when the request is refused.
+ * and deletes every session, token, and approval, in one transaction. With
+ * `authSecret` (the site's BETTER_AUTH_SECRET) a reset also clears the
+ * address's failed password sign-ins, so the new password works at once even
+ * after a day of guessing. Throws a ReviewerAccountRefusal (safe to print)
+ * when the request is refused.
  */
-export async function writeAccount(databaseUrl: string, request: ReviewerRequest, passwordHash: string) {
+export async function writeAccount(databaseUrl: string, request: ReviewerRequest, passwordHash: string, authSecret: string | null = null) {
   const client = new pg.Client({ connectionString: databaseUrl, connectionTimeoutMillis: 30_000 });
   client.on("error", () => undefined);
   await client.connect();
   try {
     await client.query("begin");
-    await (request.resetPassword ? resetPassword(client, request, passwordHash) : createAccount(client, request, passwordHash));
+    await (request.resetPassword ? resetPassword(client, request, passwordHash, authSecret) : createAccount(client, request, passwordHash));
     await client.query("commit");
   } catch (error) {
     await client.query("rollback").catch(() => undefined);
@@ -130,6 +136,12 @@ export async function writeAccount(databaseUrl: string, request: ReviewerRequest
   } finally {
     await client.end().catch(() => undefined);
   }
+}
+
+function doneMessage(request: ReviewerRequest, clearedFailures: boolean): string {
+  if (!request.resetPassword) return `Created reviewer account ${request.email} (username ${request.username}) with ${String(sampleArtifacts.length)} private sample artifacts.`;
+  const failures = clearedFailures ? "Its failed password sign-ins are cleared." : "Its failed password sign-ins are not cleared: set BETTER_AUTH_SECRET to the site's secret for the run to clear them.";
+  return `Reset the password of ${request.email}; its sessions, app tokens, access tokens, and approvals are revoked. ${failures}`;
 }
 
 async function main(argv: readonly string[], env: Env): Promise<number> {
@@ -151,9 +163,9 @@ async function main(argv: readonly string[], env: Env): Promise<number> {
   }
   try {
     const password = newPassword();
-    await writeAccount(database.url, request, await hashPassword(password));
-    const done = request.resetPassword ? `Reset the password of ${request.email}; its sessions, app tokens, access tokens, and approvals are revoked.` : `Created reviewer account ${request.email} (username ${request.username}) with ${String(sampleArtifacts.length)} private sample artifacts.`;
-    console.error(`${done} The password follows on stdout. It is shown only this once and is not saved anywhere.`);
+    const authSecret = env.BETTER_AUTH_SECRET?.trim() ?? "";
+    await writeAccount(database.url, request, await hashPassword(password), authSecret || null);
+    console.error(`${doneMessage(request, authSecret !== "")} The password follows on stdout. It is shown only this once and is not saved anywhere.`);
     console.log(password);
     return 0;
   } catch (error) {

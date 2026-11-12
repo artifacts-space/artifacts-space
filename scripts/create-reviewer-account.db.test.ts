@@ -166,4 +166,30 @@ describe.runIf(Boolean(databaseUrl))("reviewer accounts with a database", async 
     const session = await GET(new Request(`${origin}/api/auth/get-session?disableCookieCache=true`, { headers: headers({ cookie }) }));
     expect(await session.json()).toBeNull();
   });
+
+  it("should lift the address's failure ceiling when the password is reset with the site's secret", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { rateLimitBucket } = await import("@/db/schema");
+    const { rateLimits } = await import("@/lib/abuse/limits");
+    const { windowStart } = await import("@/lib/abuse/rate-limit-window");
+    const { passwordFailureBucketKey } = await import("@/lib/auth/password-sign-in-limits");
+    const reviewer = request("ceiling");
+    const secret = process.env.BETTER_AUTH_SECRET ?? "";
+    await writeAccount(url, reviewer, await hashPassword("old-password-0123456789abcdef"));
+    // A day of failures from many networks, as the ceiling stores them.
+    const { limit, windowSeconds } = rateLimits.passwordSignInFailuresByEmail;
+    const windowMs = windowSeconds * 1000;
+    const current = windowStart(Date.now(), windowMs);
+    const key = passwordFailureBucketKey(reviewer.email, secret);
+    await getDb().insert(rateLimitBucket).values([
+      { key, windowStart: new Date(current), count: limit },
+      { key, windowStart: new Date(current - windowMs), count: limit },
+    ]);
+
+    await writeAccount(url, { ...reviewer, resetPassword: true }, await hashPassword("mid-password-0123456789abcdef"));
+    expect((await signIn(reviewer.email, "mid-password-0123456789abcdef")).status).toBe(429);
+
+    await writeAccount(url, { ...reviewer, resetPassword: true }, await hashPassword("new-password-0123456789abcdef"), secret);
+    expect((await signIn(reviewer.email, "new-password-0123456789abcdef")).status).toBe(200);
+  });
 });

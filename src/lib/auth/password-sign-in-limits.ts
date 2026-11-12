@@ -52,3 +52,13 @@ export function passwordSignInChecks(networkKey: string, email: string | null, s
 export function passwordFailureKey(email: string, secret: string): string {
   return keyed(secret, `password-failures:${email}`);
 }
+
+/**
+ * The `rate_limit_bucket.key` that address's failures are stored under
+ * (`<limit name>:<subject>`, as rate-limit.ts writes it). The owner's reset
+ * script deletes it, so a new password also lifts the failure ceiling.
+ * `create-reviewer-account.db.test.ts` fails if the two ever disagree.
+ */
+export function passwordFailureBucketKey(email: string, secret: string): string {
+  return `passwordSignInFailuresByEmail:${passwordFailureKey(email.toLowerCase(), secret)}`;
+}
