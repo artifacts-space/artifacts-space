@@ -1,11 +1,10 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { AnchorHeading } from "@/components/docs/docs-content";
 import { DocsToc } from "@/components/docs/docs-toc";
-import { Logo } from "@/components/logo";
+import { PublicPageHeader } from "@/components/public-page-header";
 import { SiteFooter } from "@/components/site-footer";
-import { legalContact, legalDates, legalPaths, mailtoHref } from "@/lib/legal/contact";
+import { legalContact, legalDates, mailtoHref } from "@/lib/legal/contact";
 import { legalHeading, legalHeadings, legalSections, type LegalDocument } from "@/lib/legal/headings";
 
 /** An anchored section heading of a legal document, from src/lib/legal/headings.ts. */
@@ -30,21 +29,6 @@ export function PostalAddress() {
       <br />
       {legalContact.country}
     </address>
-  );
-}
-
-function LegalHeader() {
-  return (
-    <header className="border-b">
-      <div className="mx-auto flex h-14 w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6">
-        <Logo />
-        <nav aria-label="Legal" className="flex items-center gap-5 text-sm font-medium text-muted-foreground">
-          <Link href={legalPaths.privacy} className="transition-colors hover:text-foreground">Privacy</Link>
-          <Link href={legalPaths.terms} className="transition-colors hover:text-foreground">Terms</Link>
-          <Link href="/docs" className="hidden transition-colors hover:text-foreground sm:inline">Docs</Link>
-        </nav>
-      </div>
-    </header>
   );
 }
 
@@ -95,7 +79,7 @@ interface LegalPageProps {
 export function LegalPage({ doc, title, lead, summary, children }: LegalPageProps) {
   return (
     <div className="flex min-h-screen flex-col">
-      <LegalHeader />
+      <PublicPageHeader label="Legal" />
       <div className="mx-auto flex w-full max-w-[1100px] flex-1 gap-12 px-4 sm:px-6">
         <article className="min-w-0 max-w-[780px] flex-1 pt-10 pb-20 sm:pt-14">
           <p className="text-sm text-muted-foreground">Legal</p>

@@ -32,9 +32,9 @@ export const securityTxtExpires = new Date("2027-11-01T00:00:00.000Z");
  */
 export const crawlDisallowed = ["/app", "/inbox", "/teams", "/threads", "/invitations", "/api/", "/oauth/", "/dev/", "/preview", "/share/"] as const;
 
-/** The site's own pages for the sitemap: the home page, the legal pages, and every docs page. */
+/** The site's own pages for the sitemap: the home page, the legal pages, Support, and every docs page. */
 export function publicPaths(): string[] {
-  return ["/", "/privacy", "/terms", ...docsPages.map((page) => docsHref(page.slug))];
+  return ["/", "/privacy", "/terms", "/support", ...docsPages.map((page) => docsHref(page.slug))];
 }
 
 /**

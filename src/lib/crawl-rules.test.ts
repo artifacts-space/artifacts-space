@@ -15,14 +15,15 @@ describe("sitemapFor", () => {
     }
   });
 
-  it("should list the home page, legal pages, and every docs page when the sitemap is built", () => {
+  it("should list the home page, legal pages, Support, and every docs page when the sitemap is built", () => {
     const urls = sitemapFor(origin).map((entry) => entry.url);
     expect(urls).toContain(`${origin}/`);
     expect(urls).toContain(`${origin}/privacy`);
     expect(urls).toContain(`${origin}/terms`);
+    expect(urls).toContain(`${origin}/support`);
     expect(urls).toContain(`${origin}/docs`);
     expect(urls).toContain(`${origin}/docs/quickstart`);
-    expect(urls).toHaveLength(3 + docsPages.length);
+    expect(urls).toHaveLength(4 + docsPages.length);
   });
 
   it("should add only the artifact pages it is given after the site's pages when artifacts are opted in", () => {
