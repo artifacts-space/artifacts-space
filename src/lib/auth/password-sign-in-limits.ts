@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 
 import { z } from "zod";
 
@@ -7,7 +7,8 @@ import type { RateLimitCheck } from "@/lib/abuse/rate-limit";
 /**
  * Password sign-in limits, counted in Postgres like the sign-in link limits
  * (magic-link-limits.ts): Better Auth's own limit lives in each server's
- * memory, so on serverless it barely holds.
+ * memory, so on serverless it barely holds. Email addresses are keyed with
+ * the server secret (HMAC), never stored raw or as a plain hash.
  */
 
 /** True for a request that signs in with an email and password. */
@@ -15,7 +16,7 @@ export function isPasswordSignInRequest(method: string, pathname: string): boole
   return method === "POST" && pathname.replace(/\/+$/, "") === "/api/auth/sign-in/email";
 }
 
-/** True when the request body is JSON, the only kind the sign-in form sends. Other kinds are refused before Better Auth reads them. */
+/** True when the request body is JSON, the only kind the sign-in forms send. Other kinds are refused before Better Auth reads them. */
 export function isJsonRequest(contentType: string | null): boolean {
   return contentType?.split(";")[0]?.trim().toLowerCase() === "application/json";
 }
@@ -28,19 +29,26 @@ export function passwordSignInEmail(body: unknown): string | null {
   return parsed.success ? parsed.data.email.toLowerCase() : null;
 }
 
+function keyed(secret: string, value: string): string {
+  return createHmac("sha256", secret).update(value).digest("hex").slice(0, 32);
+}
+
 /**
- * The limits for one password sign-in: per network (15 minutes and a day),
- * and per address when there is one (hashed, never stored raw). None of them
- * depends on whether the address has an account or a password, so a refusal
- * reveals nothing about either.
+ * The limits counted on every try, before Better Auth answers: per network
+ * (15 minutes and a day; `networkKey` from networkPrefixKey, so an IPv6
+ * client counts by its /64), and per network and address together when there
+ * is an address. None depends on whether the address has an account.
  */
-export function passwordSignInChecks(networkKey: string, email: string | null): RateLimitCheck[] {
+export function passwordSignInChecks(networkKey: string, email: string | null, secret: string): RateLimitCheck[] {
   const checks: RateLimitCheck[] = [
     { name: "passwordSignInByNetwork", subject: networkKey },
     { name: "passwordSignInByNetworkDay", subject: networkKey },
   ];
-  if (!email) return checks;
-  const emailKey = createHash("sha256").update(`password:${email}`).digest("hex").slice(0, 32);
-  checks.push({ name: "passwordSignInByEmail", subject: emailKey }, { name: "passwordSignInByEmailDay", subject: emailKey });
+  if (email) checks.push({ name: "passwordSignInByNetworkEmail", subject: keyed(secret, `password-network-email:${networkKey}:${email}`) });
   return checks;
+}
+
+/** The key failed sign-ins for this address are counted under, from every network (passwordSignInFailuresByEmail). */
+export function passwordFailureKey(email: string, secret: string): string {
+  return keyed(secret, `password-failures:${email}`);
 }

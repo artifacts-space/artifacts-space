@@ -146,20 +146,28 @@ export const rateLimits = {
   magicLinkByEmailMinute: { limit: 1, windowSeconds: 60 },
   magicLinkByEmail: { limit: 5, windowSeconds: hour },
   /**
-   * Password sign-in tries per network address (password-sign-in-rules.ts).
-   * Only accounts the owner gave a password can sign in this way, so real
-   * use is a handful a day; each try also costs a password hash, which these
-   * cap. Refused tries count too, so a guessing script stays refused.
+   * Password sign-in tries per network (password-sign-in-rules.ts; an IPv6
+   * client counts by its /64). Only accounts the owner gave a password can
+   * sign in this way, so real use is a handful a day; each try also costs a
+   * password hash, which these cap. Refused tries count too, so a guessing
+   * script stays refused.
    */
   passwordSignInByNetwork: { limit: 20, windowSeconds: quarterHour },
   passwordSignInByNetworkDay: { limit: 100, windowSeconds: day },
   /**
-   * Password sign-in tries per email address, from any network. Counted the
-   * same whether or not the address has an account, so a refusal says
-   * nothing about who has one.
+   * Password sign-in tries for one email address from one network. Someone
+   * else's tries from their own network never count here, so they cannot
+   * lock a reviewer out.
    */
-  passwordSignInByEmail: { limit: 10, windowSeconds: quarterHour },
-  passwordSignInByEmailDay: { limit: 30, windowSeconds: day },
+  passwordSignInByNetworkEmail: { limit: 10, windowSeconds: quarterHour },
+  /**
+   * Failed password sign-ins for one email address from every network,
+   * counted after the answer (a refused try never counts). A cost backstop
+   * set high, so scattered guessing cannot lock the address for long; the
+   * 24-character random passwords are what stop guessing. Known and unknown
+   * addresses are counted alike.
+   */
+  passwordSignInFailuresByEmail: { limit: 500, windowSeconds: day },
   /** New teams, agents, and access tokens per person per hour. Each agent gets its own limits, so agents are capped too. */
   teamCreate: { limit: 10, windowSeconds: hour },
   agentCreate: { limit: 20, windowSeconds: hour },
@@ -221,8 +229,8 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   magicLinkByEmail: "This email address has asked for a lot of sign-in links in the last hour.",
   passwordSignInByNetwork: "Your network has tried to sign in with a password a lot in the last few minutes.",
   passwordSignInByNetworkDay: "Your network has tried to sign in with a password a lot today.",
-  passwordSignInByEmail: "This email address has had a lot of password sign-in tries in the last few minutes.",
-  passwordSignInByEmailDay: "This email address has had a lot of password sign-in tries today.",
+  passwordSignInByNetworkEmail: "You have tried to sign in to this email address a lot in the last few minutes.",
+  passwordSignInFailuresByEmail: "This email address has had a lot of failed password sign-ins today.",
   teamCreate: "You have created a lot of teams in the last hour.",
   agentCreate: "You have added a lot of agents in the last hour.",
   tokenCreate: "You have created a lot of access tokens in the last hour.",

@@ -1,7 +1,10 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
-import { magicLinkChecks } from "./magic-link-limits";
-import { isJsonRequest, isPasswordSignInRequest, passwordSignInChecks, passwordSignInEmail } from "./password-sign-in-limits";
+import { isJsonRequest, isPasswordSignInRequest, passwordFailureKey, passwordSignInChecks, passwordSignInEmail } from "./password-sign-in-limits";
+
+const secret = "test-secret";
 
 describe("isPasswordSignInRequest", () => {
   it("should match only a POST to the password sign-in endpoint", () => {
@@ -34,27 +37,36 @@ describe("passwordSignInEmail", () => {
 });
 
 describe("passwordSignInChecks", () => {
-  it("should limit by network and by a hash of the address when an address is given", () => {
-    const checks = passwordSignInChecks("net", "ada@example.com");
-    expect(checks.map((check) => check.name)).toEqual(["passwordSignInByNetwork", "passwordSignInByNetworkDay", "passwordSignInByEmail", "passwordSignInByEmailDay"]);
-    for (const check of checks.slice(0, 2)) expect(check.subject).toBe("net");
-    for (const check of checks.slice(2)) {
-      expect(check.subject).toMatch(/^[a-f0-9]{32}$/);
-      expect(check.subject).not.toContain("ada");
-    }
+  it("should limit by network and by network and address together when an address is given", () => {
+    const checks = passwordSignInChecks("net", "ada@example.com", secret);
+    expect(checks.map((check) => check.name)).toEqual(["passwordSignInByNetwork", "passwordSignInByNetworkDay", "passwordSignInByNetworkEmail"]);
+    expect(checks[2]?.subject).toMatch(/^[a-f0-9]{32}$/);
+    expect(checks[2]?.subject).not.toContain("ada");
+  });
+
+  it("should count the same address from another network under another key, so others cannot lock it", () => {
+    const mine = passwordSignInChecks("reviewer-net", "reviewer@artifacts.space", secret)[2]?.subject;
+    const theirs = passwordSignInChecks("other-net", "reviewer@artifacts.space", secret)[2]?.subject;
+    expect(mine).toBeDefined();
+    expect(mine).not.toBe(theirs);
   });
 
   it("should count one address under one key when it is typed with different case and spaces", () => {
-    const subjects = [" Ada@Example.com ", "ada@example.com"].map((typed) => passwordSignInChecks("net", passwordSignInEmail({ email: typed }))[2]?.subject);
-    expect(subjects[0]).toBeDefined();
+    const subjects = [" Ada@Example.com ", "ada@example.com"].map((typed) => passwordSignInChecks("net", passwordSignInEmail({ email: typed }), secret)[2]?.subject);
     expect(subjects[0]).toBe(subjects[1]);
   });
 
-  it("should key an address apart from its sign-in link counters", () => {
-    expect(passwordSignInChecks("net", "ada@example.com")[2]?.subject).not.toBe(magicLinkChecks("net", "ada@example.com")[3]?.subject);
-  });
-
   it("should limit by network only when there is no address", () => {
-    expect(passwordSignInChecks("net", null).map((check) => check.name)).toEqual(["passwordSignInByNetwork", "passwordSignInByNetworkDay"]);
+    expect(passwordSignInChecks("net", null, secret).map((check) => check.name)).toEqual(["passwordSignInByNetwork", "passwordSignInByNetworkDay"]);
+  });
+});
+
+describe("passwordFailureKey", () => {
+  it("should key the address with the server secret, not a plain hash anyone can recompute", () => {
+    const key = passwordFailureKey("reviewer@artifacts.space", secret);
+    expect(key).toMatch(/^[a-f0-9]{32}$/);
+    expect(key).not.toBe(passwordFailureKey("reviewer@artifacts.space", "another-secret"));
+    expect(key).not.toBe(createHash("sha256").update("reviewer@artifacts.space").digest("hex").slice(0, 32));
+    expect(key).not.toBe(createHash("sha256").update("password-failures:reviewer@artifacts.space").digest("hex").slice(0, 32));
   });
 });

@@ -125,20 +125,24 @@ describe("sign-in link limits", () => {
 });
 
 describe("password sign-in limits", () => {
-  it("should let one address be tried at most 30 times a day from any network when someone guesses", () => {
-    expect(allowedOnceFull(["passwordSignInByEmail", "passwordSignInByEmailDay"], daySeconds)).toBeLessThanOrEqual(30);
+  it("should let one network try one address at most 10 times in 15 minutes", () => {
+    expect(allowedOnceFull(["passwordSignInByNetworkEmail"], 15 * 60)).toBeLessThanOrEqual(10);
   });
 
   it("should let one network try at most 100 passwords a day when it guesses across addresses", () => {
     expect(allowedOnceFull(["passwordSignInByNetwork", "passwordSignInByNetworkDay"], daySeconds)).toBeLessThanOrEqual(100);
   });
 
-  it("should let a reviewer who mistypes a few times still sign in within the short window", () => {
-    expect(rateLimits.passwordSignInByEmail.limit).toBeGreaterThanOrEqual(5);
+  it("should need at least five networks failing all day to reach one address's failure ceiling", () => {
+    expect(rateLimits.passwordSignInFailuresByEmail.limit / rateLimits.passwordSignInByNetworkDay.limit).toBeGreaterThanOrEqual(5);
   });
 
-  it("should make a refused address wait under 20 minutes when it hit the short window", () => {
-    expect(longestWait("passwordSignInByEmail")).toBeLessThanOrEqual(20 * 60);
+  it("should let a reviewer who mistypes a few times still sign in within the short window", () => {
+    expect(rateLimits.passwordSignInByNetworkEmail.limit).toBeGreaterThanOrEqual(5);
+  });
+
+  it("should make a refused reviewer wait under 20 minutes when their own network hit the short window", () => {
+    expect(longestWait("passwordSignInByNetworkEmail")).toBeLessThanOrEqual(20 * 60);
   });
 });
 

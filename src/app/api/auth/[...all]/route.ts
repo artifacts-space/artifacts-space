@@ -3,7 +3,8 @@ import { hitRateLimit, hitRateLimits, rateLimitMessage } from "@/lib/abuse/rate-
 import { rateLimitMessages } from "@/lib/abuse/limits";
 import { describeWait } from "@/lib/abuse/rate-limit-window";
 import { isMagicLinkRequest, magicLinkChecks, magicLinkEmail } from "@/lib/auth/magic-link-limits";
-import { isJsonRequest, isPasswordSignInRequest, passwordSignInChecks, passwordSignInEmail } from "@/lib/auth/password-sign-in-limits";
+import { isPasswordSignInRequest } from "@/lib/auth/password-sign-in-limits";
+import { handlePasswordSignIn } from "@/lib/auth/password-sign-in-route";
 import { getAuth } from "@/lib/auth/server";
 import { countUnapprovedClients } from "@/lib/oauth/clients";
 import { oauthLimits } from "@/lib/oauth/config";
@@ -49,33 +50,6 @@ async function refuseMagicLinkFlood(request: Request): Promise<Response | null> 
   }
 }
 
-const noStore = { "Cache-Control": "no-store" };
-
-/**
- * Limits password sign-in tries per network and per address, in Postgres.
- * Returns a response to send instead, or null to go on. Only JSON bodies are
- * read, so the per-address limit cannot be skipped with a form post. Unlike
- * the link limits it fails closed: without the counters, guessing would be
- * unlimited, and sign-in needs the same database anyway.
- */
-async function refusePasswordGuessing(request: Request): Promise<Response | null> {
-  if (!isJsonRequest(request.headers.get("content-type"))) {
-    return Response.json({ code: "UNSUPPORTED_MEDIA_TYPE", message: "Send the sign-in as JSON." }, { status: 415, headers: noStore });
-  }
-  try {
-    const body: unknown = await request.clone().json().catch(() => null);
-    const refusal = await hitRateLimits(passwordSignInChecks(networkKey(request.headers), passwordSignInEmail(body)));
-    if (!refusal) return null;
-    return Response.json(
-      { code: "RATE_LIMITED", message: rateLimitMessage(refusal.name, refusal.retryAfterSeconds) },
-      { status: 429, headers: { ...noStore, "Retry-After": String(refusal.retryAfterSeconds) } },
-    );
-  } catch (error) {
-    console.error("[auth] Password sign-in limit check failed", error instanceof Error ? error.name : "unknown error");
-    return Response.json({ code: "SIGN_IN_UNAVAILABLE", message: "Password sign-in is not working right now. Try again in a few minutes." }, { status: 503, headers: noStore });
-  }
-}
-
 /**
  * Applies the abuse limits, then rewrites an authorization request's scope to
  * this server's policy (no scope means full access, and offline_access is
@@ -84,7 +58,6 @@ async function refusePasswordGuessing(request: Request): Promise<Response | null
 async function prepare(request: Request): Promise<Request | Response> {
   const url = new URL(request.url);
   if (isMagicLinkRequest(request.method, url.pathname)) return (await refuseMagicLinkFlood(request)) ?? request;
-  if (isPasswordSignInRequest(request.method, url.pathname)) return (await refusePasswordGuessing(request)) ?? request;
   const endpoint = publicOAuthEndpoint(request.method, url.pathname);
   if (!endpoint) return request;
   try {
@@ -99,6 +72,7 @@ async function prepare(request: Request): Promise<Request | Response> {
 }
 
 async function handle(request: Request) {
+  if (isPasswordSignInRequest(request.method, new URL(request.url).pathname)) return handlePasswordSignIn(request, (signIn) => getAuth().handler(signIn));
   const prepared = await prepare(request);
   if (prepared instanceof Response) return prepared;
   return getAuth().handler(prepared);
