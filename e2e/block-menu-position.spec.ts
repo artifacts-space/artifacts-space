@@ -33,8 +33,11 @@ async function boxOf(locator: Locator): Promise<Box> {
   return box;
 }
 
+/** Boxes can land a hair off a whole pixel, so edges within this distance count as touching, not overlapping. */
+const subPixel = 0.5;
+
 function overlaps(a: Box, b: Box): boolean {
-  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  return a.x < b.x + b.width - subPixel && b.x < a.x + a.width - subPixel && a.y < b.y + b.height - subPixel && b.y < a.y + a.height - subPixel;
 }
 
 /**
