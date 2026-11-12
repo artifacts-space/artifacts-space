@@ -3,7 +3,7 @@
 import { autoUpdate, computePosition, offset, shift, size, type VirtualElement } from "@floating-ui/dom";
 import { useEffect, useLayoutEffect, useSyncExternalStore, type RefObject } from "react";
 
-import { choosePlacement, menuEdge, menuMinHeight, type PlacementRule } from "./menu-placement";
+import { choosePlacement, menuEdge, menuMaxHeight, menuMinHeight, type PlacementRule } from "./menu-placement";
 
 /** Where a menu opens: beside an element (the grip), or at a point inside one (a right-click), so it follows the page as it scrolls. */
 export type MenuAnchor = { kind: "element"; element: HTMLElement } | { kind: "point"; element: HTMLElement; dx: number; dy: number };
@@ -34,7 +34,7 @@ function middleware(gap: number) {
     size({
       padding: menuEdge,
       apply: ({ availableHeight, elements }) => {
-        elements.floating.style.maxHeight = `${String(Math.max(menuMinHeight, Math.min(availableHeight, 560)))}px`;
+        elements.floating.style.maxHeight = `${String(Math.max(menuMinHeight, Math.min(availableHeight, menuMaxHeight)))}px`;
       },
     }),
   ];
@@ -51,10 +51,13 @@ export function useFloatingMenu(floating: RefObject<HTMLElement | null>, anchor:
     const element = floating.current;
     if (!enabled || !element || !anchor) return;
     const reference = referenceFor(anchor);
+    // A placement still resolving when the effect ends must not put back the place the cleanup removed.
+    let active = true;
     const update = () => {
       const placement = choosePlacement(rule, reference.getBoundingClientRect(), element.offsetWidth, document.documentElement.clientWidth);
       computePosition(reference, element, { strategy: "fixed", placement, middleware: middleware(rule.gap) })
         .then(({ x, y }) => {
+          if (!active) return;
           element.style.left = `${String(x)}px`;
           element.style.top = `${String(y)}px`;
           element.dataset.placed = "";
@@ -63,6 +66,7 @@ export function useFloatingMenu(floating: RefObject<HTMLElement | null>, anchor:
     };
     const stop = autoUpdate(reference, element, update);
     return () => {
+      active = false;
       stop();
       // Off again (the phone sheet, or a new anchor): drop the old place so the sheet's own layout applies and the next place fades in again.
       element.style.removeProperty("left");

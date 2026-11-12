@@ -13,10 +13,11 @@ describe("choosePlacement", () => {
     expect(choosePlacement(gripMenuRule, { left, right: left + 22 }, menuWidth, 1280)).toBe("right");
   });
 
-  it("should never choose above or below, even when no side has room", () => {
-    for (const rule of [gripMenuRule, submenuRule, pointMenuRule]) {
-      expect(choosePlacement(rule, { left: 100, right: 300 }, 400, 400)).toMatch(/^(left|right)/);
-    }
+  it("should use the rule's last side, never above or below, when no side has room", () => {
+    const cramped = { left: 100, right: 300 };
+    expect(choosePlacement(gripMenuRule, cramped, 400, 400)).toBe("right");
+    expect(choosePlacement(submenuRule, cramped, 400, 400)).toBe("left-start");
+    expect(choosePlacement(pointMenuRule, cramped, 400, 400)).toBe("left-start");
   });
 
   it("should open a submenu to the right of its row, or to its left near the right edge", () => {

@@ -19,6 +19,9 @@ export const submenuWidth = 220;
 /** The shortest a menu gets when the window is short: its search and a few rows. */
 export const menuMinHeight = 160;
 
+/** The tallest a menu gets in a tall window, so a long submenu scrolls instead of running down the page. */
+export const menuMaxHeight = 560;
+
 /** How far a submenu overlaps the menu it opens from. */
 export const submenuOverlap = 4;
 
