@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { WebrenewMark } from "@/components/webrenew-mark";
-import { COPYRIGHT_YEAR, legalContact, legalPaths, WEBRENEW_URL } from "@/lib/legal/contact";
+import { COPYRIGHT_YEAR, legalContact, legalPaths, supportPath, WEBRENEW_URL } from "@/lib/legal/contact";
 import { REPO_URL } from "@/lib/site-copy";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +13,7 @@ export const siteFooterLinks = [
   { label: "Source", href: REPO_URL, external: true },
   { label: "Sign in", href: "/sign-in" },
   { label: "Create account", href: "/sign-up" },
+  { label: "Support", href: supportPath },
   { label: "Privacy", href: legalPaths.privacy },
   { label: "Terms", href: legalPaths.terms },
 ] as const satisfies readonly { label: string; href: string; external?: boolean }[];
@@ -46,7 +47,7 @@ function WebrenewCredit() {
 
 /**
  * The site footer for the home page, the docs, and the legal pages: the logo,
- * the main links (Privacy and Terms among them), the Webrenew credit, and the
+ * the main links (Support, Privacy, and Terms among them), the Webrenew credit, and the
  * theme switcher. `className` adjusts the inner padding to match the page.
  */
 export function SiteFooter({ className }: { className?: string }) {
