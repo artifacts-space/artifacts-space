@@ -70,8 +70,8 @@ interface InlineCommentSurfaceProps {
  * Marks the text of a Markdown or Text artifact as the place its inline
  * comments are on: their words are highlighted in it, a click on highlighted
  * words opens the thread there, and selected words can be commented on.
- * Outside InlineCommentsProvider (or without access to comments) it is a
- * plain wrapper.
+ * Where the artifact has no inline comments (another format, or no access
+ * to comments) it adds nothing around its children.
  */
 export function InlineCommentSurface({ children, className }: InlineCommentSurfaceProps) {
   const inline = useInlineComments();
@@ -80,7 +80,7 @@ export function InlineCommentSurface({ children, className }: InlineCommentSurfa
 
   useEffect(() => (attachSurface && surface ? attachSurface(surface) : undefined), [attachSurface, surface]);
 
-  if (!inline) return <div className={className}>{children}</div>;
+  if (!inline) return children;
 
   /** A click on highlighted words (not the end of a drag that selected text) opens their thread. */
   function openAt(event: MouseEvent) {

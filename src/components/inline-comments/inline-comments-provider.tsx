@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useCommentThread, type ThreadApi } from "@/components/comments/use-comment-thread";
+import type { ArtifactKind } from "@/lib/artifact-types";
 import { anchorAt } from "@/lib/comments/anchor-rules";
 import type { CommentView } from "@/lib/comments/views";
 
@@ -13,8 +14,12 @@ import { DRAFT_KEY, useLocatedAnchors, type AnchorToLocate } from "./use-located
 
 interface InlineCommentsProviderProps {
   publicId: string;
+  /** The artifact's format: only a Markdown artifact's words take comments. */
+  kind: ArtifactKind;
   /** The viewer may read and write this artifact's comments. Without it there are no inline comments, and nothing loads. */
-  enabled: boolean;
+  canComment: boolean;
+  /** False for a new artifact nothing was saved to yet: there is nothing to comment on. */
+  stored?: boolean | undefined;
   /** The thread's server calls; a fixture page hands in its own. */
   api?: ThreadApi | undefined;
   children: ReactNode;
@@ -51,9 +56,11 @@ function draftFor(surface: HTMLElement, range: Range): InlineDraft | null {
  * marking it read), highlights the words each open inline comment is on
  * (InlineCommentSurface marks where the text is), and shows a thread or a
  * new comment in a card at its words. The Comments list inside reads the
- * same thread. With `enabled` false it only renders its children.
+ * same thread. For other formats, a new artifact not saved yet, or a viewer
+ * who may not comment, it only renders its children.
  */
-export function InlineCommentsProvider({ publicId, enabled, api, children }: InlineCommentsProviderProps) {
+export function InlineCommentsProvider({ publicId, kind, canComment, stored = true, api, children }: InlineCommentsProviderProps) {
+  const enabled = canComment && stored && kind === "markdown";
   const thread = useCommentThread(publicId, { api, markAsRead: false, enabled });
   const [surface, setSurface] = useState<HTMLElement | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
