@@ -354,7 +354,13 @@ lists, each indented under the item's text and set off by blank lines:
   it reads differently (a numbered list right under a quote, for one), it is
   written again with every block on lines of its own
   (`markdown-list-fresh.ts`). A list loads as formatted when one of the two
-  writings reads back as the list.
+  writings reads back as the list. The read view is asked only for a shape
+  the two readers are known to read differently, as when a block loads.
+- **A comment's list is written whole.** In the comment flavor an edited
+  list is never written over its loaded items: it goes through the comment's
+  own writer, with the comment's escaping, and is judged by the thread
+  (`toChunks` in `markdown-roundtrip.ts`). The list code itself lives in
+  `markdown-roundtrip-lists.ts`.
 - **Line ends.** A document with Windows line ends (CRLF) on every line
   keeps them when it is saved after an edit; one that mixes line ends is
   saved with LF.

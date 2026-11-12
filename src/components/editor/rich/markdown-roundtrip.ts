@@ -419,7 +419,8 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine, flav
       previous = matched;
       continue;
     }
-    const listed = listChunk(nodes, position, source, previous, used, listTools);
+    // A comment's list is written whole, in the comment's own escaping, and judged by the thread.
+    const listed = flavor === "document" ? listChunk(nodes, position, source, previous, used, listTools) : null;
     if (listed) {
       used.add(listed.block);
       chunks.push(listed);

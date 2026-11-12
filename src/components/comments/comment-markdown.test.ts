@@ -256,3 +256,27 @@ describe("the comment text encoder", () => {
     expect(serializeMarkdown(block, empty, "document")).toBe("rename snake\\_case\\_name");
   });
 });
+
+describe("editing a list in a comment", () => {
+  /** The comment with the first list item's text replaced. */
+  function withFirstItem(markdown: string, value: string): string {
+    const loaded = parseCommentMarkdown(markdown);
+    const doc = structuredClone(loaded.doc);
+    const item = doc.content?.find((node) => node.type?.endsWith("List"))?.content?.[0]?.content?.[0];
+    if (item) item.content = [text(value)];
+    return serializeCommentMarkdown(doc, loaded.source);
+  }
+
+  it("should write the edited item as typed, not with a document's escaping, when a stored comment's list is edited", () => {
+    expect(withFirstItem("- one\n- two\n", "rename snake_case 2 * 3")).toBe("- rename snake_case 2 * 3\n- two\n");
+    expect(withFirstItem("1. one\n2. two\n", "rename snake_case")).toBe("1. rename snake_case\n2. two\n");
+  });
+
+  it("should write an artifact's edited item with the document's escaping when the same list is edited there", () => {
+    const loaded = parseMarkdown("- one\n- two\n");
+    const doc = structuredClone(loaded.doc);
+    const item = doc.content?.[0]?.content?.[0]?.content?.[0];
+    if (item) item.content = [text("rename snake_case")];
+    expect(serializeMarkdown(doc, loaded.source)).toBe("- rename snake\\_case\n- two\n");
+  });
+});
