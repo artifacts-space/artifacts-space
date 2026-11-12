@@ -7,7 +7,7 @@
  * scripts/migrate-on-deploy.mts, which uses neither.
  */
 
-import ConnectionParameters from "pg/lib/connection-parameters";
+import pg from "pg";
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -27,15 +27,20 @@ function present(value: string | undefined): string | undefined {
 
 const localHosts: ReadonlySet<string> = new Set(["localhost", "127.0.0.1"]);
 
-/** The host `pg` connects to for this URL: a `?host=` parameter wins over the URL's own host, and a URL without one falls back to PGHOST or localhost. */
+/**
+ * The host `pg` connects to for this URL: a `?host=` parameter wins over the
+ * URL's own host, and a URL without one falls back to PGHOST or localhost.
+ * Read from pg's public Client, which parses the URL in its constructor and
+ * connects only when `connect()` is called, so nothing is opened here.
+ */
 function pgHost(url: string): string | undefined {
-  return new ConnectionParameters(url).host;
+  return new pg.Client({ connectionString: url }).host;
 }
 
 /**
  * True when `url` is a Postgres URL on this machine (localhost or
  * 127.0.0.1). Decided from the host as `pg` reads it (pg-connection-string,
- * through pg's own ConnectionParameters), not only from the URL's host:
+ * through pg's own Client), not only from the URL's host:
  * `postgres://u:p@localhost/db?host=db.example.net` connects to
  * db.example.net. A socket path, a list of hosts, any `hostaddr` that is
  * not local, and a malformed URL all count as not local.
