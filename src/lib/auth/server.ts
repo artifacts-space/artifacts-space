@@ -7,7 +7,7 @@ import { getDb } from "@/db";
 import * as oauthSchema from "@/db/oauth-schema";
 import * as schema from "@/db/schema";
 import { sessionHooks } from "@/lib/auth/agent-guards";
-import { sendMagicLinkEmail } from "@/lib/auth/magic-link-email";
+import { magicLinkPluginOptions } from "@/lib/auth/magic-link-email";
 import { oauthPlugins } from "@/lib/auth/oauth-plugins";
 import { sessionConfig } from "@/lib/auth/session-config";
 import { accountHooks, accountLinking, socialAuthEnv, socialProviders, socialSignInGuard, validateUserInfo } from "@/lib/auth/social-auth-options";
@@ -15,8 +15,6 @@ import { teamDepartureHook } from "@/lib/auth/team-departure";
 import { closedTeamRoutesHook } from "@/lib/auth/closed-team-routes";
 import { teamRoutesClosedOverHttp, teamsPlugin } from "@/lib/auth/teams-plugin";
 import { userHooks } from "@/lib/auth/user-hooks";
-
-const tenMinutes = 60 * 10;
 
 /** Better Auth model names mapped to the app's tables. */
 const authSchema = {
@@ -60,10 +58,7 @@ function createAuth() {
     hooks: { before: closedTeamRoutesHook, after: teamDepartureHook },
     disabledPaths: teamRoutesClosedOverHttp,
     plugins: [
-      magicLink({
-        expiresIn: tenMinutes,
-        sendMagicLink: ({ email, url, token }) => sendMagicLinkEmail({ email, url, token }),
-      }),
+      magicLink(magicLinkPluginOptions),
       teamsPlugin(),
       socialSignInGuard(),
       ...oauthPlugins(),

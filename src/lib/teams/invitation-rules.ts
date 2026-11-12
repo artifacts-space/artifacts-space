@@ -1,3 +1,5 @@
+import { UNDELIVERABLE_ADDRESS_CODE, undeliverableAddressMessage } from "@/lib/auth/undeliverable-address";
+
 /**
  * Pure decisions for team invitations: what the invitation page shows, how a
  * new invitation relates to an open one, and which Better Auth refusals get
@@ -91,6 +93,8 @@ export function invitationRefusal(code: string | undefined, email = ""): string 
       return "This team is full. Ask an owner to make room, then try again.";
     case "EMAIL_VERIFICATION_REQUIRED_BEFORE_ACCEPTING_OR_REJECTING_INVITATION":
       return "Confirm your email address first: sign in with an emailed link, then join.";
+    case UNDELIVERABLE_ADDRESS_CODE:
+      return undeliverableAddressMessage(code, email);
     case "INVITATION_NOT_FOUND":
     case "YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION":
       return "This invitation is no longer open.";

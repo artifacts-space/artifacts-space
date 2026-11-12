@@ -102,3 +102,12 @@ export async function cancelOlderOpenInvitations(invitationId: string): Promise<
       and (older.created_at, older.id) < (created.created_at, created.id)
   `);
 }
+
+/**
+ * Deletes an invitation whose email was refused before it went out (an
+ * address that cannot receive mail, or the daily budget), while it is still
+ * pending, so no row is left for a link nobody received.
+ */
+export async function deleteUnsentInvitation(invitationId: string): Promise<void> {
+  await getDb().delete(teamInvitation).where(and(eq(teamInvitation.id, invitationId), eq(teamInvitation.status, "pending")));
+}

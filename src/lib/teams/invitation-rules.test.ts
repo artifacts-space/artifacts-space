@@ -83,6 +83,10 @@ describe("invitationRefusal", () => {
     expect(invitationRefusal("EMAIL_VERIFICATION_REQUIRED_BEFORE_ACCEPTING_OR_REJECTING_INVITATION")).toMatch(/Confirm your email/);
   });
 
+  it("should name the address to check when it cannot receive mail", () => {
+    expect(invitationRefusal("EMAIL_UNDELIVERABLE", "ann@exmaple.com")).toBe("We can't send email to ann@exmaple.com. Check it for a typo.");
+  });
+
   it("should keep the default message for codes it does not know", () => {
     expect(invitationRefusal(undefined)).toBeNull();
     expect(invitationRefusal("SOMETHING_ELSE")).toBeNull();
