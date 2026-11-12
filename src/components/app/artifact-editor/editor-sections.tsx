@@ -5,7 +5,10 @@ import { IconLink } from "@tabler/icons-react";
 import { IconPicker } from "@/components/artifact-icon/icon-picker";
 import { addIconTrigger, changeIconTrigger } from "@/components/artifact-icon/icon-triggers";
 import { CopyButton } from "@/components/copy-button";
+import { LineField } from "@/components/line-field";
+import { cn } from "@/lib/utils";
 
+import { scrollbarRoom } from "./detail-scroll";
 import type { ArtifactDraft } from "./use-artifact-draft";
 
 type UpdateDraft = <K extends keyof ArtifactDraft>(key: K, value: ArtifactDraft[K]) => void;
@@ -33,39 +36,38 @@ interface TitleFieldsProps {
   summary: string;
   update: UpdateDraft;
   /** The title field, so a new artifact can put the cursor in it. */
-  titleRef?: React.Ref<HTMLInputElement>;
+  titleRef?: React.Ref<HTMLTextAreaElement>;
   /** Enter in the title moves on to the content. */
   onEnter?: () => void;
   /** The content's column (previewColumnClass), so the title lines up with the body. */
   column: string;
 }
 
-/** Icon, title, and one-line summary inputs. */
+/**
+ * Icon, title, and one-line summary fields. A long title or summary wraps
+ * inside the column (LineField) instead of running off its right edge.
+ */
 export function TitleFields({ title, icon, summary, update, titleRef, onEnter, column }: TitleFieldsProps) {
   return (
-    <div className="group/title pt-6 sm:pt-10">
+    <div className={cn("group/title pt-6 sm:pt-10", scrollbarRoom)}>
       <div className={column}>
-      <DraftIcon icon={icon} update={update} />
-      <input
-        ref={titleRef}
-        value={title}
-        onChange={(event) => { update("title", event.target.value); }}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter" || event.nativeEvent.isComposing || !onEnter) return;
-          event.preventDefault();
-          onEnter();
-        }}
-        aria-label="Artifact title"
-        className="w-full bg-transparent text-3xl leading-tight font-semibold tracking-[-0.02em] outline-none placeholder:text-muted-foreground/60 sm:text-4xl"
-        placeholder="Untitled artifact"
-      />
-      <input
-        value={summary}
-        onChange={(event) => { update("summary", event.target.value); }}
-        aria-label="Artifact summary"
-        className="mt-2 w-full bg-transparent text-base leading-6 md:text-md text-muted-foreground outline-none placeholder:text-muted-foreground/60"
-        placeholder="Add a one-line summary for search and agent retrieval"
-      />
+        <DraftIcon icon={icon} update={update} />
+        <LineField
+          ref={titleRef}
+          value={title}
+          onValueChange={(next) => { update("title", next); }}
+          onEnter={onEnter}
+          aria-label="Artifact title"
+          className="text-3xl leading-tight font-semibold tracking-[-0.02em] sm:text-4xl"
+          placeholder="Untitled artifact"
+        />
+        <LineField
+          value={summary}
+          onValueChange={(next) => { update("summary", next); }}
+          aria-label="Artifact summary"
+          className="mt-2 text-base leading-6 text-muted-foreground md:text-md"
+          placeholder="Add a one-line summary for search and agent retrieval"
+        />
       </div>
     </div>
   );

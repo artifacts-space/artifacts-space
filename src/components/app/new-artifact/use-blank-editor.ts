@@ -31,7 +31,7 @@ interface BlankEditorOptions {
 export function useBlankEditor({ blankPage, artifact, draft, replace, onUpdated, body, sourceOpen, focusRequest, save }: BlankEditorOptions) {
   const page = useBlankPage(blankPage, { artifact, draft, replace, onUpdated });
   const sectionRef = useRef<HTMLElement>(null);
-  const titleRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
   const { onContent } = page;
   const take = useCallback((content: FirstContent) => {
     onContent(content);

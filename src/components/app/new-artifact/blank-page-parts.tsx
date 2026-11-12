@@ -51,7 +51,7 @@ export function focusContent(body: HTMLElement | null, place: "start" | "end" = 
  * mount and each time New artifact is pressed again. On phones the list sits
  * above the pane, so the pane scrolls up under the sticky header first.
  */
-export function useFocusTitle(title: RefObject<HTMLInputElement | null>, page: RefObject<HTMLElement | null>, request: number, enabled: boolean) {
+export function useFocusTitle(title: RefObject<HTMLTextAreaElement | null>, page: RefObject<HTMLElement | null>, request: number, enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     if (window.matchMedia("(max-width: 767px)").matches) page.current?.scrollIntoView({ block: "start" });
