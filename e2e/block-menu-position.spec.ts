@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { choosePlacement, gripMenuRule, menuEdge as edge, menuWidth, pointMenuRule, submenuOverlap } from "../src/components/editor/rich/block-menu/menu-placement";
+import { choosePlacement, gripInset, gripMenuRule, menuEdge as edge, menuWidth, pointMenuRule, submenuOverlap, submenuWidth } from "../src/components/editor/rich/block-menu/menu-placement";
 
 /*
  * Where the block menu opens, measured by bounding boxes on the dev fixture's
@@ -86,7 +86,7 @@ async function openFrom(page: Page, text: string, at: ScrollLogicalPosition) {
   await expect(menu(page)).toHaveAttribute("data-placed", "");
   const viewport = page.viewportSize();
   if (!viewport) throw new Error("No viewport");
-  return { grip: await boxOf(grip(page)), menu: await boxOf(menu(page)), viewport };
+  return { grip: await boxOf(grip(page)), block: await boxOf(target), menu: await boxOf(menu(page)), viewport };
 }
 
 type Opened = Awaited<ReturnType<typeof openFrom>>;
@@ -114,6 +114,8 @@ for (const { width, height, side } of [{ width: 1920, height: 900, side: "left" 
 
     test(`should open to the ${side} of the grip, 12px from the top, for a block at the top of the window`, async ({ page }) => {
       const opened = await openFrom(page, middle, "start");
+      // The grip sits where the window-width figure in AGENTS.md assumes.
+      near(opened.grip.x, opened.block.x - gripInset);
       expect(choosePlacement(gripMenuRule, { left: opened.grip.x, right: opened.grip.x + opened.grip.width }, menuWidth, width)).toBe(side);
       expectSide(opened);
       expectCenteredOnGrip(opened);
@@ -143,6 +145,7 @@ for (const { width, height, side } of [{ width: 1920, height: 900, side: "left" 
         await expect(submenu).toHaveAttribute("data-placed", "");
         const box = await boxOf(submenu);
         near(box.x, opened.menu.x + opened.menu.width - submenuOverlap);
+        near(box.width, submenuWidth);
         near(box.y, Math.min((await boxOf(item)).y, height - edge - box.height));
       }
     });

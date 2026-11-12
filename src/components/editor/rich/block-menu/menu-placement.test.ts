@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { pageColumnClass } from "@/lib/page-width/rules";
 
-import { choosePlacement, gripMenuRule, menuEdge, menuWidth, pointMenuRule, submenuRule, submenuWidth } from "./menu-placement";
+import { choosePlacement, gripInset, gripMenuRule, menuEdge, menuWidth, pointMenuRule, submenuRule, submenuWidth } from "./menu-placement";
 
 describe("choosePlacement", () => {
   it("should open the grip's menu to the left of the grip when it fits there", () => {
@@ -23,11 +23,11 @@ describe("choosePlacement", () => {
   });
 
   it("should fit on the left from a 1588px page area with the contained page column, as AGENTS.md says", () => {
-    // The contained column is max-w-5xl (1024px) with px-6 (24px); the grip sits 24px left of the block ("+" 22px, then 2px).
+    // The contained column is max-w-5xl (1024px) with px-6 (24px); the grip sits gripInset left of the block.
     // Widths here are the page area (clientWidth): the window minus any classic scrollbar.
     expect(pageColumnClass(false)).toBe("max-w-5xl px-6");
     const gripAt = (windowWidth: number) => {
-      const left = (windowWidth - 1024) / 2 + 24 - 24;
+      const left = (windowWidth - 1024) / 2 + 24 - gripInset;
       return { left, right: left + 22 };
     };
     expect(choosePlacement(gripMenuRule, gripAt(1588), menuWidth, 1588)).toBe("left");

@@ -22,6 +22,13 @@ export const menuMinHeight = 160;
 /** The tallest a menu gets in a tall window, so a long submenu scrolls instead of running down the page. */
 export const menuMaxHeight = 560;
 
+/**
+ * How far the grip's left edge sits left of its block's (block-handle.tsx:
+ * the 22px grip, then 2px). Only the window-width figure in AGENTS.md uses
+ * it; e2e/block-menu-position.spec.ts checks it against the page.
+ */
+export const gripInset = 24;
+
 /** How far a submenu overlaps the menu it opens from. */
 export const submenuOverlap = 4;
 
