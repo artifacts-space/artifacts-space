@@ -84,3 +84,38 @@ describe("groupNotifications", () => {
     expect(groups).toHaveLength(3);
   });
 });
+
+describe("commentExcerpt with what a person typed", () => {
+  it.each([
+    ["Q&A at 3 < 4pm", "Q&A at 3 < 4pm"],
+    ["rename snake_case_name", "rename snake_case_name"],
+    ["Use C:\\temp", "Use C:\\temp"],
+    ["see [docs] page", "see [docs] page"],
+    ["2 * 3", "2 * 3"],
+  ])("should show %j as typed when it is stored as typed", (body, excerpt) => {
+    expect(commentExcerpt(body)).toBe(excerpt);
+  });
+
+  it.each([
+    ["\\*not bold\\*", "*not bold*"],
+    ["\\# not a heading", "# not a heading"],
+    ["1\\. not a list", "1. not a list"],
+    ["\\- not a list", "- not a list"],
+    ["&lt;b> stays text", "<b> stays text"],
+    ["Q&amp;A at 3 &lt; 4pm", "Q&A at 3 < 4pm"],
+    ["snake\\_case and 2 \\* 3", "snake_case and 2 * 3"],
+    ["\\@dana please", "@dana please"],
+    ["&amp;copy; is literal", "&copy; is literal"],
+  ])("should show the typed characters when %j keeps escapes", (body, excerpt) => {
+    expect(commentExcerpt(body)).toBe(excerpt);
+  });
+
+  it("should never turn an escaped tag back into markup it then keeps as markup", () => {
+    // Plain text: the excerpt shows the characters; the bell never renders it as HTML.
+    expect(commentExcerpt("\\<img src=x onerror=alert(1)>")).toBe("<img src=x onerror=alert(1)>");
+  });
+
+  it("should still take emphasis marks off when they are marks", () => {
+    expect(commentExcerpt("**Looks** _good_ ~~old~~")).toBe("Looks good old");
+  });
+});

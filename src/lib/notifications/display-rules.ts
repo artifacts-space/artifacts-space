@@ -16,18 +16,66 @@ const markdownPatterns: readonly [RegExp, string][] = [
   [/!\[([^\]]*)\]\([^)]*\)/g, "$1"],
   [/\[([^\]]*)\]\([^)]*\)/g, "$1"],
   [/^\s{0,3}(?:#{1,6}|>|[-*+]|\d+[.)])\s+/gm, ""],
-  [/[*_~`]+/g, ""],
+  [/`+/g, ""],
   [/<[^>]*>/g, ""],
 ];
 
+const EMPHASIS_RUN = /[*_~]+/g;
+const SPACE = /\s/;
+const WORD = /[\p{L}\p{N}]/u;
+
+/**
+ * Emphasis marks off, literal characters kept: a run of `*`, `_`, or `~`
+ * with spaces on both sides ("2 * 3") and an underscore inside a word
+ * ("snake_case") are text, not marks.
+ */
+function stripEmphasis(text: string): string {
+  return text.replace(EMPHASIS_RUN, (run: string, offset: number) => {
+    const before = text.charAt(offset - 1);
+    const after = text.charAt(offset + run.length);
+    const spaced = SPACE.test(before) && SPACE.test(after);
+    const inWord = run.startsWith("_") && WORD.test(before) && WORD.test(after);
+    return spaced || inWord ? run : "";
+  });
+}
+
+/** A backslash escape in Markdown: a backslash before ASCII punctuation, which stands for that character. */
+const BACKSLASH_ESCAPE = /\\([!-/:-@[-`{-~])/g;
+/** Private-use characters stand in for escaped punctuation while the Markdown marks come off. */
+const PRIVATE_USE = /[\uE000-\uE07F]/g;
+const STAND_IN = 0xe000;
+
+const NAMED_ENTITIES: Readonly<Record<string, string>> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+const ENTITY = /&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|(amp|lt|gt|quot|apos|nbsp));/g;
+
+/** One character for a numeric entity, or the replacement character for one that names no character. */
+function fromCodePoint(codePoint: number): string {
+  const valid = codePoint > 0 && codePoint <= 0x10ffff && (codePoint < 0xd800 || codePoint > 0xdfff);
+  return valid ? String.fromCodePoint(codePoint) : "\uFFFD";
+}
+
+/** The basic entities as their characters, in one pass so `&amp;lt;` reads "&lt;", not "<". */
+function decodeEntities(text: string): string {
+  return text.replace(ENTITY, (_match, decimal: string | undefined, hex: string | undefined, name: string | undefined) => {
+    if (decimal !== undefined) return fromCodePoint(Number(decimal));
+    if (hex !== undefined) return fromCodePoint(Number.parseInt(hex, 16));
+    return NAMED_ENTITIES[name ?? ""] ?? "";
+  });
+}
+
 /**
  * A short plain-text excerpt of a comment: Markdown marks, links' addresses,
- * and tags removed, whitespace collapsed, cut at EXCERPT_MAX. Comment text is
- * untrusted; the bell renders this as plain text, never as HTML or Markdown.
+ * and tags removed, escapes and basic entities read as the characters the
+ * writer typed (`\\*` is "*", `&amp;` is "&"), whitespace collapsed, cut at
+ * EXCERPT_MAX. Comment text is untrusted; the bell renders this as plain
+ * text, never as HTML or Markdown.
  */
 export function commentExcerpt(body: string, max: number = EXCERPT_MAX): string {
-  let text = body;
+  // Escaped characters are not marks: they stand aside as private-use characters while the marks come off.
+  let text = body.replace(PRIVATE_USE, "").replace(BACKSLASH_ESCAPE, (_match, char: string) => String.fromCharCode(STAND_IN + char.charCodeAt(0) - 0x20));
   for (const [pattern, replacement] of markdownPatterns) text = text.replace(pattern, replacement);
+  text = stripEmphasis(text);
+  text = decodeEntities(text.replace(PRIVATE_USE, (char) => String.fromCharCode(char.charCodeAt(0) - STAND_IN + 0x20)));
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 }

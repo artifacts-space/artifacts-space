@@ -1,5 +1,9 @@
 import { getSchema, type JSONContent } from "@tiptap/core";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+
+import { MarkdownView } from "@/components/artifact-view/markdown-view";
 
 import { markdownSchemaExtensions } from "@/components/editor/rich/markdown-schema";
 import { parseMarkdown, serializeMarkdown } from "@/components/editor/rich/markdown-roundtrip";
@@ -26,7 +30,31 @@ function paragraph(...content: JSONContent[]): JSONContent {
 }
 
 function written(content: JSONContent[]): string {
-  return serializeMarkdown({ type: "doc", content }, parseMarkdown("").source);
+  return serializeMarkdown({ type: "doc", content }, parseMarkdown("", "comment").source, "comment");
+}
+
+/** What the thread shows for a comment's Markdown. */
+function rendered(markdown: string): string {
+  return renderToStaticMarkup(createElement(MarkdownView, { content: markdown }));
+}
+
+/** The comment loaded into the box, its first block changed by `edit`, and written back. */
+function editedFirstBlock(body: string, edit: (block: JSONContent) => JSONContent): string {
+  const loaded = parseMarkdown(body, "comment");
+  const [first, ...rest] = loaded.doc.content ?? [];
+  if (!first) throw new Error("no block");
+  return serializeMarkdown({ type: "doc", content: [edit(first), ...rest] }, loaded.source, "comment");
+}
+
+/** Adds a word to the end of a paragraph's text. */
+function addWord(block: JSONContent): JSONContent {
+  return { ...block, content: [...(block.content ?? []), text(" more")] };
+}
+
+/** Changes "please" to "thanks" in a block kept as written. */
+function rewordRaw(block: JSONContent): JSONContent {
+  const source: unknown = block.attrs?.source;
+  return { ...block, attrs: { ...block.attrs, source: typeof source === "string" ? source.replace("please", "thanks") : source } };
 }
 
 describe("comment Markdown in the rich box", () => {
@@ -42,21 +70,21 @@ describe("comment Markdown in the rich box", () => {
   ];
 
   it.each(stored)("should write a stored comment back exactly when nobody edits it: %j", (body) => {
-    const loaded = parseMarkdown(body);
-    expect(serializeMarkdown(loaded.doc, loaded.source)).toBe(body);
+    const loaded = parseMarkdown(body, "comment");
+    expect(serializeMarkdown(loaded.doc, loaded.source, "comment")).toBe(body);
   });
 
   it("should show a quoted block as a quote, not as raw Markdown, when a comment starts from the block menu", () => {
-    const loaded = parseMarkdown(quotedCommentBody("Ship it on Friday.", "https://artifacts.space/artifact/abc#block=Ship"));
+    const loaded = parseMarkdown(quotedCommentBody("Ship it on Friday.", "https://artifacts.space/artifact/abc#block=Ship"), "comment");
     expect(loaded.rawBlocks).toBe(0);
     expect(loaded.doc.content?.map((node) => node.type)).toEqual(["blockquote"]);
   });
 
   it("should keep the untouched blocks of an edited comment as written when a paragraph is added", () => {
     const body = "Hi @dana,\n\n* first\n* second";
-    const loaded = parseMarkdown(body);
+    const loaded = parseMarkdown(body, "comment");
     const content = [...(loaded.doc.content ?? []), paragraph(text("Thanks!"))];
-    expect(serializeMarkdown({ type: "doc", content }, loaded.source)).toBe(`${body}\n\nThanks!`);
+    expect(serializeMarkdown({ type: "doc", content }, loaded.source, "comment")).toBe(`${body}\n\nThanks!`);
   });
 
   it("should write bold, a list, and a mention as Markdown when they are typed in the box", () => {
@@ -70,6 +98,74 @@ describe("comment Markdown in the rich box", () => {
 
   it("should end a new comment without a trailing newline when it is one paragraph", () => {
     expect(written([paragraph(text("Looks good."))])).toBe("Looks good.");
+  });
+});
+
+describe("typed comment text", () => {
+  const plain = ["Q&A at 3 < 4pm", "rename snake_case_name", "Use C:\\temp", "see [docs] page", "2 * 3", "50% off, a+b=c, #3 in line", "ok -- fine"];
+
+  it.each(plain)("should store %j exactly as typed and render it as the editor's fully escaped form does", (typed) => {
+    const stored = written([paragraph(text(typed))]);
+    expect(stored).toBe(typed);
+    const escaped = serializeMarkdown({ type: "doc", content: [paragraph(text(typed))] }, parseMarkdown("").source);
+    expect(rendered(stored)).toBe(rendered(escaped));
+  });
+
+  const literal: [string, string][] = [
+    ["*not bold*", "\\*not bold\\*"],
+    ["# not a heading", "\\# not a heading"],
+    ["1. not a list", "1\\. not a list"],
+    ["- not a list", "\\- not a list"],
+    ["<b>literal</b>", "&lt;b>literal&lt;/b>"],
+    ["&copy; as letters", "&amp;copy; as letters"],
+    ["[a link](notes) as text", "[a link\\](notes) as text"],
+  ];
+
+  it.each(literal)("should escape %j only as far as it must and render it as typed", (typed, expected) => {
+    const stored = written([paragraph(text(typed))]);
+    expect(stored).toBe(expected);
+    expect(rendered(stored)).toBe(renderToStaticMarkup(createElement("div", { className: "artifact-prose" }, createElement("p", null, typed))));
+  });
+
+  it.each(literal)("should keep %j literal after a save and a re-edit", (typed) => {
+    const stored = written([paragraph(text(typed))]);
+    const again = editedFirstBlock(stored, addWord);
+    const reloaded = parseMarkdown(again, "comment").doc.content;
+    expect(reloaded?.map((block) => block.content)).toEqual([[text(`${typed} more`)]]);
+  });
+
+  it("should keep &, <, and _ as typed when a block that holds them is edited", () => {
+    expect(editedFirstBlock("Q&A at 3 < 4pm on snake_case", addWord)).toBe("Q&A at 3 < 4pm on snake_case more");
+  });
+
+  it("should keep text in code exactly when it holds Markdown characters", () => {
+    expect(written([paragraph(text("a*b_c<d&e;", ["code"]))])).toBe("`a*b_c<d&e;`");
+  });
+});
+
+describe("blocks a comment keeps as written", () => {
+  it("should keep an escaped mention escaped, and no mention, when its paragraph is edited", () => {
+    const loaded = parseMarkdown("\\@dana please", "comment");
+    expect(loaded.rawBlocks).toBe(1);
+    const saved = editedFirstBlock("\\@dana please", rewordRaw);
+    expect(saved).toBe("\\@dana thanks");
+    expect(parseMentions(saved)).toEqual([]);
+  });
+
+  it("should keep a real entity when its paragraph is edited", () => {
+    const saved = editedFirstBlock("&copy; 2026 please", rewordRaw);
+    expect(saved).toBe("&copy; 2026 thanks");
+    expect(rendered(saved)).toContain("© 2026");
+  });
+
+  it("should keep literal entity text literal when its paragraph is edited", () => {
+    const saved = editedFirstBlock("&amp;copy; is how you write it", addWord);
+    expect(saved).toBe("&amp;copy; is how you write it more");
+    expect(rendered(saved)).toContain("&amp;copy; is how you write it more");
+  });
+
+  it("should show a mention typed in full as a mention when it is not escaped", () => {
+    expect(parseMarkdown("@dana please", "comment").rawBlocks).toBe(0);
   });
 });
 
