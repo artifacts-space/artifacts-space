@@ -14,11 +14,11 @@ describe("rawPartsNotice", () => {
 
   it("should stay general when the editor knows no reason for a part", () => {
     expect(rawPartsNotice(2, ["other"])).toBe("2 parts use Markdown this editor can’t format. They stay exactly as written.");
-    expect(rawPartsNotice(2, ["other", "image"])).toBe("2 parts use Markdown this editor can’t format, such as images. They stay exactly as written.");
+    expect(rawPartsNotice(2, ["other", "image"])).toBe("2 parts use Markdown this editor can’t format, such as images inside text. They stay exactly as written.");
   });
 
   it("should list three reasons with commas when there are three", () => {
-    expect(rawPartsNotice(3, ["html", "footnote", "image"])).toContain("HTML, footnotes, or images, which");
+    expect(rawPartsNotice(3, ["html", "footnote", "image"])).toContain("HTML, footnotes, or images inside text, which");
   });
 });
 
@@ -28,7 +28,7 @@ describe("parseMarkdown raw kinds", () => {
     expect(parseMarkdown(raw.footnotes ?? "").rawKinds).toEqual(["footnote"]);
     expect(parseMarkdown(raw.referenceLink ?? "").rawKinds).toEqual(["definition"]);
     expect(parseMarkdown(raw.imageInText ?? "").rawKinds).toEqual(["image"]);
-    expect(parseMarkdown(raw.imageQuery ?? "").rawKinds).toEqual(["image"]);
+    expect(parseMarkdown(raw.imageQuery ?? "").rawKinds).toEqual(["other"]);
   });
 
   it("should report no reasons when every part is formatted", () => {

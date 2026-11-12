@@ -1,41 +1,9 @@
-import type { JSONContent } from "@tiptap/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { MarkdownManager } from "@tiptap/markdown";
 
+import { edit, find, setText, tick } from "./list-edit-helpers";
 import { splitListItems } from "./markdown-list-items";
-import { parseMarkdown, serializeMarkdown } from "./markdown-roundtrip";
-
-/** Loads Markdown, applies one change to the editor content, and saves. */
-function edit(markdown: string, change: (doc: JSONContent) => void): string {
-  const loaded = parseMarkdown(markdown);
-  const doc = structuredClone(loaded.doc);
-  change(doc);
-  return serializeMarkdown(doc, loaded.source);
-}
-
-/** Every node in document order. */
-function nodes(node: JSONContent): JSONContent[] {
-  return [node, ...(node.content ?? []).flatMap((child) => nodes(child))];
-}
-
-function textOf(node: JSONContent): string {
-  return nodes(node).map((child) => child.text ?? "").join("");
-}
-
-/** The first node of `type` whose text includes `words`. */
-function find(doc: JSONContent, type: string, words: string): JSONContent {
-  const found = nodes(doc).find((node) => node.type === type && textOf(node).includes(words));
-  if (!found) throw new Error(`No ${type} with "${words}"`);
-  return found;
-}
-
-function setText(node: JSONContent, text: string) {
-  node.content = [{ type: "text", text }];
-}
-
-function tick(doc: JSONContent, words: string, checked = true) {
-  const item = find(doc, "taskItem", words);
-  item.attrs = { ...item.attrs, checked };
-}
+import { parseMarkdown } from "./markdown-roundtrip";
 
 /** The owner's case: task items that hold a paragraph, a code block, and another paragraph, with blank lines. */
 const taskItemsWithCode = [
@@ -141,6 +109,18 @@ describe("edits to one list item", () => {
     expect(add("- [ ] a\n\n- [x] b\n", "c")).toBe("- [ ] a\n\n- [x] b\n- [x] c\n");
   });
 
+  it("should change only the line of the one item edited when two items are the same", () => {
+    const markdown = "- [ ] same\n- [ ] same\n- [ ] other\n";
+    expect(edit(markdown, (doc) => { const item = doc.content?.[0]?.content?.[0]; if (item) item.attrs = { checked: true }; })).toBe("- [x] same\n- [ ] same\n- [ ] other\n");
+    expect(edit(markdown, (doc) => { const item = doc.content?.[0]?.content?.[1]; if (item) item.attrs = { checked: true }; })).toBe("- [ ] same\n- [x] same\n- [ ] other\n");
+    expect(edit(markdown, (doc) => { doc.content?.[0]?.content?.splice(1, 1); })).toBe("- [ ] same\n- [ ] other\n");
+  });
+
+  it("should keep Windows line ends when a document that has them is edited", () => {
+    const markdown = "- a\r\n- b\r\n\r\nPara\r\n";
+    expect(edit(markdown, (doc) => { setText(find(doc, "paragraph", "b"), "B"); })).toBe("- a\r\n- B\r\n\r\nPara\r\n");
+  });
+
   it("should remove only the item's lines when an item is deleted", () => {
     const markdown = "- one\n- two\n  more of two\n- three\n";
     expect(edit(markdown, (doc) => { doc.content?.[0]?.content?.splice(1, 1); })).toBe("- one\n- three\n");
@@ -160,5 +140,19 @@ describe("edits to one list item", () => {
   it("should keep the table as written when the text of an item that holds it is edited", () => {
     const markdown = "- Results:\n\n  | a | b |\n  | --- | --- |\n  | 1 | 2 |\n- Next\n";
     expect(edit(markdown, (doc) => { setText(find(doc, "paragraph", "Results"), "Results so far:"); })).toBe(markdown.replace("Results:", "Results so far:"));
+  });
+});
+
+describe("loading long lists", () => {
+  it("should parse a long nested list a fixed number of times when it loads, not once per item", () => {
+    const nested = Array.from({ length: 200 }, (_, index) => `1. step ${String(index)}\n   - sub a\n     - sub b\n       1. deep\n`).join("");
+    const parse = vi.spyOn(MarkdownManager.prototype, "parse");
+    try {
+      expect(parseMarkdown(nested).rawBlocks).toBe(0);
+      expect(parse.mock.calls.length).toBeGreaterThan(0);
+      expect(parse.mock.calls.length).toBeLessThanOrEqual(2);
+    } finally {
+      parse.mockRestore();
+    }
   });
 });

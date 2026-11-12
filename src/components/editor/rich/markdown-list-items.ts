@@ -1,5 +1,7 @@
 import type { JSONContent } from "@tiptap/core";
 
+import { renumbered } from "./markdown-list-numbers";
+
 /*
  * Lists keep their items as written. A list loads as one block of the
  * source; this file cuts that block into its items, so a save after an edit
@@ -107,8 +109,12 @@ export function splitListItems(text: string): ItemSlice[] | null {
 /** A loaded item: its slice, the key of the node it became, and the map of its content. */
 export interface ItemSource<Map> extends ItemSlice {
   key: string;
-  /** The source map of the item's content, so its unedited blocks stay as written; null when it has none. */
-  children: Map | null;
+  /**
+   * The source map of the item's content, so its unedited blocks stay as
+   * written; null when it has none. Made on first use (an edit to the item),
+   * so loading a long list parses each item once.
+   */
+  children: () => Map | null;
 }
 
 /** A loaded list block, item by item. */
@@ -163,8 +169,9 @@ function asLoaded(item: JSONContent, source: ItemSlice): JSONContent {
 /** An edited item written over its source: unedited content keeps its bytes. Null when it cannot be. */
 function editedItem<Map>(item: JSONContent, source: ItemSource<Map>, writer: ListWriter<Map>): string | null {
   if (writer.key(asLoaded(item, source)) === source.key) return withBox(source, item);
-  if (source.children === null) return null;
-  const content = writer.children(item.content ?? [], source.children).replace(/\n+$/, "");
+  const map = source.children();
+  if (map === null) return null;
+  const content = writer.children(item.content ?? [], map).replace(/\n+$/, "");
   if (content === source.content) return withBox(source, item);
   return underMarker(markerFor(source, item), source.indent, content);
 }
@@ -177,31 +184,26 @@ function restyled(fresh: string, list: ListSource<unknown>): string {
   return fresh.replace(/^(\s*)-/, `$1${first.charAt(0)}`);
 }
 
-function numberOf(text: string | undefined): number | null {
-  const digits = /^\s*(\d+)/.exec(text ?? "")?.[1];
-  return digits === undefined ? null : Number(digits);
+function startOf(node: JSONContent): number {
+  return typeof node.attrs?.start === "number" ? node.attrs.start : 1;
 }
 
-/** The number for a new item: the list's one number when every item has it, or the one after the item before. */
-function newNumber(list: ListSource<unknown>, previous: string | undefined, start: number): number {
-  const numbers = new Set(list.items.map((item) => numberOf(item.marker)));
-  const [only] = numbers;
-  if (numbers.size === 1 && typeof only === "number" && list.items.length > 1) return only;
-  const before = numberOf(previous);
-  return before === null ? start : before + 1;
+/** A new item, written fresh in the list's marker style; a numbered list is numbered again afterwards. */
+function newItem<Map>(item: JSONContent, node: JSONContent, list: ListSource<Map>, writer: ListWriter<Map>): string {
+  return restyled(writer.fresh({ ...node, content: [item] }), list);
 }
 
-/** A new item, written fresh in the list's marker style. */
-function newItem<Map>(item: JSONContent, node: JSONContent, list: ListSource<Map>, previous: string | undefined, writer: ListWriter<Map>): string {
-  const start = typeof node.attrs?.start === "number" ? node.attrs.start : 1;
-  const attrs = node.type === "orderedList" ? { ...node.attrs, start: newNumber(list, previous, start) } : node.attrs;
-  return restyled(writer.fresh({ ...node, ...(attrs ? { attrs } : {}), content: [item] }), list);
-}
-
-/** A written item and the loaded item it stands in for (-1 for a new one). */
+/** A written item, the loaded item it stands in for (-1 for a new one), and the item node. */
 interface Part {
   text: string;
   index: number;
+  item: JSONContent;
+}
+
+/** A list written over its loaded list, and the items written differently from how they loaded. */
+export interface ComposedList {
+  text: string;
+  changed: { text: string; item: JSONContent }[];
 }
 
 /** The first unused loaded item with `key`, preferring those from `from` on. */
@@ -210,11 +212,17 @@ function findItem(items: readonly { key: string }[], key: string, from: number, 
   return matches.find((index) => index >= from) ?? matches[0] ?? -1;
 }
 
-/** The loaded item an edited item replaces: the next unused one, unless a later item still matches it as written. */
-function replacedItem<Map>(list: ListSource<Map>, next: number, used: ReadonlySet<number>, laterKeys: ReadonlySet<string>): number {
+/**
+ * The loaded item an edited item replaces: the next unused one, unless the
+ * items after this one still need it as written (counted, so one of two
+ * identical items can be edited).
+ */
+function replacedItem<Map>(list: ListSource<Map>, next: number, used: ReadonlySet<number>, laterKeys: readonly string[]): number {
   const candidate = list.items[next];
-  if (!candidate || used.has(next) || laterKeys.has(candidate.key)) return -1;
-  return next;
+  if (!candidate || used.has(next)) return -1;
+  const later = laterKeys.filter((key) => key === candidate.key).length;
+  const unused = list.items.filter((item, index) => item.key === candidate.key && !used.has(index)).length;
+  return later < unused ? next : -1;
 }
 
 function separatorFor(list: ListSource<unknown>, before: Part, part: Part): string {
@@ -230,6 +238,18 @@ function joinParts(parts: readonly Part[], list: ListSource<unknown>): string {
   }).join("");
 }
 
+/** True when the items are the loaded items in their places: none added, removed, or moved. */
+function inPlace(parts: readonly Part[], list: ListSource<unknown>): boolean {
+  return parts.length === list.items.length && parts.every((part, position) => part.index === position);
+}
+
+/** Numbers a numbered list again when its items were added, removed, or moved (markdown-list-numbers.ts). */
+function numbered(parts: Part[], node: JSONContent, list: ListSource<unknown>): Part[] {
+  if (node.type !== "orderedList" || inPlace(parts, list)) return parts;
+  const texts = renumbered(parts.map((part) => part.text), list.items.map((item) => item.text), startOf(node));
+  return parts.map((part, position) => ({ ...part, text: texts[position] ?? part.text }));
+}
+
 /**
  * Writes an edited list over the list it was loaded from: items nobody
  * touched keep their source and the blank lines between them, an edited
@@ -237,7 +257,7 @@ function joinParts(parts: readonly Part[], list: ListSource<unknown>): string {
  * item is written in the list's marker style. Returns null when an edited
  * item cannot be written this way; the caller then writes the list fresh.
  */
-export function composeList<Map>(node: JSONContent, list: ListSource<Map>, writer: ListWriter<Map>): string | null {
+export function composeList<Map>(node: JSONContent, list: ListSource<Map>, writer: ListWriter<Map>): ComposedList | null {
   const items = node.content ?? [];
   const keys = items.map((item) => writer.key(item));
   const used = new Set<number>();
@@ -245,15 +265,17 @@ export function composeList<Map>(node: JSONContent, list: ListSource<Map>, write
   let next = 0;
   for (const [position, item] of items.entries()) {
     const exact = findItem(list.items, keys[position] ?? "", next, used);
-    const index = exact >= 0 ? exact : replacedItem(list, next, used, new Set(keys.slice(position + 1)));
+    const index = exact >= 0 ? exact : replacedItem(list, next, used, keys.slice(position + 1));
     const loaded = list.items[index];
-    const text = loaded ? (exact >= 0 ? loaded.text : editedItem(item, loaded, writer)) : newItem(item, node, list, parts.at(-1)?.text, writer);
+    const text = loaded ? (exact >= 0 ? loaded.text : editedItem(item, loaded, writer)) : newItem(item, node, list, writer);
     if (text === null) return null;
     if (index >= 0) {
       used.add(index);
       next = index + 1;
     }
-    parts.push({ text, index });
+    parts.push({ text, index, item });
   }
-  return joinParts(parts, list);
+  const written = numbered(parts, node, list);
+  const changed = written.filter((part) => part.text !== list.items[part.index]?.text).map(({ text, item }) => ({ text, item }));
+  return { text: joinParts(written, list), changed };
 }

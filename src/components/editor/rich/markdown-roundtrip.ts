@@ -6,8 +6,10 @@ import { liftBlockColors } from "./block-color-nodes";
 import { needsRawBlock, splitBlocks, type LooseToken, type SourceBlock, type SplitSource } from "./markdown-blocks";
 import { markdownSchemaExtensions } from "./markdown-schema";
 import { RAW_MARKDOWN } from "./raw-markdown-node";
-import { describeBlocks, type RawKind } from "./markdown-block-details";
-import { composeList, isListNode, type ListSource } from "./markdown-list-items";
+import { reviewBlocks, type RawKind } from "./markdown-block-details";
+import { checkedList } from "./markdown-list-check";
+import { freshList, type FreshList } from "./markdown-list-fresh";
+import { isListNode, type ListSource } from "./markdown-list-items";
 
 interface Engine {
   schema: Schema;
@@ -105,8 +107,10 @@ function richNodes(block: SourceBlock, definitions: string, current: Engine): JS
   const nodes = parseNodes(definitions ? `${block.text}\n\n${definitions}` : block.text, current);
   if (!nodes) return null;
   const again = parseNodes(renderNodes(nodes, current), current);
-  if (!again || nodeKey({ content: again }) !== nodeKey({ content: nodes })) return null;
-  return nodes;
+  if (again && nodeKey({ content: again }) === nodeKey({ content: nodes })) return nodes;
+  // A list the editor's own writer would misread can still be written wide (markdown-list-fresh.ts).
+  const [only] = nodes;
+  return nodes.length === 1 && isListNode(only) && freshListOf(only, current).sound ? nodes : null;
 }
 
 function blockNodes(block: SourceBlock, definitions: string, current: Engine): { nodes: JSONContent[]; raw: boolean } {
@@ -184,12 +188,12 @@ export function parseMarkdown(markdown: string): LoadedMarkdown {
     blocks.push({ key: nodeKey({ content: nodes }), nodeCount: nodes.length, text: block.text, after: block.after });
   }
 
-  const rawKinds = describeBlocks(split.blocks, blocks, content, { key: nodeKey, itemContent: itemContentMap });
+  const review = reviewBlocks(split.blocks, blocks, content, { key: nodeKey, rawNode: canonicalRawNode, itemContent: itemContentMap, definitions });
   return {
     doc: { type: "doc", content },
     source: { original: markdown, leading: split.leading, blocks, endsWithNewline: normalized.endsWith("\n") },
-    rawBlocks,
-    rawKinds,
+    rawBlocks: rawBlocks + review.addedRaw,
+    rawKinds: review.rawKinds,
   };
 }
 
@@ -256,7 +260,7 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine): Chu
     }
     position += 1;
     if (!node || isEmptyParagraph(node)) continue;
-    const text = renderNodes([node], current);
+    const text = isListNode(node) ? freshListOf(node, current).text : renderNodes([node], current);
     // A block with no Markdown yet (an empty or uploading media block) is left out.
     if (text) chunks.push({ text, block: -1 });
   }
@@ -279,8 +283,9 @@ function separator(previous: Chunk, next: Chunk, source: SourceMap): string {
  * its list is written (`composedList`).
  */
 function spacingInItem(previous: Chunk, next: Chunk, source: SourceMap): string {
-  const before = previous.block >= 0 && next.block < 0 ? source.blocks[previous.block] : source.blocks[next.block - 1];
-  return previous.block < 0 && next.block < 0 ? "\n\n" : before?.after ?? "\n\n";
+  const spacings = [source.blocks[previous.block]?.after, source.blocks[next.block - 1]?.after].filter((after) => after !== undefined);
+  // With a block removed between two kept ones, the wider spacing keeps them apart.
+  return spacings.reduce((wide, after) => (after.split("\n").length > wide.split("\n").length ? after : wide), spacings[0] ?? "\n\n");
 }
 
 function ending(last: Chunk, source: SourceMap): string {
@@ -299,7 +304,13 @@ function joinChunks(chunks: Chunk[], source: SourceMap): string {
     if (before) output += separator(before, chunk, source);
     output += chunk.text;
   });
-  return output + ending(last, source);
+  return withLineEnds(output + ending(last, source), source);
+}
+
+/** A document loaded with Windows line ends (CRLF) on every line is saved with them; one that mixes line ends is saved with LF, as before. */
+function withLineEnds(markdown: string, source: SourceMap): string {
+  const windows = source.original.includes("\r\n") && !/(?:^|[^\r])\n/.test(source.original);
+  return windows ? markdown.replace(/\r?\n/g, "\r\n") : markdown;
 }
 
 /**
@@ -325,15 +336,28 @@ export function parseMarkdownFragment(markdown: string): JSONContent[] {
 
 /** An edited list written over its loaded list, when the result reads back as the same list. */
 function composedList(node: JSONContent, list: ListSource<SourceMap>, current: Engine): string | null {
-  const text = composeList(node, list, {
+  return checkedList(node, list, {
     key: nodeKey,
-    children: (content, map) => serializeMarkdown({ type: "doc", content }, map),
+    parse: (markdown) => parseNodes(markdown, current),
+    canonical: (nodes) => canonicalNodes(nodes, current.schema),
     fresh: (fresh) => renderNodes([fresh], current),
+    children: (content, map, wide) => serializeMarkdown({ type: "doc", content }, wide ? { ...map, inItem: false } : map),
   });
-  if (text === null) return null;
-  const again = parseNodes(text, current);
-  const expected = canonicalNodes([node], current.schema);
-  return again && expected && nodeKey({ content: again }) === nodeKey({ content: expected }) ? text : null;
+}
+
+/** A list with no loaded source to keep, written so that it reads back as the list (markdown-list-fresh.ts). */
+function freshListOf(node: JSONContent, current: Engine): FreshList {
+  return freshList(node, {
+    render: (fresh) => renderNodes([fresh], current),
+    parse: (markdown) => parseNodes(markdown, current),
+    canonical: (nodes) => canonicalNodes(nodes, current.schema),
+    key: nodeKey,
+  });
+}
+
+/** The raw node that keeps `text` as written, in canonical form. */
+function canonicalRawNode(text: string): JSONContent {
+  return canonicalNodes([rawNode(text)], getEngine().schema)?.[0] ?? rawNode(text);
 }
 
 /** True when a later node still matches the block as loaded, so the block is not the one edited here. */

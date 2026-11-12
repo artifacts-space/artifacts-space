@@ -4,7 +4,7 @@ const kindLabels: Readonly<Record<Exclude<RawKind, "other">, string>> = {
   html: "HTML",
   footnote: "footnotes",
   definition: "link definitions",
-  image: "images",
+  image: "images inside text",
 };
 
 /** "a", "a or b", "a, b, or c". */
@@ -23,7 +23,7 @@ function whatTheyUse(kinds: readonly RawKind[]): string {
 /**
  * The note over the editor when parts stay as written. It names only the
  * reasons that are in the document (HTML, footnotes, link definitions,
- * images), and stays general when the editor knows none.
+ * images inside text), and stays general when the editor knows none.
  */
 export function rawPartsNotice(count: number, kinds: readonly RawKind[]): string {
   const what = whatTheyUse(kinds);

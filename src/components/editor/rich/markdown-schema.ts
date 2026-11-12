@@ -111,6 +111,18 @@ export const MarkdownTable = Table.extend({
  */
 const MarkdownOrderedList = OrderedList.extend({
   markdownTokenizer: { name: "orderedList", level: "block", start: () => -1, tokenize: () => undefined },
+  /*
+   * marked's items go to the list item rule, as a bulleted list's do. Tiptap's
+   * own rule for numbered items expects its tokenizer's items and takes the
+   * text of marked's as written, so `1. **bold**` came out as literal stars
+   * and the item stayed as written.
+   */
+  parseMarkdown: (token, helpers) => {
+    if (token.type !== "list" || token.ordered !== true) return [];
+    const start = typeof token.start === "number" ? token.start : 1;
+    const items = Array.isArray(token.items) ? token.items : [];
+    return helpers.createNode("orderedList", start === 1 ? {} : { start }, helpers.parseChildren(items));
+  },
 });
 
 /** StarterKit with paragraphs and headings that keep block colors (block-color-nodes.ts). */
