@@ -555,6 +555,18 @@ a `ThreadApi` (`use-comment-thread.ts`), so `/dev/inline-comments`
 (`?seed=1`, `?as=reader`) and `e2e/inline-comments.spec.ts` run without a
 database; `inline-comments.db.test.ts` covers the server rules.
 
+The comment box (`src/components/comments/comment-editor.tsx`, used for new
+comments, replies, edits, and the cards at the text) is the rich Markdown
+editor as a box: the same schema, round trip, Markdown paste, and menu over
+selected text, with no slash menu, no media (`media={false}`), and no block
+handles. A comment is still Markdown: a picked @mention is plain `@handle`
+text (`mention-match.ts`, rules in `mention-autocomplete.ts`), so the server
+reads mentions as before, and ⌘↵ or Ctrl+↵ posts. Its code loads only when a
+box nears the window (`useWantsEditor` in `comment-box.tsx`). The box never
+takes `data-comment-root`, and the composer carries `data-comment-skip`, so
+inline comments never read it as document words. Fixtures supply people to
+mention through `MentionablesLoader`.
+
 ### Replaced files
 
 Replace (the Files section, MCP `files_replace`, `src/lib/files/replace.ts`)

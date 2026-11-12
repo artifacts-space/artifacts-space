@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { activeMentionQuery, composerMentionMap, insertMention, matchMentionables, type Mentionable } from "./mention-autocomplete";
+import { activeMentionQuery, composerMentionMap, insertMention, matchMentionables, mentionReplacement, type Mentionable } from "./mention-autocomplete";
 
 const people: Mentionable[] = [
   { userId: "user-charles", handle: "charles", name: "Charles Smith", kind: "person" },
@@ -65,6 +65,20 @@ describe("insertMention", () => {
 
   it("should not add a space before punctuation that follows", () => {
     expect(insertMention("@c, thanks", { start: 0, query: "c" }, 2, "charles")).toEqual({ text: "@charles, thanks", caret: 8 });
+  });
+});
+
+describe("mentionReplacement", () => {
+  it("should replace only the typed letters and add a space when the mention ends the text", () => {
+    expect(mentionReplacement("Hi @cha", { start: 3, query: "cha" }, 7, "charles")).toEqual({ from: 3, to: 7, insert: "@charles ", caret: 12 });
+  });
+
+  it("should take the rest of the handle and step over the space when text follows", () => {
+    expect(mentionReplacement("@chxx please", { start: 0, query: "ch" }, 3, "charles")).toEqual({ from: 0, to: 5, insert: "@charles", caret: 9 });
+  });
+
+  it("should keep the caret right after the handle when punctuation follows", () => {
+    expect(mentionReplacement("@c, thanks", { start: 0, query: "c" }, 2, "charles")).toEqual({ from: 0, to: 2, insert: "@charles", caret: 8 });
   });
 });
 

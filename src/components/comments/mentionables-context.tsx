@@ -3,6 +3,7 @@
 import { createContext, use, useEffect, useMemo, useState } from "react";
 
 import { loadMentionablesAction } from "@/app/(workspace)/threads/actions";
+import type { ActionResult } from "@/lib/artifact-types";
 import { composerMentionMap, type MentionDirectory, type Mentionable } from "@/lib/comments/mention-autocomplete";
 import type { MentionKind } from "@/lib/comments/mentions";
 
@@ -15,8 +16,17 @@ interface MentionablesValue {
   resolved: ReadonlyMap<string, MentionKind>;
 }
 
+/** How the list of people to mention is fetched: the server action, or an in-memory one on dev fixtures. */
+export type LoadMentionables = (publicId: string) => Promise<ActionResult<MentionDirectory>>;
+
 const emptyDirectory: MentionDirectory = { candidates: [], self: null };
 const MentionablesContext = createContext<MentionablesValue>({ candidates: [], self: null, resolved: new Map() });
+const LoaderContext = createContext<LoadMentionables>(loadMentionablesAction);
+
+/** Swaps how mentionables load for everything inside, as ThreadApi does for comments (dev fixtures run without a database). */
+export function MentionablesLoader({ load, children }: { load: LoadMentionables; children: React.ReactNode }) {
+  return <LoaderContext value={load}>{children}</LoaderContext>;
+}
 
 /**
  * Loads who the viewer can mention on this artifact once, and shares the list
@@ -25,10 +35,11 @@ const MentionablesContext = createContext<MentionablesValue>({ candidates: [], s
  */
 export function MentionablesProvider({ publicId, children }: { publicId: string; children: React.ReactNode }) {
   const [directory, setDirectory] = useState<MentionDirectory>(emptyDirectory);
+  const load = use(LoaderContext);
 
   useEffect(() => {
     let active = true;
-    loadMentionablesAction(publicId)
+    load(publicId)
       .then((result) => {
         if (active && result.success) setDirectory(result.data);
       })
@@ -36,7 +47,7 @@ export function MentionablesProvider({ publicId, children }: { publicId: string;
     return () => {
       active = false;
     };
-  }, [publicId]);
+  }, [load, publicId]);
 
   const value = useMemo(() => ({ candidates: directory.candidates, self: directory.self, resolved: composerMentionMap(directory) }), [directory]);
   return <MentionablesContext value={value}>{children}</MentionablesContext>;

@@ -8,6 +8,7 @@ import { PageEditorChromeProvider } from "@/components/artifact-page/page-editor
 import { PageInlineEditor } from "@/components/artifact-page/page-inline-editor";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { CommentThread } from "@/components/comments/comment-thread";
+import { MentionablesLoader, type LoadMentionables } from "@/components/comments/mentionables-context";
 import type { ThreadApi } from "@/components/comments/use-comment-thread";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
 import { InlineCommentSurface } from "@/components/inline-comments/inline-comment-surface";
@@ -76,6 +77,16 @@ const seedComments: CommentView[] = [
 ];
 
 const done = <T,>(data: T) => Promise.resolve({ success: true as const, data });
+
+/** Teammates to mention, so the comment box's suggestions run without a database. */
+const loadFixtureMentionables: LoadMentionables = () => done({
+  candidates: [
+    { userId: "fixture-dana", handle: "dana", name: "Dana Reyes", kind: "person" as const },
+    { userId: "fixture-leah", handle: "leah", name: "Leah Park", kind: "person" as const },
+    { userId: "fixture-agent", handle: "claude-code", name: "Claude Code", kind: "agent" as const },
+  ],
+  self: { userId: viewer.userId, handle: viewer.handle, name: viewer.name, kind: "person" as const },
+});
 const noMentions = { mentions: { notified: [], refused: [] } };
 
 /** A thread kept in memory, behind the calls the app makes to the server. */
@@ -146,6 +157,7 @@ export function InlineCommentsFixture({ reader, seeded }: { reader: boolean; see
   const api = useMemo(() => memoryThreadApi(seeded ? seedComments : []), [seeded]);
   return (
     <PageEditorChromeProvider>
+      <MentionablesLoader load={loadFixtureMentionables}>
       <main className="mx-auto w-full max-w-[960px] px-6 py-12 sm:py-16">
         <InlineCommentsProvider publicId={artifact.publicId} kind="markdown" canComment api={api}>
           <h1 className="text-4xl font-medium">{artifact.title}</h1>
@@ -153,6 +165,7 @@ export function InlineCommentsFixture({ reader, seeded }: { reader: boolean; see
           <CommentThread publicId={artifact.publicId} className="mt-12 border-t pt-8" raised />
         </InlineCommentsProvider>
       </main>
+      </MentionablesLoader>
     </PageEditorChromeProvider>
   );
 }
