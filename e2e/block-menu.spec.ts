@@ -101,7 +101,7 @@ test("should open the block menu from the grip with no row highlighted", async (
       const sheet = await menu(page).boundingBox();
       return sheet ? Math.round(sheet.y + sheet.height) : 0;
     }).toBe(viewport?.height);
-    // Measured while the sheet may still be sliding in, so rounded.
+    // Layout can land a hair off a whole pixel (43.99997), so compare to the nearest pixel.
     await expect.poll(async () => Math.round((await menu(page).getByRole("menuitem", { name: "Duplicate" }).boundingBox())?.height ?? 0)).toBe(44);
   }
 });

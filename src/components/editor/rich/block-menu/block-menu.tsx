@@ -5,9 +5,10 @@ import { createPortal } from "react-dom";
 
 import type { BlockSubmenuId, MenuCommand, MenuContext, MenuEntry } from "./block-actions";
 import type { BlockMenuLastEdited } from "./block-menu-context";
-import { MenuFooter, MenuRow, panelClass, placementClass, SearchRow } from "./block-menu-parts";
+import { MenuFooter, MenuRow, panelClass, panelWidth, placementClass, SearchRow } from "./block-menu-parts";
 import { menuReducer, openedMenu, rowsFor, type MenuEvent, type MenuState } from "./block-menu-state";
 import { ChangeSubmenu, ColorSubmenu, type SubmenuFrame } from "./block-submenus";
+import { gripMenuRule, menuWidth, pointMenuRule, submenuRule, submenuWidth } from "./menu-placement";
 import { canHover, useFloatingMenu, usePhoneSheet, usePressOutside, type MenuAnchor } from "./use-floating-menu";
 
 /** Why the menu closed: Escape and Tab return focus to the grip; a press outside leaves focus where it lands. */
@@ -153,8 +154,8 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
   const [submenuRows, submenuAnchor] = useSubmenuRows(state.submenu);
   const submenu = state.submenu;
 
-  useFloatingMenu(panelRef, anchor, anchor.kind === "element" ? "left-start" : "right-start", !sheet);
-  useFloatingMenu(subRef, submenu ? submenuAnchor : null, "right-start", !sheet);
+  useFloatingMenu(panelRef, anchor, anchor.kind === "element" ? gripMenuRule : pointMenuRule, !sheet);
+  useFloatingMenu(subRef, submenu ? submenuAnchor : null, submenuRule, !sheet);
   usePressOutside(insideRefs, useCallback(() => { onClose("outside"); }, [onClose]));
   useEffect(() => { focusMenu(inputRef.current, panelRef.current); }, []);
   useEffect(() => {
@@ -191,7 +192,7 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
   return createPortal(
     <>
       {sheet && submenu ? null : (
-        <div ref={panelRef} tabIndex={-1} onKeyDown={onKeyDown} data-slot="block-menu" className={`${panelClass} ${placementClass(sheet, "w-[300px]")}`}>
+        <div ref={panelRef} tabIndex={-1} onKeyDown={onKeyDown} data-slot="block-menu" className={`${panelClass} ${placementClass(sheet)}`} style={panelWidth(sheet, menuWidth)}>
           <SearchRow inputRef={inputRef} value={state.query} menuId={menuId} activeId={state.active >= 0 ? `${menuId}-row-${String(state.active)}` : undefined} onChange={(query) => { send({ type: "typed", query }); }} />
           <MenuList menuId={menuId} typeName={typeName} rows={rows} state={state} mac={mac} submenuRows={submenuRows} onHover={hover} onChoose={(index) => { choose(index, !canHover()); }} />
           {rows.length === 0 ? <p className="px-2 py-2 text-sm text-muted-foreground">No actions match “{state.query.trim()}”.</p> : null}
@@ -203,7 +204,7 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
           id={submenu.id}
           context={context}
           onCommand={onCommand}
-          frame={{ panelRef: subRef, className: `${panelClass} ${placementClass(sheet, "w-[260px]")}`, focused: submenu.focused || sheet, sheet, onBack: backToMenu, onCloseAll: () => { onClose("escape"); } }}
+          frame={{ panelRef: subRef, className: `${panelClass} ${placementClass(sheet)}`, width: sheet ? undefined : submenuWidth, focused: submenu.focused || sheet, sheet, onBack: backToMenu, onCloseAll: () => { onClose("escape"); } }}
         />
       ) : null}
     </>,

@@ -427,8 +427,22 @@ there when the editor supports it. Duplicate, Move, and Delete are ordinary
 transactions on the whole top-level block, or on a list item as an item
 (`block-target.ts`), so Undo and autosave treat them like typing. The page
 supplies the artifact through `BlockMenuFor`; editors without it (a ui
-artifact's Markdown block) get no handles. Readers get only Copy link to block
-on right-click (`src/components/block-links`).
+artifact's Markdown block) get no handles. The menu opens in one place
+(`menu-placement.ts`): 265px wide, to the left of the grip, or to its right
+over the block's text when the window has no room on the left (the left
+needs 282px beside the grip, so with the contained page column it fits from
+a 1588px-wide page area: a 1588px window with overlay scrollbars, about
+1605px with a classic 17px one), centered on the grip and kept 12px inside
+the window. It slides up or down to stay inside, never flips above or
+below, and never scrolls the page. From a right-click it opens at the
+pointer, to its right or to its left near the window's right edge, kept
+12px inside the window too. Change and Color open on hover, 220px wide, to
+the right of the menu (overlapping it 4px), or to its left near the
+window's right edge. The menu stays transparent until placed, then fades in
+over 150ms with no movement, and not at all under reduced motion. Keep it
+that way; `e2e/block-menu-position.spec.ts` checks it by bounding boxes.
+Readers get only Copy link to block on right-click
+(`src/components/block-links`).
 
 Color (text color and background) is a block attribute on paragraphs and
 headings, stored in Markdown as a color comment at the end of the line's

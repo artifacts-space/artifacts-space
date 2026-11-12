@@ -48,6 +48,8 @@ interface SubmenuSection {
 export interface SubmenuFrame {
   panelRef: RefObject<HTMLDivElement | null>;
   className: string;
+  /** Its width in pixels beside the menu (`submenuWidth`); none in the phone sheet. */
+  width?: number | undefined;
   focused: boolean;
   /** Phones show the submenu in place of the menu, with a way back. */
   sheet: boolean;
@@ -72,7 +74,7 @@ function OptionRow({ option }: { option: SubmenuOption }) {
 }
 
 /** A submenu: its sections of choices, keyboard movement, ← or Escape back to the menu, Tab out. */
-function Submenu({ panelRef, className, focused, sheet, onBack, onCloseAll, title, slot, sections }: SubmenuProps) {
+function Submenu({ panelRef, className, width, focused, sheet, onBack, onCloseAll, title, slot, sections }: SubmenuProps) {
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!focused) return;
@@ -95,7 +97,7 @@ function Submenu({ panelRef, className, focused, sheet, onBack, onCloseAll, titl
   };
 
   return (
-    <div ref={panelRef} className={className} onKeyDown={onKeyDown} data-slot={slot}>
+    <div ref={panelRef} className={className} style={width === undefined ? undefined : { width }} onKeyDown={onKeyDown} data-slot={slot}>
       {sheet ? (
         <button type="button" onClick={onBack} className={cn(rowClass, "text-muted-foreground")}>
           <IconChevronLeft aria-hidden /> {title}
@@ -104,7 +106,7 @@ function Submenu({ panelRef, className, focused, sheet, onBack, onCloseAll, titl
       <div ref={listRef} role="menu" aria-label={title} className="flex flex-col">
         {sections.map((section, index) => (
           <div key={section.label ?? index} role="group" aria-label={section.label} className="flex flex-col">
-            {section.label ? <div aria-hidden className="px-2 pt-1.5 pb-0.5 text-xs text-muted-foreground">{section.label}</div> : null}
+            {section.label ? <div aria-hidden className="px-1.5 pt-1.5 pb-0.5 text-xs text-muted-foreground max-sm:px-2">{section.label}</div> : null}
             {section.options.map((option) => <OptionRow key={option.key} option={option} />)}
           </div>
         ))}
