@@ -7,7 +7,8 @@ import { artifact, artifactVersion, sharingRequest, team, type ArtifactRecord, t
 import { canEditRecord } from "@/lib/access";
 import type { VersionSaveKind } from "@/lib/artifact-types";
 import { isUniqueViolation } from "@/lib/db-errors";
-import { stampColumns, type HarnessStamp } from "@/lib/harness/harness-rules";
+import { artifactStillAt } from "@/lib/edits/save-time";
+import type { HarnessStamp } from "@/lib/harness/harness-rules";
 import { notifySharingRequest } from "@/lib/notifications/create";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { getTeamMembershipById } from "@/lib/teams/queries";
@@ -34,15 +35,34 @@ export async function getArtifactVersion(id: string): Promise<ArtifactVersionRec
   return row ?? null;
 }
 
-async function cancelPendingEdits(artifactId: string, byUserId: string | null) {
+/**
+ * A save's approval writes carry the save's time (`savedAt`): each runs only
+ * while the artifact is still at that save (artifactStillAt), in its own
+ * statement. A save's approval runs just after its UPDATE, so a newer save
+ * can land and decide first; the slower one then writes nothing, and what
+ * readers outside the team see stays the newer save's decision. Undefined:
+ * not part of a save (a visibility change, a decision on a request).
+ */
+function stillAtSave(artifactId: string, savedAt: Date | undefined) {
+  return savedAt ? artifactStillAt(artifactId, savedAt) : undefined;
+}
+
+async function cancelPendingEdits(artifactId: string, byUserId: string | null, savedAt?: Date) {
   await getDb()
     .update(sharingRequest)
     .set({ status: "canceled", decidedBy: byUserId, decidedAt: new Date() })
-    .where(and(eq(sharingRequest.artifactId, artifactId), eq(sharingRequest.kind, "edit"), eq(sharingRequest.status, "pending")));
+    .where(and(eq(sharingRequest.artifactId, artifactId), eq(sharingRequest.kind, "edit"), eq(sharingRequest.status, "pending"), stillAtSave(artifactId, savedAt)));
 }
 
-async function setApprovedVersion(artifactId: string, versionId: string | null) {
-  await getDb().update(artifact).set({ approvedVersionId: versionId }).where(eq(artifact.id, artifactId));
+/**
+ * Points the artifact at its approved version. With `savedAt`, only while the
+ * row is still at that save, read from the row's own column: an UPDATE that
+ * waits for another save's row lock re-checks it on the row that save wrote,
+ * which a subquery on the artifact table would not.
+ */
+async function setApprovedVersion(artifactId: string, versionId: string | null, savedAt?: Date) {
+  const stillAtOwnSave = savedAt ? sql`date_trunc('milliseconds', ${artifact.updatedAt}) = ${savedAt.toISOString()}::timestamptz` : undefined;
+  await getDb().update(artifact).set({ approvedVersionId: versionId }).where(and(eq(artifact.id, artifactId), stillAtOwnSave));
   forgetArtifactCache(artifactId);
 }
 
@@ -53,6 +73,9 @@ async function setApprovedVersion(artifactId: string, versionId: string | null) 
  */
 async function ensureApprovedBefore(before: ArtifactRecord) {
   if (before.approvedVersionId) return before.approvedVersionId;
+  // A newer save may have given it one since `before` was read: that one stands.
+  const [current] = await getDb().select({ approvedVersionId: artifact.approvedVersionId }).from(artifact).where(eq(artifact.id, before.id)).limit(1);
+  if (current?.approvedVersionId) return current.approvedVersionId;
   const versionId = await versionMatching(before, before.updatedBy ?? before.userId);
   await getDb().update(artifact).set({ approvedVersionId: versionId }).where(and(eq(artifact.id, before.id), isNull(artifact.approvedVersionId)));
   return versionId;
@@ -74,38 +97,36 @@ async function loadTeamRule(teamId: string | null) {
  */
 async function storePendingEdit(record: ArtifactRecord, teamId: string, editorId: string, versionId: string) {
   const visibility = record.visibility === "public" ? "public" : "link";
+  const stillAt = artifactStillAt(record.id, record.updatedAt);
   const open = and(eq(sharingRequest.artifactId, record.id), eq(sharingRequest.kind, "edit"), eq(sharingRequest.status, "pending"));
   const [previous] = await getDb().select({ id: sharingRequest.id }).from(sharingRequest).where(open).limit(1);
   if (previous) {
-    await getDb().update(sharingRequest).set({ versionId, teamId, visibility, requestedBy: editorId, createdAt: new Date() }).where(open);
+    await getDb().update(sharingRequest).set({ versionId, teamId, visibility, requestedBy: editorId, createdAt: new Date() }).where(and(open, stillAt));
     return;
   }
   const id = randomUUID();
   try {
-    await getDb().insert(sharingRequest).values({ id, kind: "edit", artifactId: record.id, teamId, requestedBy: editorId, visibility, versionId });
+    const opened = await getDb().execute(sql`
+      insert into ${sharingRequest} (id, kind, artifact_id, team_id, requested_by, visibility, version_id)
+      select ${id}, 'edit', ${record.id}, ${teamId}, ${editorId}, ${visibility}, ${versionId} where ${stillAt}
+      returning id
+    `);
     // Only a new request notifies; later edits move the open one along quietly.
-    notifySharingRequest(id);
+    if (opened.rows.length > 0) notifySharingRequest(id);
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
     // Another edit filed the request first; point it at this newer version.
-    await getDb().update(sharingRequest).set({ versionId, requestedBy: editorId, createdAt: new Date() }).where(open);
+    await getDb().update(sharingRequest).set({ versionId, requestedBy: editorId, createdAt: new Date() }).where(and(open, stillAt));
   }
 }
 
 async function auditOwnApproval(record: ArtifactRecord, teamId: string, editorId: string, versionId: string) {
   const visibility = record.visibility === "public" ? "public" : "link";
-  await getDb().insert(sharingRequest).values({
-    id: randomUUID(),
-    kind: "edit",
-    artifactId: record.id,
-    teamId,
-    requestedBy: editorId,
-    visibility,
-    versionId,
-    status: "approved",
-    decidedBy: editorId,
-    decidedAt: new Date(),
-  });
+  await getDb().execute(sql`
+    insert into ${sharingRequest} (id, kind, artifact_id, team_id, requested_by, visibility, version_id, status, decided_by, decided_at)
+    select ${randomUUID()}, 'edit', ${record.id}, ${teamId}, ${editorId}, ${visibility}, ${versionId}, 'approved', ${editorId}, now()
+    where ${artifactStillAt(record.id, record.updatedAt)}
+  `);
 }
 
 async function decideFor(record: ArtifactRecord, editorId: string, actor: SharingActor) {
@@ -121,8 +142,8 @@ async function applyApprovalRule(record: ArtifactRecord, versionId: string, edit
     await storePendingEdit(record, record.teamId, editorId, versionId);
     return "pending";
   }
-  await setApprovedVersion(record.id, versionId);
-  await cancelPendingEdits(record.id, editorId);
+  await setApprovedVersion(record.id, versionId, record.updatedAt);
+  await cancelPendingEdits(record.id, editorId, record.updatedAt);
   if (record.teamId && editNeedsAuditRow({ visibility: record.visibility, team: rule })) await auditOwnApproval(record, record.teamId, editorId, versionId);
   return "applied";
 }
@@ -146,10 +167,18 @@ export interface ArtifactSave {
 
 /**
  * Files a save in the artifact's history and applies the approval rule.
- * Private and team artifacts always apply. For link and public artifacts the
- * saved version becomes the approved one, or waits for an owner or admin; a
- * save that brings back exactly the approved version cancels the wait.
- * Old versions are pruned afterwards.
+ * Saves of link and public artifacts write their version and approval in
+ * their own statement instead (save-write.ts); this files a new artifact and
+ * saves of private and team artifacts, and keeps the rule for any other
+ * caller. Private and team artifacts always apply. For link and public
+ * artifacts the saved version becomes the approved one, or waits for an
+ * owner or admin; a save that brings back exactly the approved version
+ * cancels the wait. Old versions are pruned afterwards. Call it right after
+ * the save's UPDATE with the row it returned: the version is dated at the
+ * save, and when a newer save landed in between, this one's version sorts
+ * before it and its approval writes nothing (insertSaveVersion,
+ * stillAtSave), so History's newest version and the approved version stay
+ * the newer save's. The returned status is what the rule decided for this save.
  */
 export async function recordArtifactSave(save: ArtifactSave): Promise<EditStatus> {
   const { before, after, editorId } = save;
@@ -157,9 +186,10 @@ export async function recordArtifactSave(save: ArtifactSave): Promise<EditStatus
   const approvedId = before && isReviewedLevel(after.visibility) ? await ensureApprovedBefore(before) : null;
   // A continuing session that could not merge (its version was approved or waiting) replaces that version once approval moved on.
   const previous = save.session === "continue" ? await latestVersion(after.id) : null;
-  const versionId = await fileVersion({ ...after, approvedVersionId: approvedId ?? after.approvedVersionId }, { editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null, session: save.session, harness: save.harness });
+  const byAgent = save.actor === "agent";
+  const versionId = await fileVersion({ ...after, approvedVersionId: approvedId ?? after.approvedVersionId }, { editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null, session: save.session, harness: save.harness, byAgent });
   const status = approvedId ? await approvalFor(after, approvedId, versionId, save) : "applied";
-  await dropSupersededSessionVersion(after, previous, { editorId, saveKind: save.saveKind, session: save.session, newVersionId: versionId }).catch((error: unknown) => {
+  await dropSupersededSessionVersion(after, previous, { editorId, saveKind: save.saveKind, session: save.session, harness: save.harness, byAgent, newVersionId: versionId }).catch((error: unknown) => {
     // Housekeeping only: an extra version in History is the worst case.
     console.error("[versions] Dropping a superseded session version failed", error instanceof Error ? error.name : "unknown error");
   });
@@ -176,29 +206,10 @@ const fileSaveKinds: ReadonlySet<VersionSaveKind> = new Set(["files", "replace"]
 async function approvalFor(after: ArtifactRecord, approvedId: string, versionId: string, save: ArtifactSave): Promise<EditStatus> {
   const approved = await getArtifactVersion(approvedId);
   if (!fileSaveKinds.has(save.saveKind) && approved && sameReviewedFields(approved, after)) {
-    await cancelPendingEdits(after.id, save.editorId);
+    await cancelPendingEdits(after.id, save.editorId, after.updatedAt);
     return "applied";
   }
   return applyApprovalRule({ ...after, approvedVersionId: approvedId }, versionId, save.editorId, save.actor);
-}
-
-/**
- * Records a change the artifact row does not show, such as attached or
- * removed files: it marks who saved it, files a version, and runs the
- * approval rule. Readers outside the team of a link or public artifact keep
- * the approved version (and its files) until the change is approved. Call it
- * after the change is saved.
- */
-export async function recordArtifactChange(input: { artifactId: string; editorId: string; actor: SharingActor; harness?: HarnessStamp | null | undefined }): Promise<EditStatus> {
-  const [before] = await getDb().select().from(artifact).where(eq(artifact.id, input.artifactId)).limit(1);
-  if (!before) return "applied";
-  const [after] = await getDb()
-    .update(artifact)
-    .set({ ...stampColumns(input.harness), updatedBy: input.editorId, updatedAt: new Date() })
-    .where(eq(artifact.id, input.artifactId))
-    .returning();
-  if (!after) return "applied";
-  return recordArtifactSave({ before, after, editorId: input.editorId, actor: input.actor, saveKind: "files", harness: input.harness ?? null });
 }
 
 /**

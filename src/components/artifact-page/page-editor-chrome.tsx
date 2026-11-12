@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 
 import type { SourceToggle } from "@/components/app/artifact-editor/editor-toolbar";
-import { ConflictNotice } from "@/components/app/artifact-editor/save-status";
+import { AgentSaveNotice, ConflictNotice, openHistoryButton } from "@/components/app/artifact-editor/save-status";
 import type { AutosaveStatus } from "@/components/app/artifact-editor/use-autosave";
 import type { HarnessControl } from "@/components/harness/use-artifact-harness";
-import type { VersionHistoryProps } from "@/components/history/version-history";
+import { VersionHistory, type VersionHistoryProps } from "@/components/history/version-history";
 import type { FileDto } from "@/lib/files/types";
 
 import { ownSaveBase } from "./restore-base-rules";
@@ -36,6 +36,8 @@ export interface PageEditorChrome {
   save: SaveIndicatorState;
   /** Set only while a save conflicts with someone else's newer one. */
   conflict: PageConflict | null;
+  /** Set after the editor's save went through over an agent's newer save (theirs is in History), until dismissed. */
+  agentSaved: { onDismiss: () => void } | null;
   /** "Made with": the agent harness the artifact shows; null while the editable copy loads. */
   harness: HarnessControl | null;
 }
@@ -137,14 +139,33 @@ export function useWaitingChrome(input: WaitingChromeInput | null, error: string
       fullWidth: { checked: fullWidth, pending: true, busy: !error, onChange: unchangeable },
       save: error ? saveProblem(error) : idleSave,
       conflict: null,
+      agentSaved: null,
       harness: null,
     };
   }, [input, error, refresh, ownSaves]);
 }
 
-/** The notice about someone else's newer save, under the title on the artifact's page. Nothing shows without a conflict. */
+/**
+ * The notices about someone else's newer save, under the title on the
+ * artifact's page: a conflict with another person's save, or that this
+ * editor's save went over an agent's (with a way into History). Nothing
+ * shows without one.
+ */
 export function PageConflictNotice() {
-  const conflict = usePageEditorChrome()?.conflict;
-  if (!conflict) return null;
-  return <ConflictNotice status={conflict.status} onLoadTheirs={conflict.onLoadTheirs} onKeepMine={conflict.onKeepMine} className="mt-6 rounded-lg border sm:px-4" />;
+  const chrome = usePageEditorChrome();
+  if (!chrome) return null;
+  const { conflict, agentSaved, history } = chrome;
+  return (
+    <>
+      {conflict ? <ConflictNotice status={conflict.status} onLoadTheirs={conflict.onLoadTheirs} onKeepMine={conflict.onKeepMine} className="mt-6 rounded-lg border sm:px-4" /> : null}
+      <AgentSaveNotice
+        show={agentSaved !== null}
+        onDismiss={agentSaved?.onDismiss ?? noop}
+        history={<VersionHistory {...history} trigger={openHistoryButton} />}
+        className="mt-6 rounded-lg border sm:px-4"
+      />
+    </>
+  );
 }
+
+const noop = () => undefined;

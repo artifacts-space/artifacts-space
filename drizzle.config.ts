@@ -18,8 +18,8 @@ if (refusal) throw new Error(refusal);
 
 export default defineConfig({
   dialect: "postgresql",
-  // OAuth, view-count, notification, team-role, MCP connection, old file copy, and team welcome tables live in their own files to keep schema.ts under the 500-line limit.
-  schema: ["./src/db/schema.ts", "./src/db/oauth-schema.ts", "./src/db/views-schema.ts", "./src/db/notification-schema.ts", "./src/db/roles-schema.ts", "./src/db/connection-schema.ts", "./src/db/file-copy-schema.ts", "./src/db/team-welcome-schema.ts"],
+  // OAuth, view-count, notification, team-role, MCP connection, old file copy, team welcome, and edit lease tables live in their own files to keep schema.ts under the 500-line limit.
+  schema: ["./src/db/schema.ts", "./src/db/oauth-schema.ts", "./src/db/views-schema.ts", "./src/db/notification-schema.ts", "./src/db/roles-schema.ts", "./src/db/connection-schema.ts", "./src/db/file-copy-schema.ts", "./src/db/team-welcome-schema.ts", "./src/db/edit-lease-schema.ts"],
   out: "./drizzle",
   // Only manage this app's tables. Ignore the unused neon_auth schema.
   schemaFilter: ["public"],

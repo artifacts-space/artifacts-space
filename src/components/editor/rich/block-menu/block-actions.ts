@@ -1,4 +1,6 @@
-import { IconArrowDown, IconArrowUp, IconCopy, IconLink, IconMessage, IconRepeat, IconTrash, type Icon } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconCopy, IconLink, IconMessage, IconPaint, IconRepeat, IconTrash, type Icon } from "@tabler/icons-react";
+
+import { blockHues, colorChoiceLabel, type BlockColorPart, type BlockColors, type BlockHue } from "@/lib/block-colors/block-color-rules";
 
 import { blockTypes, type BlockTypeOption } from "./block-types";
 
@@ -10,13 +12,14 @@ import { blockTypes, type BlockTypeOption } from "./block-types";
 /** The actions that run on a block. */
 export type BlockActionId = "copyLink" | "duplicate" | "moveUp" | "moveDown" | "delete" | "comment";
 
-/** The submenus the menu opens. Color joins in the next phase. */
-export type BlockSubmenuId = "change";
+/** The submenus the menu opens. */
+export type BlockSubmenuId = "change" | "color";
 
-/** What choosing a row does: run an action, change the block's type, or open a submenu. */
+/** What choosing a row does: run an action, change the block's type or a color, or open a submenu. */
 export type MenuCommand =
   | { kind: "action"; id: BlockActionId }
   | { kind: "change"; typeId: string }
+  | { kind: "color"; part: BlockColorPart; hue: BlockHue | null }
   | { kind: "submenu"; id: BlockSubmenuId };
 
 /** One row of the menu. */
@@ -38,6 +41,10 @@ export interface MenuContext {
   changeable: boolean;
   /** The block's current type id, left out of "Change to" results. */
   currentType: string | null;
+  /** The block has lines of text to color (not code, tables, dividers, or media). */
+  colorable: boolean;
+  /** The block's current colors, left out of color search results. */
+  colors: BlockColors;
   canMoveUp: boolean;
   canMoveDown: boolean;
   /** The block has an artifact page to link to. */
@@ -93,10 +100,24 @@ function actionEntry(spec: ActionSpec, context: MenuContext): MenuEntry {
 
 const changeEntry: MenuEntry = { key: "change", label: "Change", icon: IconRepeat, command: { kind: "submenu", id: "change" }, group: 0 };
 
-/** The menu as it opens, before anything is typed: Change, then the block actions, then Comment. */
+const colorEntry: MenuEntry = { key: "color", label: "Color", icon: IconPaint, command: { kind: "submenu", id: "color" }, group: 0 };
+
+/** The menu as it opens, before anything is typed: Change and Color, then the block actions, then Comment. */
 export function menuEntries(context: MenuContext): MenuEntry[] {
   const actions = actionSpecs.filter((spec) => shows(spec.id, context)).map((spec) => actionEntry(spec, context));
-  return context.changeable ? [changeEntry, ...actions] : actions;
+  const submenus = [context.changeable ? changeEntry : null, context.colorable ? colorEntry : null].filter((entry) => entry !== null);
+  return [...submenus, ...actions];
+}
+
+/** Every color row, text colors then backgrounds, each starting with Default, except the block's current ones. */
+export function colorEntries(colors: BlockColors): MenuEntry[] {
+  const hues: readonly (BlockHue | null)[] = [null, ...blockHues];
+  const parts: readonly BlockColorPart[] = ["color", "background"];
+  return parts.flatMap((part) =>
+    hues
+      .filter((hue) => hue !== colors[part])
+      .map((hue) => ({ key: `${part}:${hue ?? "default"}`, label: colorChoiceLabel(part, hue), icon: IconPaint, command: { kind: "color", part, hue }, group: 0 }) satisfies MenuEntry),
+  );
 }
 
 /** The "Change to …" rows for the types a block can change to. */
@@ -137,11 +158,19 @@ function actionMatches(needle: string, entry: MenuEntry): MenuEntry[] {
   return matchesWords(needle, entry.label, spec?.keywords ?? []) ? [entry] : [];
 }
 
-/** The Change row when it matches, then each "Change to …" row that matches. */
+/** The submenu's row when it matches, then each of its entries that matches, written out. */
 function submenuMatches(needle: string, entry: MenuEntry, context: MenuContext): MenuEntry[] {
+  if (entry.key === "color") return colorMatches(needle, entry, context);
   const own = matchesWords(needle, entry.label, ["turn into", "type"]) ? [entry] : [];
   const types = blockTypes.filter((option) => option.id !== context.currentType && typeMatches(needle, option)).map((option) => typeEntry(option));
   return [...own, ...types];
+}
+
+/** The Color row when it matches, then each color row whose name contains what was typed ("red", "background"). */
+function colorMatches(needle: string, entry: MenuEntry, context: MenuContext): MenuEntry[] {
+  // "background" finds the background rows, not the Color row, so Enter applies one instead of opening the submenu.
+  const own = matchesWords(needle, entry.label, ["colour", "highlight"]) ? [entry] : [];
+  return [...own, ...colorEntries(context.colors).filter((row) => row.label.toLowerCase().includes(needle))];
 }
 
 /** The first row that can run, or -1: what Enter runs after typing. */

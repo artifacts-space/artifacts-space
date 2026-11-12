@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { saveKindLabel, versionBadges, versionLabel, versionNote } from "./version-labels";
+import { restoredMessage, saveKindLabel, versionBadges, versionLabel, versionNote } from "./version-labels";
 
 describe("version labels", () => {
   it("should describe the format and size when given a version", () => {
@@ -23,5 +23,16 @@ describe("version labels", () => {
   it("should fall back to a plain label when the replaced file's old copy is gone", () => {
     expect(versionLabel({ saveKind: "replace", replacedFile: null })).toBe("Replaced a file");
     expect(versionLabel({ saveKind: "edit", replacedFile: "sow.pdf" })).toBe("Edited");
+  });
+});
+
+describe("restoredMessage", () => {
+  it("should say an agent's newer save is in History when the restore went over it", () => {
+    expect(restoredMessage({ artifact: { pendingEdit: null }, savedOverAgents: true })).toBe("Restored. An agent saved changes since you opened History; theirs is in History.");
+  });
+
+  it("should say only that it is restored, or waits for approval, when no agent saved in between", () => {
+    expect(restoredMessage({ artifact: { pendingEdit: null }, savedOverAgents: false })).toBe("Restored.");
+    expect(restoredMessage({ artifact: { pendingEdit: { id: "r1" } }, savedOverAgents: false })).toBe("Restored. Waiting for approval.");
   });
 });

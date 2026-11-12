@@ -43,6 +43,11 @@ describe("plainMarkdown", () => {
     expect(plainMarkdown(doc, 5)).toEqual({ heading: "Plan", lines: ["We ship Friday.", "See inline here."] });
   });
 
+  it("should leave block color comments out of the heading and body when lines are colored", () => {
+    const doc = "## Status <!-- background: green -->\n\nShip it <!-- color: red; background: yellow -->\n- [ ] call back <!-- color: blue -->";
+    expect(plainMarkdown(doc, 5)).toEqual({ heading: "Status", lines: ["Ship it", "call back"] });
+  });
+
   it("should return no heading when the document has none", () => {
     expect(plainMarkdown("just text", 3)).toEqual({ heading: null, lines: ["just text"] });
   });

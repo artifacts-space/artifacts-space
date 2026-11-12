@@ -1,108 +1,63 @@
 import type { Placement } from "@floating-ui/dom";
 
 /*
- * Where the block menu and its submenus open. Each has one side it prefers
- * and one fixed fallback for when that side has no room. The menu never
- * flips above or below because it runs out of height: it slides up or down
- * to stay on screen instead, so it always opens the same way.
+ * Where the block menu and its submenus open. Each has the sides it tries,
+ * in order, and the last one is used when none has room. Menus are placed
+ * against the window, never flip above or below, and slide up or down to
+ * stay `menuEdge` inside the window instead.
  */
 
-/** The space between a menu and what it opens from. */
-export const menuGap = 6;
-
 /** How close a menu may come to the edge of the window. */
-export const menuEdge = 8;
+export const menuEdge = 12;
 
-/** The room the menu keeps below the block when it opens beneath it. */
-export const fallbackRoom = 240;
+/** The block menu's width (set on its panel in block-menu.tsx): its widest row, "Copy link to block" with Alt+Shift+L, fits whole. */
+export const menuWidth = 265;
 
-/** The block menu's width (set on its panel in block-menu.tsx), known before it opens. */
-export const menuWidth = 300;
+/** A submenu's width (Change, Color; set on its panel). */
+export const submenuWidth = 220;
 
 /** The shortest a menu gets when the window is short: its search and a few rows. */
 export const menuMinHeight = 160;
 
-/** A box in window coordinates. */
-export interface Box {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
+/** How far a submenu overlaps the menu it opens from. */
+export const submenuOverlap = 4;
 
-/** A menu's preferred side, top-aligned with what it opens from, and where it goes when that side has no room. */
+/** How far a row sits inside the menu's edge (the panel's `p-1.5`). */
+const rowInset = 6;
+
+/** The sides a menu tries, in order, and its distance from what it opens from (negative overlaps it). */
 export interface PlacementRule {
-  preferred: "left-start" | "right-start";
-  fallback: Placement;
+  sides: readonly [Placement, ...Placement[]];
+  gap: number;
 }
 
 /**
- * The block menu from its grip, and a submenu from its row: to the left,
- * top-aligned, or below, aligned to its left edge, when the left has no
- * room. Below the handle means below the whole block (handleBox), and a submenu
- * below its row stays over the menu, so neither covers the handle, nor the
- * block unless it runs past the bottom of the window. One exception: at the
- * end of a page that cannot scroll further, the menu rises over the handle
- * to stay on screen (handleBox).
+ * The block menu from its grip: to the left of the grip, or to its right
+ * (over the block's text) when the left has no room. Centered on the grip,
+ * then kept inside the window.
  */
-export const besideRule: PlacementRule = { preferred: "left-start", fallback: "bottom-start" };
-
-/** The width of a submenu beside the menu: set on the panel (block-menu.tsx) and known before it opens, for the hover check below. */
-export const submenuWidth = 260;
+export const gripMenuRule: PlacementRule = { sides: ["left", "right"], gap: 5 };
 
 /**
- * True when a submenu opened from `row` would go beside it, to the left.
- * Only then does hovering the row open it: a submenu below its row covers
- * the rows under it, so passing over the row on the way down must not open
- * it. A click, Enter, or → still does.
+ * A submenu (Change, Color) from its row: to the right of the menu,
+ * overlapping it by `submenuOverlap`, or to its left when the right has no
+ * room. Top-aligned with the row.
  */
-export function submenuOpensBeside(row: Pick<DOMRect, "left" | "right">, viewportWidth: number): boolean {
-  return choosePlacement(besideRule, row, submenuWidth, viewportWidth) === besideRule.preferred;
-}
+export const submenuRule: PlacementRule = { sides: ["right-start", "left-start"], gap: rowInset - submenuOverlap };
 
-/** The block menu from a right-click: to the right of the pointer, or to its left near the right edge. */
-export const pointMenuRule: PlacementRule = { preferred: "right-start", fallback: "left-start" };
+/** The block menu from a right-click: at the pointer, to its right, or to its left near the right edge. */
+export const pointMenuRule: PlacementRule = { sides: ["right-start", "left-start"], gap: 2 };
+
+/** The room beside `reference` on a side, inside the window's edge. */
+function roomOn(side: Placement, reference: Pick<DOMRect, "left" | "right">, gap: number, viewportWidth: number): number {
+  return side.startsWith("left") ? reference.left - gap - menuEdge : viewportWidth - reference.right - gap - menuEdge;
+}
 
 /**
  * The placement for a menu `width` wide beside `reference` in a window
- * `viewportWidth` wide: the preferred side when the menu fits there whole,
- * otherwise the fallback.
+ * `viewportWidth` wide: the first of the rule's sides where it fits whole,
+ * otherwise the last.
  */
 export function choosePlacement(rule: PlacementRule, reference: Pick<DOMRect, "left" | "right">, width: number, viewportWidth: number): Placement {
-  const room = rule.preferred === "left-start" ? reference.left - menuGap - menuEdge : viewportWidth - reference.right - menuGap - menuEdge;
-  return room >= width ? rule.preferred : rule.fallback;
-}
-
-/**
- * What the block menu opens against when it opens from a grip: the left and
- * right edges of the whole handle ("+" and the grip), the block's top (so a
- * menu beside it is top-aligned with the block, not the handle), and the
- * block's bottom (so a menu below it never covers the block). When the
- * block runs too far down the window to leave `fallbackRoom` beneath it, the
- * bottom rises to make that room, but not above the handle. Opening scrolls
- * the handle up to make that room first (`scrollForRoom`); only where the
- * page cannot scroll further (its very end) does the bottom rise past the
- * handle, just enough for a `menuMinHeight` menu, so the menu stays on screen.
- */
-export function handleBox(handle: Box, block: Box | null, viewportHeight: number): Box {
-  const onScreen = viewportHeight - menuEdge - menuGap - menuMinHeight;
-  if (!block || block.bottom <= block.top) return { ...handle, bottom: Math.min(handle.bottom, onScreen) };
-  const lowest = viewportHeight - menuEdge - menuGap - fallbackRoom;
-  const bottom = Math.max(handle.bottom, Math.min(block.bottom, lowest));
-  return { left: handle.left, right: handle.right, top: block.top, bottom: Math.min(bottom, onScreen) };
-}
-
-/**
- * How far to scroll the page down before the block menu opens below a
- * block (the left has no room): enough, in whole pixels, to bring the
- * block's bottom up so that `fallbackRoom` fits beneath it, but never so
- * far that the handle leaves the top of the window (a tall block). Zero
- * when the menu opens beside the handle, which slides up and down on its
- * own.
- */
-export function scrollForRoom(handle: Box, block: Box | null, width: number, viewportWidth: number, viewportHeight: number): number {
-  if (choosePlacement(besideRule, handle, width, viewportWidth) === besideRule.preferred) return 0;
-  const bottom = block && block.bottom > block.top ? Math.max(block.bottom, handle.bottom) : handle.bottom;
-  const needed = bottom - (viewportHeight - menuEdge - menuGap - fallbackRoom);
-  return Math.max(0, Math.ceil(Math.min(needed, handle.top - menuEdge)));
+  return rule.sides.find((side) => roomOn(side, reference, rule.gap, viewportWidth) >= width) ?? rule.sides[rule.sides.length - 1] ?? rule.sides[0];
 }

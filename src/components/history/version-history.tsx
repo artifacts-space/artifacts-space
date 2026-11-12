@@ -13,6 +13,7 @@ import { restoreVersionAction } from "@/lib/versions/actions";
 import { cn } from "@/lib/utils";
 
 import { useVersionHistory } from "./use-version-history";
+import { restoredMessage } from "./version-labels";
 import { VersionDetail, versionsNeeded, type VersionView } from "./version-detail";
 import { VersionList } from "./version-list";
 
@@ -92,8 +93,8 @@ export function VersionHistory({ publicId, title, updatedAt, reviewed, files, ha
         toast.error(result.error);
         return false;
       }
-      toast.success(result.data.pendingEdit ? "Restored. Waiting for approval." : "Restored.");
-      onRestored(result.data);
+      toast.success(restoredMessage(result.data));
+      onRestored(result.data.artifact);
       const versions = await history.loadList();
       const first = versions?.[0];
       if (versions && first) show(versions, first.id, "preview");

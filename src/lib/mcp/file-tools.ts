@@ -14,8 +14,10 @@ import { isPublicId } from "@/lib/public-id";
 import { siteUrl } from "@/lib/site-origin";
 import { listTeamsForUser } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
+import { getVersionOf } from "@/lib/versions/history";
 
 import { toMcpArtifact } from "./artifact-view";
+import { baseVersionOf } from "./edit-conflict-tools";
 import { noHarness, type HarnessSource } from "./harness-context";
 import { gateTools, type ToolServer } from "./tool-access";
 
@@ -37,10 +39,24 @@ async function respond(run: () => Promise<unknown>) {
   }
 }
 
+/** The artifact after a file change, with the baseVersion for the agent's next update. */
 async function artifactResult(userId: string, record: ArtifactRecord) {
-  const [[dto], teams] = await Promise.all([toArtifactDtos([record], userId), listTeamsForUser(userId)]);
+  const [[dto], teams, base] = await Promise.all([toArtifactDtos([record], userId), listTeamsForUser(userId), baseVersionOf(record.id, record.updatedAt.toISOString())]);
   if (!dto) throw new UserFacingError("Artifact not found.");
-  return toMcpArtifact(dto, { viewerId: userId, teamSlugs: new Map(teams.map((team) => [team.id, team.slug])), urlFor: (publicId) => siteUrl(`/artifact/${publicId}`) }, { canEdit: true });
+  return { ...toMcpArtifact(dto, { viewerId: userId, teamSlugs: new Map(teams.map((team) => [team.id, team.slug])), urlFor: (publicId) => siteUrl(`/artifact/${publicId}`) }, { canEdit: true }), ...base };
+}
+
+/**
+ * The artifact as a replace saved it. The replace is one statement and files
+ * its own version, so when someone saved after it, that version holds what
+ * the replace saw; the result shows it, with the replace's save time.
+ */
+async function asReplaced(current: ArtifactRecord, replaced: { savedAt: Date; versionId: string }): Promise<ArtifactRecord> {
+  if (current.updatedAt.getTime() === replaced.savedAt.getTime()) return current;
+  const version = await getVersionOf(current.id, replaced.versionId);
+  if (!version) return { ...current, updatedAt: replaced.savedAt };
+  const { title, icon, theme, cover, summary, content, kind, language, source, metadata } = version;
+  return { ...current, title, icon, theme, cover, summary, content, kind, language, source, metadata, updatedAt: replaced.savedAt };
 }
 
 async function ownArtifact(userId: string, publicId: string) {
@@ -110,9 +126,9 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
     },
     ({ files, notes, ...input }) => respond(async () => {
       await assertUsableFiles(userId, null, files);
-      const created = await createArtifact(userId, { ...input, kind: "file", content: notes ?? "" }, { harness: await harness() });
-      await attachFiles(userId, created.id, files, "agent", harness);
-      return artifactResult(userId, await ownArtifact(userId, created.publicId));
+      const created = await createArtifact(userId, { ...input, kind: "file", content: notes ?? "" }, { harness: await harness(), actor: "agent" });
+      const saved = await attachFiles(userId, created.id, files, "agent", harness);
+      return artifactResult(userId, saved ?? (await ownArtifact(userId, created.publicId)));
     }),
   );
 
@@ -125,9 +141,9 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
     },
     ({ artifact, files }) => respond(async () => {
       const record = await editableArtifact(userId, artifact);
-      await attachFiles(userId, record.id, files, "agent", harness);
-      // Read it again: the save stamped the harness and moved updatedAt.
-      return artifactResult(userId, await editableArtifact(userId, artifact));
+      // The artifact as this attach saved it, never a later read (see baseVersionOf); unchanged when every file was in it already.
+      const saved = await attachFiles(userId, record.id, files, "agent", harness);
+      return artifactResult(userId, saved ?? record);
     }),
   );
 
@@ -143,10 +159,10 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
       },
     },
     ({ file, upload }) => respond(async () => {
-      const { artifactId } = await replaceFile(userId, { fileId: file, uploadId: upload }, "agent", harness);
-      const record = await getEditableArtifact(userId, { id: artifactId });
+      const replaced = await replaceFile(userId, { fileId: file, uploadId: upload }, "agent", harness);
+      const record = await getEditableArtifact(userId, { id: replaced.artifactId });
       if (!record) throw new UserFacingError("Artifact not found, or you cannot edit it.");
-      return artifactResult(userId, record);
+      return artifactResult(userId, await asReplaced(record, replaced));
     }),
   );
 }
@@ -171,12 +187,14 @@ function registerAccessTools(server: ToolServer, userId: string, harness: Harnes
     "files_delete",
     {
       title: "Delete a file",
-      description: "Permanently deletes your own unattached upload, or a file from an artifact you can edit.",
+      description: "Permanently deletes your own unattached upload, or a file from an artifact you can edit. Deleting a file from an artifact saves the artifact: the result then names it (`artifact`) with its new `baseVersion` for your next update.",
       inputSchema: { fileId: fileIdField },
     },
     ({ fileId }) => respond(async () => {
-      await deleteOwnFile(userId, fileId, "agent", harness);
-      return { deleted: true, fileId };
+      const { saved } = await deleteOwnFile(userId, fileId, "agent", harness);
+      // A file deleted from an artifact saves the artifact: the agent gets the baseVersion of that save for its next update.
+      if (!saved) return { deleted: true, fileId };
+      return { deleted: true, fileId, artifact: saved.publicId, ...(await baseVersionOf(saved.id, saved.updatedAt.toISOString())) };
     }),
   );
 }

@@ -105,6 +105,10 @@ export const artifact = pgTable(
     updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    // When a person last saved (web app, a person's restore or file replace); agent saves leave it. Null: no
+    // person has saved since 0044 (an agent created it, or an older row); the artifact's web versions decide then.
+    // A web save over only agents' saves goes through (onlyAgentsSavedSince in src/lib/edits/agent-write-guard.ts).
+    personSavedAt: timestamp("person_saved_at", { withTimezone: true }),
   },
   (table) => [
     uniqueIndex("artifact_share_id_idx").on(table.shareId),
@@ -211,6 +215,9 @@ export const artifactVersion = pgTable(
     source: text("source").notNull().default(""),
     // The harness the save came through over MCP; null for saves in the web app.
     harness: text("harness"),
+    // Whether an agent saved this version (over MCP), whatever harness it named. Null on versions from
+    // before 0045: those read `harness is not null` instead (versionByAgent in src/lib/versions/history-rules.ts).
+    byAgent: boolean("by_agent"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

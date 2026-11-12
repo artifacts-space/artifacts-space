@@ -7,7 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 
 import { useCoarsePointer } from "../use-coarse-pointer";
 import { isApplePlatform, type MenuCommand, type MenuContext } from "./block-actions";
-import { changeBlockType, insertBelow, runBlockAction } from "./block-commands";
+import { blockColors, colorLines } from "./block-color";
+import { changeBlockType, colorBlockAt, insertBelow, runBlockAction } from "./block-commands";
 import { endBlockDrag, startBlockDrag } from "./block-drag";
 import { BlockHandle } from "./block-handle";
 import { BlockMenu, type MenuCloseReason } from "./block-menu";
@@ -16,14 +17,12 @@ import { BlockMenuExtension, setBlockMenuHost, setMenuTarget } from "./block-men
 import { blockCounts, blockShape, blockTargetAt, blockTargetFrom, canMoveBlock, documentBlocks } from "./block-target";
 import { blockTypeName, currentBlockType } from "./block-types";
 import { useBlockPlaces, useEditorState, useHoveredBlock } from "./use-block-places";
-import { makeRoomBelow, type MenuAnchor, type MenuPoint } from "./use-floating-menu";
+import type { MenuAnchor } from "./use-floating-menu";
 
 interface OpenMenu {
   pos: number;
   anchor: MenuAnchor;
   grip: HTMLElement | null;
-  /** Where the opening press was, when opening then scrolled the page to make room below the block (makeRoomBelow). */
-  still: MenuPoint | null;
 }
 
 /** What the menu shows for the block at `pos`, or null when no block starts there any more. */
@@ -36,23 +35,14 @@ function menuView(doc: PMNode, pos: number, page: BlockMenuPage | null) {
   const context: MenuContext = {
     changeable: current !== null,
     currentType: current?.id ?? null,
+    colorable: colorLines(target).length > 0,
+    colors: blockColors(doc, target),
     canMoveUp: canMoveBlock(doc, target, -1),
     canMoveDown: canMoveBlock(doc, target, 1),
     canLink: Boolean(page?.publicId),
     canComment: Boolean(page?.publicId) && page?.canComment === true,
   };
   return { context, typeName: blockTypeName(shape, typeof mediaKind === "string" ? mediaKind : undefined), counts: blockCounts(target.node) };
-}
-
-/** The block's own element in the editor, or null when no element starts at `pos`. */
-function blockElement(editor: Editor, pos: number): HTMLElement | null {
-  const dom = editor.view.nodeDOM(pos);
-  return dom instanceof HTMLElement ? dom : null;
-}
-
-/** The whole handle ("+" and the grip) a grip sits in: the menu opens beside it, so it never covers "+". */
-function handleOf(grip: HTMLElement): HTMLElement {
-  return grip.closest<HTMLElement>("[data-slot=block-handle]") ?? grip;
 }
 
 /** Right-clicks that keep the browser's own menu: on touch, over selected text, and on links, media, and fields. */
@@ -139,8 +129,8 @@ function BlockControls({ editor, frame }: BlockControlsProps) {
   const shown = menu?.pos ?? hovered;
   const places = useBlockPlaces(editor, frame, handlePositions(state.doc, touch, shown), state.doc, touch);
 
-  const open = useCallback((pos: number, anchor: MenuAnchor, grip: HTMLElement | null = null, press: MenuPoint | null = null) => {
-    setMenu({ pos, anchor, grip, still: makeRoomBelow(anchor) ? press : null });
+  const open = useCallback((pos: number, anchor: MenuAnchor, grip: HTMLElement | null = null) => {
+    setMenu({ pos, anchor, grip });
     setMenuTarget(editor.view, pos);
   }, [editor]);
 
@@ -168,6 +158,7 @@ function BlockControls({ editor, frame }: BlockControlsProps) {
     const { pos } = menu;
     close("command");
     if (command.kind === "change") changeBlockType(editor, pos, command.typeId);
+    else if (command.kind === "color") colorBlockAt(editor, pos, command.part, command.hue);
     else runBlockAction(editor, pos, command.id, page);
   };
 
@@ -181,7 +172,7 @@ function BlockControls({ editor, frame }: BlockControlsProps) {
           open={menu?.pos === place.pos}
           shown={!touch && shown === place.pos}
           gripRef={place.pos === (menu?.pos ?? shown) ? gripRef : undefined}
-          onOpen={(grip, press) => { if (menu?.pos === place.pos) close("outside"); else open(place.pos, { kind: "element", element: handleOf(grip), block: () => blockElement(editor, place.pos) }, grip, press); }}
+          onOpen={(grip) => { if (menu?.pos === place.pos) close("outside"); else open(place.pos, { kind: "element", element: grip }, grip); }}
           onAdd={() => { insertBelow(editor, place.pos); }}
           onDragStart={(event) => {
             const target = blockTargetFrom(editor.state.doc, place.pos);
@@ -200,7 +191,6 @@ function BlockControls({ editor, frame }: BlockControlsProps) {
           mac={mac}
           anchor={menu.anchor}
           keepOpenOn={menu.grip}
-          still={menu.still}
           onCommand={onCommand}
           onClose={close}
         />

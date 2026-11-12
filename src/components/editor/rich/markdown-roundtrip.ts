@@ -2,6 +2,7 @@ import { getSchema, type JSONContent } from "@tiptap/core";
 import { MarkdownManager } from "@tiptap/markdown";
 import type { Schema } from "@tiptap/pm/model";
 
+import { liftBlockColors } from "./block-color-nodes";
 import { needsRawBlock, splitBlocks, type LooseToken, type SourceBlock, type SplitSource } from "./markdown-blocks";
 import { markdownSchemaExtensions } from "./markdown-schema";
 import { RAW_MARKDOWN } from "./raw-markdown-node";
@@ -76,7 +77,7 @@ function canonicalNodes(nodes: JSONContent[], schema: Schema): JSONContent[] | n
 function parseNodes(text: string, current: Engine): JSONContent[] | null {
   try {
     const parsed = current.manager.parse(text).content ?? [];
-    return parsed.length > 0 ? canonicalNodes(parsed, current.schema) : null;
+    return parsed.length > 0 ? canonicalNodes(liftBlockColors(parsed), current.schema) : null;
   } catch {
     return null;
   }

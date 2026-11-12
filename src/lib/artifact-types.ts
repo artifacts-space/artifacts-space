@@ -245,5 +245,6 @@ export type ActionResult<T> =
  * version the editor may read, so it can merge or offer a reload.
  */
 export type SaveArtifactResult =
-  | { success: true; data: ArtifactDto }
+  /** `savedOverAgents`: the save went through over agents' newer saves, which stay in History (src/lib/artifact-save.ts). */
+  | { success: true; data: ArtifactDto; savedOverAgents?: boolean }
   | { success: false; error: string; latest?: ArtifactDto };

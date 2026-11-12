@@ -3,12 +3,13 @@
 import { Fragment, useCallback, useEffect, useId, useMemo, useReducer, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 
-import type { MenuCommand, MenuContext, MenuEntry } from "./block-actions";
+import type { BlockSubmenuId, MenuCommand, MenuContext, MenuEntry } from "./block-actions";
 import type { BlockMenuLastEdited } from "./block-menu-context";
-import { ChangeSubmenu, MenuFooter, MenuRow, panelClass, panelWidth, placementClass, SearchRow } from "./block-menu-parts";
+import { MenuFooter, MenuRow, panelClass, panelWidth, placementClass, SearchRow } from "./block-menu-parts";
 import { menuReducer, openedMenu, rowsFor, type MenuEvent, type MenuState } from "./block-menu-state";
-import { besideRule, menuWidth, pointMenuRule, submenuOpensBeside, submenuWidth } from "./menu-placement";
-import { canHover, useFloatingMenu, usePhoneSheet, usePressOutside, useSettling, type MenuAnchor, type MenuPoint } from "./use-floating-menu";
+import { ChangeSubmenu, ColorSubmenu, type SubmenuFrame } from "./block-submenus";
+import { gripMenuRule, menuWidth, pointMenuRule, submenuRule, submenuWidth } from "./menu-placement";
+import { canHover, useFloatingMenu, usePhoneSheet, usePressOutside, type MenuAnchor } from "./use-floating-menu";
 
 /** Why the menu closed: Escape and Tab return focus to the grip; a press outside leaves focus where it lands. */
 export type MenuCloseReason = "escape" | "outside";
@@ -23,8 +24,6 @@ export interface BlockMenuProps {
   anchor: MenuAnchor;
   /** Presses on this element (the grip) do not count as outside the menu. */
   keepOpenOn: HTMLElement | null;
-  /** Where the opening press was, when opening scrolled the page to make room (makeRoomBelow): a click there is ignored (useSettling). */
-  still: MenuPoint | null;
   onCommand: (command: MenuCommand) => void;
   onClose: (reason: MenuCloseReason) => void;
 }
@@ -83,13 +82,14 @@ interface MenuListProps {
   rows: readonly MenuEntry[];
   state: MenuState;
   mac: boolean;
-  onChangeRow: (element: HTMLElement | null) => void;
+  /** Ref callbacks for the rows that open a submenu, which it sits beside. */
+  submenuRows: Readonly<Record<BlockSubmenuId, (element: HTMLElement | null) => void>>;
   onHover: (index: number) => void;
   onChoose: (index: number) => void;
 }
 
 /** The rows, grouped, with the block's type over the first group until something is typed. */
-export function MenuList({ menuId, typeName, rows, state, mac, onChangeRow, onHover, onChoose }: MenuListProps) {
+export function MenuList({ menuId, typeName, rows, state, mac, submenuRows, onHover, onChoose }: MenuListProps) {
   const labelled = !state.query;
   return (
     <div id={menuId} role="menu" aria-label={`${typeName} block`} className="flex flex-col">
@@ -104,9 +104,9 @@ export function MenuList({ menuId, typeName, rows, state, mac, onChangeRow, onHo
                 entry={entry}
                 id={`${menuId}-row-${String(index)}`}
                 highlighted={state.active === index}
-                expanded={state.submenu !== null && entry.command.kind === "submenu"}
+                expanded={entry.command.kind === "submenu" && state.submenu?.id === entry.command.id}
                 mac={mac}
-                rowRef={entry.command.kind === "submenu" ? onChangeRow : undefined}
+                rowRef={entry.command.kind === "submenu" ? submenuRows[entry.command.id] : undefined}
                 onHover={() => { onHover(index); }}
                 onChoose={() => { onChoose(index); }}
               />
@@ -118,6 +118,20 @@ export function MenuList({ menuId, typeName, rows, state, mac, onChangeRow, onHo
   );
 }
 
+/** The rows that open submenus, kept so the open submenu can sit beside its row. */
+function useSubmenuRows(open: MenuState["submenu"]) {
+  const [changeRow, setChangeRow] = useState<HTMLElement | null>(null);
+  const [colorRow, setColorRow] = useState<HTMLElement | null>(null);
+  const refs = useMemo(() => ({ change: setChangeRow, color: setColorRow }), []);
+  return [refs, open?.id === "color" ? colorRow : changeRow] as const;
+}
+
+/** The submenu that is open: Change or Color. */
+function OpenSubmenu({ id, context, onCommand, frame }: { id: BlockSubmenuId; context: MenuContext; onCommand: (command: MenuCommand) => void; frame: SubmenuFrame }) {
+  if (id === "color") return <ColorSubmenu {...frame} colors={context.colors} onPick={(part, hue) => { onCommand({ kind: "color", part, hue }); }} />;
+  return <ChangeSubmenu {...frame} currentType={context.currentType} onPick={(typeId) => { onCommand({ kind: "change", typeId }); }} />;
+}
+
 /**
  * The block menu: a search field, the block's type, Change, the block
  * actions, Comment, and when the block was last edited. Nothing is
@@ -126,7 +140,7 @@ export function MenuList({ menuId, typeName, rows, state, mac, onChangeRow, onHo
  * ← or Escape closes it, and Escape closes the menu. Beside its anchor on
  * wider screens; a sheet with 44px rows on phones.
  */
-export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, keepOpenOn, still, onCommand, onClose }: BlockMenuProps) {
+export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, keepOpenOn, onCommand, onClose }: BlockMenuProps) {
   const reduce = useCallback((state: MenuState, event: MenuEvent) => menuReducer(state, event, context), [context]);
   const [state, send] = useReducer(reduce, openedMenu);
   const rows = useMemo(() => rowsFor(state, context), [state, context]);
@@ -137,12 +151,11 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
   const inputRef = useRef<HTMLInputElement>(null);
   const keepRef = useRef(keepOpenOn);
   const insideRefs = useMemo(() => [panelRef, subRef, keepRef], []);
-  const [changeRow, setChangeRow] = useState<HTMLElement | null>(null);
+  const [submenuRows, submenuAnchor] = useSubmenuRows(state.submenu);
   const submenu = state.submenu;
 
-  const settling = useSettling(still);
-  useFloatingMenu(panelRef, anchor, anchor.kind === "element" ? besideRule : pointMenuRule, !sheet);
-  useFloatingMenu(subRef, submenu ? changeRow : null, besideRule, !sheet);
+  useFloatingMenu(panelRef, anchor, anchor.kind === "element" ? gripMenuRule : pointMenuRule, !sheet);
+  useFloatingMenu(subRef, submenu ? submenuAnchor : null, submenuRule, !sheet);
   usePressOutside(insideRefs, useCallback(() => { onClose("outside"); }, [onClose]));
   useEffect(() => { focusMenu(inputRef.current, panelRef.current); }, []);
   useEffect(() => {
@@ -161,10 +174,7 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
     if (state.active !== index) send({ type: "hover", index });
     if (sheet) return;
     const event = hoverSubmenu(rows[index]?.command, submenu);
-    if (!event) return;
-    // A submenu that would open below its row (no room on the left) opens only on a click, Enter, or →.
-    if (event.type === "openSubmenu" && !(changeRow && submenuOpensBeside(changeRow.getBoundingClientRect(), document.documentElement.clientWidth))) return;
-    send(event);
+    if (event) send(event);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -182,24 +192,19 @@ export function BlockMenu({ typeName, context, counts, lastEdited, mac, anchor, 
   return createPortal(
     <>
       {sheet && submenu ? null : (
-        <div ref={panelRef} tabIndex={-1} onKeyDown={onKeyDown} data-slot="block-menu" {...settling} className={`${panelClass} ${placementClass(sheet)}`} style={panelWidth(sheet, menuWidth)}>
+        <div ref={panelRef} tabIndex={-1} onKeyDown={onKeyDown} data-slot="block-menu" className={`${panelClass} ${placementClass(sheet)}`} style={panelWidth(sheet, menuWidth)}>
           <SearchRow inputRef={inputRef} value={state.query} menuId={menuId} activeId={state.active >= 0 ? `${menuId}-row-${String(state.active)}` : undefined} onChange={(query) => { send({ type: "typed", query }); }} />
-          <MenuList menuId={menuId} typeName={typeName} rows={rows} state={state} mac={mac} onChangeRow={setChangeRow} onHover={hover} onChoose={(index) => { choose(index, !canHover()); }} />
+          <MenuList menuId={menuId} typeName={typeName} rows={rows} state={state} mac={mac} submenuRows={submenuRows} onHover={hover} onChoose={(index) => { choose(index, !canHover()); }} />
           {rows.length === 0 ? <p className="px-2 py-2 text-sm text-muted-foreground">No actions match “{state.query.trim()}”.</p> : null}
           <MenuFooter lastEdited={lastEdited} words={counts.words} characters={counts.characters} />
         </div>
       )}
       {submenu ? (
-        <ChangeSubmenu
-          panelRef={subRef}
-          className={`${panelClass} ${placementClass(sheet)}`}
-          width={sheet ? undefined : submenuWidth}
-          currentType={context.currentType}
-          focused={submenu.focused || sheet}
-          sheet={sheet}
-          onPick={(typeId) => { onCommand({ kind: "change", typeId }); }}
-          onBack={backToMenu}
-          onCloseAll={() => { onClose("escape"); }}
+        <OpenSubmenu
+          id={submenu.id}
+          context={context}
+          onCommand={onCommand}
+          frame={{ panelRef: subRef, className: `${panelClass} ${placementClass(sheet)}`, width: sheet ? undefined : submenuWidth, focused: submenu.focused || sheet, sheet, onBack: backToMenu, onCloseAll: () => { onClose("escape"); } }}
         />
       ) : null}
     </>,

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { MenuContext } from "./block-actions";
 import { menuReducer, openedMenu, rowsFor, type MenuEvent, type MenuState } from "./block-menu-state";
 
-const context: MenuContext = { changeable: true, currentType: "text", canMoveUp: false, canMoveDown: true, canLink: true, canComment: true };
+const context: MenuContext = { changeable: true, currentType: "text", colorable: true, colors: { color: null, background: null }, canMoveUp: false, canMoveDown: true, canLink: true, canComment: true };
 
 function after(...events: MenuEvent[]): MenuState {
   return events.reduce((state, event) => menuReducer(state, event, context), openedMenu);
@@ -30,7 +30,8 @@ describe("menuReducer", () => {
   });
 
   it("should skip a disabled row with the arrow keys", () => {
-    const state = after({ type: "arrow", direction: 1 }, { type: "arrow", direction: 1 }, { type: "arrow", direction: 1 }, { type: "arrow", direction: 1 });
+    const down = { type: "arrow", direction: 1 } as const;
+    const state = after(down, down, down, down, down);
     expect(rowsFor(state, context)[state.active]?.label).toBe("Move down");
   });
 

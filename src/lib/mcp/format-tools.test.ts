@@ -33,6 +33,12 @@ describe("formatGuide", () => {
     expect(formatGuide()).toContain("A fenced code block with the language `mermaid` draws as a diagram");
   });
 
+  it("should teach the color comment and every hue when the kind is markdown", () => {
+    const guide = formatGuide("markdown");
+    expect(guide).toContain("Ship it on Friday <!-- color: red -->");
+    expect(guide).toContain("gray, brown, orange, yellow, green, blue, purple, pink, red");
+  });
+
   it("should include rules, the generated component list, and the example when the kind is ui", () => {
     const guide = formatGuide("ui");
     expect(guide).toContain("## Rules");
