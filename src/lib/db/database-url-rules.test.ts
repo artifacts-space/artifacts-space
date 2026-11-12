@@ -131,3 +131,37 @@ describe("the production migration path", () => {
     expect(source).toContain('from "drizzle-orm/node-postgres/migrator"');
   });
 });
+
+describe("isLocalDatabaseUrl", () => {
+  const remote = fakeNeonHost("ep-remote");
+
+  it("should accept a database on localhost or 127.0.0.1", () => {
+    expect(isLocalDatabaseUrl(local)).toBe(true);
+    expect(isLocalDatabaseUrl(fakeDatabaseUrl({ user: "ci", password: "ci", host: "127.0.0.1", port: 55473, database: "t" }))).toBe(true);
+  });
+
+  it("should refuse a local-looking URL whose host parameter sends pg to another machine", () => {
+    expect(isLocalDatabaseUrl(`${local}?host=${remote}`)).toBe(false);
+    expect(isLocalDatabaseUrl(`${local}?sslmode=require&host=${remote}`)).toBe(false);
+  });
+
+  it("should refuse a hostaddr that is not local, a socket path, and a list of hosts", () => {
+    expect(isLocalDatabaseUrl(`${local}?hostaddr=10.0.0.5`)).toBe(false);
+    expect(isLocalDatabaseUrl(`${local}?host=%2Fvar%2Frun%2Fpostgresql`)).toBe(false);
+    expect(isLocalDatabaseUrl(fakeDatabaseUrl({ user: "ci", password: "ci", host: `localhost,${remote}`, database: "t" }))).toBe(false);
+  });
+
+  it("should refuse a URL with no host, which pg would send to PGHOST", () => {
+    expect(isLocalDatabaseUrl("postgres:///artifacts_test")).toBe(false);
+  });
+
+  it("should refuse a remote host and a malformed URL", () => {
+    expect(isLocalDatabaseUrl(shared)).toBe(false);
+    expect(isLocalDatabaseUrl("not a url")).toBe(false);
+    expect(isLocalDatabaseUrl(undefined)).toBe(false);
+  });
+
+  it("should keep a local host parameter local", () => {
+    expect(isLocalDatabaseUrl(`${local}?host=127.0.0.1`)).toBe(true);
+  });
+});
