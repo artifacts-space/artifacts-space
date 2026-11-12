@@ -22,6 +22,13 @@ const prodSpecs = /\.prod\.spec\.ts$/;
 const googleSignInOff = { GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "" };
 
 /**
+ * Both e2e servers run with no OpenAI domain-check token, so a token in the
+ * shell or `.env.local` never makes /.well-known/openai-apps-challenge answer
+ * 200 in a test that expects the 404 of an unconfigured site.
+ */
+const openAiChallengeOff = { OPENAI_APPS_CHALLENGE_TOKEN: "" };
+
+/**
  * The production checks run with no reachable database, as in CI. Better Auth
  * still needs a site URL, a secret, and a database URL to start, so it can
  * reject a forged session cookie (signed-in-redirect.prod.spec.ts). Nothing
@@ -35,6 +42,7 @@ const productionTestEnv = {
   BETTER_AUTH_SECRET: "e2e-only-secret-not-used-anywhere-else-0123456789",
   DATABASE_URL: isLocalDatabaseUrl(process.env.DATABASE_URL) ? process.env.DATABASE_URL : "postgres://e2e@127.0.0.1:9/none",
   ...googleSignInOff,
+  ...openAiChallengeOff,
 };
 
 export default defineConfig({
@@ -64,8 +72,8 @@ export default defineConfig({
       timeout: 120_000,
       // Both database URLs are always set, so next dev never fills them from .env.local:
       // empty for the fixture pages, or the local test database with E2E_LOCAL_DB=1.
-      // Google sign-in is pinned off too (googleSignInOff).
-      env: { ...e2eDevServerDatabaseEnv(process.env), ...googleSignInOff },
+      // Google sign-in and the OpenAI domain-check token are pinned off too.
+      env: { ...e2eDevServerDatabaseEnv(process.env), ...googleSignInOff, ...openAiChallengeOff },
     },
     {
       // `next build` writes .next/ and `next dev` writes .next/dev/, so both can run at once.
