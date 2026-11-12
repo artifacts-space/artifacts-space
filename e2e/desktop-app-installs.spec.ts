@@ -66,12 +66,16 @@ test("should open Codex's steps with the command and the settings link when Add 
 
   const dialog = page.getByRole("dialog", { name: "Add to Codex" });
   await expect(dialog).toBeVisible();
+  // The dialog says in its own words that Codex has no install link, so the guide leaves out its "no one-click link" line.
+  await expect(dialog.getByText("Codex has no install link yet. These steps take about a minute.", { exact: false })).toBeVisible();
+  await expect(dialog.getByText("no one-click link", { exact: false })).toHaveCount(0);
+  await expect(dialog.locator('[data-variant="command"]').filter({ hasText: "codex mcp list" })).toHaveCount(1);
   await expect(dialog.locator('[data-variant="command"]').filter({ hasText: `codex mcp add artifacts --url ${endpoint}` })).toBeVisible();
   await expect(dialog.locator("a", { hasText: "Open Codex settings" })).toHaveAttribute("href", "codex://settings");
   await expect(dialog.getByText("Streamable HTTP")).toBeVisible();
   await expectInsideWindow(page, dialog);
 
-  await dialog.locator('[data-variant="command"]').getByRole("button").click();
+  await dialog.locator('[data-variant="command"]').filter({ hasText: "codex mcp add" }).getByRole("button").click();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`codex mcp add artifacts --url ${endpoint}`);
 
   // Close gives the keyboard back to the button that opened the steps.
@@ -87,8 +91,12 @@ test("should open Grok Bot's steps with the message for a Bot when Add to Grok B
 
   const dialog = page.getByRole("dialog", { name: "Add to Grok Bot" });
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("Grok Bot has no install link yet. These steps take about a minute.", { exact: false })).toBeVisible();
+  await expect(dialog.getByText("no one-click link", { exact: false })).toHaveCount(0);
+  await expect(dialog.getByText("Check the connection", { exact: true })).toHaveCount(1);
   for (const label of ["Connect apps", "Add a custom connector", "Remote HTTPS", "Add plugin"]) {
-    await expect(dialog.getByText(label, { exact: true })).toBeVisible();
+    // The steps come first; the check at the end names "Connect apps" again.
+    await expect(dialog.getByText(label, { exact: true }).first()).toBeVisible();
   }
   await expect(dialog.locator("code").filter({ hasText: endpoint }).first()).toBeVisible();
   await expectInsideWindow(page, dialog);

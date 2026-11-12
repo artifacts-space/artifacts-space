@@ -94,6 +94,16 @@ export function codexMcpLoginCommand(): string {
 }
 
 /**
+ * The Codex command that lists the configured servers, to check that the
+ * server was added.
+ * Source: https://learn.chatgpt.com/docs/extend/mcp?surface=cli ("Run codex
+ * mcp list to confirm the server is configured")
+ */
+export function codexMcpListCommand(): string {
+  return "codex mcp list";
+}
+
+/**
  * The `~/.codex/config.toml` entry. The ChatGPT desktop app, the Codex CLI,
  * and the IDE extension share this file.
  * Source: https://learn.chatgpt.com/docs/extend/mcp?surface=cli

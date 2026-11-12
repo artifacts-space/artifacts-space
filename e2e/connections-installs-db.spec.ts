@@ -11,7 +11,7 @@ import { localDatabaseEnabled, localDatabaseSkipReason, readyDevUser } from "./s
 
 test.skip(!localDatabaseEnabled(), localDatabaseSkipReason);
 
-test("should offer the four desktop apps with this site's endpoint when a signed-in person opens Connections", async ({ page, baseURL }) => {
+test("should offer the four desktop apps with this site's endpoint when a signed-in person opens Connections", async ({ page }) => {
   await page.goto("/api/dev/sign-in");
   await page.waitForURL(/\/app/);
   // A new dev user is asked for a username first; this gives it one.
@@ -24,9 +24,15 @@ test("should offer the four desktop apps with this site's endpoint when a signed
   await expect(apps.locator("svg[data-client-logo]")).toHaveCount(4);
   await expect(card.getByText("Codex and Grok Bot have no install link yet, so their buttons show the steps.", { exact: false })).toBeVisible();
 
-  const endpoint = new URL("/api/mcp", baseURL).href;
+  // The page builds every link from the server's own origin (siteOrigin(): BETTER_AUTH_URL first),
+  // which need not be Playwright's baseURL. So take the endpoint from Claude's link, check that it is
+  // this server's MCP path, and check that every other link and command names the same endpoint.
   const claude = new URL((await apps.locator("a[data-install=claude-desktop]").getAttribute("href")) ?? "");
-  expect(claude.searchParams.get("connectorUrl")).toBe(endpoint);
+  const endpoint = claude.searchParams.get("connectorUrl") ?? "";
+  const parsed = new URL(endpoint);
+  expect(["http:", "https:"]).toContain(parsed.protocol);
+  expect(parsed.pathname + parsed.search + parsed.hash).toBe("/api/mcp");
+  expect(parsed.href).toBe(endpoint);
   const cursor = new URL((await apps.locator("a[data-install=cursor]").getAttribute("href")) ?? "");
   expect(JSON.parse(atob(cursor.searchParams.get("config") ?? ""))).toEqual({ url: endpoint });
 

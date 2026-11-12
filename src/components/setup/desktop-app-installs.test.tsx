@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { ClaudeDesktopGuide, CodexGuide, GrokBotGuide } from "@/components/setup/client-guides";
+import { ClaudeDesktopGuide } from "@/components/setup/client-guides";
+import { CodexGuide, GrokBotGuide } from "@/components/setup/codex-grok-guides";
 import { desktopApps } from "@/lib/setup/client-installs";
 
 import { DesktopAppInstalls } from "./desktop-app-installs";
@@ -15,13 +16,18 @@ function buttons(html: string): string[] {
   return html.match(/<(a|button)[^>]*data-install="[^"]+"[^>]*>.*?<\/\1>/g) ?? [];
 }
 
+/** A button's visible label: the text right after its logo, up to the next tag. */
+function label(button: string): string | undefined {
+  return /<\/svg>([^<]*)</.exec(button)?.[1];
+}
+
 describe("DesktopAppInstalls", () => {
   const html = renderToStaticMarkup(<DesktopAppInstalls origin={origin} apps={desktopApps} />);
 
   it("should show one button per app, in order, each with the app's mark before its label when the row renders", () => {
     const row = buttons(html);
     expect(row.map((button) => /data-install="([^"]+)"/.exec(button)?.[1])).toEqual(["cursor", "claude-desktop", "codex", "grok-bot"]);
-    expect(row.map((button) => button.replace(/<svg.*?<\/svg>/g, "").replace(/<[^>]+>/g, ""))).toEqual(["Add to Cursor", "Add to Claude Desktop (opens in a new tab)", "Add to Codex", "Add to Grok Bot"]);
+    expect(row.map(label)).toEqual(["Add to Cursor", "Add to Claude Desktop", "Add to Codex", "Add to Grok Bot"]);
     for (const button of row) {
       expect(button).toMatch(/^<(a|button)[^>]*><svg [^>]*data-client-logo=""/);
     }
@@ -33,6 +39,7 @@ describe("DesktopAppInstalls", () => {
     expect(claude).toContain(`href="${claudeLink}"`);
     expect(claude).toContain('target="_blank"');
     expect(claude).toContain('rel="noopener noreferrer"');
+    expect(claude).toContain('<span class="sr-only"> (opens in a new tab)</span>');
   });
 
   it("should give Codex and Grok Bot a button that opens their steps, never a link, when no install link exists", () => {
@@ -51,6 +58,7 @@ describe("DesktopAppInstalls", () => {
   });
 });
 
+
 describe("desktop app guides", () => {
   it("should lead with the install link and keep the by-hand path when showing Claude Desktop", () => {
     const short = renderToStaticMarkup(<ClaudeDesktopGuide origin={origin} />);
@@ -65,11 +73,12 @@ describe("desktop app guides", () => {
     expect(full).toContain("Nothing is added until you confirm in Claude.");
   });
 
-  it("should open Codex's settings and say that no link adds a server when showing Codex", () => {
+  it("should open Codex's settings without repeating that no link adds a server when showing Codex", () => {
     const guide = renderToStaticMarkup(<CodexGuide origin={origin} />);
     expect(guide).toContain('href="codex://settings"');
-    expect(guide).toContain("If you have the ChatGPT desktop app, this opens its Settings. Codex has no link that adds a server.");
-    for (const step of [`codex mcp add artifacts --url ${endpoint}`, "MCP servers", "Streamable HTTP", "Authenticate"]) {
+    expect(guide).toContain("If you have the ChatGPT desktop app, this opens its Settings.");
+    expect(guide).not.toContain("Codex has no link that adds a server.");
+    for (const step of ["no one-click link for Codex", `codex mcp add artifacts --url ${endpoint}`, "MCP servers", "Streamable HTTP", "Authenticate"]) {
       expect(guide).toContain(step);
     }
   });
@@ -81,5 +90,48 @@ describe("desktop app guides", () => {
     }
     expect(guide).not.toContain("grok.com/connectors");
     expect(renderToStaticMarkup(<GrokBotGuide origin={origin} full />)).toContain('href="https://grok.com/connectors"');
+  });
+
+  it("should leave out the no-link line and keep the steps when the dialog shows the guide", () => {
+    for (const Guide of [CodexGuide, GrokBotGuide]) {
+      const guide = renderToStaticMarkup(<Guide origin={origin} hideNoOneClick />);
+      expect(guide).not.toContain("no one-click link");
+      expect(guide).toContain(endpoint);
+    }
+  });
+});
+
+describe("check the connection", () => {
+  /** The guide's markup from its "Check the connection" label on. */
+  function checkStep(html: string): string {
+    const start = html.indexOf("Check the connection");
+    expect(start, "the guide has a check step").toBeGreaterThan(-1);
+    return html.slice(start);
+  }
+
+  it("should list the servers with codex mcp list and say where the desktop app asks to sign in when checking Codex", () => {
+    const step = checkStep(renderToStaticMarkup(<CodexGuide origin={origin} />));
+    expect(step).toContain("codex mcp list");
+    expect(step).toContain("<strong>Authenticate</strong>");
+  });
+
+  it("should point to Installed in Connect apps and say what each status means when checking Grok Bot", () => {
+    const step = checkStep(renderToStaticMarkup(<GrokBotGuide origin={origin} />));
+    for (const words of ["<strong>Installed</strong>", "<strong>Added</strong> means it is installed but not signed in yet", "<strong>Needs auth</strong> or <strong>Disconnected</strong>", "<strong>Authenticate</strong>"]) {
+      expect(step).toContain(words);
+    }
+  });
+
+  it("should point to Customize, then Connectors, and the + button in a chat when checking Claude", () => {
+    const step = checkStep(renderToStaticMarkup(<ClaudeDesktopGuide origin={origin} />));
+    for (const words of ["<strong>Customize</strong>, then <strong>Connectors</strong>", "<strong>artifacts.space</strong>", "<strong>+</strong> button"]) {
+      expect(step).toContain(words);
+    }
+  });
+
+  it("should draw no empty box when a check is text only", () => {
+    for (const html of [renderToStaticMarkup(<GrokBotGuide origin={origin} />), renderToStaticMarkup(<ClaudeDesktopGuide origin={origin} />)]) {
+      expect(checkStep(html)).not.toContain('<div class="mt-2"></div>');
+    }
   });
 });

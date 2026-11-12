@@ -9,6 +9,7 @@ import {
   codexConfigToml,
   codexHeadlessConfigToml,
   codexMcpAddCommand,
+  codexMcpListCommand,
   codexMcpLoginCommand,
   cursorInstallLink,
   desktopApps,
@@ -113,6 +114,10 @@ describe("codex snippets", () => {
 
   it("should name the same server when building the login command", () => {
     expect(codexMcpLoginCommand()).toBe("codex mcp login artifacts");
+  });
+
+  it("should list the configured servers when building the check command", () => {
+    expect(codexMcpListCommand()).toBe("codex mcp list");
   });
 
   it("should write a url entry under mcp_servers when building config.toml", () => {

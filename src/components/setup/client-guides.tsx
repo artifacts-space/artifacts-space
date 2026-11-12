@@ -2,24 +2,19 @@ import type { ReactNode } from "react";
 
 import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
 import { Prose } from "@/components/docs/docs-content";
+import { CodexGuide, GrokBotGuide } from "@/components/setup/codex-grok-guides";
+import { ApproveSteps, CheckStep, type ClientGuideProps, Label, NoOneClick } from "@/components/setup/guide-parts";
 import { ClaudeInstallButton, CursorInstallButton } from "@/components/setup/install-link-buttons";
-import { Button } from "@/components/ui/button";
 import {
   CHATGPT_PLUGINS_URL,
   CLAUDE_CONNECTOR_NAME,
   claudeTeamInstallLink,
-  CODEX_SETTINGS_LINK,
-  codexConfigToml,
-  codexMcpAddCommand,
-  codexMcpLoginCommand,
   FX_INSTALL_COMMAND,
   fxConfigJson,
   fxMcpAddCommand,
   fxMcpLoginCommand,
   fxMcpShowCommand,
   fxSkillInstallCommand,
-  GROK_CONNECTORS_URL,
-  grokBotAddMessage,
   kimiMcpLoginCommand,
   opencodeConfigJson,
   opencodeMcpAddCommand,
@@ -33,40 +28,13 @@ import { claudeMcpAddOAuthCommand, mcpEndpoint, mcpOAuthConfigJson } from "@/lib
  * Setup steps for each MCP client, shared by the quickstart picker and the
  * clients page. `full` adds the alternatives and fine print the picker
  * leaves out. Every path is the remote endpoint with OAuth: no token, and
- * nothing runs on the person's machine.
+ * nothing runs on the person's machine. The shared pieces live in
+ * `guide-parts.tsx`, and the Codex and Grok Bot guides in
+ * `codex-grok-guides.tsx`, so the Connections page's dialog loads only those.
  */
 
-/** Props every guide takes. */
-export interface ClientGuideProps {
-  /** The site origin, such as "https://artifacts.space". */
-  origin: string;
-  /** Show alternatives and fine print, for the clients page. */
-  full?: boolean;
-}
-
-function Label({ children }: { children: ReactNode }) {
-  return <p className="mt-6 text-sm font-medium text-muted-foreground first:mt-0">{children}</p>;
-}
-
-/** The sign-in and approval every OAuth client ends with. */
-function ApproveSteps({ opener }: { opener: ReactNode }) {
-  return (
-    <>
-      <Label>What happens next</Label>
-      <Prose className="mt-2">
-        <ol>
-          <li>{opener}</li>
-          <li>Sign in to artifacts.space, then approve the connection. Turn on <strong>Read-only access</strong> if the agent should only read.</li>
-          <li>The agent sees the artifacts tools. It stays signed in, and you can revoke it on the <strong>Connections</strong> page.</li>
-        </ol>
-      </Prose>
-    </>
-  );
-}
-
-function NoOneClick({ client }: { client: string }) {
-  return <p className="text-md leading-6 text-muted-foreground">There&apos;s no one-click link for {client} yet. It takes about a minute by hand.</p>;
-}
+export { CodexGuide, GrokBotGuide } from "@/components/setup/codex-grok-guides";
+export type { ClientGuideProps } from "@/components/setup/guide-parts";
 
 /** Claude Code: one command, then authenticate from `/mcp`. */
 export function ClaudeCodeGuide({ origin }: ClientGuideProps) {
@@ -102,7 +70,11 @@ export function CursorGuide({ origin, full = false }: ClientGuideProps) {
   );
 }
 
-/** Claude Desktop and claude.ai: the install link that fills in the custom connector form, with the steps by hand as the fallback. */
+/**
+ * Claude Desktop and claude.ai: the install link that fills in the custom
+ * connector form, with the steps by hand as the fallback. Steps from
+ * https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp.
+ */
 export function ClaudeDesktopGuide({ origin, full = false }: ClientGuideProps) {
   return (
     <>
@@ -123,6 +95,9 @@ export function ClaudeDesktopGuide({ origin, full = false }: ClientGuideProps) {
         </ol>
       </Prose>
       <ApproveSteps opener="Claude asks you to sign in. Your browser opens." />
+      <CheckStep
+        note={<>In Claude, open <strong>Customize</strong>, then <strong>Connectors</strong>: <strong>{CLAUDE_CONNECTOR_NAME}</strong> is in the list. To use it in a chat, choose the <strong>+</strong> button, then <strong>Connectors</strong>, and turn it on.</>}
+      />
       <Prose className="mt-4">
         <p>The connector lives in your Claude account, so it shows in Claude Desktop, on claude.ai, and in the mobile apps. Free plans can add one custom connector.</p>
         {full ? (
@@ -139,10 +114,10 @@ export function ClaudeDesktopGuide({ origin, full = false }: ClientGuideProps) {
 }
 
 /** ChatGPT on the web: a custom MCP server, added from the Plugins page by URL. */
-export function ChatGptGuide({ origin, full = false }: ClientGuideProps) {
+export function ChatGptGuide({ origin, full = false, hideNoOneClick }: ClientGuideProps) {
   return (
     <>
-      <NoOneClick client="ChatGPT" />
+      <NoOneClick client="ChatGPT" hidden={hideNoOneClick} />
       <Prose className="mt-2">
         <ol>
           <li>In ChatGPT on the web, open <a href={CHATGPT_PLUGINS_URL}><strong>Plugins</strong></a>. Choose <strong>+</strong>, then <strong>Add custom MCP server</strong>.</li>
@@ -164,79 +139,6 @@ export function ChatGptGuide({ origin, full = false }: ClientGuideProps) {
           <p>What ChatGPT saves shows <strong>via ChatGPT</strong>. Apps built on OpenAI&apos;s API can connect the same way and show as ChatGPT too. To fix the label for one connection, choose its agent on the <strong>Connections</strong> page.</p>
         </Prose>
       ) : null}
-    </>
-  );
-}
-
-/** Codex: `codex mcp add` with the URL; the desktop app and CLI share config. */
-export function CodexGuide({ origin, full = false }: ClientGuideProps) {
-  return (
-    <>
-      <NoOneClick client="Codex" />
-      <Label>In the terminal</Label>
-      <CommandSnippet command={codexMcpAddCommand(origin)} className="mt-2" />
-      <Prose className="mt-2"><p>Codex adds the server, sees that it uses sign-in, and opens your browser.</p></Prose>
-      <Label>In the ChatGPT desktop app</Label>
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <Button render={<a href={CODEX_SETTINGS_LINK} />} nativeButton={false} variant="outline" size="sm">Open Codex settings</Button>
-        <span className="text-sm text-muted-foreground">If you have the ChatGPT desktop app, this opens its Settings. Codex has no link that adds a server.</span>
-      </div>
-      <Prose className="mt-2">
-        <ol>
-          <li>In <strong>Settings</strong>, choose <strong>MCP servers</strong>, then <strong>Add server</strong>.</li>
-          <li>Name it <code>artifacts</code>, choose <strong>Streamable HTTP</strong>, and paste <code>{mcpEndpoint(origin)}</code>.</li>
-          <li>Save, choose <strong>Restart</strong>, then <strong>Authenticate</strong> next to the server.</li>
-        </ol>
-      </Prose>
-      {full ? (
-        <>
-          <Label>In config.toml</Label>
-          <Prose className="mt-2"><p>Or add this to <code>~/.codex/config.toml</code>, then sign in with the command below.</p></Prose>
-          <CodeSnippet title="config.toml" language="toml" code={codexConfigToml(origin)} className="mt-3" />
-          <CommandSnippet command={codexMcpLoginCommand()} className="mt-3" />
-        </>
-      ) : null}
-      <ApproveSteps opener="Your browser opens on the sign-in page." />
-      <Prose className="mt-4"><p>The ChatGPT desktop app, the Codex CLI, and the IDE extension share one config, so you add the server once.</p></Prose>
-    </>
-  );
-}
-
-/** Grok Bot: a custom connector in the desktop app, or a message that asks a Bot to add it. */
-export function GrokBotGuide({ origin, full = false }: ClientGuideProps) {
-  return (
-    <>
-      <NoOneClick client="Grok Bot" />
-      <Label>In the desktop app</Label>
-      <Prose className="mt-2">
-        <ol>
-          <li>Open <strong>Connect apps</strong>. At the bottom, choose <strong>Add a custom connector</strong>.</li>
-          <li>Name it <code>artifacts</code> and choose <strong>Remote HTTPS</strong>.</li>
-          <li>Paste the server URL <code>{mcpEndpoint(origin)}</code>. Leave the HTTP headers and the Client ID empty.</li>
-          <li>Choose <strong>Add plugin</strong>. When the app shows <strong>Needs auth</strong>, choose <strong>Authenticate</strong>.</li>
-        </ol>
-      </Prose>
-      <Label>Or ask a Bot</Label>
-      <Prose className="mt-2"><p>Send this message in a chat. The Bot adds the server. If it shows a sign-in card, choose <strong>Connect</strong>.</p></Prose>
-      <CodeSnippet title="Message" code={grokBotAddMessage(origin)} wrap className="mt-3" />
-      <ApproveSteps opener="Your browser opens on the sign-in page." />
-      {full ? (
-        <Prose className="mt-4">
-          <p>In a team, an admin&apos;s MCP policy decides which servers you can add. If the app refuses to save the server, ask your admin to allow it.</p>
-          <p>Grok on the web takes the same URL: open <a href={GROK_CONNECTORS_URL}>grok.com/connectors</a>, choose <strong>New Connector</strong>, then <strong>Custom</strong>.</p>
-        </Prose>
-      ) : null}
-    </>
-  );
-}
-
-/** A step that checks the connection, with the command or text that shows it. */
-function CheckStep({ children, note }: { children: ReactNode; note: ReactNode }) {
-  return (
-    <>
-      <Label>Check the connection</Label>
-      <div className="mt-2">{children}</div>
-      <Prose className="mt-2"><p>{note}</p></Prose>
     </>
   );
 }
@@ -267,10 +169,10 @@ export function OpenCodeGuide({ origin, full = false }: ClientGuideProps) {
 }
 
 /** Kimi Code CLI: an entry in `mcp.json`, then `/mcp-config login` inside Kimi Code. */
-export function KimiCodeGuide({ origin, full = false }: ClientGuideProps) {
+export function KimiCodeGuide({ origin, full = false, hideNoOneClick }: ClientGuideProps) {
   return (
     <>
-      <NoOneClick client="Kimi Code CLI" />
+      <NoOneClick client="Kimi Code CLI" hidden={hideNoOneClick} />
       <Prose className="mt-2">
         <p>Add this to <code>~/.kimi-code/mcp.json</code> for every project, or to <code>.kimi-code/mcp.json</code> in one project. Or type <code>/mcp-config</code> in Kimi Code and ask it to add the server.</p>
       </Prose>
@@ -333,10 +235,10 @@ export function FxGuide({ origin, full = false }: ClientGuideProps) {
 }
 
 /** Devin: a custom MCP server with OAuth. */
-export function DevinGuide({ origin, full = false }: ClientGuideProps) {
+export function DevinGuide({ origin, full = false, hideNoOneClick }: ClientGuideProps) {
   return (
     <>
-      <NoOneClick client="Devin" />
+      <NoOneClick client="Devin" hidden={hideNoOneClick} />
       <Prose className="mt-2">
         <ol>
           <li>Open <strong>Customize</strong>, then <strong>MCPs</strong>. Choose <strong>Add MCP</strong>, then <strong>Add custom MCP</strong>.</li>
