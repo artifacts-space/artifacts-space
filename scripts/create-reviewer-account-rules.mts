@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 
 import { z } from "zod";
 
+import { isReviewerDomainEmail, reviewerEmailDomains, testReviewerEmailDomain } from "../src/lib/auth/reviewer-domains.ts";
 import { isLocalDatabaseUrl } from "../src/lib/db/database-url-rules.ts";
 import { validateHandle } from "../src/lib/handles.ts";
 
@@ -14,9 +15,6 @@ type Env = Readonly<Record<string, string | undefined>>;
 
 /** The variable that lets one run reach a database that is not on this machine. */
 export const ALLOW_SHARED_REVIEWER_ACCOUNT = "ALLOW_SHARED_REVIEWER_ACCOUNT";
-
-/** The only domains a reviewer account may use: the site's own, and the reserved test domain for local runs. */
-export const reviewerEmailDomains = ["artifacts.space", "example.com"] as const;
 
 /** Random bytes in a password: 24 bytes are 32 base64url characters, about 192 bits. */
 export const PASSWORD_BYTES = 24;
@@ -28,8 +26,8 @@ export const usage = [
   "Usage: node scripts/create-reviewer-account.mts --email <address> --name <display name> --username <username> [--reset-password]",
   "",
   "Creates one reviewer account with a password and a few private sample artifacts, and prints the password once.",
-  "With --reset-password it gives an existing reviewer account a new password instead and signs it out everywhere.",
-  `The email must be under @${reviewerEmailDomains.join(" or @")}.`,
+  "With --reset-password it gives an existing reviewer account a new password instead and revokes its sessions, app tokens, access tokens, and approvals.",
+  `The email must be under @${reviewerEmailDomains.join(" or @")} (@${testReviewerEmailDomain} only for a database on this machine).`,
   "The database comes from DATABASE_URL_UNPOOLED or DATABASE_URL set for this run; .env.local is never read.",
   `A database that is not on this machine needs ${ALLOW_SHARED_REVIEWER_ACCOUNT}=1 for that one run.`,
 ].join("\n");
@@ -42,21 +40,8 @@ export interface ReviewerRequest {
   resetPassword: boolean;
 }
 
-/** True when `email` is under one of the reviewer domains, and nothing else. */
-export function isReviewerEmail(email: string): boolean {
-  const at = email.lastIndexOf("@");
-  if (at < 1) return false;
-  const domain = email.slice(at + 1);
-  return (reviewerEmailDomains as readonly string[]).includes(domain);
-}
-
 const requestSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .pipe(z.email())
-    .refine(isReviewerEmail, `The email must be under @${reviewerEmailDomains.join(" or @")}.`),
+  email: z.string().trim().toLowerCase().pipe(z.email()),
   name: z.string().trim().min(1, "Give a display name with --name.").max(100),
   username: z
     .string()
@@ -87,20 +72,42 @@ export function parseReviewerArgs(argv: readonly string[]): { ok: true; request:
   return { ok: true, request: parsed.data };
 }
 
+/** Where the run writes: the URL, and whether the reserved test domain may be used there. */
+export interface ReviewerDatabase {
+  ok: true;
+  url: string;
+  /** True only for a database on this machine reached without ALLOW_SHARED_REVIEWER_ACCOUNT. */
+  allowTestDomain: boolean;
+}
+
 /**
  * The database this run writes to, or why it must stop before it connects.
  * Only what is set for this run counts, never `.env.local`. A database that
  * is not on this machine needs ALLOW_SHARED_REVIEWER_ACCOUNT=1. The message
  * never shows the URL, which holds a password.
  */
-export function reviewerDatabase(env: Env): { ok: true; url: string } | { ok: false; error: string } {
+export function reviewerDatabase(env: Env): ReviewerDatabase | { ok: false; error: string } {
   const url = env.DATABASE_URL_UNPOOLED?.trim() || env.DATABASE_URL?.trim() || "";
   if (!url) return { ok: false, error: "No database: set DATABASE_URL (or DATABASE_URL_UNPOOLED) for this run." };
-  if (isLocalDatabaseUrl(url) || env[ALLOW_SHARED_REVIEWER_ACCOUNT] === "1") return { ok: true, url };
+  const shared = env[ALLOW_SHARED_REVIEWER_ACCOUNT] === "1";
+  if (isLocalDatabaseUrl(url)) return { ok: true, url, allowTestDomain: !shared };
+  if (shared) return { ok: true, url, allowTestDomain: false };
   return {
     ok: false,
     error: `Stopped: the database is not on this machine. To write a reviewer account to a shared database on purpose, set ${ALLOW_SHARED_REVIEWER_ACCOUNT}=1 for this one run.`,
   };
+}
+
+/**
+ * Why this address cannot be a reviewer account, or null when it can: it
+ * must be under a reviewer domain (reviewer-domains.ts, shared with the
+ * sign-in page). The reserved test domain counts only for a database on this
+ * machine, never with ALLOW_SHARED_REVIEWER_ACCOUNT=1.
+ */
+export function reviewerEmailProblem(email: string, database: ReviewerDatabase): string | null {
+  if (isReviewerDomainEmail(email, database.allowTestDomain)) return null;
+  const local = database.allowTestDomain ? ` or @${testReviewerEmailDomain}` : "";
+  return `The email must be under @${reviewerEmailDomains.join(" or @")}${local}.`;
 }
 
 /** True when a generated password is long enough to print. */

@@ -2,16 +2,21 @@ import { randomBytes } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
+import { fakeDatabaseUrl, fakeNeonHost } from "@/test/fake-database-url";
+
 import {
   ALLOW_SHARED_REVIEWER_ACCOUNT,
-  isReviewerEmail,
   isStrongEnough,
   MIN_PASSWORD_LENGTH,
   PASSWORD_BYTES,
   parseReviewerArgs,
   reviewerDatabase,
+  reviewerEmailProblem,
   sampleArtifacts,
 } from "./create-reviewer-account-rules.mts";
+
+const local = fakeDatabaseUrl({ user: "ci", password: "ci", host: "127.0.0.1", port: 55473, database: "artifacts_test" });
+const shared = fakeDatabaseUrl({ user: "owner", password: "fake-secret", host: fakeNeonHost("ep-example"), database: "neondb" });
 
 const base = ["--email", "Reviewer@Artifacts.Space", "--name", "Directory reviewer", "--username", "Reviewer-One"];
 
@@ -25,17 +30,8 @@ describe("parseReviewerArgs", () => {
     expect(parsed.ok && parsed.request.resetPassword).toBe(true);
   });
 
-  it.each([
-    ["an outside domain", "reviewer@gmail.com"],
-    ["a look-alike domain", "reviewer@artifacts.space.evil.example"],
-    ["a subdomain", "reviewer@mail.artifacts.space"],
-    ["no address", "reviewer"],
-  ])("should refuse %s", (_label, email) => {
-    expect(parseReviewerArgs(["--email", email, "--name", "R", "--username", "reviewer"]).ok).toBe(false);
-  });
-
-  it("should accept an @example.com address for local tests", () => {
-    expect(parseReviewerArgs(["--email", "reviewer@example.com", "--name", "R", "--username", "reviewer"]).ok).toBe(true);
+  it("should refuse an address that is not an email", () => {
+    expect(parseReviewerArgs(["--email", "reviewer", "--name", "R", "--username", "reviewer"]).ok).toBe(false);
   });
 
   it("should refuse a reserved or malformed username", () => {
@@ -50,38 +46,57 @@ describe("parseReviewerArgs", () => {
   });
 });
 
-describe("isReviewerEmail", () => {
-  it("should accept only the site's domain and the reserved test domain", () => {
-    expect(isReviewerEmail("a@artifacts.space")).toBe(true);
-    expect(isReviewerEmail("a@example.com")).toBe(true);
-    expect(isReviewerEmail("a@example.com.evil.example")).toBe(false);
-    expect(isReviewerEmail("@artifacts.space")).toBe(false);
+describe("reviewerEmailProblem", () => {
+  const localRun = { ok: true as const, url: local, allowTestDomain: true };
+  const sharedRun = { ok: true as const, url: shared, allowTestDomain: false };
+
+  it.each([
+    ["an outside domain", "reviewer@gmail.com"],
+    ["a look-alike domain", "reviewer@artifacts.space.evil.example"],
+    ["a subdomain", "reviewer@mail.artifacts.space"],
+  ])("should refuse %s", (_label, email) => {
+    expect(reviewerEmailProblem(email, localRun)).not.toBeNull();
+  });
+
+  it("should accept the site's own domain on any database", () => {
+    expect(reviewerEmailProblem("reviewer@artifacts.space", sharedRun)).toBeNull();
+    expect(reviewerEmailProblem("reviewer@artifacts.space", localRun)).toBeNull();
+  });
+
+  it("should accept @example.com only for a database on this machine", () => {
+    expect(reviewerEmailProblem("reviewer@example.com", localRun)).toBeNull();
+    expect(reviewerEmailProblem("reviewer@example.com", sharedRun)).not.toBeNull();
   });
 });
 
 describe("reviewerDatabase", () => {
-  const local = "postgres://ci:ci@127.0.0.1:55473/artifacts_test";
-  const shared = "postgres://owner:secret@ep-example.neon.tech/neondb";
-
-  it("should use a database on this machine", () => {
-    expect(reviewerDatabase({ DATABASE_URL: local })).toEqual({ ok: true, url: local });
+  it("should use a database on this machine and allow the test domain there", () => {
+    expect(reviewerDatabase({ DATABASE_URL: local })).toEqual({ ok: true, url: local, allowTestDomain: true });
   });
 
   it("should prefer the direct connection when both are set", () => {
-    expect(reviewerDatabase({ DATABASE_URL: shared, DATABASE_URL_UNPOOLED: local })).toEqual({ ok: true, url: local });
+    expect(reviewerDatabase({ DATABASE_URL: shared, DATABASE_URL_UNPOOLED: local })).toMatchObject({ ok: true, url: local });
   });
 
   it("should stop before it connects to a shared database without the flag, and never show the URL", () => {
     const result = reviewerDatabase({ DATABASE_URL: shared });
     expect(result.ok).toBe(false);
-    expect(JSON.stringify(result)).not.toContain("secret");
-    expect(JSON.stringify(result)).not.toContain("neon.tech");
+    expect(JSON.stringify(result)).not.toContain("fake-secret");
+    expect(JSON.stringify(result)).not.toContain("ep-example");
     expect(reviewerDatabase({ DATABASE_URL: shared, ALLOW_SHARED_MIGRATE: "1" }).ok).toBe(false);
     expect(reviewerDatabase({ DATABASE_URL: shared, [ALLOW_SHARED_REVIEWER_ACCOUNT]: "true" }).ok).toBe(false);
   });
 
-  it("should reach a shared database only when the flag is set to 1 for the run", () => {
-    expect(reviewerDatabase({ DATABASE_URL: shared, [ALLOW_SHARED_REVIEWER_ACCOUNT]: "1" })).toEqual({ ok: true, url: shared });
+  it("should stop when a local-looking URL sends pg to another host", () => {
+    expect(reviewerDatabase({ DATABASE_URL: `${local}?host=${fakeNeonHost("ep-example")}` }).ok).toBe(false);
+  });
+
+  it("should reach a shared database only when the flag is set to 1, and never allow the test domain there", () => {
+    expect(reviewerDatabase({ DATABASE_URL: shared, [ALLOW_SHARED_REVIEWER_ACCOUNT]: "1" })).toEqual({ ok: true, url: shared, allowTestDomain: false });
+  });
+
+  it("should not allow the test domain with the shared flag set, even on this machine", () => {
+    expect(reviewerDatabase({ DATABASE_URL: local, [ALLOW_SHARED_REVIEWER_ACCOUNT]: "1" })).toMatchObject({ ok: true, allowTestDomain: false });
   });
 
   it("should stop when no database is set", () => {
