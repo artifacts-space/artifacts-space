@@ -3,6 +3,7 @@
 import { InlineContent } from "@/components/app/artifact-editor/inline-content";
 import { EditorLoadingFallback } from "@/components/editor/document-editor";
 import { BlockMenuFor } from "@/components/editor/rich/block-menu/block-menu-context";
+import { LineField } from "@/components/line-field";
 
 import { usePageEdit } from "./page-edit-context";
 
@@ -15,26 +16,13 @@ import { usePageEdit } from "./page-edit-context";
 const titleClass = "text-balance text-4xl font-medium leading-[1.08] tracking-[-0.03em] sm:text-5xl";
 const summaryClass = "max-w-2xl text-md leading-7 text-muted-foreground";
 
-/** Titles are one line: Enter never adds a break, and pasted breaks become spaces. */
-function singleLine(value: string) {
-  return value.replace(/\s*[\r\n]+\s*/g, " ");
-}
-
 /** The page title: a heading for readers, the same heading as a field for editors. */
 export function InlineTitle({ children }: { children: React.ReactNode }) {
   const edit = usePageEdit();
   if (!edit) return <h1 className={titleClass}>{children}</h1>;
   return (
     <h1 className={titleClass}>
-      <textarea
-        value={edit.draft.title}
-        rows={1}
-        onChange={(event) => { edit.update("title", singleLine(event.target.value)); }}
-        onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}
-        aria-label="Title"
-        placeholder="Untitled artifact"
-        className="block w-full resize-none overflow-hidden bg-transparent field-sizing-content outline-none placeholder:text-muted-foreground/60"
-      />
+      <LineField value={edit.draft.title} onValueChange={(title) => { edit.update("title", title); }} aria-label="Title" placeholder="Untitled artifact" />
     </h1>
   );
 }

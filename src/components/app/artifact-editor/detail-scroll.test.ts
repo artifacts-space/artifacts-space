@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { scrollShare, scrollTopForShare } from "./detail-scroll";
+import { scrollbarWidth, scrollShare, scrollTopForShare } from "./detail-scroll";
 
 describe("scrollShare", () => {
   it("should be 0 when the box is at the top", () => {
@@ -32,5 +32,19 @@ describe("scrollTopForShare", () => {
 
   it("should be 0 when the box cannot scroll", () => {
     expect(scrollTopForShare(0.7, { scrollHeight: 300, clientHeight: 500 })).toBe(0);
+  });
+});
+
+describe("scrollbarWidth", () => {
+  it("should be the room the scrollbar takes when the box shows a scrollbar beside its content", () => {
+    expect(scrollbarWidth({ offsetWidth: 1437, clientWidth: 1422 })).toBe(15);
+  });
+
+  it("should be 0 when the scrollbar overlays the content or the box does not scroll", () => {
+    expect(scrollbarWidth({ offsetWidth: 1437, clientWidth: 1437 })).toBe(0);
+  });
+
+  it("should never be negative when the box reports a wider content than its own width", () => {
+    expect(scrollbarWidth({ offsetWidth: 0, clientWidth: 1 })).toBe(0);
   });
 });

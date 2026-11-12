@@ -21,12 +21,13 @@ import { useArtifactHarness, type HarnessControl } from "@/components/harness/us
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { sheetFormatTarget } from "@/lib/create/new-artifact-rules";
 import { previewColumnClass, usesFullWidth } from "@/lib/page-width/rules";
+import { cn } from "@/lib/utils";
 import { BlankPageFilesSlot } from "@/components/app/new-artifact/blank-page-parts";
 import type { BlankPageOptions } from "@/components/app/new-artifact/use-blank-page";
 import { useBlankEditor } from "@/components/app/new-artifact/use-blank-editor";
 
 import { DetectedNotice } from "./detected-format-chip";
-import { detailBody, detailOuter, detailSection, stickyModeBar, useScrollPlace } from "./detail-scroll";
+import { detailBody, detailOuter, detailSection, scrollbarRoom, stickyModeBar, useScrollbarRoom, useScrollPlace } from "./detail-scroll";
 import { ShareBanner, TitleFields } from "./editor-sections";
 import { BlankToolbar, EditorToolbar, type SourceToggle } from "./editor-toolbar";
 import { FormatDialog } from "./format-dialog";
@@ -143,6 +144,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   const { draft, update, replace, reset, remount, revision } = useArtifactDraft(artifact);
   const [sourceOpen, setSourceOpen] = useState(false);
   const { outerRef, bodyRef, remember } = useScrollPlace(sourceOpen ? "source" : "page");
+  useScrollbarRoom(outerRef, bodyRef);
   const { page, sectionRef, titleRef, dragging, focusBody, filesApi, saveWith } = useBlankEditor({ blankPage, artifact, draft, replace, onUpdated, body: bodyRef, sourceOpen, focusRequest, save });
   const autosave = useAutosave({ artifact, draft, replaceDraft: replace, onUpdated, save: saveWith, problem: page.problem, idle: page.idle });
   const [formatOpen, setFormatOpen] = useState(false);
@@ -192,7 +194,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
       <div ref={outerRef} data-slot="detail-outer" className={detailOuter}>
         {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} /> : null}
         <TitleFields title={draft.title} icon={draft.icon} summary={draft.summary} update={update} titleRef={titleRef} onEnter={focusBody} column={column} />
-        <ArtifactOrganizers artifact={artifact} kind={draft.kind} onChangeFormat={() => { setFormatOpen(true); }} onUpdated={onUpdated} column={column} hidden={page.blank} />
+        <ArtifactOrganizers artifact={artifact} kind={draft.kind} onChangeFormat={() => { setFormatOpen(true); }} onUpdated={onUpdated} column={column} className={scrollbarRoom} hidden={page.blank} />
         <SaveStatusBar
           status={autosave.status}
           dirty={autosave.dirty}
@@ -204,7 +206,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           id={page.blank ? undefined : artifact.id}
           onRetry={autosave.retryNow}
           column={column}
-          className={stickyModeBar}
+          className={cn(stickyModeBar, scrollbarRoom)}
         />
         <ConflictNotice status={autosave.status} onLoadTheirs={autosave.loadTheirs} onKeepMine={autosave.keepMine} />
         <AgentSaveNotice

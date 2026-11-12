@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef, type RefObject } from "react";
 
 /**
  * Scroll boxes for the artifact column of the /app shell (see `shell-tall`
@@ -27,6 +27,13 @@ export const detailBody = [
   "shell-tall:[--data-grid-max-height:max(12rem,min(70vh,calc(100cqh_-_8rem)))]",
   "focus-visible:outline-2 focus-visible:-outline-offset-2",
 ].join(" ");
+
+/**
+ * For each row above `detailBody` that holds the content's column (title,
+ * chips, meta line): it leaves the room the body's scrollbar takes, so its
+ * column is centered in the same width as the body's (useScrollbarRoom).
+ */
+export const scrollbarRoom = "pe-(--detail-scrollbar)";
 
 /** The meta line on short viewports: it sticks to the top of the scroll box, opaque on the pane's card colour. */
 export const stickyModeBar = "shell-short:sticky shell-short:top-0 shell-short:z-10 shell-short:bg-card";
@@ -77,4 +84,31 @@ export function useScrollPlace(mode: string) {
   }, [mode]);
 
   return { outerRef, bodyRef, remember };
+}
+
+/** The room a scroll box's own scrollbar takes beside its content, in px: 0 with overlay scrollbars or when nothing scrolls. */
+export function scrollbarWidth(box: { offsetWidth: number; clientWidth: number }): number {
+  return Math.max(0, box.offsetWidth - box.clientWidth);
+}
+
+/**
+ * Publishes the width of `detailBody`'s scrollbar as `--detail-scrollbar` on
+ * `detailOuter`. A scrollbar that takes room (Windows, Linux, and macOS with
+ * "Show scroll bars: Always") narrows the body, so its centered column would
+ * sit half a scrollbar left of the title above it; rows with `scrollbarRoom`
+ * leave the same room and stay lined up. The width is 0 with overlay
+ * scrollbars and whenever the body does not scroll.
+ */
+export function useScrollbarRoom(outer: RefObject<HTMLElement | null>, body: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const target = outer.current;
+    const box = body.current;
+    if (!target || !box) return;
+    const publish = () => { target.style.setProperty("--detail-scrollbar", `${String(scrollbarWidth(box))}px`); };
+    publish();
+    // A scrollbar that appears or goes narrows or widens the body's content box, which is what this observes.
+    const observer = new ResizeObserver(publish);
+    observer.observe(box);
+    return () => { observer.disconnect(); };
+  }, [outer, body]);
 }
