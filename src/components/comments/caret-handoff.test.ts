@@ -2,15 +2,15 @@ import { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { describe, expect, it } from "vitest";
 
 import { richEditorExtensions } from "@/components/editor/rich/editor-extensions";
-import { parseMarkdown } from "@/components/editor/rich/markdown-roundtrip";
 import { getSchema } from "@tiptap/core";
 
 import { positionForOffset } from "./caret-handoff";
+import { parseCommentMarkdown } from "./comment-markdown";
 
 const schema = getSchema(richEditorExtensions({ onLinkShortcut: () => false, media: false }));
 
 function docFor(markdown: string): ProseMirrorNode {
-  return ProseMirrorNode.fromJSON(schema, parseMarkdown(markdown, "comment").doc);
+  return ProseMirrorNode.fromJSON(schema, parseCommentMarkdown(markdown).doc);
 }
 
 /** The document text before a position, with blocks joined the way the plain box writes them. */

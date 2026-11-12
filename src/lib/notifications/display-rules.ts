@@ -67,8 +67,15 @@ function decodeEntities(text: string): string {
  * A short plain-text excerpt of a comment: Markdown marks, links' addresses,
  * and tags removed, escapes and basic entities read as the characters the
  * writer typed (`\\*` is "*", `&amp;` is "&"), whitespace collapsed, cut at
- * EXCERPT_MAX. Comment text is untrusted; the bell renders this as plain
- * text, never as HTML or Markdown.
+ * EXCERPT_MAX.
+ *
+ * Contract: the result is plain text and may hold `<`, `>`, and `&` as
+ * characters; a stored `&lt;img onerror=…&gt;` comes back as the text
+ * `<img onerror=…>`. Every consumer must treat it as text, never as HTML or
+ * Markdown. Today: the bell (feed.ts → notification-list.tsx, a React text
+ * node) and browser notifications (push/notify.ts → pushMessage → the
+ * service worker's showNotification body, which is text). A consumer that
+ * builds HTML, such as an email, must escape it (email/layout.ts `html`).
  */
 export function commentExcerpt(body: string, max: number = EXCERPT_MAX): string {
   // Escaped characters are not marks: they stand aside as private-use characters while the marks come off.

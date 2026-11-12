@@ -3,7 +3,7 @@ import { MarkdownManager } from "@tiptap/markdown";
 import type { Schema } from "@tiptap/pm/model";
 
 import { liftBlockColors } from "./block-color-nodes";
-import { commentKeepsAsWritten, commentTextMarkdown } from "./comment-text-markdown";
+import { commentKeepsAsWritten, commentLiteralMarkdown, commentTextMarkdown } from "./comment-text-markdown";
 import { needsRawBlock, splitBlocks, type LooseToken, type SourceBlock, type SplitSource } from "./markdown-blocks";
 import { markdownSchemaExtensions } from "./markdown-schema";
 import { RAW_MARKDOWN } from "./raw-markdown-node";
@@ -14,12 +14,22 @@ interface Engine {
 }
 
 /**
+ * How a comment's Markdown is judged: `shows` says whether the comment
+ * thread renders `markdown` as the box shows `nodes` (same blocks, marks,
+ * and text). src/components/comments/comment-markdown.ts supplies it.
+ */
+export interface CommentFlavor {
+  shows: (markdown: string, nodes: readonly JSONContent[]) => boolean;
+}
+
+/**
  * Whose Markdown it is. A document (an artifact) is written with the editor's
  * full escaping, as it always was. A comment keeps what the person typed
- * (comment-text-markdown.ts) and keeps blocks the editor would misread as
- * written (`commentKeepsAsWritten`).
+ * (comment-text-markdown.ts), checks every block it writes by how the
+ * thread renders it, and keeps blocks the box would show differently from
+ * the thread as written.
  */
-export type MarkdownFlavor = "document" | "comment";
+export type MarkdownFlavor = "document" | CommentFlavor;
 
 type TextEncoder = (text: string, node: JSONContent, parent: JSONContent | undefined) => string;
 
@@ -65,9 +75,12 @@ function startsLine(node: JSONContent, parent: JSONContent | undefined): boolean
 /** A comment's text, escaped only where Markdown needs it. */
 const commentEncoder: TextEncoder = (text, node, parent) => (inCode(node, parent) ? text : commentTextMarkdown(text, startsLine(node, parent)));
 
+/** A comment's text with every mark escaped, for when the light escaping reads differently. */
+const literalEncoder: TextEncoder = (text, node, parent) => (inCode(node, parent) ? text : commentLiteralMarkdown(text, startsLine(node, parent)));
+
 /** Runs `write` with a comment's text encoder in place. */
-function asComment<T>(write: () => T): T {
-  textEncoder = commentEncoder;
+function asComment<T>(write: () => T, encoder: TextEncoder = commentEncoder): T {
+  textEncoder = encoder;
   try {
     return write();
   } finally {
@@ -142,15 +155,32 @@ function renderNodes(nodes: JSONContent[], current: Engine): string {
  * The nodes for one block, if the editor can show the block and write it
  * back with the same meaning. Anything else stays a raw block.
  */
+/** True when the editor reads `written` back as `nodes`. */
+function readsBack(written: string, nodes: JSONContent[], current: Engine): boolean {
+  const again = parseNodes(written, current);
+  return again !== null && nodeKey({ content: again }) === nodeKey({ content: nodes });
+}
+
+function richDocumentNodes(text: string, current: Engine): JSONContent[] | null {
+  const nodes = parseNodes(text, current);
+  return nodes && readsBack(renderNodes(nodes, current), nodes, current) ? nodes : null;
+}
+
+/**
+ * A comment's block in the box only when the box shows it as the thread
+ * does, and \@handle or an entity the editor cannot read never loads as text.
+ */
+function richCommentNodes(source: string, text: string, current: Engine, comment: CommentFlavor): JSONContent[] | null {
+  if (commentKeepsAsWritten(source)) return null;
+  const nodes = parseNodes(text, current);
+  if (!nodes || !readsBack(asComment(() => renderNodes(nodes, current)), nodes, current)) return null;
+  return comment.shows(text, nodes) ? nodes : null;
+}
+
 function richNodes(block: SourceBlock, definitions: string, current: Engine, flavor: MarkdownFlavor): JSONContent[] | null {
   if (needsRawBlock(block.token)) return null;
-  if (flavor === "comment" && commentKeepsAsWritten(block.text)) return null;
-  const nodes = parseNodes(definitions ? `${block.text}\n\n${definitions}` : block.text, current);
-  if (!nodes) return null;
-  const written = flavor === "comment" ? asComment(() => renderNodes(nodes, current)) : renderNodes(nodes, current);
-  const again = parseNodes(written, current);
-  if (!again || nodeKey({ content: again }) !== nodeKey({ content: nodes })) return null;
-  return nodes;
+  const text = definitions ? `${block.text}\n\n${definitions}` : block.text;
+  return flavor === "document" ? richDocumentNodes(text, current) : richCommentNodes(block.text, text, current, flavor);
 }
 
 function blockNodes(block: SourceBlock, definitions: string, current: Engine, flavor: MarkdownFlavor): { nodes: JSONContent[]; raw: boolean } {
@@ -233,17 +263,55 @@ export function parseMarkdown(markdown: string, flavor: MarkdownFlavor = "docume
   };
 }
 
+/** Blocks the box keeps as Markdown, which are written as they are, never judged. */
+const writtenAsIs: ReadonlySet<string> = new Set([RAW_MARKDOWN, "media"]);
+
+/** A textblock's text as lines (split at line breaks), marks left out. */
+function textLines(node: JSONContent): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const child of node.content ?? []) {
+    if (child.type !== "hardBreak") {
+      line += child.text ?? "";
+      continue;
+    }
+    lines.push(line);
+    line = "";
+  }
+  return [...lines, line];
+}
+
+function textblocksOf(node: JSONContent): JSONContent[] {
+  if ((node.content ?? []).some((child) => child.type === "text" || child.type === "hardBreak")) return [node];
+  return (node.content ?? []).flatMap(textblocksOf);
+}
+
 /**
- * A comment's new or edited block, with only the escapes it needs, when
- * reading that Markdown back gives the same block. Otherwise the editor's
- * full escaping, which costs backslashes but never the meaning.
+ * The last resort: every textblock as a paragraph of literal text (every
+ * mark escaped, line breaks kept, an empty line as an escaped space), so the
+ * person's words post as words, never as a structure they did not see.
  */
-function renderCommentNode(node: JSONContent, current: Engine): string {
-  const light = asComment(() => renderNodes([node], current));
-  const expected = canonicalNodes([node], current.schema);
-  const again = parseNodes(light, current);
-  if (expected && again && nodeKey({ content: again }) === nodeKey({ content: expected })) return light;
-  return renderNodes([node], current);
+function literalParagraphs(node: JSONContent): string {
+  return textblocksOf(node)
+    .map((block) => textLines(block).map((line) => commentLiteralMarkdown(line, true) || "&#32;").join("\\\n"))
+    .join("\n\n");
+}
+
+/**
+ * A comment's new or edited block: with only the escapes it needs when the
+ * thread shows that as the box does; else with every mark escaped, when
+ * that shows the same; else (no generated case in
+ * comment-markdown-fuzz.test.tsx gets here) its words as literal
+ * paragraphs, which drop marks rather than post a structure nobody saw.
+ * Each candidate is judged by the thread's renderer.
+ */
+function renderCommentNode(node: JSONContent, current: Engine, comment: CommentFlavor): string {
+  if (writtenAsIs.has(node.type ?? "")) return renderNodes([node], current);
+  for (const encoder of [commentEncoder, literalEncoder]) {
+    const written = asComment(() => renderNodes([node], current), encoder);
+    if (comment.shows(written, [node])) return written;
+  }
+  return literalParagraphs(node);
 }
 
 /** A piece of output: source text and the loaded block it came from, if any. */
@@ -299,7 +367,7 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine, flav
     }
     position += 1;
     if (!node || isEmptyParagraph(node)) continue;
-    const text = flavor === "comment" ? renderCommentNode(node, current) : renderNodes([node], current);
+    const text = flavor === "document" ? renderNodes([node], current) : renderCommentNode(node, current, flavor);
     // A block with no Markdown yet (an empty or uploading media block) is left out.
     if (text) chunks.push({ text, block: -1 });
   }

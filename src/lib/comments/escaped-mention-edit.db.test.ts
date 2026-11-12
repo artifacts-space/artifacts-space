@@ -24,7 +24,7 @@ describe.runIf(Boolean(databaseUrl))("an escaped mention edited in the comment b
   const { getDb } = await import("@/db");
   const { artifact, comment, mention, rateLimitBucket, user } = await import("@/db/schema");
   const { generatePublicId } = await import("@/lib/public-id");
-  const { parseMarkdown, serializeMarkdown } = await import("@/components/editor/rich/markdown-roundtrip");
+  const { parseCommentMarkdown, serializeCommentMarkdown } = await import("@/components/comments/comment-markdown");
   const { createComment, updateComment } = await import("./service");
 
   const tag = randomUUID().slice(0, 8);
@@ -35,13 +35,13 @@ describe.runIf(Boolean(databaseUrl))("an escaped mention edited in the comment b
 
   /** What the comment box saves after a person changes "please" to "thanks" in the block kept as written. */
   function editedInBox(body: string): string {
-    const loaded = parseMarkdown(body, "comment");
+    const loaded = parseCommentMarkdown(body);
     const content = (loaded.doc.content ?? []).map((block) => {
       const source: unknown = block.attrs?.source;
       if (block.type !== "rawMarkdown" || typeof source !== "string") return block;
       return { ...block, attrs: { ...block.attrs, source: source.replace("please", "thanks") } };
     });
-    return serializeMarkdown({ type: "doc", content }, loaded.source, "comment");
+    return serializeCommentMarkdown({ type: "doc", content }, loaded.source);
   }
 
   const mentionsOf = async (commentId: string) => getDb().select({ recipientId: mention.recipientId }).from(mention).where(eq(mention.commentId, commentId));

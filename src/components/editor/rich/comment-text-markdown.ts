@@ -5,9 +5,9 @@ import { stripCode } from "@/lib/comments/mentions";
  * what a person types stays as they typed it ("Q&A at 3 < 4pm",
  * "snake_case", "2 * 3", "[docs]"), and a character is escaped only where
  * leaving it bare could change how the comment renders. The round trip
- * (markdown-roundtrip.ts) checks every block written this way by reading it
- * back, and falls back to the editor's full escaping when the reading differs,
- * so a case these rules miss costs a backslash, never the meaning.
+ * (markdown-roundtrip.ts) checks every block it writes by how the comment
+ * thread renders it, and falls back to `commentLiteralMarkdown`, which
+ * escapes every mark, when the reading differs; that is checked too.
  */
 
 /** ASCII punctuation: a backslash before one of these is an escape. */
@@ -102,6 +102,25 @@ export function commentTextMarkdown(text: string, lineStart: boolean): string {
     const escaped = escapeAt(text, index);
     output += index === marker && escaped.length === 1 ? `\\${escaped}` : escaped;
     if (text.charAt(index) === "\n") atLineStart = true;
+  }
+  return output;
+}
+
+/**
+ * Comment text with every ASCII punctuation character escaped and the
+ * spaces at the start of each line left out (a reader never sees them, and
+ * four would start a code block). Only letters, digits, spaces, and
+ * non-ASCII characters stay bare, and none of those starts Markdown syntax,
+ * so the text reads literally wherever it sits: no list, heading, quote,
+ * rule, underline, fence, table, emphasis, link, tag, or entity.
+ */
+export function commentLiteralMarkdown(text: string, lineStart: boolean): string {
+  let output = "";
+  let atLineStart = lineStart;
+  for (const char of text) {
+    if (atLineStart && (char === " " || char === "\t")) continue;
+    atLineStart = char === "\n";
+    output += ASCII_PUNCTUATION.test(char) ? `\\${char}` : char;
   }
   return output;
 }

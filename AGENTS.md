@@ -562,13 +562,21 @@ selected text, with no slash menu, no media (`media={false}`), and no block
 handles. A comment is still Markdown: a picked @mention is plain `@handle`
 text (`mention-match.ts`, rules in `mention-autocomplete.ts`), so the server
 reads mentions as before, and ⌘↵ or Ctrl+↵ posts from anywhere in the box,
-code blocks included. Comments use the round trip's `"comment"` flavor
-(`comment-text-markdown.ts`): text is written as typed (`Q&A`, `snake_case`,
-`2 * 3`) and escaped only where it would otherwise render differently, each
-block checked by reading it back. A block holding `\@handle` or a named entity
-such as `&copy;` loads as Markdown kept as written, so an edit never turns it
-into a mention or into the entity's letters. Artifacts keep the `"document"`
-flavor and its full escaping. Its code loads only when a box nears the window
+code blocks included. Comments use the round trip's comment flavor
+(`comment-markdown.ts`, escapes in `comment-text-markdown.ts`): text is
+written as typed (`Q&A`, `snake_case`, `2 * 3`) and escaped only where it
+would otherwise render differently. Every new or edited block is judged by
+how the thread renders it (`thread-reading.ts`: MarkdownView's renderer and
+syntax plugins, `markdown-syntax.ts`; compared in `comment-shape.ts`), and
+written with every mark escaped when the light form reads differently; a
+loaded block the box would show differently from the thread stays as
+written. `comment-markdown-fuzz.test.tsx` checks awkward typed text against
+the rendered HTML. A block holding `\@handle` or a named entity such as
+`&copy;` loads as Markdown kept as written, so an edit never turns it into a
+mention or into the entity's letters. Pasted Markdown links follow the
+renderer's link rule (`src/lib/markdown/link-href.ts`): uploads stay links
+in artifacts, never in comments. Artifacts keep the `"document"` flavor and
+its full escaping. Its code loads only when a box nears the window
 or takes focus (`useWantsEditor` in `comment-box.tsx`); until then, and for
 good if the load fails, a plain textarea with the same name, size, and
 shortcut stands in, and the rich box takes over its text and caret when it

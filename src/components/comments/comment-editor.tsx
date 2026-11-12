@@ -8,11 +8,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { TableBubbleMenu, TextBubbleMenu } from "@/components/editor/rich/bubble-menus";
 import { richEditorExtensions } from "@/components/editor/rich/editor-extensions";
 import { MarkdownLinkInput } from "@/components/editor/rich/markdown-link-input";
-import { parseMarkdown, serializeMarkdown, type SourceMap } from "@/components/editor/rich/markdown-roundtrip";
+import type { SourceMap } from "@/components/editor/rich/markdown-roundtrip";
 import { useCoarsePointer } from "@/components/editor/rich/use-coarse-pointer";
+import { commentShowsLink } from "@/lib/markdown/link-href";
 import { cn } from "@/lib/utils";
 
 import { positionForOffset } from "./caret-handoff";
+import { parseCommentMarkdown, serializeCommentMarkdown } from "./comment-markdown";
 import { commentBoxClass, commentBoxHeight, commentBoxMaxHeight, commentFocusClass, commentTextClass, isSubmitShortcut } from "./comment-box";
 import { CommentMentions, type MentionSource } from "./comment-mentions";
 
@@ -55,7 +57,7 @@ function useClearOnSignal(editor: Editor | null, signal: number, sourceRef: Reac
   useEffect(() => {
     if (!editor || seen.current === signal) return;
     seen.current = signal;
-    sourceRef.current = parseMarkdown("", "comment").source;
+    sourceRef.current = parseCommentMarkdown("").source;
     editor.commands.clearContent(false);
   }, [editor, signal, sourceRef]);
 }
@@ -81,7 +83,7 @@ function useHandoff(editor: Editor | null, root: React.RefObject<HTMLDivElement 
     if (!editor) return;
     const api: CommentEditorApi = {
       load: (markdown, caret) => {
-        const loaded = parseMarkdown(markdown, "comment");
+        const loaded = parseCommentMarkdown(markdown);
         sourceRef.current = loaded.source;
         editor.commands.setContent(loaded.doc, { emitUpdate: false });
         // Shown at once, ahead of the composer's next render, which keeps it shown.
@@ -110,7 +112,7 @@ function useHandoff(editor: Editor | null, root: React.RefObject<HTMLDivElement 
 export default function CommentEditor({ onChange, label, placeholder, hidden, onReady, clearSignal, onSubmitShortcut, mentions, compact }: CommentEditorProps) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [filesRefused, setFilesRefused] = useState(false);
-  const sourceRef = useRef<SourceMap>(parseMarkdown("", "comment").source);
+  const sourceRef = useRef<SourceMap>(parseCommentMarkdown("").source);
   const root = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
   const coarse = useCoarsePointer();
@@ -128,6 +130,7 @@ export default function CommentEditor({ onChange, label, placeholder, hidden, on
         media: false,
         onMediaRefused: () => { setFilesRefused(true); },
         boxPlaceholder: placeholder,
+        pastedLinks: commentShowsLink,
       }),
       MarkdownLinkInput,
       CommentMentions,
@@ -150,7 +153,7 @@ export default function CommentEditor({ onChange, label, placeholder, hidden, on
     },
     onUpdate: ({ editor: current }) => {
       setFilesRefused(false);
-      onChangeRef.current(serializeMarkdown(current.getJSON(), sourceRef.current, "comment"));
+      onChangeRef.current(serializeCommentMarkdown(current.getJSON(), sourceRef.current));
     },
     onSelectionUpdate: () => { setLinkOpen(false); },
   });

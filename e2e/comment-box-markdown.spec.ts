@@ -46,6 +46,26 @@ test("should post text as typed when it needs no escapes, and show it the same",
   expect(await writes(page)).toEqual([typed]);
 });
 
+test("should post a numbered-looking line and an underline-looking line as the text typed", async ({ page }) => {
+  await openThread(page);
+  const box = newComment(page);
+  await typeIn(box, "1) see https://x.co");
+  await postButton(page).click();
+  const first = posted(page, "1) see");
+  await expect(first).toContainText("1) see https://x.co");
+  await expect(first.locator("ol"), "no numbered list").toHaveCount(0);
+
+  await typeIn(box, "see https://x.co");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("===");
+  await postButton(page).click();
+  const second = posted(page, "===");
+  await expect(second.locator("h1, h2"), "no heading").toHaveCount(0);
+  await expect(second).toContainText("===");
+  // The box links the address once the line breaks; the "===" line keeps its escape.
+  expect(await writes(page)).toEqual(["1\\) see https://x.co", expect.stringMatching(/^see (https:\/\/x\.co|\[https:\/\/x\.co\]\(https:\/\/x\.co\)) {2}\n\\===\s*$/)]);
+});
+
 test("should escape only what would change how the comment shows", async ({ page }) => {
   await openThread(page);
   await typeIn(newComment(page), "Keep <b>literal</b> and &copy; as letters");

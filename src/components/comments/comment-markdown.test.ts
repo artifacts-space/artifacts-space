@@ -7,6 +7,8 @@ import { MarkdownView } from "@/components/artifact-view/markdown-view";
 
 import { markdownSchemaExtensions } from "@/components/editor/rich/markdown-schema";
 import { parseMarkdown, serializeMarkdown } from "@/components/editor/rich/markdown-roundtrip";
+
+import { parseCommentMarkdown, serializeCommentMarkdown } from "./comment-markdown";
 import { parseMentions } from "@/lib/comments/mentions";
 
 import { mentionEditAt, mentionMatchAt } from "./mention-match";
@@ -30,7 +32,7 @@ function paragraph(...content: JSONContent[]): JSONContent {
 }
 
 function written(content: JSONContent[]): string {
-  return serializeMarkdown({ type: "doc", content }, parseMarkdown("", "comment").source, "comment");
+  return serializeCommentMarkdown({ type: "doc", content }, parseCommentMarkdown("").source);
 }
 
 /** What the thread shows for a comment's Markdown. */
@@ -40,10 +42,10 @@ function rendered(markdown: string): string {
 
 /** The comment loaded into the box, its first block changed by `edit`, and written back. */
 function editedFirstBlock(body: string, edit: (block: JSONContent) => JSONContent): string {
-  const loaded = parseMarkdown(body, "comment");
+  const loaded = parseCommentMarkdown(body);
   const [first, ...rest] = loaded.doc.content ?? [];
   if (!first) throw new Error("no block");
-  return serializeMarkdown({ type: "doc", content: [edit(first), ...rest] }, loaded.source, "comment");
+  return serializeCommentMarkdown({ type: "doc", content: [edit(first), ...rest] }, loaded.source);
 }
 
 /** Adds a word to the end of a paragraph's text. */
@@ -70,21 +72,21 @@ describe("comment Markdown in the rich box", () => {
   ];
 
   it.each(stored)("should write a stored comment back exactly when nobody edits it: %j", (body) => {
-    const loaded = parseMarkdown(body, "comment");
-    expect(serializeMarkdown(loaded.doc, loaded.source, "comment")).toBe(body);
+    const loaded = parseCommentMarkdown(body);
+    expect(serializeCommentMarkdown(loaded.doc, loaded.source)).toBe(body);
   });
 
   it("should show a quoted block as a quote, not as raw Markdown, when a comment starts from the block menu", () => {
-    const loaded = parseMarkdown(quotedCommentBody("Ship it on Friday.", "https://artifacts.space/artifact/abc#block=Ship"), "comment");
+    const loaded = parseCommentMarkdown(quotedCommentBody("Ship it on Friday.", "https://artifacts.space/artifact/abc#block=Ship"));
     expect(loaded.rawBlocks).toBe(0);
     expect(loaded.doc.content?.map((node) => node.type)).toEqual(["blockquote"]);
   });
 
   it("should keep the untouched blocks of an edited comment as written when a paragraph is added", () => {
     const body = "Hi @dana,\n\n* first\n* second";
-    const loaded = parseMarkdown(body, "comment");
+    const loaded = parseCommentMarkdown(body);
     const content = [...(loaded.doc.content ?? []), paragraph(text("Thanks!"))];
-    expect(serializeMarkdown({ type: "doc", content }, loaded.source, "comment")).toBe(`${body}\n\nThanks!`);
+    expect(serializeCommentMarkdown({ type: "doc", content }, loaded.source)).toBe(`${body}\n\nThanks!`);
   });
 
   it("should write bold, a list, and a mention as Markdown when they are typed in the box", () => {
@@ -130,7 +132,7 @@ describe("typed comment text", () => {
   it.each(literal)("should keep %j literal after a save and a re-edit", (typed) => {
     const stored = written([paragraph(text(typed))]);
     const again = editedFirstBlock(stored, addWord);
-    const reloaded = parseMarkdown(again, "comment").doc.content;
+    const reloaded = parseCommentMarkdown(again).doc.content;
     expect(reloaded?.map((block) => block.content)).toEqual([[text(`${typed} more`)]]);
   });
 
@@ -145,7 +147,7 @@ describe("typed comment text", () => {
 
 describe("blocks a comment keeps as written", () => {
   it("should keep an escaped mention escaped, and no mention, when its paragraph is edited", () => {
-    const loaded = parseMarkdown("\\@dana please", "comment");
+    const loaded = parseCommentMarkdown("\\@dana please");
     expect(loaded.rawBlocks).toBe(1);
     const saved = editedFirstBlock("\\@dana please", rewordRaw);
     expect(saved).toBe("\\@dana thanks");
@@ -165,7 +167,7 @@ describe("blocks a comment keeps as written", () => {
   });
 
   it("should show a mention typed in full as a mention when it is not escaped", () => {
-    expect(parseMarkdown("@dana please", "comment").rawBlocks).toBe(0);
+    expect(parseCommentMarkdown("@dana please").rawBlocks).toBe(0);
   });
 });
 
