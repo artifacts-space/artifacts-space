@@ -87,7 +87,7 @@ export function LegalPage({ doc, title, lead, summary, children }: LegalPageProp
           <p className="mt-4 max-w-[64ch] text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">{lead}</p>
           <p className="mt-4 text-sm text-muted-foreground">
             Effective <time dateTime={legalDates.effective.iso}>{legalDates.effective.label}</time> · Last updated{" "}
-            <time dateTime={legalDates.updated.iso}>{legalDates.updated.label}</time>
+            <time dateTime={legalDates.updated[doc].iso}>{legalDates.updated[doc].label}</time>
           </p>
           <PlainTerms points={summary} />
           <InlineContents doc={doc} />

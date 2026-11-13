@@ -1,3 +1,5 @@
+import type { LegalDocument } from "./headings";
+
 /*
  * Who runs artifacts.space and how to reach them. The Privacy Policy, the
  * Terms, the Support page, and the site footer all read these values, so the
@@ -19,10 +21,13 @@ export const legalContact = {
   supportEmail: "support@artifacts.space",
 } as const;
 
-/** When both documents took effect and last changed. */
+/** When both documents took effect, and when each one last changed. */
 export const legalDates = {
   effective: { label: "November 7, 2026", iso: "2026-11-07" },
-  updated: { label: "November 13, 2026", iso: "2026-11-13" },
+  updated: {
+    privacy: { label: "November 12, 2026", iso: "2026-11-12" },
+    terms: { label: "November 13, 2026", iso: "2026-11-13" },
+  } satisfies Record<LegalDocument, { label: string; iso: string }>,
 } as const;
 
 /** The year in the footer's copyright line. */

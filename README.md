@@ -276,5 +276,5 @@ problem, follow [SECURITY.md](SECURITY.md) instead of opening an issue.
 
 Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE).
 
-The license does not grant rights to the artifacts.space name or logos
-(section 6). Forks and self-hosted copies must use their own name.
+The license does not grant trademark rights to the artifacts.space name or
+logos (section 6). Forks and self-hosted copies must use their own name.
