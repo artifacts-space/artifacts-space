@@ -15,12 +15,6 @@ export interface ClientGuideProps {
   origin: string;
   /** Show alternatives and fine print, for the clients page. */
   full?: boolean;
-  /**
-   * Leave out the opening "There's no one-click link" line. The "Add to"
-   * dialog sets it, because its own description already says the app has
-   * no install link; the docs keep the line.
-   */
-  hideNoOneClick?: boolean;
 }
 
 /** The small heading over one part of a guide, such as "In the terminal". */
@@ -44,9 +38,8 @@ export function ApproveSteps({ opener }: { opener: ReactNode }) {
   );
 }
 
-/** The opening line for a client with no install link. Renders nothing when `hidden`. */
-export function NoOneClick({ client, hidden = false }: { client: string; hidden?: boolean | undefined }) {
-  if (hidden) return null;
+/** The opening line for a client with no install link. */
+export function NoOneClick({ client }: { client: string }) {
   return <p className="text-md leading-6 text-muted-foreground">There&apos;s no one-click link for {client} yet. It takes about a minute by hand.</p>;
 }
 

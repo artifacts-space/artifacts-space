@@ -9,6 +9,8 @@ import { DesktopAppInstalls } from "./desktop-app-installs";
 
 const origin = "https://artifacts.space";
 const endpoint = "https://artifacts.space/api/mcp";
+/** The server URL as the guides show it: a button that copies it. */
+const copyEndpoint = `data-copy-code="" aria-label="Copy ${endpoint}"`;
 const claudeLink = "https://claude.ai/customize/connectors?modal=add-custom-connector&amp;connectorName=artifacts.space&amp;connectorUrl=https%3A%2F%2Fartifacts.space%2Fapi%2Fmcp";
 
 /** Each button's markup, in the order the row shows them. */
@@ -42,12 +44,15 @@ describe("DesktopAppInstalls", () => {
     expect(claude).toContain('<span class="sr-only"> (opens in a new tab)</span>');
   });
 
-  it("should give Codex and Grok Bot a button that opens their steps, never a link, when no install link exists", () => {
+  it("should link Codex and Grok Bot to their steps in the docs in a new tab when no install link exists", () => {
     const [, , codex, grok] = buttons(html);
+    expect(codex).toMatch(/^<a [^>]*href="\/docs\/clients#codex"/);
+    expect(grok).toMatch(/^<a [^>]*href="\/docs\/clients#grok-bot"/);
     for (const button of [codex, grok]) {
-      expect(button).toMatch(/^<button /);
-      expect(button).toContain('aria-haspopup="dialog"');
-      expect(button).not.toContain("href=");
+      expect(button).toContain('target="_blank"');
+      expect(button).toContain('rel="noopener noreferrer"');
+      expect(button).toContain('<span class="sr-only"> (opens in a new tab)</span>');
+      expect(button).not.toContain("aria-haspopup");
     }
   });
 
@@ -64,7 +69,7 @@ describe("desktop app guides", () => {
     const short = renderToStaticMarkup(<ClaudeDesktopGuide origin={origin} />);
     expect(short).toContain(`href="${claudeLink}"`);
     expect(short).not.toContain("no one-click link");
-    for (const step of ["Add custom connector", `<code>${endpoint}</code>`, "<code>artifacts.space</code>", "published identity"]) {
+    for (const step of ["Add custom connector", copyEndpoint, "<code>artifacts.space</code>", "published identity"]) {
       expect(short).toContain(step);
     }
     expect(short).not.toContain("admin-settings");
@@ -73,31 +78,39 @@ describe("desktop app guides", () => {
     expect(full).toContain("Nothing is added until you confirm in Claude.");
   });
 
-  it("should open Codex's settings without repeating that no link adds a server when showing Codex", () => {
+  it("should give the app's Plugins steps and the terminal command when showing Codex", () => {
     const guide = renderToStaticMarkup(<CodexGuide origin={origin} />);
-    expect(guide).toContain('href="codex://settings"');
-    expect(guide).toContain("If you have the ChatGPT desktop app, this opens its Settings.");
-    expect(guide).not.toContain("Codex has no link that adds a server.");
-    for (const step of ["no one-click link for Codex", `codex mcp add artifacts --url ${endpoint}`, "MCP servers", "Streamable HTTP", "Authenticate"]) {
+    const steps = [
+      "no one-click link for Codex",
+      "Open <strong>Plugins</strong>. Choose <strong>Add</strong>, then <strong>Add custom MCP server</strong>.",
+      "<code>artifacts.space</code>",
+      "<strong>Server URL</strong>",
+      copyEndpoint,
+      "<strong>OAuth</strong>",
+      "<strong>I understand and want to continue</strong>",
+      "<strong>Create as a plugin</strong>",
+      `codex mcp add artifacts --url ${endpoint}`,
+    ];
+    for (const step of steps) {
       expect(guide).toContain(step);
+    }
+    expect(guide.indexOf("In the Codex app")).toBeLessThan(guide.indexOf("In the terminal"));
+  });
+
+  it("should name no settings link and no Settings steps when showing Codex", () => {
+    const guide = renderToStaticMarkup(<CodexGuide origin={origin} full />);
+    for (const gone of ["codex://", "MCP servers", "Streamable HTTP", "Add server", "ChatGPT desktop app"]) {
+      expect(guide).not.toContain(gone);
     }
   });
 
   it("should give the desktop steps and the message for a Bot when showing Grok Bot", () => {
     const guide = renderToStaticMarkup(<GrokBotGuide origin={origin} />);
-    for (const step of ["no one-click link for Grok Bot", "Connect apps", "Add a custom connector", "Remote HTTPS", `<code>${endpoint}</code>`, "Add plugin", "Needs auth", `Add the MCP server at ${endpoint} and name it artifacts.`]) {
+    for (const step of ["no one-click link for Grok Bot", "Connect apps", "Add a custom connector", "Remote HTTPS", copyEndpoint, "Add plugin", "Needs auth", `Add the MCP server at ${endpoint} and name it artifacts.`]) {
       expect(guide).toContain(step);
     }
     expect(guide).not.toContain("grok.com/connectors");
     expect(renderToStaticMarkup(<GrokBotGuide origin={origin} full />)).toContain('href="https://grok.com/connectors"');
-  });
-
-  it("should leave out the no-link line and keep the steps when the dialog shows the guide", () => {
-    for (const Guide of [CodexGuide, GrokBotGuide]) {
-      const guide = renderToStaticMarkup(<Guide origin={origin} hideNoOneClick />);
-      expect(guide).not.toContain("no one-click link");
-      expect(guide).toContain(endpoint);
-    }
   });
 });
 
@@ -109,10 +122,10 @@ describe("check the connection", () => {
     return html.slice(start);
   }
 
-  it("should list the servers with codex mcp list and say where the desktop app asks to sign in when checking Codex", () => {
+  it("should point to Installed in Plugins and list the servers with codex mcp list when checking Codex", () => {
     const step = checkStep(renderToStaticMarkup(<CodexGuide origin={origin} />));
     expect(step).toContain("codex mcp list");
-    expect(step).toContain("<strong>Authenticate</strong>");
+    expect(step).toContain("open <strong>Plugins</strong>: <strong>artifacts.space</strong> shows under <strong>Installed</strong>");
   });
 
   it("should point to Installed in Connect apps and say what each status means when checking Grok Bot", () => {

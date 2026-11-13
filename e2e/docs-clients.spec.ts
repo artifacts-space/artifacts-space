@@ -72,12 +72,34 @@ test("should give the ChatGPT steps when its section and quickstart tab open", a
   const section = page.locator("section", { has: page.getByRole("heading", { level: 2, name: headingName("ChatGPT") }) });
   await expect(section.getByRole("link", { name: "Plugins" })).toHaveAttribute("href", "https://chatgpt.com/plugins");
   await expect(section.getByText("Add custom MCP server")).toBeVisible();
-  await expect(section.locator("code").filter({ hasText: endpoint })).toBeVisible();
+  await expect(section.getByRole("button", { name: `Copy ${endpoint}` })).toBeVisible();
 
   await page.goto("/docs/quickstart");
   const chatgptTab = page.getByRole("tab", { name: "ChatGPT", exact: true });
   await expect(chatgptTab.locator("svg[data-client-logo]")).toHaveCount(1);
   await chatgptTab.click();
   await expect(page.getByRole("tabpanel").getByText("Leave the client ID and secret empty", { exact: false })).toBeVisible();
+  expect(await pageScrollsSideways(page)).toBe(false);
+});
+
+test("should copy the server URL without moving the text when it is chosen in a client's steps", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/docs/clients");
+
+  // Every guide that names the URL in its steps shows it as a copy button.
+  for (const id of ["claude-desktop", "chatgpt", "codex", "grok-bot", "devin", "other-clients"]) {
+    const section = page.locator(`section[aria-labelledby=${id}]`);
+    await expect(section.getByRole("button", { name: `Copy ${endpoint}` }), id).toHaveCount(1);
+  }
+
+  const copy = page.locator("section[aria-labelledby=codex]").getByRole("button", { name: `Copy ${endpoint}` });
+  await copy.scrollIntoViewIfNeeded();
+  const before = await copy.boundingBox();
+  await copy.click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(endpoint);
+  // The mark turns into a check, and the text around the button does not move.
+  await expect(copy.locator("svg.tabler-icon-check")).toBeVisible();
+  expect(await copy.boundingBox()).toEqual(before);
+  await expect(copy).toHaveText(endpoint);
   expect(await pageScrollsSideways(page)).toBe(false);
 });
