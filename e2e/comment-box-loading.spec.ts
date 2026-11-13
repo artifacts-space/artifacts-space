@@ -171,6 +171,21 @@ for (const { moment, before, after, shows } of moments) {
   });
 }
 
+test("should post with the button while the plain box is being typed in, and not swap under the pointer", async ({ page }) => {
+  const box = await typeWhileItArrives(page, "Some **bold** words ", "and a long tail.");
+  const post = list(page).getByRole("button", { name: "Comment", exact: true });
+  await post.scrollIntoViewIfNeeded();
+  const spot = await post.boundingBox();
+  expect(spot, "the button is on screen").not.toBeNull();
+  await page.mouse.move((spot?.x ?? 0) + (spot?.width ?? 0) / 2, (spot?.y ?? 0) + (spot?.height ?? 0) / 2);
+  await page.mouse.down();
+  await expect(box, "no swap on the press").toHaveJSProperty("tagName", "TEXTAREA");
+  await expect(box).toBeFocused();
+  await page.mouse.up();
+  await expect.poll(() => writes(page), "the click posted, as typed").toEqual(["Some **bold** words and a long tail."]);
+  await expectRichBox(page);
+});
+
 test("should post what the thread then shows when the text is edited after the swap", async ({ page }) => {
   const box = await typeWhileItArrives(page, "Some **bo", "ld** words");
   await box.blur();

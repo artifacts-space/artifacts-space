@@ -40,6 +40,15 @@ function draftProblem(body: string): string | null {
   return null;
 }
 
+/**
+ * Keeps the caret in the box when Post or Cancel is pressed, in every
+ * browser: the click still lands, and the box does not swap, and change
+ * size under the pointer, between press and release.
+ */
+function keepCaret(event: React.MouseEvent) {
+  event.preventDefault();
+}
+
 /** Puts the cursor at the end of the plain box's text, for a box that opens focused. */
 function focusAtEnd(textarea: HTMLTextAreaElement) {
   textarea.focus();
@@ -139,11 +148,7 @@ export function CommentComposer({ label, placeholder, submitLabel, initialBody =
             value={body}
             onChange={(event) => { onChange(event.target.value); }}
             onFocus={want}
-            onBlur={(event) => {
-              // Not when the caret goes to the form's own buttons: a box that changed size under the pointer would make the click miss.
-              if (form.current?.contains(event.relatedTarget)) return;
-              takeOver();
-            }}
+            onBlur={takeOver}
             onKeyDown={(event) => {
               if (!isSubmitShortcut(event)) return;
               event.preventDefault();
@@ -174,8 +179,8 @@ export function CommentComposer({ label, placeholder, submitLabel, initialBody =
         <p className="mr-auto text-xs text-muted-foreground">
           Type @ to bring someone in. <ExternalLink href={SYNTAX_HELP_URL}>Formatting help</ExternalLink>
         </p>
-        {onCancel ? <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</Button> : null}
-        <Button type="submit" size="sm" disabled={pending}>
+        {onCancel ? <Button type="button" variant="ghost" size="sm" onMouseDown={keepCaret} onClick={onCancel}>Cancel</Button> : null}
+        <Button type="submit" size="sm" disabled={pending} onMouseDown={keepCaret}>
           {pending ? <IconLoader2 className="animate-spin" /> : <IconSend />} {submitLabel}
         </Button>
       </div>
