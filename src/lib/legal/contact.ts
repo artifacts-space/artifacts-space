@@ -22,7 +22,7 @@ export const legalContact = {
 /** When both documents took effect and last changed. */
 export const legalDates = {
   effective: { label: "November 7, 2026", iso: "2026-11-07" },
-  updated: { label: "November 12, 2026", iso: "2026-11-12" },
+  updated: { label: "November 13, 2026", iso: "2026-11-13" },
 } as const;
 
 /** The year in the footer's copyright line. */

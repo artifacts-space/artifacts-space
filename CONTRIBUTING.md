@@ -153,5 +153,6 @@ small differences as noise.
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the
-[MIT License](LICENSE).
+Contributions are licensed under the [Apache License, Version 2.0](LICENSE),
+as section 5 of the license provides. There is no separate contributor
+license agreement.

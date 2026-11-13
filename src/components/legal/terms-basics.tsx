@@ -20,7 +20,7 @@ export function TermsBasics() {
           If you use the Service for a company or other organization, you agree to these Terms for it, and you confirm that you have the authority to do so. &quot;You&quot; then means both you and that organization.
         </p>
         <p>
-          The artifacts.space code is open source under the MIT License, in the <a href={REPO_URL}>public repository</a>. That license governs the code. These Terms govern the hosted Service. If you run your own copy, these Terms do not apply to it, and the artifacts.space and Webrenew names and logos are not licensed to you.
+          The artifacts.space code is open source under the Apache License 2.0, in the <a href={REPO_URL}>public repository</a>. That license governs the code. These Terms govern the hosted Service. If you run your own copy, these Terms do not apply to it, and the artifacts.space and Webrenew names and logos are not licensed to you.
         </p>
       </Prose>
 
