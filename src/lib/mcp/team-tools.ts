@@ -100,7 +100,7 @@ async function toMcpInboxEntry(entry: InboxEntryView, viewerId: string, served: 
     id: entry.id,
     read: entry.readAt !== null,
     mentionedAt: entry.createdAt,
-    artifact: { id: publicId, title: entry.artifact.title, url: siteUrl(`/artifact/${publicId}`), threadUrl: threadUrl(publicId) },
+    artifact: { id: publicId, title: entry.artifact.title, url: siteUrl(`/artifact/${publicId}`), threadUrl: threadUrl(publicId, entry.comment.id) },
     comment: mentioned ?? toMcpComment(entry.comment),
     recentThread,
     reply: { tool: "comment_create", artifact: entry.artifact.publicId, replyTo: entry.comment.parentId ?? entry.comment.id },

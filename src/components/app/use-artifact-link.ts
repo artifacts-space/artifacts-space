@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
-import { parseArtifactLinkSearch, withoutArtifactLink, type ArtifactLink } from "@/lib/app-link";
+import { parseArtifactLinkSearch, withoutArtifactLink, withoutCommentHash, type ArtifactLink } from "@/lib/app-link";
 import { linkedStart, linkNotice, openArtifactLink } from "@/lib/app-link-rules";
 import type { ArtifactListItemDto } from "@/lib/artifact-types";
 
@@ -37,10 +37,25 @@ interface ArtifactLinkOptions {
   detail: RefObject<HTMLElement | null>;
 }
 
-/** The current URL without the link: the address bar is the record of what is handled, so a link still there has not been acted on. */
+/** The current URL without the link (and an old link's `#comment-<id>`): the address bar is the record of what is handled, so a link still there has not been acted on. */
 function cleanLocation(): string {
   const { pathname, search, hash } = window.location;
-  return `${pathname}${withoutArtifactLink(search)}${hash}`;
+  return `${pathname}${withoutArtifactLink(search)}${withoutCommentHash(hash)}`;
+}
+
+/** The link in the address bar, with the comment an old thread link names in its fragment (the server never sees it). */
+function linkInLocation(): ArtifactLink | null {
+  return parseArtifactLinkSearch(new URLSearchParams(window.location.search), window.location.hash);
+}
+
+/**
+ * The first load's link: in the browser, read from the address bar with its
+ * fragment, so the comments open at an old link's comment from the start and
+ * never open first without it. The server render has no fragment; nothing it
+ * draws depends on the comment (only effects act on it), so both agree.
+ */
+function firstLink(params: URLSearchParams): ArtifactLink | null {
+  return typeof window === "undefined" ? parseArtifactLinkSearch(params) : parseArtifactLinkSearch(params, window.location.hash);
 }
 
 /**
@@ -64,7 +79,7 @@ export function useArtifactLink({ initialArtifacts, target = null, failed = fals
   const router = useRouter();
   const params = useSearchParams();
   const search = params.toString();
-  const [start] = useState(() => linkedStart(initialArtifacts, parseArtifactLinkSearch(params), target));
+  const [start] = useState(() => linkedStart(initialArtifacts, firstLink(params), target));
   const [artifacts, setArtifacts] = useState(start.artifacts);
   const [selectedId, setSelectedId] = useState(start.selectedId);
   const [notice, setNotice] = useState(() => linkNotice(start.unavailable, failed));
@@ -92,7 +107,7 @@ export function useArtifactLink({ initialArtifacts, target = null, failed = fals
 
   // Runs after each navigation commits: the search or the server's answer for it changes.
   useEffect(() => {
-    const link = parseArtifactLinkSearch(new URLSearchParams(window.location.search));
+    const link = linkInLocation();
     if (!link) return;
     if (startLink.current) startLink.current = false;
     else arrive(link);

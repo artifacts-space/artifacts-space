@@ -2,14 +2,12 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  canReadArtifact: vi.fn(),
   checkArtifactPage: vi.fn(),
   getSession: vi.fn(),
   getTeamForMember: vi.fn(),
   hitRateLimits: vi.fn(),
 }));
 
-vi.mock("@/lib/access", () => ({ canReadArtifact: mocks.canReadArtifact }));
 vi.mock("@/lib/auth/server", () => ({ getAuth: () => ({ api: { getSession: mocks.getSession } }) }));
 vi.mock("@/lib/teams/queries", () => ({ getTeamForMember: mocks.getTeamForMember }));
 vi.mock("@/lib/artifact-page-check", () => ({ checkArtifactPage: mocks.checkArtifactPage }));
@@ -116,16 +114,23 @@ describe("proxy", () => {
     expect(location(response)).toBeNull();
   });
 
-  it("should redirect a comment thread to sign-in when it is loaded signed out", async () => {
-    const response = await proxy(request("/threads/abc"));
+  it("should redirect an old thread link to the artifact's comments in the workspace when a signed-in viewer opens it", async () => {
+    const response = await proxy(request("/threads/abc", { cookie: sessionCookie }));
     expect(response.status).toBe(307);
-    expect(mocks.canReadArtifact).not.toHaveBeenCalled();
+    expect(location(response)).toBe(`${origin}/app?artifact=abc&comments=1`);
   });
 
-  it("should still check the artifact when a signed-in viewer loads a comment thread", async () => {
-    mocks.canReadArtifact.mockResolvedValue(false);
-    const response = await proxy(request("/threads/abc", { cookie: sessionCookie }));
-    expect(response.status).toBe(404);
+  it("should redirect an old thread link the same way without any lookup when the visitor is signed out", async () => {
+    const response = await proxy(request("/threads/abc"));
+    expect(response.status).toBe(307);
+    expect(location(response)).toBe(`${origin}/app?artifact=abc&comments=1`);
+    expect(mocks.getSession).not.toHaveBeenCalled();
+    expect(mocks.checkArtifactPage).not.toHaveBeenCalled();
+  });
+
+  it("should keep an odd id inside the redirect's query when an old thread link carries one", async () => {
+    const response = await proxy(request("/threads/a%26b%3Dc"));
+    expect(location(response)).toBe(`${origin}/app?artifact=a%26b%3Dc&comments=1`);
   });
 
   it("should leave artifact pages open when the viewer is signed out", async () => {
@@ -180,7 +185,6 @@ describe("proxy", () => {
     const response = await proxy(request("/artifact/abc", { accept: "text/html,application/xhtml+xml,*/*;q=0.8" }));
     expect(response.headers.get("x-middleware-rewrite")).toBeNull();
     expect(mocks.checkArtifactPage).toHaveBeenCalledWith("abc", expect.any(Function));
-    expect(mocks.canReadArtifact).not.toHaveBeenCalled();
   });
 
   it("should pass server actions through when the request is a POST", async () => {

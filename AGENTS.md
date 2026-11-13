@@ -724,7 +724,24 @@ can read, or the call fails and saves nothing.
 Resolve (`resolveComment`, `rules.ts`): people who can comment resolve and
 reopen top-level threads; agents cannot. It is rate limited per person
 (`RESOLVE_RATE_LIMITS`), because anyone who may comment may resolve.
-Resolving twice keeps the first resolver. A deleted comment loses its quote. The UI takes its data through
+Resolving twice keeps the first resolver. A deleted comment loses its quote.
+
+Links to one comment (the Inbox, mention emails, MCP `inbox_list`'s
+`threadUrl`) open `/app?artifact=<id>&comment=<commentId>`
+(`src/lib/app-link.ts`). The artifact opens in the workspace, and
+`useLinkedArrival` (`src/components/comments`) decides where the comment
+shows (`linkedCommentTarget`, `src/lib/comments/link-target-rules.ts`): an
+inline comment, or a reply to one, in its card at the words when they are
+on the page; anything else (a comment on the whole artifact, a resolved
+thread, words that changed) in the Comments dialog, scrolled to the comment
+and briefly marked; a deleted comment as a quiet "This comment was deleted."
+The link only names a comment: what shows comes from the thread the viewer
+may load. The old thread page is gone; `src/proxy.ts` redirects
+`/threads/<id>` to `/app?artifact=<id>&comments=1` for every id, and the
+browser keeps an old link's `#comment-<id>` across the redirect, which the
+workspace reads as the comment.
+
+The UI takes its data through
 a `ThreadApi` (`use-comment-thread.ts`), so `/dev/inline-comments`
 (`?seed=1`, `?as=reader`) and `e2e/inline-comments.spec.ts` run without a
 database; `inline-comments.db.test.ts` covers the server rules.

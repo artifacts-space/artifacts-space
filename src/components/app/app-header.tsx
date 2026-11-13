@@ -118,7 +118,7 @@ export function AppHeader({ userId, name, email, username, unreadNotifications, 
         {/* Teams live in the sidebar's workspace switcher and the account menu. */}
         <nav className="flex h-full items-center gap-1" aria-label="Workspace navigation">
           <NavLink {...artifactsLink} active={pathname === artifactsLink.href} />
-          <InboxLink active={pathname.startsWith("/inbox") || pathname.startsWith("/threads")} />
+          <InboxLink active={pathname.startsWith("/inbox")} />
           {/* On phones, Connections lives in the account menu ("Access tokens"). */}
           <NavLink {...connectionsLink} active={pathname.startsWith(connectionsLink.href)} className="max-sm:hidden" />
         </nav>

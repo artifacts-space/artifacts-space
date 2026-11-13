@@ -93,6 +93,8 @@ export function useLocatedAnchors(surface: HTMLElement | null, anchors: readonly
   const active = useRef(activeKey);
   const [located, setLocated] = useState<ReadonlySet<string>>(NONE_LOCATED);
   const [ready, setReady] = useState(false);
+  // The anchors the last pass looked for, so a caller can tell `located` caught up with the thread as loaded now.
+  const [locatedFor, setLocatedFor] = useState<readonly AnchorToLocate[] | null>(null);
 
   useEffect(() => {
     active.current = activeKey;
@@ -120,6 +122,7 @@ export function useLocatedAnchors(surface: HTMLElement | null, anchors: readonly
       painted.current = paint(found, active.current);
       setLocated((previous) => (sameKeys(previous, found) ? previous : new Set(found.keys())));
       setReady(true);
+      setLocatedFor(anchors);
     };
     const whenTextRests = () => {
       clearTimeout(timer);
@@ -157,5 +160,5 @@ export function useLocatedAnchors(surface: HTMLElement | null, anchors: readonly
   }, []);
 
   // Without a surface (the source view is open) nothing is on the page, and nothing is known about the words.
-  return { located: surface ? located : NONE_LOCATED, ready: surface !== null && ready, boxOf, scrollTo, keysAt };
+  return { located: surface ? located : NONE_LOCATED, ready: surface !== null && ready, settled: surface !== null && locatedFor === anchors, boxOf, scrollTo, keysAt };
 }

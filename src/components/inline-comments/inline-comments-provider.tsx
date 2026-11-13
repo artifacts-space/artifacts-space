@@ -64,6 +64,7 @@ export function InlineCommentsProvider({ publicId, kind, canComment, stored = tr
   const thread = useCommentThread(publicId, { api, markAsRead: false, enabled });
   const [surface, setSurface] = useState<HTMLElement | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
   const [draft, setDraft] = useState<InlineDraft | null>(null);
 
   const comments = thread.state.status === "ready" ? thread.state.data.comments : null;
@@ -72,13 +73,14 @@ export function InlineCommentsProvider({ publicId, kind, canComment, stored = tr
     return draft ? [...open, { key: DRAFT_KEY, anchor: draft.anchor }] : open;
   }, [comments, draft]);
   const activeKey = draft ? DRAFT_KEY : activeId;
-  const { located, ready, boxOf, scrollTo, keysAt } = useLocatedAnchors(enabled ? surface : null, anchors, activeKey);
+  const { located, ready, settled, boxOf, scrollTo, keysAt } = useLocatedAnchors(enabled ? surface : null, anchors, activeKey);
 
   const startComment = useCallback(
     (range?: Range) => {
       const next = surface ? draftFor(surface, range ?? selectedRange() ?? document.createRange()) : null;
       if (!next) return false;
       setActiveId(null);
+      setFocusId(null);
       setDraft(next);
       return true;
     },
@@ -99,23 +101,28 @@ export function InlineCommentsProvider({ publicId, kind, canComment, stored = tr
       thread,
       ready,
       located,
+      settled,
       activeId,
       draft,
+      focusId,
       open: (commentId) => {
         setDraft(null);
         setActiveId(commentId);
+        setFocusId(null);
         void thread.markRead();
       },
-      reveal: (commentId) => {
+      reveal: (commentId, focus) => {
         if (!scrollTo(commentId)) return false;
         setDraft(null);
         setActiveId(commentId);
+        setFocusId(focus ?? null);
         void thread.markRead();
         return true;
       },
       close: () => {
         setDraft(null);
         setActiveId(null);
+        setFocusId(null);
       },
       startComment,
       surface,
@@ -123,7 +130,7 @@ export function InlineCommentsProvider({ publicId, kind, canComment, stored = tr
       commentsAt: keysAt,
       attachSurface,
     }),
-    [publicId, thread, ready, located, activeId, draft, startComment, surface, boxOf, scrollTo, keysAt, attachSurface],
+    [publicId, thread, ready, located, settled, activeId, draft, focusId, startComment, surface, boxOf, scrollTo, keysAt, attachSurface],
   );
 
   // One tree shape on or off: turning inline comments on (a new artifact's first save) must not remount the editor inside.

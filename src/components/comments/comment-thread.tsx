@@ -8,6 +8,7 @@ import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
 import { useInlineComments, type InlineComments } from "@/components/inline-comments/inline-comments-context";
 import type { MentionOutcome } from "@/lib/comments/delivery";
+import { linkedCommentTarget } from "@/lib/comments/link-target-rules";
 import type { ThreadAgentView } from "@/lib/comments/mutes";
 import type { CommentView } from "@/lib/comments/views";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ import { CommentItem, type AnchorLookup, type CommentHandlers } from "./comment-
 import { MentionablesProvider } from "./mentionables-context";
 import { takeQuotedComment, usePendingQuote } from "./quote-request";
 import { useCommentThread, type CommentThreadControl, type WriteOutcome } from "./use-comment-thread";
+import { useLinkedCommentView } from "./use-linked-comment-view";
 
 /** A top-level comment with its replies. */
 export interface ThreadGroup {
@@ -137,25 +139,37 @@ interface ThreadGroupsProps {
   handlers: CommentHandlers;
   anchors: AnchorLookup | undefined;
   raised: boolean;
+  /** The comment a link asked for, brought into view and marked. */
+  linkedId: string | null;
 }
 
 /** Threads one after another: each top-level comment, then its replies. */
-function ThreadGroups({ groups, agentFor, handlers, anchors, raised }: ThreadGroupsProps) {
+function ThreadGroups({ groups, agentFor, handlers, anchors, raised, linkedId }: ThreadGroupsProps) {
   return (
     <div className={cn("divide-y", raised && groups.length > 0 && "card-surface px-4 sm:px-5")}>
       {groups.map(({ root, replies }) => (
         <div key={root.id} data-slot="comment-group" data-resolved={root.resolved !== null}>
-          <CommentItem comment={root} agent={agentFor(root)} handlers={handlers} anchors={anchors} />
-          {replies.map((item) => <CommentItem key={item.id} comment={item} agent={agentFor(item)} handlers={handlers} reply />)}
+          <CommentItem comment={root} agent={agentFor(root)} handlers={handlers} anchors={anchors} linked={root.id === linkedId} />
+          {replies.map((item) => <CommentItem key={item.id} comment={item} agent={agentFor(item)} handlers={handlers} reply linked={item.id === linkedId} />)}
         </div>
       ))}
     </div>
   );
 }
 
-/** Resolved threads, folded away under the open ones until asked for. */
+function holds(groups: readonly ThreadGroup[], commentId: string | null): boolean {
+  return commentId !== null && groups.some(({ root, replies }) => root.id === commentId || replies.some((item) => item.id === commentId));
+}
+
+/** Resolved threads, folded away under the open ones until asked for, or until a link asks for a comment in them. */
 function ResolvedThreads(props: ThreadGroupsProps) {
-  const [shown, setShown] = useState(false);
+  const linkedHere = holds(props.groups, props.linkedId) ? props.linkedId : null;
+  const [shown, setShown] = useState(linkedHere !== null);
+  const [seenLinked, setSeenLinked] = useState(linkedHere);
+  if (linkedHere !== seenLinked) {
+    setSeenLinked(linkedHere);
+    if (linkedHere !== null) setShown(true);
+  }
   if (props.groups.length === 0) return null;
   return (
     <div className="space-y-3">
@@ -168,6 +182,12 @@ function ResolvedThreads(props: ThreadGroupsProps) {
   );
 }
 
+/** Says, quietly, that the comment a link asked for is gone. It takes focus, as the comment would have. */
+function DeletedNotice() {
+  const ref = useLinkedCommentView<HTMLParagraphElement>(true);
+  return <p ref={ref} role="status" tabIndex={-1} data-slot="linked-comment-deleted" className="text-md text-muted-foreground outline-none">This comment was deleted.</p>;
+}
+
 interface ThreadBodyProps {
   publicId: string;
   data: ThreadData;
@@ -176,10 +196,11 @@ interface ThreadBodyProps {
   onNotices: (outcome: WriteOutcome) => void;
   raised: boolean;
   anchors: AnchorLookup | undefined;
+  focusId: string | null;
 }
 
 /** The loaded thread: muted agents, comments with replies, the composer, and mention notices. */
-function ThreadBody({ publicId, data, handlers, post, onNotices, raised, anchors }: ThreadBodyProps) {
+function ThreadBody({ publicId, data, handlers, post, onNotices, raised, anchors, focusId }: ThreadBodyProps) {
   const [replyTo, setReplyTo] = useState<CommentView | null>(null);
   const [started, clearStarted] = useStartedComment(publicId);
   const groups = useMemo(() => groupThread(data.comments), [data.comments]);
@@ -188,6 +209,8 @@ function ThreadBody({ publicId, data, handlers, post, onNotices, raised, anchors
   const agents = useMemo(() => new Map(data.agents.map((agent) => [agent.userId, agent])), [data.agents]);
   const agentFor = (comment: CommentView) => (comment.author?.kind === "agent" ? agents.get(comment.author.userId) : undefined);
   const withReply: CommentHandlers = { ...handlers, onReply: setReplyTo };
+  const linked = useMemo(() => (focusId ? linkedCommentTarget(data.comments, focusId, null) : null), [data.comments, focusId]);
+  const linkedId = linked?.kind === "list" ? linked.commentId : null;
 
   async function submit(body: string) {
     const outcome = await post(body, replyTo?.parentId ?? replyTo?.id ?? null);
@@ -201,10 +224,11 @@ function ThreadBody({ publicId, data, handlers, post, onNotices, raised, anchors
 
   return (
     <>
+      {linked?.kind === "deleted" ? <DeletedNotice /> : null}
       <MutedAgents agents={data.agents} onMute={handlers.onMute} />
       {groups.length === 0 ? <p className="text-md text-muted-foreground">No comments yet. Start the thread, and @mention a teammate or agent to bring them in.</p> : null}
-      <ThreadGroups groups={open} agentFor={agentFor} handlers={withReply} anchors={anchors} raised={raised} />
-      <ResolvedThreads groups={resolved} agentFor={agentFor} handlers={withReply} anchors={anchors} raised={raised} />
+      <ThreadGroups groups={open} agentFor={agentFor} handlers={withReply} anchors={anchors} raised={raised} linkedId={linkedId} />
+      <ResolvedThreads groups={resolved} agentFor={agentFor} handlers={withReply} anchors={anchors} raised={raised} linkedId={linkedId} />
       <ThreadComposer replyTo={replyTo} started={started} onCancelReply={() => { setReplyTo(null); }} onSubmit={submit} raised={raised} />
     </>
   );
@@ -216,10 +240,11 @@ interface ThreadSectionProps {
   anchors?: AnchorLookup | undefined;
   className?: string | undefined;
   raised: boolean;
+  focusId: string | null;
 }
 
 /** The Comments section over one loaded thread: heading, count, the threads, and the composer. */
-function ThreadSection({ publicId, thread, anchors, className, raised }: ThreadSectionProps) {
+function ThreadSection({ publicId, thread, anchors, className, raised, focusId }: ThreadSectionProps) {
   const { state, post, edit, remove, setMute, resolve } = thread;
   const [notices, setNotices] = useState<MentionOutcome | null>(null);
 
@@ -249,7 +274,7 @@ function ThreadSection({ publicId, thread, anchors, className, raised }: ThreadS
       {state.status === "error" ? <p className="text-sm text-muted-foreground">{state.error}</p> : null}
       {state.status === "ready" ? (
         <MentionablesProvider publicId={publicId}>
-          <ThreadBody publicId={publicId} data={state.data} handlers={handlers} post={post} onNotices={showNotices} raised={raised} anchors={anchors} />
+          <ThreadBody publicId={publicId} data={state.data} handlers={handlers} post={post} onNotices={showNotices} raised={raised} anchors={anchors} focusId={focusId} />
         </MentionablesProvider>
       ) : null}
       <MentionNotices outcome={notices} />
@@ -257,10 +282,17 @@ function ThreadSection({ publicId, thread, anchors, className, raised }: ThreadS
   );
 }
 
+/** Where a thread sits and what a link asked it to show. */
+interface ThreadPlacement {
+  className?: string | undefined;
+  raised: boolean;
+  focusId: string | null;
+}
+
 /** The thread loaded by this section itself, where nothing around it shares one. */
-function OwnThread({ publicId, className, raised }: { publicId: string; className?: string | undefined; raised: boolean }) {
+function OwnThread({ publicId, ...placement }: ThreadPlacement & { publicId: string }) {
   const thread = useCommentThread(publicId);
-  return <ThreadSection publicId={publicId} thread={thread} className={className} raised={raised} />;
+  return <ThreadSection publicId={publicId} thread={thread} {...placement} />;
 }
 
 /**
@@ -270,7 +302,7 @@ function OwnThread({ publicId, className, raised }: { publicId: string; classNam
  * a list opened after the thread loaded (the Comments dialog) loads it again
  * first, so it shows comments made since.
  */
-function SharedThread({ inline, className, raised }: { inline: InlineComments; className?: string | undefined; raised: boolean }) {
+function SharedThread({ inline, ...placement }: ThreadPlacement & { inline: InlineComments }) {
   const { thread, ready, located, reveal } = inline;
   const { markRead, reload } = thread;
   const loadedBefore = useRef(thread.state.status === "ready");
@@ -287,7 +319,7 @@ function SharedThread({ inline, className, raised }: { inline: InlineComments; c
     }),
     [ready, located, reveal],
   );
-  return <ThreadSection publicId={inline.publicId} thread={thread} anchors={anchors} className={className} raised={raised} />;
+  return <ThreadSection publicId={inline.publicId} thread={thread} anchors={anchors} {...placement} />;
 }
 
 /**
@@ -298,9 +330,11 @@ function SharedThread({ inline, className, raised }: { inline: InlineComments; c
  * as cards; leave it off inside a card, which must not nest card shadows.
  * Inside an artifact's inline comments (InlineCommentsProvider) it shows
  * their thread, with each inline comment's words and a way to them.
+ * `focusId` names a comment a link asked for: it is brought into view and
+ * marked, or the thread says it was deleted.
  */
-export function CommentThread({ publicId, className, raised = false }: { publicId: string; className?: string; raised?: boolean }) {
+export function CommentThread({ publicId, className, raised = false, focusId = null }: { publicId: string; className?: string; raised?: boolean; focusId?: string | null }) {
   const inline = useInlineComments();
-  if (inline?.publicId === publicId) return <SharedThread inline={inline} className={className} raised={raised} />;
-  return <OwnThread publicId={publicId} className={className} raised={raised} />;
+  if (inline?.publicId === publicId) return <SharedThread inline={inline} className={className} raised={raised} focusId={focusId} />;
+  return <OwnThread publicId={publicId} className={className} raised={raised} focusId={focusId} />;
 }

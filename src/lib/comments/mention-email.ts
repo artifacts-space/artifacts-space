@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { artifactLinkHref } from "@/lib/app-link";
 import { reserveBudgetedEmail } from "@/lib/email/budget";
 import { html, renderEmail } from "@/lib/email/layout";
 import { isSendirConfigured, sendEmail } from "@/lib/sendir";
@@ -21,10 +22,12 @@ function shortTitle(title: string) {
   return flat.length > TITLE_MAX ? `${flat.slice(0, TITLE_MAX - 1)}…` : flat || "an artifact";
 }
 
-/** The thread page for a mention. Never built from the request. */
+/**
+ * Where a mention opens: the artifact in the workspace with its comments, at
+ * the comment when one is named. Never built from the request.
+ */
 export function threadUrl(publicId: string, commentId?: string) {
-  const hash = commentId ? `#comment-${encodeURIComponent(commentId)}` : "";
-  return siteUrl(`/threads/${encodeURIComponent(publicId)}${hash}`);
+  return siteUrl(artifactLinkHref(commentId ? { publicId, comments: true, commentId } : { publicId, comments: true }));
 }
 
 /** The mention email in the shared layout. The author label and title are escaped; the comment text is never included. */

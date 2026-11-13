@@ -23,13 +23,21 @@ export interface InlineComments {
   ready: boolean;
   /** Ids of open inline comments whose words are on the page. */
   located: ReadonlySet<string>;
+  /** True once `located` was worked out for the thread as loaded now (it lags a frame behind a load). */
+  settled: boolean;
   /** The thread open at its words, by its top-level comment. */
   activeId: string | null;
   draft: InlineDraft | null;
   /** Opens a thread at its words. */
   open: (commentId: string) => void;
-  /** Scrolls to a thread's words and opens it there. False when the words are not on the page. */
-  reveal: (commentId: string) => boolean;
+  /** The comment a link asked to show in the open thread's card (its first comment or a reply), or null. */
+  focusId: string | null;
+  /**
+   * Scrolls to a thread's words and opens it there. `focusId` names a comment
+   * in it to bring into view and mark, for a link to it. False when the words
+   * are not on the page.
+   */
+  reveal: (commentId: string, focusId?: string) => boolean;
   /** Closes the open thread or the new comment. */
   close: () => void;
   /** Starts a comment on a stretch of the page, or on the current selection. False when it holds no words of this artifact. */
