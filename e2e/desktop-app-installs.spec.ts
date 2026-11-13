@@ -1,10 +1,10 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * The "Add to" buttons for the desktop apps, on the component gallery (no
- * database). Cursor and Claude Desktop are links to the app's own install
- * link; Codex and Grok Bot open their steps in a dialog, with the command
- * and the message ready to copy.
+ * database). Every button is a link. Cursor and Claude Desktop go to the
+ * app's own install link; Codex and Grok Bot have none, so they open their
+ * steps on the clients page of the docs in a new tab.
  */
 
 const endpoint = "https://artifacts.space/api/mcp";
@@ -17,21 +17,10 @@ async function openGallery(page: Page) {
   await row(page).scrollIntoViewIfNeeded();
 }
 
-/** The dialog stays inside the window, with room around it. */
-async function expectInsideWindow(page: Page, dialog: Locator) {
-  const box = await dialog.boundingBox();
-  const size = page.viewportSize();
-  if (!box || !size) throw new Error("the dialog or the window has no size");
-  expect(box.x, "left edge").toBeGreaterThanOrEqual(0);
-  expect(box.y, "top edge").toBeGreaterThanOrEqual(0);
-  expect(box.x + box.width, "right edge").toBeLessThanOrEqual(size.width);
-  expect(box.y + box.height, "bottom edge").toBeLessThanOrEqual(size.height);
-}
-
 test("should show the four apps in order, each with its mark, when the row renders", async ({ page }) => {
   await openGallery(page);
   const items = row(page).getByRole("listitem");
-  await expect(items).toHaveText(["Add to Cursor", "Add to Claude Desktop (opens in a new tab)", "Add to Codex", "Add to Grok Bot"]);
+  await expect(items).toHaveText(["Add to Cursor", "Add to Claude Desktop (opens in a new tab)", "Add to Codex (opens in a new tab)", "Add to Grok Bot (opens in a new tab)"]);
   for (const item of await items.all()) {
     await expect(item.locator("svg[data-client-logo]")).toHaveCount(1);
     await expect(item.locator("svg[data-client-logo]")).toBeVisible();
@@ -58,57 +47,47 @@ test("should link Cursor and Claude Desktop to their install links when the app 
   await expect(claude).toHaveAttribute("rel", "noopener noreferrer");
 });
 
-test("should open Codex's steps with the command and the settings link when Add to Codex is pressed", async ({ page, context }) => {
+test("should open the Codex steps in the docs in a new tab when Add to Codex is pressed", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await openGallery(page);
-  const button = row(page).getByRole("button", { name: "Add to Codex" });
-  await button.click();
+  const button = row(page).locator("a[data-install=codex]");
+  await expect(button).toHaveAttribute("href", "/docs/clients#codex");
+  await expect(button).toHaveAttribute("rel", "noopener noreferrer");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  const dialog = page.getByRole("dialog", { name: "Add to Codex" });
-  await expect(dialog).toBeVisible();
-  // The dialog says in its own words that Codex has no install link, so the guide leaves out its "no one-click link" line.
-  await expect(dialog.getByText("Codex has no install link yet. These steps take about a minute.", { exact: false })).toBeVisible();
-  await expect(dialog.getByText("no one-click link", { exact: false })).toHaveCount(0);
-  await expect(dialog.locator('[data-variant="command"]').filter({ hasText: "codex mcp list" })).toHaveCount(1);
-  await expect(dialog.locator('[data-variant="command"]').filter({ hasText: `codex mcp add artifacts --url ${endpoint}` })).toBeVisible();
-  await expect(dialog.locator("a", { hasText: "Open Codex settings" })).toHaveAttribute("href", "codex://settings");
-  await expect(dialog.getByText("Streamable HTTP")).toBeVisible();
-  await expectInsideWindow(page, dialog);
+  const [docs] = await Promise.all([context.waitForEvent("page"), button.click()]);
+  await docs.waitForLoadState("domcontentloaded");
+  expect(new URL(docs.url()).pathname + new URL(docs.url()).hash).toBe("/docs/clients#codex");
+  // The gallery stays where it was: the steps open beside it, not in its place.
+  expect(new URL(page.url()).pathname).toBe("/dev/components");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  await dialog.locator('[data-variant="command"]').filter({ hasText: "codex mcp add" }).getByRole("button").click();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`codex mcp add artifacts --url ${endpoint}`);
+  const section = docs.locator("section[aria-labelledby=codex]");
+  await expect(section.getByRole("heading", { level: 2 })).toBeInViewport();
+  for (const label of ["Plugins", "Add custom MCP server", "Server URL", "Create as a plugin"]) {
+    await expect(section.getByText(label, { exact: true }).first()).toBeVisible();
+  }
+  await expect(section.locator('[data-variant="command"]').filter({ hasText: `codex mcp add artifacts --url ${endpoint}` })).toBeVisible();
 
-  // Close gives the keyboard back to the button that opened the steps.
-  await dialog.getByRole("button", { name: "Close" }).click();
-  await expect(dialog).toBeHidden();
-  await expect(button).toBeFocused();
+  // The URL the form takes is one press away from the clipboard.
+  await section.getByRole("button", { name: `Copy ${endpoint}` }).click();
+  expect(await docs.evaluate(() => navigator.clipboard.readText())).toBe(endpoint);
 });
 
-test("should open Grok Bot's steps with the message for a Bot when Add to Grok Bot is pressed", async ({ page, context }) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+test("should open the Grok Bot steps in the docs in a new tab when Add to Grok Bot is pressed", async ({ page, context }) => {
   await openGallery(page);
-  await row(page).getByRole("button", { name: "Add to Grok Bot" }).click();
+  const button = row(page).locator("a[data-install=grok-bot]");
+  await expect(button).toHaveAttribute("href", "/docs/clients#grok-bot");
 
-  const dialog = page.getByRole("dialog", { name: "Add to Grok Bot" });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText("Grok Bot has no install link yet. These steps take about a minute.", { exact: false })).toBeVisible();
-  await expect(dialog.getByText("no one-click link", { exact: false })).toHaveCount(0);
-  await expect(dialog.getByText("Check the connection", { exact: true })).toHaveCount(1);
+  const [docs] = await Promise.all([context.waitForEvent("page"), button.click()]);
+  await docs.waitForLoadState("domcontentloaded");
+  expect(new URL(docs.url()).pathname + new URL(docs.url()).hash).toBe("/docs/clients#grok-bot");
+
+  const section = docs.locator("section[aria-labelledby=grok-bot]");
+  await expect(section.getByRole("heading", { level: 2 })).toBeInViewport();
   for (const label of ["Connect apps", "Add a custom connector", "Remote HTTPS", "Add plugin"]) {
-    // The steps come first; the check at the end names "Connect apps" again.
-    await expect(dialog.getByText(label, { exact: true }).first()).toBeVisible();
+    await expect(section.getByText(label, { exact: true }).first()).toBeVisible();
   }
-  await expect(dialog.locator("code").filter({ hasText: endpoint }).first()).toBeVisible();
-  await expectInsideWindow(page, dialog);
-  // It opens at the first step, and Close stays in reach however far the steps scroll.
-  const steps = dialog.locator("[data-slot=install-steps]");
-  expect(await steps.evaluate((element) => element.scrollTop), "opens at the first step").toBe(0);
-  await steps.evaluate((element) => { element.scrollTop = element.scrollHeight; });
-  await expect(dialog.getByRole("button", { name: "Close" })).toBeInViewport({ ratio: 1 });
-  await expect(dialog.getByRole("heading", { name: "Add to Grok Bot" })).toBeInViewport({ ratio: 1 });
-
-  const message = dialog.locator("figure[data-code-block]").filter({ hasText: "Add the MCP server at" });
-  await message.scrollIntoViewIfNeeded();
-  await message.getByRole("button").click();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`Add the MCP server at ${endpoint} and name it artifacts.`);
+  await expect(section.getByRole("button", { name: `Copy ${endpoint}` })).toBeVisible();
+  await expect(section.locator("figure[data-code-block]").filter({ hasText: `Add the MCP server at ${endpoint} and name it artifacts.` })).toBeVisible();
 });

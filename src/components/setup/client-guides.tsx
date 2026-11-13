@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
+import { CopyCode } from "@/components/copy-code";
 import { Prose } from "@/components/docs/docs-content";
 import { CodexGuide, GrokBotGuide } from "@/components/setup/codex-grok-guides";
 import { ApproveSteps, CheckStep, type ClientGuideProps, Label, NoOneClick } from "@/components/setup/guide-parts";
@@ -28,9 +29,10 @@ import { claudeMcpAddOAuthCommand, mcpEndpoint, mcpOAuthConfigJson } from "@/lib
  * Setup steps for each MCP client, shared by the quickstart picker and the
  * clients page. `full` adds the alternatives and fine print the picker
  * leaves out. Every path is the remote endpoint with OAuth: no token, and
- * nothing runs on the person's machine. The shared pieces live in
- * `guide-parts.tsx`, and the Codex and Grok Bot guides in
- * `codex-grok-guides.tsx`, so the Connections page's dialog loads only those.
+ * nothing runs on the person's machine. The server URL is always
+ * click-to-copy, because the reader pastes it into another app. The shared
+ * pieces live in `guide-parts.tsx`, and the Codex and Grok Bot guides in
+ * `codex-grok-guides.tsx`.
  */
 
 export { CodexGuide, GrokBotGuide } from "@/components/setup/codex-grok-guides";
@@ -84,7 +86,7 @@ export function ClaudeDesktopGuide({ origin, full = false }: ClientGuideProps) {
       </div>
       <Prose className="mt-3">
         <p>
-          To open the form by hand, open <strong>Customize</strong>, then <strong>Connectors</strong>. Choose <strong>+ Add</strong>, then <strong>Add custom connector</strong>. Name it <code>{CLAUDE_CONNECTOR_NAME}</code> and paste the URL <code>{mcpEndpoint(origin)}</code>.
+          To open the form by hand, open <strong>Customize</strong>, then <strong>Connectors</strong>. Choose <strong>+ Add</strong>, then <strong>Add custom connector</strong>. Name it <code>{CLAUDE_CONNECTOR_NAME}</code> and paste the URL <CopyCode value={mcpEndpoint(origin)} />.
         </p>
       </Prose>
       <Label>In Claude&apos;s form</Label>
@@ -114,14 +116,14 @@ export function ClaudeDesktopGuide({ origin, full = false }: ClientGuideProps) {
 }
 
 /** ChatGPT on the web: a custom MCP server, added from the Plugins page by URL. */
-export function ChatGptGuide({ origin, full = false, hideNoOneClick }: ClientGuideProps) {
+export function ChatGptGuide({ origin, full = false }: ClientGuideProps) {
   return (
     <>
-      <NoOneClick client="ChatGPT" hidden={hideNoOneClick} />
+      <NoOneClick client="ChatGPT" />
       <Prose className="mt-2">
         <ol>
           <li>In ChatGPT on the web, open <a href={CHATGPT_PLUGINS_URL}><strong>Plugins</strong></a>. Choose <strong>+</strong>, then <strong>Add custom MCP server</strong>.</li>
-          <li>Name it <code>artifacts.space</code>. Under <strong>Connection</strong>, paste the server URL <code>{mcpEndpoint(origin)}</code>.</li>
+          <li>Name it <code>artifacts.space</code>. Under <strong>Connection</strong>, paste the server URL <CopyCode value={mcpEndpoint(origin)} />.</li>
           <li>Choose <strong>OAuth</strong> for authentication. Leave the client ID and secret empty: ChatGPT registers itself.</li>
           <li>Choose <strong>I understand and want to continue</strong>, then <strong>Create as a plugin</strong>. Then install the plugin.</li>
         </ol>
@@ -169,10 +171,10 @@ export function OpenCodeGuide({ origin, full = false }: ClientGuideProps) {
 }
 
 /** Kimi Code CLI: an entry in `mcp.json`, then `/mcp-config login` inside Kimi Code. */
-export function KimiCodeGuide({ origin, full = false, hideNoOneClick }: ClientGuideProps) {
+export function KimiCodeGuide({ origin, full = false }: ClientGuideProps) {
   return (
     <>
-      <NoOneClick client="Kimi Code CLI" hidden={hideNoOneClick} />
+      <NoOneClick client="Kimi Code CLI" />
       <Prose className="mt-2">
         <p>Add this to <code>~/.kimi-code/mcp.json</code> for every project, or to <code>.kimi-code/mcp.json</code> in one project. Or type <code>/mcp-config</code> in Kimi Code and ask it to add the server.</p>
       </Prose>
@@ -214,7 +216,7 @@ export function FxGuide({ origin, full = false }: ClientGuideProps) {
       ) : null}
       <p className="text-md leading-6 text-muted-foreground">Run one command. There is no token to copy.</p>
       <CommandSnippet command={fxMcpAddCommand(origin)} className="mt-3" />
-      <Prose className="mt-2"><p>fx saves the server in <code>~/.fx/mcp.json</code>, sees that it uses sign-in, and opens your browser. Inside fx, <code>/mcp add artifacts {mcpEndpoint(origin)}</code> does the same.</p></Prose>
+      <Prose className="mt-2"><p>fx saves the server in <code>~/.fx/mcp.json</code>, sees that it uses sign-in, and opens your browser. Inside fx, <CopyCode value={`/mcp add artifacts ${mcpEndpoint(origin)}`} /> does the same.</p></Prose>
       <ApproveSteps opener={<>Your browser opens on the sign-in page. To sign in later or again, run <code>{fxMcpLoginCommand()}</code>.</>} />
       <Label>Add the skill</Label>
       <Prose className="mt-2"><p>Type this inside fx. It installs the skill to <code>~/.fx/skills</code>, so it works in every project.</p></Prose>
@@ -235,15 +237,15 @@ export function FxGuide({ origin, full = false }: ClientGuideProps) {
 }
 
 /** Devin: a custom MCP server with OAuth. */
-export function DevinGuide({ origin, full = false, hideNoOneClick }: ClientGuideProps) {
+export function DevinGuide({ origin, full = false }: ClientGuideProps) {
   return (
     <>
-      <NoOneClick client="Devin" hidden={hideNoOneClick} />
+      <NoOneClick client="Devin" />
       <Prose className="mt-2">
         <ol>
           <li>Open <strong>Customize</strong>, then <strong>MCPs</strong>. Choose <strong>Add MCP</strong>, then <strong>Add custom MCP</strong>.</li>
           <li>Name it <code>artifacts</code> and choose the <strong>HTTP</strong> transport.</li>
-          <li>Paste the server URL <code>{mcpEndpoint(origin)}</code> and choose <strong>OAuth</strong> as the authentication method. Set <strong>Access</strong> to <strong>Personal</strong>.</li>
+          <li>Paste the server URL <CopyCode value={mcpEndpoint(origin)} /> and choose <strong>OAuth</strong> as the authentication method. Set <strong>Access</strong> to <strong>Personal</strong>.</li>
           <li>Save, then choose <strong>Connect</strong> next to the server.</li>
         </ol>
       </Prose>
@@ -265,7 +267,7 @@ export function OtherClientsGuide({ origin, full = false }: ClientGuideProps) {
   return (
     <>
       <Prose className="mt-0">
-        <p>Point any client that supports OAuth for remote servers at <code>{mcpEndpoint(origin)}</code> over Streamable HTTP. It needs only the URL.</p>
+        <p>Point any client that supports OAuth for remote servers at <CopyCode value={mcpEndpoint(origin)} /> over Streamable HTTP. It needs only the URL.</p>
       </Prose>
       <ApproveSteps opener="The client opens your browser when it first connects." />
       {full ? (

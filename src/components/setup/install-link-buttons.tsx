@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { ClientLogo } from "@/components/setup/client-logos";
 import { Button } from "@/components/ui/button";
+import { docsHref } from "@/lib/docs/pages";
 import { claudeInstallLink, cursorInstallLink, type DesktopAppId } from "@/lib/setup/client-installs";
 import { cn } from "@/lib/utils";
 
@@ -48,4 +49,20 @@ export function CursorInstallButton({ origin, className }: InstallButtonProps) {
  */
 export function ClaudeInstallButton({ origin, className }: InstallButtonProps) {
   return <InstallLink app="claude-desktop" href={claudeInstallLink(origin)} newTab className={className}>Add to Claude Desktop</InstallLink>;
+}
+
+/**
+ * "Add to Codex": Codex publishes no install link, so the button opens the
+ * Codex steps on the clients page of the docs, in a new tab.
+ */
+export function CodexInstallButton({ className }: InstallButtonProps) {
+  return <InstallLink app="codex" href={docsHref("clients", "codex")} newTab className={className}>Add to Codex</InstallLink>;
+}
+
+/**
+ * "Add to Grok Bot": Grok Bot publishes no install link, so the button opens
+ * the Grok Bot steps on the clients page of the docs, in a new tab.
+ */
+export function GrokBotInstallButton({ className }: InstallButtonProps) {
+  return <InstallLink app="grok-bot" href={docsHref("clients", "grok-bot")} newTab className={className}>Add to Grok Bot</InstallLink>;
 }

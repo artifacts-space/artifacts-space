@@ -1,9 +1,9 @@
 import { CodeSnippet, CommandSnippet } from "@/components/code/code-snippet";
+import { CopyCode } from "@/components/copy-code";
 import { Prose } from "@/components/docs/docs-content";
 import { ApproveSteps, CheckStep, type ClientGuideProps, Label, NoOneClick } from "@/components/setup/guide-parts";
-import { Button } from "@/components/ui/button";
 import {
-  CODEX_SETTINGS_LINK,
+  CODEX_PLUGIN_NAME,
   codexConfigToml,
   codexMcpAddCommand,
   codexMcpListCommand,
@@ -15,35 +15,33 @@ import { mcpEndpoint } from "@/lib/setup/mcp-config";
 
 /**
  * The guides for Codex and Grok Bot, the two desktop apps with no install
- * link. The docs show them, and the Connections page shows them in its
- * "Add to" dialog, so they live apart from the other guides and that page
- * loads only these two.
+ * link. Their "Add to" buttons on the Connections page open these sections
+ * of the clients page, so the steps live in one place.
  */
 
 /**
- * Codex: `codex mcp add` with the URL; the desktop app and CLI share config.
- * Steps from https://learn.chatgpt.com/docs/extend/mcp?surface=cli; the
- * desktop app's menu names are not checked in the app itself.
+ * Codex: a custom MCP server added from Plugins in the app, or
+ * `codex mcp add` in the terminal. The app's steps follow its "Add custom
+ * MCP server" form as the owner saw it in November 2026; what the app shows
+ * after "Create as a plugin" is not checked. The terminal steps are from
+ * https://learn.chatgpt.com/docs/extend/mcp?surface=cli.
  */
-export function CodexGuide({ origin, full = false, hideNoOneClick }: ClientGuideProps) {
+export function CodexGuide({ origin, full = false }: ClientGuideProps) {
   return (
     <>
-      <NoOneClick client="Codex" hidden={hideNoOneClick} />
-      <Label>In the terminal</Label>
-      <CommandSnippet command={codexMcpAddCommand(origin)} className="mt-2" />
-      <Prose className="mt-2"><p>Codex adds the server, sees that it uses sign-in, and opens your browser.</p></Prose>
-      <Label>In the ChatGPT desktop app</Label>
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <Button render={<a href={CODEX_SETTINGS_LINK} />} nativeButton={false} variant="outline" size="sm">Open Codex settings</Button>
-        <span className="text-sm text-muted-foreground">If you have the ChatGPT desktop app, this opens its Settings.</span>
-      </div>
+      <NoOneClick client="Codex" />
+      <Label>In the Codex app</Label>
       <Prose className="mt-2">
         <ol>
-          <li>In <strong>Settings</strong>, choose <strong>MCP servers</strong>, then <strong>Add server</strong>.</li>
-          <li>Name it <code>artifacts</code>, choose <strong>Streamable HTTP</strong>, and paste <code>{mcpEndpoint(origin)}</code>.</li>
-          <li>Save, choose <strong>Restart</strong>, then <strong>Authenticate</strong> next to the server.</li>
+          <li>Open <strong>Plugins</strong>. Choose <strong>Add</strong>, then <strong>Add custom MCP server</strong>.</li>
+          <li>Name it <code>{CODEX_PLUGIN_NAME}</code>. Under <strong>Connection</strong>, keep <strong>Server URL</strong> and paste <CopyCode value={mcpEndpoint(origin)} />.</li>
+          <li>Set <strong>Authentication</strong> to <strong>OAuth</strong>. Leave <strong>Advanced OAuth settings</strong> as they are.</li>
+          <li>Select <strong>I understand and want to continue</strong>, then choose <strong>Create as a plugin</strong>.</li>
         </ol>
       </Prose>
+      <Label>In the terminal</Label>
+      <CommandSnippet command={codexMcpAddCommand(origin)} className="mt-2" />
+      <Prose className="mt-2"><p>Codex adds the server, sees that it uses sign-in, and opens your browser. The Codex CLI and the IDE extension share one config, so the command covers both.</p></Prose>
       {full ? (
         <>
           <Label>In config.toml</Label>
@@ -52,11 +50,10 @@ export function CodexGuide({ origin, full = false, hideNoOneClick }: ClientGuide
           <CommandSnippet command={codexMcpLoginCommand()} className="mt-3" />
         </>
       ) : null}
-      <ApproveSteps opener="Your browser opens on the sign-in page." />
-      <CheckStep note={<>The list shows <strong>artifacts</strong>. In the ChatGPT desktop app, the server list shows <strong>Authenticate</strong> next to a server you still need to sign in to.</>}>
+      <ApproveSteps opener="Codex asks you to sign in. Your browser opens on the sign-in page." />
+      <CheckStep note={<>In the Codex app, open <strong>Plugins</strong>: <strong>{CODEX_PLUGIN_NAME}</strong> shows under <strong>Installed</strong>. In the terminal, the list shows <strong>artifacts</strong>.</>}>
         <CommandSnippet command={codexMcpListCommand()} />
       </CheckStep>
-      <Prose className="mt-4"><p>The ChatGPT desktop app, the Codex CLI, and the IDE extension share one config, so you add the server once.</p></Prose>
     </>
   );
 }
@@ -66,16 +63,16 @@ export function CodexGuide({ origin, full = false, hideNoOneClick }: ClientGuide
  * Steps from https://docs.x.ai/grok-bot/computer-and-apps; the menu names
  * are not checked in the app itself.
  */
-export function GrokBotGuide({ origin, full = false, hideNoOneClick }: ClientGuideProps) {
+export function GrokBotGuide({ origin, full = false }: ClientGuideProps) {
   return (
     <>
-      <NoOneClick client="Grok Bot" hidden={hideNoOneClick} />
+      <NoOneClick client="Grok Bot" />
       <Label>In the desktop app</Label>
       <Prose className="mt-2">
         <ol>
           <li>Open <strong>Connect apps</strong>. At the bottom, choose <strong>Add a custom connector</strong>.</li>
           <li>Name it <code>artifacts</code> and choose <strong>Remote HTTPS</strong>.</li>
-          <li>Paste the server URL <code>{mcpEndpoint(origin)}</code>. Leave the HTTP headers and the Client ID empty.</li>
+          <li>Paste the server URL <CopyCode value={mcpEndpoint(origin)} />. Leave the HTTP headers and the Client ID empty.</li>
           <li>Choose <strong>Add plugin</strong>. When the app shows <strong>Needs auth</strong>, choose <strong>Authenticate</strong>.</li>
         </ol>
       </Prose>

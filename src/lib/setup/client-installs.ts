@@ -68,12 +68,11 @@ function claudeConnectorQuery(origin: string): string {
 }
 
 /**
- * Opens Settings in the ChatGPT desktop app, where Codex keeps its MCP
- * servers. Codex documents no link that adds a server, so this is as far as
- * a link can go; the person chooses "MCP servers" and "Add server" there.
- * Source: https://learn.chatgpt.com/docs/reference/commands
+ * The name the Codex app's "Add custom MCP server" form takes. The app
+ * lists the server as a plugin under this name; the CLI keeps its own
+ * entry, named `artifacts`.
  */
-export const CODEX_SETTINGS_LINK = "codex://settings";
+export const CODEX_PLUGIN_NAME = "artifacts.space";
 
 /**
  * The Codex command that adds the server. `codex mcp add <NAME> --url <URL>`
@@ -104,8 +103,8 @@ export function codexMcpListCommand(): string {
 }
 
 /**
- * The `~/.codex/config.toml` entry. The ChatGPT desktop app, the Codex CLI,
- * and the IDE extension share this file.
+ * The `~/.codex/config.toml` entry. The Codex CLI and the IDE extension
+ * share this file.
  * Source: https://learn.chatgpt.com/docs/extend/mcp?surface=cli
  */
 export function codexConfigToml(origin: string): string {
@@ -267,8 +266,8 @@ export type McpClientId = (typeof mcpClients)[number]["id"];
 /**
  * The desktop apps the Connections page gives an "Add to" button, in the
  * order it shows them: the two with an install link first (Cursor, Claude),
- * then Codex and Grok Bot, which publish none, so their buttons open the
- * few steps left.
+ * then Codex and Grok Bot, which publish none, so their buttons open
+ * their steps in the docs.
  */
 export const desktopApps = ["cursor", "claude-desktop", "codex", "grok-bot"] as const satisfies readonly McpClientId[];
 

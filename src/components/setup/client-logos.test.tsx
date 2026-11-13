@@ -64,9 +64,21 @@ describe("client guides", () => {
     }
   });
 
+  it("should never show the server URL as plain inline code when a guide names it in its steps", () => {
+    for (const client of mcpClients) {
+      const Guide = clientGuides[client.id];
+      const html = renderToStaticMarkup(<Guide origin={origin} full />);
+      expect(html, client.label).not.toContain(`<code>${endpoint}</code>`);
+    }
+    for (const id of ["claude-desktop", "chatgpt", "codex", "grok-bot", "devin", "other-clients"] as const) {
+      const Guide = clientGuides[id];
+      expect(renderToStaticMarkup(<Guide origin={origin} />), id).toContain(`aria-label="Copy ${endpoint}"`);
+    }
+  });
+
   it("should send ChatGPT to Plugins with OAuth and no client ID when rendered in full", () => {
     const html = renderToStaticMarkup(<ChatGptGuide origin={origin} full />);
-    for (const step of ['href="https://chatgpt.com/plugins"', "Add custom MCP server", `<code>${endpoint}</code>`, "<strong>OAuth</strong>", "Leave the client ID and secret empty", "Create as a plugin", "You do not need Developer mode", "<strong>via ChatGPT</strong>"]) {
+    for (const step of ['href="https://chatgpt.com/plugins"', "Add custom MCP server", `aria-label="Copy ${endpoint}"`, "<strong>OAuth</strong>", "Leave the client ID and secret empty", "Create as a plugin", "You do not need Developer mode", "<strong>via ChatGPT</strong>"]) {
       expect(html).toContain(step);
     }
   });
