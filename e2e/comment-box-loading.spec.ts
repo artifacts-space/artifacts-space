@@ -12,12 +12,22 @@ const CHUNKS = "**/_next/static/chunks/**";
 /** Words only the rich comment box's code holds (comment-editor.tsx), to tell its chunk from the rest. */
 const EDITOR_MARKER = "Comments hold text only.";
 
-/** Passes every chunk through, except the rich box's, which goes to `onEditor`. */
-async function routeEditorChunk(page: Page, onEditor: (route: Route, response: APIResponse) => Promise<void> | void) {
+/** A chunk fetched by the test: its response for status and headers, and its text read at once. */
+interface FetchedChunk {
+  response: APIResponse;
+  body: string;
+}
+
+/**
+ * Passes every chunk through, except the rich box's, which goes to `onEditor`.
+ * The body is read here, once: a held response may be disposed before it is
+ * released, so it is always fulfilled with this text, never read again.
+ */
+async function routeEditorChunk(page: Page, onEditor: (route: Route, chunk: FetchedChunk) => Promise<void> | void) {
   await page.route(CHUNKS, async (route) => {
     const response = await route.fetch();
     const body = await response.text();
-    if (body.includes(EDITOR_MARKER)) return onEditor(route, response);
+    if (body.includes(EDITOR_MARKER)) return onEditor(route, { response, body });
     return route.fulfill({ response, body });
   });
 }
@@ -57,18 +67,18 @@ test("should post from the plain box when the rich box cannot load", async ({ pa
 
 /** Holds the rich box's code until `release` is called, then lets it through. */
 async function holdEditorChunk(page: Page) {
-  const held: { route: Route; response: APIResponse }[] = [];
+  const held: { route: Route; chunk: FetchedChunk }[] = [];
   let released = false;
-  await routeEditorChunk(page, (route, response) => {
-    if (released) return route.fulfill({ response });
-    held.push({ route, response });
+  await routeEditorChunk(page, (route, chunk) => {
+    if (released) return route.fulfill(chunk);
+    held.push({ route, chunk });
     return undefined;
   });
   return {
     asked: () => held.length,
     release: async () => {
       released = true;
-      await Promise.all(held.map(({ route, response }) => route.fulfill({ response })));
+      await Promise.all(held.map(({ route, chunk }) => route.fulfill(chunk)));
     },
   };
 }
