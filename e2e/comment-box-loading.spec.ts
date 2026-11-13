@@ -65,6 +65,9 @@ test("should post from the plain box when the rich box cannot load", async ({ pa
   await expect(list(page).locator("[data-slot=comment-editor]"), "no rich box appeared").toHaveCount(0);
 });
 
+/** Requests for the rich box's code held by the running test and not yet released. */
+const waiting = new Set<Route>();
+
 /** Holds the rich box's code until `release` is called, then lets it through. */
 async function holdEditorChunk(page: Page) {
   const held: { route: Route; chunk: FetchedChunk }[] = [];
@@ -72,16 +75,32 @@ async function holdEditorChunk(page: Page) {
   await routeEditorChunk(page, (route, chunk) => {
     if (released) return route.fulfill(chunk);
     held.push({ route, chunk });
+    waiting.add(route);
     return undefined;
   });
   return {
     asked: () => held.length,
     release: async () => {
       released = true;
-      await Promise.all(held.map(({ route, chunk }) => route.fulfill(chunk)));
+      await Promise.all(held.map(({ route, chunk }) => {
+        waiting.delete(route);
+        return route.fulfill(chunk);
+      }));
     },
   };
 }
+
+/**
+ * Every held request was let through, and no chunk handler outlives the
+ * test: a chunk still being fetched as the page closes would fail it with
+ * "Test ended" or a disposed response.
+ */
+test.afterEach(async ({ page }) => {
+  const left = waiting.size;
+  waiting.clear();
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  expect(left, "no held request for the rich box's code was left waiting").toBe(0);
+});
 
 /** The rich box has taken over: it is the box, and it has the caret. */
 async function expectRichBox(page: Page) {
@@ -185,6 +204,28 @@ test("should post with the button while the plain box is being typed in, and not
   await expect.poll(() => writes(page), "the click posted, as typed").toEqual(["Some **bold** words and a long tail."]);
   await expectRichBox(page);
 });
+
+const trailingTails = [
+  { tail: "a space", before: "Some **bold** words ", after: "more.", posted: "Some **bold** words more." },
+  { tail: "a line break", before: "Some **bold** words\n", after: "more.", posted: "Some **bold** words\nmore." },
+];
+
+for (const { tail, before, after, posted } of trailingTails) {
+  test(`should keep the plain box when it loses focus with text ending in ${tail}, and post the next word apart`, async ({ page }) => {
+    const box = await typeWhileItArrives(page, before, "");
+    await list(page).getByRole("heading", { name: /Comments/ }).click();
+    await expect(box, "the box lost focus").not.toBeFocused();
+    await expect(box, "the plain box stays, so the rich box cannot drop the tail").toHaveJSProperty("tagName", "TEXTAREA");
+    await expect(box).toHaveValue(before);
+    // Back in the box, the caret is where it was: after the tail.
+    await box.focus();
+    await page.keyboard.type(after);
+    await expect(box).toHaveValue(before + after);
+    await page.keyboard.press(`${await modKey(page)}+Enter`);
+    expect(await writes(page), "the next word did not join the last").toEqual([posted]);
+    await expectRichBox(page);
+  });
+}
 
 test("should post what the thread then shows when the text is edited after the swap", async ({ page }) => {
   const box = await typeWhileItArrives(page, "Some **bo", "ld** words");
