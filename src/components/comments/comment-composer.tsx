@@ -8,6 +8,7 @@ import { FormError } from "@/components/teams/form-error";
 import { Button } from "@/components/ui/button";
 import { COMMENT_MAX_LENGTH } from "@/lib/comments/config";
 
+import { takesOverNow } from "./caret-handoff";
 import { CommentEditorBoundary, isSubmitShortcut, PlainCommentBox, useWantsEditor } from "./comment-box";
 import type { CommentEditorApi } from "./comment-editor";
 import type { MentionSource } from "./comment-mentions";
@@ -39,6 +40,15 @@ function draftProblem(body: string): string | null {
   return null;
 }
 
+/**
+ * Keeps the caret in the box when Post or Cancel is pressed, in every
+ * browser: the click still lands, and the box does not swap, and change
+ * size under the pointer, between press and release.
+ */
+function keepCaret(event: React.MouseEvent) {
+  event.preventDefault();
+}
+
 /** Puts the cursor at the end of the plain box's text, for a box that opens focused. */
 function focusAtEnd(textarea: HTMLTextAreaElement) {
   textarea.focus();
@@ -53,8 +63,10 @@ function focusAtEnd(textarea: HTMLTextAreaElement) {
  *
  * The rich box loads on demand. Until it is in, and for good if it cannot
  * load, a plain text box with the same name, size, and text stands in its
- * place; what is typed there posts as written, and the rich box takes it
- * over, with the caret, when it arrives.
+ * place; what is typed there posts as written. The rich box never takes
+ * over while someone is typing: it does when it arrives if the plain box is
+ * empty, unfocused, or unchanged, and otherwise once the plain box loses
+ * the caret, posts, or is cleared (caret-handoff.ts, `takesOverNow`).
  */
 export function CommentComposer({ label, placeholder, submitLabel, initialBody = "", onSubmit, onCancel, autoFocus = false, compact = false }: CommentComposerProps) {
   const [body, setBody] = useState(initialBody);
@@ -64,6 +76,9 @@ export function CommentComposer({ label, placeholder, submitLabel, initialBody =
   const [rich, setRich] = useState(false);
   const form = useRef<HTMLFormElement>(null);
   const plain = useRef<HTMLTextAreaElement>(null);
+  /** The rich box, loaded and waiting for the plain box to stop being typed in. */
+  const ready = useRef<CommentEditorApi | null>(null);
+  const opening = useRef(initialBody);
   const { candidates, self, resolved } = useMentionables();
   const mentions = useMemo<MentionSource>(() => ({ candidates, self, resolved }), [candidates, self, resolved]);
   const { attach, wanted, want } = useWantsEditor(autoFocus);
@@ -77,15 +92,29 @@ export function CommentComposer({ label, placeholder, submitLabel, initialBody =
     setError("");
   }, []);
   const onSubmitShortcut = useCallback(() => { form.current?.requestSubmit(); }, []);
-  const onReady = useCallback((editor: CommentEditorApi) => {
+  /** Swaps in the rich box, if it is ready: the plain box's exact text, and its caret when it has one. */
+  const takeOver = useCallback(() => {
+    const editor = ready.current;
     const textarea = plain.current;
-    if (!textarea) return;
+    if (!editor || !textarea) return;
+    ready.current = null;
     const focused = document.activeElement === textarea;
     editor.load(textarea.value, focused ? textarea.selectionStart : null);
     // Hidden at once, ahead of the next render, which removes it.
     textarea.parentElement?.setAttribute("hidden", "");
     setRich(true);
   }, []);
+  const onReady = useCallback((editor: CommentEditorApi) => {
+    ready.current = editor;
+    const textarea = plain.current;
+    if (!textarea) return;
+    if (takesOverNow({ text: textarea.value, opening: opening.current, focused: document.activeElement === textarea })) takeOver();
+  }, [takeOver]);
+
+  // A box emptied by a post, or by hand, is not being typed in: the rich box can take over.
+  useEffect(() => {
+    if (body === "") takeOver();
+  }, [body, takeOver]);
 
   async function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -119,6 +148,7 @@ export function CommentComposer({ label, placeholder, submitLabel, initialBody =
             value={body}
             onChange={(event) => { onChange(event.target.value); }}
             onFocus={want}
+            onBlur={takeOver}
             onKeyDown={(event) => {
               if (!isSubmitShortcut(event)) return;
               event.preventDefault();
@@ -149,8 +179,8 @@ export function CommentComposer({ label, placeholder, submitLabel, initialBody =
         <p className="mr-auto text-xs text-muted-foreground">
           Type @ to bring someone in. <ExternalLink href={SYNTAX_HELP_URL}>Formatting help</ExternalLink>
         </p>
-        {onCancel ? <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</Button> : null}
-        <Button type="submit" size="sm" disabled={pending}>
+        {onCancel ? <Button type="button" variant="ghost" size="sm" onMouseDown={keepCaret} onClick={onCancel}>Cancel</Button> : null}
+        <Button type="submit" size="sm" disabled={pending} onMouseDown={keepCaret}>
           {pending ? <IconLoader2 className="animate-spin" /> : <IconSend />} {submitLabel}
         </Button>
       </div>

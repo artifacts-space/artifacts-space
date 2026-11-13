@@ -55,8 +55,8 @@ interface PlainCommentBoxProps extends Omit<React.ComponentProps<"textarea">, "c
 /**
  * A plain text box with the rich box's name, frame, size, and text: what
  * shows while the rich box loads, and for good if it cannot load. What is
- * typed here is the comment's Markdown, and the rich box takes it over,
- * with the caret, when it arrives.
+ * typed here is the comment's Markdown, and the rich box takes it over
+ * when nobody is typing in it (comment-composer.tsx).
  */
 export function PlainCommentBox({ compact, ...props }: PlainCommentBoxProps) {
   return (
