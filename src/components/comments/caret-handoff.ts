@@ -34,3 +34,24 @@ export function positionForOffset(doc: ProseMirrorNode, offset: number): number 
   }
   return end;
 }
+
+/** The plain box, at the moment the rich box is ready to take it over. */
+export interface PlainBoxNow {
+  /** Its text. */
+  text: string;
+  /** The text it opened with: the comment being edited, or nothing. */
+  opening: string;
+  /** Whether it has the caret. */
+  focused: boolean;
+}
+
+/**
+ * Whether the rich box takes over from the plain box now, or waits. It never
+ * takes over while someone is typing: only when the plain box does not have
+ * the caret, is empty, or still holds just the text it opened with. Until
+ * then the plain box stays, and the rich box takes over when it loses the
+ * caret, posts, or is cleared.
+ */
+export function takesOverNow({ text, opening, focused }: PlainBoxNow): boolean {
+  return !focused || text === "" || text === opening;
+}

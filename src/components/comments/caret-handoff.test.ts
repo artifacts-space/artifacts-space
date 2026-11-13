@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { richEditorExtensions } from "@/components/editor/rich/editor-extensions";
 import { getSchema } from "@tiptap/core";
 
-import { positionForOffset } from "./caret-handoff";
+import { positionForOffset, takesOverNow } from "./caret-handoff";
 import { parseCommentMarkdown } from "./comment-markdown";
 
 const schema = getSchema(richEditorExtensions({ onLinkShortcut: () => false, media: false }));
@@ -35,5 +35,29 @@ describe("positionForOffset", () => {
   it("should put the caret at the start when the box is empty", () => {
     const doc = docFor("");
     expect(positionForOffset(doc, 4)).toBe(1);
+  });
+});
+
+describe("takesOverNow", () => {
+  it("should take over when the plain box is empty and has the caret", () => {
+    expect(takesOverNow({ text: "", opening: "", focused: true })).toBe(true);
+  });
+
+  it("should take over when the plain box holds text but not the caret", () => {
+    expect(takesOverNow({ text: "Typed, then left.", opening: "", focused: false })).toBe(true);
+  });
+
+  it("should wait when the plain box has the caret and text typed in it", () => {
+    for (const text of ["First wo", "Words then a space ", "Line one\n", "```\ncode\n```\n", "| a | b |\n| - | - |\n| 1 | 2 |\n"]) {
+      expect(takesOverNow({ text, opening: "", focused: true })).toBe(false);
+    }
+  });
+
+  it("should take over an edit box that still holds the comment it opened with", () => {
+    expect(takesOverNow({ text: "The **old** comment", opening: "The **old** comment", focused: true })).toBe(true);
+  });
+
+  it("should wait when an edit box has the caret and its comment was changed", () => {
+    expect(takesOverNow({ text: "The **old** comment, changed", opening: "The **old** comment", focused: true })).toBe(false);
   });
 });
