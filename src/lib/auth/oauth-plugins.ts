@@ -2,7 +2,7 @@ import { cimd } from "@better-auth/cimd";
 import { fetchClientMetadataResource } from "@better-auth/cimd/node";
 import { oauthProvider } from "@better-auth/oauth-provider";
 
-import { hashOAuthToken, mcpResource, oauthLimits, oauthTokenPrefixes } from "@/lib/oauth/config";
+import { betterAuthEndpointBursts, hashOAuthToken, mcpResource, oauthLimits, oauthTokenPrefixes } from "@/lib/oauth/config";
 import { oauthScopes } from "@/lib/oauth/scopes";
 
 /** Where the OAuth server sends people: sign-in first, then the approval page. */
@@ -43,6 +43,8 @@ export function oauthPlugins() {
       refreshTokenReuseInterval: oauthLimits.refreshReuseSeconds,
       storeTokens: { hash: hashOAuthToken },
       prefix: oauthTokenPrefixes,
+      // The route's Postgres limits govern these endpoints (src/lib/oauth/token-limits.ts).
+      rateLimit: { token: betterAuthEndpointBursts.token, register: betterAuthEndpointBursts.register },
     }),
     cimd({
       fetchClientMetadataResource,

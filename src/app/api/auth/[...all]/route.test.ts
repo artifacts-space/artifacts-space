@@ -7,11 +7,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * verifier); it needs a database, so it is not exercised here.
  */
 
-const mocks = vi.hoisted(() => ({ handler: vi.fn<(request: Request) => Promise<Response>>(), hitRateLimit: vi.fn(), hitRateLimits: vi.fn<(checks: readonly { name: string; subject: string }[]) => Promise<unknown>>() }));
+const mocks = vi.hoisted(() => ({
+  handler: vi.fn<(request: Request) => Promise<Response>>(),
+  hitRateLimit: vi.fn(),
+  hitRateLimits: vi.fn<(checks: readonly { name: string; subject: string }[]) => Promise<unknown>>(),
+  peekRateLimit: vi.fn(),
+  countRateLimitHit: vi.fn(),
+}));
 
 vi.mock("@/lib/auth/server", () => ({ getAuth: () => ({ handler: mocks.handler }) }));
-vi.mock("@/lib/abuse/rate-limit", () => ({ hitRateLimit: mocks.hitRateLimit, hitRateLimits: mocks.hitRateLimits, rateLimitMessage: () => "Slow down." }));
-vi.mock("@/lib/oauth/clients", () => ({ countUnapprovedClients: () => Promise.resolve(0) }));
+vi.mock("@/lib/abuse/rate-limit", () => ({
+  hitRateLimit: mocks.hitRateLimit,
+  hitRateLimits: mocks.hitRateLimits,
+  peekRateLimit: mocks.peekRateLimit,
+  countRateLimitHit: mocks.countRateLimitHit,
+  rateLimitMessage: () => "Slow down.",
+}));
+vi.mock("@/lib/oauth/limit-store", () => ({
+  findRefreshGrant: () => Promise.resolve(null),
+  unapprovedClientCounts: () => Promise.resolve({ total: 0, fromNetwork: 0, oldestFromNetwork: null }),
+  markClientNetwork: () => Promise.resolve(),
+}));
 
 const { OPTIONS, POST } = await import("./route");
 
@@ -30,6 +46,8 @@ describe("auth route CORS", () => {
     vi.resetAllMocks();
     vi.stubEnv("BETTER_AUTH_SECRET", "test-secret");
     mocks.hitRateLimit.mockResolvedValue({ allowed: true, retryAfterSeconds: 0 });
+    mocks.peekRateLimit.mockResolvedValue({ allowed: true, retryAfterSeconds: 0 });
+    mocks.countRateLimitHit.mockResolvedValue(undefined);
     mocks.handler.mockImplementation(() => Promise.resolve(Response.json({ access_token: "t" }, { headers: { "Access-Control-Allow-Credentials": "true" } })));
   });
 

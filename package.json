@@ -32,6 +32,7 @@
     "check:migrations": "node scripts/check-migrations.mts",
     "check": "pnpm typecheck && pnpm lint && pnpm check:lines && pnpm check:migrations && pnpm test",
     "reviewer:create": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/create-reviewer-account.mts",
+    "reviewer:seed": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-reviewer-demo.mts",
     "eval:routing": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/evals/artifact-routing.mts",
     "prepare": "husky",
     "test": "vitest run",

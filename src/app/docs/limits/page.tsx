@@ -11,6 +11,7 @@ import { rateLimitRows, sampleRefusal, type RateLimitRow, type RefusalShape } fr
 import { INVITATION_BUDGET_MESSAGE, NON_SIGN_IN_SHARE, nonSignInDailyLimit, SENDIR_DAILY_RECIPIENTS } from "@/lib/email/budget-rules";
 import { fileLimits, formatBytes } from "@/lib/files/config";
 import { maxMermaidLength } from "@/lib/mermaid-source";
+import { oauthLimits } from "@/lib/oauth/config";
 import { contentQuotaProblem, fileQuotaProblem, storageQuota } from "@/lib/quota/rules";
 import { teamLimits } from "@/lib/teams/limits";
 import { uiLimits } from "@/lib/ui/limits";
@@ -68,6 +69,9 @@ export default function LimitsPage() {
           <GroupTable rows={rateLimitRows().filter((row) => row.group === group)} />
         </section>
       ))}
+      <Prose>
+        <p>Apps that connect with OAuth refresh their access about once an hour. Hosted apps send every person&apos;s refreshes from a few shared addresses, so a successful refresh counts against its connection (one person and one app), and the address only meets a load backstop of {n(rateLimits.oauthToken.limit)} an hour. Failed token requests count against the address. After {rateLimits.oauthTokenFailuresByNetwork.limit} in {rateLimits.oauthTokenFailuresByNetwork.windowSeconds / 60} minutes, a request from it waits only when it carries no code or refresh token, or names no app the site can look up. Every other request still gets a real answer, so an app whose connection has ended learns to ask the person to connect again, however busy its address is. Codes, refresh tokens, and client secrets are long random values that cannot be guessed. One address may register {n(rateLimits.oauthRegister.limit)} apps an hour and have at most {oauthLimits.maxUnapprovedClientsPerNetwork} that nobody has approved. When it has that many, or when {n(oauthLimits.maxUnapprovedClients)} apps wait for approval in all, a new registration removes the oldest one that has waited over {oauthLimits.unapprovedEvictionGraceMinutes} minutes, from the same address first. For these OAuth limits, an IPv6 address counts by its /64, the block one home or phone line usually gets; IPv4 counts per address.</p>
+      </Prose>
 
       <DocsH page={page} id="storage" />
       <Prose>

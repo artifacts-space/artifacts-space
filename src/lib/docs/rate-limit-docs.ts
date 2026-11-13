@@ -12,7 +12,7 @@ export type RefusalShape = "mcp-429" | "tool-error" | "http-429" | "form" | "not
 
 interface LimitPlacement {
   /** Who is counted: a user, a token, a team, or a network address. */
-  per: "user" | "token" | "team" | "network" | "email address";
+  per: "user" | "token" | "team" | "network" | "email address" | "connection" | "code or refresh token";
   /** Where the limit is checked, in words. */
   where: string;
   refusal: RefusalShape;
@@ -69,9 +69,11 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   passwordSignInByNetworkDay: { per: "network", where: "Password sign-in tries, each day", refusal: "http-429", group: "Sign-in and OAuth" },
   passwordSignInByNetworkEmail: { per: "network", where: "Password sign-in tries for one email address from one network", refusal: "http-429", group: "Sign-in and OAuth" },
   passwordSignInFailuresByEmail: { per: "email address", where: "Failed password sign-ins for one address, from any network (only failures count)", refusal: "http-429", group: "Sign-in and OAuth" },
-  oauthRegister: { per: "network", where: "OAuth app registration (MCP clients)", refusal: "http-429", group: "Sign-in and OAuth" },
+  oauthRegister: { per: "network", where: "OAuth app registration (MCP clients; IPv6 counts by /64)", refusal: "http-429", group: "Sign-in and OAuth" },
   oauthAuthorize: { per: "network", where: "OAuth authorization requests", refusal: "http-429", group: "Sign-in and OAuth" },
-  oauthToken: { per: "network", where: "OAuth token requests and refreshes", refusal: "http-429", group: "Sign-in and OAuth" },
+  oauthToken: { per: "network", where: "Every OAuth token request: a load backstop, high so hosted apps that serve many people from one address are not slowed (IPv6 counts by /64)", refusal: "http-429", group: "Sign-in and OAuth" },
+  oauthTokenFailuresByNetwork: { per: "network", where: "Failed OAuth token requests (IPv6 counts by /64); over it, only requests that carry no code or refresh token, or name no app this site can look up, wait", refusal: "http-429", group: "Sign-in and OAuth" },
+  oauthRefreshByConnection: { per: "connection", where: "Successful OAuth refreshes for one person and one app, from any network", refusal: "http-429", group: "Sign-in and OAuth" },
 };
 
 /** One row of the rate limit table. */

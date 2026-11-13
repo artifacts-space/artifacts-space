@@ -71,6 +71,25 @@ describe("addressPrefix", () => {
     expect(addressPrefix("::ffff:203.0.113.7")).toBe("203.0.113.7");
   });
 
+  it("should map an IPv4-mapped IPv6 address written in hex to the same IPv4 address as the dotted form", () => {
+    expect(addressPrefix("::ffff:cb00:7107")).toBe("203.0.113.7");
+    expect(addressPrefix("::FFFF:CB00:7107")).toBe("203.0.113.7");
+    expect(addressPrefix("0:0:0:0:0:ffff:cb00:7107")).toBe("203.0.113.7");
+    expect(addressPrefix("::ffff:0102:0304")).toBe("1.2.3.4");
+    expect(addressPrefix("::ffff:0102:0304")).not.toBe(addressPrefix("::ffff:0102:0305"));
+  });
+
+  it("should key the hex and dotted forms of one IPv4-mapped address as that IPv4 address", () => {
+    const key = (address: string) => networkPrefixKey(new Headers({ "x-forwarded-for": address }), "s");
+    expect(key("::ffff:cb00:7107")).toBe(key("::ffff:203.0.113.7"));
+    expect(key("::ffff:cb00:7107")).toBe(key("203.0.113.7"));
+  });
+
+  it("should keep an address that only looks mapped in its own IPv6 /64", () => {
+    expect(addressPrefix("::fffe:cb00:7107")).toBe("0000:0000:0000:0000::/64");
+    expect(addressPrefix("1::ffff:cb00:7107")).toBe("0001:0000:0000:0000::/64");
+  });
+
   it("should give every address in one IPv6 /64 the same prefix, however it is written", () => {
     const prefix = "2001:0db8:0001:0002::/64";
     expect(addressPrefix("2001:db8:1:2::1")).toBe(prefix);
@@ -87,6 +106,8 @@ describe("addressPrefix", () => {
     expect(addressPrefix("unknown")).toBe("unknown");
     expect(addressPrefix("1:2:3")).toBe("1:2:3");
     expect(addressPrefix("1::2::3")).toBe("1::2::3");
+    expect(addressPrefix("::ffff:cb00:71077")).toBe("::ffff:cb00:71077");
+    expect(addressPrefix("::ffff:cb00:zz07")).toBe("::ffff:cb00:zz07");
   });
 });
 

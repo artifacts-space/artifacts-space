@@ -21,8 +21,47 @@ export const oauthLimits = {
   refreshReuseSeconds: 30,
   /** Registered apps nobody approved are deleted after this long. */
   unapprovedClientHours: 24,
-  /** Most unapproved apps stored at once. Registration pauses above this. */
-  maxUnapprovedClients: 500,
+  /**
+   * Most unapproved apps stored at once. Each one is two small rows (the app
+   * and its resource link), so this bounds the table. When the pool is full,
+   * a new registration evicts the oldest unapproved app past the grace below
+   * instead of being refused (src/lib/oauth/registration-limits.ts).
+   */
+  maxUnapprovedClients: 2000,
+  /**
+   * An unapproved app younger than this is never evicted: the time a person
+   * takes from registration to approval, including signing in with an
+   * emailed link, which itself stays valid for 10 minutes.
+   */
+  unapprovedEvictionGraceMinutes: 15,
+  /**
+   * Most unapproved apps one network address may have within the window
+   * above. Approved apps never count, so a hosted app whose people finish
+   * connecting is limited only by the hourly registration limit; one address
+   * cannot hold more than a twentieth of the pool.
+   */
+  maxUnapprovedClientsPerNetwork: 100,
+  /**
+   * The network an app was registered from (oauth_client.registered_network,
+   * a keyed hash used only for the cap above) is cleared once the app is
+   * approved, and for every app after this many hours. The cleanup job runs
+   * every 6 hours, so no tag outlives 24 hours, well inside what the privacy
+   * page gives rate-limit data (rateLimitRetentionDays). The cap therefore
+   * counts a network's apps from the last 18 hours.
+   */
+  registeredNetworkHours: 18,
+} as const;
+
+/**
+ * Better Auth's own per-instance, in-memory limits on the token and
+ * registration endpoints (20 and 5 a minute per address by default). The
+ * Postgres limits in src/lib/abuse/limits.ts are the real ones; these are
+ * raised far above any real burst so they never throttle a hosted app that
+ * serves many people from one address.
+ */
+export const betterAuthEndpointBursts = {
+  token: { window: 10, max: 1000 },
+  register: { window: 10, max: 100 },
 } as const;
 
 /**
