@@ -10,7 +10,8 @@ import { markdownSchemaExtensions } from "./markdown-schema";
 import { RAW_MARKDOWN } from "./raw-markdown-node";
 import { reviewBlocks, type RawKind } from "./markdown-block-details";
 import type { ListSource } from "./markdown-list-items";
-import { itemContentMap, listChunk, ownWriting, spacingInItem, withLineEnds, writtenNodes, type ListTools } from "./markdown-roundtrip-lists";
+import { checkedListRuns, claimed, itemContentMap, listChunk, ownWriting, writtenNodes, type ListTools } from "./markdown-roundtrip-lists";
+import { writtenDocument, type Chunk } from "./markdown-roundtrip-output";
 
 interface Engine {
   schema: Schema;
@@ -366,14 +367,6 @@ function writtenCommentNode(node: JSONContent, current: Engine, comment: Comment
   return memo(nodeKey(node), () => renderCommentNode(node, current, comment));
 }
 
-/** A piece of output: source text and the loaded block it came from, if any. */
-interface Chunk {
-  text: string;
-  block: number;
-  /** True when the chunk is an edited list written over its loaded block. */
-  edited?: boolean;
-}
-
 function isEmptyParagraph(node: JSONContent): boolean {
   return node.type === "paragraph" && (node.content ?? []).every((child) => child.type === "text" && !child.text?.trim());
 }
@@ -414,7 +407,7 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine, flav
     const block = source.blocks[matched];
     if (block) {
       used.add(matched);
-      chunks.push({ text: block.text, block: matched });
+      chunks.push({ text: block.text, block: matched, nodes: nodes.slice(position, position + block.nodeCount) });
       position += block.nodeCount;
       previous = matched;
       continue;
@@ -422,48 +415,18 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine, flav
     // A comment's list is written whole, in the comment's own escaping, and judged by the thread.
     const listed = flavor === "document" ? listChunk(nodes, position, source, previous, used, listTools) : null;
     if (listed) {
-      used.add(listed.block);
-      chunks.push(listed);
-      previous = listed.block;
       position += 1;
+      if (listed.text) chunks.push(listed);
+      previous = claimed(listed.block, used, previous);
       continue;
     }
     position += 1;
     if (!node || isEmptyParagraph(node)) continue;
     const text = flavor === "document" ? renderNodes([node], current) : writtenCommentNode(node, current, flavor);
     // A block with no Markdown yet (an empty or uploading media block) is left out.
-    if (text) chunks.push({ text, block: -1 });
+    if (text) chunks.push({ text, block: -1, nodes: [node] });
   }
   return chunks;
-}
-
-function isUnchanged(chunks: Chunk[], source: SourceMap): boolean {
-  return chunks.length === source.blocks.length && chunks.every((chunk, position) => chunk.block === position && !chunk.edited);
-}
-
-function separator(previous: Chunk, next: Chunk, source: SourceMap): string {
-  const block = source.blocks[previous.block];
-  if (block && next.block === previous.block + 1) return block.after;
-  return source.inItem ? spacingInItem(previous, next, source) : "\n\n";
-}
-
-function ending(last: Chunk, source: SourceMap): string {
-  const block = source.blocks[last.block];
-  if (block && last.block === source.blocks.length - 1) return block.after;
-  return source.endsWithNewline ? "\n" : "";
-}
-
-function joinChunks(chunks: Chunk[], source: SourceMap): string {
-  const first = chunks[0];
-  const last = chunks.at(-1);
-  if (!first || !last) return "";
-  let output = first.block === 0 ? source.leading : "";
-  chunks.forEach((chunk, position) => {
-    const before = chunks[position - 1];
-    if (before) output += separator(before, chunk, source);
-    output += chunk.text;
-  });
-  return withLineEnds(output + ending(last, source), source.original);
 }
 
 /**
@@ -473,8 +436,7 @@ function joinChunks(chunks: Chunk[], source: SourceMap): string {
  */
 export function serializeMarkdown(doc: JSONContent, source: SourceMap, flavor: MarkdownFlavor = "document"): string {
   const chunks = toChunks(doc.content ?? [], source, getEngine(), flavor);
-  if (isUnchanged(chunks, source)) return source.original;
-  return joinChunks(chunks, source);
+  return writtenDocument(flavor === "document" ? checkedListRuns(chunks, source, listTools) : chunks, source);
 }
 
 /** An empty source map, for content that was never loaded from Markdown. */

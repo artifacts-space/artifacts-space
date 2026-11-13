@@ -1,6 +1,6 @@
 import type { AnyExtension, JSONContent, NodeViewRenderer } from "@tiptap/core";
 import CodeBlock from "@tiptap/extension-code-block";
-import { OrderedList, TaskItem, TaskList } from "@tiptap/extension-list";
+import { BulletList, OrderedList, TaskItem, TaskList } from "@tiptap/extension-list";
 import { renderTableToMarkdown, Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
 import StarterKit from "@tiptap/starter-kit";
 
@@ -102,6 +102,92 @@ export const MarkdownTable = Table.extend({
   renderMarkdown: (node, helpers) => renderTableToMarkdown(node, helpers).replace(/^\n+|\n+$/g, ""),
 }).configure({ resizable: false });
 
+/** A list rule that never matches, so marked's own list rule reads the list. */
+function leftToMarked(name: string) {
+  return { name, level: "block" as const, start: () => -1, tokenize: () => undefined };
+}
+
+/** The fields of a marked list item that the task rules read. */
+interface ItemToken {
+  type?: string;
+  raw?: string;
+  text?: string;
+  task?: boolean;
+  checked?: boolean;
+  tokens?: ItemToken[];
+}
+
+const boxPrefix = /^\[[ xX]\] /;
+const boxAlone = /^\[([ xX])\]$/;
+
+/** A task item's token without marked's checkbox, which sits first in the item or first in its opening paragraph. */
+function withoutBox(item: ItemToken): ItemToken {
+  const tokens = (item.tokens ?? []).filter((token) => token.type !== "checkbox");
+  const [first, ...rest] = tokens;
+  if (!first?.tokens?.some((token) => token.type === "checkbox")) return { ...item, task: false, tokens };
+  const opening = { ...first, raw: (first.raw ?? "").replace(boxPrefix, ""), text: (first.text ?? "").replace(boxPrefix, ""), tokens: first.tokens.filter((token) => token.type !== "checkbox") };
+  return { ...item, task: false, tokens: [opening, ...rest] };
+}
+
+/** The box of an item that holds a box and nothing else (`- [ ]`): marked reads it as text, the editor as an empty task. */
+function emptyTaskBox(item: ItemToken): string | undefined {
+  const [only, ...more] = item.tokens ?? [];
+  const isText = only?.type === "text" || only?.type === "paragraph";
+  return more.length === 0 && isText ? boxAlone.exec((only.text ?? "").trim())?.[1] : undefined;
+}
+
+/** A task item's content: a paragraph first, as the schema asks, then its other blocks. */
+function taskContent(content: JSONContent[] | undefined): JSONContent[] {
+  const blocks = content ?? [];
+  return blocks[0]?.type === "paragraph" ? blocks : [{ type: "paragraph" }, ...blocks];
+}
+
+/** One item of a bulleted or task list as its node, and the list type it belongs in. */
+function unorderedItem(item: ItemToken, parse: (item: ItemToken) => JSONContent | undefined): { list: string; node: JSONContent } | null {
+  const box = emptyTaskBox(item);
+  if (box !== undefined) return { list: "taskList", node: { type: "taskItem", attrs: { checked: box !== " " }, content: [{ type: "paragraph" }] } };
+  const parsed = parse(item.task === true ? withoutBox(item) : item);
+  if (!parsed) return null;
+  if (item.task !== true) return { list: "bulletList", node: parsed };
+  return { list: "taskList", node: { type: "taskItem", attrs: { checked: item.checked === true }, content: taskContent(parsed.content) } };
+}
+
+/**
+ * Bulleted and task lists read by marked's own list rule, as CommonMark
+ * reads them and as the read view does. Tiptap's task list rule ended a list
+ * at a blank line before the next item, so a loose task list loaded as one
+ * list per item, and it read a second paragraph in a nested task item as
+ * bare text, which the schema rejects. Here a list is one list however its
+ * items are spaced. Task items and plain items in one Markdown list become a
+ * task list and a bulleted list, in the order written.
+ */
+const MarkdownBulletList = BulletList.extend({
+  parseMarkdown: (token, helpers) => {
+    if (token.type !== "list" || token.ordered === true) return [];
+    const lists: JSONContent[] = [];
+    for (const item of (Array.isArray(token.items) ? token.items : []) as ItemToken[]) {
+      const read = unorderedItem(item, (cleaned) => helpers.parseChildren([cleaned])[0]);
+      if (!read) continue;
+      const last = lists.at(-1);
+      if (last?.type === read.list) last.content = [...(last.content ?? []), read.node];
+      else lists.push({ type: read.list, content: [read.node] });
+    }
+    return lists;
+  },
+});
+
+/**
+ * Task lists come from `MarkdownBulletList`. Tiptap's own task list rule
+ * never runs, and no rule answers to a `taskList` token: with one in place,
+ * the Markdown manager splits a list of task and plain items by its own
+ * rule, which takes only the first line of a task item's text.
+ */
+const MarkdownTaskList = TaskList.extend({
+  markdownTokenizer: leftToMarked("taskList"),
+  markdownTokenName: "list",
+  parseMarkdown: () => [],
+});
+
 /**
  * Numbered lists read by marked's own list rule, as CommonMark reads them.
  * Tiptap's numbered list rule indents an item's blocks by two spaces, not
@@ -110,7 +196,7 @@ export const MarkdownTable = Table.extend({
  * every numbered list to marked; Tiptap still turns its tokens into nodes.
  */
 const MarkdownOrderedList = OrderedList.extend({
-  markdownTokenizer: { name: "orderedList", level: "block", start: () => -1, tokenize: () => undefined },
+  markdownTokenizer: leftToMarked("orderedList"),
   /*
    * marked's items go to the list item rule, as a bulleted list's do. Tiptap's
    * own rule for numbered items expects its tokenizer's items and takes the
@@ -161,11 +247,13 @@ export function markdownSchemaExtensions(views: SchemaViews = {}): AnyExtension[
         HTMLAttributes: { rel: "noopener noreferrer nofollow ugc", target: null },
       },
       codeBlock: false,
+      bulletList: false,
       orderedList: false,
     }),
+    MarkdownBulletList,
     MarkdownOrderedList,
     codeBlock ? MarkdownCodeBlock.extend({ addNodeView: () => codeBlock }) : MarkdownCodeBlock,
-    TaskList,
+    MarkdownTaskList,
     TaskItem.configure({ nested: true }),
     MarkdownTable,
     TableRow,

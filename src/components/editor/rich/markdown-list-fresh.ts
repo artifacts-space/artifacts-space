@@ -43,25 +43,23 @@ function wideItem(list: JSONContent, item: JSONContent, position: number, helper
   return [`${marker} ${first}`.trimEnd(), ...rest.map((line) => (line ? `${pad}${line}` : ""))].join("\n");
 }
 
-/**
- * The list with a blank line between the blocks inside its items, and
- * between the items too, except in a task list: the editor reads task items
- * with a blank line between them as two lists.
- */
+/** The list with a blank line between its items, and between the blocks inside them. */
 export function wideList(list: JSONContent, helpers: FreshListHelpers): string {
-  const between = list.type === "taskList" ? "\n" : "\n\n";
-  return (list.content ?? []).map((item, position) => wideItem(list, item, position, helpers)).join(between);
+  return (list.content ?? []).map((item, position) => wideItem(list, item, position, helpers)).join("\n\n");
 }
 
 /**
- * True when the editor and the read view both read `text` as `node`. The
- * read view's parse is paid only for a shape the two readers are known to
- * read differently, as when a block loads (markdown-display-shape.ts).
+ * When the read view is asked: for every list that is saved, or, when a
+ * block loads, only for a shape the two readers are known to read
+ * differently (markdown-display-shape.ts), as the load's own check does.
  */
-function readsBack(text: string, expected: JSONContent[], helpers: FreshListHelpers): boolean {
+export type ReadViewCheck = "always" | "known shapes";
+
+/** True when the editor and the read view both read `text` as `node`. */
+function readsBack(text: string, expected: JSONContent[], helpers: FreshListHelpers, readView: ReadViewCheck): boolean {
   const again = helpers.parse(text);
   if (again === null || helpers.key({ content: again }) !== helpers.key({ content: expected })) return false;
-  return !mayReadDifferently(text) || readsTheSame(text, expected);
+  return (readView === "known shapes" && !mayReadDifferently(text)) || readsTheSame(text, expected);
 }
 
 /** A freshly written list, and whether both readers read it back as the list. */
@@ -72,14 +70,15 @@ export interface FreshList {
 
 /**
  * A list written fresh: the editor's own writing when it reads back as the
- * list, else the wide form when that does. When neither does, the editor's
- * own writing stands, as before this check existed, and `sound` is false.
+ * list, else the wide form when that does. When neither does, `sound` is
+ * false and the text must not be saved: the caller keeps the list as it was
+ * loaded, or writes its blocks without the list (markdown-roundtrip-lists.ts).
  */
-export function freshList(list: JSONContent, helpers: FreshListHelpers): FreshList {
+export function freshList(list: JSONContent, helpers: FreshListHelpers, readView: ReadViewCheck): FreshList {
   const tight = helpers.render(list);
   const expected = helpers.canonical([list]);
   if (!expected) return { text: tight, sound: false };
-  if (readsBack(tight, expected, helpers)) return { text: tight, sound: true };
+  if (readsBack(tight, expected, helpers, readView)) return { text: tight, sound: true };
   const wide = wideList(list, helpers);
-  return readsBack(wide, expected, helpers) ? { text: wide, sound: true } : { text: tight, sound: false };
+  return readsBack(wide, expected, helpers, readView) ? { text: wide, sound: true } : { text: tight, sound: false };
 }

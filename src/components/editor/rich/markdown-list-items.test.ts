@@ -106,7 +106,8 @@ describe("edits to one list item", () => {
     expect(add("* one\n* two\n", "three")).toBe("* one\n* two\n* three\n");
     expect(add("1. a\n1. b\n", "c")).toBe("1. a\n1. b\n1. c\n");
     expect(add("3) a\n4) b\n", "c")).toBe("3) a\n4) b\n5) c\n");
-    expect(add("- [ ] a\n\n- [x] b\n", "c")).toBe("- [ ] a\n\n- [x] b\n- [x] c\n");
+    // A loose task list is one list, so the new item is set apart like the others.
+    expect(add("- [ ] a\n\n- [x] b\n", "c")).toBe("- [ ] a\n\n- [x] b\n\n- [x] c\n");
   });
 
   it("should change only the line of the one item edited when two items are the same", () => {

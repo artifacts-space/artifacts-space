@@ -354,18 +354,35 @@ lists, each indented under the item's text and set off by blank lines:
   it reads differently (a numbered list right under a quote, for one), it is
   written again with every block on lines of its own
   (`markdown-list-fresh.ts`). A list loads as formatted when one of the two
-  writings reads back as the list. The read view is asked only for a shape
-  the two readers are known to read differently, as when a block loads.
+  writings reads back as the list. On a save the read view is asked every
+  time; when a block loads, only for a shape the two readers are known to
+  read differently.
 - **A comment's list is written whole.** In the comment flavor an edited
   list is never written over its loaded items: it goes through the comment's
   own writer, with the comment's escaping, and is judged by the thread
   (`toChunks` in `markdown-roundtrip.ts`). The list code itself lives in
-  `markdown-roundtrip-lists.ts`.
+  `markdown-roundtrip-lists.ts`, and the joining of the written pieces in
+  `markdown-roundtrip-output.ts`.
 - **Line ends.** A document with Windows line ends (CRLF) on every line
   keeps them when it is saved after an edit; one that mixes line ends is
   saved with LF.
-- **A loose task list** loads as one task list per item, since the task list
-  rule ends a list at a blank line; each item is then a block of its own.
+- **Bulleted and task lists** are read by marked's own list rule too
+  (`markdown-schema.ts`), so a task list is one list however its items are
+  spaced: steps set apart by blank lines, each with a code block under it,
+  are one task list. Task items and plain items in one Markdown list load as
+  a task list and a bulleted list, in the order written. A box with no text
+  after it (`- [ ]`) is an empty task; the read view prints its brackets
+  until text follows.
+- **Lists that follow each other are read back together.** Markdown reads
+  them as one list, so each list reading back on its own is not enough
+  (`checkedListRuns` in `markdown-roundtrip-lists.ts`).
+- **The last resort.** A list is never saved as Markdown that reads back as
+  something else. When no writing of an edited list reads back the same in
+  the editor and in the read view, the list is saved as it was loaded, so
+  that save leaves the edit to that list out; a list with nothing loaded in
+  its place is saved as its blocks without the list, every word kept. No
+  generated edit reaches this (`markdown-list-fuzz.test.ts`); an item added
+  with no text yet may.
 
 ### Raw blocks
 

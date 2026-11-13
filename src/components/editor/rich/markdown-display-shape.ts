@@ -60,7 +60,7 @@ function onlyImages(node: MarkdownNode): boolean {
   return children.length > 0 && children.every((child) => child.type === "image");
 }
 
-/** Adjacent lists of the same kind as one: the editor splits a loose task list, and a task list from a plain one. */
+/** Adjacent lists of the same kind as one: the editor holds a task list and a plain one where Markdown has one list of both. */
 function joinLists(blocks: Outline[]): Outline[] {
   const joined: Outline[] = [];
   for (const block of blocks) {
@@ -71,8 +71,22 @@ function joinLists(blocks: Outline[]): Outline[] {
   return joined;
 }
 
+const boxAlone = /^\[([ xX])\]$/;
+
+/**
+ * One list item. An item that holds a box and nothing else (`- [ ]`) is a
+ * task with no text yet in the editor; the read view prints the brackets
+ * until text follows them. The two count as the same item.
+ */
+function markdownItem(item: MarkdownNode): ItemOutline {
+  const blocks = markdownBlocks(item.children ?? []);
+  const [only, ...more] = blocks;
+  const box = more.length === 0 && only?.t === "p" && item.checked == null ? boxAlone.exec(only.x ?? "")?.[1] : undefined;
+  return box === undefined ? { k: item.checked ?? null, c: blocks } : { k: box !== " ", c: [] };
+}
+
 function markdownList(node: MarkdownNode): Outline {
-  const items = (node.children ?? []).map((item) => ({ k: item.checked ?? null, c: markdownBlocks(item.children ?? []) }));
+  const items = (node.children ?? []).map((item) => markdownItem(item));
   return node.ordered ? { t: "ol", s: node.start ?? 1, items } : { t: "ul", items };
 }
 

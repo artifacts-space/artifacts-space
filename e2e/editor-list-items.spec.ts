@@ -42,6 +42,10 @@ test("should format list items that hold code blocks and save only the parts edi
   await page.waitForLoadState("networkidle");
   await expect(editor(page).getByRole("heading", { name: "Record" })).toBeVisible();
 
+  // Steps set apart by blank lines are one task list, not one list per step.
+  await expect(editor(page).locator('ul[data-type="taskList"]')).toHaveCount(1);
+  await expect(editor(page).locator('ul[data-type="taskList"] > li')).toHaveCount(3);
+
   // Nothing is kept as written: no notice over the editor and no source box.
   await expect(page.getByRole("note")).toHaveCount(0);
   await expect(editor(page).getByText("Kept as written")).toHaveCount(0);
