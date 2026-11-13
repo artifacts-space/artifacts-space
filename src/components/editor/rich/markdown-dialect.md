@@ -337,10 +337,28 @@ lists, each indented under the item's text and set off by blank lines:
   bullet (`*` stays `*`) and delimiter. When items are added, removed, or
   moved, a numbered list is numbered again from its start, or keeps one
   number on every item when it had one (`markdown-list-numbers.ts`).
-- **Checked both ways.** An edited list is kept only when the editor reads
-  it back as the edit and the read view (remark) shows each item written
-  anew the same way (`markdown-list-check.ts`); otherwise the edited blocks
-  get blank lines around them, and failing that the list is written fresh.
+- **Two ways to save an edited list, and no other.** An edited list is
+  saved over its loaded items, as above, when that text is verified to read
+  back as the edit (`markdown-list-check.ts`): the editor reads it as the
+  edited list, the list would load formatted again (the rule every block
+  loads by: the round trip's own writing of its nodes reads back as them),
+  and the read view (remark) shows each item written anew as the editor
+  holds it. An edited block inside an item first keeps the spacing it had,
+  then gets blank lines around it. When neither verifies, the list is
+  written whole by the round trip's own writer, exactly as any other edited
+  block is and as lists were before item maps. No check stands between a
+  list and that writer, and nothing else is ever saved. Both ways write the
+  content as it is at that save, so no save can take back an earlier edit.
+- **Read back by meaning.** The editor can hold what Markdown cannot store:
+  a space at the end of an item, a line break with nothing after it, spaces
+  at the start of a new item's text. A written list is compared with the
+  edit after both are reduced to what Markdown stores
+  (`markdown-meaning.ts`), so typing a space at the end of an item changes
+  that item only.
+- **An item reads the same beside any other item.** marked marks a line of
+  text among an item's blocks as a paragraph only in a list it takes as
+  loose; here every such line is a paragraph (`markdown-schema.ts`). A
+  paragraph after a table in an item loads whatever the other items hold.
 - **Where the readers differ, the list stays as written.** A list shape
   that marked and remark read differently (an empty first item, a numbered
   item other than 1 under text, code right after a marker, tab indents,
@@ -348,15 +366,6 @@ lists, each indented under the item's text and set off by blank lines:
   show it differently (`markdown-display-shape.ts`). Numbered task items
   (`1. [ ]`) are one such shape: the editor has no numbered task list, so
   they stay as written with their boxes.
-- **A fresh list is checked too.** A list with no source to keep (a new or
-  pasted list, or an edit the item map cannot hold) is written by the
-  editor's own writer, then read back by the editor and the read view. When
-  it reads differently (a numbered list right under a quote, for one), it is
-  written again with every block on lines of its own
-  (`markdown-list-fresh.ts`). A list loads as formatted when one of the two
-  writings reads back as the list. On a save the read view is asked every
-  time; when a block loads, only for a shape the two readers are known to
-  read differently.
 - **A comment's list is written whole.** In the comment flavor an edited
   list is never written over its loaded items: it goes through the comment's
   own writer, with the comment's escaping, and is judged by the thread
@@ -370,19 +379,14 @@ lists, each indented under the item's text and set off by blank lines:
   (`markdown-schema.ts`), so a task list is one list however its items are
   spaced: steps set apart by blank lines, each with a code block under it,
   are one task list. Task items and plain items in one Markdown list load as
-  a task list and a bulleted list, in the order written. A box with no text
-  after it (`- [ ]`) is an empty task; the read view prints its brackets
-  until text follows.
-- **Lists that follow each other are read back together.** Markdown reads
-  them as one list, so each list reading back on its own is not enough
-  (`checkedListRuns` in `markdown-roundtrip-lists.ts`).
-- **The last resort.** A list is never saved as Markdown that reads back as
-  something else. When no writing of an edited list reads back the same in
-  the editor and in the read view, the list is saved as it was loaded, so
-  that save leaves the edit to that list out; a list with nothing loaded in
-  its place is saved as its blocks without the list, every word kept. No
-  generated edit reaches this (`markdown-list-fuzz.test.ts`); an item added
-  with no text yet may.
+  a task list and a bulleted list, in the order written. A box with nothing
+  after it (`- [ ]`) is an item with the text `[ ]`, as the read view shows
+  it: Markdown has no task without text.
+- **Every save is checked against the old way.** `markdown-list-fuzz.test.ts`
+  loads generated lists and the corpus (`list-generator.ts`,
+  `list-corpus.ts`), makes every kind of edit, and asserts that what is
+  saved is the whole-list writing of the same edit, or text that loads again
+  as the edit, formatted, and reads the same in the read view.
 
 ### Raw blocks
 

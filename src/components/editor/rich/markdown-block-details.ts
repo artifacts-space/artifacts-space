@@ -12,7 +12,8 @@ export interface DetailedBlock<Map> {
   key: string;
   nodeCount: number;
   text: string;
-  list?: ListSource<Map>;
+  /** The list's items, cut from its source the first time the list is edited. */
+  list?: () => ListSource<Map> | null;
 }
 
 /** What reviewing the blocks needs from the round trip. */
@@ -95,6 +96,6 @@ function keepAsWritten<Map>(block: DetailedBlock<Map>, offset: number, content: 
 }
 
 function attachList<Map>(block: DetailedBlock<Map>, node: JSONContent, helpers: BlockDetailHelpers<Map>) {
-  const list = listSource(block.text, node, helpers);
-  if (list) block.list = list;
+  const { text } = block;
+  block.list = once(() => listSource(text, node, helpers));
 }

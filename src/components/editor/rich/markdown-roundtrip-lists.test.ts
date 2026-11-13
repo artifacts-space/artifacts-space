@@ -1,10 +1,12 @@
 import type { JSONContent } from "@tiptap/core";
 import { describe, expect, it } from "vitest";
 
-import { edit, editAndSave, find, paragraph, reloaded, tick } from "./list-edit-helpers";
+import { edit, editAndSave, editBothWays, find, paragraph, reloaded, setText, tick } from "./list-edit-helpers";
 import { readsTheSame } from "./markdown-display-shape";
-import { parseMarkdown, serializeMarkdown, type SourceMap } from "./markdown-roundtrip";
-import { checkedListRuns, listChunk, type ListTools } from "./markdown-roundtrip-lists";
+import { emptySourceMap, parseMarkdown, serializeMarkdown } from "./markdown-roundtrip";
+
+const emptyParagraph = (): JSONContent => ({ type: "paragraph", attrs: { color: null, background: null } });
+const item = (...content: JSONContent[]): JSONContent => ({ type: "listItem", content });
 
 /** A document's blocks by type, with the item count of each list. */
 function blocks(markdown: string): string[] {
@@ -76,15 +78,12 @@ describe("a loose task list", () => {
     expect(reloaded(saved)).toEqual(doc);
   });
 
-  it("should read a box with no text after it as an empty task, as the read view's brackets", () => {
-    expect(blocks("- [ ] one\n- [ ]\n- [x] three\n")).toEqual(["taskList:3"]);
-    expect(blocks("- [ ] one\n\n- [ ] \n")).toEqual(["taskList:2"]);
-    const saved = edit("* [ ] one\n* [x] two\n", (doc) => {
-      doc.content?.[0]?.content?.splice(1, 0, { type: "taskItem", attrs: { checked: false }, content: [{ type: "paragraph", attrs: { color: null, background: null } }] });
-    });
-    // The other items keep their marker: an empty task does not send the list to a fresh write.
-    expect(saved).toBe("* [ ] one\n* [ ] \n* [x] two\n");
-    expect(blocks(saved)).toEqual(["taskList:3"]);
+  it("should read a box with nothing after it as an item with the text [ ], as the page shows it", () => {
+    const loaded = parseMarkdown("- [ ] one\n- [ ]\n- [x] three\n");
+    expect(loaded.rawBlocks).toBe(0);
+    expect(blocks("- [ ] one\n- [ ]\n- [x] three\n")).toEqual(["taskList:1", "bulletList:1", "taskList:1"]);
+    expect(find(loaded.doc, "listItem", "[ ]").content?.[0]?.content?.[0]?.text).toBe("[ ]");
+    expect(readsTheSame("- [ ] one\n- [ ]\n- [x] three\n", loaded.doc.content ?? [])).toBe(true);
   });
 });
 
@@ -100,14 +99,10 @@ describe("task and plain items in one Markdown list", () => {
     expect(find(loaded.doc, "taskItem", "first line").content?.[0]?.content?.map((node) => node.text).join("")).toContain("second line");
   });
 
-  it("should save lists that read back as the edit when an item with no text yet is added to one of them", () => {
-    const markdown = "- alpha\n- [ ] one\n- [x] two\n\n  | name | value |\n  | --- | --- |\n  | a | b |\n\nAfter.\n";
-    const { doc, saved } = editAndSave(markdown, (edited) => {
-      edited.content?.[0]?.content?.unshift({ type: "listItem", content: [{ type: "paragraph", attrs: { color: null, background: null } }] });
-    });
-    expect(parseMarkdown(saved).rawBlocks).toBe(0);
-    expect(reloaded(saved)).toEqual(doc);
-    expect(readsTheSame(saved, reloaded(saved).content ?? [])).toBe(true);
+  it("should save a ticked box as the round trip's own writer does when the list also holds plain items", () => {
+    const { saved, whole } = editBothWays("- [ ] task\n- plain\n- [x] done\n", (doc) => { tick(doc, "task"); });
+    expect(saved).toBe(whole);
+    expect(blocks(saved)).toEqual(["taskList:1", "bulletList:1", "taskList:1"]);
   });
 });
 
@@ -154,51 +149,113 @@ describe("seed 1595 of the generated lists", () => {
   });
 });
 
-describe("the last resort", () => {
-  const key = (node: JSONContent) => JSON.stringify(node);
-  /** The round trip's tools with a reader that reads nothing back, so no writing of a list is sound. */
-  const unreadable: ListTools = {
-    key,
-    parse: () => null,
-    canonical: (nodes) => nodes,
-    write: (node) => (node.type === "paragraph" ? (node.content ?? []).map((child) => child.text ?? "").join("") : `<${String(node.type)}>`),
-    load: (text) => parseMarkdown(text),
-    save: (content, map) => serializeMarkdown({ type: "doc", content }, map),
-  };
-
-  function edited(markdown: string): { nodes: JSONContent[]; source: SourceMap } {
-    const loaded = parseMarkdown(markdown);
-    const nodes = structuredClone(loaded.doc.content ?? []);
-    nodes[0]?.content?.push({ type: "listItem", content: [paragraph("added")] });
-    return { nodes, source: loaded.source };
-  }
-
-  it("should keep an edited list as it was loaded when no writing of it reads back the same", () => {
-    const { nodes, source } = edited("* one\n* two\n");
-    expect(listChunk(nodes, 0, source, -1, new Set(), unreadable)).toEqual({ text: "* one\n* two", block: 0 });
+describe("numbered items", () => {
+  it("should load formatted when an item holds bold text, a link, or code", () => {
+    const loaded = parseMarkdown("1. **Ship** it.\n2. Read [the docs](https://example.com).\n3. Run `pnpm test`.\n");
+    expect(loaded.rawBlocks).toBe(0);
+    expect(blocks("1. **Ship** it.\n2. Read [the docs](https://example.com).\n3. Run `pnpm test`.\n")).toEqual(["orderedList:3"]);
+    expect(find(loaded.doc, "paragraph", "Ship").content?.[0]).toMatchObject({ text: "Ship", marks: [{ type: "bold" }] });
   });
 
-  it("should save the words of a list with nothing loaded as blocks of their own when no writing of it reads back the same", () => {
-    const list: JSONContent = { type: "bulletList", content: [{ type: "listItem", content: [paragraph("one"), { type: "bulletList", content: [{ type: "listItem", content: [paragraph("two")] }] }] }] };
-    const empty: SourceMap = { original: "", leading: "", blocks: [], endsWithNewline: true };
-    expect(listChunk([list], 0, empty, -1, new Set(), unreadable)).toEqual({ text: "one\n\ntwo", block: -1 });
+  it("should keep its numbers when a new numbered list is saved", () => {
+    const list: JSONContent = { type: "orderedList", attrs: { start: 1 }, content: [item(paragraph("one")), item(paragraph("two")), item(paragraph("three"))] };
+    const saved = serializeMarkdown({ type: "doc", content: [list] }, emptySourceMap());
+    expect(saved).toBe("1. one\n2. two\n3. three\n");
+    expect(blocks(saved)).toEqual(["orderedList:3"]);
+  });
+});
+
+/*
+ * An edited list is saved over its loaded items when that reads back as the
+ * edit, and otherwise exactly as the round trip's own writer saves the whole
+ * list (`whole` below). No other text is ever saved, so nothing can reach
+ * back to how the list was loaded: both ways write the content as it is now.
+ */
+describe("the two ways an edited list is saved", () => {
+  it("should keep an earlier edit when a later one ends an item with a space", () => {
+    const { saved } = editBothWays("* alpha\n* beta\n* gamma\n", (doc) => {
+      setText(find(doc, "paragraph", "alpha"), "ALPHA rewritten");
+      setText(find(doc, "paragraph", "gamma"), "gamma ");
+    });
+    expect(saved).toBe("* ALPHA rewritten\n* beta\n* gamma \n");
+    expect(blocks(saved)).toEqual(["bulletList:3"]);
   });
 
-  it("should keep lists that follow each other as they were loaded when together they read back differently", () => {
-    const loaded = parseMarkdown("Before.\n\n- plain\n- [ ] task\n\nAfter.\n");
-    const [before, plain, task, after] = loaded.doc.content ?? [];
-    const chunks = [
-      { text: "Before.", block: 0, nodes: before ? [before] : [] },
-      { text: "- plain\n- more", block: -1, nodes: plain ? [plain] : [] },
-      { text: "- [ ] task", block: -1, nodes: task ? [task] : [] },
-      { text: "After.", block: 2, nodes: after ? [after] : [] },
-    ];
-    expect(checkedListRuns(chunks, loaded.source, unreadable).map((chunk) => [chunk.text, chunk.block])).toEqual([["Before.", 0], ["- plain\n- [ ] task", 1], ["After.", 2]]);
+  it("should change only the item when a space is typed at its end", () => {
+    const { saved } = editBothWays("* alpha\n* beta\n", (doc) => { setText(find(doc, "paragraph", "alpha"), "alpha "); });
+    expect(saved).toBe("* alpha \n* beta\n");
+    expect(blocks(saved)).toEqual(["bulletList:2"]);
   });
 
-  it("should leave a run of loaded lists alone when nobody edited them", () => {
-    const loaded = parseMarkdown("* one\n\n- two\n");
-    const chunks = (loaded.doc.content ?? []).map((node, block) => ({ text: loaded.source.blocks[block]?.text ?? "", block, nodes: [node] }));
-    expect(checkedListRuns(chunks, loaded.source, unreadable)).toEqual(chunks);
+  it("should keep a new list a list when its item ends with a space", () => {
+    const saved = serializeMarkdown({ type: "doc", content: [{ type: "bulletList", content: [item(paragraph("Buy milk "))] }] }, emptySourceMap());
+    expect(blocks(saved)).toEqual(["bulletList:1"]);
+    expect(find(reloaded(saved), "paragraph", "Buy").content?.[0]?.text).toBe("Buy milk");
+  });
+
+  it("should save the whole list as the round trip's own writer does when an item is moved under an empty item", () => {
+    const { saved, whole } = editBothWays("* a\n*\n* c\n", (doc) => {
+      const items = doc.content?.[0]?.content ?? [];
+      const [moved] = items.splice(2, 1);
+      if (moved) items[1]?.content?.push({ type: "bulletList", content: [moved] });
+    });
+    expect(saved).toBe(whole);
+    expect(saved).toBe("- a\n- \n  - c\n");
+  });
+
+  it("should store what is typed in a child of an empty item", () => {
+    const { saved, whole } = editBothWays("* a\n* b\n", (doc) => {
+      doc.content?.[0]?.content?.push(item(emptyParagraph(), { type: "bulletList", content: [item(paragraph("typed"))] }));
+    });
+    expect(saved).toBe(whole);
+    expect(saved).toBe("- a\n- b\n- \n  - typed\n");
+  });
+
+  it("should save the whole list as the round trip's own writer does when the first numbered item is emptied", () => {
+    const { saved, whole } = editBothWays("1) a\n2) b\n", (doc) => { find(doc, "paragraph", "a").content = []; });
+    expect(saved).toBe(whole);
+    expect(saved).toBe("1. \n2. b\n");
+  });
+
+  it("should save the whole list as the round trip's own writer does when a task with no text yet is added", () => {
+    const { saved, whole } = editBothWays("* [ ] one\n* [x] two\n", (doc) => {
+      doc.content?.[0]?.content?.splice(1, 0, { type: "taskItem", attrs: { checked: false }, content: [emptyParagraph()] });
+    });
+    expect(saved).toBe(whole);
+  });
+
+  it("should write the item over its source again when the task gets its text", () => {
+    const loaded = parseMarkdown("* [ ] one\n* [x] two\n");
+    const doc = structuredClone(loaded.doc);
+    doc.content?.[0]?.content?.splice(1, 0, { type: "taskItem", attrs: { checked: false }, content: [emptyParagraph()] });
+    serializeMarkdown(doc, loaded.source);
+    const added = doc.content?.[0]?.content?.[1]?.content?.[0];
+    if (added) setText(added, "between");
+    expect(serializeMarkdown(doc, loaded.source)).toBe("* [ ] one\n* [ ] between\n* [x] two\n");
+  });
+
+  it("should save a list that loads formatted again when a line after a line break starts with spaces", () => {
+    const markdown = "* top\n  - [x] gamma\n\n    more\n* last\n";
+    const { saved } = editBothWays(markdown, (doc) => {
+      const text = find(doc, "paragraph", "gamma");
+      text.content = [...(text.content ?? []), { type: "hardBreak" }, { type: "text", text: "  edited" }];
+    });
+    // The line is stored without the spaces it starts with: with them, the list would load as written the next time.
+    expect(saved).toBe("* top\n  - [x] gamma  \n    edited\n\n    more\n* last\n");
+    expect(parseMarkdown(saved).rawBlocks).toBe(0);
+    expect(find(reloaded(saved), "paragraph", "gamma").content?.map((node) => node.text ?? "/")).toEqual(["gamma", "/", "edited"]);
+  });
+
+  it("should keep the spaces that end an item's first line when a block under it is edited", () => {
+    const markdown = "* top  \n  - [x] gamma\n* last\n";
+    const { saved } = editBothWays(markdown, (doc) => { setText(find(doc, "paragraph", "gamma"), "gamma ray"); });
+    expect(saved).toBe("* top  \n  - [x] gamma ray\n* last\n");
+  });
+
+  it("should load a list formatted again after an item beside a table item is removed", () => {
+    const markdown = "- first\n\n  more\n\n- step\n\n  | name | value |\n  | --- | --- |\n  | a | b |\n\n  after\n";
+    const { doc, saved } = editAndSave(markdown, (edited) => { edited.content?.[0]?.content?.splice(0, 1); });
+    expect(parseMarkdown(saved).rawBlocks).toBe(0);
+    expect(reloaded(saved)).toEqual(doc);
   });
 });

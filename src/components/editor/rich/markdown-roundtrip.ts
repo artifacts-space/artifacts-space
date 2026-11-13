@@ -10,7 +10,7 @@ import { markdownSchemaExtensions } from "./markdown-schema";
 import { RAW_MARKDOWN } from "./raw-markdown-node";
 import { reviewBlocks, type RawKind } from "./markdown-block-details";
 import type { ListSource } from "./markdown-list-items";
-import { checkedListRuns, claimed, itemContentMap, listChunk, ownWriting, writtenNodes, type ListTools } from "./markdown-roundtrip-lists";
+import { itemContentMap, listChunk, type ListTools } from "./markdown-roundtrip-lists";
 import { writtenDocument, type Chunk } from "./markdown-roundtrip-output";
 
 interface Engine {
@@ -105,7 +105,7 @@ interface MappedBlock {
   text: string;
   after: string;
   /** A list block's items, so an edit to one item leaves the others as written. */
-  list?: ListSource<SourceMap>;
+  list?: () => ListSource<SourceMap> | null;
 }
 
 /**
@@ -153,7 +153,7 @@ function canonicalNodes(nodes: JSONContent[], schema: Schema): JSONContent[] | n
   }
 }
 
-function readNodes(text: string, current: Engine): JSONContent[] | null {
+function parseNodes(text: string, current: Engine): JSONContent[] | null {
   try {
     const parsed = current.manager.parse(text).content ?? [];
     return parsed.length > 0 ? canonicalNodes(liftBlockColors(parsed), current.schema) : null;
@@ -162,22 +162,9 @@ function readNodes(text: string, current: Engine): JSONContent[] | null {
   }
 }
 
-/** The last text a written list was read back from, with its nodes: the block's own check reads that text again right after. */
-let lastRead: { text: string; nodes: JSONContent[] | null } | null = null;
-
-/** The nodes for `text`, to compare only: the same objects are handed out again for the same text. */
-function readBack(text: string, current: Engine): JSONContent[] | null {
-  if (lastRead?.text !== text) lastRead = { text, nodes: readNodes(text, current) };
-  return lastRead.nodes;
-}
-
-function parseNodes(text: string, current: Engine): JSONContent[] | null {
-  return lastRead?.text === text ? structuredClone(lastRead.nodes) : readNodes(text, current);
-}
-
-/** Markdown for nodes; a list on its own is written so that it reads back as the list (markdown-list-fresh.ts). */
+/** Markdown for nodes, without the blank lines a renderer may add around them. */
 function renderNodes(nodes: JSONContent[], current: Engine): string {
-  return writtenNodes(nodes, listTools, () => ownWriting(current.manager, nodes));
+  return current.manager.serialize({ type: "doc", content: nodes }).replace(/^\n+|\n+$/g, "");
 }
 
 /**
@@ -407,7 +394,7 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine, flav
     const block = source.blocks[matched];
     if (block) {
       used.add(matched);
-      chunks.push({ text: block.text, block: matched, nodes: nodes.slice(position, position + block.nodeCount) });
+      chunks.push({ text: block.text, block: matched });
       position += block.nodeCount;
       previous = matched;
       continue;
@@ -415,16 +402,17 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine, flav
     // A comment's list is written whole, in the comment's own escaping, and judged by the thread.
     const listed = flavor === "document" ? listChunk(nodes, position, source, previous, used, listTools) : null;
     if (listed) {
+      used.add(listed.block);
+      chunks.push(listed);
+      previous = listed.block;
       position += 1;
-      if (listed.text) chunks.push(listed);
-      previous = claimed(listed.block, used, previous);
       continue;
     }
     position += 1;
     if (!node || isEmptyParagraph(node)) continue;
     const text = flavor === "document" ? renderNodes([node], current) : writtenCommentNode(node, current, flavor);
     // A block with no Markdown yet (an empty or uploading media block) is left out.
-    if (text) chunks.push({ text, block: -1, nodes: [node] });
+    if (text) chunks.push({ text, block: -1 });
   }
   return chunks;
 }
@@ -436,7 +424,7 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine, flav
  */
 export function serializeMarkdown(doc: JSONContent, source: SourceMap, flavor: MarkdownFlavor = "document"): string {
   const chunks = toChunks(doc.content ?? [], source, getEngine(), flavor);
-  return writtenDocument(flavor === "document" ? checkedListRuns(chunks, source, listTools) : chunks, source);
+  return writtenDocument(chunks, source);
 }
 
 /** An empty source map, for content that was never loaded from Markdown. */
@@ -452,9 +440,10 @@ export function parseMarkdownFragment(markdown: string): JSONContent[] {
 /** This file's own functions, for the list side of the round trip (markdown-roundtrip-lists.ts). */
 const listTools: ListTools = {
   key: nodeKey,
-  parse: (markdown) => readBack(markdown, getEngine()),
+  parse: (markdown) => parseNodes(markdown.replace(/\s+$/, ""), getEngine()),
+  writtenBack: (nodes) => parseNodes(renderNodes(nodes, getEngine()), getEngine()),
   canonical: (nodes) => canonicalNodes(nodes, getEngine().schema),
-  write: (node) => ownWriting(getEngine().manager, [node]),
+  write: (node) => renderNodes([node], getEngine()),
   load: (markdown) => parseMarkdown(markdown),
   save: (content, map) => serializeMarkdown({ type: "doc", content }, map),
 };

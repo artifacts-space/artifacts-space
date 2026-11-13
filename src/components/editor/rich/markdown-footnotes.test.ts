@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { blockCorpus } from "./block-corpus";
-import { parseMarkdown } from "./markdown-roundtrip";
+import { parseMarkdown, serializeMarkdown } from "./markdown-roundtrip";
 
 describe("footnotes", () => {
   it.each([
@@ -24,6 +24,23 @@ describe("footnotes", () => {
     const loaded = parseMarkdown(blockCorpus.rawMarkdown?.samples.footnotes ?? "");
     expect(loaded.rawBlocks).toBe(2);
     expect(loaded.rawKinds).toEqual(["footnote"]);
+  });
+
+  it("should keep a paragraph as written when its footnote is defined with a link, which reads as a link definition", () => {
+    const markdown = "See the study[^src].\n\n[^src]: https://example.com/paper\n";
+    const loaded = parseMarkdown(markdown);
+    expect(loaded.rawBlocks).toBe(2);
+    expect(loaded.rawKinds).toEqual(["footnote"]);
+    expect(serializeMarkdown(structuredClone(loaded.doc), loaded.source)).toBe(markdown);
+  });
+
+  it("should store the footnote as written when another part of the document is edited", () => {
+    const markdown = "See the study[^src].\n\nMore.\n\n[^src]: https://example.com/paper\n";
+    const loaded = parseMarkdown(markdown);
+    const doc = structuredClone(loaded.doc);
+    const more = doc.content?.find((node) => node.type === "paragraph");
+    if (more) more.content = [{ type: "text", text: "More words." }];
+    expect(serializeMarkdown(doc, loaded.source)).toBe(markdown.replace("More.", "More words."));
   });
 
   it("should keep a list item as written when it refers to a footnote defined below", () => {

@@ -117,8 +117,19 @@ interface ItemToken {
   tokens?: ItemToken[];
 }
 
+/**
+ * A list item with each line of text among its blocks as a paragraph. marked
+ * marks them so only in a list it takes as loose, and Tiptap's item rule
+ * reads a line of text after the item's first block as bare text, which the
+ * schema rejects. So `- a` with a table and a paragraph under it loaded only
+ * beside an item with a blank line in it. Read this way, an item reads the
+ * same whatever the other items hold.
+ */
+function withParagraphs(item: ItemToken): ItemToken {
+  return { ...item, tokens: (item.tokens ?? []).map((token) => (token.type === "text" ? { ...token, type: "paragraph" } : token)) };
+}
+
 const boxPrefix = /^\[[ xX]\] /;
-const boxAlone = /^\[([ xX])\]$/;
 
 /** A task item's token without marked's checkbox, which sits first in the item or first in its opening paragraph. */
 function withoutBox(item: ItemToken): ItemToken {
@@ -129,13 +140,6 @@ function withoutBox(item: ItemToken): ItemToken {
   return { ...item, task: false, tokens: [opening, ...rest] };
 }
 
-/** The box of an item that holds a box and nothing else (`- [ ]`): marked reads it as text, the editor as an empty task. */
-function emptyTaskBox(item: ItemToken): string | undefined {
-  const [only, ...more] = item.tokens ?? [];
-  const isText = only?.type === "text" || only?.type === "paragraph";
-  return more.length === 0 && isText ? boxAlone.exec((only.text ?? "").trim())?.[1] : undefined;
-}
-
 /** A task item's content: a paragraph first, as the schema asks, then its other blocks. */
 function taskContent(content: JSONContent[] | undefined): JSONContent[] {
   const blocks = content ?? [];
@@ -144,9 +148,7 @@ function taskContent(content: JSONContent[] | undefined): JSONContent[] {
 
 /** One item of a bulleted or task list as its node, and the list type it belongs in. */
 function unorderedItem(item: ItemToken, parse: (item: ItemToken) => JSONContent | undefined): { list: string; node: JSONContent } | null {
-  const box = emptyTaskBox(item);
-  if (box !== undefined) return { list: "taskList", node: { type: "taskItem", attrs: { checked: box !== " " }, content: [{ type: "paragraph" }] } };
-  const parsed = parse(item.task === true ? withoutBox(item) : item);
+  const parsed = parse(withParagraphs(item.task === true ? withoutBox(item) : item));
   if (!parsed) return null;
   if (item.task !== true) return { list: "bulletList", node: parsed };
   return { list: "taskList", node: { type: "taskItem", attrs: { checked: item.checked === true }, content: taskContent(parsed.content) } };
@@ -159,7 +161,8 @@ function unorderedItem(item: ItemToken, parse: (item: ItemToken) => JSONContent 
  * list per item, and it read a second paragraph in a nested task item as
  * bare text, which the schema rejects. Here a list is one list however its
  * items are spaced. Task items and plain items in one Markdown list become a
- * task list and a bulleted list, in the order written.
+ * task list and a bulleted list, in the order written. A box with nothing
+ * after it (`- [ ]`) is an item with the text `[ ]`, as the page shows it.
  */
 const MarkdownBulletList = BulletList.extend({
   parseMarkdown: (token, helpers) => {
@@ -206,8 +209,8 @@ const MarkdownOrderedList = OrderedList.extend({
   parseMarkdown: (token, helpers) => {
     if (token.type !== "list" || token.ordered !== true) return [];
     const start = typeof token.start === "number" ? token.start : 1;
-    const items = Array.isArray(token.items) ? token.items : [];
-    return helpers.createNode("orderedList", start === 1 ? {} : { start }, helpers.parseChildren(items));
+    const items = (Array.isArray(token.items) ? token.items : []) as ItemToken[];
+    return helpers.createNode("orderedList", start === 1 ? {} : { start }, helpers.parseChildren(items.map((item) => withParagraphs(item))));
   },
 });
 

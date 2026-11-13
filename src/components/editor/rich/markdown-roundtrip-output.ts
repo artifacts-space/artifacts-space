@@ -1,5 +1,3 @@
-import type { JSONContent } from "@tiptap/core";
-
 import type { SourceMap } from "./markdown-roundtrip";
 
 /*
@@ -13,8 +11,6 @@ export interface Chunk {
   block: number;
   /** True when the chunk is an edited list written over its loaded block. */
   edited?: boolean;
-  /** The nodes the chunk writes. */
-  nodes?: JSONContent[];
 }
 
 function isUnchanged(chunks: readonly Chunk[], source: SourceMap): boolean {

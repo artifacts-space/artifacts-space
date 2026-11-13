@@ -1,6 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 
-import { parseMarkdown, serializeMarkdown } from "./markdown-roundtrip";
+import { parseMarkdown, serializeMarkdown, type SourceMap } from "./markdown-roundtrip";
 
 /*
  * Test helpers for list edits: load Markdown, change the editor content as
@@ -21,6 +21,24 @@ export function editAndSave(markdown: string, change: (doc: JSONContent) => void
   const doc = structuredClone(loaded.doc);
   change(doc);
   return { doc, saved: serializeMarkdown(doc, loaded.source) };
+}
+
+/**
+ * The content as the round trip's own writer saves it when an edited list
+ * has no items to be written over: the same save with the item maps taken
+ * away, which is how lists were saved before item maps existed.
+ */
+export function wholeListWriting(doc: JSONContent, source: SourceMap): string {
+  const blocks = source.blocks.map((block) => ({ key: block.key, nodeCount: block.nodeCount, text: block.text, after: block.after }));
+  return serializeMarkdown(structuredClone(doc), { ...source, blocks });
+}
+
+/** Loads Markdown, applies one change, and returns what was saved beside the whole-list writing of the same edit. */
+export function editBothWays(markdown: string, change: (doc: JSONContent) => void): { doc: JSONContent; saved: string; whole: string } {
+  const loaded = parseMarkdown(markdown);
+  const doc = structuredClone(loaded.doc);
+  change(doc);
+  return { doc, saved: serializeMarkdown(doc, loaded.source), whole: wholeListWriting(doc, loaded.source) };
 }
 
 /** Every node in document order. */

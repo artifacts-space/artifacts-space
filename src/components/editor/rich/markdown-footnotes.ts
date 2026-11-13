@@ -19,14 +19,19 @@ function children(token: Record<string, unknown>): unknown[] | null {
   return found.length > 0 ? found.flat() : null;
 }
 
-/** A token's text outside code, with its blocks on lines of their own. */
+/** A token whose own source is read whole: marked turns `[^id]` into a link when `[^id]: text` is a link definition, and a definition has no children. */
+const wholeTypes: ReadonlySet<string> = new Set(["link", "image", "def"]);
+
+/** A token's text outside code, as written, with its blocks on lines of their own. */
 export function proseOf(value: unknown): string {
   if (Array.isArray(value)) return value.map((item) => proseOf(item)).join("");
   if (!isRecord(value)) return "";
-  if (typeof value.type === "string" && codeTypes.has(value.type)) return "\n";
+  const type = typeof value.type === "string" ? value.type : "";
+  if (codeTypes.has(type)) return "\n";
+  const raw = typeof value.raw === "string" ? value.raw : "";
+  if (wholeTypes.has(type)) return type === "def" ? `\n${raw}\n` : raw;
   const nested = children(value);
-  if (nested) return `${proseOf(nested)}\n`;
-  return typeof value.raw === "string" ? value.raw : "";
+  return nested ? `${proseOf(nested)}\n` : raw;
 }
 
 const definitionLine = /(?:^|\n)[ \t]*\[\^([^\]\s]+)\]:/g;

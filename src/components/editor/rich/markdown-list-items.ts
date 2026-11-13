@@ -34,7 +34,7 @@ export interface ItemSlice {
 
 /** A list marker that starts an item with text after it (CommonMark: up to 3 spaces before, 1–4 after). */
 const itemStart = /^( {0,3})([-+*]|\d{1,9}[.)])( {1,4})(?=\S)/;
-const taskBox = /^\[[ xX]\] /;
+const taskBox = /^\[[ xX]\][ \t]/;
 
 function leadingSpaces(line: string): number {
   return /^ */.exec(line)?.[0].length ?? 0;
@@ -204,6 +204,8 @@ interface Part {
 export interface ComposedList {
   text: string;
   changed: { text: string; item: JSONContent }[];
+  /** Where the items written differently sit, when every item is a loaded item in its place; null when items were added, removed, or moved. */
+  changedInPlace: number[] | null;
 }
 
 /** The first unused loaded item with `key`, preferring those from `from` on. */
@@ -225,16 +227,24 @@ function replacedItem<Map>(list: ListSource<Map>, next: number, used: ReadonlySe
   return later < unused ? next : -1;
 }
 
-function separatorFor(list: ListSource<unknown>, before: Part, part: Part): string {
-  const loaded = list.items[before.index];
-  if (loaded && part.index === before.index + 1) return loaded.after;
-  return list.items.find((item) => item.after)?.after ?? "\n";
+/** A separator for a place that had none: without the spaces that ended the item it came from, and with one blank line at most. */
+function plainSeparator(after: string): string {
+  return after.replace(/^[ \t]+/, "").replace(/\n[ \t\n]*\n(?=\n)/, "\n");
 }
 
+/**
+ * The parts joined. What followed a loaded item still follows it: its
+ * spaces and blank lines can be part of what the item reads as. A new item,
+ * and the item that was the list's last, are followed by the separator
+ * before them, so a new item is set apart as the items around it are.
+ */
 function joinParts(parts: readonly Part[], list: ListSource<unknown>): string {
+  let separator = plainSeparator(list.items.find((item) => item.after)?.after ?? "\n");
   return parts.map((part, position) => {
     const before = parts[position - 1];
-    return before ? `${separatorFor(list, before, part)}${part.text}` : part.text;
+    if (!before) return part.text;
+    separator = list.items[before.index]?.after || plainSeparator(separator);
+    return `${separator}${part.text}`;
   }).join("");
 }
 
@@ -255,7 +265,7 @@ function numbered(parts: Part[], node: JSONContent, list: ListSource<unknown>): 
  * touched keep their source and the blank lines between them, an edited
  * item keeps its marker and indent (and its unedited blocks), and a new
  * item is written in the list's marker style. Returns null when an edited
- * item cannot be written this way; the caller then writes the list fresh.
+ * item cannot be written this way; the list is then written whole.
  */
 export function composeList<Map>(node: JSONContent, list: ListSource<Map>, writer: ListWriter<Map>): ComposedList | null {
   const items = node.content ?? [];
@@ -276,6 +286,8 @@ export function composeList<Map>(node: JSONContent, list: ListSource<Map>, write
     parts.push({ text, index, item });
   }
   const written = numbered(parts, node, list);
-  const changed = written.filter((part) => part.text !== list.items[part.index]?.text).map(({ text, item }) => ({ text, item }));
-  return { text: joinParts(written, list), changed };
+  const differs = (part: Part) => part.text !== list.items[part.index]?.text;
+  const changed = written.filter(differs).map(({ text, item }) => ({ text, item }));
+  const changedInPlace = inPlace(written, list) ? written.flatMap((part, position) => (differs(part) ? [position] : [])) : null;
+  return { text: joinParts(written, list), changed, changedInPlace };
 }

@@ -71,22 +71,8 @@ function joinLists(blocks: Outline[]): Outline[] {
   return joined;
 }
 
-const boxAlone = /^\[([ xX])\]$/;
-
-/**
- * One list item. An item that holds a box and nothing else (`- [ ]`) is a
- * task with no text yet in the editor; the read view prints the brackets
- * until text follows them. The two count as the same item.
- */
-function markdownItem(item: MarkdownNode): ItemOutline {
-  const blocks = markdownBlocks(item.children ?? []);
-  const [only, ...more] = blocks;
-  const box = more.length === 0 && only?.t === "p" && item.checked == null ? boxAlone.exec(only.x ?? "")?.[1] : undefined;
-  return box === undefined ? { k: item.checked ?? null, c: blocks } : { k: box !== " ", c: [] };
-}
-
 function markdownList(node: MarkdownNode): Outline {
-  const items = (node.children ?? []).map((item) => markdownItem(item));
+  const items = (node.children ?? []).map((item) => ({ k: item.checked ?? null, c: markdownBlocks(item.children ?? []) }));
   return node.ordered ? { t: "ol", s: node.start ?? 1, items } : { t: "ul", items };
 }
 
@@ -165,8 +151,8 @@ const emptyItem = /^[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]*$/m;
 const numberedTask = /^[ \t>]*\d{1,9}[.)][ \t]+\[[ xX]\]/m;
 const codeAfterMarker = /^[ \t>]*(?:[-+*]|\d{1,9}[.)]) {5,}\S/m;
 const tabIndent = /^[ >]*\t/m;
-const taskItem = /^[ \t>]*[-+*][ \t]+\[[ xX]\](?:[ \t]|$)/m;
-const plainItem = /^[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]+(?!\[[ xX]\](?:[ \t]|$))\S/m;
+/** A task box with no space and text after it: `- [ ]`, `- [x]a`, or a tab after the box. */
+const oddBox = /^[ \t>]*[-+*][ \t]+\[[ xX]\](?:[^ \n]|[ \t]*$)/m;
 const numberedLine = /^( *)(\d{1,9})[.)][ \t]/;
 
 const markerLine = /^( *)(?:[-+*]|\d{1,9}[.)])(?:[ \t]|$)/;
@@ -190,8 +176,8 @@ function numberUnderText(markdown: string): boolean {
 
 /** True when the block has a list shape the two readers may read differently, so the read view's reading is checked. */
 export function mayReadDifferently(markdown: string): boolean {
-  if ([emptyItem, numberedTask, codeAfterMarker, tabIndent].some((pattern) => pattern.test(markdown))) return true;
-  return (taskItem.test(markdown) && plainItem.test(markdown)) || numberUnderText(markdown);
+  if ([emptyItem, numberedTask, codeAfterMarker, tabIndent, oddBox].some((pattern) => pattern.test(markdown))) return true;
+  return numberUnderText(markdown);
 }
 
 /**

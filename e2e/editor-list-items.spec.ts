@@ -80,5 +80,13 @@ test("should format numbered items and number the list again when an item is add
   await cursorAtEnd(page, editor(page).locator("li p", { hasText: "Run it." }), "Run it.");
   await page.keyboard.press("Enter");
   await page.keyboard.type("Check.");
-  await expectSaved(page, listItemsFixtureMarkdown.replace("2. Run it.\n3. **Ship** it.\n", "2. Run it.\n\n3. Check.\n\n4. **Ship** it.\n"));
+  const added = listItemsFixtureMarkdown.replace("2. Run it.\n3. **Ship** it.\n", "2. Run it.\n3. Check.\n4. **Ship** it.\n");
+  await expectSaved(page, added);
+
+  // A space typed at the end of another item changes that item only: the step added before stays.
+  await cursorAtEnd(page, editor(page).locator("li p", { hasText: "two" }), "two");
+  await page.keyboard.type(" ");
+  await expectSaved(page, added.replace("* two\n", "* two \n"));
+  await page.keyboard.type("more");
+  await expectSaved(page, added.replace("* two\n", "* two more\n"));
 });
