@@ -4,18 +4,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import { networkKey } from "@/lib/abuse/network-key";
 import { hitRateLimits } from "@/lib/abuse/rate-limit";
 import { tooManyRequests } from "@/lib/abuse/responses";
-import { canReadArtifact } from "@/lib/access";
 import { checkArtifactPage } from "@/lib/artifact-page-check";
 import { authPageDecisionFor, entryDecisionFor, entryPageFor, workspaceDecisionFor, type EntryPage } from "@/lib/auth/entry-rules";
 import { applySessionDecision, noStore, proxySession } from "@/lib/auth/proxy-session";
 import { getAuth } from "@/lib/auth/server";
+import { artifactLinkHref } from "@/lib/app-link";
 import { markdownRequestFor, markdownRoutePath } from "@/lib/markdown/negotiation";
 import { routeCheckFor, signInPath, type RouteCheck } from "@/lib/route-status";
 import { noindexHeader, robotsHeaderName } from "@/lib/search/search-rules";
 import { getTeamForMember } from "@/lib/teams/queries";
 
 /**
- * Real HTTP statuses for workspace, artifact, comment thread, and team pages. With
+ * Real HTTP statuses for workspace, artifact, and team pages. With
  * Cache Components the page shell streams first, so a notFound() or redirect() in
  * the page can only send a 200. These checks run before the page renders:
  * signed-out workspace pages redirect to sign-in, and unknown or unreadable
@@ -28,6 +28,13 @@ import { getTeamForMember } from "@/lib/teams/queries";
  * Artifact pages also have a Markdown version for agents: /artifact/<id>.md,
  * or /artifact/<id> with Accept: text/markdown, is rewritten to the Markdown
  * route handler, which runs the access check and rate limits itself.
+ *
+ * The retired comment thread page, /threads/<id>, redirects to the artifact
+ * in the workspace with its comments open, for links already sent (mention
+ * emails). The browser keeps the link's `#comment-<id>` across the redirect,
+ * and the workspace opens that comment (src/lib/app-link.ts). The redirect is
+ * the same for every id, readable or not, so it reveals nothing; /app runs
+ * the sign-in and access checks.
  *
  * Signed-in visitors skip the landing page and the sign-in pages and go to
  * the workspace (src/lib/auth/entry-rules.ts). Those pages stay static: the
@@ -58,11 +65,11 @@ function toSignIn(request: NextRequest) {
 }
 
 /**
- * Workspace pages (comment threads included) need a session. A missing cookie
- * redirects to sign-in here with no lookup at all.
+ * Workspace pages need a session. A missing cookie redirects to sign-in here
+ * with no lookup at all.
  */
 function needsSignIn(request: NextRequest, check: NonNullable<RouteCheck>) {
-  if (check.kind !== "workspace" && check.kind !== "thread") return false;
+  if (check.kind !== "workspace") return false;
   return !getSessionCookie(request);
 }
 
@@ -110,9 +117,7 @@ async function checkWorkspace(request: NextRequest) {
 async function checkRecord(request: NextRequest, check: NonNullable<RouteCheck>) {
   if (check.kind === "workspace") return checkWorkspace(request);
   if (check.kind === "team") return checkTeam(request, check.slug);
-  if (check.kind === "artifact") return checkArtifact(request, check.publicId);
-  // Comment threads share the artifact read check.
-  return (await canReadArtifact(check.publicId, () => viewerId(request))) ? NextResponse.next() : notFound(request);
+  return checkArtifact(request, check.publicId);
 }
 
 /**
@@ -164,6 +169,7 @@ export async function proxy(request: NextRequest) {
   if (markdown) return toMarkdown(request, markdown.publicId);
   const check = routeCheckFor(request.method, request.nextUrl.pathname);
   if (!check) return NextResponse.next();
+  if (check.kind === "thread") return noStore(redirectTo(request, artifactLinkHref({ publicId: check.publicId, comments: true })));
   if (needsSignIn(request, check)) return toSignIn(request);
   const refusal = await refuseArtifactPageFlood(request, check);
   if (refusal) return refusal;

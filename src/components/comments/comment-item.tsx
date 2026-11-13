@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 
 import { CommentComposer } from "./comment-composer";
 import type { WriteOutcome } from "./use-comment-thread";
+import { useLinkedCommentView } from "./use-linked-comment-view";
 
 const timeFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 
@@ -147,6 +148,8 @@ interface CommentItemProps {
   showAnchor?: boolean;
   /** A shorter edit box, for the card at the text. */
   compact?: boolean;
+  /** The comment a link asked for (the Inbox, a mention email): brought into view, focused, and briefly marked. */
+  linked?: boolean;
 }
 
 /** A comment that is not deleted: its text and actions, or the box to edit it. */
@@ -180,9 +183,16 @@ function LiveComment({ comment, agent, handlers, compact = false }: Pick<Comment
 }
 
 /** One comment: author, the words it was made on (an inline comment), markdown body, and the viewer's actions. */
-export function CommentItem({ comment, agent, handlers, reply = false, anchors, showAnchor = true, compact = false }: CommentItemProps) {
+export function CommentItem({ comment, agent, handlers, reply = false, anchors, showAnchor = true, compact = false, linked = false }: CommentItemProps) {
+  const ref = useLinkedCommentView<HTMLElement>(linked);
   return (
-    <article id={`comment-${comment.id}`} className={cn("scroll-mt-20 space-y-1.5 py-3", reply && "border-l pl-4")}>
+    <article
+      ref={ref}
+      id={`comment-${comment.id}`}
+      tabIndex={linked ? -1 : undefined}
+      data-linked-comment={linked ? "" : undefined}
+      className={cn("scroll-mt-20 space-y-1.5 py-3 outline-none", reply && "border-l pl-4")}
+    >
       <AuthorLine comment={comment} agent={agent} />
       {showAnchor ? <AnchorQuote comment={comment} lookup={anchors} /> : null}
       {comment.deleted ? <p className="text-md text-muted-foreground italic">This comment was deleted.</p> : <LiveComment comment={comment} agent={agent} handlers={handlers} compact={compact} />}

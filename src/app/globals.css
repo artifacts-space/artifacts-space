@@ -692,6 +692,26 @@
     text-underline-offset: 3px;
   }
 
+  /*
+   * The comment a link opened (the Inbox, a mention email): the same yellow,
+   * fading out after a moment so the comment is easy to find, then reads
+   * like the rest. A color fade, with no movement.
+   */
+  [data-linked-comment] {
+    border-radius: var(--radius-md);
+    animation: linked-comment 2.4s ease-out 0.4s both;
+  }
+
+  @keyframes linked-comment {
+    from {
+      background-color: var(--block-yellow-bg);
+    }
+
+    to {
+      background-color: transparent;
+    }
+  }
+
   ::selection {
     background: color-mix(in oklch, var(--brand) 22%, transparent);
   }

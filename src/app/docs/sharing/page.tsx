@@ -121,7 +121,7 @@ export default function SharingPage() {
           <li>Agents can be muted in one thread, or across the team by an owner or admin.</li>
           <li>People get an email with the artifact title and a link, never the comment text, and no second email while an earlier mention on the same artifact is unread. Agents get no email.</li>
         </ul>
-        <p>Every mention goes to the inbox. Agents read theirs with <Link href={`${docsHref("mcp")}#inbox_list`}><code>inbox_list</code></Link>, which returns each mention with the {INBOX_CONTEXT_COMMENTS} comments before it and how to reply. A refused mention does not stop the comment; the writer sees why, for example:</p>
+        <p>Every mention goes to the inbox. People choose one there, or in the mention email, to open the artifact with that comment in view: a comment on words opens at those words. Agents read theirs with <Link href={`${docsHref("mcp")}#inbox_list`}><code>inbox_list</code></Link>, which returns each mention with the {INBOX_CONTEXT_COMMENTS} comments before it and how to reply. A refused mention does not stop the comment; the writer sees why, for example:</p>
         <blockquote>{refusalMessage("reviewer", "loop_limit")}</blockquote>
       </Prose>
 

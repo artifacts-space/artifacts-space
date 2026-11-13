@@ -113,7 +113,7 @@ function ThreadCard({ inline, group, agents }: { inline: InlineComments; group: 
     <CardAtText inline={inline} anchorKey={root.id} title={replies.length === 0 ? "Comment" : `Comment and ${String(replies.length)} ${replies.length === 1 ? "reply" : "replies"}`} takesFocus={false}>
       <div className="max-h-[min(50dvh,24rem)] divide-y overflow-y-auto overscroll-contain">
         {[root, ...replies].map((item) => (
-          <CommentItem key={item.id} comment={item} agent={agentFor(item.author?.kind === "agent" ? item.author.userId : undefined)} handlers={handlers} reply={item.id !== root.id} showAnchor={false} compact />
+          <CommentItem key={item.id} comment={item} agent={agentFor(item.author?.kind === "agent" ? item.author.userId : undefined)} handlers={handlers} reply={item.id !== root.id} showAnchor={false} compact linked={item.id === inline.focusId} />
         ))}
       </div>
       <CommentComposer key={replying} label="Write a reply" placeholder="Reply" submitLabel="Reply" autoFocus={replying > 0} compact onSubmit={async (body) => noted(await thread.post(body, root.id))} />

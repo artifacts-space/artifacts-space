@@ -73,7 +73,7 @@ describe("transactional emails", () => {
     const { magic, invitation, mention, report } = await sendEach();
     expect(magic.message.text).toContain("https://artifacts.space/api/auth/magic-link/verify?token=t1");
     expect(invitation.message.text).toContain("https://artifacts.space/invitations/inv1");
-    expect(mention.message.text).toContain("https://artifacts.space/threads/pub1#comment-c1");
+    expect(mention.message.text).toContain("https://artifacts.space/app?artifact=pub1&comment=c1");
     expect(report.message.text).toContain("https://artifacts.space/artifact/pub1");
     expect(report.message.text).toContain("https://artifacts.space/teams/acme");
   });

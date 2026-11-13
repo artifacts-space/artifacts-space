@@ -10,6 +10,7 @@ import { markInboxReadAction } from "@/app/(workspace)/inbox/actions";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
+import { artifactLinkHref } from "@/lib/app-link";
 import type { InboxEntryView } from "@/lib/comments/inbox";
 import { cn } from "@/lib/utils";
 
@@ -21,11 +22,20 @@ function snippet(body: string) {
   return flat.length > SNIPPET_LENGTH ? `${flat.slice(0, SNIPPET_LENGTH - 1)}…` : flat;
 }
 
+/** Where a mention opens: its artifact in the workspace, with that comment in view. */
+function entryHref(entry: InboxEntryView): string {
+  return artifactLinkHref({ publicId: entry.artifact.publicId, comments: true, commentId: entry.comment.id });
+}
+
+/**
+ * One mention. The title is a real link whose hit area covers the whole row
+ * (middle-click and Cmd-click open a new tab), and Mark read sits above it.
+ */
 function EntryRow({ entry, pending, onRead }: { entry: InboxEntryView; pending: boolean; onRead: (id: string) => void }) {
   const unread = entry.readAt === null;
   const author = entry.comment.author;
   return (
-    <li className={cn("flex gap-3 border-t px-5 py-3 first:border-t-0", unread ? "bg-card" : "bg-background/60")}>
+    <li data-slot="inbox-entry" className={cn("relative flex gap-3 border-t px-5 py-3 transition-colors first:border-t-0 hover:bg-muted/50", unread ? "bg-card" : "bg-background/60")}>
       <span aria-hidden className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", unread ? "bg-foreground" : "bg-transparent")} />
       <div className="min-w-0 flex-1 space-y-1">
         <p className="flex flex-wrap items-center gap-x-1.5 text-md">
@@ -33,7 +43,10 @@ function EntryRow({ entry, pending, onRead }: { entry: InboxEntryView; pending: 
           <span className="font-medium">{author?.label ?? "Former member"}</span>
           <span className="text-muted-foreground">mentioned you on</span>
           {entry.artifact.icon ? <ArtifactIcon icon={entry.artifact.icon} /> : null}
-          <Link href={`/threads/${entry.artifact.publicId}#comment-${entry.comment.id}`} className="truncate font-medium underline decoration-border underline-offset-[3px] hover:decoration-foreground">
+          <Link
+            href={entryHref(entry)}
+            className="truncate font-medium underline decoration-border underline-offset-[3px] outline-none after:absolute after:inset-0 after:content-[''] hover:decoration-foreground focus-visible:after:ring-3 focus-visible:after:ring-ring/50 focus-visible:after:ring-inset"
+          >
             {entry.artifact.title}
           </Link>
         </p>
@@ -41,7 +54,7 @@ function EntryRow({ entry, pending, onRead }: { entry: InboxEntryView; pending: 
         <p className="text-xs text-muted-foreground">{timeFormat.format(new Date(entry.createdAt))} UTC</p>
       </div>
       {unread ? (
-        <Button variant="ghost" size="sm" className="shrink-0" disabled={pending} onClick={() => { onRead(entry.id); }}>
+        <Button variant="ghost" size="sm" className="relative z-10 shrink-0" disabled={pending} onClick={() => { onRead(entry.id); }}>
           <IconCheck /> Mark read
         </Button>
       ) : null}
@@ -49,7 +62,7 @@ function EntryRow({ entry, pending, onRead }: { entry: InboxEntryView; pending: 
   );
 }
 
-/** Mentions of the viewer, unread first. Opening a thread marks its mentions read. */
+/** Mentions of the viewer, unread first. Opening one shows its comment on the artifact and marks the artifact's mentions read. */
 export function InboxList({ entries }: { entries: InboxEntryView[] }) {
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
