@@ -49,6 +49,16 @@ function linkInLocation(): ArtifactLink | null {
 }
 
 /**
+ * The first load's link: in the browser, read from the address bar with its
+ * fragment, so the comments open at an old link's comment from the start and
+ * never open first without it. The server render has no fragment; nothing it
+ * draws depends on the comment (only effects act on it), so both agree.
+ */
+function firstLink(params: URLSearchParams): ArtifactLink | null {
+  return typeof window === "undefined" ? parseArtifactLinkSearch(params) : parseArtifactLinkSearch(params, window.location.hash);
+}
+
+/**
  * The workspace's list and selection, driven by links as well as clicks.
  *
  * A link arrives when the address bar holds one (`?artifact=<id>`): on the
@@ -69,7 +79,7 @@ export function useArtifactLink({ initialArtifacts, target = null, failed = fals
   const router = useRouter();
   const params = useSearchParams();
   const search = params.toString();
-  const [start] = useState(() => linkedStart(initialArtifacts, parseArtifactLinkSearch(params), target));
+  const [start] = useState(() => linkedStart(initialArtifacts, firstLink(params), target));
   const [artifacts, setArtifacts] = useState(start.artifacts);
   const [selectedId, setSelectedId] = useState(start.selectedId);
   const [notice, setNotice] = useState(() => linkNotice(start.unavailable, failed));
@@ -95,19 +105,12 @@ export function useArtifactLink({ initialArtifacts, target = null, failed = fals
     onHandled?.();
   });
 
-  // The first load's link was read on the server, which never sees a fragment: a comment named only there joins it here.
-  const completeStart = useEffectEvent((link: ArtifactLink) => {
-    if (start.opened && link.commentId !== start.opened.commentId) setOpened(link);
-  });
-
   // Runs after each navigation commits: the search or the server's answer for it changes.
   useEffect(() => {
     const link = linkInLocation();
     if (!link) return;
-    if (startLink.current) {
-      startLink.current = false;
-      completeStart(link);
-    } else arrive(link);
+    if (startLink.current) startLink.current = false;
+    else arrive(link);
     forget();
   }, [search, target, failed]);
 

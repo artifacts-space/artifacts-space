@@ -45,6 +45,7 @@ function EntryRow({ entry, pending, onRead }: { entry: InboxEntryView; pending: 
           {entry.artifact.icon ? <ArtifactIcon icon={entry.artifact.icon} /> : null}
           <Link
             href={entryHref(entry)}
+            aria-label={`${author?.label ?? "Former member"} mentioned you on ${entry.artifact.title}`}
             className="truncate font-medium underline decoration-border underline-offset-[3px] outline-none after:absolute after:inset-0 after:content-[''] hover:decoration-foreground focus-visible:after:ring-3 focus-visible:after:ring-ring/50 focus-visible:after:ring-inset"
           >
             {entry.artifact.title}

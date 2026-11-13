@@ -80,6 +80,23 @@ async function chooseInInbox(page: Page, seeded: Seeded, text: string, commentId
 /** The Comments dialog. The card at the words is a dialog too (a popover), so it is told apart by its heading. */
 const dialog = (page: Page) => page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: /^Comments on / }) });
 
+/**
+ * From the next page load on, records whether the Comments dialog ever
+ * showed in that page, even for a moment (the card at the words is not it).
+ */
+async function watchForCommentsDialog(page: Page) {
+  await page.addInitScript(() => {
+    const record = window as unknown as { commentsDialogSeen?: boolean };
+    new MutationObserver(() => {
+      if (document.querySelector("[data-slot=dialog-content]")) record.commentsDialogSeen = true;
+    }).observe(document, { childList: true, subtree: true });
+  });
+}
+
+function commentsDialogSeen(page: Page): Promise<boolean> {
+  return page.evaluate(() => (window as unknown as { commentsDialogSeen?: boolean }).commentsDialogSeen === true);
+}
+
 /** The linked comment is marked, in view, and has focus. */
 async function expectLinked(comment: Locator) {
   await expect(comment).toHaveAttribute("data-linked-comment", "");
@@ -89,12 +106,13 @@ async function expectLinked(comment: Locator) {
 
 test("should open an inline comment in its card at the words when it is chosen in the Inbox", async ({ page }, testInfo) => {
   const seeded = await seed(page, `inline ${testInfo.project.name}`);
+  await watchForCommentsDialog(page);
   await chooseInInbox(page, seeded, "Is this still true?", seeded.inline);
 
   await expect(card(page)).toContainText("Is this still true?");
   await expectLinked(card(page).locator(`#comment-${seeded.inline}`));
   await expect.poll(async () => (await highlighted(page)).open, "the words are marked as the open thread's").toEqual(["single writer"]);
-  await expect(dialog(page)).toHaveCount(0);
+  expect(await commentsDialogSeen(page), "the Comments dialog never opened on the way").toBe(false);
   await expect.poll(() => mentionRead(seeded.inline, seeded.viewer), "choosing it marks it read").toBe(true);
 });
 
@@ -128,6 +146,7 @@ test("should open the Comments list at a reply when the reply is chosen in the I
 
 test("should send an old thread link to the artifact at its comment when the link was sent before", async ({ page }, testInfo) => {
   const seeded = await seed(page, `old link ${testInfo.project.name}`);
+  await watchForCommentsDialog(page);
 
   await page.goto(`/threads/${seeded.publicId}#comment-${seeded.thread}`);
   await expect(page).toHaveURL(/\/app$/);
@@ -137,6 +156,7 @@ test("should send an old thread link to the artifact at its comment when the lin
   await expect(page).toHaveURL(/\/app$/);
   await expect(card(page)).toContainText("Is this still true?");
   await expectLinked(card(page).locator(`#comment-${seeded.inline}`));
+  expect(await commentsDialogSeen(page), "an old link to a comment on words never opens the Comments dialog first").toBe(false);
 
   // A link without a comment still opens the artifact's comments.
   await page.goto(`/threads/${seeded.publicId}`);
