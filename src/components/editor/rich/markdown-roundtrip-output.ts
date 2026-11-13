@@ -1,3 +1,5 @@
+import type { JSONContent } from "@tiptap/core";
+
 import type { SourceMap } from "./markdown-roundtrip";
 
 /*
@@ -11,6 +13,8 @@ export interface Chunk {
   block: number;
   /** True when the chunk is an edited list written over its loaded block. */
   edited?: boolean;
+  /** For such a list: its node, and whether its last item changed (markdown-list-check.ts). */
+  list?: { node: JSONContent; last: boolean };
 }
 
 function isUnchanged(chunks: readonly Chunk[], source: SourceMap): boolean {
@@ -28,7 +32,8 @@ function spacingInItem(previous: Chunk, next: Chunk, source: SourceMap): string 
   return spacings.reduce((wide, after) => (after.split("\n").length > wide.split("\n").length ? after : wide), spacings[0] ?? "\n\n");
 }
 
-function separator(previous: Chunk, next: Chunk, source: SourceMap): string {
+/** What stands between two chunks that follow each other in the written document. */
+export function separator(previous: Chunk, next: Chunk, source: SourceMap): string {
   const block = source.blocks[previous.block];
   if (block && next.block === previous.block + 1) return block.after;
   return source.inItem ? spacingInItem(previous, next, source) : "\n\n";

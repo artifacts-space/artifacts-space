@@ -43,6 +43,7 @@ function listSource<Map>(text: string, node: JSONContent, helpers: BlockDetailHe
   if (slices?.length !== items.length || !node.type) return null;
   return {
     type: node.type,
+    shell: helpers.key({ ...node, content: [] }),
     items: slices.map((slice, index) => {
       const item = items[index] ?? {};
       return { ...slice, key: helpers.key(item), children: once(() => helpers.itemContent(slice.content, item)) };

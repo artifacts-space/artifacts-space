@@ -3,6 +3,8 @@ import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
 
+import { RAW_MARKDOWN } from "./raw-markdown-node";
+
 /*
  * The editor reads Markdown with marked; the read view draws it with remark
  * (react-markdown and remark-gfm). Where the two disagree about lists (an
@@ -135,9 +137,16 @@ function isEmptyParagraph(node: JSONContent): boolean {
   return node.type === "paragraph" && !squash(editorText(node));
 }
 
+/** A block kept as written reads as the read view reads its source. */
+function keptAsWritten(node: JSONContent): Outline[] {
+  const source: unknown = node.attrs?.source;
+  return typeof source === "string" ? markdownBlocks((reader.parse(source) as MarkdownNode).children ?? []) : [];
+}
+
 function editorBlocks(nodes: readonly JSONContent[]): Outline[] {
   return joinLists(nodes.flatMap((node) => {
     if (isEmptyParagraph(node)) return [];
+    if (node.type === RAW_MARKDOWN) return keptAsWritten(node);
     const outline = editorOutlines[node.type ?? ""];
     return [outline ? outline(node) : { t: node.type ?? "" }];
   }));

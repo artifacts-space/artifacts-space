@@ -10,8 +10,8 @@ import { markdownSchemaExtensions } from "./markdown-schema";
 import { RAW_MARKDOWN } from "./raw-markdown-node";
 import { reviewBlocks, type RawKind } from "./markdown-block-details";
 import type { ListSource } from "./markdown-list-items";
-import { itemContentMap, listChunk, type ListTools } from "./markdown-roundtrip-lists";
-import { writtenDocument, type Chunk } from "./markdown-roundtrip-output";
+import { itemContentMap, listChunk, listsInContext, type ListTools } from "./markdown-roundtrip-lists";
+import { separator, writtenDocument, type Chunk } from "./markdown-roundtrip-output";
 
 interface Engine {
   schema: Schema;
@@ -423,8 +423,14 @@ function toChunks(nodes: JSONContent[], source: SourceMap, current: Engine, flav
  * fresh. An unedited document returns the loaded string exactly.
  */
 export function serializeMarkdown(doc: JSONContent, source: SourceMap, flavor: MarkdownFlavor = "document"): string {
-  const chunks = toChunks(doc.content ?? [], source, getEngine(), flavor);
-  return writtenDocument(chunks, source);
+  const current = getEngine();
+  const chunks = toChunks(doc.content ?? [], source, current, flavor);
+  const stored = listsInContext(chunks, {
+    between: (before, chunk) => separator(before, chunk, source),
+    blocks: (markdown) => lexBlocks(markdown, current)?.blocks.map((block) => block.text) ?? null,
+    write: (node) => renderNodes([node], current),
+  });
+  return writtenDocument(stored, source);
 }
 
 /** An empty source map, for content that was never loaded from Markdown. */

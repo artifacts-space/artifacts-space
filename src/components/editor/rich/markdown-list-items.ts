@@ -120,6 +120,8 @@ export interface ItemSource<Map> extends ItemSlice {
 /** A loaded list block, item by item. */
 export interface ListSource<Map> {
   type: string;
+  /** The key of the list node without its items: its type and attributes, such as the number it starts at. */
+  shell: string;
   items: ItemSource<Map>[];
 }
 
@@ -188,29 +190,44 @@ function startOf(node: JSONContent): number {
   return typeof node.attrs?.start === "number" ? node.attrs.start : 1;
 }
 
-/** A new item, written fresh in the list's marker style; a numbered list is numbered again afterwards. */
+/** A new item, written fresh in the list's marker style and as far in as the list's first item; a numbered list is numbered again afterwards. */
 function newItem<Map>(item: JSONContent, node: JSONContent, list: ListSource<Map>, writer: ListWriter<Map>): string {
-  return restyled(writer.fresh({ ...node, content: [item] }), list);
+  const fresh = restyled(writer.fresh({ ...node, content: [item] }), list);
+  const pad = /^ */.exec(list.items[0]?.marker ?? "")?.[0] ?? "";
+  return pad ? fresh.split("\n").map((line) => (line ? `${pad}${line}` : line)).join("\n") : fresh;
 }
 
 /** A written item, the loaded item it stands in for (-1 for a new one), and the item node. */
-interface Part {
+export interface Part {
   text: string;
   index: number;
   item: JSONContent;
+  /** True when the item is a loaded item nobody edited: it is written as it loaded, but for its number. */
+  exact: boolean;
 }
 
-/** A list written over its loaded list, and the items written differently from how they loaded. */
+/** A list written over its loaded list: its items as written, what stands before each (nothing before the first), and all of it joined. */
 export interface ComposedList {
+  parts: Part[];
+  separators: string[];
   text: string;
-  changed: { text: string; item: JSONContent }[];
-  /** Where the items written differently sit, when every item is a loaded item in its place; null when items were added, removed, or moved. */
-  changedInPlace: number[] | null;
+}
+
+const itemsByKey = new WeakMap<object, Map<string, number[]>>();
+
+/** Where each key sits among the loaded items, made once for a list. */
+function keyIndex(list: ListSource<unknown>): Map<string, number[]> {
+  const known = itemsByKey.get(list);
+  if (known) return known;
+  const index = new Map<string, number[]>();
+  list.items.forEach((item, position) => index.set(item.key, [...(index.get(item.key) ?? []), position]));
+  itemsByKey.set(list, index);
+  return index;
 }
 
 /** The first unused loaded item with `key`, preferring those from `from` on. */
-function findItem(items: readonly { key: string }[], key: string, from: number, used: ReadonlySet<number>): number {
-  const matches = items.flatMap((item, index) => (item.key === key && !used.has(index) ? [index] : []));
+function findItem(list: ListSource<unknown>, key: string, from: number, used: ReadonlySet<number>): number {
+  const matches = (keyIndex(list).get(key) ?? []).filter((index) => !used.has(index));
   return matches.find((index) => index >= from) ?? matches[0] ?? -1;
 }
 
@@ -223,7 +240,7 @@ function replacedItem<Map>(list: ListSource<Map>, next: number, used: ReadonlySe
   const candidate = list.items[next];
   if (!candidate || used.has(next)) return -1;
   const later = laterKeys.filter((key) => key === candidate.key).length;
-  const unused = list.items.filter((item, index) => item.key === candidate.key && !used.has(index)).length;
+  const unused = (keyIndex(list).get(candidate.key) ?? []).filter((index) => !used.has(index)).length;
   return later < unused ? next : -1;
 }
 
@@ -233,19 +250,20 @@ function plainSeparator(after: string): string {
 }
 
 /**
- * The parts joined. What followed a loaded item still follows it: its
- * spaces and blank lines can be part of what the item reads as. A new item,
- * and the item that was the list's last, are followed by the separator
- * before them, so a new item is set apart as the items around it are.
+ * What stands before each part. What followed a loaded item still follows
+ * it: its spaces and blank lines can be part of what the item reads as. A
+ * new item, and the item that was the list's last, are followed by the
+ * separator before them, so a new item is set apart as the items around it
+ * are.
  */
-function joinParts(parts: readonly Part[], list: ListSource<unknown>): string {
+function separators(parts: readonly Part[], list: ListSource<unknown>): string[] {
   let separator = plainSeparator(list.items.find((item) => item.after)?.after ?? "\n");
-  return parts.map((part, position) => {
+  return parts.map((_part, position) => {
     const before = parts[position - 1];
-    if (!before) return part.text;
+    if (!before) return "";
     separator = list.items[before.index]?.after || plainSeparator(separator);
-    return `${separator}${part.text}`;
-  }).join("");
+    return separator;
+  });
 }
 
 /** True when the items are the loaded items in their places: none added, removed, or moved. */
@@ -274,7 +292,7 @@ export function composeList<Map>(node: JSONContent, list: ListSource<Map>, write
   const parts: Part[] = [];
   let next = 0;
   for (const [position, item] of items.entries()) {
-    const exact = findItem(list.items, keys[position] ?? "", next, used);
+    const exact = findItem(list, keys[position] ?? "", next, used);
     const index = exact >= 0 ? exact : replacedItem(list, next, used, keys.slice(position + 1));
     const loaded = list.items[index];
     const text = loaded ? (exact >= 0 ? loaded.text : editedItem(item, loaded, writer)) : newItem(item, node, list, writer);
@@ -283,11 +301,9 @@ export function composeList<Map>(node: JSONContent, list: ListSource<Map>, write
       used.add(index);
       next = index + 1;
     }
-    parts.push({ text, index, item });
+    parts.push({ text, index, item, exact: exact >= 0 });
   }
   const written = numbered(parts, node, list);
-  const differs = (part: Part) => part.text !== list.items[part.index]?.text;
-  const changed = written.filter(differs).map(({ text, item }) => ({ text, item }));
-  const changedInPlace = inPlace(written, list) ? written.flatMap((part, position) => (differs(part) ? [position] : [])) : null;
-  return { text: joinParts(written, list), changed, changedInPlace };
+  const between = separators(written, list);
+  return { parts: written, separators: between, text: written.map((part, position) => `${between[position] ?? ""}${part.text}`).join("") };
 }

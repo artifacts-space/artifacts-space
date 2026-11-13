@@ -339,16 +339,24 @@ lists, each indented under the item's text and set off by blank lines:
   number on every item when it had one (`markdown-list-numbers.ts`).
 - **Two ways to save an edited list, and no other.** An edited list is
   saved over its loaded items, as above, when that text is verified to read
-  back as the edit (`markdown-list-check.ts`): the editor reads it as the
-  edited list, the list would load formatted again (the rule every block
-  loads by: the round trip's own writing of its nodes reads back as them),
-  and the read view (remark) shows each item written anew as the editor
-  holds it. An edited block inside an item first keeps the spacing it had,
-  then gets blank lines around it. When neither verifies, the list is
-  written whole by the round trip's own writer, exactly as any other edited
-  block is and as lists were before item maps. No check stands between a
-  list and that writer, and nothing else is ever saved. Both ways write the
-  content as it is at that save, so no save can take back an earlier edit.
+  back as the edit (`markdown-list-check.ts`); otherwise it is written whole
+  by the round trip's own writer, exactly as any other edited block is and
+  as lists were before item maps. No check stands between a list and that
+  writer, and nothing else is ever saved. Both ways write the content as it
+  is at that save, so no save can take back an earlier edit.
+- **What is verified.** Only what an edit can change is read again: the
+  items written differently and the ones beside them
+  (`markdown-list-runs.ts`). Both readers read a list item by item, so an
+  item nobody edited, between the neighbours it loaded with, reads as it
+  did. Those items must read back as the edit in the editor, load formatted
+  again (the rule every block loads by), and read the same in the read view
+  (remark). When the list's last item changed (a new or renumbered last
+  item), the list and the block after it are split again as the document
+  will hold them; if the list would take that block in, the list is written
+  whole (`listsInContext` in `markdown-roundtrip-lists.ts`). A new item sits
+  as far in as the list's first item, so the start of a list never moves.
+  An edited block inside an item first keeps the spacing it had, then gets
+  blank lines around it.
 - **Read back by meaning.** The editor can hold what Markdown cannot store:
   a space at the end of an item, a line break with nothing after it, spaces
   at the start of a new item's text. A written list is compared with the
@@ -386,7 +394,9 @@ lists, each indented under the item's text and set off by blank lines:
   loads generated lists and the corpus (`list-generator.ts`,
   `list-corpus.ts`), makes every kind of edit, and asserts that what is
   saved is the whole-list writing of the same edit, or text that loads again
-  as the edit, formatted, and reads the same in the read view.
+  as the edit, formatted, and reads the same in the read view, with the
+  blocks around it. `markdown-list-runs.test.ts` pins how many items one
+  edit makes the readers read.
 
 ### Raw blocks
 

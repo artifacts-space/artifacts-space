@@ -7,7 +7,8 @@ import type { JSONContent } from "@tiptap/core";
  * and loose, up to four lists deep, with paragraphs, code blocks, quotes,
  * tables, and nested lists in their items, and the spacing people and agents
  * really write: spaces at the end of a line, two blank lines between items,
- * two spaces or a tab after a marker, items with no text.
+ * two spaces or a tab after a marker, a child indented with a tab, items
+ * with no text, and a list right under another, set less far in.
  */
 
 /** A source of numbers from 0 up to 1, the same sequence for the same seed. */
@@ -35,6 +36,8 @@ function extraLines(random: Random, indent: string, depth: number): string[] {
   if (kind === "code") return [`${indent}\`\`\`${pick(random, ["", "text", "sh"])}`, `${indent}${pick(random, codeLines)}`, `${indent}\`\`\``];
   if (kind === "quote") return [`${indent}> ${pick(random, words)}`];
   if (kind === "table") return [`${indent}| name | ${pick(random, words)} |`, `${indent}| --- | --- |`, `${indent}| one | ${pick(random, codeLines)} |`];
+  // Now and then a child indented with a tab, as some editors write one.
+  if (depth === 0 && random() < 0.05) return [`\t- tabbed ${pick(random, words)}`];
   return depth < 3 ? listLines(random, indent, depth + 1) : [];
 }
 
@@ -95,11 +98,27 @@ function listLines(random: Random, indent: string, depth: number): string[] {
   return lines;
 }
 
+const below = ["  * sub", "  + sub", "  2. two", " - [ ] under", "   1) deeper", "2. two", "+ plus"];
+const apart = ["   - [x] apart", "  * apart", "   indented text"];
+
+/**
+ * What stands right under a list now and then: another list, set less far
+ * in than the item above it, so it is a block of its own (`1. one` then
+ * `  * sub`), or an indented block after a blank line. An edit to the list
+ * above can make such a block part of it.
+ */
+function attached(random: Random): string {
+  const chance = random();
+  if (chance < 0.08) return `\n${pick(random, below)}`;
+  if (chance < 0.12) return `\n${pick(random, below)}\n${pick(random, below)}`;
+  return chance < 0.16 ? `\n\n${pick(random, apart)}` : "";
+}
+
 /** A document of one to three lists with a paragraph or a heading after each. */
 export function generatedLists(random: Random): string {
   const blocks: string[] = [];
   for (let index = 0, count = 1 + Math.floor(random() * 3); index < count; index += 1) {
-    blocks.push(listLines(random, "", 0).join("\n"), index % 2 === 0 ? `Between ${String(index)}.` : `## Heading ${String(index)}`);
+    blocks.push(`${listLines(random, "", 0).join("\n")}${attached(random)}`, index % 2 === 0 ? `Between ${String(index)}.` : `## Heading ${String(index)}`);
   }
   return `${blocks.join("\n\n")}\n`;
 }
