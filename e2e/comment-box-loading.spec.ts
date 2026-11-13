@@ -55,18 +55,65 @@ test("should post from the plain box when the rich box cannot load", async ({ pa
   await expect(list(page).locator("[data-slot=comment-editor]"), "no rich box appeared").toHaveCount(0);
 });
 
-test("should keep every character typed while the rich box loads, and not move", async ({ page }) => {
+/** Holds the rich box's code until `release` is called, then lets it through. */
+async function holdEditorChunk(page: Page) {
   const held: { route: Route; response: APIResponse }[] = [];
-  let release = false;
+  let released = false;
   await routeEditorChunk(page, (route, response) => {
-    if (release) return route.fulfill({ response });
+    if (released) return route.fulfill({ response });
     held.push({ route, response });
     return undefined;
   });
+  return {
+    asked: () => held.length,
+    release: async () => {
+      released = true;
+      await Promise.all(held.map(({ route, response }) => route.fulfill({ response })));
+    },
+  };
+}
+
+/** The rich box has taken over: it is the box, and it has the caret. */
+async function expectRichBox(page: Page) {
+  const rich = newComment(page);
+  await expect(rich, "the rich box took over").toHaveAttribute("contenteditable", "true");
+  await expect(rich).toBeFocused();
+  return rich;
+}
+
+const handovers = [
+  { moment: "right after a space", before: "First words typed before it ", after: "loads, and the end.", posted: "First words typed before it loads, and the end." },
+  { moment: "mid-word", before: "First wo", after: "rds typed.", posted: "First words typed." },
+  // The rich box writes a line break inside a paragraph as Markdown's hard break: two spaces, then the break.
+  { moment: "right after a line break", before: "Line one\n", after: "line two", posted: "Line one  \nline two" },
+  { moment: "right after a blank line", before: "Para one\n\n", after: "para two", posted: "Para one\n\npara two" },
+];
+
+for (const { moment, before, after, posted } of handovers) {
+  test(`should keep every character when the rich box takes over ${moment}`, async ({ page }) => {
+    const chunk = await holdEditorChunk(page);
+    await openThread(page);
+    const box = newComment(page);
+    await expect(box).toHaveJSProperty("tagName", "TEXTAREA");
+    await expect.poll(chunk.asked, "the rich box's code was asked for").toBeGreaterThan(0);
+
+    await box.click();
+    await page.keyboard.type(before);
+    await expect(box).toHaveValue(before);
+    await chunk.release();
+    await expectRichBox(page);
+    await page.keyboard.type(after);
+    await page.keyboard.press(`${await modKey(page)}+Enter`);
+    expect(await writes(page), "not one character was lost or moved").toEqual([posted]);
+  });
+}
+
+test("should keep every character typed while the rich box loads, and not move", async ({ page }) => {
+  const chunk = await holdEditorChunk(page);
   await openThread(page);
   const box = newComment(page);
   await expect(box).toHaveJSProperty("tagName", "TEXTAREA");
-  await expect.poll(() => held.length, "the rich box's code was asked for").toBeGreaterThan(0);
+  await expect.poll(chunk.asked, "the rich box's code was asked for").toBeGreaterThan(0);
   const plainHeight = (await page.locator("[data-slot=comment-box-plain]").boundingBox())?.height ?? 0;
   const fontSize = await box.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
 
@@ -74,13 +121,10 @@ test("should keep every character typed while the rich box loads, and not move",
   await box.click();
   const typing = page.keyboard.type(text, { delay: 25 });
   await expect.poll(async () => (await newComment(page).evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : ""))).length).toBeGreaterThan(20);
-  release = true;
-  await Promise.all(held.map(({ route, response }) => route.fulfill({ response })));
+  await chunk.release();
   await typing;
 
-  const rich = newComment(page);
-  await expect(rich, "the rich box took over").toHaveAttribute("contenteditable", "true");
-  await expect(rich).toBeFocused();
+  const rich = await expectRichBox(page);
   await expect(rich).toHaveText(text);
   await page.keyboard.press(`${await modKey(page)}+Enter`);
   expect(await writes(page), "not one character was lost").toEqual([text]);

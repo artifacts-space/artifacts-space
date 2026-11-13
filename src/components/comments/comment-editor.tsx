@@ -13,7 +13,7 @@ import { useCoarsePointer } from "@/components/editor/rich/use-coarse-pointer";
 import { commentShowsLink } from "@/lib/markdown/link-href";
 import { cn } from "@/lib/utils";
 
-import { positionForOffset } from "./caret-handoff";
+import { positionForOffset, withoutTypedTail, withTypedTail } from "./caret-handoff";
 import { parseCommentMarkdown, serializeCommentMarkdown } from "./comment-markdown";
 import { commentBoxClass, commentBoxHeight, commentBoxMaxHeight, commentFocusClass, commentTextClass, isSubmitShortcut } from "./comment-box";
 import { CommentMentions, type MentionSource } from "./comment-mentions";
@@ -83,9 +83,10 @@ function useHandoff(editor: Editor | null, root: React.RefObject<HTMLDivElement 
     if (!editor) return;
     const api: CommentEditorApi = {
       load: (markdown, caret) => {
-        const loaded = parseCommentMarkdown(markdown);
+        // The spaces and line breaks typed last go in as text, which Markdown would drop, so the next word does not join the last.
+        const loaded = parseCommentMarkdown(withoutTypedTail(markdown));
         sourceRef.current = loaded.source;
-        editor.commands.setContent(loaded.doc, { emitUpdate: false });
+        editor.commands.setContent(withTypedTail(loaded.doc, markdown), { emitUpdate: false });
         // Shown at once, ahead of the composer's next render, which keeps it shown.
         if (root.current) root.current.hidden = false;
         if (caret !== null) focusAt(editor, positionForOffset(editor.state.doc, caret));
