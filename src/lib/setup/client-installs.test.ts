@@ -80,7 +80,7 @@ describe("claudeInstallLink", () => {
 
 describe("grokBotAddMessage", () => {
   it("should name the endpoint and the server when asking a Grok Bot to add it", () => {
-    expect(grokBotAddMessage(origin)).toBe(`Add the MCP server at ${endpoint} and name it artifacts.`);
+    expect(grokBotAddMessage(origin)).toBe(`Add the MCP server at ${endpoint} and name it artifacts.space.`);
   });
 });
 

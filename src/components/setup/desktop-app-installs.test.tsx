@@ -106,7 +106,7 @@ describe("desktop app guides", () => {
 
   it("should give the desktop steps and the message for a Bot when showing Grok Bot", () => {
     const guide = renderToStaticMarkup(<GrokBotGuide origin={origin} />);
-    for (const step of ["no one-click link for Grok Bot", "Connect apps", "Add a custom connector", "Remote HTTPS", copyEndpoint, "Add plugin", "Needs auth", `Add the MCP server at ${endpoint} and name it artifacts.`]) {
+    for (const step of ["no one-click link for Grok Bot", "choose the apps button", "<strong>Connect Apps</strong> opens", "Add a custom connector", "<code>artifacts.space</code>", "keep the type <strong>Remote HTTPS</strong>", copyEndpoint, "<strong>Add plugin</strong>. Grok Bot asks you to sign in.", "Needs auth", `Add the MCP server at ${endpoint} and name it artifacts.space.`]) {
       expect(guide).toContain(step);
     }
     expect(guide).not.toContain("grok.com/connectors");
@@ -128,7 +128,7 @@ describe("check the connection", () => {
     expect(step).toContain("open <strong>Plugins</strong>: <strong>artifacts.space</strong> shows under <strong>Installed</strong>");
   });
 
-  it("should point to Installed in Connect apps and say what each status means when checking Grok Bot", () => {
+  it("should point to Installed in Connect Apps and say what each status means when checking Grok Bot", () => {
     const step = checkStep(renderToStaticMarkup(<GrokBotGuide origin={origin} />));
     for (const words of ["<strong>Installed</strong>", "<strong>Added</strong> means it is installed but not signed in yet", "<strong>Needs auth</strong> or <strong>Disconnected</strong>", "<strong>Authenticate</strong>"]) {
       expect(step).toContain(words);

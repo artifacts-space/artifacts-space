@@ -132,12 +132,19 @@ export function codexHeadlessConfigToml(origin: string): string {
 export const CHATGPT_PLUGINS_URL = "https://chatgpt.com/plugins";
 
 /**
+ * The name the Grok Bot guide gives the connector, in the app's "Add a
+ * custom connector" form and in the message for a Bot, so the check step
+ * names one thing whichever way the server was added.
+ */
+export const GROK_CONNECTOR_NAME = "artifacts.space";
+
+/**
  * The message that asks a Grok Bot to add the server. Grok Bot documents no
  * install link; a Bot can add an MCP server by its URL when asked in chat.
  * Source: https://docs.x.ai/grok-bot/computer-and-apps
  */
 export function grokBotAddMessage(origin: string): string {
-  return `Add the MCP server at ${mcpEndpoint(origin)} and name it ${MCP_SERVER_NAME}.`;
+  return `Add the MCP server at ${mcpEndpoint(origin)} and name it ${GROK_CONNECTOR_NAME}.`;
 }
 
 /**
