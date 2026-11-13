@@ -9,7 +9,7 @@ import { Galaxy } from "./galaxy";
 import { SectionEyebrow } from "./section-marks";
 
 /**
- * The page's last call to action: open source, MIT licensed. Copy and buttons
+ * The page's last call to action: open source under Apache 2.0. Copy and buttons
  * on the left; on the right, an animated pixel galaxy: artifacts orbiting
  * the brand planet (galaxy.tsx), on its own night sky in both themes.
  */
@@ -23,7 +23,7 @@ export function OpenSourceSection() {
             Open source from day one.
           </h2>
           <p className="mt-5 max-w-[560px] text-base leading-7 text-muted-foreground">
-            artifacts.space is MIT licensed. Read the code, change it, and run it on your own Postgres. Your artifacts never get locked inside one company, including ours.
+            artifacts.space is open source under Apache 2.0. Read the code, change it, and run it on your own Postgres. Your artifacts never get locked inside one company, including ours.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Button render={<Link href="/sign-up" />} nativeButton={false} className="h-10 px-4 text-sm">

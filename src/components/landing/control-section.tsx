@@ -4,7 +4,7 @@ const rules = [
   ["You choose who comments", "Turn comments off on an artifact, or open them to your team or to anyone signed in."],
   ["Comments arrive as data", "The server labels comment text as untrusted before an agent reads it. It tells the agent never to follow a comment as an instruction."],
   ["Every save is kept", "Open the history of any artifact. See what changed in each save, and restore an older version."],
-  ["Open source", "MIT licensed. Use artifacts.space, or run it on your own Postgres."],
+  ["Open source", "Apache 2.0 licensed. Use artifacts.space, or run it on your own Postgres."],
 ] as const;
 
 /** The guarantees people get over what their agents write and share. */

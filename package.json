@@ -2,7 +2,7 @@
   "name": "artifacts-space",
   "version": "0.1.0",
   "private": true,
-  "license": "MIT",
+  "license": "Apache-2.0",
   "homepage": "https://artifacts.space",
   "repository": {
     "type": "git",

@@ -1,7 +1,7 @@
 # artifacts.space
 
 [![CI](https://github.com/artifacts-space/artifacts-space/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/artifacts-space/artifacts-space/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 The collaboration space for humans and agents.
 
@@ -268,10 +268,13 @@ problem, follow [SECURITY.md](SECURITY.md) instead of opening an issue.
 | --- | --- | --- |
 | Geist and Geist Mono | Loaded with `next/font/google`; `src/app/og/fonts/Geist-Medium.ttf`, `Geist-SemiBold.ttf`, and `GeistMono-Regular.ttf` (from the geist@1.8.2 npm package) for Open Graph images | SIL Open Font License 1.1, copyright 2023 Vercel with basement.studio. See `src/app/og/fonts/LICENSE-geist.txt`. |
 | Theme fonts: Inter, Roboto, Work Sans, DM Sans, Manrope, IBM Plex Sans, Source Serif 4, Instrument Serif, Fraunces, JetBrains Mono, IBM Plex Mono | `public/fonts/v1/<face>/`: latin-subset woff2 files from Google Fonts, served from this site and loaded only on pages whose theme uses the face | SIL Open Font License 1.1. Each folder holds that face's `OFL.txt` with its copyright line: Inter (2020 The Inter Project Authors), Roboto (2011 The Roboto Project Authors), Work Sans (2019 The Work Sans Project Authors), DM Sans (2014 The DM Sans Project Authors), Manrope (2018 The Manrope Project Authors), IBM Plex Sans and IBM Plex Mono (2017 IBM Corp., Reserved Font Name "Plex"), Source Serif 4 (2014 The Source Serif 4 Project Authors), Instrument Serif (2022 The Instrument Serif Project Authors), Fraunces (2018 The Fraunces Project Authors), JetBrains Mono (2020 The JetBrains Mono Project Authors). |
-| Pixel planet logo and icons | `public/artifacts-space-mark.svg`, `public/artifacts-space-icon.png`, `public/email/`, `src/app/icon.svg`, `src/app/favicon.ico`, `src/app/og/planet-40.png` | Original work, MIT with the code |
+| Pixel planet logo and icons | `public/artifacts-space-mark.svg`, `public/artifacts-space-icon.png`, `public/email/`, `src/app/icon.svg`, `src/app/favicon.ico`, `src/app/og/planet-40.png` | Original work, Apache-2.0 with the code |
 | Hero background | `public/hero-dusk.webp` | A dusk wallpaper made with vmotif. TODO(owner): confirm the license before release. |
 | Open Graph backdrops | `src/app/og/strata-ink.png`, `src/app/og/strata-ink-plain.png` | Made for this project. TODO(owner): confirm before release. |
 
 ## License
 
-[MIT](LICENSE)
+Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE).
+
+The license does not grant trademark rights to the artifacts.space name or
+logos (section 6). Forks and self-hosted copies must use their own name.
