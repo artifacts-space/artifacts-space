@@ -1,33 +1,23 @@
 import { networkKey } from "@/lib/abuse/network-key";
 import { hitRateLimit, hitRateLimits, rateLimitMessage } from "@/lib/abuse/rate-limit";
-import { rateLimitMessages } from "@/lib/abuse/limits";
-import { describeWait } from "@/lib/abuse/rate-limit-window";
 import { isMagicLinkRequest, magicLinkChecks, magicLinkEmail } from "@/lib/auth/magic-link-limits";
 import { isPasswordSignInRequest } from "@/lib/auth/password-sign-in-limits";
 import { handlePasswordSignIn } from "@/lib/auth/password-sign-in-route";
 import { getAuth } from "@/lib/auth/server";
-import { countUnapprovedClients } from "@/lib/oauth/clients";
-import { oauthLimits } from "@/lib/oauth/config";
 import { corsOAuthEndpoint, corsPreflightResponse, withCorsHeaders, withoutCookies } from "@/lib/oauth/cors-rules";
-import { oauthErrorResponse, oauthRateLimits, publicOAuthEndpoint, withPolicyScope, type PublicOAuthEndpoint } from "@/lib/oauth/request-policy";
+import { handleConsent, handleRegistration, isConsentDecision } from "@/lib/oauth/registration-limits";
+import { authorizeRateLimit, oauthRateLimited, publicOAuthEndpoint, withPolicyScope } from "@/lib/oauth/request-policy";
+import { handleTokenRequest } from "@/lib/oauth/token-limits";
 
 /**
- * Abuse limits for the OAuth endpoints anyone can call: a per-network rate
- * limit on each, and a cap on stored apps nobody approved yet. Returns a
- * response to send instead, or null to go on.
+ * The per-network limit on authorization requests, which come from the
+ * person's own browser. Registration and token requests have their own
+ * limits (handleRegistration, handleTokenRequest). Returns a response to send
+ * instead, or null to go on.
  */
-async function refuseAbuse(request: Request, endpoint: PublicOAuthEndpoint): Promise<Response | null> {
-  const name = oauthRateLimits[endpoint];
-  const decision = await hitRateLimit(name, networkKey(request.headers));
-  if (!decision.allowed) {
-    return oauthErrorResponse(429, "rate_limited", `${rateLimitMessages[name]} Try again in ${describeWait(decision.retryAfterSeconds)}.`, {
-      "Retry-After": String(decision.retryAfterSeconds),
-    });
-  }
-  if (endpoint === "register" && (await countUnapprovedClients()) >= oauthLimits.maxUnapprovedClients) {
-    return oauthErrorResponse(503, "temporarily_unavailable", "Too many apps are waiting for approval. Try again later.", { "Retry-After": "3600" });
-  }
-  return null;
+async function refuseAbuse(request: Request): Promise<Response | null> {
+  const decision = await hitRateLimit(authorizeRateLimit, networkKey(request.headers));
+  return decision.allowed ? null : oauthRateLimited(authorizeRateLimit, decision.retryAfterSeconds);
 }
 
 /**
@@ -58,16 +48,14 @@ async function refuseMagicLinkFlood(request: Request): Promise<Response | null> 
 async function prepare(request: Request): Promise<Request | Response> {
   const url = new URL(request.url);
   if (isMagicLinkRequest(request.method, url.pathname)) return (await refuseMagicLinkFlood(request)) ?? request;
-  const endpoint = publicOAuthEndpoint(request.method, url.pathname);
-  if (!endpoint) return request;
+  if (publicOAuthEndpoint(request.method, url.pathname) !== "authorize") return request;
   try {
-    const refusal = await refuseAbuse(request, endpoint);
+    const refusal = await refuseAbuse(request);
     if (refusal) return refusal;
   } catch (error) {
     // A limit check that fails open keeps sign-in working when the counters are unavailable.
     console.error("[oauth] Abuse check failed", error instanceof Error ? error.name : "unknown error");
   }
-  if (endpoint !== "authorize") return request;
   return new Request(withPolicyScope(url), request);
 }
 
@@ -84,7 +72,9 @@ async function handle(request: Request) {
  * the CORS headers too, so a browser client can read why it was refused.
  */
 async function handleCors(request: Request) {
-  return withCorsHeaders(await handle(withoutCookies(request)));
+  const bare = withoutCookies(request);
+  const isToken = publicOAuthEndpoint(bare.method, new URL(bare.url).pathname) === "token";
+  return withCorsHeaders(isToken ? await handleTokenRequest(bare, handle) : await handle(bare));
 }
 
 /** Better Auth endpoints: GitHub and Google sign-in, magic links, password sign-in for accounts given one, sessions, and the OAuth server for MCP clients. */
@@ -93,7 +83,10 @@ export function GET(request: Request) {
 }
 
 export function POST(request: Request) {
-  return corsOAuthEndpoint(new URL(request.url).pathname) ? handleCors(request) : handle(request);
+  const { pathname } = new URL(request.url);
+  if (corsOAuthEndpoint(pathname)) return handleCors(request);
+  if (isConsentDecision(pathname)) return handleConsent(request, handle);
+  return publicOAuthEndpoint(request.method, pathname) === "register" ? handleRegistration(request, handle) : handle(request);
 }
 
 /** Preflight for the CORS-enabled OAuth endpoints. Every other path answers as Next does by default, with no CORS headers. */

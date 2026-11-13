@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Prose } from "@/components/docs/docs-content";
 import { LegalH, Mail, PostalAddress } from "@/components/legal/legal-page";
+import { rateLimitRetentionDays } from "@/lib/abuse/limits";
 import { sessionLifetimeSeconds } from "@/lib/auth/session-config";
 import { fileLimits } from "@/lib/files/config";
 import { legalContact, legalPaths } from "@/lib/legal/contact";
@@ -70,7 +71,7 @@ export function PrivacyRights() {
           <li><strong>Deleted comments:</strong> the text is erased at once. A placeholder stays so replies keep their place.</li>
           <li><strong>Sessions and sign-in:</strong> a session ends when you sign out or {sessionDays} days after you last use it. Sign-in links expire after 10 minutes, and team invitations after 7 days.</li>
           <li><strong>Connected apps:</strong> app access tokens last {oauthLimits.accessTokenSeconds / 3600} hour and refresh tokens {refreshDays} days. App registrations nobody approved are deleted after {oauthLimits.unapprovedClientHours} hours.</li>
-          <li><strong>Rate-limit counters:</strong> deleted as their window ends, within a day.</li>
+          <li><strong>Rate-limit counters:</strong> deleted after {rateLimitRetentionDays} days.</li>
           <li><strong>View counts:</strong> visitor hashes are deleted after their day ends (UTC), when the next view is counted. Daily counts and linking domains are kept while the artifact exists and are deleted with it.</li>
           <li><strong>Logs and backups:</strong> our providers keep logs and database backups for a limited time, then delete them in their normal cycles.</li>
         </ul>

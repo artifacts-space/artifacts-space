@@ -5,14 +5,11 @@ import { getDb } from "@/db";
 import { rateLimitBucket } from "@/db/schema";
 import { UserFacingError } from "@/lib/user-facing-error";
 
-import { rateLimitMessages, rateLimits, type RateLimitName } from "./limits";
+import { rateLimitMessages, rateLimitRetentionDays, rateLimits, type RateLimitName } from "./limits";
 import { decideRateLimit, describeWait, windowStart, type RateLimitDecision } from "./rate-limit-window";
 
-/**
- * Buckets older than this are deleted now and then. The longest window is a
- * day, and a sliding window also reads the day before, so keep three days.
- */
-const CLEANUP_AGE_MS = 3 * 24 * 3_600_000;
+/** Buckets older than rateLimitRetentionDays are deleted now and then (on about one count in fifty). */
+const CLEANUP_AGE_MS = rateLimitRetentionDays * 24 * 3_600_000;
 const CLEANUP_CHANCE = 0.02;
 
 /** A rate limit was reached. The message says what happened and when to try again. */

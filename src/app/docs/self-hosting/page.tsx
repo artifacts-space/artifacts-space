@@ -75,7 +75,7 @@ export default function SelfHostingPage() {
           <li>For GitHub, create an OAuth app with the callback URL <code>{"<BETTER_AUTH_URL>"}/api/auth/callback/github</code>. The GitHub login becomes the preferred username.</li>
           <li>For Google, create an OAuth client of type Web application with the authorized redirect URI <code>{"<BETTER_AUTH_URL>"}/api/auth/callback/google</code>, and ask only for the <code>openid</code>, <code>email</code>, and <code>profile</code> scopes. The button shows only when both Google values are set, and never on Vercel preview deploys, because Google accepts only exact redirect URIs. The sign-in pages read the Google values when the app builds, so after you change them, build again; a restart is not enough.</li>
           <li>A GitHub or Google sign-in whose email matches an existing account joins that account only when the provider has verified the email and the account has confirmed it. Google may create or join an account only for an address it hosts: Gmail, or a Google Workspace domain. A Google account on any other address, or with an unverified one, is sent back to use an email link. Google&apos;s tokens are not kept.</li>
-          <li>MCP apps register themselves. Apps nobody approves are deleted after {oauthLimits.unapprovedClientHours} hours, and registration pauses while {oauthLimits.maxUnapprovedClients} wait.</li>
+          <li>MCP apps register themselves. Apps nobody approves are deleted after {oauthLimits.unapprovedClientHours} hours. One network address may have {oauthLimits.maxUnapprovedClientsPerNetwork} of them waiting, and at most {oauthLimits.maxUnapprovedClients} wait at once. Past either cap, a new registration removes the oldest one that has waited over {oauthLimits.unapprovedEvictionGraceMinutes} minutes, from the same address first, and registration pauses only while all of them are newer.</li>
         </ul>
       </Prose>
 
@@ -115,7 +115,7 @@ export default function SelfHostingPage() {
         mono={[0, 1]}
       />
       <Prose>
-        <p><code>cleanup-files</code> deletes unfinished and unattached uploads and prunes versions past {versionRetention.keep} or {versionRetention.maxAgeMs / 86_400_000} days. <code>cleanup-oauth</code> deletes unapproved MCP apps, expired access tokens, and old refresh tokens. On another host, call both paths on the same schedule with <code>Authorization: Bearer $CRON_SECRET</code>.</p>
+        <p><code>cleanup-files</code> deletes unfinished and unattached uploads and prunes versions past {versionRetention.keep} or {versionRetention.maxAgeMs / 86_400_000} days. <code>cleanup-oauth</code> deletes unapproved MCP apps, expired access tokens, and old refresh tokens, and forgets which address registered each app after {oauthLimits.registeredNetworkHours} hours. On another host, call both paths on the same schedule with <code>Authorization: Bearer $CRON_SECRET</code>.</p>
       </Prose>
 
       <DocsH page={page} id="local" />

@@ -132,6 +132,10 @@ claude mcp add --transport http artifacts https://artifacts.space/api/mcp \
 
 For a self-hosted instance, replace `https://artifacts.space` with your origin.
 
+`server.json` at the repository root is the hosted server's entry for the
+[MCP Registry](https://registry.modelcontextprotocol.io); a test keeps its
+version and title in step with the server.
+
 ### Tools
 
 | Area | Tools |
