@@ -8,6 +8,7 @@ import {
   codexMcpAddCommand,
   codexMcpListCommand,
   codexMcpLoginCommand,
+  GROK_CONNECTOR_NAME,
   GROK_CONNECTORS_URL,
   grokBotAddMessage,
 } from "@/lib/setup/client-installs";
@@ -22,8 +23,8 @@ import { mcpEndpoint } from "@/lib/setup/mcp-config";
 /**
  * Codex: a custom MCP server added from Plugins in the app, or
  * `codex mcp add` in the terminal. The app's steps follow its "Add custom
- * MCP server" form as the owner saw it in November 2026; what the app shows
- * after "Create as a plugin" is not checked. The terminal steps are from
+ * MCP server" form as the owner saw it in November 2026, and the owner
+ * confirmed that the app then asks you to sign in. The terminal steps are from
  * https://learn.chatgpt.com/docs/extend/mcp?surface=cli.
  */
 export function CodexGuide({ origin, full = false }: ClientGuideProps) {
@@ -60,8 +61,11 @@ export function CodexGuide({ origin, full = false }: ClientGuideProps) {
 
 /**
  * Grok Bot: a custom connector in the desktop app, or a message that asks a Bot to add it.
- * Steps from https://docs.x.ai/grok-bot/computer-and-apps; the menu names
- * are not checked in the app itself.
+ * The desktop steps follow the app as the owner recorded it in November
+ * 2026, up to the filled-in form; the owner confirmed that the app then
+ * asks you to sign in. The status names in the check and the message for a
+ * Bot are from https://docs.x.ai/grok-bot/computer-and-apps and are not
+ * checked in the app.
  */
 export function GrokBotGuide({ origin, full = false }: ClientGuideProps) {
   return (
@@ -70,10 +74,11 @@ export function GrokBotGuide({ origin, full = false }: ClientGuideProps) {
       <Label>In the desktop app</Label>
       <Prose className="mt-2">
         <ol>
-          <li>Open <strong>Connect apps</strong>. At the bottom, choose <strong>Add a custom connector</strong>.</li>
-          <li>Name it <code>artifacts</code> and choose <strong>Remote HTTPS</strong>.</li>
+          <li>At the bottom of the sidebar, choose the apps button, above your picture. <strong>Connect Apps</strong> opens.</li>
+          <li>Scroll to the bottom of the list and choose <strong>Add a custom connector</strong>.</li>
+          <li>Name it <code>{GROK_CONNECTOR_NAME}</code> and keep the type <strong>Remote HTTPS</strong>.</li>
           <li>Paste the server URL <CopyCode value={mcpEndpoint(origin)} />. Leave the HTTP headers and the Client ID empty.</li>
-          <li>Choose <strong>Add plugin</strong>. When the app shows <strong>Needs auth</strong>, choose <strong>Authenticate</strong>.</li>
+          <li>Choose <strong>Add plugin</strong>. Grok Bot asks you to sign in. If it shows <strong>Needs auth</strong> instead, choose <strong>Authenticate</strong>.</li>
         </ol>
       </Prose>
       <Label>Or ask a Bot</Label>
@@ -81,7 +86,7 @@ export function GrokBotGuide({ origin, full = false }: ClientGuideProps) {
       <CodeSnippet title="Message" code={grokBotAddMessage(origin)} wrap className="mt-3" />
       <ApproveSteps opener="Your browser opens on the sign-in page." />
       <CheckStep
-        note={<>Open <strong>Connect apps</strong>. <strong>artifacts</strong> shows under <strong>Installed</strong>. <strong>Added</strong> means it is installed but not signed in yet. If it shows <strong>Needs auth</strong> or <strong>Disconnected</strong>, choose <strong>Authenticate</strong>.</>}
+        note={<>Open <strong>Connect Apps</strong>. <strong>{GROK_CONNECTOR_NAME}</strong> shows under <strong>Installed</strong>. <strong>Added</strong> means it is installed but not signed in yet. If it shows <strong>Needs auth</strong> or <strong>Disconnected</strong>, choose <strong>Authenticate</strong>.</>}
       />
       {full ? (
         <Prose className="mt-4">

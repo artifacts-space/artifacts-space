@@ -85,9 +85,9 @@ test("should open the Grok Bot steps in the docs in a new tab when Add to Grok B
 
   const section = docs.locator("section[aria-labelledby=grok-bot]");
   await expect(section.getByRole("heading", { level: 2 })).toBeInViewport();
-  for (const label of ["Connect apps", "Add a custom connector", "Remote HTTPS", "Add plugin"]) {
+  for (const label of ["Connect Apps", "Add a custom connector", "Remote HTTPS", "Add plugin"]) {
     await expect(section.getByText(label, { exact: true }).first()).toBeVisible();
   }
   await expect(section.getByRole("button", { name: `Copy ${endpoint}` })).toBeVisible();
-  await expect(section.locator("figure[data-code-block]").filter({ hasText: `Add the MCP server at ${endpoint} and name it artifacts.` })).toBeVisible();
+  await expect(section.locator("figure[data-code-block]").filter({ hasText: `Add the MCP server at ${endpoint} and name it artifacts.space.` })).toBeVisible();
 });
