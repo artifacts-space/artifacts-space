@@ -41,9 +41,10 @@ function draftProblem(body: string): string | null {
 }
 
 /**
- * Keeps the caret in the box when Post or Cancel is pressed, in every
- * browser: the click still lands, and the box does not swap, and change
- * size under the pointer, between press and release.
+ * Keeps the caret in the box while Post or Cancel is pressed, in every
+ * browser. The box keeps its size between press and release, because it
+ * does not swap then, so the button stays under the pointer and the click
+ * lands.
  */
 function keepCaret(event: React.MouseEvent) {
   event.preventDefault();
@@ -66,7 +67,9 @@ function focusAtEnd(textarea: HTMLTextAreaElement) {
  * place; what is typed there posts as written. The rich box never takes
  * over while someone is typing: it does when it arrives if the plain box is
  * empty, unfocused, or unchanged, and otherwise once the plain box loses
- * the caret, posts, or is cleared (caret-handoff.ts, `takesOverNow`).
+ * the caret, posts, or is cleared. It waits for a post or a cleared box
+ * while the text ends in a space or line break, which it would drop
+ * (caret-handoff.ts, `takesOverNow`).
  */
 export function CommentComposer({ label, placeholder, submitLabel, initialBody = "", onSubmit, onCancel, autoFocus = false, compact = false }: CommentComposerProps) {
   const [body, setBody] = useState(initialBody);
@@ -148,7 +151,9 @@ export function CommentComposer({ label, placeholder, submitLabel, initialBody =
             value={body}
             onChange={(event) => { onChange(event.target.value); }}
             onFocus={want}
-            onBlur={takeOver}
+            onBlur={(event) => {
+              if (takesOverNow({ text: event.currentTarget.value, opening: opening.current, focused: false })) takeOver();
+            }}
             onKeyDown={(event) => {
               if (!isSubmitShortcut(event)) return;
               event.preventDefault();

@@ -57,6 +57,13 @@ describe("takesOverNow", () => {
     expect(takesOverNow({ text: "The **old** comment", opening: "The **old** comment", focused: true })).toBe(true);
   });
 
+  it("should wait when the text ends in a space, tab, or line break, even without the caret", () => {
+    for (const text of ["Some **bold** words ", "Tabbed\t", "Line one\n", "Para one\n\n"]) {
+      expect(takesOverNow({ text, opening: "", focused: false })).toBe(false);
+      expect(takesOverNow({ text, opening: text, focused: true })).toBe(false);
+    }
+  });
+
   it("should wait when an edit box has the caret and its comment was changed", () => {
     expect(takesOverNow({ text: "The **old** comment, changed", opening: "The **old** comment", focused: true })).toBe(false);
   });
