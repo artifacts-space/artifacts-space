@@ -45,13 +45,17 @@ export interface PlainBoxNow {
   focused: boolean;
 }
 
+/** A space, tab, or line break typed last: Markdown drops it when the text is read, so the next word would join the last. */
+const TYPED_TAIL = /[ \t\n]$/;
+
 /**
  * Whether the rich box takes over from the plain box now, or waits. It never
  * takes over while someone is typing: only when the plain box does not have
- * the caret, is empty, or still holds just the text it opened with. Until
- * then the plain box stays, and the rich box takes over when it loses the
- * caret, posts, or is cleared.
+ * the caret, is empty, or still holds just the text it opened with. Nor while
+ * the text ends in a space, tab, or line break, which the rich box would drop.
+ * Until then the plain box stays; a post or a cleared box always swaps.
  */
 export function takesOverNow({ text, opening, focused }: PlainBoxNow): boolean {
+  if (TYPED_TAIL.test(text)) return false;
   return !focused || text === "" || text === opening;
 }
