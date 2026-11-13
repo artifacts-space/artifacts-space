@@ -106,6 +106,24 @@ describe("a long list of identical items", () => {
     expect(saved).toBe(same.replace("- edit me", "- edited"));
   });
 
+  it("should look items up a few times each when every item was edited", () => {
+    const loaded = parseMarkdown(same);
+    const doc = structuredClone(loaded.doc);
+    for (const step of doc.content?.[0]?.content ?? []) {
+      const text = step.content?.[0];
+      if (text) setText(text, "Done!");
+    }
+    const filter = vi.spyOn(Array.prototype, "filter");
+    try {
+      serializeMarkdown(doc, loaded.source);
+      // No pass over the items for each item: the elements filtered stay linear in the items.
+      const filtered = filter.mock.contexts.reduce<number>((total, array) => total + (Array.isArray(array) ? array.length : 0), 0);
+      expect(filtered).toBeLessThan(40 * 2001);
+    } finally {
+      filter.mockRestore();
+    }
+  });
+
   it("should keep the other identical items when one in the middle is removed", () => {
     const { saved } = editBothWays(same, (doc) => { doc.content?.[0]?.content?.splice(1000, 1); });
     expect(saved).toBe(same.replace("- Done.\n", ""));

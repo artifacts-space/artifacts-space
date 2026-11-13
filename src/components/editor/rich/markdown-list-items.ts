@@ -280,11 +280,17 @@ class UnusedItems {
  * items after this one still need it as written (counted, so one of two
  * identical items can be edited).
  */
-function replacedItem<Map>(list: ListSource<Map>, next: number, unused: UnusedItems, laterKeys: readonly string[]): number {
+function replacedItem<Map>(list: ListSource<Map>, next: number, unused: UnusedItems, later: ReadonlyMap<string, number>): number {
   const candidate = list.items[next];
   if (!candidate || unused.has(next)) return -1;
-  const later = laterKeys.filter((key) => key === candidate.key).length;
-  return later < unused.count(candidate.key) ? next : -1;
+  return (later.get(candidate.key) ?? 0) < unused.count(candidate.key) ? next : -1;
+}
+
+/** How many times each key occurs, for counting the items still to come. */
+function keyCounts(keys: readonly string[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1);
+  return counts;
 }
 
 /** A separator for a place that had none: without the spaces that ended the item it came from, and with one blank line at most. */
@@ -334,9 +340,13 @@ export function composeList<Map>(node: JSONContent, list: ListSource<Map>, write
   const unused = new UnusedItems(list);
   const parts: Part[] = [];
   let next = 0;
+  // The keys of the items after the one being written, counted.
+  const later = keyCounts(keys);
   for (const [position, item] of items.entries()) {
-    const exact = unused.find(keys[position] ?? "", next);
-    const index = exact >= 0 ? exact : replacedItem(list, next, unused, keys.slice(position + 1));
+    const key = keys[position] ?? "";
+    later.set(key, (later.get(key) ?? 1) - 1);
+    const exact = unused.find(key, next);
+    const index = exact >= 0 ? exact : replacedItem(list, next, unused, later);
     const loaded = list.items[index];
     const text = loaded ? (exact >= 0 ? loaded.text : editedItem(item, loaded, writer)) : newItem(item, node, list, writer);
     if (text === null) return null;
