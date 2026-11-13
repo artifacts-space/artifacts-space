@@ -300,13 +300,118 @@ Ship it on Friday <!-- color: red -->
   of an item in a tight list, which has no `<p>`. The Markdown version keeps
   the comment as written, and link preview text leaves it out.
 
+### Lists
+
+Bulleted (`-`, `*`, `+`), numbered (`1.` or `1)`, from any start, or `1.` on
+every item), and task (`- [ ]`, `- [x]`, `- [X]`) lists, tight or loose, as
+CommonMark and GFM read them. An item can hold more than one block: a first
+paragraph, then code blocks, more paragraphs, quotes, tables, and nested
+lists, each indented under the item's text and set off by blank lines:
+
+````md
+- [ ] **Save a new artifact.** Paste:
+
+  ```text
+  Save this as an artifact in my Launch project.
+  ```
+
+  Expect: a new private artifact, with a link.
+
+1. Install:
+
+   ```sh
+   pnpm install
+   ```
+````
+
+- **Numbered lists** are read by marked's own list rule, so the editor and
+  the read view agree on where an item ends: an item's blocks are indented
+  to its text (three spaces under `1.`). Their items go through the same
+  list item rule as a bulleted list's, so bold, links, and code inside a
+  numbered item are read as formatting (`markdown-schema.ts`).
+- **Edits stay in their item.** A list loads as one block, cut into its
+  items (`markdown-list-items.ts`). After an edit, every item nobody touched
+  is written back as it was, with the blank lines between items; the edited
+  item keeps its marker, its indent, and its blocks nobody touched; ticking
+  a task box changes only the mark in the box. A new item takes the list's
+  bullet (`*` stays `*`) and delimiter. When items are added, removed, or
+  moved, a numbered list is numbered again from its start, or keeps one
+  number on every item when it had one (`markdown-list-numbers.ts`).
+- **Two ways to save an edited list, and no other.** An edited list is
+  saved over its loaded items, as above, when that text is verified to read
+  back as the edit (`markdown-list-check.ts`); otherwise it is written whole
+  by the round trip's own writer, exactly as any other edited block is and
+  as lists were before item maps. No check stands between a list and that
+  writer, and nothing else is ever saved. Both ways write the content as it
+  is at that save, so no save can take back an earlier edit.
+- **What is verified.** Only what an edit can change is read again: the
+  items written differently and the ones beside them
+  (`markdown-list-runs.ts`). Both readers read a list item by item, so an
+  item nobody edited, between the neighbours it loaded with, reads as it
+  did. Those items must read back as the edit in the editor, load formatted
+  again (the rule every block loads by), and read the same in the read view
+  (remark). When the list's last item changed (a new or renumbered last
+  item), the list and the block after it are split again as the document
+  will hold them; if the list would take that block in, the list is written
+  whole (`listsInContext` in `markdown-roundtrip-lists.ts`). A new item sits
+  as far in as the list's first item, so the start of a list never moves.
+  An edited block inside an item first keeps the spacing it had, then gets
+  blank lines around it.
+- **Read back by meaning.** The editor can hold what Markdown cannot store:
+  a space at the end of an item, a line break with nothing after it, spaces
+  at the start of a new item's text. A written list is compared with the
+  edit after both are reduced to what Markdown stores
+  (`markdown-meaning.ts`), so typing a space at the end of an item changes
+  that item only.
+- **An item reads the same beside any other item.** marked marks a line of
+  text among an item's blocks as a paragraph only in a list it takes as
+  loose; here every such line is a paragraph (`markdown-schema.ts`). A
+  paragraph after a table in an item loads whatever the other items hold.
+- **Where the readers differ, the list stays as written.** A list shape
+  that marked and remark read differently (an empty first item, a numbered
+  item other than 1 under text, code right after a marker, tab indents,
+  task boxes after a number) loads as a raw block when the read view would
+  show it differently (`markdown-display-shape.ts`). Numbered task items
+  (`1. [ ]`) are one such shape: the editor has no numbered task list, so
+  they stay as written with their boxes.
+- **A comment's list is written whole.** In the comment flavor an edited
+  list is never written over its loaded items: it goes through the comment's
+  own writer, with the comment's escaping, and is judged by the thread
+  (`toChunks` in `markdown-roundtrip.ts`). The list code itself lives in
+  `markdown-roundtrip-lists.ts`, and the joining of the written pieces in
+  `markdown-roundtrip-output.ts`.
+- **Line ends.** A document with Windows line ends (CRLF) on every line
+  keeps them when it is saved after an edit; one that mixes line ends is
+  saved with LF.
+- **Bulleted and task lists** are read by marked's own list rule too
+  (`markdown-schema.ts`), so a task list is one list however its items are
+  spaced: steps set apart by blank lines, each with a code block under it,
+  are one task list. Task items and plain items in one Markdown list load as
+  a task list and a bulleted list, in the order written. A box with nothing
+  after it (`- [ ]`) is an item with the text `[ ]`, as the read view shows
+  it: Markdown has no task without text.
+- **Every save is checked against the old way.** `markdown-list-fuzz.test.ts`
+  loads generated lists and the corpus (`list-generator.ts`,
+  `list-corpus.ts`), makes every kind of edit, and asserts that what is
+  saved is the whole-list writing of the same edit, or text that loads again
+  as the edit, formatted, and reads the same in the read view, with the
+  blocks around it. `markdown-list-runs.test.ts` pins how many items one
+  edit makes the readers read.
+
 ### Raw blocks
 
 A top-level block the editor cannot show as formatted text, or that would
 not survive a round trip, loads as a `rawMarkdown` node holding its exact
 source. It shows as an editable source box and saves unchanged. Today that is
 raw HTML, footnotes, link reference definitions, images inside text, and any
-block whose fresh rendering would change its meaning.
+block whose fresh rendering would change its meaning. Footnotes count as
+the read view finds them (`markdown-footnotes.ts`): a definition `[^id]:` at
+the start of a line, or a reference `[^id]` to a defined label, outside
+code. `[^a-z]` in a code block or inline code is code.
+
+The note over the editor names only the reasons found in the document
+(`rawKinds` from `parseMarkdown`, copy in `raw-parts-notice.ts`), and stays
+general when a part stays as written for another reason.
 
 ## Block node conventions
 

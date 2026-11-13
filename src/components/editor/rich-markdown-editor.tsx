@@ -12,7 +12,9 @@ import { HighlightedTextarea } from "./highlighted-textarea";
 import { BlockHandlesFrame, useBlockHandles } from "./rich/block-menu/block-controls";
 import { TableBubbleMenu, TextBubbleMenu } from "./rich/bubble-menus";
 import { richEditorExtensions } from "./rich/editor-extensions";
+import type { RawKind } from "./rich/markdown-block-details";
 import { parseMarkdown, serializeMarkdown, type SourceMap } from "./rich/markdown-roundtrip";
+import { rawPartsNotice } from "./rich/raw-parts-notice";
 import { TouchToolbar } from "./rich/touch-toolbar";
 import { useCoarsePointer } from "./rich/use-coarse-pointer";
 
@@ -41,13 +43,11 @@ function MediaRefusedNote({ shown }: { shown: boolean }) {
   return <p role="status" className={cn("text-sm text-muted-foreground", shown ? "mb-3" : "sr-only")}>{shown ? mediaRefusedMessage : ""}</p>;
 }
 
-function RawBlocksNotice({ count, onShowMarkdown }: { count: number; onShowMarkdown: () => void }) {
+function RawBlocksNotice({ count, kinds, onShowMarkdown }: { count: number; kinds: readonly RawKind[]; onShowMarkdown: () => void }) {
   if (count === 0) return null;
   return (
     <p role="note" className="mb-4 flex flex-wrap items-baseline gap-x-2 text-sm text-muted-foreground">
-      <span>
-        {count === 1 ? "One part uses Markdown this editor can’t format, such as HTML or footnotes. It stays exactly as written." : `${String(count)} parts use Markdown this editor can’t format, such as HTML or footnotes. They stay exactly as written.`}
-      </span>
+      <span>{rawPartsNotice(count, kinds)}</span>
       <button type="button" onClick={onShowMarkdown} className="rounded-sm text-foreground underline decoration-border underline-offset-4 outline-none hover:decoration-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
         Edit as Markdown
       </button>
@@ -82,6 +82,7 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
   const [mode, setMode] = useState<Mode>("rich");
   const [loaded] = useState(() => parseMarkdown(value));
   const [rawBlocks, setRawBlocks] = useState(loaded.rawBlocks);
+  const [rawKinds, setRawKinds] = useState(loaded.rawKinds);
   const [linkOpen, setLinkOpen] = useState(false);
   const [mediaRefused, setMediaRefused] = useState(false);
   const sourceRef = useRef<SourceMap>(loaded.source);
@@ -132,6 +133,7 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
     const next = parseMarkdown(value);
     sourceRef.current = next.source;
     setRawBlocks(next.rawBlocks);
+    setRawKinds(next.rawKinds);
     editor?.commands.setContent(next.doc, { emitUpdate: false });
     setMode("rich");
     requestAnimationFrame(() => { editor?.commands.focus(); });
@@ -154,7 +156,7 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
       <div hidden={mode !== "rich"}>
         {editor ? (
           <>
-            <RawBlocksNotice count={rawBlocks} onShowMarkdown={onEditSource ?? showMarkdown} />
+            <RawBlocksNotice count={rawBlocks} kinds={rawKinds} onShowMarkdown={onEditSource ?? showMarkdown} />
             <MediaRefusedNote shown={mediaRefused} />
             {coarse ? <TouchToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /> : <TextBubbleMenu editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
             <TableBubbleMenu editor={editor} />

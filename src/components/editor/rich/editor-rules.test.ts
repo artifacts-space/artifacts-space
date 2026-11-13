@@ -117,8 +117,12 @@ describe("needsRawBlock", () => {
     expect(needsRawBlock({ type: "paragraph", raw: "a <b>x</b>", tokens: [{ type: "html", raw: "<b>" }] })).toBe(true);
   });
 
-  it("should keep a block as written when it holds a footnote", () => {
-    expect(needsRawBlock({ type: "paragraph", raw: "Claim.[^1]", tokens: [] })).toBe(true);
+  it("should keep a block as written when it holds a reference to a footnote the document defines", () => {
+    const claim = { type: "paragraph", raw: "Claim.[^1]", tokens: [{ type: "text", raw: "Claim.[^1]" }] };
+    const definition = { type: "paragraph", raw: "[^1]: Source.", tokens: [{ type: "text", raw: "[^1]: Source." }] };
+    const defined = splitBlocks("Claim.[^1]\n\n[^1]: Source.", [claim, { type: "space", raw: "\n\n" }, definition]);
+    expect(defined?.blocks.map((block) => needsRawBlock(block.token))).toEqual([true, true]);
+    expect(needsRawBlock(splitBlocks("Claim.[^1]", [claim])?.blocks[0]?.token)).toBe(false);
   });
 
   it("should format a block when it is plain Markdown", () => {

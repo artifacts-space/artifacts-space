@@ -1,0 +1,362 @@
+import type { JSONContent } from "@tiptap/core";
+
+import { renumbered } from "./markdown-list-numbers";
+
+/*
+ * Lists keep their items as written. A list loads as one block of the
+ * source; this file cuts that block into its items, so a save after an edit
+ * writes back every item nobody touched byte for byte, and changes only the
+ * item that was edited. Ticking a task box changes one character.
+ */
+
+const listTypes: ReadonlySet<string> = new Set(["bulletList", "orderedList", "taskList"]);
+
+/** True for a bulleted, numbered, or task list node. */
+export function isListNode(node: JSONContent | undefined): node is JSONContent {
+  return node?.type !== undefined && listTypes.has(node.type);
+}
+
+/** One item of a list as written. */
+export interface ItemSlice {
+  /** The item's source, without the blank lines after it. */
+  text: string;
+  /** The whitespace between this item and the next; empty for the last item. */
+  after: string;
+  /** What starts the item's first line: indent, marker, spaces, and a task box (`- [ ] `). */
+  marker: string;
+  /** How far the item's other lines are indented. */
+  indent: number;
+  /** The item's content without its marker and indent: Markdown for its blocks. */
+  content: string;
+  /** Where the task box's mark (` `, `x`, or `X`) sits in `text`, or null. */
+  box: number | null;
+}
+
+/** A list marker that starts an item with text after it (CommonMark: up to 3 spaces before, 1–4 after). */
+const itemStart = /^( {0,3})([-+*]|\d{1,9}[.)])( {1,4})(?=\S)/;
+const taskBox = /^\[[ xX]\][ \t]/;
+
+function leadingSpaces(line: string): number {
+  return /^ */.exec(line)?.[0].length ?? 0;
+}
+
+/** The item's other lines without its indent; null when a line is indented with tabs. */
+function dedent(lines: readonly string[], indent: number): string[] | null {
+  const result: string[] = [];
+  for (const line of lines) {
+    if (!line.trim()) {
+      result.push("");
+      continue;
+    }
+    if (/^ *\t/.test(line)) return null;
+    result.push(line.slice(Math.min(indent, leadingSpaces(line))));
+  }
+  return result;
+}
+
+/** One item's slice from its lines; `last` items keep no whitespace after them. */
+function sliceItem(lines: readonly string[], last: boolean): ItemSlice | null {
+  const full = last ? lines.join("\n") : `${lines.join("\n")}\n`;
+  const text = full.replace(/\s+$/, "");
+  const [first = "", ...rest] = text.split("\n");
+  const start = itemStart.exec(first);
+  if (!start) return null;
+  const indent = start[0].length;
+  const boxed = taskBox.test(first.slice(indent));
+  const marker = first.slice(0, boxed ? indent + 4 : indent);
+  const restLines = dedent(rest, indent);
+  if (!restLines) return null;
+  return {
+    text,
+    after: full.slice(text.length),
+    marker,
+    indent,
+    content: [first.slice(marker.length), ...restLines].join("\n"),
+    box: boxed ? indent + 1 : null,
+  };
+}
+
+/** Line numbers where items start: a marker at the first item's indent. */
+function itemStarts(lines: readonly string[]): number[] | null {
+  const base = itemStart.exec(lines[0] ?? "")?.[1]?.length;
+  if (base === undefined) return null;
+  const starts: number[] = [];
+  lines.forEach((line, index) => {
+    if (itemStart.exec(line)?.[1]?.length === base) starts.push(index);
+  });
+  return starts;
+}
+
+/**
+ * Cuts a list block's source into its items. Returns null when the source
+ * is not one plain list the cut can follow (tab indents, a marker with no
+ * text after it, or code indented right after the marker).
+ */
+export function splitListItems(text: string): ItemSlice[] | null {
+  const lines = text.split("\n");
+  const starts = itemStarts(lines);
+  if (!starts) return null;
+  const slices: ItemSlice[] = [];
+  for (const [position, start] of starts.entries()) {
+    const end = starts[position + 1] ?? lines.length;
+    const slice = sliceItem(lines.slice(start, end), end === lines.length);
+    if (!slice) return null;
+    slices.push(slice);
+  }
+  return slices;
+}
+
+/** A loaded item: its slice, the key of the node it became, and the map of its content. */
+export interface ItemSource<Map> extends ItemSlice {
+  key: string;
+  /**
+   * The source map of the item's content, so its unedited blocks stay as
+   * written; null when it has none. Made on first use (an edit to the item),
+   * so loading a long list parses each item once.
+   */
+  children: () => Map | null;
+}
+
+/** A loaded list block, item by item. */
+export interface ListSource<Map> {
+  type: string;
+  /** The key of the list node without its items: its type and attributes, such as the number it starts at. */
+  shell: string;
+  items: ItemSource<Map>[];
+}
+
+/** What composing a list needs from the round trip. */
+export interface ListWriter<Map> {
+  key: (node: JSONContent) => string;
+  /** Markdown for an item's content, keeping blocks that match `map` as written. */
+  children: (content: JSONContent[], map: Map) => string;
+  /** Fresh Markdown for a list node. */
+  fresh: (list: JSONContent) => string;
+}
+
+function isChecked(item: JSONContent): boolean {
+  return item.attrs?.checked === true;
+}
+
+/** The mark a task box gets: a checked box keeps its `x` or `X`. */
+function boxMark(item: JSONContent, written: string): string {
+  if (!isChecked(item)) return " ";
+  return written === " " ? "x" : written;
+}
+
+/** The item's source with its task box set to the item's state. */
+function withBox(source: ItemSlice, item: JSONContent): string {
+  if (source.box === null || item.type !== "taskItem") return source.text;
+  const mark = boxMark(item, source.text.charAt(source.box));
+  return `${source.text.slice(0, source.box)}${mark}${source.text.slice(source.box + 1)}`;
+}
+
+function markerFor(source: ItemSlice, item: JSONContent): string {
+  return withBox({ ...source, text: source.marker }, item);
+}
+
+/** Content written under a marker, with its other lines indented. */
+function underMarker(marker: string, indent: number, content: string): string {
+  const [first = "", ...rest] = content.split("\n");
+  const pad = " ".repeat(indent);
+  return [`${marker}${first}`, ...rest.map((line) => (line ? `${pad}${line}` : ""))].join("\n");
+}
+
+/** The item as it was loaded, apart from its task box, for telling a ticked box from an edit. */
+function asLoaded(item: JSONContent, source: ItemSlice): JSONContent {
+  if (source.box === null || item.type !== "taskItem") return item;
+  return { ...item, attrs: { ...item.attrs, checked: source.text.charAt(source.box) !== " " } };
+}
+
+/** An edited item written over its source: unedited content keeps its bytes. Null when it cannot be. */
+function editedItem<Map>(item: JSONContent, source: ItemSource<Map>, writer: ListWriter<Map>): string | null {
+  if (writer.key(asLoaded(item, source)) === source.key) return withBox(source, item);
+  const map = source.children();
+  if (map === null) return null;
+  const content = writer.children(item.content ?? [], map).replace(/\n+$/, "");
+  if (content === source.content) return withBox(source, item);
+  return underMarker(markerFor(source, item), source.indent, content);
+}
+
+/** The list's own marker style: its bullet, or its number delimiter. */
+function restyled(fresh: string, list: ListSource<unknown>): string {
+  const first = list.items[0]?.marker.trimStart() ?? "-";
+  const delimiter = /^\d+([.)])/.exec(first)?.[1];
+  if (delimiter) return fresh.replace(/^(\s*\d+)\./, `$1${delimiter}`);
+  return fresh.replace(/^(\s*)-/, `$1${first.charAt(0)}`);
+}
+
+function startOf(node: JSONContent): number {
+  return typeof node.attrs?.start === "number" ? node.attrs.start : 1;
+}
+
+/** A new item, written fresh in the list's marker style and as far in as the list's first item; a numbered list is numbered again afterwards. */
+function newItem<Map>(item: JSONContent, node: JSONContent, list: ListSource<Map>, writer: ListWriter<Map>): string {
+  const fresh = restyled(writer.fresh({ ...node, content: [item] }), list);
+  const pad = /^ */.exec(list.items[0]?.marker ?? "")?.[0] ?? "";
+  return pad ? fresh.split("\n").map((line) => (line ? `${pad}${line}` : line)).join("\n") : fresh;
+}
+
+/** A written item, the loaded item it stands in for (-1 for a new one), and the item node. */
+export interface Part {
+  text: string;
+  index: number;
+  item: JSONContent;
+  /** True when the item is a loaded item nobody edited: it is written as it loaded, but for its number. */
+  exact: boolean;
+}
+
+/** A list written over its loaded list: its items as written, what stands before each (nothing before the first), and all of it joined. */
+export interface ComposedList {
+  parts: Part[];
+  separators: string[];
+  text: string;
+}
+
+const itemsByKey = new WeakMap<object, Map<string, number[]>>();
+
+/** Where each key sits among the loaded items, made once for a list. */
+function keyIndex(list: ListSource<unknown>): Map<string, number[]> {
+  const known = itemsByKey.get(list);
+  if (known) return known;
+  const index = new Map<string, number[]>();
+  list.items.forEach((item, position) => index.set(item.key, [...(index.get(item.key) ?? []), position]));
+  itemsByKey.set(list, index);
+  return index;
+}
+
+/**
+ * The loaded items not yet used while one list is written, found by key
+ * without walking every item with that key each time: a list of many
+ * identical items (`- Done.` on every step) stays linear.
+ */
+class UnusedItems {
+  private readonly used = new Set<number>();
+  private readonly usedByKey = new Map<string, number>();
+
+  constructor(private readonly list: ListSource<unknown>) {}
+
+  /** Marks the loaded item at `index` used. */
+  take(index: number) {
+    const key = this.list.items[index]?.key ?? "";
+    this.used.add(index);
+    this.usedByKey.set(key, (this.usedByKey.get(key) ?? 0) + 1);
+  }
+
+  has(index: number): boolean {
+    return this.used.has(index);
+  }
+
+  /** How many loaded items with `key` are not used yet. */
+  count(key: string): number {
+    return (keyIndex(this.list).get(key)?.length ?? 0) - (this.usedByKey.get(key) ?? 0);
+  }
+
+  /** The first unused loaded item with `key`, preferring those from `from` on; -1 when there is none. */
+  find(key: string, from: number): number {
+    const positions = keyIndex(this.list).get(key) ?? [];
+    if (this.count(key) === 0) return -1;
+    let low = 0;
+    let high = positions.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if ((positions[middle] ?? 0) < from) low = middle + 1;
+      else high = middle;
+    }
+    return this.firstUnused(positions, low) ?? this.firstUnused(positions, 0) ?? -1;
+  }
+
+  private firstUnused(positions: readonly number[], start: number): number | undefined {
+    for (let at = start; at < positions.length; at += 1) {
+      const index = positions[at];
+      if (index !== undefined && !this.used.has(index)) return index;
+    }
+    return undefined;
+  }
+}
+
+/**
+ * The loaded item an edited item replaces: the next unused one, unless the
+ * items after this one still need it as written (counted, so one of two
+ * identical items can be edited).
+ */
+function replacedItem<Map>(list: ListSource<Map>, next: number, unused: UnusedItems, later: ReadonlyMap<string, number>): number {
+  const candidate = list.items[next];
+  if (!candidate || unused.has(next)) return -1;
+  return (later.get(candidate.key) ?? 0) < unused.count(candidate.key) ? next : -1;
+}
+
+/** How many times each key occurs, for counting the items still to come. */
+function keyCounts(keys: readonly string[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1);
+  return counts;
+}
+
+/** A separator for a place that had none: without the spaces that ended the item it came from, and with one blank line at most. */
+function plainSeparator(after: string): string {
+  return after.replace(/^[ \t]+/, "").replace(/\n[ \t\n]*\n(?=\n)/, "\n");
+}
+
+/**
+ * What stands before each part. What followed a loaded item still follows
+ * it: its spaces and blank lines can be part of what the item reads as. A
+ * new item, and the item that was the list's last, are followed by the
+ * separator before them, so a new item is set apart as the items around it
+ * are.
+ */
+function separators(parts: readonly Part[], list: ListSource<unknown>): string[] {
+  let separator = plainSeparator(list.items.find((item) => item.after)?.after ?? "\n");
+  return parts.map((_part, position) => {
+    const before = parts[position - 1];
+    if (!before) return "";
+    separator = list.items[before.index]?.after || plainSeparator(separator);
+    return separator;
+  });
+}
+
+/** True when the items are the loaded items in their places: none added, removed, or moved. */
+function inPlace(parts: readonly Part[], list: ListSource<unknown>): boolean {
+  return parts.length === list.items.length && parts.every((part, position) => part.index === position);
+}
+
+/** Numbers a numbered list again when its items were added, removed, or moved (markdown-list-numbers.ts). */
+function numbered(parts: Part[], node: JSONContent, list: ListSource<unknown>): Part[] {
+  if (node.type !== "orderedList" || inPlace(parts, list)) return parts;
+  const texts = renumbered(parts.map((part) => part.text), list.items.map((item) => item.text), startOf(node));
+  return parts.map((part, position) => ({ ...part, text: texts[position] ?? part.text }));
+}
+
+/**
+ * Writes an edited list over the list it was loaded from: items nobody
+ * touched keep their source and the blank lines between them, an edited
+ * item keeps its marker and indent (and its unedited blocks), and a new
+ * item is written in the list's marker style. Returns null when an edited
+ * item cannot be written this way; the list is then written whole.
+ */
+export function composeList<Map>(node: JSONContent, list: ListSource<Map>, writer: ListWriter<Map>): ComposedList | null {
+  const items = node.content ?? [];
+  const keys = items.map((item) => writer.key(item));
+  const unused = new UnusedItems(list);
+  const parts: Part[] = [];
+  let next = 0;
+  // The keys of the items after the one being written, counted.
+  const later = keyCounts(keys);
+  for (const [position, item] of items.entries()) {
+    const key = keys[position] ?? "";
+    later.set(key, (later.get(key) ?? 1) - 1);
+    const exact = unused.find(key, next);
+    const index = exact >= 0 ? exact : replacedItem(list, next, unused, later);
+    const loaded = list.items[index];
+    const text = loaded ? (exact >= 0 ? loaded.text : editedItem(item, loaded, writer)) : newItem(item, node, list, writer);
+    if (text === null) return null;
+    if (index >= 0) {
+      unused.take(index);
+      next = index + 1;
+    }
+    parts.push({ text, index, item, exact: exact >= 0 });
+  }
+  const written = numbered(parts, node, list);
+  const between = separators(written, list);
+  return { parts: written, separators: between, text: written.map((part, position) => `${between[position] ?? ""}${part.text}`).join("") };
+}
