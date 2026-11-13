@@ -87,6 +87,31 @@ describe("the work one edit to a long list takes", () => {
   });
 });
 
+describe("a long list of identical items", () => {
+  const same = `- edit me\n${Array.from({ length: 2000 }, () => "- Done.").join("\n")}\n`;
+
+  it("should change only the edited item, and find each identical item's source once, when one item is edited", () => {
+    const loaded = parseMarkdown(same);
+    const doc = structuredClone(loaded.doc);
+    setText(find(doc, "paragraph", "edit me"), "edited");
+    const has = vi.spyOn(Set.prototype, "has");
+    let saved = "";
+    try {
+      saved = serializeMarkdown(doc, loaded.source);
+      // Linear in the items: a few lookups each, never one per identical item for every item.
+      expect(has.mock.calls.length).toBeLessThan(20 * 2001);
+    } finally {
+      has.mockRestore();
+    }
+    expect(saved).toBe(same.replace("- edit me", "- edited"));
+  });
+
+  it("should keep the other identical items when one in the middle is removed", () => {
+    const { saved } = editBothWays(same, (doc) => { doc.content?.[0]?.content?.splice(1000, 1); });
+    expect(saved).toBe(same.replace("- Done.\n", ""));
+  });
+});
+
 describe("a list beside a block it could join", () => {
   // Three lists, as both readers have them: the second and third sit too far out to be under `one`.
   const between = "1. one\n  * sub\n  2. two\n";

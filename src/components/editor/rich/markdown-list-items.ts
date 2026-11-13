@@ -225,10 +225,54 @@ function keyIndex(list: ListSource<unknown>): Map<string, number[]> {
   return index;
 }
 
-/** The first unused loaded item with `key`, preferring those from `from` on. */
-function findItem(list: ListSource<unknown>, key: string, from: number, used: ReadonlySet<number>): number {
-  const matches = (keyIndex(list).get(key) ?? []).filter((index) => !used.has(index));
-  return matches.find((index) => index >= from) ?? matches[0] ?? -1;
+/**
+ * The loaded items not yet used while one list is written, found by key
+ * without walking every item with that key each time: a list of many
+ * identical items (`- Done.` on every step) stays linear.
+ */
+class UnusedItems {
+  private readonly used = new Set<number>();
+  private readonly usedByKey = new Map<string, number>();
+
+  constructor(private readonly list: ListSource<unknown>) {}
+
+  /** Marks the loaded item at `index` used. */
+  take(index: number) {
+    const key = this.list.items[index]?.key ?? "";
+    this.used.add(index);
+    this.usedByKey.set(key, (this.usedByKey.get(key) ?? 0) + 1);
+  }
+
+  has(index: number): boolean {
+    return this.used.has(index);
+  }
+
+  /** How many loaded items with `key` are not used yet. */
+  count(key: string): number {
+    return (keyIndex(this.list).get(key)?.length ?? 0) - (this.usedByKey.get(key) ?? 0);
+  }
+
+  /** The first unused loaded item with `key`, preferring those from `from` on; -1 when there is none. */
+  find(key: string, from: number): number {
+    const positions = keyIndex(this.list).get(key) ?? [];
+    if (this.count(key) === 0) return -1;
+    let low = 0;
+    let high = positions.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if ((positions[middle] ?? 0) < from) low = middle + 1;
+      else high = middle;
+    }
+    return this.firstUnused(positions, low) ?? this.firstUnused(positions, 0) ?? -1;
+  }
+
+  private firstUnused(positions: readonly number[], start: number): number | undefined {
+    for (let at = start; at < positions.length; at += 1) {
+      const index = positions[at];
+      if (index !== undefined && !this.used.has(index)) return index;
+    }
+    return undefined;
+  }
 }
 
 /**
@@ -236,12 +280,11 @@ function findItem(list: ListSource<unknown>, key: string, from: number, used: Re
  * items after this one still need it as written (counted, so one of two
  * identical items can be edited).
  */
-function replacedItem<Map>(list: ListSource<Map>, next: number, used: ReadonlySet<number>, laterKeys: readonly string[]): number {
+function replacedItem<Map>(list: ListSource<Map>, next: number, unused: UnusedItems, laterKeys: readonly string[]): number {
   const candidate = list.items[next];
-  if (!candidate || used.has(next)) return -1;
+  if (!candidate || unused.has(next)) return -1;
   const later = laterKeys.filter((key) => key === candidate.key).length;
-  const unused = (keyIndex(list).get(candidate.key) ?? []).filter((index) => !used.has(index)).length;
-  return later < unused ? next : -1;
+  return later < unused.count(candidate.key) ? next : -1;
 }
 
 /** A separator for a place that had none: without the spaces that ended the item it came from, and with one blank line at most. */
@@ -288,17 +331,17 @@ function numbered(parts: Part[], node: JSONContent, list: ListSource<unknown>): 
 export function composeList<Map>(node: JSONContent, list: ListSource<Map>, writer: ListWriter<Map>): ComposedList | null {
   const items = node.content ?? [];
   const keys = items.map((item) => writer.key(item));
-  const used = new Set<number>();
+  const unused = new UnusedItems(list);
   const parts: Part[] = [];
   let next = 0;
   for (const [position, item] of items.entries()) {
-    const exact = findItem(list, keys[position] ?? "", next, used);
-    const index = exact >= 0 ? exact : replacedItem(list, next, used, keys.slice(position + 1));
+    const exact = unused.find(keys[position] ?? "", next);
+    const index = exact >= 0 ? exact : replacedItem(list, next, unused, keys.slice(position + 1));
     const loaded = list.items[index];
     const text = loaded ? (exact >= 0 ? loaded.text : editedItem(item, loaded, writer)) : newItem(item, node, list, writer);
     if (text === null) return null;
     if (index >= 0) {
-      used.add(index);
+      unused.take(index);
       next = index + 1;
     }
     parts.push({ text, index, item, exact: exact >= 0 });
