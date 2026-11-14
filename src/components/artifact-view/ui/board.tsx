@@ -9,6 +9,7 @@ import { boardLayoutVars } from "@/lib/ui/board-layout";
 import { formatShortDate, parseIsoDate } from "@/lib/ui/calendar-dates";
 import type { UiProps } from "@/lib/ui/catalog";
 import type { Tone } from "@/lib/ui/props/shared";
+import { hasTitleText } from "@/lib/ui/title-rules";
 import { cn } from "@/lib/utils";
 
 import { badgeTone, toneDot } from "./content";
@@ -108,14 +109,16 @@ export function BoardView({ props }: ViewProps<"Board">) {
   const id = useId();
   const frame = useRef<HTMLDivElement>(null);
   const scrollable = useScrollable(frame);
+  // A title of only spaces shows no caption, so the frame takes its own name instead of an empty one.
+  const titled = hasTitleText(props.title);
   // Custom properties are not in CSSProperties, so the record needs a cast.
   const layout = boardLayoutVars(props.columns.length) as CSSProperties;
   return (
     <figure className="min-w-0 space-y-2">
-      {props.title ? <figcaption id={`${id}-title`} className="text-md font-medium break-words">{props.title}</figcaption> : null}
+      {titled ? <figcaption id={`${id}-title`} className="text-md font-medium break-words">{props.title}</figcaption> : null}
       <div
         ref={frame}
-        {...scrollStopProps(scrollable, props.title ? { labelledBy: `${id}-title` } : { label: "Board" })}
+        {...scrollStopProps(scrollable, titled ? { labelledBy: `${id}-title` } : { label: "Board" })}
         style={layout}
         className="@container relative flex min-w-0 snap-x snap-proximity items-start gap-(--board-gap) overflow-x-auto overscroll-x-contain rounded-lg pb-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >

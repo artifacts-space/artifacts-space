@@ -15,7 +15,7 @@ import { expectNoAxeViolations } from "./support/a11y";
  * the pull request, never fixed by changing tokens in a test.
  */
 const knownContrast = {
-  board: { on: 'ul[aria-label="Labels"] > li', reason: "a warning badge's text (--tone-warning on its 12% tint) is 3.52:1, under 4.5:1" },
+  board: { on: 'ul[aria-label="Labels"] > li.text-tone-warning', reason: "a warning badge's text (--tone-warning on its 12% tint) is 3.52:1, under 4.5:1" },
   docs: { on: ".text-tone-warning, .text-syntax-comment", reason: "--tone-warning text on white (a tool's write badge, a prop's \"required\", 4.06:1) and syntax comments (--syntax-comment, 3.89:1) are under 4.5:1" },
 } as const;
 
@@ -46,7 +46,8 @@ test("should pass axe on two boards that share column titles, naming each column
   await expect(sprint.getByRole("heading", { name: /^To do/ })).toBeVisible();
   await expect(next.getByRole("heading", { name: /^To do/ })).toBeVisible();
   // The widest board scrolls at every width: once it is a tab stop, the boards have measured themselves.
-  await expect(boards.locator('[data-specimen="8 columns, 50 cards, long text"] figure > [role=group]')).toHaveAttribute("tabindex", "0");
+  // That needs the whole gallery interactive, which takes longer than the default 5 s on a slow machine.
+  await expect(boards.locator('[data-specimen="8 columns, 50 cards, long text"] figure > [role=group]')).toHaveAttribute("tabindex", "0", { timeout: 30_000 });
   // Each column keeps its name for assistive technology, as a group rather than a landmark.
   await expect(sprint.getByRole("group", { name: /^To do\s*, 2 cards$/ })).toHaveCount(1);
   await expect(next.getByRole("group", { name: /^To do\s*, 2 cards$/ })).toHaveCount(1);

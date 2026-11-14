@@ -5,7 +5,7 @@ import { Children, type ReactNode } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Gap } from "@/lib/ui/props/shared";
-import { hasTitleText } from "@/lib/ui/title-rules";
+import { hasTitleText, titleOr } from "@/lib/ui/title-rules";
 import { cn } from "@/lib/utils";
 
 import type { ViewProps } from "./stout";
@@ -89,7 +89,7 @@ export function TabsView({ props, children }: ViewProps<"Tabs">) {
         <TabsList variant="line" className="w-max">
           {props.tabs.map((tab, index) => (
             <TabsTrigger key={`${tab.label}-${String(index)}`} value={index} className="flex-none">
-              {tab.label}
+              {titleOr(tab.label, `Tab ${String(index + 1)}`)}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -109,7 +109,7 @@ export function AccordionView({ props, children }: ViewProps<"Accordion">) {
     <Accordion defaultValue={props.openFirst ? [0] : []} multiple className="min-w-0 rounded-lg border bg-card px-4 shadow-xs">
       {props.items.map((item, index) => (
         <AccordionItem key={`${item.title}-${String(index)}`} value={index}>
-          <AccordionTrigger className="min-w-0 break-words">{item.title}</AccordionTrigger>
+          <AccordionTrigger className="min-w-0 break-words">{titleOr(item.title, `Item ${String(index + 1)}`)}</AccordionTrigger>
           <AccordionContent>{panels[index] ?? <Empty what="content here" />}</AccordionContent>
         </AccordionItem>
       ))}
