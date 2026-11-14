@@ -33,10 +33,23 @@ test("should pass axe on the docs clients page", async ({ page }) => {
   await page.goto("/docs/clients");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   // A code block that scrolls becomes a tab stop once it has measured itself in the browser.
-  await expect(page.locator("pre[role=region][tabindex='0']").first()).toBeAttached();
-  await expectNoAxeViolations(page, {
-    skip: { "landmark-unique": { on: "pre[role=region]", reason: "a scrolling code block is a region named by its language or title, so two shell commands are both \"Command code\"" } },
-  });
+  await expect(page.locator("pre[role=group][tabindex='0']").first()).toBeAttached();
+  await expectNoAxeViolations(page);
+});
+
+test("should make a scrolling code block a named group the keyboard scrolls, never a landmark", async ({ page }) => {
+  await page.goto("/docs/clients");
+  const scrolling = page.locator("pre[role=group][tabindex='0']").first();
+  await expect(scrolling).toBeAttached();
+  await expect(scrolling).toHaveAccessibleName(/ code$/);
+  // Ten shell commands are ten "Command code" groups, not ten landmarks with one name.
+  await expect(page.getByRole("region", { name: / code$/ })).toHaveCount(0);
+  await scrolling.scrollIntoViewIfNeeded();
+  await scrolling.focus();
+  await expect(scrolling).toBeFocused();
+  const before = await scrolling.evaluate((element) => element.scrollLeft + element.scrollTop);
+  await page.keyboard.press(await scrolling.evaluate((element) => (element.scrollWidth > element.clientWidth ? "ArrowRight" : "ArrowDown")));
+  await expect.poll(() => scrolling.evaluate((element) => element.scrollLeft + element.scrollTop)).toBeGreaterThan(before);
 });
 
 test("should pass axe on the sign-in page", async ({ page }) => {

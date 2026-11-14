@@ -38,7 +38,7 @@ function HeadingBlock({ id, props }: BlockProps<"Heading">) {
   const tag = (["h1", "h2", "h3", "h4"] as const)[level - 1] ?? "h2";
   return (
     <EditableText
-      as={tag}
+      heading={tag}
       blockKey={id}
       value={props.text}
       onChange={(text) => { setProp(id, "text", text); }} maxLength={textLimit("Heading", "text")}
@@ -158,7 +158,7 @@ function TitledBlock({ id, title, description, children, variant }: { id: string
   return (
     <div className={cn("flex min-w-0 flex-col", style.frame)}>
       <div className="space-y-1">
-        <EditableText as={style.tag} blockKey={id} value={title} onChange={(text) => { setProp(id, "title", text || undefined); }} maxLength={textLimit(style.type, "title")} label={`${style.type} title`} placeholder="Title" className={style.title} />
+        <EditableText heading={style.tag} blockKey={id} value={title} onChange={(text) => { setProp(id, "title", text || undefined); }} maxLength={textLimit(style.type, "title")} label={`${style.type} title`} placeholder="Title" className={style.title} />
         <EditableText as="p" multiline blockKey={`${id}:description`} value={description} onChange={(text) => { setProp(id, "description", text || undefined); }} maxLength={textLimit(style.type, "description")} label={`${style.type} description`} placeholder="Description" className={style.description} />
       </div>
       {Children.count(children) > 0 ? <div className={cn("flex min-w-0 flex-col", style.body)}>{children}</div> : null}

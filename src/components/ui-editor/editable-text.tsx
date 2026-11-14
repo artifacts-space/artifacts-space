@@ -1,16 +1,25 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, type ElementType, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, type ElementType, type KeyboardEvent, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
 import { useBlockEditor } from "./block-editor-context";
 
+/** The heading levels a block title takes. */
+export type HeadingTag = "h1" | "h2" | "h3" | "h4";
+
 interface EditableTextProps {
   value: string;
   onChange: (value: string) => void;
-  /** The element it renders as, so it keeps the block's own semantics and type. */
+  /** The element it renders as, so it keeps the block's own semantics and type. Not a heading: use `heading`. */
   as?: ElementType;
+  /**
+   * The heading the text is the title of. The heading keeps its role, so it
+   * stays in the page's outline, and the text box sits inside it: a heading
+   * may not itself be a text box. `className` then styles the heading.
+   */
+  heading?: HeadingTag | undefined;
   className?: string;
   /** The accessible name, such as "Heading text". */
   label: string;
@@ -71,6 +80,19 @@ function handleKey(event: KeyboardEvent<HTMLElement>, props: EditableTextProps):
   return handleEnter(event, props) || handleEmptyKey(event, props);
 }
 
+/** The classes every editable text takes: its box, its caret, and its placeholder while empty. */
+const editableClass = "block min-h-[1lh] min-w-[2ch] cursor-text rounded-sm outline-none focus-visible:bg-muted/40 empty:before:pointer-events-none empty:before:text-muted-foreground/60 empty:before:content-[attr(data-placeholder)]";
+
+/**
+ * The heading around a title's text box. An empty title is no heading, as
+ * in the read view, which leaves the heading out: `role="none"` keeps the
+ * element (so the box keeps focus while the first letter is typed) but
+ * takes it out of the outline.
+ */
+function TitleHeading({ tag: Tag, empty, className, children }: { tag: HeadingTag; empty: boolean; className: string | undefined; children: ReactNode }) {
+  return <Tag role={empty ? "none" : undefined} className={className}>{children}</Tag>;
+}
+
 /**
  * Plain text you click and type into, in place, with the look of the block
  * around it. The browser owns the text while it has focus: React writes it
@@ -78,7 +100,7 @@ function handleKey(event: KeyboardEvent<HTMLElement>, props: EditableTextProps):
  * the caret never jumps while typing.
  */
 export function EditableText(props: EditableTextProps) {
-  const { value, onChange, as: Tag = "span", className, label, placeholder = "", multiline = false, blockKey, maxLength } = props;
+  const { value, onChange, as: Tag = "span", heading, className, label, placeholder = "", multiline = false, blockKey, maxLength } = props;
   const ref = useRef<HTMLElement>(null);
   const { takeFocus } = useBlockEditor();
 
@@ -94,7 +116,7 @@ export function EditableText(props: EditableTextProps) {
     if (element && takeFocus(blockKey)) element.focus();
   }, [blockKey, takeFocus]);
 
-  return (
+  const box = (
     <Tag
       ref={ref}
       role="textbox"
@@ -115,12 +137,9 @@ export function EditableText(props: EditableTextProps) {
         caretToEnd(element);
       }}
       onKeyDown={(event: KeyboardEvent<HTMLElement>) => { if (handleKey(event, props)) event.preventDefault(); }}
-      className={cn(
-        "block min-h-[1lh] min-w-[2ch] cursor-text rounded-sm outline-none",
-        multiline ? "whitespace-pre-wrap" : "whitespace-pre-wrap break-words",
-        "focus-visible:bg-muted/40 empty:before:pointer-events-none empty:before:text-muted-foreground/60 empty:before:content-[attr(data-placeholder)]",
-        className,
-      )}
+      className={cn(editableClass, "whitespace-pre-wrap", !multiline && "break-words", !heading && className)}
     />
   );
+  if (!heading) return box;
+  return <TitleHeading tag={heading} empty={value === ""} className={className}>{box}</TitleHeading>;
 }

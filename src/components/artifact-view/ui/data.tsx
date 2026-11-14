@@ -1,9 +1,11 @@
 "use client";
 
 import { IconArrowDownRight, IconArrowUpRight, IconCheck, IconMinus } from "@tabler/icons-react";
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { MermaidView } from "@/components/artifact-view/mermaid-view";
+import { scrollStopProps } from "@/components/code/scroll-stop";
+import { useScrollable } from "@/components/code/use-scrollable";
 import { Button } from "@/components/ui/button";
 import { formatCellValue, formatNumber, missingValue, sharedFractionDigits } from "@/lib/ui/number-format";
 import type { CellFormat } from "@/lib/ui/props/shared";
@@ -36,15 +38,24 @@ function columnDigits(props: TableProps, currency: string): Map<string, number> 
   return digits;
 }
 
+/**
+ * A table in a figure, captioned by its figcaption. Its frame scrolls when
+ * the table is taller or wider than it; only then is the frame a tab stop,
+ * a group named by the caption (scroll-stop.ts), so two tables with one
+ * caption never make two landmarks with one name.
+ */
 export function TableView({ props }: ViewProps<"Table">) {
   const [expanded, setExpanded] = useState(false);
+  const captionId = useId();
+  const frame = useRef<HTMLDivElement>(null);
+  const scrollable = useScrollable(frame);
   const rows = expanded ? props.rows : props.rows.slice(0, initialRows);
   const currency = props.currency ?? "USD";
   const digits = columnDigits(props, currency);
   return (
     <figure className="min-w-0 space-y-2">
-      {props.caption ? <figcaption className="text-md font-medium break-words">{props.caption}</figcaption> : null}
-      <div tabIndex={0} role="region" aria-label={props.caption ?? "Table"} className="max-h-[32rem] overflow-auto rounded-md border bg-card shadow-xs focus-visible:outline-2 focus-visible:outline-ring">
+      {props.caption ? <figcaption id={captionId} className="text-md font-medium break-words">{props.caption}</figcaption> : null}
+      <div ref={frame} {...scrollStopProps(scrollable, props.caption ? { labelledBy: captionId } : { label: "Table" })} className="max-h-[32rem] overflow-auto rounded-md border bg-card shadow-xs focus-visible:outline-2 focus-visible:outline-ring">
         <table className="w-full border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-card">
             <tr>

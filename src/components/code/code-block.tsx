@@ -7,6 +7,7 @@ import type { SyntaxKind, SyntaxLine } from "@/lib/syntax/tokens";
 import { cn } from "@/lib/utils";
 
 import { codeBlockModel } from "./code-block-model";
+import { scrollStopProps } from "./scroll-stop";
 import { useHighlightedLines } from "./use-highlighted-lines";
 import { useScrollable } from "./use-scrollable";
 
@@ -56,7 +57,7 @@ interface CodeAreaProps {
   /** The code as shown. */
   display: string;
   lines: SyntaxLine[] | null;
-  /** The region name screen readers hear while the area scrolls. */
+  /** What the code is (its title or language); screen readers hear "<name> code" when a scrolling area takes focus. */
   name: string;
   /** Wrap long lines instead of scrolling sideways. */
   wrap?: boolean;
@@ -65,26 +66,20 @@ interface CodeAreaProps {
   className: string;
 }
 
-/** Makes a scrolling area a named, focusable region; one that fits stays out of the tab order. */
-function scrollRegion(scrollable: boolean, name: string) {
-  if (!scrollable) return {};
-  return { tabIndex: 0, role: "region", "aria-label": `${name} code` } as const;
-}
-
 /** Block code fills the area and scrolls sideways unless it wraps; code after a prompt flows inline. */
 function codeClass(prompt: boolean, wrap: boolean): string | undefined {
   if (prompt) return undefined;
   return wrap ? "block" : "block w-max min-w-full";
 }
 
-/** The code area. A tab stop only while it actually scrolls. */
+/** The code area. A named group and a tab stop only while it actually scrolls (see scroll-stop.ts). */
 function CodeArea({ display, lines, name, wrap = false, prompt = false, className }: CodeAreaProps) {
   const scrollRef = useRef<HTMLPreElement>(null);
   const scrollable = useScrollable(scrollRef);
   return (
     <pre
       ref={scrollRef}
-      {...scrollRegion(scrollable, name)}
+      {...scrollStopProps(scrollable, { label: `${name} code` })}
       className={cn("font-mono text-sm leading-6", focusClass, wrap && "whitespace-pre-wrap break-words", className)}
     >
       {prompt ? <span aria-hidden="true" className="text-syntax-comment select-none">$ </span> : null}
