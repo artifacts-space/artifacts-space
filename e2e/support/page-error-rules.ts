@@ -57,15 +57,35 @@ function quoted(text: string): string {
   return `${text.slice(0, quotedTextLimit)}… (${String(text.length - quotedTextLimit)} more characters)`;
 }
 
-/** The failure message that names each unexpected error, its kind, and where it came from. */
-export function pageErrorReport(errors: readonly PageError[]): string {
-  const lines = errors.map((error, index) => {
+/** How many errors a failure lists before it says how many more there were. */
+export const listedErrorLimit = 10;
+
+/** An allowance as a reader sees it: the pattern as written, then the reason. */
+function allowanceLine(allowance: PageErrorAllowance): string {
+  const pattern = typeof allowance.pattern === "string" ? JSON.stringify(allowance.pattern) : String(allowance.pattern);
+  return `- ${pattern}: ${allowance.reason}`;
+}
+
+/**
+ * The failure message: the first `listedErrorLimit` unexpected errors, each
+ * with its kind and where it came from, how many more there were, and the
+ * allowances already in force in the test, so a reader sees what was let
+ * pass and why the rest was not.
+ */
+export function pageErrorReport(errors: readonly PageError[], allowances: readonly PageErrorAllowance[] = []): string {
+  const lines = errors.slice(0, listedErrorLimit).map((error, index) => {
     const where = error.url ? ` (${error.url})` : "";
     return `${String(index + 1)}. ${error.kind}${where}: ${quoted(error.text)}`;
   });
+  const unlisted = errors.length - lines.length;
+  if (unlisted > 0) lines.push(`… and ${String(unlisted)} more.`);
+  const allowed = allowances.length > 0
+    ? ["", "Already allowed in this test:", ...allowances.map(allowanceLine)]
+    : ["", "Nothing is allowed in this test."];
   return [
     `The page reported ${String(errors.length)} unexpected error${errors.length === 1 ? "" : "s"}:`,
     ...lines,
+    ...allowed,
     "",
     "Fix the cause. If the test causes it on purpose, call allowPageError(pattern, reason) from e2e/support/test.ts in that test.",
   ].join("\n");

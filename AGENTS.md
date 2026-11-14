@@ -523,7 +523,8 @@ catch this, so test the generated SQL with `.toSQL()`, as
   `@playwright/test` (ESLint fails on it; type imports may stay). Its auto
   fixture fails any test whose pages throw or log `console.error` (hydration
   warnings included), in the test's context and in contexts the test opens,
-  and names each error. A test that causes an error on purpose (an aborted
+  and names the first ten errors (then how many more) and the allowances in
+  force in that test. A test that causes an error on purpose (an aborted
   route, blocked storage, a stubbed failure) calls
   `allowPageError(pattern, reason)` in that test. Noise we cannot fix goes in
   `e2e/support/known-page-errors.ts` with a one-line reason; fix the cause

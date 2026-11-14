@@ -46,16 +46,23 @@ async function openThread(page: Page) {
 
 test("should post from the plain box when the rich box cannot load", async ({ page }) => {
   let refused = 0;
-  allowPageError("net::ERR_FAILED", "The test refuses the rich box's code on purpose.");
-  allowPageError("ChunkLoadError", "React reports the refused chunk that CommentEditorBoundary catches; it shows only on some runs.");
+  allowPageError("net::ERR_FAILED", "The test refuses every request for the rich box's code.");
+  allowPageError(
+    "ChunkLoadError",
+    "The bundler retries the refused chunk once, then rejects the import; CommentEditorBoundary catches that and React logs the caught error.",
+  );
   await routeEditorChunk(page, (route) => {
     refused += 1;
     return route.abort();
   });
+  // The retry comes 200 to 600 ms after the first refusal, so wait for the import to fail for good:
+  // the rest of the test then runs on a page whose rich box can no longer arrive.
+  const gaveUp = page.waitForEvent("console", { predicate: (message) => message.text().includes("ChunkLoadError") });
   await openThread(page);
   const box = newComment(page);
   await expect(box, "the plain box has the rich box's name").toBeVisible();
   await expect.poll(() => refused, "the rich box's code was asked for and refused").toBeGreaterThan(0);
+  await gaveUp;
   await expect(box).toHaveJSProperty("tagName", "TEXTAREA");
 
   await box.click();
