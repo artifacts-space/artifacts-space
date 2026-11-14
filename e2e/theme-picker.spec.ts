@@ -14,13 +14,13 @@ test("should apply a preset picked with the keyboard when an editor opens the pi
   await specimen.getByRole("button", { name: /Theme: Default/ }).click();
   const group = page.getByRole("listbox", { name: "Artifact theme" });
   await expect(group).toBeVisible();
-  const defaultOption = group.getByRole("option", { name: /^Default:/ });
+  const defaultOption = group.getByRole("option", { name: "Default Geist Sans" });
   await expect(defaultOption).toHaveAttribute("aria-selected", "true");
   await expect(defaultOption).toBeFocused();
 
   // Default, Paper, Graphite, Ink, Ocean, Forest, Editorial, Classic in two columns: Right moves to Paper.
   await page.keyboard.press("ArrowRight");
-  await expect(group.getByRole("option", { name: /^Paper:/ })).toBeFocused();
+  await expect(group.getByRole("option", { name: "Paper Work Sans" })).toBeFocused();
   await page.keyboard.press("Enter");
 
   await expect(group).toBeHidden();
@@ -29,9 +29,9 @@ test("should apply a preset picked with the keyboard when an editor opens the pi
   await expect(specimen.getByRole("button", { name: /Theme: Paper/ })).toBeVisible();
 
   await specimen.getByRole("button", { name: /Theme: Paper/ }).click();
-  await expect(page.getByRole("option", { name: /^Paper:/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("option", { name: "Paper Work Sans" })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("End");
-  await expect(page.getByRole("option", { name: /^Classic:/ })).toBeFocused();
+  await expect(page.getByRole("option", { name: "Classic Roboto" })).toBeFocused();
   await page.keyboard.press("Space");
   await expect(scope).toHaveAttribute("data-picker-scope", "classic");
   await expect(scope).toHaveCSS("font-family", /^Roboto/);

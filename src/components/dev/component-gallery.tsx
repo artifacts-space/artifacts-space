@@ -16,7 +16,7 @@ import { imageStandIn, mediaFixtureFiles, mediaStandInUrl } from "@/components/d
 import { NotificationsSpecimen } from "@/components/dev/notifications-specimen";
 import { SwitchSpecimen } from "@/components/dev/switch-specimen";
 import { ThemeFocusSpecimen } from "@/components/dev/theme-focus-specimen";
-import { ThemePickerSpecimen } from "@/components/dev/theme-picker-specimen";
+import { GroupedThemePickerSpecimen, ThemePickerSpecimen } from "@/components/dev/theme-picker-specimen";
 import { ViewsSpecimen } from "@/components/dev/views-specimen";
 import { UiView } from "@/components/artifact-view/ui-view";
 import { ClientLogo } from "@/components/setup/client-logos";
@@ -150,6 +150,9 @@ export function ComponentGallery() {
           </Specimen>
           <Specimen name="theme picker">
             <ThemePickerSpecimen />
+          </Specimen>
+          <Specimen name="theme picker · groups">
+            <GroupedThemePickerSpecimen />
           </Specimen>
           <Specimen name="cover picker">
             <CoverSpecimen />
