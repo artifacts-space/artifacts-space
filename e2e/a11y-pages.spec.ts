@@ -4,20 +4,14 @@ import { expect, test } from "./support/test";
 import { expectNoAxeViolations } from "./support/a11y";
 
 /*
- * Accessibility of whole pages and the sheet grid: axe on the spreadsheet
+ * Accessibility of whole pages and gallery pieces: axe on the spreadsheet
  * grid with a cell selected (the gallery specimen and the editor fixture),
- * the docs clients page, and the sign-in page, as everyone sees it and with
- * the password field a reviewer address reveals.
+ * boards (columns as named groups, the scrolling frame's name), the docs
+ * (the clients page; the MCP reference and a component page at phone width,
+ * where every sideways scroller must be a named group; a scrolling code
+ * block), and the sign-in page, as everyone sees it and with the password
+ * field a reviewer address reveals.
  */
-
-/**
- * Contrast findings are design decisions (AGENTS.md, Testing): reported in
- * the pull request, never fixed by changing tokens in a test.
- */
-const knownContrast = {
-  board: { on: 'ul[aria-label="Labels"] > li.text-tone-warning', reason: "a warning badge's text (--tone-warning on its 12% tint) is 3.52:1, under 4.5:1" },
-  docs: { on: ".text-tone-warning, .text-syntax-comment", reason: "--tone-warning text on white (a tool's write badge, a prop's \"required\", 4.06:1) and syntax comments (--syntax-comment, 3.89:1) are under 4.5:1" },
-} as const;
 
 const linkButton = (page: Page) => page.getByRole("button", { name: "Email me a sign-in link" });
 
@@ -52,7 +46,7 @@ test("should pass axe on two boards that share column titles, naming each column
   await expect(sprint.getByRole("group", { name: /^To do\s*, 2 cards$/ })).toHaveCount(1);
   await expect(next.getByRole("group", { name: /^To do\s*, 2 cards$/ })).toHaveCount(1);
   await expect(boards.getByRole("region", { name: /^To do/ })).toHaveCount(0);
-  await expectNoAxeViolations(boards, { skip: { "color-contrast": knownContrast.board } });
+  await expectNoAxeViolations(boards);
 });
 
 test("should name a scrolling board without a title \"Board\"", async ({ page }) => {
@@ -90,7 +84,7 @@ test("should pass axe on the MCP docs at phone width, with every sideways scroll
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByRole("group", { name: "artifacts_create arguments" })).toHaveAttribute("tabindex", "0");
   await expect.poll(() => unreachableSidewaysScrollers(page)).toEqual([]);
-  await expectNoAxeViolations(page, { skip: { "color-contrast": knownContrast.docs } });
+  await expectNoAxeViolations(page);
 });
 
 test("should keep a component page's props table reachable at phone width", async ({ page }) => {

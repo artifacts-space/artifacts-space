@@ -1,7 +1,7 @@
 import { siteBlockColors } from "@/lib/block-colors/block-color-palette";
 import { blockHues } from "@/lib/block-colors/block-color-rules";
 
-import { contrastRatio, ensureContrast, formatOklch, mixOklch, parseColor, relativeLuminance, type Oklch } from "./color";
+import { contrastRatio, ensureContrast, formatOklch, mixOklch, paintOver, parseColor, relativeLuminance, type Oklch } from "./color";
 import type { ThemeColors } from "./schema";
 
 /**
@@ -23,7 +23,7 @@ const siteSyntax: Record<PaletteMode, Record<SyntaxRole, string>> = {
     function: "oklch(0.5 0.19 295)",
     property: "oklch(0.5 0.14 250)",
     number: "oklch(0.56 0.14 60)",
-    comment: "oklch(0.6 0.008 65)",
+    comment: "oklch(0.555 0.008 65)",
     punctuation: "oklch(0.52 0.008 65)",
     inserted: "oklch(0.5 0.12 150)",
     deleted: "oklch(0.55 0.18 27)",
@@ -34,7 +34,7 @@ const siteSyntax: Record<PaletteMode, Record<SyntaxRole, string>> = {
     function: "oklch(0.77 0.12 295)",
     property: "oklch(0.77 0.1 245)",
     number: "oklch(0.81 0.11 70)",
-    comment: "oklch(0.58 0.008 70)",
+    comment: "oklch(0.6 0.008 70)",
     punctuation: "oklch(0.66 0.008 70)",
     inserted: "oklch(0.78 0.12 150)",
     deleted: "oklch(0.72 0.14 25)",
@@ -44,15 +44,15 @@ const siteSyntax: Record<PaletteMode, Record<SyntaxRole, string>> = {
 const syntaxRoles = ["keyword", "string", "function", "property", "number", "comment", "punctuation", "inserted", "deleted"] as const;
 type SyntaxRole = (typeof syntaxRoles)[number];
 
-/** Comments and punctuation are quieter by design: 3:1. Everything else in code is text: 4.5:1. */
+/** Everything in code is text, comments and punctuation included: 4.5:1. They stay quieter by chroma, not by falling under AA. */
 export const syntaxMinimum: Record<SyntaxRole, number> = {
   keyword: 4.5,
   string: 4.5,
   function: 4.5,
   property: 4.5,
   number: 4.5,
-  comment: 3,
-  punctuation: 3,
+  comment: 4.5,
+  punctuation: 4.5,
   inserted: 4.5,
   deleted: 4.5,
 };
@@ -301,7 +301,32 @@ export function ringTokens(mode: PaletteMode, colors: ThemeColors): Record<strin
   return { "--ring": formatOklch(ring) };
 }
 
+const toneRoles = ["info", "success", "warning", "danger"] as const;
+
+/** The site's status tones per mode, from globals.css (Callout, Badge, Metric changes, Board and Calendar labels). */
+const siteTones: Record<PaletteMode, Record<(typeof toneRoles)[number], string>> = {
+  light: { info: "oklch(0.485 0.15 255)", success: "oklch(0.47 0.13 150)", warning: "oklch(0.49 0.14 70)", danger: "oklch(0.5 0.2 27)" },
+  dark: { info: "oklch(0.74 0.12 255)", success: "oklch(0.75 0.13 150)", warning: "oklch(0.8 0.13 75)", danger: "oklch(0.7 0.17 25)" },
+};
+
+/** The strongest tint of a tone its own text sits on: a badge or calendar event is the tone's text on the tone at 12% at most. */
+export const toneTintMax = 0.12;
+
+/**
+ * Status tones on the themed card, page, and quiet surfaces (--secondary,
+ * --muted, --accent). A tone is text there and on its own tint over each
+ * (a badge), so it keeps the site's hue and chroma and is re-lit until it
+ * reads at 4.5:1 on every one. Dots and edges use the same token.
+ */
+export function toneTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
+  const card = read(colors.card);
+  const ink = read(colors.foreground);
+  const surfaces = [card, read(colors.background), ...Object.values(quietTint).map((amount) => mixOklch(card, ink, amount))];
+  const reads = (tone: Oklch) => surfaces.every((surface) => contrastRatio(tone, surface) >= 4.55 && contrastRatio(tone, paintOver(tone, toneTintMax, surface)) >= 4.55);
+  return Object.fromEntries(toneRoles.map((role) => [`--tone-${role}`, formatOklch(holdApart(read(siteTones[mode][role]), card, reads))]));
+}
+
 /** Every CSS token a palette sets, keyed by custom property name, with canonical color values. */
 export function paletteTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
-  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors), ...switchTokens(mode, colors), ...ringTokens(mode, colors), ...blockColorTokens(mode, colors) };
+  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors), ...switchTokens(mode, colors), ...ringTokens(mode, colors), ...blockColorTokens(mode, colors), ...toneTokens(mode, colors) };
 }

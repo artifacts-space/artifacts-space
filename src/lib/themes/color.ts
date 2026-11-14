@@ -269,6 +269,23 @@ export function ensureContrast(color: Oklch, background: Oklch, minimum: number)
 
 const toGamma = (channel: number) => (channel <= 0.0031308 ? channel * 12.92 : 1.055 * channel ** (1 / 2.4) - 0.055);
 
+/**
+ * `top` at `alpha` painted over the opaque `under`, composited channel by
+ * channel in gamma sRGB as browsers do: what a tint such as `bg-tone-info/10`
+ * looks like on a surface, for contrast checks of text on that tint.
+ */
+export function paintOver(top: Oklch, alpha: number, under: Oklch): Oklch {
+  const t = clamp(alpha, 0, 1);
+  const gamma = (color: Oklch): Rgb => {
+    const [r, g, b] = oklchToLinearRgb(color);
+    return [toGamma(r), toGamma(g), toGamma(b)];
+  };
+  const [topR, topG, topB] = gamma(top);
+  const [underR, underG, underB] = gamma(under);
+  const over = (a: number, b: number) => a * t + b * (1 - t);
+  return rgbToOklch([over(topR, underR), over(topG, underG), over(topB, underB)]);
+}
+
 /** The color as `#rrggbb` (alpha dropped), clamped to sRGB, for renderers that cannot read oklch() such as social preview images. */
 export function formatHex(color: Oklch): string {
   return `#${oklchToLinearRgb(color).map((channel) => Math.round(clamp(toGamma(channel), 0, 1) * 255).toString(16).padStart(2, "0")).join("")}`;

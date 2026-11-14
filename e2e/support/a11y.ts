@@ -27,6 +27,8 @@ interface ScanOptions {
    * Prefer the narrower form; name the reason; never skip silently.
    */
   skip?: SkippedRules;
+  /** Run only these rules, for a scan about one thing (color contrast across a whole page). Skips still apply. */
+  only?: readonly string[];
 }
 
 /**
@@ -101,10 +103,12 @@ async function withoutNodesOn(page: Page, violations: readonly Violation[], sele
  * Runs every rule but the skipped ones (and, on a part, the page-structure
  * ones), then each rule skipped only on some nodes, everywhere but there.
  */
-async function runRules(page: Page, token: string | null, skip: SkippedRules): Promise<Violation[]> {
+async function runRules(page: Page, token: string | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<Violation[]> {
   const entries = Object.entries(skip);
   const skipped = entries.map(([rule]) => rule);
-  const main = await builder(page, token).disableRules([...(token ? pageStructureRules : []), ...skipped]).analyze();
+  const left = [...(token ? pageStructureRules : []), ...skipped];
+  const scan = only ? builder(page, token).withRules(only.filter((rule) => !left.includes(rule))) : builder(page, token).disableRules(left);
+  const main = await scan.analyze();
   const violations: Violation[] = [...main.violations];
   // One after another: axe cannot run twice at once in a page.
   for (const [rule, why] of entries) {
@@ -115,12 +119,12 @@ async function runRules(page: Page, token: string | null, skip: SkippedRules): P
   return violations;
 }
 
-async function analyze(page: Page, scope: Locator | null, skip: SkippedRules): Promise<Violation[]> {
-  if (!scope) return runRules(page, null, skip);
+async function analyze(page: Page, scope: Locator | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<Violation[]> {
+  if (!scope) return runRules(page, null, skip, only);
   const token = `scan-${String(Date.now())}-${String(Math.random()).slice(2, 8)}`;
   await scope.evaluateAll((elements, value) => { for (const element of elements) element.setAttribute("data-a11y-scan", value); }, token);
   try {
-    return await runRules(page, token, skip);
+    return await runRules(page, token, skip, only);
   } finally {
     await scope.evaluateAll((elements) => { for (const element of elements) element.removeAttribute("data-a11y-scan"); }).catch(() => undefined);
   }
@@ -139,7 +143,7 @@ export async function expectNoAxeViolations(target: Page | Locator, options: Sca
   const scope = isPage ? null : target;
   if (scope) await expect(scope.first()).toBeVisible();
   await settleAnimations(page);
-  const violations = await analyze(page, scope, options.skip ?? {});
+  const violations = await analyze(page, scope, options.skip ?? {}, options.only);
   const where = scope ? `${page.url()} (${scope.toString()})` : page.url();
   expect(violations.length, `axe found ${String(violations.length)} violation(s) on ${where}:\n${report(violations)}`).toBe(0);
 }

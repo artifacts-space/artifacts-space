@@ -254,11 +254,16 @@
   --avatar-tint-strength: 30%;
   --avatar-ink: oklch(0.2 0.006 60);
   --avatar-ink-strength: 22%;
-  /* Status tones for Callout, Badge, Metric changes. Reserved: never chart series. */
-  --tone-info: oklch(0.52 0.15 255);
-  --tone-success: oklch(0.52 0.13 150);
-  --tone-warning: oklch(0.6 0.14 70);
-  --tone-danger: oklch(0.55 0.2 27);
+  /*
+   * Status tones for Callout, Badge, Metric changes. Reserved: never chart
+   * series. Each is text on the page, the card, the quiet surfaces, and its
+   * own tint over them (a badge, up to 12%), at 4.5:1 on every one; themes
+   * re-light them by the same rule (toneTokens in src/lib/themes/derive.ts).
+   */
+  --tone-info: oklch(0.485 0.15 255);
+  --tone-success: oklch(0.47 0.13 150);
+  --tone-warning: oklch(0.49 0.14 70);
+  --tone-danger: oklch(0.5 0.2 27);
   /* Categorical chart series, fixed order (validated reference palette). 7-8 pass adjacent checks with gaps and labels as secondary encoding. */
   --series-1: #2a78d6;
   --series-2: #eb6834;
@@ -285,7 +290,7 @@
   --syntax-function: oklch(0.5 0.19 295);
   --syntax-property: oklch(0.5 0.14 250);
   --syntax-number: oklch(0.56 0.14 60);
-  --syntax-comment: oklch(0.6 0.008 65);
+  --syntax-comment: oklch(0.555 0.008 65);
   --syntax-punctuation: oklch(0.52 0.008 65);
   --syntax-inserted: oklch(0.5 0.12 150);
   --syntax-deleted: oklch(0.55 0.18 27);
@@ -374,7 +379,7 @@
    */
   --actor-agent: oklch(0.52 0.2 262);
   --actor-agent-tint: oklch(0.95 0.03 262);
-  --actor-person: oklch(0.56 0.14 58);
+  --actor-person: oklch(0.535 0.14 58);
   --actor-person-tint: oklch(0.95 0.045 75);
   --dot-grid: oklch(0.2 0.006 60 / 0.13);
   /*
@@ -481,7 +486,7 @@
   --syntax-function: oklch(0.77 0.12 295);
   --syntax-property: oklch(0.77 0.1 245);
   --syntax-number: oklch(0.81 0.11 70);
-  --syntax-comment: oklch(0.58 0.008 70);
+  --syntax-comment: oklch(0.6 0.008 70);
   --syntax-punctuation: oklch(0.66 0.008 70);
   --syntax-inserted: oklch(0.78 0.12 150);
   --syntax-deleted: oklch(0.72 0.14 25);

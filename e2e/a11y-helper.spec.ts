@@ -5,7 +5,8 @@ import { expectNoAxeViolations } from "./support/a11y";
 /*
  * The axe helper itself (e2e/support/a11y.ts), on inline pages with no
  * server: a rule skipped `{ on }` a selector is left out only on the nodes
- * that selector matches, never on what sits inside them.
+ * that selector matches, never on what sits inside them; and a scan told to
+ * run `only` some rules reports those and nothing else.
  */
 
 // An icon button with no name fails axe's button-name rule.
@@ -21,4 +22,17 @@ test("should leave a skipped rule out on the node its selector matches", async (
 test("should still report a skipped rule on a node inside what its selector matches", async ({ page }) => {
   await page.setContent(`<main id="scan"><div class="skip-zone">${unnamedButton}</div></main>`);
   await expect(expectNoAxeViolations(page.locator("#scan"), { skip: skipOnZone })).rejects.toThrow(/button-name/);
+});
+
+// Grey text on white at about 2.3:1 fails axe's color-contrast rule.
+const faintText = `<p style="color: #aaaaaa; background: #ffffff">Hard to read</p>`;
+
+test("should report a rule the scan is told to run alone", async ({ page }) => {
+  await page.setContent(`<main id="scan">${faintText}${unnamedButton}</main>`);
+  await expect(expectNoAxeViolations(page.locator("#scan"), { only: ["color-contrast"] })).rejects.toThrow(/color-contrast/);
+});
+
+test("should leave every other rule out when the scan is told to run one alone", async ({ page }) => {
+  await page.setContent(`<main id="scan">${unnamedButton}</main>`);
+  await expectNoAxeViolations(page.locator("#scan"), { only: ["color-contrast"] });
 });

@@ -271,7 +271,7 @@ export default function ThemesPage() {
       </Prose>
       <FactTable head={["Text", "On", "Minimum", "Why"]} rows={contrastPairs.map((pair) => [pair.text, pair.surface, `${String(pair.minimum)}:1`, pair.use])} mono={[0, 1, 2]} />
       <Note title="Code colors">
-        Syntax colors come from the theme. You do not set them. Each reaches {String(syntaxMinimum.keyword)}:1 on the theme&apos;s code background ({String(syntaxMinimum.comment)}:1 for comments and punctuation).
+        Syntax colors come from the theme. You do not set them. Each reaches {String(syntaxMinimum.keyword)}:1 on the theme&apos;s code background, comments and punctuation included.
       </Note>
       <Note title="Focus ring">
         The focus ring comes from the theme too. It is the site&apos;s blue, and its lightness changes until it reaches 3:1 on the theme&apos;s card, page, and quieter surfaces. Most themes keep the site&apos;s blue exactly. A theme whose card is near the lightness limit gets a darker or lighter blue, so a focused control stays easy to see.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contrastRatio, ensureContrast, formatOklch, mixOklab, mixOklch, normalizeColor, parseColor } from "./color";
+import { contrastRatio, ensureContrast, formatHex, formatOklch, mixOklab, mixOklch, normalizeColor, paintOver, parseColor } from "./color";
 
 const parsed = (value: string) => {
   const color = parseColor(value);
@@ -108,5 +108,23 @@ describe("mixOklab", () => {
     const b = { l: 0.9, c: 0, h: 0, alpha: 1 };
     expect(mixOklab(a, b, 0).l).toBeCloseTo(0.5);
     expect(mixOklab(a, b, 1)).toMatchObject({ l: 0.9, c: 0 });
+  });
+});
+
+describe("paintOver", () => {
+  it("should give the surface at alpha 0 and the top color at alpha 1", () => {
+    const top = parseColor("#b46e00");
+    const under = parseColor("#ffffff");
+    if (!top || !under) throw new Error("unreadable color");
+    expect(formatHex(paintOver(top, 0, under))).toBe("#ffffff");
+    expect(formatHex(paintOver(top, 1, under))).toBe("#b46e00");
+  });
+
+  it("should composite channel by channel in sRGB when a tint sits on a surface, as a browser does", () => {
+    const top = parseColor("#b46e00");
+    const under = parseColor("#ffffff");
+    if (!top || !under) throw new Error("unreadable color");
+    // 12% of #b46e00 over white: 255 + (180 - 255) * 0.12 = 246, 255 + (110 - 255) * 0.12 = 237.6, 255 * 0.88 = 224.4.
+    expect(formatHex(paintOver(top, 0.12, under))).toBe("#f6eee0");
   });
 });
