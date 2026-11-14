@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import { allowPageError, expect, test } from "./support/test";
 
 import { largePhoto } from "./support/photos";
 
@@ -17,6 +18,7 @@ const editor = (page: Page) => page.getByRole("textbox", { name: "Artifact conte
 const savedMarkdown = (page: Page) => page.getByTestId("fixture-markdown");
 
 async function openFixture(page: Page) {
+  allowPageError("/dev/missing-file/", "The fixture shows a file that does not exist, so its image fails to load on purpose.");
   await page.goto("/dev/editor?kind=media");
   await page.waitForLoadState("networkidle");
   await expect(editor(page).getByRole("heading", { name: "Media fixture" })).toBeVisible();

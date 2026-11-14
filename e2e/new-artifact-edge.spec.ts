@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import { allowPageError, expect, test } from "./support/test";
 
 /**
  * The New artifact page's harder cases, on /dev/workspace: files removed or
@@ -22,6 +23,7 @@ const attachPartial = "Some files could not be added. The Files section shows th
 const attachUnknownStale = "We could not confirm the files were added. Reload the page and check Files before adding them again.";
 
 async function openNewArtifact(page: Page) {
+  allowPageError("/api/files/", "The /dev/workspace stand-in keeps uploads in the tab, so the file route, which has no database here, cannot serve them.");
   await page.goto("/dev/workspace");
   await expect(page.locator("[data-slot=artifact-list] li").first()).toBeVisible();
   await page.evaluate(() => { window.sessionStorage.clear(); });

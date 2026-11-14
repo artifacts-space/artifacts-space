@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { allowPageError, expect, test } from "./support/test";
 
 import { UNDELIVERABLE_ADDRESS_CODE, UNDELIVERABLE_ADDRESS_MESSAGE } from "../src/lib/auth/undeliverable-address";
 
@@ -14,6 +15,7 @@ import { UNDELIVERABLE_ADDRESS_CODE, UNDELIVERABLE_ADDRESS_MESSAGE } from "../sr
 /** Answers every sign-in link request with the server's undeliverable refusal, and records what was asked. */
 async function refuseAddresses(page: Page) {
   const asked: unknown[] = [];
+  allowPageError("/api/auth/sign-in/magic-link", "The test answers the sign-in link request with the undeliverable refusal on purpose.");
   await page.route("**/api/auth/sign-in/magic-link", async (route) => {
     asked.push(route.request().postDataJSON());
     await route.fulfill({ status: 422, json: { code: UNDELIVERABLE_ADDRESS_CODE, message: UNDELIVERABLE_ADDRESS_MESSAGE } });

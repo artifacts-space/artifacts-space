@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
 import { card, highlighted, pointOn } from "./support/inline-comments";

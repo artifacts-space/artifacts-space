@@ -1,4 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 const endpoint = "https://artifacts.space/api/mcp";
 const clients = ["Claude Code", "Cursor", "Claude Desktop and claude.ai", "ChatGPT", "Codex", "Grok Bot", "OpenCode", "Devin", "Kimi Code CLI", "fx", "Other clients"];

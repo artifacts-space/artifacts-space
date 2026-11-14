@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { allowPageError, expect, test } from "./support/test";
 
 /**
  * Replace in the Files section: a new upload takes a file's place under the
@@ -16,6 +17,7 @@ const body = (page: Page) => page.getByRole("region", { name: "Content" });
 const filesSection = (page: Page) => page.locator("[data-slot=attached-files]");
 
 async function openNewArtifact(page: Page) {
+  allowPageError("/api/files/", "The /dev/workspace stand-in keeps uploads in the tab, so the file route, which has no database here, cannot serve them.");
   await page.goto("/dev/workspace");
   await expect(page.locator("[data-slot=artifact-list] li").first()).toBeVisible();
   await page.evaluate(() => { window.sessionStorage.clear(); });

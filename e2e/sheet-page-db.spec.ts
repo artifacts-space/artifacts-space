@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { cleanUp, createTestArtifact, createTestUser, localDatabaseEnabled, localDatabaseSkipReason } from "./support/local-db";
 

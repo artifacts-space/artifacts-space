@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 /*
  * Signed-in visitors skip the landing and sign-in pages (src/proxy.ts and

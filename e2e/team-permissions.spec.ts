@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 /**
  * The Permissions tab on /dev/team: the role matrix, locked cells, the New

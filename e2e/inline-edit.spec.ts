@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { closeInlineEditDb, saveAsAgent, saveAsSomeoneElse, storedText, versionKinds, versionSources } from "./support/inline-edit-db";
 import { cleanUp, createTestArtifact, localDatabaseEnabled, localDatabaseSkipReason, readyDevUser } from "./support/local-db";

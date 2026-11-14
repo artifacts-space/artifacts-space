@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { allowPageError, expect, test } from "./support/test";
 
 import { cleanUp, devUserId, localDatabaseEnabled, localDatabaseSkipReason } from "./support/local-db";
 import { cleanUpReplacedFiles, seedReplacedFile, type ReplacedFileSeed } from "./support/replace-file-db";
@@ -28,6 +29,7 @@ test("should show the replace in History and offer the old copy only to people w
   await signIn(page);
   const seed = await seedReplacedFile(await devUserId(), `Replaced file ${testInfo.project.name}`);
   seeds.push(seed);
+  allowPageError(`/api/files/${seed.fileId}`, "The seeded file and its old copy have no stored object in the e2e environment, so the file route cannot serve them.");
   await page.goto(`/artifact/${seed.publicId}`);
 
   await page.getByRole("banner").getByRole("button", { name: "More actions" }).click();

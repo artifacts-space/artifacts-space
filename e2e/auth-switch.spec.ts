@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 test("should keep the start-a-team destination when the person switches between sign up and sign in", async ({ page }) => {
   await page.goto("/sign-up?next=%2Fteams%2Fnew");

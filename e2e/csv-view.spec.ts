@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 test("should sort and filter the CSV preview without changing the file when a reader uses the header and search", async ({ page }) => {
   await page.goto("/preview");

@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import type { APIRequestContext } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { OG_DESCRIPTION, OG_WORDMARK } from "../src/lib/site-copy";
 

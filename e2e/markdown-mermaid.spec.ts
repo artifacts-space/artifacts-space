@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 /*
  * Mermaid diagrams in Markdown documents, on the dev fixture (/dev/mermaid,
@@ -42,8 +43,6 @@ async function svgOf(page: Page, src: string | null): Promise<string> {
 }
 
 test("should draw a fenced mermaid block as an SVG diagram that fits the page when a document has one", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
   await openFixture(page);
 
   const drawn = readDiagrams(page).first();
@@ -62,7 +61,6 @@ test("should draw a fenced mermaid block as an SVG diagram that fits the page wh
   await expect(readView(page).locator("[data-code-block]").filter({ hasText: "const answer = 42;" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
-  expect(errors).toEqual([]);
 });
 
 test("should show the source with a short note when a diagram cannot be drawn", async ({ page }) => {

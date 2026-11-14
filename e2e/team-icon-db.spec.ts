@@ -1,4 +1,5 @@
-import { expect, request as playwrightRequest, test, type Locator, type Page, type Request } from "@playwright/test";
+import { request as playwrightRequest, type Locator, type Page, type Request } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { createTestTeam, deleteTestTeams, localDatabaseEnabled, readyDevUser, setTeamRole } from "./support/local-db";
 import { closeTeamIconDb, localStorageEnabled, localStorageSkipReason, storedObjectExists, teamLogoOf } from "./support/team-icon-db";

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 /**
  * The Views dialog (the gallery's "views dialog" specimen, the same dialog

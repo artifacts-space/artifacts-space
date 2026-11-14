@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 /**
  * A ThemeScope that follows the reader's light or dark choice (the gallery's
@@ -6,16 +6,11 @@ import { expect, test } from "@playwright/test";
  * light-dark() pairs, resolved by the inherited color-scheme.
  */
 test("should follow the site mode and draw diagrams in theme colors when a scope is not locked", async ({ browser }) => {
-  const errors: string[] = [];
   const readings: Record<string, { scope: string; backdrop: string; page: string; diagram: string | null }> = {};
   for (const theme of ["light", "dark"] as const) {
     // A fresh context per mode, so the stored site theme starts clean.
     const context = await browser.newContext();
     const page = await context.newPage();
-    page.on("pageerror", (error) => errors.push(error.message));
-    page.on("console", (message) => {
-      if (message.type() === "error") errors.push(message.text().slice(0, 500));
-    });
     // Top frame only: the gallery's file stand-ins are data: frames, which have no storage.
     await page.addInitScript((value) => { if (window === window.top) window.localStorage.setItem("theme", value); }, theme);
     await page.goto("/dev/components#themes");
@@ -39,5 +34,4 @@ test("should follow the site mode and draw diagrams in theme colors when a scope
   expect(light.backdrop).not.toBe(dark.backdrop);
   expect(light.diagram).toBeTruthy();
   expect(light.diagram).not.toBe(dark.diagram);
-  expect(errors).toEqual([]);
 });

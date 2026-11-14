@@ -1,4 +1,5 @@
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 /**
  * Columns in the spreadsheet grid: drag a header's edge to resize it and

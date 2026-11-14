@@ -1,4 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 /** True when the page itself scrolls sideways. */
 async function pageScrollsSideways(page: Page): Promise<boolean> {

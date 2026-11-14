@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { allowPageError, expect, test } from "./support/test";
 
 /**
  * The Team icon control and the icon in the team header, on /dev/team with
@@ -33,6 +34,7 @@ test("should show the image with replace and remove when the team has an icon", 
 });
 
 test("should show the team's pixel avatar instead when its icon cannot load", async ({ page }) => {
+  allowPageError("dev-fixture-missing-team-icon.png", "The fixture's team icon does not exist, so it fails to load on purpose.");
   await page.goto("/dev/team?icon=broken");
   await expect(headerIcon(page)).toHaveAttribute("data-team-icon", "avatar");
   await expect(headerIcon(page).locator("svg")).toHaveAttribute("data-avatar-kind", "team");

@@ -37,6 +37,25 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // Specs take test and expect from the shared fixture, which fails a test on page and console errors.
+    files: ["e2e/**/*.ts"],
+    ignores: ["e2e/support/test.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@playwright/test",
+              importNames: ["test", "expect"],
+              message: "Import test and expect from e2e/support/test.ts, which fails a spec on page and console errors.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Config and script files run outside the app's type program.
     files: ["**/*.mjs", "**/*.cjs"],
     ...tseslint.configs.disableTypeChecked,

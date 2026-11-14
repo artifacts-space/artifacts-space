@@ -1,5 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Locator, type Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+
+import { expect } from "./test";
 
 /*
  * Accessibility checks for the e2e specs: axe-core's rules run against a page
