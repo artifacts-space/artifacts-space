@@ -4,7 +4,9 @@ import { expectNoAxeViolations } from "./support/a11y";
 
 /*
  * Color contrast across whole pages, in light and in dark: every text color
- * on every surface it sits on reads at WCAG AA. The gallery holds each
+ * axe can judge reads at WCAG AA on the surface it sits on. Text axe cannot
+ * judge (over a chart, or partly covered by a sticky edge) is listed on the
+ * test as an annotation, not failed. The gallery holds each
  * interface block in each tone (badges, callouts, board labels, calendar
  * events), the MCP reference holds the write badges, the "required" labels
  * and code comments, a component page holds a live example, and the landing
@@ -35,9 +37,9 @@ for (const scheme of ["light", "dark"] as const) {
         await page.goto(path);
         await expect(page.locator("html")).toHaveClass(scheme === "dark" ? /(^|\s)dark(\s|$)/ : /^(?!.*(^|\s)dark(\s|$))/);
         await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
-        // Fonts and lazy pieces settle before colors are read.
-        await page.waitForLoadState("networkidle");
-        await expectNoAxeViolations(page, { only: ["color-contrast"] });
+        await page.evaluate(() => document.fonts.ready);
+        // A piece that paints late (a chart, a lazy block) is read again once it has its final colors.
+        await expect(async () => { await expectNoAxeViolations(page, { only: ["color-contrast"] }); }).toPass({ timeout: 20_000 });
       });
     }
   });

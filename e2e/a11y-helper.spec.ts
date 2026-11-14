@@ -36,3 +36,16 @@ test("should leave every other rule out when the scan is told to run one alone",
   await page.setContent(`<main id="scan">${unnamedButton}</main>`);
   await expectNoAxeViolations(page.locator("#scan"), { only: ["color-contrast"] });
 });
+
+test("should not run a rule skipped on some nodes when the scan is told to run another alone", async ({ page }) => {
+  await page.setContent(`<main id="scan"><div class="skip-zone">${unnamedButton}</div></main>`);
+  await expectNoAxeViolations(page.locator("#scan"), { only: ["color-contrast"], skip: skipOnZone });
+});
+
+test("should list what a rule could not judge on the test when the scan runs it alone", async ({ page }) => {
+  // Text over a background image: axe cannot read the backdrop, so the node is neither a pass nor a violation.
+  const pixel = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  await page.setContent(`<main id="scan"><p style="background-image: url(${pixel}); color: #777777">Over an image</p></main>`);
+  await expectNoAxeViolations(page.locator("#scan"), { only: ["color-contrast"] });
+  expect(test.info().annotations.filter((note) => note.type === "axe could not judge").map((note) => note.description).join(" ")).toContain("color-contrast on 1 node(s)");
+});

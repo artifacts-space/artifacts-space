@@ -273,6 +273,9 @@ export default function ThemesPage() {
       <Note title="Code colors">
         Syntax colors come from the theme. You do not set them. Each reaches {String(syntaxMinimum.keyword)}:1 on the theme&apos;s code background, comments and punctuation included.
       </Note>
+      <Note title="Status colors">
+        The info, success, warning, and danger colors of badges, callouts, and labels come from the theme too. Each keeps the site&apos;s hue, and its lightness changes until it reaches 4.5:1 on the theme&apos;s card, page, and quieter surfaces, and on its own tint over them. So a warning badge can be a little darker or lighter in one theme than in another.
+      </Note>
       <Note title="Focus ring">
         The focus ring comes from the theme too. It is the site&apos;s blue, and its lightness changes until it reaches 3:1 on the theme&apos;s card, page, and quieter surfaces. Most themes keep the site&apos;s blue exactly. A theme whose card is near the lightness limit gets a darker or lighter blue, so a focused control stays easy to see.
       </Note>

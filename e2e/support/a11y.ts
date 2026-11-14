@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Locator, Page } from "@playwright/test";
 
-import { expect } from "./test";
+import { expect, test } from "./test";
 
 /*
  * Accessibility checks for the e2e specs: axe-core's rules run against a page
@@ -27,7 +27,13 @@ interface ScanOptions {
    * Prefer the narrower form; name the reason; never skip silently.
    */
   skip?: SkippedRules;
-  /** Run only these rules, for a scan about one thing (color contrast across a whole page). Skips still apply. */
+  /**
+   * Run only these rules, for a scan about one thing (color contrast across a
+   * whole page). Skips still apply, and a rule skipped on some nodes runs
+   * only when it is one of these. Nodes axe could not judge (text over an
+   * image, or partly covered) do not fail the scan: they are listed on the
+   * test as an "axe could not judge" annotation, so the gap shows in the report.
+   */
   only?: readonly string[];
 }
 
@@ -100,8 +106,22 @@ async function withoutNodesOn(page: Page, violations: readonly Violation[], sele
 }
 
 /**
+ * Records, on the running test, the nodes a rule could not judge either way
+ * (axe's `incomplete`): the rule, how many, and the first few selectors. A
+ * scan passes without them, so the report says what it did not prove.
+ */
+function noteUnjudged(page: Page, incomplete: readonly Violation[]): void {
+  for (const entry of incomplete) {
+    if (entry.nodes.length === 0) continue;
+    const first = entry.nodes.slice(0, 5).map((node) => node.target.map(String).join(" >> "));
+    test.info().annotations.push({ type: "axe could not judge", description: `${entry.id} on ${String(entry.nodes.length)} node(s) at ${page.url()}: ${first.join("; ")}` });
+  }
+}
+
+/**
  * Runs every rule but the skipped ones (and, on a part, the page-structure
- * ones), then each rule skipped only on some nodes, everywhere but there.
+ * ones), or only the rules in `only`, then each rule skipped only on some
+ * nodes, everywhere but there.
  */
 async function runRules(page: Page, token: string | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<Violation[]> {
   const entries = Object.entries(skip);
@@ -109,10 +129,11 @@ async function runRules(page: Page, token: string | null, skip: SkippedRules, on
   const left = [...(token ? pageStructureRules : []), ...skipped];
   const scan = only ? builder(page, token).withRules(only.filter((rule) => !left.includes(rule))) : builder(page, token).disableRules(left);
   const main = await scan.analyze();
+  if (only) noteUnjudged(page, main.incomplete);
   const violations: Violation[] = [...main.violations];
   // One after another: axe cannot run twice at once in a page.
   for (const [rule, why] of entries) {
-    if (typeof why === "string") continue;
+    if (typeof why === "string" || (only && !only.includes(rule))) continue;
     const narrowed = await builder(page, token).withRules([rule]).analyze();
     violations.push(...(await withoutNodesOn(page, narrowed.violations, why.on)));
   }
