@@ -543,7 +543,12 @@ catch this, so test the generated SQL with `.toSQL()`, as
   (`skip: { "<rule>": { on: "<selector>", reason: "<why>" } }`, or
   `{ "<rule>": "<why>" }` for the whole scan), and record it in the pull
   request. Contrast findings are design decisions: report them, never change
-  tokens to pass.
+  tokens to pass. `e2e/a11y-contrast.spec.ts` scans the gallery, the MCP
+  reference, a component page, and the landing page for color contrast alone,
+  in light and in dark. Status tones (`--tone-*`) and code syntax colors hold
+  4.5:1 by rule on every surface they sit on, tints included (`toneTokens`
+  and `syntaxTokens` in `src/lib/themes/derive.ts`, which themes use too), so
+  a new tint strength or surface under a tone goes into that rule.
 
 ### Page column
 

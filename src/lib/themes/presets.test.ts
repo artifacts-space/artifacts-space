@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { contrastIssues } from "./contrast";
-import { mentionTokens, paletteTokens, switchOffHover, switchOnHover, switchTokens, syntaxTokens } from "./derive";
-import { contrastRatio, mixOklch, normalizeColor, parseColor, type Oklch } from "./color";
+import { mentionTokens, paletteTokens, switchOffHover, switchOnHover, switchTokens, syntaxMinimum, syntaxTokens, toneTintMax, toneTokens } from "./derive";
+import { contrastRatio, mixOklch, normalizeColor, paintOver, parseColor, type Oklch } from "./color";
 import { themePresets } from "./presets";
 import { builtInPresets } from "./resolve";
 import { parseTheme, type ThemeColors } from "./schema";
@@ -87,9 +87,8 @@ describe("theme presets", () => {
         const code = parseColor(tokens["--code"] ?? "");
         if (!code) throw new Error("no code surface");
         for (const [name, value] of Object.entries(syntaxTokens(mode, code))) {
-          const minimum = name.endsWith("comment") || name.endsWith("punctuation") ? 3 : 4.5;
           const color = parseColor(value);
-          expect(color && contrastRatio(color, code), `${id} ${mode} ${name}`).toBeGreaterThanOrEqual(minimum);
+          expect(color && contrastRatio(color, code), `${id} ${mode} ${name}`).toBeGreaterThanOrEqual(4.5);
         }
       }
     }
@@ -217,9 +216,43 @@ describe("the Default preset", () => {
       for (const [name, derived] of Object.entries(syntaxTokens(mode, code))) {
         const original = siteColor(mode, name);
         const color = parseColor(original ?? "");
-        const minimum = name.endsWith("comment") || name.endsWith("punctuation") ? 3 : 4.5;
-        if (color && contrastRatio(color, code) >= minimum + 0.05) expect(derived, `${mode} ${name}`).toBe(original);
-        else expect(original, `${mode} ${name}`).not.toBeNull();
+        // Every site syntax color, comments and punctuation included, reads at AA on the site's code surface, so none is re-lit.
+        expect(color && contrastRatio(color, code), `${mode} ${name}`).toBeGreaterThanOrEqual(4.55);
+        expect(derived, `${mode} ${name}`).toBe(original);
+      }
+    }
+  });
+});
+
+describe("status tones", () => {
+  it("should hold every syntax role to 4.5:1 when listing the minimums", () => {
+    expect(new Set(Object.values(syntaxMinimum))).toEqual(new Set([4.5]));
+  });
+
+  it("should reproduce the site tones in globals.css when deriving them from the Default preset", () => {
+    const preset = builtInPresets().get("default");
+    if (!preset) throw new Error("default preset missing");
+    for (const mode of ["light", "dark"] as const) {
+      for (const [name, value] of Object.entries(toneTokens(mode, preset.theme[mode]))) {
+        expect(value, `${mode} ${name}`).toBe(siteColor(mode, name));
+      }
+    }
+  });
+
+  it("should read at 4.5:1 on every preset's surfaces and on the tone's own tint over each, in both modes", () => {
+    for (const [id, preset] of builtInPresets()) {
+      for (const mode of ["light", "dark"] as const) {
+        const tokens = paletteTokens(mode, preset.theme[mode]);
+        for (const tone of ["info", "success", "warning", "danger"]) {
+          const text = parseColor(tokens[`--tone-${tone}`] ?? "");
+          if (!text) throw new Error(`${id} ${mode} has no --tone-${tone}`);
+          for (const surfaceName of ["--card", "--background", "--secondary", "--muted", "--accent"]) {
+            const surface = parseColor(tokens[surfaceName] ?? "");
+            if (!surface) throw new Error(`${id} ${mode} has no ${surfaceName}`);
+            expect(contrastRatio(text, surface), `${id} ${mode} ${tone} on ${surfaceName}`).toBeGreaterThanOrEqual(4.5);
+            expect(contrastRatio(text, paintOver(text, toneTintMax, surface)), `${id} ${mode} ${tone} on its tint over ${surfaceName}`).toBeGreaterThanOrEqual(4.5);
+          }
+        }
       }
     }
   });

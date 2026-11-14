@@ -18,7 +18,7 @@ function EventPill({ entry }: { entry: CalendarEntry }) {
   const time = entry.allDay || entry.startMinute === null ? null : formatClock(entry.startMinute);
   return (
     <li title={entry.title} className={cn("truncate rounded-sm border px-1 text-xs leading-4", badgeTone[entry.tone ?? "neutral"])}>
-      {time ? <span className="mr-1 opacity-75 tabular-nums">{time}</span> : null}
+      {time ? <span className="mr-1 tabular-nums">{time}</span> : null}
       {entry.title}
     </li>
   );
