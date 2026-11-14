@@ -129,7 +129,7 @@ test("should show an artifact's custom theme as Custom, copy it, and let only ow
 
   await page.goto(`/artifact/${publicId}`);
   await page.getByRole("button", { name: "Theme: Custom. Change theme" }).click();
-  await expect(page.getByRole("radio", { name: "Custom: this artifact's own theme" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("option", { name: "Custom: this artifact's own theme" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("note").filter({ hasText: "has its own theme" })).toBeVisible();
   await page.getByRole("button", { name: "Copy theme JSON" }).click();
   await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
@@ -148,7 +148,7 @@ test("should show an artifact's custom theme as Custom, copy it, and let only ow
   // The artifact keeps its own theme, and the new preset is on offer.
   await page.reload();
   await page.getByRole("button", { name: "Theme: Custom. Change theme" }).click();
-  await expect(page.getByRole("radio", { name: new RegExp(`^${name}:`) })).toBeVisible();
+  await expect(page.getByRole("option", { name: new RegExp(`^${name}:`) })).toBeVisible();
 
   // A plain member can copy the theme but not save presets.
   await setTeamRole(team.id, userId, "member");

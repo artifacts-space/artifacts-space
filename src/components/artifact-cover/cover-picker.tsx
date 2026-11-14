@@ -33,8 +33,9 @@ interface CoverPickerProps {
 }
 
 /**
- * The gradients as one radio group: a single tab stop, arrow keys, Home, and
- * End move between swatches, and Enter or Space picks one.
+ * The gradients as one listbox: a single tab stop, arrow keys, Home, and End
+ * move focus between swatches without changing the cover, and Enter, Space,
+ * or a click picks one and closes the picker.
  */
 function GradientGrid({ selected, onSelect }: { selected: string | null; onSelect: (id: string) => void }) {
   const cells = useRef<(HTMLButtonElement | null)[]>([]);
@@ -49,14 +50,14 @@ function GradientGrid({ selected, onSelect }: { selected: string | null; onSelec
   }
 
   return (
-    <div role="radiogroup" aria-label="Cover gradient" className="grid grid-cols-4 gap-2 p-3">
+    <div role="listbox" aria-label="Cover gradient" className="grid grid-cols-4 gap-2 p-3">
       {coverGradients.map((gradient, index) => (
         <button
           key={gradient.id}
           ref={(node) => { cells.current[index] = node; }}
           type="button"
-          role="radio"
-          aria-checked={gradient.id === selected}
+          role="option"
+          aria-selected={gradient.id === selected}
           aria-label={gradient.name}
           title={gradient.name}
           tabIndex={index === active ? 0 : -1}

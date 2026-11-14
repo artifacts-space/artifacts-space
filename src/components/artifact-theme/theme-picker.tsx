@@ -39,9 +39,10 @@ interface SwatchGridProps {
 }
 
 /**
- * Every option as one radio group: a single tab stop, arrow keys, Home, and
- * End move between swatches, and Enter or Space picks one. Group headings
- * (Team default, each team, Built-in) span the grid.
+ * Every option as one listbox: a single tab stop, arrow keys, Home, and End
+ * move focus between swatches without changing the theme, and Enter, Space,
+ * or a click picks one and closes the picker. Group headings (Team default,
+ * each team, Built-in) span the grid.
  */
 function SwatchGrid({ options, selected, onSelect }: SwatchGridProps) {
   const cells = useRef<(HTMLButtonElement | null)[]>([]);
@@ -57,7 +58,7 @@ function SwatchGrid({ options, selected, onSelect }: SwatchGridProps) {
   }
 
   return (
-    <div role="radiogroup" aria-label="Artifact theme" className="grid max-h-[min(60dvh,32rem)] grid-cols-2 gap-2 overflow-y-auto overscroll-contain p-2">
+    <div role="listbox" aria-label="Artifact theme" className="grid max-h-[min(60dvh,32rem)] grid-cols-2 gap-2 overflow-y-auto overscroll-contain p-2">
       {options.map((option, index) => {
         const checked = option.key === selected;
         return (
@@ -66,8 +67,8 @@ function SwatchGrid({ options, selected, onSelect }: SwatchGridProps) {
             <button
               ref={(node) => { cells.current[index] = node; }}
               type="button"
-              role="radio"
-              aria-checked={checked}
+              role="option"
+              aria-selected={checked}
               aria-label={option.label}
               title={option.label}
               tabIndex={index === active ? 0 : -1}

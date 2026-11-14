@@ -44,12 +44,14 @@ export function WorkspaceSwitcher({ teams, scopeTeam, listPath, viewerId }: Work
     <DropdownMenu>
       <DropdownMenuTrigger
         render={<button type="button" />}
-        aria-label={`Workspace: ${name}. Switch workspace`}
+        aria-label={`Workspace: ${name}, ${kind}. Switch workspace`}
         className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 text-left transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-[popup-open]:bg-muted"
       >
         <TeamIcon team={scopeTeam} viewerId={viewerId} size={32} />
         <span className="min-w-0 flex-1">
           <span data-slot="workspace-name" className="block truncate text-md font-medium">{name}</span>
+          {/* The visible text reads "Your artifacts Personal workspace", in the label word for word. */}
+          {" "}
           <span className="block truncate text-xs text-muted-foreground">{kind}</span>
         </span>
         <IconSelector aria-hidden className="size-4 shrink-0 text-muted-foreground" />

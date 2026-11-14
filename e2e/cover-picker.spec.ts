@@ -11,10 +11,10 @@ test("should show a gradient cover picked with the keyboard, in each theme", asy
   const specimen = page.locator('[data-specimen="cover picker"]');
   await specimen.getByRole("button", { name: "Cover: No cover" }).click();
 
-  const group = page.getByRole("radiogroup", { name: "Cover gradient" });
-  await expect(group.getByRole("radio", { name: "Stone" })).toBeFocused();
+  const group = page.getByRole("listbox", { name: "Cover gradient" });
+  await expect(group.getByRole("option", { name: "Stone" })).toBeFocused();
   await page.keyboard.press("ArrowRight");
-  await expect(group.getByRole("radio", { name: "Mist" })).toBeFocused();
+  await expect(group.getByRole("option", { name: "Mist" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(group).toBeHidden();
 
@@ -35,7 +35,7 @@ test("should show a gradient cover picked with the keyboard, in each theme", asy
   expect(inDefault).not.toBe(inOcean);
 
   await specimen.getByRole("button", { name: "Cover: Mist" }).click();
-  await expect(page.getByRole("radio", { name: "Mist" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("option", { name: "Mist" })).toHaveAttribute("aria-selected", "true");
   await page.getByRole("button", { name: "Remove cover" }).click();
   await expect(covers).toHaveCount(0);
 });

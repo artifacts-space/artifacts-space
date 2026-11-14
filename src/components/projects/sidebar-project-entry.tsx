@@ -132,6 +132,8 @@ export function DropRow({ blocked = false, label, icon, count, active, disclosur
       >
         {icon}
         <span className="min-w-0 flex-1 truncate">{label}</span>
+        {/* A space between the name and the count, so the visible text reads "Design 2", as the label begins. */}
+        {" "}
         <span className={cn("shrink-0 text-xs text-muted-foreground tabular-nums", children ? "pr-6 pointer-coarse:pr-11" : "pr-1.5")}>{count}</span>
       </button>
       {children}

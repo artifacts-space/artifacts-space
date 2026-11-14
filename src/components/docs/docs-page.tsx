@@ -64,7 +64,7 @@ export function DocsPage({ href, eyebrow, title, description, source, headings, 
         </footer>
       </article>
       {showToc ? (
-        <aside className="hidden w-56 shrink-0 xl:block">
+        <aside aria-label="On this page" className="hidden w-56 shrink-0 xl:block">
           <div className="sticky top-14 max-h-[calc(100dvh-3.5rem)] overflow-y-auto overscroll-contain pt-10 pb-10">
             <DocsToc headings={headings} />
           </div>

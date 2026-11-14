@@ -42,7 +42,7 @@ export default function DocsLayout({ children }: LayoutProps<"/docs">) {
     <div className="flex min-h-screen flex-col">
       <DocsHeader />
       <div className="mx-auto flex w-full max-w-[1440px] flex-1 px-4 sm:px-6">
-        <aside className="hidden w-60 shrink-0 lg:block">
+        <aside aria-label="Docs" className="hidden w-60 shrink-0 lg:block">
           <div className="sticky top-14 h-[calc(100dvh-3.5rem)] overflow-y-auto overscroll-contain py-8 pr-6">
             <DocsSidebar tree={tree} />
           </div>

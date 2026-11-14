@@ -37,12 +37,12 @@ async function readAll(page: Page): Promise<Map<Part, ColorReading>> {
 
 async function pickTheme(page: Page, next: string) {
   const specimen = page.locator('[data-specimen="artifact page chrome"]');
-  const group = page.getByRole("radiogroup", { name: "Artifact theme" });
+  const group = page.getByRole("listbox", { name: "Artifact theme" });
   // A click that lands while the picker is still opening can miss, so open and pick again until the page shows it.
   // A pick can also land after its check timed out: the button then names the new theme, so a retry finds it by its prefix.
   await expect(async () => {
     if (!(await group.isVisible())) await specimen.getByRole("button", { name: /^Page theme: / }).click({ timeout: 2_000 });
-    await group.getByRole("radio", { name: new RegExp(`^${next}:`) }).click({ timeout: 2_000 });
+    await group.getByRole("option", { name: new RegExp(`^${next}:`) }).click({ timeout: 2_000 });
     await expect(specimen.locator("[data-page-theme]")).toHaveAttribute("data-page-theme", next.toLowerCase(), { timeout: 2_000 });
   }).toPass({ timeout: 15_000 });
   await expect(specimen.getByRole("button", { name: `Page theme: ${next}`, exact: true }), "the picker names the theme in use").toBeVisible();

@@ -519,6 +519,18 @@ catch this, so test the generated SQL with `.toSQL()`, as
   production HTML (for example, that theme fonts are never preloaded on pages
   that do not use them). CI splits it with `--shard=<i>/<n>`; run one shard
   locally the same way.
+- Accessibility: `e2e/a11y-*.spec.ts` run axe (`@axe-core/playwright`) with
+  `expectNoAxeViolations` from `e2e/support/a11y.ts`, which scans a page, or
+  only what a locator matches, and fails listing each rule, its help, and the
+  failing nodes' selectors. Scan a hand-built interactive piece in each state
+  it has (closed, open, empty, an item highlighted, a submenu open), once
+  that state is on screen and the page is interactive, on `desktop` and
+  `phone` when both show it. Pair it with `toMatchAriaSnapshot` where the
+  tree is the point (menus, listboxes, pickers, splitters). A new menu,
+  picker, or composite widget gets a scan. Fix what a scan finds; when the
+  fix is bigger than the change at hand, pass `skip: { "<rule>": "<reason>" }`
+  for that one scan and record it in the pull request. Contrast findings are
+  design decisions: report them, never change tokens to pass.
 
 ### Page column
 

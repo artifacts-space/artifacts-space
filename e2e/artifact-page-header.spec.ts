@@ -173,7 +173,7 @@ test("should tick Full width to match the page when the width changed after the 
   // Someone turns Full width on elsewhere; a theme change then refreshes the page but hands the editor no new copy.
   await setTestFullWidth(publicId, true);
   await page.getByRole("button", { name: "Choose a theme" }).click();
-  await page.getByRole("radiogroup", { name: "Artifact theme" }).getByRole("radio", { name: /^Paper:/ }).click();
+  await page.getByRole("listbox", { name: "Artifact theme" }).getByRole("option", { name: /^Paper:/ }).click();
   await expect(page.locator("main")).toHaveAttribute("data-full-width", "true");
 
   await page.keyboard.press("Escape");
@@ -336,7 +336,7 @@ test("should restore from History right after a theme change, and still refuse w
 
   // A theme saves through its own action and moves the artifact's save time past the editor's copy.
   await page.getByRole("button", { name: "Choose a theme" }).click();
-  await page.getByRole("radiogroup", { name: "Artifact theme" }).getByRole("radio", { name: /^Paper:/ }).click();
+  await page.getByRole("listbox", { name: "Artifact theme" }).getByRole("option", { name: /^Paper:/ }).click();
   await expect(page.getByRole("button", { name: "Theme: Paper. Change theme" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-artifact-theme]")).toHaveAttribute("data-artifact-theme", "paper");

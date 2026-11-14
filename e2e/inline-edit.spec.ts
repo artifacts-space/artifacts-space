@@ -186,7 +186,7 @@ const headingPickers = [
   {
     name: "theme",
     open: (page: Page) => page.getByRole("button", { name: "Choose a theme" }).click(),
-    inside: (page: Page) => page.getByRole("radiogroup", { name: "Artifact theme" }),
+    inside: (page: Page) => page.getByRole("listbox", { name: "Artifact theme" }),
   },
   {
     name: "icon",
@@ -199,7 +199,7 @@ const headingPickers = [
       await page.locator("[data-artifact-cover]").hover();
       await page.getByRole("button", { name: "Change cover" }).click();
     },
-    inside: (page: Page) => page.getByRole("radio", { name: "Dusk" }),
+    inside: (page: Page) => page.getByRole("option", { name: "Dusk" }),
   },
 ] as const;
 
@@ -229,6 +229,6 @@ test("should keep the theme, icon, and cover pickers open on the artifact page w
   await page.getByRole("button", { name: "Choose a theme" }).click();
   release();
   await expect(content).toBeVisible();
-  await page.getByRole("radiogroup", { name: "Artifact theme" }).getByRole("radio", { name: /^Paper:/ }).click();
+  await page.getByRole("listbox", { name: "Artifact theme" }).getByRole("option", { name: /^Paper:/ }).click();
   await expect(page.getByRole("button", { name: "Theme: Paper. Change theme" })).toBeVisible();
 });
