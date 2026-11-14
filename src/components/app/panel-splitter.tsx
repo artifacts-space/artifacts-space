@@ -2,8 +2,8 @@
 
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 
-import { applyPanelSize, savePanelSize } from "@/components/app/panel-size-storage";
-import { clampSize, isResetKey, keyboardResize, type PanelSpec, type SizeBounds, type SplitterOrientation } from "@/lib/panel-size-rules";
+import { applyLivePanelSize, applyPanelSize, savePanelSize } from "@/components/app/panel-size-storage";
+import { clampSize, isResetKey, keyboardResize, resizeCursor, type PanelSpec, type SizeBounds, type SplitterOrientation } from "@/lib/panel-size-rules";
 import { cn } from "@/lib/utils";
 
 /** A panel's drawn size and how far it may go, measured from the page. */
@@ -24,6 +24,8 @@ interface PanelSplitterProps {
   measure: () => PanelMeasure | null;
   /** The elements whose size changes move the panel's size or bounds. Called from an effect only. */
   watch: () => readonly (Element | null | undefined)[];
+  /** The element whose layout reads the panel's size, beside the handle itself. Called from events and cleanup only. */
+  layout: () => HTMLElement | null;
   /** What the handle reports before the first measure: the panel's default and its usual bounds. */
   initial: PanelMeasure;
   /** Where the handle sits on its panel's edge. */
@@ -39,8 +41,6 @@ interface Drag {
   /** The size the drag reached; null until the pointer moves. */
   size: number | null;
 }
-
-const cursors: Record<SplitterOrientation, string> = { vertical: "col-resize", horizontal: "row-resize" };
 
 /** The keys that move each kind of handle, for its screen reader hint. */
 const arrowKeys: Record<SplitterOrientation, string> = { vertical: "the Left and Right arrows", horizontal: "the Up and Down arrows" };
@@ -73,12 +73,17 @@ function useMeasured(initial: PanelMeasure, measure: () => PanelMeasure | null, 
  * A handle on the edge between two panels: drag it, or focus it and use the
  * arrow keys (Shift for bigger steps, Home and End for the minimum and
  * maximum), to resize the panel; double-click it or press Enter to go back
- * to the default.
+ * to the default. At its smallest or largest size the cursor points the only
+ * way the handle can still go.
+ * While a drag or a held key moves it, the size is written to the panel's
+ * live property on the handle and its layout element only, so a move never
+ * restyles the page; the size goes to the root and to storage when the move
+ * ends.
  * Sizes are remembered per viewer. It follows the WAI-ARIA window splitter
  * pattern. Shown from lg up only: below that the sidebar stacks over the
  * artifact, and the layout keeps its fixed sizes.
  */
-export function PanelSplitter({ panel, label, controls, orientation, measure, watch, initial, className }: PanelSplitterProps) {
+export function PanelSplitter({ panel, label, controls, orientation, measure, watch, layout, initial, className }: PanelSplitterProps) {
   const { value, setValue, measured } = useMeasured(initial, measure, watch);
   const [dragging, setDragging] = useState(false);
   /**
@@ -88,20 +93,39 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
    */
   const [keyboard, setKeyboard] = useState(false);
   const drag = useRef<Drag | null>(null);
+  const handle = useRef<HTMLDivElement>(null);
   const hintId = useId();
   /** A size set from the keyboard and not yet stored: held keys repeat, so it is stored on key up or blur. */
   const unsaved = useRef<number | null>(null);
 
-  // A handle that leaves mid-drag or mid-keypress (the Projects group closing, the window narrowing past lg)
-  // must not leave its cursor on the page, and must still store a size the keyboard set.
+  /** The elements that read the panel's live size: the handle and its layout element. */
+  function readers() {
+    return [handle.current, layout()];
+  }
+  const liveReaders = useEffectEvent(readers);
+
+  // A handle that leaves mid-drag or mid-keypress (the sidebar hiding, the workspace closing) must not leave
+  // its cursor on the page or a live size on the layout, and must still keep a size the keyboard set.
   useEffect(() => () => {
     if (drag.current) document.documentElement.style.removeProperty("cursor");
-    if (unsaved.current !== null) savePanelSize(panel, unsaved.current);
+    if (unsaved.current !== null) {
+      applyPanelSize(panel, unsaved.current);
+      savePanelSize(panel, unsaved.current);
+    }
+    applyLivePanelSize(panel, liveReaders(), null);
   }, [panel]);
 
+  /** Draws a size while it is still moving: on the readers only, so the page is not restyled. */
   function show(size: number, bounds: SizeBounds) {
-    applyPanelSize(panel, size);
+    applyLivePanelSize(panel, readers(), size);
     setValue({ size, bounds });
+  }
+
+  /** Ends a move: the size goes to the root, where the layout reads it at rest, and to storage. */
+  function commit(size: number) {
+    applyPanelSize(panel, size);
+    applyLivePanelSize(panel, readers(), null);
+    savePanelSize(panel, size);
   }
 
   function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
@@ -115,7 +139,7 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
     event.currentTarget.focus({ preventScroll: true, focusVisible: false });
     setKeyboard(false);
     drag.current = { pointerId: event.pointerId, origin: along(event, orientation), start: now.size, bounds: now.bounds, size: null };
-    document.documentElement.style.cursor = cursors[orientation];
+    document.documentElement.style.cursor = resizeCursor(now.size, now.bounds, orientation);
     setDragging(true);
   }
 
@@ -124,6 +148,9 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
     if (current?.pointerId !== event.pointerId) return;
     current.size = clampSize(current.start + along(event, orientation) - current.origin, current.bounds);
     show(current.size, current.bounds);
+    // The page's cursor changes only when the drag reaches or leaves a limit: a change restyles the page.
+    const cursor = resizeCursor(current.size, current.bounds, orientation);
+    if (document.documentElement.style.cursor !== cursor) document.documentElement.style.cursor = cursor;
   }
 
   function endDrag(event: React.PointerEvent) {
@@ -133,7 +160,7 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
     document.documentElement.style.removeProperty("cursor");
     setDragging(false);
     // A click without a move keeps the default instead of storing it.
-    if (current.size !== null) savePanelSize(panel, current.size);
+    if (current.size !== null) commit(current.size);
   }
 
   function onKeyDown(event: React.KeyboardEvent) {
@@ -165,12 +192,13 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
 
   function saveKeyboardSize() {
     if (unsaved.current === null) return;
-    savePanelSize(panel, unsaved.current);
+    commit(unsaved.current);
     unsaved.current = null;
   }
 
   function reset() {
     unsaved.current = null;
+    applyLivePanelSize(panel, readers(), null);
     applyPanelSize(panel, null);
     savePanelSize(panel, null);
     const now = measure();
@@ -180,6 +208,7 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
   return (
     <>
     <div
+      ref={handle}
       role="separator"
       tabIndex={0}
       aria-label={label}
@@ -205,6 +234,7 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
       onFocus={onFocus}
       onBlur={onBlur}
       onDoubleClick={reset}
+      style={{ cursor: resizeCursor(value.size, value.bounds, orientation) }}
       className={cn(
         "absolute z-20 hidden touch-none select-none outline-none lg:block",
         // The line is the only mark: invisible at rest (the border shows), a quiet bar on hover and while dragging,
@@ -214,8 +244,9 @@ export function PanelSplitter({ panel, label, controls, orientation, measure, wa
         "forced-colors:data-[keyboard]:outline-2 forced-colors:data-[keyboard]:outline-solid",
         orientation === "vertical"
           // A vertical handle sits just past its panel's edge, so its line runs along the handle's start, on the border.
-          ? "cursor-col-resize after:inset-y-0 after:left-0 after:w-0.5 data-[keyboard]:after:w-1"
-          : "cursor-row-resize after:inset-x-0 after:top-1/2 after:h-0.5 after:-translate-y-1/2 data-[keyboard]:after:h-1",
+          // For a finger it starts 8px before the edge, and the line stays on the border.
+          ? "after:inset-y-0 after:left-0 after:w-0.5 data-[keyboard]:after:w-1 pointer-coarse:-translate-x-2 pointer-coarse:after:left-2"
+          : "after:inset-x-0 after:top-1/2 after:h-0.5 after:-translate-y-1/2 data-[keyboard]:after:h-1",
         className,
       )}
     />

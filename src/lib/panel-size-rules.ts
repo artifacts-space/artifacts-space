@@ -17,6 +17,14 @@ export interface PanelSpec {
   storageKey: string;
   /** The CSS custom property, set on the root element, that the layout reads. */
   cssVar: string;
+  /**
+   * The CSS custom property that carries the size while a drag or a held key
+   * moves it. It is registered in `globals.css` as not inherited and set only
+   * on the elements that read it, so a move restyles those elements and not
+   * the whole page, as a change to `cssVar` on the root does. When the move
+   * ends, the size goes to `cssVar` and this property is removed.
+   */
+  liveVar: string;
   /** The size when nothing is stored, and after a double-click reset. */
   defaultSize: number;
   /** The smallest size: the panel's content still fits. */
@@ -33,6 +41,7 @@ export interface PanelSpec {
 export const sidebarPanel = {
   storageKey: "artifacts.space:workspace:sidebar-width",
   cssVar: "--workspace-sidebar-width",
+  liveVar: "--workspace-sidebar-width-live",
   defaultSize: 280,
   min: 272,
   max: 520,
@@ -51,10 +60,10 @@ export const rememberedPanels: readonly PanelSpec[] = [sidebarPanel];
  * stored width never draws the sidebar or the artifact pane past them, even
  * before the handle has measured anything.
  */
-export const sidebarColumns = "lg:[grid-template-columns:clamp(272px,var(--workspace-sidebar-width,280px),520px)_minmax(0,1fr)]";
+export const sidebarColumns = "lg:[grid-template-columns:clamp(272px,var(--workspace-sidebar-width-live,var(--workspace-sidebar-width,280px)),520px)_minmax(0,1fr)]";
 
 /** The sidebar handle's place in the workspace card from lg up: the same clamp as `sidebarColumns`, so it sits on the sidebar's edge. */
-export const sidebarHandleLeft = "lg:left-[clamp(272px,var(--workspace-sidebar-width,280px),520px)]";
+export const sidebarHandleLeft = "lg:left-[clamp(272px,var(--workspace-sidebar-width-live,var(--workspace-sidebar-width,280px)),520px)]";
 
 /** One arrow press moves a handle this far; with Shift held, `bigStep`. */
 export const step = 16;
@@ -91,6 +100,22 @@ export function keyboardResize(key: string, shiftKey: boolean, current: number, 
   if (key === grows[orientation]) return clampSize(current + amount, bounds);
   if (key === shrinks[orientation]) return clampSize(current - amount, bounds);
   return null;
+}
+
+const bothWays: Record<SplitterOrientation, string> = { vertical: "col-resize", horizontal: "row-resize" };
+const growsOnly: Record<SplitterOrientation, string> = { vertical: "e-resize", horizontal: "s-resize" };
+const shrinksOnly: Record<SplitterOrientation, string> = { vertical: "w-resize", horizontal: "n-resize" };
+
+/**
+ * The cursor for a handle: the two-way resize cursor, or at a limit the
+ * one-way cursor for the only direction the handle can still go. Bounds
+ * that leave no room keep the two-way cursor.
+ */
+export function resizeCursor(size: number, bounds: SizeBounds, orientation: SplitterOrientation): string {
+  const atMin = size <= bounds.min;
+  const atMax = size >= bounds.max;
+  if (atMin === atMax) return bothWays[orientation];
+  return atMin ? growsOnly[orientation] : shrinksOnly[orientation];
 }
 
 /** True for the key that puts a panel back at its default size, as a double-click does. */
