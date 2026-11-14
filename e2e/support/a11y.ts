@@ -86,14 +86,15 @@ function builder(page: Page, token: string | null): AxeBuilder {
 }
 
 /**
- * Drops the failing nodes that `selector` matches themselves, and any
- * violation left with none. A node inside a match is still reported. Filtered
- * after the run, because axe's own `exclude` cannot take out a node the scan
- * was told to include.
+ * Drops the nodes that `selector` matches themselves, and any entry left
+ * with none, from axe results of either kind (violations, or nodes a rule
+ * could not judge). A node inside a match is kept. Filtered after the run,
+ * because axe's own `exclude` cannot take out a node the scan was told to
+ * include.
  */
-async function withoutNodesOn(page: Page, violations: readonly Violation[], selector: string): Promise<Violation[]> {
+async function withoutNodesOn(page: Page, entries: readonly Violation[], selector: string): Promise<Violation[]> {
   const kept: Violation[] = [];
-  for (const violation of violations) {
+  for (const violation of entries) {
     const targets = violation.nodes.map((node) => {
       const last = node.target.at(-1);
       return typeof last === "string" ? last : "";
@@ -128,35 +129,60 @@ function noteUnjudged(page: Page, incomplete: readonly Violation[]): void {
 /**
  * The first pass: every rule but `left`, or the rules in `only` that are not
  * in `left`. When `only` names nothing else (its one rule is skipped on some
- * nodes), there is nothing to run here and the narrowed pass does the work.
+ * nodes), there is nothing to run here and the narrowed pass does the work;
+ * `ran` says how many rules this pass ran, so a scan that runs none can fail.
  */
-async function mainPass(page: Page, token: string | null, left: readonly string[], only: readonly string[] | undefined): Promise<{ violations: Violation[]; incomplete: Violation[] }> {
-  if (!only) return builder(page, token).disableRules([...left]).analyze();
+async function mainPass(page: Page, token: string | null, left: readonly string[], only: readonly string[] | undefined): Promise<{ violations: Violation[]; incomplete: Violation[]; ran: number | null }> {
+  if (!only) return { ...(await builder(page, token).disableRules([...left]).analyze()), ran: null };
   const wanted = only.filter((rule) => !left.includes(rule));
-  if (wanted.length === 0) return { violations: [], incomplete: [] };
-  return builder(page, token).withRules(wanted).analyze();
+  if (wanted.length === 0) return { violations: [], incomplete: [], ran: 0 };
+  return { ...(await builder(page, token).withRules(wanted).analyze()), ran: wanted.length };
+}
+
+/** A rule skipped only on some nodes: its id, and where and why it is left out. */
+type NarrowedSkip = readonly [rule: string, why: { readonly on: string; readonly reason: string }];
+
+/** The skips that name nodes and that this scan runs: all of them, or with `only`, the ones `only` names. */
+function narrowedSkips(skip: SkippedRules, only: readonly string[] | undefined): NarrowedSkip[] {
+  const narrowed: NarrowedSkip[] = [];
+  for (const [rule, why] of Object.entries(skip)) {
+    if (typeof why !== "string" && (!only || only.includes(rule))) narrowed.push([rule, why]);
+  }
+  return narrowed;
+}
+
+/**
+ * The second pass: each rule skipped only on some nodes, run everywhere and
+ * kept everywhere but there. With `only`, what the rule could not judge
+ * outside those nodes is recorded here, since the first pass left the rule out.
+ */
+async function narrowedPass(page: Page, token: string | null, skips: readonly NarrowedSkip[], recordUnjudged: boolean): Promise<Violation[]> {
+  const violations: Violation[] = [];
+  // One after another: axe cannot run twice at once in a page.
+  for (const [rule, why] of skips) {
+    const narrowed = await builder(page, token).withRules([rule]).analyze();
+    violations.push(...(await withoutNodesOn(page, narrowed.violations, why.on)));
+    if (recordUnjudged) noteUnjudged(page, await withoutNodesOn(page, narrowed.incomplete, why.on));
+  }
+  return violations;
 }
 
 /**
  * Runs every rule but the skipped ones (and, on a part, the page-structure
  * ones), or only the rules in `only`, then each rule skipped only on some
- * nodes, everywhere but there.
+ * nodes, everywhere but there. A scan left with no rule to run throws: it
+ * would pass having checked nothing.
  */
 async function runRules(page: Page, token: string | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<Violation[]> {
-  const entries = Object.entries(skip);
-  const skipped = entries.map(([rule]) => rule);
-  const main = await mainPass(page, token, [...(token ? pageStructureRules : []), ...skipped], only);
-  if (only) noteUnjudged(page, main.incomplete);
-  const violations: Violation[] = [...main.violations];
-  // One after another: axe cannot run twice at once in a page.
-  for (const [rule, why] of entries) {
-    if (typeof why === "string" || (only && !only.includes(rule))) continue;
-    const narrowed = await builder(page, token).withRules([rule]).analyze();
-    violations.push(...(await withoutNodesOn(page, narrowed.violations, why.on)));
-    // The main pass left this rule out, so what it could not judge outside the skipped nodes is recorded here.
-    if (only) noteUnjudged(page, await withoutNodesOn(page, narrowed.incomplete, why.on));
+  const partOnly = token ? pageStructureRules : [];
+  const main = await mainPass(page, token, [...partOnly, ...Object.keys(skip)], only);
+  const skips = narrowedSkips(skip, only);
+  if (only && main.ran === 0 && skips.length === 0) {
+    const part = token ? ` or is a page-structure rule (${pageStructureRules.join(", ")}) that a scan of a part never runs` : "";
+    throw new Error(`This scan runs no rule: only [${only.join(", ")}] is left out by its skips${part}.`);
   }
-  return violations;
+  if (only) noteUnjudged(page, main.incomplete);
+  return [...main.violations, ...(await narrowedPass(page, token, skips, only !== undefined))];
 }
 
 async function analyze(page: Page, scope: Locator | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<Violation[]> {

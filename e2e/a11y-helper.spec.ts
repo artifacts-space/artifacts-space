@@ -5,8 +5,9 @@ import { expectNoAxeViolations, unjudgedNote } from "./support/a11y";
 /*
  * The axe helper itself (e2e/support/a11y.ts), on inline pages with no
  * server: a rule skipped `{ on }` a selector is left out only on the nodes
- * that selector matches, never on what sits inside them; and a scan told to
- * run `only` some rules reports those and nothing else.
+ * that selector matches, never on what sits inside them; a scan told to run
+ * `only` some rules reports those and nothing else, lists once what they
+ * could not judge, and fails when it is left with no rule to run.
  */
 
 // An icon button with no name fails axe's button-name rule.
@@ -68,12 +69,16 @@ test("should list what a rule could not judge outside the nodes it is skipped on
 
 test("should list an unjudged node once when the same scan runs again, as a retried scan does", async ({ page }) => {
   await page.setContent(`<main id="scan">${overImage()}</main>`);
-  let attempts = 0;
-  await expect(async () => {
-    attempts += 1;
-    await expectNoAxeViolations(page.locator("#scan"), { only: ["color-contrast"] });
-    expect(attempts).toBeGreaterThanOrEqual(3);
-  }).toPass({ timeout: 20_000 });
-  expect(attempts).toBeGreaterThanOrEqual(3);
+  for (let attempt = 0; attempt < 3; attempt += 1) await expectNoAxeViolations(page.locator("#scan"), { only: ["color-contrast"] });
   expect(unjudgedNotes()).toHaveLength(1);
+});
+
+test("should fail when the scan is told to run alone a rule that a scan of a part leaves out", async ({ page }) => {
+  await page.setContent(`<main id="scan">${unnamedButton}</main>`);
+  await expect(expectNoAxeViolations(page.locator("#scan"), { only: ["region"] })).rejects.toThrow(/runs no rule/);
+});
+
+test("should fail when the only rule the scan is told to run is skipped outright", async ({ page }) => {
+  await page.setContent(`<main>${unnamedButton}</main>`);
+  await expect(expectNoAxeViolations(page, { only: ["button-name"], skip: { "button-name": "this test checks a scan left with nothing to run" } })).rejects.toThrow(/runs no rule/);
 });
