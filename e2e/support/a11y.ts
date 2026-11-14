@@ -105,17 +105,36 @@ async function withoutNodesOn(page: Page, violations: readonly Violation[], sele
   return kept;
 }
 
+/** The annotation a scan run with `only` leaves on its test for nodes a rule could not judge. */
+export const unjudgedNote = "axe could not judge";
+
 /**
  * Records, on the running test, the nodes a rule could not judge either way
  * (axe's `incomplete`): the rule, how many, and the first few selectors. A
- * scan passes without them, so the report says what it did not prove.
+ * scan passes without them, so the report says what it did not prove. The
+ * same finding is listed once, however often the scan runs again (a retried
+ * scan reads the same nodes each time).
  */
 function noteUnjudged(page: Page, incomplete: readonly Violation[]): void {
+  const { annotations } = test.info();
   for (const entry of incomplete) {
     if (entry.nodes.length === 0) continue;
     const first = entry.nodes.slice(0, 5).map((node) => node.target.map(String).join(" >> "));
-    test.info().annotations.push({ type: "axe could not judge", description: `${entry.id} on ${String(entry.nodes.length)} node(s) at ${page.url()}: ${first.join("; ")}` });
+    const note = { type: unjudgedNote, description: `${entry.id} on ${String(entry.nodes.length)} node(s) at ${page.url()}: ${first.join("; ")}` };
+    if (!annotations.some((existing) => existing.type === note.type && existing.description === note.description)) annotations.push(note);
   }
+}
+
+/**
+ * The first pass: every rule but `left`, or the rules in `only` that are not
+ * in `left`. When `only` names nothing else (its one rule is skipped on some
+ * nodes), there is nothing to run here and the narrowed pass does the work.
+ */
+async function mainPass(page: Page, token: string | null, left: readonly string[], only: readonly string[] | undefined): Promise<{ violations: Violation[]; incomplete: Violation[] }> {
+  if (!only) return builder(page, token).disableRules([...left]).analyze();
+  const wanted = only.filter((rule) => !left.includes(rule));
+  if (wanted.length === 0) return { violations: [], incomplete: [] };
+  return builder(page, token).withRules(wanted).analyze();
 }
 
 /**
@@ -126,9 +145,7 @@ function noteUnjudged(page: Page, incomplete: readonly Violation[]): void {
 async function runRules(page: Page, token: string | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<Violation[]> {
   const entries = Object.entries(skip);
   const skipped = entries.map(([rule]) => rule);
-  const left = [...(token ? pageStructureRules : []), ...skipped];
-  const scan = only ? builder(page, token).withRules(only.filter((rule) => !left.includes(rule))) : builder(page, token).disableRules(left);
-  const main = await scan.analyze();
+  const main = await mainPass(page, token, [...(token ? pageStructureRules : []), ...skipped], only);
   if (only) noteUnjudged(page, main.incomplete);
   const violations: Violation[] = [...main.violations];
   // One after another: axe cannot run twice at once in a page.
@@ -136,6 +153,8 @@ async function runRules(page: Page, token: string | null, skip: SkippedRules, on
     if (typeof why === "string" || (only && !only.includes(rule))) continue;
     const narrowed = await builder(page, token).withRules([rule]).analyze();
     violations.push(...(await withoutNodesOn(page, narrowed.violations, why.on)));
+    // The main pass left this rule out, so what it could not judge outside the skipped nodes is recorded here.
+    if (only) noteUnjudged(page, await withoutNodesOn(page, narrowed.incomplete, why.on));
   }
   return violations;
 }
