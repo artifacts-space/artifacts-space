@@ -1,8 +1,10 @@
 "use client";
 
 import { IconCalendarEvent, IconUser } from "@tabler/icons-react";
-import { useId, type CSSProperties } from "react";
+import { useId, useRef, type CSSProperties } from "react";
 
+import { scrollStopProps } from "@/components/code/scroll-stop";
+import { useScrollable } from "@/components/code/use-scrollable";
 import { boardLayoutVars } from "@/lib/ui/board-layout";
 import { formatShortDate, parseIsoDate } from "@/lib/ui/calendar-dates";
 import type { UiProps } from "@/lib/ui/catalog";
@@ -103,16 +105,16 @@ function BoardColumn({ column, headingId }: { column: Column; headingId: string 
  */
 export function BoardView({ props }: ViewProps<"Board">) {
   const id = useId();
-  const name = props.title ?? "Board";
+  const frame = useRef<HTMLDivElement>(null);
+  const scrollable = useScrollable(frame);
   // Custom properties are not in CSSProperties, so the record needs a cast.
   const layout = boardLayoutVars(props.columns.length) as CSSProperties;
   return (
     <figure className="min-w-0 space-y-2">
-      {props.title ? <figcaption className="text-md font-medium break-words">{props.title}</figcaption> : null}
+      {props.title ? <figcaption id={`${id}-title`} className="text-md font-medium break-words">{props.title}</figcaption> : null}
       <div
-        role="region"
-        aria-label={name}
-        tabIndex={0}
+        ref={frame}
+        {...scrollStopProps(scrollable, props.title ? { labelledBy: `${id}-title` } : { label: "Board" })}
         style={layout}
         className="@container relative flex min-w-0 snap-x snap-proximity items-start gap-(--board-gap) overflow-x-auto overscroll-x-contain rounded-lg pb-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >

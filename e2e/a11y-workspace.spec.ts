@@ -12,18 +12,6 @@ import { expectNoAxeViolations } from "./support/a11y";
 
 const sidebar = (page: Page) => page.getByRole("complementary", { name: "Workspace" });
 
-/** Found by these checks and left for a separate change (listed in the pull request that added them). */
-const knownInWorkspacePage = {
-  "aria-allowed-role": {
-    on: "h1[role=textbox], h2[role=textbox], h3[role=textbox]",
-    reason: "interface title blocks are headings with role=textbox (ui-editor/editable-text.tsx); the fix wraps the textbox in its heading, a change to the block editor",
-  },
-  "landmark-unique": {
-    on: "figure > [role=region]",
-    reason: "an interface table's region is named by its caption, and the fixture's long interface repeats the caption Owners",
-  },
-};
-
 async function openWorkspace(page: Page) {
   await page.goto("/dev/workspace");
   await expect(page.getByRole("region", { name: "Content" })).toBeVisible();
@@ -32,7 +20,29 @@ async function openWorkspace(page: Page) {
 
 test("should pass axe on the workspace page", async ({ page }) => {
   await openWorkspace(page);
-  await expectNoAxeViolations(page, { skip: knownInWorkspacePage });
+  await expectNoAxeViolations(page);
+});
+
+test("should keep an interface's title a heading in the outline with its text box inside", async ({ page }) => {
+  await openWorkspace(page);
+  await expect(page.locator('[data-block="title-0"]')).toMatchAriaSnapshot(`
+    - heading "Checkout v2 rollout" [level=1]:
+      - textbox "Heading"
+  `);
+  await expect(page.locator('[data-block="title-0"]').getByRole("textbox", { name: "Heading" })).toHaveText("Checkout v2 rollout");
+});
+
+test("should make a scrolling interface table's frame a group named by its caption, never a landmark", async ({ page }) => {
+  await openWorkspace(page);
+  const owners = page.locator('[data-block="owners-0"]');
+  const frame = owners.locator("figure > div").first();
+  await frame.scrollIntoViewIfNeeded();
+  // Too narrow for its columns, so it scrolls, as a wide table does on a phone.
+  await frame.evaluate((element) => { element.style.width = "8rem"; });
+  await expect(frame).toHaveAttribute("tabindex", "0");
+  await expect(owners.getByRole("group", { name: "Owners" })).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Owners" })).toHaveCount(0);
+  await expectNoAxeViolations(owners);
 });
 
 test("should pass axe on the sidebar", async ({ page }) => {

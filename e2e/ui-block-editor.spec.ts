@@ -121,3 +121,27 @@ test("should refuse a pasted file and offer no media blocks when typing in an in
   expect(block?.props?.content).toMatch(/Notes \/image$/u);
   expect(block?.props?.content).not.toContain("/api/files/");
 });
+
+test("should keep the heading block a heading while it is typed into, and leave the outline while it is empty", async ({ page }) => {
+  await openBlocks(page);
+  const block = editor(page).locator("[data-block=title]");
+  await expect(block).toMatchAriaSnapshot(`
+    - heading "Launch plan" [level=1]:
+      - textbox "Heading"
+  `);
+  const text = block.getByRole("textbox", { name: "Heading" });
+  await text.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await expect(text).toHaveText("");
+  await expect(block.getByRole("heading")).toHaveCount(0);
+  await expect(text).toBeFocused();
+  await page.keyboard.type("Ship");
+  await expect(block.getByRole("heading", { level: 1, name: "Ship" })).toBeVisible();
+  await expect(text).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(editor(page).getByRole("textbox", { name: "Text" }).first()).toBeFocused();
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
+  const spec = await savedSpec(page);
+  expect(spec.elements.title?.props?.text).toBe("Ship");
+});
