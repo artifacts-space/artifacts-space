@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { Page } from "@playwright/test";
-import { expect, test } from "./support/test";
+import { allowPageError, expect, test } from "./support/test";
 
 import { approveVersionWithCover, attachTestImage, cleanUp, createTestArtifact, devUserId, localDatabaseEnabled, localDatabaseSkipReason, storedCovers } from "./support/local-db";
 
@@ -79,6 +79,7 @@ test("should not shift the layout while a page with a gradient or image cover lo
   const userId = await devUserId();
   const gradient = await createTestArtifact({ userId, title: `Cover CLS gradient ${testInfo.project.name}`, content: "# Steady\n\nNothing moves.", visibility: "private", theme: "paper", cover: "tide" });
   // The file does not exist locally, so the image falls back to a quiet fill: the box must not change size either way.
+  allowPageError("/api/files/0f8fad5b-d9cb-469f-a165-70867728950e", "The cover file does not exist, on purpose.");
   const image = await createTestArtifact({ userId, title: `Cover CLS image ${testInfo.project.name}`, content: "# Steady\n\nNothing moves.", visibility: "private", theme: null, cover: "file:0f8fad5b-d9cb-469f-a165-70867728950e@30" });
   created.push(gradient, image);
   await watchLayoutShifts(page);
@@ -118,6 +119,7 @@ test("should move an image cover's focal point with the keyboard and save it whe
   const publicId = await createTestArtifact({ userId, title: `Cover reposition ${testInfo.project.name}`, content: "# Notes", visibility: "private", theme: null, cover: `file:${fileId}@30` });
   created.push(publicId);
   await attachTestImage(publicId, userId, fileId);
+  allowPageError(`/api/files/${fileId}`, "The seeded file has no stored object in the e2e environment, so the file route cannot serve it.");
   await page.goto(`/artifact/${publicId}`);
 
   const cover = page.locator("[data-artifact-cover]");

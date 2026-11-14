@@ -1,5 +1,5 @@
 import type { Browser, Locator, Page } from "@playwright/test";
-import { expect, test } from "./support/test";
+import { allowPageError, expect, test } from "./support/test";
 
 import { closeInlineEditDb, saveAsSomeoneElse } from "./support/inline-edit-db";
 import { cleanUp, createTestArtifact, localDatabaseEnabled, localDatabaseSkipReason, readyDevUser, setTestFullWidth } from "./support/local-db";
@@ -261,6 +261,7 @@ async function holdActions(page: Page, publicId: string): Promise<() => void> {
 
 /** Fails the page's server actions (load, save, Full width) while `state.failing` is true, as a dropped connection would. */
 async function failActionsWhile(page: Page, publicId: string, state: { failing: boolean }) {
+  allowPageError("net::ERR_INTERNET_DISCONNECTED", "The test drops the page's server actions on purpose.");
   await page.route(`**/artifact/${publicId}`, async (route) => {
     if (route.request().method() === "POST" && state.failing) await route.abort("internetdisconnected");
     else await route.continue();

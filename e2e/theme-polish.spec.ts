@@ -3,7 +3,6 @@ import { readFile } from "node:fs/promises";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
-import { themePresets } from "../src/lib/themes/presets";
 import { presetTheme } from "../src/lib/themes/resolve";
 
 import {
@@ -65,10 +64,11 @@ async function downloadJson(page: Page, dialog: ReturnType<Page["getByRole"]>): 
   return { name: download.suggestedFilename(), text: await readFile(path, "utf8") };
 }
 
+/** A preset's theme as the app stores it: parsed, with every default filled in. */
 function presetJson(id: string) {
-  const preset = themePresets.find((item) => item.id === id);
-  if (!preset) throw new Error(`The ${id} preset is missing.`);
-  return preset.theme;
+  const theme = presetTheme(id);
+  if (!theme) throw new Error(`The ${id} preset is missing.`);
+  return theme;
 }
 
 const oceanTheme = () => presetJson("ocean");

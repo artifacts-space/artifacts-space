@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 
-import { expect, test } from "./support/test";
+import { allowPageError, expect, test } from "./support/test";
 
 import { cleanUp, createTestUser, deleteSignInLinks, localDatabaseEnabled, localDatabaseSkipReason, testUserEmail } from "./support/local-db";
 
@@ -64,6 +64,7 @@ test("should send two links and refuse the rest, alike for known and unknown add
 });
 
 test("should tell the person to wait when they ask for a second link to one address within a minute", async ({ page }) => {
+  allowPageError("/api/auth/sign-in/magic-link", "The test asks for a second link on purpose, which the limit refuses.");
   await page.setExtraHTTPHeaders({ "x-forwarded-for": networkAddress() });
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill(newEmail("form"));

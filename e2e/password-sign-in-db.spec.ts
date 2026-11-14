@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createHash, randomBytes, randomInt, randomUUID } from "node:crypto";
 
 import type { Page } from "@playwright/test";
-import { expect, test } from "./support/test";
+import { allowPageError, expect, test } from "./support/test";
 
 import { cleanUp, deleteRegisteredOAuthClients, deleteReviewerAccounts, localDatabaseEnabled, localDatabaseSkipReason } from "./support/local-db";
 
@@ -89,6 +89,7 @@ test("should return to the page the reviewer came from when sign-in started ther
 test("should refuse a wrong password and an unknown email with the same words", async ({ page }) => {
   const { email } = createReviewer("wrong");
   const refusal = "That email and password do not match. Check both and try again.";
+  allowPageError("/api/auth/sign-in/email", "The test signs in with a wrong password and an unknown email on purpose.");
 
   const wrong = await signIn(page, email, "not-the-password-0123456789");
   await expect(wrong.getByRole("alert")).toHaveText(refusal);
