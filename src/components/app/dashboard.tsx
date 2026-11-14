@@ -299,7 +299,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
             listState={artifactListState({ total: artifacts.length, shown: filtered.length })}
             onClearFilters={clearFilters}
           />
-          {sidebarHidden ? null : <SidebarSplitter sidebar={sidebarRef} />}
+          {sidebarHidden ? null : <SidebarSplitter sidebar={sidebarRef} shell={shellRef} />}
 
           {/* `contents` keeps the pane a grid item; the ref lets a link bring it into view on phones. */}
           <div ref={detailRef} data-slot="workspace-detail" className="contents">

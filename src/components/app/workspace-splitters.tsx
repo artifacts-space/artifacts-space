@@ -28,8 +28,11 @@ export function PanelSizesBeforePaint() {
   return <script suppressHydrationWarning type={typeof window === "undefined" ? undefined : "text/plain"} dangerouslySetInnerHTML={{ __html: script }} />;
 }
 
-/** The handle on the sidebar's right edge, sizing its width against the artifact pane. It sits in the workspace card, not the sidebar. */
-export function SidebarSplitter({ sidebar }: { sidebar: RefObject<HTMLElement | null> }) {
+/**
+ * The handle on the sidebar's right edge, sizing its width against the artifact pane. It sits in the
+ * workspace card, not the sidebar. `shell` is the workspace grid, whose columns read the width.
+ */
+export function SidebarSplitter({ sidebar, shell }: { sidebar: RefObject<HTMLElement | null>; shell: RefObject<HTMLElement | null> }) {
   const measure = () => {
     if (!sidebar.current) return null;
     return { size: Math.round(sidebar.current.getBoundingClientRect().width), bounds: sidebarBounds() };
@@ -42,9 +45,11 @@ export function SidebarSplitter({ sidebar }: { sidebar: RefObject<HTMLElement | 
       orientation="vertical"
       measure={measure}
       watch={() => [sidebar.current]}
+      layout={() => shell.current}
       initial={{ size: sidebarPanel.defaultSize, bounds: { min: sidebarPanel.min, max: sidebarPanel.max } }}
       // In the workspace card, just past the sidebar's edge: the sidebar can scroll on short windows, and its list's scroll bar stays free.
-      className={cn("inset-y-0 w-3", sidebarHandleLeft)}
+      // On a touch screen it is wider and reaches 8px over the sidebar's edge: far enough to grab, and short of the Hide the sidebar button.
+      className={cn("inset-y-0 w-3 pointer-coarse:w-5", sidebarHandleLeft)}
     />
   );
 }

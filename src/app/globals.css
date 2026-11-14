@@ -29,6 +29,18 @@
 @custom-variant shell-short (@media (width >= 48rem) and (height < 700px));
 
 /*
+ * The sidebar's width while a drag or a held key moves it (`liveVar` in
+ * src/lib/panel-size-rules.ts). Not inherited: it is set on the workspace
+ * grid and the handle, the two elements that read it, so each move restyles
+ * those two and not every element under them. With no value it is invalid,
+ * and the layout falls back to the stored width.
+ */
+@property --workspace-sidebar-width-live {
+  syntax: "*";
+  inherits: false;
+}
+
+/*
  * Type scale. Four steps for everything that is not a heading. Use these
  * classes only; never an arbitrary `text-md`.
  *   text-xs   13/18  smallest: badges, timestamps, labels, fine print, axis ticks

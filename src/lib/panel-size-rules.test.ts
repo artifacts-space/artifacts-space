@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { runInNewContext } from "node:vm";
 
 import { describe, expect, it } from "vitest";
@@ -9,6 +11,8 @@ import {
   isResetKey,
   keyboardResize,
   parseStoredSize,
+  rememberedPanels,
+  resizeCursor,
   sidebarBounds,
   sideBySideMinWidth,
   sidebarColumns,
@@ -132,9 +136,51 @@ describe("beforePaintScript", () => {
 
 describe("layout classes", () => {
   it("should draw the sidebar column inside the same bounds the handle reports when a size is stored", () => {
-    const { min, max, defaultSize, cssVar } = sidebarPanel;
-    const clamp = `clamp(${String(min)}px,var(${cssVar},${String(defaultSize)}px),${String(max)}px)`;
+    const { min, max, defaultSize, cssVar, liveVar } = sidebarPanel;
+    // A size on the move wins over the stored one, and with neither the default draws.
+    const clamp = `clamp(${String(min)}px,var(${liveVar},var(${cssVar},${String(defaultSize)}px)),${String(max)}px)`;
     expect(sidebarColumns).toContain(clamp);
     expect(sidebarHandleLeft, "the handle sits on the same edge").toBe(`lg:left-[${clamp}]`);
+  });
+});
+
+describe("live size properties", () => {
+  it("should register every panel's live property as not inherited when the stylesheet loads", () => {
+    const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+    for (const panel of rememberedPanels) {
+      const rule = new RegExp(`@property ${panel.liveVar} \\{([^}]*)\\}`).exec(css)?.[1] ?? "";
+      expect(rule, `${panel.liveVar} is registered`).not.toBe("");
+      // Inherited, a move would restyle every element under the one it is set on.
+      expect(rule).toMatch(/inherits:\s*false/);
+      // A universal syntax has no initial value, so the layout falls back to the stored size.
+      expect(rule).toMatch(/syntax:\s*"\*"/);
+      expect(rule).not.toContain("initial-value");
+      expect(panel.liveVar).not.toBe(panel.cssVar);
+    }
+  });
+});
+
+describe("resizeCursor", () => {
+  const bounds = { min: 272, max: 520 };
+
+  it("should point both ways when the panel can grow and shrink", () => {
+    expect(resizeCursor(300, bounds, "vertical")).toBe("col-resize");
+    expect(resizeCursor(300, bounds, "horizontal")).toBe("row-resize");
+  });
+
+  it("should point the only way left when the panel is at its smallest or largest size", () => {
+    expect(resizeCursor(272, bounds, "vertical")).toBe("e-resize");
+    expect(resizeCursor(520, bounds, "vertical")).toBe("w-resize");
+    expect(resizeCursor(272, bounds, "horizontal")).toBe("s-resize");
+    expect(resizeCursor(520, bounds, "horizontal")).toBe("n-resize");
+  });
+
+  it("should treat a size past a limit as at it when the page drew the panel outside its bounds", () => {
+    expect(resizeCursor(200, bounds, "vertical")).toBe("e-resize");
+    expect(resizeCursor(600, bounds, "vertical")).toBe("w-resize");
+  });
+
+  it("should keep the two-way cursor when the bounds leave no room to move", () => {
+    expect(resizeCursor(300, { min: 300, max: 300 }, "vertical")).toBe("col-resize");
   });
 });
