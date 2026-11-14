@@ -23,6 +23,19 @@ export function applyPanelSize(panel: PanelSpec, size: number | null) {
   else style.setProperty(panel.cssVar, `${String(size)}px`);
 }
 
+/**
+ * Draws a panel at `size` pixels while a drag or a held key moves it, or
+ * ends that when `size` is null. It writes the panel's live property on the
+ * elements that read it and nowhere else, so each move restyles only them.
+ */
+export function applyLivePanelSize(panel: PanelSpec, readers: readonly (HTMLElement | null | undefined)[], size: number | null) {
+  for (const reader of readers) {
+    if (!reader) continue;
+    if (size === null) reader.style.removeProperty(panel.liveVar);
+    else reader.style.setProperty(panel.liveVar, `${String(size)}px`);
+  }
+}
+
 /** Remembers a panel's size for this viewer, or forgets it when `size` is null. */
 export function savePanelSize(panel: PanelSpec, size: number | null) {
   try {
