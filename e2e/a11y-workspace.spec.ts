@@ -56,7 +56,7 @@ test("should name the workspace switcher with its visible text and give its menu
   `);
 });
 
-test("should give the sidebar's resize handle a separator tree with its value", async ({ page, isMobile }) => {
+test("should give the sidebar's resize handle a separator tree with its value, and change the value from the keyboard", async ({ page, isMobile }) => {
   test.skip(isMobile, "Phones stack the sidebar over the artifact and have no handle.");
   await openWorkspace(page);
   const handle = page.getByRole("separator", { name: "Resize the sidebar" });
@@ -64,5 +64,12 @@ test("should give the sidebar's resize handle a separator tree with its value", 
   await expect(handle).toMatchAriaSnapshot(`
     - separator "Resize the sidebar"
   `);
+  await expect(handle).toHaveAttribute("aria-orientation", "vertical");
+  await expect(handle).toHaveAttribute("aria-controls", "workspace-sidebar");
+  await expect(handle).toHaveAttribute("aria-valuetext", /^\d+ pixels$/);
+  const before = Number(await handle.getAttribute("aria-valuenow"));
+  await handle.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(async () => Number(await handle.getAttribute("aria-valuenow"))).toBeGreaterThan(before);
   await expectNoAxeViolations(handle);
 });
