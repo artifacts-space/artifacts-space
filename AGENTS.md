@@ -528,9 +528,12 @@ catch this, so test the generated SQL with `.toSQL()`, as
   `phone` when both show it. Pair it with `toMatchAriaSnapshot` where the
   tree is the point (menus, listboxes, pickers, splitters). A new menu,
   picker, or composite widget gets a scan. Fix what a scan finds; when the
-  fix is bigger than the change at hand, pass `skip: { "<rule>": "<reason>" }`
-  for that one scan and record it in the pull request. Contrast findings are
-  design decisions: report them, never change tokens to pass.
+  fix is bigger than the change at hand, skip the rule for that one scan,
+  only on the nodes at fault where you can
+  (`skip: { "<rule>": { on: "<selector>", reason: "<why>" } }`, or
+  `{ "<rule>": "<why>" }` for the whole scan), and record it in the pull
+  request. Contrast findings are design decisions: report them, never change
+  tokens to pass.
 
 ### Page column
 

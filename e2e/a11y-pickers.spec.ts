@@ -24,7 +24,7 @@ test("should pass axe with the theme picker open", async ({ page }) => {
   const picker = page.getByRole("listbox", { name: "Artifact theme" });
   await expect(picker.getByRole("option", { name: /^Default:/ })).toBeFocused();
   await expectNoAxeViolations(page.getByRole("dialog", { name: "Theme" }), {
-    skip: { "label-content-name-mismatch": "each swatch is named \"<theme>: <description>\", which leaves out its visible font line; renaming them is a separate change" },
+    skip: { "label-content-name-mismatch": { on: "[data-theme-option]", reason: "each swatch is named \"<theme>: <description>\", which leaves out its visible font line; renaming them is a separate change" } },
   });
 });
 

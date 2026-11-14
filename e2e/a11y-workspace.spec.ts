@@ -13,8 +13,14 @@ const sidebar = (page: Page) => page.getByRole("complementary", { name: "Workspa
 
 /** Found by these checks and left for a separate change (listed in the pull request that added them). */
 const knownInWorkspacePage = {
-  "aria-allowed-role": "interface title blocks are h1-h3 with role=textbox (ui-editor/editable-text.tsx); the fix wraps the textbox in its heading, a change to the block editor",
-  "landmark-unique": "the fixture's long interface repeats one table caption, Owners, and each table region is named by its caption",
+  "aria-allowed-role": {
+    on: "h1[role=textbox], h2[role=textbox], h3[role=textbox]",
+    reason: "interface title blocks are headings with role=textbox (ui-editor/editable-text.tsx); the fix wraps the textbox in its heading, a change to the block editor",
+  },
+  "landmark-unique": {
+    on: "figure > [role=region]",
+    reason: "an interface table's region is named by its caption, and the fixture's long interface repeats the caption Owners",
+  },
 };
 
 async function openWorkspace(page: Page) {

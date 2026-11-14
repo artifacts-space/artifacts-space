@@ -17,7 +17,9 @@ const blockMenu = (page: Page) => page.locator("[data-slot=block-menu]");
 const changeMenu = (page: Page) => page.locator("[data-slot=block-menu-change]");
 
 /** Focus stays in the editor and moves through the options by aria-activedescendant, so the list itself is never a tab stop. */
-const slashMenuScroll = { "scrollable-region-focusable": "the slash menu is driven from the editor with aria-activedescendant; the highlighted option scrolls into view" };
+const slashMenuScroll = {
+  "scrollable-region-focusable": { on: "[data-slot=slash-menu]", reason: "the slash menu is driven from the editor with aria-activedescendant; the highlighted option scrolls into view" },
+};
 
 async function openFixture(page: Page) {
   await page.goto("/dev/block-menu");

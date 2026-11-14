@@ -34,7 +34,7 @@ test("should pass axe on the docs clients page", async ({ page }) => {
   // A code block that scrolls becomes a tab stop once it has measured itself in the browser.
   await expect(page.locator("pre[role=region][tabindex='0']").first()).toBeAttached();
   await expectNoAxeViolations(page, {
-    skip: { "landmark-unique": "every scrolling code block is a region named by its language or title, so two shell commands are both \"Command code\"" },
+    skip: { "landmark-unique": { on: "pre[role=region]", reason: "a scrolling code block is a region named by its language or title, so two shell commands are both \"Command code\"" } },
   });
 });
 
