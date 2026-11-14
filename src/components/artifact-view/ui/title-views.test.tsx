@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { BoardView } from "./board";
 import { HeadingView } from "./content";
-import { AccordionView, CardView, SectionView, TabsView } from "./layout";
+import { AccordionView, CardView, SectionView, SeparatorView, TabsView } from "./layout";
 
 const emit = () => undefined;
 
@@ -53,5 +53,21 @@ describe("title views", () => {
     const html = renderToStaticMarkup(<TabsView props={{ tabs: [{ label: "" }, { label: "Notes" }] }} emit={emit}>{null}</TabsView>);
     expect(html).toContain("Tab 1");
     expect(html).toContain("Notes");
+  });
+
+  it("should render no header when a Section's title and description are both only spaces", () => {
+    const html = renderToStaticMarkup(<SectionView props={{ title: " ", description: "  " }} emit={emit}>x</SectionView>);
+    expect(html).not.toContain("<header");
+    expect(html).not.toContain("<p");
+  });
+
+  it("should leave out a Card's description when it is only spaces", () => {
+    const html = renderToStaticMarkup(<CardView props={{ title: "Plan", description: "  " }} emit={emit}>x</CardView>);
+    expect(html).toContain("<h3");
+    expect(html).not.toContain("<p");
+  });
+
+  it("should draw a plain rule when a Separator's label is only spaces", () => {
+    expect(renderToStaticMarkup(<SeparatorView props={{ label: "  " }} emit={emit} />)).toMatch(/^<hr /);
   });
 });

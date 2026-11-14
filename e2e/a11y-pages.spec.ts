@@ -55,6 +55,15 @@ test("should pass axe on two boards that share column titles, naming each column
   await expectNoAxeViolations(boards, { skip: { "color-contrast": knownContrast.board } });
 });
 
+test("should name a scrolling board without a title \"Board\"", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/dev/components#Board");
+  const untitled = page.locator('section#Board [data-specimen="Empty columns"] figure');
+  await expect(untitled.locator("figcaption")).toHaveCount(0);
+  // It takes its own name once it scrolls, which needs the whole gallery interactive.
+  await expect(untitled.getByRole("group", { name: "Board", exact: true })).toHaveAttribute("tabindex", "0", { timeout: 30_000 });
+});
+
 /**
  * Every box on the page that scrolls sideways and is not a named group with a
  * tab stop (scroll-stop.ts), described by its tag and classes. Empty when the

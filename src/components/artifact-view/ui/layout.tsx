@@ -33,10 +33,10 @@ function hasChildren(children: ReactNode) {
 export function SectionView({ props, children }: ViewProps<"Section">) {
   return (
     <section className="min-w-0 space-y-4">
-      {hasTitleText(props.title) || props.description ? (
+      {hasTitleText(props.title) || hasTitleText(props.description) ? (
         <header className="space-y-1">
           {hasTitleText(props.title) ? <h2 className="text-lg font-medium tracking-[-0.01em] break-words">{props.title}</h2> : null}
-          {props.description ? <p className="text-md leading-6 text-muted-foreground break-words">{props.description}</p> : null}
+          {hasTitleText(props.description) ? <p className="text-md leading-6 text-muted-foreground break-words">{props.description}</p> : null}
         </header>
       ) : null}
       <div className="flex min-w-0 flex-col gap-4">{hasChildren(children) ? children : <Empty what="content" />}</div>
@@ -68,10 +68,10 @@ export function GridView({ props, children }: ViewProps<"Grid">) {
 export function CardView({ props, children }: ViewProps<"Card">) {
   return (
     <div className="card-surface flex min-w-0 flex-col gap-3 p-4 sm:p-5">
-      {hasTitleText(props.title) || props.description ? (
+      {hasTitleText(props.title) || hasTitleText(props.description) ? (
         <div className="space-y-1">
           {hasTitleText(props.title) ? <h3 className="text-base font-medium break-words">{props.title}</h3> : null}
-          {props.description ? <p className="text-sm leading-5 text-muted-foreground break-words">{props.description}</p> : null}
+          {hasTitleText(props.description) ? <p className="text-sm leading-5 text-muted-foreground break-words">{props.description}</p> : null}
         </div>
       ) : null}
       {hasChildren(children) ? <div className="flex min-w-0 flex-col gap-3">{children}</div> : null}
@@ -118,7 +118,7 @@ export function AccordionView({ props, children }: ViewProps<"Accordion">) {
 }
 
 export function SeparatorView({ props }: ViewProps<"Separator">) {
-  if (!props.label) return <hr className="my-2 border-border" />;
+  if (!hasTitleText(props.label)) return <hr className="my-2 border-border" />;
   return (
     <div role="separator" aria-label={props.label} className="my-2 flex items-center gap-3 text-xs text-muted-foreground">
       <span className="h-px flex-1 bg-border" />
