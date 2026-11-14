@@ -47,6 +47,7 @@ async function openThread(page: Page) {
 test("should post from the plain box when the rich box cannot load", async ({ page }) => {
   let refused = 0;
   allowPageError("net::ERR_FAILED", "The test refuses the rich box's code on purpose.");
+  allowPageError("ChunkLoadError", "React reports the refused chunk that CommentEditorBoundary catches; it shows only on some runs.");
   await routeEditorChunk(page, (route) => {
     refused += 1;
     return route.abort();
