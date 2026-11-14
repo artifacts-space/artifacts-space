@@ -230,6 +230,6 @@ test("should keep the theme, icon, and cover pickers open on the artifact page w
   await page.getByRole("button", { name: "Choose a theme" }).click();
   release();
   await expect(content).toBeVisible();
-  await page.getByRole("listbox", { name: "Artifact theme" }).getByRole("option", { name: /^Paper:/ }).click();
+  await page.getByRole("listbox", { name: "Artifact theme" }).getByRole("option", { name: "Paper Work Sans" }).click();
   await expect(page.getByRole("button", { name: "Theme: Paper. Change theme" })).toBeVisible();
 });

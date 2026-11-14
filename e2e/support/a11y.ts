@@ -78,9 +78,10 @@ function builder(page: Page, token: string | null): AxeBuilder {
 }
 
 /**
- * Drops the failing nodes that sit on or inside what `selector` matches, and
- * any violation left with none. Filtered after the run, because axe's own
- * `exclude` cannot take out a node the scan was told to include.
+ * Drops the failing nodes that `selector` matches themselves, and any
+ * violation left with none. A node inside a match is still reported. Filtered
+ * after the run, because axe's own `exclude` cannot take out a node the scan
+ * was told to include.
  */
 async function withoutNodesOn(page: Page, violations: readonly Violation[], selector: string): Promise<Violation[]> {
   const kept: Violation[] = [];
@@ -89,7 +90,7 @@ async function withoutNodesOn(page: Page, violations: readonly Violation[], sele
       const last = node.target.at(-1);
       return typeof last === "string" ? last : "";
     });
-    const skipped = await page.evaluate(({ list, on }) => list.map((target) => target !== "" && document.querySelector(target)?.closest(on) != null), { list: targets, on: selector });
+    const skipped = await page.evaluate(({ list, on }) => list.map((target) => target !== "" && document.querySelector(target)?.matches(on) === true), { list: targets, on: selector });
     const nodes = violation.nodes.filter((_, index) => skipped[index] !== true);
     if (nodes.length > 0) kept.push({ ...violation, nodes });
   }

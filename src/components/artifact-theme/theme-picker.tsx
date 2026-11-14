@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Fragment, useMemo, useRef, useState } from "react";
+import { Fragment, useId, useMemo, useRef, useState } from "react";
 
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { iconGridMove } from "@/lib/icon-grid";
@@ -11,7 +11,7 @@ import { noThemeChoices, type ThemeChoices, type ThemeChoiceTeam } from "@/lib/t
 import { cn } from "@/lib/utils";
 
 import { CustomThemeActions } from "./custom-theme-actions";
-import { CUSTOM_KEY, selectedOptionKey, themeOptions, type ThemeOption } from "./theme-options";
+import { CUSTOM_KEY, selectedOptionKey, themeOptionGroups, themeOptions, type ThemeOption } from "./theme-options";
 import { ThemeSwatch } from "./theme-swatch";
 
 // The preset editor loads only when an owner or admin saves a custom theme as a team preset.
@@ -40,12 +40,15 @@ interface SwatchGridProps {
 
 /**
  * Every option as one listbox: a single tab stop, arrow keys, Home, and End
- * move focus between swatches without changing the theme, and Enter, Space,
- * or a click picks one and closes the picker. Group headings (Team default,
- * each team, Built-in) span the grid.
+ * move focus between swatches without changing the theme (across groups, in
+ * list order), and Enter, Space, or a click picks one and closes the picker.
+ * Each group (This artifact, Team default, each team, Built-in) is a `group`
+ * named by its heading, which spans the grid.
  */
 function SwatchGrid({ options, selected, onSelect }: SwatchGridProps) {
   const cells = useRef<(HTMLButtonElement | null)[]>([]);
+  const baseId = useId();
+  const groups = useMemo(() => themeOptionGroups(options), [options]);
   const selectedIndex = options.findIndex((option) => option.key === selected);
   const [active, setActive] = useState(Math.max(0, selectedIndex));
 
@@ -57,38 +60,53 @@ function SwatchGrid({ options, selected, onSelect }: SwatchGridProps) {
     cells.current[next]?.focus();
   }
 
+  // An option is named by what it shows, its name then its line ("Paper Work Sans"), with no
+  // aria-label: the swatch's sample text is hidden, so every word of the name is on screen.
+  function swatch({ option, index }: { option: ThemeOption; index: number }) {
+    const checked = option.key === selected;
+    const descriptionId = `${baseId}-description-${String(index)}`;
+    return (
+      <button
+        key={option.key}
+        ref={(node) => { cells.current[index] = node; }}
+        type="button"
+        role="option"
+        aria-selected={checked}
+        aria-describedby={descriptionId}
+        title={option.hint}
+        tabIndex={index === active ? 0 : -1}
+        autoFocus={index === active}
+        onKeyDown={(event) => { onKey(event, index); }}
+        onFocus={() => { setActive(index); }}
+        onClick={() => { onSelect(option); }}
+        data-theme-option={option.key}
+        className={cn(
+          "card-nested flex flex-col overflow-hidden rounded-lg text-left transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+          checked && "ring-2 ring-foreground/70",
+        )}
+      >
+        <ThemeSwatch theme={option.theme} />
+        {/* The option's accessible description; the hover title carries it for pointers. */}
+        <span id={descriptionId} hidden>{option.description}</span>
+        <span className="flex flex-col gap-0.5 border-t border-card-edge px-2.5 py-2">
+          <span className="truncate text-sm font-medium">{option.name}</span>
+          <span className="truncate text-xs text-muted-foreground">{option.detail}</span>
+        </span>
+      </button>
+    );
+  }
+
   return (
     <div role="listbox" aria-label="Artifact theme" className="grid max-h-[min(60dvh,32rem)] grid-cols-2 gap-2 overflow-y-auto overscroll-contain p-2">
-      {options.map((option, index) => {
-        const checked = option.key === selected;
+      {groups.map((group, groupIndex) => {
+        if (group.heading === null) return <Fragment key="ungrouped">{group.options.map(swatch)}</Fragment>;
+        const id = `${baseId}-group-${String(groupIndex)}`;
+        // The heading names its group; hidden itself, so it is read once, as the group's name.
         return (
-          <Fragment key={option.key}>
-            {option.group ? <p aria-hidden className="col-span-2 px-1 pt-1 text-xs font-medium text-muted-foreground">{option.group}</p> : null}
-            <button
-              ref={(node) => { cells.current[index] = node; }}
-              type="button"
-              role="option"
-              aria-selected={checked}
-              aria-label={option.label}
-              title={option.label}
-              tabIndex={index === active ? 0 : -1}
-              autoFocus={index === active}
-              onKeyDown={(event) => { onKey(event, index); }}
-              onFocus={() => { setActive(index); }}
-              onClick={() => { onSelect(option); }}
-              data-theme-option={option.key}
-              className={cn(
-                "card-nested flex flex-col overflow-hidden rounded-lg text-left transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
-                checked && "ring-2 ring-foreground/70",
-              )}
-            >
-              <ThemeSwatch theme={option.theme} />
-              <span className="flex flex-col gap-0.5 border-t border-card-edge px-2.5 py-2">
-                <span className="truncate text-sm font-medium">{option.name}</span>
-                <span className="truncate text-xs text-muted-foreground">{option.detail}</span>
-              </span>
-            </button>
-          </Fragment>
+          <div key={id} role="group" aria-labelledby={id} className="col-span-2 grid grid-cols-2 gap-2">
+            <p id={id} aria-hidden className="col-span-2 px-1 pt-1 text-xs font-medium text-muted-foreground">{group.heading}</p>
+            {group.options.map(swatch)}
+          </div>
         );
       })}
     </div>

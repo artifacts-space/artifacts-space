@@ -92,7 +92,7 @@ test("should let an admin build a preset with a live preview and make it the tea
   const markdown = await page.request.get(`/artifact/${seeded.publicId}.md`);
   expect(await markdown.text()).toContain(`- Theme: ${seeded.name} (team default)`);
   await page.getByRole("button", { name: "Choose a theme" }).click();
-  await expect(page.getByRole("option", { name: /^Team default: / })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("option", { name: `Team default ${seeded.name}` })).toHaveAttribute("aria-selected", "true");
 });
 
 test("should show a plain member the team preset in the picker but not the controls to manage it", async ({ page }, testInfo) => {
@@ -110,7 +110,7 @@ test("should show a plain member the team preset in the picker but not the contr
 
   await page.goto(`/artifact/${seeded.publicId}`);
   await page.getByRole("button", { name: "Choose a theme" }).click();
-  await page.getByRole("option", { name: new RegExp(`^${seeded.name}:`) }).click();
+  await page.getByRole("option", { name: new RegExp(`^${seeded.name} `) }).click();
   await expect(page.getByRole("button", { name: `Theme: ${seeded.name}. Change theme` })).toBeVisible();
   await expect(page.locator("[data-artifact-theme]")).toHaveAttribute("data-theme-source", "artifact");
   const stored = await storedThemes(seeded.publicId);
@@ -122,7 +122,7 @@ test("should show a plain member the team preset in the picker but not the contr
   seeded.publicIds.push(fresh);
   await page.goto(`/artifact/${fresh}`);
   await page.getByRole("button", { name: "Choose a theme" }).click();
-  await expect(page.getByRole("option", { name: new RegExp(`^${seeded.name}:`) })).toBeVisible();
+  await expect(page.getByRole("option", { name: new RegExp(`^${seeded.name} `) })).toBeVisible();
 });
 
 test("should say how many artifacts use a preset before deleting it, then fall back cleanly", async ({ page }, testInfo) => {
