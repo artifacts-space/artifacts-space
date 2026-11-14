@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { allowPageError, expect, test } from "./support/test";
 
 import { approveVersionWithCover, attachTestImage, cleanUp, createTestArtifact, devUserId, fileCurrentAsRecentEdit, fileRowExists, localDatabaseEnabled, localDatabaseSkipReason, storedCovers } from "./support/local-db";
 import { largePhoto } from "./support/photos";
@@ -58,6 +59,7 @@ test("should bring a removed image cover back with its file when an editor resto
   const publicId = await createTestArtifact({ userId, title: `Cover restore ${testInfo.project.name}`, content: "# Notes", visibility: "private", theme: null, cover: `file:${fileId}@30` });
   created.push(publicId);
   await attachTestImage(publicId, userId, fileId);
+  allowPageError(`/api/files/${fileId}`, "The seeded file has no stored object in the e2e environment, so the file route cannot serve it.");
   // The image cover was saved moments ago: a quick next save by the same editor would normally merge into that version.
   await fileCurrentAsRecentEdit(publicId);
   await page.goto(`/artifact/${publicId}`);

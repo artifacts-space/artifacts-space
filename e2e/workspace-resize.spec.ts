@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import { allowPageError, expect, test } from "./support/test";
 
 /**
  * The /app workspace's resizable sidebar, on /dev/workspace (the real
@@ -229,6 +230,7 @@ test.describe("desktop", () => {
     await storeSizes(page, { [sidebarKey]: "400" });
     await page.setViewportSize(desktop);
     // Hold the page's scripts so only the server HTML and its inline script run.
+    allowPageError("net::ERR_FAILED", "The test refuses the page's scripts on purpose.");
     let held = 0;
     await page.route(/\/_next\/static\/chunks\/.*\.js(\?|$)/, (route) => {
       held += 1;

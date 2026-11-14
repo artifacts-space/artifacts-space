@@ -47,6 +47,8 @@ const productionTestEnv = {
 
 export default defineConfig({
   testDir: "./e2e",
+  // Only specs: e2e/support holds Vitest unit tests (`*.test.ts`) for the shared fixture's rules.
+  testMatch: "**/*.spec.ts",
   outputDir: "./test-results",
   timeout: 120_000,
   workers: 1,

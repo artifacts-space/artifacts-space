@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { allowPageError, expect, test } from "./support/test";
 
 /**
  * "Continue with Google" on the sign-in form, on a phone and a desktop
@@ -17,6 +18,7 @@ async function pageOverflow(page: Page) {
 
 /** Clicks Google and returns what the form asked Better Auth for. The request is refused here, so the page stays put. */
 async function startGoogle(page: Page) {
+  allowPageError("/api/auth/sign-in/social", "The test refuses the sign-in request on purpose.");
   const request = page.waitForRequest((candidate) => candidate.url().endsWith("/api/auth/sign-in/social") && candidate.method() === "POST");
   await page.route("**/api/auth/sign-in/social", (route) => route.fulfill({ status: 400, json: { message: "Stopped by the test." } }));
   await google(page).click();

@@ -1,4 +1,5 @@
-import { expect, test, type APIResponse, type Page, type Route } from "@playwright/test";
+import type { APIResponse, Page, Route } from "@playwright/test";
+import { allowPageError, expect, test } from "./support/test";
 
 /*
  * The rich comment box loads on demand. Until it is in, a plain text box
@@ -45,6 +46,8 @@ async function openThread(page: Page) {
 
 test("should post from the plain box when the rich box cannot load", async ({ page }) => {
   let refused = 0;
+  allowPageError("net::ERR_FAILED", "The test refuses the rich box's code on purpose.");
+  allowPageError("ChunkLoadError", "React reports the refused chunk that CommentEditorBoundary catches; it shows only on some runs.");
   await routeEditorChunk(page, (route) => {
     refused += 1;
     return route.abort();

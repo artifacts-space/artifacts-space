@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 /**
  * Links into the workspace (from notifications): `?artifact=<id>` selects

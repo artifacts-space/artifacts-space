@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { changeMemberRole, setRoleCapability } from "../src/lib/teams/role-store";
 

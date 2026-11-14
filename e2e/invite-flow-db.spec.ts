@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { storedText } from "./support/inline-edit-db";
 import { closeInviteDb, invitationState, leaveTestTeam, openInvitations, seedInvitation, storedTeamRole, useUpTeamInvitations, waitingReviews, welcomeDismissed } from "./support/invite-db";
