@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 import { InlineCodeText } from "./docs-content";
 import { ExamplePreview } from "./example-preview";
+import { ScrollFrame } from "./scroll-frame";
 
 /**
  * The spec under a live example, behind a quiet "Show JSON" toggle. The JSON
@@ -48,11 +49,15 @@ export function LiveExample({ example, className, jsonOpen = true }: { example: 
   );
 }
 
-/** A props or arguments table built from a zod schema. */
-export function PropsTable({ rows, label = "Prop" }: { rows: PropRow[]; label?: string }) {
+/**
+ * A props or arguments table built from a zod schema. `of` names what the
+ * rows belong to (a tool or a component), so the frame that scrolls it
+ * sideways on a phone is a group named "<of> arguments" or "<of> props".
+ */
+export function PropsTable({ rows, of, label = "Prop" }: { rows: PropRow[]; of: string; label?: string }) {
   if (rows.length === 0) return <p className="mt-4 text-md text-muted-foreground">No arguments.</p>;
   return (
-    <div className="card-surface mt-4 overflow-x-auto">
+    <ScrollFrame label={`${of} ${label.toLowerCase()}s`} className="card-surface mt-4 overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <thead className="bg-muted/50">
           <tr>
@@ -74,6 +79,6 @@ export function PropsTable({ rows, label = "Prop" }: { rows: PropRow[]; label?: 
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollFrame>
   );
 }

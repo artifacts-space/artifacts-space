@@ -1,6 +1,8 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
+import { expectNoAxeViolations } from "./support/a11y";
+
 /** Autosave sends at most one save every 5 seconds (autosave-rules.ts), so "Saved" can take a little over that. */
 const savedWithin = { timeout: 12_000 };
 
@@ -136,6 +138,9 @@ test("should keep the heading block a heading while it is typed into, and leave 
   await expect(text).toHaveText("");
   await expect(block.getByRole("heading")).toHaveCount(0);
   await expect(text).toBeFocused();
+  // The emptied title is role="none" around its text box: no empty heading, and nothing else for axe to find.
+  await expect(block.locator('h1[role="none"]')).toHaveCount(1);
+  await expectNoAxeViolations(editor(page));
   await page.keyboard.type("Ship");
   await expect(block.getByRole("heading", { level: 1, name: "Ship" })).toBeVisible();
   await expect(text).toBeFocused();

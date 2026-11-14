@@ -102,7 +102,7 @@ async function ComponentReference({ params }: { params: PageProps<"/docs/json-re
       <Prose>
         <p>Generated from the zod schema the server validates with. Unknown props are ignored with a warning. Any prop can also be a dynamic value such as <Code>{"{ \"$state\": \"/path\" }"}</Code>; it is checked again once it resolves.</p>
       </Prose>
-      <PropsTable rows={propRows(componentProps[name])} />
+      <PropsTable rows={propRows(componentProps[name])} of={name} />
       {doc.rules?.length ? (
         <>
           <AnchorHeading heading={{ id: "rules", title: "Rules", level: 2 }} />

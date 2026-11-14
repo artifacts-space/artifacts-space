@@ -6,6 +6,7 @@ import { ExternalLink } from "@/components/artifact-view/external-link";
 import { CodeBlock } from "@/components/code/code-block";
 import { MarkdownView } from "@/components/artifact-view/markdown-view";
 import type { Tone } from "@/lib/ui/props/shared";
+import { hasTitleText } from "@/lib/ui/title-rules";
 import { cn } from "@/lib/utils";
 
 import type { ViewProps } from "./stout";
@@ -19,6 +20,8 @@ export const headingClass = {
 } as const;
 
 export function HeadingView({ props }: ViewProps<"Heading">) {
+  // Only spaces show nothing, so no empty heading reaches the outline (the editor drops it by the same rule).
+  if (!hasTitleText(props.text)) return null;
   const level = (props.level ?? 2) as keyof typeof headingClass;
   const Tag = (["h1", "h2", "h3", "h4"] as const)[level - 1] ?? "h2";
   return <Tag className={cn("min-w-0 text-balance break-words", headingClass[level])}>{props.text}</Tag>;

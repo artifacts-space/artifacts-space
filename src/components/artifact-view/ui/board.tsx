@@ -9,6 +9,7 @@ import { boardLayoutVars } from "@/lib/ui/board-layout";
 import { formatShortDate, parseIsoDate } from "@/lib/ui/calendar-dates";
 import type { UiProps } from "@/lib/ui/catalog";
 import type { Tone } from "@/lib/ui/props/shared";
+import { hasTitleText } from "@/lib/ui/title-rules";
 import { cn } from "@/lib/utils";
 
 import { badgeTone, toneDot } from "./content";
@@ -76,7 +77,8 @@ function Card({ card }: { card: BoardCard }) {
 function BoardColumn({ column, headingId }: { column: Column; headingId: string }) {
   const count = column.count ?? column.cards.length;
   return (
-    <section aria-labelledby={headingId} className="flex w-(--board-column) shrink-0 snap-start flex-col gap-2 rounded-lg border bg-muted/40 p-2 shadow-xs">
+    // A named group, not a section: two boards with the same column titles would list landmarks with one name.
+    <div role="group" aria-labelledby={headingId} className="flex w-(--board-column) shrink-0 snap-start flex-col gap-2 rounded-lg border bg-muted/40 p-2 shadow-xs">
       <h3 id={headingId} className="flex min-w-0 items-center gap-2 px-1 pt-0.5 text-sm font-medium">
         {column.tone ? <span aria-hidden className={cn("size-2 shrink-0 rounded-full", toneDot[column.tone])} /> : null}
         <span className="min-w-0 break-words">{column.title}</span>
@@ -93,7 +95,7 @@ function BoardColumn({ column, headingId }: { column: Column; headingId: string 
           {column.cards.map((card, index) => <Card key={`${String(index)}-${card.title.slice(0, 20)}`} card={card} />)}
         </ul>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -107,14 +109,16 @@ export function BoardView({ props }: ViewProps<"Board">) {
   const id = useId();
   const frame = useRef<HTMLDivElement>(null);
   const scrollable = useScrollable(frame);
+  // A title of only spaces shows no caption, so the frame takes its own name instead of an empty one.
+  const titled = hasTitleText(props.title);
   // Custom properties are not in CSSProperties, so the record needs a cast.
   const layout = boardLayoutVars(props.columns.length) as CSSProperties;
   return (
     <figure className="min-w-0 space-y-2">
-      {props.title ? <figcaption id={`${id}-title`} className="text-md font-medium break-words">{props.title}</figcaption> : null}
+      {titled ? <figcaption id={`${id}-title`} className="text-md font-medium break-words">{props.title}</figcaption> : null}
       <div
         ref={frame}
-        {...scrollStopProps(scrollable, props.title ? { labelledBy: `${id}-title` } : { label: "Board" })}
+        {...scrollStopProps(scrollable, titled ? { labelledBy: `${id}-title` } : { label: "Board" })}
         style={layout}
         className="@container relative flex min-w-0 snap-x snap-proximity items-start gap-(--board-gap) overflow-x-auto overscroll-x-contain rounded-lg pb-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >

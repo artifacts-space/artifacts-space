@@ -38,6 +38,8 @@ const fiftyCards = Array.from({ length: 8 }, (_, column) => ({
 /** Normal and extreme Board fixtures. 8 columns hold 50 cards, with an empty column and text at every limit. */
 export const boardFixtures: ComponentFixture[] = [
   { name: "Sprint", props: { title: "Sprint 14", columns: sprint } },
+  // The same column titles as Sprint, so a page holds two columns of each name (axe landmark-unique).
+  { name: "Next sprint, same columns", props: { title: "Sprint 15", columns: sprint } },
   { name: "Empty columns", props: { columns: [{ title: "Backlog", cards: [] }, { title: "Doing", tone: "info", cards: [] }] } },
   { name: "8 columns, 50 cards, long text", props: { title: long(160), columns: fiftyCards } },
 ];

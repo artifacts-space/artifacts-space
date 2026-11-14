@@ -3,6 +3,7 @@
 import { IconPalette } from "@tabler/icons-react";
 import { useState } from "react";
 
+import { teamPresetNames } from "@/components/artifact-theme/theme-options";
 import { ThemePicker } from "@/components/artifact-theme/theme-picker";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ThemeBackdrop, ThemeScope } from "@/components/artifact-view/theme-scope";
@@ -57,6 +58,9 @@ const fixtureChoices: ThemeChoices = {
   manageable: [],
 };
 
+/** The fixture presets' names by id, for the trigger's label; built once, not on every render. */
+const fixturePresetNames = teamPresetNames(fixtureChoices);
+
 /**
  * The picker with every group it can show: the artifact's own theme JSON
  * (This artifact), the team default, a team's presets, and the built-ins,
@@ -66,7 +70,7 @@ export function GroupedThemePickerSpecimen() {
   const [theme, setTheme] = useState<StoredArtifactTheme | null>(() => builtIn("ocean"));
   const trigger = (
     <Button type="button" variant="outline" size="sm">
-      <IconPalette /> Grouped theme: {themeLabel(theme, new Map([["team:fixture-brand", "Brand"], ["team:fixture-reports", "Reports"]]))}
+      <IconPalette /> Grouped theme: {themeLabel(theme, fixturePresetNames)}
     </Button>
   );
   return <ThemePicker value={theme} onChange={setTheme} trigger={trigger} choices={fixtureChoices} />;
