@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { card, highlighted, pointOn, select } from "./support/inline-comments";
 import { closeInlineCommentsDb, storedComments } from "./support/inline-comments-db";

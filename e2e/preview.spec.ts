@@ -1,14 +1,9 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 const themes = ["light", "dark"] as const;
 
 for (const theme of themes) {
   test(`should show every component in both panels without errors when the site theme is ${theme}`, async ({ page }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (error) => errors.push(error.message));
-    page.on("console", (message) => {
-      if (message.type() === "error") errors.push(message.text().slice(0, 500));
-    });
     await page.addInitScript((value) => { window.localStorage.setItem("theme", value); }, theme);
 
     await page.goto("/preview");
@@ -25,16 +20,10 @@ for (const theme of themes) {
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
-    expect(errors).toEqual([]);
   });
 }
 
 test("should apply every preset to both panels and redraw diagrams without errors when switching themes", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text().slice(0, 500));
-  });
   await page.goto("/preview");
   await expect(page.getByRole("status").filter({ hasText: "Drawing diagram" })).toHaveCount(0, { timeout: 60_000 });
 
@@ -55,5 +44,4 @@ test("should apply every preset to both panels and redraw diagrams without error
     await expect(page.getByRole("status").filter({ hasText: "Drawing diagram" })).toHaveCount(0, { timeout: 60_000 });
     await expect(diagram).not.toHaveAttribute("src", defaultDiagram ?? "");
   }
-  expect(errors).toEqual([]);
 });

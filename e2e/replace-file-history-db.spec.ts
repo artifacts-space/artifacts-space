@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { cleanUp, devUserId, localDatabaseEnabled, localDatabaseSkipReason } from "./support/local-db";
 import { cleanUpReplacedFiles, seedReplacedFile, type ReplacedFileSeed } from "./support/replace-file-db";

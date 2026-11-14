@@ -1,17 +1,14 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 const themes = ["light", "dark"] as const;
 
 for (const theme of themes) {
   test(`should render the component gallery without errors when the theme is ${theme}`, async ({ page }, testInfo) => {
-    const errors: string[] = [];
-    page.on("pageerror", (error) => errors.push(error.message));
-    page.on("console", (message) => {
-      if (message.type() === "error") errors.push(message.text().slice(0, 500));
-    });
+    // Page errors fail the test through the shared fixture (e2e/support/test.ts).
     // Any alert means content ran code. Nothing in the gallery may do that.
+    const dialogs: string[] = [];
     page.on("dialog", (dialog) => {
-      errors.push(`Unexpected dialog: ${dialog.message()}`);
+      dialogs.push(dialog.message());
       void dialog.dismiss();
     });
     // Top frame only: the gallery's file stand-ins are data: frames, which have no storage.
@@ -25,7 +22,7 @@ for (const theme of themes) {
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
-    expect(errors).toEqual([]);
+    expect(dialogs, "no dialog opened").toEqual([]);
 
     const path = testInfo.outputPath(`gallery-${testInfo.project.name}-${theme}.png`);
     await page.screenshot({ fullPage: true, path });

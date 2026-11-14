@@ -519,6 +519,15 @@ catch this, so test the generated SQL with `.toSQL()`, as
   production HTML (for example, that theme fonts are never preloaded on pages
   that do not use them). CI splits it with `--shard=<i>/<n>`; run one shard
   locally the same way.
+- Specs import `test` and `expect` from `e2e/support/test.ts`, never from
+  `@playwright/test` (ESLint fails on it; type imports may stay). Its auto
+  fixture fails any test whose pages throw or log `console.error` (hydration
+  warnings included), in the test's context and in contexts the test opens,
+  and names each error. A test that causes an error on purpose (an aborted
+  route, blocked storage, a stubbed failure) calls
+  `allowPageError(pattern, reason)` in that test. Noise we cannot fix goes in
+  `e2e/support/known-page-errors.ts` with a one-line reason; fix the cause
+  when it is ours. `e2e/page-errors.spec.ts` proves the fixture works.
 
 ### Page column
 

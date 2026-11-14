@@ -1,4 +1,5 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { addTestMember, cleanUp, createTestArtifact, createTestTeam, createTestUser, deleteTestTeams, localDatabaseEnabled, localDatabaseSkipReason, readyDevUser, shareTestArtifact, sharingOf } from "./support/local-db";
 

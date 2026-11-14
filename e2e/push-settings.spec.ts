@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 /**
  * Notification settings with browser notifications set up, on the component
@@ -41,6 +42,8 @@ test("should list the browsers with a remove button and a test button", async ({
 test("should not ask for permission or register a service worker when the page loads", async ({ page }) => {
   // Count permission prompts and registrations; headless Chromium reports "denied" without prompting.
   await page.addInitScript(() => {
+    // Top frame only: the gallery's file stand-ins are data: frames, which have no service worker container.
+    if (window !== window.top) return;
     const counts = { prompts: 0, registrations: 0 };
     Object.assign(window, { pushCounts: counts });
     const ask = Notification.requestPermission.bind(Notification);

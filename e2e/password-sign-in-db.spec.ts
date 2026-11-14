@@ -1,7 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomBytes, randomInt, randomUUID } from "node:crypto";
 
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { cleanUp, deleteRegisteredOAuthClients, deleteReviewerAccounts, localDatabaseEnabled, localDatabaseSkipReason } from "./support/local-db";
 

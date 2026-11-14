@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { approveVersionWithCover, attachTestImage, cleanUp, createTestArtifact, devUserId, localDatabaseEnabled, localDatabaseSkipReason, storedCovers } from "./support/local-db";
 

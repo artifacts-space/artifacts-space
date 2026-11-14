@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { cleanUp, createTestUser, deleteSignInLinks, localDatabaseEnabled, localDatabaseSkipReason, testUserEmail } from "./support/local-db";
 

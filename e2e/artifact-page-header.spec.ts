@@ -1,4 +1,5 @@
-import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
+import type { Browser, Locator, Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { closeInlineEditDb, saveAsSomeoneElse } from "./support/inline-edit-db";
 import { cleanUp, createTestArtifact, localDatabaseEnabled, localDatabaseSkipReason, readyDevUser, setTestFullWidth } from "./support/local-db";

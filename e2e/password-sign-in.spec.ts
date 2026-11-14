@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { allowPageError, expect, test } from "./support/test";
 
 /**
  * Password sign-in in the browser, on a phone and a desktop viewport, with
@@ -79,6 +80,7 @@ test.describe("the public sign-in page", () => {
 
   test("should sign in with the password on Enter in the password field, and send a link only from the email field", async ({ page }) => {
     const asked: string[] = [];
+    allowPageError("/api/auth/sign-in/email", "The test answers the password sign-in with a refusal on purpose.");
     await page.route("**/api/auth/sign-in/email", (route) => {
       asked.push("password");
       return route.fulfill({ status: 401, json: { code: "INVALID_EMAIL_OR_PASSWORD", message: "Invalid email or password" } });
@@ -104,6 +106,7 @@ test.describe("the public sign-in page", () => {
     let sent = 0;
     let answer: (() => void) | undefined;
     const answered = new Promise<void>((resolve) => { answer = resolve; });
+    allowPageError("/api/auth/sign-in/email", "The test answers the password sign-in with a refusal on purpose.");
     await page.route("**/api/auth/sign-in/email", async (route) => {
       sent += 1;
       await answered;
@@ -143,6 +146,7 @@ test.describe("the public sign-in page", () => {
 
   test("should ask for the password inline without sending anything when it is empty", async ({ page }) => {
     let sent = 0;
+    allowPageError("/api/auth/sign-in/email", "The test answers the password sign-in with a refusal on purpose.");
     await page.route("**/api/auth/sign-in/email", (route) => {
       sent += 1;
       return route.fulfill({ status: 500, json: {} });
@@ -171,6 +175,7 @@ test.describe("the unlisted reviewer page", () => {
 
   test("should offer a fillable form that says what is wrong inline", async ({ page }) => {
     const request = page.waitForRequest((candidate) => candidate.url().endsWith("/api/auth/sign-in/email") && candidate.method() === "POST");
+    allowPageError("/api/auth/sign-in/email", "The test answers the password sign-in with a refusal on purpose.");
     await page.route("**/api/auth/sign-in/email", (route) => route.fulfill({ status: 401, json: { code: "INVALID_EMAIL_OR_PASSWORD", message: "Invalid email or password" } }));
     await page.goto("/sign-in/reviewer");
     await expect(form(page).getByLabel("Email")).toHaveAttribute("autocomplete", "username");
@@ -191,6 +196,7 @@ test.describe("the unlisted reviewer page", () => {
 
   test("should show the server's wait when too many tries were made", async ({ page }) => {
     const wait = "You have tried to sign in to this email address a lot in the last few minutes. Try again in 9 minutes.";
+    allowPageError("/api/auth/sign-in/email", "The test answers the password sign-in with a refusal on purpose.");
     await page.route("**/api/auth/sign-in/email", (route) => route.fulfill({ status: 429, json: { code: "RATE_LIMITED", message: wait } }));
     await page.goto("/sign-in/reviewer");
     await form(page).getByLabel("Email").fill("reviewer@example.com");

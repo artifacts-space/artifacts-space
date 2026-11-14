@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { choosePlacement, gripInset, gripMenuRule, menuEdge as edge, menuWidth, pointMenuRule, submenuOverlap, submenuWidth } from "../src/components/editor/rich/block-menu/menu-placement";
 
