@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, type ElementType, type KeyboardEvent, type ReactNode } from "react";
 
+import { hasTitleText } from "@/lib/ui/title-rules";
 import { cn } from "@/lib/utils";
 
 import { useBlockEditor } from "./block-editor-context";
@@ -84,8 +85,9 @@ function handleKey(event: KeyboardEvent<HTMLElement>, props: EditableTextProps):
 const editableClass = "block min-h-[1lh] min-w-[2ch] cursor-text rounded-sm outline-none focus-visible:bg-muted/40 empty:before:pointer-events-none empty:before:text-muted-foreground/60 empty:before:content-[attr(data-placeholder)]";
 
 /**
- * The heading around a title's text box. An empty title is no heading, as
- * in the read view, which leaves the heading out: `role="none"` keeps the
+ * The heading around a title's text box. An empty title (or one of only
+ * spaces) is no heading, as in the read view, which leaves the heading out
+ * by the same rule (hasTitleText): `role="none"` keeps the
  * element (so the box keeps focus while the first letter is typed) but
  * takes it out of the outline.
  */
@@ -141,5 +143,5 @@ export function EditableText(props: EditableTextProps) {
     />
   );
   if (!heading) return box;
-  return <TitleHeading tag={heading} empty={value === ""} className={className}>{box}</TitleHeading>;
+  return <TitleHeading tag={heading} empty={!hasTitleText(value)} className={className}>{box}</TitleHeading>;
 }

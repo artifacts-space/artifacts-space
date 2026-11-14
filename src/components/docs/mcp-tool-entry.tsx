@@ -37,7 +37,7 @@ export function McpToolEntry({ tool, result }: { tool: DocsMcpTool; result: Tool
         <InlineCodeText text={tool.description} />
       </p>
       <h5 className="mt-5 text-sm font-medium">Arguments</h5>
-      <PropsTable rows={tool.args} label="Argument" />
+      <PropsTable rows={tool.args} of={tool.name} label="Argument" />
       <h5 className="mt-5 text-sm font-medium">Returns</h5>
       <p className="mt-2 text-md leading-7 text-muted-foreground">
         <InlineCodeText text={result.summary} />

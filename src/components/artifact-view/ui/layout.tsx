@@ -5,6 +5,7 @@ import { Children, type ReactNode } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Gap } from "@/lib/ui/props/shared";
+import { hasTitleText } from "@/lib/ui/title-rules";
 import { cn } from "@/lib/utils";
 
 import type { ViewProps } from "./stout";
@@ -32,9 +33,9 @@ function hasChildren(children: ReactNode) {
 export function SectionView({ props, children }: ViewProps<"Section">) {
   return (
     <section className="min-w-0 space-y-4">
-      {props.title || props.description ? (
+      {hasTitleText(props.title) || props.description ? (
         <header className="space-y-1">
-          {props.title ? <h2 className="text-lg font-medium tracking-[-0.01em] break-words">{props.title}</h2> : null}
+          {hasTitleText(props.title) ? <h2 className="text-lg font-medium tracking-[-0.01em] break-words">{props.title}</h2> : null}
           {props.description ? <p className="text-md leading-6 text-muted-foreground break-words">{props.description}</p> : null}
         </header>
       ) : null}
@@ -67,9 +68,9 @@ export function GridView({ props, children }: ViewProps<"Grid">) {
 export function CardView({ props, children }: ViewProps<"Card">) {
   return (
     <div className="card-surface flex min-w-0 flex-col gap-3 p-4 sm:p-5">
-      {props.title || props.description ? (
+      {hasTitleText(props.title) || props.description ? (
         <div className="space-y-1">
-          {props.title ? <h3 className="text-base font-medium break-words">{props.title}</h3> : null}
+          {hasTitleText(props.title) ? <h3 className="text-base font-medium break-words">{props.title}</h3> : null}
           {props.description ? <p className="text-sm leading-5 text-muted-foreground break-words">{props.description}</p> : null}
         </div>
       ) : null}

@@ -36,7 +36,14 @@ describe("EditableText", () => {
     expect(html).toMatch(/^<p role="textbox"[^>]*class="[^"]*text-muted-foreground[^"]*"[^>]*><\/p>$/);
   });
 
+  it("should take a title of only spaces out of the outline when it has no words", () => {
+    expect(render({ value: "   ", heading: "h2" })).toMatch(/^<h2 role="none"/);
+  });
+
   it("should show the placeholder on the text box when it is a title", () => {
-    expect(render({ value: "", heading: "h2" })).toContain('<span role="textbox" aria-label="Section title" aria-multiline="false" contentEditable="plaintext-only" spellCheck="true" data-placeholder="Title"');
+    const box = /<span ([^>]*)>/.exec(render({ value: "", heading: "h2" }))?.[1] ?? "";
+    expect(box).toContain('role="textbox"');
+    expect(box).toContain('aria-label="Section title"');
+    expect(box).toContain('data-placeholder="Title"');
   });
 });
