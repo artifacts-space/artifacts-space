@@ -292,6 +292,88 @@ test.describe("desktop", () => {
     expect(problems).toEqual([]);
   });
 
+  test("should move the width on the grid and the handle alone while it changes, and on the root once it ends", async ({ page }) => {
+    await openWorkspace(page);
+    const handle = sidebarHandle(page);
+    const rootWidth = () => page.evaluate(() => document.documentElement.style.getPropertyValue("--workspace-sidebar-width"));
+    /** The live width on the workspace grid and on the handle, the two elements that read it. */
+    const liveWidths = () => handle.evaluate((element) => [element.parentElement, element].map((reader) => reader?.style.getPropertyValue("--workspace-sidebar-width-live") ?? "missing"));
+    // Not inherited: a move restyles the two readers, never the elements under the grid.
+    expect(await sidebar(page).evaluate((element) => getComputedStyle(element).getPropertyValue("--workspace-sidebar-width-live"))).toBe("");
+
+    const box = await handle.boundingBox();
+    if (!box) throw new Error("The handle is not on screen.");
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2, { steps: 4 });
+    expect(await widthOf(sidebar(page))).toBe(340);
+    expect(await liveWidths()).toEqual(["340px", "340px"]);
+    expect(await rootWidth(), "the root keeps its value while the drag moves").toBe("");
+    expect(await stored(page, sidebarKey)).toBeNull();
+    expect(await sidebar(page).evaluate((element) => getComputedStyle(element).getPropertyValue("--workspace-sidebar-width-live")), "the sidebar under the grid does not inherit it").toBe("");
+    await page.mouse.up();
+    expect(await liveWidths()).toEqual(["", ""]);
+    expect(await rootWidth()).toBe("340px");
+    expect(await stored(page, sidebarKey)).toBe("340");
+    expect(await widthOf(sidebar(page))).toBe(340);
+    expect(await sidebarEdgeGap(page)).toBeLessThan(2);
+
+    // A held arrow key repeats: the width moves on the readers, and reaches the root and storage on key up.
+    await handle.focus();
+    await page.keyboard.down("ArrowRight");
+    await page.keyboard.down("ArrowRight");
+    expect(await widthOf(sidebar(page))).toBe(372);
+    expect(await liveWidths()).toEqual(["372px", "372px"]);
+    expect(await rootWidth()).toBe("340px");
+    await page.keyboard.up("ArrowRight");
+    expect(await liveWidths()).toEqual(["", ""]);
+    expect(await rootWidth()).toBe("372px");
+    expect(await stored(page, sidebarKey)).toBe("372");
+
+    // A key still held when focus leaves is kept, and a reset clears both.
+    await page.keyboard.down("ArrowRight");
+    await handle.blur();
+    expect(await liveWidths()).toEqual(["", ""]);
+    expect(await rootWidth()).toBe("388px");
+    await page.keyboard.up("ArrowRight");
+    await handle.dblclick();
+    expect(await liveWidths()).toEqual(["", ""]);
+    expect(await rootWidth()).toBe("");
+    expect(await widthOf(sidebar(page))).toBe(280);
+  });
+
+  test("should point the cursor the only way the handle can go when the sidebar is at its smallest or largest", async ({ page }) => {
+    await openWorkspace(page);
+    const handle = sidebarHandle(page);
+    const handleCursor = () => handle.evaluate((element) => getComputedStyle(element).cursor);
+    const pageCursor = () => page.evaluate(() => document.documentElement.style.cursor);
+    const box = await handle.boundingBox();
+    if (!box) throw new Error("The handle is not on screen.");
+    const y = box.y + box.height / 2;
+
+    await page.mouse.move(box.x + box.width / 2, y);
+    await page.mouse.down();
+    expect(await pageCursor()).toBe("col-resize");
+    // Past the smallest size it can only grow, so the cursor points right, over the whole page.
+    await page.mouse.move(box.x - 300, y, { steps: 4 });
+    expect(await widthOf(sidebar(page))).toBe(272);
+    expect(await pageCursor()).toBe("e-resize");
+    // Back between the limits it points both ways again.
+    await page.mouse.move(box.x + 60, y, { steps: 4 });
+    expect(await pageCursor()).toBe("col-resize");
+    await page.mouse.move(box.x + 600, y, { steps: 4 });
+    expect(await widthOf(sidebar(page))).toBe(520);
+    expect(await pageCursor()).toBe("w-resize");
+    await page.mouse.up();
+    expect(await pageCursor()).toBe("");
+    // At rest the handle's own cursor says the same.
+    expect(await handleCursor()).toBe("w-resize");
+    await handle.press("Home");
+    expect(await handleCursor()).toBe("e-resize");
+    await handle.press("ArrowRight");
+    expect(await handleCursor()).toBe("col-resize");
+  });
+
   test("should end a cancelled drag without leaving the resize cursor on the page", async ({ page }) => {
     await openWorkspace(page);
     const handle = sidebarHandle(page);
@@ -332,6 +414,36 @@ test.describe("desktop", () => {
     const content = await page.getByRole("region", { name: "Content" }).boundingBox();
     expect(aside?.width ?? 0, "the stored width does not apply").toBeGreaterThan(700);
     expect(content?.y ?? 0, "the artifact sits under the sidebar").toBeGreaterThan((aside?.y ?? 0) + (aside?.height ?? 0) - 1);
+  });
+});
+
+test.describe("touch screen", () => {
+  test.skip(({ isMobile }) => isMobile, "phones have no handles; checked below");
+  test.use({ hasTouch: true });
+
+  test("should give a finger a wider handle that reaches over the sidebar's edge and stays clear of Hide the sidebar", async ({ page }) => {
+    await openWorkspace(page, { width: 1280, height: 800 });
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches), "the test runs with a coarse pointer").toBe(true);
+    const handle = sidebarHandle(page);
+    const [box, aside, hide] = await Promise.all([handle.boundingBox(), sidebar(page).boundingBox(), page.getByRole("button", { name: "Hide the sidebar" }).boundingBox()]);
+    if (!box || !aside || !hide) throw new Error("The handle, the sidebar, or its Hide button is not on screen.");
+    const edge = aside.x + aside.width;
+    expect(Math.round(box.x - edge), "it starts 8px before the sidebar's edge").toBe(-8);
+    expect(Math.round(box.width)).toBe(20);
+    expect(hide.x + hide.width, "the Hide button stays outside the handle").toBeLessThanOrEqual(box.x);
+    // The line stays on the border, not on the handle's new left edge.
+    const line = await handle.evaluate((element) => Math.round(element.getBoundingClientRect().left + Number.parseFloat(getComputedStyle(element, "::after").left)));
+    expect(Math.abs(line - Math.round(edge))).toBeLessThanOrEqual(1);
+
+    // A press on the sidebar's side of the border drags it.
+    const y = box.y + box.height / 2;
+    await page.mouse.move(edge - 6, y);
+    await page.mouse.down();
+    await page.mouse.move(edge + 54, y, { steps: 4 });
+    await page.mouse.up();
+    expect(await widthOf(sidebar(page))).toBe(340);
+    await page.getByRole("button", { name: "Hide the sidebar" }).click();
+    await expect(sidebar(page)).toBeHidden();
   });
 });
 
