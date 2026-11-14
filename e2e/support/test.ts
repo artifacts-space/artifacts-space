@@ -14,6 +14,16 @@ export { expect } from "@playwright/test";
 /** Errors each running test allows on purpose, by its TestInfo. */
 const allowancesByTest = new WeakMap<TestInfo, PageErrorAllowance[]>();
 
+/** Errors each running test's pages reported so far, by its TestInfo. */
+const errorsByTest = new WeakMap<TestInfo, PageError[]>();
+
+/** The message the fixture fails the test with, or null when every error was allowed. */
+function failureReport(testInfo: TestInfo): string | null {
+  const allowances = [...knownPageErrors, ...(allowancesByTest.get(testInfo) ?? [])];
+  const unexpected = unexpectedPageErrors(errorsByTest.get(testInfo) ?? [], allowances);
+  return unexpected.length > 0 ? pageErrorReport(unexpected, allowances) : null;
+}
+
 /** Reports every uncaught exception and error-level console message from any page of a context. */
 function watchContext(context: BrowserContext, errors: PageError[]): void {
   context.on("weberror", (webError) => {
@@ -48,20 +58,21 @@ function watchNewContexts(browser: Browser, errors: PageError[]): () => void {
  * Every spec imports `test` and `expect` from here, never from
  * `@playwright/test`. The auto fixture `failOnPageErrors` collects uncaught
  * page errors and `console.error` messages (hydration warnings included) from
- * every page the test opens, and fails the test at the end, naming each one.
+ * every page the test opens, and fails the test at the end, naming the
+ * first few and the allowances in force.
  */
 export const test = base.extend<{ failOnPageErrors: undefined }>({
   failOnPageErrors: [
     async ({ context, browser }, use, testInfo) => {
       const errors: PageError[] = [];
+      errorsByTest.set(testInfo, errors);
       watchContext(context, errors);
       const restore = watchNewContexts(browser, errors);
       // `use` resolves when the test ends, whether it passed or failed.
       await use(undefined);
       restore();
-      const allowances = [...knownPageErrors, ...(allowancesByTest.get(testInfo) ?? [])];
-      const unexpected = unexpectedPageErrors(errors, allowances);
-      if (unexpected.length > 0) throw new Error(pageErrorReport(unexpected));
+      const report = failureReport(testInfo);
+      if (report) throw new Error(report);
     },
     { auto: true },
   ],
@@ -79,4 +90,13 @@ export function allowPageError(pattern: RegExp | string, reason: string): void {
   const allowances = allowancesByTest.get(info) ?? [];
   allowances.push({ pattern, reason });
   allowancesByTest.set(info, allowances);
+}
+
+/**
+ * The message the running test would fail with if it ended now, or null
+ * when it would pass. Only `e2e/page-errors.spec.ts` needs it, to check the
+ * message itself.
+ */
+export function pageErrorReportSoFar(): string | null {
+  return failureReport(test.info());
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { ClaudeDesktopGuide } from "@/components/setup/client-guides";
 import { CodexGuide, GrokBotGuide } from "@/components/setup/codex-grok-guides";
-import { desktopApps } from "@/lib/setup/client-installs";
+import { desktopApps, GROK_CONNECTOR_NAME } from "@/lib/setup/client-installs";
 
 import { DesktopAppInstalls } from "./desktop-app-installs";
 
@@ -130,6 +130,8 @@ describe("check the connection", () => {
 
   it("should point to Installed in Connect Apps and say what each status means when checking Grok Bot", () => {
     const step = checkStep(renderToStaticMarkup(<GrokBotGuide origin={origin} />));
+    expect(GROK_CONNECTOR_NAME).toBe("artifacts.space");
+    expect(step, "the step names the connector to look for").toContain(`<strong>${GROK_CONNECTOR_NAME}</strong> shows under <strong>Installed</strong>`);
     for (const words of ["<strong>Installed</strong>", "<strong>Added</strong> means it is installed but not signed in yet", "<strong>Needs auth</strong> or <strong>Disconnected</strong>", "<strong>Authenticate</strong>"]) {
       expect(step).toContain(words);
     }

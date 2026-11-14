@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { knownPageErrors } from "./known-page-errors";
-import { allowanceCovers, consoleMessageKind, pageErrorReport, unexpectedPageErrors, type PageError } from "./page-error-rules";
+import {
+  allowanceCovers,
+  consoleMessageKind,
+  listedErrorLimit,
+  pageErrorReport,
+  unexpectedPageErrors,
+  type PageError,
+} from "./page-error-rules";
 
 const thrown: PageError = { kind: "pageerror", text: "TypeError: x is undefined", url: "http://localhost/app" };
 const logged: PageError = { kind: "console.error", text: "Failed to load resource: 500", url: "http://localhost/api/x" };
@@ -59,6 +66,34 @@ describe("pageErrorReport", () => {
     const report = pageErrorReport([{ kind: "console.error", text: "a".repeat(5_000), url: "" }]);
     expect(report).toContain("(4000 more characters)");
     expect(report.length).toBeLessThan(1_400);
+  });
+
+  it("should list only the first errors and count the rest when a test logs hundreds", () => {
+    const errors = Array.from({ length: 250 }, (_, index): PageError => ({ kind: "console.error", text: `error number ${String(index + 1)}`, url: "" }));
+    const report = pageErrorReport(errors);
+    expect(report).toContain("250 unexpected errors");
+    expect(report).toContain(`${String(listedErrorLimit)}. console.error: error number ${String(listedErrorLimit)}`);
+    expect(report).not.toContain(`error number ${String(listedErrorLimit + 1)}`);
+    expect(report).toContain(`… and ${String(250 - listedErrorLimit)} more.`);
+  });
+
+  it("should not count more errors when every error is listed", () => {
+    const errors = Array.from({ length: listedErrorLimit }, (): PageError => thrown);
+    expect(pageErrorReport(errors)).not.toContain("more.");
+  });
+
+  it("should name each allowance in force with its pattern and reason when the test allowed some", () => {
+    const report = pageErrorReport([thrown], [
+      { pattern: "net::ERR_FAILED", reason: "The test aborts the route." },
+      { pattern: /ChunkLoadError/i, reason: "The import fails for good." },
+    ]);
+    expect(report).toContain("Already allowed in this test:");
+    expect(report).toContain(`- "net::ERR_FAILED": The test aborts the route.`);
+    expect(report).toContain("- /ChunkLoadError/i: The import fails for good.");
+  });
+
+  it("should say nothing is allowed when the test allowed nothing", () => {
+    expect(pageErrorReport([thrown], [])).toContain("Nothing is allowed in this test.");
   });
 });
 
