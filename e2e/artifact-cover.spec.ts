@@ -60,7 +60,7 @@ test("should add, change, and remove a cover as saved versions when an editor us
 
   await cover.hover();
   await page.getByRole("button", { name: "Change cover" }).click();
-  await page.getByRole("radio", { name: "Dusk" }).click();
+  await page.getByRole("option", { name: "Dusk" }).click();
   await expect(cover.locator('[data-cover-gradient="dusk"]')).toBeVisible();
   await expect.poll(async () => (await storedCovers(publicId)).artifact).toBe("dusk");
   // Each save is filed as a version (quick saves by the same editor merge into the newest one).

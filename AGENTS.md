@@ -528,6 +528,21 @@ catch this, so test the generated SQL with `.toSQL()`, as
   `allowPageError(pattern, reason)` in that test. Noise we cannot fix goes in
   `e2e/support/known-page-errors.ts` with a one-line reason; fix the cause
   when it is ours. `e2e/page-errors.spec.ts` proves the fixture works.
+- Accessibility: `e2e/a11y-*.spec.ts` run axe (`@axe-core/playwright`) with
+  `expectNoAxeViolations` from `e2e/support/a11y.ts`, which scans a page, or
+  only what a locator matches, and fails listing each rule, its help, and the
+  failing nodes' selectors. Scan a hand-built interactive piece in each state
+  it has (closed, open, empty, an item highlighted, a submenu open), once
+  that state is on screen and the page is interactive, on `desktop` and
+  `phone` when both show it. Pair it with `toMatchAriaSnapshot` where the
+  tree is the point (menus, listboxes, pickers, splitters). A new menu,
+  picker, or composite widget gets a scan. Fix what a scan finds; when the
+  fix is bigger than the change at hand, skip the rule for that one scan,
+  only on the nodes at fault where you can
+  (`skip: { "<rule>": { on: "<selector>", reason: "<why>" } }`, or
+  `{ "<rule>": "<why>" }` for the whole scan), and record it in the pull
+  request. Contrast findings are design decisions: report them, never change
+  tokens to pass.
 
 ### Page column
 

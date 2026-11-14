@@ -37,9 +37,23 @@ function nextIndex(key: string, current: number, count: number): number | null {
 }
 
 /**
+ * Scrolls the list, and only the list, until the highlighted option shows.
+ * Focus stays in the document, so the browser never does it on its own.
+ */
+function revealOption(index: number) {
+  const option = document.getElementById(optionId(index));
+  const list = option?.closest("[data-slot=slash-menu]");
+  if (!option || !(list instanceof HTMLElement)) return;
+  const shown = list.getBoundingClientRect();
+  const box = option.getBoundingClientRect();
+  if (box.top < shown.top) list.scrollTop -= shown.top - box.top;
+  else if (box.bottom > shown.bottom) list.scrollTop += box.bottom - shown.bottom;
+}
+
+/**
  * The list under a typed slash. Focus stays in the document; arrow keys move
- * the highlight, Enter or Tab inserts, Escape closes. The document's
- * `aria-activedescendant` points at the highlighted option.
+ * the highlight (scrolled into view), Enter or Tab inserts, Escape closes.
+ * The document's `aria-activedescendant` points at the highlighted option.
  */
 function SlashMenuList({ items, command, onActive, ref }: SlashMenuProps) {
   const [active, setActive] = useState(0);
@@ -50,6 +64,7 @@ function SlashMenuList({ items, command, onActive, ref }: SlashMenuProps) {
   }
 
   useEffect(() => { onActive(items.length > 0 ? active : -1); }, [active, items.length, onActive]);
+  useEffect(() => { revealOption(active); }, [active, items]);
 
   useImperativeHandle(ref, () => ({
     onKeyDown: (event) => {
@@ -100,13 +115,21 @@ function SlashMenuList({ items, command, onActive, ref }: SlashMenuProps) {
 export const floatingMenuClass =
   "z-50 rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none";
 
-function setComboboxState(editor: Editor, open: boolean, activeIndex = -1) {
+/**
+ * Which list the editor's suggestions are in and which one is highlighted,
+ * for screen readers. The editor keeps the textbox role, which supports
+ * `aria-autocomplete`, `aria-controls`, and `aria-activedescendant` but not
+ * `aria-expanded` (as in the comment box's mention list).
+ */
+function setComboboxState(editor: Editor, activeIndex: number) {
   const dom = editor.view.dom;
-  dom.setAttribute("aria-expanded", String(open));
-  if (open) dom.setAttribute("aria-controls", listboxId);
-  else dom.removeAttribute("aria-controls");
-  if (open && activeIndex >= 0) dom.setAttribute("aria-activedescendant", optionId(activeIndex));
-  else dom.removeAttribute("aria-activedescendant");
+  if (activeIndex >= 0) {
+    dom.setAttribute("aria-controls", listboxId);
+    dom.setAttribute("aria-activedescendant", optionId(activeIndex));
+    return;
+  }
+  dom.removeAttribute("aria-controls");
+  dom.removeAttribute("aria-activedescendant");
 }
 
 type SlashProps = SuggestionProps<SlashCommand, SlashCommand>;
@@ -115,7 +138,7 @@ function menuProps(props: SlashProps) {
   return {
     items: props.items,
     command: (item: SlashCommand) => { props.command(item); },
-    onActive: (index: number) => { setComboboxState(props.editor, true, index); },
+    onActive: (index: number) => { setComboboxState(props.editor, index); },
   };
 }
 
@@ -136,7 +159,7 @@ function renderSlashMenu(): ReturnType<NonNullable<SuggestionOptions<SlashComman
       renderer?.destroy();
       renderer = null;
       unmount = null;
-      setComboboxState(props.editor, false);
+      setComboboxState(props.editor, -1);
     },
   };
 }

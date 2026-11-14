@@ -27,7 +27,7 @@ test("should save and render the theme an editor picks on the artifact page", as
   const scope = page.locator("[data-artifact-theme]");
   await expect(scope).toHaveAttribute("data-artifact-theme", "default");
   await page.getByRole("button", { name: "Choose a theme" }).click();
-  await page.getByRole("radio", { name: /^Editorial:/ }).click();
+  await page.getByRole("option", { name: /^Editorial:/ }).click();
 
   await expect(scope).toHaveAttribute("data-artifact-theme", "editorial");
   await expect(page.getByRole("heading", { level: 1, name: `Theme e2e ${testInfo.project.name}` })).toHaveCSS("font-family", /^"Instrument Serif"/);

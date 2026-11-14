@@ -45,7 +45,7 @@ test.describe("desktop", () => {
     await expect(search).not.toBeFocused();
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
-    await page.getByRole("button", { name: "Workspace: Your artifacts. Switch workspace" }).click();
+    await page.getByRole("button", { name: "Workspace: Your artifacts, Personal workspace. Switch workspace" }).click();
     await expect(page.getByRole("menu")).toBeVisible();
     await page.keyboard.press("/");
     await expect(page.getByRole("menu")).toBeVisible();
@@ -116,7 +116,7 @@ test.describe("desktop", () => {
 test("should name the team in the workspace switcher and the heading, and offer no New artifact on a team workspace", async ({ page }) => {
   await page.goto("/dev/workspace?scopes=1&team=fixture-shared-2");
   await expect(page.getByText("Checkout v2 rollout").first()).toBeVisible();
-  const switcher = page.getByRole("button", { name: "Workspace: Customer research. Switch workspace" });
+  const switcher = page.getByRole("button", { name: "Workspace: Customer research, Team workspace. Switch workspace" });
   await expect(switcher).toContainText("Team workspace");
   await expect(page.getByRole("heading", { level: 1, name: "Shared with Customer research" })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "New artifact" }), "team workspaces list others' work").toHaveCount(0);
@@ -128,12 +128,12 @@ test("should name the team in the workspace switcher and the heading, and offer 
   await expect(page.getByRole("menuitem", { name: /Your artifacts/ })).toHaveAttribute("href", "/dev/workspace");
   await page.getByRole("menuitem", { name: /Your artifacts/ }).click();
   await expect(page).toHaveURL(/\/dev\/workspace$/);
-  await expect(page.getByRole("button", { name: "Workspace: Your artifacts. Switch workspace" })).toContainText("Personal workspace");
+  await expect(page.getByRole("button", { name: "Workspace: Your artifacts, Personal workspace. Switch workspace" })).toContainText("Personal workspace");
 });
 
 test("should mark each workspace with its avatar: the viewer's own, a team's icon, or the team's pixel avatar", async ({ page }) => {
   await page.goto("/dev/workspace?scopes=1&team=fixture-shared-0");
-  const switcher = page.getByRole("button", { name: "Workspace: Design. Switch workspace" });
+  const switcher = page.getByRole("button", { name: "Workspace: Design, Team workspace. Switch workspace" });
   const triggerAvatar = switcher.locator("[data-team-icon=avatar]");
   await expect(triggerAvatar.locator("svg")).toHaveAttribute("data-avatar-kind", "team");
   // Computed, since the server and the browser write the same style with different spacing.
@@ -216,7 +216,7 @@ test.describe("phone", () => {
 
   test("should give every workspace switcher item a 44px touch target", async ({ page }) => {
     await page.goto("/dev/workspace?scopes=1");
-    await page.getByRole("button", { name: "Workspace: Your artifacts. Switch workspace" }).click();
+    await page.getByRole("button", { name: "Workspace: Your artifacts, Personal workspace. Switch workspace" }).click();
     const items = page.getByRole("menuitem");
     await expect(items).toHaveCount(6);
     for (const item of await items.all()) {

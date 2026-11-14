@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { docsHeading, type DocsHeading, type DocsSlug } from "@/lib/docs/pages";
 import { cn } from "@/lib/utils";
 
+import { ScrollFrame } from "./scroll-frame";
+
 /**
  * Building blocks for docs pages. Headings take their id and title from the
  * page registry (src/lib/docs/pages.ts), so the sidebar search, "On this
@@ -66,10 +68,16 @@ export function Code({ children }: { children: ReactNode }) {
   return <code className="inline-code">{children}</code>;
 }
 
+/** The name a table's frame takes while it scrolls: its column headings, or "Table" without them. */
+function tableLabel(head: readonly string[]): string {
+  const named = head.filter(Boolean);
+  return named.length > 0 ? `Table: ${named.join(", ")}` : "Table";
+}
+
 /** A simple table for facts, outside Prose. Rows are cells in order. All-empty `head` cells leave out the header row. */
 export function FactTable({ head, rows, mono = [0] }: { head: string[]; rows: ReactNode[][]; mono?: number[] }) {
   return (
-    <div className="card-surface mt-6 overflow-x-auto">
+    <ScrollFrame label={tableLabel(head)} className="card-surface mt-6 overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         {head.some(Boolean) ? (
           <thead className="bg-muted/50">
@@ -88,7 +96,7 @@ export function FactTable({ head, rows, mono = [0] }: { head: string[]; rows: Re
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollFrame>
   );
 }
 
