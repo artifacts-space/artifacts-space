@@ -46,7 +46,8 @@ const pageStructureRules = ["region", "landmark-one-main", "page-has-heading-one
 /** Marks the elements a locator matches so axe can be told to scan only them. */
 const scanAttribute = "data-a11y-scan";
 
-interface Violation {
+/** One rule's result from an axe run, of either kind: a violation, or nodes the rule could not judge (`incomplete`). */
+interface AxeRuleResult {
   id: string;
   help: string;
   helpUrl: string;
@@ -54,7 +55,7 @@ interface Violation {
 }
 
 /** One line per violation, then one indented line per failing node: its selector and what is wrong. */
-function report(violations: readonly Violation[]): string {
+function report(violations: readonly AxeRuleResult[]): string {
   return violations
     .map((violation) => {
       const nodes = violation.nodes.map((node) => {
@@ -92,16 +93,16 @@ function builder(page: Page, token: string | null): AxeBuilder {
  * because axe's own `exclude` cannot take out a node the scan was told to
  * include.
  */
-async function withoutNodesOn(page: Page, entries: readonly Violation[], selector: string): Promise<Violation[]> {
-  const kept: Violation[] = [];
-  for (const violation of entries) {
-    const targets = violation.nodes.map((node) => {
+async function withoutNodesOn(page: Page, entries: readonly AxeRuleResult[], selector: string): Promise<AxeRuleResult[]> {
+  const kept: AxeRuleResult[] = [];
+  for (const entry of entries) {
+    const targets = entry.nodes.map((node) => {
       const last = node.target.at(-1);
       return typeof last === "string" ? last : "";
     });
     const skipped = await page.evaluate(({ list, on }) => list.map((target) => target !== "" && document.querySelector(target)?.matches(on) === true), { list: targets, on: selector });
-    const nodes = violation.nodes.filter((_, index) => skipped[index] !== true);
-    if (nodes.length > 0) kept.push({ ...violation, nodes });
+    const nodes = entry.nodes.filter((_, index) => skipped[index] !== true);
+    if (nodes.length > 0) kept.push({ ...entry, nodes });
   }
   return kept;
 }
@@ -116,7 +117,7 @@ export const unjudgedNote = "axe could not judge";
  * same finding is listed once, however often the scan runs again (a retried
  * scan reads the same nodes each time).
  */
-function noteUnjudged(page: Page, incomplete: readonly Violation[]): void {
+function noteUnjudged(page: Page, incomplete: readonly AxeRuleResult[]): void {
   const { annotations } = test.info();
   for (const entry of incomplete) {
     if (entry.nodes.length === 0) continue;
@@ -132,7 +133,7 @@ function noteUnjudged(page: Page, incomplete: readonly Violation[]): void {
  * nodes), there is nothing to run here and the narrowed pass does the work;
  * `ran` says how many rules this pass ran, so a scan that runs none can fail.
  */
-async function mainPass(page: Page, token: string | null, left: readonly string[], only: readonly string[] | undefined): Promise<{ violations: Violation[]; incomplete: Violation[]; ran: number | null }> {
+async function mainPass(page: Page, token: string | null, left: readonly string[], only: readonly string[] | undefined): Promise<{ violations: AxeRuleResult[]; incomplete: AxeRuleResult[]; ran: number | null }> {
   if (!only) return { ...(await builder(page, token).disableRules([...left]).analyze()), ran: null };
   const wanted = only.filter((rule) => !left.includes(rule));
   if (wanted.length === 0) return { violations: [], incomplete: [], ran: 0 };
@@ -156,8 +157,8 @@ function narrowedSkips(skip: SkippedRules, only: readonly string[] | undefined):
  * kept everywhere but there. With `only`, what the rule could not judge
  * outside those nodes is recorded here, since the first pass left the rule out.
  */
-async function narrowedPass(page: Page, token: string | null, skips: readonly NarrowedSkip[], recordUnjudged: boolean): Promise<Violation[]> {
-  const violations: Violation[] = [];
+async function narrowedPass(page: Page, token: string | null, skips: readonly NarrowedSkip[], recordUnjudged: boolean): Promise<AxeRuleResult[]> {
+  const violations: AxeRuleResult[] = [];
   // One after another: axe cannot run twice at once in a page.
   for (const [rule, why] of skips) {
     const narrowed = await builder(page, token).withRules([rule]).analyze();
@@ -173,7 +174,7 @@ async function narrowedPass(page: Page, token: string | null, skips: readonly Na
  * nodes, everywhere but there. A scan left with no rule to run throws: it
  * would pass having checked nothing.
  */
-async function runRules(page: Page, token: string | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<Violation[]> {
+async function runRules(page: Page, token: string | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<AxeRuleResult[]> {
   const partOnly = token ? pageStructureRules : [];
   const main = await mainPass(page, token, [...partOnly, ...Object.keys(skip)], only);
   const skips = narrowedSkips(skip, only);
@@ -185,7 +186,7 @@ async function runRules(page: Page, token: string | null, skip: SkippedRules, on
   return [...main.violations, ...(await narrowedPass(page, token, skips, only !== undefined))];
 }
 
-async function analyze(page: Page, scope: Locator | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<Violation[]> {
+async function analyze(page: Page, scope: Locator | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<AxeRuleResult[]> {
   if (!scope) return runRules(page, null, skip, only);
   const token = `scan-${String(Date.now())}-${String(Math.random()).slice(2, 8)}`;
   await scope.evaluateAll((elements, value) => { for (const element of elements) element.setAttribute("data-a11y-scan", value); }, token);
