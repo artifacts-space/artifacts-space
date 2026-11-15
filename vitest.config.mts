@@ -2,8 +2,8 @@ import { fileURLToPath } from "node:url";
 
 import { configDefaults, defineConfig } from "vitest/config";
 
-/** Tests that run SQL against the one shared test database (TEST_DATABASE_URL). */
-const databaseTests = ["src/**/*.db.test.ts", "scripts/**/*.db.test.ts"];
+/** Tests that run SQL against the one shared test database (TEST_DATABASE_URL), wherever they live. */
+const databaseTests = ["**/*.db.test.ts"];
 
 export default defineConfig({
   resolve: {
