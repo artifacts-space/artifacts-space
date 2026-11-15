@@ -213,7 +213,7 @@ const entryTemplates: readonly UiTemplate[] = [
         "close-menu": { type: "Button", props: { label: "Close navigation", icon: "x", iconOnly: true, variant: "ghost" }, visible: { $state: "/open" }, on: { press: { action: "setState", params: { statePath: "/open", value: false } } } },
         "page-title": { type: "Heading", props: { text: "Projects", level: 1, size: "md" } },
         "top-right": { type: "Box", props: { direction: "horizontal", align: "center", gap: "sm" }, children: ["search-box", "alerts", "me"] },
-        "search-box": { type: "Box", props: { hideBelow: "sm" }, children: ["search"] },
+        "search-box": { type: "Box", props: { hideBelow: "md" }, children: ["search"] },
         search: { type: "Input", props: { label: "Search", type: "search", placeholder: "Search projects", hideLabel: true } },
         alerts: { type: "Button", props: { label: "Notifications", icon: "bell", iconOnly: true, variant: "ghost" } },
         me: { type: "Avatar", props: { name: "Dana Whitfield" } },

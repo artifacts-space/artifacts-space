@@ -335,7 +335,7 @@ export const appScreenTemplates: readonly UiTemplate[] = [
       { what: "Countries", element: "country", prop: "options" },
       { what: "Note under the payment fields", element: "pay-note", prop: "text" },
       { what: "Items in the order, each with a name, a detail, and a price", state: "/items" },
-      { what: "Totals", element: "totals", prop: "items" },
+      { what: "Totals; the Delivery and Total rows switch with the delivery speed", element: "totals", prop: "items" },
       { what: "Pay button label", element: "pay", prop: "label" },
     ],
     fragment: {
@@ -390,15 +390,16 @@ export const appScreenTemplates: readonly UiTemplate[] = [
         "item-name": { type: "Text", props: { text: { $item: "name" }, weight: "medium" } },
         "item-detail": { type: "Text", props: { text: { $item: "detail" }, size: "sm", tone: "muted" } },
         "item-price": { type: "Text", props: { text: { $item: "price" } } },
+        // Written copy, not sums: the Delivery and Total rows only switch between two written values with /speed. Change them together.
         totals: {
           type: "KeyValue",
           props: {
             columns: 1,
             items: [
               { label: "Subtotal", value: 62, format: "currency" },
-              { label: "Delivery", value: "Free" },
+              { label: "Delivery", value: { $cond: { $state: "/speed", eq: "Express, next working day" }, $then: "$12", $else: "Free" } },
               { label: "Tax", value: 4.96, format: "currency" },
-              { label: "Total", value: 66.96, format: "currency" },
+              { label: "Total", value: { $cond: { $state: "/speed", eq: "Express, next working day" }, $then: 78.96, $else: 66.96 }, format: "currency" },
             ],
           },
         },
