@@ -2,6 +2,7 @@
 
 import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 
+import { ScrollFrame } from "@/components/code/scroll-frame";
 import { Button } from "@/components/ui/button";
 import { scalePosition, tickLabelWidth, type ChartScale } from "@/lib/ui/chart-scale";
 import { formatNumber, missingValue, sharedFractionDigits } from "@/lib/ui/number-format";
@@ -119,28 +120,32 @@ interface TableProps {
   textColumns?: number;
 }
 
-/** The data table behind a chart: hidden for screen readers until shown. */
+/**
+ * The data table behind a chart: kept for screen readers while the chart
+ * shows, and drawn in its place when a reader asks for it. Drawn, it scrolls
+ * past 18rem, and while it does it is a named tab stop (scroll-frame.tsx).
+ */
 export function ChartTable({ head, rows, visible, textColumns = 1 }: TableProps) {
-  return (
-    <div className={visible ? "max-h-72 overflow-auto rounded-md border" : "sr-only"}>
-      <table className="w-full text-sm">
-        <thead className="sticky top-0 bg-card">
-          <tr>
-            {head.map((name, index) => <th key={name + String(index)} scope="col" className={cn("border-b px-3 py-1.5 font-medium text-muted-foreground", index < textColumns ? "text-left" : "text-right")}>{name}</th>)}
+  const table = (
+    <table className="w-full text-sm">
+      <thead className="sticky top-0 bg-card">
+        <tr>
+          {head.map((name, index) => <th key={name + String(index)} scope="col" className={cn("border-b px-3 py-1.5 font-medium text-muted-foreground", index < textColumns ? "text-left" : "text-right")}>{name}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.key} className="border-b last:border-b-0">
+            {row.cells.map((cell, index) => index === 0
+              ? <th key={index} scope="row" className="px-3 py-1 text-left font-normal break-words">{cell}</th>
+              : <td key={index} className={cn("px-3 py-1", index < textColumns ? "text-left break-words" : "text-right tabular-nums")}>{cell}</td>)}
           </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.key} className="border-b last:border-b-0">
-              {row.cells.map((cell, index) => index === 0
-                ? <th key={index} scope="row" className="px-3 py-1 text-left font-normal break-words">{cell}</th>
-                : <td key={index} className={cn("px-3 py-1", index < textColumns ? "text-left break-words" : "text-right tabular-nums")}>{cell}</td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+        ))}
+      </tbody>
+    </table>
   );
+  if (!visible) return <div className="sr-only">{table}</div>;
+  return <ScrollFrame label="Chart data" className="max-h-72 overflow-auto rounded-md border">{table}</ScrollFrame>;
 }
 
 interface FrameProps {

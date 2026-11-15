@@ -1,9 +1,9 @@
 import { highlightCode } from "#syntax-highlight";
 
 import { CodeBlock } from "@/components/code/code-block";
+import { ScrollFrame } from "@/components/code/scroll-frame";
 import { prettyJson } from "@/lib/pretty-json";
 import { checkSvg, svgDataUri } from "@/lib/svg";
-import { cn } from "@/lib/utils";
 
 import { ViewNotice } from "./view-notice";
 
@@ -47,7 +47,9 @@ export function SvgView({ content, title }: { content: string; title: string }) 
     return (
       <div className="space-y-3">
         <ViewNotice tone="warning" title="This SVG could not be shown.">{check.error}</ViewNotice>
-        <pre className={cn(sourceClass, "max-h-80 overflow-auto")}>{content}</pre>
+        <ScrollFrame label="SVG source" className="max-h-80 overflow-auto">
+          <pre className={sourceClass}>{content}</pre>
+        </ScrollFrame>
       </div>
     );
   }

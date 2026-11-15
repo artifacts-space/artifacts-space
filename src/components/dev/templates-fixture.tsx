@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 import { UiView } from "@/components/artifact-view/ui-view";
-import { ScrollFrame } from "@/components/docs/scroll-frame";
+import { ScrollFrame } from "@/components/code/scroll-frame";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { useHydrated } from "@/components/use-hydrated";
 import { templateFrameWidths, type TemplateFrameWidth } from "@/lib/ui/templates/frames";
