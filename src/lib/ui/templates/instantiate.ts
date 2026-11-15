@@ -20,8 +20,9 @@ import { TemplateError, templateBudget, templateNamePattern, type TemplateElemen
  * - element keys: the `elements` map, `root`, and each `children` list;
  * - state paths: `$state` and `$bindState` anywhere in `props`, `visible`,
  *   `repeat`, and `on` (a condition, a `$cond`, an action's value),
- *   `statePath` (a `repeat`, and the params of setState, pushState,
- *   removeState, and validateForm), `clearStatePath` (pushState), and each
+ *   `statePath` (a `repeat`, and the params of setState, toggleState,
+ *   pushState, removeState, and validateForm), `clearStatePath`
+ *   (pushState), and each
  *   `${/path}` inside a `$template` string;
  * - left alone: `$item` and `$bindItem` (a field of the repeat's current
  *   item), a `repeat`'s `key` (an item field), and a bare `${name}` in a

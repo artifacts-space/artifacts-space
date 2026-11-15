@@ -10,11 +10,13 @@ import { expect, test } from "./support/test";
 
 /*
  * Every section template (src/lib/ui/templates), drawn by the real renderer
- * on the fixture page /dev/templates at the widths it is made for: 1440,
- * 768, and 390 pixels. The page draws one category at a time
- * (`?category=`), so it stays light however many templates there are. The
- * loops read the index, so a template added to a batch file is covered here
- * with no test of its own, and each failure names the template.
+ * on the fixture page /dev/templates in the frames its viewport names
+ * (templateFrameWidths): 1440, 768, and 390 pixels for a fluid template,
+ * 1440 and 768 for a wide one, 390 for a phone one. The page draws one
+ * category at a time (`?category=`), so it stays light however many
+ * templates there are. The loops read the index, so a template added to a
+ * batch file is covered here with no test of its own, and each failure
+ * names the template.
  */
 
 /** The categories that have templates. Every template has one category, so the loops below reach every template. */

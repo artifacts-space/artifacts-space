@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { actionHides, actionLabels, oneWayReasons, pictureLabels, pressButtons } from "./behavior";
+import { allowedActions } from "../validate-element";
+
+import { actionHides, actionLabels, oneWayReasons, pictureLabels, pressButtons, stateActions, unpressedActions } from "./behavior";
 import type { TemplateElement, UiTemplate } from "./types";
 
 /** A navbar in small: links from a list, a sign-in link, a menu that opens and closes, a form that sends, and a picture. */
@@ -105,6 +107,80 @@ describe("pressButtons, for a push and a remove", () => {
   });
 });
 
+describe("pressButtons, for a toggle", () => {
+  const toggle = (label: string, statePath = "/open"): TemplateElement => ({ type: "Button", props: { label }, on: { press: { action: "toggleState", params: { statePath } } } });
+  const find = (template: UiTemplate, label: string) => pressButtons(template).buttons.find((button) => button.label === label);
+
+  it("should read a toggle as a press its own button undoes, whether its path starts false or true", () => {
+    expect(find(sample({ flip: toggle("Menu") }), "Menu")).toMatchObject({ action: "toggleState", statePath: "/open", changesStart: true, oneWay: null });
+    expect(find(sample({ flip: toggle("Menu") }), "Menu")?.restoredBy[0]).toBe("Menu");
+    expect(find(sample({ flip: toggle("Menu") }, { open: true }), "Menu")).toMatchObject({ changesStart: true, oneWay: null });
+    expect(find(sample({ flip: toggle("Menu") }, { open: true }), "Menu")?.restoredBy[0]).toBe("Menu");
+  });
+
+  it("should name its own button first, then a button that writes the starting value back", () => {
+    // The sample's "Close menu" writes false to /open, where the menu starts; "Open menu" writes true and undoes nothing.
+    expect(find(sample({ flip: toggle("Menu") }), "Menu")?.restoredBy).toEqual(["Menu", "Close menu"]);
+    expect(find(sample({ flip: toggle("Menu") }, { open: true }), "Menu")?.restoredBy).toEqual(["Menu", "Open menu"]);
+  });
+
+  it("should let a toggle undo a setState on its path, and only one that leaves the other boolean", () => {
+    expect(find(sample({ flip: toggle("Menu") }), "Open menu")?.restoredBy).toEqual(["Close menu", "Menu"]);
+    const words: Record<string, TemplateElement> = {
+      flip: toggle("Menu", "/plan"),
+      pick: { type: "Button", props: { label: "Pick Solo" }, on: { press: { action: "setState", params: { statePath: "/plan", value: "Solo" } } } },
+    };
+    // After "Pick Solo" the path holds a word; a toggle would leave true, not the starting "Team".
+    expect(find(sample(words), "Pick Solo")).toMatchObject({ restoredBy: [], oneWay: oneWayReasons.setState });
+  });
+
+  it("should find a toggle whose label is a $cond by the words it shows at the start, and name the other branch to undo it", () => {
+    const flip: TemplateElement = { type: "Button", props: { label: { $cond: { $state: "/sent" }, $then: "Hide details", $else: "Show details" } }, on: { press: { action: "toggleState", params: { statePath: "/sent" } } } };
+    expect(find(sample({ flip }), "Show details")).toMatchObject({ action: "toggleState", restoredBy: ["Hide details"], oneWay: null });
+    // Started open, the sample's "Send" also writes true back, after the button itself.
+    expect(find(sample({ flip }, { sent: true }), "Hide details")?.restoredBy).toEqual(["Show details", "Send"]);
+    const negated: TemplateElement = { ...flip, props: { label: { $cond: { $state: "/sent", not: true }, $then: "Show details", $else: "Hide details" } } };
+    expect(find(sample({ flip: negated }), "Show details")?.restoredBy).toEqual(["Hide details"]);
+    const compared: TemplateElement = { ...flip, props: { label: { $cond: { $state: "/sent", eq: true }, $then: "Hide details", $else: "Show details" } } };
+    expect(find(sample({ flip: compared }), "Show details")?.restoredBy).toEqual(["Hide details"]);
+  });
+
+  it("should name a toggle as unlabelled when its $cond reads something the fragment cannot resolve", () => {
+    const flip: TemplateElement = { type: "Button", props: { label: { $cond: { $or: [{ $state: "/sent" }, { $state: "/open" }] }, $then: "Hide", $else: "Show" } }, on: { press: { action: "toggleState", params: { statePath: "/sent" } } } };
+    expect(pressButtons(sample({ flip })).unlabelled).toEqual(["flip"]);
+  });
+
+  it("should find a restorer by the words it shows after the press, when its label follows the state", () => {
+    const shut: TemplateElement = { type: "Button", props: { label: { $cond: { $state: "/open" }, $then: "Hide panel", $else: "Panel is hidden" } }, on: { press: { action: "setState", params: { statePath: "/open", value: false } } } };
+    expect(find(sample({ shut }), "Open menu")?.restoredBy).toEqual(["Close menu", "Hide panel"]);
+  });
+
+  it("should never read a toggle as one-way, when no other button touches its path", () => {
+    const alone = find(sample({ flip: toggle("Menu", "/sent") }), "Menu");
+    expect(alone).toMatchObject({ restoredBy: ["Menu"], oneWay: null, changesStart: true });
+  });
+});
+
+describe("the actions the validator allows", () => {
+  it("should have every allowed action either read as a state action or listed as not pressed, with a reason", () => {
+    const read = new Set<string>(stateActions);
+    const unread = [...allowedActions].filter((action) => !read.has(action) && (unpressedActions[action] ?? "").trim() === "");
+    expect(unread).toEqual([]);
+  });
+
+  it("should list no action twice, and none the validator does not allow", () => {
+    const listed = [...stateActions, ...Object.keys(unpressedActions)];
+    expect(new Set(listed).size).toBe(listed.length);
+    expect(listed.filter((action) => !allowedActions.has(action))).toEqual([]);
+  });
+
+  it("should fail the check above when an action is in neither list", () => {
+    const read = new Set<string>(stateActions);
+    const unread = [...allowedActions, "openDialog"].filter((action) => !read.has(action) && (unpressedActions[action] ?? "").trim() === "");
+    expect(unread).toEqual(["openDialog"]);
+  });
+});
+
 describe("actionLabels and pictureLabels", () => {
   it("should read a label written in the template, one per item of a repeat, and a $template filled from the state", () => {
     expect(actionLabels(sample()).labels.sort()).toEqual(["Choose Team", "Close menu", "Open menu", "Pricing", "Product", "Send"]);
@@ -118,8 +194,14 @@ describe("actionLabels and pictureLabels", () => {
   });
 
   it("should name an element whose label only the browser can resolve", () => {
-    const more: Record<string, TemplateElement> = { choose: { type: "Button", props: { label: { $cond: { $state: "/open" }, $then: "Close", $else: "Open" } } } };
+    const more: Record<string, TemplateElement> = { choose: { type: "Button", props: { label: { $cond: { $state: "/open" }, $then: "Close", $else: { $state: "/plan" } } } } };
     expect(actionLabels(sample(more)).unread).toEqual(["choose"]);
+  });
+
+  it("should read both branches of a $cond label when each is fixed words", () => {
+    const more: Record<string, TemplateElement> = { choose: { type: "Button", props: { label: { $cond: { $state: "/open" }, $then: "Hide plans", $else: "Show plans" } } } };
+    expect(actionLabels(sample(more)).unread).toEqual([]);
+    expect(actionLabels(sample(more)).labels).toEqual(expect.arrayContaining(["Hide plans", "Show plans"]));
   });
 });
 

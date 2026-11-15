@@ -22,7 +22,7 @@ const sample: UiTemplate = {
     root: "box",
     state: { open: true, name: "Ada", draft: "", rows: [{ id: "a", label: "First", done: false }], check: null },
     elements: {
-      box: { type: "Box", props: { direction: "vertical" }, children: ["title", "switch", "list", "add", "check", "note"] },
+      box: { type: "Box", props: { direction: "vertical" }, children: ["title", "switch", "list", "add", "check", "flip", "note"] },
       title: { type: "Heading", props: { text: { $template: "Hello ${/name}, ${/rows/0/label}" } }, visible: { $or: [{ $state: "/open" }, { $state: "/name", eq: { $state: "/draft" } }] } },
       switch: { type: "Switch", props: { label: "Open", checked: { $bindState: "/open" } }, on: { change: { action: "setState", params: { statePath: "/draft", value: { $state: "/name" } } } } },
       list: { type: "Box", props: {}, repeat: { statePath: "/rows", key: "id" }, children: ["row"] },
@@ -32,6 +32,7 @@ const sample: UiTemplate = {
       "row-remove": { type: "Button", props: { label: "Remove" }, on: { press: { action: "removeState", params: { statePath: "/rows", index: { $index: true } } } } },
       add: { type: "Button", props: { label: "Add" }, on: { press: [{ action: "pushState", params: { statePath: "/rows", value: { id: "$id", label: { $state: "/draft" }, done: false }, clearStatePath: "/draft" } }] } },
       check: { type: "Button", props: { label: { $cond: { $state: "/open" }, $then: "Check", $else: { $state: "/name" } } }, on: { press: { action: "validateForm", params: { statePath: "/check" } } } },
+      flip: { type: "Button", props: { label: "Flip" }, on: { press: { action: "toggleState", params: { statePath: "/open" } } } },
       note: { type: "Text", props: { text: "Plain /text that starts with a slash stays as written." } },
     },
   },
@@ -43,7 +44,7 @@ describe("instantiateTemplate", () => {
   it("should prefix every element key, the root, and each children list when a prefix is given", () => {
     expect(instance.root).toBe("one-box");
     expect(Object.keys(instance.elements)).toEqual(Object.keys(sample.fragment.elements).map((key) => `one-${key}`));
-    expect(instance.elements["one-box"]?.children).toEqual(["one-title", "one-switch", "one-list", "one-add", "one-check", "one-note"]);
+    expect(instance.elements["one-box"]?.children).toEqual(["one-title", "one-switch", "one-list", "one-add", "one-check", "one-flip", "one-note"]);
     expect(instance.elements["one-list"]?.children).toEqual(["one-row"]);
   });
 
@@ -79,6 +80,7 @@ describe("instantiateTemplate", () => {
     expect(instance.elements["one-add"]?.on).toEqual({ press: [{ action: "pushState", params: { statePath: "/one/rows", value: { id: "$id", label: { $state: "/one/draft" }, done: false }, clearStatePath: "/one/draft" } }] });
     expect(instance.elements["one-row-remove"]?.on).toEqual({ press: { action: "removeState", params: { statePath: "/one/rows", index: { $index: true } } } });
     expect(instance.elements["one-check"]?.on).toEqual({ press: { action: "validateForm", params: { statePath: "/one/check" } } });
+    expect(instance.elements["one-flip"]?.on).toEqual({ press: { action: "toggleState", params: { statePath: "/one/open" } } });
   });
 
   it("should leave plain text alone when it only looks like a path", () => {

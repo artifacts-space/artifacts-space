@@ -13,26 +13,40 @@ import type { TemplateElement, TemplateFragment, UiTemplate } from "./types";
 
 /**
  * Actions that change state. A press with one of them can show, hide, or
- * change something: setState writes a value to a path, pushState adds an
- * item to the end of a list, and removeState takes one item out of a list.
+ * change something, so the e2e loop presses its button: setState writes a
+ * value to a path, toggleState flips a path between true and false,
+ * pushState adds an item to the end of a list, and removeState takes one
+ * item out of a list.
  */
-const stateActionNames = ["setState", "pushState", "removeState"] as const;
+export const stateActions = ["setState", "toggleState", "pushState", "removeState"] as const;
 
 /** An action that changes state. */
-export type StateAction = (typeof stateActionNames)[number];
+export type StateAction = (typeof stateActions)[number];
 
-const isStateAction = (action: unknown): action is StateAction => stateActionNames.some((name) => name === action);
+const isStateAction = (action: unknown): action is StateAction => stateActions.some((name) => name === action);
+
+/**
+ * Actions the e2e loop presses no button for, each with why. Every action
+ * the validator allows is in `stateActions` or here (behavior.test.ts), so
+ * a new action cannot go unread: add it to one of the two.
+ */
+export const unpressedActions: Readonly<Record<string, string>> = {
+  validateForm:
+    "it checks the fields and writes { valid, errors } to its path, and draws nothing itself; a press that shows something to a reader does it with a state action in the same press, which the loop does press",
+};
 
 /**
  * Why no press undoes another, by the action it runs. A setState is one-way
- * when no button writes the starting value back. A push or a remove is
+ * when no button puts the starting value back. A toggleState is never
+ * one-way: a second press of the same button undoes the first. A push or a
+ * remove is
  * one-way for a reader of the fragment whatever else the template holds: a
  * remove takes the item at one place in the list, and which place depends
  * on the copy of the button a reader presses (inside a repeat it is that
  * row's own), so the fragment cannot name a press that takes away exactly
  * the item a push added, or puts back the one a remove took.
  */
-export const oneWayReasons: Readonly<Record<StateAction, string>> = {
+export const oneWayReasons: Readonly<Record<Exclude<StateAction, "toggleState">, string>> = {
   setState: "no button writes the starting value back",
   pushState: "it adds an item to a list, and the fragment cannot name a press that takes away exactly that item",
   removeState: "it takes an item out of a list, and no press puts that item back",
@@ -48,9 +62,9 @@ const pictureTypes: ReadonlySet<string> = new Set(["Placeholder", "Image"]);
 export interface PressButton {
   /** The element's key in the fragment. */
   key: string;
-  /** The words the button is found by: its label, which is also its name when it shows only an icon. */
+  /** The words the button is found by while the template is as it starts: its label, which is also its name when it shows only an icon. */
   label: string;
-  /** What its press does to the state: write a value, add an item to a list, or take one out. */
+  /** What its press does to the state: write a value, flip true and false, add an item to a list, or take one out. */
   action: StateAction;
   /** The state path its press changes, and the value a setState writes there or a pushState adds. */
   statePath: string;
@@ -58,16 +72,21 @@ export interface PressButton {
   /**
    * True when pressing it first changes the state the template starts with:
    * a setState that writes something other than the path's starting value,
-   * any pushState, and a removeState whose list starts with an item to take.
+   * any toggleState, any pushState, and a removeState whose list starts
+   * with an item to take.
    */
   changesStart: boolean;
   /**
-   * The labels of the buttons whose press writes the starting value back to
-   * the same path (a "Close menu" for an "Open menu"). Several can: a menu
-   * may have one closing button for wide frames and one for narrow ones, and
-   * the browser shows which. Empty when nothing in the template undoes the
-   * press (a form's send button), when the press writes the starting value
-   * itself, and for every push and remove (see `oneWay`).
+   * The labels of the buttons whose press puts the starting value back at
+   * the same path (a "Close menu" for an "Open menu"), in the order the e2e
+   * loop tries them, each by the words it shows after this press. Several
+   * can: a menu may have one closing button for wide frames and one for
+   * narrow ones, and the browser shows which. A toggleState names its own
+   * button first, since pressing it again undoes it: by the same label, or
+   * by the other branch when its label is a `$cond` ("Close menu" for
+   * "Open menu"). Empty when nothing in the template undoes the press (a
+   * form's send button), when the press writes the starting value itself,
+   * and for every push and remove (see `oneWay`).
    */
   restoredBy: string[];
   /**
@@ -108,30 +127,102 @@ function stateWrites(fragment: TemplateFragment): StateWrite[] {
 
 const sameValue = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
-const staticLabel = (element: TemplateElement | undefined) => (typeof element?.props?.label === "string" ? element.props.label : null);
+/**
+ * Whether a condition holds while the state is `state`: `{ $state: path }`,
+ * with `eq` or `neq` against a written value, and `not`. Undefined for any
+ * other shape, which only the browser can resolve.
+ */
+function holds(condition: unknown, state: unknown): boolean | undefined {
+  if (!isPlainObject(condition) || typeof condition.$state !== "string") return undefined;
+  if (isPlainObject(condition.eq) || isPlainObject(condition.neq)) return undefined;
+  const value: unknown = readPointer(state, condition.$state);
+  const plain = "eq" in condition ? sameValue(value, condition.eq) : "neq" in condition ? !sameValue(value, condition.neq) : Boolean(value);
+  return condition.not === true ? !plain : plain;
+}
+
+/** The two branches of a `$cond` label when both are fixed words, or null. */
+function condBranches(label: unknown): { condition: unknown; then: string; otherwise: string } | null {
+  if (!isPlainObject(label) || !("$cond" in label)) return null;
+  const { $cond: condition, $then: then, $else: otherwise } = label;
+  return typeof then === "string" && typeof otherwise === "string" ? { condition, then, otherwise } : null;
+}
+
+/**
+ * The words a button is found by while the state is `state`: its label
+ * when it is written in the template, or the branch a `$cond` on state
+ * picks (a button that reads "Open menu", then "Close menu"). Null when
+ * the fragment cannot tell.
+ */
+function labelAt(element: TemplateElement | undefined, state: unknown): string | null {
+  const label = element?.props?.label;
+  if (typeof label === "string") return label;
+  const branches = condBranches(label);
+  const picked = branches ? holds(branches.condition, state) : undefined;
+  if (!branches || picked === undefined) return null;
+  return picked ? branches.then : branches.otherwise;
+}
+
+/** The state with `value` at `path`: what a setState or a toggleState leaves behind. A path through anything but objects leaves the state as it is. */
+function withValue(state: unknown, path: string, value: unknown): unknown {
+  const copy: unknown = structuredClone(state ?? {});
+  const keys = path.split("/").slice(1);
+  const last = keys.pop();
+  let at: unknown = copy;
+  for (const key of keys) at = isPlainObject(at) && Object.hasOwn(at, key) ? at[key] : undefined;
+  if (isPlainObject(at) && last !== undefined && last !== "__proto__") at[last] = value;
+  return copy;
+}
+
+/** A press that leaves one value at its path: a setState or a toggleState. */
+type ValueWrite = StateWrite & { action: "setState" | "toggleState" };
+
+const writesValue = (write: StateWrite): write is ValueWrite => write.action === "setState" || write.action === "toggleState";
+
+/** What a setState or a toggleState leaves at its path when the path holds `current`: the value written, or true unless it was true (the renderer's toggle). */
+const leaves = (write: ValueWrite, current: unknown): unknown => (write.action === "setState" ? write.value : current !== true);
 
 /** True when a press changes the state the template starts with. */
 function changesStart(fragment: TemplateFragment, write: StateWrite): boolean {
   const start: unknown = readPointer(fragment.state ?? {}, write.statePath);
+  if (writesValue(write)) return !sameValue(leaves(write, start), start);
   if (write.action === "pushState") return true;
-  if (write.action === "setState") return !sameValue(write.value, start);
   if (!Array.isArray(start)) return false;
   return typeof write.index === "number" ? write.index >= 0 && write.index < start.length : start.length > 0;
 }
 
-/** The labels of the buttons that write a path's starting value back, for a setState that changed it. A push or a remove has none (oneWayReasons). */
+/**
+ * The labels of the buttons that put a path's starting value back after a
+ * setState or a toggleState changed it: another button whose press, made
+ * after this one, leaves the starting value (a setState that writes it, or
+ * a toggleState that flips to it), and for a toggleState its own button,
+ * first. A push or a remove has none (oneWayReasons).
+ */
 function restorersOf(fragment: TemplateFragment, writes: readonly StateWrite[], write: StateWrite): string[] {
-  const start = readPointer(fragment.state ?? {}, write.statePath);
-  if (write.action !== "setState" || sameValue(write.value, start)) return [];
-  const undoes = (other: StateWrite) => other.key !== write.key && other.action === "setState" && other.statePath === write.statePath && sameValue(other.value, start);
-  const labels = writes.filter(undoes).map((other) => staticLabel(fragment.elements[other.key])).filter((label): label is string => label !== null);
+  const start: unknown = readPointer(fragment.state ?? {}, write.statePath);
+  if (!writesValue(write)) return [];
+  const changed = leaves(write, start);
+  if (sameValue(changed, start)) return [];
+  const undoes = (other: StateWrite) => other.key !== write.key && other.statePath === write.statePath && writesValue(other) && sameValue(leaves(other, changed), start);
+  const own = write.action === "toggleState" ? [write.key] : [];
+  // A restorer is pressed after this press, so it is found by the words it shows then.
+  const after = withValue(fragment.state, write.statePath, changed);
+  const labels = [...own, ...writes.filter(undoes).map((other) => other.key)].map((key) => labelAt(fragment.elements[key], after)).filter((label): label is string => label !== null);
   return [...new Set(labels)];
+}
+
+/** Why no press undoes this one, or null: it has a restorer, it is a toggle, or it is a setState that changes nothing. */
+function oneWayReason(write: StateWrite, changes: boolean, restoredBy: readonly string[]): string | null {
+  if (restoredBy.length > 0 || write.action === "toggleState") return null;
+  // A push or a remove is one-way even where it changes nothing yet: a remove on a list that starts empty acts once a push has filled it.
+  return changes || write.action !== "setState" ? oneWayReasons[write.action] : null;
 }
 
 /**
  * Every element whose press changes state, with the buttons that undo it.
- * `unlabelled` lists the keys of such elements that have no fixed label (it
- * comes from a repeat's item, say), which the e2e loop cannot find by name.
+ * `unlabelled` lists the keys of such elements whose label the fragment
+ * cannot read for a state (it comes from a repeat's item, say), which the
+ * e2e loop cannot find by name. A fixed label can be read, and so can a
+ * `$cond` on state with fixed words in both branches.
  */
 export function pressButtons(template: UiTemplate): { buttons: PressButton[]; unlabelled: string[] } {
   const { fragment } = template;
@@ -139,16 +230,14 @@ export function pressButtons(template: UiTemplate): { buttons: PressButton[]; un
   const buttons: PressButton[] = [];
   const unlabelled: string[] = [];
   for (const write of writes) {
-    const label = staticLabel(fragment.elements[write.key]);
+    const label = labelAt(fragment.elements[write.key], fragment.state ?? {});
     if (label === null) {
       unlabelled.push(write.key);
       continue;
     }
     const changes = changesStart(fragment, write);
     const restoredBy = restorersOf(fragment, writes, write);
-    // A push or a remove is one-way even where it changes nothing yet: a remove on a list that starts empty acts once a push has filled it.
-    const oneWay = restoredBy.length === 0 && (changes || write.action !== "setState") ? oneWayReasons[write.action] : null;
-    buttons.push({ key: write.key, label, action: write.action, statePath: write.statePath, value: write.value, changesStart: changes, restoredBy, oneWay });
+    buttons.push({ key: write.key, label, action: write.action, statePath: write.statePath, value: write.value, changesStart: changes, restoredBy, oneWay: oneWayReason(write, changes, restoredBy) });
   }
   return { buttons, unlabelled };
 }
@@ -208,9 +297,9 @@ function templateWords(template: string, fragment: TemplateFragment, parents: Ma
 /**
  * The words a label is drawn with: itself when it is written in the
  * template, one string per item when it reads a repeat's item, the state's
- * value when it reads state, and a `$template` with its references filled
- * in. Null when it is built some other way (a `$cond`), which only the
- * browser can resolve.
+ * value when it reads state, a `$template` with its references filled in,
+ * and both branches of a `$cond` when each is fixed words. Null when it is
+ * built some other way, which only the browser can resolve.
  */
 function wordsOf(label: unknown, fragment: TemplateFragment, parents: Map<string, string>, key: string): string[] | null {
   if (typeof label === "string") return [label];
@@ -218,7 +307,9 @@ function wordsOf(label: unknown, fragment: TemplateFragment, parents: Map<string
   const { $item: field, $state: path, $template: template } = label;
   if (typeof field === "string") return perItem((item) => itemField(item, field), fragment, parents, key);
   if (typeof path === "string") return strings([readPointer(fragment.state ?? {}, path)]);
-  return typeof template === "string" ? templateWords(template, fragment, parents, key) : null;
+  if (typeof template === "string") return templateWords(template, fragment, parents, key);
+  const branches = condBranches(label);
+  return branches ? [branches.then, branches.otherwise] : null;
 }
 
 /** The labels a template's elements of some types are drawn with, each once, and the keys whose label could not be read. */

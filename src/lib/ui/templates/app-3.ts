@@ -104,7 +104,7 @@ export const appMomentTemplates: readonly UiTemplate[] = [
         sure: { type: "Checkbox", props: { label: "I understand that the project cannot be brought back", checked: { $bindState: "/sure" } } },
         actions: { type: "Box", props: { direction: "horizontal", justify: "end", gap: "sm", wrap: true }, children: ["cancel", "confirm"] },
         cancel: { type: "Button", props: { label: "Keep the project", variant: "outline" } },
-        confirm: { type: "Button", props: { label: "Delete project", icon: "trash", disabled: { $cond: { $state: "/sure" }, $then: false, $else: true } } },
+        confirm: { type: "Button", props: { label: "Delete project", icon: "trash", variant: "danger", disabled: { $cond: { $state: "/sure" }, $then: false, $else: true } } },
       },
     },
   },
