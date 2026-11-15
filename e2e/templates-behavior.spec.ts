@@ -268,10 +268,11 @@ test("should count a label where it is drawn, and see a press change one frame, 
 /*
  * The one layout the loops cannot read from labels: feature-zigzag changes
  * the side of its picture from row to row while a row is a row, and puts it
- * after the words once the row stacks. The template draws each picture with
- * three elements and shows one of them, so each width also counts the
- * pictures a reader meets. The rows come from the template's own state,
- * however many it ships with.
+ * after the words once the row stacks (a row with its picture first stacks
+ * in reverse). The template draws each picture with one of two elements,
+ * one for each side, so each width also counts the pictures a reader
+ * meets. The rows come from the template's own state, however many it
+ * ships with.
  */
 interface ZigzagRow {
   title: string;
