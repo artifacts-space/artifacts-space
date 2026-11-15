@@ -1,8 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { uiComponentNames } from "@/lib/ui/catalog";
 import { componentFixtures, fixtureSpec } from "@/lib/ui/fixtures/components";
 import { signInSpec } from "@/lib/ui/fixtures/fields";
+import { textFields } from "@/lib/ui/validate-fields";
 
 import { ArtifactView } from "../artifact-view";
 
@@ -24,6 +26,24 @@ function one(type: string, props: Record<string, unknown>, state: Record<string,
 /** Every real text control in the markup: its whole opening tag. */
 function controls(html: string): string[] {
   return html.match(/<(input|textarea)\b[^>]*>/g) ?? [];
+}
+
+/** Kinds of `<input>` a reader cannot type text into. */
+const notTyped = new Set(["checkbox", "radio", "range", "hidden", "button", "submit", "reset", "file", "color", "image"]);
+
+/** True for a control a reader can type free text into: a text area, or an input that is on screen and of a typed kind. */
+function takesTypedText(control: string): boolean {
+  if (control.startsWith("<textarea")) return true;
+  if (control.includes('aria-hidden="true"')) return false;
+  return !notTyped.has(/\stype="([^"]*)"/.exec(control)?.[1] ?? "text");
+}
+
+/** Every catalog component that draws a field a reader types in, in any of its gallery fixtures. */
+function componentsWithTypedText(): string[] {
+  return uiComponentNames.filter((name) => componentFixtures[name].some((fixture) => {
+    const html = page(fixtureSpec(name, fixture));
+    return html.includes("contenteditable") || controls(html).some(takesTypedText);
+  }));
 }
 
 const skipAttributes = ['autoComplete="off"', 'data-1p-ignore=""', 'data-lpignore="true"', 'data-bwignore=""', 'data-form-type="other"'];
@@ -144,6 +164,29 @@ describe("text fields", () => {
     expect(html).toContain('aria-invalid="true"');
     expect(html).toContain("Choose a region.");
     expect(html).toMatch(/disabled/);
+  });
+});
+
+describe("the typed-text rule's list of text fields", () => {
+  it("should list every catalog component that draws a field a reader types in, so a new one cannot be missed", () => {
+    // Read from what each component draws in its gallery fixtures, not from a second list.
+    for (const name of uiComponentNames) expect(componentFixtures[name].length, `${name} has no fixture to draw`).toBeGreaterThan(0);
+    expect(componentsWithTypedText().sort()).toEqual([...textFields].sort());
+  });
+
+  it.each([...textFields])("should show state in a %s through `value`, the prop the rule reads for a binding", (type) => {
+    const html = one(type, { label: "Field", value: { $bindState: "/typed" } }, { typed: "zebra-typed" });
+    expect(controls(html).filter(takesTypedText)).toHaveLength(1);
+    expect(html).toContain("zebra-typed");
+  });
+
+  it("should not count a checkbox, a slider, a switch, or the hidden input under a Select as typed text", () => {
+    expect(takesTypedText('<input tabindex="-1" type="checkbox" aria-hidden="true"/>')).toBe(false);
+    expect(takesTypedText('<input type="range" min="0" max="100"/>')).toBe(false);
+    expect(takesTypedText('<input tabindex="-1" aria-hidden="true"/>')).toBe(false);
+    expect(takesTypedText('<input data-slot="input"/>')).toBe(true);
+    expect(takesTypedText('<input type="search"/>')).toBe(true);
+    expect(takesTypedText('<textarea rows="3">')).toBe(true);
   });
 });
 

@@ -15,6 +15,17 @@ function issuesOf(field: { type: string; props: Record<string, unknown> }, other
   return validateUiSpec(spec).issues.filter((issue) => issue.code === "typed_text_in_link");
 }
 
+/** The message for a spec with `count` bound Inputs and one Link whose address is read from state. */
+function messageWith(count: number): string {
+  const keys = Array.from({ length: count }, (_, index) => `field-${String(index + 1)}`);
+  const fields = Object.fromEntries(keys.map((key) => [key, { type: "Input", props: { label: key, value: { $bindState: `/${key}` } } }]));
+  const elements = { page: { type: "Stack", props: {}, children: [...keys, "go"] }, ...fields, go: { type: "Link", props: { label: "Go", href: { $state: "/url" } } } };
+  const state = { url: "https://example.com", ...Object.fromEntries(keys.map((key) => [key, ""])) };
+  const found = validateUiSpec({ version: 1, root: "page", state, elements }).issues.filter((issue) => issue.code === "typed_text_in_link");
+  expect(found).toHaveLength(1);
+  return found[0]?.message ?? "";
+}
+
 const carriers: [string, { type: string; props: Record<string, unknown> }][] = [
   ["a Link address read from state", { type: "Link", props: { label: "Go", href: { $state: "/url" } } }],
   ["a Link address built from a template", { type: "Link", props: { label: "Go", href: { $template: "https://example.com/?q=${/name}" } } }],
@@ -31,6 +42,38 @@ describe("typed text never reaches a link", () => {
     expect(found[0]?.elementKey).toBe("other");
     expect(found[0] ? isBlocking(found[0]) : false).toBe(true);
     expect(found[0]?.message).toContain("text a reader types must never reach a link");
+  });
+
+  it("should name the one bound text field when a single field is bound", () => {
+    const found = issuesOf(bound, { type: "Link", props: { label: "Go", href: { $state: "/url" } } });
+    expect(found[0]?.message).toBe(
+      'Element "other" (Link): `href` cannot use an expression in a spec whose text field "field" is bound to state, because text a reader types must never reach a link. Write `href` out in the spec, or remove the binding from the text field\'s `value`.',
+    );
+  });
+
+  it.each([
+    [2, 'text fields "field-1" and "field-2" are bound to state'],
+    [3, 'text fields "field-1", "field-2", and "field-3" are bound to state'],
+    [4, 'text fields "field-1", "field-2", "field-3", and 1 more are bound to state'],
+    [9, 'text fields "field-1", "field-2", "field-3", and 6 more are bound to state'],
+  ])("should name every bound text field, up to three and then how many more, when %i are bound", (count, words) => {
+    const message = messageWith(count);
+    expect(message).toContain(`in a spec whose ${words}, because`);
+    expect(message).toContain("or remove the binding from each of those text fields' `value`.");
+  });
+
+  it("should name bound fields only, in the spec's order, and both kinds of text field", () => {
+    const elements = {
+      page: { type: "Stack", props: {}, children: ["notes", "plain", "email", "go"] },
+      notes: { type: "Textarea", props: { label: "Notes", value: { $bindState: "/notes" } } },
+      plain: { type: "Input", props: { label: "Plan", value: "Team" } },
+      email: { type: "Input", props: { label: "Email", value: { $bindState: "/email" } } },
+      go: { type: "Link", props: { label: "Go", href: { $state: "/url" } } },
+    };
+    const found = validateUiSpec({ version: 1, root: "page", state: { notes: "", email: "", url: "https://example.com" }, elements }).issues.filter((issue) => issue.code === "typed_text_in_link");
+    expect(found).toHaveLength(1);
+    expect(found[0]?.message).toContain('whose text fields "notes" and "email" are bound to state');
+    expect(found[0]?.message).not.toContain('"plain"');
   });
 
   it("should stop the spec when the bound field is a Textarea", () => {
