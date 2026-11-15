@@ -5,10 +5,15 @@ import { CodeBlock } from "@/components/code/code-block";
 
 import type { ViewProps } from "./stout";
 
-/** A numbered how-to: each step has a title, optional Markdown body, and optional code with a copy button. */
+/**
+ * A numbered how-to: each step has a title, optional Markdown body, and
+ * optional code with a copy button. It is a named group, not a section: a
+ * named section is a landmark, and a page that shows one screen more than
+ * once would list the same landmark each time.
+ */
 export function StepsView({ props }: ViewProps<"Steps">) {
   return (
-    <section className="min-w-0 space-y-3" aria-label={props.title ?? "Steps"}>
+    <div role="group" className="min-w-0 space-y-3" aria-label={props.title ?? "Steps"}>
       {props.title ? <p className="text-md font-medium break-words">{props.title}</p> : null}
       {props.items.length === 0 ? <p className="text-sm text-muted-foreground">No steps yet.</p> : null}
       <ol className="min-w-0">
@@ -31,6 +36,6 @@ export function StepsView({ props }: ViewProps<"Steps">) {
           </li>
         ))}
       </ol>
-    </section>
+    </div>
   );
 }

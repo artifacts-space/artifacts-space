@@ -8,7 +8,7 @@ import { isPlainObject, walkJson } from "./json-walk";
 import { uiLimits } from "./limits";
 import { normalizeElement, toRendererSpec, type UiElement, type UiSpec } from "./spec";
 import { validateElement } from "./validate-element";
-import { typedTextIssues } from "./validate-fields";
+import { announcedTypingIssues, typedTextIssues } from "./validate-fields";
 import { validateTree } from "./validate-tree";
 import { migrateUiSpec, UI_SPEC_VERSION } from "./version";
 
@@ -134,6 +134,6 @@ function checkSpec(spec: UiSpec, raws: Record<string, Record<string, unknown>>, 
   for (const [key, element] of Object.entries(spec.elements)) issues.push(...validateElement(key, element, raws[key] ?? {}));
   const hasRoot = Object.hasOwn(spec.elements, spec.root);
   if (hasRoot) issues.push(...validateTree(spec), ...libraryIssues(spec));
-  issues.push(...typedTextIssues(spec));
+  issues.push(...typedTextIssues(spec), ...announcedTypingIssues(spec));
   return { valid: !hasErrors(issues), renderable: hasRoot && !issues.some(isBlocking), spec, issues };
 }
