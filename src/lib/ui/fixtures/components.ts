@@ -37,7 +37,7 @@ const layout: Pick<Record<UiComponentName, ComponentFixture[]>, "Section" | "Sta
   ],
   Grid: [
     { name: "Four columns", props: { columns: 4 }, children: Array.from({ length: 6 }, (_, index) => ({ type: "Metric", props: { label: `Metric ${index + 1}`, value: index * 1234 } })) },
-    { name: "Three columns", props: { columns: 3 }, children: Array.from({ length: 3 }, (_, index) => ({ type: "Card", props: { title: `Card ${index + 1}` }, children: [text("A card in a three-column grid.")] })) },
+    { name: "Three columns", props: { columns: 3 }, children: Array.from({ length: 3 }, (_, index) => ({ type: "Card", props: { title: `Card ${index + 1}`, description: "A card in a three-column grid." } })) },
     { name: "Empty", props: { columns: 3 } },
   ],
   Card: [

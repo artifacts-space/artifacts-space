@@ -11,17 +11,24 @@ import { expect, test } from "./support/test";
 
 test.skip(({ isMobile }) => isMobile, "The window is the narrow part on a phone; these checks need a wide window.");
 
-/** Sets the width of the interface inside `scope` and returns how many columns its first grid has. */
-async function columnsAt(scope: Locator, width: number): Promise<number> {
-  return scope.evaluate((element, px) => {
+/** Sets the width of the interface in `scope` (the element itself, or the first one inside it). */
+async function setInterfaceWidth(scope: Locator, width: number): Promise<void> {
+  await scope.evaluate((element, px) => {
     const nodes = [element, ...element.querySelectorAll("*")];
     const root = nodes.find((node) => getComputedStyle(node).containerName === "ui");
     if (!(root instanceof HTMLElement)) throw new Error("No interface found.");
     root.style.width = `${String(px)}px`;
-    const grid = [...root.querySelectorAll("*")].find((node) => getComputedStyle(node).display === "grid");
+  }, width);
+}
+
+/** Sets the interface's width and returns how many columns the first grid inside `scope` has. */
+async function columnsAt(scope: Locator, width: number): Promise<number> {
+  await setInterfaceWidth(scope, width);
+  return scope.evaluate((element) => {
+    const grid = [...element.querySelectorAll("*")].find((node) => getComputedStyle(node).display === "grid");
     if (!grid) throw new Error("No grid found.");
     return getComputedStyle(grid).gridTemplateColumns.split(" ").length;
-  }, width);
+  });
 }
 
 const specimen = (scope: Locator, group: string, name: string) => scope.locator(`#${group} [data-specimen="${name}"]`);
@@ -50,6 +57,28 @@ test("should fit a two-column key-value list to the interface when the window is
 
   expect(await columnsAt(list, 590)).toBe(1);
   expect(await columnsAt(list, 620)).toBe(2);
+});
+
+test("should give a card more padding when the interface is wide", async ({ page }) => {
+  await page.goto("/dev/components");
+  const scope = specimen(page.locator("body"), "Card", "Normal");
+  const card = scope.locator(".card-surface");
+
+  await setInterfaceWidth(scope, 390);
+  await expect(card).toHaveCSS("padding-left", "16px");
+  await setInterfaceWidth(scope, 620);
+  await expect(card).toHaveCSS("padding-left", "20px");
+});
+
+test("should size a level-1 heading up when the interface is wide", async ({ page }) => {
+  await page.goto("/dev/components");
+  const scope = specimen(page.locator("body"), "Heading", "Levels");
+  const heading = scope.getByRole("heading", { level: 1 });
+
+  await setInterfaceWidth(scope, 390);
+  await expect(heading).toHaveCSS("font-size", "30px");
+  await setInterfaceWidth(scope, 620);
+  await expect(heading).toHaveCSS("font-size", "36px");
 });
 
 test("should lay a grid out in columns when the interface is open in the editor", async ({ page }) => {
