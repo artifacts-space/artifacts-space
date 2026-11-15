@@ -43,8 +43,16 @@ export const containerComponents: ReadonlySet<UiComponentName> = new Set([
   "Box",
 ]);
 
-/** Cross-field prop rules, checked after the zod schema passes. */
+/** Cross-field prop rules. Most are checked after the zod schema passes; see `fieldWiseChecks`. */
 export const componentChecks: Partial<Record<UiComponentName, PropCheck>> = { ...contentChecks, ...dataChecks, ...planningChecks, ...inputChecks, ...mediaChecks, Box: boxCheck };
+
+/**
+ * Components whose rule reads only the props it is about, each on its own.
+ * Their rule runs even when another prop fails the schema, so validation
+ * reports every problem at once. A new rule should be written this way and
+ * listed here.
+ */
+export const fieldWiseChecks: ReadonlySet<UiComponentName> = new Set(["Box", "Input", "Button", "List"]);
 
 /** Events a component can emit for `on` bindings. */
 export const componentEvents: Partial<Record<UiComponentName, readonly string[]>> = inputEvents;

@@ -4,6 +4,11 @@ import type { ReactNode } from "react";
 import { externalLinkRel, safeHref } from "@/lib/link-policy";
 import { cn } from "@/lib/utils";
 
+/** The small arrow after a link that leaves the page. The interface editor draws it after link text typed in place. */
+export function ExternalLinkMark() {
+  return <IconArrowUpRight aria-hidden className="ml-0.5 inline size-[0.85em] -translate-y-px align-baseline text-muted-foreground" />;
+}
+
 /**
  * A link from artifact content. Only http, https, and mailto URLs become
  * links; anything else renders as plain text. Links open in a new tab with
@@ -22,7 +27,7 @@ export function ExternalLink({ href, children, className, current }: { href: unk
       className={cn("underline decoration-border underline-offset-[3px] transition-colors hover:decoration-foreground focus-visible:rounded-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", className)}
     >
       {children}
-      <IconArrowUpRight aria-hidden className="ml-0.5 inline size-[0.85em] -translate-y-px align-baseline text-muted-foreground" />
+      <ExternalLinkMark />
       <span className="sr-only"> (opens in a new tab)</span>
     </a>
   );

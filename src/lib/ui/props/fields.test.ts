@@ -88,6 +88,49 @@ describe("screen props on Button, Badge, List, Image, and Avatar", () => {
   });
 });
 
+describe("every problem at once", () => {
+  it("should report the password rule together with another prop's error on an Input", () => {
+    const found = messages("Input", { label: "Password", type: "password", value: { $bindState: "/v" }, hideLabel: "yes" });
+    expect(found).toHaveLength(2);
+    expect(found.join("\n")).toContain("hideLabel");
+    expect(found.join("\n")).toContain("stand-in that cannot be typed into");
+  });
+
+  it("should report the literal-type rule together with another prop's error on an Input", () => {
+    const found = messages("Input", { label: "Field", type: { $state: "/v" }, disabled: "no" });
+    expect(found.join("\n")).toContain("disabled");
+    expect(found.join("\n")).toContain("`type` must be written in the spec");
+  });
+
+  it("should report the icon rule together with an unknown size on a Button", () => {
+    const found = messages("Button", { label: "Menu", iconOnly: true, size: "huge" });
+    expect(found).toHaveLength(2);
+    expect(found.join("\n")).toContain("`iconOnly` needs an `icon`");
+  });
+
+  it("should report the marker rule together with an item that is not text on a List", () => {
+    const found = messages("List", { items: ["One", 2], ordered: true, marker: "check" });
+    expect(found.join("\n")).toContain("`marker` applies to a bulleted list");
+    expect(found.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("should report typed text reaching a link together with an unrelated invalid prop elsewhere in the spec", () => {
+    const issues = validateUiSpec({
+      version: 1,
+      root: "page",
+      state: { q: "" },
+      elements: {
+        page: { type: "Box", props: { padding: "12px" }, children: ["field", "go"] },
+        field: { type: "Input", props: { label: "Search", value: { $bindState: "/q" } } },
+        go: { type: "Link", props: { label: "Go", href: { $template: "https://example.com/?q=${/q}" } } },
+      },
+    }).issues;
+    const codes = issues.map((issue) => issue.code);
+    expect(codes).toContain("typed_text_in_link");
+    expect(issues.some((issue) => issue.elementKey === "page" && issue.message.includes("padding"))).toBe(true);
+  });
+});
+
 describe("field fixtures", () => {
   it.each(["Input", "Textarea", "Avatar", "Button", "Badge", "List", "Select"] as const)("should pass validation with no issues for every %s fixture", (type) => {
     for (const fixture of componentFixtures[type]) {

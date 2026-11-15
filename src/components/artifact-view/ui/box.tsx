@@ -79,6 +79,29 @@ function layoutClass(props: BoxProps): string {
   );
 }
 
+/**
+ * Twice each padding step: the room a growing Box claims in a row before
+ * the free room is shared out, since its padding is part of its starting
+ * size. The editor's frame has no padding of its own, so it claims the same.
+ */
+const growBasis: Record<Space, string> = { none: "basis-0", xs: "basis-2", sm: "basis-4", md: "basis-8", lg: "basis-12", xl: "basis-12 @2xl/ui:basis-20", "2xl": "basis-16 @2xl/ui:basis-32", "3xl": "basis-24 @2xl/ui:basis-48" };
+
+/**
+ * The classes that place a Box in its parent: the room it takes and whether
+ * it shows. The interface editor wraps each block in a frame, so the frame
+ * takes these and the Box fills the frame, and a Box sits in a row the same
+ * way while it is edited.
+ */
+export function boxPlacementClass(props: Pick<BoxProps, "grow" | "width" | "maxWidth" | "hideBelow" | "hideAbove" | "padding" | "paddingX">): string {
+  return cn(
+    pick(shownFrom, props.hideBelow) ?? "flex",
+    pick(hiddenFrom, props.hideAbove),
+    props.grow && cn("shrink grow", growBasis[props.paddingX ?? props.padding ?? "none"]),
+    props.width === "full" && "w-full",
+    pick(maxWidthClass, props.maxWidth),
+  );
+}
+
 function finishClass(props: BoxProps): string {
   return cn(pick(borderClass, props.border), pick(radiusClass, props.radius), pick(shadowClass, props.shadow), pick(overflowClass, props.overflow));
 }

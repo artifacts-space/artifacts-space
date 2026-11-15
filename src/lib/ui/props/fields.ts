@@ -48,6 +48,7 @@ export const avatarProps = z.object({
  * and no binding, so there is nothing to read back from it.
  */
 export const inputCheck: PropCheck = (props) => {
+  // Reads `type` and `value` only, so it runs beside any other prop's error.
   if (props.type !== undefined && typeof props.type !== "string") {
     return ["`type` must be written in the spec (text, email, search, number, or password), not read from state with an expression."];
   }

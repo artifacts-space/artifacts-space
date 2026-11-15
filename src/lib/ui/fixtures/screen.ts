@@ -153,3 +153,42 @@ export const landingPageSpec = {
     "footer-terms": { type: "Link", props: { label: "Terms", variant: "muted" } },
   },
 };
+
+/**
+ * One of every block whose look comes from a screen prop, each with words of
+ * its own, so a test can find the same block in the read view and in the
+ * interface editor and compare how it is drawn.
+ */
+export const styledBlocksSpec = {
+  version: 1,
+  root: "page",
+  elements: {
+    page: { type: "Box", props: { gap: "md" }, children: ["nav", "eyebrow", "title", "lead", "sub", "mono", "caption", "badges", "features", "actions", "hero"] },
+    nav: { type: "Box", props: { direction: "horizontal", align: "center", justify: "between", gap: "md", padding: "md", border: "bottom", wrap: true, label: "Styled navigation" }, children: ["nav-links", "nav-docs"] },
+    "nav-links": { type: "Box", props: { direction: "horizontal", gap: "lg", wrap: true }, children: ["link-active", "link-plain", "link-muted-active", "link-muted"] },
+    "link-active": { type: "Link", props: { label: "Product", variant: "nav", active: true } },
+    "link-plain": { type: "Link", props: { label: "Pricing", variant: "nav" } },
+    "link-muted-active": { type: "Link", props: { label: "Changelog", variant: "muted", active: true } },
+    "link-muted": { type: "Link", props: { label: "Careers", variant: "muted" } },
+    "nav-docs": { type: "Link", props: { label: "Read the docs", href: "https://example.com/docs" } },
+    eyebrow: { type: "Text", props: { text: "New this week", variant: "eyebrow" } },
+    title: { type: "Heading", props: { text: "Count every shelf", level: 1, size: "display", align: "center" } },
+    lead: { type: "Text", props: { text: "Stock that keeps up", size: "xl", weight: "semibold", align: "center", tone: "info" } },
+    sub: { type: "Heading", props: { text: "Small heading at the end", level: 3, size: "sm", align: "end" } },
+    mono: { type: "Text", props: { text: "order-4821", variant: "mono" } },
+    caption: { type: "Text", props: { text: "Ends on Friday", variant: "caption", tone: "danger", weight: "medium", align: "end", clamp: 1 } },
+    badges: { type: "Box", props: { direction: "horizontal", gap: "sm", wrap: true }, children: ["badge-solid", "badge-outline", "badge-soft"] },
+    "badge-solid": { type: "Badge", props: { label: "Shipped", tone: "success", variant: "solid", icon: "check" } },
+    "badge-outline": { type: "Badge", props: { label: "Beta", tone: "info", variant: "outline" } },
+    "badge-soft": { type: "Badge", props: { label: "Draft" } },
+    features: { type: "List", props: { marker: "check", items: ["Unlimited projects", "Weekly reports"] } },
+    actions: { type: "Box", props: { direction: "horizontal", gap: "sm", align: "center" }, children: ["action-start", "action-menu"] },
+    "action-start": { type: "Button", props: { label: "Start free", size: "lg", icon: "arrow-right", iconPosition: "end" } },
+    "action-menu": { type: "Button", props: { label: "Open menu", icon: "menu-2", iconOnly: true, variant: "ghost" } },
+    hero: { type: "Box", props: { direction: "horizontal", gap: "lg", label: "Styled hero" }, children: ["hero-copy", "hero-art"] },
+    "hero-copy": { type: "Box", props: { grow: true, surface: "muted", padding: "md", radius: "lg" }, children: ["hero-note"] },
+    "hero-note": { type: "Text", props: { text: "Grows to fill the row" } },
+    "hero-art": { type: "Box", props: { grow: true }, children: ["hero-image"] },
+    "hero-image": { type: "Placeholder", props: { label: "Screenshot", ratio: "video" } },
+  },
+};

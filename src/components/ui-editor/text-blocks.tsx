@@ -3,7 +3,9 @@
 import dynamic from "next/dynamic";
 import { Children, type ComponentType, type ReactNode } from "react";
 
-import { badgeClassName, headingClassName, linkVariantClass, textClassName, toneStyles } from "@/components/artifact-view/ui/content";
+import { ExternalLinkMark } from "@/components/artifact-view/external-link";
+import { BadgeIcon, badgeClassName, headingClassName, linkClassName, ListMark, listMarkerOf, markedListClass, textClassName, toneStyles } from "@/components/artifact-view/ui/content";
+import { safeHref } from "@/lib/link-policy";
 import { textLimit } from "@/lib/ui/block-templates";
 import { componentProps, type UiComponentName, type UiProps } from "@/lib/ui/catalog";
 import { cn } from "@/lib/utils";
@@ -100,13 +102,16 @@ function BadgeBlock({ id, props }: BlockProps<"Badge">) {
   const { setProp } = useBlockEditor();
   return (
     <span className={badgeClassName(props)}>
+      <BadgeIcon name={props.icon} />
       <EditableText blockKey={id} value={props.label} onChange={(text) => { setProp(id, "label", text); }} maxLength={textLimit("Badge", "label")} label="Badge" placeholder="Label" className="min-h-0 whitespace-nowrap" />
     </span>
   );
 }
 
+/** Link text typed in place, drawn as readers see it: the variant, the mark of the current page, and the arrow of an inline link that leaves the page. */
 function LinkBlock({ id, props }: BlockProps<"Link">) {
   const { setProp } = useBlockEditor();
+  const leaves = (props.variant ?? "inline") === "inline" && safeHref(props.href) !== null;
   return (
     <span className="min-w-0 break-words">
       <EditableText
@@ -116,8 +121,9 @@ function LinkBlock({ id, props }: BlockProps<"Link">) {
         maxLength={textLimit("Link", "label")}
         label={props.href ? `Link text (opens ${props.href})` : "Link text (goes nowhere)"}
         placeholder="Link"
-        className={cn("inline-block", linkVariantClass[props.variant ?? "inline"])}
+        className={cn("inline-block", linkClassName(props))}
       />
+      {leaves ? <ExternalLinkMark /> : null}
     </span>
   );
 }
@@ -131,11 +137,15 @@ function ListBlock({ id, props }: BlockProps<"List">) {
   const Tag = props.ordered ? "ol" : "ul";
   const items = props.items.length > 0 ? props.items : [""];
   const write = (next: string[]) => { setProp(id, "items", next); };
+  // An icon marker is drawn before each item, as readers see it; numbers and plain bullets are the list's own.
+  const marker = listMarkerOf(props);
+  const listClass = marker ? markedListClass.list : cn("max-w-[var(--artifact-measure,72ch)] space-y-1 pl-5 text-md leading-7 marker:text-muted-foreground", props.ordered ? "list-decimal" : "list-disc");
   return (
-    <Tag className={cn("max-w-[var(--artifact-measure,72ch)] space-y-1 pl-5 text-md leading-7 marker:text-muted-foreground", props.ordered ? "list-decimal" : "list-disc")}>
+    <Tag className={listClass}>
       {items.map((item, index) => (
         // Items have no ids of their own; the index is their identity while typing.
-        <li key={index}>
+        <li key={index} className={marker ? markedListClass.item : undefined}>
+          {marker ? <ListMark marker={marker} /> : null}
           <EditableText
             blockKey={index === 0 ? id : `${id}:${String(index)}`}
             value={item}
@@ -145,7 +155,7 @@ function ListBlock({ id, props }: BlockProps<"List">) {
             onEmptyBackspace={items.length > 1 ? () => { write(items.filter((_, at) => at !== index)); } : undefined}
             label={`List item ${String(index + 1)}`}
             placeholder="List item"
-            className="break-words"
+            className={marker ? cn(markedListClass.text, "flex-1") : "break-words"}
           />
         </li>
       ))}
