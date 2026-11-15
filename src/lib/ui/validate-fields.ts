@@ -20,8 +20,8 @@ import type { UiSpec } from "./spec";
  */
 export const textFields: ReadonlySet<string> = new Set(["Input", "Textarea"]);
 
-/** How many bound text fields an error names before it counts the rest. */
-const namedFieldLimit = 3;
+/** How many bound text fields an error names before it counts the rest. The docs read it too. */
+export const namedFieldLimit = 3;
 
 /**
  * Every prop that can become a link a reader follows, by component. Add a
