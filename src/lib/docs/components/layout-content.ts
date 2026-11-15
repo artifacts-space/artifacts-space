@@ -133,7 +133,7 @@ export const contentDocs = {
       },
     ],
     rules: ["A `variant` sets a size and a tone; `size` and `tone` still win when given.", "`clamp` cuts the text off after that many lines with an ellipsis. The full text stays in the page for screen readers.",
-      "`announce` speaks the text to screen readers when it appears after a reader's action, such as a line a button press shows through `visible`, and again when its words change. Text that is there when the interface is first drawn is not spoken. Do not set it on text that follows typing: it would speak on every key.",
+      "`announce` speaks the text to screen readers when it appears after a reader's action, such as a line a button press shows through `visible`, and again when its words change. Text that is there when the interface is first drawn is not spoken. Do not set it on text that follows typing: it would speak on every key. Mark one element for each action: when two appear together, only the last is spoken.",
     ],
   },
   Markdown: {
@@ -162,7 +162,7 @@ export const contentDocs = {
         }),
       },
     ],
-    rules: ["`announce` speaks the title and text to screen readers when the Callout appears after a reader's action. A Callout that is there from the start is not spoken."],
+    rules: ["`announce` speaks the title and text to screen readers when the Callout appears after a reader's action. A Callout that is there from the start is not spoken. Mark one element for each action: when two appear together, only the last is spoken."],
   },
   Badge: {
     examples: [

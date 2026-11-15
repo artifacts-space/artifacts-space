@@ -88,6 +88,14 @@ describe("variants and formats", () => {
     expect(messages("Placeholder", { frame: "phone", variant: "avatar" })).toEqual([expect.stringContaining('`frame` applies to an image, video, or map Placeholder. Remove `frame`, or change `variant: "avatar"`.')]);
     expect(messages("Placeholder", { frame: "tablet" })).not.toEqual([]);
   });
+
+  it("should say nothing about frame when variant is an expression", () => {
+    const shape = { $cond: { $state: "/open" }, $then: "logo", $else: "image" };
+    expect(messages("Placeholder", { variant: shape, frame: "browser" })).toEqual([]);
+    expect(messages("Placeholder", { variant: { $state: "/open" }, frame: "phone" })).toEqual([]);
+    // And nothing when the frame is the expression: it is only known once it resolves.
+    expect(messages("Placeholder", { variant: "logo", frame: { $cond: { $state: "/open" }, $then: "browser", $else: "none" } })).toEqual([]);
+  });
 });
 
 describe("the toggleState action", () => {

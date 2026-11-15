@@ -116,10 +116,19 @@ function scrollProblems(props: Record<string, unknown>): string[] {
   return problems;
 }
 
-/** A frame is drawn around a picture-sized stand-in; a logo or an avatar is too small to sit in a window or a phone. */
+const frameFields = placeholderProps.pick({ variant: true, frame: true });
+
+/**
+ * A frame is drawn around a picture-sized stand-in; a logo or an avatar is
+ * too small to sit in a window or a phone. Like the Box rules, it says
+ * nothing unless both props are valid as written: an expression is only
+ * known once it resolves, and an invalid value has its own error.
+ */
 export const placeholderCheck: PropCheck = (props) => {
-  const variant = props.variant;
-  if (props.frame !== "browser" && props.frame !== "phone") return [];
+  const read = frameFields.safeParse(props);
+  if (!read.success) return [];
+  const { variant, frame } = read.data;
+  if (frame !== "browser" && frame !== "phone") return [];
   if (variant !== "logo" && variant !== "avatar") return [];
   return [`\`frame\` applies to an image, video, or map Placeholder. Remove \`frame\`, or change \`variant: "${variant}"\`.`];
 };
