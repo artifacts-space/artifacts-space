@@ -4,6 +4,9 @@ import type { ComponentDoc } from "./types";
 const icon = (name: string, extra: Record<string, unknown> = {}): DocElement => ({ type: "Icon", props: { name, ...extra } });
 const navLink = (label: string, extra: Record<string, unknown> = {}): DocElement => ({ type: "Link", props: { label, variant: "nav", ...extra } });
 
+const socialButton = (label: string, mark: string): DocElement => ({ type: "Button", props: { label, icon: mark, iconOnly: true, variant: "ghost" } });
+const providerButton = (label: string, mark: string): DocElement => ({ type: "Button", props: { label, icon: mark, variant: "outline", fullWidth: true } });
+
 const containerWidths = "Responsive props follow the width of the page column or canvas frame, never the browser window: sm is 576, md is 672, and lg is 896 pixels.";
 
 export const boxDocs: Record<"Box", ComponentDoc> = {
@@ -77,8 +80,35 @@ export const iconDocs: Record<"Icon", ComponentDoc> = {
         }),
       },
       { title: "Named for screen readers", note: "With a `label` the icon is announced; without one it is decorative.", spec: single("Icon", { name: "star", size: "lg", tone: "warning", label: "Rated five stars" }) },
+      {
+        title: "Brand marks: social links in a footer",
+        note: "Each mark is an icon-only Button, so its `label` names the network for screen readers.",
+        spec: spec("footer", {
+          footer: { type: "Box", props: { direction: "horizontal", stackBelow: "sm", justify: "between", align: "center", gap: "md", padding: "lg", border: "top", label: "Footer" }, children: ["note", "social"] },
+          note: text("© 2026 Northwind", { variant: "caption" }),
+          social: { type: "Box", props: { direction: "horizontal", gap: "xs", label: "Social links" }, children: ["github", "linkedin", "youtube"] },
+          github: socialButton("GitHub", "brand-github"),
+          linkedin: socialButton("LinkedIn", "brand-linkedin"),
+          youtube: socialButton("YouTube", "brand-youtube"),
+        }),
+      },
+      {
+        title: "Brand marks: a Continue with button",
+        note: "The mark sits at the start of a Button whose words name the provider.",
+        spec: spec("providers", {
+          providers: { type: "Box", props: { gap: "sm", maxWidth: "xs" }, children: ["google", "apple", "github"] },
+          google: providerButton("Continue with Google", "brand-google"),
+          apple: providerButton("Continue with Apple", "brand-apple"),
+          github: providerButton("Continue with GitHub", "brand-github"),
+        }),
+      },
     ],
-    rules: ["`name` is one of the listed icon names. An unknown name fails validation.", "An icon that carries meaning on its own needs a `label`."],
+    rules: [
+      "`name` is one of the listed icon names. An unknown name fails validation.",
+      "An icon that carries meaning on its own needs a `label`.",
+      "Brand marks all start with `brand-`, such as `brand-github` or `brand-google`. They are outline only and drawn in the text color, never in a brand color, and every component that takes an icon name takes them: Icon, Button, Badge, and Link.",
+      "Use a brand mark for a link to the brand's profile, or for a \"Continue with\" button for that provider, and name the brand in the `label` or the words (\"GitHub\", \"Continue with Google\"). An icon-only Button needs that `label`. Do not use a mark as if your own product were that brand.",
+    ],
   },
 };
 

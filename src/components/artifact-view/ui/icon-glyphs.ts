@@ -4,6 +4,27 @@ import {
   IconArrowUpRight,
   IconAt,
   IconBookmark,
+  IconBrandAndroid,
+  IconBrandApple,
+  IconBrandBehance,
+  IconBrandBluesky,
+  IconBrandDiscord,
+  IconBrandDribbble,
+  IconBrandFacebook,
+  IconBrandGithub,
+  IconBrandGitlab,
+  IconBrandGoogle,
+  IconBrandInstagram,
+  IconBrandLinkedin,
+  IconBrandMastodon,
+  IconBrandMedium,
+  IconBrandReddit,
+  IconBrandThreads,
+  IconBrandTiktok,
+  IconBrandTwitch,
+  IconBrandWindows,
+  IconBrandX,
+  IconBrandYoutube,
   IconCheck,
   IconChevronDown,
   IconChevronLeft,
@@ -38,7 +59,7 @@ import {
 } from "@tabler/icons-react";
 
 import { tablerIconComponents } from "@/components/artifact-icon/tabler-icons";
-import type { ExtraUiIconName, UiIconName } from "@/lib/ui/icon-names";
+import type { BrandUiIconName, ExtraUiIconName, UiIconName } from "@/lib/ui/icon-names";
 
 /** The component for each screen mark. The type fails when the list in src/lib/ui/icon-names.ts gains a name without one. */
 export const extraIconComponents: Record<ExtraUiIconName, TablerIcon> = {
@@ -79,5 +100,30 @@ export const extraIconComponents: Record<ExtraUiIconName, TablerIcon> = {
   "moon": IconMoon,
 };
 
-/** The component for every icon an interface may use: the page icons and the screen marks. */
-export const uiIconComponents: Record<UiIconName, TablerIcon> = { ...tablerIconComponents, ...extraIconComponents };
+/** The component for each brand mark. The type fails when the list in src/lib/ui/icon-names.ts gains a name without one. */
+export const brandIconComponents: Record<BrandUiIconName, TablerIcon> = {
+  "brand-github": IconBrandGithub,
+  "brand-gitlab": IconBrandGitlab,
+  "brand-x": IconBrandX,
+  "brand-linkedin": IconBrandLinkedin,
+  "brand-youtube": IconBrandYoutube,
+  "brand-instagram": IconBrandInstagram,
+  "brand-facebook": IconBrandFacebook,
+  "brand-tiktok": IconBrandTiktok,
+  "brand-discord": IconBrandDiscord,
+  "brand-mastodon": IconBrandMastodon,
+  "brand-bluesky": IconBrandBluesky,
+  "brand-threads": IconBrandThreads,
+  "brand-reddit": IconBrandReddit,
+  "brand-twitch": IconBrandTwitch,
+  "brand-dribbble": IconBrandDribbble,
+  "brand-behance": IconBrandBehance,
+  "brand-medium": IconBrandMedium,
+  "brand-apple": IconBrandApple,
+  "brand-google": IconBrandGoogle,
+  "brand-windows": IconBrandWindows,
+  "brand-android": IconBrandAndroid,
+};
+
+/** The component for every icon an interface may use: the page icons, the screen marks, and the brand marks. */
+export const uiIconComponents: Record<UiIconName, TablerIcon> = { ...tablerIconComponents, ...extraIconComponents, ...brandIconComponents };

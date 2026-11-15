@@ -91,6 +91,11 @@ describe("IconView and PlaceholderView", () => {
     expect(renderToStaticMarkup(<IconView props={{ name: "arrow-right" }} emit={emit} />)).toContain("tabler-icon-arrow-right");
   });
 
+  it("should draw a brand mark from the same name list when the name starts with brand-", () => {
+    expect(renderToStaticMarkup(<IconView props={{ name: "brand-github", label: "GitHub" }} emit={emit} />)).toContain("tabler-icon-brand-github");
+    expect(renderToStaticMarkup(<IconView props={{ name: "brand-x" }} emit={emit} />)).toContain("tabler-icon-brand-x");
+  });
+
   it("should name a placeholder by its label, or by what it stands in for", () => {
     expect(renderToStaticMarkup(<PlaceholderView props={{ label: "Hero image" }} emit={emit} />)).toContain('role="img" aria-label="Hero image"');
     expect(renderToStaticMarkup(<PlaceholderView props={{ variant: "map" }} emit={emit} />)).toContain('aria-label="Map placeholder"');

@@ -1,4 +1,5 @@
 import { isPlainObject, readPointer, walkJson } from "../json-walk";
+import { brandMarkLabels } from "../icon-names";
 import { uiLimits } from "../limits";
 import { validateUiSpec } from "../validate";
 
@@ -200,6 +201,55 @@ function elementProblems(fragment: TemplateFragment): string[] {
   ]);
 }
 
+/** The marks a "Continue with" sign-in button may use. */
+const signInMarks: ReadonlySet<string> = new Set(["brand-google", "brand-apple", "brand-github"]);
+
+/** One use of a brand mark: where it is, its name, the words beside it, and the component drawing it (null for an item in state, drawn by a repeat). */
+interface BrandUse {
+  where: string;
+  mark: string;
+  label: unknown;
+  component: string | null;
+}
+
+function brandNameIn(...candidates: unknown[]): string | undefined {
+  return candidates.find((candidate): candidate is string => typeof candidate === "string" && candidate.startsWith("brand-"));
+}
+
+/** Every brand mark the fragment draws: in an element's props, or in an item of its state that a repeat draws. */
+function brandUses(fragment: TemplateFragment): BrandUse[] {
+  const uses: BrandUse[] = [];
+  for (const [key, element] of Object.entries(fragment.elements)) {
+    const mark = brandNameIn(element.props?.icon, element.props?.name);
+    if (mark !== undefined) uses.push({ where: `element "${key}"`, mark, label: element.props?.label, component: element.type });
+  }
+  walkJson(fragment.state ?? {}, uiLimits.maxJsonDepth, ({ value }) => {
+    if (!isPlainObject(value)) return;
+    const mark = brandNameIn(value.icon, value.name);
+    if (mark !== undefined) uses.push({ where: `an item in state (${String(value.label)})`, mark, label: value.label, component: null });
+  });
+  return uses;
+}
+
+/**
+ * A brand mark in a template is a narrow exception to "no real logos": a
+ * social-profile link or a "Continue with" sign-in button. So it sits on a
+ * Button or a Link, its label names the brand, and "Continue with" is for
+ * Google, Apple, and GitHub only.
+ */
+function brandProblems(fragment: TemplateFragment): string[] {
+  return brandUses(fragment).flatMap(({ where, mark, label, component }) => {
+    const brand = Object.entries(brandMarkLabels).find(([name]) => name === mark)?.[1];
+    if (brand === undefined) return [`${where}: "${mark}" is not a brand mark in the icon list.`];
+    const problems: string[] = [];
+    if (component !== null && component !== "Button" && component !== "Link") problems.push(`${where} (${component}): ${mark} is a brand mark. A template uses one only on a Button or a Link that names the brand.`);
+    if (typeof label !== "string") return problems;
+    if (!label.toLowerCase().includes(brand.toLowerCase())) problems.push(`${where}: the label "${label}" does not name ${brand}, the brand of ${mark}.`);
+    if (label.startsWith("Continue with") && !signInMarks.has(mark)) problems.push(`${where}: "Continue with" is for brand-google, brand-apple, and brand-github only, not ${mark}.`);
+    return problems;
+  });
+}
+
 /** The first segment of an absolute path: the state key it starts at. */
 function stateKeyOf(path: string): string {
   return path.split("/")[1] ?? "";
@@ -257,6 +307,7 @@ export function templateProblems(template: UiTemplate, file: TemplateFile): stri
     ...hideProblems(fragment),
     ...choiceProblems(fragment),
     ...elementProblems(fragment),
+    ...brandProblems(fragment),
     ...stateProblems(fragment),
     ...slotProblems(template),
     ...specProblems(template),

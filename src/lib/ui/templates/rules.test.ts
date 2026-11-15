@@ -130,6 +130,33 @@ describe("templateProblems", () => {
     expect(templateProblems(withElements({ more: { type: "Link", props: { label: "More", href: "https://example.com/docs" } } }, ["title", "points", "more"]), "heroes")).toEqual([]);
   });
 
+  it("should allow a brand mark on an icon-only Button or a Link when its label names the brand, and a Continue with button for Google", () => {
+    const social: TemplateElement = { type: "Button", props: { label: "LinkedIn", icon: "brand-linkedin", iconOnly: true, variant: "ghost" } };
+    const provider: TemplateElement = { type: "Button", props: { label: "Continue with Google", icon: "brand-google" } };
+    const profile: TemplateElement = { type: "Link", props: { label: "Follow us on GitHub", icon: "brand-github" } };
+    expect(templateProblems(withElements({ social, provider, profile }, ["title", "points", "social", "provider", "profile"]), "heroes")).toEqual([]);
+  });
+
+  it("should name a brand mark on an Icon or a Badge, where it would stand for the template's own company", () => {
+    expect(problemsOf(withElements({ mark: { type: "Icon", props: { name: "brand-google", label: "Google" } } }, ["title", "points", "mark"]))).toMatch(/element "mark" \(Icon\): brand-google is a brand mark\. A template uses one only on a Button or a Link/);
+    expect(problemsOf(withElements({ pill: { type: "Badge", props: { label: "Google", icon: "brand-google" } } }, ["title", "points", "pill"]))).toMatch(/element "pill" \(Badge\): brand-google is a brand mark/);
+  });
+
+  it("should name a brand mark whose label does not name the brand", () => {
+    expect(problemsOf(withElements({ social: { type: "Button", props: { label: "Follow us", icon: "brand-linkedin", iconOnly: true } } }, ["title", "points", "social"]))).toMatch(/the label "Follow us" does not name LinkedIn, the brand of brand-linkedin/);
+  });
+
+  it("should name a Continue with button that uses a mark other than Google, Apple, or GitHub", () => {
+    expect(problemsOf(withElements({ social: { type: "Button", props: { label: "Continue with Discord", icon: "brand-discord" } } }, ["title", "points", "social"]))).toMatch(/"Continue with" is for brand-google, brand-apple, and brand-github only, not brand-discord/);
+  });
+
+  it("should read a brand mark and its label from an item in state when a repeat draws the button", () => {
+    const base = withElements({ channels: { type: "Box", props: {}, repeat: { statePath: "/channels", key: "label" }, children: ["channel"] }, channel: { type: "Button", props: { label: { $item: "label" }, icon: { $item: "icon" }, iconOnly: true } } }, ["title", "points", "channels"]);
+    const withChannels = (channels: unknown): UiTemplate => ({ ...base, fragment: { ...base.fragment, state: { ...base.fragment.state, channels } } });
+    expect(templateProblems(withChannels([{ icon: "brand-youtube", label: "YouTube" }]), "heroes")).toEqual([]);
+    expect(problemsOf(withChannels([{ icon: "brand-youtube", label: "Our videos" }]))).toMatch(/an item in state \(Our videos\): the label "Our videos" does not name YouTube/);
+  });
+
   it("should name a validateForm action that names no statePath", () => {
     expect(problemsOf(withElements({ go: { type: "Button", props: { label: "Go" }, on: { press: { action: "validateForm" } } } }, ["title", "points", "go"]))).toMatch(/validateForm must name its `statePath`/);
   });
