@@ -42,6 +42,7 @@ pnpm dev           # development server on http://localhost:3000
 pnpm check         # typecheck + lint (0 warnings) + 500-line + migration checks + vitest
 pnpm build         # production build; must pass before you push
 pnpm test          # vitest only
+pnpm test:db       # the *.db.test.ts files; needs TEST_DATABASE_URL (see Testing)
 pnpm test:e2e      # Playwright: the /dev/components gallery, plus production checks
 pnpm db:generate   # generate a migration from schema changes
 pnpm db:migrate    # apply migrations to a local or throwaway database only
@@ -518,12 +519,17 @@ catch this, so test the generated SQL with `.toSQL()`, as
   correctly granted.
 - `*.db.test.ts` files run SQL against a real Postgres. They run only when
   `TEST_DATABASE_URL` names a throwaway database with the migrations applied,
-  so `pnpm test` skips them; the CI **Database tests** job runs them against a
-  service container and fails if any is skipped. Run them with `pnpm test:db`,
-  which takes one file at a time: every file shares the one database, and
-  several fill or trim the same tables, so files side by side change each
-  other's counts (a full pool of unapproved OAuth apps once got a 201 where it
-  expected a 503, because another file's old apps were there to evict).
+  so a plain `pnpm test` skips them; the CI **Database tests** job runs them
+  against a service container and fails if any is skipped. Run them with
+  `pnpm test:db`, which stops when the variable is unset. They are the `db`
+  project in `vitest.config.mts`, which runs one file at a time, after the
+  unit tests, from every command (`pnpm test` and `pnpm check` too): the
+  files share one database, and several count or trim the same tables. A db
+  test deletes the rows it inserts, so the next file starts from the same
+  counts. Side by side, a full pool of unapproved OAuth apps twice got a 201
+  where its test expected a 503. The likely cause, reproduced by hand but
+  never caught in CI: an app another file registered was counted while the
+  pool was filled, then approved, which left the pool one short of full.
 - `pnpm test:e2e` renders the component gallery at `/dev/components` on a
   phone and a desktop viewport. It also builds and starts production on
   `PLAYWRIGHT_PORT + 1000` for the `*.prod.spec.ts` checks, which need real

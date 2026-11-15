@@ -95,8 +95,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:migrate
-      # One file at a time: every file uses the same database, and several fill or trim the same
-      # tables (the pool of unapproved OAuth apps), so files running side by side change each other's counts.
+      # The db project runs one file at a time (vitest.config.mts): the files
+      # share this database, and several count or trim the same tables.
       - run: pnpm test:db --reporter=default --reporter=json --outputFile.json=db-test-results.json
       # describe.runIf skips silently without a database, so prove every test ran.
       - name: Check that no database test was skipped
