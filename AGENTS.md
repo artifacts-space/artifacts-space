@@ -169,6 +169,13 @@ lint. Nothing renders under the 13px floor.
   validation bubbles.
 - Copy is plain, short, and benefit-first, in sentences with verbs. The UI
   says "Team", never "Organization".
+- Interface blocks (`src/components/artifact-view/ui`) size themselves by the
+  interface's width, never the window's: the renderer's roots (`UiView` and
+  the block editor) are the container named `ui`, and blocks use container
+  variants on it (`@xl/ui:grid-cols-2`), never `sm:`, `md:`, or `lg:`. So a
+  narrow interface on a wide window (a pane, a docs example, a frame) gets
+  the narrow layout. Always name the container: a bare `@xl:` binds to the
+  nearest chart, board, or calendar. `e2e/ui-container-width.spec.ts` checks it.
 
 ### Aesthetic: soft minimalism
 

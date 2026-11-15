@@ -13,7 +13,7 @@ import type { ViewProps } from "./stout";
 
 /** Heading classes by level; the interface editor uses them for headings typed in place. */
 export const headingClass = {
-  1: "text-3xl font-medium leading-[1.12] tracking-[-0.025em] sm:text-4xl",
+  1: "text-3xl font-medium leading-[1.12] tracking-[-0.025em] @xl/ui:text-4xl",
   2: "text-xl font-medium leading-snug tracking-[-0.015em]",
   3: "text-base font-medium leading-snug",
   4: "text-md font-medium text-muted-foreground",

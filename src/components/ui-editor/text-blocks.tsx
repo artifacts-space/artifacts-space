@@ -148,7 +148,7 @@ function ListBlock({ id, props }: BlockProps<"List">) {
 
 const titledStyles = {
   section: { frame: "gap-4", title: "text-lg font-medium tracking-[-0.01em] break-words", description: "text-md leading-6 text-muted-foreground break-words", body: "gap-4", tag: "h2", type: "Section" },
-  card: { frame: "card-surface gap-3 p-4 sm:p-5", title: "text-base font-medium break-words", description: "text-sm leading-5 text-muted-foreground break-words", body: "gap-3", tag: "h3", type: "Card" },
+  card: { frame: "card-surface gap-3 p-4 @xl/ui:p-5", title: "text-base font-medium break-words", description: "text-sm leading-5 text-muted-foreground break-words", body: "gap-3", tag: "h3", type: "Card" },
 } as const;
 
 /** The editable title and description of a Section or Card, over its child blocks. */

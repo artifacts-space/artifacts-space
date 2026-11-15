@@ -164,7 +164,7 @@ export function UiBlockEditor({ content, onChange }: UiBlockEditorProps) {
   return (
     <JSONUIProvider registry={uiRegistry} initialState={spec.state ?? {}} handlers={noHandlers}>
       <BlockEditorContext value={editor}>
-        <div data-slot="ui-block-editor" className="flex min-w-0 flex-col gap-4" onMouseLeave={() => { active.set(null); }}>
+        <div data-slot="ui-block-editor" className="@container/ui flex min-w-0 flex-col gap-4" onMouseLeave={() => { active.set(null); }}>
           {problem ? <ViewNotice tone="warning" title="Not changed">{problem}</ViewNotice> : null}
           {isContainerType(rootType) ? <ElementView id={spec.root} /> : <BlockFrame id={spec.root} type={rootType} parent={spec.root} index={0}><ElementView id={spec.root} /></BlockFrame>}
           <Button variant="ghost" size="sm" onClick={(event) => { openInsert({ kind: "end", parent: spec.root }, event.currentTarget); }} className="w-fit text-muted-foreground">

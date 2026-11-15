@@ -15,11 +15,17 @@ const gapClass: Record<Gap, string> = { none: "gap-0", sm: "gap-2", md: "gap-4",
 
 const alignClass = { start: "items-start", center: "items-center", end: "items-end", stretch: "items-stretch" } as const;
 
+/**
+ * Columns follow the width of the interface (the `ui` container on the
+ * renderer's root), never the window: two from 576px, three from 608px, four
+ * from 896px. An artifact page's column is 976px at most, and a docs example
+ * is about 630px, so a three-column grid shows three columns in both.
+ */
 const gridColumns = {
   1: "grid-cols-1",
-  2: "grid-cols-1 sm:grid-cols-2",
-  3: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
-  4: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
+  2: "grid-cols-1 @xl/ui:grid-cols-2",
+  3: "grid-cols-1 @xl/ui:grid-cols-2 @[38rem]/ui:grid-cols-3",
+  4: "grid-cols-1 @xl/ui:grid-cols-2 @4xl/ui:grid-cols-4",
 } as const;
 
 function Empty({ what }: { what: string }) {
@@ -62,12 +68,12 @@ export function StackView({ props, children }: ViewProps<"Stack">) {
 
 export function GridView({ props, children }: ViewProps<"Grid">) {
   const columns = (props.columns ?? 2) as keyof typeof gridColumns;
-  return <div className={cn("grid min-w-0", gridColumns[columns], gapClass[props.gap ?? "md"])}>{children}</div>;
+  return <div data-slot="ui-grid" className={cn("grid min-w-0", gridColumns[columns], gapClass[props.gap ?? "md"])}>{children}</div>;
 }
 
 export function CardView({ props, children }: ViewProps<"Card">) {
   return (
-    <div className="card-surface flex min-w-0 flex-col gap-3 p-4 sm:p-5">
+    <div className="card-surface flex min-w-0 flex-col gap-3 p-4 @xl/ui:p-5">
       {hasTitleText(props.title) || hasTitleText(props.description) ? (
         <div className="space-y-1">
           {hasTitleText(props.title) ? <h3 className="text-base font-medium break-words">{props.title}</h3> : null}

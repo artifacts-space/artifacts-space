@@ -33,8 +33,36 @@ const textEdges = (box: Locator) => box.first().evaluate((element) => {
   return { left: left + Number.parseFloat(style.paddingLeft), right: right - Number.parseFloat(style.paddingRight) };
 });
 
+/** An interface of one three-column grid: its edges and its columns show the width the interface was given. */
+const gridInterface = JSON.stringify({
+  version: 1,
+  root: "grid",
+  elements: {
+    grid: { type: "Grid", props: { columns: 3 }, children: ["one", "two", "three"] },
+    one: { type: "Callout", props: { text: "One" } },
+    two: { type: "Callout", props: { text: "Two" } },
+    three: { type: "Callout", props: { text: "Three" } },
+  },
+});
+
+/**
+ * The grid fills the column the title sits in, and lays out the columns that
+ * width allows (three from 608px, as in layout.tsx). An interface has no
+ * width of its own, so a parent that sized it by its content would collapse
+ * it here.
+ */
+async function expectGridInColumn(grid: Locator, heading: Locator) {
+  const title = await textEdges(heading);
+  const edges = await textEdges(grid);
+  expect(Math.abs(edges.left - title.left), "the interface starts where the title starts").toBeLessThanOrEqual(0.5);
+  expect(Math.abs(edges.right - title.right), "the interface ends where the title ends").toBeLessThanOrEqual(0.5);
+  expect(edges.right - edges.left, "the column is wide enough for three columns").toBeGreaterThanOrEqual(608);
+  const columns = await grid.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length);
+  expect(columns).toBe(3);
+}
+
 /** Signs in to seed a public artifact, then signs out, so the page is a reader's. */
-async function openAsReader(page: Page, input: { title: string; content: string; kind: "markdown" | "text" }) {
+async function openAsReader(page: Page, input: { title: string; content: string; kind: "markdown" | "text" | "ui" }) {
   await page.goto("/api/dev/sign-in");
   await page.waitForURL(/\/app/);
   const publicId = await createTestArtifact({ userId: await readyDevUser(), title: input.title, content: input.content, visibility: "public", theme: null, kind: input.kind, summary });
@@ -74,10 +102,17 @@ for (const size of [{ width: 1720, height: 900 }, { width: 1280, height: 800 }, 
     expect(Math.abs(edges.right - title.right), "the text ends where the title ends").toBeLessThanOrEqual(0.5);
     await expectSummaryInColumn(page);
   });
+
+  test(`should give an interface the whole column for a reader, at ${String(size.width)}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize(size);
+    await openAsReader(page, { title: `One column interface ${testInfo.project.name} ${String(size.width)}`, content: gridInterface, kind: "ui" });
+    await expectGridInColumn(page.locator("main [data-slot=ui-grid]"), page.locator("main h1"));
+    await expectSummaryInColumn(page);
+  });
 }
 
 /** Signs in, and opens in /app someone else's public artifact from its link: the pane's read-only view. */
-async function openShared(page: Page, input: { title: string; content: string; kind: "markdown" | "text" }) {
+async function openShared(page: Page, input: { title: string; content: string; kind: "markdown" | "text" | "ui" }) {
   await page.goto("/api/dev/sign-in");
   await page.waitForURL(/\/app/);
   await readyDevUser();
@@ -108,6 +143,12 @@ for (const size of [{ width: 1720, height: 900 }, { width: 1280, height: 800 }])
     const edges = await textEdges(page.locator("[data-slot=detail-body] article").filter({ hasText: line.slice(0, 40) }).last());
     expect(Math.abs(edges.left - title.left), "the text starts where the title starts").toBeLessThanOrEqual(0.5);
     expect(Math.abs(edges.right - title.right), "the text ends where the title ends").toBeLessThanOrEqual(0.5);
+  });
+
+  test(`should give a shared interface the whole column in the /app pane, at ${String(size.width)}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize(size);
+    const heading = await openShared(page, { title: `Shared column interface ${testInfo.project.name} ${String(size.width)}`, content: gridInterface, kind: "ui" });
+    await expectGridInColumn(page.locator("[data-slot=detail-body] [data-slot=ui-grid]"), heading);
   });
 }
 

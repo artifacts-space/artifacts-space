@@ -28,7 +28,7 @@ export function UiView({ content }: { content: string }) {
     );
   }
   return (
-    <div className="flex min-w-0 flex-col gap-4">
+    <div className="@container/ui flex min-w-0 flex-col gap-4">
       {errors.length > 0 ? (
         <ViewNotice tone="warning" title={`${String(errors.length)} ${errors.length === 1 ? "part" : "parts"} of this interface could not be shown.`}>
           <details>
