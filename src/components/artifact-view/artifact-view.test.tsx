@@ -7,6 +7,8 @@ import { exampleUiSpec } from "@/lib/ui/fixtures/example";
 import { invalidPropsSpec, unknownTypeSpec } from "@/lib/ui/fixtures/specs";
 import { uiComponentNames } from "@/lib/ui/catalog";
 
+import { appFlowCanvas, brokenFrameCanvas, emptyCanvas } from "@/lib/canvas/fixtures";
+
 import { ArtifactView } from "./artifact-view";
 
 function render(kind: string, content: string) {
@@ -161,5 +163,58 @@ describe("ArtifactView for markdown code and text", () => {
     expect(html).toContain("<code>billing.ledger_v2</code>");
     expect(html).toContain("Backfill 2025 invoices");
     expect(html).toContain("<td>@dana</td>");
+  });
+});
+
+describe("ArtifactView for canvas", () => {
+  it("should server-render every frame's name, size, and interface when the canvas is valid", () => {
+    const html = render("canvas", JSON.stringify(appFlowCanvas));
+    for (const name of ["1. Sign in", "2. Inbox", "3. Ticket", "4. Settings"]) expect(html).toContain(name);
+    expect(html).toContain("390 × 844");
+    expect(html).toContain("Welcome back");
+    expect(html).toContain('aria-label="Canvas, 4 frames"');
+    expect(html.match(/data-canvas-frame="/g)).toHaveLength(4);
+  });
+
+  it("should show a notice in place of a frame that cannot be shown and still render the others", () => {
+    const html = render("canvas", JSON.stringify(brokenFrameCanvas));
+    expect(html).toContain("Welcome back");
+    expect(html).toContain("This frame could not be shown.");
+    expect(html).toContain("&quot;width&quot; must be a whole number from 240 to 2560");
+    expect(html).toContain("This interface could not be shown.");
+  });
+
+  it("should say so when a canvas has no frames", () => {
+    expect(render("canvas", JSON.stringify(emptyCanvas))).toContain("This canvas has no frames yet.");
+  });
+
+  it("should show the issues instead of a board when the canvas cannot be read", () => {
+    const html = render("canvas", '{ "version": 1, "frames": "none" }');
+    expect(html).toContain("This canvas could not be shown.");
+    expect(html).toContain("&quot;frames&quot; must be a list of frames");
+    expect(html).not.toContain("data-canvas-board");
+  });
+
+  it("should show a notice, not fail, when a frame's spec nests far too deep to draw", () => {
+    // A runtime that cannot write the nesting out shows the frame's notice; one that can hands it to the interface renderer, which refuses it. Either way a notice, never a throw.
+    const depth = 20_000;
+    const deep = `${'{"a":'.repeat(depth)}1${"}".repeat(depth)}`;
+    const html = render("canvas", `{"version":1,"frames":[{"id":"home","name":"Home","width":390,"spec":${deep}}]}`);
+    expect(html).toMatch(/This (frame|interface) could not be shown\./);
+  });
+
+  it("should show the interface's own notice when a frame's spec nests deeper than the limit", () => {
+    const depth = 1_000;
+    const deep = `${'{"a":'.repeat(depth)}1${"}".repeat(depth)}`;
+    const html = render("canvas", `{"version":1,"frames":[{"id":"home","name":"Home","width":390,"spec":${deep}}]}`);
+    expect(html).toContain("This interface could not be shown.");
+    expect(html).toContain("nests JSON more than 64 levels deep");
+  });
+
+  it("should never render markup from a frame's text", () => {
+    const spec = { version: 1, root: "t", elements: { t: { type: "Text", props: { text: "<script>alert(1)</script>" } } } };
+    const html = render("canvas", JSON.stringify({ version: 1, frames: [{ id: "a", name: "<img src=x onerror=alert(1)>", width: 390, spec }] }));
+    expect(html).not.toContain("<script");
+    expect(html).not.toContain("<img");
   });
 });

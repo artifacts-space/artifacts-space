@@ -90,6 +90,13 @@ describe("artifactDescription", () => {
     expect(artifactDescription(input({ kind: "ui", content }))).toBe("Weekly revenue is up.");
   });
 
+  it("should name a canvas's frames when the kind is canvas", () => {
+    const spec = { version: 1, root: "h", elements: { h: { type: "Heading", props: { text: "Hi" } } } };
+    const content = JSON.stringify({ version: 1, frames: [{ id: "a", name: "Home, desktop", width: 1440, spec }, { id: "b", name: "Home, phone", width: 390, spec }] });
+    expect(artifactDescription(input({ kind: "canvas", content }))).toBe("2 frames: Home, desktop; Home, phone");
+    expect(artifactDescription(input({ kind: "canvas", content: "{" }))).toBe("Canvas on artifacts.space");
+  });
+
   it("should use a file artifact's notes, else list its files", () => {
     expect(artifactDescription(input({ kind: "file", content: "Signed **contract** copies." }))).toBe("Signed contract copies.");
     const files = [{ filename: "a.pdf" }, { filename: "b.png" }];

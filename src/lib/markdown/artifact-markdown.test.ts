@@ -95,6 +95,17 @@ describe("contentToMarkdown", () => {
     const spec = JSON.stringify({ version: 1, root: "h", elements: { h: { type: "Heading", props: { text: "Dashboard" } } } });
     expect(content("ui", spec)).toBe("## Dashboard");
   });
+
+  it("should render a canvas as one section per frame, each with its interface as Markdown", () => {
+    const spec = (text: string) => ({ version: 1, root: "t", elements: { t: { type: "Text", props: { text } } } });
+    const canvas = { version: 1, frames: [{ id: "a", name: "Home, desktop", width: 1440, spec: spec("Wide") }, { id: "b", name: "Home, phone", width: 390, spec: spec("Narrow") }, { id: "c", name: "Draft", width: 390 }] };
+    expect(content("canvas", JSON.stringify(canvas))).toBe("## Home, desktop (1440 wide)\n\nWide\n\n## Home, phone (390 wide)\n\nNarrow\n\n## Draft (390 wide)\n\n_This frame has no interface._");
+  });
+
+  it("should say so when a canvas has no frames, and show the source when it cannot be read", () => {
+    expect(content("canvas", '{"version":1,"frames":[]}')).toBe("_This canvas has no frames yet._");
+    expect(content("canvas", "{ nope")).toBe("_This canvas could not be read, so here is its source._\n\n```json\n{ nope\n```");
+  });
 });
 
 describe("csvToMarkdown", () => {

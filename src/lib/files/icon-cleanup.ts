@@ -33,9 +33,9 @@ function retainedImageRefs(artifactId: string) {
     .where(and(eq(artifactVersion.artifactId, artifactId), or(like(artifactVersion.icon, `${FILE_PREFIX}%`), like(artifactVersion.cover, `${FILE_PREFIX}%`))));
 }
 
-/** For an `artifact_file` row: no ui or Markdown version of the artifact names it in its content (a case-insensitive text match, so it errs on keeping). */
+/** For an `artifact_file` row: no ui, Markdown, or canvas version of the artifact names it in its content (a case-insensitive text match, so it errs on keeping). */
 function notNamedByVersions(artifactId: string) {
-  return sql`not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and v.kind in ('ui', 'markdown') and strpos(lower(v.content), "artifact_file"."id") > 0)`;
+  return sql`not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and v.kind in ('ui', 'markdown', 'canvas') and strpos(lower(v.content), "artifact_file"."id") > 0)`;
 }
 
 /**
@@ -46,10 +46,10 @@ function notNamedByVersions(artifactId: string) {
  * (the correlated-subquery tripwire in AGENTS.md).
  */
 export function notNamedByArtifact(artifactId: string) {
-  return sql`not exists (select 1 from ${artifact} a where a.id = ${artifactId} and (strpos(lower(a.content), "artifact_file"."id") > 0 or strpos(lower(concat_ws(' ', a.icon, a.cover)), "artifact_file"."id") > 0)) and not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and ((v.kind in ('ui', 'markdown') and strpos(lower(v.content), "artifact_file"."id") > 0) or strpos(lower(concat_ws(' ', v.icon, v.cover)), "artifact_file"."id") > 0))`;
+  return sql`not exists (select 1 from ${artifact} a where a.id = ${artifactId} and (strpos(lower(a.content), "artifact_file"."id") > 0 or strpos(lower(concat_ws(' ', a.icon, a.cover)), "artifact_file"."id") > 0)) and not exists (select 1 from ${artifactVersion} v where v.artifact_id = ${artifactId} and ((v.kind in ('ui', 'markdown', 'canvas') and strpos(lower(v.content), "artifact_file"."id") > 0) or strpos(lower(concat_ws(' ', v.icon, v.cover)), "artifact_file"."id") > 0))`;
 }
 
-/** The files among `fileIds` that no ui or Markdown version of the artifact names in its content, in one query however many there are. */
+/** The files among `fileIds` that no ui, Markdown, or canvas version of the artifact names in its content, in one query however many there are. */
 async function notNamedInContent(artifactId: string, fileIds: readonly string[]): Promise<string[]> {
   const rows = await getDb()
     .select({ id: artifactFile.id })

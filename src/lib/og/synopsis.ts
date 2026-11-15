@@ -1,4 +1,5 @@
 import type { ArtifactKind } from "@/lib/artifact-types";
+import { canvasOutline, frameCountLabel } from "@/lib/canvas/outline";
 import { parseCsv } from "@/lib/csv";
 
 import type { Synopsis } from "./synopsis-types";
@@ -29,6 +30,7 @@ export const ogKindLabels: Record<ArtifactKind, string> = {
   svg: "SVG image",
   mermaid: "Diagram",
   ui: "Dashboard",
+  canvas: "Canvas",
   file: "Files",
 };
 
@@ -110,7 +112,13 @@ function fileSynopsis(files: SynopsisInput["files"]): Synopsis {
   return { type: "glyph", glyph: "file", label: truncate(first.filename, 30), detail: `${fileTypeLabel(first)}${more}` };
 }
 
+function canvasSynopsis(content: string): Synopsis {
+  const frames = canvasOutline(content);
+  return { type: "glyph", glyph: "page", label: "Canvas", detail: frames && frames.length > 0 ? frameCountLabel(frames.length) : null };
+}
+
 const builders: Record<ArtifactKind, (input: SynopsisInput) => Synopsis> = {
+  canvas: ({ content }) => canvasSynopsis(content),
   ui: ({ content }) => uiSynopsis(content) ?? { type: "glyph", glyph: "page", label: "Dashboard", detail: null },
   markdown: ({ content }) => proseSynopsis(content, true),
   text: ({ content }) => proseSynopsis(content, false),

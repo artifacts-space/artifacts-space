@@ -77,6 +77,7 @@
   --color-kind-svg: var(--kind-svg);
   --color-kind-mermaid: var(--kind-mermaid);
   --color-kind-ui: var(--kind-ui);
+  --color-kind-canvas: var(--kind-canvas);
   --color-kind-file: var(--kind-file);
   --color-mention: var(--mention);
   --color-mention-foreground: var(--mention-foreground);
@@ -219,6 +220,7 @@
   --kind-svg: oklch(0.58 0.17 350);
   --kind-mermaid: oklch(0.6 0.15 45);
   --kind-ui: oklch(0.55 0.13 225);
+  --kind-canvas: oklch(0.55 0.12 115);
   --kind-file: oklch(0.52 0.06 260);
   /* @mention chips in comments: people, and agents (a slightly different hue). */
   --mention: oklch(0.95 0.025 262);
@@ -436,6 +438,7 @@
   --kind-svg: oklch(0.76 0.13 350);
   --kind-mermaid: oklch(0.78 0.13 50);
   --kind-ui: oklch(0.76 0.11 225);
+  --kind-canvas: oklch(0.78 0.12 115);
   --kind-file: oklch(0.76 0.05 260);
   --mention: oklch(0.3 0.045 262);
   --mention-foreground: oklch(0.86 0.08 262);

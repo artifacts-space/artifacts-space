@@ -81,11 +81,20 @@ function authoredIds(values: readonly unknown[]): Set<string> {
   return ids;
 }
 
-/** An id for a frame that has no usable one. It is never an id that any frame wrote, nor one already given out. */
+/**
+ * An id for a frame that has no usable one: "frame-2" for the second frame,
+ * or "frame-2-2", "frame-2-3", and so on when a frame wrote that id itself.
+ * It is never an id that any frame wrote, nor one already given out. A board
+ * holds at most `maxFrames` frames, so a free number is always near and the
+ * stand-in stays a short id that passes the id rule.
+ */
 function standInId(index: number, ids: FrameIds): string {
-  let id = `frame-${String(index + 1)}`;
-  while (ids.authored.has(id) || ids.taken.has(id)) id = `${id}-x`;
-  return id;
+  const base = `frame-${String(index + 1)}`;
+  const free = (id: string) => !ids.authored.has(id) && !ids.taken.has(id);
+  if (free(base)) return base;
+  let number = 2;
+  while (!free(`${base}-${String(number)}`)) number += 1;
+  return `${base}-${String(number)}`;
 }
 
 const idExamples = `Give each frame a short id such as "home" or "checkout-phone".`;

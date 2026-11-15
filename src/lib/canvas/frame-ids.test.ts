@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { canvasLimits, frameIdPattern } from "./limits";
 import { readCanvas } from "./read";
 
 const spec = { version: 1, root: "page", elements: { page: { type: "Heading", props: { text: "Hello" } } } };
@@ -12,13 +13,13 @@ const problems = (frames: readonly unknown[]) => read(frames).map((item) => item
 describe("frame ids: stand-ins", () => {
   it("should leave a later frame its own id when an earlier frame needs a stand-in", () => {
     const frames = [frame(""), frame("frame-1")];
-    expect(ids(frames)).toEqual(["frame-1-x", "frame-1"]);
+    expect(ids(frames)).toEqual(["frame-1-2", "frame-1"]);
     expect(problems(frames)).toEqual([['Frame 1: "id" is empty. Give each frame a short id such as "home" or "checkout-phone".'], []]);
   });
 
   it("should leave a later frame its own id when a frame in the middle needs a stand-in", () => {
     const frames = [frame("home"), frame(""), frame("frame-2")];
-    expect(ids(frames)).toEqual(["home", "frame-2-x", "frame-2"]);
+    expect(ids(frames)).toEqual(["home", "frame-2-2", "frame-2"]);
     expect(problems(frames)[2]).toEqual([]);
   });
 
@@ -28,24 +29,39 @@ describe("frame ids: stand-ins", () => {
 
   it("should not hand out a stand-in that a later frame wrote as its id", () => {
     const frames = [frame("Home"), frame("frame-1")];
-    expect(ids(frames)).toEqual(["frame-1-x", "frame-1"]);
+    expect(ids(frames)).toEqual(["frame-1-2", "frame-1"]);
     expect(problems(frames)[1]).toEqual([]);
   });
 
   it("should not hand out a stand-in that an earlier frame wrote as its id", () => {
     const frames = [frame("frame-2"), frame("")];
-    expect(ids(frames)).toEqual(["frame-2", "frame-2-x"]);
+    expect(ids(frames)).toEqual(["frame-2", "frame-2-2"]);
     expect(problems(frames)[0]).toEqual([]);
   });
 
   it("should leave a later frame its own id when a value that is not a frame comes first", () => {
     const frames = ["not a frame", frame("frame-1")];
-    expect(ids(frames)).toEqual(["frame-1-x", "frame-1"]);
+    expect(ids(frames)).toEqual(["frame-1-2", "frame-1"]);
     expect(problems(frames)[1]).toEqual([]);
   });
 
   it("should skip every id a frame wrote when the first stand-ins are all asked for", () => {
-    expect(ids([frame(42), frame("frame-1"), frame("frame-1-x")])).toEqual(["frame-1-x-x", "frame-1", "frame-1-x"]);
+    expect(ids([frame(42), frame("frame-1"), frame("frame-1-2")])).toEqual(["frame-1-3", "frame-1", "frame-1-2"]);
+  });
+
+  it("should keep a stand-in within the id rule when frames wrote every id it would try first", () => {
+    // Frame 1 has no usable id; the 23 others wrote "frame-1", then "frame-1-2" to "frame-1-23", the ids a stand-in tries in order.
+    const wrote = ["frame-1", ...Array.from({ length: canvasLimits.maxFrames - 2 }, (_, index) => `frame-1-${String(index + 2)}`)];
+    const given = ids([frame(""), ...wrote.map((id) => frame(id))]);
+    expect(given).toEqual(["frame-1-24", ...wrote]);
+    expect(given[0]?.length).toBeLessThanOrEqual(canvasLimits.maxIdLength);
+    expect(given[0]).toMatch(frameIdPattern);
+  });
+
+  it("should keep every stand-in within the id rule when no frame on a full board has a usable id", () => {
+    const given = ids(Array.from({ length: canvasLimits.maxFrames }, () => frame(null)));
+    expect(new Set(given).size).toBe(canvasLimits.maxFrames);
+    expect(given.every((id) => id.length <= canvasLimits.maxIdLength && frameIdPattern.test(id))).toBe(true);
   });
 
   it("should give every frame a different id when none of them has a usable one", () => {
@@ -69,7 +85,7 @@ describe("frame ids: duplicates", () => {
 
   it("should keep the stand-in for a duplicate away from an id a later frame wrote", () => {
     const frames = [frame("home"), frame("home"), frame("frame-2")];
-    expect(ids(frames)).toEqual(["home", "frame-2-x", "frame-2"]);
+    expect(ids(frames)).toEqual(["home", "frame-2-2", "frame-2"]);
     expect(problems(frames)[2]).toEqual([]);
   });
 

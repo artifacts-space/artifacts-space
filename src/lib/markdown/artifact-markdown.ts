@@ -7,6 +7,7 @@ import { absoluteFileLinks } from "@/lib/files/media-rules";
 import { prettyJson } from "@/lib/pretty-json";
 import { formatSize } from "@/lib/relative-time";
 
+import { canvasToMarkdown } from "./canvas";
 import { fenced, inlineText, link, markdownTable } from "./text";
 import { uiSpecToMarkdown } from "./ui-spec";
 
@@ -138,6 +139,7 @@ const byFormat: Record<ArtifactKind, (input: ContentInput) => string> = {
   svg: (input) => fenced(input.content, "svg"),
   mermaid: (input) => fenced(input.content, "mermaid"),
   ui: (input) => uiSpecToMarkdown(input.content, { fileLink: fileLinkFor(input.files) }),
+  canvas: (input) => canvasToMarkdown(input.content, { fileLink: fileLinkFor(input.files) }),
 };
 
 /** The body of the artifact, by format. A file artifact's body is its notes. */

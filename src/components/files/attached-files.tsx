@@ -147,7 +147,7 @@ export function AttachedFiles({ artifact, onUpdated, api = serverApi, column, cl
             <AttachedRow
               key={file.id}
               file={file}
-              showId={artifact.kind === "ui"}
+              showId={artifact.kind === "ui" || artifact.kind === "canvas"}
               removing={removing === file.id}
               replacing={replacing?.fileId === file.id ? replacing : null}
               busy={replacing !== null}

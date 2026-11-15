@@ -37,6 +37,16 @@ describe("withPlainUiFileRefs", () => {
     expect(withPlainUiFileRefs("not json")).toBe("not json");
   });
 
+  it("should write an escaped file id plainly in a canvas frame when the save is a canvas", () => {
+    const canvas = (file: string) => `{"version":1,"frames":[{"id":"a","name":"A","width":390,"spec":${spec(file)}}]}`;
+    const escaped = canvas(`2\\u0061${fileId.slice(2)}`);
+    expect(fileRefsInContent("canvas", escaped)).toEqual([fileId]);
+    expect(escaped.toLowerCase()).not.toContain(fileId);
+    const saved = contentForSave("canvas", { content: escaped }).content;
+    expect(saved).toContain(fileId);
+    expect(contentForSave("canvas", { content: canvas(fileId) }).content).toBe(canvas(fileId));
+  });
+
   it("should apply to ui saves through contentForSave", () => {
     expect(contentForSave("ui", { content: spec(`2\\u0061${fileId.slice(2)}`) }, null).content).toContain(fileId);
   });

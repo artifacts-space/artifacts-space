@@ -1,5 +1,6 @@
 import { ZodError } from "zod";
 
+import { validateCanvas } from "@/lib/canvas/validate";
 import { parseCsv } from "@/lib/csv";
 import { checkMermaidSource } from "@/lib/mermaid-source";
 import { checkSvg } from "@/lib/svg";
@@ -54,6 +55,7 @@ const checks: Record<string, (content: string) => UiSpecIssue[]> = {
     return problem ? [error("invalid_mermaid", problem)] : [];
   },
   ui: (content) => validateUiSpec(content).issues,
+  canvas: (content) => validateCanvas(content).issues,
 };
 
 /** Exceptions a caller may ask for. */
@@ -75,7 +77,8 @@ function mayBeEmpty(kind: string, options: ContentCheckOptions): boolean {
  * is optional notes, may be empty (and Markdown, when `emptyMarkdown` is set).
  * Markdown, code, and text accept any text. JSON must parse, CSV must have a
  * header and closed quotes, SVG must have an <svg> root, Mermaid must name a
- * diagram type, and ui must pass `validateUiSpec`.
+ * diagram type, ui must pass `validateUiSpec`, and canvas must pass
+ * `validateCanvas`.
  */
 export function validateArtifactContent(kind: string, content: string, options: ContentCheckOptions = {}): ArtifactContentResult {
   if (content === "" && !mayBeEmpty(kind, options)) return result([error("empty_content", "Add content. Only file artifacts may be saved without it.")]);

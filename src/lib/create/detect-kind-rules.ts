@@ -1,4 +1,5 @@
 import type { ArtifactKind } from "@/lib/artifact-types";
+import { validateCanvas } from "@/lib/canvas/validate";
 import { detectDelimiter, parseCsv } from "@/lib/csv";
 import { checkMermaidSource, mermaidDiagramType } from "@/lib/mermaid-source";
 import { checkSvg } from "@/lib/svg";
@@ -13,7 +14,7 @@ import { validateUiSpec } from "@/lib/ui/validate";
  */
 
 /** Why a format was chosen, for tests and for the chip that names it. */
-export type DetectReason = "empty" | "prose" | "heading" | "svg" | "json" | "ui" | "fence" | "shebang" | "mermaid" | "csv" | "extension";
+export type DetectReason = "empty" | "prose" | "heading" | "svg" | "json" | "ui" | "canvas" | "fence" | "shebang" | "mermaid" | "csv" | "extension";
 
 export interface Detection {
   kind: ArtifactKind;
@@ -58,6 +59,12 @@ function detectSvg(text: string): Detection | null {
   return checkSvg(text).ok ? { kind: "svg", language: "", content: text, title: null, reason: "svg" } : null;
 }
 
+/** A valid canvas with at least one frame; an object that only happens to have an empty `frames` list stays JSON. */
+function isCanvas(text: string): boolean {
+  const canvas = validateCanvas(text);
+  return canvas.valid && canvas.frames.length > 0;
+}
+
 function detectJson(text: string): Detection | null {
   const first = text.trimStart()[0];
   if (first !== "{" && first !== "[") return null;
@@ -67,6 +74,7 @@ function detectJson(text: string): Detection | null {
     return null;
   }
   if (first === "{" && validateUiSpec(text).valid) return { kind: "ui", language: "", content: text, title: null, reason: "ui" };
+  if (first === "{" && isCanvas(text)) return { kind: "canvas", language: "", content: text, title: null, reason: "canvas" };
   return { kind: "json", language: "", content: text, title: null, reason: "json" };
 }
 

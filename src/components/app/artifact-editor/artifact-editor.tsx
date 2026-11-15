@@ -80,7 +80,7 @@ function SharingSlot({ artifact, shareUrl, canShare, manager, team, onUpdated }:
 
 /** Files show under formats that use them, and under any artifact that has some. */
 function showsFiles(kind: ArtifactDto["kind"], fileCount: number) {
-  return kind === "file" || kind === "ui" || fileCount > 0;
+  return kind === "file" || kind === "ui" || kind === "canvas" || fileCount > 0;
 }
 
 interface ArtifactToolbarProps {

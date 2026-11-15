@@ -1,10 +1,10 @@
 import type { ArtifactKind } from "@/lib/artifact-types";
 
 /** Formats whose source is JSON, compared pretty-printed so a one-line spec still diffs line by line. */
-const jsonKinds: ReadonlySet<ArtifactKind> = new Set(["json", "ui"]);
+const jsonKinds: ReadonlySet<ArtifactKind> = new Set(["json", "ui", "canvas"]);
 
 /**
- * The text a version diff compares. JSON and ui specs are parsed and
+ * The text a version diff compares. JSON, ui specs, and canvases are parsed and
  * pretty-printed with two-space indents; content that does not parse, and
  * every other format, is compared as written.
  */

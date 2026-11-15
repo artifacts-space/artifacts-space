@@ -14,6 +14,7 @@ import { maxMermaidLength } from "@/lib/mermaid-source";
 import { oauthLimits } from "@/lib/oauth/config";
 import { contentQuotaProblem, fileQuotaProblem, storageQuota } from "@/lib/quota/rules";
 import { teamLimits } from "@/lib/teams/limits";
+import { canvasLimits } from "@/lib/canvas/limits";
 import { uiLimits } from "@/lib/ui/limits";
 
 export const metadata = docsMetadata("limits");
@@ -112,6 +113,10 @@ export default function LimitsPage() {
           ["ui JSON depth", String(uiLimits.maxJsonDepth)],
           ["ui element key", `${String(uiLimits.maxKeyLength)} characters`],
           ["Issues reported per check", String(uiLimits.maxReportedIssues)],
+          ["Canvas", size(canvasLimits.maxCanvasBytes)],
+          ["Canvas frames", String(canvasLimits.maxFrames)],
+          ["Canvas elements, all frames", n(canvasLimits.maxElements)],
+          ["Canvas frame width", `${String(canvasLimits.minWidth)} to ${n(canvasLimits.maxWidth)} pixels`],
         ]}
         mono={[1]}
       />

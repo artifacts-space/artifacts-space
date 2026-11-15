@@ -1,4 +1,5 @@
 import type { FormatKind } from "@/lib/artifact-formats";
+import { exampleCanvas } from "@/lib/canvas/fixtures";
 import { formatDocs } from "@/lib/docs/format-docs";
 import { docsExampleFiles, single, spec, type DocExample, type DocSpec } from "@/lib/docs/spec-builders";
 import type { FileDto } from "@/lib/files/types";
@@ -102,7 +103,7 @@ const serviceReportCsv = [
 
 const checkoutNotes = "Screenshots and the metrics export from the **Checkout v2** review on Nov 6.";
 
-/** Content for each format viewer. Reuses the Formats docs examples, except csv, ui, and file. */
+/** Content for each format viewer. Reuses the Formats docs examples, except csv, ui, canvas, and file. */
 export const formatSamples: Record<FormatKind, FormatSample> = {
   markdown: { format: "markdown", content: formatDocs.markdown.example },
   code: { format: "code", content: formatDocs.code.example, language: "typescript" },
@@ -112,6 +113,7 @@ export const formatSamples: Record<FormatKind, FormatSample> = {
   svg: { format: "svg", content: formatDocs.svg.example },
   mermaid: { format: "mermaid", content: formatDocs.mermaid.example },
   ui: { format: "ui", content: JSON.stringify(checkoutRolloutSpec) },
+  canvas: { format: "canvas", content: JSON.stringify(exampleCanvas) },
   file: { format: "file", content: checkoutNotes },
 };
 

@@ -46,7 +46,7 @@ describe("formatSwitchProblem", () => {
 
 describe("contentForSwitch", () => {
   it("should give an empty page a valid start when it becomes a format that cannot be empty", () => {
-    for (const kind of ["csv", "json", "svg", "mermaid", "ui"] as const) {
+    for (const kind of ["csv", "json", "svg", "mermaid", "ui", "canvas"] as const) {
       const content = contentForSwitch(kind, "");
       expect(content, kind).not.toBe("");
       expect(formatSwitchProblem(kind, content), kind).toBeNull();

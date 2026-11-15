@@ -46,7 +46,7 @@ async function shownAsImage(viewable: Pick<ArtifactAccess, "record">, fileId: st
   return row !== undefined;
 }
 
-/** The file references in the approved version's content (ui and Markdown). */
+/** The file references in the approved version's content (ui, Markdown, and canvas). */
 async function approvedContentRefs(versionId: string): Promise<string[]> {
   const [row] = await getDb().select({ kind: artifactVersion.kind, content: artifactVersion.content }).from(artifactVersion).where(eq(artifactVersion.id, versionId)).limit(1);
   return row ? fileRefsInContent(row.kind, row.content) : [];

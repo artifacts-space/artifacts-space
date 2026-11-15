@@ -21,6 +21,14 @@ describe("fileRefsInContent", () => {
     expect(fileRefsInContent("ui", JSON.stringify(spec))).toEqual([a, b]);
   });
 
+  it("should collect distinct Image and File ids from every frame when the content is a canvas", () => {
+    const frame = (id: string, file: string) => ({ id, name: id, width: 390, spec: { version: 1, root: "i", elements: { i: { type: "Image", props: { file, alt: "x" } }, t: { type: "Text", props: { text: b } } } } });
+    const canvas = { version: 1, frames: [frame("one", a.toUpperCase()), frame("two", b), frame("three", a), "not a frame", { id: "bare" }] };
+    expect(fileRefsInContent("canvas", JSON.stringify(canvas))).toEqual([a, b]);
+    expect(fileRefsInContent("canvas", '{"version":1,"frames":{}}')).toEqual([]);
+    expect(fileRefsInContent("canvas", "{ nope")).toEqual([]);
+  });
+
   it("should collect every file a Markdown document embeds or links when the content is Markdown", () => {
     const markdown = `![Plan](/api/files/${a.toUpperCase()}#width=50 "Cap")\n\nSee [the deck](/api/files/${b}) and ![again](/api/files/${a}).`;
     expect(fileRefsInContent("markdown", markdown)).toEqual([a, b]);

@@ -28,7 +28,7 @@ async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/editor"
 
 /**
  * Development-only page for the editor layout e2e test: the page editor on
- * a long artifact, without a database. `?kind=` picks ui, json, markdown, blocks (a short interface), data, or sheet (a CSV at the size limit),
+ * a long artifact, without a database. `?kind=` picks ui, json, markdown, blocks (a short interface), data, sheet (a CSV at the size limit), or canvas (four phone screens),
  * or media: the Markdown editor with uploads kept in the tab (media-editor-fixture.tsx),
  * or lists: the same editor on list items that hold code blocks (list-items-fixture.ts).
  * `?save=fail` fails every save; `?save=agent` lands the first save over an agent's save.

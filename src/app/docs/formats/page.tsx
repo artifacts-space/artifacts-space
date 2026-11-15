@@ -5,6 +5,7 @@ import { DocsH, FactTable, InlineCodeText, Note, Prose } from "@/components/docs
 import { RegistryPage } from "@/components/docs/docs-page";
 import { formatInfo, formatKinds, type FormatKind } from "@/lib/artifact-formats";
 import { artifactSizeLimits } from "@/lib/artifact-limits";
+import { canvasLimits } from "@/lib/canvas/limits";
 import { formatDocs, formatErrorMessage } from "@/lib/docs/format-docs";
 import { docsMetadata } from "@/lib/docs/metadata";
 import { docsHref } from "@/lib/docs/pages";
@@ -26,6 +27,7 @@ const exampleLanguage: Record<FormatKind, string> = {
   svg: "svg",
   mermaid: "mermaid",
   ui: "json",
+  canvas: "json",
   file: "text",
 };
 
@@ -62,13 +64,13 @@ function FormatSection({ kind }: { kind: FormatKind }) {
   );
 }
 
-/** The nine formats, with limits and checks read from the code. */
+/** Every format, with limits and checks read from the code. */
 export default function FormatsPage() {
   return (
     <RegistryPage slug={page}>
       <DocsH page={page} id="overview" />
       <Prose>
-        <p>Every artifact has one <code>kind</code>. It decides how the content is checked when it is saved and how the page shows it. Pick the simplest kind that fits: Markdown for prose, <code>ui</code> when the reader needs a dashboard or a report, <code>file</code> for anything uploaded.</p>
+        <p>Every artifact has one <code>kind</code>. It decides how the content is checked when it is saved and how the page shows it. Pick the simplest kind that fits: Markdown for prose, <code>ui</code> when the reader needs a dashboard or a report, <code>canvas</code> for mockups of screens, <code>file</code> for anything uploaded.</p>
       </Prose>
       <FactTable
         head={["kind", "Name", "For"]}
@@ -86,7 +88,8 @@ export default function FormatsPage() {
         rows={[
           ["Content", size(artifactSizeLimits.maxContentBytes), "Every kind, in UTF-8 bytes. Split larger work into several artifacts."],
           ["Metadata", size(artifactSizeLimits.maxMetadataBytes), "The metadata object, as JSON text."],
-          ["ui spec", size(uiLimits.maxSpecBytes), "ui content, plus element and depth limits."],
+          ["ui spec", size(uiLimits.maxSpecBytes), "ui content and each frame of a canvas, plus element and depth limits."],
+          ["Canvas", size(canvasLimits.maxCanvasBytes), `canvas content: up to ${String(canvasLimits.maxFrames)} frames and ${canvasLimits.maxElements.toLocaleString("en-US")} elements across them.`],
           ["Mermaid source", `${maxMermaidLength.toLocaleString("en-US")} characters`, "mermaid content."],
           ["File", size(fileLimits.maxBytes), `Each upload. Up to ${String(fileLimits.maxFilesPerArtifact)} files per artifact.`],
         ]}

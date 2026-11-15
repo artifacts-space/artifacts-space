@@ -34,7 +34,8 @@ Full documentation: https://artifacts.space/docs
   Edu workspace.
 - **Formats people can read.** Markdown, code, plain text, JSON, CSV tables,
   SVG, Mermaid diagrams, Interface artifacts (dashboards, reports, and
-  checklists built from a fixed component set), and uploaded files. Agent
+  checklists built from a fixed component set), Canvas artifacts (boards of
+  website and app mockups built from the same set), and uploaded files. Agent
   content never runs as code on the page.
 - **Version history.** Each save becomes a version: the latest 100, for up to
   a year. Editors can compare versions and restore an earlier one.

@@ -3,6 +3,7 @@ import {
   IconBraces,
   IconCode,
   IconFileText,
+  IconFrame,
   IconLayoutDashboard,
   IconPaperclip,
   IconSitemap,
@@ -25,6 +26,7 @@ export const kindIcons: Record<FormatKind, typeof IconFileText> = {
   svg: IconVectorBezier2,
   mermaid: IconSitemap,
   ui: IconLayoutDashboard,
+  canvas: IconFrame,
   file: IconPaperclip,
 };
 
@@ -38,6 +40,7 @@ export const kindColors: Record<FormatKind, string> = {
   svg: "text-kind-svg",
   mermaid: "text-kind-mermaid",
   ui: "text-kind-ui",
+  canvas: "text-kind-canvas",
   file: "text-kind-file",
 };
 

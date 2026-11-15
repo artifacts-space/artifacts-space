@@ -1,3 +1,4 @@
+import { exampleCanvas } from "@/lib/canvas/fixtures";
 import type { SheetFormat } from "@/lib/sheet-format/rules";
 
 import { exampleUiSpec } from "./example";
@@ -44,6 +45,7 @@ export const formatFixtures: FormatFixture[] = [
   { name: "Empty", kind: "markdown", content: "   " },
   { name: "Files", kind: "file", content: "Notes for the **2.4** release: the diagram, the report, and the spec." },
   { name: "Files, no notes", kind: "file", content: "" },
+  { name: "Canvas", kind: "canvas", content: JSON.stringify(exampleCanvas) },
 ];
 
 /**

@@ -57,11 +57,39 @@ function landingPage(columns: number) {
   });
 }
 
-/** One page of a website at the three usual sizes, placed automatically. */
+/**
+ * The top of a landing page drawn edge to edge with Box: a navbar with a rule
+ * under it, a hero on a contrasting surface, and a screenshot stand-in. It
+ * goes in a frame with `padding: "none"`, so the surfaces reach the frame's
+ * edges.
+ */
+const fullBleedHome = spec("page", {
+  page: { type: "Box", props: {}, children: ["nav", "hero", "shot"] },
+  nav: { type: "Box", props: { direction: "horizontal", align: "center", justify: "between", paddingX: "xl", paddingY: "md", surface: "card", border: "bottom" }, children: ["brand", "nav-links", "nav-cta"] },
+  brand: { type: "Box", props: { direction: "horizontal", align: "center", gap: "sm" }, children: ["brand-mark", "brand-name"] },
+  "brand-mark": { type: "Icon", props: { name: "star" } },
+  "brand-name": { type: "Text", props: { text: "Northwind" } },
+  "nav-links": { type: "Box", props: { direction: "horizontal", align: "center", gap: "lg" }, children: ["nav-product", "nav-pricing"] },
+  "nav-product": { type: "Link", props: { label: "Product", href: "https://example.com/product" } },
+  "nav-pricing": { type: "Link", props: { label: "Pricing", href: "https://example.com/pricing" } },
+  "nav-cta": { type: "Button", props: { label: "Start free" } },
+  hero: { type: "Box", props: { align: "center", paddingX: "xl", paddingY: "3xl", surface: "inverse" }, children: ["hero-copy"] },
+  "hero-copy": { type: "Box", props: { maxWidth: "lg", gap: "md" }, children: ["hero-title", "hero-text", "hero-actions"] },
+  "hero-title": { type: "Heading", props: { text: "Get paid nine days sooner", level: 1 } },
+  "hero-text": { type: "Text", props: { text: "Connect your bank once. Northwind drafts, sends, and chases every invoice for you.", size: "lg" } },
+  "hero-actions": { type: "Box", props: { direction: "horizontal", gap: "sm" }, children: ["hero-primary", "hero-secondary"] },
+  "hero-primary": { type: "Button", props: { label: "Start free" } },
+  "hero-secondary": { type: "Button", props: { label: "Watch the demo", variant: "outline" } },
+  shot: { type: "Box", props: { padding: "xl", surface: "muted" }, children: ["shot-image"] },
+  "shot-image": { type: "Placeholder", props: { variant: "image", ratio: "wide", label: "The invoices dashboard" } },
+});
+
+/** One page of a website at the three usual sizes, placed automatically, and its top again drawn edge to edge. */
 export const siteMockupCanvas = canvas([
   { id: "home-desktop", name: "Home, desktop", width: frameSizes.desktop, spec: landingPage(3) },
   { id: "home-tablet", name: "Home, tablet", width: frameSizes.tablet, spec: landingPage(2) },
   { id: "home-phone", name: "Home, phone", width: frameSizes.phone, spec: landingPage(1) },
+  { id: "home-full-bleed", name: "Home, edge to edge", width: frameSizes.desktop, padding: "none", spec: fullBleedHome },
 ]);
 
 const phoneHeight = 844;

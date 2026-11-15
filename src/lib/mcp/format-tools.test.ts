@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { artifactKinds } from "@/lib/artifact-types";
+import { exampleCanvas } from "@/lib/canvas/fixtures";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
 
 import { formatGuide, validationReport } from "./format-tools";
@@ -48,7 +49,28 @@ describe("formatGuide", () => {
   });
 });
 
+describe("formatGuide for canvas", () => {
+  it("should include the canvas rules and a valid example when the kind is canvas", () => {
+    const guide = formatGuide("canvas");
+    expect(guide).toContain("# canvas artifacts");
+    expect(guide).toContain('"frames": [');
+    expect(guide).toContain('artifacts_formats_guide with kind "ui"');
+  });
+
+  it("should point agents at the canvas guide from the overview", () => {
+    expect(formatGuide()).toContain('call it with kind "canvas"');
+  });
+});
+
 describe("validationReport", () => {
+  it("should confirm a valid canvas, and name the frame when one is wrong", () => {
+    expect(validationReport("canvas", JSON.stringify(exampleCanvas))).toBe("Valid canvas content. It is ready to save.");
+    const broken = JSON.stringify({ version: 1, frames: [{ id: "home", name: "Home", width: 20, spec: {} }] });
+    const report = validationReport("canvas", broken);
+    expect(report).toMatch(/^Invalid canvas content/);
+    expect(report).toContain('Frame "home": "width" must be a whole number from 240 to 2560');
+  });
+
   it("should confirm valid content when there are no issues", () => {
     expect(validationReport("ui", JSON.stringify(exampleUiSpec))).toMatch(/^Valid ui content/);
   });

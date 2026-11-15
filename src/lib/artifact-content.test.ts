@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
 import { ArtifactContentError, assertValidArtifactContent, assertValidArtifactUpdate, updateCheckOptions, validateArtifactContent } from "./artifact-content";
+import { exampleCanvas } from "./canvas/fixtures";
 import { exampleUiSpec } from "./ui/fixtures/example";
 
 describe("validateArtifactContent", () => {
@@ -44,6 +45,21 @@ describe("validateArtifactContent", () => {
   it("should validate ui specs when the kind is ui", () => {
     expect(validateArtifactContent("ui", JSON.stringify(exampleUiSpec)).valid).toBe(true);
     expect(validateArtifactContent("ui", "{}").valid).toBe(false);
+  });
+});
+
+describe("validateArtifactContent for canvas", () => {
+  it("should validate the board and every frame when the kind is canvas", () => {
+    expect(validateArtifactContent("canvas", JSON.stringify(exampleCanvas)).valid).toBe(true);
+    expect(validateArtifactContent("canvas", "{}").valid).toBe(false);
+    expect(validateArtifactContent("canvas", JSON.stringify(exampleUiSpec)).message).toContain('"frames" must be a list of frames');
+  });
+
+  it("should name the frame and the element in the report when a frame's spec is wrong", () => {
+    const canvas = { version: 1, frames: [{ id: "home", name: "Home", width: 390, spec: { version: 1, root: "t", elements: { t: { type: "Gauge", props: {} } } } }] };
+    const result = validateArtifactContent("canvas", JSON.stringify(canvas));
+    expect(result.valid).toBe(false);
+    expect(result.message).toMatch(/^- Error: Frame "home": .*"t".*Gauge/);
   });
 });
 
