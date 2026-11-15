@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo } from "react";
 
 import { UiView } from "@/components/artifact-view/ui-view";
 import { ScrollFrame } from "@/components/docs/scroll-frame";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { useHydrated } from "@/components/use-hydrated";
 import { templateCategoriesInUse, templatesIn, uiTemplates } from "@/lib/ui/templates/index";
 import { templateAsSpec } from "@/lib/ui/templates/instantiate";
 import type { TemplateViewport, UiTemplate } from "@/lib/ui/templates/types";
@@ -15,8 +16,6 @@ export const templateFrameWidths: Record<TemplateViewport, readonly (1440 | 390)
 
 const frameWidthClass = { 1440: "w-[1440px]", 390: "w-[390px]" } as const;
 
-const neverChanges = () => () => undefined;
-
 /**
  * Says the page has hydrated, for tests: the server leaves the mark out and
  * the browser adds it once React has taken over every template above it. A
@@ -24,8 +23,7 @@ const neverChanges = () => () => undefined;
  * to check.
  */
 function ReadyMark() {
-  const hydrated = useSyncExternalStore(neverChanges, () => true, () => false);
-  return hydrated ? <span hidden data-templates-ready="" /> : null;
+  return useHydrated() ? <span hidden data-templates-ready="" /> : null;
 }
 
 function TemplateSpecimen({ template }: { template: UiTemplate }) {

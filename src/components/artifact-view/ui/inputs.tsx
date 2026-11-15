@@ -16,7 +16,16 @@ import { useFieldNotes } from "./fields";
 import { uiIconComponents } from "./icon-glyphs";
 import { useInputValue, type ViewProps } from "./stout";
 
+/*
+ * A Checkbox or Switch here is a span with a role, not a native input, so the
+ * <label> around it gives it no name by itself. The control finds that label
+ * in the browser, after React takes over; until then, in the server's HTML,
+ * it would have no name. So each one points at its words with
+ * `aria-labelledby`, which is in the HTML from the start.
+ */
+
 export function ChecklistView({ props }: ViewProps<"Checklist">) {
+  const labelId = useId();
   const [checked, setChecked] = useState(() => props.items.map((item) => item.checked ?? false));
   const done = checked.filter(Boolean).length;
   return (
@@ -32,10 +41,11 @@ export function ChecklistView({ props }: ViewProps<"Checklist">) {
             <label className="flex cursor-pointer items-start gap-2.5 text-md leading-6">
               <Checkbox
                 className="mt-1"
+                aria-labelledby={`${labelId}-${String(index)}`}
                 checked={checked[index] ?? false}
                 onCheckedChange={(value) => { setChecked((current) => current.map((entry, position) => (position === index ? value : entry))); }}
               />
-              <span className={cn("min-w-0 break-words", checked[index] && "text-muted-foreground line-through decoration-muted-foreground/50")}>{item.label}</span>
+              <span id={`${labelId}-${String(index)}`} className={cn("min-w-0 break-words", checked[index] && "text-muted-foreground line-through decoration-muted-foreground/50")}>{item.label}</span>
             </label>
           </li>
         ))}
@@ -45,11 +55,12 @@ export function ChecklistView({ props }: ViewProps<"Checklist">) {
 }
 
 export function CheckboxView({ props, bindings, emit }: ViewProps<"Checkbox">) {
+  const labelId = useId();
   const [value, setValue] = useInputValue(props.checked, bindings?.checked, false);
   return (
     <label className="flex min-w-0 cursor-pointer items-start gap-2.5 text-md leading-6">
-      <Checkbox className="mt-1" checked={value} onCheckedChange={(next) => { setValue(next); emit("change"); }} />
-      <span className="min-w-0">
+      <Checkbox className="mt-1" aria-labelledby={labelId} checked={value} onCheckedChange={(next) => { setValue(next); emit("change"); }} />
+      <span id={labelId} className="min-w-0">
         <span className="block break-words">{props.label}</span>
         {props.description ? <span className="block text-sm text-muted-foreground break-words">{props.description}</span> : null}
       </span>
@@ -58,14 +69,15 @@ export function CheckboxView({ props, bindings, emit }: ViewProps<"Checkbox">) {
 }
 
 export function SwitchView({ props, bindings, emit }: ViewProps<"Switch">) {
+  const labelId = useId();
   const [value, setValue] = useInputValue(props.checked, bindings?.checked, false);
   return (
     <label className="flex min-w-0 cursor-pointer items-start justify-between gap-4 text-md leading-6">
-      <span className="min-w-0">
+      <span id={labelId} className="min-w-0">
         <span className="block break-words">{props.label}</span>
         {props.description ? <span className="block text-sm text-muted-foreground break-words">{props.description}</span> : null}
       </span>
-      <Switch checked={value} onCheckedChange={(next) => { setValue(next); emit("change"); }} />
+      <Switch aria-labelledby={labelId} checked={value} onCheckedChange={(next) => { setValue(next); emit("change"); }} />
     </label>
   );
 }

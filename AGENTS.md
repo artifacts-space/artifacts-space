@@ -1003,6 +1003,15 @@ template text is ours, so the tools add no untrusted-content label.
   A category's page title is in `src/lib/docs/template-docs.ts`. Never pass
   a spec to two client components, and never draw every template on one
   page.
+- A scan waits for the browser, not for luck. Before axe, a templates test
+  waits for the page's ready mark (`data-templates-ready` on the dev page,
+  `data-ready` on each docs preview, both from `useHydrated`) and polls
+  `unreachableSidewaysScrollers` (`e2e/support/scrollers.ts`) until every
+  code block and table that scrolls has become a tab stop. One test runs
+  the docs checks with a slowed CPU, so a scan that depends on timing fails
+  on a fast machine too. What a reader needs must not wait for the browser
+  at all: a Checkbox or Switch names itself in the server's HTML with
+  `aria-labelledby` (`inputs.tsx`, `toggle-views.test.tsx`).
 - Rules, all checked by `templateProblems`: the id is `<category>-<variant>`
   and is accepted as a prefix (`prefixProblem`), since it is the default one;
   the root is a Box; at most 60 elements and 10 levels deep; its first

@@ -4,6 +4,7 @@ import { templateCategoriesInUse, templatesIn, uiTemplates } from "../src/lib/ui
 import type { TemplateCategory, UiTemplate } from "../src/lib/ui/templates/types";
 
 import { expectNoAxeViolations } from "./support/a11y";
+import { unreachableSidewaysScrollers } from "./support/scrollers";
 import { expect, test } from "./support/test";
 
 /*
@@ -28,11 +29,21 @@ const widthsOf = (template: UiTemplate) => (template.viewport === "fluid" ? [144
  */
 const section = (page: Page, id: string) => page.locator(`[data-template="${id}"]:visible`);
 
+/**
+ * Waits until every box that scrolls sideways has measured itself and become
+ * a tab stop. That happens in the browser, after React takes the page over,
+ * so a scan that runs sooner fails on a slow machine and passes on a fast one.
+ */
+async function expectScrollersMeasured(page: Page) {
+  await expect.poll(() => unreachableSidewaysScrollers(page), { timeout: 30_000 }).toEqual([]);
+}
+
 /** Opens one category's page and waits until React has taken over every template: a scan marks what it scans, which must not land on HTML React has yet to check. */
 async function open(page: Page, category: TemplateCategory) {
   await page.goto(`/dev/templates?category=${category}`);
   await expect(page.locator("[data-templates-ready]")).toBeAttached({ timeout: 60_000 });
   await page.evaluate(() => document.fonts.ready);
+  await expectScrollersMeasured(page);
 }
 
 /** Runs `check` for each template and fails once, naming every template that failed. */
@@ -169,7 +180,8 @@ test("should measure content wider than its frame, so the frame check can fail",
   expect(overflows).toBe(true);
 });
 
-test("should list every template on the docs index, each linked to its category's page, without drawing any, and pass axe", async ({ page }) => {
+/** The docs index: a row for every template, each linked to its category's page, nothing drawn, and a clean scan. */
+async function expectDocsIndex(page: Page) {
   await page.goto("/docs/json-render/templates");
   await expect(page.getByRole("heading", { level: 1, name: "Section templates" })).toBeVisible();
   await expect(page.locator("[data-docs-template-row]")).toHaveCount(uiTemplates.length);
@@ -181,7 +193,31 @@ test("should list every template on the docs index, each linked to its category'
   // The index carries rows, not specs: nothing is drawn here.
   await expect(page.locator("[data-docs-preview]")).toHaveCount(0);
   await page.evaluate(() => document.fonts.ready);
+  // Its code blocks and its table become tab stops once they have measured themselves in the browser.
+  await expectScrollersMeasured(page);
   await expectNoAxeViolations(page);
+}
+
+/** One category's docs page: each of its templates drawn live under a heading that carries its id, and a clean scan. */
+async function expectDocsCategory(page: Page, category: TemplateCategory) {
+  const templates = templatesIn(category);
+  await page.goto(`/docs/json-render/templates/${category}`);
+  // Each preview says when React has taken it over; what the browser adds is there from then on.
+  await expect(page.locator("[data-docs-template][data-ready]")).toHaveCount(templates.length, { timeout: 60_000 });
+  for (const template of templates) {
+    const example = page.locator(`[data-docs-template="${template.id}"]`);
+    // The heading carries the template's id, so the index's link lands on it.
+    await expect(page.locator(`h2[id="${template.id}"]`)).toContainText(template.name);
+    await expect(example.getByText(/could not be shown/)).toHaveCount(0);
+    expect((await example.locator("[data-docs-preview]").boundingBox())?.height ?? 0, template.id).toBeGreaterThan(40);
+  }
+  await page.evaluate(() => document.fonts.ready);
+  await expectScrollersMeasured(page);
+  await expectNoAxeViolations(page);
+}
+
+test("should list every template on the docs index, each linked to its category's page, without drawing any, and pass axe", async ({ page }) => {
+  await expectDocsIndex(page);
 });
 
 test("should draw each category's templates live on that category's docs page, and pass axe", async ({ page }) => {
@@ -190,18 +226,7 @@ test("should draw each category's templates live on that category's docs page, a
   const failures: string[] = [];
   for (const category of categories) {
     try {
-      const templates = templatesIn(category);
-      await page.goto(`/docs/json-render/templates/${category}`);
-      await expect(page.locator("[data-docs-template]")).toHaveCount(templates.length);
-      for (const template of templates) {
-        const example = page.locator(`[data-docs-template="${template.id}"]`);
-        // The heading carries the template's id, so the index's link lands on it.
-        await expect(page.locator(`h2[id="${template.id}"]`)).toContainText(template.name);
-        await expect(example.getByText(/could not be shown/)).toHaveCount(0);
-        expect((await example.locator("[data-docs-preview]").boundingBox())?.height ?? 0, template.id).toBeGreaterThan(40);
-      }
-      await page.evaluate(() => document.fonts.ready);
-      await expectNoAxeViolations(page);
+      await expectDocsCategory(page, category);
     } catch (error) {
       failures.push(`${category}: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -209,12 +234,33 @@ test("should draw each category's templates live on that category's docs page, a
   expect(failures, failures.join("\n\n")).toEqual([]);
 });
 
+test("should pass the same docs checks when the machine is slow, so no scan depends on how soon React takes the page over", async ({ page, isMobile }) => {
+  // Seen on CI only: a scan that ran before the page was taken over found a code block with no tab stop and a switch with no name.
+  test.skip(isMobile, "the timing is the same on a phone; once is enough");
+  test.setTimeout(240_000);
+  const session = await page.context().newCDPSession(page);
+  await session.send("Emulation.setCPUThrottlingRate", { rate: 8 });
+  await expectDocsIndex(page);
+  await expectDocsCategory(page, "pricing");
+});
+
+test("should name the billing switch in the HTML the server sends, before the browser runs", async ({ request }) => {
+  const html = await (await request.get("/docs/json-render/templates/pricing")).text();
+  const control = /<[a-z]+\b[^>]*role="switch"[^>]*>/.exec(html)?.[0] ?? "";
+  const labelId = /aria-labelledby="([^"]+)"/.exec(control)?.[1] ?? "missing";
+  expect(control, "the switch in the server's HTML").not.toBe("");
+  expect(html).toContain(`id="${labelId}"`);
+  expect(html.slice(html.indexOf(`id="${labelId}"`), html.indexOf(`id="${labelId}"`) + 400)).toContain("Bill yearly and save two months");
+});
+
 test("should copy a template's spec, indented, from its docs page, though the page carries it compact", async ({ page, context, browserName }) => {
   test.skip(browserName !== "chromium", "clipboard permissions are a Chromium feature");
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/docs/json-render/templates/hero");
-  await page.locator('[data-docs-template="hero-centered"]').getByRole("button", { name: "Copy JSON" }).click();
+  // The button copies only once React has taken the preview over.
+  const example = page.locator('[data-docs-template="hero-centered"][data-ready]');
+  await example.getByRole("button", { name: "Copy JSON" }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('\n  "root": "page"');
   const copied = await page.evaluate(() => navigator.clipboard.readText());
-  expect(copied).toContain('\n  "root": "page"');
   expect((JSON.parse(copied) as { elements: Record<string, unknown> }).elements).toHaveProperty("hero-centered-title");
 });
