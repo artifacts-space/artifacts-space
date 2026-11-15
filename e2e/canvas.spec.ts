@@ -143,11 +143,14 @@ test.describe("on a desktop", () => {
     await expect.poll(async () => Math.round((await boxOf(frameBody(page, "sign-in"))).y - pane.y)).toBe(69);
     expect((await boxOf(alerts)).x).toBeGreaterThan(pane.x + pane.width);
     await alerts.focus();
+    // Focus first scrolls the board's box, which brings the control into view at once; the box's scroll
+    // handler then hands that scroll to the pan and sets the box back to 0, one event later. So wait for
+    // the end state: the box at rest and the control still in view.
+    await expect.poll(async () => board(page).evaluate((element) => [element.scrollLeft, element.scrollTop])).toEqual([0, 0]);
     await expect.poll(async () => {
       const box = await boxOf(alerts);
       return box.x >= pane.x && box.x + box.width <= pane.x + pane.width;
     }).toBe(true);
-    expect(await board(page).evaluate((element) => [element.scrollLeft, element.scrollTop])).toEqual([0, 0]);
   });
 
   test("should move and zoom from the keyboard when the board has focus", async ({ page }) => {
