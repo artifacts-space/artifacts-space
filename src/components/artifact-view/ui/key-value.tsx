@@ -34,7 +34,7 @@ export function KeyValueView({ props }: ViewProps<"KeyValue">) {
       ) : (
         // Two columns from 608px of interface width, so each holds a label and a value in
         // 288px or more, and a docs example (about 630px) shows both. The window plays no part.
-        <dl className={cn("grid min-w-0 gap-x-8 border-t", twoColumns && "@[38rem]/ui:grid-cols-2")}>
+        <dl data-slot="ui-key-value-list" className={cn("grid min-w-0 gap-x-8 border-t", twoColumns && "@[38rem]/ui:grid-cols-2")}>
           {props.items.map((item, index) => (
             <div key={`${String(index)}-${item.label}`} className="flex min-w-0 items-baseline gap-4 border-b py-2 text-sm leading-6">
               <dt className="w-2/5 max-w-56 shrink-0 break-words text-muted-foreground">{item.label}</dt>

@@ -68,7 +68,7 @@ export function StackView({ props, children }: ViewProps<"Stack">) {
 
 export function GridView({ props, children }: ViewProps<"Grid">) {
   const columns = (props.columns ?? 2) as keyof typeof gridColumns;
-  return <div className={cn("grid min-w-0", gridColumns[columns], gapClass[props.gap ?? "md"])}>{children}</div>;
+  return <div data-slot="ui-grid" className={cn("grid min-w-0", gridColumns[columns], gapClass[props.gap ?? "md"])}>{children}</div>;
 }
 
 export function CardView({ props, children }: ViewProps<"Card">) {
