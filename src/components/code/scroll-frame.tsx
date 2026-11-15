@@ -4,11 +4,8 @@ import { useRef, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-import { scrollStopProps } from "./scroll-stop";
+import { scrollStopProps, scrollStopRing } from "./scroll-stop";
 import { useScrollable } from "./use-scrollable";
-
-/** The focus ring of a box that is a tab stop while it scrolls: drawn inside it, so a frame that clips its content still shows it. */
-export const scrollStopRing = "outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset";
 
 /**
  * A box that scrolls when its content is larger, such as a docs table on a

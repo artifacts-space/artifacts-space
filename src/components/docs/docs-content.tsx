@@ -1,10 +1,9 @@
 import { IconAlertTriangle, IconInfoCircle, IconLink, IconSparkles } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 
+import { ScrollFrame } from "@/components/code/scroll-frame";
 import { docsHeading, type DocsHeading, type DocsSlug } from "@/lib/docs/pages";
 import { cn } from "@/lib/utils";
-
-import { ScrollFrame } from "@/components/code/scroll-frame";
 
 /**
  * Building blocks for docs pages. Headings take their id and title from the

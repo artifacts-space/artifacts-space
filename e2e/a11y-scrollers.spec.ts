@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
-import { expectScrollersSettled, unreachableScrollersIn } from "./support/scrollers";
+import { diagramDrawTimeout, expectScrollersSettled, unreachableScrollersIn } from "./support/scrollers";
 
 /*
  * A box that scrolls must be reachable by keyboard, or its hidden part
@@ -41,8 +41,8 @@ test("should make a diagram that is wider than its frame a named tab stop the ke
   await galleryReady(page, "Diagram");
   const flow = specimen(page, "Diagram", "Flowchart");
   await flow.scrollIntoViewIfNeeded();
+  await expect(flow.locator("[data-diagram-state]")).toHaveAttribute("data-diagram-state", "drawn", { timeout: diagramDrawTimeout });
   const frame = flow.locator("[data-diagram-frame]");
-  await expect(frame).toHaveAttribute("data-diagram-drawn", "");
 
   // Narrower than the drawing can shrink while its text stays readable: the frame scrolls sideways.
   await restyle(flow, { width: "160px" });
@@ -65,6 +65,8 @@ test("should make a failed diagram's source a named tab stop while it scrolls", 
   await galleryReady(page, "Diagram");
   const broken = specimen(page, "Diagram", "Broken source");
   await broken.scrollIntoViewIfNeeded();
+  // The notice shows once Mermaid has loaded and tried to draw, which starts only after the page is ready.
+  await expect(broken.locator("[data-diagram-state]")).toHaveAttribute("data-diagram-state", "failed", { timeout: diagramDrawTimeout });
   await expect(broken.getByText("This diagram could not be drawn.")).toBeVisible();
   const source = broken.locator("pre").locator("xpath=..");
   // A short source fits: no tab stop.
@@ -114,7 +116,7 @@ test("should make a zoomed diagram a named tab stop while it is larger than the 
   await page.goto("/dev/mermaid");
   const readView = page.getByRole("region", { name: "Read view" });
   const drawn = readView.locator("[data-markdown-diagram]").first();
-  await expect(drawn).toHaveAttribute("data-diagram-state", "drawn");
+  await expect(drawn).toHaveAttribute("data-diagram-state", "drawn", { timeout: diagramDrawTimeout });
   await drawn.getByRole("button", { name: "Zoom in" }).click();
   const dialog = page.getByRole("dialog", { name: "Diagram" });
   await expect(dialog.getByRole("img", { name: "Diagram" })).toBeVisible();

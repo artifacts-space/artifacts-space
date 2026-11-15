@@ -52,12 +52,33 @@ export async function unreachableScrollersIn(scope: Locator): Promise<string[]> 
 }
 
 /**
- * Waits until every diagram in `scope` has been drawn and every box in it
- * that scrolls is a named tab stop. A diagram draws after the page loads,
- * and only then is its frame as wide as it will be, so an axe scan that
- * runs sooner can pass or fail by luck.
+ * How long a diagram may take to draw after the page is ready. Drawing
+ * starts only once React has taken the page over: Mermaid's code loads,
+ * the font is read, and diagrams draw one at a time. On a phone, from the
+ * gallery's ready mark to the first diagram's end, this took 1.9 s at full
+ * speed, 12 s with the CPU slowed four times, and 27 s slowed eight times;
+ * a CI runner sits in between. The default 5 s wait passed or failed by
+ * the runner's speed.
+ */
+export const diagramDrawTimeout = 60_000;
+
+/**
+ * Waits until no diagram in `scope` is still drawing: each is drawn or
+ * has failed (`data-diagram-state`, set by every diagram view). A diagram
+ * in a document draws only once it nears the window, so scroll such a
+ * one into view first.
+ */
+export async function expectDiagramsSettled(scope: Locator): Promise<void> {
+  await expect(scope.locator('[data-diagram-state="drawing"]')).toHaveCount(0, { timeout: diagramDrawTimeout });
+}
+
+/**
+ * Waits until every diagram in `scope` has finished drawing and every box
+ * in it that scrolls is a named tab stop. Only a drawn diagram's frame is
+ * as wide as it will be, so an axe scan that runs sooner can pass or fail
+ * by luck.
  */
 export async function expectScrollersSettled(scope: Locator): Promise<void> {
-  await expect(scope.locator("[data-diagram-frame]:not([data-diagram-drawn])")).toHaveCount(0, { timeout: 30_000 });
+  await expectDiagramsSettled(scope);
   await expect.poll(() => unreachableScrollersIn(scope)).toEqual([]);
 }

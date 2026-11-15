@@ -2,8 +2,8 @@
 
 import { useId, useMemo, useRef, type ReactNode } from "react";
 
-import { ScrollFrame, scrollStopRing } from "@/components/code/scroll-frame";
-import { scrollStopProps } from "@/components/code/scroll-stop";
+import { ScrollFrame } from "@/components/code/scroll-frame";
+import { scrollStopProps, scrollStopRing } from "@/components/code/scroll-stop";
 import { useScrollable } from "@/components/code/use-scrollable";
 import { svgDataUri } from "@/lib/svg";
 import { minReadableWidth } from "@/lib/svg-text-size";
@@ -36,7 +36,8 @@ function SourceFallback({ code, title, reason }: { code: string; title: string; 
 export function MermaidView({ code, title, className }: { code: string; title?: string; className?: string }) {
   const { scopeRef, state } = useMermaidDiagram(code);
   return (
-    <div ref={scopeRef} className={cn("min-w-0", className)}>
+    // data-diagram-state (drawing, drawn, or failed), as diagrams in documents carry it: tests wait for a drawing attempt to end.
+    <div ref={scopeRef} data-diagram-state={state.status} className={cn("min-w-0", className)}>
       {state.status === "failed" ? <SourceFallback code={code} title="This diagram could not be drawn." reason={state.reason} /> : <DiagramFigure title={title} diagram={state.diagram} />}
     </div>
   );
@@ -82,8 +83,6 @@ interface DiagramFrameProps {
  * wider than the page, and while it does it is a named group and a tab
  * stop, so a keyboard can scroll it too (scroll-stop.ts). It measures
  * again once the drawing replaces the placeholder, and on resize.
- * `data-diagram-drawn` says the drawing is in place, for tests that need
- * its final width.
  */
 function DiagramFrame({ drawing, framed, name, children }: DiagramFrameProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -93,7 +92,6 @@ function DiagramFrame({ drawing, framed, name, children }: DiagramFrameProps) {
       ref={ref}
       {...scrollStopProps(scrollable, name)}
       data-diagram-frame=""
-      data-diagram-drawn={drawing ? "" : undefined}
       // justify-center-safe: when the diagram is wider than the frame, it starts at the left edge so all of it can be scrolled to.
       className={cn("flex min-h-24 justify-center-safe overflow-x-auto bg-card px-4 py-6 sm:px-6", scrollStopRing, framed && "card-nested")}
     >

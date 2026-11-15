@@ -8,6 +8,9 @@
  * is announced on focus but stays out of the landmark list.
  */
 
+/** The focus ring of a box that is a tab stop while it scrolls: drawn inside it, so a frame that clips its content still shows it. */
+export const scrollStopRing = "outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset";
+
 /** How a scrolling box is named: by its own words, or by an element that already shows them, such as a caption. */
 export type ScrollStopName = { label: string } | { labelledBy: string };
 

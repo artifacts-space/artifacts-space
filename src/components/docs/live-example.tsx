@@ -1,6 +1,7 @@
 import { IconChevronRight } from "@tabler/icons-react";
 
 import { CodeSnippet } from "@/components/code/code-snippet";
+import { ScrollFrame } from "@/components/code/scroll-frame";
 import { CopyButton } from "@/components/copy-button";
 import { specJson, type DocExample } from "@/lib/docs/spec-builders";
 import type { PropRow } from "@/lib/docs/prop-rows";
@@ -8,7 +9,6 @@ import { cn } from "@/lib/utils";
 
 import { InlineCodeText } from "./docs-content";
 import { ExamplePreview } from "./example-preview";
-import { ScrollFrame } from "@/components/code/scroll-frame";
 
 /**
  * The spec under a live example, behind a quiet "Show JSON" toggle. The JSON
