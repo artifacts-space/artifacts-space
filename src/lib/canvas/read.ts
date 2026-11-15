@@ -59,18 +59,52 @@ function wholeNumber(value: unknown, min: number, max: number): number | null {
   return typeof value === "number" && Number.isInteger(value) && value >= min && value <= max ? value : null;
 }
 
-function standInId(index: number, taken: ReadonlySet<string>): string {
+/** The ids in play while frames are read: the ones frames ask for, and the ones already given out. */
+interface FrameIds {
+  /** Every usable id a frame wrote, wherever it is in the list. A stand-in never takes one of these. */
+  authored: ReadonlySet<string>;
+  /** The ids given to the frames read so far, authored or stand-in. */
+  taken: Set<string>;
+}
+
+/** Whether a value can be a frame's id. It is checked exactly as written: an id is an address, so it is never trimmed or lowercased for the author. */
+function isFrameId(value: unknown): value is string {
+  return typeof value === "string" && value.length <= canvasLimits.maxIdLength && frameIdPattern.test(value);
+}
+
+/** The usable ids the frames wrote, collected before any stand-in is given out. */
+function authoredIds(values: readonly unknown[]): Set<string> {
+  const ids = new Set<string>();
+  for (const value of values) {
+    if (isPlainObject(value) && isFrameId(value.id)) ids.add(value.id);
+  }
+  return ids;
+}
+
+/** An id for a frame that has no usable one. It is never an id that any frame wrote, nor one already given out. */
+function standInId(index: number, ids: FrameIds): string {
   let id = `frame-${String(index + 1)}`;
-  while (taken.has(id)) id = `${id}-x`;
+  while (ids.authored.has(id) || ids.taken.has(id)) id = `${id}-x`;
   return id;
 }
 
+const idExamples = `Give each frame a short id such as "home" or "checkout-phone".`;
+
+/** What is wrong with a frame's id, or null when the frame keeps it. Of two frames that wrote the same id, the first keeps it. */
 function idProblem(value: unknown, taken: ReadonlySet<string>): string | null {
-  if (typeof value !== "string" || value === "") return `"id" is missing. Give each frame a short id such as "home" or "checkout-phone".`;
-  if (value.length > canvasLimits.maxIdLength || !frameIdPattern.test(value)) {
-    return `"id" must be up to ${String(canvasLimits.maxIdLength)} ${frameIdRule}, such as "checkout-phone".`;
-  }
+  if (value === undefined) return `"id" is missing. ${idExamples}`;
+  if (typeof value !== "string") return `"id" must be a string, such as "checkout-phone".`;
+  if (value.trim() === "") return `"id" is empty. ${idExamples}`;
+  if (!isFrameId(value)) return `"id" must be up to ${String(canvasLimits.maxIdLength)} ${frameIdRule}, such as "checkout-phone".`;
   return taken.has(value) ? `another frame already has the id "${value}". Frame ids must be unique.` : null;
+}
+
+/** Gives the frame its own id when it is usable and free, or a stand-in and the reason. */
+function claimId(value: unknown, index: number, ids: FrameIds): { id: string; problem: string | null } {
+  const problem = idProblem(value, ids.taken);
+  const id = problem === null && isFrameId(value) ? value : standInId(index, ids);
+  ids.taken.add(id);
+  return { id, problem };
 }
 
 function readName(raw: Record<string, unknown>, fallback: string): { name: string; problem?: string } {
@@ -142,19 +176,16 @@ function unknownFrameFieldIssues(raw: Record<string, unknown>, id: string, label
   return [frameWarning("unknown_frame_field", id, label, `${extra.map((key) => `"${key}"`).join(", ")} ${verb} ignored. A frame takes id, name, width, height, padding, x, y, and spec.`)];
 }
 
-function notAFrame(index: number, taken: Set<string>): CanvasFrameRead {
-  const id = standInId(index, taken);
-  taken.add(id);
+function notAFrame(index: number, ids: FrameIds): CanvasFrameRead {
+  const { id } = claimId(undefined, index, ids);
   const label = frameLabel(null, index);
   const issues = [frameError("invalid_frame", id, label, `a frame must be an object such as { "id": "home", "name": "Home", "width": ${String(frameSizes.desktop)}, "spec": { … } }.`)];
   return { id, label, name: label, width: frameSizes.desktop, height: null, padding: "md", position: null, spec: null, elementCount: 0, issues };
 }
 
-function readFrame(value: unknown, index: number, taken: Set<string>): CanvasFrameRead {
-  if (!isPlainObject(value)) return notAFrame(index, taken);
-  const badId = idProblem(value.id, taken);
-  const id = badId === null && typeof value.id === "string" ? value.id : standInId(index, taken);
-  taken.add(id);
+function readFrame(value: unknown, index: number, ids: FrameIds): CanvasFrameRead {
+  if (!isPlainObject(value)) return notAFrame(index, ids);
+  const { id, problem: badId } = claimId(value.id, index, ids);
   const label = frameLabel(badId === null ? id : null, index);
   const { fields, problems } = readFields(value, label);
   const errors = [...(badId === null ? [] : [badId]), ...problems].map((problem) => frameError("invalid_frame", id, label, problem));
@@ -162,8 +193,8 @@ function readFrame(value: unknown, index: number, taken: Set<string>): CanvasFra
 }
 
 function readFrames(values: readonly unknown[]): CanvasFrameRead[] {
-  const taken = new Set<string>();
-  return values.map((value, index) => readFrame(value, index, taken));
+  const ids: FrameIds = { authored: authoredIds(values), taken: new Set<string>() };
+  return values.map((value, index) => readFrame(value, index, ids));
 }
 
 function boardIssues(frames: readonly CanvasFrameRead[]): CanvasIssue[] {

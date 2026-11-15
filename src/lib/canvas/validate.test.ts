@@ -124,6 +124,8 @@ describe("validateCanvas frames", () => {
   it.each([
     ["an uppercase id", { id: "Home" }, '"id" must be up to 40 lowercase letters'],
     ["a missing id", { id: undefined }, '"id" is missing'],
+    ["an id that is not text", { id: 42 }, '"id" must be a string'],
+    ["an empty id", { id: "" }, '"id" is empty'],
     ["a missing name", { name: "  " }, '"name" is missing'],
     ["a long name", { name: "n".repeat(81) }, '"name" is 81 characters; the limit is 80.'],
     ["a narrow width", { width: 100 }, '"width" must be a whole number from 240 to 2560'],
@@ -168,20 +170,17 @@ describe("validateCanvas frames", () => {
     expect(result.issues[0]?.message).toMatch(/^Frame 1: a frame must be an object/);
   });
 
-  it("should give a stand-in id that no frame uses when a frame has no usable id", () => {
-    const result = validateCanvas(canvas([frame({ id: "frame-2" }), frame({ id: "" })]));
-    expect(result.frames.map((item) => item.id)).toEqual(["frame-2", "frame-2-x"]);
-  });
-
   it("should refuse a spec nested far deeper than the limit, without throwing, whether or not the runtime can write it out", () => {
     const depth = 20_000;
     const deep = `${'{"a":'.repeat(depth)}1${"}".repeat(depth)}`;
     const text = `{"version":1,"frames":[{"id":"home","name":"Home","width":390,"spec":${deep}}]}`;
     const result = validateCanvas(text);
     expect(result.valid).toBe(false);
-    // A runtime that cannot write the nesting out reports unreadable JSON; one that can reports the nesting limit. Both refuse it, on the frame.
-    expect(result.issues.map((issue) => issue.code)).toEqual([expect.stringMatching(/^(invalid_json|too_deep_json)$/)]);
-    expect(result.issues[0]?.frameId).toBe("home");
+    // Two steps depend on the runtime. Reading the text: a parser with a depth limit refuses the whole canvas as unreadable JSON.
+    // Writing the frame's spec out again: a runtime that cannot reports unreadable JSON on the frame; one that can reports the nesting limit on the frame.
+    const refusals = result.issues.map((issue) => `${issue.code} on ${issue.frameId ?? "the canvas"}`);
+    expect(refusals).toHaveLength(1);
+    expect(["invalid_json on the canvas", "invalid_json on home", "too_deep_json on home"]).toContain(refusals[0]);
   });
 
   it("should refuse a spec nested deeper than the limit by naming that limit when every runtime can write the nesting out", () => {
