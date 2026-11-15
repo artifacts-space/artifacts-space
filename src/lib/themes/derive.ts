@@ -116,9 +116,29 @@ function codeTokens(mode: PaletteMode, colors: ThemeColors): Record<string, stri
   };
 }
 
-function seriesTokens(colors: ThemeColors): Record<string, string> {
-  const { chart } = colors;
-  return Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`--series-${String(index + 1)}`, chart[index % chart.length] ?? colors.foreground]));
+/**
+ * Every surface a block can sit on in one palette: the card, the page, the
+ * quiet surfaces (--secondary, --muted, --accent), and every block hue's
+ * background, which a Box can be painted with. Status tones and chart
+ * colors are held to their minimum on all of them.
+ */
+function paintedSurfaces(mode: PaletteMode, colors: ThemeColors): Oklch[] {
+  const card = read(colors.card);
+  const ink = read(colors.foreground);
+  return [card, read(colors.background), ...Object.values(quietTint).map((amount) => mixOklch(card, ink, amount)), ...blockFills(mode, colors)];
+}
+
+/**
+ * Chart colors: the theme's own, each re-lit, keeping its hue and chroma,
+ * until its marks show at 3:1 on every surface a chart can sit on. A color
+ * that already shows there is used exactly as written.
+ */
+export function seriesTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
+  const surfaces = paintedSurfaces(mode, colors);
+  const shows = (candidate: Oklch) => surfaces.every((surface) => contrastRatio(candidate, surface) >= nonTextMinimum);
+  const card = read(colors.card);
+  const held = colors.chart.map((value) => (shows(read(value)) ? value : formatOklch(holdApart(read(value), card, shows))));
+  return Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`--series-${String(index + 1)}`, held[index % held.length] ?? colors.foreground]));
 }
 
 /** The site's @mention chip ink per mode, from globals.css: people, and agents in a slightly different hue. */
@@ -212,7 +232,7 @@ const siteSwitch: Record<PaletteMode, { on: string; onThumb: string; offThumb: s
 const switchOffTint = 0.08;
 
 /** Non-text UI needs 3:1 (WCAG 1.4.11); the small margin keeps rounding from dipping under it. */
-const nonTextMinimum = 3.05;
+export const nonTextMinimum = 3.05;
 
 /**
  * The hover tints, --switch-on-hover-tint and --switch-off-hover-tint in
@@ -330,13 +350,12 @@ export const toneTintMax = 0.12;
  */
 export function toneTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
   const card = read(colors.card);
-  const ink = read(colors.foreground);
-  const surfaces = [card, read(colors.background), ...Object.values(quietTint).map((amount) => mixOklch(card, ink, amount)), ...blockFills(mode, colors)];
+  const surfaces = paintedSurfaces(mode, colors);
   const reads = (tone: Oklch) => surfaces.every((surface) => contrastRatio(tone, surface) >= 4.55 && contrastRatio(tone, paintOver(tone, toneTintMax, surface)) >= 4.55);
   return Object.fromEntries(toneRoles.map((role) => [`--tone-${role}`, formatOklch(holdApart(read(siteTones[mode][role]), card, reads))]));
 }
 
 /** Every CSS token a palette sets, keyed by custom property name, with canonical color values. */
 export function paletteTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
-  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(colors), ...mentionTokens(mode, colors), ...switchTokens(mode, colors), ...ringTokens(mode, colors), ...blockColorTokens(mode, colors), ...toneTokens(mode, colors) };
+  return { ...surfaceTokens(colors), ...codeTokens(mode, colors), ...seriesTokens(mode, colors), ...mentionTokens(mode, colors), ...switchTokens(mode, colors), ...ringTokens(mode, colors), ...blockColorTokens(mode, colors), ...toneTokens(mode, colors) };
 }

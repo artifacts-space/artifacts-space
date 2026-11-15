@@ -8,11 +8,11 @@ import type { StrongScope, StrongSurface, SurfaceEngine } from "@/lib/themes/sur
 
 /** What a ThemeScope tells the views inside it. Kept apart from ThemeScope so a view can read it without loading the theme engine. */
 export interface ThemeScopeValue {
-  /** The pinned mode, or null when the scope follows the reader's choice. */
+  /** The mode the scope's palette is, whatever the reader's, or null when it follows the reader's choice. */
   mode: PaletteMode | null;
   /** Changes whenever the theme does, so views that draw their own colors redraw. */
   key: string;
-  /** True inside an inverse surface that follows the reader: it shows the mode opposite to the page's. */
+  /** True inside a surface that follows the reader but shows the mode opposite to the page's: an inverse surface, or a primary one whose accent palette is of the other mode. */
   flipped?: boolean;
   /** True inside an inverse or primary surface (a Box). They do not nest. */
   inStrong?: boolean;
@@ -22,7 +22,7 @@ export interface ThemeScopeValue {
 
 export const ThemeScopeContext = createContext<ThemeScopeValue | null>(null);
 
-/** True when the nearest scope shows dark: it pins dark, or it follows the reader and the page is dark (light, inside an inverse surface). */
+/** True when the nearest scope shows dark: its palette is dark, or it follows the reader and the page is dark (light, inside a surface that flips the mode). */
 export function useDarkTheme(): boolean {
   const scoped = useContext(ThemeScopeContext);
   const { resolvedTheme } = useTheme();

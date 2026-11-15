@@ -549,20 +549,28 @@ catch this, so test the generated SQL with `.toSQL()`, as
   only on the nodes at fault where you can
   (`skip: { "<rule>": { on: "<selector>", reason: "<why>" } }`, or
   `{ "<rule>": "<why>" }` for the whole scan), and record it in the pull
-  request. Contrast findings are design decisions: report them, never change
-  tokens to pass. `e2e/a11y-contrast.spec.ts` scans the gallery, the MCP
-  reference, a component page, and the landing page for color contrast alone,
-  in light and in dark. Status tones (`--tone-*`) and code syntax colors hold
-  4.5:1 by rule on every surface they sit on, tints included (`toneTokens`
-  and `syntaxTokens` in `src/lib/themes/derive.ts`, which themes use too), so
-  a new tint strength or surface under a tone goes into that rule. A Box
+  request. Always fix a contrast failure, in the same change: move the token
+  by the smallest step that passes in light and in dark, extend the rule or
+  the test that should have caught it, and report the before and after
+  values in the pull request. `e2e/a11y-contrast.spec.ts` scans the gallery,
+  the MCP reference, a component page, and the landing page for color
+  contrast alone, in light and in dark. Status tones (`--tone-*`) and code
+  syntax colors hold 4.5:1 by rule on every surface they sit on, tints
+  included, and chart colors (`--series-*`) hold 3:1 there (`toneTokens`,
+  `syntaxTokens`, and `seriesTokens` in `src/lib/themes/derive.ts`, which
+  themes use too), so a new tint strength or surface under a tone or a chart
+  goes into that rule. The site paints hand-set hue fills, so
+  `src/lib/themes/presets.test.ts` checks the site's own values in
+  `globals.css` as well. A Box
   surface in an interface (`src/components/artifact-view/ui/box.tsx`) is a
   scope of the theme: inverse is the theme's other mode (`theme-invert` on
   the site palette), primary is a palette built on the accent, and the muted
   fill and the block hues re-light body and muted text only where a theme
   leaves them under 4.5:1 (`src/lib/themes/surface-scope.ts`, tested over
   every preset). The tone rule covers the hue fills too, so a tone and a
-  tone badge read on every hue. A new surface goes there and into the "Surfaces and tones"
+  tone badge read on every hue. A primary surface tells the views inside it
+  the mode its accent palette is, and steps its fill until the accent's
+  label holds a badge. A new surface goes there and into the "Surfaces and tones"
   gallery specimen, which the contrast spec reads.
 
 ### Page column

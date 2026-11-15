@@ -266,12 +266,12 @@
   --tone-success: oklch(0.47 0.13 150);
   --tone-warning: oklch(0.49 0.14 70);
   --tone-danger: oklch(0.5 0.2 27);
-  /* Categorical chart series, fixed order (validated reference palette). 7-8 pass adjacent checks with gaps and labels as secondary encoding. */
+  /* Categorical chart series, fixed order (validated reference palette). 7-8 pass adjacent checks with gaps and labels as secondary encoding. Each holds 3:1 on the page, the card, the quiet surfaces, and every block hue fill (presets.test.ts). */
   --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #e87ba4;
+  --series-2: #df5d27;
+  --series-3: #009965;
+  --series-4: #be7500;
+  --series-5: #cc628c;
   --series-6: #6250d6;
   --series-7: #008300;
   --series-8: #e34948;
@@ -477,7 +477,7 @@
   --series-4: #c98500;
   --series-5: #d55181;
   --series-6: #9085e9;
-  --series-7: #008300;
+  --series-7: #0d880b;
   --series-8: #e66767;
   --code: oklch(0.19 0.004 60);
   --code-foreground: oklch(0.9 0.004 80);

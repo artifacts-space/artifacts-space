@@ -71,8 +71,10 @@ const tones = ["info", "success", "warning", "danger"] as const;
 /** One surface with everything that must read on it: body and muted text, each status tone as text and as an icon, a rule, links, and buttons. */
 function surfaceElements(surface: BoxSurface): Elements {
   const id = (part: string) => `${surface}-${part}`;
+  // A chart and a diagram draw their own colors, so the surfaces that switch the palette each hold one of both.
+  const drawn = surface === "inverse" || surface === "primary";
   const elements: Elements = {
-    [id("box")]: { type: "Box", props: { surface, padding: "md", gap: "sm", radius: "lg", border: surface === "none" ? "all" : "none", label: `Surface ${surface}` }, children: [id("body"), id("muted"), id("tones"), id("badges"), id("rule"), id("actions")] },
+    [id("box")]: { type: "Box", props: { surface, padding: "md", gap: "sm", radius: "lg", border: surface === "none" ? "all" : "none", label: `Surface ${surface}` }, children: [id("body"), id("muted"), id("tones"), id("badges"), id("rule"), id("actions"), ...(drawn ? [id("chart"), id("diagram")] : [])] },
     [id("body")]: { type: "Text", props: { text: `Body text on the ${surface} surface.` } },
     [id("muted")]: { type: "Text", props: { text: "Muted text, for secondary detail.", tone: "muted", size: "sm" } },
     [id("tones")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: tones.flatMap((tone) => [id(`icon-${tone}`), id(`text-${tone}`)]) },
@@ -84,6 +86,10 @@ function surfaceElements(surface: BoxSurface): Elements {
     [id("nav")]: { type: "Link", props: { label: "Nav link", variant: "nav" } },
     [id("quiet")]: { type: "Link", props: { label: "Muted link", variant: "muted" } },
   };
+  if (drawn) {
+    elements[id("chart")] = { type: "Chart", props: { type: "bar", title: `Orders on the ${surface} surface`, labels: ["Q1", "Q2", "Q3"], series: [{ name: "Online", values: [4, 6, 5] }, { name: "In store", values: [3, 2, 4] }, { name: "Phone", values: [1, 2, 1] }] } };
+    elements[id("diagram")] = { type: "Diagram", props: { title: `Flow on the ${surface} surface`, code: "flowchart LR\n  A[Order] --> B[Pack] --> C[Ship]" } };
+  }
   for (const tone of tones) {
     elements[id(`icon-${tone}`)] = { type: "Icon", props: { name: "circle-check", size: "sm", tone } };
     elements[id(`text-${tone}`)] = { type: "Text", props: { text: `${tone} text`, tone, size: "sm" } };
@@ -92,7 +98,7 @@ function surfaceElements(surface: BoxSurface): Elements {
   return elements;
 }
 
-/** Every Box surface with every text tone and every tone badge on it, for the contrast scan in light, in dark, and under themes. */
+/** Every Box surface with every text tone and every tone badge on it, and a chart and a diagram on the two that switch the palette, for the contrast scan in light, in dark, and under themes. */
 export const surfaceMatrixSpec = {
   version: 1,
   root: "page",

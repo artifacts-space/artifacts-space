@@ -34,6 +34,42 @@ function isLight(target: Locator, property: string): Promise<boolean> {
   }, property);
 }
 
+type Rgb = [number, number, number];
+
+/** A CSS color as the page paints it, opaque, read from one canvas pixel: a token in scope at the element (`--card`), or one of its computed properties (`fill`). */
+function paintedRgb(target: Locator, source: string): Promise<Rgb> {
+  return target.evaluate((element, name) => {
+    const probe = document.createElement("span");
+    probe.hidden = true;
+    element.appendChild(probe);
+    probe.style.color = name.startsWith("--") ? `var(${name})` : getComputedStyle(element).getPropertyValue(name);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    const context = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("no canvas");
+    context.fillStyle = color;
+    context.fillRect(0, 0, 1, 1);
+    const [red = 0, green = 0, blue = 0] = context.getImageData(0, 0, 1, 1).data;
+    return [red, green, blue] as [number, number, number];
+  }, source);
+}
+
+const hexOf = (rgb: Rgb) => `#${rgb.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+
+function luminance(rgb: Rgb): number {
+  const [red, green, blue] = rgb.map((channel) => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  }) as Rgb;
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+/** The WCAG contrast ratio of two opaque colors. */
+function contrast(a: Rgb, b: Rgb): number {
+  const [low, high] = [luminance(a), luminance(b)].sort((x, y) => x - y) as [number, number];
+  return (high + 0.05) / (low + 0.05);
+}
+
 test("should pass axe on the Box, Icon, and Placeholder groups of the gallery", async ({ page }) => {
   await galleryReady(page);
   for (const group of ["Box", "Icon", "Placeholder"]) {
@@ -121,6 +157,49 @@ for (const scheme of ["light", "dark"] as const) {
     await themedInverse.scrollIntoViewIfNeeded();
     expect(await computed(themedInverse, "background-color")).not.toBe(await computed(inverse, "background-color"));
     expect(await isLight(themedInverse, "background-color")).toBe(!pageIsLight);
+  });
+}
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`should show every chart color at 3:1 on every surface, and draw a chart and a diagram in the colors of the surface they sit on, when the site is ${scheme}`, async ({ page, isMobile }) => {
+    test.skip(isMobile, "the same colors as the desktop run");
+    await page.addInitScript((value) => {
+      try { window.localStorage.setItem("theme", value); } catch { /* no storage in this frame */ }
+    }, scheme);
+    await galleryReady(page);
+    // On the site palette, and under a theme whose accent is of the other mode on each side.
+    for (const matrix of [specimen(page, "specs", "Surfaces and tones"), page.locator('[data-themed-surfaces="ocean"]')]) {
+      const outside = await paintedRgb(matrix.getByRole("group", { name: "Surface page" }), "--series-1");
+      const boxes = await matrix.getByRole("group", { name: /^Surface / }).all();
+      expect(boxes).toHaveLength(15);
+      for (const box of boxes) {
+        const name = (await box.getAttribute("aria-label")) ?? "";
+        // A Box with no surface is clear: it shows the page behind it.
+        const fill = await paintedRgb(box, name === "Surface none" ? "--background" : "background-color");
+        for (let index = 1; index <= 8; index += 1) {
+          expect(contrast(await paintedRgb(box, `--series-${String(index)}`), fill), `${name}: chart color ${String(index)}`).toBeGreaterThanOrEqual(3);
+        }
+      }
+      for (const surface of ["inverse", "primary"]) {
+        const box = matrix.getByRole("group", { name: `Surface ${surface}` });
+        await box.scrollIntoViewIfNeeded();
+        const card = await paintedRgb(box, "--card");
+        const ink = await paintedRgb(box, "--foreground");
+        expect(contrast(ink, card), `${surface}: text on the surface`).toBeGreaterThanOrEqual(4.5);
+        // The bars take the surface's own series colors, not the page's.
+        const series = box.locator("svg g[class*='fill-series-']");
+        await expect(series).toHaveCount(3);
+        expect(await paintedRgb(series.first(), "fill"), `${surface}: the first series`).toEqual(await paintedRgb(box, "--series-1"));
+        expect(await paintedRgb(box, "--series-1"), `${surface}: the first series is the surface's`).not.toEqual(outside);
+        // The diagram is an image, drawn from the tokens in scope: its boxes are the surface and its words the surface's ink.
+        const diagram = box.getByRole("img", { name: `Flow on the ${surface} surface` });
+        await expect(diagram).toBeVisible({ timeout: 30_000 });
+        const svg = decodeURIComponent((await diagram.getAttribute("src")) ?? "");
+        expect(svg, `${surface}: diagram boxes`).toContain(hexOf(card));
+        expect(svg, `${surface}: diagram text`).toContain(hexOf(ink));
+        expect(contrast(await paintedRgb(box, "--diagram-line"), card), `${surface}: diagram lines`).toBeGreaterThanOrEqual(3);
+      }
+    }
   });
 }
 
