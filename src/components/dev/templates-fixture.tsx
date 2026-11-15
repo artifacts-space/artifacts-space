@@ -11,10 +11,18 @@ import { templateCategoriesInUse, templatesIn, uiTemplates } from "@/lib/ui/temp
 import { templateAsSpec } from "@/lib/ui/templates/instantiate";
 import type { TemplateViewport, UiTemplate } from "@/lib/ui/templates/types";
 
-/** The frame widths a template is drawn at, by the viewport it is made for: a desktop, a phone, or both. */
-export const templateFrameWidths: Record<TemplateViewport, readonly (1440 | 390)[]> = { fluid: [1440, 390], wide: [1440], phone: [390] };
+/** A frame width on the page: a desktop, a tablet, and a phone. */
+export type TemplateFrameWidth = 1440 | 768 | 390;
 
-const frameWidthClass = { 1440: "w-[1440px]", 390: "w-[390px]" } as const;
+/**
+ * The frame widths a template is drawn at, by the viewport it is made for.
+ * The tablet frame sits between the width steps the blocks change at (576,
+ * 672, and 896 pixels), where a layout made for the two ends can show a
+ * part twice or not at all.
+ */
+export const templateFrameWidths: Record<TemplateViewport, readonly TemplateFrameWidth[]> = { fluid: [1440, 768, 390], wide: [1440, 768], phone: [390] };
+
+const frameWidthClass: Record<TemplateFrameWidth, string> = { 1440: "w-[1440px]", 768: "w-[768px]", 390: "w-[390px]" };
 
 /**
  * Says the page has hydrated, for tests: the server leaves the mark out and
@@ -56,7 +64,7 @@ function shownFor({ category, template }: TemplatesFilter): readonly UiTemplate[
   return category === null ? [] : uiTemplates.filter((entry) => entry.category === category);
 }
 
-/** The categories that have templates, each a link to its page. Sixty templates at two widths are too many to draw at once. */
+/** The categories that have templates, each a link to its page. Sixty templates at three widths are too many to draw at once. */
 function CategoryList() {
   return (
     <ul className="mt-4 grid gap-2 sm:grid-cols-3" data-template-categories="">

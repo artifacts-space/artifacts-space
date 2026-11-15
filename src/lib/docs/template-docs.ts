@@ -1,3 +1,4 @@
+import { templatesIn, templateSourcePath } from "@/lib/ui/templates/index";
 import { templateCategories, type TemplateCategory, type TemplateKind, type TemplateViewport } from "@/lib/ui/templates/types";
 
 import { docsHref } from "./pages";
@@ -58,7 +59,12 @@ export function templateDocsHref(template: { id: string; category: TemplateCateg
   return docsHref(`json-render/templates/${template.category}`, template.id);
 }
 
-/** The repository file a category's templates are written in. */
+/**
+ * The repository file to edit for a category's page: the file its first
+ * template is written in, read from the index (a batch can span several
+ * files). A category with no template yet points at its batch's first file.
+ */
 export function templateCategorySource(category: TemplateCategory): string {
-  return `src/lib/ui/templates/${templateCategories[category].file}.ts`;
+  const first = templatesIn(category)[0];
+  return (first ? templateSourcePath(first.id) : undefined) ?? `src/lib/ui/templates/${templateCategories[category].file}.ts`;
 }

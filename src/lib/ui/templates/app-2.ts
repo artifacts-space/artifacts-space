@@ -331,11 +331,12 @@ export const appScreenTemplates: readonly UiTemplate[] = [
     surface: "page",
     slots: [
       { what: "Page title", element: "title", prop: "text" },
-      { what: "Delivery speeds", element: "speed", prop: "options" },
+      { what: "Delivery speeds. The totals show their Express values while the chosen speed equals the second option word for word, so change that option's words in `totals` (two places) too", element: "speed", prop: "options" },
+      { what: "The delivery speed chosen at the start: one of the options, word for word", state: "/speed" },
       { what: "Countries", element: "country", prop: "options" },
       { what: "Note under the payment fields", element: "pay-note", prop: "text" },
       { what: "Items in the order, each with a name, a detail, and a price", state: "/items" },
-      { what: "Totals; the Delivery and Total rows switch with the delivery speed", element: "totals", prop: "items" },
+      { what: "Totals. The Delivery and Total rows compare the chosen speed with the Express option's exact words; keep them the same as that option", element: "totals", prop: "items" },
       { what: "Pay button label", element: "pay", prop: "label" },
     ],
     fragment: {
@@ -390,7 +391,8 @@ export const appScreenTemplates: readonly UiTemplate[] = [
         "item-name": { type: "Text", props: { text: { $item: "name" }, weight: "medium" } },
         "item-detail": { type: "Text", props: { text: { $item: "detail" }, size: "sm", tone: "muted" } },
         "item-price": { type: "Text", props: { text: { $item: "price" } } },
-        // Written copy, not sums: the Delivery and Total rows only switch between two written values with /speed. Change them together.
+        // Written copy, not sums: the Delivery and Total rows only switch between two written values with /speed. A Select's value is its option's words,
+        // so the two `eq` strings below must stay word for word the Express option of `speed`; templateProblems fails when they differ.
         totals: {
           type: "KeyValue",
           props: {

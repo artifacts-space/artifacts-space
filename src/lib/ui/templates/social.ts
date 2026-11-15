@@ -1,13 +1,13 @@
-import { socialTemplatesMore } from "./social-2";
 import type { UiTemplate } from "./types";
 
 /**
  * Testimonials and team (batch E, first half). Categories: testimonial,
- * team. The blog, contact, and newsletter templates are in social-2.ts and
- * join the list at the end. The shared test (templates.test.ts) and the e2e
- * loop (e2e/templates.spec.ts) cover every template added here.
+ * team. The blog, contact, and newsletter templates are in social-2.ts; the
+ * index (index.ts) lists both files under the social batch. The shared test
+ * (templates.test.ts) and the e2e loop (e2e/templates.spec.ts) cover every
+ * template added here.
  */
-const testimonialAndTeam: readonly UiTemplate[] = [
+export const socialTemplates: readonly UiTemplate[] = [
   {
     id: "testimonial-single-quote",
     name: "Testimonial, one big quote",
@@ -208,6 +208,3 @@ const testimonialAndTeam: readonly UiTemplate[] = [
     },
   },
 ];
-
-/** Testimonials, team, blog, contact, and newsletter (batch E): every template of the social file. */
-export const socialTemplates: readonly UiTemplate[] = [...testimonialAndTeam, ...socialTemplatesMore];

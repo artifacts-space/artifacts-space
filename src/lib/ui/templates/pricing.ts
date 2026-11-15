@@ -271,6 +271,7 @@ export const pricingTemplates: readonly UiTemplate[] = [
         questions: {
           type: "Accordion",
           props: {
+            openFirst: true,
             items: [
               { title: "How long is the free trial?" },
               { title: "Can I bring my books from another app?" },
@@ -323,6 +324,7 @@ export const pricingTemplates: readonly UiTemplate[] = [
         questions: {
           type: "Accordion",
           props: {
+            openFirst: true,
             items: [
               { title: "How long does delivery take?" },
               { title: "How much is delivery?" },
@@ -375,6 +377,7 @@ export const pricingTemplates: readonly UiTemplate[] = [
         questions: {
           type: "Accordion",
           props: {
+            openFirst: true,
             items: [
               { title: "How long can I watch the lessons?" },
               { title: "Do I get a certificate?" },

@@ -2,8 +2,8 @@ import type { UiTemplate } from "./types";
 
 /**
  * Blog, contact, and newsletter (batch E, second half). Categories: blog,
- * contact, newsletter. social.ts adds these to its list, so the index, the
- * shared test, and the e2e loop reach them through the social file.
+ * contact, newsletter. The index (index.ts) lists this file under the social
+ * batch, after social.ts, so the shared test and the e2e loop reach them.
  */
 export const socialTemplatesMore: readonly UiTemplate[] = [
   {

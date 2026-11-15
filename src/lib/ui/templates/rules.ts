@@ -2,6 +2,7 @@ import { isPlainObject, readPointer, walkJson } from "../json-walk";
 import { uiLimits } from "../limits";
 import { validateUiSpec } from "../validate";
 
+import { actionHides, actionLabels, pressButtons } from "./behavior";
 import { elementStatePaths, templateFacts } from "./facts";
 import { prefixProblem, templateAsSpec } from "./instantiate";
 import { templateBudget, templateCategories, templateNamePattern, type TemplateElement, type TemplateFile, type TemplateFragment, type UiTemplate } from "./types";
@@ -83,6 +84,68 @@ function firstHeading(fragment: TemplateFragment): TemplateElement | undefined {
 function outlineProblems(fragment: TemplateFragment): string[] {
   const level = firstHeading(fragment)?.props?.level;
   return typeof level === "number" && level > 2 ? [`its first heading is level ${String(level)}. Start a template at level 2 (or 1 for a page's opening), so stacked sections never skip a level.`] : [];
+}
+
+/**
+ * The shared e2e loop finds a button by its label and counts links and
+ * buttons by theirs, both read from the fragment. So a button whose press
+ * changes state has a label written in the template, and every link and
+ * button label is one the fragment can be read for.
+ */
+function behaviorProblems(template: UiTemplate): string[] {
+  return [
+    ...pressButtons(template).unlabelled.map((key) => `element "${key}" changes state when pressed, but its label is not written in the template. Give it a fixed label, so the e2e loop can press it.`),
+    ...actionLabels(template).unread.map((key) => `element "${key}": its label cannot be read from the template (a $cond, say). Use fixed words, a repeat's item, state, or a $template.`),
+  ];
+}
+
+const otherSide = { hideBelow: "hideAbove", hideAbove: "hideBelow" } as const;
+
+/**
+ * A Box that hides links or buttons below a width step is paired with one
+ * that hides links or buttons above the same step, and the other way round.
+ * Unpaired, or paired at another step, some width shows an action twice or
+ * not at all. This checks the steps only; the e2e loop checks the labels a
+ * reader meets (e2e/templates.spec.ts).
+ */
+function hideProblems(fragment: TemplateFragment): string[] {
+  const hides = actionHides(fragment);
+  return hides
+    .filter((hide) => !hides.some((other) => other.side === otherSide[hide.side] && other.step === hide.step))
+    .map((hide) => `element "${hide.key}" hides links or buttons with \`${hide.side}: "${hide.step}"\`, but no Box holds any with \`${otherSide[hide.side]}: "${hide.step}"\`. Pair the two at one step, so every action is drawn once at every width.`);
+}
+
+/** A Select with written options that keeps its choice in state: the path, and the words it can put there. */
+function boundChoices(fragment: TemplateFragment): { key: string; path: string; options: string[] }[] {
+  return Object.entries(fragment.elements).flatMap(([key, element]) => {
+    const { options, value } = element.props ?? {};
+    if (element.type !== "Select" || !Array.isArray(options) || !isPlainObject(value) || typeof value.$bindState !== "string") return [];
+    return [{ key, path: value.$bindState, options: options.filter((option): option is string => typeof option === "string") }];
+  });
+}
+
+/** Every string a condition compares the state at `path` with (`{ "$state": path, "eq": "…" }`), anywhere in the fragment. */
+function comparedWith(fragment: TemplateFragment, path: string): string[] {
+  const found: string[] = [];
+  walkJson(Object.values(fragment.elements), uiLimits.maxJsonDepth, ({ value }) => {
+    if (isPlainObject(value) && value.$state === path && typeof value.eq === "string") found.push(value.eq);
+  });
+  return found;
+}
+
+/**
+ * A Select's value is the chosen option's own words. So the value it starts
+ * with, and every string a condition compares it with, must be one of its
+ * options word for word, or the condition can never be true (or the start
+ * shows no choice). An agent that rewords an option must reword these too.
+ */
+function choiceProblems(fragment: TemplateFragment): string[] {
+  return boundChoices(fragment).flatMap(({ key, path, options }) => {
+    const start = readPointer(fragment.state ?? {}, path);
+    const starts = typeof start === "string" && start !== "" && !options.includes(start) ? [`element "${key}" starts at "${start}" (${path}), which is not one of its options.`] : [];
+    const compared = comparedWith(fragment, path).filter((text) => !options.includes(text));
+    return [...starts, ...[...new Set(compared)].map((text) => `a condition compares ${path} with "${text}", which is not one of the options of "${key}". A Select's value is its option's exact words.`)];
+  });
 }
 
 function linkProblem(key: string, element: TemplateElement): string[] {
@@ -185,6 +248,9 @@ export function templateProblems(template: UiTemplate, file: TemplateFile): stri
     ...rootProblems(template),
     ...budgetProblems(template),
     ...outlineProblems(fragment),
+    ...behaviorProblems(template),
+    ...hideProblems(fragment),
+    ...choiceProblems(fragment),
     ...elementProblems(fragment),
     ...stateProblems(fragment),
     ...slotProblems(template),

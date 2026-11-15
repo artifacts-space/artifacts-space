@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { validateUiSpec } from "../validate";
 
 import { templateFacts } from "./facts";
-import { listTemplates, templatesByFile, uiTemplates } from "./index";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { listTemplates, templateCategoriesInUse, templatesByFile, templatesIn, templateSourcePath, templateSources, uiTemplates } from "./index";
 import { attachFragment, instantiateTemplate, prefixProblem, templateAsSpec, templatePageKey } from "./instantiate";
 import { templateProblems } from "./rules";
 import { templateFiles, type UiTemplate } from "./types";
@@ -64,6 +67,30 @@ describe("every template", () => {
       return paths.filter((path) => path !== "/other" && !path.startsWith("/other/")).map((path) => `${template.id}: ${path}`);
     });
     expect(stray).toEqual([]);
+  });
+});
+
+describe("template source files", () => {
+  const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+
+  it("should name, for every template, a source file that holds its id", () => {
+    const wrong = uiTemplates.flatMap((template) => {
+      const path = templateSourcePath(template.id);
+      return path !== undefined && read(path).includes(`id: "${template.id}"`) ? [] : [`${template.id}: ${path ?? "no source file"}`];
+    });
+    expect(wrong).toEqual([]);
+  });
+
+  it("should list every template of the index in exactly one source file, and no source file twice", () => {
+    const listed = templateSources.flatMap((source) => source.templates.map((template) => template.id));
+    expect([...listed].sort()).toEqual(uiTemplates.map((template) => template.id).sort());
+    const names = templateSources.map((source) => source.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("should keep each category in one source file, so its docs page has one file to edit", () => {
+    const split = templateCategoriesInUse().filter((category) => new Set(templatesIn(category).map((template) => templateSourcePath(template.id))).size > 1);
+    expect(split).toEqual([]);
   });
 });
 

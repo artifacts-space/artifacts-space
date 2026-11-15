@@ -109,6 +109,14 @@ export function TabsView({ props, children }: ViewProps<"Tabs">) {
   );
 }
 
+/**
+ * Each item is a button that opens a panel. An open panel is a group named
+ * by its button, not a region: a region is a landmark, and the same
+ * accordion drawn twice on a page (one screen in two canvas frames) would
+ * list two landmarks with one name. The ARIA accordion pattern makes the
+ * region role optional and warns against many of them; the button still
+ * says whether its panel is open and which panel it controls.
+ */
 export function AccordionView({ props, children }: ViewProps<"Accordion">) {
   const panels = Children.toArray(children);
   return (
@@ -116,7 +124,7 @@ export function AccordionView({ props, children }: ViewProps<"Accordion">) {
       {props.items.map((item, index) => (
         <AccordionItem key={`${item.title}-${String(index)}`} value={index}>
           <AccordionTrigger className="min-w-0 break-words">{titleOr(item.title, `Item ${String(index + 1)}`)}</AccordionTrigger>
-          <AccordionContent>{panels[index] ?? <Empty what="content here" />}</AccordionContent>
+          <AccordionContent role="group">{panels[index] ?? <Empty what="content here" />}</AccordionContent>
         </AccordionItem>
       ))}
     </Accordion>

@@ -26,7 +26,8 @@ async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/canvas"
  * column, without a database (canvas-fixture.tsx). `?fixture=` picks site
  * (one page at three sizes), flow (four phone screens), placed (two rows
  * placed by hand), empty, broken (one good frame and two that cannot be
- * shown), unreadable, or large (a full board, for timing). Returns 404 in
+ * shown), unreadable, large (a full board, for timing), or screens (one
+ * screen of section templates in three frames). Returns 404 in
  * every other environment.
  */
 export default function CanvasFixturePage({ searchParams }: PageProps<"/dev/canvas">) {
