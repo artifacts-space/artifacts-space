@@ -8,7 +8,7 @@ import { expect, test } from "./support/test";
  * Heading sizes, weights, tones and alignment, Badge variants and icons, a
  * List's markers, Button sizes and the danger fill, a Textarea's rows, a
  * vertical rule, a plain Metric, a row drawn in reverse once it has
- * stacked, a Box that grows in a row). It is drawn for readers in the gallery and opened in the editor on
+ * stacked, a Box that grows in a row, a Link's icon at either side). It is drawn for readers in the gallery and opened in the editor on
  * the editor fixture, and each block's computed style is compared between
  * the two.
  */
@@ -65,6 +65,17 @@ async function drawn(view: Locator) {
   return { text, boxes, artShare: Math.round((art / row) * 100), buttons, notes, rule, wordsFirst, shotShare, stat };
 }
 
+/** A link's icon: the side it is drawn on, its size, its color, and the gap to the words. */
+function linkIconOf(holder: Locator): Promise<Record<string, string | number> | null> {
+  return holder.evaluate((element) => {
+    const icon = element.querySelector("[data-link-icon]");
+    if (!icon) return null;
+    const style = getComputedStyle(icon);
+    const box = icon.getBoundingClientRect();
+    return { side: icon.getAttribute("data-link-icon") ?? "", width: Math.round(box.width), height: Math.round(box.height), color: style.color, gap: style.marginLeft === "0px" ? style.marginRight : style.marginLeft };
+  });
+}
+
 type Drawn = Awaited<ReturnType<typeof drawn>>;
 
 /** The words of the styled fixture carry the styles it sets. */
@@ -98,7 +109,8 @@ test("should draw every styled block in the editor as it is drawn for readers", 
   const forReaders = await drawn(read);
   // The link that leaves the page: its words, and the arrow after them.
   const readLink = read.getByRole("link", { name: /Read the docs/ });
-  const linkForReaders = { style: await styleOf(readLink, textStyle), arrows: await readLink.locator("svg").count() };
+  const linkForReaders = { style: await styleOf(readLink, textStyle), arrows: await readLink.locator("svg:not([data-link-icon])").count(), icon: await linkIconOf(readLink) };
+  const menuIconForReaders = await linkIconOf(read.getByText("Pricing", { exact: true }));
 
   await page.goto("/dev/editor?kind=styled");
   const editor = editorView(page);
@@ -106,7 +118,9 @@ test("should draw every styled block in the editor as it is drawn for readers", 
   const inEditor = await drawn(editor);
   const editLink = editor.getByRole("textbox", { name: /^Link text \(opens/ });
   await expect(editLink).toHaveText("Read the docs");
-  const linkInEditor = { style: await styleOf(editLink, textStyle), arrows: await editLink.locator("xpath=..").locator("svg").count() };
+  const editHolder = editLink.locator("xpath=..");
+  const linkInEditor = { style: await styleOf(editLink, textStyle), arrows: await editHolder.locator("svg:not([data-link-icon])").count(), icon: await linkIconOf(editHolder) };
+  const menuIconInEditor = await linkIconOf(editor.getByText("Pricing", { exact: true }).locator("xpath=.."));
 
   for (const word of words) expect(inEditor.text[word], `the words "${word}"`).toEqual(forReaders.text[word]);
   expect(inEditor.boxes).toEqual(forReaders.boxes);
@@ -117,8 +131,11 @@ test("should draw every styled block in the editor as it is drawn for readers", 
   expect(Math.abs(inEditor.shotShare - forReaders.shotShare), "the picture's share of the row that stacks").toBeLessThanOrEqual(2);
   expect(Math.abs(inEditor.rule - forReaders.rule), "the height of the rule between the buttons").toBeLessThanOrEqual(2);
   expect(linkInEditor).toEqual(linkForReaders);
+  expect(menuIconInEditor, "the icon after a nav link's words").toEqual(menuIconForReaders);
   expect(Math.abs(inEditor.artShare - forReaders.artShare), "the placeholder's share of the row that grows").toBeLessThanOrEqual(1);
 
   expect(linkForReaders.arrows).toBe(1);
+  expect(linkForReaders.icon?.side).toBe("start");
+  expect(menuIconForReaders?.side).toBe("end");
   expectStyledFixture(forReaders, isMobile);
 });

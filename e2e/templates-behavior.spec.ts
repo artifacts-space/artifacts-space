@@ -5,6 +5,7 @@ import type { TemplateFrameWidth } from "../src/lib/ui/templates/frames";
 import { findTemplate, templateCategoriesInUse, templatesIn } from "../src/lib/ui/templates/index";
 import type { TemplateCategory, UiTemplate } from "../src/lib/ui/templates/types";
 
+import { expectNoAxeViolations } from "./support/a11y";
 import { countLabels, setFrameWidth, shownButton, signatureOf, type LabelCounts } from "./support/template-frames";
 import { endFrames, mostOf, readingPlan, widthProblems, type ReadingPlan, type WidthReading } from "./support/template-readings";
 import { expect, test } from "./support/test";
@@ -122,6 +123,19 @@ async function expectToggleKeepsFocus(frame: Locator, button: PressButton, width
   await expect(shownButton(frame, again).first(), `after "${button.label}" at ${String(width)}, the same button is still there and has the focus`).toBeFocused();
 }
 
+/**
+ * A button that says whether what it opens is open (`expanded`) says it to
+ * screen readers too: `aria-expanded` is what `behavior.ts` read from the
+ * fragment for this moment. `label` is the words it shows then. Only a
+ * toggle is read after its press: another button may leave the page.
+ */
+async function expectExpanded(frame: Locator, button: PressButton, when: "atStart" | "afterPress", width: number) {
+  if (!button.expanded || (when === "afterPress" && button.action !== "toggleState")) return;
+  const label = when === "atStart" ? button.label : (button.restoredBy[0] ?? button.label);
+  const value = String(button.expanded[when]);
+  await expect(shownButton(frame, label).first(), `"${label}" at ${String(width)} says aria-expanded="${value}"`).toHaveAttribute("aria-expanded", value);
+}
+
 /** Presses the first button a reader can see among `labels`, and returns its label. */
 async function pressFirstShown(frame: Locator, labels: readonly string[], why: string): Promise<string> {
   for (const label of labels) {
@@ -141,11 +155,14 @@ async function readFrame(page: Page, plan: Plan, read: WidthReading, pressed: Se
   const readings = [await countLabels(frame, plan.labels)];
   for (const button of plan.reveals) {
     if ((await shownButton(frame, button.label).count()) === 0) continue;
+    await expectExpanded(frame, button, "atStart", read.width);
     await pressAndExpectChange(page, plan, read, frame, button, rest);
     await expectToggleKeepsFocus(frame, button, read.width);
+    await expectExpanded(frame, button, "afterPress", read.width);
     readings.push(await countLabels(frame, plan.labels));
     const undo = await pressFirstShown(frame, undoing(button), `after "${button.label}" at ${String(read.width)}, nothing puts the frame back`);
     await expect.poll(() => signatureOf(frame), { message: `"${undo}" at ${String(read.width)} brings back what "${button.label}" changed` }).toBe(rest);
+    await expectExpanded(frame, button, "atStart", read.width);
     pressed.add(button.label).add(undo);
   }
   return mostOf(readings);
@@ -234,6 +251,64 @@ function behaviorTests(category: TemplateCategory) {
 }
 
 for (const category of categories) behaviorTests(category);
+
+/** Each template drawn at 390 with toggles that say whether what they open is open (read from its fragment). */
+const disclosures = categories.flatMap((category) => templatesIn(category)).flatMap((template) => {
+  const toggles = pressButtons(template).buttons.filter((button) => button.action === "toggleState" && button.expanded !== null);
+  return toggles.length > 0 && readingPlan(template.viewport).frames.includes(390) ? [{ template, toggles }] : [];
+});
+
+/** The first of `toggles` the frame shows: a wide menu's own buttons are hidden at 390, where its menu button shows. */
+async function firstShown(frame: Locator, toggles: readonly PressButton[]): Promise<PressButton> {
+  for (const toggle of toggles) if ((await shownButton(frame, toggle.label).count()) > 0) return toggle;
+  throw new Error(`no toggle shown at 390 (looked for ${toggles.map((toggle) => `"${toggle.label}"`).join(", ")})`);
+}
+
+/**
+ * Presses a button from the keyboard. On the phone project the page is wider
+ * than the screen (it holds the 1440 frame), so the browser zooms it out and
+ * a tap's point moves while the page scrolls; the keyboard reaches the same
+ * button with no point to aim at.
+ */
+async function pressByKeyboard(button: Locator) {
+  await button.focus();
+  await button.press("Enter");
+}
+
+/** At 390: scans the frame as it starts, presses the toggle, waits until the button says the panel changed, scans again, and puts it back. */
+async function expectDisclosureScans(page: Page, template: UiTemplate, toggles: readonly PressButton[]) {
+  await open(page, `template=${template.id}`);
+  const frame = frameAt(page, template.id, 390);
+  await frame.scrollIntoViewIfNeeded();
+  const toggle = await firstShown(frame, toggles);
+  const expanded = toggle.expanded;
+  if (!expanded) throw new Error(`"${toggle.label}" does not say whether what it opens is open`);
+  const after = toggle.restoredBy[0] ?? toggle.label;
+  await test.step(`scan with "${toggle.label}" as it starts`, async () => {
+    await expect(shownButton(frame, toggle.label).first()).toHaveAttribute("aria-expanded", String(expanded.atStart));
+    await expectNoAxeViolations(frame);
+  });
+  await test.step(`press "${toggle.label}" and scan again`, async () => {
+    await pressByKeyboard(shownButton(frame, toggle.label).first());
+    // The press has landed once the button says so: the state it reads has flipped.
+    await expect(shownButton(frame, after).first()).toHaveAttribute("aria-expanded", String(expanded.afterPress));
+    await expectNoAxeViolations(frame);
+  });
+  await test.step(`press "${after}" to put it back`, async () => {
+    await pressByKeyboard(shownButton(frame, after).first());
+    await expect(shownButton(frame, toggle.label).first()).toHaveAttribute("aria-expanded", String(expanded.atStart));
+  });
+}
+
+test("should find templates with a menu toggle that says whether its panel is open", () => {
+  expect(disclosures.length).toBeGreaterThan(0);
+});
+
+for (const { template, toggles } of disclosures) {
+  test(`should pass axe on ${template.id} at 390, with its panel closed and open`, async ({ page }) => {
+    await expectDisclosureScans(page, template, toggles);
+  });
+}
 
 /*
  * The checks above must be able to fail. A frame's reading counts a label

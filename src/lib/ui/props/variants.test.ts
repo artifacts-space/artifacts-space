@@ -129,3 +129,35 @@ describe("the toggleState action", () => {
     expect(result.renderable).toBe(false);
   });
 });
+
+describe("Button expanded", () => {
+  it("should accept expanded as true, false, or read from state", () => {
+    expect(messages("Button", { label: "Menu", expanded: true })).toEqual([]);
+    expect(messages("Button", { label: "Menu", expanded: { $state: "/open" } })).toEqual([]);
+    expect(messages("Button", { label: "Menu", expanded: "yes" })).not.toEqual([]);
+  });
+});
+
+describe("Link icon", () => {
+  const endIcon = 'An inline link with an `href` ends with its own arrow, so its icon goes at the start.';
+
+  it("should accept an icon at the start of any link, and at the end of one with no arrow", () => {
+    expect(messages("Link", { label: "Docs", icon: "book", href: "https://example.com" })).toEqual([]);
+    expect(messages("Link", { label: "Docs", icon: "arrow-right", iconPosition: "end" })).toEqual([]);
+    expect(messages("Link", { label: "Docs", icon: "arrow-right", iconPosition: "end", variant: "nav", href: "https://example.com" })).toEqual([]);
+  });
+
+  it("should refuse an icon at the end of an inline link with an href, written or read from state", () => {
+    expect(messages("Link", { label: "Docs", icon: "arrow-right", iconPosition: "end", href: "https://example.com" })).toEqual([expect.stringContaining(endIcon)]);
+    expect(messages("Link", { label: "Docs", icon: "arrow-right", iconPosition: "end", variant: "inline", href: { $state: "/url" } })).toEqual([expect.stringContaining(endIcon)]);
+  });
+
+  it("should say nothing about the icon while the variant or the position is an expression", () => {
+    expect(messages("Link", { label: "Docs", icon: "arrow-right", iconPosition: { $state: "/side" }, href: "https://example.com" })).toEqual([]);
+    expect(messages("Link", { label: "Docs", icon: "arrow-right", iconPosition: "end", variant: { $state: "/kind" }, href: "https://example.com" })).toEqual([]);
+  });
+
+  it("should refuse an icon name that is not in the list", () => {
+    expect(messages("Link", { label: "Docs", icon: "not-an-icon" })).not.toEqual([]);
+  });
+});

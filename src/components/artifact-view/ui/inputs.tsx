@@ -173,8 +173,10 @@ function buttonClass(props: ButtonProps, size: (typeof buttonSize)[ButtonSize]):
 export function ButtonView({ props, emit }: ViewProps<"Button">) {
   const size = buttonSize[props.size ?? "md"];
   const named = props.iconOnly ? { "aria-label": props.label } : {};
+  // A disclosure button says whether what it opens is open; an ordinary button says nothing.
+  const expanded = props.expanded === undefined ? {} : { "aria-expanded": props.expanded };
   return (
-    <Button {...named} variant={props.variant === "danger" ? "default" : (props.variant ?? "default")} data-variant={props.variant === "danger" ? "danger" : undefined} size={props.iconOnly ? size.icon : size.text} disabled={props.disabled ?? false} className={buttonClass(props, size)} onClick={() => { emit("press"); }}>
+    <Button {...named} {...expanded} variant={props.variant === "danger" ? "default" : (props.variant ?? "default")} data-variant={props.variant === "danger" ? "danger" : undefined} size={props.iconOnly ? size.icon : size.text} disabled={props.disabled ?? false} className={buttonClass(props, size)} onClick={() => { emit("press"); }}>
       {buttonIcon(props, "start")}
       {props.iconOnly ? null : <span className="truncate">{props.label}</span>}
       {buttonIcon(props, "end")}

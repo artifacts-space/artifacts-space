@@ -48,6 +48,7 @@ export const inputProps = {
     iconPosition: z.enum(["start", "end"]).optional(),
     iconOnly: z.boolean().optional(),
     disabled: z.boolean().optional(),
+    expanded: z.boolean().optional(),
   }),
   Input: inputFieldProps,
   Textarea: textareaProps,

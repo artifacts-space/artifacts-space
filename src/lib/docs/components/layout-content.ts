@@ -233,8 +233,17 @@ export const contentDocs = {
           privacy: { type: "Link", props: { label: "Privacy", variant: "muted" } },
         }),
       },
+      {
+        title: "With an icon",
+        note: "A link that leaves the page already ends with an arrow, so its icon goes at the start.",
+        spec: single("Stack", { direction: "horizontal", gap: "lg" }, {
+          guide: { type: "Link", props: { label: "Read the guide", href: "https://example.com/guide", icon: "book" } },
+          solutions: { type: "Link", props: { label: "Solutions", variant: "nav", icon: "chevron-down", iconPosition: "end" } },
+          sales: { type: "Link", props: { label: "Call sales", variant: "muted", icon: "phone" } },
+        }),
+      },
     ],
-    rules: ["Only absolute http, https, and mailto URLs pass validation. Links open in a new tab.", "Leave `href` out for a link that goes nowhere. Relative and `#` addresses are refused."],
+    rules: ["Only absolute http, https, and mailto URLs pass validation. Links open in a new tab.", "Leave `href` out for a link that goes nowhere. Relative and `#` addresses are refused.", "`icon` names an icon (see Icon) drawn at the start, or at the end with `iconPosition: \"end\"`. An inline link with an `href` ends with its own arrow, so its icon must go at the start; nav and muted links, and a link without `href`, take either side."],
   },
   Quote: {
     examples: [{ title: "With a citation", spec: single("Quote", { text: "Make it work, make it right, make it fast.", cite: "Kent Beck" }) }],

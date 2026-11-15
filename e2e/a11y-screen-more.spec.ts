@@ -144,15 +144,19 @@ test("should open and close a note with one button that runs toggleState, and sp
   const note = waitlist.getByRole("note");
   const details = waitlist.getByRole("button", { name: "Details" });
   await expect(note).toHaveCount(0);
+  // The button says whether the note is open, from the same state it flips.
+  await expect(details).toHaveAttribute("aria-expanded", "false");
 
   await details.click();
   await expect(note).toBeVisible();
+  await expect(details).toHaveAttribute("aria-expanded", "true");
   await expect(status).toHaveText("One email. We write once, when your place is ready.");
   await expectNoAxeViolations(waitlist);
   const spoken = await status.locator("span").elementHandle();
 
   await details.click();
   await expect(note).toHaveCount(0);
+  await expect(details).toHaveAttribute("aria-expanded", "false");
 
   await details.click();
   await expect(note).toBeVisible();

@@ -45,6 +45,8 @@ export const screenButtonFixtures: ComponentFixture[] = [
   { name: "Danger", props: { label: "Delete project", variant: "danger" } },
   { name: "Danger with an icon", props: { label: "Remove member", variant: "danger", icon: "trash", size: "sm" } },
   { name: "Danger, disabled", props: { label: "Delete account", variant: "danger", disabled: true } },
+  { name: "Disclosure, closed", props: { label: "Show more", variant: "outline", icon: "chevron-down", iconPosition: "end", expanded: false } },
+  { name: "Disclosure, open", props: { label: "Show less", variant: "outline", icon: "chevron-up", iconPosition: "end", expanded: true } },
 ];
 
 export const screenBadgeFixtures: ComponentFixture[] = [

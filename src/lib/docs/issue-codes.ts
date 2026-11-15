@@ -31,7 +31,7 @@ const elementCodes: Omit<IssueCodeDoc, "blocking">[] = [
   { code: "unknown_prop", severity: "warning", meaning: "A prop the component does not have. It is ignored." },
   { code: "leaf_children", severity: "warning", meaning: "A component that does not show children has some." },
   { code: "orphaned_element", severity: "warning", meaning: "An element the root never reaches. It is ignored." },
-  { code: "announce_follows_typing", severity: "warning", meaning: "A Text or Callout with announce shows words read from state that a text field writes, so it would be spoken on every key." },
+  { code: "announce_follows_typing", severity: "warning", meaning: "A Text or Callout with announce (true, or an expression that can be true) shows words read from state that a text field writes, so it would be spoken on every key." },
 ];
 
 const blockingMeanings: Record<string, string> = {

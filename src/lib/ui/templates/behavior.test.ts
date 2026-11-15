@@ -161,6 +161,43 @@ describe("pressButtons, for a toggle", () => {
   });
 });
 
+describe("pressButtons, for a button that says whether what it opens is open", () => {
+  const find = (template: UiTemplate, label: string) => pressButtons(template).buttons.find((button) => button.label === label);
+  const toggle = (expanded: unknown, statePath = "/open"): TemplateElement => ({ type: "Button", props: { label: "Menu", expanded }, on: { press: { action: "toggleState", params: { statePath } } } });
+
+  it("should read expanded from the state a toggle flips, before and after the press", () => {
+    expect(find(sample({ flip: toggle({ $state: "/open" }) }), "Menu")?.expanded).toEqual({ atStart: false, afterPress: true });
+    expect(find(sample({ flip: toggle({ $state: "/open" }) }, { open: true }), "Menu")?.expanded).toEqual({ atStart: true, afterPress: false });
+  });
+
+  it("should read expanded with not and eq, and from a setState", () => {
+    expect(find(sample({ flip: toggle({ $state: "/open", not: true }) }), "Menu")?.expanded).toEqual({ atStart: true, afterPress: false });
+    expect(find(sample({ flip: toggle({ $state: "/plan", eq: "Solo" }) }), "Menu")?.expanded).toEqual({ atStart: false, afterPress: false });
+    const opener: TemplateElement = { type: "Button", props: { label: "Show all", expanded: { $state: "/sent" } }, on: { press: { action: "setState", params: { statePath: "/sent", value: true } } } };
+    expect(find(sample({ opener }), "Show all")?.expanded).toEqual({ atStart: false, afterPress: true });
+  });
+
+  it("should keep a written true or false through the press", () => {
+    expect(find(sample({ flip: toggle(true) }), "Menu")?.expanded).toEqual({ atStart: true, afterPress: true });
+  });
+
+  it("should leave expanded unread when the button has none, or the fragment cannot resolve it", () => {
+    expect(find(sample({ flip: toggle(undefined) }), "Menu")?.expanded).toBeNull();
+    expect(find(sample({ flip: toggle({ $or: [{ $state: "/open" }, { $state: "/sent" }] }) }), "Menu")?.expanded).toBeNull();
+    expect(find(sample(), "Open menu")?.expanded).toBeNull();
+  });
+
+  it("should read every toggle that says whether it is open in the templates", async () => {
+    const { uiTemplates } = await import("./index");
+    const toggles = uiTemplates.flatMap((template) => pressButtons(template).buttons.filter((button) => button.action === "toggleState").map((button) => ({ id: template.id, key: button.key, expanded: button.expanded })));
+    expect(toggles.length).toBeGreaterThan(0);
+    // Every menu toggle in the templates says whether its menu is open, and the fragment can follow it.
+    expect(toggles.filter((toggle) => toggle.expanded === null)).toEqual([]);
+    // A press flips it, whichever way the menu starts (navbar-collapsible starts open).
+    for (const toggle of toggles) expect(toggle.expanded?.afterPress, `${toggle.id} "${toggle.key}"`).toBe(toggle.expanded?.atStart === false);
+  });
+});
+
 describe("the actions the validator allows", () => {
   it("should have every allowed action either read as a state action or listed as not pressed, with a reason", () => {
     const read = new Set<string>(stateActions);

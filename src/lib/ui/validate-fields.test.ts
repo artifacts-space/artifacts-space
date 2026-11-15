@@ -161,10 +161,33 @@ describe("announce on words that follow typing", () => {
     expect(warnings(button, thanks({ $state: "/name" })).found).toEqual([]);
   });
 
-  it("should say nothing when the element is not announced, or announce is not written as true", () => {
+  it("should say nothing when the element is not announced, or announce is written as false", () => {
     expect(warnings(bound, { type: "Text", props: { text: { $state: "/name" } } }).found).toEqual([]);
     expect(warnings(bound, thanks({ $state: "/name" }, false)).found).toEqual([]);
-    expect(warnings(bound, thanks({ $state: "/name" }, { $state: "/on" })).found).toEqual([]);
+  });
+
+  it("should warn when announce is an expression, since state can make it true", () => {
+    const fromState = warnings(bound, thanks({ $state: "/name" }, { $state: "/on" }));
+    expect(fromState.found.map((issue) => issue.elementKey)).toEqual(["spoken"]);
+    expect(fromState.result.renderable).toBe(true);
+    expect(warnings(bound, thanks(greeting, { $cond: { $state: "/on" }, $then: true, $else: false })).found).toHaveLength(1);
+  });
+
+  it("should name the field that writes the path, when two bound fields write different paths", () => {
+    const spec = {
+      version: 1,
+      root: "page",
+      state: { email: "", name: "" },
+      elements: {
+        page: { type: "Stack", props: {}, children: ["email", "name", "spoken"] },
+        email: { type: "Input", props: { label: "Email", value: { $bindState: "/email" } } },
+        name: { type: "Input", props: { label: "Name", value: { $bindState: "/name" } } },
+        spoken: { type: "Text", props: { text: greeting, announce: true } },
+      },
+    };
+    const found = validateUiSpec(spec).issues.filter((issue) => issue.code === "announce_follows_typing");
+    expect(found).toHaveLength(1);
+    expect(found[0]?.message).toContain('reads "/name", which text field "name" writes');
   });
 
   it("should say nothing when the field that writes the state is a Select or a Switch", () => {

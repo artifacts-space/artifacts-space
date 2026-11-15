@@ -208,7 +208,7 @@ export const appTemplates: readonly UiTemplate[] = [
         topbar: { type: "Box", props: { direction: "horizontal", align: "center", justify: "between", gap: "md", paddingX: "lg", paddingY: "sm", border: "bottom" }, children: ["top-left", "top-right"] },
         "top-left": { type: "Box", props: { direction: "horizontal", align: "center", gap: "sm" }, children: ["menu-box", "page-title"] },
         "menu-box": { type: "Box", props: { hideAbove: "md" }, children: ["menu"] },
-        menu: { type: "Button", props: { label: { $cond: { $state: "/open" }, $then: "Close navigation", $else: "Open navigation" }, icon: { $cond: { $state: "/open" }, $then: "x", $else: "menu-2" }, iconOnly: true, variant: "ghost" }, on: { press: { action: "toggleState", params: { statePath: "/open" } } } },
+        menu: { type: "Button", props: { label: { $cond: { $state: "/open" }, $then: "Close navigation", $else: "Open navigation" }, icon: { $cond: { $state: "/open" }, $then: "x", $else: "menu-2" }, iconOnly: true, variant: "ghost", expanded: { $state: "/open" } }, on: { press: { action: "toggleState", params: { statePath: "/open" } } } },
         "page-title": { type: "Heading", props: { text: "Projects", level: 1, size: "md" } },
         "top-right": { type: "Box", props: { direction: "horizontal", align: "center", gap: "sm" }, children: ["search-box", "alerts", "me"] },
         "search-box": { type: "Box", props: { hideBelow: "md" }, children: ["search"] },
