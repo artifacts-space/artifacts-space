@@ -92,6 +92,12 @@ describe("ui_template_get", () => {
     expect(answer.isError).toBe(true);
     expect(textOf(answer)).toMatch(/`prefix` must be up to 40 lowercase letters, digits, and hyphens/);
   });
+
+  it("should answer with a tool error, not a fragment that cannot be saved, when the prefix is a key the ui format rejects", async () => {
+    const answer = await call("ui_template_get", { id: "navbar-basic", prefix: "constructor" });
+    expect(answer.isError).toBe(true);
+    expect(textOf(answer)).toMatch(/`prefix` "constructor" would become a state key and state paths a ui spec cannot use\. Pass another/);
+  });
 });
 
 describe("the template tools on a read-only connection", () => {

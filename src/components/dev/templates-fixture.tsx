@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useSyncExternalStore } from "react";
 
 import { UiView } from "@/components/artifact-view/ui-view";
 import { ScrollFrame } from "@/components/docs/scroll-frame";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { uiTemplates } from "@/lib/ui/templates/index";
+import { templateCategoriesInUse, templatesIn, uiTemplates } from "@/lib/ui/templates/index";
 import { templateAsSpec } from "@/lib/ui/templates/instantiate";
 import type { TemplateViewport, UiTemplate } from "@/lib/ui/templates/types";
 
@@ -46,13 +47,42 @@ function TemplateSpecimen({ template }: { template: UiTemplate }) {
   );
 }
 
+/** Which templates the page draws: one category's, one template, or none (the page then lists the categories). */
+export interface TemplatesFilter {
+  category: string | null;
+  template: string | null;
+}
+
+function shownFor({ category, template }: TemplatesFilter): readonly UiTemplate[] {
+  if (template !== null) return uiTemplates.filter((entry) => entry.id === template);
+  return category === null ? [] : uiTemplates.filter((entry) => entry.category === category);
+}
+
+/** The categories that have templates, each a link to its page. Sixty templates at two widths are too many to draw at once. */
+function CategoryList() {
+  return (
+    <ul className="mt-4 grid gap-2 sm:grid-cols-3" data-template-categories="">
+      {templateCategoriesInUse().map((category) => (
+        <li key={category}>
+          <Link href={`/dev/templates?category=${category}`} className="card-surface card-hover flex items-center justify-between gap-3 px-4 py-3 text-sm">
+            <span className="font-mono">{category}</span>
+            <span className="text-muted-foreground">{templatesIn(category).length}</span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /**
- * Development only: every section template drawn by the real renderer at the
- * widths it is made for, each in a frame of that exact width. `only` narrows
- * the page to one template. The templates e2e spec reads it.
+ * Development only: section templates drawn by the real renderer at the
+ * widths they are made for, each in a frame of that exact width. The page
+ * draws one category (`?category=`) or one template (`?template=`); with
+ * neither it lists the categories. The templates e2e spec reads it, one
+ * category at a time.
  */
-export function TemplatesFixture({ only }: { only: string | null }) {
-  const shown = only === null ? uiTemplates : uiTemplates.filter((template) => template.id === only);
+export function TemplatesFixture({ filter }: { filter: TemplatesFilter }) {
+  const shown = shownFor(filter);
   return (
     <main className="w-full px-4 pb-24 sm:px-6">
       <header className="flex flex-wrap items-center gap-3 py-4">
@@ -60,6 +90,7 @@ export function TemplatesFixture({ only }: { only: string | null }) {
         <span className="text-xs text-muted-foreground">{shown.length} of {uiTemplates.length} · development only</span>
         <div className="ml-auto"><ThemeSwitcher /></div>
       </header>
+      {filter.category === null && filter.template === null ? <CategoryList /> : null}
       {shown.map((template) => <TemplateSpecimen key={template.id} template={template} />)}
       <ReadyMark />
     </main>

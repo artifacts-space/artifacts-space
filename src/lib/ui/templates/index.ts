@@ -5,7 +5,7 @@ import { heroTemplates } from "./heroes";
 import { navTemplates } from "./nav";
 import { pricingTemplates } from "./pricing";
 import { socialTemplates } from "./social";
-import { templateCategories, templateFiles, type TemplateCategory, type TemplateFile, type TemplateKind, type TemplateViewport, type UiTemplate } from "./types";
+import { templateCategories, templateCategoryNames, templateFiles, type TemplateCategory, type TemplateFile, type TemplateKind, type TemplateViewport, type UiTemplate } from "./types";
 
 /** Every template, by the batch file it lives in. */
 export const templatesByFile: Record<TemplateFile, readonly UiTemplate[]> = {
@@ -23,6 +23,17 @@ export const uiTemplates: readonly UiTemplate[] = templateFiles.flatMap((file) =
 /** The template with this id, or undefined. */
 export function findTemplate(id: string): UiTemplate | undefined {
   return uiTemplates.find((template) => template.id === id);
+}
+
+/** The templates of one category, in index order. */
+export function templatesIn(category: TemplateCategory): UiTemplate[] {
+  return uiTemplates.filter((template) => template.category === category);
+}
+
+/** The categories that have at least one template, in category order. The docs and the e2e loop make one page per entry. */
+export function templateCategoriesInUse(): TemplateCategory[] {
+  const used = new Set(uiTemplates.map((template) => template.category));
+  return templateCategoryNames.filter((category) => used.has(category));
 }
 
 /** Whether a template is a section of a marketing site or a screen of an app. It follows from the category. */

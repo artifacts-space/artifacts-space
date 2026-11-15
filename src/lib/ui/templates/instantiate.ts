@@ -1,4 +1,5 @@
 import { containerComponents, isUiComponentName } from "../catalog";
+import { findUnsafePaths } from "../expressions";
 import { isPlainObject } from "../json-walk";
 import { uiLimits } from "../limits";
 import { UI_SPEC_VERSION } from "../version";
@@ -30,8 +31,13 @@ import { TemplateError, templateBudget, templateNamePattern, type TemplateElemen
 /** Keys whose string value is an absolute state path. `$item` and `$bindItem` are relative to a repeat's item and stay as written. */
 export const statePathKeys: ReadonlySet<string> = new Set(["$state", "$bindState", "statePath", "clearStatePath"]);
 
-/** An absolute `${/path}` reference inside a `$template` string. */
+/** An absolute `${/path}` reference inside a `$template` string. The one definition: the rewrite below and the path count in facts.ts both use it. */
 const absoluteReference = /\$\{(\/[^}]*)\}/g;
+
+/** The absolute state paths a `$template` string reads, in order. A bare `${name}` (a field of a repeat's item) is not one. */
+export function absoluteReferences(text: string): string[] {
+  return [...text.matchAll(absoluteReference)].map((match) => match[1] ?? "");
+}
 
 /** A template made ready for a spec: every key and state path carries the prefix. */
 export interface TemplateInstance extends TemplateFragment {
@@ -90,10 +96,31 @@ function rewriteSlot(slot: TemplateSlot, prefix: string): TemplateSlot {
   return "state" in slot ? { what: slot.what, state: prefixedPath(slot.state, prefix) } : { what: slot.what, element: prefixedKey(slot.element, prefix), prop: slot.prop };
 }
 
-/** Throws unless `prefix` is lowercase words joined by hyphens, up to the id length. */
+/** What a prefix turns into in a spec: the one state key, the start of every state path, and the start of every element key. */
+function prefixInSpec(prefix: string): unknown {
+  return { state: { [prefix]: null }, read: { $state: prefixedPath("/value", prefix) }, elements: { [prefixedKey("key", prefix)]: null } };
+}
+
+/**
+ * Why `prefix` cannot be used, or null when it can. It must be lowercase
+ * words joined by hyphens, up to the id length, and the state key, state
+ * paths, and element keys it makes must be ones the ui format accepts. That
+ * last check is the format's own (`findUnsafePaths`), not a list kept here.
+ */
+export function prefixProblem(prefix: string): string | null {
+  if (prefix.length > templateBudget.maxIdLength || !templateNamePattern.test(prefix)) {
+    return `\`prefix\` must be up to ${String(templateBudget.maxIdLength)} lowercase letters, digits, and hyphens, starting with a letter, such as "hero" or "pricing-2". Got "${prefix.slice(0, 60)}".`;
+  }
+  if (findUnsafePaths(prefixInSpec(prefix)).length > 0) {
+    return `\`prefix\` "${prefix}" would become a state key and state paths a ui spec cannot use. Pass another, such as "hero" or "pricing-2".`;
+  }
+  return null;
+}
+
+/** Throws unless `prefix` can be used (see `prefixProblem`). */
 export function assertPrefix(prefix: string): void {
-  if (prefix.length <= templateBudget.maxIdLength && templateNamePattern.test(prefix)) return;
-  throw new TemplateError(`\`prefix\` must be up to ${String(templateBudget.maxIdLength)} lowercase letters, digits, and hyphens, starting with a letter, such as "hero" or "pricing-2". Got "${prefix.slice(0, 60)}".`);
+  const problem = prefixProblem(prefix);
+  if (problem !== null) throw new TemplateError(problem);
 }
 
 /**
@@ -156,7 +183,8 @@ function assertNoCollisions(spec: SpecLike, fragment: TemplateFragment): void {
  * in, and its root added to the children of `place.parent` at `place.index`
  * (the end when left out). Throws, changing nothing, when the parent cannot
  * hold it, a key or state key is already taken, or the spec would pass the
- * element limit.
+ * element limit. It has no caller in the app yet: it is the merge the web
+ * editor's insert picker will call, and the one the guides tell agents to do.
  */
 export function attachFragment<T extends SpecLike>(spec: T, fragment: TemplateFragment, place: AttachPlace): T {
   const parent = parentOf(spec, place.parent);

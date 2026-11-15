@@ -4,7 +4,7 @@ import { validateUiSpec } from "../validate";
 
 import { templateFacts } from "./facts";
 import { listTemplates, templatesByFile, uiTemplates } from "./index";
-import { attachFragment, instantiateTemplate, templateAsSpec, templatePageKey } from "./instantiate";
+import { attachFragment, instantiateTemplate, prefixProblem, templateAsSpec, templatePageKey } from "./instantiate";
 import { templateProblems } from "./rules";
 import { templateFiles, type UiTemplate } from "./types";
 
@@ -34,6 +34,14 @@ describe("every template", () => {
     expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([]);
     const names = uiTemplates.map((template) => template.name);
     expect(names.filter((name, index) => names.indexOf(name) !== index)).toEqual([]);
+  });
+
+  it("should have an id that is accepted as a prefix, since the id is the prefix when none is passed", () => {
+    const refused = uiTemplates.flatMap((template) => {
+      const problem = prefixProblem(template.id);
+      return problem === null ? [] : [`${template.id}: ${problem}`];
+    });
+    expect(refused).toEqual([]);
   });
 
   it("should stay valid, with no issues, when it is drawn under another prefix", () => {

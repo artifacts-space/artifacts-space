@@ -4,7 +4,7 @@ import { uiLimits } from "../limits";
 import { validateUiSpec } from "../validate";
 
 import { attachFragment, instantiateTemplate, templateAsSpec, templatePageKey } from "./instantiate";
-import { TemplateError, type UiTemplate } from "./types";
+import { TemplateError, templateBudget, type UiTemplate } from "./types";
 
 /** A template that uses every place a key or a state path can appear. */
 const sample: UiTemplate = {
@@ -101,6 +101,21 @@ describe("instantiateTemplate", () => {
 
   it.each(["", "One", "1st", "a b", "a_b", "-a", "a-", "a".repeat(41), "__proto__"])("should refuse the prefix %j when it is not lowercase words joined by hyphens", (prefix) => {
     expect(() => instantiateTemplate(sample, { prefix })).toThrow(TemplateError);
+  });
+
+  it.each(["constructor", "prototype"])("should refuse the prefix %j when the state key it makes is one the ui format rejects", (prefix) => {
+    expect(() => instantiateTemplate(sample, { prefix })).toThrow(/would become a state key and state paths a ui spec cannot use/);
+    // The format's own verdict on the same key, so the two cannot drift apart.
+    const spec = templateAsSpec(sample, { prefix: "ok" });
+    expect(validateUiSpec({ ...spec, state: { ...spec.state, [prefix]: {} } }).valid).toBe(false);
+  });
+
+  it.each(["constructor-2", "prototypes", "proto"])("should accept the prefix %j when it only contains such a word, and give a spec that validates", (prefix) => {
+    expect(validateUiSpec(templateAsSpec(sample, { prefix })).issues).toEqual([]);
+  });
+
+  it("should keep the longest prefixed element key inside the ui format's key limit", () => {
+    expect(templateBudget.maxIdLength + 1 + templateBudget.maxKeyLength).toBeLessThanOrEqual(uiLimits.maxKeyLength);
   });
 });
 

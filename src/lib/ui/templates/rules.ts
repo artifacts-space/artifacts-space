@@ -3,7 +3,7 @@ import { uiLimits } from "../limits";
 import { validateUiSpec } from "../validate";
 
 import { elementStatePaths, templateFacts } from "./facts";
-import { templateAsSpec } from "./instantiate";
+import { prefixProblem, templateAsSpec } from "./instantiate";
 import { templateBudget, templateCategories, templateNamePattern, type TemplateElement, type TemplateFile, type TemplateFragment, type UiTemplate } from "./types";
 
 /**
@@ -21,11 +21,12 @@ const exampleLink = /^https:\/\/(?:www\.)?example\.(?:com|org|net)(?:\/|$)/;
 /** A bare `${name}` reference in a `$template` string: a field of the repeat's current item. */
 const bareReference = /\$\{(?!\/)[^}]*\}/;
 
-const validId = (id: string) => templateNamePattern.test(id) && id.length <= templateBudget.maxIdLength;
+/** An id is also the default prefix, so it must be one `ui_template_get` would accept as `prefix`. */
+const validId = (id: string) => prefixProblem(id) === null;
 
 function idProblems({ id, category }: UiTemplate, file: TemplateFile): string[] {
   const problems: string[] = [];
-  if (!validId(id)) problems.push(`id "${id}" must be up to ${String(templateBudget.maxIdLength)} lowercase letters, digits, and hyphens.`);
+  if (!validId(id)) problems.push(`id "${id}" must be up to ${String(templateBudget.maxIdLength)} lowercase letters, digits, and hyphens, and usable as a prefix.`);
   if (!id.startsWith(`${category}-`)) problems.push(`id "${id}" must start with its category, "${category}-".`);
   if (templateCategories[category].file !== file) problems.push(`category "${category}" belongs in ${templateCategories[category].file}.ts, not ${file}.ts.`);
   return problems;

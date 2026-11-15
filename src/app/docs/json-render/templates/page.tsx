@@ -1,30 +1,18 @@
 import Link from "next/link";
 
 import { CodeSnippet } from "@/components/code/code-snippet";
-import { CopyButton } from "@/components/copy-button";
 import { DocsH, FactTable, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
-import { ExamplePreview } from "@/components/docs/example-preview";
 import { docsMetadata } from "@/lib/docs/metadata";
 import { docsHref } from "@/lib/docs/pages";
 import { compactJson } from "@/lib/docs/spec-builders";
-import { templateFacts } from "@/lib/ui/templates/facts";
-import { templatesByFile, uiTemplates } from "@/lib/ui/templates/index";
-import { templateAsSpec } from "@/lib/ui/templates/instantiate";
-import { templateBudget, templateFiles, type TemplateFile, type UiTemplate } from "@/lib/ui/templates/types";
+import { templateCategoryHref, templateDocsHref, templateViewportWords } from "@/lib/docs/template-docs";
+import { listTemplates, templateCategoriesInUse, type TemplateRow } from "@/lib/ui/templates/index";
+import { templateBudget } from "@/lib/ui/templates/types";
 
 export const metadata = docsMetadata("json-render/templates");
 
-const fileTitles: Record<TemplateFile, string> = {
-  nav: "Navigation, banners, and footers",
-  heroes: "Heroes and calls to action",
-  features: "Features, steps, numbers, and logos",
-  pricing: "Pricing, comparison, and questions",
-  social: "Testimonials, team, blog, and contact",
-  app: "App screens",
-};
-
-const viewportWords = { fluid: "any width", wide: "desktop and tablet", phone: "phone" } as const;
+const linkClassName = "underline decoration-border underline-offset-4 hover:decoration-foreground";
 
 const getCall = compactJson({ id: "pricing-three-tiers", prefix: "plans", as: "fragment" });
 
@@ -45,30 +33,27 @@ const rules = [
   ["Style", "Only the component set's named steps: no CSS, no colors, no class names."],
 ];
 
-/** One template: its name and id, what it is for, a copy button for its spec, and the template drawn live. */
-function TemplateExample({ template }: { template: UiTemplate }) {
-  const json = JSON.stringify(templateAsSpec(template), null, 2);
-  const facts = templateFacts(template);
-  return (
-    <figure className="mt-6 min-w-0 overflow-hidden rounded-lg border" data-docs-template={template.id}>
-      <figcaption className="border-b bg-muted/40 px-4 py-2">
-        <div className="flex min-h-8 items-center justify-between gap-3">
-          <span className="min-w-0 truncate text-sm font-medium">{template.name}</span>
-          <CopyButton value={json} label="Copy JSON" variant="ghost" size="sm" />
-        </div>
-        <p className="font-mono text-xs text-muted-foreground">{template.id} · {String(facts.elements)} elements · {viewportWords[template.viewport]}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{template.description}</p>
-      </figcaption>
-      <div className="min-w-0 bg-background" data-docs-preview="">
-        <ExamplePreview json={json} />
-      </div>
-    </figure>
-  );
+/**
+ * One row of the list: the template's name (a link to it, drawn, on its
+ * category's page), its id, its category, the widths it is made for, and its
+ * size. A row carries no spec, so the list stays light however many templates
+ * there are.
+ */
+function rowOf(row: TemplateRow) {
+  return [
+    <Link key="name" href={templateDocsHref(row)} className={`text-foreground ${linkClassName}`} data-docs-template-row={row.id}>{row.name}</Link>,
+    row.id,
+    <Link key="category" href={templateCategoryHref(row.category)} className={linkClassName}>{row.category}</Link>,
+    templateViewportWords[row.viewport],
+    String(row.elements),
+  ];
 }
 
-/** What section templates are, how an agent uses them over MCP, and every template drawn live. */
+/** What section templates are, how an agent uses them over MCP, and a row for every template. Each category's page draws its templates. */
 export default function TemplatesPage() {
   const page = "json-render/templates" as const;
+  // In category order, so a category's templates sit together however the batch files order them.
+  const rows = templateCategoriesInUse().flatMap((category) => listTemplates({ category }));
   return (
     <RegistryPage slug={page}>
       <Prose>
@@ -111,16 +96,10 @@ export default function TemplatesPage() {
       <DocsH page={page} id="catalog" />
       <Prose>
         <p>
-          {uiTemplates.length} templates today, drawn here by the same renderer an artifact uses. Each is shown at the width of this column; in a wider page or frame it spreads out.
+          {rows.length} templates today. Each name opens the template, drawn by the same renderer an artifact uses, on the page of its category. The <code>category</code> is also what <code>ui_templates_list</code> filters by.
         </p>
       </Prose>
-      {templateFiles.filter((file) => templatesByFile[file].length > 0).map((file) => (
-        <section key={file} aria-labelledby={`templates-${file}`} className="mt-10">
-          {/* A level-2 heading: a template drawn below may carry its own level-1 heading, and the next group must not skip a level after it. */}
-          <h2 id={`templates-${file}`} className="text-lg font-medium tracking-[-0.01em]">{fileTitles[file]}</h2>
-          {templatesByFile[file].map((template) => <TemplateExample key={template.id} template={template} />)}
-        </section>
-      ))}
+      <FactTable head={["Template", "Id", "Category", "Made for", "Elements"]} rows={rows.map(rowOf)} mono={[1]} />
     </RegistryPage>
   );
 }

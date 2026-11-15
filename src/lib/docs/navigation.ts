@@ -1,8 +1,10 @@
 import { toolAccess } from "@/lib/mcp/tool-access";
 import type { UiComponentName } from "@/lib/ui/catalog";
+import { templateCategoriesInUse, templatesIn } from "@/lib/ui/templates/index";
 
 import { componentDescription, componentGroups, componentSlug, orderedComponents } from "./components/catalog-docs";
 import { docsHref, docsPages, docsSections, type DocsSectionName } from "./pages";
+import { templateCategoryHref, templateCategoryTitles } from "./template-docs";
 
 /**
  * The docs as navigation: the sidebar tree, the reading order for prev/next
@@ -52,13 +54,20 @@ export function docsNavTree(): DocsNavTree {
   };
 }
 
-/** Every page in reading order: component pages follow the components index. */
+/** The page of each template category that has templates, in category order. */
+function templateCategoryLinks(): DocsLink[] {
+  return templateCategoriesInUse().map((category) => ({ title: templateCategoryTitles[category], href: templateCategoryHref(category) }));
+}
+
+/** The pages that follow an index page: each component after the components index, each template category after the templates index. */
+function pagesUnder(slug: string): DocsLink[] {
+  if (slug === "json-render/components") return orderedComponents.map((component) => ({ title: component, href: componentHref(component) }));
+  return slug === "json-render/templates" ? templateCategoryLinks() : [];
+}
+
+/** Every page in reading order: component pages follow the components index, and template category pages follow the templates index. */
 export function docsReadingOrder(): DocsLink[] {
-  return docsPages.flatMap((page) => {
-    const link = { title: page.title, href: docsHref(page.slug) };
-    if (page.slug !== "json-render/components") return [link];
-    return [link, ...orderedComponents.map((component) => ({ title: component, href: componentHref(component) }))];
-  });
+  return docsPages.flatMap((page) => [{ title: page.title, href: docsHref(page.slug) }, ...pagesUnder(page.slug)]);
 }
 
 /** The pages before and after `href` in reading order. */
@@ -99,11 +108,22 @@ function componentEntries(): DocsSearchEntry[] {
   );
 }
 
+/** One entry per template category page; the names of its templates are extra words to match. */
+function templateEntries(): DocsSearchEntry[] {
+  return templateCategoriesInUse().map((category) => ({
+    title: templateCategoryTitles[category],
+    context: "Section templates",
+    href: templateCategoryHref(category),
+    keywords: [category, "template", ...templatesIn(category).map((template) => template.name)].join(" "),
+    kind: "page" as const,
+  }));
+}
+
 function toolEntries(): DocsSearchEntry[] {
   return Object.keys(toolAccess).map((name) => ({ title: name, context: "MCP reference", href: docsHref("mcp", name), keywords: "tool", kind: "tool" as const }));
 }
 
-/** The search index: page titles and headings, components, and MCP tools. */
+/** The search index: page titles and headings, components, template categories, and MCP tools. */
 export function docsSearchIndex(): DocsSearchEntry[] {
-  return [...pageEntries(), ...componentEntries(), ...toolEntries()];
+  return [...pageEntries(), ...componentEntries(), ...templateEntries(), ...toolEntries()];
 }

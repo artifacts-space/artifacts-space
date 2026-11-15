@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
-import { templatesByFile, uiTemplates } from "../src/lib/ui/templates/index";
-import { templateFiles, type UiTemplate } from "../src/lib/ui/templates/types";
+import { templateCategoriesInUse, templatesIn, uiTemplates } from "../src/lib/ui/templates/index";
+import type { TemplateCategory, UiTemplate } from "../src/lib/ui/templates/types";
 
 import { expectNoAxeViolations } from "./support/a11y";
 import { expect, test } from "./support/test";
@@ -9,10 +9,14 @@ import { expect, test } from "./support/test";
 /*
  * Every section template (src/lib/ui/templates), drawn by the real renderer
  * on the fixture page /dev/templates at the widths it is made for: 1440
- * pixels, 390 pixels, or both. The loops read the index, so a template added
- * to a batch file is covered here with no test of its own, and each failure
- * names the template.
+ * pixels, 390 pixels, or both. The page draws one category at a time
+ * (`?category=`), so it stays light however many templates there are. The
+ * loops read the index, so a template added to a batch file is covered here
+ * with no test of its own, and each failure names the template.
  */
+
+/** The categories that have templates. Every template has one category, so the loops below reach every template. */
+const categories = templateCategoriesInUse();
 
 const widthsOf = (template: UiTemplate) => (template.viewport === "fluid" ? [1440, 390] : template.viewport === "wide" ? [1440] : [390]);
 
@@ -24,9 +28,9 @@ const widthsOf = (template: UiTemplate) => (template.viewport === "fluid" ? [144
  */
 const section = (page: Page, id: string) => page.locator(`[data-template="${id}"]:visible`);
 
-/** Opens the page and waits until React has taken over every template: a scan marks what it scans, which must not land on HTML React has yet to check. */
-async function open(page: Page) {
-  await page.goto("/dev/templates");
+/** Opens one category's page and waits until React has taken over every template: a scan marks what it scans, which must not land on HTML React has yet to check. */
+async function open(page: Page, category: TemplateCategory) {
+  await page.goto(`/dev/templates?category=${category}`);
   await expect(page.locator("[data-templates-ready]")).toBeAttached({ timeout: 60_000 });
   await page.evaluate(() => document.fonts.ready);
 }
@@ -44,60 +48,60 @@ async function forEachTemplate(templates: readonly UiTemplate[], check: (templat
   expect(failures, failures.join("\n\n")).toEqual([]);
 }
 
-test("should draw every template in the index, each at the widths it is made for, with nothing left out", async ({ page }) => {
-  await open(page);
-  await expect(page.locator("[data-template]:visible")).toHaveCount(uiTemplates.length);
-  await forEachTemplate(uiTemplates, async (template) => {
-    await expect(section(page, template.id).locator("[data-template-frame]")).toHaveCount(widthsOf(template).length);
-    // A spec that cannot be drawn, or a part of one, shows a notice in its place.
-    await expect(section(page, template.id).getByText(/could not be shown/)).toHaveCount(0);
-  });
+test("should reach every template in the index through the category pages, and list those categories when no category is asked for", async ({ page }) => {
+  expect(categories.flatMap((category) => templatesIn(category)).map((template) => template.id).sort()).toEqual(uiTemplates.map((template) => template.id).sort());
+  await page.goto("/dev/templates");
+  await expect(page.locator("[data-templates-ready]")).toBeAttached({ timeout: 60_000 });
+  await expect(page.locator("[data-template-categories] a:visible")).toHaveText(categories.map((category) => new RegExp(`^${category}\\s*${String(templatesIn(category).length)}$`)));
+  await expect(page.locator("[data-template]")).toHaveCount(0);
 });
 
-test("should keep every template inside its frame, at 1440 and at 390 pixels wide", async ({ page }) => {
-  await open(page);
-  await forEachTemplate(uiTemplates, async (template) => {
-    for (const width of widthsOf(template)) {
-      const frame = section(page, template.id).locator(`[data-template-frame="${String(width)}"]`);
-      const box = await frame.evaluate((element: HTMLElement) => ({ offset: element.offsetWidth, client: element.clientWidth, scroll: element.scrollWidth, height: element.offsetHeight }));
-      expect(box.offset, `the ${String(width)} frame's own width`).toBe(width);
-      expect(box.scroll, `content wider than the ${String(width)} frame`).toBeLessThanOrEqual(box.client);
-      expect(box.height, `the ${String(width)} frame draws something`).toBeGreaterThan(20);
-    }
-  });
-});
+/** Each frame is exactly as wide as it says, holds its content, and draws something. */
+async function expectInsideFrames(page: Page, template: UiTemplate) {
+  for (const width of widthsOf(template)) {
+    const frame = section(page, template.id).locator(`[data-template-frame="${String(width)}"]`);
+    const box = await frame.evaluate((element: HTMLElement) => ({ offset: element.offsetWidth, client: element.clientWidth, scroll: element.scrollWidth, height: element.offsetHeight }));
+    expect(box.offset, `the ${String(width)} frame's own width`).toBe(width);
+    expect(box.scroll, `content wider than the ${String(width)} frame`).toBeLessThanOrEqual(box.client);
+    expect(box.height, `the ${String(width)} frame draws something`).toBeGreaterThan(20);
+  }
+}
 
-for (const file of templateFiles) {
-  const templates = templatesByFile[file];
+for (const category of categories) {
+  const templates = templatesIn(category);
 
-  test(`should pass axe on every template in ${file}.ts`, async ({ page }) => {
-    test.skip(templates.length === 0, "this batch has no templates yet");
-    await open(page);
+  test(`should draw every ${category} template at the widths it is made for, inside its frames, and pass axe`, async ({ page }) => {
+    await open(page, category);
+    await expect(page.locator("[data-template]:visible")).toHaveCount(templates.length);
     await forEachTemplate(templates, async (template) => {
+      await expect(section(page, template.id).locator("[data-template-frame]")).toHaveCount(widthsOf(template).length);
+      // A spec that cannot be drawn, or a part of one, shows a notice in its place.
+      await expect(section(page, template.id).getByText(/could not be shown/)).toHaveCount(0);
+      await expectInsideFrames(page, template);
       await section(page, template.id).scrollIntoViewIfNeeded();
       await expectNoAxeViolations(section(page, template.id));
     });
   });
-}
 
-for (const scheme of ["light", "dark"] as const) {
-  test.describe(`in ${scheme}`, () => {
-    test.use({ colorScheme: scheme });
+  for (const scheme of ["light", "dark"] as const) {
+    test.describe(`in ${scheme}`, () => {
+      test.use({ colorScheme: scheme });
 
-    test(`should pass color contrast on every template when the site is ${scheme}`, async ({ page, isMobile }) => {
-      // Colors do not change with the viewport: once, on the desktop.
-      test.skip(isMobile, "the same colors as the desktop run");
-      await page.addInitScript((value) => {
-        try { window.localStorage.setItem("theme", value); } catch { /* no storage in this frame */ }
-      }, scheme);
-      await open(page);
-      await expect(page.locator("html")).toHaveClass(scheme === "dark" ? /(^|\s)dark(\s|$)/ : /^(?!.*(^|\s)dark(\s|$))/);
-      await forEachTemplate(uiTemplates, async (template) => {
-        await section(page, template.id).scrollIntoViewIfNeeded();
-        await expectNoAxeViolations(section(page, template.id), { only: ["color-contrast"] });
+      test(`should pass color contrast on every ${category} template when the site is ${scheme}`, async ({ page, isMobile }) => {
+        // Colors do not change with the viewport: once, on the desktop.
+        test.skip(isMobile, "the same colors as the desktop run");
+        await page.addInitScript((value) => {
+          try { window.localStorage.setItem("theme", value); } catch { /* no storage in this frame */ }
+        }, scheme);
+        await open(page, category);
+        await expect(page.locator("html")).toHaveClass(scheme === "dark" ? /(^|\s)dark(\s|$)/ : /^(?!.*(^|\s)dark(\s|$))/);
+        await forEachTemplate(templates, async (template) => {
+          await section(page, template.id).scrollIntoViewIfNeeded();
+          await expectNoAxeViolations(section(page, template.id), { only: ["color-contrast"] });
+        });
       });
     });
-  });
+  }
 }
 
 /*
@@ -108,7 +112,7 @@ for (const scheme of ["light", "dark"] as const) {
 const frameOf = (page: Page, id: string, width: 1440 | 390) => section(page, id).locator(`[data-template-frame="${String(width)}"]`);
 
 test("should change every plan's price in one frame only when a reader flips the billing switch of a prefixed template", async ({ page }) => {
-  await open(page);
+  await open(page, "pricing");
   const wide = frameOf(page, "pricing-three-tiers", 1440);
   const narrow = frameOf(page, "pricing-three-tiers", 390);
   await wide.scrollIntoViewIfNeeded();
@@ -131,13 +135,14 @@ test("should change every plan's price in one frame only when a reader flips the
 });
 
 test("should lay a template out by its frame's width, not the window's", async ({ page }) => {
-  await open(page);
+  await open(page, "pricing");
   const columns = (width: 1440 | 390) => frameOf(page, "pricing-three-tiers", width).locator("[data-slot=ui-grid]").first().evaluate((element) => {
     const tracks = getComputedStyle(element).gridTemplateColumns;
     return tracks === "none" ? 0 : tracks.split(" ").length;
   });
   expect(await columns(1440)).toBe(3);
   expect(await columns(390)).toBe(1);
+  await open(page, "navbar");
   const wideBar = frameOf(page, "navbar-basic", 1440).getByRole("group", { name: "Site navigation" });
   const narrowBar = frameOf(page, "navbar-basic", 390).getByRole("group", { name: "Site navigation" });
   await wideBar.scrollIntoViewIfNeeded();
@@ -148,7 +153,7 @@ test("should lay a template out by its frame's width, not the window's", async (
 });
 
 test("should measure content wider than its frame, so the frame check can fail", async ({ page }) => {
-  await open(page);
+  await open(page, "hero");
   const frame = frameOf(page, "hero-centered", 390);
   const fits = await frame.evaluate((element: HTMLElement) => element.scrollWidth <= element.clientWidth);
   const overflows = await frame.evaluate((element: HTMLElement) => {
@@ -164,16 +169,52 @@ test("should measure content wider than its frame, so the frame check can fail",
   expect(overflows).toBe(true);
 });
 
-test("should list every template on the docs page, each drawn live, and pass axe", async ({ page }) => {
+test("should list every template on the docs index, each linked to its category's page, without drawing any, and pass axe", async ({ page }) => {
   await page.goto("/docs/json-render/templates");
   await expect(page.getByRole("heading", { level: 1, name: "Section templates" })).toBeVisible();
-  await expect(page.locator("[data-docs-template]")).toHaveCount(uiTemplates.length);
+  await expect(page.locator("[data-docs-template-row]")).toHaveCount(uiTemplates.length);
   await forEachTemplate(uiTemplates, async (template) => {
-    const example = page.locator(`[data-docs-template="${template.id}"]`);
-    await expect(example.getByText(template.name, { exact: true })).toBeVisible();
-    await expect(example.getByText(/could not be shown/)).toHaveCount(0);
-    expect((await example.locator("[data-docs-preview]").boundingBox())?.height ?? 0).toBeGreaterThan(40);
+    const row = page.locator(`[data-docs-template-row="${template.id}"]`);
+    await expect(row).toHaveText(template.name);
+    await expect(row).toHaveAttribute("href", `/docs/json-render/templates/${template.category}#${template.id}`);
   });
+  // The index carries rows, not specs: nothing is drawn here.
+  await expect(page.locator("[data-docs-preview]")).toHaveCount(0);
   await page.evaluate(() => document.fonts.ready);
   await expectNoAxeViolations(page);
+});
+
+test("should draw each category's templates live on that category's docs page, and pass axe", async ({ page }) => {
+  // One page per category; the time allowed grows with them.
+  test.setTimeout(60_000 + categories.length * 20_000);
+  const failures: string[] = [];
+  for (const category of categories) {
+    try {
+      const templates = templatesIn(category);
+      await page.goto(`/docs/json-render/templates/${category}`);
+      await expect(page.locator("[data-docs-template]")).toHaveCount(templates.length);
+      for (const template of templates) {
+        const example = page.locator(`[data-docs-template="${template.id}"]`);
+        // The heading carries the template's id, so the index's link lands on it.
+        await expect(page.locator(`h2[id="${template.id}"]`)).toContainText(template.name);
+        await expect(example.getByText(/could not be shown/)).toHaveCount(0);
+        expect((await example.locator("[data-docs-preview]").boundingBox())?.height ?? 0, template.id).toBeGreaterThan(40);
+      }
+      await page.evaluate(() => document.fonts.ready);
+      await expectNoAxeViolations(page);
+    } catch (error) {
+      failures.push(`${category}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  expect(failures, failures.join("\n\n")).toEqual([]);
+});
+
+test("should copy a template's spec, indented, from its docs page, though the page carries it compact", async ({ page, context, browserName }) => {
+  test.skip(browserName !== "chromium", "clipboard permissions are a Chromium feature");
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/docs/json-render/templates/hero");
+  await page.locator('[data-docs-template="hero-centered"]').getByRole("button", { name: "Copy JSON" }).click();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toContain('\n  "root": "page"');
+  expect((JSON.parse(copied) as { elements: Record<string, unknown> }).elements).toHaveProperty("hero-centered-title");
 });

@@ -990,11 +990,21 @@ template text is ours, so the tools add no untrusted-content label.
   `features.ts`, `pricing.ts`, `social.ts`, `app.ts`; the category says
   which). Do not write a validity test for it: `templates.test.ts` runs
   `templateProblems` (`rules.ts`) over every template in the index, and
-  `e2e/templates.spec.ts` draws each one on `/dev/templates` at 1440 and 390
-  pixels and checks that it stays inside its frame, passes axe, and passes
-  color contrast in light and in dark. Both name the template that fails.
-  The docs page (`/docs/json-render/templates`) lists the index too.
-- Rules, all checked by `templateProblems`: the id is `<category>-<variant>`;
+  `e2e/templates.spec.ts` draws each category on
+  `/dev/templates?category=<name>` at 1440 and 390 pixels and checks that
+  every template stays inside its frame, passes axe, and passes color
+  contrast in light and in dark. Both name the template that fails.
+- Pages stay light however many templates there are. `/dev/templates` draws
+  one category (or `?template=<id>`), never all of them. The docs index
+  (`/docs/json-render/templates`) has one row per template and no specs;
+  `/docs/json-render/templates/<category>` is built for each category that
+  has a template, draws only that category, and sends each spec once, as
+  compact JSON (`TemplateExample` indents it in the browser for Copy JSON).
+  A category's page title is in `src/lib/docs/template-docs.ts`. Never pass
+  a spec to two client components, and never draw every template on one
+  page.
+- Rules, all checked by `templateProblems`: the id is `<category>-<variant>`
+  and is accepted as a prefix (`prefixProblem`), since it is the default one;
   the root is a Box; at most 60 elements and 10 levels deep; its first
   heading is level 1 or 2, so stacked sections never skip a level; list content
   lives in `state` and is drawn by one `repeat`; every state path the
@@ -1009,9 +1019,14 @@ template text is ours, so the tools add no untrusted-content label.
   (`instantiate.ts`) puts every element key and every state path under a
   prefix (the template's id by default), so several templates, or one twice,
   share a spec; `templateAsSpec` wraps it in a root Box named `page`;
-  `attachFragment` adds a fragment under an element. The header of
+  `attachFragment` adds a fragment under an element. `attachFragment` has no
+  caller in the app yet: it is the merge the web editor's insert picker
+  will call, and the one the guides tell agents to do themselves. A prefix
+  is refused when the state key or paths it makes are ones the ui format
+  rejects; that check is the format's own (`findUnsafePaths` in
+  `src/lib/ui/expressions.ts`), never a second list. The header of
   `instantiate.ts` lists every place a key or a state path can appear. When
   json-render or the validator gains a new one (a new expression key, a new
-  action param that names a path), add it to `statePathKeys` or the rewrite
-  there, to `elementStatePaths` in `facts.ts`, and to the sample template in
-  `instantiate.test.ts`.
+  action param that names a path), add it there (`statePathKeys`,
+  `absoluteReferences`, or the rewrite; `facts.ts` reads the same two) and
+  to the sample template in `instantiate.test.ts`.

@@ -1,7 +1,7 @@
 import { walkJson } from "../json-walk";
 import { uiLimits } from "../limits";
 
-import { statePathKeys } from "./instantiate";
+import { absoluteReferences, statePathKeys } from "./instantiate";
 import type { TemplateElement, TemplateFragment, UiTemplate } from "./types";
 
 /**
@@ -23,8 +23,6 @@ export interface TemplateFacts {
   interactive: boolean;
 }
 
-const absoluteReference = /\$\{(\/[^}]*)\}/g;
-
 /** The parts of an element that can hold expressions and paths. */
 function dynamicParts(element: TemplateElement): unknown[] {
   return [element.props, element.visible, element.repeat, element.on].filter((part) => part !== undefined);
@@ -36,7 +34,7 @@ export function elementStatePaths(element: TemplateElement): string[] {
   walkJson(dynamicParts(element), uiLimits.maxJsonDepth, ({ key, value }) => {
     if (typeof value !== "string" || key === null) return;
     if (statePathKeys.has(key) && value.startsWith("/")) paths.push(value);
-    if (key === "$template") paths.push(...[...value.matchAll(absoluteReference)].map((match) => match[1] ?? ""));
+    if (key === "$template") paths.push(...absoluteReferences(value));
   });
   return paths;
 }

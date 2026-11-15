@@ -13,15 +13,16 @@ export const metadata: Metadata = {
 };
 
 async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/templates">["searchParams"] }) {
-  const { template } = await searchParams;
-  return <TemplatesFixture only={typeof template === "string" ? template : null} />;
+  const { category, template } = await searchParams;
+  return <TemplatesFixture filter={{ category: typeof category === "string" ? category : null, template: typeof template === "string" ? template : null }} />;
 }
 
 /**
- * Development-only page for the templates e2e tests: every section template
+ * Development-only page for the templates e2e tests: section templates
  * (src/lib/ui/templates) drawn by the real renderer at 1440 and at 390
- * pixels wide, without a database. `?template=<id>` shows one. Returns 404
- * in every other environment.
+ * pixels wide, without a database. `?category=<name>` draws one category,
+ * `?template=<id>` one template, and with neither the page lists the
+ * categories. Returns 404 in every other environment.
  */
 export default function TemplatesFixturePage({ searchParams }: PageProps<"/dev/templates">) {
   if (process.env.NODE_ENV !== "development") notFound();
