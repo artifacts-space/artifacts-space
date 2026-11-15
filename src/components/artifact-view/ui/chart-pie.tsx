@@ -106,7 +106,7 @@ export function PieChart({ props, donut }: { props: UiProps<"Chart">; donut: boo
       legend={null}
       empty={!slices.some((slice) => slice.fraction > 0)}
       heightClass={chartHeights[height]}
-      table={(visible) => <ChartTable head={[props.xLabel ?? "Label", props.series[0]?.name ?? "Value", "Share"]} rows={allSlices.map((slice) => ({ key: `${slice.label}-${String(slice.index)}`, cells: [slice.label, format(slice.value), percent(slice.fraction)] }))} visible={visible} />}
+      table={(visible) => <ChartTable head={[props.xLabel ?? "Label", props.series[0]?.name ?? "Value", "Share"]} rows={allSlices.map((slice) => ({ key: `${slice.label}-${String(slice.index)}`, cells: [slice.label, format(slice.value), percent(slice.fraction)] }))} visible={visible} title={props.title} />}
     >
       <div className="@container min-w-0">
         <div className="flex min-w-0 flex-col items-center gap-x-8 gap-y-4 @xl:flex-row">

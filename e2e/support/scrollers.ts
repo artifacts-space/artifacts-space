@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { expect } from "./test";
+import { expect, test } from "./test";
 
 /**
  * Every box on the page that scrolls sideways and is not a named group with a
@@ -62,14 +62,42 @@ export async function unreachableScrollersIn(scope: Locator): Promise<string[]> 
  */
 export const diagramDrawTimeout = 60_000;
 
+/** Words that pick out each diagram still drawing: its gallery specimen, its caption, and its first words. */
+function describeDiagrams(drawing: Locator): Promise<string[]> {
+  return drawing.evaluateAll((elements) => {
+    const squeeze = (text: string | null | undefined) => (text ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+    const describe = (element: Element, index: number) => {
+      const parts = [
+        ["specimen", element.closest("[data-specimen]")?.getAttribute("data-specimen")],
+        ["caption", element.closest("figure")?.querySelector("figcaption")?.textContent ?? element.querySelector("figcaption")?.textContent],
+        ["words", element.textContent],
+      ].flatMap(([kind, text]) => (squeeze(text) ? [`${String(kind)} "${squeeze(text)}"`] : []));
+      return parts.length > 0 ? parts.join(", ") : `diagram ${String(index + 1)}, which shows no words yet`;
+    };
+    return elements.map(describe);
+  });
+}
+
 /**
  * Waits until no diagram in `scope` is still drawing: each is drawn or
  * has failed (`data-diagram-state`, set by every diagram view). A diagram
  * in a document draws only once it nears the window, so scroll such a
  * one into view first.
+ *
+ * The test's own time limit grows by the wait, so a diagram that never
+ * draws fails here, naming the diagram, and not later as a test timeout.
  */
-export async function expectDiagramsSettled(scope: Locator): Promise<void> {
-  await expect(scope.locator('[data-diagram-state="drawing"]')).toHaveCount(0, { timeout: diagramDrawTimeout });
+export async function expectDiagramsSettled(scope: Locator, timeout = diagramDrawTimeout): Promise<void> {
+  const info = test.info();
+  if (info.timeout > 0) info.setTimeout(info.timeout + timeout);
+  const drawing = scope.locator('[data-diagram-state="drawing"]');
+  try {
+    await expect(drawing).toHaveCount(0, { timeout });
+  } catch (error) {
+    const stuck = await describeDiagrams(drawing);
+    if (stuck.length === 0) throw error;
+    throw new Error(`Still drawing after ${String(timeout / 1000)} s: ${stuck.join("; ")}`, { cause: error });
+  }
 }
 
 /**

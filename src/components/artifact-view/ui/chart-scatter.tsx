@@ -146,7 +146,7 @@ export function ScatterChart({ props }: { props: ChartProps }) {
       legend={<Legend names={data.names} />}
       empty={data.points.length === 0}
       heightClass={heightClass}
-      table={(visible) => <ChartTable head={["Series", "Label", props.xLabel ?? "x", props.yLabel ?? "y"]} rows={rows} visible={visible} textColumns={2} />}
+      table={(visible) => <ChartTable head={["Series", "Label", props.xLabel ?? "x", props.yLabel ?? "y"]} rows={rows} visible={visible} textColumns={2} title={props.title} />}
     >
       <div className="min-w-0 space-y-1">
         {/* Room for the top tick label, which centers on the plot edge. */}

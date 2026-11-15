@@ -118,14 +118,17 @@ interface TableProps {
   visible: boolean;
   /** How many leading columns hold text (left-aligned). The first is the row header. Default 1. */
   textColumns?: number;
+  /** The chart's title, which names the table's scrolling frame ("<title> data"). */
+  title?: string | undefined;
 }
 
 /**
  * The data table behind a chart: kept for screen readers while the chart
  * shows, and drawn in its place when a reader asks for it. Drawn, it scrolls
- * past 18rem, and while it does it is a named tab stop (scroll-frame.tsx).
+ * past 18rem, and while it does it is a named tab stop (scroll-frame.tsx),
+ * named from the chart's title.
  */
-export function ChartTable({ head, rows, visible, textColumns = 1 }: TableProps) {
+export function ChartTable({ head, rows, visible, textColumns = 1, title }: TableProps) {
   const table = (
     <table className="w-full text-sm">
       <thead className="sticky top-0 bg-card">
@@ -145,7 +148,7 @@ export function ChartTable({ head, rows, visible, textColumns = 1 }: TableProps)
     </table>
   );
   if (!visible) return <div className="sr-only">{table}</div>;
-  return <ScrollFrame label="Chart data" className="max-h-72 overflow-auto rounded-md border">{table}</ScrollFrame>;
+  return <ScrollFrame label={title ? `${title} data` : "Chart data"} className="max-h-72 overflow-auto rounded-md border">{table}</ScrollFrame>;
 }
 
 interface FrameProps {
