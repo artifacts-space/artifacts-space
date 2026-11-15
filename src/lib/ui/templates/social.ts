@@ -1,8 +1,212 @@
+import { socialTemplatesMore } from "./social-2";
 import type { UiTemplate } from "./types";
 
 /**
- * Testimonials, team, blog, contact, and newsletter (batch E). Categories: testimonial, team, blog, contact, newsletter.
- * Empty until its batch fills it. The shared test (templates.test.ts) and
- * the e2e loop (e2e/templates.spec.ts) cover every template added here.
+ * Testimonials and team (batch E, first half). Categories: testimonial,
+ * team. The blog, contact, and newsletter templates are in social-2.ts and
+ * join the list at the end. The shared test (templates.test.ts) and the e2e
+ * loop (e2e/templates.spec.ts) cover every template added here.
  */
-export const socialTemplates: readonly UiTemplate[] = [];
+const testimonialAndTeam: readonly UiTemplate[] = [
+  {
+    id: "testimonial-single-quote",
+    name: "Testimonial, one big quote",
+    category: "testimonial",
+    description: "One customer's words set large and centered, with their avatar, name, and role underneath.",
+    viewport: "fluid",
+    surface: "page",
+    slots: [
+      { what: "Small label above the quote", element: "eyebrow", prop: "text" },
+      { what: "The quote, with its quotation marks", element: "quote", prop: "text" },
+      { what: "The person: name and role", state: "/person" },
+    ],
+    fragment: {
+      root: "section",
+      state: { person: { name: "Maya Okafor", role: "Operations lead at a family bakery" } },
+      elements: {
+        section: { type: "Box", props: { direction: "vertical", align: "center", gap: "lg", paddingX: "lg", paddingY: "2xl", surface: "page" }, children: ["mark", "words", "person"] },
+        mark: { type: "Icon", props: { name: "quote", size: "xl", tone: "muted" } },
+        words: { type: "Box", props: { direction: "vertical", align: "center", gap: "md", maxWidth: "lg" }, children: ["eyebrow", "quote"] },
+        eyebrow: { type: "Text", props: { text: "What customers say", variant: "eyebrow", align: "center" } },
+        quote: { type: "Text", props: { text: "“We stopped losing orders the week we switched. Every morning the whole shop sees the same list, and nobody has to ask what comes next.”", size: "2xl", weight: "medium", align: "center" } },
+        person: { type: "Box", props: { direction: "horizontal", align: "center", gap: "md" }, children: ["avatar", "who"] },
+        avatar: { type: "Avatar", props: { name: { $state: "/person/name" }, size: "lg" } },
+        who: { type: "Box", props: { direction: "vertical", gap: "none" }, children: ["name", "role"] },
+        name: { type: "Text", props: { text: { $state: "/person/name" }, weight: "semibold" } },
+        role: { type: "Text", props: { text: { $state: "/person/role" }, size: "sm", tone: "muted" } },
+      },
+    },
+  },
+  {
+    id: "testimonial-grid-3",
+    name: "Testimonials, three cards",
+    category: "testimonial",
+    description: "Three customer quotes as cards in a row, each with a star score, the person's avatar, name, and role.",
+    viewport: "fluid",
+    surface: "muted",
+    slots: [
+      { what: "Small label above the headline", element: "eyebrow", prop: "text" },
+      { what: "Headline", element: "title", prop: "text" },
+      { what: "Supporting sentence", element: "text", prop: "text" },
+      { what: "Quotes, each with a score, the quote, a name, and a role", state: "/quotes" },
+    ],
+    fragment: {
+      root: "section",
+      state: {
+        quotes: [
+          { score: "5.0", quote: "Setup took one afternoon. By Friday the whole crew was using it without a single training call.", name: "Daniel Reyes", role: "Site manager, home builder" },
+          { score: "4.9", quote: "I check the board on my phone before the first coffee. It tells me who needs help today.", name: "Priya Nair", role: "Head nurse, community clinic" },
+          { score: "5.0", quote: "Our customers get an answer in minutes now. The reminders alone paid for the first year.", name: "Tom Lindqvist", role: "Owner, bike repair shop" },
+        ],
+      },
+      elements: {
+        section: { type: "Box", props: { direction: "vertical", align: "center", gap: "xl", paddingX: "lg", paddingY: "2xl", surface: "muted" }, children: ["intro", "cards"] },
+        intro: { type: "Box", props: { direction: "vertical", align: "center", gap: "sm", maxWidth: "lg" }, children: ["eyebrow", "title", "text"] },
+        eyebrow: { type: "Text", props: { text: "Customer stories", variant: "eyebrow", align: "center" } },
+        title: { type: "Heading", props: { text: "Teams like yours rely on it every day", level: 2, size: "xl", align: "center" } },
+        text: { type: "Text", props: { text: "More than two thousand small teams run their week here. These are three of them.", tone: "muted", align: "center" } },
+        cards: { type: "Grid", props: { columns: 3, gap: "md" }, repeat: { statePath: "/quotes", key: "name" }, children: ["card"] },
+        card: { type: "Box", props: { direction: "vertical", justify: "between", gap: "lg", padding: "lg", surface: "card", border: "all", radius: "lg" }, children: ["card-top", "person"] },
+        "card-top": { type: "Box", props: { direction: "vertical", align: "start", gap: "md" }, children: ["score", "quote"] },
+        score: { type: "Badge", props: { label: { $item: "score" }, icon: "star", tone: "warning" } },
+        quote: { type: "Text", props: { text: { $item: "quote" } } },
+        person: { type: "Box", props: { direction: "horizontal", align: "center", gap: "sm" }, children: ["avatar", "who"] },
+        avatar: { type: "Avatar", props: { name: { $item: "name" }, size: "lg" } },
+        who: { type: "Box", props: { direction: "vertical", gap: "none" }, children: ["name", "role"] },
+        name: { type: "Text", props: { text: { $item: "name" }, size: "sm", weight: "semibold" } },
+        role: { type: "Text", props: { text: { $item: "role" }, size: "sm", tone: "muted" } },
+      },
+    },
+  },
+  {
+    id: "testimonial-featured-plus-cards",
+    name: "Testimonials, one featured and two more",
+    category: "testimonial",
+    description: "A large featured quote on a dark card, with two shorter quotes stacked beside it.",
+    viewport: "fluid",
+    surface: "page",
+    slots: [
+      { what: "Headline", element: "title", prop: "text" },
+      { what: "Supporting sentence", element: "text", prop: "text" },
+      { what: "The featured quote: the quote, a name, and a role", state: "/featured" },
+      { what: "Two more quotes, each with the quote, a name, and a role", state: "/more" },
+    ],
+    fragment: {
+      root: "section",
+      state: {
+        featured: { quote: "“Before this, our schedule lived in three notebooks and one very tired manager. Now a new hire can see their first week on day one, and I get my evenings back.”", name: "Hana Sato", role: "Founder of a ceramics studio" },
+        more: [
+          { quote: "Invoices go out the day a job ends. We are paid about nine days sooner.", name: "Luis Ortega", role: "Co-owner, landscaping crew" },
+          { quote: "It is the first tool my whole team opened a second time without being asked.", name: "Amara Diallo", role: "Director, youth sports league" },
+        ],
+      },
+      elements: {
+        section: { type: "Box", props: { direction: "vertical", gap: "xl", paddingX: "lg", paddingY: "2xl", surface: "page" }, children: ["head", "quotes"] },
+        head: { type: "Box", props: { direction: "vertical", gap: "sm", maxWidth: "lg" }, children: ["title", "text"] },
+        title: { type: "Heading", props: { text: "Less chasing, more doing", level: 2, size: "xl" } },
+        text: { type: "Text", props: { text: "Owners tell us the same thing in different words: the day runs itself.", tone: "muted" } },
+        quotes: { type: "Box", props: { direction: "horizontal", gap: "md", stackBelow: "md" }, children: ["featured", "side"] },
+        featured: { type: "Box", props: { direction: "vertical", justify: "between", gap: "xl", padding: "xl", grow: true, surface: "inverse", radius: "lg" }, children: ["featured-quote", "featured-person"] },
+        "featured-quote": { type: "Text", props: { text: { $state: "/featured/quote" }, size: "xl", weight: "medium" } },
+        "featured-person": { type: "Box", props: { direction: "horizontal", align: "center", gap: "md" }, children: ["featured-avatar", "featured-who"] },
+        "featured-avatar": { type: "Avatar", props: { name: { $state: "/featured/name" }, size: "lg" } },
+        "featured-who": { type: "Box", props: { direction: "vertical", gap: "none" }, children: ["featured-name", "featured-role"] },
+        "featured-name": { type: "Text", props: { text: { $state: "/featured/name" }, weight: "semibold" } },
+        "featured-role": { type: "Text", props: { text: { $state: "/featured/role" }, size: "sm", tone: "muted" } },
+        side: { type: "Box", props: { direction: "vertical", gap: "md", grow: true }, repeat: { statePath: "/more", key: "name" }, children: ["side-card"] },
+        "side-card": { type: "Box", props: { direction: "vertical", gap: "md", padding: "lg", grow: true, surface: "muted", radius: "lg" }, children: ["side-quote", "side-person"] },
+        "side-quote": { type: "Quote", props: { text: { $item: "quote" } } },
+        "side-person": { type: "Box", props: { direction: "horizontal", align: "center", gap: "sm" }, children: ["side-avatar", "side-who"] },
+        "side-avatar": { type: "Avatar", props: { name: { $item: "name" } } },
+        "side-who": { type: "Box", props: { direction: "vertical", gap: "none" }, children: ["side-name", "side-role"] },
+        "side-name": { type: "Text", props: { text: { $item: "name" }, size: "sm", weight: "semibold" } },
+        "side-role": { type: "Text", props: { text: { $item: "role" }, size: "sm", tone: "muted" } },
+      },
+    },
+  },
+  {
+    id: "team-grid-4",
+    name: "Team, four across",
+    category: "team",
+    description: "The people behind the product in a grid: an avatar, a name, a role, and one line about each, with a link to open roles.",
+    viewport: "fluid",
+    surface: "page",
+    slots: [
+      { what: "Small label above the headline", element: "eyebrow", prop: "text" },
+      { what: "Headline", element: "title", prop: "text" },
+      { what: "Supporting sentence", element: "text", prop: "text" },
+      { what: "People, each with a name, a role, and one line about them", state: "/people" },
+      { what: "Hiring sentence", element: "join-text", prop: "text" },
+      { what: "Hiring link label", element: "join-link", prop: "label" },
+    ],
+    fragment: {
+      root: "section",
+      state: {
+        people: [
+          { name: "Jonas Weber", role: "Founder", line: "Ran a print shop for ten years before writing a line of code." },
+          { name: "Elena Petrova", role: "Design", line: "Draws every screen on paper first, then throws half away." },
+          { name: "Sam Whitaker", role: "Engineering", line: "Keeps the app fast on old phones and slow connections." },
+          { name: "Noor Haddad", role: "Customer care", line: "Answers the first email you send, usually within the hour." },
+        ],
+      },
+      elements: {
+        section: { type: "Box", props: { direction: "vertical", align: "center", gap: "xl", paddingX: "lg", paddingY: "2xl", surface: "page" }, children: ["intro", "people", "join"] },
+        intro: { type: "Box", props: { direction: "vertical", align: "center", gap: "sm", maxWidth: "lg" }, children: ["eyebrow", "title", "text"] },
+        eyebrow: { type: "Text", props: { text: "Our team", variant: "eyebrow", align: "center" } },
+        title: { type: "Heading", props: { text: "A small team that picks up the phone", level: 2, size: "xl", align: "center" } },
+        text: { type: "Text", props: { text: "Eleven of us build and support the product. Here are four you will hear from first.", tone: "muted", align: "center" } },
+        people: { type: "Grid", props: { columns: 4, gap: "lg" }, repeat: { statePath: "/people", key: "name" }, children: ["person"] },
+        person: { type: "Box", props: { direction: "vertical", align: "center", gap: "sm" }, children: ["avatar", "name", "role", "line"] },
+        avatar: { type: "Avatar", props: { name: { $item: "name" }, size: "xl" } },
+        name: { type: "Heading", props: { text: { $item: "name" }, level: 3, size: "sm", align: "center" } },
+        role: { type: "Badge", props: { label: { $item: "role" }, variant: "outline" } },
+        line: { type: "Text", props: { text: { $item: "line" }, size: "sm", tone: "muted", align: "center" } },
+        join: { type: "Box", props: { direction: "horizontal", align: "center", justify: "center", gap: "sm", wrap: true }, children: ["join-text", "join-link"] },
+        "join-text": { type: "Text", props: { text: "Want to build this with us?", tone: "muted" } },
+        "join-link": { type: "Link", props: { label: "See open roles" } },
+      },
+    },
+  },
+  {
+    id: "team-list-bio",
+    name: "Team, list with bios",
+    category: "team",
+    description: "A heading beside a list of people; each row has an avatar, a name, a role, and a short biography.",
+    viewport: "fluid",
+    surface: "muted",
+    slots: [
+      { what: "Small label above the headline", element: "eyebrow", prop: "text" },
+      { what: "Headline", element: "title", prop: "text" },
+      { what: "Supporting sentence", element: "text", prop: "text" },
+      { what: "People, each with a name, a role, and a short biography", state: "/people" },
+    ],
+    fragment: {
+      root: "section",
+      state: {
+        people: [
+          { name: "Ines Duarte", role: "Managing partner", bio: "Ines started the practice in a spare room in 2011. She still reviews every set of accounts before it leaves the office." },
+          { name: "Kofi Mensah", role: "Tax adviser", bio: "Kofi helps shop owners and freelancers plan the year ahead, so the bill in spring is never a surprise." },
+          { name: "Greta Lund", role: "Payroll", bio: "Greta runs payroll for forty local employers. In nine years she has not missed a payday." },
+        ],
+      },
+      elements: {
+        section: { type: "Box", props: { direction: "horizontal", gap: "xl", paddingX: "lg", paddingY: "2xl", stackBelow: "lg", surface: "muted" }, children: ["intro", "people"] },
+        intro: { type: "Box", props: { direction: "vertical", gap: "sm", maxWidth: "sm" }, children: ["eyebrow", "title", "text"] },
+        eyebrow: { type: "Text", props: { text: "Who you work with", variant: "eyebrow" } },
+        title: { type: "Heading", props: { text: "People you can name, not a ticket queue", level: 2, size: "xl" } },
+        text: { type: "Text", props: { text: "Every client has one adviser who knows their books and answers their calls.", tone: "muted" } },
+        people: { type: "Box", props: { direction: "vertical", grow: true }, repeat: { statePath: "/people", key: "name" }, children: ["person"] },
+        person: { type: "Box", props: { direction: "horizontal", align: "start", gap: "md", paddingY: "lg", border: "bottom" }, children: ["avatar", "about"] },
+        avatar: { type: "Avatar", props: { name: { $item: "name" }, size: "xl" } },
+        about: { type: "Box", props: { direction: "vertical", gap: "xs", grow: true }, children: ["who", "bio"] },
+        who: { type: "Box", props: { direction: "horizontal", align: "center", gap: "sm", wrap: true }, children: ["name", "role"] },
+        name: { type: "Heading", props: { text: { $item: "name" }, level: 3, size: "sm" } },
+        role: { type: "Badge", props: { label: { $item: "role" }, variant: "outline" } },
+        bio: { type: "Text", props: { text: { $item: "bio" }, tone: "muted" } },
+      },
+    },
+  },
+];
+
+/** Testimonials, team, blog, contact, and newsletter (batch E): every template of the social file. */
+export const socialTemplates: readonly UiTemplate[] = [...testimonialAndTeam, ...socialTemplatesMore];
