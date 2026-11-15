@@ -20,7 +20,7 @@ describe("mcpToolCalls", () => {
 
 describe("mcpLimitChecks", () => {
   it("should count every read tool per token and per user", () => {
-    for (const name of ["artifacts_list", "artifacts_get", "comments_list", "inbox_list", "files_get_download_url"]) {
+    for (const name of ["artifacts_list", "artifacts_get", "canvas_frames_list", "canvas_frame_get", "comments_list", "inbox_list", "files_get_download_url"]) {
       expect(mcpLimitChecks(principal, [name])).toEqual([
         { name: "readByToken", subject: "api:t1" },
         { name: "readByUser", subject: "u1" },
@@ -33,6 +33,12 @@ describe("mcpLimitChecks", () => {
     expect(mcpLimitChecks(principal, ["files_attach"])).toEqual([{ name: "artifactUpdateByToken", subject: "api:t1" }]);
     expect(mcpLimitChecks(principal, ["files_replace"])).toEqual([{ name: "artifactUpdateByToken", subject: "api:t1" }]);
     expect(mcpLimitChecks(principal, ["artifacts_restore_version"])).toEqual([{ name: "artifactUpdateByToken", subject: "api:t1" }]);
+  });
+
+  it("should count a canvas frame write as an artifact edit, because each one saves the artifact", () => {
+    for (const name of ["canvas_frame_save", "canvas_frame_update", "canvas_frame_delete"]) {
+      expect(mcpLimitChecks(principal, [name])).toEqual([{ name: "artifactUpdateByToken", subject: "api:t1" }]);
+    }
   });
 
   it("should count nothing here when the tool has its own limit elsewhere", () => {

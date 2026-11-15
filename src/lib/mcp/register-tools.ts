@@ -5,6 +5,7 @@ import type { McpAccess } from "@/lib/oauth/scopes";
 import { noHarness, type HarnessSource } from "./harness-context";
 
 import { registerArtifactTools } from "./artifact-tools";
+import { registerCanvasTools } from "./canvas-tools";
 import { registerFileTools } from "./file-tools";
 import { registerFormatTools } from "./format-tools";
 import { registerProjectTools } from "./project-tools";
@@ -20,13 +21,14 @@ import { registerViewTools } from "./view-tools";
  * always-load test and the routing eval's tool snapshot) all call this, so a
  * new tool reaches each of them. Write tools are left out for read-only
  * access by each registration. `harness` is the connection's agent harness,
- * stamped on the saves the artifact, file, and version tools make.
+ * stamped on the saves the artifact, canvas frame, file, and version tools make.
  */
 export function registerAllTools(server: McpServer, userId: string, access: McpAccess, harness: HarnessSource = noHarness) {
   registerArtifactTools(server, userId, access, harness);
   registerProjectTools(server, userId, access);
   registerTagTools(server, userId, access);
   registerFormatTools(server, access);
+  registerCanvasTools(server, userId, access, harness);
   registerThemeTools(server, userId, access);
   registerFileTools(server, userId, access, harness);
   registerTeamTools(server, userId, access);

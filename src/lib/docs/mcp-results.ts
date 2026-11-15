@@ -41,6 +41,10 @@ const commentShape = `{ "id", "replyTo": "…" | null, "author": { "handle", "ki
   "body": { "untrustedText": "…" }, "quote": { "untrustedText": "…" } | null, "onTextThatChanged": false, "resolved": false,
   "deleted": false, "edited": false, "createdAt": "…" }`;
 
+const frameOutlineShape = `{ "id": "home-phone", "name": "Home, phone", "width": 390, "height": 844 | null, "padding": "none" | "sm" | "md" | "lg",
+    "position": { "x": 1520, "y": 0, "auto": true },   // auto: the board placed it
+    "elements": 28, "problems": 0 }`;
+
 const mentionsShape = `"mentions": { "notified": [{ "handle", "kind" }], "refused": [ … with the reason ] }`;
 
 export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
@@ -97,11 +101,48 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   "daily": [ { "day": "2026-11-08", "views": 4, "visitors": 3 }, … ], "referrers": [ { "domain": "news.ycombinator.com", "views": 40 } ] }`,
   },
   artifacts_formats_guide: {
-    summary: "Plain text. Without `kind`, one line per format. With `kind: \"ui\"`, the full JSON Render guide: rules, every component and its props, and an example spec.",
+    summary: "Plain text. Without `kind`, one line per format. With `kind: \"ui\"`, the full JSON Render guide: rules, every component and its props, and an example spec. With `kind: \"canvas\"`, the canvas guide: the frame rules, the frame tools, and an example.",
   },
   artifacts_validate: {
     summary: "Plain text: \"Valid <kind> content. It is ready to save.\", or a list of every error and warning with the element key and the fix. Nothing is saved.",
     shape: `Invalid ui content. Fix these and validate again:\n- Error: Element "chart" (Chart): Series "Signups" has 3 values but there are 4 labels. …`,
+  },
+  canvas_frames_list: {
+    summary: "The canvas's outline: every frame without its spec, and the board's totals beside its limits. `version` and `editPending` mean what they do in artifacts_get. When you can edit the canvas: `versionId` and `baseVersion`, which every frame write needs. An artifact that is not a canvas is a tool error.",
+    shape: `{ "id": "…", "title": "…", "url": "…", "version": "latest" | "approved", "editPending": false,
+  "frames": [ ${frameOutlineShape} ],
+  "frameCount": 3, "elements": 86, "bytes": 14210,
+  "limits": { "frames": 24, "elements": 3000, "bytes": 800000 },
+  "problems": [],                        // problems with the canvas as a whole
+  "versionId": "<version id>", "baseVersion": "<version id>.<ms>" }   // editors only`,
+  },
+  canvas_frame_get: {
+    summary: "One frame exactly as written, with its ui spec, where it sits on the board, and each problem it has (naming the frame and the element). When you can edit the canvas: `versionId` and `baseVersion`. A frame id the canvas does not have is a tool error that lists the ids it has.",
+    shape: `{ "id": "…", "title": "…", "url": "…", "version": "latest" | "approved", "editPending": false,
+  "frame": { "id": "home-phone", "name": "Home, phone", "width": 390, "spec": { "version": 1, "root": "…", "elements": { … } } },
+  "position": { "x": 1520, "y": 0, "auto": true }, "elements": 28, "problems": [],
+  "versionId": "…", "baseVersion": "…" }   // editors only`,
+  },
+  canvas_frame_save: {
+    summary: "The frame's outline as your save left it, whether it was added, and the `baseVersion` of your save for the next frame write. `edit` is \"pending\" when the change waits for approval, and \"unchanged\" when the canvas already had exactly that frame: nothing was saved, and the result has no `baseVersion`, so keep the one you have. A frame that is not valid, or one that takes the board past a limit, is a tool error that names the frame, the element, and the fix, and nothing is saved. A canvas that changed since your `baseVersion` is the typed error below.",
+    shape: `{ "id": "…", "frameId": "home-phone", "edit": "applied" | "pending" | "unchanged", "added": true,
+  "frame": ${frameOutlineShape},
+  "frameCount": 4, "elements": 114, "versionId": "…", "baseVersion": "…" }
+
+// refused, the canvas changed since you read it:
+{ "isError": true, "content": [{ "type": "text", "text": "This canvas changed since you read it (by @ann via the web). Nothing was saved. Call canvas_frames_list …" }],
+  "structuredContent": { "error": { "code": "artifact_changed", "message": "…",
+    "changedBy": { "handle": "ann", "via": "web" | "Claude Code" } | null, "nextStep": "canvas_frames_list" } } }`,
+  },
+  canvas_frame_update: {
+    summary: "The frame's outline after the change, with the `baseVersion` of your save. `edit`, the refusals, and the typed error are those of canvas_frame_save.",
+    shape: `{ "id": "…", "frameId": "home-phone", "edit": "applied" | "pending" | "unchanged",
+  "frame": ${frameOutlineShape},
+  "frameCount": 4, "elements": 114, "versionId": "…", "baseVersion": "…" }`,
+  },
+  canvas_frame_delete: {
+    summary: "Confirms the delete, with how many frames are left and the `baseVersion` of your save. The typed error is that of canvas_frame_save.",
+    shape: `{ "id": "…", "frameId": "home-phone", "deleted": true, "edit": "applied" | "pending", "frameCount": 3, "elements": 86, "versionId": "…", "baseVersion": "…" }`,
   },
   themes_list: {
     summary: "The built-in theme presets, the font ids custom theme JSON may use in each slot, the cover gradients, and usage notes. Nothing is saved.",

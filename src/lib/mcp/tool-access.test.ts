@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { McpAccess } from "@/lib/oauth/scopes";
 
 import { registerArtifactTools } from "./artifact-tools";
+import { registerCanvasTools } from "./canvas-tools";
 import { registerFileTools } from "./file-tools";
 import { registerFormatTools } from "./format-tools";
 import { registerProjectTools } from "./project-tools";
@@ -25,6 +26,8 @@ const readOnlyTools = [
   "artifacts_validate",
   "artifacts_versions",
   "artifacts_views",
+  "canvas_frame_get",
+  "canvas_frames_list",
   "comments_list",
   "files_get_download_url",
   "inbox_list",
@@ -43,6 +46,7 @@ async function connect(access: McpAccess) {
   registerProjectTools(server, "user-1", access);
   registerTagTools(server, "user-1", access);
   registerFormatTools(server, access);
+  registerCanvasTools(server, "user-1", access);
   registerThemeTools(server, "agent-1", access);
   registerFileTools(server, "user-1", access);
   registerTeamTools(server, "user-1", access);
@@ -81,6 +85,9 @@ describe("toolAccess", () => {
       "artifacts_delete",
       "artifacts_restore_version",
       "artifacts_update",
+      "canvas_frame_delete",
+      "canvas_frame_save",
+      "canvas_frame_update",
       "comment_create",
       "comment_delete",
       "comment_update",
@@ -173,13 +180,13 @@ describe("tool annotations", () => {
   it("should mark the tools that delete or replace something destructive", async () => {
     const { tools } = await connect("full");
     const destructive = tools.filter((tool) => tool.annotations?.destructiveHint === true).map((tool) => tool.name).sort();
-    expect(destructive).toEqual(["artifacts_delete", "artifacts_restore_version", "artifacts_update", "comment_delete", "comment_update", "files_delete", "files_replace"]);
+    expect(destructive).toEqual(["artifacts_delete", "artifacts_restore_version", "artifacts_update", "canvas_frame_delete", "canvas_frame_save", "canvas_frame_update", "comment_delete", "comment_update", "files_delete", "files_replace"]);
   });
 
   it("should mark the tools whose repeat changes nothing more idempotent", async () => {
     const { tools } = await connect("full");
     const idempotent = tools.filter((tool) => tool.annotations?.idempotentHint === true).map((tool) => tool.name).sort();
-    expect(idempotent).toEqual(["artifacts_delete", "comment_delete", "files_attach", "files_delete", "files_finalize", "inbox_mark_read"]);
+    expect(idempotent).toEqual(["artifacts_delete", "canvas_frame_delete", "canvas_frame_save", "canvas_frame_update", "comment_delete", "files_attach", "files_delete", "files_finalize", "inbox_mark_read"]);
   });
 
   it("should list only tools marked read-only, not destructive, and closed world when access is read-only", async () => {

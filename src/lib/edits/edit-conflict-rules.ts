@@ -140,7 +140,8 @@ export interface ChangedBy {
   harness: { id: HarnessId; name: string } | null;
 }
 
-function changedByPhrase(changedBy: ChangedBy | null): string {
+/** " (by @handle via the web)", for a refusal that says who saved since; "" when nobody is known. */
+export function changedByPhrase(changedBy: ChangedBy | null): string {
   if (!changedBy) return "";
   const who = changedBy.handle ? `@${changedBy.handle}` : "someone";
   return ` (by ${who} ${changedBy.harness ? `via ${changedBy.harness.name}` : "via the web"})`;

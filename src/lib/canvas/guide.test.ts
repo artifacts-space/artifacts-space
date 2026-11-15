@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { toolAccess } from "@/lib/mcp/tool-access";
+
 import { exampleCanvas } from "./fixtures";
 import { buildCanvasGuide } from "./guide";
 import { canvasLimits, frameIdPattern, frameIdRule } from "./limits";
@@ -8,6 +10,15 @@ import { validateCanvas } from "./validate";
 
 describe("buildCanvasGuide", () => {
   const guide = buildCanvasGuide();
+
+  it("should name every frame tool the server has, and no tool it does not have", () => {
+    const frameTools = Object.keys(toolAccess).filter((name) => name.startsWith("canvas_"));
+    expect(frameTools).toHaveLength(5);
+    for (const name of frameTools) expect(guide, name).toContain(name);
+    const named = new Set(guide.match(/\b(?:canvas|artifacts|files)_[a-z_]+\b/g));
+    for (const name of named) expect(Object.keys(toolAccess), name).toContain(name);
+    expect(guide).toContain("baseVersion");
+  });
 
   it("should show an example that passes validation with no issues", () => {
     const example = guide.slice(guide.indexOf("## Example") + "## Example".length).trim();
