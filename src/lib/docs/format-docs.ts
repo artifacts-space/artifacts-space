@@ -70,7 +70,7 @@ export const formatDocs: Record<FormatKind, FormatDoc> = {
   },
   canvas: {
     checks: `A JSON object with a list of frames that passes validateCanvas: up to ${String(canvasLimits.maxFrames)} frames, each with a unique id, a name, a width from ${String(canvasLimits.minWidth)} to ${count(canvasLimits.maxWidth)}, and a ui spec that passes the ui checks. A frame may also set a least height, its padding, and its place on the board.`,
-    renders: "A board of frames, each drawn at its real width with the stout component set. Readers drag to move the board and zoom with its buttons or with Ctrl or ⌘ and the wheel; Fit shows every frame. On a phone the frames stack in the page, each scaled to fit. A frame with a problem shows a notice in its place and the other frames still render.",
+    renders: "A board of frames, each drawn at its real width with the stout component set. Readers drag to move the board and zoom with its buttons, with Ctrl or ⌘ and the wheel, or with two fingers on a touch screen; Fit shows every frame. A plain scroll or a one-finger swipe always moves the page. On a phone the frames stack in the page, each scaled to fit. A frame with a problem shows a notice in its place and the other frames still render.",
     example: '{ "version": 1, "frames": [{ "id": "home-phone", "name": "Home, phone", "width": 390, "spec": { "version": 1, "root": "page", "elements": { "page": { "type": "Heading", "props": { "text": "Hello" } } } } }] }',
     broken: '{ "version": 1, "frames": [{ "id": "home-phone", "name": "Home, phone", "width": 20, "spec": { "version": 1, "root": "page", "elements": { "page": { "type": "Gauge", "props": {} } } } }] }',
   },

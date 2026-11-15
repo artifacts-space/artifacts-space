@@ -37,6 +37,20 @@ const gridColumns = (page: Page, id: string) => frame(page, id).locator("[data-s
   return tracks === "none" ? 0 : tracks.split(" ").length;
 });
 
+/** Sends touches to the page as a touch screen would: each call says where every finger is now. */
+async function touchScreen(page: Page) {
+  const client = await page.context().newCDPSession(page);
+  return (type: "touchStart" | "touchMove" | "touchEnd", fingers: readonly { x: number; y: number }[]) =>
+    client.send("Input.dispatchTouchEvent", { type, touchPoints: fingers.map((finger, id) => ({ x: Math.round(finger.x), y: Math.round(finger.y), id })) });
+}
+
+/** A frame body's box, measured from the board window's corner, so a page scroll does not change it. */
+async function boxInBoard(page: Page, id: string) {
+  const pane = await boxOf(board(page));
+  const box = await boxOf(frameBody(page, id));
+  return { x: box.x - pane.x, y: box.y - pane.y, width: box.width, height: box.height };
+}
+
 const zoomOf = async (page: Page) => Number.parseInt((await board(page).getAttribute("data-canvas-zoom")) ?? "", 10);
 
 test.describe("on a desktop", () => {
@@ -149,7 +163,7 @@ test.describe("on a desktop", () => {
     await open(page, "site", "board");
     await page.getByRole("button", { name: "Frames" }).click();
     const menu = page.getByRole("menu");
-    await expect(menu.getByRole("menuitem")).toHaveText([/Home, desktop\s*1440/, /Home, tablet\s*768/, /Home, phone\s*390/]);
+    await expect(menu.getByRole("menuitem")).toHaveText([/Home, desktop\s*1440/, /Home, tablet\s*768/, /Home, phone\s*390/, /Home, edge to edge\s*1440/]);
     await expectNoAxeViolations(menu);
     await expectNoAxeViolations(page.getByRole("group", { name: "Canvas view" }));
     await menu.getByRole("menuitem", { name: /Home, phone/ }).click();
@@ -215,6 +229,53 @@ test.describe("on a desktop", () => {
     expect(await gridColumns(page, "home-desktop")).toBe(3);
   });
 
+  test("should let a frame with no padding draw its surfaces to the frame's edges", async ({ page }) => {
+    await open(page, "site", "board");
+    const body = frameBody(page, "home-full-bleed");
+    await expect(body.getByRole("heading", { name: "Get paid nine days sooner" })).toBeVisible();
+    await expect(body.getByRole("img", { name: "The invoices dashboard" })).toBeVisible();
+    // The hero's painted surface is the nearest ancestor of its heading with a background. It is as wide as the frame inside its border.
+    const widths = await body.evaluate((element: HTMLElement) => {
+      let painted = element.querySelector("h1")?.parentElement ?? null;
+      while (painted && painted !== element && getComputedStyle(painted).backgroundColor === "rgba(0, 0, 0, 0)") painted = painted.parentElement;
+      return { frame: element.clientWidth, hero: painted instanceof HTMLElement && painted !== element ? painted.offsetWidth : 0 };
+    });
+    expect(widths.frame).toBe(1438);
+    expect(widths.hero).toBe(widths.frame);
+    // A frame with the usual padding keeps its content inside it.
+    expect(await frameBody(page, "home-desktop").evaluate((element: HTMLElement) => (element.firstElementChild instanceof HTMLElement ? element.firstElementChild.offsetWidth : 0))).toBe(1390);
+  });
+
+  for (const [name, lose] of [
+    ["the pointer's capture is lost", (page: Page) => board(page).evaluate((element, id) => { element.releasePointerCapture(id); }, 1)],
+    ["the window loses focus", (page: Page) => page.evaluate(() => { window.dispatchEvent(new Event("blur")); })],
+  ] as const) {
+    test(`should end a drag when ${name}, so the board stops following the pointer`, async ({ page }) => {
+      await open(page, "flow", "board");
+      const pane = await boxOf(board(page));
+      const before = await boxInBoard(page, "inbox");
+      await page.mouse.move(pane.x + 12, pane.y + 12);
+      await page.mouse.down();
+      await page.mouse.move(pane.x + 72, pane.y + 42, { steps: 4 });
+      await expect(board(page)).toHaveClass(/cursor-grabbing/);
+      expect(Math.round((await boxInBoard(page, "inbox")).x - before.x)).toBe(60);
+
+      await lose(page);
+      // The button is still down, but the drag is over: moving on does not move the board. (A browser reports a lost capture with the pointer's next event.)
+      await page.mouse.move(pane.x + 192, pane.y + 102, { steps: 4 });
+      await expect(board(page)).not.toHaveClass(/cursor-grabbing/);
+      expect(Math.round((await boxInBoard(page, "inbox")).x - before.x)).toBe(60);
+      await page.mouse.up();
+
+      // The next press drags again.
+      await page.mouse.move(pane.x + 12, pane.y + 12);
+      await page.mouse.down();
+      await page.mouse.move(pane.x + 42, pane.y + 12, { steps: 4 });
+      await page.mouse.up();
+      expect(Math.round((await boxInBoard(page, "inbox")).x - before.x)).toBe(90);
+    });
+  }
+
   test("should draw a full board and say how long it took", async ({ page }) => {
     const started = Date.now();
     await open(page, "large", "board");
@@ -224,6 +285,80 @@ test.describe("on a desktop", () => {
     const nodes = await board(page).evaluate((element) => element.querySelectorAll("*").length);
     test.info().annotations.push({ type: "canvas timing", description: `24 frames, ${String(nodes)} DOM nodes: shown ${String(elapsed)} ms after navigation started (development build).` });
     expect(elapsed).toBeLessThan(30_000);
+  });
+});
+
+test.describe("on a touch screen wide enough for the board", () => {
+  test.use({ hasTouch: true });
+  test.beforeEach(({ isMobile }) => {
+    test.skip(isMobile, "a phone stacks the frames; this is a tablet's board");
+  });
+
+  test("should zoom the board about the fingers, and not the page, when a reader pinches it", async ({ page }) => {
+    await open(page, "flow", "board");
+    const touch = await touchScreen(page);
+    const pane = await boxOf(board(page));
+    const middle = { x: pane.x + pane.width / 2, y: pane.y + pane.height / 2 };
+    const before = await boxInBoard(page, "inbox");
+    const fingers = (apart: number) => [{ x: middle.x - apart, y: middle.y }, { x: middle.x + apart, y: middle.y }];
+
+    await touch("touchStart", fingers(50));
+    for (const apart of [60, 70, 80, 90, 100]) await touch("touchMove", fingers(apart));
+    await touch("touchEnd", []);
+
+    const after = await boxInBoard(page, "inbox");
+    expect(after.width / before.width).toBeCloseTo(2, 1);
+    // The board point under the middle of the fingers is still under it.
+    const under = (box: { x: number; width: number }) => (pane.width / 2 - box.x) / box.width;
+    expect(under(after)).toBeCloseTo(under(before), 2);
+    expect(await page.evaluate(() => ({ pageZoom: window.visualViewport?.scale, scrolled: window.scrollY }))).toEqual({ pageZoom: 1, scrolled: 0 });
+    await expect(board(page)).not.toHaveAttribute("data-canvas-zoom", "100%");
+  });
+
+  test("should scroll the page, and leave the board alone, when a reader swipes up on the board with one finger", async ({ page }) => {
+    await open(page, "flow", "board");
+    const touch = await touchScreen(page);
+    const pane = await boxOf(board(page));
+    const before = await boxInBoard(page, "inbox");
+    const x = pane.x + pane.width / 2;
+    const from = pane.y + pane.height - 60;
+
+    await touch("touchStart", [{ x, y: from }]);
+    for (const up of [40, 80, 120, 160, 200, 240]) await touch("touchMove", [{ x, y: from - up }]);
+    await touch("touchEnd", []);
+
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+    expect(await boxInBoard(page, "inbox")).toEqual(before);
+  });
+
+  test("should move the board, and not the page, when a reader drags sideways with one finger", async ({ page }) => {
+    await open(page, "flow", "board");
+    const touch = await touchScreen(page);
+    const pane = await boxOf(board(page));
+    const before = await boxInBoard(page, "inbox");
+    const from = { x: pane.x + 40, y: pane.y + 40 };
+
+    await touch("touchStart", [from]);
+    for (const right of [30, 60, 90, 120]) await touch("touchMove", [{ x: from.x + right, y: from.y }]);
+    await touch("touchEnd", []);
+
+    await expect.poll(async () => Math.round((await boxInBoard(page, "inbox")).x - before.x)).toBe(120);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  });
+
+  test("should zoom and fit from the board's buttons when a reader taps them", async ({ page }) => {
+    await open(page, "flow", "board");
+    const toolbar = page.getByRole("group", { name: "Canvas view" });
+    const fitted = await zoomOf(page);
+    await toolbar.getByRole("button", { name: "Zoom in" }).tap();
+    await expect.poll(() => zoomOf(page)).toBeGreaterThan(fitted);
+    await toolbar.getByRole("button", { name: "Fit" }).tap();
+    await expect(board(page)).toHaveAttribute("data-canvas-zoom", `${String(fitted)}%`);
+    // Each button is large enough for a finger.
+    for (const name of ["Frames", "Zoom out", "Zoom in", "Fit"]) {
+      const box = await boxOf(toolbar.getByRole("button", { name, exact: true }));
+      expect(Math.min(box.width, box.height), `${name} is at least 28px each way`).toBeGreaterThanOrEqual(28);
+    }
   });
 });
 
@@ -237,7 +372,7 @@ test.describe("on a phone", () => {
     await expect(page.getByRole("group", { name: "Canvas view" })).toHaveCount(0);
     const column = await boxOf(board(page));
     let bottom = column.y;
-    for (const id of ["home-desktop", "home-tablet", "home-phone"]) {
+    for (const id of ["home-desktop", "home-tablet", "home-phone", "home-full-bleed"]) {
       const box = await boxOf(frameBody(page, id));
       expect(box.x).toBeCloseTo(column.x, 0);
       expect(box.width).toBeLessThanOrEqual(column.width + 0.5);
@@ -251,6 +386,39 @@ test.describe("on a phone", () => {
     const below = await boxOf(page.locator("[data-fixture-below]:visible"));
     expect(below.y).toBeGreaterThanOrEqual(bottom);
     expect(below.y - bottom).toBeLessThan(40);
+  });
+
+  test("should give each stacked frame its final height in the first paint, so nothing moves when scripts start", async ({ page }) => {
+    // Before any page script: note every height each frame's place in the column ever has, from the server's markup on.
+    await page.addInitScript(() => {
+      const heights: Record<string, number[]> = {};
+      Object.assign(window, { canvasFrameHeights: heights });
+      const sizes = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const height = Math.round(entry.target.getBoundingClientRect().height);
+          // A copy the page keeps hidden has no height and is not a frame anyone sees.
+          if (height > 0) (heights[entry.target.getAttribute("data-canvas-frame") ?? ""] ??= []).push(height);
+        }
+      });
+      const watched = new WeakSet<Element>();
+      new MutationObserver(() => {
+        for (const slot of document.querySelectorAll("[data-canvas-frame]")) {
+          if (watched.has(slot)) continue;
+          watched.add(slot);
+          sizes.observe(slot);
+        }
+      }).observe(document, { childList: true, subtree: true });
+    });
+    await open(page, "site", "stacked");
+    await page.evaluate(() => document.fonts.ready);
+    await expect(frame(page, "home-full-bleed").getByRole("heading", { name: "Get paid nine days sooner" })).toBeVisible();
+    await page.evaluate(() => new Promise((resolve) => { requestAnimationFrame(() => requestAnimationFrame(resolve)); }));
+
+    const heights = await page.evaluate(() => (window as unknown as { canvasFrameHeights: Record<string, number[]> }).canvasFrameHeights);
+    expect(Object.keys(heights).sort()).toEqual(["home-desktop", "home-full-bleed", "home-phone", "home-tablet"]);
+    for (const [id, seen] of Object.entries(heights)) {
+      expect(Math.max(...seen) - Math.min(...seen), `${id} kept one height: ${seen.join(", ")}`).toBeLessThanOrEqual(1);
+    }
   });
 
   test("should let a reader use a control in a stacked frame", async ({ page }) => {

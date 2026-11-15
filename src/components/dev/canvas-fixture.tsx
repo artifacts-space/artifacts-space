@@ -8,7 +8,7 @@ export const canvasFixtureNames = ["site", "flow", "placed", "empty", "broken", 
 export type CanvasFixtureName = (typeof canvasFixtureNames)[number];
 
 const fixtures: Record<CanvasFixtureName, { title: string; content: string }> = {
-  site: { title: "One page at three sizes", content: JSON.stringify(siteMockupCanvas) },
+  site: { title: "One page at three sizes, and its top edge to edge", content: JSON.stringify(siteMockupCanvas) },
   flow: { title: "An app flow", content: JSON.stringify(appFlowCanvas) },
   placed: { title: "Two rows, placed by hand", content: JSON.stringify(placedCanvas) },
   empty: { title: "An empty canvas", content: JSON.stringify(emptyCanvas) },

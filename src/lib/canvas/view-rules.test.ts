@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { canvasLimits, frameSizes } from "./limits";
-import { boundsOf, clampZoom, fitPadding, fitView, frameView, nextZoomStep, panBy, stackedScale, wheelZoom, zoomAbout, zoomPercent, zoomRange } from "./view-rules";
+import { boundsOf, clampZoom, fitPadding, fitView, frameView, nextZoomStep, panBy, pinchOf, pinchView, wheelZoom, zoomAbout, zoomPercent, zoomRange } from "./view-rules";
 
 const window = { width: 1000, height: 600 };
 
@@ -115,16 +115,40 @@ describe("panBy", () => {
   });
 });
 
-describe("stackedScale", () => {
-  it("should shrink a frame wider than the column to the column's width", () => {
-    expect(stackedScale(1440, 358)).toBeCloseTo(358 / 1440);
+describe("pinchOf", () => {
+  it("should give the point midway between two touches and the distance between them", () => {
+    expect(pinchOf({ x: 100, y: 100 }, { x: 400, y: 500 })).toEqual({ center: { x: 250, y: 300 }, distance: 500 });
+  });
+});
+
+describe("pinchView", () => {
+  const view = { zoom: 0.5, x: 40, y: 60 };
+  const from = { center: { x: 300, y: 200 }, distance: 100 };
+
+  it("should zoom about the middle of the fingers when they move apart", () => {
+    const next = pinchView(view, from, { center: from.center, distance: 200 });
+    expect(next.zoom).toBe(1);
+    // The board point under the fingers, (300 - 40) / 0.5 = 520 and (200 - 60) / 0.5 = 280, is still under them.
+    expect(next.x + 520 * next.zoom).toBeCloseTo(300);
+    expect(next.y + 280 * next.zoom).toBeCloseTo(200);
   });
 
-  it("should leave a frame narrower than the column at 100%", () => {
-    expect(stackedScale(390, 600)).toBe(1);
+  it("should zoom out when the fingers move together", () => {
+    expect(pinchView(view, from, { center: from.center, distance: 50 }).zoom).toBe(0.25);
   });
 
-  it("should stay at 100% when the column has not been measured", () => {
-    expect(stackedScale(390, 0)).toBe(1);
+  it("should move the board with the fingers when they keep their distance", () => {
+    expect(pinchView(view, from, { center: { x: 350, y: 180 }, distance: 100 })).toEqual({ zoom: 0.5, x: 90, y: 40 });
+  });
+
+  it("should stop at the zoom limits and still keep the point under the fingers", () => {
+    const most = pinchView(view, from, { center: from.center, distance: 10_000 });
+    expect(most.zoom).toBe(zoomRange.max);
+    expect(most.x + 520 * most.zoom).toBeCloseTo(300);
+    expect(pinchView(view, from, { center: from.center, distance: 0.001 }).zoom).toBe(zoomRange.min);
+  });
+
+  it("should keep the zoom when the pinch began with both fingers on one point", () => {
+    expect(pinchView(view, { center: from.center, distance: 0 }, { center: from.center, distance: 80 })).toEqual(view);
   });
 });

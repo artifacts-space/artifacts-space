@@ -52,68 +52,55 @@ function FrameContent({ frame }: { frame: BoardFrame }) {
   return <FrameSpec content={frame.spec} />;
 }
 
-interface CanvasFrameProps {
-  frame: BoardFrame;
-  /** True on the pannable board; false when frames stack in the page column. */
-  onBoard: boolean;
-  /** Stacked only: the scale that fits the frame into the column. */
-  scale: number;
-  /** Stacked only: the frame's measured height at 100%, so the page keeps room for the scaled frame. */
-  measuredHeight: number;
+/**
+ * The frame's numbers, as custom properties its styles read. The styles place
+ * and scale the frame, so the same markup is right on a board and stacked.
+ */
+function frameVariables(frame: BoardFrame): CSSProperties {
+  return {
+    ["--frame-x" as string]: `${String(frame.x)}px`,
+    ["--frame-y" as string]: `${String(frame.y)}px`,
+    ["--frame-width" as string]: `${String(frame.width)}px`,
+    // On the board, a frame outside the window skips its layout and paint until it comes near; this height stands in until then.
+    ["--frame-rest-height" as string]: `${String(frame.height ?? unmeasuredHeight)}px`,
+  };
 }
 
-function slotStyle({ frame, onBoard }: CanvasFrameProps): CSSProperties {
-  return onBoard ? { position: "absolute", left: frame.x, top: frame.y, width: frame.width } : {};
-}
+/** The frame's place. In the column it is in the page's flow; on the board it sits at its own x and y. */
+const slotClass = "group/frame rounded-lg outline-none @[640px]/canvas:absolute @[640px]/canvas:top-(--frame-y) @[640px]/canvas:left-(--frame-x) @[640px]/canvas:w-(--frame-width)";
 
-function bodyStyle({ frame, onBoard, scale }: CanvasFrameProps): CSSProperties {
-  const size: CSSProperties = { width: frame.width, minHeight: frame.height ?? undefined };
-  // On the board, a frame outside the window skips its layout and paint until it comes near; the size is a stand-in until then.
-  if (onBoard) return { ...size, contentVisibility: "auto", containIntrinsicBlockSize: `auto ${String(frame.height ?? unmeasuredHeight)}px` };
-  return { ...size, transform: `scale(${String(scale)})`, transformOrigin: "top left" };
-}
+/** The name and size above a frame. On the board it hangs above the frame and keeps its size at every zoom. */
+const labelClass =
+  "flex min-w-0 items-baseline gap-2 pb-1.5 text-xs select-none @[640px]/canvas:absolute @[640px]/canvas:bottom-full @[640px]/canvas:left-0 @[640px]/canvas:w-[calc(var(--frame-width)*var(--canvas-zoom,1))] @[640px]/canvas:origin-bottom-left @[640px]/canvas:[transform:scale(calc(1/var(--canvas-zoom,1)))]";
+
+/**
+ * The frame's content, always laid out at the frame's real width. In the
+ * column it is scaled to fit by `zoom`, from the column's width alone
+ * (`tan(atan2(a, b))` is a divided by b for two lengths), so the page gives
+ * the frame its final room with no script and nothing moves when scripts
+ * start. On the board the board's own transform scales every frame, and a
+ * frame outside the window skips its layout and paint until it comes near.
+ */
+const bodyClass =
+  "flex w-(--frame-width) flex-col rounded-lg border border-card-edge bg-background text-foreground shadow-xs [zoom:min(1,tan(atan2(100cqw,var(--frame-width))))] group-focus-visible/frame:ring-3 group-focus-visible/frame:ring-ring/50 @[640px]/canvas:[zoom:1] @[640px]/canvas:[contain-intrinsic-block-size:auto_var(--frame-rest-height)] @[640px]/canvas:[content-visibility:auto]";
 
 /**
  * One frame: its name and size above it, then its content at the frame's real
- * width. On the board the frame sits at its place and the board's transform
- * scales it. Stacked, it is scaled to the column and the page keeps exactly
- * the room the scaled frame takes. The element that carries the transform is
- * outside the renderer's root, so components inside still measure the
- * frame's real width.
+ * width. Its styles follow the canvas column: in a narrow column the frame is
+ * in the page's flow, scaled to the column; in a wide one it sits at its
+ * place on the board, which scales it. The scaling is outside the renderer's
+ * root, so components inside still measure the frame's real width.
  */
-export const CanvasFrame = memo(function CanvasFrame(props: CanvasFrameProps) {
-  const { frame, onBoard, scale, measuredHeight } = props;
+export const CanvasFrame = memo(function CanvasFrame({ frame }: { frame: BoardFrame }) {
   const labelId = useId();
   return (
-    <div
-      role="group"
-      aria-labelledby={labelId}
-      tabIndex={-1}
-      data-canvas-frame={frame.id}
-      className="group/frame rounded-lg outline-none"
-      style={slotStyle(props)}
-    >
-      <div
-        id={labelId}
-        data-comment-skip=""
-        data-canvas-frame-label=""
-        className={cn("flex min-w-0 items-baseline gap-2 pb-1.5 text-xs select-none", onBoard && "absolute bottom-full left-0 origin-bottom-left")}
-        style={onBoard ? { width: `calc(${String(frame.width)}px * var(--canvas-zoom, 1))`, transform: "scale(calc(1 / var(--canvas-zoom, 1)))" } : undefined}
-      >
+    <div role="group" aria-labelledby={labelId} tabIndex={-1} data-canvas-frame={frame.id} className={slotClass} style={frameVariables(frame)}>
+      <div id={labelId} data-comment-skip="" data-canvas-frame-label="" className={labelClass}>
         <span className="truncate font-medium text-foreground">{frame.name}</span>
         <span className="shrink-0 text-muted-foreground">{frameSizeLabel(frame)}</span>
       </div>
-      <div className={cn(!onBoard && "overflow-hidden")} style={onBoard ? undefined : { width: frame.width * scale, height: measuredHeight * scale }}>
-        <div
-          {...{ [frameBodyAttribute]: frame.id }}
-          className={cn(
-            "flex flex-col rounded-lg border border-card-edge bg-background text-foreground shadow-xs group-focus-visible/frame:ring-3 group-focus-visible/frame:ring-ring/50",
-            paddingClass[frame.padding],
-          )}
-          style={bodyStyle(props)}
-        >
-          <FrameContent frame={frame} />
-        </div>
+      <div {...{ [frameBodyAttribute]: frame.id }} className={cn(bodyClass, paddingClass[frame.padding])} style={{ minHeight: frame.height ?? undefined }}>
+        <FrameContent frame={frame} />
       </div>
     </div>
   );

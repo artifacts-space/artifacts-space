@@ -34,7 +34,12 @@ export const zoomSteps = [0.02, 0.05, 0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25,
 /** Space kept around the board when it is fitted to the window. */
 export const fitPadding = 40;
 
-/** Below this board width frames stack in the page column instead of sitting on a pannable board. */
+/**
+ * Below this column width frames stack in the page instead of sitting on a
+ * pannable board. The viewer applies it in CSS (a container query on the
+ * column, written as this number of pixels), so the page is laid out the same
+ * before and after its scripts run.
+ */
 export const stackBelowWidth = 640;
 
 /** How much of the board must stay inside the window when it is dragged, so it cannot be lost. */
@@ -118,10 +123,34 @@ export function panBy(view: BoardView, delta: { x: number; y: number }, bounds: 
   };
 }
 
-/** The scale that fits a frame into a column no wider than it: at most 100%. */
-export function stackedScale(frameWidth: number, columnWidth: number): number {
-  if (columnWidth <= 0 || frameWidth <= 0) return 1;
-  return Math.min(1, columnWidth / frameWidth);
+/** A point in the board's window, in CSS pixels from its top left corner. */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/** Two fingers on the board: the point midway between them, and how far apart they are. */
+export interface Pinch {
+  center: Point;
+  distance: number;
+}
+
+/** The middle of two touches and the distance between them. */
+export function pinchOf(first: Point, second: Point): Pinch {
+  return { center: { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 }, distance: Math.hypot(second.x - first.x, second.y - first.y) };
+}
+
+/**
+ * The view while two fingers pinch the board. `view` and `from` are the view
+ * and the fingers when the pinch began; `to` is the fingers now. The zoom
+ * follows how far the fingers moved apart, inside the zoom range, and the
+ * board point that was under the middle of the fingers stays under it, so a
+ * pinch zooms about the fingers and two fingers moving together pan.
+ */
+export function pinchView(view: BoardView, from: Pinch, to: Pinch): BoardView {
+  const zoom = clampZoom(from.distance > 0 ? view.zoom * (to.distance / from.distance) : view.zoom);
+  const ratio = zoom / view.zoom;
+  return { zoom, x: to.center.x - (from.center.x - view.x) * ratio, y: to.center.y - (from.center.y - view.y) * ratio };
 }
 
 /** The zoom as a whole percent, for the zoom button's label. */
