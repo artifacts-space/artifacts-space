@@ -12,6 +12,7 @@ import type { TextAlign, Tone } from "@/lib/ui/props/shared";
 import { hasTitleText } from "@/lib/ui/title-rules";
 import { cn } from "@/lib/utils";
 
+import { useAnnounced } from "./announcer";
 import { uiIconComponents } from "./icon-glyphs";
 import type { ViewProps } from "./stout";
 
@@ -102,6 +103,7 @@ export function textClassName(props: Omit<TextProps, "text">): string {
 }
 
 export function TextView({ props }: ViewProps<"Text">) {
+  useAnnounced(props.text, props.announce);
   if (!props.text) return null;
   return <p className={cn("whitespace-pre-line", textClassName(props))}>{props.text}</p>;
 }
@@ -125,6 +127,7 @@ export const toneStyles: Record<Tone, { box: string; icon: string; Icon: typeof 
 };
 
 export function CalloutView({ props }: ViewProps<"Callout">) {
+  useAnnounced(props.title ? `${props.title}. ${props.text}` : props.text, props.announce);
   const style = toneStyles[props.tone ?? "info"];
   return (
     <div role="note" className={cn("flex min-w-0 gap-3 rounded-md border px-4 py-3 shadow-xs", style.box)}>

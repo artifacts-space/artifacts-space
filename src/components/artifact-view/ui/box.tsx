@@ -36,8 +36,24 @@ const borderClass: Record<NonNullable<BoxProps["border"]>, string> = { none: "",
 const shadowClass: Record<NonNullable<BoxProps["shadow"]>, string> = { none: "", sm: "shadow-sm", md: "shadow-md", lg: "shadow-lg" };
 const overflowClass: Record<NonNullable<BoxProps["overflow"]>, string> = { visible: "", hidden: "overflow-hidden", scroll: "overflow-x-auto *:shrink-0" };
 
+type Align = NonNullable<BoxProps["align"]>;
+type Justify = NonNullable<BoxProps["justify"]>;
+
 /** Width steps of the named `ui` container (the page column or a canvas frame): 576, 672, and 896 pixels. */
 const rowFrom: Record<ContainerStep, string> = { sm: "flex-col @xl/ui:flex-row", md: "flex-col @2xl/ui:flex-row", lg: "flex-col @4xl/ui:flex-row" };
+/** The same row, stacked last child first. */
+const reversedRowFrom: Record<ContainerStep, string> = { sm: "flex-col-reverse @xl/ui:flex-row", md: "flex-col-reverse @2xl/ui:flex-row", lg: "flex-col-reverse @4xl/ui:flex-row" };
+/** The row's own `align` and `justify`, from the width where it is a row again. */
+const alignFrom: Record<ContainerStep, Record<Align, string>> = {
+  sm: { start: "@xl/ui:items-start", center: "@xl/ui:items-center", end: "@xl/ui:items-end", stretch: "@xl/ui:items-stretch" },
+  md: { start: "@2xl/ui:items-start", center: "@2xl/ui:items-center", end: "@2xl/ui:items-end", stretch: "@2xl/ui:items-stretch" },
+  lg: { start: "@4xl/ui:items-start", center: "@4xl/ui:items-center", end: "@4xl/ui:items-end", stretch: "@4xl/ui:items-stretch" },
+};
+const justifyFrom: Record<ContainerStep, Record<"start" | "end", string>> = {
+  sm: { start: "@xl/ui:justify-start", end: "@xl/ui:justify-end" },
+  md: { start: "@2xl/ui:justify-start", end: "@2xl/ui:justify-end" },
+  lg: { start: "@4xl/ui:justify-start", end: "@4xl/ui:justify-end" },
+};
 const shownFrom: Record<ContainerStep, string> = { sm: "hidden @xl/ui:flex", md: "hidden @2xl/ui:flex", lg: "hidden @4xl/ui:flex" };
 const hiddenFrom: Record<ContainerStep, string> = { sm: "@xl/ui:hidden", md: "@2xl/ui:hidden", lg: "@4xl/ui:hidden" };
 
@@ -54,9 +70,35 @@ const surfaceClass: Record<Exclude<BoxSurface, BlockHue>, string> = {
   primary: "bg-background text-foreground",
 };
 
+/** The step a row stacks below, or nothing for a column or a row that never stacks. */
+function stackStep(props: BoxProps): ContainerStep | undefined {
+  return props.direction === "horizontal" ? props.stackBelow : undefined;
+}
+
 function directionClass(props: BoxProps): string {
   if (props.direction !== "horizontal") return "flex-col";
-  return pick(rowFrom, props.stackBelow) ?? "flex-row";
+  const step = stackStep(props);
+  if (!step) return "flex-row";
+  return props.reverseBelow ? reversedRowFrom[step] : rowFrom[step];
+}
+
+/** `alignBelow` while the row is stacked, and the row's own `align` (stretch when unset) from the width where it is a row. */
+function alignClasses(props: BoxProps): string | undefined {
+  const step = stackStep(props);
+  if (!step || !props.alignBelow) return pick(alignClass, props.align);
+  return cn(alignClass[props.alignBelow], alignFrom[step][props.align ?? "stretch"]);
+}
+
+/**
+ * A reversed column packs from its far end, so a stacked row drawn in
+ * reverse takes the opposite `justify` while it is stacked: its children
+ * still gather at the top for start and at the bottom for end.
+ */
+function justifyClasses(props: BoxProps): string | undefined {
+  const step = stackStep(props);
+  const justify: Justify = props.justify ?? "start";
+  if (!step || !props.reverseBelow || justify === "center" || justify === "between") return pick(justifyClass, props.justify);
+  return cn(justifyClass[justify === "start" ? "end" : "start"], justifyFrom[step][justify]);
 }
 
 function layoutClass(props: BoxProps): string {
@@ -69,8 +111,8 @@ function layoutClass(props: BoxProps): string {
     pick(padClass, props.padding),
     pick(padXClass, props.paddingX),
     pick(padYClass, props.paddingY),
-    pick(alignClass, props.align),
-    pick(justifyClass, props.justify),
+    alignClasses(props),
+    justifyClasses(props),
     props.wrap && "flex-wrap",
     props.grow && "flex-1",
     props.width === "full" && "w-full",

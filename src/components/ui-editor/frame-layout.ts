@@ -33,6 +33,9 @@ const frames: Record<string, (props: Record<string, unknown>) => string | undefi
   Button: (props) => (props.fullWidth === true && props.iconOnly !== true ? fullWidth : undefined),
   Input: (props) => cn(fullWidth, props.fullWidth !== true && "max-w-sm"),
   Textarea: (props) => cn(fullWidth, props.fullWidth !== true && "max-w-sm"),
+  Select: (props) => (props.fullWidth === true ? fullWidth : undefined),
+  // A line between two items stretches across its row or column, so its frame does too, and the line fills the frame.
+  Separator: (props) => (props.orientation === "vertical" ? "flex flex-col self-stretch [&>*:last-child]:grow" : undefined),
 };
 
 /** The classes a block's frame takes so the block sits in its parent as it does for readers, or undefined when the frame needs none. */

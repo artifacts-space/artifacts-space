@@ -124,6 +124,10 @@ export function AccordionView({ props, children }: ViewProps<"Accordion">) {
 }
 
 export function SeparatorView({ props }: ViewProps<"Separator">) {
+  // A line between two items: it stretches across its parent and is one pixel the other way. So it is as tall as a
+  // row, and lies flat between the same items once the row has stacked, where a line with no height would leave a
+  // double gap. The orientation it states is the one the spec asked for.
+  if (props.orientation === "vertical") return <div role="separator" aria-orientation="vertical" className="min-h-px min-w-px shrink-0 self-stretch bg-border" />;
   if (!hasTitleText(props.label)) return <hr className="my-2 border-border" />;
   return (
     <div role="separator" aria-label={props.label} className="my-2 flex items-center gap-3 text-xs text-muted-foreground">

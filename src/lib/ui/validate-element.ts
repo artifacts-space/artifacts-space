@@ -18,7 +18,7 @@ import { pairedChildren } from "./props/layout";
 import type { UiElement } from "./spec";
 
 /** Actions an `on` binding may run. All of them only change the spec's own state. */
-export const allowedActions = new Set(["setState", "pushState", "removeState", "validateForm"]);
+export const allowedActions = new Set(["setState", "pushState", "removeState", "toggleState", "validateForm"]);
 
 const unsupportedFields = {
   watch: "Remove `watch`: state watchers are not supported. Use `on` bindings on Button or inputs instead.",

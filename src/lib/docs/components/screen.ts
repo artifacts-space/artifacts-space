@@ -56,6 +56,8 @@ export const boxDocs: Record<"Box", ComponentDoc> = {
       "Every style prop is a named step. A Box takes no CSS, colors, or pixel sizes.",
       containerWidths,
       "`stackBelow` needs `direction: \"horizontal\"`. `hideAbove` must be a wider step than `hideBelow`.",
+      "`alignBelow` and `reverseBelow` need a row with `stackBelow`. `alignBelow` is the `align` to use once the row has stacked: a row with `align: \"center\"` shrinks each stacked child to its content unless `alignBelow` is `stretch`. Without it the row's `align` applies at every width.",
+      "`reverseBelow` draws the stacked children last first, so words can sit above a picture that comes first in the row. It changes what is drawn, not the order a keyboard or a screen reader follows, so use it only when at most one side holds buttons, links, or fields.",
       "`overflow: \"scroll\"` needs `direction: \"horizontal\"` and no `wrap`. Give the Box a `label`: while it scrolls it is a named group the keyboard can reach.",
       "Inverse and primary do not nest: inside either, both paint the surrounding surface.",
       "Use a shadow on a surface that sits on the page, never on a Box inside a card.",
@@ -85,6 +87,15 @@ export const placeholderDocs: Record<"Placeholder", ComponentDoc> = {
     examples: [
       { title: "An image stand-in", spec: single("Placeholder", { label: "Team photo", ratio: "wide", radius: "xl" }) },
       {
+        title: "A product shot in a browser and on a phone",
+        spec: spec("row", {
+          row: { type: "Box", props: { direction: "horizontal", stackBelow: "sm", align: "end", alignBelow: "center", gap: "lg" }, children: ["desktop", "phone"] },
+          desktop: { type: "Box", props: { grow: true }, children: ["window"] },
+          window: { type: "Placeholder", props: { frame: "browser", label: "Dashboard" } },
+          phone: { type: "Placeholder", props: { frame: "phone", label: "Home screen" } },
+        }),
+      },
+      {
         title: "Logos and an avatar",
         spec: spec("row", {
           row: { type: "Box", props: { direction: "horizontal", wrap: true, align: "center", gap: "md" }, children: ["acme", "globex", "person"] },
@@ -94,6 +105,10 @@ export const placeholderDocs: Record<"Placeholder", ComponentDoc> = {
         }),
       },
     ],
-    rules: ["A placeholder never loads a file. Use Image for an uploaded picture.", "`label` is what screen readers announce; the small logo and avatar shapes do not show it."],
+    rules: [
+      "A placeholder never loads a file. Use Image for an uploaded picture.",
+      "`label` is what screen readers announce; the small logo and avatar shapes do not show it.",
+      "`frame` (browser or phone) draws a window or a phone around an image, video, or map stand-in. The frame is decoration: its dots and bars are not controls and are hidden from screen readers. A framed stand-in ignores `radius`; a phone frame is at most 256 pixels wide and defaults to the portrait ratio.",
+    ],
   },
 };

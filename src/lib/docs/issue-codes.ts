@@ -21,7 +21,7 @@ const elementCodes: Omit<IssueCodeDoc, "blocking">[] = [
   { code: "missing_child", severity: "error", meaning: "children names a key that does not exist." },
   { code: "children_mismatch", severity: "error", meaning: "Tabs or Accordion has a different number of children and entries." },
   { code: "invalid_event", severity: "error", meaning: "on uses an event the component does not emit." },
-  { code: "invalid_action", severity: "error", meaning: "on runs an action other than the four state actions." },
+  { code: "invalid_action", severity: "error", meaning: "on runs an action other than the five state actions." },
   { code: "unsupported_expression", severity: "error", meaning: "A prop uses $computed." },
   { code: "unsupported_field", severity: "error", meaning: "The element has watch or slots." },
   { code: "invalid_key", severity: "error", meaning: "An element key is too long." },

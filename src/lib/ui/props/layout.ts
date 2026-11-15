@@ -32,9 +32,16 @@ export const layoutProps = {
   }),
   Separator: z.object({
     label: label(60).optional(),
+    orientation: z.enum(["horizontal", "vertical"]).optional(),
   }),
   Box: boxProps,
 };
+
+/** A vertical rule is a line between two items in a row: it has no room for words. */
+export const separatorCheck = (props: Record<string, unknown>): string[] =>
+  props.orientation === "vertical" && typeof props.label === "string" && props.label.trim() !== ""
+    ? ['`label` applies to a horizontal Separator. Remove `label`, or remove `orientation: "vertical"`.']
+    : [];
 
 /** Components whose children map one to one onto an array prop. */
 export const pairedChildren = {

@@ -54,6 +54,7 @@ const layout: Pick<Record<UiComponentName, ComponentFixture[]>, "Section" | "Sta
   Separator: [
     { name: "Plain", props: {} },
     { name: "Labelled", props: { label: "Appendix" } },
+    { name: "Vertical, alone", props: { orientation: "vertical" } },
   ],
   Box: boxFixtures,
 };
@@ -69,6 +70,7 @@ const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Te
   Text: [
     { name: "Normal", props: { text: "Plain text keeps\nits line breaks." } },
     { name: "Muted small", props: { text: "Muted small text.", tone: "muted", size: "sm" } },
+    { name: "Announced", props: { text: "Thanks. You are on the list.", announce: true } },
     { name: "Empty", props: { text: "" } },
     { name: "At limit", props: { text: longText(5000) } },
     ...screenTextFixtures,
@@ -86,6 +88,7 @@ const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Te
     { name: "Tones", props: { text: "Deploys pause during the migration window.", title: "Heads up", tone: "warning" } },
     { name: "Danger", props: { text: "This drops the legacy table.", tone: "danger" } },
     { name: "Success", props: { text: "All checks passed.", tone: "success" } },
+    { name: "Announced", props: { text: "Your changes are saved.", title: "Saved", tone: "success", announce: true } },
     { name: "Long", props: { text: longText(2000), title: longText(160), tone: "info" } },
   ],
   Badge: [
@@ -119,6 +122,7 @@ const data: Pick<Record<UiComponentName, ComponentFixture[]>, "Table" | "Metric"
   Table: [
     { name: "Normal", props: { caption: "Monthly spend", currency: "USD", columns: [{ key: "team", label: "Team" }, { key: "spend", label: "Spend", align: "right", format: "currency" }, { key: "change", label: "Change", align: "right", format: "percent" }], rows: [{ team: "Platform", spend: 12840, change: 4.2 }, { team: "Web", spend: 5300, change: -1.5 }, { team: "Data" }] } },
     { name: "Empty rows", props: { columns: [{ key: "a", label: "A" }], rows: [] } },
+    { name: "Check marks", props: { caption: "Plans", columns: [{ key: "feature", label: "Feature" }, { key: "free", label: "Free", format: "check" }, { key: "team", label: "Team", format: "check" }, { key: "seats", label: "Seats", format: "check", align: "right" }], rows: [{ feature: "Unlimited artifacts", free: true, team: true, seats: "Up to 3" }, { feature: "Team themes", free: false, team: true, seats: 25 }, { feature: "Audit log", free: false, team: true, seats: null }, { feature: "Words stay words", free: "Yes", team: "No" }] } },
     { name: "500 rows", props: { columns: [{ key: "id", label: "#", format: "number" }, { key: "name", label: "Name" }, { key: "amount", label: "Amount", format: "compact", align: "right" }, { key: "ok", label: "OK" }], rows: manyRows } },
     { name: "Huge and long", props: { columns: [{ key: "v", label: "Value", format: "number", align: "right" }, { key: "t", label: longText(80) }], rows: [{ v: 1e300, t: unbroken(500) }, { v: -9_007_199_254_740_991, t: longText(2000) }, { v: null, t: null }] } },
   ],
@@ -126,6 +130,8 @@ const data: Pick<Record<UiComponentName, ComponentFixture[]>, "Table" | "Metric"
     { name: "Currency", props: { label: "Revenue", value: 1_284_000, format: "currency", currency: "USD", change: 12.4, changeFormat: "percent", changeLabel: "vs last month", goodDirection: "up" } },
     { name: "Bad change", props: { label: "Errors", value: 42, change: 8, goodDirection: "down" } },
     { name: "Text value", props: { label: "Status", value: "Healthy" } },
+    { name: "Plain", props: { label: "Teams onboarded", value: 1_240, format: "compact", change: 12.4, changeFormat: "percent", changeLabel: "this quarter", goodDirection: "up", variant: "plain" } },
+    { name: "Plain, long", props: { label: longText(80), value: 1e300, unit: "ops", change: -1e20, format: "compact", variant: "plain" } },
     { name: "Huge", props: { label: longText(80), value: 1e300, unit: "ops", change: -1e20, format: "compact" } },
     { name: "Sparkline", props: { label: "Weekly active", value: 18_420, format: "compact", change: 6.1, changeFormat: "percent", goodDirection: "up", sparkline: [12_100, 12_900, 13_400, 13_100, 14_800, 15_900, 15_200, 16_700, 17_300, 18_420] } },
     { name: "Sparkline, gaps and huge", props: { label: "Volatile", value: -3, sparkline: [1e300, null, -1e300, 0, null, 5, 5, -3] } },

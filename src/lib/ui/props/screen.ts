@@ -43,6 +43,8 @@ export const boxProps = z.object({
   shadow: z.enum(["none", "sm", "md", "lg"]).optional(),
   overflow: z.enum(["visible", "hidden", "scroll"]).optional(),
   stackBelow: containerStep.optional(),
+  alignBelow: z.enum(["start", "center", "end", "stretch"]).optional(),
+  reverseBelow: z.boolean().optional(),
   hideBelow: containerStep.optional(),
   hideAbove: containerStep.optional(),
   label: label(120).optional(),
@@ -60,6 +62,7 @@ export const placeholderProps = z.object({
   label: label(80).optional(),
   ratio: aspectRatio.optional(),
   radius: radius.optional(),
+  frame: z.enum(["none", "browser", "phone"]).optional(),
 });
 
 const stepOrder = { sm: 1, md: 2, lg: 3 } as const;
@@ -71,6 +74,7 @@ const stepOrder = { sm: 1, md: 2, lg: 3 } as const;
  * valid (or is an expression): that prop's own error covers it.
  */
 const stackFields = boxProps.pick({ direction: true, stackBelow: true });
+const stackedFields = boxProps.pick({ direction: true, stackBelow: true, alignBelow: true, reverseBelow: true });
 const hideFields = boxProps.pick({ hideBelow: true, hideAbove: true });
 const scrollRowFields = boxProps.pick({ overflow: true, direction: true });
 const scrollWrapFields = boxProps.pick({ overflow: true, wrap: true });
@@ -79,6 +83,16 @@ function stackProblems(props: Record<string, unknown>): string[] {
   const read = stackFields.safeParse(props);
   if (!read.success || !read.data.stackBelow || read.data.direction === "horizontal") return [];
   return ['`stackBelow` only applies to a Box with `direction: "horizontal"`. Set the direction, or remove `stackBelow`.'];
+}
+
+/** `alignBelow` and `reverseBelow` say how a row looks once it has stacked, so they need a row that stacks. */
+function stackedProblems(props: Record<string, unknown>): string[] {
+  const read = stackedFields.safeParse(props);
+  if (!read.success) return [];
+  const { direction, stackBelow, alignBelow, reverseBelow } = read.data;
+  if (direction === "horizontal" && stackBelow) return [];
+  const used = [alignBelow === undefined ? null : "alignBelow", reverseBelow ? "reverseBelow" : null].filter((name) => name !== null);
+  return used.map((name) => `\`${name}\` only applies to a row that stacks: a Box with \`direction: "horizontal"\` and \`stackBelow\`. Set both, or remove \`${name}\`.`);
 }
 
 function hideProblems(props: Record<string, unknown>): string[] {
@@ -102,13 +116,21 @@ function scrollProblems(props: Record<string, unknown>): string[] {
   return problems;
 }
 
+/** A frame is drawn around a picture-sized stand-in; a logo or an avatar is too small to sit in a window or a phone. */
+export const placeholderCheck: PropCheck = (props) => {
+  const variant = props.variant;
+  if (props.frame !== "browser" && props.frame !== "phone") return [];
+  if (variant !== "logo" && variant !== "avatar") return [];
+  return [`\`frame\` applies to an image, video, or map Placeholder. Remove \`frame\`, or change \`variant: "${variant}"\`.`];
+};
+
 /** A Box that can never show, or a rule that cannot apply to it, is a mistake worth naming. */
-export const boxCheck: PropCheck = (props) => [...stackProblems(props), ...hideProblems(props), ...scrollProblems(props)];
+export const boxCheck: PropCheck = (props) => [...stackProblems(props), ...stackedProblems(props), ...hideProblems(props), ...scrollProblems(props)];
 
 /** Agent-facing descriptions; the guide is generated from them. */
 export const screenDescriptions = {
   Box:
-    "A free-layout container for drawing screens. Children stack vertically or sit in a row (`direction`), with `gap`, `padding` (`paddingX` / `paddingY` override one axis), `align` (across the direction), `justify` (along it), `wrap`, `grow` (take the free room in a row), `width`, `maxWidth` (xs 320, sm 384, md 576, lg 768, xl 1024, 2xl 1280 pixels; center it with `align: \"center\"` on the parent) and `minHeight`. `surface` paints it and sets a text color that reads on it: none, page, card, muted, a hue (gray, brown, orange, yellow, green, blue, purple, pink, red), or inverse and primary, which switch everything inside to a contrasting palette and do not nest. `border` (all, top, bottom, start, end, x, y), `radius`, and `shadow` finish it. `overflow`: hidden clips children to the radius; scroll makes a row scroll sideways instead of wrapping (set `label` to name it). Responsive props follow the width of the page column or canvas frame, never the browser window (sm 576, md 672, lg 896 pixels): `stackBelow` turns a row into a column below that width; `hideBelow` and `hideAbove` hide the Box. `label` names it for screen readers.",
+    "A free-layout container for drawing screens. Children stack vertically or sit in a row (`direction`), with `gap`, `padding` (`paddingX` / `paddingY` override one axis), `align` (across the direction), `justify` (along it), `wrap`, `grow` (take the free room in a row), `width`, `maxWidth` (xs 320, sm 384, md 576, lg 768, xl 1024, 2xl 1280 pixels; center it with `align: \"center\"` on the parent) and `minHeight`. `surface` paints it and sets a text color that reads on it: none, page, card, muted, a hue (gray, brown, orange, yellow, green, blue, purple, pink, red), or inverse and primary, which switch everything inside to a contrasting palette and do not nest. `border` (all, top, bottom, start, end, x, y), `radius`, and `shadow` finish it. `overflow`: hidden clips children to the radius; scroll makes a row scroll sideways instead of wrapping (set `label` to name it). Responsive props follow the width of the page column or canvas frame, never the browser window (sm 576, md 672, lg 896 pixels): `stackBelow` turns a row into a column below that width; on such a row, `alignBelow` (start, center, end, stretch) is the `align` to use once it has stacked, so `align: \"center\"` on the row does not shrink each stacked child to its content, and `reverseBelow` draws the stacked children in reverse order (words above a picture that sits first in the row; keyboard and reading order stay as written, so do not use it across buttons, links, or fields). `hideBelow` and `hideAbove` hide the Box. `label` names it for screen readers.",
   Icon: `An icon by name, in the text color. \`size\`: xs to xl. \`tone\`: default, muted, or a status tone. Decorative unless \`label\` is set. Names: ${uiIconNames.join(", ")}.`,
-  Placeholder: "A neutral stand-in so a mockup needs no upload. `variant`: image (default), video, or map fill the width at `ratio` (square, photo 4:3, video 16:9, wide 21:9, portrait 3:4); logo is a small wordmark box; avatar is a small circle. `label` says what goes there.",
+  Placeholder: "A neutral stand-in so a mockup needs no upload. `variant`: image (default), video, or map fill the width at `ratio` (square, photo 4:3, video 16:9, wide 21:9, portrait 3:4); logo is a small wordmark box; avatar is a small circle. `label` says what goes there. `frame`: browser or phone draws a plain window or phone around an image, video, or map stand-in, for a product shot; the frame is decoration with no working controls.",
 } as const;

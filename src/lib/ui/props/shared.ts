@@ -25,6 +25,10 @@ export type NumberFormat = z.infer<typeof numberFormat>;
 export const cellFormat = z.enum(["text", "number", "compact", "percent", "currency"]);
 export type CellFormat = z.infer<typeof cellFormat>;
 
+/** A table column also takes "check": true draws a check mark and false a dash, for a comparison table. */
+export const columnFormat = z.enum([...cellFormat.options, "check"]);
+export type ColumnFormat = z.infer<typeof columnFormat>;
+
 /** Color tone shared by Callout, Badge, and status-like components. */
 export const tone = z.enum(["neutral", "info", "success", "warning", "danger"]);
 export type Tone = z.infer<typeof tone>;

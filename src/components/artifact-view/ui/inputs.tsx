@@ -87,10 +87,10 @@ export function SelectView({ props, bindings, emit }: ViewProps<"Select">) {
   const { notes, control } = useFieldNotes(props.description, props.error);
   const [value, setValue] = useInputValue<string | null>(props.value, bindings?.value, null);
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
+    <div className={cn("flex min-w-0 flex-col gap-1.5", props.fullWidth && "w-full")}>
       <span id={labelId} className={cn("text-md font-medium break-words", props.hideLabel && "sr-only")}>{props.label}</span>
       <Select value={value} disabled={props.disabled ?? false} onValueChange={(next) => { if (typeof next === "string") { setValue(next); emit("change"); } }}>
-        <SelectTrigger {...control} aria-labelledby={labelId} className="w-full max-w-sm min-w-0">
+        <SelectTrigger {...control} aria-labelledby={labelId} className={cn("w-full min-w-0", !props.fullWidth && "max-w-sm")}>
           <SelectValue placeholder={props.placeholder ?? "Choose…"} />
         </SelectTrigger>
         <SelectContent>
@@ -155,16 +155,26 @@ function buttonIcon(props: ButtonProps, side: "start" | "end"): ReactNode {
   return position === side ? <ButtonIcon name={props.icon} at={side === "start" ? "inline-start" : "inline-end"} /> : null;
 }
 
+/**
+ * A destructive action: the danger tone as the fill and the page color as
+ * its label, the same pair as the tone written on the page, which holds
+ * 4.5:1 by rule on every surface and in every theme. Hover mixes the fill
+ * toward the text color, away from the label, so the label only gains
+ * (`dangerHoverMix`, which the theme rule checks over every preset).
+ */
+const dangerClass = "bg-tone-danger text-background hover:bg-[color-mix(in_oklch,var(--tone-danger),var(--foreground)_14%)] focus-visible:ring-tone-danger/40";
+
 function buttonClass(props: ButtonProps, size: (typeof buttonSize)[ButtonSize]): string {
-  if (props.iconOnly) return cn("shrink-0", size.extra && "size-10");
-  return cn("max-w-full min-w-0", props.fullWidth ? "w-full" : "w-fit", size.extra);
+  const danger = props.variant === "danger" && dangerClass;
+  if (props.iconOnly) return cn("shrink-0", size.extra && "size-10", danger);
+  return cn("max-w-full min-w-0", props.fullWidth ? "w-full" : "w-fit", size.extra, danger);
 }
 
 export function ButtonView({ props, emit }: ViewProps<"Button">) {
   const size = buttonSize[props.size ?? "md"];
   const named = props.iconOnly ? { "aria-label": props.label } : {};
   return (
-    <Button {...named} variant={props.variant ?? "default"} size={props.iconOnly ? size.icon : size.text} disabled={props.disabled ?? false} className={buttonClass(props, size)} onClick={() => { emit("press"); }}>
+    <Button {...named} variant={props.variant === "danger" ? "default" : (props.variant ?? "default")} data-variant={props.variant === "danger" ? "danger" : undefined} size={props.iconOnly ? size.icon : size.text} disabled={props.disabled ?? false} className={buttonClass(props, size)} onClick={() => { emit("press"); }}>
       {buttonIcon(props, "start")}
       {props.iconOnly ? null : <span className="truncate">{props.label}</span>}
       {buttonIcon(props, "end")}

@@ -177,6 +177,18 @@ lint. Nothing renders under the 13px floor.
   narrow interface on a wide window (a pane, a docs example, a frame) gets
   the narrow layout. Always name the container: a bare `@xl:` binds to the
   nearest chart, board, or calendar. `e2e/ui-container-width.spec.ts` checks it.
+- Text that appears in an interface is spoken through one live region per
+  interface root (`Announcer` in `src/components/artifact-view/ui/announcer.tsx`,
+  mounted by `UiView`): a view hands it words with `useAnnounced`, behind the
+  `announce` prop. Never put `role="status"` or `aria-live` on an element
+  that arrives later; a screen reader announces that unreliably. Text drawn
+  with the interface is not spoken, and the editor has no region.
+- An interface action that the renderer does not run itself goes into
+  `src/components/artifact-view/ui/state-actions.tsx` (`toggleState` is
+  there), with its name in `allowedActions` and its state path under a key
+  the path checks already read (`statePath`). The handlers are fixed from
+  the first draw; do not register one from an effect, which costs a second
+  draw of every element and leaves a press unanswered until it lands.
 
 ### Aesthetic: soft minimalism
 
@@ -581,7 +593,10 @@ catch this, so test the generated SQL with `.toSQL()`, as
   tone badge read on every hue. A primary surface tells the views inside it
   the mode its accent palette is, and steps its fill until the accent's
   label holds a badge. A new surface goes there and into the "Surfaces and tones"
-  gallery specimen, which the contrast spec reads.
+  gallery specimen, which the contrast spec reads. A danger Button is the
+  danger tone as the fill under the page color, the tone rule's own pair, and
+  moves toward the text color under the pointer (`dangerHoverMix`);
+  `surface-scope.test.ts` holds it at 4.5:1 over every preset and surface.
 
 ### Page column
 

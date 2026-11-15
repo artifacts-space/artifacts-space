@@ -6,10 +6,10 @@ import { useMemo } from "react";
 import { toRendererSpec } from "@/lib/ui/spec";
 import { validateUiSpec } from "@/lib/ui/validate";
 
+import { Announcer } from "./ui/announcer";
 import { UnknownComponent, uiRegistry } from "./ui/registry";
+import { StateActions, useStateActions } from "./ui/state-actions";
 import { IssueList, ViewNotice } from "./view-notice";
-
-const noHandlers = {};
 
 /**
  * Renders a ui artifact (a json-render spec) with the stout registry. A spec
@@ -19,6 +19,7 @@ const noHandlers = {};
  */
 export function UiView({ content }: { content: string }) {
   const result = useMemo(() => validateUiSpec(content), [content]);
+  const { handlers, accessRef } = useStateActions();
   const errors = result.issues.filter((issue) => issue.severity === "error");
   if (!result.renderable || !result.spec) {
     return (
@@ -37,8 +38,11 @@ export function UiView({ content }: { content: string }) {
           </details>
         </ViewNotice>
       ) : null}
-      <JSONUIProvider key={content} registry={uiRegistry} initialState={result.spec.state ?? {}} handlers={noHandlers}>
-        <Renderer spec={toRendererSpec(result.spec)} registry={uiRegistry} fallback={UnknownComponent} />
+      <JSONUIProvider key={content} registry={uiRegistry} initialState={result.spec.state ?? {}} handlers={handlers}>
+        <StateActions accessRef={accessRef} />
+        <Announcer>
+          <Renderer spec={toRendererSpec(result.spec)} registry={uiRegistry} fallback={UnknownComponent} />
+        </Announcer>
       </JSONUIProvider>
     </div>
   );

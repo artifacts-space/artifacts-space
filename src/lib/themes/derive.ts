@@ -342,6 +342,15 @@ const siteTones: Record<PaletteMode, Record<(typeof toneRoles)[number], string>>
 export const toneTintMax = 0.12;
 
 /**
+ * How far a danger Button's fill moves under the pointer: the danger tone
+ * mixed this far toward the text color, in OKLCH. Its label is the page
+ * color, the far side from the text color, so the label only gains. The
+ * Button's class in `src/components/artifact-view/ui/inputs.tsx` carries
+ * the same number, and a test holds the two together.
+ */
+export const dangerHoverMix = 0.14;
+
+/**
  * Status tones on the themed card, page, quiet surfaces (--secondary,
  * --muted, --accent), and every block hue's background (a Box can be
  * painted with one). A tone is text there and on its own tint over each (a
