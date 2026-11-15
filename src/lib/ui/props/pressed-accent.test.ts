@@ -15,32 +15,43 @@ const messages = (type: string, props: Record<string, unknown>) => issues(type, 
 
 const bothStates = "`pressed` and `expanded` describe different buttons";
 const dangerPressed = "A danger Button is a one-time action that deletes or cannot be undone, so it cannot stay pressed";
+const quietToSolid = "A toggle button goes from quiet to solid when pressed, so `pressed` needs `variant: \"outline\"`, `\"secondary\"`, or `\"ghost\"`.";
 
 describe("Button pressed", () => {
   it("should accept pressed as true, false, or read from state", () => {
-    expect(messages("Button", { label: "Bold", pressed: true })).toEqual([]);
+    expect(messages("Button", { label: "Bold", pressed: true, variant: "secondary" })).toEqual([]);
     expect(messages("Button", { label: "Bold", pressed: false, variant: "outline" })).toEqual([]);
     expect(messages("Button", { label: "Bold", pressed: { $state: "/bold" }, variant: "ghost" })).toEqual([]);
   });
 
-  it.each(["default", "outline", "secondary", "ghost"])("should accept pressed on the %s variant", (variant) => {
+  it.each(["outline", "secondary", "ghost"])("should accept pressed on the %s variant", (variant) => {
     expect(messages("Button", { label: "Bold", pressed: true, variant })).toEqual([]);
   });
 
   it("should refuse pressed written as anything but true, false, or an expression", () => {
-    expect(messages("Button", { label: "Bold", pressed: "yes" })).not.toEqual([]);
+    expect(messages("Button", { label: "Bold", pressed: "yes", variant: "outline" })).not.toEqual([]);
   });
 
   it("should refuse pressed with expanded, written or read from state, and say to keep one", () => {
-    expect(messages("Button", { label: "Menu", pressed: true, expanded: false })).toEqual([expect.stringContaining(bothStates)]);
-    expect(messages("Button", { label: "Menu", pressed: { $state: "/bold" }, expanded: { $state: "/open" } })).toEqual([expect.stringContaining(bothStates)]);
-    expect(messages("Button", { label: "Menu", pressed: true, expanded: false })[0]).toContain("Keep `pressed` for a toggle, or `expanded` for a button that opens something.");
+    expect(messages("Button", { label: "Menu", pressed: true, expanded: false, variant: "outline" })).toEqual([expect.stringContaining(bothStates)]);
+    expect(messages("Button", { label: "Menu", pressed: { $state: "/bold" }, expanded: { $state: "/open" }, variant: "ghost" })).toEqual([expect.stringContaining(bothStates)]);
+    expect(messages("Button", { label: "Menu", pressed: true, expanded: false, variant: "outline" })[0]).toContain("Keep `pressed` for a toggle, or `expanded` for a button that opens something.");
   });
 
   it("should refuse pressed on a danger Button, and say why and what to use instead", () => {
     const found = messages("Button", { label: "Delete", variant: "danger", pressed: false });
     expect(found).toEqual([expect.stringContaining(dangerPressed)]);
-    expect(found[0]).toContain("Remove `pressed`, or use the default, outline, secondary, or ghost variant for a toggle.");
+    expect(found[0]).toContain("Remove `pressed`, or use `variant: \"outline\"`, `\"secondary\"`, or `\"ghost\"` for a toggle.");
+  });
+
+  it("should refuse pressed on a default Button, written or left unset, and name the variants a toggle takes", () => {
+    expect(messages("Button", { label: "Bold", variant: "default", pressed: true })).toEqual([`Element "e" (Button): ${quietToSolid}`]);
+    expect(messages("Button", { label: "Bold", pressed: false })).toEqual([`Element "e" (Button): ${quietToSolid}`]);
+    expect(messages("Button", { label: "Bold", pressed: { $state: "/bold" } })).toEqual([`Element "e" (Button): ${quietToSolid}`]);
+  });
+
+  it("should say nothing about the variant when a default Button has no pressed", () => {
+    expect(messages("Button", { label: "Save" })).toEqual([]);
   });
 
   it("should report every problem at once when a danger Button also takes expanded and iconOnly without an icon", () => {

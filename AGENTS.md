@@ -609,13 +609,16 @@ catch this, so test the generated SQL with `.toSQL()`, as
   danger tone as the fill under the page color, the tone rule's own pair, and
   moves toward the text color under the pointer (`dangerHoverMix`);
   `surface-scope.test.ts` holds it at 4.5:1 over every preset and surface.
-  A pressed Button (`pressed`, every variant but danger) is the text color
-  as the fill, with the page color as its label and as a thin line inside
-  its edge, and moves toward the page color under the pointer
+  A pressed Button (`pressed`, only on outline, secondary, and ghost, which
+  go from quiet to solid; default and danger refuse it) is the text color
+  as the fill and edge, with the page color as its label, and moves toward
+  the page color under the pointer
   (`pressedHoverMix`); `surface-scope.test.ts` holds its label at 4.5:1 and
   its edge at 3:1 against the surface over every preset and surface. The
   accent tone (`--tone-accent`, Text, Icon, and Badge `tone: "accent"`) is
-  the theme's accent under the tone rule (`toneTokens`); on a primary
+  the theme's accent under the tone rule (`toneTokens`); the site's accent
+  is its ink, so the site palette starts it from a blue of its own in the
+  `--brand` family (hue 262; `--brand` stays for focus and selection); on a primary
   surface, which is the accent, it starts from that surface's label color
   (the accent palette's own accent), with the tones' fallback behind it.
 

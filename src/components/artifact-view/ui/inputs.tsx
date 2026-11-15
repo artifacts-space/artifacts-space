@@ -174,25 +174,27 @@ function isTrue(value: unknown): boolean {
 const dangerClass = "bg-tone-danger text-background hover:bg-[color-mix(in_oklch,var(--tone-danger),var(--foreground)_14%)] focus-visible:ring-tone-danger/40";
 
 /**
- * A toggle that is on, on every variant it takes: the text color as the
- * fill, the page color as its label and as a thin line just inside its edge.
- * The fill is a solid block where rest is quiet (outline, secondary, ghost)
- * and the inner line marks it where rest is already solid (default), so it
- * never differs by color alone, and the focus ring stays outside the edge.
+ * A toggle that is on: the text color as the fill and the edge, the page
+ * color as its label. The variants a toggle takes (outline, secondary,
+ * ghost) are quiet at rest, so pressed turns a hairline or a tint into a
+ * solid block, unlike hover (a tint) and the focus ring (outside the edge).
  * The text color reads on every surface at 4.5:1, so the edge holds 3:1
  * there, and the label holds 4.5:1 on the fill. Hover mixes the fill a step
  * toward the label (`pressedHoverMix`, which the theme rule checks over
  * every preset). The dark: classes override the variants' own dark fills.
  */
-const pressedFill = "bg-foreground hover:bg-[color-mix(in_oklch,var(--foreground),var(--background)_12%)]";
+const pressedHover = "hover:bg-[color-mix(in_oklch,var(--foreground),var(--background)_12%)]";
 const pressedClass = cn(
-  "border-foreground text-background outline-1 outline-solid -outline-offset-3 outline-background hover:text-background",
-  pressedFill,
+  "border-foreground bg-foreground text-background hover:text-background",
+  pressedHover,
   "dark:border-foreground dark:bg-foreground dark:hover:bg-[color-mix(in_oklch,var(--foreground),var(--background)_12%)]",
 );
 
-/** True when the button draws its pressed look: pressed, on a variant that takes it (validation refuses it on danger). */
-const looksPressed = (props: ButtonProps) => isTrue(props.pressed) && props.variant !== "danger";
+/** The variants a toggle takes: quiet at rest, so pressed is a change from quiet to solid. Validation refuses `pressed` on the others. */
+const toggleVariants: ReadonlySet<string> = new Set(["outline", "secondary", "ghost"]);
+
+/** True when the button draws its pressed look: pressed, on a variant a toggle takes. */
+const looksPressed = (props: ButtonProps) => isTrue(props.pressed) && toggleVariants.has(props.variant ?? "default");
 
 function buttonClass(props: ButtonProps, size: (typeof buttonSize)[ButtonSize]): string {
   const look = props.variant === "danger" ? dangerClass : looksPressed(props) && pressedClass;

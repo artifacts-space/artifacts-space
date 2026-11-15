@@ -86,7 +86,7 @@ export const iconDocs: Record<"Icon", ComponentDoc> = {
         }),
       },
     ],
-    rules: ["`name` is one of the listed icon names. An unknown name fails validation.", "An icon that carries meaning on its own needs a `label`.", "`tone`: default, muted, a status tone (info, success, warning, danger), or accent, the theme's accent color. Every tone reads on every Box surface and in every theme."],
+    rules: ["`name` is one of the listed icon names. An unknown name fails validation.", "An icon that carries meaning on its own needs a `label`.", "`tone`: default, muted, a status tone (info, success, warning, danger), or accent: the theme's own accent, or blue on the default palette. Every tone reads on every Box surface and in every theme."],
   },
 };
 

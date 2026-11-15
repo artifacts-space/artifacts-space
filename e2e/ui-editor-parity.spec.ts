@@ -50,7 +50,7 @@ async function drawn(view: Locator) {
   const width = (target: Locator) => target.evaluate((element) => element.getBoundingClientRect().width);
   const row = await width(hero);
   const art = await width(hero.getByRole("img", { name: "Screenshot" }));
-  const buttons = await Promise.all(["Start free", "Open menu", "Delete draft", "Bold"].map((name) => styleOf(view.getByRole("button", { name }), ["height", "font-size", "color", "background-color", "border-top-color", "outline-style", "outline-color", "outline-offset"])));
+  const buttons = await Promise.all(["Start free", "Open menu", "Delete draft", "Bold"].map((name) => styleOf(view.getByRole("button", { name }), ["height", "font-size", "color", "background-color", "border-top-color"])));
   const pressed = await view.getByRole("button", { name: "Bold" }).getAttribute("aria-pressed");
   // The rule between the buttons, as tall as its row.
   const rule = Math.round(await view.getByRole("separator").first().evaluate((element) => element.getBoundingClientRect().height));
@@ -99,9 +99,8 @@ function expectStyledFixture(forReaders: Drawn, isMobile: boolean) {
   expect(forReaders.rule).toBeGreaterThan(20);
   expect(forReaders.stat["box-shadow"]).toBe("none");
   expect(forReaders.buttons[2]?.["background-color"]).not.toBe(forReaders.buttons[0]?.["background-color"]);
-  // The pressed Button: on, filled with the text color, and its inner line drawn; the accent words are not the body color.
+  // The pressed Button: on, and filled with the text color; the accent words are not the body color.
   expect(forReaders.pressed).toBe("true");
-  expect(forReaders.buttons[3]?.["outline-style"]).toBe("solid");
   expect(forReaders.buttons[3]?.["background-color"]).toBe(forReaders.text["Grows to fill the row"]?.color);
   expect(forReaders.boxes.Featured?.edge).not.toBe(forReaders.boxes.Draft?.edge);
   // On a phone the row has stacked, words first; on a desktop it is a row with the picture first.

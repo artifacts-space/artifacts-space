@@ -262,14 +262,16 @@
    * series. Each is text on the page, the card, the quiet surfaces, and its
    * own tint over them (a badge, up to 12%), at 4.5:1 on every one; themes
    * re-light them by the same rule (toneTokens in src/lib/themes/derive.ts).
-   * The accent tone is the accent (--primary) as text, under the same rule;
-   * the site's accent is its ink, so here it is the ink.
+   * The accent tone is the accent (--primary) as text, under the same rule.
+   * The site's accent is its ink, which would read as body text, so here it
+   * is a blue of its own in the --brand family (hue 262); --brand itself
+   * stays for focus rings and text selection.
    */
   --tone-info: oklch(0.485 0.15 255);
   --tone-success: oklch(0.47 0.13 150);
   --tone-warning: oklch(0.49 0.14 70);
   --tone-danger: oklch(0.5 0.2 27);
-  --tone-accent: oklch(0.2 0.006 60);
+  --tone-accent: oklch(0.49 0.22 262);
   /* Categorical chart series, fixed order (validated reference palette). 7-8 pass adjacent checks with gaps and labels as secondary encoding. Each holds 3:1 on the page, the card, the quiet surfaces, and every block hue fill (presets.test.ts). */
   --series-1: #2a78d6;
   --series-2: #df5d27;
@@ -475,7 +477,7 @@
   --tone-success: oklch(0.75 0.13 150);
   --tone-warning: oklch(0.8 0.13 75);
   --tone-danger: oklch(0.735 0.17 25);
-  --tone-accent: oklch(0.93 0.004 80);
+  --tone-accent: oklch(0.725 0.17 262);
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;

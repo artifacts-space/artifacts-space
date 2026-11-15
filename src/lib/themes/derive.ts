@@ -338,6 +338,27 @@ const siteTones: Record<PaletteMode, Record<(typeof toneRoles)[number], string>>
   dark: { info: "oklch(0.74 0.12 255)", success: "oklch(0.75 0.13 150)", warning: "oklch(0.8 0.13 75)", danger: "oklch(0.735 0.17 25)" },
 };
 
+/**
+ * The site's own accent (its --primary, from globals.css): the site's ink,
+ * so as text it would read as body text. A palette whose accent is exactly
+ * this one is the site's, and its accent tone starts from `siteAccentTone`.
+ */
+const siteAccent: Record<PaletteMode, string> = { light: "oklch(0.2 0.006 60)", dark: "oklch(0.93 0.004 80)" };
+
+/**
+ * Where the site's accent tone starts: the blue family of --brand (hue 262),
+ * as a token of its own, since --brand is kept for focus rings and text
+ * selection. Each is the step of that blue nearest --brand's lightness that
+ * also holds on the site's hand-set hue fills (presets.test.ts), and the
+ * tone rule re-lights it like every tone.
+ */
+const siteAccentTone: Record<PaletteMode, string> = { light: "oklch(0.49 0.22 262)", dark: "oklch(0.725 0.17 262)" };
+
+/** The color the accent tone starts from: the theme's own accent, or the site's blue when the accent is the site's ink. */
+function accentSeed(mode: PaletteMode, colors: ThemeColors): string {
+  return formatOklch(read(colors.accent)) === formatOklch(read(siteAccent[mode])) ? siteAccentTone[mode] : colors.accent;
+}
+
 /** The strongest tint of a tone its own text sits on: a badge or calendar event is the tone's text on the tone at 12% at most. */
 export const toneTintMax = 0.12;
 
@@ -368,14 +389,15 @@ export const pressedHoverMix = 0.12;
  * its own tint over each (a badge), so it keeps its hue and chroma and is
  * re-lit until it reads at 4.5:1 on every one. The status tones start from
  * the site's hues; the accent tone starts from the theme's accent, so it is
- * the theme's own color as text (on the site palette, whose accent is its
- * ink, the ink). Dots and edges use the same token.
+ * the theme's own color as text. The site's accent is its ink, which would
+ * read as body text, so on the site palette it starts from a blue of its own
+ * (`siteAccentTone`). Dots and edges use the same token.
  */
 export function toneTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
   const card = read(colors.card);
   const surfaces = paintedSurfaces(mode, colors);
   const reads = (tone: Oklch) => surfaces.every((surface) => contrastRatio(tone, surface) >= 4.55 && contrastRatio(tone, paintOver(tone, toneTintMax, surface)) >= 4.55);
-  const seeds: [string, string][] = [...toneRoles.map((role): [string, string] => [role, siteTones[mode][role]]), ["accent", colors.accent]];
+  const seeds: [string, string][] = [...toneRoles.map((role): [string, string] => [role, siteTones[mode][role]]), ["accent", accentSeed(mode, colors)]];
   return Object.fromEntries(seeds.map(([role, seed]) => [`--tone-${role}`, formatOklch(holdApart(read(seed), card, reads))]));
 }
 

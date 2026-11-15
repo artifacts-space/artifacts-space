@@ -87,8 +87,8 @@ type Elements = Record<string, { type: string; props: Record<string, unknown>; c
 
 const tones = ["info", "success", "warning", "danger", "accent"] as const;
 
-/** A pressed Button of each variant that takes it, by its label: the text color as the fill on every one. */
-const pressedButtons = { bold: "default", italic: "outline", starred: "secondary", saved: "ghost" } as const;
+/** A pressed Button of each variant a toggle takes, by its label: the text color as the fill on every one. */
+const pressedButtons = { italic: "outline", starred: "secondary", saved: "ghost" } as const;
 
 /** One surface with everything that must read on it: body and muted text, each status tone and the accent as text and as an icon, a rule, links, and buttons, pressed ones included. */
 function surfaceElements(surface: BoxSurface): Elements {

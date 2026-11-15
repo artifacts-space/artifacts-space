@@ -12,7 +12,8 @@ import { readColors } from "./support/colors";
  * themes, in light and in dark: the label against the pressed fill at
  * 4.5:1 and the edge against the surface at 3:1, at rest and under the
  * pointer. The accent tone is read there too: the theme's own accent as
- * text, and the surface's own text color on a primary surface.
+ * text, the site's own blue on the site palette, and the surface's own
+ * text color on a primary surface.
  */
 
 const specimen = (page: Page, group: string, name: string) => page.locator(`section#${group} [data-specimen="${name}"]`);
@@ -50,8 +51,7 @@ test("should flip aria-pressed with one press, show the button pressed, and pass
   await bold.click();
   await expect(bold).toHaveAttribute("aria-pressed", "true");
   await expect(sample).toHaveCSS("font-weight", "600");
-  // The look follows: a filled button with its inner line, not the outline it was.
-  await expect(bold).toHaveCSS("outline-style", "solid");
+  // The look follows: a filled button, not the outline it was.
   expect(await bold.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(restFill);
   // A toggle stays in place and keeps the focus, so the same press turns it off.
   await expect(bold).toBeFocused();
@@ -65,12 +65,14 @@ test("should flip aria-pressed with one press, show the button pressed, and pass
   await bold.press("Space");
   await expect(bold).toHaveAttribute("aria-pressed", "false");
   await expect(sample).toHaveCSS("font-weight", "400");
-  await expect(bold).toHaveCSS("outline-style", "none");
+  // Away from the pointer it is the outline it was at the start.
+  await page.mouse.move(0, 0);
+  await expect.poll(() => bold.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(restFill);
 });
 
 test("should pass axe on the Button, Badge, Text, and Icon groups of the gallery, with every pressed and accent fixture drawn", async ({ page }) => {
   await galleryReady(page, "Button");
-  await expect(specimen(page, "Button", "Toggle, pressed").getByRole("button", { name: "Bold" })).toHaveAttribute("aria-pressed", "true");
+  await expect(specimen(page, "Button", "Toggle, pressed, outline").getByRole("button", { name: "Bold" })).toHaveAttribute("aria-pressed", "true");
   await expect(specimen(page, "Button", "Toggle, not pressed").getByRole("button", { name: "Bold" })).toHaveAttribute("aria-pressed", "false");
   await expect(specimen(page, "Button", "Toggle, pressed, ghost icon only").getByRole("button", { name: "Saved" })).toHaveAttribute("aria-pressed", "true");
   for (const group of ["Button", "Badge", "Text", "Icon"]) {
@@ -85,7 +87,6 @@ interface PressedColors {
   surface: number[];
   fill: number[];
   edge: number[];
-  line: number[];
   label: number[];
 }
 
@@ -111,7 +112,7 @@ function readPressed(button: Locator): Promise<PressedColors> {
     const fill = paint(style.backgroundColor);
     const onFill = (color: string) => { paint(`rgb(${fill.join(",")})`); return paint(color); };
     const edge = (() => { paint(under); return paint(style.borderTopColor); })();
-    return { surface, fill, edge, line: onFill(style.outlineColor), label: onFill(style.color) };
+    return { surface, fill, edge, label: onFill(style.color) };
   });
 }
 
@@ -131,7 +132,6 @@ function contrast(a: readonly number[], b: readonly number[]): number {
 interface PressedReading {
   label: number;
   edge: number;
-  line: number;
 }
 
 function pairsOf(colors: PressedColors): PressedReading {
@@ -139,14 +139,13 @@ function pairsOf(colors: PressedColors): PressedReading {
     label: contrast(colors.label, colors.fill),
     // The edge is the border, and the fill beside it: both must show on the surface.
     edge: Math.min(contrast(colors.edge, colors.surface), contrast(colors.fill, colors.surface)),
-    line: contrast(colors.line, colors.fill),
   };
 }
 
 /** Each pressed button of a surface box, at rest and under the pointer. */
 async function expectPressedReads(page: Page, box: Locator, lowest: PressedReading) {
   const name = (await box.getAttribute("aria-label")) ?? "";
-  for (const label of ["Bold", "Italic", "Starred", "Saved"]) {
+  for (const label of ["Italic", "Starred", "Saved"]) {
     const button = box.getByRole("button", { name: label });
     await button.scrollIntoViewIfNeeded();
     await expect(button, `${name}: ${label}`).toHaveAttribute("aria-pressed", "true");
@@ -164,10 +163,8 @@ async function expectPressedReads(page: Page, box: Locator, lowest: PressedReadi
       const where = `${name}, ${label} ${state}: label ${colors.label.join(",")} on ${colors.fill.join(",")}, edge ${colors.edge.join(",")} on ${colors.surface.join(",")}`;
       expect(pairs.label, where).toBeGreaterThanOrEqual(4.5);
       expect(pairs.edge, where).toBeGreaterThanOrEqual(3);
-      expect(pairs.line, where).toBeGreaterThanOrEqual(3);
       lowest.label = Math.min(lowest.label, pairs.label);
       lowest.edge = Math.min(lowest.edge, pairs.edge);
-      lowest.line = Math.min(lowest.line, pairs.line);
     }
     await page.mouse.move(0, 0);
   }
@@ -188,9 +185,9 @@ for (const scheme of ["light", "dark"] as const) {
       await page.addStyleTag({ content: "*, *::before, *::after { transition: none !important; }" });
       const boxes = await find(page).getByRole("group", { name: /^Surface / }).all();
       expect(boxes).toHaveLength(15);
-      const lowest: PressedReading = { label: Infinity, edge: Infinity, line: Infinity };
+      const lowest: PressedReading = { label: Infinity, edge: Infinity };
       for (const box of boxes) await expectPressedReads(page, box, lowest);
-      test.info().annotations.push({ type: "lowest contrast", description: `${theme} ${scheme}: label ${lowest.label.toFixed(2)}, edge ${lowest.edge.toFixed(2)}, inner line ${lowest.line.toFixed(2)}` });
+      test.info().annotations.push({ type: "lowest contrast", description: `${theme} ${scheme}: label ${lowest.label.toFixed(2)}, edge ${lowest.edge.toFixed(2)}` });
     });
   }
 }
@@ -219,6 +216,23 @@ for (const scheme of ["light", "dark"] as const) {
     const [accent, body] = [await readColors(accentText("primary")), await readColors(bodyText("primary"))];
     expect(Math.abs(accent.contrast - body.contrast)).toBeLessThan(0.5);
     await expect(surface("primary").getByText("accent badge", { exact: true })).toBeVisible();
+  });
+
+  test(`should draw the site's accent tone as a blue of its own, not its body text, at 4.5:1 on every surface, when the site is ${scheme}`, async ({ page, isMobile }) => {
+    test.skip(isMobile, "the same colors as the desktop run");
+    await useScheme(page, scheme);
+    await galleryReady(page, "specs");
+    const boxes = await specimen(page, "specs", "Surfaces and tones").getByRole("group", { name: /^Surface / }).all();
+    expect(boxes).toHaveLength(15);
+    const pageBox = specimen(page, "specs", "Surfaces and tones").getByRole("group", { name: "Surface page", exact: true });
+    expect(await colorOf(pageBox.getByText("accent text", { exact: true }))).not.toBe(await colorOf(pageBox.getByText("Body text on the page surface.", { exact: true })));
+    let lowest = Infinity;
+    for (const box of boxes) {
+      const reading = await readColors(box.getByText("accent text", { exact: true }));
+      expect(reading.contrast, `${(await box.getAttribute("aria-label")) ?? ""}: ${reading.text} on ${reading.background}`).toBeGreaterThanOrEqual(4.5);
+      lowest = Math.min(lowest, reading.contrast);
+    }
+    test.info().annotations.push({ type: "lowest contrast", description: `site accent ${scheme}: ${lowest.toFixed(2)}` });
   });
 }
 

@@ -239,6 +239,27 @@ describe("status tones", () => {
     }
   });
 
+  it("should give the site palette an accent tone of its own in the blue of --brand, not its ink, and leave --brand as it is", () => {
+    for (const mode of ["light", "dark"] as const) {
+      const accent = parseColor(siteColor(mode, "--tone-accent") ?? "");
+      if (!accent) throw new Error(`${mode} has no --tone-accent`);
+      expect(accent.h, mode).toBeCloseTo(262, 0);
+      expect(accent.c, mode).toBeGreaterThan(0.1);
+      expect(siteColor(mode, "--tone-accent"), mode).not.toBe(siteColor(mode, "--foreground"));
+      expect(siteColor(mode, "--tone-accent"), mode).not.toBe(siteColor(mode, "--brand"));
+    }
+  });
+
+  it("should start a theme's accent tone from its own accent when that accent is not the site's ink", () => {
+    for (const id of ["ocean", "forest", "editorial", "ink"]) {
+      const preset = builtInPresets().get(id);
+      if (!preset) throw new Error(`${id} preset missing`);
+      for (const mode of ["light", "dark"] as const) {
+        expect(toneTokens(mode, preset.theme[mode])["--tone-accent"], `${id} ${mode}`).toBe(normalizeColor(preset.theme[mode].accent));
+      }
+    }
+  });
+
   it("should read at 4.5:1 in globals.css as text and as a badge on the site's page, card, muted fill, and every hue fill, in both modes", () => {
     // The site paints its own hand-set hue fills, not derived ones, so the rule is checked here against the values a reader sees.
     for (const mode of ["light", "dark"] as const) {

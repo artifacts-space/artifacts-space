@@ -143,7 +143,7 @@ export const inputDocs = {
       "`danger` is for an action that deletes or cannot be undone: a solid fill in the danger tone. Its label reads on every Box surface and in every theme.",
       "`iconOnly` needs an `icon`; the `label` is then what screen readers announce.",
       "`expanded` says whether what the button opens is open (a menu toggle, a \"Show more\"). Read it from the same path the button flips: `\"expanded\": { \"$state\": \"/open\" }`. That path must hold `true` or `false`; any other value stops the button from being shown. Leave it off a button that opens nothing.",
-      "`pressed` says whether a toggle is on (Bold, a filter chip, a view switch). Read it from the path the button flips: `\"pressed\": { \"$state\": \"/bold\" }`. A pressed button is filled with the text color, with its label and a thin line inside its edge in the page color, on every variant and surface. A button takes `pressed` or `expanded`, never both, and a danger button never takes `pressed`: it is a one-time action, not a state that stays on.",
+      "`pressed` says whether a toggle is on (Bold, a filter chip, a view switch). Read it from the path the button flips: `\"pressed\": { \"$state\": \"/bold\" }`. A toggle goes from quiet to solid when pressed, so it takes `variant: \"outline\"`, `\"secondary\"`, or `\"ghost\"`: pressed, it is filled with the text color, with its label in the page color, on every surface. The default variant is solid already and is refused, and so is danger: a one-time action, not a state that stays on. A button takes `pressed` or `expanded`, never both.",
     ],
   },
 } satisfies Record<string, ComponentDoc>;

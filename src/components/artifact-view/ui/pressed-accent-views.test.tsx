@@ -56,11 +56,18 @@ describe("a Button that says whether it is on", () => {
 });
 
 describe("the pressed look", () => {
-  it.each(["default", "outline", "secondary", "ghost"] as const)("should fill a pressed %s Button with the text color, write its label in the page color, and draw the inner line", (variant) => {
+  it.each(["outline", "secondary", "ghost"] as const)("should fill a pressed %s Button with the text color and write its label in the page color", (variant) => {
     const classes = classesOf(button({ label: "Bold", variant, pressed: true }));
-    for (const name of ["bg-foreground", "text-background", "border-foreground", "outline-solid", "outline-background", "-outline-offset-3", "dark:bg-foreground", "dark:border-foreground"]) expect(classes, name).toContain(name);
+    for (const name of ["bg-foreground", "text-background", "border-foreground", "dark:bg-foreground", "dark:border-foreground"]) expect(classes, name).toContain(name);
     // The variant's own fills and words under the pointer give way to the pressed ones.
-    for (const name of ["bg-primary", "hover:bg-primary/80", "hover:bg-muted", "hover:text-foreground", "bg-secondary", "outline-none", "dark:bg-input/30", "dark:hover:bg-input/50", "dark:hover:bg-muted/50"]) expect(classes, name).not.toContain(name);
+    for (const name of ["hover:bg-muted", "hover:text-foreground", "bg-secondary", "dark:bg-input/30", "dark:hover:bg-input/50", "dark:hover:bg-muted/50"]) expect(classes, name).not.toContain(name);
+  });
+
+  it("should draw a default Button that reaches the view with pressed, which validation refuses, as the default variant", () => {
+    const pressed = classesOf(button({ label: "Bold", pressed: true }));
+    expect(pressed).toContain("bg-primary");
+    expect(pressed).not.toContain("bg-foreground");
+    expect(classesOf(button({ label: "Bold", variant: "default", pressed: true }))).toEqual(classesOf(button({ label: "Bold", variant: "default" })));
   });
 
   it("should move a pressed Button's fill toward its label under the pointer, by the step the theme rule checks", () => {

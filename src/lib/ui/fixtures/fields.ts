@@ -48,7 +48,6 @@ export const screenButtonFixtures: ComponentFixture[] = [
   { name: "Disclosure, closed", props: { label: "Show more", variant: "outline", icon: "chevron-down", iconPosition: "end", expanded: false } },
   { name: "Disclosure, open", props: { label: "Show less", variant: "outline", icon: "chevron-up", iconPosition: "end", expanded: true } },
   { name: "Toggle, not pressed", props: { label: "Bold", variant: "outline", pressed: false } },
-  { name: "Toggle, pressed", props: { label: "Bold", pressed: true } },
   { name: "Toggle, pressed, outline", props: { label: "Bold", variant: "outline", pressed: true } },
   { name: "Toggle, pressed, secondary with an icon", props: { label: "Starred", variant: "secondary", icon: "star", pressed: true } },
   { name: "Toggle, pressed, ghost icon only", props: { label: "Saved", variant: "ghost", icon: "bookmark", iconOnly: true, pressed: true } },

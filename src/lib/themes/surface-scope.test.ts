@@ -281,7 +281,7 @@ describe("a danger Button: the danger tone as the fill, the page color as its la
   });
 });
 
-describe("a pressed Button: the text color as the fill, the page color as its label and inner line", () => {
+describe("a pressed Button: the text color as the fill, the page color as its label", () => {
   /** The label on the fill, and the fill's edge on the surface, at rest and under the pointer. */
   function reads(tokens: { label: Oklch; fill: Oklch; surface: Oklch }) {
     const hover = mixOklch(tokens.fill, tokens.label, pressedHoverMix);
