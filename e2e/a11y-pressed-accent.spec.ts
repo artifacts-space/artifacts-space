@@ -234,8 +234,8 @@ for (const slug of ["button", "text", "icon", "badge"]) {
 test("should turn Bold on and off with one button in the Button docs, and say so to screen readers", async ({ page }) => {
   await page.goto("/docs/json-render/components/button");
   const example = page.locator('[data-docs-example="A toggle that stays pressed"]');
-  // Pressed only once React answers a press there.
-  await expect(example.locator("[data-example-ready]")).toBeAttached();
+  // Pressed only once React answers a press there: the interface's own root says so.
+  await expect(example.locator("[data-docs-preview] > [data-example-ready]")).toBeAttached();
   const bold = example.getByRole("button", { name: "Bold" });
   await bold.scrollIntoViewIfNeeded();
   await expect(bold).toHaveAttribute("aria-pressed", "false");
