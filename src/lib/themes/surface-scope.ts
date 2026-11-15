@@ -1,7 +1,7 @@
 import type { BlockHue } from "@/lib/block-colors/block-color-rules";
 
-import { contrastRatio, ensureContrast, formatOklch, mixOklch, parseColor, relativeLuminance, type Oklch } from "./color";
-import { paletteTokens, type PaletteMode } from "./derive";
+import { contrastRatio, ensureContrast, formatOklch, mixOklch, paintOver, parseColor, relativeLuminance, type Oklch } from "./color";
+import { paletteTokens, toneTintMax, type PaletteMode } from "./derive";
 import type { Theme, ThemeColors } from "./schema";
 import { usesSitePalette } from "./style";
 
@@ -76,14 +76,17 @@ const toneNames = ["--tone-info", "--tone-success", "--tone-warning", "--tone-da
 
 /**
  * On an accent of middling lightness a tone can run out of room before it
- * reads (a red tone on a red accent). It then takes the accent's own label
- * color, which the theme rules already hold at 4.5:1 there.
+ * reads as text and on its own tint (a red tone on a red accent, a badge
+ * there). It then takes the accent's own label color, which the theme
+ * rules already hold at 4.5:1 there.
  */
 function tonesOnAccent(tokens: Record<string, string>, colors: ThemeColors): Record<string, string> {
   const page = read(colors.background);
   const held = { ...tokens };
   for (const name of toneNames) {
-    if (contrastRatio(read(tokens[name]), page) < textMinimum) held[name] = colors.foreground;
+    const tone = read(tokens[name]);
+    const reads = contrastRatio(tone, page) >= textMinimum && contrastRatio(tone, paintOver(tone, toneTintMax, page)) >= textMinimum;
+    if (!reads) held[name] = colors.foreground;
   }
   return held;
 }

@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { Children, type ComponentType, type ReactNode } from "react";
 
-import { badgeTone, headingClassName, linkVariantClass, textClassName, toneStyles } from "@/components/artifact-view/ui/content";
+import { badgeClassName, headingClassName, linkVariantClass, textClassName, toneStyles } from "@/components/artifact-view/ui/content";
 import { textLimit } from "@/lib/ui/block-templates";
 import { componentProps, type UiComponentName, type UiProps } from "@/lib/ui/catalog";
 import { cn } from "@/lib/utils";
@@ -99,7 +99,7 @@ function QuoteBlock({ id, props }: BlockProps<"Quote">) {
 function BadgeBlock({ id, props }: BlockProps<"Badge">) {
   const { setProp } = useBlockEditor();
   return (
-    <span className={cn("inline-flex h-5 w-fit max-w-full items-center rounded-full border px-2 text-xs font-medium", badgeTone[props.tone ?? "neutral"])}>
+    <span className={badgeClassName(props)}>
       <EditableText blockKey={id} value={props.label} onChange={(text) => { setProp(id, "label", text); }} maxLength={textLimit("Badge", "label")} label="Badge" placeholder="Label" className="min-h-0 whitespace-nowrap" />
     </span>
   );

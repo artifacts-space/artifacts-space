@@ -152,6 +152,15 @@ export const contentDocs = {
   Badge: {
     examples: [
       { title: "Tones", spec: single("Stack", { direction: "horizontal", gap: "sm" }, { neutral: badge("draft"), info: badge("beta", "info"), success: badge("shipped", "success"), warning: badge("at risk", "warning"), danger: badge("blocked", "danger") }) },
+      {
+        title: "Variants and an icon",
+        spec: single("Stack", { direction: "horizontal", gap: "sm" }, {
+          soft: { type: "Badge", props: { label: "soft", tone: "info" } },
+          solid: { type: "Badge", props: { label: "solid", tone: "success", variant: "solid", icon: "check" } },
+          outline: { type: "Badge", props: { label: "outline", tone: "warning", variant: "outline" } },
+          rated: { type: "Badge", props: { label: "4.8", icon: "star" } },
+        }),
+      },
     ],
   },
   List: {
@@ -163,7 +172,16 @@ export const contentDocs = {
           numbers: { type: "List", props: { items: ["Freeze main", "Tag the release", "Deploy"], ordered: true } },
         }),
       },
+      {
+        title: "Markers",
+        note: "A check for what a plan includes, a cross for what it leaves out.",
+        spec: single("Grid", { columns: 2 }, {
+          included: { type: "List", props: { marker: "check", items: ["Unlimited projects", "Weekly reports", "Email support"] } },
+          excluded: { type: "List", props: { marker: "cross", items: ["Single sign-on", "Audit log"] } },
+        }),
+      },
     ],
+    rules: ["`marker` is dot, check, cross, or arrow. A numbered list (`ordered`) keeps its numbers and takes no other marker."],
   },
   Steps: {
     examples: [

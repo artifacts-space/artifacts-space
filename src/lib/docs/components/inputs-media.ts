@@ -45,7 +45,7 @@ export const inputDocs = {
         ),
       },
     ],
-    rules: [stateNote],
+    rules: [stateNote, "`description` sits under the label. `error` marks the field invalid and shows the message. `hideLabel` keeps the label for screen readers only."],
   },
   Switch: {
     examples: [
@@ -98,8 +98,23 @@ export const inputDocs = {
           { answer: "None yet" },
         ),
       },
+      {
+        title: "Sizes and icons",
+        spec: single("Box", { direction: "horizontal", wrap: true, align: "center", gap: "sm" }, {
+          small: { type: "Button", props: { label: "Filter", size: "sm", variant: "outline", icon: "filter" } },
+          medium: { type: "Button", props: { label: "Continue", icon: "arrow-right", iconPosition: "end" } },
+          large: { type: "Button", props: { label: "Start free", size: "lg" } },
+          more: { type: "Button", props: { label: "More actions", variant: "ghost", icon: "dots", iconOnly: true } },
+          off: { type: "Button", props: { label: "Unavailable", variant: "secondary", disabled: true } },
+        }),
+      },
+      { title: "Full width", spec: single("Box", { maxWidth: "sm" }, { wide: { type: "Button", props: { label: "Create account", fullWidth: true } } }) },
     ],
-    rules: ["`press` can run setState, pushState, removeState, or validateForm. A button cannot load or send data.", "Variants: default, outline, secondary, ghost."],
+    rules: [
+      "`press` can run setState, pushState, removeState, or validateForm. A button cannot load or send data.",
+      "Variants: default, outline, secondary, ghost. Sizes: sm, md, lg.",
+      "`iconOnly` needs an `icon`; the `label` is then what screen readers announce.",
+    ],
   },
 } satisfies Record<string, ComponentDoc>;
 
@@ -111,11 +126,19 @@ export const mediaDocs = {
         note: "The docs show a stand-in picture. On a real artifact, `file` is the id files_finalize returned.",
         spec: single("Image", { file: imageFile.id, alt: "Architecture diagram: agents reach the API over MCP", caption: "How agents reach the API." }),
       },
+      {
+        title: "Cropped to a shape",
+        spec: single("Grid", { columns: 2 }, {
+          wide: { type: "Image", props: { file: imageFile.id, alt: "Architecture diagram, cropped wide", ratio: "wide", radius: "xl" } },
+          square: { type: "Image", props: { file: imageFile.id, alt: "Architecture diagram, shown whole in a square", ratio: "square", fit: "contain", radius: "lg" } },
+        }),
+      },
     ],
     rules: [
       "`file` is the id of a finished upload attached to this artifact. URLs are refused.",
       "`file` must be written in the spec, not read from state, so saving can check it.",
       "PNG, JPEG, GIF, WebP, and AVIF. The image shows at up to its natural size.",
+      "`ratio` crops the image to a shape (`fit: \"contain\"` shows all of it instead), and `radius` rounds its corners.",
     ],
   },
   File: {

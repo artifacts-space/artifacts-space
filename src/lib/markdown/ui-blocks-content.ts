@@ -133,6 +133,7 @@ export const contentBlocks: Record<string, BlockRenderer> = {
   Link: linkBlock,
   Icon: icon,
   Placeholder: placeholder,
+  Avatar: ({ props }) => [inlineText(textOf(props.name) ?? "")],
   Quote: quote,
   Diagram: diagram,
   Image: image,

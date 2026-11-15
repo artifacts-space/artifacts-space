@@ -7,6 +7,7 @@ import { mediaProps } from "@/lib/ui/props/media";
 import { planningProps } from "@/lib/ui/props/planning";
 
 import { dataDocs, planningDocs } from "./data";
+import { avatarDocs, fieldDocs } from "./fields";
 import { inputDocs, mediaDocs } from "./inputs-media";
 import { contentDocs, layoutDocs } from "./layout-content";
 import { boxDocs, iconDocs, placeholderDocs } from "./screen";
@@ -17,7 +18,7 @@ import type { ComponentDoc } from "./types";
  * Docs for every component in the stout catalog. The Record type makes a new
  * catalog component fail the typecheck until it has examples here.
  */
-export const componentDocs: Record<UiComponentName, ComponentDoc> = { ...layoutDocs, ...boxDocs, ...contentDocs, ...iconDocs, ...dataDocs, ...planningDocs, ...inputDocs, ...mediaDocs, ...placeholderDocs };
+export const componentDocs: Record<UiComponentName, ComponentDoc> = { ...layoutDocs, ...boxDocs, ...contentDocs, ...iconDocs, ...avatarDocs, ...dataDocs, ...planningDocs, ...inputDocs, ...fieldDocs, ...mediaDocs, ...placeholderDocs };
 
 /** A group of components, in catalog order. Groups follow the props modules in src/lib/ui/props. */
 export interface ComponentGroup {

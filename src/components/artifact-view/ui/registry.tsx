@@ -12,10 +12,11 @@ import { CalendarView } from "./calendar";
 import { ChartView } from "./chart";
 import { BadgeView, CalloutView, CodeView, HeadingView, LinkView, ListView, MarkdownBlockView, QuoteView, TextView } from "./content";
 import { DiagramView, MetricView, ProgressView, TableView, TimelineView } from "./data";
+import { InputView, TextareaView } from "./fields";
 import { ButtonView, CheckboxView, ChecklistView, SelectView, SliderView, SwitchView } from "./inputs";
 import { AccordionView, CardView, GridView, SectionView, SeparatorView, StackView, TabsView } from "./layout";
 import { KeyValueView } from "./key-value";
-import { IconView, PlaceholderView } from "./screen";
+import { AvatarView, IconView, PlaceholderView } from "./screen";
 import { FileView, ImageView } from "./media";
 import { StepsView } from "./steps";
 import { renderStout, type ViewProps } from "./stout";
@@ -43,6 +44,7 @@ export const uiViews: Views = {
   Link: LinkView,
   Quote: QuoteView,
   Icon: IconView,
+  Avatar: AvatarView,
   Table: TableView,
   Metric: MetricView,
   Chart: ChartView,
@@ -58,6 +60,8 @@ export const uiViews: Views = {
   Switch: SwitchView,
   Slider: SliderView,
   Button: ButtonView,
+  Input: InputView,
+  Textarea: TextareaView,
   Image: ImageView,
   File: FileView,
   Placeholder: PlaceholderView,

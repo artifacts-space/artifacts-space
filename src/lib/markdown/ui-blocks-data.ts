@@ -164,6 +164,14 @@ function select({ props }: BlockContext): string[] {
   return [`- **${inlineText(textOf(props.label) ?? "")}:** ${value ? inlineText(value) : "not chosen"} (options: ${options})`];
 }
 
+/** A text field as a labelled line. A password field is a stand-in and never holds a value. */
+function field({ props }: BlockContext): string[] {
+  const label = inlineText(textOf(props.label) ?? "");
+  if (props.type === "password") return [`- **${label}:** (password field, cannot be typed into)`];
+  const value = textOf(props.value);
+  return [`- **${label}:** ${value ? inlineText(value) : "empty"}`];
+}
+
 function slider({ props }: BlockContext): string[] {
   const min = numberOf(props.min) ?? 0;
   const max = numberOf(props.max) ?? 100;
@@ -190,6 +198,8 @@ export const dataBlocks: Record<string, BlockRenderer> = {
   Checkbox: ({ props }) => [task(props.label, props.checked, props.description)],
   Switch: toggle,
   Select: select,
+  Input: field,
+  Textarea: field,
   Slider: slider,
   Button: ({ props }) => [`_Button: ${inlineText(textOf(props.label) ?? "")}_`],
 };

@@ -239,6 +239,24 @@ describe("status tones", () => {
     }
   });
 
+  it("should read at 4.5:1 in globals.css as text and as a badge on the site's page, card, muted fill, and every hue fill, in both modes", () => {
+    // The site paints its own hand-set hue fills, not derived ones, so the rule is checked here against the values a reader sees.
+    for (const mode of ["light", "dark"] as const) {
+      const surfaces = [...site[mode].keys()].filter((name) => /^--block-[a-z]+-bg$/.test(name));
+      expect(surfaces).toHaveLength(9);
+      for (const tone of ["info", "success", "warning", "danger"]) {
+        const text = parseColor(siteColor(mode, `--tone-${tone}`) ?? "");
+        if (!text) throw new Error(`${mode} has no --tone-${tone}`);
+        for (const surfaceName of ["--background", "--card", "--muted", ...surfaces]) {
+          const surface = parseColor(siteColor(mode, surfaceName) ?? "");
+          if (!surface) throw new Error(`${mode} has no ${surfaceName}`);
+          expect(contrastRatio(text, surface), `${mode} ${tone} on ${surfaceName}`).toBeGreaterThanOrEqual(4.5);
+          expect(contrastRatio(text, paintOver(text, toneTintMax, surface)), `${mode} ${tone} badge on ${surfaceName}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    }
+  });
+
   it("should read at 4.5:1 on every preset's surfaces and on the tone's own tint over each, in both modes", () => {
     for (const [id, preset] of builtInPresets()) {
       for (const mode of ["light", "dark"] as const) {

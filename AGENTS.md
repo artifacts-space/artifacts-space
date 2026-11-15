@@ -561,7 +561,8 @@ catch this, so test the generated SQL with `.toSQL()`, as
   the site palette), primary is a palette built on the accent, and the muted
   fill and the block hues re-light body and muted text only where a theme
   leaves them under 4.5:1 (`src/lib/themes/surface-scope.ts`, tested over
-  every preset). A new surface goes there and into the "Surfaces and tones"
+  every preset). The tone rule covers the hue fills too, so a tone and a
+  tone badge read on every hue. A new surface goes there and into the "Surfaces and tones"
   gallery specimen, which the contrast spec reads.
 
 ### Page column

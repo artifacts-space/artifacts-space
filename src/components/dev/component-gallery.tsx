@@ -25,6 +25,7 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { uiComponentNames } from "@/lib/ui/catalog";
 import { componentFixtures, fixtureFiles, fixtureSpec } from "@/lib/ui/fixtures/components";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
+import { signInSpec } from "@/lib/ui/fixtures/fields";
 import { formatFixtures, mediaFormatFixtures, type FormatFixture } from "@/lib/ui/fixtures/formats";
 import { landingPageSpec, surfaceMatrixSpec } from "@/lib/ui/fixtures/screen";
 import { deepSpec, invalidPropsSpec, javascriptLinkSpec, manyElementsSpec, repeatSpec, unknownTypeSpec } from "@/lib/ui/fixtures/specs";
@@ -35,6 +36,7 @@ const specFixtures: { name: string; spec: unknown }[] = [
   { name: "Example", spec: exampleUiSpec },
   { name: "Surfaces and tones", spec: surfaceMatrixSpec },
   { name: "Landing page", spec: landingPageSpec },
+  { name: "Sign-in screen", spec: signInSpec },
   { name: "Unknown type", spec: unknownTypeSpec },
   { name: "Invalid props", spec: invalidPropsSpec },
   { name: "javascript: link", spec: javascriptLinkSpec },

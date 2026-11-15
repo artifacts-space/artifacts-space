@@ -7,11 +7,12 @@ import { useScrollable } from "@/components/code/use-scrollable";
 import { blockHues, type BlockHue } from "@/lib/block-colors/block-color-rules";
 import type { UiProps } from "@/lib/ui/catalog";
 import type { BoxSurface } from "@/lib/ui/props/screen";
-import type { ContainerStep, Radius, Space } from "@/lib/ui/props/shared";
+import type { ContainerStep, Space } from "@/lib/ui/props/shared";
 import { cn } from "@/lib/utils";
 
 import { ThemeScopeContext, strongSurfaceScope, type ThemeScopeValue } from "../theme-scope-context";
 
+import { radiusClass } from "./scales";
 import type { ViewProps } from "./stout";
 
 type BoxProps = UiProps<"Box">;
@@ -32,7 +33,6 @@ const justifyClass: Record<NonNullable<BoxProps["justify"]>, string> = { start: 
 const maxWidthClass: Record<NonNullable<BoxProps["maxWidth"]>, string> = { xs: "w-full max-w-xs", sm: "w-full max-w-sm", md: "w-full max-w-xl", lg: "w-full max-w-3xl", xl: "w-full max-w-5xl", "2xl": "w-full max-w-7xl" };
 const minHeightClass: Record<NonNullable<BoxProps["minHeight"]>, string> = { sm: "min-h-24", md: "min-h-48", lg: "min-h-80", xl: "min-h-128" };
 const borderClass: Record<NonNullable<BoxProps["border"]>, string> = { none: "", all: "border", top: "border-t", bottom: "border-b", start: "border-s", end: "border-e", x: "border-x", y: "border-y" };
-const radiusClass: Record<Radius, string> = { none: "rounded-none", sm: "rounded-sm", md: "rounded-md", lg: "rounded-lg", xl: "rounded-xl", full: "rounded-full" };
 const shadowClass: Record<NonNullable<BoxProps["shadow"]>, string> = { none: "", sm: "shadow-sm", md: "shadow-md", lg: "shadow-lg" };
 const overflowClass: Record<NonNullable<BoxProps["overflow"]>, string> = { visible: "", hidden: "overflow-hidden", scroll: "overflow-x-auto *:shrink-0" };
 

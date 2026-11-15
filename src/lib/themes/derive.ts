@@ -308,32 +308,31 @@ export function ringTokens(mode: PaletteMode, colors: ThemeColors): Record<strin
 
 const toneRoles = ["info", "success", "warning", "danger"] as const;
 
-/** The site's status tones per mode, from globals.css (Callout, Badge, Metric changes, Board and Calendar labels). */
+/**
+ * The site's status tones per mode, from globals.css (Callout, Badge, Metric
+ * changes, Board and Calendar labels). The site paints its own hand-set hue
+ * fills, so presets.test.ts holds these values to 4.5:1 on those too.
+ */
 const siteTones: Record<PaletteMode, Record<(typeof toneRoles)[number], string>> = {
   light: { info: "oklch(0.485 0.15 255)", success: "oklch(0.47 0.13 150)", warning: "oklch(0.49 0.14 70)", danger: "oklch(0.5 0.2 27)" },
-  dark: { info: "oklch(0.74 0.12 255)", success: "oklch(0.75 0.13 150)", warning: "oklch(0.8 0.13 75)", danger: "oklch(0.7 0.17 25)" },
+  dark: { info: "oklch(0.74 0.12 255)", success: "oklch(0.75 0.13 150)", warning: "oklch(0.8 0.13 75)", danger: "oklch(0.735 0.17 25)" },
 };
 
 /** The strongest tint of a tone its own text sits on: a badge or calendar event is the tone's text on the tone at 12% at most. */
 export const toneTintMax = 0.12;
 
 /**
- * Status tones on the themed card, page, and quiet surfaces (--secondary,
- * --muted, --accent). A tone is text there and on its own tint over each
- * (a badge), so it keeps the site's hue and chroma and is re-lit until it
- * reads at 4.5:1 on every one. Dots and edges use the same token. A Box can
- * be painted with a block hue's background, so a tone is held at 4.5:1 as
- * plain text on each of those too; its own tint over a hue (a badge inside
- * a hue Box) is not part of the rule.
+ * Status tones on the themed card, page, quiet surfaces (--secondary,
+ * --muted, --accent), and every block hue's background (a Box can be
+ * painted with one). A tone is text there and on its own tint over each (a
+ * badge), so it keeps the site's hue and chroma and is re-lit until it
+ * reads at 4.5:1 on every one. Dots and edges use the same token.
  */
 export function toneTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
   const card = read(colors.card);
   const ink = read(colors.foreground);
-  const surfaces = [card, read(colors.background), ...Object.values(quietTint).map((amount) => mixOklch(card, ink, amount))];
-  const fills = blockFills(mode, colors);
-  const reads = (tone: Oklch) =>
-    surfaces.every((surface) => contrastRatio(tone, surface) >= 4.55 && contrastRatio(tone, paintOver(tone, toneTintMax, surface)) >= 4.55) &&
-    fills.every((fill) => contrastRatio(tone, fill) >= 4.55);
+  const surfaces = [card, read(colors.background), ...Object.values(quietTint).map((amount) => mixOklch(card, ink, amount)), ...blockFills(mode, colors)];
+  const reads = (tone: Oklch) => surfaces.every((surface) => contrastRatio(tone, surface) >= 4.55 && contrastRatio(tone, paintOver(tone, toneTintMax, surface)) >= 4.55);
   return Object.fromEntries(toneRoles.map((role) => [`--tone-${role}`, formatOklch(holdApart(read(siteTones[mode][role]), card, reads))]));
 }
 

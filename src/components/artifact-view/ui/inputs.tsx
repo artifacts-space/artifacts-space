@@ -1,15 +1,19 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import type { UiProps } from "@/lib/ui/catalog";
+import type { UiIconName } from "@/lib/ui/icon-names";
 import { formatNumber } from "@/lib/ui/number-format";
 import { cn } from "@/lib/utils";
 
+import { useFieldNotes } from "./fields";
+import { uiIconComponents } from "./icon-glyphs";
 import { useInputValue, type ViewProps } from "./stout";
 
 export function ChecklistView({ props }: ViewProps<"Checklist">) {
@@ -68,12 +72,13 @@ export function SwitchView({ props, bindings, emit }: ViewProps<"Switch">) {
 
 export function SelectView({ props, bindings, emit }: ViewProps<"Select">) {
   const labelId = useId();
+  const { notes, control } = useFieldNotes(props.description, props.error);
   const [value, setValue] = useInputValue<string | null>(props.value, bindings?.value, null);
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <span id={labelId} className="text-md font-medium break-words">{props.label}</span>
-      <Select value={value} onValueChange={(next) => { if (typeof next === "string") { setValue(next); emit("change"); } }}>
-        <SelectTrigger aria-labelledby={labelId} className="w-full max-w-sm min-w-0">
+      <span id={labelId} className={cn("text-md font-medium break-words", props.hideLabel && "sr-only")}>{props.label}</span>
+      <Select value={value} disabled={props.disabled ?? false} onValueChange={(next) => { if (typeof next === "string") { setValue(next); emit("change"); } }}>
+        <SelectTrigger {...control} aria-labelledby={labelId} className="w-full max-w-sm min-w-0">
           <SelectValue placeholder={props.placeholder ?? "Choose…"} />
         </SelectTrigger>
         <SelectContent>
@@ -82,6 +87,8 @@ export function SelectView({ props, bindings, emit }: ViewProps<"Select">) {
           ))}
         </SelectContent>
       </Select>
+      {props.description ? <p id={notes.description} className="text-sm leading-5 text-muted-foreground break-words">{props.description}</p> : null}
+      {props.error ? <p id={notes.error} className="text-sm leading-5 text-tone-danger break-words">{props.error}</p> : null}
     </div>
   );
 }
@@ -114,10 +121,41 @@ export function SliderView({ props, bindings, emit }: ViewProps<"Slider">) {
   );
 }
 
+type ButtonProps = UiProps<"Button">;
+type ButtonSize = NonNullable<ButtonProps["size"]>;
+
+/** The shared button's size for each step, with and without a label. The large step is a hero's call to action. */
+const buttonSize: Record<ButtonSize, { text: "sm" | "default" | "lg"; icon: "icon-sm" | "icon" | "icon-lg"; extra: string }> = {
+  sm: { text: "sm", icon: "icon-sm", extra: "" },
+  md: { text: "default", icon: "icon", extra: "" },
+  lg: { text: "lg", icon: "icon-lg", extra: "h-10 px-4 text-md" },
+};
+
+function ButtonIcon({ name, at }: { name: UiIconName; at: "inline-start" | "inline-end" }) {
+  const Glyph = uiIconComponents[name];
+  return <Glyph aria-hidden data-icon={at} />;
+}
+
+/** The icon on the side it sits on, or nothing. An icon-only button shows it alone. */
+function buttonIcon(props: ButtonProps, side: "start" | "end"): ReactNode {
+  if (!props.icon) return null;
+  const position = props.iconOnly ? "start" : (props.iconPosition ?? "start");
+  return position === side ? <ButtonIcon name={props.icon} at={side === "start" ? "inline-start" : "inline-end"} /> : null;
+}
+
+function buttonClass(props: ButtonProps, size: (typeof buttonSize)[ButtonSize]): string {
+  if (props.iconOnly) return cn("shrink-0", size.extra && "size-10");
+  return cn("max-w-full min-w-0", props.fullWidth ? "w-full" : "w-fit", size.extra);
+}
+
 export function ButtonView({ props, emit }: ViewProps<"Button">) {
+  const size = buttonSize[props.size ?? "md"];
+  const named = props.iconOnly ? { "aria-label": props.label } : {};
   return (
-    <Button variant={props.variant ?? "default"} className="w-fit max-w-full min-w-0" onClick={() => { emit("press"); }}>
-      <span className="truncate">{props.label}</span>
+    <Button {...named} variant={props.variant ?? "default"} size={props.iconOnly ? size.icon : size.text} disabled={props.disabled ?? false} className={buttonClass(props, size)} onClick={() => { emit("press"); }}>
+      {buttonIcon(props, "start")}
+      {props.iconOnly ? null : <span className="truncate">{props.label}</span>}
+      {buttonIcon(props, "end")}
     </Button>
   );
 }

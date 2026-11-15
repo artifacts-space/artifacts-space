@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { blockHues } from "@/lib/block-colors/block-color-rules";
 
-import { contrastRatio, parseColor, type Oklch } from "./color";
-import { blockFills, paletteTokens, type PaletteMode } from "./derive";
+import { contrastRatio, paintOver, parseColor, type Oklch } from "./color";
+import { blockFills, paletteTokens, toneTintMax, type PaletteMode } from "./derive";
 import { themePresets } from "./presets";
 import { presetTheme, siteDefaultTheme } from "./resolve";
 import type { Theme } from "./schema";
@@ -40,6 +40,19 @@ describe("quiet surfaces", () => {
           expect(contrastRatio(resolved(style, tokens, name), surface), `${mode} ${name} on ${fill}`).toBeGreaterThanOrEqual(4.5);
         }
       });
+    }
+  });
+
+  it.each(themes)("should keep a tone badge, the tone on its own tint, at 4.5:1 on the muted fill and every hue of the %s preset", (_id, theme) => {
+    for (const mode of modes) {
+      const tokens = paletteTokens(mode, theme[mode]);
+      const surfaces: [string, Oklch][] = [["muted", color(tokens["--muted"])], ...blockFills(mode, theme[mode]).map((fill, index): [string, Oklch] => [blockHues[index] ?? "hue", fill])];
+      for (const tone of tones) {
+        const ink = color(tokens[`--tone-${tone}`]);
+        for (const [name, surface] of surfaces) {
+          expect(contrastRatio(ink, paintOver(ink, toneTintMax, surface)), `${mode} ${tone} badge on ${name}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
     }
   });
 
@@ -89,7 +102,7 @@ describe("strong surfaces", () => {
     expect(scope.inner).toMatchObject({ mode: null, flipped: true });
   });
 
-  it.each(themes)("should keep body text, muted text, and every status tone at 4.5:1 on the primary surface of the %s preset", (_id, theme) => {
+  it.each(themes)("should keep body text, muted text, every status tone, and every tone badge at 4.5:1 on the primary surface of the %s preset", (_id, theme) => {
     for (const mode of modes) {
       const scope = surfaceEngine(theme, mode, "test").strong("primary");
       // On the site palette primary is the inverse surface: the other mode's own tokens, already held by the theme rules.
@@ -97,6 +110,10 @@ describe("strong surfaces", () => {
       const page = color(scope.style["--background"]);
       expect(scope.style["--background"]).toBe(theme[mode].accent);
       for (const name of inks) expect(contrastRatio(color(scope.style[name]), page), `${mode} ${name}`).toBeGreaterThanOrEqual(4.5);
+      for (const tone of tones) {
+        const ink = color(scope.style[`--tone-${tone}`]);
+        expect(contrastRatio(ink, paintOver(ink, toneTintMax, page)), `${mode} ${tone} badge`).toBeGreaterThanOrEqual(4.5);
+      }
       // A default button inside swaps the two, so it shows against the accent.
       expect(scope.style["--primary"]).toBe(theme[mode].accentForeground);
       expect(scope.style["--primary-foreground"]).toBe(theme[mode].accent);

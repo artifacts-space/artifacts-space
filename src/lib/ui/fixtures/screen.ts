@@ -72,10 +72,11 @@ const tones = ["info", "success", "warning", "danger"] as const;
 function surfaceElements(surface: BoxSurface): Elements {
   const id = (part: string) => `${surface}-${part}`;
   const elements: Elements = {
-    [id("box")]: { type: "Box", props: { surface, padding: "md", gap: "sm", radius: "lg", border: surface === "none" ? "all" : "none", label: `Surface ${surface}` }, children: [id("body"), id("muted"), id("tones"), id("rule"), id("actions")] },
+    [id("box")]: { type: "Box", props: { surface, padding: "md", gap: "sm", radius: "lg", border: surface === "none" ? "all" : "none", label: `Surface ${surface}` }, children: [id("body"), id("muted"), id("tones"), id("badges"), id("rule"), id("actions")] },
     [id("body")]: { type: "Text", props: { text: `Body text on the ${surface} surface.` } },
     [id("muted")]: { type: "Text", props: { text: "Muted text, for secondary detail.", tone: "muted", size: "sm" } },
     [id("tones")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: tones.flatMap((tone) => [id(`icon-${tone}`), id(`text-${tone}`)]) },
+    [id("badges")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "sm", align: "center" }, children: tones.map((tone) => id(`badge-${tone}`)) },
     [id("rule")]: { type: "Separator", props: { label: "Details" } },
     [id("actions")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: [id("primary"), id("outline"), id("nav"), id("quiet")] },
     [id("primary")]: { type: "Button", props: { label: "Primary" } },
@@ -86,11 +87,12 @@ function surfaceElements(surface: BoxSurface): Elements {
   for (const tone of tones) {
     elements[id(`icon-${tone}`)] = { type: "Icon", props: { name: "circle-check", size: "sm", tone } };
     elements[id(`text-${tone}`)] = { type: "Text", props: { text: `${tone} text`, tone, size: "sm" } };
+    elements[id(`badge-${tone}`)] = { type: "Badge", props: { label: `${tone} badge`, tone } };
   }
   return elements;
 }
 
-/** Every Box surface with every text tone on it, for the contrast scan in light, in dark, and under themes. */
+/** Every Box surface with every text tone and every tone badge on it, for the contrast scan in light, in dark, and under themes. */
 export const surfaceMatrixSpec = {
   version: 1,
   root: "page",
