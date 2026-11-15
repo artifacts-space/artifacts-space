@@ -1044,7 +1044,11 @@ template text is ours, so the tools add no untrusted-content label.
   of the same button must bring the frame back. So an open and close pair
   that stays in one place is one toggle whose label and icon follow the
   state, never two buttons that take each other's place (the pressed one
-  leaves the page, and the focus with it). Every
+  leaves the page, and the focus with it). That toggle sets `expanded`
+  from the path it flips (`"expanded": { "$state": "/open" }`), so screen
+  readers hear whether its panel is open; the loop reads `aria-expanded`
+  before and after each press from the fragment (`PressButton.expanded`),
+  and a unit test fails for a template toggle without it. Every
   action the validator allows is read by `behavior.ts` (`stateActions`) or
   listed there as not pressed, with a reason (`unpressedActions`), and a
   test fails for a new action that is in neither. What it presses and

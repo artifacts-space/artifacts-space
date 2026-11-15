@@ -75,6 +75,10 @@ export const screenLinkFixtures: ComponentFixture[] = [
   { name: "Nav, current page, no address", props: { label: "Docs", variant: "nav", active: true } },
   { name: "Muted", props: { label: "Privacy", href: "https://example.com/privacy", variant: "muted" } },
   { name: "Inline, no address", props: { label: "A link that goes nowhere" } },
+  { name: "Inline with an icon", props: { label: "Read the guide", href: "https://example.com/guide", icon: "book" } },
+  { name: "Inline, no address, icon at the end", props: { label: "See every plan", icon: "arrow-right", iconPosition: "end" } },
+  { name: "Nav, icon at the end", props: { label: "Solutions", href: "https://example.com/solutions", variant: "nav", icon: "chevron-down", iconPosition: "end" } },
+  { name: "Muted with an icon", props: { label: "Call sales", variant: "muted", icon: "phone" } },
 ];
 
 type Elements = Record<string, { type: string; props: Record<string, unknown>; children?: string[] }>;
@@ -181,10 +185,10 @@ export const styledBlocksSpec = {
     nav: { type: "Box", props: { direction: "horizontal", align: "center", justify: "between", gap: "md", padding: "md", border: "bottom", wrap: true, label: "Styled navigation" }, children: ["nav-links", "nav-docs"] },
     "nav-links": { type: "Box", props: { direction: "horizontal", gap: "lg", wrap: true }, children: ["link-active", "link-plain", "link-muted-active", "link-muted"] },
     "link-active": { type: "Link", props: { label: "Product", variant: "nav", active: true } },
-    "link-plain": { type: "Link", props: { label: "Pricing", variant: "nav" } },
+    "link-plain": { type: "Link", props: { label: "Pricing", variant: "nav", icon: "chevron-down", iconPosition: "end" } },
     "link-muted-active": { type: "Link", props: { label: "Changelog", variant: "muted", active: true } },
     "link-muted": { type: "Link", props: { label: "Careers", variant: "muted" } },
-    "nav-docs": { type: "Link", props: { label: "Read the docs", href: "https://example.com/docs" } },
+    "nav-docs": { type: "Link", props: { label: "Read the docs", href: "https://example.com/docs", icon: "book" } },
     eyebrow: { type: "Text", props: { text: "New this week", variant: "eyebrow" } },
     title: { type: "Heading", props: { text: "Count every shelf", level: 1, size: "display", align: "center" } },
     lead: { type: "Text", props: { text: "Stock that keeps up", size: "xl", weight: "semibold", align: "center", tone: "info" } },
@@ -217,7 +221,8 @@ export const styledBlocksSpec = {
 
 /**
  * A line that appears after a button press and is spoken to screen readers,
- * and a note that one button opens and closes with `toggleState`.
+ * and a note that one button opens and closes with `toggleState`, saying
+ * through `expanded` whether the note is open.
  */
 export const announcedSpec = {
   version: 1,
@@ -228,7 +233,7 @@ export const announcedSpec = {
     title: { type: "Heading", props: { text: "Join the waitlist", level: 3 } },
     join: { type: "Button", props: { label: "Join the list" }, on: { press: { action: "setState", params: { statePath: "/joined", value: true } } } },
     thanks: { type: "Text", props: { text: "Thanks. You are on the list.", tone: "success", announce: true }, visible: { $state: "/joined" } },
-    more: { type: "Button", props: { label: "Details", variant: "outline" }, on: { press: { action: "toggleState", params: { statePath: "/open" } } } },
+    more: { type: "Button", props: { label: "Details", variant: "outline", expanded: { $state: "/open" } }, on: { press: { action: "toggleState", params: { statePath: "/open" } } } },
     details: { type: "Callout", props: { title: "One email", text: "We write once, when your place is ready.", tone: "info", announce: true }, visible: { $state: "/open" } },
   },
 };

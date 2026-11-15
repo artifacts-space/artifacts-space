@@ -7,7 +7,7 @@ import { checkSvg, svgDataUri } from "@/lib/svg";
 
 import { ViewNotice } from "./view-notice";
 
-const sourceClass = "overflow-x-auto font-mono text-sm leading-7 whitespace-pre-wrap break-words";
+const sourceClass = "font-mono text-sm leading-7 whitespace-pre-wrap break-words";
 
 /**
  * Plain text, shown as written. It has no frame of its own: its lines start

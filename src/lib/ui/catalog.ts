@@ -52,7 +52,7 @@ export const componentChecks: Partial<Record<UiComponentName, PropCheck>> = { ..
  * reports every problem at once. A new rule should be written this way and
  * listed here.
  */
-export const fieldWiseChecks: ReadonlySet<UiComponentName> = new Set(["Box", "Input", "Button", "List", "Placeholder", "Separator"]);
+export const fieldWiseChecks: ReadonlySet<UiComponentName> = new Set(["Box", "Input", "Button", "List", "Placeholder", "Separator", "Link"]);
 
 /** Events a component can emit for `on` bindings. */
 export const componentEvents: Partial<Record<UiComponentName, readonly string[]>> = inputEvents;
@@ -74,7 +74,7 @@ const descriptions: Record<UiComponentName, string> = {
   Badge: "A small status label with a tone. `variant`: soft (default), solid, or outline. `icon` puts an icon by name (see Icon) before the label.",
   List: "A bulleted or numbered list of plain-text items. `marker` replaces the bullets with an icon: check, cross, or arrow.",
   Steps: "A numbered how-to or runbook. Each item has a `title`, an optional `body` in Markdown, and optional `code` (with `language`) to copy and run.",
-  Link: "A link that opens in a new tab. Only absolute http, https, and mailto URLs are allowed; leave `href` out for a mockup link that goes nowhere. `variant`: inline (default, underlined), nav (a plain menu link), or muted (small and quiet, for footers). `active` marks the current page.",
+  Link: "A link that opens in a new tab. Only absolute http, https, and mailto URLs are allowed; leave `href` out for a mockup link that goes nowhere. `variant`: inline (default, underlined), nav (a plain menu link), or muted (small and quiet, for footers). `active` marks the current page. `icon` puts an icon by name (see Icon) at the start or the end (`iconPosition`); an inline link with an `href` ends with its own arrow, so its icon goes at the start.",
   Quote: "A block quote with an optional citation.",
   Icon: screenDescriptions.Icon,
   Avatar: fieldDescriptions.Avatar,
@@ -92,7 +92,7 @@ const descriptions: Record<UiComponentName, string> = {
   Select: "A dropdown of text options. Bind `value` with { \"$bindState\": \"/path\" }. Takes `description`, `error`, `hideLabel`, `disabled`, and `fullWidth` like Input.",
   Switch: "An on/off switch. Bind `checked` with { \"$bindState\": \"/path\" }.",
   Slider: "A numeric slider between `min` (default 0) and `max` (default 100). Bind `value` with { \"$bindState\": \"/path\" }.",
-  Button: "A button. Its `press` event can run setState, toggleState, pushState, or removeState through `on`. It cannot load or send data. `variant`: default, outline, secondary, ghost, or danger (a solid fill in the danger tone, for an action that deletes or cannot be undone). `size` (sm, md, lg), `fullWidth`, `disabled`, and an `icon` by name (see Icon) at the start or the end (`iconPosition`); `iconOnly` shows the icon alone, with `label` as its name for screen readers.",
+  Button: "A button. Its `press` event can run setState, toggleState, pushState, or removeState through `on`. It cannot load or send data. `variant`: default, outline, secondary, ghost, or danger (a solid fill in the danger tone, for an action that deletes or cannot be undone). `size` (sm, md, lg), `fullWidth`, `disabled`, and an `icon` by name (see Icon) at the start or the end (`iconPosition`); `iconOnly` shows the icon alone, with `label` as its name for screen readers. `expanded` tells screen readers whether what the button opens is open (a menu toggle, a \"Show more\"): read it from the same state the button flips, { \"$state\": \"/open\" }, which must hold true or false.",
   Input: fieldDescriptions.Input,
   Textarea: fieldDescriptions.Textarea,
   Image: "An uploaded image (PNG, JPEG, GIF, WebP, or AVIF), shown at up to its natural size. `file` is the id from files_finalize; `alt` describes it for screen readers. `ratio` (square, photo 4:3, video 16:9, wide 21:9, portrait 3:4) fills the width and crops to that shape; `fit: \"contain\"` shows all of it instead; `radius` rounds it.",

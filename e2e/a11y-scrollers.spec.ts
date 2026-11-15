@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
-import { diagramDrawTimeout, expectScrollersSettled, unreachableScrollersIn } from "./support/scrollers";
+import { diagramDrawTimeout, expectDiagramsSettled, expectScrollersSettled, unreachableScrollersIn } from "./support/scrollers";
 
 /*
  * A box that scrolls must be reachable by keyboard, or its hidden part
@@ -79,15 +79,15 @@ test("should make a failed diagram's source a named tab stop while it scrolls", 
   await expectNoAxeViolations(broken);
 });
 
-test("should make a chart's table a named tab stop the keyboard can scroll while it is shown and longer than its frame", async ({ page }) => {
+test("should make a chart's table a tab stop named from the chart's title, which the keyboard can scroll while it is shown and longer than its frame", async ({ page }) => {
   await galleryReady(page, "Chart");
   const chart = specimen(page, "Chart", "Huge values, 200 points");
   await chart.scrollIntoViewIfNeeded();
   // Hidden for screen readers behind the chart: no tab stop.
-  await expect(chart.getByRole("group", { name: "Chart data" })).toHaveCount(0);
+  await expect(chart.getByRole("group", { name: "Huge values data" })).toHaveCount(0);
 
   await chart.getByRole("button", { name: "Table" }).click();
-  const stop = chart.getByRole("group", { name: "Chart data" });
+  const stop = chart.getByRole("group", { name: "Huge values data" });
   await expect(stop).toHaveAttribute("tabindex", "0");
   await expect(stop.getByRole("table")).toBeVisible();
   await expectKeyboardScrolls(page, stop, "ArrowDown");
@@ -95,7 +95,15 @@ test("should make a chart's table a named tab stop the keyboard can scroll while
   await expectNoAxeViolations(chart);
 
   await chart.getByRole("button", { name: "Chart" }).click();
-  await expect(chart.getByRole("group", { name: "Chart data" })).toHaveCount(0);
+  await expect(chart.getByRole("group", { name: "Huge values data" })).toHaveCount(0);
+});
+
+test("should name the table of a chart without a title \"Chart data\"", async ({ page }) => {
+  await galleryReady(page, "Chart");
+  const chart = specimen(page, "Chart", "Stacked bars, 8 series, 24 labels");
+  await chart.scrollIntoViewIfNeeded();
+  await chart.getByRole("button", { name: "Table" }).click();
+  await expect(chart.getByRole("group", { name: "Chart data" })).toHaveAttribute("tabindex", "0");
 });
 
 test("should make an SVG's source a named tab stop while it scrolls, when the SVG cannot be shown", async ({ page }) => {
@@ -150,4 +158,14 @@ test("should leave no box that scrolls out of the keyboard's reach on the diagra
       },
     });
   }).toPass({ timeout: 20_000 });
+});
+
+test("should fail the diagram wait with words that name a diagram that never draws, before the test's own time runs out", async ({ page }) => {
+  await page.setContent('<section data-specimen="Never drawn"><figure><figcaption>Release flow</figcaption><div data-diagram-state="drawing">flowchart LR</div></figure></section>');
+  const limit = test.info().timeout;
+  const wait = () => expectDiagramsSettled(page.locator("body"), 500).then(() => "it settled", (error: unknown) => (error instanceof Error ? error.message : String(error)));
+  expect(await wait()).toBe('Still drawing after 0.5 s: specimen "Never drawn", caption "Release flow", words "flowchart LR"');
+  // A second wait in the same test does not grow its time limit again.
+  await wait();
+  expect(test.info().timeout).toBe(limit + diagramDrawTimeout);
 });

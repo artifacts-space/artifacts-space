@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { isSafeHref, maxHrefLength } from "@/lib/link-policy";
 
+import { isExpression } from "../expressions";
+
 import type { PropCheck } from "./data";
 import { avatarProps } from "./fields";
 import { iconName, iconProps, inkTone } from "./screen";
@@ -70,6 +72,8 @@ export const contentProps = {
       .optional(),
     variant: z.enum(["inline", "nav", "muted"]).optional(),
     active: z.boolean().optional(),
+    icon: iconName.optional(),
+    iconPosition: z.enum(["start", "end"]).optional(),
   }),
   Quote: z.object({
     text: prose(2000),
@@ -83,5 +87,24 @@ export const contentProps = {
 const listCheck: PropCheck = (props) =>
   props.ordered === true && typeof props.marker === "string" && props.marker !== "dot" ? ["`marker` applies to a bulleted list. Remove `ordered`, or remove `marker`."] : [];
 
+const linkIconFields = z.object({ variant: z.enum(["inline", "nav", "muted"]).optional(), iconPosition: z.enum(["start", "end"]).optional() });
+
+/**
+ * An inline link with an address already ends with its own mark, the arrow
+ * that says it opens a new tab, so it takes an icon at the start only. It
+ * reads `variant` and `iconPosition` as written and says nothing while
+ * either is an expression. The address counts as the view counts it: one
+ * the link policy accepts, or one read from state. A refused `href` has its
+ * own error and draws no arrow.
+ */
+export const linkCheck: PropCheck = (props) => {
+  const read = linkIconFields.safeParse(props);
+  const drawsArrow = isExpression(props.href) || isSafeHref(props.href);
+  if (!read.success || !drawsArrow) return [];
+  const { variant = "inline", iconPosition } = read.data;
+  if (variant !== "inline" || iconPosition !== "end") return [];
+  return ['An inline link with an `href` ends with its own arrow, so its icon goes at the start. Set `iconPosition: "start"`, or use `variant: "nav"` or `"muted"`, which have no arrow.'];
+};
+
 /** Cross-field rules for content components. */
-export const contentChecks: Partial<Record<keyof typeof contentProps, PropCheck>> = { List: listCheck };
+export const contentChecks: Partial<Record<keyof typeof contentProps, PropCheck>> = { List: listCheck, Link: linkCheck };

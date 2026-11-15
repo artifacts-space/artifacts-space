@@ -139,7 +139,7 @@ function CartesianChart({ props, mark }: { props: ChartProps; mark: Mark }) {
       legend={<Legend names={data.series.map((item) => item.name)} />}
       empty={!hasData(data.labels, data.series)}
       heightClass={heightClass}
-      table={(visible) => <ChartTable head={head} rows={tableRows(data, format)} visible={visible} />}
+      table={(visible) => <ChartTable head={head} rows={tableRows(data, format)} visible={visible} title={props.title} />}
     >
       <div className="min-w-0 space-y-1">
         {/* Room for the top tick label, which centers on the plot edge. */}

@@ -109,6 +109,19 @@ export const inputDocs = {
         }),
       },
       { title: "Full width", spec: single("Box", { maxWidth: "sm" }, { wide: { type: "Button", props: { label: "Create account", fullWidth: true } } }) },
+      {
+        title: "Open and close with one button",
+        note: "`expanded` reads the same state the button flips, so screen readers hear whether the list is open.",
+        spec: spec(
+          "page",
+          {
+            page: { type: "Stack", props: { gap: "sm" }, children: ["more", "list"] },
+            more: { type: "Button", props: { label: "All plans", variant: "outline", icon: "chevron-down", iconPosition: "end", expanded: { $state: "/open" } }, on: { press: { action: "toggleState", params: { statePath: "/open" } } } },
+            list: { type: "List", props: { items: ["Starter", "Team", "Business"] }, visible: { $state: "/open" } },
+          },
+          { open: false },
+        ),
+      },
     ],
     rules: [
       "`press` can run setState, toggleState, pushState, removeState, or validateForm. A button cannot load or send data.",
@@ -116,6 +129,7 @@ export const inputDocs = {
       "Variants: default, outline, secondary, ghost, danger. Sizes: sm, md, lg.",
       "`danger` is for an action that deletes or cannot be undone: a solid fill in the danger tone. Its label reads on every Box surface and in every theme.",
       "`iconOnly` needs an `icon`; the `label` is then what screen readers announce.",
+      "`expanded` says whether what the button opens is open (a menu toggle, a \"Show more\"). Read it from the same path the button flips: `\"expanded\": { \"$state\": \"/open\" }`. That path must hold `true` or `false`; any other value stops the button from being shown. Leave it off a button that opens nothing.",
     ],
   },
 } satisfies Record<string, ComponentDoc>;

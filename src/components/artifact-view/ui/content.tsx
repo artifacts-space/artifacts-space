@@ -271,6 +271,18 @@ export function linkClassName(props: Pick<LinkProps, "variant" | "active">): str
   return cn(linkVariantClass[variant], props.active && linkActiveClass[variant]);
 }
 
+/**
+ * A link's icon on one side of its words, or nothing. It is decoration: the
+ * label names the link. It sits on the text's baseline at the text's size,
+ * so it scales with the variant. The interface editor draws it beside link
+ * text typed in place.
+ */
+export function LinkIcon({ props, side }: { props: Pick<LinkProps, "icon" | "iconPosition">; side: "start" | "end" }) {
+  if (!props.icon || (props.iconPosition ?? "start") !== side) return null;
+  const Glyph = uiIconComponents[props.icon];
+  return <Glyph aria-hidden data-link-icon={side} className={cn("inline size-[1.1em] shrink-0 align-[-0.2em]", side === "start" ? "mr-1" : "ml-1")} />;
+}
+
 const linkFocus = "transition-colors focus-visible:rounded-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 /**
@@ -283,17 +295,25 @@ export function LinkView({ props }: ViewProps<"Link">) {
   const variant = props.variant ?? "inline";
   const current = props.active ? { "aria-current": "page" as const } : {};
   const href = safeHref(props.href);
-  if (!href) return <span {...current} className={cn("min-w-0 break-words", linkClassName(props))}>{props.label}</span>;
+  const words = (
+    <>
+      <LinkIcon props={props} side="start" />
+      {props.label}
+      <LinkIcon props={props} side="end" />
+    </>
+  );
+  if (!href) return <span {...current} className={cn("min-w-0 break-words", linkClassName(props))}>{words}</span>;
   if (variant === "inline") {
+    // Validation keeps an end icon off this one: it ends with the arrow that says it opens a new tab.
     return (
       <span className="min-w-0 text-md break-words">
-        <ExternalLink href={href} current={props.active}>{props.label}</ExternalLink>
+        <ExternalLink href={href} current={props.active}>{words}</ExternalLink>
       </span>
     );
   }
   return (
     <a {...current} href={href} target="_blank" rel={externalLinkRel} className={cn("min-w-0 break-words", linkClassName(props), linkFocus)}>
-      {props.label}
+      {words}
       <span className="sr-only"> (opens in a new tab)</span>
     </a>
   );

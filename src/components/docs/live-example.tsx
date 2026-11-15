@@ -2,6 +2,7 @@ import { IconChevronRight } from "@tabler/icons-react";
 
 import { CodeSnippet } from "@/components/code/code-snippet";
 import { ScrollFrame } from "@/components/code/scroll-frame";
+import { scrollStopRing } from "@/components/code/scroll-stop";
 import { CopyButton } from "@/components/copy-button";
 import { specJson, type DocExample } from "@/lib/docs/spec-builders";
 import type { PropRow } from "@/lib/docs/prop-rows";
@@ -18,7 +19,7 @@ import { ExamplePreview } from "./example-preview";
 export function ExampleSource({ title, json, open }: { title: string; json: string; open: boolean }) {
   return (
     <details className="group border-t" open={open}>
-      <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1.5 px-4 text-sm text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
+      <summary className={cn("flex min-h-10 cursor-pointer list-none items-center gap-1.5 px-4 text-sm text-muted-foreground select-none hover:text-foreground [&::-webkit-details-marker]:hidden", scrollStopRing)}>
         <IconChevronRight aria-hidden className="size-4 shrink-0 transition-transform group-open:rotate-90" />
         <span className="group-open:hidden">Show JSON</span>
         <span className="hidden group-open:inline">Hide JSON</span>

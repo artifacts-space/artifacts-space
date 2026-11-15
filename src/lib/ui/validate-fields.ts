@@ -1,4 +1,4 @@
-import { containsExpression, templateStatePaths } from "./expressions";
+import { containsExpression, isExpression, templateStatePaths } from "./expressions";
 import { specError, specWarning, type UiSpecIssue } from "./issues";
 import { isPlainObject } from "./json-walk";
 import type { UiSpec } from "./spec";
@@ -123,26 +123,43 @@ function wordPaths(value: unknown): string[] {
 }
 
 /**
- * Warnings for an element that has `announce: true` and shows words read
- * from state that a text field writes. Its words change with every key, so
- * a screen reader would speak on every key. The spec still draws.
+ * True when `announce` is, or can become, true: `true` as written, or an
+ * expression that state can resolve to true. Unset and `false` cannot.
+ */
+function mayAnnounce(announce: unknown): boolean {
+  return announce === true || isExpression(announce);
+}
+
+/** The first prop of an announced element whose words follow typing: the prop, the path it reads, and the text field that writes it. */
+function typedWords(element: UiSpec["elements"][string], typed: ReadonlyMap<string, string>): { prop: string; path: string; field: string } | null {
+  for (const prop of announcedProps[element.type] ?? []) {
+    for (const path of wordPaths(element.props[prop])) {
+      const field = typed.get(path);
+      if (field !== undefined) return { prop, path, field };
+    }
+  }
+  return null;
+}
+
+/**
+ * Warnings for an element whose `announce` is or can become true and that
+ * shows words read from state a text field writes. Its words change with
+ * every key, so a screen reader would speak on every key. The spec still
+ * draws.
  */
 export function announcedTypingIssues(spec: UiSpec): UiSpecIssue[] {
   const typed = typedPaths(spec);
   if (typed.size === 0) return [];
   const issues: UiSpecIssue[] = [];
   for (const [key, element] of Object.entries(spec.elements)) {
-    if (element.props.announce !== true) continue;
-    for (const prop of announcedProps[element.type] ?? []) {
-      const path = wordPaths(element.props[prop]).find((read) => typed.has(read));
-      if (path === undefined) continue;
-      issues.push(specWarning(
-        "announce_follows_typing",
-        `Element "${key}" (${element.type}): \`announce\` is set and \`${prop}\` reads "${path}", which text field "${typed.get(path) ?? ""}" writes as a reader types, so a screen reader would speak on every key. Remove \`announce\`, or show words there that do not come from a text field.`,
-        key,
-      ));
-      break;
-    }
+    if (!mayAnnounce(element.props.announce)) continue;
+    const found = typedWords(element, typed);
+    if (!found) continue;
+    issues.push(specWarning(
+      "announce_follows_typing",
+      `Element "${key}" (${element.type}): \`announce\` is set and \`${found.prop}\` reads "${found.path}", which text field "${found.field}" writes as a reader types, so a screen reader would speak on every key. Remove \`announce\`, or show words there that do not come from a text field.`,
+      key,
+    ));
   }
   return issues;
 }

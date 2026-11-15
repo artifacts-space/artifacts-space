@@ -96,6 +96,15 @@ export interface PressButton {
    * starting value, which changes nothing to undo.
    */
   oneWay: string | null;
+  /**
+   * What the button tells screen readers about what it opens
+   * (`aria-expanded`), at the start and after its press, read from its
+   * `expanded` prop: written as true or false, or `{ $state }` on a path
+   * the fragment can follow. Null when the button has no `expanded`, and
+   * when the fragment cannot tell (a push or a remove, a condition only
+   * the browser can resolve).
+   */
+  expanded: { atStart: boolean; afterPress: boolean } | null;
 }
 
 /** One state-changing binding of an element's `press`. */
@@ -181,6 +190,22 @@ const writesValue = (write: StateWrite): write is ValueWrite => write.action ===
 /** What a setState or a toggleState leaves at its path when the path holds `current`: the value written, or true unless it was true (the renderer's toggle). */
 const leaves = (write: ValueWrite, current: unknown): unknown => (write.action === "setState" ? write.value : current !== true);
 
+/** Whether a button's `expanded` holds while the state is `state`, or undefined when the fragment cannot tell. */
+function expandedAt(element: TemplateElement | undefined, state: unknown): boolean | undefined {
+  const expanded: unknown = element?.props?.expanded;
+  return typeof expanded === "boolean" ? expanded : holds(expanded, state);
+}
+
+/** A button's `aria-expanded` at the start and after its press, when the fragment can read both. */
+function expandedStates(fragment: TemplateFragment, write: StateWrite): PressButton["expanded"] {
+  const element = fragment.elements[write.key];
+  const start = fragment.state ?? {};
+  const atStart = expandedAt(element, start);
+  if (atStart === undefined || !writesValue(write)) return null;
+  const afterPress = expandedAt(element, withValue(start, write.statePath, leaves(write, readPointer(start, write.statePath))));
+  return afterPress === undefined ? null : { atStart, afterPress };
+}
+
 /** True when a press changes the state the template starts with. */
 function changesStart(fragment: TemplateFragment, write: StateWrite): boolean {
   const start: unknown = readPointer(fragment.state ?? {}, write.statePath);
@@ -237,7 +262,7 @@ export function pressButtons(template: UiTemplate): { buttons: PressButton[]; un
     }
     const changes = changesStart(fragment, write);
     const restoredBy = restorersOf(fragment, writes, write);
-    buttons.push({ key: write.key, label, action: write.action, statePath: write.statePath, value: write.value, changesStart: changes, restoredBy, oneWay: oneWayReason(write, changes, restoredBy) });
+    buttons.push({ key: write.key, label, action: write.action, statePath: write.statePath, value: write.value, changesStart: changes, restoredBy, oneWay: oneWayReason(write, changes, restoredBy), expanded: expandedStates(fragment, write) });
   }
   return { buttons, unlabelled };
 }

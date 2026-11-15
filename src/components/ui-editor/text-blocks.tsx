@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { Children, type ComponentType, type ReactNode } from "react";
 
 import { ExternalLinkMark } from "@/components/artifact-view/external-link";
-import { BadgeIcon, badgeClassName, headingClassName, linkClassName, ListMark, listMarkerOf, markedListClass, textClassName, toneStyles } from "@/components/artifact-view/ui/content";
+import { BadgeIcon, badgeClassName, headingClassName, LinkIcon, linkClassName, ListMark, listMarkerOf, markedListClass, textClassName, toneStyles } from "@/components/artifact-view/ui/content";
 import { safeHref } from "@/lib/link-policy";
 import { textLimit } from "@/lib/ui/block-templates";
 import { componentProps, type UiComponentName, type UiProps } from "@/lib/ui/catalog";
@@ -108,12 +108,13 @@ function BadgeBlock({ id, props }: BlockProps<"Badge">) {
   );
 }
 
-/** Link text typed in place, drawn as readers see it: the variant, the mark of the current page, and the arrow of an inline link that leaves the page. */
+/** Link text typed in place, drawn as readers see it: the variant, the mark of the current page, its icon, and the arrow of an inline link that leaves the page. */
 function LinkBlock({ id, props }: BlockProps<"Link">) {
   const { setProp } = useBlockEditor();
   const leaves = (props.variant ?? "inline") === "inline" && safeHref(props.href) !== null;
   return (
-    <span className="min-w-0 break-words">
+    <span className={cn("min-w-0 break-words", linkClassName(props))}>
+      <LinkIcon props={props} side="start" />
       <EditableText
         blockKey={id}
         value={props.label}
@@ -123,6 +124,7 @@ function LinkBlock({ id, props }: BlockProps<"Link">) {
         placeholder="Link"
         className={cn("inline-block", linkClassName(props))}
       />
+      <LinkIcon props={props} side="end" />
       {leaves ? <ExternalLinkMark /> : null}
     </span>
   );
