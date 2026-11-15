@@ -23,7 +23,8 @@ import { expect, test } from "./support/test";
  *
  * For each template the loop checks:
  * - a press shows or changes something in its own frame only, and the
- *   button that undoes it brings the frame back;
+ *   button that undoes it brings the frame back; for a toggle that is the
+ *   same button, pressed a second time;
  * - a press nothing undoes (a form's send, a banner's close, a push to a
  *   list or a remove from one) changes its own frame only; the restore is
  *   left out, and the test's annotations say for which button and why;
@@ -102,6 +103,13 @@ async function pressAndExpectChange(page: Page, plan: Plan, read: WidthReading, 
   expect(await otherFrames(page, plan, read), `pressing "${button.label}" at ${String(read.width)} changes that frame only`).toEqual(before);
 }
 
+/**
+ * The buttons to try, in order, to undo a press. A toggle is undone by its
+ * own button and no other: it must still be there to press again, or a
+ * reader who opened something with it cannot close it the same way.
+ */
+const undoing = (button: PressButton): readonly string[] => (button.action === "toggleState" ? [button.label] : button.restoredBy);
+
 /** Presses the first button a reader can see among `labels`, and returns its label. */
 async function pressFirstShown(frame: Locator, labels: readonly string[], why: string): Promise<string> {
   for (const label of labels) {
@@ -123,7 +131,7 @@ async function readFrame(page: Page, plan: Plan, read: WidthReading, pressed: Se
     if ((await shownButton(frame, button.label).count()) === 0) continue;
     await pressAndExpectChange(page, plan, read, frame, button, rest);
     readings.push(await countLabels(frame, plan.labels));
-    const undo = await pressFirstShown(frame, button.restoredBy, `after "${button.label}" at ${String(read.width)}, nothing puts the frame back`);
+    const undo = await pressFirstShown(frame, undoing(button), `after "${button.label}" at ${String(read.width)}, nothing puts the frame back`);
     await expect.poll(() => signatureOf(frame), { message: `"${undo}" at ${String(read.width)} brings back what "${button.label}" changed` }).toBe(rest);
     pressed.add(button.label).add(undo);
   }
@@ -168,14 +176,14 @@ async function pressOneWay(page: Page, plan: Plan, pressed: Set<string>) {
 }
 
 /** Fails with words when the page does not draw the frames the plan reads, instead of a locator that times out later. */
-async function expectFrames(page: Page, plan: Plan) {
-  const drawn = await section(page, plan.template.id).locator("[data-template-frame]").evaluateAll((frames) => frames.map((frame) => Number(frame.getAttribute("data-template-frame"))));
-  expect(drawn, `the frames the page draws for a ${plan.template.viewport} template`).toEqual([...plan.reading.frames]);
+async function expectFrames(page: Page, template: UiTemplate, reading: ReadingPlan) {
+  const drawn = await section(page, template.id).locator("[data-template-frame]").evaluateAll((frames) => frames.map((frame) => Number(frame.getAttribute("data-template-frame"))));
+  expect(drawn, `the frames the page draws for a ${template.viewport} template`).toEqual([...reading.frames]);
 }
 
 async function expectBehavior(page: Page, template: UiTemplate) {
   const plan = planFor(template);
-  await expectFrames(page, plan);
+  await expectFrames(page, template, plan.reading);
   const pressed = new Set<string>();
   const readings = new Map<number, LabelCounts>();
   for (const read of plan.reading.reads) {
@@ -260,12 +268,15 @@ interface ZigzagRow {
   pictureFirst?: boolean;
 }
 
-function zigzag(): { rows: ZigzagRow[]; reads: readonly WidthReading[] } {
+function zigzag(): { template: UiTemplate; rows: ZigzagRow[]; reading: ReadingPlan } {
   const template = findTemplate("feature-zigzag");
   const rows = template?.fragment.state?.rows;
   if (!template || !Array.isArray(rows) || rows.length === 0) throw new Error("feature-zigzag has no rows in its state.");
-  return { rows: rows as ZigzagRow[], reads: readingPlan(template.viewport).reads };
+  return { template, rows: rows as ZigzagRow[], reading: readingPlan(template.viewport) };
 }
+
+/** The width a zigzag row stacks below: the tablet frame is still a row, anything narrower is stacked. */
+const zigzagRowFrom = 768;
 
 /** The last words of a row a reader meets before a picture drawn after them: its last point, its sentence, or its title. */
 function lastWords(frame: Locator, row: ZigzagRow): Locator {
@@ -281,11 +292,16 @@ async function boxOf(locator: Locator, what: string) {
 
 test("should draw each zigzag row's picture once, beside the words on changing sides while the row is a row, and after the words once it stacks", async ({ page, isMobile }) => {
   test.skip(isMobile, "the frames are the same widths in every project; once is enough");
-  const { rows, reads } = zigzag();
+  const { template, rows, reading } = zigzag();
+  const { reads } = reading;
+  // Both halves of the test must run: a reading where the rows are rows, and one where they have stacked.
+  expect(reads.some((read) => read.width >= zigzagRowFrom), "feature-zigzag is read at a width where its rows are rows").toBe(true);
+  expect(reads.some((read) => read.width < zigzagRowFrom), "feature-zigzag is read at a width where its rows have stacked").toBe(true);
   // Both sides must be in the shipped rows, or the side check below proves nothing for one of them.
   expect(rows.some((row) => row.pictureFirst === true), "a row with its picture first").toBe(true);
   expect(rows.some((row) => row.pictureFirst !== true), "a row with its picture last").toBe(true);
   await open(page, "template=feature-zigzag");
+  await expectFrames(page, template, reading);
   for (const { width, frame: frameWidth } of reads) {
     const frame = frameAt(page, "feature-zigzag", frameWidth);
     if (width !== frameWidth) await setFrameWidth(frame, width);
@@ -296,7 +312,7 @@ test("should draw each zigzag row's picture once, beside the words on changing s
       const where = `"${row.title}" at ${String(width)}`;
       const title = await boxOf(frame.getByRole("heading", { name: row.title, exact: true }), `the title of ${where}`);
       const image = await boxOf(frame.getByRole("img", { name: row.image, exact: true }), `the picture of ${where}`);
-      if (width >= 768) {
+      if (width >= zigzagRowFrom) {
         // A row: the picture is beside the words (they overlap in height), on the side the row asks for.
         expect(image.x < title.x ? "left" : "right", `the picture's side in ${where}`).toBe(row.pictureFirst === true ? "left" : "right");
         expect(image.y, `the picture of ${where} starts above the end of its title`).toBeLessThan(title.y + title.height);

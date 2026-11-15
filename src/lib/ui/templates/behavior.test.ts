@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { actionHides, actionLabels, oneWayReasons, pictureLabels, pressButtons } from "./behavior";
+import { allowedActions } from "../validate-element";
+
+import { actionHides, actionLabels, oneWayReasons, pictureLabels, pressButtons, stateActions, unpressedActions } from "./behavior";
 import type { TemplateElement, UiTemplate } from "./types";
 
 /** A navbar in small: links from a list, a sign-in link, a menu that opens and closes, a form that sends, and a picture. */
@@ -102,6 +104,59 @@ describe("pressButtons, for a push and a remove", () => {
   it("should never pair a setState with a push or a remove on the same path", () => {
     const more: Record<string, TemplateElement> = { reset: { type: "Button", props: { label: "Add link" }, on: { press: { action: "pushState", params: { statePath: "/open", value: false } } } } };
     expect(find(sample(more), "Open menu")?.restoredBy).toEqual(["Close menu"]);
+  });
+});
+
+describe("pressButtons, for a toggle", () => {
+  const toggle = (label: string, statePath = "/open"): TemplateElement => ({ type: "Button", props: { label }, on: { press: { action: "toggleState", params: { statePath } } } });
+  const find = (template: UiTemplate, label: string) => pressButtons(template).buttons.find((button) => button.label === label);
+
+  it("should read a toggle as a press its own button undoes, whether its path starts false or true", () => {
+    expect(find(sample({ flip: toggle("Menu") }), "Menu")).toMatchObject({ action: "toggleState", statePath: "/open", changesStart: true, oneWay: null });
+    expect(find(sample({ flip: toggle("Menu") }), "Menu")?.restoredBy[0]).toBe("Menu");
+    expect(find(sample({ flip: toggle("Menu") }, { open: true }), "Menu")).toMatchObject({ changesStart: true, oneWay: null });
+    expect(find(sample({ flip: toggle("Menu") }, { open: true }), "Menu")?.restoredBy[0]).toBe("Menu");
+  });
+
+  it("should name its own button first, then a button that writes the starting value back", () => {
+    // The sample's "Close menu" writes false to /open, where the menu starts; "Open menu" writes true and undoes nothing.
+    expect(find(sample({ flip: toggle("Menu") }), "Menu")?.restoredBy).toEqual(["Menu", "Close menu"]);
+    expect(find(sample({ flip: toggle("Menu") }, { open: true }), "Menu")?.restoredBy).toEqual(["Menu", "Open menu"]);
+  });
+
+  it("should let a toggle undo a setState on its path, and only one that leaves the other boolean", () => {
+    expect(find(sample({ flip: toggle("Menu") }), "Open menu")?.restoredBy).toEqual(["Close menu", "Menu"]);
+    const words: Record<string, TemplateElement> = {
+      flip: toggle("Menu", "/plan"),
+      pick: { type: "Button", props: { label: "Pick Solo" }, on: { press: { action: "setState", params: { statePath: "/plan", value: "Solo" } } } },
+    };
+    // After "Pick Solo" the path holds a word; a toggle would leave true, not the starting "Team".
+    expect(find(sample(words), "Pick Solo")).toMatchObject({ restoredBy: [], oneWay: oneWayReasons.setState });
+  });
+
+  it("should never read a toggle as one-way, when no other button touches its path", () => {
+    const alone = find(sample({ flip: toggle("Menu", "/sent") }), "Menu");
+    expect(alone).toMatchObject({ restoredBy: ["Menu"], oneWay: null, changesStart: true });
+  });
+});
+
+describe("the actions the validator allows", () => {
+  it("should have every allowed action either read as a state action or listed as not pressed, with a reason", () => {
+    const read = new Set<string>(stateActions);
+    const unread = [...allowedActions].filter((action) => !read.has(action) && (unpressedActions[action] ?? "").trim() === "");
+    expect(unread).toEqual([]);
+  });
+
+  it("should list no action twice, and none the validator does not allow", () => {
+    const listed = [...stateActions, ...Object.keys(unpressedActions)];
+    expect(new Set(listed).size).toBe(listed.length);
+    expect(listed.filter((action) => !allowedActions.has(action))).toEqual([]);
+  });
+
+  it("should fail the check above when an action is in neither list", () => {
+    const read = new Set<string>(stateActions);
+    const unread = [...allowedActions, "openDialog"].filter((action) => !read.has(action) && (unpressedActions[action] ?? "").trim() === "");
+    expect(unread).toEqual(["openDialog"]);
   });
 });
 

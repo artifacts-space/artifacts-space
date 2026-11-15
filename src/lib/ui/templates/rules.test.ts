@@ -109,6 +109,17 @@ describe("templateProblems", () => {
     expect(problemsOf(withElements({ either }, ["title", "points", "either"]))).toMatch(/element "either": its label cannot be read from the template/);
   });
 
+  it("should name a toggle whose path does not start as true or false, and accept one that does", () => {
+    const menu = (statePath: string): TemplateElement => ({ type: "Button", props: { label: "Menu" }, on: { press: { action: "toggleState", params: { statePath } } } });
+    const withToggle = (statePath: string, state: Record<string, unknown>): UiTemplate => {
+      const base = withElements({ menu: menu(statePath) }, ["title", "points", "menu"]);
+      return { ...base, fragment: { ...base.fragment, state: { ...base.fragment.state, ...state } } };
+    };
+    expect(templateProblems(withToggle("/open", { open: false }), "heroes")).toEqual([]);
+    expect(problemsOf(withToggle("/open", { open: "no" }))).toMatch(/element "menu" runs toggleState on "\/open", which does not start as true or false/);
+    expect(problemsOf(withToggle("/menu/open", { menu: {} }))).toMatch(/element "menu" runs toggleState on "\/menu\/open", which does not start as true or false/);
+  });
+
   it("should name a component that needs an upload", () => {
     expect(problemsOf(withElements({ shot: { type: "Image", props: { file: "00000000-0000-4000-8000-000000000000", alt: "x" } } }, ["title", "points", "shot"]))).toMatch(/Image needs an upload\. Use Placeholder/);
   });

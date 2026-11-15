@@ -1027,7 +1027,11 @@ template text is ours, so the tools add no untrusted-content label.
   or picture is drawn more often between the ends than at either end. A
   press nothing undoes is checked for its change only, and the test notes
   why: a `setState` no button writes back, and every `pushState` and
-  `removeState` (`oneWayReasons`). What it presses and
+  `removeState` (`oneWayReasons`). A `toggleState` button is pressed twice:
+  the second press of the same button must bring the frame back. Every
+  action the validator allows is read by `behavior.ts` (`stateActions`) or
+  listed there as not pressed, with a reason (`unpressedActions`), and a
+  test fails for a new action that is in neither. What it presses and
   counts is read from the fragment (`behavior.ts`), never from a list. A
   link or button left out of narrow frames on purpose goes in
   `leftOutWhenNarrow` in that spec, with its reason. All of them name the
@@ -1060,7 +1064,8 @@ template text is ours, so the tools add no untrusted-content label.
   links or buttons above the same step; the value a bound Select starts
   with, and every string a condition compares it with, is one of its
   options word for word (a Select's value is its option's words); a
-  state-changing button has a fixed label; a bare
+  state-changing button has a fixed label; a path a `toggleState` flips
+  starts as true or false; a bare
   `${name}` in `$template` only inside a repeat; no Image or File (use
   Placeholder); links have no `href`, or point at example.com; `validateForm`
   names its `statePath`; every slot points at a prop that is set or a state
