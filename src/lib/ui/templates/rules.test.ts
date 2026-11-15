@@ -104,9 +104,10 @@ describe("templateProblems", () => {
   it("should name a state-changing button whose label is not fixed, and a label only the browser can resolve", () => {
     const remove: TemplateElement = { type: "Button", props: { label: { $template: "Remove ${text}" } }, on: { press: { action: "removeState", params: { statePath: "/points", index: { $index: true } } } } };
     const withRemove = withElements({ points: { type: "Box", props: {}, repeat: { statePath: "/points" }, children: ["point", "remove"] }, remove });
-    expect(problemsOf(withRemove)).toMatch(/element "remove" changes state when pressed, but its label is not written in the template/);
-    const either: TemplateElement = { type: "Link", props: { label: { $cond: { $state: "/points/0/text", eq: "Fast" }, $then: "Fast", $else: "Slow" } } };
-    expect(problemsOf(withElements({ either }, ["title", "points", "either"]))).toMatch(/element "either": its label cannot be read from the template/);
+    expect(problemsOf(withRemove)).toMatch(/element "remove" changes state when pressed, but its label cannot be read from the template/);
+    const either = (otherwise: unknown): TemplateElement => ({ type: "Link", props: { label: { $cond: { $state: "/points/0/text", eq: "Fast" }, $then: "Fast", $else: otherwise } } });
+    expect(problemsOf(withElements({ either: either({ $state: "/points/0/text" }) }, ["title", "points", "either"]))).toMatch(/element "either": its label cannot be read from the template/);
+    expect(templateProblems(withElements({ either: either("Slow") }, ["title", "points", "either"]), "heroes")).toEqual([]);
   });
 
   it("should name a toggle whose path does not start as true or false, and accept one that does", () => {

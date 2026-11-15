@@ -99,8 +99,8 @@ function behaviorProblems(template: UiTemplate): string[] {
     ...buttons
       .filter((button) => button.action === "toggleState" && typeof start(button.statePath) !== "boolean")
       .map((button) => `element "${button.key}" runs toggleState on "${button.statePath}", which does not start as true or false. Set it in the template's state, so a second press brings back exactly what the first changed.`),
-    ...unlabelled.map((key) => `element "${key}" changes state when pressed, but its label is not written in the template. Give it a fixed label, so the e2e loop can press it.`),
-    ...actionLabels(template).unread.map((key) => `element "${key}": its label cannot be read from the template (a $cond, say). Use fixed words, a repeat's item, state, or a $template.`),
+    ...unlabelled.map((key) => `element "${key}" changes state when pressed, but its label cannot be read from the template. Give it a fixed label, or a $cond on state with fixed words in both branches, so the e2e loop can press it.`),
+    ...actionLabels(template).unread.map((key) => `element "${key}": its label cannot be read from the template. Use fixed words, a repeat's item, state, a $template, or a $cond with fixed words in both branches.`),
   ];
 }
 

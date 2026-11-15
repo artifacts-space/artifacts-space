@@ -105,10 +105,22 @@ async function pressAndExpectChange(page: Page, plan: Plan, read: WidthReading, 
 
 /**
  * The buttons to try, in order, to undo a press. A toggle is undone by its
- * own button and no other: it must still be there to press again, or a
- * reader who opened something with it cannot close it the same way.
+ * own button and no other (the first of `restoredBy`, under the words it
+ * shows once pressed): it must still be there to press again, or a reader
+ * who opened something with it cannot close it the same way.
  */
-const undoing = (button: PressButton): readonly string[] => (button.action === "toggleState" ? [button.label] : button.restoredBy);
+const undoing = (button: PressButton): readonly string[] => (button.action === "toggleState" ? button.restoredBy.slice(0, 1) : button.restoredBy);
+
+/**
+ * A toggle stays where it is and keeps the focus. Two buttons that take
+ * each other's place do not: the one a reader pressed leaves the page, and
+ * the focus with it.
+ */
+async function expectToggleKeepsFocus(frame: Locator, button: PressButton, width: number) {
+  if (button.action !== "toggleState") return;
+  const [again = button.label] = button.restoredBy;
+  await expect(shownButton(frame, again).first(), `after "${button.label}" at ${String(width)}, the same button is still there and has the focus`).toBeFocused();
+}
 
 /** Presses the first button a reader can see among `labels`, and returns its label. */
 async function pressFirstShown(frame: Locator, labels: readonly string[], why: string): Promise<string> {
@@ -130,6 +142,7 @@ async function readFrame(page: Page, plan: Plan, read: WidthReading, pressed: Se
   for (const button of plan.reveals) {
     if ((await shownButton(frame, button.label).count()) === 0) continue;
     await pressAndExpectChange(page, plan, read, frame, button, rest);
+    await expectToggleKeepsFocus(frame, button, read.width);
     readings.push(await countLabels(frame, plan.labels));
     const undo = await pressFirstShown(frame, undoing(button), `after "${button.label}" at ${String(read.width)}, nothing puts the frame back`);
     await expect.poll(() => signatureOf(frame), { message: `"${undo}" at ${String(read.width)} brings back what "${button.label}" changed` }).toBe(rest);
