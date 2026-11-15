@@ -241,6 +241,19 @@ export const docsPages = [
     ],
   },
   {
+    slug: "json-render/templates",
+    title: "Section templates",
+    description: "Ready-made navbars, heroes, pricing sections, and app screens, built only from the component set. An agent fetches one over MCP and changes the words.",
+    section: "JSON Render",
+    source: app("json-render/templates/"),
+    headings: [
+      h2("what", "What a template is"),
+      h2("use", "Use one over MCP"),
+      h2("combine", "Several in one page"),
+      h2("catalog", "The templates"),
+    ],
+  },
+  {
     slug: "json-render/validation",
     title: "Validation",
     description: "The checks every ui spec passes, the messages agents get back, and how artifacts_validate catches problems before saving.",

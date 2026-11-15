@@ -11,6 +11,7 @@ import { registerFormatTools } from "./format-tools";
 import { registerProjectTools } from "./project-tools";
 import { registerTagTools } from "./tag-tools";
 import { registerTeamTools } from "./team-tools";
+import { registerTemplateTools } from "./template-tools";
 import { registerThemeTools } from "./theme-tools";
 import { registerVersionTools } from "./version-tools";
 import { registerViewTools } from "./view-tools";
@@ -29,6 +30,7 @@ export function registerAllTools(server: McpServer, userId: string, access: McpA
   registerTagTools(server, userId, access);
   registerFormatTools(server, access);
   registerCanvasTools(server, userId, access, harness);
+  registerTemplateTools(server, access);
   registerThemeTools(server, userId, access);
   registerFileTools(server, userId, access, harness);
   registerTeamTools(server, userId, access);

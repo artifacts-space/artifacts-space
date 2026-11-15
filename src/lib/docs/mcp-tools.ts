@@ -8,6 +8,7 @@ import { registerFormatTools } from "@/lib/mcp/format-tools";
 import { registerProjectTools } from "@/lib/mcp/project-tools";
 import { registerTagTools } from "@/lib/mcp/tag-tools";
 import { registerTeamTools } from "@/lib/mcp/team-tools";
+import { registerTemplateTools } from "@/lib/mcp/template-tools";
 import { registerThemeTools } from "@/lib/mcp/theme-tools";
 import { toolAccess, type McpToolName } from "@/lib/mcp/tool-access";
 import { registerVersionTools } from "@/lib/mcp/version-tools";
@@ -32,7 +33,7 @@ export interface DocsMcpTool {
   args: PropRow[];
 }
 
-export const mcpToolGroups = ["Artifacts", "Version history", "Views", "Formats", "Canvas frames", "Themes", "Files", "Inbox and comments"] as const;
+export const mcpToolGroups = ["Artifacts", "Version history", "Views", "Formats", "Canvas frames", "Section templates", "Themes", "Files", "Inbox and comments"] as const;
 export type McpToolGroup = (typeof mcpToolGroups)[number];
 
 interface ToolConfig {
@@ -73,6 +74,7 @@ function recordTools(): DocsMcpTool[] {
   registerTagTools(recordingServer("Artifacts", tools), docsUserId, "full");
   registerFormatTools(recordingServer("Formats", tools), "full");
   registerCanvasTools(recordingServer("Canvas frames", tools), docsUserId, "full");
+  registerTemplateTools(recordingServer("Section templates", tools), "full");
   registerThemeTools(recordingServer("Themes", tools), docsUserId, "full");
   registerFileTools(recordingServer("Files", tools), docsUserId, "full");
   registerTeamTools(recordingServer("Inbox and comments", tools), docsUserId, "full");

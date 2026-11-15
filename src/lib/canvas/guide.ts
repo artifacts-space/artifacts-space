@@ -1,4 +1,5 @@
 import { uiLimits } from "@/lib/ui/limits";
+import { templateGuide } from "@/lib/ui/templates/guide";
 
 import { exampleCanvas } from "./fixtures";
 import { canvasLimits, frameIdRule, frameSizes } from "./limits";
@@ -51,6 +52,7 @@ export function buildCanvasGuide(): string {
     "A canvas can hold many screens. These tools read and change one frame, so you never resend the others:",
     frameTools.map((tool) => `- ${tool}`).join("\n"),
     frameToolNotes.map((note) => `- ${note}`).join("\n"),
+    templateGuide("canvas"),
     "## Example",
     JSON.stringify(exampleCanvas, null, 2),
   ].join("\n\n");

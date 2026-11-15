@@ -144,6 +144,21 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     summary: "Confirms the delete, with how many frames are left and the `baseVersion` of your save. The typed error is that of canvas_frame_save.",
     shape: `{ "id": "…", "frameId": "home-phone", "deleted": true, "edit": "applied" | "pending", "frameCount": 3, "elements": 86, "versionId": "…", "baseVersion": "…" }`,
   },
+  ui_templates_list: {
+    summary: "One small row per section template, all of them or only one `category` or `kind`. No specs. Nothing is saved.",
+    shape: `{ "templates": [ { "id": "pricing-three-tiers", "name": "Pricing, three tiers", "category": "pricing", "kind": "marketing" | "app",
+      "description": "…", "viewport": "fluid" | "wide" | "phone", "elements": 17 } ],
+  "count": 3 }`,
+  },
+  ui_template_get: {
+    summary: "The template's row, what was counted from it, its `slots` (what to change), and the template itself: a `fragment` to add to a spec, or with `as: \"spec\"` a complete `spec`. `attach` says how to use it. Every key and state path carries `prefix`. An id no template has, or a prefix that is not lowercase words joined by hyphens, is a tool error. Nothing is saved.",
+    shape: `{ "id": "hero-centered", "name": "Hero, centered", "category": "hero", "kind": "marketing", "description": "…", "viewport": "fluid", "elements": 9,
+  "surface": "page", "depth": 3, "interactive": false, "components": ["Badge", "Box", "Button", "Heading", "Text"], "prefix": "hero-centered",
+  "slots": [ { "what": "Headline", "element": "hero-centered-title", "prop": "text" },   // a prop of one element
+             { "what": "Plans", "state": "/pricing-three-tiers/plans" } ],                // or a value in the state
+  "attach": "Add fragment.elements to your spec's elements and put \\"hero-centered-hero\\" in the children of a Box, …",
+  "fragment": { "root": "hero-centered-hero", "elements": { … }, "state": { "<prefix>": { … } } } }   // or "spec": { "version": 1, "root": "page", … }`,
+  },
   themes_list: {
     summary: "The built-in theme presets, the font ids custom theme JSON may use in each slot, the cover gradients, and usage notes. Nothing is saved.",
     shape: `{ "presets": [ { "id": "paper", "name": "Paper", "description": "…", "mode": "auto",

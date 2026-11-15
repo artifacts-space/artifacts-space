@@ -1,6 +1,7 @@
 import { uiCatalog } from "./catalog";
 import { exampleUiSpec } from "./fixtures/example";
 import { uiLimits } from "./limits";
+import { templateGuide } from "./templates/guide";
 import { UI_SPEC_VERSION } from "./version";
 
 /** Pulls the generated component list out of the catalog prompt. */
@@ -47,6 +48,7 @@ export function buildUiGuide(): string {
     "A ui artifact is a json-render spec rendered with the artifacts.space component set. Pages are read-only to the world: inputs only change on-page state.",
     "## Rules",
     rules.map((rule, index) => `${index + 1}. ${rule}`).join("\n"),
+    templateGuide("ui"),
     "## Components",
     componentReference(),
     "## Example",
