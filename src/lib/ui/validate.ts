@@ -2,7 +2,8 @@ import { validateSpec } from "@json-render/core";
 
 import { uiCatalog } from "./catalog";
 import { findUnsafePaths } from "./expressions";
-import { formatPath, hasErrors, isBlocking, specError, specWarning, type UiSpecIssue } from "./issues";
+import { formatPath, hasErrors, isBlocking, specError, type UiSpecIssue } from "./issues";
+import { readJsonInput, readVersionField } from "./json-input";
 import { isPlainObject, walkJson } from "./json-walk";
 import { uiLimits } from "./limits";
 import { normalizeElement, toRendererSpec, type UiElement, type UiSpec } from "./spec";
@@ -24,46 +25,16 @@ export interface UiValidationResult {
 /** json-render issue codes our own checks already report in more detail. */
 const coveredCodes = new Set(["missing_root", "root_not_found", "missing_child", "orphaned_element", "empty_spec"]);
 
-const encoder = new TextEncoder();
+/** How a ui spec names itself when its JSON cannot be read. */
+const uiInput = {
+  maxBytes: uiLimits.maxSpecBytes,
+  noun: "spec",
+  splitInto: "artifacts",
+  shapeHint: `A ui artifact is one JSON object: { "version": ${String(UI_SPEC_VERSION)}, "root": "…", "elements": { … } }.`,
+} as const;
 
 function failed(issue: UiSpecIssue): UiValidationResult {
   return { valid: false, renderable: false, spec: null, issues: [issue] };
-}
-
-function stringify(value: unknown): string | null {
-  try {
-    const text = JSON.stringify(value) as string | undefined;
-    return typeof text === "string" ? text : null;
-  } catch {
-    return null;
-  }
-}
-
-function parseInput(input: unknown): { value: unknown } | { issue: UiSpecIssue } {
-  const text = typeof input === "string" ? input : stringify(input);
-  if (text === null) return { issue: specError("invalid_json", "The spec could not be read as JSON.") };
-  const bytes = encoder.encode(text).length;
-  if (bytes > uiLimits.maxSpecBytes) {
-    return { issue: specError("too_large", `The spec is ${bytes.toLocaleString("en-US")} bytes; the limit is ${uiLimits.maxSpecBytes.toLocaleString("en-US")}. Split it into several artifacts or trim data.`) };
-  }
-  if (typeof input !== "string") return { value: input };
-  try {
-    return { value: JSON.parse(input) as unknown };
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : "it is not valid JSON";
-    return { issue: specError("invalid_json", `The content is not valid JSON: ${reason}. A ui artifact is one JSON object: { "version": ${UI_SPEC_VERSION}, "root": "…", "elements": { … } }.`) };
-  }
-}
-
-function readVersion(raw: Record<string, unknown>): { version: number; issue?: UiSpecIssue } {
-  const version = raw.version;
-  if (version === undefined) {
-    return { version: UI_SPEC_VERSION, issue: specWarning("missing_version", `Add "version": ${UI_SPEC_VERSION} at the top level so the spec keeps its meaning as components evolve.`) };
-  }
-  if (typeof version !== "number" || !Number.isInteger(version) || version < 1 || version > UI_SPEC_VERSION) {
-    return { version: UI_SPEC_VERSION, issue: specError("unsupported_version", `"version" must be an integer from 1 to ${UI_SPEC_VERSION}. Use ${UI_SPEC_VERSION}.`) };
-  }
-  return { version };
 }
 
 function readElements(raw: Record<string, unknown>): { elements: Record<string, UiElement>; raws: Record<string, Record<string, unknown>>; issues: UiSpecIssue[] } {
@@ -122,14 +93,14 @@ function checkRaw(raw: Record<string, unknown>): UiSpecIssue | null {
  * Issues name the element key and say how to fix the problem.
  */
 export function validateUiSpec(input: unknown): UiValidationResult {
-  const parsed = parseInput(input);
+  const parsed = readJsonInput(input, uiInput);
   if ("issue" in parsed) return failed(parsed.issue);
   if (!isPlainObject(parsed.value)) {
     return failed(specError("not_object", `A ui artifact must be one JSON object: { "version": ${UI_SPEC_VERSION}, "root": "…", "elements": { … } }.`));
   }
   const rawIssue = checkRaw(parsed.value);
   if (rawIssue) return failed(rawIssue);
-  const { version, issue: versionIssue } = readVersion(parsed.value);
+  const { version, issue: versionIssue } = readVersionField(parsed.value, UI_SPEC_VERSION, "so the spec keeps its meaning as components evolve");
   const read = readSpec(migrateUiSpec(parsed.value, version));
   if (versionIssue) read.issues.unshift(versionIssue);
   if (!read.spec) return { valid: false, renderable: false, spec: null, issues: read.issues };
