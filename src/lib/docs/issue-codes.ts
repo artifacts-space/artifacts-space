@@ -50,7 +50,7 @@ const blockingMeanings: Record<string, string> = {
   nested_repeat: "A repeat sits inside another repeat.",
   too_many_rendered: "Repeats expand past the rendered-element limit.",
   repeat_too_long: "One repeat has more items than the limit.",
-  typed_text_in_link: `A text field is bound to state and a link address, Markdown, Steps, or Diagram prop uses an expression. Typed text must never reach a link. The error names every bound text field: the first ${String(namedFieldLimit)}, then how many more.`,
+  typed_text_in_link: `A text field is bound to state and a link address, Markdown, Steps, or Diagram prop uses an expression. Typed text must never reach a link. The error names every bound text field; past ${String(namedFieldLimit + 1)} of them it names the first ${String(namedFieldLimit)} and counts the rest.`,
 };
 
 /** Blocking codes first, then element errors, then warnings. */

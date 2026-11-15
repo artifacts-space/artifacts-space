@@ -54,12 +54,18 @@ describe("typed text never reaches a link", () => {
   it.each([
     [2, 'text fields "field-1" and "field-2" are bound to state'],
     [3, 'text fields "field-1", "field-2", and "field-3" are bound to state'],
-    [4, 'text fields "field-1", "field-2", "field-3", and 1 more are bound to state'],
+    // One past the limit: the fourth is named, since "and 1 more" would hide the one name still needed.
+    [4, 'text fields "field-1", "field-2", "field-3", and "field-4" are bound to state'],
+    [5, 'text fields "field-1", "field-2", "field-3", and 2 more are bound to state'],
     [9, 'text fields "field-1", "field-2", "field-3", and 6 more are bound to state'],
-  ])("should name every bound text field, up to three and then how many more, when %i are bound", (count, words) => {
+  ])("should name every bound text field, or the first three and how many more from five up, when %i are bound", (count, words) => {
     const message = messageWith(count);
     expect(message).toContain(`in a spec whose ${words}, because`);
     expect(message).toContain("or remove the binding from each of those text fields' `value`.");
+  });
+
+  it("should never write a count that stands for one field", () => {
+    for (let count = 1; count <= 12; count += 1) expect(messageWith(count), `${String(count)} bound fields`).not.toContain("and 1 more");
   });
 
   it("should name bound fields only, in the spec's order, and both kinds of text field", () => {

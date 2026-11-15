@@ -207,12 +207,14 @@ describe("the typed-text rule's list of text fields", () => {
   // This test owns how a listed field binds what is typed: an editable region, or a field bound through another prop, fails here.
   it.each([...textFields])("should show state in a %s through `value`, the prop the rule reads for a binding", (type) => {
     const html = one(type, { label: "Field", value: { $bindState: "/typed" } }, { typed: "zebra-typed" });
-    const shown = controls(html).filter((control) => takesTypedText(control) && (control.includes('value="zebra-typed"') || control.startsWith("<textarea")));
+    // An input carries its value in the tag; a text area carries it between its tags.
+    const inputs = controls(html).filter((control) => !control.startsWith("<textarea") && control.includes('value="zebra-typed"'));
+    const textAreas = html.match(/<textarea\b[^>]*>zebra-typed/g) ?? [];
+    const shown = [...inputs, ...textAreas].filter(takesTypedText);
     expect(
       shown,
       `${type} is in \`textFields\`, but no input or text area shows state bound to \`value\`. The typed-text rule reads only \`value\` for a binding: teach \`boundTextFields\` in src/lib/ui/validate-fields.ts the prop this component binds what is typed to, test it there, and then extend this test`,
     ).toHaveLength(1);
-    expect(html).toContain("zebra-typed");
   });
 
   it("should not count a checkbox, a slider, a switch, or the hidden input under a Select as typed text", () => {

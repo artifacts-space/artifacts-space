@@ -51,11 +51,13 @@ function inWords(items: readonly string[]): string {
 
 /**
  * The bound text fields as an error names them: every key, so one pass
- * unbinds them all, or the first three and how many more when there are
- * more than that.
+ * unbinds them all, or the first `namedFieldLimit` and how many more. A
+ * count is written only when it stands for two or more fields: one more
+ * field is named, since "and 1 more" would hide the one name still needed.
  */
 function namedFields(fields: readonly string[]): string {
-  const quoted = fields.slice(0, namedFieldLimit).map((key) => `"${key}"`);
+  const shown = fields.length - namedFieldLimit === 1 ? fields.length : namedFieldLimit;
+  const quoted = fields.slice(0, shown).map((key) => `"${key}"`);
   const more = fields.length - quoted.length;
   const names = inWords(more > 0 ? [...quoted, `${String(more)} more`] : quoted);
   return fields.length === 1 ? `text field ${names} is` : `text fields ${names} are`;
