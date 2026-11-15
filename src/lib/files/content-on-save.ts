@@ -24,22 +24,22 @@ export function withRelativeFileLinks<T extends { content?: string | undefined }
 }
 
 /**
- * A ui spec whose file ids are all written plainly. JSON may spell an id
+ * A ui spec or a canvas whose file ids are all written plainly. JSON may spell an id
  * with escapes (`"2\\u0061d2…"` for `"2ad2…"`), which reads as the same id but is not the
  * same text, and pruning checks content as text (icon-cleanup.ts). Such a
  * spec is saved re-serialized, compact or two-space indented as it came;
  * every other spec is saved exactly as sent.
  */
-export function withPlainUiFileRefs(content: string): string {
-  const refs = fileRefsInContent("ui", content);
+export function withPlainUiFileRefs(content: string, kind: "ui" | "canvas" = "ui"): string {
+  const refs = fileRefsInContent(kind, content);
   const text = content.toLowerCase();
   if (refs.every((fileId) => text.includes(fileId))) return content;
   return JSON.stringify(JSON.parse(content), null, content.includes("\n") ? 2 : undefined);
 }
 
-/** Content as a save stores it: Markdown with this site's file links relative, and ui specs with plain file ids. */
+/** Content as a save stores it: Markdown with this site's file links relative, and ui specs and canvases with plain file ids. */
 export function contentForSave<T extends { content?: string | undefined }>(kind: string, input: T, origin: string | null = ownOrigin()): T {
   if (input.content === undefined) return input;
-  if (kind === "ui") return { ...input, content: withPlainUiFileRefs(input.content) };
+  if (kind === "ui" || kind === "canvas") return { ...input, content: withPlainUiFileRefs(input.content, kind) };
   return withRelativeFileLinks(kind, input, origin);
 }

@@ -5,6 +5,7 @@ import { validateArtifactContent } from "@/lib/artifact-content";
 import { blockHues } from "@/lib/block-colors/block-color-rules";
 import { formatInfo, type FormatKind } from "@/lib/artifact-formats";
 import { artifactKinds } from "@/lib/artifact-types";
+import { buildCanvasGuide } from "@/lib/canvas/guide";
 import type { McpAccess } from "@/lib/oauth/scopes";
 import { buildUiGuide } from "@/lib/ui/guide";
 
@@ -81,10 +82,13 @@ function text(value: string) {
 /** The guide for one format, or an overview of all formats. */
 export function formatGuide(kind?: FormatKind): string {
   if (kind === "ui") return buildUiGuide();
+  if (kind === "canvas") return buildCanvasGuide();
   if (kind === "markdown") return `${formatInfo.markdown.label} (markdown): ${formatInfo.markdown.agent}\n\n${MARKDOWN_DIAGRAM_GUIDE}\n\n${MARKDOWN_MEDIA_GUIDE}\n\n${MARKDOWN_COLOR_GUIDE}`;
   if (kind) return `${formatInfo[kind].label} (${kind}): ${formatInfo[kind].agent}`;
   const lines = artifactKinds.map((item) => `- ${item}: ${formatInfo[item].agent}`);
-  const uiHint = (artifactKinds as readonly string[]).includes("ui") ? ['', 'For rich pages, call artifacts_formats_guide with kind "ui" to get the component reference and an example.'] : [];
+  const uiHint = (artifactKinds as readonly string[]).includes("ui")
+    ? ["", 'For rich pages, call artifacts_formats_guide with kind "ui" to get the component reference and an example. For mockups of websites and app screens, call it with kind "canvas".']
+    : [];
   return ["Artifact formats:", ...lines, ...uiHint, "", ICON_GUIDE, "", THEME_GUIDE, "", COVER_GUIDE].join("\n");
 }
 
@@ -98,7 +102,7 @@ export function validationReport(kind: FormatKind, content: string): string {
 
 /**
  * Registers the format tools on an MCP server:
- * - artifacts_formats_guide: what each format is, and the full ui component guide.
+ * - artifacts_formats_guide: what each format is, the full ui component guide, and the canvas guide.
  * - artifacts_validate: checks content against a format without saving it.
  */
 export function registerFormatTools(server: McpServer, access: McpAccess) {
@@ -107,7 +111,7 @@ export function registerFormatTools(server: McpServer, access: McpAccess) {
     "artifacts_formats_guide",
     {
       title: "Artifact formats guide",
-      description: "Explains every artifact format. With kind \"ui\", returns the component reference, rules, and an example for rich pages. Read it before creating a ui artifact.",
+      description: "Explains every artifact format. With kind \"ui\", returns the component reference, rules, and an example for rich pages. With kind \"canvas\", returns the rules and an example for a board of website and app mockups. Read it before creating a ui or canvas artifact.",
       inputSchema: { kind: z.enum(artifactKinds).optional().describe("Format to explain. Omit for an overview.") },
     },
     ({ kind }) => text(formatGuide(kind)),
@@ -117,7 +121,7 @@ export function registerFormatTools(server: McpServer, access: McpAccess) {
     "artifacts_validate",
     {
       title: "Validate artifact content",
-      description: "Checks content against a format without saving it. Reports every problem at once, naming the element and the fix.",
+      description: "Checks content against a format without saving it. Reports every problem at once, naming the element (and for a canvas, the frame) and the fix.",
       inputSchema: {
         kind: z.enum(artifactKinds),
         content: z.string().max(1_000_000),

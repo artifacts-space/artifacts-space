@@ -1,4 +1,5 @@
 import type { ArtifactKind } from "@/lib/artifact-types";
+import { canvasExcerpt } from "@/lib/canvas/outline";
 import { parseCsv } from "@/lib/csv";
 import { uiSpecToMarkdown } from "@/lib/markdown/ui-spec";
 import { OG_WORDMARK } from "@/lib/site-copy";
@@ -108,6 +109,7 @@ const excerpts: Record<ArtifactKind, (input: DescriptionInput) => string> = {
   markdown: ({ content }) => markdownExcerpt(content),
   text: ({ content }) => content.slice(0, proseScan),
   ui: ({ content }) => uiExcerpt(content),
+  canvas: ({ content }) => canvasExcerpt(content),
   code: ({ content, language }) => codeExcerpt(content, language),
   json: ({ content }) => jsonExcerpt(content),
   csv: ({ content }) => csvExcerpt(content),

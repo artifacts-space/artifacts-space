@@ -14,6 +14,7 @@ import { SheetFill } from "@/components/artifact-view/sheet-fill";
 import { SheetFormatProvider, type SheetFormatSaver } from "@/components/artifact-view/sheet-format";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
+import { appFlowCanvas } from "@/lib/canvas/fixtures";
 import { bodyFillsColumnClass, pageColumnClass, usesFullWidth } from "@/lib/page-width/rules";
 import { plainSheetFormat } from "@/lib/sheet-format/rules";
 import { sheetAtLimit } from "@/lib/ui/fixtures/formats";
@@ -28,6 +29,7 @@ const samples: Record<EditorFixtureKind, { kind: ArtifactKind; content: () => st
   blocks: { kind: "ui", content: shortUi },
   data: { kind: "ui", content: dataUi },
   sheet: { kind: "csv", content: sheetAtLimit },
+  canvas: { kind: "canvas", content: () => JSON.stringify(appFlowCanvas, null, 2) },
 };
 
 /** Sheet formatting kept in memory, so the format menus work without a database. */

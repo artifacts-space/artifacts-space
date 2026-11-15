@@ -123,6 +123,16 @@ describe("detectTextKind", () => {
       expect(detectTextKind(uiSpec)).toMatchObject({ kind: "ui", reason: "ui" });
     });
 
+    it("should detect a canvas when the json is a valid canvas with a frame", () => {
+      const canvas = JSON.stringify({ version: 1, frames: [{ id: "home", name: "Home", width: 390, spec: JSON.parse(uiSpec) as unknown }] });
+      expect(detectTextKind(canvas)).toMatchObject({ kind: "canvas", reason: "canvas" });
+    });
+
+    it("should stay json when a canvas has no frames or a frame that fails its checks", () => {
+      expect(detectTextKind('{ "version": 1, "frames": [] }').kind).toBe("json");
+      expect(detectTextKind('{ "version": 1, "frames": [{ "id": "home", "name": "Home", "width": 390, "spec": {} }] }').kind).toBe("json");
+    });
+
     it("should stay json when the object only looks like a spec", () => {
       expect(detectTextKind('{ "root": "page", "elements": {} }').kind).toBe("json");
     });

@@ -9,7 +9,7 @@ export interface FormatInfo {
 }
 
 /** Every artifact format, in picker order. Server-safe: no React, no icons. */
-export const formatKinds = ["markdown", "code", "text", "json", "csv", "svg", "mermaid", "ui", "file"] as const;
+export const formatKinds = ["markdown", "code", "text", "json", "csv", "svg", "mermaid", "ui", "canvas", "file"] as const;
 export type FormatKind = (typeof formatKinds)[number];
 
 export const formatInfo: Record<FormatKind, FormatInfo> = {
@@ -52,6 +52,11 @@ export const formatInfo: Record<FormatKind, FormatInfo> = {
     label: "Interface",
     helper: "A rich page, such as a dashboard or report, built from our components.",
     agent: "A json-render spec on the artifacts.space component set: dashboards, reports, checklists. Read artifacts_formats_guide with kind \"ui\" before writing one.",
+  },
+  canvas: {
+    label: "Canvas",
+    helper: "A board of screens: mockups of websites and apps, built from our components.",
+    agent: "A board of frames for mocking up websites and app screens. Each frame is one screen at a width you choose (1440 desktop, 768 tablet, 390 phone) and holds a json-render spec on the artifacts.space component set. No HTML or CSS. Read artifacts_formats_guide with kind \"canvas\" before writing one.",
   },
   file: {
     label: "Files",

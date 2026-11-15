@@ -1,9 +1,10 @@
 import Link from "next/link";
 
 import { CodeSnippet } from "@/components/code/code-snippet";
-import { DocsH, Note, Prose } from "@/components/docs/docs-content";
+import { DocsH, FactTable, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { LiveExample } from "@/components/docs/live-example";
+import { canvasLimits, frameSizes } from "@/lib/canvas/limits";
 import { componentGroups } from "@/lib/docs/components/catalog-docs";
 import { dashboardExample, minimalExample } from "@/lib/docs/guide-examples";
 import { docsMetadata } from "@/lib/docs/metadata";
@@ -28,6 +29,14 @@ const elementShape = compactJson({
 const childrenShape = compactJson({
   page: { type: "Stack", props: { gap: "lg" }, children: ["title", "kpis"] },
   kpis: { type: "Grid", props: { columns: 3 }, children: ["kpi-revenue", "kpi-churn", "kpi-nps"] },
+});
+
+const canvasShape = compactJson({
+  version: 1,
+  frames: [
+    { id: "home-desktop", name: "Home, desktop", width: frameSizes.desktop, spec: { version: UI_SPEC_VERSION, root: "page", elements: { page: { type: "Grid", props: { columns: 3 }, children: ["…"] } } } },
+    { id: "home-phone", name: "Home, phone", width: frameSizes.phone, height: 844, spec: { version: UI_SPEC_VERSION, root: "page", elements: { page: { type: "Stack", props: {}, children: ["…"] } } } },
+  ],
 });
 
 const stateShape = compactJson({ state: { showMoney: true, filters: { team: "Platform" }, services: [{ name: "api" }] } });
@@ -107,6 +116,32 @@ export default function JsonRenderPage() {
           </div>
         ))}
       </div>
+
+      <DocsH page={page} id="canvas" />
+      <Prose>
+        <p>
+          A <code>canvas</code> artifact is a board of frames for mocking up websites and app screens. Each frame is one screen at a width you choose, and its <code>spec</code> is a ui spec, so every component and rule on these pages works inside a frame. Readers drag to move the board and zoom in to read a frame; on a phone the frames stack in the page, each scaled to fit. No HTML or CSS is involved, and each frame keeps its own state.
+        </p>
+      </Prose>
+      <FactTable
+        head={["Frame field", "Required", "What it does"]}
+        rows={[
+          ["id", "Yes", `A short, unique name: up to ${String(canvasLimits.maxIdLength)} lowercase letters, digits, and hyphens. Keep it when you change the frame.`],
+          ["name", "Yes", `What people see above the frame, up to ${String(canvasLimits.maxNameLength)} characters.`],
+          ["width", "Yes", `The frame's width in CSS pixels, ${String(canvasLimits.minWidth)} to ${canvasLimits.maxWidth.toLocaleString("en-US")}. Usual sizes: ${String(frameSizes.desktop)} (desktop), ${String(frameSizes.tablet)} (tablet), ${String(frameSizes.phone)} (phone).`],
+          ["height", "No", `The least height, ${String(canvasLimits.minHeight)} to ${canvasLimits.maxHeight.toLocaleString("en-US")}. Left out, the frame is as tall as its content. Longer content makes the frame taller and is never cut off.`],
+          ["padding", "No", "The space between the frame's edge and its content: none, sm, md (the default), or lg."],
+          ["x, y", "No", `The frame's top-left corner on the board. Left out, frames sit in one row in the order listed, ${String(canvasLimits.autoGap)} pixels apart.`],
+          ["spec", "Yes", "The frame's ui spec: version, root, elements, and state."],
+        ]}
+        mono={[0]}
+      />
+      <CodeSnippet title="A canvas with one page at two sizes" language="json" code={canvasShape} className="mt-4" />
+      <Prose>
+        <p>
+          To show one screen at several sizes, add one frame per size and lay each out for its width. A canvas holds up to {canvasLimits.maxFrames} frames and {canvasLimits.maxElements.toLocaleString("en-US")} elements across them, and each frame keeps the ui limits. The agent reads the rules with <code>artifacts_formats_guide</code> (<code>kind: &quot;canvas&quot;</code>) and checks a canvas with <code>artifacts_validate</code>: each issue names the frame, then the element, and the fix. A frame with a problem shows a notice in its place, and the other frames still render.
+        </p>
+      </Prose>
     </RegistryPage>
   );
 }

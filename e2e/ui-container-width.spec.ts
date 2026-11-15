@@ -112,7 +112,7 @@ test.describe("on a wide window", () => {
  * would take the narrow layout. Each interface on these pages must fill the
  * room its parent gives it.
  */
-const interfacePages = ["/dev/components", "/?home", "/docs/json-render/components/grid", "/preview", "/dev/editor?kind=ui", "/dev/workspace"] as const;
+const interfacePages = ["/dev/components", "/?home", "/docs/json-render/components/grid", "/preview", "/dev/editor?kind=ui", "/dev/workspace", "/dev/canvas?fixture=site"] as const;
 
 /** Narrower than any place we draw an interface: a phone column is about 330px. */
 const narrowestInterface = 200;
@@ -120,17 +120,19 @@ const narrowestInterface = 200;
 /**
  * Every interface that has a layout: its width, and the room its parent gives. One under `display: none`
  * (a closed tab) has none and is left out; one hidden by opacity or visibility still has, and is measured.
+ * Both numbers are layout widths, before any transform: a canvas draws each frame at its real width and
+ * scales it to fit, and the blocks inside follow the real width, not the scaled one.
  */
 const laidOutInterfaces = (page: Page) =>
   page.evaluate(() =>
     [...document.querySelectorAll("*")]
-      .filter((node) => getComputedStyle(node).containerName === "ui" && node.checkVisibility())
+      .filter((node): node is HTMLElement => node instanceof HTMLElement && getComputedStyle(node).containerName === "ui" && node.checkVisibility())
       .flatMap((root) => {
         const parent = root.parentElement;
         if (!parent) return [];
         const style = getComputedStyle(parent);
         const room = parent.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-        return [{ width: Math.round(root.getBoundingClientRect().width), room: Math.round(room), parent: parent.className.slice(0, 80) }];
+        return [{ width: root.offsetWidth, room: Math.round(room), parent: parent.className.slice(0, 80) }];
       }),
   );
 

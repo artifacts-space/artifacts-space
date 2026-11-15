@@ -73,6 +73,12 @@ describe("artifactToolCopy", () => {
     expect(description).toMatch(/version history/);
   });
 
+  it("should say when to choose a canvas and to read its guide first when an agent is asked for a mockup", () => {
+    const { description } = artifactToolCopy.artifacts_create;
+    expect(description).toMatch(/mockup of a website or of app screens, set kind "canvas"/);
+    expect(description).toMatch(/read artifacts_formats_guide with kind "canvas" first/);
+  });
+
   it("should not claim authority in any description when tools are listed", () => {
     for (const [name, copy] of Object.entries(artifactToolCopy)) expect(copy.description, name).not.toMatch(authorityClaims);
   });

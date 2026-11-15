@@ -127,6 +127,7 @@ export const docsPages = [
       h2("svg", "SVG"),
       h2("mermaid", "Mermaid"),
       h2("ui", "Interface (ui)"),
+      h2("canvas", "Canvas"),
       h2("file", "Files"),
     ],
   },
@@ -190,6 +191,7 @@ export const docsPages = [
       h2("minimal", "A minimal spec"),
       h2("dashboard", "A full dashboard"),
       h2("catalog", "The component set"),
+      h2("canvas", "Canvases: boards of screens"),
     ],
   },
   {

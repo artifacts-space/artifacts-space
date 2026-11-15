@@ -23,13 +23,16 @@ export function formatSwitchProblem(kind: ArtifactKind, content: string, page: {
 /** Formats a blank page may switch to with nothing in it: they take any text, so the first words typed make them valid. */
 const startsEmptyOnBlank: ReadonlySet<ArtifactKind> = new Set(["text", "code"]);
 
-/** A small valid start for formats that cannot begin empty, so an empty page can become a table, an interface, or a diagram. */
+/** A small valid start for formats that cannot begin empty, so an empty page can become a table, an interface, a canvas, or a diagram. */
+const starterPage = { version: 1, root: "page", elements: { page: { type: "Stack", props: {}, children: ["title"] }, title: { type: "Heading", props: { text: "Untitled", level: 1 } } } };
+
 const starters: Partial<Record<ArtifactKind, string>> = {
   csv: "Name,Value\n,",
   json: "{}",
   svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"></svg>',
   mermaid: "flowchart TD\n  A --> B",
-  ui: JSON.stringify({ version: 1, root: "page", elements: { page: { type: "Stack", props: {}, children: ["title"] }, title: { type: "Heading", props: { text: "Untitled", level: 1 } } } }, null, 2),
+  ui: JSON.stringify(starterPage, null, 2),
+  canvas: JSON.stringify({ version: 1, frames: [{ id: "screen-1", name: "Screen 1", width: 1440, spec: starterPage }] }, null, 2),
 };
 
 /** The content after a switch to `kind`: an empty page gets that format's starter; anything written stays as it is. */
