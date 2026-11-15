@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { canvasLimits, frameSizes } from "./limits";
-import { boundsOf, clampZoom, fitPadding, fitView, frameView, nextZoomStep, panBy, pinchOf, pinchView, wheelZoom, zoomAbout, zoomPercent, zoomRange } from "./view-rules";
+import { boundsOf, clampZoom, fitPadding, fitView, frameView, keepInWindow, nextZoomStep, panBy, pinchOf, pinchView, wheelZoom, zoomAbout, zoomPercent, zoomRange } from "./view-rules";
 
 const window = { width: 1000, height: 600 };
 
@@ -112,6 +112,32 @@ describe("panBy", () => {
   it("should keep part of the board in the window when a drag would push it out", () => {
     expect(panBy({ zoom: 1, x: 0, y: 0 }, { x: 5000, y: 5000 }, bounds, window)).toEqual({ zoom: 1, x: 920, y: 520 });
     expect(panBy({ zoom: 1, x: 0, y: 0 }, { x: -5000, y: -5000 }, bounds, window)).toEqual({ zoom: 1, x: -720, y: -320 });
+  });
+});
+
+describe("keepInWindow", () => {
+  const bounds = { x: 0, y: 0, width: 800, height: 400 };
+
+  it("should leave a view alone when part of the board is already in the window", () => {
+    const view = { zoom: 0.5, x: -200, y: 300 };
+    expect(keepInWindow(view, bounds, window)).toEqual(view);
+    expect(keepInWindow(view, null, window)).toBe(view);
+  });
+
+  it("should bring the board back to the window's edge when a pinch carried it out", () => {
+    // Two fingers that start at the board's corner and move together far past the window's right and bottom edges.
+    const carried = pinchView({ zoom: 1, x: 0, y: 0 }, { center: { x: 10, y: 10 }, distance: 100 }, { center: { x: 5000, y: 5000 }, distance: 100 });
+    expect(carried).toEqual({ zoom: 1, x: 4990, y: 4990 });
+    expect(keepInWindow(carried, bounds, window)).toEqual(panBy({ zoom: 1, x: 0, y: 0 }, { x: 5000, y: 5000 }, bounds, window));
+  });
+
+  it("should bring the board back when a zoom about a far point pushed it out", () => {
+    // The board fills the window's left; zooming in about a point at the right edge sends it off to the left.
+    const pushed = zoomAbout({ zoom: 0.25, x: 40, y: 40 }, { x: window.width - 10, y: 300 }, 2);
+    expect(pushed.x + bounds.width * pushed.zoom).toBeLessThan(0);
+    const kept = keepInWindow(pushed, bounds, window);
+    expect(kept.zoom).toBe(2);
+    expect(kept.x + bounds.width * kept.zoom).toBe(80);
   });
 });
 

@@ -1,6 +1,7 @@
-import type { Locator, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
+import { board, boxInBoard, boxOf, frame, frameBody, gridColumns, openCanvas as open, zoomOf } from "./support/canvas";
 import { expect, test } from "./support/test";
 
 /*
@@ -10,48 +11,6 @@ import { expect, test } from "./support/test";
  * A plain wheel always scrolls the page.
  */
 
-/*
- * The fixture page streams its content, and a stored theme can update the
- * page before that content hydrates. React then draws the content itself and
- * leaves the streamed copy in the document, hidden. So every locator starts
- * from the board a reader can see.
- */
-const board = (page: Page) => page.locator("[data-canvas-board]:visible");
-const frame = (page: Page, id: string) => board(page).locator(`[data-canvas-frame="${id}"]`);
-const frameBody = (page: Page, id: string) => frame(page, id).locator("[data-canvas-frame-body]");
-
-async function open(page: Page, fixture: string, mode: "board" | "stacked") {
-  await page.goto(`/dev/canvas?fixture=${fixture}`);
-  await expect(board(page)).toHaveAttribute("data-canvas-board", mode);
-}
-
-async function boxOf(locator: Locator) {
-  const box = await locator.boundingBox();
-  if (!box) throw new Error("The element has no box.");
-  return box;
-}
-
-/** How many columns the first Grid in a frame lays out. */
-const gridColumns = (page: Page, id: string) => frame(page, id).locator("[data-slot=ui-grid]").first().evaluate((element) => {
-  const tracks = getComputedStyle(element).gridTemplateColumns;
-  return tracks === "none" ? 0 : tracks.split(" ").length;
-});
-
-/** Sends touches to the page as a touch screen would: each call says where every finger is now. */
-async function touchScreen(page: Page) {
-  const client = await page.context().newCDPSession(page);
-  return (type: "touchStart" | "touchMove" | "touchEnd", fingers: readonly { x: number; y: number }[]) =>
-    client.send("Input.dispatchTouchEvent", { type, touchPoints: fingers.map((finger, id) => ({ x: Math.round(finger.x), y: Math.round(finger.y), id })) });
-}
-
-/** A frame body's box, measured from the board window's corner, so a page scroll does not change it. */
-async function boxInBoard(page: Page, id: string) {
-  const pane = await boxOf(board(page));
-  const box = await boxOf(frameBody(page, id));
-  return { x: box.x - pane.x, y: box.y - pane.y, width: box.width, height: box.height };
-}
-
-const zoomOf = async (page: Page) => Number.parseInt((await board(page).getAttribute("data-canvas-zoom")) ?? "", 10);
 
 test.describe("on a desktop", () => {
   test.beforeEach(({ isMobile }) => {
@@ -288,79 +247,6 @@ test.describe("on a desktop", () => {
   });
 });
 
-test.describe("on a touch screen wide enough for the board", () => {
-  test.use({ hasTouch: true });
-  test.beforeEach(({ isMobile }) => {
-    test.skip(isMobile, "a phone stacks the frames; this is a tablet's board");
-  });
-
-  test("should zoom the board about the fingers, and not the page, when a reader pinches it", async ({ page }) => {
-    await open(page, "flow", "board");
-    const touch = await touchScreen(page);
-    const pane = await boxOf(board(page));
-    const middle = { x: pane.x + pane.width / 2, y: pane.y + pane.height / 2 };
-    const before = await boxInBoard(page, "inbox");
-    const fingers = (apart: number) => [{ x: middle.x - apart, y: middle.y }, { x: middle.x + apart, y: middle.y }];
-
-    await touch("touchStart", fingers(50));
-    for (const apart of [60, 70, 80, 90, 100]) await touch("touchMove", fingers(apart));
-    await touch("touchEnd", []);
-
-    const after = await boxInBoard(page, "inbox");
-    expect(after.width / before.width).toBeCloseTo(2, 1);
-    // The board point under the middle of the fingers is still under it.
-    const under = (box: { x: number; width: number }) => (pane.width / 2 - box.x) / box.width;
-    expect(under(after)).toBeCloseTo(under(before), 2);
-    expect(await page.evaluate(() => ({ pageZoom: window.visualViewport?.scale, scrolled: window.scrollY }))).toEqual({ pageZoom: 1, scrolled: 0 });
-    await expect(board(page)).not.toHaveAttribute("data-canvas-zoom", "100%");
-  });
-
-  test("should scroll the page, and leave the board alone, when a reader swipes up on the board with one finger", async ({ page }) => {
-    await open(page, "flow", "board");
-    const touch = await touchScreen(page);
-    const pane = await boxOf(board(page));
-    const before = await boxInBoard(page, "inbox");
-    const x = pane.x + pane.width / 2;
-    const from = pane.y + pane.height - 60;
-
-    await touch("touchStart", [{ x, y: from }]);
-    for (const up of [40, 80, 120, 160, 200, 240]) await touch("touchMove", [{ x, y: from - up }]);
-    await touch("touchEnd", []);
-
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
-    expect(await boxInBoard(page, "inbox")).toEqual(before);
-  });
-
-  test("should move the board, and not the page, when a reader drags sideways with one finger", async ({ page }) => {
-    await open(page, "flow", "board");
-    const touch = await touchScreen(page);
-    const pane = await boxOf(board(page));
-    const before = await boxInBoard(page, "inbox");
-    const from = { x: pane.x + 40, y: pane.y + 40 };
-
-    await touch("touchStart", [from]);
-    for (const right of [30, 60, 90, 120]) await touch("touchMove", [{ x: from.x + right, y: from.y }]);
-    await touch("touchEnd", []);
-
-    await expect.poll(async () => Math.round((await boxInBoard(page, "inbox")).x - before.x)).toBe(120);
-    expect(await page.evaluate(() => window.scrollY)).toBe(0);
-  });
-
-  test("should zoom and fit from the board's buttons when a reader taps them", async ({ page }) => {
-    await open(page, "flow", "board");
-    const toolbar = page.getByRole("group", { name: "Canvas view" });
-    const fitted = await zoomOf(page);
-    await toolbar.getByRole("button", { name: "Zoom in" }).tap();
-    await expect.poll(() => zoomOf(page)).toBeGreaterThan(fitted);
-    await toolbar.getByRole("button", { name: "Fit" }).tap();
-    await expect(board(page)).toHaveAttribute("data-canvas-zoom", `${String(fitted)}%`);
-    // Each button is large enough for a finger.
-    for (const name of ["Frames", "Zoom out", "Zoom in", "Fit"]) {
-      const box = await boxOf(toolbar.getByRole("button", { name, exact: true }));
-      expect(Math.min(box.width, box.height), `${name} is at least 28px each way`).toBeGreaterThanOrEqual(28);
-    }
-  });
-});
 
 test.describe("on a phone", () => {
   test.beforeEach(({ isMobile }) => {
