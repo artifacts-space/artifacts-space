@@ -87,7 +87,8 @@ export function PlaceholderView({ props }: ViewProps<"Placeholder">) {
   return <StandIn props={props} className={cn("border border-dashed", placeholderShape(props), radiusClass[props.radius ?? variant.radius])} />;
 }
 
-const avatarSize: Record<NonNullable<UiProps<"Avatar">["size"]>, string> = { sm: "size-6 text-xs", md: "size-8 text-xs", lg: "size-10 text-sm", xl: "size-14 text-lg" };
+/** The size classes of an avatar, by its `size`; AvatarGroup draws its circles at the same sizes. */
+export const avatarSize: Record<NonNullable<UiProps<"Avatar">["size"]>, string> = { sm: "size-6 text-xs", md: "size-8 text-xs", lg: "size-10 text-sm", xl: "size-14 text-lg" };
 
 const graphemes = new Intl.Segmenter("en", { granularity: "grapheme" });
 
@@ -97,12 +98,21 @@ export function initialsOf(name: string): string {
   return words.slice(0, 2).map((word) => graphemes.segment(word)[Symbol.iterator]().next().value?.segment ?? "").join("").toUpperCase();
 }
 
+/** Every class of an avatar's circle, from its size and tone. */
+export function avatarClassName(size: UiProps<"Avatar">["size"], tone: UiProps<"Avatar">["tone"]): string {
+  return cn("inline-flex shrink-0 items-center justify-center rounded-full border font-medium select-none", avatarSize[size ?? "md"], badgeTone[tone ?? "neutral"]);
+}
+
+/** What an avatar's circle shows: its letters, or a person mark when there are none. Hidden from screen readers. */
+export function AvatarFace({ letters }: { letters: string }) {
+  return letters ? <span aria-hidden>{letters}</span> : <IconUser aria-hidden className="size-1/2" />;
+}
+
 /** A round avatar with a person's initials, tinted by tone. The name is its accessible name. */
 export function AvatarView({ props }: ViewProps<"Avatar">) {
-  const initials = initialsOf(props.name);
   return (
-    <span role="img" aria-label={props.name} className={cn("inline-flex shrink-0 items-center justify-center rounded-full border font-medium select-none", avatarSize[props.size ?? "md"], badgeTone[props.tone ?? "neutral"])}>
-      {initials ? <span aria-hidden>{initials}</span> : <IconUser aria-hidden className="size-1/2" />}
+    <span role="img" aria-label={props.name} className={avatarClassName(props.size, props.tone)}>
+      <AvatarFace letters={initialsOf(props.name)} />
     </span>
   );
 }

@@ -195,6 +195,11 @@ lint. Nothing renders under the 13px floor.
   it measures again. An axe scan of anything holding a diagram first calls
   `expectScrollersSettled` (`e2e/support/scrollers.ts`), which waits for the
   drawing and for every scrolling box to become reachable.
+- A display piece that is drawn from marks (AvatarGroup, Rating, Kbd, a
+  Badge's lone dot) is one thing to a screen reader, named in words, with
+  what is drawn hidden from it. The words come from
+  `src/lib/ui/display-words.ts`, which the Markdown copy of an interface
+  reads too, so readers and agents get the same sentence.
 - An interface action that the renderer does not run itself goes into
   `src/components/artifact-view/ui/state-actions.tsx` (`toggleState` is
   there), with its name in `allowedActions` and its state path under a key

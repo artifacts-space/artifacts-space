@@ -149,6 +149,28 @@ describe("text fields", () => {
     }
   });
 
+  it("should draw an Input's icon hidden from screen readers and leave the label as the field's name, when it has an icon", () => {
+    const html = one("Input", { label: "Search the docs", type: "search", icon: "search" });
+    expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*data-field-icon=""/);
+    const control = controls(html)[0] ?? "";
+    const id = /\sid="([^"]+)"/.exec(control)?.[1] ?? "missing";
+    expect(html).toContain(`for="${id}"`);
+    expect(control).toContain("pl-8");
+  });
+
+  it("should keep the password stand-in an image with no field when it has an icon", () => {
+    const html = one("Input", { label: "Password", type: "password", icon: "lock" });
+    expect(controls(html)).toEqual([]);
+    expect(html).toMatch(/role="img"[^>]*data-password-stand-in/);
+    expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*data-field-icon=""/);
+  });
+
+  it("should draw no icon and no extra padding when an Input has no icon", () => {
+    const html = one("Input", { label: "Plan" });
+    expect(html).not.toContain("data-field-icon");
+    expect(controls(html)[0]).not.toContain("pl-8");
+  });
+
   it("should tie the description and the error to the field and mark it invalid when an error is set", () => {
     const html = one("Input", { label: "Email", description: "Work address.", error: "Enter a full address." });
     const control = controls(html)[0] ?? "";
