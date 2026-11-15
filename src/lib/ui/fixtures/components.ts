@@ -2,6 +2,7 @@ import type { UiComponentName } from "../catalog";
 import { chartFixtures } from "./charts";
 import { keyValueFixtures, stepsFixtures } from "./details";
 import { boardFixtures, calendarFixtures } from "./planning";
+import { boxFixtures, iconFixtures, placeholderFixtures, screenHeadingFixtures, screenLinkFixtures, screenTextFixtures } from "./screen";
 
 /** A child element used inside a container fixture. */
 export interface FixtureChild {
@@ -25,7 +26,7 @@ export const unbroken = (length: number) => "x".repeat(length);
 const text = (value: string): FixtureChild => ({ type: "Text", props: { text: value } });
 const manyRows = Array.from({ length: 500 }, (_, index) => ({ id: index + 1, name: `Row ${index + 1}`, amount: (index * 7919) % 100_000, ok: index % 3 === 0 }));
 
-const layout: Pick<Record<UiComponentName, ComponentFixture[]>, "Section" | "Stack" | "Grid" | "Card" | "Tabs" | "Accordion" | "Separator"> = {
+const layout: Pick<Record<UiComponentName, ComponentFixture[]>, "Section" | "Stack" | "Grid" | "Card" | "Tabs" | "Accordion" | "Separator" | "Box"> = {
   Section: [
     { name: "Normal", props: { title: "Rollout plan", description: "What ships, in what order." }, children: [text("Phase one ships to staff first.")] },
     { name: "Empty", props: {} },
@@ -56,20 +57,23 @@ const layout: Pick<Record<UiComponentName, ComponentFixture[]>, "Section" | "Sta
     { name: "Plain", props: {} },
     { name: "Labelled", props: { label: "Appendix" } },
   ],
+  Box: boxFixtures,
 };
 
-const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Text" | "Markdown" | "Code" | "Callout" | "Badge" | "List" | "Steps" | "Link" | "Quote"> = {
+const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Text" | "Markdown" | "Code" | "Callout" | "Badge" | "List" | "Steps" | "Link" | "Quote" | "Icon"> = {
   Heading: [
     { name: "Levels", props: { text: "Level one heading", level: 1 } },
     { name: "Level four", props: { text: "Level four heading", level: 4 } },
     { name: "Very long", props: { text: longText(200), level: 1 } },
     { name: "Unbroken", props: { text: unbroken(200), level: 2 } },
+    ...screenHeadingFixtures,
   ],
   Text: [
     { name: "Normal", props: { text: "Plain text keeps\nits line breaks." } },
     { name: "Muted small", props: { text: "Muted small text.", tone: "muted", size: "sm" } },
     { name: "Empty", props: { text: "" } },
     { name: "At limit", props: { text: longText(5000) } },
+    ...screenTextFixtures,
   ],
   Markdown: [
     { name: "GFM", props: { content: "## Notes\n\n- [x] Done\n- [ ] Open\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n`code` and **bold** and [a link](https://example.com).\n\n<script>alert(1)</script> [bad](javascript:alert(1))" } },
@@ -101,11 +105,13 @@ const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Te
     { name: "Normal", props: { label: "Base UI docs", href: "https://base-ui.com" } },
     { name: "Mailto", props: { label: "Email the team", href: "mailto:team@example.com" } },
     { name: "Long", props: { label: longText(200), href: `https://example.com/${unbroken(300)}` } },
+    ...screenLinkFixtures,
   ],
   Quote: [
     { name: "Normal", props: { text: "Make it work, make it right, make it fast.", cite: "Kent Beck" } },
     { name: "Long", props: { text: longText(2000) } },
   ],
+  Icon: iconFixtures,
 };
 
 const data: Pick<Record<UiComponentName, ComponentFixture[]>, "Table" | "Metric" | "Chart" | "KeyValue" | "Progress" | "Timeline" | "Board" | "Calendar" | "Diagram"> = {
@@ -180,7 +186,7 @@ export const fixtureFiles = [
 
 const [imageFile, pdfFile, longFile] = fixtureFiles;
 
-const media: Pick<Record<UiComponentName, ComponentFixture[]>, "Image" | "File"> = {
+const media: Pick<Record<UiComponentName, ComponentFixture[]>, "Image" | "File" | "Placeholder"> = {
   Image: [
     { name: "Normal", props: { file: imageFile.id, alt: "Architecture diagram", caption: "How agents reach the API." } },
     { name: "Long caption", props: { file: imageFile.id, alt: longText(300), caption: longText(300) } },
@@ -191,6 +197,7 @@ const media: Pick<Record<UiComponentName, ComponentFixture[]>, "Image" | "File">
     { name: "Long name", props: { file: longFile.id } },
     { name: "Unknown file", props: { file: "00000000-0000-4000-8000-0000000000ff" } },
   ],
+  Placeholder: placeholderFixtures,
 };
 
 /** Normal and extreme fixtures for every component, for the gallery and tests. */

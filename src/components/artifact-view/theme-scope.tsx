@@ -6,6 +6,7 @@ import { preload } from "react-dom";
 import type { PaletteMode } from "@/lib/themes/derive";
 import { siteDefaultTheme } from "@/lib/themes/resolve";
 import type { Theme } from "@/lib/themes/schema";
+import { surfaceEngine } from "@/lib/themes/surface-scope";
 import { themeBackdropStyle, themeKey, themeScopeProps } from "@/lib/themes/style";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +38,10 @@ type ThemeScopeProps = Omit<ComponentProps<"div">, "style"> & {
 export function ThemeScope({ theme, mode, className, children, ...rest }: ThemeScopeProps) {
   const resolved = theme ?? siteDefaultTheme();
   const props = useMemo(() => themeScopeProps(resolved, mode), [resolved, mode]);
-  const context = useMemo<ThemeScopeValue>(() => ({ mode: props.modeClass, key: themeKey(resolved) }), [props.modeClass, resolved]);
+  const context = useMemo<ThemeScopeValue>(() => {
+    const key = themeKey(resolved);
+    return { mode: props.modeClass, key, surfaces: surfaceEngine(resolved, props.modeClass, key) };
+  }, [props.modeClass, resolved]);
   for (const href of props.preloads) preload(href, { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
   return (
     <ThemeScopeContext.Provider value={context}>

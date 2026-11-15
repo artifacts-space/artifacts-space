@@ -15,6 +15,18 @@ function spec(elements: Elements, state?: Record<string, unknown>, top: string[]
 }
 
 describe("uiSpecToMarkdown", () => {
+  it("should write a Box as its children, a link without an address as its words, and a placeholder as a note when given a screen", () => {
+    const markdown = uiSpecToMarkdown(spec({
+      nav: { type: "Box", props: { direction: "horizontal", surface: "inverse" }, children: ["home", "docs", "mark", "decor", "art"] },
+      home: { type: "Link", props: { label: "Home", variant: "nav" } },
+      docs: { type: "Link", props: { label: "Docs", href: "https://example.com/docs" } },
+      mark: { type: "Icon", props: { name: "star", label: "Rated five stars" } },
+      decor: { type: "Icon", props: { name: "check" } },
+      art: { type: "Placeholder", props: { variant: "video", label: "Product tour" } },
+    }, undefined, ["nav"]));
+    expect(markdown).toBe("Home\n\n[Docs](https://example.com/docs)\n\nRated five stars\n\n_Video placeholder: Product tour_");
+  });
+
   it("should write headings, metrics as bullets, a chart as its data table, and checklists as task lists when given the reference example", () => {
     const markdown = uiSpecToMarkdown(JSON.stringify(exampleUiSpec));
     expect(markdown).toContain("## Release 2.4 readiness");

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { PropCheck } from "./data";
+import { placeholderProps } from "./screen";
 import { label } from "./shared";
 
 /**
@@ -22,6 +23,7 @@ export const mediaProps = {
     file: fileId,
     label: label(200).optional(),
   }),
+  Placeholder: placeholderProps,
 };
 
 /** The file prop must be written out, not read from state, so saving can check it. */

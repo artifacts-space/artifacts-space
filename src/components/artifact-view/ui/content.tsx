@@ -5,7 +5,10 @@ import { IconAlertTriangle, IconCircleCheck, IconInfoCircle, IconNote, IconOctag
 import { ExternalLink } from "@/components/artifact-view/external-link";
 import { CodeBlock } from "@/components/code/code-block";
 import { MarkdownView } from "@/components/artifact-view/markdown-view";
-import type { Tone } from "@/lib/ui/props/shared";
+import { externalLinkRel, safeHref } from "@/lib/link-policy";
+import type { UiProps } from "@/lib/ui/catalog";
+import type { InkTone } from "@/lib/ui/props/screen";
+import type { TextAlign, Tone } from "@/lib/ui/props/shared";
 import { hasTitleText } from "@/lib/ui/title-rules";
 import { cn } from "@/lib/utils";
 
@@ -19,24 +22,87 @@ export const headingClass = {
   4: "text-md font-medium text-muted-foreground",
 } as const;
 
+type HeadingProps = UiProps<"Heading">;
+type TextProps = UiProps<"Text">;
+
+/** Heading classes by `size`, which sets the look whatever the level. The two largest grow with the page column or canvas frame. */
+const headingSize: Record<NonNullable<HeadingProps["size"]>, string> = {
+  sm: "text-base font-medium leading-snug",
+  md: "text-xl font-medium leading-snug tracking-[-0.015em]",
+  lg: "text-2xl font-medium leading-tight tracking-[-0.02em]",
+  xl: "text-3xl font-medium leading-[1.12] tracking-[-0.025em]",
+  "2xl": "text-3xl font-medium leading-[1.1] tracking-[-0.025em] @2xl/ui:text-5xl",
+  display: "text-4xl font-medium leading-[1.05] tracking-[-0.03em] @2xl/ui:text-6xl",
+};
+
+const alignText: Record<TextAlign, string> = { start: "text-start", center: "text-center", end: "text-end" };
+/** A block capped at the reading measure moves with its alignment, so centered text sits in the center of its container. */
+const alignBlock: Record<TextAlign, string> = { start: "", center: "mx-auto", end: "ms-auto" };
+
+/** Every class a heading takes from its props; the interface editor draws headings typed in place with it. */
+export function headingClassName(props: Pick<HeadingProps, "level" | "size" | "align">): string {
+  const level = (props.level ?? 2) as keyof typeof headingClass;
+  return cn("min-w-0 text-balance break-words", props.size ? headingSize[props.size] : headingClass[level], props.align && alignText[props.align]);
+}
+
 export function HeadingView({ props }: ViewProps<"Heading">) {
   // Only spaces show nothing, so no empty heading reaches the outline (the editor drops it by the same rule).
   if (!hasTitleText(props.text)) return null;
-  const level = (props.level ?? 2) as keyof typeof headingClass;
-  const Tag = (["h1", "h2", "h3", "h4"] as const)[level - 1] ?? "h2";
-  return <Tag className={cn("min-w-0 text-balance break-words", headingClass[level])}>{props.text}</Tag>;
+  const Tag = (["h1", "h2", "h3", "h4"] as const)[(props.level ?? 2) - 1] ?? "h2";
+  return <Tag className={headingClassName(props)}>{props.text}</Tag>;
 }
 
 /** Text classes by size; the interface editor uses them too. */
-export const textSize = { sm: "text-sm leading-6", md: "text-md leading-7", lg: "text-lg leading-8" } as const;
+export const textSize = {
+  xs: "text-xs leading-5",
+  sm: "text-sm leading-6",
+  md: "text-md leading-7",
+  lg: "text-lg leading-8",
+  xl: "text-xl leading-8",
+  "2xl": "text-2xl leading-9",
+  "3xl": "text-3xl leading-10 tracking-[-0.02em]",
+  "4xl": "text-4xl leading-[1.1] tracking-[-0.025em]",
+} as const;
+
+/** Text colors for Text and Icon: status tones hold 4.5:1 on every surface a Box paints (toneTokens in src/lib/themes/derive.ts). */
+export const inkToneClass: Record<InkTone, string> = {
+  default: "",
+  muted: "text-muted-foreground",
+  info: "text-tone-info",
+  success: "text-tone-success",
+  warning: "text-tone-warning",
+  danger: "text-tone-danger",
+};
+
+const textWeight: Record<NonNullable<TextProps["weight"]>, string> = { normal: "font-normal", medium: "font-medium", semibold: "font-semibold" };
+const textClamp = { 1: "line-clamp-1", 2: "line-clamp-2", 3: "line-clamp-3" } as const;
+
+/** What a variant sets when `size` and `tone` are left out; both still win when given. */
+const textVariant: Record<NonNullable<TextProps["variant"]>, { size: keyof typeof textSize; tone: InkTone; extra: string }> = {
+  body: { size: "md", tone: "default", extra: "" },
+  eyebrow: { size: "xs", tone: "muted", extra: "font-medium tracking-[0.08em] uppercase" },
+  caption: { size: "xs", tone: "muted", extra: "" },
+  mono: { size: "sm", tone: "default", extra: "font-mono" },
+};
+
+/** Every class a paragraph takes from its props; the interface editor draws text typed in place with it. */
+export function textClassName(props: Omit<TextProps, "text">): string {
+  const variant = textVariant[props.variant ?? "body"];
+  return cn(
+    "max-w-[var(--artifact-measure,72ch)] break-words",
+    textSize[props.size ?? variant.size],
+    inkToneClass[props.tone ?? variant.tone],
+    variant.extra,
+    props.weight && textWeight[props.weight],
+    props.align && alignText[props.align],
+    props.align && alignBlock[props.align],
+    props.clamp && textClamp[props.clamp as keyof typeof textClamp],
+  );
+}
 
 export function TextView({ props }: ViewProps<"Text">) {
   if (!props.text) return null;
-  return (
-    <p className={cn("max-w-[var(--artifact-measure,72ch)] whitespace-pre-line break-words", textSize[props.size ?? "md"], props.tone === "muted" && "text-muted-foreground")}>
-      {props.text}
-    </p>
-  );
+  return <p className={cn("whitespace-pre-line", textClassName(props))}>{props.text}</p>;
 }
 
 export function MarkdownBlockView({ props }: ViewProps<"Markdown">) {
@@ -108,11 +174,40 @@ export function ListView({ props }: ViewProps<"List">) {
   );
 }
 
+type LinkProps = UiProps<"Link">;
+
+/** Link looks by variant; the interface editor draws link text typed in place with them. */
+export const linkVariantClass: Record<NonNullable<LinkProps["variant"]>, string> = {
+  inline: "text-md underline decoration-border underline-offset-[3px] hover:decoration-foreground",
+  nav: "text-sm font-medium text-foreground underline-offset-[6px] hover:underline aria-[current=page]:underline",
+  muted: "text-sm text-muted-foreground hover:text-foreground aria-[current=page]:font-medium aria-[current=page]:text-foreground",
+};
+
+const linkFocus = "transition-colors focus-visible:rounded-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+
+/**
+ * A link. With an `href` it opens in a new tab under the same URL rules as
+ * every link in an artifact, and the inline variant keeps the external-link
+ * mark. Without one it is the same words in the same style, going nowhere,
+ * for a mockup's menu.
+ */
 export function LinkView({ props }: ViewProps<"Link">) {
+  const variant = props.variant ?? "inline";
+  const current = props.active ? { "aria-current": "page" as const } : {};
+  const href = safeHref(props.href);
+  if (!href) return <span {...current} className={cn("min-w-0 break-words", linkVariantClass[variant])}>{props.label}</span>;
+  if (variant === "inline") {
+    return (
+      <span className="min-w-0 text-md break-words">
+        <ExternalLink href={href}>{props.label}</ExternalLink>
+      </span>
+    );
+  }
   return (
-    <span className="min-w-0 text-md break-words">
-      <ExternalLink href={props.href}>{props.label}</ExternalLink>
-    </span>
+    <a {...current} href={href} target="_blank" rel={externalLinkRel} className={cn("min-w-0 break-words", linkVariantClass[variant], linkFocus)}>
+      {props.label}
+      <span className="sr-only"> (opens in a new tab)</span>
+    </a>
   );
 }
 

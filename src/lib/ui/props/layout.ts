@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { boxProps } from "./screen";
 import { gap, label, prose } from "./shared";
 
 /** Props for layout components. Children come from the element's `children`. */
@@ -32,6 +33,7 @@ export const layoutProps = {
   Separator: z.object({
     label: label(60).optional(),
   }),
+  Box: boxProps,
 };
 
 /** Components whose children map one to one onto an array prop. */

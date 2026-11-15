@@ -7,6 +7,7 @@ import type { UiComponentName } from "@/lib/ui/catalog";
 import { uiCatalog } from "@/lib/ui/catalog";
 
 import { BoardView } from "./board";
+import { BoxView } from "./box";
 import { CalendarView } from "./calendar";
 import { ChartView } from "./chart";
 import { BadgeView, CalloutView, CodeView, HeadingView, LinkView, ListView, MarkdownBlockView, QuoteView, TextView } from "./content";
@@ -14,6 +15,7 @@ import { DiagramView, MetricView, ProgressView, TableView, TimelineView } from "
 import { ButtonView, CheckboxView, ChecklistView, SelectView, SliderView, SwitchView } from "./inputs";
 import { AccordionView, CardView, GridView, SectionView, SeparatorView, StackView, TabsView } from "./layout";
 import { KeyValueView } from "./key-value";
+import { IconView, PlaceholderView } from "./screen";
 import { FileView, ImageView } from "./media";
 import { StepsView } from "./steps";
 import { renderStout, type ViewProps } from "./stout";
@@ -29,6 +31,7 @@ export const uiViews: Views = {
   Tabs: TabsView,
   Accordion: AccordionView,
   Separator: SeparatorView,
+  Box: BoxView,
   Heading: HeadingView,
   Text: TextView,
   Markdown: MarkdownBlockView,
@@ -39,6 +42,7 @@ export const uiViews: Views = {
   Steps: StepsView,
   Link: LinkView,
   Quote: QuoteView,
+  Icon: IconView,
   Table: TableView,
   Metric: MetricView,
   Chart: ChartView,
@@ -56,6 +60,7 @@ export const uiViews: Views = {
   Button: ButtonView,
   Image: ImageView,
   File: FileView,
+  Placeholder: PlaceholderView,
 };
 
 function stoutComponent(type: UiComponentName) {

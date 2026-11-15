@@ -8,7 +8,9 @@ import { expectNoAxeViolations } from "./support/a11y";
  * judge (over a chart, or partly covered by a sticky edge) is listed on the
  * test as an annotation, not failed. The gallery holds each
  * interface block in each tone (badges, callouts, board labels, calendar
- * events), the MCP reference holds the write badges, the "required" labels
+ * events) and every Box surface with every text tone on it, on the site
+ * palette and under two themes (the "Surfaces and tones" specimen and the
+ * Themes group), the MCP reference holds the write badges, the "required" labels
  * and code comments, a component page holds a live example, and the landing
  * page holds the actor colors. The status tones and syntax colors are set to
  * pass by rule (toneTokens and syntaxTokens in src/lib/themes/derive.ts); a

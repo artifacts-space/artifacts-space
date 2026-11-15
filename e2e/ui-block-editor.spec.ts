@@ -65,6 +65,30 @@ test("should add a block from the + button and turn an empty line into a heading
   expect(await rootChildren(page)).toEqual(["Heading", "Text", "Callout", "Tabs", "Heading"]);
 });
 
+test("should add a Box from the insert menu and repaint it from its properties", async ({ page }) => {
+  await openBlocks(page);
+  await editor(page).getByRole("button", { name: "Add a block", exact: true }).last().click();
+  await page.getByRole("combobox", { name: "Search blocks" }).fill("box");
+  await page.keyboard.press("Enter");
+  const handle = editor(page).getByRole("button", { name: /^Box block/ });
+  await expect(handle).toHaveCount(1);
+  await handle.locator("xpath=ancestor::*[@data-block][1]").hover();
+  await handle.click();
+  await page.getByRole("menuitem", { name: "Edit properties" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit Box" });
+  await dialog.getByRole("combobox", { name: "Surface" }).click();
+  await page.getByRole("option", { name: "inverse", exact: true }).click();
+  await expect(dialog.getByRole("status")).toHaveText("Changes save as you type.");
+  await page.keyboard.press("Escape");
+  // The band takes the other palette at once, in the editor as for readers.
+  await expect(editor(page).locator(".theme-invert")).toHaveCount(1);
+  await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
+  const spec = await savedSpec(page);
+  const box = Object.values(spec.elements).find((element) => element.type === "Box");
+  expect(box?.props).toMatchObject({ surface: "inverse", padding: "md" });
+  expect(box?.children).toHaveLength(1);
+});
+
 test("should duplicate and delete a block from its handle and keep the spec valid", async ({ page }) => {
   await openBlocks(page);
   const callout = editor(page).locator("[data-block=note]");
