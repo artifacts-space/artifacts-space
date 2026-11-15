@@ -26,6 +26,13 @@ const groupSources: Record<string, string> = {
   Media: "src/lib/docs/components/inputs-media.ts",
 };
 
+/** Components whose docs live in their own file, not their group's. */
+const componentSources: Partial<Record<UiComponentName, string>> = {
+  Box: "src/lib/docs/components/screen.ts",
+  Icon: "src/lib/docs/components/screen.ts",
+  Placeholder: "src/lib/docs/components/screen.ts",
+};
+
 async function componentFrom(params: PageProps<"/docs/json-render/components/[component]">["params"]): Promise<UiComponentName | null> {
   const { component } = await params;
   return componentBySlug(component);
@@ -95,7 +102,7 @@ async function ComponentReference({ params }: { params: PageProps<"/docs/json-re
   const doc = componentDocs[name];
   const group = groupOf(name);
   return (
-    <DocsPage href={componentHref(name)} eyebrow={`Components · ${group.name}`} title={name} description={<InlineCodeText text={componentDescription(name)} />} source={groupSources[group.name] ?? "src/lib/ui/catalog.ts"} headings={headingsFor(name)}>
+    <DocsPage href={componentHref(name)} eyebrow={`Components · ${group.name}`} title={name} description={<InlineCodeText text={componentDescription(name)} />} source={componentSources[name] ?? groupSources[group.name] ?? "src/lib/ui/catalog.ts"} headings={headingsFor(name)}>
       <AnchorHeading heading={{ id: "examples", title: "Examples", level: 2 }} />
       {doc.examples.map((example) => <LiveExample key={example.title} example={example} />)}
       <AnchorHeading heading={{ id: "props", title: "Props", level: 2 }} />

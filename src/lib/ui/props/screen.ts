@@ -1,0 +1,99 @@
+import { z } from "zod";
+
+import { blockHues } from "@/lib/block-colors/block-color-rules";
+
+import { uiIconNames } from "../icon-names";
+
+import type { PropCheck } from "./data";
+import { aspectRatio, containerStep, label, radius, space } from "./shared";
+
+/**
+ * Props for the pieces a screen is drawn with: a free-layout Box, icons, and
+ * image stand-ins. Every style prop is a named step on a scale, never a CSS
+ * value, so a spec cannot carry its own colors or sizes.
+ */
+
+/** What a Box is painted with. Hues are the block colors; each surface brings a text color that reads on it. */
+export const boxSurfaces = ["none", "page", "card", "muted", "inverse", "primary", ...blockHues] as const;
+export type BoxSurface = (typeof boxSurfaces)[number];
+
+/** An icon by name. The message names a few; the guide lists all of them. */
+export const iconName = z.enum(uiIconNames, "Use an icon name from the Icon component's list, such as check, arrow-right, star, or mail.");
+
+/** Text color for Icon and Text: the default, muted, or a status tone. */
+export const inkTone = z.enum(["default", "muted", "info", "success", "warning", "danger"]);
+export type InkTone = z.infer<typeof inkTone>;
+
+export const boxProps = z.object({
+  direction: z.enum(["vertical", "horizontal"]).optional(),
+  gap: space.optional(),
+  padding: space.optional(),
+  paddingX: space.optional(),
+  paddingY: space.optional(),
+  align: z.enum(["start", "center", "end", "stretch"]).optional(),
+  justify: z.enum(["start", "center", "end", "between"]).optional(),
+  wrap: z.boolean().optional(),
+  grow: z.boolean().optional(),
+  width: z.enum(["auto", "full"]).optional(),
+  maxWidth: z.enum(["xs", "sm", "md", "lg", "xl", "2xl"]).optional(),
+  minHeight: z.enum(["sm", "md", "lg", "xl"]).optional(),
+  surface: z.enum(boxSurfaces).optional(),
+  border: z.enum(["none", "all", "top", "bottom", "start", "end", "x", "y"]).optional(),
+  radius: radius.optional(),
+  shadow: z.enum(["none", "sm", "md", "lg"]).optional(),
+  overflow: z.enum(["visible", "hidden", "scroll"]).optional(),
+  stackBelow: containerStep.optional(),
+  hideBelow: containerStep.optional(),
+  hideAbove: containerStep.optional(),
+  label: label(120).optional(),
+});
+
+export const iconProps = z.object({
+  name: iconName,
+  size: z.enum(["xs", "sm", "md", "lg", "xl"]).optional(),
+  tone: inkTone.optional(),
+  label: label(80).optional(),
+});
+
+export const placeholderProps = z.object({
+  variant: z.enum(["image", "logo", "video", "map", "avatar"]).optional(),
+  label: label(80).optional(),
+  ratio: aspectRatio.optional(),
+  radius: radius.optional(),
+});
+
+const stepOrder = { sm: 1, md: 2, lg: 3 } as const;
+
+type BoxProps = z.output<typeof boxProps>;
+
+function scrollProblems({ overflow, direction, wrap }: BoxProps): string[] {
+  if (overflow !== "scroll") return [];
+  const problems: string[] = [];
+  if (direction !== "horizontal") problems.push('`overflow: "scroll"` scrolls a row sideways. Set `direction: "horizontal"`, or remove `overflow`.');
+  if (wrap) problems.push('`overflow: "scroll"` and `wrap` cannot both apply: a row that wraps never scrolls. Remove one.');
+  return problems;
+}
+
+function responsiveProblems({ direction, stackBelow, hideBelow, hideAbove }: BoxProps): string[] {
+  const problems: string[] = [];
+  if (stackBelow && direction !== "horizontal") problems.push('`stackBelow` only applies to a Box with `direction: "horizontal"`. Set the direction, or remove `stackBelow`.');
+  if (hideBelow && hideAbove && stepOrder[hideAbove] <= stepOrder[hideBelow]) {
+    problems.push(`\`hideBelow: "${hideBelow}"\` with \`hideAbove: "${hideAbove}"\` hides the Box at every width. Make \`hideAbove\` a wider step than \`hideBelow\`, or remove one.`);
+  }
+  return problems;
+}
+
+/** A Box that can never show, or a rule that cannot apply to it, is a mistake worth naming. */
+export const boxCheck: PropCheck = (props) => {
+  const parsed = boxProps.safeParse(props);
+  if (!parsed.success) return [];
+  return [...responsiveProblems(parsed.data), ...scrollProblems(parsed.data)];
+};
+
+/** Agent-facing descriptions; the guide is generated from them. */
+export const screenDescriptions = {
+  Box:
+    "A free-layout container for drawing screens. Children stack vertically or sit in a row (`direction`), with `gap`, `padding` (`paddingX` / `paddingY` override one axis), `align` (across the direction), `justify` (along it), `wrap`, `grow` (take the free room in a row), `width`, `maxWidth` (xs 320, sm 384, md 576, lg 768, xl 1024, 2xl 1280 pixels; center it with `align: \"center\"` on the parent) and `minHeight`. `surface` paints it and sets a text color that reads on it: none, page, card, muted, a hue (gray, brown, orange, yellow, green, blue, purple, pink, red), or inverse and primary, which switch everything inside to a contrasting palette and do not nest. `border` (all, top, bottom, start, end, x, y), `radius`, and `shadow` finish it. `overflow`: hidden clips children to the radius; scroll makes a row scroll sideways instead of wrapping (set `label` to name it). Responsive props follow the width of the page column or canvas frame, never the browser window (sm 576, md 672, lg 896 pixels): `stackBelow` turns a row into a column below that width; `hideBelow` and `hideAbove` hide the Box. `label` names it for screen readers.",
+  Icon: `An icon by name, in the text color. \`size\`: xs to xl. \`tone\`: default, muted, or a status tone. Decorative unless \`label\` is set. Names: ${uiIconNames.join(", ")}.`,
+  Placeholder: "A neutral stand-in so a mockup needs no upload. `variant`: image (default), video, or map fill the width at `ratio` (square, photo 4:3, video 16:9, wide 21:9, portrait 3:4); logo is a small wordmark box; avatar is a small circle. `label` says what goes there.",
+} as const;

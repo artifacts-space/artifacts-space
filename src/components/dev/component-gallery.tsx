@@ -26,12 +26,15 @@ import { uiComponentNames } from "@/lib/ui/catalog";
 import { componentFixtures, fixtureFiles, fixtureSpec } from "@/lib/ui/fixtures/components";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
 import { formatFixtures, mediaFormatFixtures, type FormatFixture } from "@/lib/ui/fixtures/formats";
+import { landingPageSpec, surfaceMatrixSpec } from "@/lib/ui/fixtures/screen";
 import { deepSpec, invalidPropsSpec, javascriptLinkSpec, manyElementsSpec, repeatSpec, unknownTypeSpec } from "@/lib/ui/fixtures/specs";
 import { desktopApps, mcpClients } from "@/lib/setup/client-installs";
 import { presetTheme } from "@/lib/themes/resolve";
 
 const specFixtures: { name: string; spec: unknown }[] = [
   { name: "Example", spec: exampleUiSpec },
+  { name: "Surfaces and tones", spec: surfaceMatrixSpec },
+  { name: "Landing page", spec: landingPageSpec },
   { name: "Unknown type", spec: unknownTypeSpec },
   { name: "Invalid props", spec: invalidPropsSpec },
   { name: "javascript: link", spec: javascriptLinkSpec },
@@ -90,6 +93,8 @@ function ThemedSpecimen({ id }: { id: string }) {
           {formatFixtures.filter((fixture) => themedFormats.has(fixture.name)).map((fixture) => (
             <ArtifactView key={fixture.name} kind={fixture.kind} content={fixture.content} language={fixture.language} title={fixture.name} />
           ))}
+          {/* Every Box surface under the theme: inverse, primary, and the hues re-light what sits on them. */}
+          <div data-themed-surfaces={id}><UiView content={JSON.stringify(surfaceMatrixSpec)} /></div>
         </ThemeScope>
       </ThemeBackdrop>
     </Specimen>

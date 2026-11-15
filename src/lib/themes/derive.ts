@@ -172,6 +172,13 @@ function blockFill(mode: PaletteMode, card: Oklch, ink: Oklch, hueInk: Oklch): O
   return contrastRatio(ink, apart) >= 4.55 ? apart : fill;
 }
 
+/** Every hue's background on the themed card, in `blockHues` order. A Box can be painted with one, so status tones read on them too. */
+export function blockFills(mode: PaletteMode, colors: ThemeColors): Oklch[] {
+  const card = read(colors.card);
+  const ink = read(colors.foreground);
+  return blockHues.map((hue) => blockFill(mode, card, ink, read(siteBlockColors[mode][hue].text)));
+}
+
 /**
  * Block colors (markdown-dialect.md, "Block colors") for a themed card and
  * page. Each background is the card tinted toward the hue, kept readable
@@ -182,12 +189,10 @@ function blockFill(mode: PaletteMode, card: Oklch, ink: Oklch, hueInk: Oklch): O
  */
 export function blockColorTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
   const card = read(colors.card);
-  const ink = read(colors.foreground);
   const tokens: Record<string, string> = {};
-  const fills = blockHues.map((hue) => {
-    const fill = blockFill(mode, card, ink, read(siteBlockColors[mode][hue].text));
-    tokens[`--block-${hue}-bg`] = formatOklch(fill);
-    return fill;
+  const fills = blockFills(mode, colors);
+  blockHues.forEach((hue, index) => {
+    tokens[`--block-${hue}-bg`] = formatOklch(fills[index] ?? card);
   });
   const surfaces = [card, read(colors.background), ...fills];
   for (const hue of blockHues) {
@@ -316,13 +321,19 @@ export const toneTintMax = 0.12;
  * Status tones on the themed card, page, and quiet surfaces (--secondary,
  * --muted, --accent). A tone is text there and on its own tint over each
  * (a badge), so it keeps the site's hue and chroma and is re-lit until it
- * reads at 4.5:1 on every one. Dots and edges use the same token.
+ * reads at 4.5:1 on every one. Dots and edges use the same token. A Box can
+ * be painted with a block hue's background, so a tone is held at 4.5:1 as
+ * plain text on each of those too; its own tint over a hue (a badge inside
+ * a hue Box) is not part of the rule.
  */
 export function toneTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
   const card = read(colors.card);
   const ink = read(colors.foreground);
   const surfaces = [card, read(colors.background), ...Object.values(quietTint).map((amount) => mixOklch(card, ink, amount))];
-  const reads = (tone: Oklch) => surfaces.every((surface) => contrastRatio(tone, surface) >= 4.55 && contrastRatio(tone, paintOver(tone, toneTintMax, surface)) >= 4.55);
+  const fills = blockFills(mode, colors);
+  const reads = (tone: Oklch) =>
+    surfaces.every((surface) => contrastRatio(tone, surface) >= 4.55 && contrastRatio(tone, paintOver(tone, toneTintMax, surface)) >= 4.55) &&
+    fills.every((fill) => contrastRatio(tone, fill) >= 4.55);
   return Object.fromEntries(toneRoles.map((role) => [`--tone-${role}`, formatOklch(holdApart(read(siteTones[mode][role]), card, reads))]));
 }
 

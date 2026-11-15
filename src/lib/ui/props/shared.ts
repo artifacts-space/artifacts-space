@@ -36,3 +36,27 @@ export type Gap = z.infer<typeof gap>;
 /** A table cell or data point: text, number, yes/no, or empty. */
 export const cellValue = z.union([z.string().max(2000), finiteNumber(), z.boolean(), z.null()]);
 export type CellValue = z.infer<typeof cellValue>;
+
+/** Spacing for a Box's gap and padding: 0, 4, 8, 16, 24, 40, 64, and 96 pixels. The three largest are smaller on narrow surfaces. */
+export const space = z.enum(["none", "xs", "sm", "md", "lg", "xl", "2xl", "3xl"]);
+export type Space = z.infer<typeof space>;
+
+/** Corner rounding for boxes and placeholders. */
+export const radius = z.enum(["none", "sm", "md", "lg", "xl", "full"]);
+export type Radius = z.infer<typeof radius>;
+
+/** Horizontal text alignment. */
+export const textAlign = z.enum(["start", "center", "end"]);
+export type TextAlign = z.infer<typeof textAlign>;
+
+/**
+ * A width of the surface the interface is drawn on (the page column, or a
+ * canvas frame), never of the browser window: sm is 576, md is 672, and lg
+ * is 896 pixels.
+ */
+export const containerStep = z.enum(["sm", "md", "lg"]);
+export type ContainerStep = z.infer<typeof containerStep>;
+
+/** Width to height shapes for placeholders. */
+export const aspectRatio = z.enum(["square", "photo", "video", "wide", "portrait"]);
+export type AspectRatio = z.infer<typeof aspectRatio>;

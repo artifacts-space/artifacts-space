@@ -91,12 +91,34 @@ function headingBlock({ props, level }: BlockContext): string[] {
   return [heading(level + own - 1, text)];
 }
 
+/** A link with an address, or just its words when it goes nowhere (a mockup's menu item). */
+function linkBlock({ props }: BlockContext): string[] {
+  const label = textOf(props.label) ?? "";
+  const href = textOf(props.href);
+  return [href ? link(label, href) : inlineText(label)];
+}
+
+/** An icon says something only when it has a label; a decorative one writes nothing. */
+function icon({ props }: BlockContext): string[] {
+  const label = textOf(props.label);
+  return label ? [inlineText(label)] : [];
+}
+
+const placeholderNames: Record<string, string> = { image: "Image", video: "Video", map: "Map", logo: "Logo", avatar: "Avatar" };
+
+function placeholder({ props }: BlockContext): string[] {
+  const name = placeholderNames[typeof props.variant === "string" ? props.variant : "image"] ?? "Image";
+  const label = textOf(props.label);
+  return [`_${name} placeholder${label ? `: ${inlineText(label)}` : ""}_`];
+}
+
 /** Renderers for layout, content, and media components. */
 export const contentBlocks: Record<string, BlockRenderer> = {
   Section: titled,
   Card: titled,
   Stack: ({ children }) => children(),
   Grid: ({ children }) => children(),
+  Box: ({ children }) => children(),
   Tabs: paired("tabs", "label"),
   Accordion: paired("items", "title"),
   Separator: separator,
@@ -108,7 +130,9 @@ export const contentBlocks: Record<string, BlockRenderer> = {
   Badge: ({ props }) => [`\`${inlineText(textOf(props.label) ?? "").replaceAll("`", "'")}\``],
   List: list,
   Steps: steps,
-  Link: ({ props }) => [link(textOf(props.label) ?? "", textOf(props.href) ?? "")],
+  Link: linkBlock,
+  Icon: icon,
+  Placeholder: placeholder,
   Quote: quote,
   Diagram: diagram,
   Image: image,

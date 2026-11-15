@@ -94,8 +94,9 @@ export const contentDocs = {
           h4: { type: "Heading", props: { text: "Migration notes", level: 4 } },
         }),
       },
+      { title: "A display heading", note: "`size` sets the look; `level` still sets the outline.", spec: single("Heading", { text: "Plans your whole team can read", level: 2, size: "display", align: "center" }) },
     ],
-    rules: ["Use one level-1 heading at most."],
+    rules: ["Use one level-1 heading at most.", "`size` changes how large a heading looks, never its level. The two largest sizes shrink on a narrow page column or canvas frame."],
   },
   Text: {
     examples: [
@@ -108,7 +109,18 @@ export const contentDocs = {
           fine: text("Updated by @release-bot 5 minutes ago.", { size: "sm", tone: "muted" }),
         }),
       },
+      {
+        title: "Variants for a screen",
+        spec: spec("page", {
+          page: { type: "Stack", props: { gap: "sm" }, children: ["eyebrow", "price", "caption", "command"] },
+          eyebrow: text("Team plan", { variant: "eyebrow" }),
+          price: text("$29", { size: "4xl", weight: "semibold" }),
+          caption: text("Per person each month, billed yearly.", { variant: "caption" }),
+          command: text("pnpm add artifacts", { variant: "mono" }),
+        }),
+      },
     ],
+    rules: ["A `variant` sets a size and a tone; `size` and `tone` still win when given.", "`clamp` cuts the text off after that many lines with an ellipsis. The full text stays in the page for screen readers."],
   },
   Markdown: {
     examples: [
@@ -179,8 +191,17 @@ export const contentDocs = {
           mail: { type: "Link", props: { label: "Email the team", href: "mailto:team@example.com" } },
         }),
       },
+      {
+        title: "A mockup menu",
+        note: "Without `href` a link is the same words in the same style, going nowhere.",
+        spec: single("Stack", { direction: "horizontal", gap: "lg" }, {
+          product: { type: "Link", props: { label: "Product", variant: "nav", active: true } },
+          pricing: { type: "Link", props: { label: "Pricing", variant: "nav" } },
+          privacy: { type: "Link", props: { label: "Privacy", variant: "muted" } },
+        }),
+      },
     ],
-    rules: ["Only absolute http, https, and mailto URLs pass validation. Links open in a new tab."],
+    rules: ["Only absolute http, https, and mailto URLs pass validation. Links open in a new tab.", "Leave `href` out for a link that goes nowhere. Relative and `#` addresses are refused."],
   },
   Quote: {
     examples: [{ title: "With a citation", spec: single("Quote", { text: "Make it work, make it right, make it fast.", cite: "Kent Beck" }) }],

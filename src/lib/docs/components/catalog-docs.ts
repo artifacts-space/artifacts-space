@@ -9,6 +9,7 @@ import { planningProps } from "@/lib/ui/props/planning";
 import { dataDocs, planningDocs } from "./data";
 import { inputDocs, mediaDocs } from "./inputs-media";
 import { contentDocs, layoutDocs } from "./layout-content";
+import { boxDocs, iconDocs, placeholderDocs } from "./screen";
 import type { ComponentDoc } from "./types";
 
 
@@ -16,7 +17,7 @@ import type { ComponentDoc } from "./types";
  * Docs for every component in the stout catalog. The Record type makes a new
  * catalog component fail the typecheck until it has examples here.
  */
-export const componentDocs: Record<UiComponentName, ComponentDoc> = { ...layoutDocs, ...contentDocs, ...dataDocs, ...planningDocs, ...inputDocs, ...mediaDocs };
+export const componentDocs: Record<UiComponentName, ComponentDoc> = { ...layoutDocs, ...boxDocs, ...contentDocs, ...iconDocs, ...dataDocs, ...planningDocs, ...inputDocs, ...mediaDocs, ...placeholderDocs };
 
 /** A group of components, in catalog order. Groups follow the props modules in src/lib/ui/props. */
 export interface ComponentGroup {
@@ -29,11 +30,11 @@ const names = (props: object) => Object.keys(props) as UiComponentName[];
 
 export const componentGroups: ComponentGroup[] = [
   { name: "Layout", summary: "Arrange other elements. Only these components show their children.", components: names(layoutProps) },
-  { name: "Content", summary: "Headings, text, Markdown, code, and links.", components: names(contentProps) },
+  { name: "Content", summary: "Headings, text, Markdown, code, links, and icons.", components: names(contentProps) },
   { name: "Data", summary: "Tables, numbers, charts, and diagrams.", components: names(dataProps) },
   { name: "Planning", summary: "Read-only boards and calendars.", components: names(planningProps) },
   { name: "Inputs", summary: "Controls that change on-page state only.", components: names(inputProps) },
-  { name: "Media", summary: "Uploaded images and files, by id.", components: names(mediaProps) },
+  { name: "Media", summary: "Uploaded images and files, by id, and stand-ins for a mockup.", components: names(mediaProps) },
 ];
 
 /** The group a component belongs to. */

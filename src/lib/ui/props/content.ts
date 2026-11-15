@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { isSafeHref, maxHrefLength } from "@/lib/link-policy";
 
-import { label, prose, tone } from "./shared";
+import { iconProps, inkTone } from "./screen";
+import { label, prose, textAlign, tone } from "./shared";
 
 const stepItem = z.object({
   title: label(160),
@@ -16,11 +17,17 @@ export const contentProps = {
   Heading: z.object({
     text: label(200),
     level: z.number().int().min(1).max(4).optional(),
+    size: z.enum(["sm", "md", "lg", "xl", "2xl", "display"]).optional(),
+    align: textAlign.optional(),
   }),
   Text: z.object({
     text: prose(5000),
-    tone: z.enum(["default", "muted"]).optional(),
-    size: z.enum(["sm", "md", "lg"]).optional(),
+    variant: z.enum(["body", "eyebrow", "caption", "mono"]).optional(),
+    tone: inkTone.optional(),
+    size: z.enum(["xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"]).optional(),
+    weight: z.enum(["normal", "medium", "semibold"]).optional(),
+    align: textAlign.optional(),
+    clamp: z.number().int().min(1).max(3).optional(),
   }),
   Markdown: z.object({
     content: prose(20_000),
@@ -52,10 +59,14 @@ export const contentProps = {
     href: z
       .string()
       .max(maxHrefLength)
-      .refine(isSafeHref, "Use an absolute http, https, or mailto URL."),
+      .refine(isSafeHref, "Use an absolute http, https, or mailto URL, or leave `href` out for a link that goes nowhere.")
+      .optional(),
+    variant: z.enum(["inline", "nav", "muted"]).optional(),
+    active: z.boolean().optional(),
   }),
   Quote: z.object({
     text: prose(2000),
     cite: label(200).optional(),
   }),
+  Icon: iconProps,
 };

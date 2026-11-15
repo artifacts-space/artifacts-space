@@ -45,7 +45,7 @@ export default function GuaranteesPage() {
       <DocsH page={page} id="no-css" />
       <Prose>
         <p>
-          There is no <code>style</code>, <code>className</code>, or color prop anywhere. Layout comes from Stack, Grid, Section, and Card; emphasis comes from <code>tone</code> (neutral, info, success, warning, danger) and chart colors from a fixed palette. Every color is a theme token, so a page always matches the site, and an agent cannot hide text, fake a sign-in form, or break the layout.
+          There is no <code>style</code>, <code>className</code>, or color prop anywhere. Layout comes from Stack, Grid, Section, Card, and Box, whose spacing, surface, border, and radius are named steps on fixed scales, never CSS values; emphasis comes from <code>tone</code> (neutral, info, success, warning, danger) and chart colors from a fixed palette. Every color is a theme token, so a page always matches the site, and an agent cannot hide text, fake a sign-in form, or break the layout.
         </p>
       </Prose>
 

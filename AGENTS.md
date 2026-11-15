@@ -555,7 +555,14 @@ catch this, so test the generated SQL with `.toSQL()`, as
   in light and in dark. Status tones (`--tone-*`) and code syntax colors hold
   4.5:1 by rule on every surface they sit on, tints included (`toneTokens`
   and `syntaxTokens` in `src/lib/themes/derive.ts`, which themes use too), so
-  a new tint strength or surface under a tone goes into that rule.
+  a new tint strength or surface under a tone goes into that rule. A Box
+  surface in an interface (`src/components/artifact-view/ui/box.tsx`) is a
+  scope of the theme: inverse is the theme's other mode (`theme-invert` on
+  the site palette), primary is a palette built on the accent, and the muted
+  fill and the block hues re-light body and muted text only where a theme
+  leaves them under 4.5:1 (`src/lib/themes/surface-scope.ts`, tested over
+  every preset). A new surface goes there and into the "Surfaces and tones"
+  gallery specimen, which the contrast spec reads.
 
 ### Page column
 

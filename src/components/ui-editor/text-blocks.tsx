@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { Children, type ComponentType, type ReactNode } from "react";
 
-import { badgeTone, headingClass, textSize, toneStyles } from "@/components/artifact-view/ui/content";
+import { badgeTone, headingClassName, linkVariantClass, textClassName, toneStyles } from "@/components/artifact-view/ui/content";
 import { textLimit } from "@/lib/ui/block-templates";
 import { componentProps, type UiComponentName, type UiProps } from "@/lib/ui/catalog";
 import { cn } from "@/lib/utils";
@@ -34,8 +34,7 @@ function useNewLineAfter(id: string) {
 function HeadingBlock({ id, props }: BlockProps<"Heading">) {
   const { setProp } = useBlockEditor();
   const newLine = useNewLineAfter(id);
-  const level = (props.level ?? 2) as keyof typeof headingClass;
-  const tag = (["h1", "h2", "h3", "h4"] as const)[level - 1] ?? "h2";
+  const tag = (["h1", "h2", "h3", "h4"] as const)[(props.level ?? 2) - 1] ?? "h2";
   return (
     <EditableText
       heading={tag}
@@ -45,7 +44,7 @@ function HeadingBlock({ id, props }: BlockProps<"Heading">) {
       onEnter={newLine}
       label="Heading"
       placeholder="Heading"
-      className={cn("min-w-0 text-balance break-words", headingClass[level])}
+      className={headingClassName(props)}
     />
   );
 }
@@ -65,7 +64,7 @@ function TextBlock({ id, props }: BlockProps<"Text">) {
       onEmptyBackspace={() => { apply((raw) => removeBlock(raw, id)); }}
       label="Text"
       placeholder="Type, or press / for blocks"
-      className={cn("max-w-[var(--artifact-measure,72ch)] break-words", textSize[props.size ?? "md"], props.tone === "muted" && "text-muted-foreground")}
+      className={textClassName(props)}
     />
   );
 }
@@ -109,8 +108,16 @@ function BadgeBlock({ id, props }: BlockProps<"Badge">) {
 function LinkBlock({ id, props }: BlockProps<"Link">) {
   const { setProp } = useBlockEditor();
   return (
-    <span className="min-w-0 text-md break-words">
-      <EditableText blockKey={id} value={props.label} onChange={(text) => { setProp(id, "label", text); }} maxLength={textLimit("Link", "label")} label={`Link text (opens ${props.href})`} placeholder="Link" className="inline-block underline decoration-border underline-offset-4" />
+    <span className="min-w-0 break-words">
+      <EditableText
+        blockKey={id}
+        value={props.label}
+        onChange={(text) => { setProp(id, "label", text); }}
+        maxLength={textLimit("Link", "label")}
+        label={props.href ? `Link text (opens ${props.href})` : "Link text (goes nowhere)"}
+        placeholder="Link"
+        className={cn("inline-block", linkVariantClass[props.variant ?? "inline"])}
+      />
     </span>
   );
 }
