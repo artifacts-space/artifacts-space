@@ -25,6 +25,8 @@ interface BlockFrameProps {
   type: string;
   parent: string;
   index: number;
+  /** The block's place in its parent (frameLayoutClass), so it lays out as it does for readers. */
+  className?: string | undefined;
   children: ReactNode;
 }
 
@@ -94,7 +96,7 @@ function BlockHandle({ id, type, frame }: { id: string; type: string; frame: Rea
  * appears on hover or focus. Drag the handle onto another block to move it
  * before or after that block, among that block's siblings.
  */
-export function BlockFrame({ id, type, parent, index, children }: BlockFrameProps) {
+export function BlockFrame({ id, type, parent, index, className, children }: BlockFrameProps) {
   const editor = useBlockEditor();
   const frame = useRef<HTMLDivElement>(null);
   const [drop, setDrop] = useState<DropSide | null>(null);
@@ -130,7 +132,7 @@ export function BlockFrame({ id, type, parent, index, children }: BlockFrameProp
     <div
       ref={frame}
       data-block={id}
-      className="relative min-w-0"
+      className={cn("relative min-w-0", className)}
       onMouseOver={activate}
       onFocus={activate}
       onDragOver={onDragOver}

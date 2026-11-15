@@ -5,6 +5,7 @@ import {
   componentEvents,
   componentProps,
   containerComponents,
+  fieldWiseChecks,
   isUiComponentName,
   uiComponentNames,
   type UiComponentName,
@@ -40,7 +41,8 @@ function checkProps(key: string, type: UiComponentName, props: Record<string, un
   const issues = result.success ? [] : result.error.issues.filter((issue) => !dynamicKeys.has(String(issue.path[0])));
   const errors = propIssues(key, type, issues);
   const check = componentChecks[type];
-  if (errors.length === 0 && check) {
+  // A rule that reads its props one by one still runs beside schema errors, so every problem is reported at once.
+  if (check && (errors.length === 0 || fieldWiseChecks.has(type))) {
     errors.push(...check(props).map((problem) => specError("invalid_props", `Element "${key}" (${type}): ${problem}`, key)));
   }
   return [...errors, ...unknownPropWarnings(key, type, props)];

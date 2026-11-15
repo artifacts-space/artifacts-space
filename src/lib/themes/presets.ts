@@ -18,8 +18,8 @@ export interface ThemePreset {
 
 /** The site's own categorical series (globals.css): a validated reference palette. */
 const reference = {
-  light: ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#6250d6", "#008300", "#e34948"],
-  dark: ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#9085e9", "#008300", "#e66767"],
+  light: ["#2a78d6", "#df5d27", "#009965", "#be7500", "#cc628c", "#6250d6", "#008300", "#e34948"],
+  dark: ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#9085e9", "#0d880b", "#e66767"],
 };
 
 /** Warm, earthy series for the paper and editorial presets. */

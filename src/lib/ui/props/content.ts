@@ -2,7 +2,9 @@ import { z } from "zod";
 
 import { isSafeHref, maxHrefLength } from "@/lib/link-policy";
 
-import { iconProps, inkTone } from "./screen";
+import type { PropCheck } from "./data";
+import { avatarProps } from "./fields";
+import { iconName, iconProps, inkTone } from "./screen";
 import { label, prose, textAlign, tone } from "./shared";
 
 const stepItem = z.object({
@@ -45,10 +47,13 @@ export const contentProps = {
   Badge: z.object({
     label: label(60),
     tone: tone.optional(),
+    variant: z.enum(["soft", "solid", "outline"]).optional(),
+    icon: iconName.optional(),
   }),
   List: z.object({
     items: z.array(prose(1000)).max(200),
     ordered: z.boolean().optional(),
+    marker: z.enum(["dot", "check", "cross", "arrow"]).optional(),
   }),
   Steps: z.object({
     items: z.array(stepItem).max(50),
@@ -69,4 +74,12 @@ export const contentProps = {
     cite: label(200).optional(),
   }),
   Icon: iconProps,
+  Avatar: avatarProps,
 };
+
+/** A numbered list has its numbers as markers. */
+const listCheck: PropCheck = (props) =>
+  props.ordered === true && typeof props.marker === "string" && props.marker !== "dot" ? ["`marker` applies to a bulleted list. Remove `ordered`, or remove `marker`."] : [];
+
+/** Cross-field rules for content components. */
+export const contentChecks: Partial<Record<keyof typeof contentProps, PropCheck>> = { List: listCheck };

@@ -71,11 +71,14 @@ const tones = ["info", "success", "warning", "danger"] as const;
 /** One surface with everything that must read on it: body and muted text, each status tone as text and as an icon, a rule, links, and buttons. */
 function surfaceElements(surface: BoxSurface): Elements {
   const id = (part: string) => `${surface}-${part}`;
+  // A chart and a diagram draw their own colors, so the surfaces that switch the palette each hold one of both.
+  const drawn = surface === "inverse" || surface === "primary";
   const elements: Elements = {
-    [id("box")]: { type: "Box", props: { surface, padding: "md", gap: "sm", radius: "lg", border: surface === "none" ? "all" : "none", label: `Surface ${surface}` }, children: [id("body"), id("muted"), id("tones"), id("rule"), id("actions")] },
+    [id("box")]: { type: "Box", props: { surface, padding: "md", gap: "sm", radius: "lg", border: surface === "none" ? "all" : "none", label: `Surface ${surface}` }, children: [id("body"), id("muted"), id("tones"), id("badges"), id("rule"), id("actions"), ...(drawn ? [id("chart"), id("diagram")] : [])] },
     [id("body")]: { type: "Text", props: { text: `Body text on the ${surface} surface.` } },
     [id("muted")]: { type: "Text", props: { text: "Muted text, for secondary detail.", tone: "muted", size: "sm" } },
     [id("tones")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: tones.flatMap((tone) => [id(`icon-${tone}`), id(`text-${tone}`)]) },
+    [id("badges")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "sm", align: "center" }, children: tones.map((tone) => id(`badge-${tone}`)) },
     [id("rule")]: { type: "Separator", props: { label: "Details" } },
     [id("actions")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: [id("primary"), id("outline"), id("nav"), id("quiet")] },
     [id("primary")]: { type: "Button", props: { label: "Primary" } },
@@ -83,14 +86,19 @@ function surfaceElements(surface: BoxSurface): Elements {
     [id("nav")]: { type: "Link", props: { label: "Nav link", variant: "nav" } },
     [id("quiet")]: { type: "Link", props: { label: "Muted link", variant: "muted" } },
   };
+  if (drawn) {
+    elements[id("chart")] = { type: "Chart", props: { type: "bar", title: `Orders on the ${surface} surface`, labels: ["Q1", "Q2", "Q3"], series: [{ name: "Online", values: [4, 6, 5] }, { name: "In store", values: [3, 2, 4] }, { name: "Phone", values: [1, 2, 1] }] } };
+    elements[id("diagram")] = { type: "Diagram", props: { title: `Flow on the ${surface} surface`, code: "flowchart LR\n  A[Order] --> B[Pack] --> C[Ship]" } };
+  }
   for (const tone of tones) {
     elements[id(`icon-${tone}`)] = { type: "Icon", props: { name: "circle-check", size: "sm", tone } };
     elements[id(`text-${tone}`)] = { type: "Text", props: { text: `${tone} text`, tone, size: "sm" } };
+    elements[id(`badge-${tone}`)] = { type: "Badge", props: { label: `${tone} badge`, tone } };
   }
   return elements;
 }
 
-/** Every Box surface with every text tone on it, for the contrast scan in light, in dark, and under themes. */
+/** Every Box surface with every text tone and every tone badge on it, and a chart and a diagram on the two that switch the palette, for the contrast scan in light, in dark, and under themes. */
 export const surfaceMatrixSpec = {
   version: 1,
   root: "page",
@@ -143,5 +151,46 @@ export const landingPageSpec = {
     "footer-links": { type: "Box", props: { direction: "horizontal", gap: "lg", label: "Footer links" }, children: ["footer-privacy", "footer-terms"] },
     "footer-privacy": { type: "Link", props: { label: "Privacy", variant: "muted" } },
     "footer-terms": { type: "Link", props: { label: "Terms", variant: "muted" } },
+  },
+};
+
+/**
+ * One of every block whose look comes from a screen prop, each with words of
+ * its own, so a test can find the same block in the read view and in the
+ * interface editor and compare how it is drawn.
+ */
+export const styledBlocksSpec = {
+  version: 1,
+  root: "page",
+  elements: {
+    page: { type: "Box", props: { gap: "md" }, children: ["nav", "eyebrow", "title", "lead", "sub", "mono", "caption", "badges", "features", "actions", "note-short", "note-long", "hero"] },
+    nav: { type: "Box", props: { direction: "horizontal", align: "center", justify: "between", gap: "md", padding: "md", border: "bottom", wrap: true, label: "Styled navigation" }, children: ["nav-links", "nav-docs"] },
+    "nav-links": { type: "Box", props: { direction: "horizontal", gap: "lg", wrap: true }, children: ["link-active", "link-plain", "link-muted-active", "link-muted"] },
+    "link-active": { type: "Link", props: { label: "Product", variant: "nav", active: true } },
+    "link-plain": { type: "Link", props: { label: "Pricing", variant: "nav" } },
+    "link-muted-active": { type: "Link", props: { label: "Changelog", variant: "muted", active: true } },
+    "link-muted": { type: "Link", props: { label: "Careers", variant: "muted" } },
+    "nav-docs": { type: "Link", props: { label: "Read the docs", href: "https://example.com/docs" } },
+    eyebrow: { type: "Text", props: { text: "New this week", variant: "eyebrow" } },
+    title: { type: "Heading", props: { text: "Count every shelf", level: 1, size: "display", align: "center" } },
+    lead: { type: "Text", props: { text: "Stock that keeps up", size: "xl", weight: "semibold", align: "center", tone: "info" } },
+    sub: { type: "Heading", props: { text: "Small heading at the end", level: 3, size: "sm", align: "end" } },
+    mono: { type: "Text", props: { text: "order-4821", variant: "mono" } },
+    caption: { type: "Text", props: { text: "Ends on Friday", variant: "caption", tone: "danger", weight: "medium", align: "end", clamp: 1 } },
+    badges: { type: "Box", props: { direction: "horizontal", gap: "sm", wrap: true }, children: ["badge-solid", "badge-outline", "badge-soft"] },
+    "badge-solid": { type: "Badge", props: { label: "Shipped", tone: "success", variant: "solid", icon: "check" } },
+    "badge-outline": { type: "Badge", props: { label: "Beta", tone: "info", variant: "outline" } },
+    "badge-soft": { type: "Badge", props: { label: "Draft" } },
+    features: { type: "List", props: { marker: "check", items: ["Unlimited projects", "Weekly reports"] } },
+    actions: { type: "Box", props: { direction: "horizontal", gap: "sm", align: "center" }, children: ["action-start", "action-menu"] },
+    "action-start": { type: "Button", props: { label: "Start free", size: "lg", icon: "arrow-right", iconPosition: "end" } },
+    "action-menu": { type: "Button", props: { label: "Open menu", icon: "menu-2", iconOnly: true, variant: "ghost" } },
+    "note-short": { type: "Textarea", props: { label: "Short note", rows: 2 } },
+    "note-long": { type: "Textarea", props: { label: "Long note", rows: 6 } },
+    hero: { type: "Box", props: { direction: "horizontal", gap: "lg", label: "Styled hero" }, children: ["hero-copy", "hero-art"] },
+    "hero-copy": { type: "Box", props: { grow: true, surface: "muted", padding: "md", radius: "lg" }, children: ["hero-note"] },
+    "hero-note": { type: "Text", props: { text: "Grows to fill the row" } },
+    "hero-art": { type: "Box", props: { grow: true }, children: ["hero-image"] },
+    "hero-image": { type: "Placeholder", props: { label: "Screenshot", ratio: "video" } },
   },
 };

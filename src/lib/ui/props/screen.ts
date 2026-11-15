@@ -64,31 +64,46 @@ export const placeholderProps = z.object({
 
 const stepOrder = { sm: 1, md: 2, lg: 3 } as const;
 
-type BoxProps = z.output<typeof boxProps>;
+/*
+ * Each rule reads only the props it is about, parsed on their own, so it
+ * still runs when an unrelated prop is invalid and a spec's problems are all
+ * reported at once. A rule says nothing when one of its own props is not
+ * valid (or is an expression): that prop's own error covers it.
+ */
+const stackFields = boxProps.pick({ direction: true, stackBelow: true });
+const hideFields = boxProps.pick({ hideBelow: true, hideAbove: true });
+const scrollRowFields = boxProps.pick({ overflow: true, direction: true });
+const scrollWrapFields = boxProps.pick({ overflow: true, wrap: true });
 
-function scrollProblems({ overflow, direction, wrap }: BoxProps): string[] {
-  if (overflow !== "scroll") return [];
-  const problems: string[] = [];
-  if (direction !== "horizontal") problems.push('`overflow: "scroll"` scrolls a row sideways. Set `direction: "horizontal"`, or remove `overflow`.');
-  if (wrap) problems.push('`overflow: "scroll"` and `wrap` cannot both apply: a row that wraps never scrolls. Remove one.');
-  return problems;
+function stackProblems(props: Record<string, unknown>): string[] {
+  const read = stackFields.safeParse(props);
+  if (!read.success || !read.data.stackBelow || read.data.direction === "horizontal") return [];
+  return ['`stackBelow` only applies to a Box with `direction: "horizontal"`. Set the direction, or remove `stackBelow`.'];
 }
 
-function responsiveProblems({ direction, stackBelow, hideBelow, hideAbove }: BoxProps): string[] {
+function hideProblems(props: Record<string, unknown>): string[] {
+  const read = hideFields.safeParse(props);
+  if (!read.success) return [];
+  const { hideBelow, hideAbove } = read.data;
+  if (!hideBelow || !hideAbove || stepOrder[hideAbove] > stepOrder[hideBelow]) return [];
+  return [`\`hideBelow: "${hideBelow}"\` with \`hideAbove: "${hideAbove}"\` hides the Box at every width. Make \`hideAbove\` a wider step than \`hideBelow\`, or remove one.`];
+}
+
+function scrollProblems(props: Record<string, unknown>): string[] {
+  const row = scrollRowFields.safeParse(props);
+  const wrap = scrollWrapFields.safeParse(props);
   const problems: string[] = [];
-  if (stackBelow && direction !== "horizontal") problems.push('`stackBelow` only applies to a Box with `direction: "horizontal"`. Set the direction, or remove `stackBelow`.');
-  if (hideBelow && hideAbove && stepOrder[hideAbove] <= stepOrder[hideBelow]) {
-    problems.push(`\`hideBelow: "${hideBelow}"\` with \`hideAbove: "${hideAbove}"\` hides the Box at every width. Make \`hideAbove\` a wider step than \`hideBelow\`, or remove one.`);
+  if (row.success && row.data.overflow === "scroll" && row.data.direction !== "horizontal") {
+    problems.push('`overflow: "scroll"` scrolls a row sideways. Set `direction: "horizontal"`, or remove `overflow`.');
+  }
+  if (wrap.success && wrap.data.overflow === "scroll" && wrap.data.wrap) {
+    problems.push('`overflow: "scroll"` and `wrap` cannot both apply: a row that wraps never scrolls. Remove one.');
   }
   return problems;
 }
 
 /** A Box that can never show, or a rule that cannot apply to it, is a mistake worth naming. */
-export const boxCheck: PropCheck = (props) => {
-  const parsed = boxProps.safeParse(props);
-  if (!parsed.success) return [];
-  return [...responsiveProblems(parsed.data), ...scrollProblems(parsed.data)];
-};
+export const boxCheck: PropCheck = (props) => [...stackProblems(props), ...hideProblems(props), ...scrollProblems(props)];
 
 /** Agent-facing descriptions; the guide is generated from them. */
 export const screenDescriptions = {

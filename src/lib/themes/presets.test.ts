@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { contrastIssues } from "./contrast";
-import { mentionTokens, paletteTokens, switchOffHover, switchOnHover, switchTokens, syntaxMinimum, syntaxTokens, toneTintMax, toneTokens } from "./derive";
+import { mentionTokens, paletteTokens, seriesTokens, switchOffHover, switchOnHover, switchTokens, syntaxMinimum, syntaxTokens, toneTintMax, toneTokens } from "./derive";
 import { contrastRatio, mixOklch, normalizeColor, paintOver, parseColor, type Oklch } from "./color";
 import { themePresets } from "./presets";
 import { builtInPresets } from "./resolve";
@@ -239,6 +239,24 @@ describe("status tones", () => {
     }
   });
 
+  it("should read at 4.5:1 in globals.css as text and as a badge on the site's page, card, muted fill, and every hue fill, in both modes", () => {
+    // The site paints its own hand-set hue fills, not derived ones, so the rule is checked here against the values a reader sees.
+    for (const mode of ["light", "dark"] as const) {
+      const surfaces = [...site[mode].keys()].filter((name) => /^--block-[a-z]+-bg$/.test(name));
+      expect(surfaces).toHaveLength(9);
+      for (const tone of ["info", "success", "warning", "danger"]) {
+        const text = parseColor(siteColor(mode, `--tone-${tone}`) ?? "");
+        if (!text) throw new Error(`${mode} has no --tone-${tone}`);
+        for (const surfaceName of ["--background", "--card", "--muted", ...surfaces]) {
+          const surface = parseColor(siteColor(mode, surfaceName) ?? "");
+          if (!surface) throw new Error(`${mode} has no ${surfaceName}`);
+          expect(contrastRatio(text, surface), `${mode} ${tone} on ${surfaceName}`).toBeGreaterThanOrEqual(4.5);
+          expect(contrastRatio(text, paintOver(text, toneTintMax, surface)), `${mode} ${tone} badge on ${surfaceName}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    }
+  });
+
   it("should read at 4.5:1 on every preset's surfaces and on the tone's own tint over each, in both modes", () => {
     for (const [id, preset] of builtInPresets()) {
       for (const mode of ["light", "dark"] as const) {
@@ -255,6 +273,70 @@ describe("status tones", () => {
         }
       }
     }
+  });
+});
+
+describe("chart colors", () => {
+  const series = Array.from({ length: 8 }, (_, index) => `--series-${String(index + 1)}`);
+  const quiet = ["--background", "--card", "--secondary", "--muted", "--accent"];
+  const hueFills = (names: Iterable<string>) => [...names].filter((name) => /^--block-[a-z]+-bg$/.test(name));
+
+  it("should show at 3:1 in globals.css on the site's page, card, quiet surfaces, and every hue fill, in both modes", () => {
+    // The site paints its own hand-set hue fills, so its chart colors are checked against the values a reader sees.
+    for (const mode of ["light", "dark"] as const) {
+      const surfaces = [...quiet, ...hueFills(site[mode].keys())];
+      expect(surfaces).toHaveLength(14);
+      for (const name of series) {
+        const mark = parseColor(siteColor(mode, name) ?? "");
+        if (!mark) throw new Error(`${mode} has no ${name}`);
+        for (const surfaceName of surfaces) {
+          const surface = parseColor(siteColor(mode, surfaceName) ?? "");
+          if (!surface) throw new Error(`${mode} has no ${surfaceName}`);
+          expect(contrastRatio(mark, surface), `${mode} ${name} on ${surfaceName}`).toBeGreaterThanOrEqual(3);
+        }
+      }
+    }
+  });
+
+  it("should reproduce the site chart colors in globals.css when deriving them from the Default preset", () => {
+    for (const mode of ["light", "dark"] as const) {
+      for (const [name, value] of Object.entries(seriesTokens(mode, siteDefaultColors(mode)))) {
+        expect(normalizeColor(value), `${mode} ${name}`).toBe(siteColor(mode, name));
+      }
+    }
+  });
+
+  it("should show at 3:1 on every preset's page, card, quiet surfaces, and every hue fill, in both modes", () => {
+    for (const [id, preset] of builtInPresets()) {
+      for (const mode of ["light", "dark"] as const) {
+        const tokens = paletteTokens(mode, preset.theme[mode]);
+        const surfaces = [...quiet, ...hueFills(Object.keys(tokens))];
+        expect(surfaces, `${id} ${mode}`).toHaveLength(14);
+        for (const name of series) {
+          const mark = parseColor(tokens[name] ?? "");
+          if (!mark) throw new Error(`${id} ${mode} has no ${name}`);
+          for (const surfaceName of surfaces) {
+            const surface = parseColor(tokens[surfaceName] ?? "");
+            if (!surface) throw new Error(`${id} ${mode} has no ${surfaceName}`);
+            expect(contrastRatio(mark, surface), `${id} ${mode} ${name} on ${surfaceName}`).toBeGreaterThanOrEqual(3);
+          }
+        }
+      }
+    }
+  });
+
+  it("should use a chart color exactly as written when it already shows on every surface", () => {
+    const colors = siteDefaultColors("light");
+    expect(seriesTokens("light", colors)["--series-1"]).toBe(colors.chart[0]);
+  });
+
+  it("should keep the hue and chroma and move only the lightness when a chart color is too faint", () => {
+    const colors = { ...siteDefaultColors("light"), chart: ["oklch(0.9 0.12 95)", "oklch(0.5 0.1 250)", "oklch(0.5 0.1 150)", "oklch(0.5 0.1 30)", "oklch(0.5 0.1 300)", "oklch(0.5 0.1 200)"] };
+    const held = parseColor(seriesTokens("light", colors)["--series-1"] ?? "");
+    expect(held?.c).toBeCloseTo(0.12, 3);
+    expect(held?.h).toBeCloseTo(95, 1);
+    expect(held?.l).toBeLessThan(0.9);
+    expect(held && contrastRatio(held, parseColor(colors.card) ?? held)).toBeGreaterThanOrEqual(3);
   });
 });
 

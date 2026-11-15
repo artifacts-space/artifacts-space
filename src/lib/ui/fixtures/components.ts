@@ -1,6 +1,8 @@
 import type { UiComponentName } from "../catalog";
 import { chartFixtures } from "./charts";
 import { keyValueFixtures, stepsFixtures } from "./details";
+import { avatarFixtures, inputFixtures, screenBadgeFixtures, screenButtonFixtures, screenImageFixtures, screenListFixtures, screenSelectFixtures, textareaFixtures } from "./fields";
+import { longText, unbroken } from "./long-text";
 import { boardFixtures, calendarFixtures } from "./planning";
 import { boxFixtures, iconFixtures, placeholderFixtures, screenHeadingFixtures, screenLinkFixtures, screenTextFixtures } from "./screen";
 
@@ -17,11 +19,7 @@ export interface ComponentFixture {
   children?: FixtureChild[];
 }
 
-const sentence = "Agents save decisions, plans, and results here so the next session starts with context. ";
-/** Text at a component's length limit, made of real words. */
-export const longText = (length: number) => sentence.repeat(Math.ceil(length / sentence.length)).slice(0, length).trim();
-/** One unbroken token, to test wrapping. */
-export const unbroken = (length: number) => "x".repeat(length);
+export { longText, unbroken };
 
 const text = (value: string): FixtureChild => ({ type: "Text", props: { text: value } });
 const manyRows = Array.from({ length: 500 }, (_, index) => ({ id: index + 1, name: `Row ${index + 1}`, amount: (index * 7919) % 100_000, ok: index % 3 === 0 }));
@@ -60,7 +58,7 @@ const layout: Pick<Record<UiComponentName, ComponentFixture[]>, "Section" | "Sta
   Box: boxFixtures,
 };
 
-const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Text" | "Markdown" | "Code" | "Callout" | "Badge" | "List" | "Steps" | "Link" | "Quote" | "Icon"> = {
+const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Text" | "Markdown" | "Code" | "Callout" | "Badge" | "List" | "Steps" | "Link" | "Quote" | "Icon" | "Avatar"> = {
   Heading: [
     { name: "Levels", props: { text: "Level one heading", level: 1 } },
     { name: "Level four", props: { text: "Level four heading", level: 4 } },
@@ -93,12 +91,14 @@ const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Te
   Badge: [
     { name: "Tones", props: { label: "beta", tone: "info" } },
     { name: "Long", props: { label: longText(60), tone: "success" } },
+    ...screenBadgeFixtures,
   ],
   List: [
     { name: "Bullets", props: { items: ["Ship the API", "Write the docs", "Tell the team"] } },
     { name: "Ordered", props: { items: ["First", "Second"], ordered: true } },
     { name: "Empty", props: { items: [] } },
     { name: "Many", props: { items: Array.from({ length: 200 }, (_, index) => `Item ${index + 1}`), ordered: true } },
+    ...screenListFixtures,
   ],
   Steps: stepsFixtures,
   Link: [
@@ -112,6 +112,7 @@ const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Te
     { name: "Long", props: { text: longText(2000) } },
   ],
   Icon: iconFixtures,
+  Avatar: avatarFixtures,
 };
 
 const data: Pick<Record<UiComponentName, ComponentFixture[]>, "Table" | "Metric" | "Chart" | "KeyValue" | "Progress" | "Timeline" | "Board" | "Calendar" | "Diagram"> = {
@@ -154,7 +155,7 @@ const data: Pick<Record<UiComponentName, ComponentFixture[]>, "Table" | "Metric"
   ],
 };
 
-const input: Pick<Record<UiComponentName, ComponentFixture[]>, "Checklist" | "Checkbox" | "Select" | "Switch" | "Slider" | "Button"> = {
+const input: Pick<Record<UiComponentName, ComponentFixture[]>, "Checklist" | "Checkbox" | "Select" | "Switch" | "Slider" | "Button" | "Input" | "Textarea"> = {
   Checklist: [
     { name: "Normal", props: { title: "Launch", items: [{ label: "Write release notes", checked: true }, { label: "Tag the release" }] } },
     { name: "Empty", props: { items: [] } },
@@ -164,6 +165,7 @@ const input: Pick<Record<UiComponentName, ComponentFixture[]>, "Checklist" | "Ch
   Select: [
     { name: "Normal", props: { label: "Environment", options: ["Production", "Preview", "Development"], value: "Preview" } },
     { name: "Many long options", props: { label: longText(120), options: Array.from({ length: 100 }, (_, index) => `${index + 1}. ${longText(100)}`), placeholder: "Pick one" } },
+    ...screenSelectFixtures,
   ],
   Switch: [{ name: "Normal", props: { label: "Dark launch", checked: true, description: "Hide the feature from users." } }],
   Slider: [
@@ -174,7 +176,10 @@ const input: Pick<Record<UiComponentName, ComponentFixture[]>, "Checklist" | "Ch
     { name: "Variants", props: { label: "Primary" } },
     { name: "Outline", props: { label: "Outline", variant: "outline" } },
     { name: "Long", props: { label: longText(60), variant: "secondary" } },
+    ...screenButtonFixtures,
   ],
+  Input: inputFixtures,
+  Textarea: textareaFixtures,
 };
 
 /** Files the media fixtures point at. The gallery shows them from local stand-ins; nothing is uploaded. */
@@ -190,6 +195,7 @@ const media: Pick<Record<UiComponentName, ComponentFixture[]>, "Image" | "File" 
   Image: [
     { name: "Normal", props: { file: imageFile.id, alt: "Architecture diagram", caption: "How agents reach the API." } },
     { name: "Long caption", props: { file: imageFile.id, alt: longText(300), caption: longText(300) } },
+    ...screenImageFixtures(imageFile.id),
   ],
   File: [
     { name: "PDF", props: { file: pdfFile.id } },

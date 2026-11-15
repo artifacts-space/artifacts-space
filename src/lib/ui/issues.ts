@@ -32,6 +32,7 @@ export const blockingCodes: ReadonlySet<string> = new Set([
   "nested_repeat",
   "too_many_rendered",
   "repeat_too_long",
+  "typed_text_in_link",
 ]);
 
 /** Builds an error issue. */

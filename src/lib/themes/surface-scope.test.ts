@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { blockHues } from "@/lib/block-colors/block-color-rules";
 
-import { contrastRatio, parseColor, type Oklch } from "./color";
-import { blockFills, paletteTokens, type PaletteMode } from "./derive";
+import { contrastRatio, paintOver, parseColor, type Oklch } from "./color";
+import { blockFills, paletteTokens, toneTintMax, type PaletteMode } from "./derive";
 import { themePresets } from "./presets";
 import { presetTheme, siteDefaultTheme } from "./resolve";
 import type { Theme } from "./schema";
@@ -40,6 +40,19 @@ describe("quiet surfaces", () => {
           expect(contrastRatio(resolved(style, tokens, name), surface), `${mode} ${name} on ${fill}`).toBeGreaterThanOrEqual(4.5);
         }
       });
+    }
+  });
+
+  it.each(themes)("should keep a tone badge, the tone on its own tint, at 4.5:1 on the muted fill and every hue of the %s preset", (_id, theme) => {
+    for (const mode of modes) {
+      const tokens = paletteTokens(mode, theme[mode]);
+      const surfaces: [string, Oklch][] = [["muted", color(tokens["--muted"])], ...blockFills(mode, theme[mode]).map((fill, index): [string, Oklch] => [blockHues[index] ?? "hue", fill])];
+      for (const tone of tones) {
+        const ink = color(tokens[`--tone-${tone}`]);
+        for (const [name, surface] of surfaces) {
+          expect(contrastRatio(ink, paintOver(ink, toneTintMax, surface)), `${mode} ${tone} badge on ${name}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
     }
   });
 
@@ -89,17 +102,33 @@ describe("strong surfaces", () => {
     expect(scope.inner).toMatchObject({ mode: null, flipped: true });
   });
 
-  it.each(themes)("should keep body text, muted text, and every status tone at 4.5:1 on the primary surface of the %s preset", (_id, theme) => {
+  it.each(themes)("should keep body text, muted text, every status tone, and every tone badge at 4.5:1 on the primary surface of the %s preset", (_id, theme) => {
     for (const mode of modes) {
       const scope = surfaceEngine(theme, mode, "test").strong("primary");
-      // On the site palette primary is the inverse surface: the other mode's own tokens, already held by the theme rules.
-      if (scope.className !== null) continue;
+      // On the site palette primary is the inverse surface: the site CSS holds the other mode's own tokens, so no value is set.
+      if (Object.keys(scope.style).length === 0) continue;
       const page = color(scope.style["--background"]);
       expect(scope.style["--background"]).toBe(theme[mode].accent);
       for (const name of inks) expect(contrastRatio(color(scope.style[name]), page), `${mode} ${name}`).toBeGreaterThanOrEqual(4.5);
+      for (const tone of tones) {
+        const ink = color(scope.style[`--tone-${tone}`]);
+        expect(contrastRatio(ink, paintOver(ink, toneTintMax, page)), `${mode} ${tone} badge`).toBeGreaterThanOrEqual(4.5);
+      }
       // A default button inside swaps the two, so it shows against the accent.
       expect(scope.style["--primary"]).toBe(theme[mode].accentForeground);
       expect(scope.style["--primary-foreground"]).toBe(theme[mode].accent);
+    }
+  });
+
+  it.each(themes)("should keep every chart color and a diagram's lines at 3:1 on the primary surface of the %s preset, where a theme's chart colors sit beside its accent", (_id, theme) => {
+    for (const mode of modes) {
+      const scope = surfaceEngine(theme, mode, "test").strong("primary");
+      if (Object.keys(scope.style).length === 0) continue;
+      const page = color(scope.style["--background"]);
+      for (let index = 1; index <= 8; index += 1) {
+        expect(contrastRatio(color(scope.style[`--series-${String(index)}`]), page), `${mode} series ${String(index)}`).toBeGreaterThanOrEqual(3);
+      }
+      expect(contrastRatio(color(scope.style["--diagram-line"]), page), `${mode} diagram line`).toBeGreaterThanOrEqual(3);
     }
   });
 
@@ -107,5 +136,114 @@ describe("strong surfaces", () => {
     const engine = surfaceEngine(presetTheme("ocean") ?? siteDefaultTheme(), null, "ocean");
     expect(engine.strong("primary")).toBe(engine.strong("primary"));
     expect(engine.quietInk("blue")).toBe(engine.quietInk("blue"));
+  });
+});
+
+describe("the mode inside a primary surface", () => {
+  const site = siteDefaultTheme();
+  const darkAccent = { accent: "oklch(0.35 0.12 255)", accentForeground: "oklch(0.98 0.01 255)" };
+  const lightAccent = { accent: "oklch(0.86 0.1 255)", accentForeground: "oklch(0.2 0.03 255)" };
+  /** A theme with the given accent on each side; the rest is the site palette with a tinted page, so it is not the site's. */
+  const themed = (light: typeof darkAccent, dark: typeof darkAccent): Theme => ({
+    ...site,
+    light: { ...site.light, background: "oklch(0.97 0.02 250)", ...light },
+    dark: { ...site.dark, background: "oklch(0.2 0.02 250)", ...dark },
+  });
+  const crossed = themed(darkAccent, lightAccent);
+  const straight = themed(lightAccent, darkAccent);
+  const bothLight = themed(lightAccent, lightAccent);
+
+  it("should pin dark inside when a pinned light theme has a dark accent, and light when a pinned dark theme has a light accent", () => {
+    const inLight = surfaceEngine(crossed, "light", "t").strong("primary");
+    expect(inLight.className).toBe("dark");
+    expect(inLight.inner).toMatchObject({ mode: "dark", flipped: false });
+    expect(inLight.style["--background"]).toBe(darkAccent.accent);
+    const inDark = surfaceEngine(crossed, "dark", "t").strong("primary");
+    expect(inDark.className).toBe("light");
+    expect(inDark.inner).toMatchObject({ mode: "light", flipped: false });
+    expect(inDark.style["--background"]).toBe(lightAccent.accent);
+  });
+
+  it("should flip the mode inside when the theme follows the reader and each side's accent is of the other mode", () => {
+    const scope = surfaceEngine(crossed, null, "t").strong("primary");
+    expect(scope.className).toBe("theme-invert");
+    expect(scope.inner).toMatchObject({ mode: null, flipped: true });
+    // Inside `theme-invert` the color-scheme is the other one, so a light reader gets the second value: the light side's dark accent.
+    expect(scope.style["--background"]).toBe(`light-dark(${lightAccent.accent}, ${darkAccent.accent})`);
+    expect(scope.style["--foreground"]).toBe(`light-dark(${lightAccent.accentForeground}, ${darkAccent.accentForeground})`);
+  });
+
+  it("should keep the theme's mode inside when each side's accent is of its own mode, pinned or following the reader", () => {
+    const followed = surfaceEngine(straight, null, "t").strong("primary");
+    expect(followed.className).toBeNull();
+    expect(followed.inner).toMatchObject({ mode: null, flipped: false });
+    expect(followed.style["--background"]).toBe(`light-dark(${lightAccent.accent}, ${darkAccent.accent})`);
+    for (const mode of modes) {
+      const pinned = surfaceEngine(straight, mode, "t").strong("primary");
+      expect(pinned.className, mode).toBeNull();
+      expect(pinned.inner, mode).toMatchObject({ mode, flipped: false });
+    }
+  });
+
+  it("should tell views the accent's mode when both sides have a light accent, for a light reader and a dark one", () => {
+    const followed = surfaceEngine(bothLight, null, "t").strong("primary");
+    expect(followed.inner).toMatchObject({ mode: "light", flipped: false });
+    // The color-scheme stays the reader's, since it picks each side's values.
+    expect(followed.className).toBeNull();
+    const pinnedDark = surfaceEngine(bothLight, "dark", "t").strong("primary");
+    expect(pinnedDark.className).toBe("light");
+    expect(pinnedDark.inner).toMatchObject({ mode: "light", flipped: false });
+  });
+
+  it("should give the surface a key of its own, so views that draw their own colors redraw inside it", () => {
+    const engine = surfaceEngine(crossed, null, "t");
+    expect(engine.strong("primary").inner.key).toBe("t:primary");
+    expect(engine.strong("inverse").inner.key).toBe("t:inverse");
+  });
+
+  it("should report the other mode inside an inverse surface, pinned and following the reader", () => {
+    expect(surfaceEngine(crossed, "light", "t").strong("inverse").inner).toMatchObject({ mode: "dark", flipped: false });
+    expect(surfaceEngine(crossed, null, "t").strong("inverse").inner).toMatchObject({ mode: null, flipped: true });
+  });
+});
+
+describe("a status badge on a primary surface", () => {
+  const site = siteDefaultTheme();
+  // Each accent holds its label at 4.5:1, as the theme rules ask, but leaves no color that reads on a 12% tint of itself.
+  const midDark = { accent: "oklch(0.546 0.215 262.9)", accentForeground: "oklch(1 0 0)" };
+  const midLight = { accent: "oklch(0.56 0.1 150)", accentForeground: "oklch(0 0 0)" };
+  const theme: Theme = {
+    ...site,
+    light: { ...site.light, background: "oklch(0.97 0.02 250)", ...midDark },
+    dark: { ...site.dark, background: "oklch(0.2 0.02 250)", ...midLight },
+  };
+
+  it.each([
+    ["a light label", "light", midDark],
+    ["a dark label", "dark", midLight],
+  ] as const)("should step the fill away from %s, keeping the accent's hue, until the label and every tone hold a badge", (_name, mode, accent) => {
+    const before = color(accent.accent);
+    const label = color(accent.accentForeground);
+    expect(contrastRatio(label, before)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(label, paintOver(label, toneTintMax, before))).toBeLessThan(4.5);
+    const scope = surfaceEngine(theme, mode, "t").strong("primary");
+    const fill = color(scope.style["--background"]);
+    expect(fill.h).toBeCloseTo(before.h, 1);
+    expect(fill.c).toBeCloseTo(before.c, 3);
+    expect(Math.abs(fill.l - label.l)).toBeGreaterThan(Math.abs(before.l - label.l));
+    for (const name of ["--foreground", ...tones.map((tone) => `--tone-${tone}`)]) {
+      const ink = color(scope.style[name]);
+      expect(contrastRatio(ink, fill), `${name} as text`).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(ink, paintOver(ink, toneTintMax, fill)), `${name} as a badge`).toBeGreaterThanOrEqual(4.5);
+    }
+    // A default button inside still swaps the pair.
+    expect(scope.style["--primary-foreground"]).toBe(scope.style["--background"]);
+  });
+
+  it.each(themes)("should leave the accent of the %s preset as written, where its label already holds a badge", (_id, preset) => {
+    for (const mode of modes) {
+      const scope = surfaceEngine(preset, mode, "t").strong("primary");
+      if (Object.keys(scope.style).length > 0) expect(scope.style["--background"], mode).toBe(preset[mode].accent);
+    }
   });
 });

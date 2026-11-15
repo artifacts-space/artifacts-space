@@ -1,9 +1,10 @@
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { specJson, type DocElement } from "@/lib/docs/spec-builders";
 import { checkoutRolloutSpec } from "@/lib/preview/samples";
+import { styledBlocksSpec } from "@/lib/ui/fixtures/screen";
 
-/** Samples the editor fixture can open: long ones for layout, a short interface ("blocks") for the block editor, and a canvas of four screens. */
-export const editorFixtureKinds = ["ui", "json", "markdown", "blocks", "data", "sheet", "canvas"] as const;
+/** Samples the editor fixture can open: long ones for layout, a short interface ("blocks") for the block editor, "styled" for how it draws styled blocks, and a canvas of four screens. */
+export const editorFixtureKinds = ["ui", "json", "markdown", "blocks", "styled", "data", "sheet", "canvas"] as const;
 export type EditorFixtureKind = (typeof editorFixtureKinds)[number];
 
 /** The rollout dashboard twelve times over: a long ui with charts, timelines, and tables. */
@@ -36,6 +37,11 @@ export function shortUi(): string {
       owners: { type: "Text", props: { text: "Ann and Bo." } },
     },
   }, null, 2);
+}
+
+/** One of every block styled by a screen prop: the block editor must draw each as the read view does. */
+export function styledUi(): string {
+  return JSON.stringify(styledBlocksSpec, null, 2);
 }
 
 /** A short interface of data blocks for the properties form checks: a chart, a table, and tabs. */

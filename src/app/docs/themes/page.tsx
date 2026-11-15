@@ -27,7 +27,7 @@ const colorRows: [string, string, string][] = [
   ["cardEdge", "--card-edge, --code-border", "The hairline edge of a card. It can be transparent, such as oklch(0.2 0 0 / 0.09)."],
   ["accent", "--primary", "Primary buttons and the strongest marks."],
   ["accentForeground", "--primary-foreground", "Text on the accent."],
-  ["chart", "--series-1 … --series-8", `${String(CHART_MIN)} to ${String(CHART_MAX)} chart colors, in order. A shorter palette repeats.`],
+  ["chart", "--series-1 … --series-8", `${String(CHART_MIN)} to ${String(CHART_MAX)} chart colors, in order. A shorter palette repeats. A color too faint to show at 3:1 on a surface is drawn darker or lighter, with the same hue.`],
 ];
 
 const roleNames: Record<FontRole, string> = { body: "Body", heading: "Headings", mono: "Code" };

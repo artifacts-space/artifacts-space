@@ -1,20 +1,29 @@
 "use client";
 
 import { fileTypeLabel } from "@/lib/files/config";
+import type { UiProps } from "@/lib/ui/catalog";
+import { cn } from "@/lib/utils";
 
 import { FileCard } from "../file-card";
 import { useArtifactFile } from "../files-context";
 
+import { radiusClass, ratioClass } from "./scales";
 import { ElementNotice, type ViewProps } from "./stout";
+
+/** At its natural size, capped by the page; with a `ratio`, the full width cropped to that shape, or fitted inside it. */
+function imageClass(props: UiProps<"Image">): string {
+  const shape = props.ratio ? cn("w-full", ratioClass[props.ratio], props.fit === "contain" ? "object-contain" : "object-cover") : "h-auto max-h-[70vh] max-w-full object-contain";
+  return cn("border bg-muted shadow-xs", shape, radiusClass[props.radius ?? "md"]);
+}
 
 /** An uploaded image, by file id. Never a URL. */
 export function ImageView({ props }: ViewProps<"Image">) {
   const { attached, url } = useArtifactFile(props.file);
   if (!attached) return <ElementNotice type="Image" detail="Its file is not attached to this artifact." />;
   return (
-    <figure className="flex min-w-0 flex-col items-start gap-2">
+    <figure className={cn("flex min-w-0 flex-col items-start gap-2", props.ratio && "w-full")}>
       {/* eslint-disable-next-line @next/next/no-img-element -- an access-checked redirect to R2, which next/image cannot optimize */}
-      <img src={url} alt={props.alt} loading="lazy" decoding="async" className="h-auto max-h-[70vh] max-w-full rounded-md border bg-muted object-contain shadow-xs" />
+      <img src={url} alt={props.alt} loading="lazy" decoding="async" className={imageClass(props)} />
       {props.caption ? <figcaption className="text-sm leading-5 text-muted-foreground">{props.caption}</figcaption> : null}
     </figure>
   );

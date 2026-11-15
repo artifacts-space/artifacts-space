@@ -4,7 +4,7 @@ import { tablerIconEntries } from "@/lib/artifact-icons";
 import { blockHues } from "@/lib/block-colors/block-color-rules";
 
 import { containerComponents, uiCatalog } from "../catalog";
-import { landingPageSpec, surfaceMatrixSpec } from "../fixtures/screen";
+import { landingPageSpec, styledBlocksSpec, surfaceMatrixSpec } from "../fixtures/screen";
 import { extraUiIconNames, uiIconNames } from "../icon-names";
 import { validateUiSpec } from "../validate";
 
@@ -51,6 +51,25 @@ describe("Box props", () => {
     expect(messages("Box", { hideBelow: "md", hideAbove: "md" }).join("\n")).toContain("hides the Box at every width");
     expect(messages("Box", { hideBelow: "lg", hideAbove: "sm" }).join("\n")).toContain("hides the Box at every width");
     expect(messages("Box", { hideBelow: "sm", hideAbove: "lg" })).toEqual([]);
+  });
+
+  it("should report the cross-field problems together with the enum problems when a Box has both", () => {
+    const found = messages("Box", { stackBelow: "md", hideBelow: "lg", hideAbove: "sm", padding: "12px", surface: "#ff0000" });
+    const all = found.join("\n");
+    expect(all).toContain("padding");
+    expect(all).toContain("surface");
+    expect(all).toContain("`stackBelow` only applies to a Box with `direction: \"horizontal\"`");
+    expect(all).toContain("hides the Box at every width");
+    expect(found).toHaveLength(4);
+  });
+
+  it("should leave a rule out when one of the props it reads is itself invalid or an expression", () => {
+    // The direction's own error covers it: the rule cannot tell what the direction will be.
+    const invalid = messages("Box", { direction: "row", stackBelow: "md", overflow: "scroll" });
+    expect(invalid).toHaveLength(1);
+    expect(invalid[0]).toContain("direction");
+    expect(messages("Box", { direction: { $state: "/dir" }, stackBelow: "md" })).toEqual([]);
+    expect(messages("Box", { hideBelow: "huge", hideAbove: "sm" })).toHaveLength(1);
   });
 
   it("should explain what a scrolling row needs when overflow is scroll", () => {
@@ -114,7 +133,7 @@ describe("Text, Heading, and Link screen props", () => {
 });
 
 describe("screen fixtures", () => {
-  it.each([["every surface with every tone", surfaceMatrixSpec], ["the landing page", landingPageSpec]])("should validate %s with no errors or warnings", (_name, fixture) => {
+  it.each([["every surface with every tone", surfaceMatrixSpec], ["the landing page", landingPageSpec], ["every styled block", styledBlocksSpec]])("should validate %s with no errors or warnings", (_name, fixture) => {
     expect(validateUiSpec(fixture).issues).toEqual([]);
   });
 

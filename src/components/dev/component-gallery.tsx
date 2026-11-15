@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ArtifactFilesProvider } from "@/components/artifact-view/files-context";
@@ -25,8 +25,9 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { uiComponentNames } from "@/lib/ui/catalog";
 import { componentFixtures, fixtureFiles, fixtureSpec } from "@/lib/ui/fixtures/components";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
+import { signInSpec } from "@/lib/ui/fixtures/fields";
 import { formatFixtures, mediaFormatFixtures, type FormatFixture } from "@/lib/ui/fixtures/formats";
-import { landingPageSpec, surfaceMatrixSpec } from "@/lib/ui/fixtures/screen";
+import { landingPageSpec, styledBlocksSpec, surfaceMatrixSpec } from "@/lib/ui/fixtures/screen";
 import { deepSpec, invalidPropsSpec, javascriptLinkSpec, manyElementsSpec, repeatSpec, unknownTypeSpec } from "@/lib/ui/fixtures/specs";
 import { desktopApps, mcpClients } from "@/lib/setup/client-installs";
 import { presetTheme } from "@/lib/themes/resolve";
@@ -35,6 +36,8 @@ const specFixtures: { name: string; spec: unknown }[] = [
   { name: "Example", spec: exampleUiSpec },
   { name: "Surfaces and tones", spec: surfaceMatrixSpec },
   { name: "Landing page", spec: landingPageSpec },
+  { name: "Sign-in screen", spec: signInSpec },
+  { name: "Styled blocks", spec: styledBlocksSpec },
   { name: "Unknown type", spec: unknownTypeSpec },
   { name: "Invalid props", spec: invalidPropsSpec },
   { name: "javascript: link", spec: javascriptLinkSpec },
@@ -99,6 +102,20 @@ function ThemedSpecimen({ id }: { id: string }) {
       </ThemeBackdrop>
     </Specimen>
   );
+}
+
+const neverChanges = () => () => undefined;
+
+/**
+ * Says the gallery has hydrated, for tests. The server leaves the mark out
+ * and the browser adds it once React has taken over every group above it.
+ * The server's HTML is on screen before that, and a test that writes on it
+ * (an accessibility scan marks what it scans) would differ from what React
+ * expects to find.
+ */
+function ReadyMark() {
+  const hydrated = useSyncExternalStore(neverChanges, () => true, () => false);
+  return hydrated ? <span hidden data-gallery-ready="" /> : null;
 }
 
 /**
@@ -205,6 +222,7 @@ export function ComponentGallery() {
           {mediaFormatFixtures.map((fixture) => <FormatSpecimen key={fixture.name} fixture={fixture} media />)}
         </Group>
       </div>
+      <ReadyMark />
     </div>
   );
 }

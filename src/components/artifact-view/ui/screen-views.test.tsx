@@ -139,6 +139,16 @@ describe("screen props on Text, Heading, and Link", () => {
     expect(plain).not.toContain("<a");
   });
 
+  it("should draw the current page from the Link's own classes, so the editor can draw it without the attribute", () => {
+    const classOf = (html: string) => /class="([^"]*)"/.exec(html)?.[1]?.split(" ") ?? [];
+    expect(classOf(renderToStaticMarkup(<LinkView props={{ label: "Docs", variant: "nav", active: true }} emit={emit} />))).toContain("underline");
+    expect(classOf(renderToStaticMarkup(<LinkView props={{ label: "Docs", variant: "nav" }} emit={emit} />))).not.toContain("underline");
+    const muted = classOf(renderToStaticMarkup(<LinkView props={{ label: "Docs", variant: "muted", active: true }} emit={emit} />));
+    expect(muted).toContain("font-medium");
+    expect(muted).toContain("text-foreground");
+    expect(muted).not.toContain("text-muted-foreground");
+  });
+
   it.each(["inline", "nav", "muted"] as const)("should not mark the current page on a %s Link when active is not set, with and without an address", (variant) => {
     const linked = renderToStaticMarkup(<LinkView props={{ label: "Docs", href: "https://example.com/docs", variant }} emit={emit} />);
     const plain = renderToStaticMarkup(<LinkView props={{ label: "Docs", variant }} emit={emit} />);

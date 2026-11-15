@@ -1,6 +1,6 @@
 "use client";
 
-import { IconAlertTriangle, IconCircleCheck, IconInfoCircle, IconNote, IconOctagon } from "@tabler/icons-react";
+import { IconAlertTriangle, IconArrowRight, IconCheck, IconCircleCheck, IconInfoCircle, IconNote, IconOctagon, IconX } from "@tabler/icons-react";
 
 import { ExternalLink } from "@/components/artifact-view/external-link";
 import { CodeBlock } from "@/components/code/code-block";
@@ -12,6 +12,7 @@ import type { TextAlign, Tone } from "@/lib/ui/props/shared";
 import { hasTitleText } from "@/lib/ui/title-rules";
 import { cn } from "@/lib/utils";
 
+import { uiIconComponents } from "./icon-glyphs";
 import type { ViewProps } from "./stout";
 
 /** Heading classes by level; the interface editor uses them for headings typed in place. */
@@ -154,21 +155,95 @@ export const toneDot: Record<Tone, string> = {
   danger: "bg-tone-danger",
 };
 
+type BadgeProps = UiProps<"Badge">;
+
+/** A solid badge is the tone as the fill, with the page color as its text: the same pair as the tone as text on the page. */
+const badgeSolid: Record<Tone, string> = {
+  neutral: "border-transparent bg-foreground text-background",
+  info: "border-transparent bg-tone-info text-background",
+  success: "border-transparent bg-tone-success text-background",
+  warning: "border-transparent bg-tone-warning text-background",
+  danger: "border-transparent bg-tone-danger text-background",
+};
+
+const badgeOutline: Record<Tone, string> = {
+  neutral: "border-border text-foreground",
+  info: "border-tone-info/40 text-tone-info",
+  success: "border-tone-success/40 text-tone-success",
+  warning: "border-tone-warning/45 text-tone-warning",
+  danger: "border-tone-danger/40 text-tone-danger",
+};
+
+const badgeVariant: Record<NonNullable<BadgeProps["variant"]>, Record<Tone, string>> = { soft: badgeTone, solid: badgeSolid, outline: badgeOutline };
+
+/** Every class a badge takes from its props; the interface editor draws badges typed in place with it. */
+export function badgeClassName(props: Pick<BadgeProps, "tone" | "variant">): string {
+  return cn("inline-flex h-5 w-fit max-w-full items-center gap-1 rounded-full border px-2 text-xs font-medium", badgeVariant[props.variant ?? "soft"][props.tone ?? "neutral"]);
+}
+
+/** A badge's icon, before its label; the interface editor draws it beside a label typed in place. */
+export function BadgeIcon({ name }: { name: BadgeProps["icon"] }) {
+  const Glyph = name ? uiIconComponents[name] : null;
+  return Glyph ? <Glyph aria-hidden className="size-3 shrink-0" /> : null;
+}
+
 export function BadgeView({ props }: ViewProps<"Badge">) {
   return (
-    <span className={cn("inline-flex h-5 w-fit max-w-full items-center truncate rounded-full border px-2 text-xs font-medium", badgeTone[props.tone ?? "neutral"])}>
-      {props.label}
+    <span className={badgeClassName(props)}>
+      <BadgeIcon name={props.icon} />
+      <span className="truncate">{props.label}</span>
     </span>
+  );
+}
+
+/** A list marker drawn as an icon; the dot is the browser's own bullet. */
+export type ListMarker = Exclude<NonNullable<UiProps<"List">["marker"]>, "dot">;
+
+/** The icon and color of each list marker: a check reads as included, a cross and an arrow stay quiet. */
+const listMarker: Record<ListMarker, { Glyph: typeof IconCheck; className: string }> = {
+  check: { Glyph: IconCheck, className: "text-tone-success" },
+  cross: { Glyph: IconX, className: "text-muted-foreground" },
+  arrow: { Glyph: IconArrowRight, className: "text-muted-foreground" },
+};
+
+const listKey = (item: string, index: number) => `${String(index)}-${item.slice(0, 20)}`;
+
+/** The classes of a list with icon markers; the interface editor draws list items typed in place with them. */
+export const markedListClass = { list: "max-w-[var(--artifact-measure,72ch)] space-y-1.5 text-md leading-7", item: "flex min-w-0 gap-2", text: "min-w-0 break-words" } as const;
+
+/** The icon marker a list draws, or null for a numbered list and for plain bullets. */
+export function listMarkerOf(props: Pick<UiProps<"List">, "ordered" | "marker">): ListMarker | null {
+  return !props.ordered && props.marker && props.marker !== "dot" ? props.marker : null;
+}
+
+/** One item's marker icon. */
+export function ListMark({ marker }: { marker: ListMarker }) {
+  const { Glyph, className } = listMarker[marker];
+  return <Glyph aria-hidden className={cn("mt-1.5 size-4 shrink-0", className)} />;
+}
+
+function MarkedList({ items, marker }: { items: string[]; marker: ListMarker }) {
+  return (
+    <ul className={markedListClass.list}>
+      {items.map((item, index) => (
+        <li key={listKey(item, index)} className={markedListClass.item}>
+          <ListMark marker={marker} />
+          <span className={markedListClass.text}>{item}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 export function ListView({ props }: ViewProps<"List">) {
   if (props.items.length === 0) return <p className="text-sm text-muted-foreground">No items.</p>;
+  const marker = listMarkerOf(props);
+  if (marker) return <MarkedList items={props.items} marker={marker} />;
   const Tag = props.ordered ? "ol" : "ul";
   return (
     <Tag className={cn("max-w-[var(--artifact-measure,72ch)] space-y-1 pl-5 text-md leading-7 marker:text-muted-foreground", props.ordered ? "list-decimal" : "list-disc")}>
       {props.items.map((item, index) => (
-        <li key={`${String(index)}-${item.slice(0, 20)}`} className="break-words">{item}</li>
+        <li key={listKey(item, index)} className="break-words">{item}</li>
       ))}
     </Tag>
   );
@@ -176,12 +251,22 @@ export function ListView({ props }: ViewProps<"List">) {
 
 type LinkProps = UiProps<"Link">;
 
-/** Link looks by variant; the interface editor draws link text typed in place with them. */
-export const linkVariantClass: Record<NonNullable<LinkProps["variant"]>, string> = {
+type LinkVariant = NonNullable<LinkProps["variant"]>;
+
+const linkVariantClass: Record<LinkVariant, string> = {
   inline: "text-md underline decoration-border underline-offset-[3px] hover:decoration-foreground",
-  nav: "text-sm font-medium text-foreground underline-offset-[6px] hover:underline aria-[current=page]:underline",
-  muted: "text-sm text-muted-foreground hover:text-foreground aria-[current=page]:font-medium aria-[current=page]:text-foreground",
+  nav: "text-sm font-medium text-foreground underline-offset-[6px] hover:underline",
+  muted: "text-sm text-muted-foreground hover:text-foreground",
 };
+
+/** What `active` adds to each variant: the mark of the page a reader is on. */
+const linkActiveClass: Record<LinkVariant, string> = { inline: "", nav: "underline", muted: "font-medium text-foreground" };
+
+/** Every class a link's words take from its props; the interface editor draws link text typed in place with it. */
+export function linkClassName(props: Pick<LinkProps, "variant" | "active">): string {
+  const variant = props.variant ?? "inline";
+  return cn(linkVariantClass[variant], props.active && linkActiveClass[variant]);
+}
 
 const linkFocus = "transition-colors focus-visible:rounded-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
@@ -195,7 +280,7 @@ export function LinkView({ props }: ViewProps<"Link">) {
   const variant = props.variant ?? "inline";
   const current = props.active ? { "aria-current": "page" as const } : {};
   const href = safeHref(props.href);
-  if (!href) return <span {...current} className={cn("min-w-0 break-words", linkVariantClass[variant])}>{props.label}</span>;
+  if (!href) return <span {...current} className={cn("min-w-0 break-words", linkClassName(props))}>{props.label}</span>;
   if (variant === "inline") {
     return (
       <span className="min-w-0 text-md break-words">
@@ -204,7 +289,7 @@ export function LinkView({ props }: ViewProps<"Link">) {
     );
   }
   return (
-    <a {...current} href={href} target="_blank" rel={externalLinkRel} className={cn("min-w-0 break-words", linkVariantClass[variant], linkFocus)}>
+    <a {...current} href={href} target="_blank" rel={externalLinkRel} className={cn("min-w-0 break-words", linkClassName(props), linkFocus)}>
       {props.label}
       <span className="sr-only"> (opens in a new tab)</span>
     </a>

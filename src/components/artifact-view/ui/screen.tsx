@@ -6,8 +6,9 @@ import type { UiProps } from "@/lib/ui/catalog";
 import type { AspectRatio, Radius } from "@/lib/ui/props/shared";
 import { cn } from "@/lib/utils";
 
-import { inkToneClass } from "./content";
+import { badgeTone, inkToneClass } from "./content";
 import { uiIconComponents } from "./icon-glyphs";
+import { radiusClass, ratioClass } from "./scales";
 import type { ViewProps } from "./stout";
 
 const iconSize: Record<NonNullable<UiProps<"Icon">["size"]>, string> = { xs: "size-3.5", sm: "size-4", md: "size-5", lg: "size-6", xl: "size-8" };
@@ -22,8 +23,6 @@ export function IconView({ props }: ViewProps<"Icon">) {
 type PlaceholderProps = UiProps<"Placeholder">;
 type PlaceholderVariant = NonNullable<PlaceholderProps["variant"]>;
 
-const ratioClass: Record<AspectRatio, string> = { square: "aspect-square", photo: "aspect-4/3", video: "aspect-video", wide: "aspect-21/9", portrait: "aspect-3/4" };
-const placeholderRadius: Record<Radius, string> = { none: "rounded-none", sm: "rounded-sm", md: "rounded-md", lg: "rounded-lg", xl: "rounded-xl", full: "rounded-full" };
 
 /** Each variant's mark, what a screen reader calls it without a label, and its shape: fills the width at a ratio, or a small fixed box. */
 const placeholderVariant: Record<PlaceholderVariant, { Glyph: TablerIcon; name: string; ratio: AspectRatio | null; box: string; radius: Radius }> = {
@@ -50,10 +49,30 @@ export function PlaceholderView({ props }: ViewProps<"Placeholder">) {
     <div
       role="img"
       aria-label={props.label ?? variant.name}
-      className={cn("flex min-w-0 flex-col items-center justify-center gap-2 overflow-hidden border border-dashed bg-muted text-muted-foreground", placeholderShape(props), placeholderRadius[props.radius ?? variant.radius])}
+      className={cn("flex min-w-0 flex-col items-center justify-center gap-2 overflow-hidden border border-dashed bg-muted text-muted-foreground", placeholderShape(props), radiusClass[props.radius ?? variant.radius])}
     >
       <variant.Glyph aria-hidden className={small ? "size-4" : "size-6"} stroke={1.5} />
       {props.label && !small ? <span className="max-w-full truncate px-3 text-xs">{props.label}</span> : null}
     </div>
+  );
+}
+
+const avatarSize: Record<NonNullable<UiProps<"Avatar">["size"]>, string> = { sm: "size-6 text-xs", md: "size-8 text-xs", lg: "size-10 text-sm", xl: "size-14 text-lg" };
+
+const graphemes = new Intl.Segmenter("en", { granularity: "grapheme" });
+
+/** The first letter of the first two words, as written: "Maya Chen" is "MC". Empty when the name has no letters or digits. */
+export function initialsOf(name: string): string {
+  const words = name.split(/\s+/).filter((word) => /[\p{L}\p{N}]/u.test(word));
+  return words.slice(0, 2).map((word) => graphemes.segment(word)[Symbol.iterator]().next().value?.segment ?? "").join("").toUpperCase();
+}
+
+/** A round avatar with a person's initials, tinted by tone. The name is its accessible name. */
+export function AvatarView({ props }: ViewProps<"Avatar">) {
+  const initials = initialsOf(props.name);
+  return (
+    <span role="img" aria-label={props.name} className={cn("inline-flex shrink-0 items-center justify-center rounded-full border font-medium select-none", avatarSize[props.size ?? "md"], badgeTone[props.tone ?? "neutral"])}>
+      {initials ? <span aria-hidden>{initials}</span> : <IconUser aria-hidden className="size-1/2" />}
+    </span>
   );
 }

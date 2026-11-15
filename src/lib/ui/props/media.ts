@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { PropCheck } from "./data";
 import { placeholderProps } from "./screen";
-import { label } from "./shared";
+import { aspectRatio, label, radius } from "./shared";
 
 /**
  * Props for media components. They point at uploaded files by id only:
@@ -18,6 +18,9 @@ export const mediaProps = {
     file: fileId,
     alt: label(300),
     caption: label(300).optional(),
+    ratio: aspectRatio.optional(),
+    fit: z.enum(["cover", "contain"]).optional(),
+    radius: radius.optional(),
   }),
   File: z.object({
     file: fileId,

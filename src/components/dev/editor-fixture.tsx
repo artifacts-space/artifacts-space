@@ -20,13 +20,14 @@ import { plainSheetFormat } from "@/lib/sheet-format/rules";
 import { sheetAtLimit } from "@/lib/ui/fixtures/formats";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
-import { dataUi, fixtureArtifact, longJson, longMarkdown, longUi, shortUi, type EditorFixtureKind } from "./fixture-content";
+import { dataUi, fixtureArtifact, longJson, longMarkdown, longUi, shortUi, styledUi, type EditorFixtureKind } from "./fixture-content";
 
 const samples: Record<EditorFixtureKind, { kind: ArtifactKind; content: () => string }> = {
   ui: { kind: "ui", content: longUi },
   json: { kind: "json", content: longJson },
   markdown: { kind: "markdown", content: longMarkdown },
   blocks: { kind: "ui", content: shortUi },
+  styled: { kind: "ui", content: styledUi },
   data: { kind: "ui", content: dataUi },
   sheet: { kind: "csv", content: sheetAtLimit },
   canvas: { kind: "canvas", content: () => JSON.stringify(appFlowCanvas, null, 2) },

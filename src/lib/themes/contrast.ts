@@ -3,8 +3,11 @@ import type { Theme, ThemeColorKey, ThemeColors, ThemeIssue } from "./schema";
 
 /**
  * Contrast policy: a theme whose text and surfaces fail WCAG AA is rejected
- * with an issue naming the pair and its ratio. Nothing is adjusted silently,
- * because a theme an agent or editor saved should render exactly as written.
+ * with an issue naming the pair and its ratio. Those colors are never
+ * adjusted silently, because a theme an agent or editor saved should render
+ * as written. Chart colors are the one part that is: a saved theme is never
+ * refused for them, and each is re-lit when the page is drawn until it shows
+ * at 3:1 on every surface (seriesTokens in derive.ts).
  * `autofixContrast` is a separate helper that suggests the nearest passing
  * colors, for a future editor to offer.
  */

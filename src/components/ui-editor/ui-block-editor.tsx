@@ -19,6 +19,7 @@ import { validateUiSpec } from "@/lib/ui/validate";
 import { insertAt, isContainerType } from "./block-changes";
 import { BlockEditorContext, createActiveBlockStore, createDraggedBlock, useBlockEditor, type BlockEditor, type InsertTarget } from "./block-editor-context";
 import { BlockFrame } from "./block-frame";
+import { frameLayoutClass } from "./frame-layout";
 import { InsertPicker } from "./insert-picker";
 import { PropsDialog } from "./props-dialog";
 import { renderEditableBlock } from "./text-blocks";
@@ -72,7 +73,7 @@ function ElementView({ id }: { id: string }) {
   if (isStateDriven(element)) return <StateDrivenElement id={id} />;
   const type: UiComponentName = element.type;
   const blocks: ReactNode[] = element.children.map((child, index) => (
-    <BlockFrame key={child} id={child} type={spec.elements[child]?.type ?? "Block"} parent={id} index={index}>
+    <BlockFrame key={child} id={child} type={spec.elements[child]?.type ?? "Block"} parent={id} index={index} className={frameLayoutClass(spec.elements[child])}>
       <ElementView id={child} />
     </BlockFrame>
   ));
