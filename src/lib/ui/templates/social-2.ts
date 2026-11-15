@@ -103,6 +103,10 @@ export const socialTemplatesMore: readonly UiTemplate[] = [
     slots: [
       { what: "Headline", element: "title", prop: "text" },
       { what: "Supporting sentence", element: "text", prop: "text" },
+      { what: "Name field label", element: "name", prop: "label" },
+      { what: "Email field label", element: "email", prop: "label" },
+      { what: "Message field label", element: "message", prop: "label" },
+      { what: "Help text under the message field", element: "message", prop: "description" },
       { what: "Send button label", element: "send", prop: "label" },
       { what: "Line shown after the button is pressed", element: "sent", prop: "text" },
       { what: "Heading above the contact details", element: "ways-title", prop: "text" },

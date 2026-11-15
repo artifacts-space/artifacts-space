@@ -16,7 +16,7 @@ const testimonialAndTeam: readonly UiTemplate[] = [
     viewport: "fluid",
     surface: "page",
     slots: [
-      { what: "Small label above the quote", element: "eyebrow", prop: "text" },
+      { what: "Short section heading above the quote", element: "title", prop: "text" },
       { what: "The quote, with its quotation marks", element: "quote", prop: "text" },
       { what: "The person: name and role", state: "/person" },
     ],
@@ -26,8 +26,9 @@ const testimonialAndTeam: readonly UiTemplate[] = [
       elements: {
         section: { type: "Box", props: { direction: "vertical", align: "center", gap: "lg", paddingX: "lg", paddingY: "2xl", surface: "page" }, children: ["mark", "words", "person"] },
         mark: { type: "Icon", props: { name: "quote", size: "xl", tone: "muted" } },
-        words: { type: "Box", props: { direction: "vertical", align: "center", gap: "md", maxWidth: "lg" }, children: ["eyebrow", "quote"] },
-        eyebrow: { type: "Text", props: { text: "What customers say", variant: "eyebrow", align: "center" } },
+        words: { type: "Box", props: { direction: "vertical", align: "center", gap: "md", maxWidth: "lg" }, children: ["title", "quote"] },
+        // A small heading, not an eyebrow Text: stacked between other sections, the quote stays in the page's heading outline.
+        title: { type: "Heading", props: { text: "What customers say", level: 2, size: "sm", align: "center" } },
         quote: { type: "Text", props: { text: "“We stopped losing orders the week we switched. Every morning the whole shop sees the same list, and nobody has to ask what comes next.”", size: "2xl", weight: "medium", align: "center" } },
         person: { type: "Box", props: { direction: "horizontal", align: "center", gap: "md" }, children: ["avatar", "who"] },
         avatar: { type: "Avatar", props: { name: { $state: "/person/name" }, size: "lg" } },
