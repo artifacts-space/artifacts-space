@@ -166,6 +166,13 @@ lint. Nothing renders under the 13px floor.
 - A `Select`'s `onValueChange` can pass `null`; handle it.
 - A Menu `GroupLabel` must sit inside a Menu `Group`.
 - Icons come from `@tabler/icons-react`.
+- Interface icon names are in `src/lib/ui/icon-names.ts`, with their
+  components in `src/components/artifact-view/ui/icon-glyphs.ts`. Brand marks
+  (`brand-github`, `brand-google`, and so on) are outline only, drawn in the
+  text color, and every name starts with `brand-`. Do not add a brand of a
+  document, notes, or workspace tool (this product's own market) or a mark
+  that needs its own color. An icon-only Button with a brand mark still needs
+  its `label` as its name.
 - Forms use `noValidate` and show errors in the page's own UI, never browser
   validation bubbles.
 - Copy is plain, short, and benefit-first, in sentences with verbs. The UI
@@ -1098,7 +1105,18 @@ template text is ours, so the tools add no untrusted-content label.
   names its `statePath`; every slot points at a prop that is set or a state
   value that exists; and the template, drawn as a spec, validates with no
   errors and no warnings. Copy is original placeholder text: no company
-  names, no real logos, nothing taken from a block library.
+  names, no real logos, nothing taken from a block library. One narrow
+  exception, approved by the owner on 2026-11-15, is a brand mark (the
+  `brand-` icons in `src/lib/ui/icon-names.ts`): a social profile link in a
+  footer or a contact section, drawn as an icon-only Button or a Link whose
+  label names the network ("LinkedIn"), and a "Continue with <provider>"
+  sign-in Button that uses `brand-google`, `brand-apple`, or `brand-github`.
+  Still not allowed: a company name or logo as the product's own brand,
+  customer logos, or a mark used as if the template's company were that
+  company. `brandProblems` (`rules.ts`) checks the part it can read: a brand
+  mark sits on a Button or a Link (in an element or in an item of the state
+  a repeat draws), its label names the brand, and "Continue with" is for the
+  three sign-in marks only.
 - A view never marks a part of itself as a landmark: one screen is often on
   a page several times (three canvas frames, three widths here), and axe
   then reports `landmark-unique`. An open Accordion panel is a group named

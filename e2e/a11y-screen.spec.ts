@@ -3,6 +3,7 @@ import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
 import { expectScrollersSettled } from "./support/scrollers";
+import { brandUiIconNames } from "../src/lib/ui/icon-names";
 
 /*
  * The pieces a screen is drawn with (Box, Icon, Placeholder, and the screen
@@ -88,6 +89,28 @@ test("should pass axe on every surface with every tone, and on a composed landin
     // Each surface holds a diagram, which draws after the page loads; scan once every one is drawn at its final width.
     await expectScrollersSettled(whole);
     await expectNoAxeViolations(whole);
+  }
+});
+
+test("should draw every brand mark at five growing sizes in the text color, each named by its brand, and pass axe", async ({ page }) => {
+  await galleryReady(page);
+  const marks = specimen(page, "specs", "Brand marks");
+  await marks.scrollIntoViewIfNeeded();
+  await expectNoAxeViolations(marks);
+  const github = marks.getByRole("img", { name: "GitHub" });
+  await expect(github).toHaveCount(5);
+  await expect(marks.getByRole("img", { name: "Google" })).toHaveCount(5);
+  await expect(marks.getByRole("img")).toHaveCount(brandUiIconNames.length * 5);
+  const drawn = await github.evaluateAll((icons) => icons.map((icon) => {
+    const box = icon.getBoundingClientRect();
+    return { width: Math.round(box.width), color: getComputedStyle(icon).color, ink: getComputedStyle(icon.parentElement ?? icon).color, stroke: getComputedStyle(icon).stroke };
+  }));
+  const widths = drawn.map((icon) => icon.width);
+  expect(widths).toEqual([...widths].sort((a, b) => a - b));
+  expect(new Set(widths).size).toBe(5);
+  for (const icon of drawn) {
+    expect(icon.color).toBe(icon.ink);
+    expect(icon.stroke).toBe(icon.color);
   }
 });
 

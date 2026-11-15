@@ -4,8 +4,9 @@ import { tablerIconEntries } from "@/lib/artifact-icons";
 import { blockHues } from "@/lib/block-colors/block-color-rules";
 
 import { containerComponents, uiCatalog } from "../catalog";
+import { brandMarksSpec } from "../fixtures/brand-marks";
 import { landingPageSpec, styledBlocksSpec, surfaceMatrixSpec } from "../fixtures/screen";
-import { extraUiIconNames, uiIconNames } from "../icon-names";
+import { brandMarkLabels, brandUiIconNames, extraUiIconNames, plainUiIconNames, uiIconNames } from "../icon-names";
 import { validateUiSpec } from "../validate";
 
 import { boxSurfaces } from "./screen";
@@ -80,10 +81,32 @@ describe("Box props", () => {
 });
 
 describe("Icon props", () => {
-  it("should list every page icon and every screen mark once when naming icons", () => {
+  it("should list every page icon, screen mark, and brand mark once when naming icons", () => {
     expect(new Set(uiIconNames).size).toBe(uiIconNames.length);
-    expect(uiIconNames).toHaveLength(tablerIconEntries.length + extraUiIconNames.length);
+    expect(uiIconNames).toHaveLength(tablerIconEntries.length + extraUiIconNames.length + brandUiIconNames.length);
     for (const name of ["check", "star", "x", "arrow-right", "menu-2"]) expect(uiIconNames).toContain(name);
+  });
+
+  it("should start every brand mark with brand- when naming it, so none clashes with a plain icon", () => {
+    for (const name of brandUiIconNames) expect(name.startsWith("brand-")).toBe(true);
+    for (const name of plainUiIconNames) expect(name.startsWith("brand-")).toBe(false);
+  });
+
+  it("should accept a brand mark on an Icon, a Button, a Badge, and a Link when it names a listed brand", () => {
+    expect(messages("Icon", { name: "brand-github", label: "GitHub" })).toEqual([]);
+    expect(messages("Button", { label: "GitHub", icon: "brand-github", iconOnly: true })).toEqual([]);
+    expect(messages("Badge", { label: "Google", icon: "brand-google" })).toEqual([]);
+    expect(messages("Link", { label: "LinkedIn", icon: "brand-linkedin" })).toEqual([]);
+  });
+
+  it("should refuse a bare brand name when the mark needs its brand- prefix", () => {
+    expect(messages("Icon", { name: "github" }).join("\n")).toContain("Use an icon name from the Icon component's list");
+  });
+
+  it("should leave out brands of document and workspace tools when listing names", () => {
+    for (const left of ["notion", "confluence", "coda", "google-docs", "dropbox", "slack", "figma"]) {
+      expect(uiIconNames).not.toContain(`brand-${left}`);
+    }
   });
 
   it("should point to the icon list when the name is unknown", () => {
@@ -93,6 +116,12 @@ describe("Icon props", () => {
   it("should list the icon names in the description an agent reads", () => {
     expect(uiCatalog.data.components.Icon.description).toContain("arrow-right");
     expect(uiCatalog.data.components.Icon.description).toContain("shield-check");
+  });
+
+  it("should group the brand marks after the plain icons in the description an agent reads", () => {
+    const description = uiCatalog.data.components.Icon.description;
+    for (const name of brandUiIconNames) expect(description).toContain(name);
+    expect(description.indexOf("brand-github")).toBeGreaterThan(description.indexOf("shield-check"));
   });
 
   it("should accept an icon name read from a repeated item when the prop is an expression", () => {
@@ -133,8 +162,15 @@ describe("Text, Heading, and Link screen props", () => {
 });
 
 describe("screen fixtures", () => {
-  it.each([["every surface with every tone", surfaceMatrixSpec], ["the landing page", landingPageSpec], ["every styled block", styledBlocksSpec]])("should validate %s with no errors or warnings", (_name, fixture) => {
+  it.each([["every surface with every tone", surfaceMatrixSpec], ["the landing page", landingPageSpec], ["every styled block", styledBlocksSpec], ["every brand mark", brandMarksSpec]])("should validate %s with no errors or warnings", (_name, fixture) => {
     expect(validateUiSpec(fixture).issues).toEqual([]);
+  });
+
+  it("should draw every brand mark at every size with a label when the gallery shows them", () => {
+    const icons = Object.values(brandMarksSpec.elements).filter((element) => element.type === "Icon");
+    expect(icons).toHaveLength(brandUiIconNames.length * 5);
+    expect(new Set(icons.map((icon) => icon.props?.label))).toEqual(new Set(Object.values(brandMarkLabels)));
+    expect(new Set(icons.map((icon) => icon.props?.size))).toEqual(new Set(["xs", "sm", "md", "lg", "xl"]));
   });
 
   it("should put every surface in the matrix when the contrast scan reads it", () => {

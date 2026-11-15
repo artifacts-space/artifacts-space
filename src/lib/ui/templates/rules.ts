@@ -1,4 +1,5 @@
 import { isPlainObject, readPointer, walkJson } from "../json-walk";
+import { brandMarkLabels } from "../icon-names";
 import { uiLimits } from "../limits";
 import { validateUiSpec } from "../validate";
 
@@ -200,6 +201,118 @@ function elementProblems(fragment: TemplateFragment): string[] {
   ]);
 }
 
+/** The marks a "Continue with" sign-in button may use. */
+const signInMarks: ReadonlySet<string> = new Set(["brand-google", "brand-apple", "brand-github"]);
+
+/** One use of a brand mark: where it is, its name, the words beside it, and the component drawing it (null when no Button or Link that reads it can be found). */
+interface BrandUse {
+  where: string;
+  mark: string;
+  label: unknown;
+  component: string | null;
+  /** Set when `component` is null: why the drawing element could not be found. */
+  unread?: string;
+}
+
+/** An item of the state that carries a brand mark: the path of the list it is in, and the field that holds the mark. */
+interface StateMark {
+  list: string;
+  field: "icon" | "name";
+  mark: string;
+  label: unknown;
+}
+
+function brandFieldOf(value: Record<string, unknown>): "icon" | "name" | undefined {
+  const isBrand = (candidate: unknown) => typeof candidate === "string" && candidate.startsWith("brand-");
+  if (isBrand(value.icon)) return "icon";
+  return isBrand(value.name) ? "name" : undefined;
+}
+
+const pointerSegment = (key: string | number) => String(key).replaceAll("~", "~0").replaceAll("/", "~1");
+
+/** Every item of the state that carries a brand mark, with the path of the list it sits in. */
+function stateMarks(state: unknown): StateMark[] {
+  const found: StateMark[] = [];
+  const stack: { value: unknown; path: string }[] = [{ value: state, path: "" }];
+  for (let entry = stack.pop(); entry; entry = stack.pop()) {
+    const { value, path } = entry;
+    if (Array.isArray(value)) stack.push(...value.map((item: unknown, index) => ({ value: item, path: `${path}/${String(index)}` })));
+    if (!isPlainObject(value)) continue;
+    stack.push(...Object.entries(value).map(([key, item]) => ({ value: item, path: `${path}/${pointerSegment(key)}` })));
+    const field = brandFieldOf(value);
+    const mark = field === undefined ? undefined : value[field];
+    if (field !== undefined && typeof mark === "string") found.push({ list: path.slice(0, path.lastIndexOf("/")), field, mark, label: value.label });
+  }
+  return found;
+}
+
+/** Keys of the elements a repeat over `list` draws each item with: the repeat's children and everything under them. */
+function drawnForEach(fragment: TemplateFragment, list: string): string[] {
+  const inside = new Set<string>();
+  const stack = Object.values(fragment.elements).flatMap((element) => (isPlainObject(element.repeat) && element.repeat.statePath === list ? element.children ?? [] : []));
+  for (let key = stack.pop(); key !== undefined; key = stack.pop()) {
+    if (inside.has(key)) continue;
+    inside.add(key);
+    stack.push(...((Object.hasOwn(fragment.elements, key) ? fragment.elements[key] : undefined)?.children ?? []));
+  }
+  return [...inside];
+}
+
+const readsItemField = (value: unknown, field: string) => isPlainObject(value) && value.$item === field;
+
+/** The brand uses of one state item: one per element under the repeat that reads the item's mark, or one with no component when none does. */
+function stateItemUses(fragment: TemplateFragment, { list, field, mark, label }: StateMark): BrandUse[] {
+  const where = `an item in state (${String(label)})`;
+  const drawers = drawnForEach(fragment, list).flatMap((key) => {
+    const element = Object.hasOwn(fragment.elements, key) ? fragment.elements[key] : undefined;
+    return element && (readsItemField(element.props?.icon, field) || readsItemField(element.props?.name, field)) ? [{ key, element }] : [];
+  });
+  if (drawers.length === 0) {
+    return [{ where, mark, label, component: null, unread: `${mark} is in the state, but no element under a repeat over ${list} reads it with { "$item": "${field}" }. A template draws a brand mark only on a Button or a Link that can be found from the fragment.` }];
+  }
+  return drawers.map(({ key, element }) => ({ where: `${where}, drawn by element "${key}"`, mark, label: typeof label === "string" ? label : element.props?.label, component: element.type }));
+}
+
+/** Every brand mark the fragment draws: in an element's props, or in an item of its state that a repeat draws. */
+function brandUses(fragment: TemplateFragment): BrandUse[] {
+  const fromElements = Object.entries(fragment.elements).flatMap(([key, element]): BrandUse[] => {
+    const field = brandFieldOf(element.props ?? {});
+    const mark = field === undefined ? undefined : element.props?.[field];
+    return typeof mark === "string" ? [{ where: `element "${key}"`, mark, label: element.props?.label, component: element.type }] : [];
+  });
+  return [...fromElements, ...stateMarks(fragment.state ?? {}).flatMap((item) => stateItemUses(fragment, item))];
+}
+
+const isBrandMark = (name: string): name is keyof typeof brandMarkLabels => Object.hasOwn(brandMarkLabels, name);
+
+/** True when `label` has the brand's name as a whole word, in any case: "Follow us on X" names X, "Next" does not. */
+function namesBrand(label: string, brand: string): boolean {
+  return new RegExp(`(?<![\\p{L}\\p{N}])${brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu").test(label);
+}
+
+function brandUseProblems({ where, mark, label, component, unread }: BrandUse): string[] {
+  if (!isBrandMark(mark)) return [`${where}: "${mark}" is not a brand mark in the icon list.`];
+  if (component === null) return [`${where}: ${unread ?? `${mark} has no component that can be found.`}`];
+  const brand = brandMarkLabels[mark];
+  const problems: string[] = [];
+  if (component !== "Button" && component !== "Link") problems.push(`${where} (${component}): ${mark} is a brand mark. A template uses one only on a Button or a Link that names the brand.`);
+  if (typeof label !== "string") return problems;
+  if (!namesBrand(label, brand)) problems.push(`${where}: the label "${label}" does not name ${brand}, the brand of ${mark}, as a word of its own.`);
+  if (label.startsWith("Continue with") && !signInMarks.has(mark)) problems.push(`${where}: "Continue with" is for brand-google, brand-apple, and brand-github only, not ${mark}.`);
+  return problems;
+}
+
+/**
+ * A brand mark in a template is a narrow exception to "no real logos": a
+ * social-profile link or a "Continue with" sign-in button. So it sits on a
+ * Button or a Link (for an item of the state, the element its repeat draws
+ * it with, read from `$item`), its label names the brand as a whole word, and
+ * "Continue with" is for Google, Apple, and GitHub only.
+ */
+function brandProblems(fragment: TemplateFragment): string[] {
+  return [...new Set(brandUses(fragment).flatMap(brandUseProblems))];
+}
+
 /** The first segment of an absolute path: the state key it starts at. */
 function stateKeyOf(path: string): string {
   return path.split("/")[1] ?? "";
@@ -257,6 +370,7 @@ export function templateProblems(template: UiTemplate, file: TemplateFile): stri
     ...hideProblems(fragment),
     ...choiceProblems(fragment),
     ...elementProblems(fragment),
+    ...brandProblems(fragment),
     ...stateProblems(fragment),
     ...slotProblems(template),
     ...specProblems(template),
