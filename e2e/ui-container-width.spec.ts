@@ -1,4 +1,4 @@
-import type { Locator } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { expect, test } from "./support/test";
 
@@ -114,24 +114,35 @@ test.describe("on a wide window", () => {
  */
 const interfacePages = ["/dev/components", "/?home", "/docs/json-render/components/grid", "/preview", "/dev/editor?kind=ui", "/dev/workspace"] as const;
 
+/** Narrower than any place we draw an interface: a phone column is about 330px. */
+const narrowestInterface = 200;
+
+/** Every interface the page shows (not inside a hidden parent): its width, and the room its parent gives. */
+const shownInterfaces = (page: Page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll("*")]
+      .filter((node) => getComputedStyle(node).containerName === "ui" && node.checkVisibility())
+      .flatMap((root) => {
+        const parent = root.parentElement;
+        if (!parent) return [];
+        const style = getComputedStyle(parent);
+        const room = parent.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        return [{ width: Math.round(root.getBoundingClientRect().width), room: Math.round(room), parent: parent.className.slice(0, 80) }];
+      }),
+  );
+
 for (const path of interfacePages) {
   test(`should stretch every interface to its parent when ${path} opens`, async ({ page }) => {
     await page.goto(path);
-    await expect.poll(() => page.evaluate(() => [...document.querySelectorAll("*")].filter((node) => getComputedStyle(node).containerName === "ui").length)).toBeGreaterThan(0);
+    // Wait for interfaces that are shown; hidden ones (a closed tab, the other half of a swap) are not measured.
+    await expect.poll(async () => (await shownInterfaces(page)).length).toBeGreaterThan(0);
 
-    const shrunk = await page.evaluate(() =>
-      [...document.querySelectorAll("*")]
-        .filter((node) => getComputedStyle(node).containerName === "ui" && node.checkVisibility())
-        .flatMap((root) => {
-          const parent = root.parentElement;
-          if (!parent) return [];
-          const style = getComputedStyle(parent);
-          const room = parent.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-          return [{ width: Math.round(root.getBoundingClientRect().width), room: Math.round(room), parent: parent.className.slice(0, 80) }];
-        })
-        .filter(({ width, room }) => Math.abs(width - room) > 1),
-    );
+    const shown = await shownInterfaces(page);
+    const collapsed = shown.filter(({ width }) => width < narrowestInterface);
+    const unstretched = shown.filter(({ width, room }) => Math.abs(width - room) > 1);
 
-    expect(shrunk, "interfaces narrower or wider than the room their parent gives").toEqual([]);
+    // A parent that shrinks to fit collapses together with its interface, so equal widths alone prove nothing.
+    expect(collapsed, `interfaces narrower than ${String(narrowestInterface)}px`).toEqual([]);
+    expect(unstretched, "interfaces narrower or wider than the room their parent gives").toEqual([]);
   });
 }
