@@ -117,8 +117,11 @@ const interfacePages = ["/dev/components", "/?home", "/docs/json-render/componen
 /** Narrower than any place we draw an interface: a phone column is about 330px. */
 const narrowestInterface = 200;
 
-/** Every interface the page shows (not inside a hidden parent): its width, and the room its parent gives. */
-const shownInterfaces = (page: Page) =>
+/**
+ * Every interface that has a layout: its width, and the room its parent gives. One under `display: none`
+ * (a closed tab) has none and is left out; one hidden by opacity or visibility still has, and is measured.
+ */
+const laidOutInterfaces = (page: Page) =>
   page.evaluate(() =>
     [...document.querySelectorAll("*")]
       .filter((node) => getComputedStyle(node).containerName === "ui" && node.checkVisibility())
@@ -134,12 +137,12 @@ const shownInterfaces = (page: Page) =>
 for (const path of interfacePages) {
   test(`should stretch every interface to its parent when ${path} opens`, async ({ page }) => {
     await page.goto(path);
-    // Wait for interfaces that are shown; hidden ones (a closed tab, the other half of a swap) are not measured.
-    await expect.poll(async () => (await shownInterfaces(page)).length).toBeGreaterThan(0);
+    // Wait for interfaces with a layout; the same list is measured below.
+    await expect.poll(async () => (await laidOutInterfaces(page)).length).toBeGreaterThan(0);
 
-    const shown = await shownInterfaces(page);
-    const collapsed = shown.filter(({ width }) => width < narrowestInterface);
-    const unstretched = shown.filter(({ width, room }) => Math.abs(width - room) > 1);
+    const laidOut = await laidOutInterfaces(page);
+    const collapsed = laidOut.filter(({ width }) => width < narrowestInterface);
+    const unstretched = laidOut.filter(({ width, room }) => Math.abs(width - room) > 1);
 
     // A parent that shrinks to fit collapses together with its interface, so equal widths alone prove nothing.
     expect(collapsed, `interfaces narrower than ${String(narrowestInterface)}px`).toEqual([]);
