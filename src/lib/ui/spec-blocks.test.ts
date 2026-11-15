@@ -191,3 +191,58 @@ describe("textLimit", () => {
     expect(textLimit("Heading", "level")).toBeUndefined();
   });
 });
+
+describe("a Grid's spans, kept in step with its children", () => {
+  const grid = (spans?: number[]): RawSpec => {
+    const spec = readRawSpec(JSON.stringify({
+      version: 1,
+      root: "page",
+      elements: {
+        page: { type: "Stack", props: {}, children: ["grid", "loose"] },
+        grid: { type: "Grid", props: { columns: 3, ...(spans ? { spans } : {}) }, children: ["wide", "a", "b"] },
+        wide: { type: "Card", props: { title: "Wide" } },
+        a: { type: "Card", props: { title: "A" } },
+        b: { type: "Card", props: { title: "B" } },
+        loose: { type: "Text", props: { text: "Loose" } },
+      },
+    }));
+    if (!spec) throw new Error("fixture");
+    return spec;
+  };
+  const spansOf = (spec: RawSpec | null) => (spec ? propsOf(spec, "grid").spans : "no spec");
+
+  it("should add a one-column span for a child added to the grid", () => {
+    const result = insertBlock(grid([2, 1, 1]), "grid", 1, { element: { type: "Text", props: { text: "New" } } });
+    expect(spansOf(result?.spec ?? null)).toEqual([2, 1, 1, 1]);
+  });
+
+  it("should move a child's span with it, inside the grid and out of it, and give a child moved in one column", () => {
+    expect(spansOf(moveBlock(grid([2, 1, 3]), "wide", "grid", 3))).toEqual([1, 3, 2]);
+    const out = moveBlock(grid([2, 1, 3]), "wide", "page", 2);
+    expect(spansOf(out)).toEqual([1, 3]);
+    expect(spansOf(out ? moveBlock(out, "loose", "grid", 0) : null)).toEqual([1, 1, 3]);
+  });
+
+  it("should give a duplicated child the span of the child it copies, right after it", () => {
+    expect(spansOf(duplicateBlock(grid([2, 1, 1]), "wide")?.spec ?? null)).toEqual([2, 2, 1, 1]);
+  });
+
+  it("should take a deleted child's span away with it", () => {
+    expect(spansOf(deleteBlock(grid([2, 1, 3]), "a"))).toEqual([2, 3]);
+  });
+
+  it("should leave a grid without spans without them, whatever the edit", () => {
+    const plain = grid();
+    expect(spansOf(insertBlock(plain, "grid", 0, { element: { type: "Text", props: { text: "New" } } })?.spec ?? null)).toBeUndefined();
+    expect(spansOf(moveBlock(plain, "b", "grid", 0))).toBeUndefined();
+    expect(spansOf(duplicateBlock(plain, "a")?.spec ?? null)).toBeUndefined();
+    expect(spansOf(deleteBlock(plain, "a"))).toBeUndefined();
+  });
+
+  it("should leave every edited grid valid, with as many spans as children", () => {
+    const edited = deleteBlock(duplicateBlock(grid([2, 1, 1]), "wide")?.spec ?? grid(), "b");
+    expect(edited ? errorsOf(edited) : "no spec").toEqual([]);
+    expect(edited ? spansOf(edited) : "no spec").toEqual([2, 2, 1]);
+  });
+});
+

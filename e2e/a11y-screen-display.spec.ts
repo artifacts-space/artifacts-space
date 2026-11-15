@@ -112,6 +112,24 @@ test("should keep two metrics to a row in a phone-wide grid with narrowColumns 2
   await expectNoAxeViolations(fixture);
 });
 
+test("should give the wide card two of three columns where the grid is wide, and every card the full row in a phone-wide frame", async ({ page, isMobile }) => {
+  await galleryReady(page, "Grid");
+  const fixture = specimen(page, "Grid", "Feature grid, one wide card");
+  await fixture.scrollIntoViewIfNeeded();
+  const widths = async () => Promise.all((await fixture.locator("[data-grid-span]").all()).map(async (cell) => Math.round((await boxOf(cell)).width)));
+  if (!isMobile) {
+    const [wide = 0, ...rest] = await widths();
+    for (const narrowCell of rest) expect(wide, "the wide card is two cells and a gap").toBeGreaterThan(narrowCell * 2);
+    await expectNoAxeViolations(fixture);
+    // A phone-wide frame in a desktop window: the grid follows its interface's width.
+    await fixture.evaluate((element) => { element.style.width = "390px"; });
+  }
+  await expect.poll(async () => new Set(await widths()).size, { message: "every card as wide as the others: the full row" }).toBe(1);
+  const grid = Math.round((await boxOf(fixture.locator('[data-slot="ui-grid"]'))).width);
+  expect((await widths())[0]).toBe(grid);
+  await expectNoAxeViolations(fixture);
+});
+
 for (const [slug, name] of [["avatar-group", "AvatarGroup"], ["kbd", "Kbd"], ["rating", "Rating"], ["badge", "Badge"], ["input", "Input"], ["grid", "Grid"]] as const) {
   test(`should pass axe on the ${slug} docs page, with its live examples drawn`, async ({ page }) => {
     await page.goto(`/docs/json-render/components/${slug}`);

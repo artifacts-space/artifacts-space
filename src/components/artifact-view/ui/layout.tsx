@@ -8,6 +8,7 @@ import type { Gap } from "@/lib/ui/props/shared";
 import { hasTitleText, titleOr } from "@/lib/ui/title-rules";
 import { cn } from "@/lib/utils";
 
+import { gridSpanClass } from "./grid-spans";
 import type { ViewProps } from "./stout";
 import { TabStrip } from "./tab-strip";
 
@@ -66,10 +67,23 @@ export function StackView({ props, children }: ViewProps<"Stack">) {
   );
 }
 
+/** Each child in a cell that spans its entry of `spans`; without `spans` the children are the grid's own cells, as before. */
+function spannedCells(children: ReactNode, spans: readonly number[] | undefined, columns: number, narrowColumns: number | undefined): ReactNode {
+  if (!spans) return children;
+  // A one-cell grid of its own, so the child stretches to the row's height as a bare child does.
+  return Children.toArray(children).map((child, index) => (
+    <div key={index} data-grid-span={spans[index] ?? 1} className={cn("grid min-w-0", gridSpanClass(spans[index], columns, narrowColumns))}>{child}</div>
+  ));
+}
+
 export function GridView({ props, children }: ViewProps<"Grid">) {
   const columns = (props.columns ?? 2) as keyof typeof gridColumns;
   // Two columns on a narrow interface replace the one every grid starts from; the wider steps stay as they are.
-  return <div data-slot="ui-grid" className={cn("grid min-w-0", gridColumns[columns], props.narrowColumns === 2 && "grid-cols-2", gapClass[props.gap ?? "md"])}>{children}</div>;
+  return (
+    <div data-slot="ui-grid" className={cn("grid min-w-0", gridColumns[columns], props.narrowColumns === 2 && "grid-cols-2", gapClass[props.gap ?? "md"])}>
+      {spannedCells(children, props.spans, columns, props.narrowColumns)}
+    </div>
+  );
 }
 
 export function CardView({ props, children }: ViewProps<"Card">) {

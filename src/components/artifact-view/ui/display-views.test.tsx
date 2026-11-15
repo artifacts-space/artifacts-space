@@ -5,6 +5,8 @@ import { uiSpecToMarkdown } from "@/lib/markdown/ui-spec";
 
 import { ArtifactView } from "../artifact-view";
 
+import { RatingView } from "./display";
+
 /* AvatarGroup, Kbd, Rating, and the Badge dot, as readers get them. */
 
 function one(type: string, props: Record<string, unknown>): string {
@@ -58,6 +60,35 @@ describe("RatingView", () => {
     expect(html).toMatch(/tabular-nums">7</);
     // The stars and the number are hidden: the image's name is the whole score.
     expect(count(html, /<span aria-hidden="true" class="inline-flex items-center gap-0.5">/g)).toBe(1);
+  });
+});
+
+describe("RatingView from state", () => {
+  it("should show a notice in place of the stars, when the value read from state is past max", () => {
+    const html = renderToStaticMarkup(<ArtifactView kind="ui" content={JSON.stringify({ version: 1, root: "e", state: { score: 9 }, elements: { e: { type: "Rating", props: { value: { $state: "/score" } } } } })} title="Test" />);
+    expect(html).toContain("This Rating could not be shown.");
+    expect(html).not.toContain("data-star");
+  });
+
+  it("should draw and read max stars, and write max, when a value past max reaches the view", () => {
+    const html = renderToStaticMarkup(<RatingView props={{ value: 9, showValue: true }} emit={() => undefined} />);
+    expect(html).toContain('aria-label="5 out of 5"');
+    expect(count(html, /data-star="full"/g)).toBe(5);
+    expect(html).toMatch(/tabular-nums">5</);
+  });
+});
+
+describe("Grid spans", () => {
+  const grid = (props: Record<string, unknown>) => renderToStaticMarkup(<ArtifactView kind="ui" content={JSON.stringify({ version: 1, root: "g", elements: { g: { type: "Grid", props, children: ["a", "b"] }, a: { type: "Text", props: { text: "A" } }, b: { type: "Text", props: { text: "B" } } } })} title="Test" />);
+
+  it("should put each child in a cell that spans its entry, when spans is set", () => {
+    const html = grid({ columns: 3, spans: [2, 1] });
+    expect(html).toMatch(/data-grid-span="2" class="grid min-w-0 col-span-1 @xl\/ui:col-span-2 @\[38rem\]\/ui:col-span-2"/);
+    expect(html).toContain('data-grid-span="1"');
+  });
+
+  it("should draw the children as the grid's own cells, as before, when spans is not set", () => {
+    expect(grid({ columns: 3 })).not.toContain("data-grid-span");
   });
 });
 

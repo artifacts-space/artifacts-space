@@ -187,7 +187,10 @@ export const styledBlocksSpec = {
   version: 1,
   root: "page",
   elements: {
-    page: { type: "Box", props: { gap: "md" }, children: ["nav", "eyebrow", "title", "lead", "sub", "mono", "caption", "badges", "features", "actions", "note-short", "note-long", "hero", "stacked", "stat", "display"] },
+    page: { type: "Box", props: { gap: "md" }, children: ["nav", "eyebrow", "title", "lead", "sub", "mono", "caption", "badges", "features", "actions", "note-short", "note-long", "hero", "stacked", "stat", "display", "spanned"] },
+    spanned: { type: "Grid", props: { columns: 3, spans: [2, 1] }, children: ["spanned-wide", "spanned-narrow"] },
+    "spanned-wide": { type: "Text", props: { text: "Wide cell" } },
+    "spanned-narrow": { type: "Text", props: { text: "Narrow cell" } },
     nav: { type: "Box", props: { direction: "horizontal", align: "center", justify: "between", gap: "md", padding: "md", border: "bottom", wrap: true, label: "Styled navigation" }, children: ["nav-links", "nav-docs"] },
     "nav-links": { type: "Box", props: { direction: "horizontal", gap: "lg", wrap: true }, children: ["link-active", "link-plain", "link-muted-active", "link-muted"] },
     "link-active": { type: "Link", props: { label: "Product", variant: "nav", active: true } },

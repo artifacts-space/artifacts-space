@@ -39,6 +39,8 @@ const layout: Pick<Record<UiComponentName, ComponentFixture[]>, "Section" | "Sta
     { name: "Four columns", props: { columns: 4 }, children: Array.from({ length: 6 }, (_, index) => ({ type: "Metric", props: { label: `Metric ${index + 1}`, value: index * 1234 } })) },
     { name: "Three columns", props: { columns: 3 }, children: Array.from({ length: 3 }, (_, index) => ({ type: "Callout", props: { title: `Note ${index + 1}`, text: "One of three blocks in a three-column grid." } })) },
     { name: "Empty", props: { columns: 3 } },
+    { name: "Feature grid, one wide card", props: { columns: 3, spans: [2, 1, 1, 1, 1] }, children: [{ type: "Card", props: { title: "Wide feature card", description: "Spans two of three columns where the grid is wide, and the full row on a phone." } }, ...Array.from({ length: 4 }, (_, index) => ({ type: "Card", props: { title: `Feature ${index + 1}`, description: "One column." } }))] },
+    { name: "Spans in four columns", props: { columns: 4, spans: [3, 1, 4] }, children: [{ type: "Callout", props: { title: "Three of four", text: "Two columns where the grid shows two." } }, { type: "Callout", props: { title: "One", text: "One column." } }, { type: "Callout", props: { title: "Every column", text: "A full row at every width." } }] },
     { name: "Two columns on a phone", props: { columns: 4, narrowColumns: 2 }, children: Array.from({ length: 4 }, (_, index) => ({ type: "Metric", props: { label: `Narrow metric ${index + 1}`, value: (index + 1) * 120, variant: "plain" } })) },
   ],
   Card: [
