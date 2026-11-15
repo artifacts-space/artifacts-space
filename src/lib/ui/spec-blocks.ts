@@ -1,5 +1,5 @@
 import { isPlainObject } from "./json-walk";
-import { pairedChildren } from "./props/layout";
+import { isPairedType, pairedChildren } from "./props/layout";
 
 /**
  * Block operations for the interface editor: each takes a raw ui spec (the
@@ -114,11 +114,19 @@ export function replaceProps(spec: RawSpec, key: string, props: Record<string, u
   return withElement(spec, key, { ...element, props: { ...props } });
 }
 
-/** The paired-label prop of a Tabs or Accordion element, or null for every other type. */
-function pairedProp(spec: RawSpec, key: string): "tabs" | "items" | null {
+type PairedProp = (typeof pairedChildren)[keyof typeof pairedChildren];
+
+/**
+ * The prop that pairs an element's children one to one (Tabs `tabs`,
+ * Accordion `items`, Grid `spans`), or null when there is none. A Grid
+ * without `spans` has none: every child spans one column, and an edit does
+ * not add the list.
+ */
+function pairedProp(spec: RawSpec, key: string): PairedProp | null {
   const type = spec.elements[key]?.type;
-  if (type === "Tabs" || type === "Accordion") return pairedChildren[type];
-  return null;
+  if (!isPairedType(type)) return null;
+  const prop = pairedChildren[type];
+  return type === "Grid" && !Array.isArray(propsOf(spec, key)[prop]) ? null : prop;
 }
 
 function pairedEntries(spec: RawSpec, key: string, prop: string): unknown[] {
@@ -126,9 +134,16 @@ function pairedEntries(spec: RawSpec, key: string, prop: string): unknown[] {
   return Array.isArray(entries) ? entries.map((entry: unknown) => entry) : [];
 }
 
-/** The label a new Tabs or Accordion child gets. */
-function newPairedEntry(prop: "tabs" | "items"): Record<string, string> {
+/** The entry a new child gets: a label for a tab or an item, one column for a grid cell. */
+function newPairedEntry(prop: PairedProp): Record<string, string> | number {
+  if (prop === "spans") return 1;
   return prop === "tabs" ? { label: "New tab" } : { title: "New item" };
+}
+
+/** A moved or copied child keeps its own entry; anything else gets a new one. */
+function keptEntry(prop: PairedProp, entry: unknown): unknown {
+  const fits = prop === "spans" ? typeof entry === "number" : isPlainObject(entry);
+  return fits ? entry : newPairedEntry(prop);
 }
 
 /** Takes `key` out of its parent (and its paired label with it). Returns the spec and the label removed. */
@@ -155,7 +170,7 @@ function attach(spec: RawSpec, key: string, parent: string, index: number, entry
   const prop = pairedProp(spec, parent);
   if (!prop) return next;
   const entries = pairedEntries(next, parent, prop);
-  entries.splice(at, 0, isPlainObject(entry) ? entry : newPairedEntry(prop));
+  entries.splice(at, 0, keptEntry(prop, entry));
   next = setProp(next, parent, prop, entries);
   return next;
 }

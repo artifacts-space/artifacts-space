@@ -1,7 +1,7 @@
 import { IconStar, IconStarFilled } from "@tabler/icons-react";
 
 import type { UiProps } from "@/lib/ui/catalog";
-import { avatarGroupName, avatarGroupShape, kbdWords, ratingWords, scoreText } from "@/lib/ui/display-words";
+import { avatarGroupName, avatarGroupShape, clampScore, kbdWords, ratingWords, scoreText } from "@/lib/ui/display-words";
 import { cn } from "@/lib/utils";
 
 import { AvatarFace, avatarClassName, initialsOf } from "./screen";
@@ -78,16 +78,17 @@ function Star({ fill, size }: { fill: number; size: string }) {
   );
 }
 
-/** A star rating to look at. It is one image to screen readers, named "4.5 out of 5". */
+/** A star rating to look at. It is one image to screen readers, named "4.5 out of 5". A value read from state past `max` draws and reads as `max`. */
 export function RatingView({ props }: ViewProps<"Rating">) {
   const max = props.max ?? 5;
+  const value = clampScore(props.value, max);
   const size = starSize[props.size ?? "md"];
   return (
-    <span role="img" aria-label={ratingWords(props.value, max, props.label)} className="inline-flex w-fit items-center gap-1.5">
+    <span role="img" aria-label={ratingWords(value, max, props.label)} className="inline-flex w-fit items-center gap-1.5">
       <span aria-hidden className="inline-flex items-center gap-0.5">
-        {Array.from({ length: max }, (_, index) => <Star key={index} fill={Math.min(1, Math.max(0, props.value - index))} size={size} />)}
+        {Array.from({ length: max }, (_, index) => <Star key={index} fill={Math.min(1, Math.max(0, value - index))} size={size} />)}
       </span>
-      {props.showValue ? <span aria-hidden className="text-sm font-medium tabular-nums">{scoreText(props.value)}</span> : null}
+      {props.showValue ? <span aria-hidden className="text-sm font-medium tabular-nums">{scoreText(value)}</span> : null}
     </span>
   );
 }

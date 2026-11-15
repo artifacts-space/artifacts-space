@@ -34,6 +34,17 @@ export const layoutDocs = {
         }),
       },
       {
+        title: "A feature grid with one wide card",
+        note: "The first card spans two of three columns. On a phone every card is a full row.",
+        spec: single("Grid", { columns: 3, spans: [2, 1, 1, 1, 1] }, {
+          lead: { type: "Card", props: { title: "Every shelf, counted nightly", description: "The headline feature takes the wide cell." } },
+          scan: { type: "Card", props: { title: "Scan", description: "Point a phone at a shelf." } },
+          sync: { type: "Card", props: { title: "Sync", description: "Counts reach the office at once." } },
+          alert: { type: "Card", props: { title: "Alerts", description: "Hear about a gap before a customer does." } },
+          report: { type: "Card", props: { title: "Reports", description: "A weekly summary for each store." } },
+        }),
+      },
+      {
         title: "Two columns on a phone",
         note: "Small items stay two across on a narrow screen, so a band of stats is half as tall.",
         spec: single("Grid", { columns: 4, narrowColumns: 2 }, {
@@ -44,7 +55,12 @@ export const layoutDocs = {
         }),
       },
     ],
-    rules: ["`columns` applies on wide screens. Phones show one column, or two with `narrowColumns: 2`, which is never more than `columns`."],
+    rules: [
+      "`columns` applies on wide screens. Phones show one column, or two with `narrowColumns: 2`, which is never more than `columns`.",
+      "`spans` has one entry per child, in order: how many columns that child takes, from 1 to `columns`. Leave it out and every child takes one.",
+      "Where the grid shows fewer columns than a span (two on a tablet, one on a phone), the child takes every column there is, so a wide card is a full row on a phone.",
+      "`spans` pairs with the children written in the spec, so a Grid with `repeat` takes none.",
+    ],
   },
   Card: {
     examples: [
@@ -201,7 +217,7 @@ export const contentDocs = {
     ],
     rules: [
       "`tone`: neutral (default), info, success, warning, danger, or accent. The status tones mean a state; accent is the accent color (the theme's own accent, or blue on the default palette), for a label that is not a status (New, Featured). Every tone reads in every variant on every Box surface and in every theme.",
-      "`dot: \"start\"` draws a small dot in the tone before the label. `dot: \"only\"` draws the dot alone and keeps the label for screen readers, so the label must say what the dot means (\"Unread messages\").",
+      "`dot: \"start\"` draws a small dot in the tone before the label. `dot: \"only\"` draws the dot alone and keeps the label for screen readers, so the label must say what the dot means (\"Unread messages\"). A dot alone takes no `icon` or `variant`: it has no pill for them to style.",
     ],
   },
   List: {

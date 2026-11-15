@@ -44,8 +44,13 @@ export function scoreText(value: number): string {
   return score.format(value);
 }
 
-/** A rating in words: "4.5 out of 5", after the label when there is one. */
+/** A score kept between 0 and `max`, for a value read from state that the rule could not check. */
+export function clampScore(value: number, max = 5): number {
+  return Math.min(max, Math.max(0, value));
+}
+
+/** A rating in words: "4.5 out of 5", after the label when there is one. The score never passes `max`. */
 export function ratingWords(value: number, max = 5, label?: string): string {
-  const words = `${scoreText(value)} out of ${String(max)}`;
+  const words = `${scoreText(clampScore(value, max))} out of ${String(max)}`;
   return label ? `${label}: ${words}` : words;
 }

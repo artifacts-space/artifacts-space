@@ -18,6 +18,8 @@ export const layoutProps = {
     columns: z.number().int().min(1).max(4).optional(),
     /** Columns where the interface is narrow (a phone, below 576 pixels). Default 1. */
     narrowColumns: z.number().int().min(1).max(2).optional(),
+    /** How many columns each child spans, one entry per child in order. Without it every child spans one. */
+    spans: z.array(z.number().int().min(1).max(4)).max(200).optional(),
     gap: gap.optional(),
   }),
   Card: z.object({
@@ -45,15 +47,43 @@ export const separatorCheck = (props: Record<string, unknown>): string[] =>
     ? ['`label` applies to a horizontal Separator. Remove `label`, or remove `orientation: "vertical"`.']
     : [];
 
-/** A narrow interface never shows more columns than a wide one. Reads `columns` and `narrowColumns` only, as written. */
-export const gridCheck = (props: Record<string, unknown>): string[] => {
-  const { columns = 2, narrowColumns } = props;
-  if (typeof columns !== "number" || typeof narrowColumns !== "number" || narrowColumns <= columns) return [];
+/** A narrow interface never shows more columns than a wide one. */
+function narrowProblem(columns: number, narrowColumns: unknown): string[] {
+  if (typeof narrowColumns !== "number" || narrowColumns <= columns) return [];
   return [`\`narrowColumns\` (${String(narrowColumns)}) is more than \`columns\` (${String(columns)}): a narrow interface never shows more columns than a wide one. Lower it, or raise \`columns\`.`];
+}
+
+/** No child spans more columns than the grid has. */
+function spanProblem(columns: number, spans: unknown): string[] {
+  if (!Array.isArray(spans)) return [];
+  const wide = spans.flatMap((span: unknown, index) => (typeof span === "number" && span > columns ? [`#${String(index + 1)} (${String(span)})`] : []));
+  if (wide.length === 0) return [];
+  return [`\`spans\` ${wide.join(", ")} ${wide.length === 1 ? "is" : "are"} more than \`columns\` (${String(columns)}): a child spans at most every column. Lower ${wide.length === 1 ? "it" : "them"}, or raise \`columns\`.`];
+}
+
+/**
+ * Grid rules on `columns`, `narrowColumns`, and `spans`, as written: each
+ * is read only when it is a number (or a list), so an expression gets no
+ * message here.
+ */
+export const gridCheck = (props: Record<string, unknown>): string[] => {
+  const { columns = 2 } = props;
+  if (typeof columns !== "number") return [];
+  return [...narrowProblem(columns, props.narrowColumns), ...spanProblem(columns, props.spans)];
 };
 
-/** Components whose children map one to one onto an array prop. */
+/**
+ * Components whose children map one to one onto an array prop. Tabs and
+ * Accordion always have theirs; a Grid's `spans` is optional, and when it is
+ * set it has one entry per child too.
+ */
 export const pairedChildren = {
   Tabs: "tabs",
   Accordion: "items",
+  Grid: "spans",
 } as const;
+
+/** True when `type` pairs its children with an array prop. */
+export function isPairedType(type: string | undefined): type is keyof typeof pairedChildren {
+  return type !== undefined && Object.hasOwn(pairedChildren, type);
+}

@@ -110,5 +110,17 @@ export const linkCheck: PropCheck = (props) => {
   return ['An inline link with an `href` ends with its own arrow, so its icon goes at the start. Set `iconPosition: "start"`, or use `variant: "nav"` or `"muted"`, which have no arrow.'];
 };
 
+/**
+ * A dot alone draws no pill, so the `icon` and `variant` that style one have
+ * nothing to style. Reads `dot`, `icon`, and `variant` as written.
+ */
+export const badgeCheck: PropCheck = (props) => {
+  if (props.dot !== "only") return [];
+  const unused = ["icon", "variant"].filter((name) => props[name] !== undefined);
+  if (unused.length === 0) return [];
+  const names = unused.map((name) => `\`${name}\``).join(" and ");
+  return [`${names} ${unused.length === 1 ? "styles" : "style"} a badge with its label on screen, and a dot alone (\`dot: "only"\`) draws no label. Remove ${unused.length === 1 ? "it" : "them"}, or use \`dot: "start"\`.`];
+};
+
 /** Cross-field rules for content components. */
-export const contentChecks: Partial<Record<keyof typeof contentProps, PropCheck>> = { List: listCheck, Link: linkCheck, AvatarGroup: avatarGroupCheck, Rating: ratingCheck };
+export const contentChecks: Partial<Record<keyof typeof contentProps, PropCheck>> = { List: listCheck, Link: linkCheck, Badge: badgeCheck, AvatarGroup: avatarGroupCheck, Rating: ratingCheck };

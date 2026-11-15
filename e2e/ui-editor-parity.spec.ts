@@ -10,7 +10,8 @@ import { expect, test } from "./support/test";
  * vertical rule, a plain Metric, a row drawn in reverse once it has
  * stacked, a Box that grows in a row, a Link's icon at either side, the
  * accent tone on Text and a Badge, a pressed Button, a Badge's dot, and the
- * display pieces: an AvatarGroup, a Kbd, a Rating). It is drawn for readers in the gallery and opened in the editor on
+ * display pieces: an AvatarGroup, a Kbd, a Rating, and a Grid cell that
+ * spans two of three columns). It is drawn for readers in the gallery and opened in the editor on
  * the editor fixture, and each block's computed style is compared between
  * the two.
  */
@@ -19,7 +20,7 @@ import { expect, test } from "./support/test";
 const textStyle = ["color", "font-size", "font-weight", "font-family", "text-align", "text-transform", "letter-spacing", "line-height", "text-decoration-line"] as const;
 
 /** Every block with words, by its words. */
-const words = ["Product", "Pricing", "Changelog", "Careers", "New this week", "Count every shelf", "Stock that keeps up", "Small heading at the end", "order-4821", "Ends on Friday", "Shipped", "Beta", "Draft", "Unlimited projects", "Weekly reports", "Grows to fill the row", "Words first on a phone", "Shelves counted", "Online", "Picked by the team", "Featured"];
+const words = ["Product", "Pricing", "Changelog", "Careers", "New this week", "Count every shelf", "Stock that keeps up", "Small heading at the end", "order-4821", "Ends on Friday", "Shipped", "Beta", "Draft", "Unlimited projects", "Weekly reports", "Grows to fill the row", "Words first on a phone", "Shelves counted", "Online", "Wide cell", "Narrow cell", "Picked by the team", "Featured"];
 
 const readView = (page: Page) => page.locator('section#specs [data-specimen="Styled blocks"]');
 const editorView = (page: Page) => page.locator("[data-slot=ui-block-editor]");
@@ -55,7 +56,16 @@ async function displayOf(view: Locator) {
     stars: await size(stars),
     full: await stars.locator('[data-star="full"]').count(),
     lone: await row.locator('[data-badge-dot="only"]').evaluate((element) => getComputedStyle(element).backgroundColor),
+    spans: await spanShares(view),
   };
+}
+
+/** Each spanned cell's share of its grid's width, in percent, in order. */
+function spanShares(view: Locator): Promise<number[]> {
+  return view.locator("[data-grid-span]").evaluateAll((cells) => cells.map((cell) => {
+    const grid = cell.parentElement?.getBoundingClientRect().width ?? 1;
+    return Math.round((cell.getBoundingClientRect().width / grid) * 100);
+  }));
 }
 
 /** How a view draws the fixture: each block's text style, the boxes that carry icons, and the widths in the row that grows. */
@@ -107,6 +117,13 @@ function expectStyledWords(text: Drawn["text"]) {
   expect(text["Ends on Friday"]?.["text-align"]).toBe("end");
 }
 
+/** The pressed Button is on and filled with the text color, and the accent Badge's edge is not a neutral one. */
+function expectPressedAndAccent(forReaders: Drawn) {
+  expect(forReaders.pressed).toBe("true");
+  expect(forReaders.buttons[3]?.["background-color"]).toBe(forReaders.text["Grows to fill the row"]?.color);
+  expect(forReaders.boxes.Featured?.edge).not.toBe(forReaders.boxes.Draft?.edge);
+}
+
 /** What the fixture is there to show, so equal does not mean equally plain. */
 function expectStyledFixture(forReaders: Drawn, isMobile: boolean) {
   expectStyledWords(forReaders.text);
@@ -115,15 +132,17 @@ function expectStyledFixture(forReaders: Drawn, isMobile: boolean) {
   expect(forReaders.boxes.Online?.dot).not.toBe("");
   expect(forReaders.display.circles).toBe(3);
   expect(forReaders.display.full).toBe(3);
+  // Two of three columns where the grid is wide; on a phone each cell is the full row.
+  expect(forReaders.display.spans).toHaveLength(2);
+  const [wide = 0, narrowCell = 0] = forReaders.display.spans;
+  if (isMobile) expect([wide, narrowCell]).toEqual([100, 100]);
+  else expect(wide).toBeGreaterThan(narrowCell * 1.8);
   expect(forReaders.artShare).toBeGreaterThan(30);
   expect(forReaders.notes.long).toBeGreaterThan(forReaders.notes.short + 60);
   expect(forReaders.rule).toBeGreaterThan(20);
   expect(forReaders.stat["box-shadow"]).toBe("none");
   expect(forReaders.buttons[2]?.["background-color"]).not.toBe(forReaders.buttons[0]?.["background-color"]);
-  // The pressed Button: on, and filled with the text color; the accent words are not the body color.
-  expect(forReaders.pressed).toBe("true");
-  expect(forReaders.buttons[3]?.["background-color"]).toBe(forReaders.text["Grows to fill the row"]?.color);
-  expect(forReaders.boxes.Featured?.edge).not.toBe(forReaders.boxes.Draft?.edge);
+  expectPressedAndAccent(forReaders);
   // On a phone the row has stacked, words first; on a desktop it is a row with the picture first.
   expect(forReaders.wordsFirst).toBe(isMobile);
 }
