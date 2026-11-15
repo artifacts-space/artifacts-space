@@ -52,7 +52,7 @@ test("should draw the password field as a stand-in that takes no focus and no ty
   const standIn = screen.locator("[data-password-stand-in]");
   await expect(standIn).toBeVisible();
   await expect(standIn).toHaveAttribute("role", "img");
-  await expect(standIn).toHaveAccessibleName(/Password: a password field in a mockup/);
+  await expect(standIn).toHaveAccessibleName("Password");
   // Clicking it and typing puts the text nowhere on the page.
   await standIn.click();
   expect(await standIn.evaluate((element) => document.activeElement === element || element.contains(document.activeElement))).toBe(false);
@@ -64,6 +64,46 @@ test("should draw the password field as a stand-in that takes no focus and no ty
   await screen.getByRole("textbox", { name: "Email" }).focus();
   await page.keyboard.press("Tab");
   await expect(screen.getByRole("button", { name: "Sign in" })).toBeFocused();
+});
+
+test("should show a Textarea at least as tall as its rows, and let it grow with what is typed", async ({ page }) => {
+  await galleryReady(page);
+  const height = (name: string) => specimen(page, "Textarea", name).getByRole("textbox").evaluate((element) => element.getBoundingClientRect().height);
+  const two = await height("Two rows");
+  const four = await height("Normal");
+  const six = await height("Six rows");
+  expect(four).toBeGreaterThan(two + 20);
+  expect(six).toBeGreaterThan(four + 20);
+  // Six rows are three times the lines of two, over the same padding.
+  const line = (six - two) / 4;
+  expect(line).toBeGreaterThan(14);
+  expect(Math.abs(four - (two + 2 * line))).toBeLessThan(2);
+  const short = specimen(page, "Textarea", "Two rows").getByRole("textbox");
+  await short.fill("one\ntwo\nthree\nfour\nfive");
+  expect(await height("Two rows")).toBeGreaterThan(two + 2 * line);
+});
+
+test("should name the password stand-in once, describe it, and show it disabled", async ({ page }) => {
+  await galleryReady(page);
+  const plain = specimen(page, "Input", "Password stand-in");
+  await plain.scrollIntoViewIfNeeded();
+  const standIn = plain.locator("[data-password-stand-in]");
+  await expect(standIn).toHaveAccessibleName("Password");
+  await expect(standIn).toHaveAccessibleDescription("A password field in a mockup. It cannot be typed into. Drawn only: it cannot be typed into.");
+  // The label is the image's name, not a second line of text before it.
+  await expect(standIn.locator("xpath=..")).toMatchAriaSnapshot(`
+    - img "Password"
+    - paragraph: "Drawn only: it cannot be typed into."
+  `);
+  const disabled = specimen(page, "Input", "Password stand-in, disabled").locator("[data-password-stand-in]");
+  await expect(disabled).toHaveAccessibleName("Current password");
+  // An image has no disabled state to set, so its description says it.
+  await expect(disabled).toHaveAccessibleDescription("A disabled password field in a mockup. It cannot be typed into.");
+  const opacity = (target: typeof disabled) => target.evaluate((element) => Number(getComputedStyle(element).opacity));
+  expect(await opacity(disabled)).toBeLessThan(1);
+  expect(await opacity(standIn)).toBe(1);
+  // The same dimming as a disabled text field beside it.
+  expect(await opacity(disabled)).toBe(await opacity(specimen(page, "Input", "Disabled").getByRole("textbox")));
 });
 
 test("should mark every text field in the gallery so browsers and password managers skip it", async ({ page }) => {

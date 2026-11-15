@@ -31,6 +31,7 @@ export const textareaProps = z.object({
   label: label(120),
   placeholder: label(120).optional(),
   value: prose(5000).optional(),
+  /** The least number of lines the field shows. It grows past them with what is typed. */
   rows: z.number().int().min(2).max(12).optional(),
   fullWidth: z.boolean().optional(),
   ...fieldBase,
@@ -62,6 +63,6 @@ export const inputCheck: PropCheck = (props) => {
 export const fieldDescriptions = {
   Input:
     "A one-line text field. `type`: text (default), email, search, number, or password. Bind `value` with { \"$bindState\": \"/path\" }; it only changes on-page state and nothing is ever sent. A password field is a stand-in: it shows dots, cannot be typed into, and takes no `value`. `description` and `error` show under the field; `hideLabel` keeps the label for screen readers only; `fullWidth` fills the container.",
-  Textarea: "A multi-line text field with `rows` (2-12). Bind `value` with { \"$bindState\": \"/path\" }; it only changes on-page state and nothing is ever sent. Takes `description`, `error`, `hideLabel`, `disabled`, and `fullWidth` like Input.",
+  Textarea: "A multi-line text field. `rows` (2-12, default 3) is the least number of lines it shows; it grows with what is typed. Bind `value` with { \"$bindState\": \"/path\" }; it only changes on-page state and nothing is ever sent. Takes `description`, `error`, `hideLabel`, `disabled`, and `fullWidth` like Input.",
   Avatar: "A round avatar with the initials of `name`, which also names it for screen readers. `size`: sm to xl. `tone` tints it.",
 } as const;

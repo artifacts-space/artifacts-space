@@ -6,9 +6,10 @@ import { expect, test } from "./support/test";
  * apart from the caret and the handles. One fixture holds every block whose
  * look comes from a screen prop (a Link's variant and current page, Text and
  * Heading sizes, weights, tones and alignment, Badge variants and icons, a
- * List's markers, Button sizes, a Box that grows in a row). It is drawn for
- * readers in the gallery and opened in the editor on the editor fixture, and
- * each block's computed style is compared between the two.
+ * List's markers, Button sizes, a Textarea's rows, a Box that grows in a
+ * row). It is drawn for readers in the gallery and opened in the editor on
+ * the editor fixture, and each block's computed style is compared between
+ * the two.
  */
 
 /** What decides how a block's words look. */
@@ -48,7 +49,9 @@ async function drawn(view: Locator) {
   const row = await width(hero);
   const art = await width(hero.getByRole("img", { name: "Screenshot" }));
   const buttons = await Promise.all(["Start free", "Open menu"].map((name) => styleOf(view.getByRole("button", { name }), ["height", "font-size", "color", "background-color"])));
-  return { text, boxes, artShare: Math.round((art / row) * 100), buttons };
+  const height = (name: string) => view.getByRole("textbox", { name, exact: true }).evaluate((element) => Math.round(element.getBoundingClientRect().height));
+  const notes = { short: await height("Short note"), long: await height("Long note") };
+  return { text, boxes, artShare: Math.round((art / row) * 100), buttons, notes };
 }
 
 test("should draw every styled block in the editor as it is drawn for readers", async ({ page }) => {
@@ -72,6 +75,7 @@ test("should draw every styled block in the editor as it is drawn for readers", 
   for (const word of words) expect(inEditor.text[word], `the words "${word}"`).toEqual(forReaders.text[word]);
   expect(inEditor.boxes).toEqual(forReaders.boxes);
   expect(inEditor.buttons).toEqual(forReaders.buttons);
+  expect(inEditor.notes, "the heights of the two-row and six-row text areas").toEqual(forReaders.notes);
   expect(linkInEditor).toEqual(linkForReaders);
   expect(Math.abs(inEditor.artShare - forReaders.artShare), "the placeholder's share of the row that grows").toBeLessThanOrEqual(1);
 
@@ -85,4 +89,5 @@ test("should draw every styled block in the editor as it is drawn for readers", 
   expect(forReaders.boxes["Unlimited projects"]?.icons).toBe(1);
   expect(linkForReaders.arrows).toBe(1);
   expect(forReaders.artShare).toBeGreaterThan(30);
+  expect(forReaders.notes.long).toBeGreaterThan(forReaders.notes.short + 60);
 });

@@ -163,7 +163,7 @@ export const styledBlocksSpec = {
   version: 1,
   root: "page",
   elements: {
-    page: { type: "Box", props: { gap: "md" }, children: ["nav", "eyebrow", "title", "lead", "sub", "mono", "caption", "badges", "features", "actions", "hero"] },
+    page: { type: "Box", props: { gap: "md" }, children: ["nav", "eyebrow", "title", "lead", "sub", "mono", "caption", "badges", "features", "actions", "note-short", "note-long", "hero"] },
     nav: { type: "Box", props: { direction: "horizontal", align: "center", justify: "between", gap: "md", padding: "md", border: "bottom", wrap: true, label: "Styled navigation" }, children: ["nav-links", "nav-docs"] },
     "nav-links": { type: "Box", props: { direction: "horizontal", gap: "lg", wrap: true }, children: ["link-active", "link-plain", "link-muted-active", "link-muted"] },
     "link-active": { type: "Link", props: { label: "Product", variant: "nav", active: true } },
@@ -185,6 +185,8 @@ export const styledBlocksSpec = {
     actions: { type: "Box", props: { direction: "horizontal", gap: "sm", align: "center" }, children: ["action-start", "action-menu"] },
     "action-start": { type: "Button", props: { label: "Start free", size: "lg", icon: "arrow-right", iconPosition: "end" } },
     "action-menu": { type: "Button", props: { label: "Open menu", icon: "menu-2", iconOnly: true, variant: "ghost" } },
+    "note-short": { type: "Textarea", props: { label: "Short note", rows: 2 } },
+    "note-long": { type: "Textarea", props: { label: "Long note", rows: 6 } },
     hero: { type: "Box", props: { direction: "horizontal", gap: "lg", label: "Styled hero" }, children: ["hero-copy", "hero-art"] },
     "hero-copy": { type: "Box", props: { grow: true, surface: "muted", padding: "md", radius: "lg" }, children: ["hero-note"] },
     "hero-note": { type: "Text", props: { text: "Grows to fill the row" } },

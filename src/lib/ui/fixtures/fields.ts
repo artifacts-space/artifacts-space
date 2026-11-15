@@ -14,11 +14,14 @@ export const inputFixtures: ComponentFixture[] = [
   { name: "Number", props: { label: "Seats", type: "number", value: "5" } },
   { name: "Disabled", props: { label: "Plan", value: "Team", disabled: true } },
   { name: "Password stand-in", props: { label: "Password", type: "password", description: "Drawn only: it cannot be typed into." } },
+  { name: "Password stand-in, disabled", props: { label: "Current password", type: "password", disabled: true } },
   { name: "Long", props: { label: longText(120), placeholder: longText(120), description: longText(400), error: unbroken(300), value: unbroken(500) } },
 ];
 
 export const textareaFixtures: ComponentFixture[] = [
   { name: "Normal", props: { label: "Message", placeholder: "How can we help?", rows: 4 } },
+  { name: "Two rows", props: { label: "Short note", rows: 2 } },
+  { name: "Six rows", props: { label: "Long note", rows: 6 } },
   { name: "With an error, full width", props: { label: "Feedback", value: "ok", error: "Tell us a little more.", fullWidth: true } },
   { name: "Disabled", props: { label: "Notes", value: "Locked while the review runs.", disabled: true } },
   { name: "Long", props: { label: longText(120), description: longText(400), value: longText(5000), rows: 12 } },

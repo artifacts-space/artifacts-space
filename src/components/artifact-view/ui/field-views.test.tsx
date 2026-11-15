@@ -40,6 +40,28 @@ describe("password stand-in", () => {
     expect(html).toContain("It cannot be typed into.");
   });
 
+  it("should name the stand-in by its label once, and describe it, instead of repeating the label in the name", () => {
+    const html = one("Input", { label: "Password", type: "password", description: "At least 12 characters." });
+    expect(html).not.toContain("aria-label=");
+    const labelId = /aria-labelledby="([^"]+)"/.exec(html)?.[1] ?? "missing";
+    expect(html).toMatch(new RegExp(`<span[^>]*id="${labelId}"[^>]*aria-hidden="true"[^>]*>Password</span>`));
+    const described = /aria-describedby="([^"]+)"/.exec(html)?.[1]?.split(" ") ?? [];
+    expect(described).toHaveLength(2);
+    for (const id of described) expect(html).toContain(`id="${id}"`);
+    // What it is reads as its description only: the text itself is hidden.
+    expect(html).toMatch(/<span[^>]*hidden=""[^>]*>A password field in a mockup\. It cannot be typed into\.<\/span>/);
+    expect(html).not.toContain("data-disabled");
+  });
+
+  it("should dim a disabled stand-in and say it is disabled in its description", () => {
+    const html = one("Input", { label: "Password", type: "password", disabled: true });
+    expect(html).toContain("A disabled password field in a mockup.");
+    // An image takes no disabled state, so the words carry it.
+    expect(html).not.toContain("aria-disabled");
+    expect(html).toContain("opacity-50");
+    expect(controls(html)).toEqual([]);
+  });
+
   it("should show a notice in place of the field, with no editable field, when a password Input is given a binding", () => {
     const html = one("Input", { label: "Password", type: "password", value: { $bindState: "/secret" } }, { secret: "" });
     expect(controls(html)).toEqual([]);
@@ -80,6 +102,12 @@ describe("text fields", () => {
     const described = /aria-describedby="([^"]+)"/.exec(control)?.[1]?.split(" ") ?? [];
     expect(described).toHaveLength(2);
     for (const id of described) expect(html).toContain(`id="${id}"`);
+  });
+
+  it("should give a Textarea its rows as the least height it shows", () => {
+    expect(controls(one("Textarea", { label: "Notes", rows: 6 }))[0]).toContain("--field-rows:6");
+    expect(controls(one("Textarea", { label: "Notes" }))[0]).toContain("--field-rows:3");
+    expect(controls(one("Textarea", { label: "Notes", rows: 6 }))[0]).toContain("min-h-[calc(var(--field-rows)*1lh+1rem+2px)]");
   });
 
   it("should keep the label for screen readers only when hideLabel is set", () => {

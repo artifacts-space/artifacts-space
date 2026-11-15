@@ -62,7 +62,7 @@ export const fieldDocs: Record<"Input" | "Textarea", ComponentDoc> = {
         ),
       },
     ],
-    rules: [typedNote, "`rows` is 2 to 12 and defaults to 3.", noLinkRule],
+    rules: [typedNote, "`rows` is 2 to 12 and defaults to 3. It is the least number of lines the field shows; the field grows with what is typed.", noLinkRule],
   },
 };
 

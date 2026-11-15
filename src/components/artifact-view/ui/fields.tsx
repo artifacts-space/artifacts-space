@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type ReactNode } from "react";
+import { useId, type CSSProperties, type ReactNode } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,8 +29,10 @@ export const fieldSkipProps = {
 } as const;
 
 interface FieldShellProps {
-  /** The id of the control the label is for; null when the control is not a real field (the password stand-in). */
+  /** The id of the control the label is for; null when the control is not a real field (the password stand-in), which then takes its name from `labelId`. */
   controlId: string | null;
+  /** The id of the label text, for a control that is named by it instead of labelled as a field. */
+  labelId?: string | undefined;
   label: string;
   hideLabel: boolean | undefined;
   description: string | undefined;
@@ -42,11 +44,12 @@ interface FieldShellProps {
 }
 
 /** A field's label, its control, and the description and error under it. */
-export function FieldShell({ controlId, label, hideLabel, description, error, notes, fullWidth, children }: FieldShellProps) {
+export function FieldShell({ controlId, labelId, label, hideLabel, description, error, notes, fullWidth, children }: FieldShellProps) {
   const labelClass = cn("text-md font-medium break-words", hideLabel && "sr-only");
   return (
     <div className={cn("flex w-full min-w-0 flex-col gap-1.5", !fullWidth && "max-w-sm")}>
-      {controlId ? <label htmlFor={controlId} className={labelClass}>{label}</label> : <span className={labelClass}>{label}</span>}
+      {/* Without a real field the label is the control's name (aria-labelledby), so it is not also read as a line of its own. */}
+      {controlId ? <label htmlFor={controlId} className={labelClass}>{label}</label> : <span id={labelId} aria-hidden className={labelClass}>{label}</span>}
       {children}
       {description ? <p id={notes.description} className="text-sm leading-5 text-muted-foreground break-words">{description}</p> : null}
       {error ? <p id={notes.error} className="text-sm leading-5 text-tone-danger break-words">{error}</p> : null}
@@ -66,20 +69,30 @@ export function useFieldNotes(description: string | undefined, error: string | u
 /**
  * The password stand-in: dots in a box drawn like a field. It is an image to
  * assistive technology, not an input: it takes no focus, no typing, and no
- * value, and nothing binds to it.
+ * value, and nothing binds to it. Its name is the field's label, once; what
+ * it is, and the field's description and error, are its description. A
+ * disabled one is dimmed like the other fields, and its description says it
+ * is disabled: an image has no disabled state for `aria-disabled` to set.
  */
 function PasswordStandIn({ props }: ViewProps<"Input">) {
-  const { notes } = useFieldNotes(props.description, props.error);
+  const { id, notes } = useFieldNotes(props.description, props.error);
+  const labelId = `${id}-label`;
+  const hintId = `${id}-hint`;
+  const describedBy = [hintId, props.description ? notes.description : null, props.error ? notes.error : null].filter(Boolean).join(" ");
   return (
-    <FieldShell controlId={null} label={props.label} hideLabel={props.hideLabel} description={props.description} error={props.error} notes={notes} fullWidth={props.fullWidth}>
+    <FieldShell controlId={null} labelId={labelId} label={props.label} hideLabel={props.hideLabel} description={props.description} error={props.error} notes={notes} fullWidth={props.fullWidth}>
       <div
         role="img"
-        aria-label={`${props.label}: a password field in a mockup. It cannot be typed into.`}
+        aria-labelledby={labelId}
+        aria-describedby={describedBy}
         data-password-stand-in=""
-        className={cn("flex h-8 w-full min-w-0 items-center rounded-lg border border-input px-2.5 shadow-xs select-none", props.disabled && "opacity-50")}
+        data-disabled={props.disabled ? "" : undefined}
+        className={cn("flex h-8 w-full min-w-0 items-center rounded-lg border border-input px-2.5 shadow-xs select-none", props.disabled && "cursor-not-allowed bg-input/50 opacity-50 dark:bg-input/80")}
       >
         <span aria-hidden className="truncate text-sm tracking-[0.25em] text-muted-foreground">••••••••</span>
       </div>
+      {/* Read only as the image's description, never as text of its own. */}
+      <span id={hintId} hidden>{props.disabled ? "A disabled password field in a mockup." : "A password field in a mockup."} It cannot be typed into.</span>
     </FieldShell>
   );
 }
@@ -110,6 +123,7 @@ export function InputView(view: ViewProps<"Input">) {
 
 export function TextareaView({ props, bindings, emit }: ViewProps<"Textarea">) {
   const { id, notes, control } = useFieldNotes(props.description, props.error);
+  const rows = props.rows ?? 3;
   const [value, setValue] = useInputValue(props.value, bindings?.value, "");
   return (
     <FieldShell controlId={id} label={props.label} hideLabel={props.hideLabel} description={props.description} error={props.error} notes={notes} fullWidth={props.fullWidth}>
@@ -117,7 +131,10 @@ export function TextareaView({ props, bindings, emit }: ViewProps<"Textarea">) {
         {...fieldSkipProps}
         {...control}
         id={id}
-        rows={props.rows ?? 3}
+        rows={rows}
+        // The field grows with what is typed, so `rows` is the least it shows: that many lines, plus its padding and border.
+        style={{ "--field-rows": String(rows) } as CSSProperties}
+        className="min-h-[calc(var(--field-rows)*1lh+1rem+2px)]"
         value={value}
         placeholder={props.placeholder}
         disabled={props.disabled}
