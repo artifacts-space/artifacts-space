@@ -970,3 +970,72 @@ text to the connection's owner. The byline is what the client claims, not a
 verified attribution: any client can name itself "Claude Code", and the
 byline's tooltip says so. Readers see the harness name and icon, never
 OAuth client ids or raw client names.
+
+### Section templates
+
+Section templates are ready-made pieces of a website or app screen (a
+navbar, a hero, a pricing section, a sign-in screen) built only from the
+interface components, in `src/lib/ui/templates`. Agents get them over MCP
+(`ui_templates_list`, `ui_template_get` in `src/lib/mcp/template-tools.ts`,
+both read tools) and start a ui artifact or a canvas frame from them. The
+template text is ours, so the tools add no untrusted-content label.
+
+- A template is authored metadata (`id`, `name`, `category`, `description`,
+  `viewport`, `surface`, `slots`) and a fragment (`root`, `elements`,
+  `state`). Nothing that can be counted is written by hand: `facts.ts`
+  counts elements, depth, components, state paths, and whether a reader can
+  change anything; the kind (marketing or app) follows from the category
+  (`templateCategories` in `types.ts`).
+- Add a template by adding it to its batch file (`nav.ts`, `heroes.ts`,
+  `features.ts`, `pricing.ts`, `social.ts`, `app.ts`; the category says
+  which). Do not write a validity test for it: `templates.test.ts` runs
+  `templateProblems` (`rules.ts`) over every template in the index, and
+  `e2e/templates.spec.ts` draws each category on
+  `/dev/templates?category=<name>` at 1440 and 390 pixels and checks that
+  every template stays inside its frame, passes axe, and passes color
+  contrast in light and in dark. Both name the template that fails.
+- Pages stay light however many templates there are. `/dev/templates` draws
+  one category (or `?template=<id>`), never all of them. The docs index
+  (`/docs/json-render/templates`) has one row per template and no specs;
+  `/docs/json-render/templates/<category>` is built for each category that
+  has a template, draws only that category, and sends each spec once, as
+  compact JSON (`TemplateExample` indents it in the browser for Copy JSON).
+  A category's page title is in `src/lib/docs/template-docs.ts`. Never pass
+  a spec to two client components, and never draw every template on one
+  page.
+- A scan waits for the browser, not for luck. Before axe, a templates test
+  waits for the page's ready mark (`data-templates-ready` on the dev page,
+  `data-ready` on each docs preview, both from `useHydrated`) and polls
+  `unreachableSidewaysScrollers` (`e2e/support/scrollers.ts`) until every
+  code block and table that scrolls has become a tab stop. One test runs
+  the docs checks with a slowed CPU, so a scan that depends on timing fails
+  on a fast machine too. What a reader needs must not wait for the browser
+  at all: a Checkbox or Switch names itself in the server's HTML with
+  `aria-labelledby` (`inputs.tsx`, `toggle-views.test.tsx`).
+- Rules, all checked by `templateProblems`: the id is `<category>-<variant>`
+  and is accepted as a prefix (`prefixProblem`), since it is the default one;
+  the root is a Box; at most 60 elements and 10 levels deep; its first
+  heading is level 1 or 2, so stacked sections never skip a level; list content
+  lives in `state` and is drawn by one `repeat`; every state path the
+  template reads or writes starts at a key of its own `state`; a bare
+  `${name}` in `$template` only inside a repeat; no Image or File (use
+  Placeholder); links have no `href`, or point at example.com; `validateForm`
+  names its `statePath`; every slot points at a prop that is set or a state
+  value that exists; and the template, drawn as a spec, validates with no
+  errors and no warnings. Copy is original placeholder text: no company
+  names, no real logos, nothing taken from a block library.
+- An agent never gets a template's own keys. `instantiateTemplate`
+  (`instantiate.ts`) puts every element key and every state path under a
+  prefix (the template's id by default), so several templates, or one twice,
+  share a spec; `templateAsSpec` wraps it in a root Box named `page`;
+  `attachFragment` adds a fragment under an element. `attachFragment` has no
+  caller in the app yet: it is the merge the web editor's insert picker
+  will call, and the one the guides tell agents to do themselves. A prefix
+  is refused when the state key or paths it makes are ones the ui format
+  rejects; that check is the format's own (`findUnsafePaths` in
+  `src/lib/ui/expressions.ts`), never a second list. The header of
+  `instantiate.ts` lists every place a key or a state path can appear. When
+  json-render or the validator gains a new one (a new expression key, a new
+  action param that names a path), add it there (`statePathKeys`,
+  `absoluteReferences`, or the rewrite; `facts.ts` reads the same two) and
+  to the sample template in `instantiate.test.ts`.

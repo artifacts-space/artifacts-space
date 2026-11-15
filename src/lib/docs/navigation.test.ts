@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { uiComponentNames } from "@/lib/ui/catalog";
+import { templateCategoriesInUse } from "@/lib/ui/templates/index";
 
 import { docsNavTree, docsNeighbors, docsReadingOrder, docsSearchIndex } from "./navigation";
 import { docsHeading, docsPages } from "./pages";
@@ -10,7 +11,16 @@ describe("docs navigation", () => {
   it("should list every page once in reading order when building prev and next", () => {
     const hrefs = docsReadingOrder().map((link) => link.href);
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    expect(hrefs).toHaveLength(docsPages.length + uiComponentNames.length);
+    expect(hrefs).toHaveLength(docsPages.length + uiComponentNames.length + templateCategoriesInUse().length);
+  });
+
+  it("should follow the templates index with a page for each category that has templates when reading forward", () => {
+    const hrefs = docsReadingOrder().map((link) => link.href);
+    const start = hrefs.indexOf("/docs/json-render/templates");
+    const categories = templateCategoriesInUse();
+    expect(categories.length).toBeGreaterThan(0);
+    expect(hrefs.slice(start + 1, start + 1 + categories.length)).toEqual(categories.map((category) => `/docs/json-render/templates/${category}`));
+    expect(docsNeighbors(`/docs/json-render/templates/${categories[0] ?? ""}`).previous?.href).toBe("/docs/json-render/templates");
   });
 
   it("should link the introduction to the quickstart when reading forward", () => {
@@ -48,6 +58,10 @@ describe("searchDocs", () => {
 
   it("should rank an exact component name first when searching for it", () => {
     expect(searchDocs(index, "chart")[0]?.title).toBe("Chart");
+  });
+
+  it("should find a template category's page by the name of one of its templates when the query names it", () => {
+    expect(searchDocs(index, "three tiers").map((result) => result.href)).toContain("/docs/json-render/templates/pricing");
   });
 
   it("should find MCP tools by name when the query names one", () => {

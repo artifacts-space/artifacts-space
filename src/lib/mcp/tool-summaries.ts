@@ -25,6 +25,8 @@ export const toolSummaries = {
   canvas_frame_save: "Add a frame to a canvas, or replace one.",
   canvas_frame_update: "Rename, resize, or move one frame of a canvas.",
   canvas_frame_delete: "Remove one frame from a canvas.",
+  ui_templates_list: "List ready-made sections for website and app mockups.",
+  ui_template_get: "Get one section template, ready to add to a page or a frame.",
   themes_list: "List the theme presets and cover gradients an artifact can use.",
   files_get_download_url: "Get a short-lived link to download a file.",
   files_request_upload: "Start a file upload and get a link to send it to.",

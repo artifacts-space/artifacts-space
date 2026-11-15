@@ -33,6 +33,9 @@ export const toolAccess = {
   canvas_frame_save: "write",
   canvas_frame_update: "write",
   canvas_frame_delete: "write",
+  // Section templates: ready-made pieces of a mockup, shipped with the server. Nothing is saved.
+  ui_templates_list: "read",
+  ui_template_get: "read",
   // Themes: the built-in presets an artifact's `theme` can name.
   themes_list: "read",
   // Files

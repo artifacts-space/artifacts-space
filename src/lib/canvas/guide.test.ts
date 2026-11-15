@@ -15,7 +15,7 @@ describe("buildCanvasGuide", () => {
     const frameTools = Object.keys(toolAccess).filter((name) => name.startsWith("canvas_"));
     expect(frameTools).toHaveLength(5);
     for (const name of frameTools) expect(guide, name).toContain(name);
-    const named = new Set(guide.match(/\b(?:canvas|artifacts|files)_[a-z_]+\b/g));
+    const named = new Set(guide.match(/\b(?:canvas|artifacts|files|ui)_[a-z_]+\b/g));
     for (const name of named) expect(Object.keys(toolAccess), name).toContain(name);
     expect(guide).toContain("baseVersion");
   });

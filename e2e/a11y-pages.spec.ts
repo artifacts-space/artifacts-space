@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
+import { unreachableSidewaysScrollers } from "./support/scrollers";
 
 /*
  * Accessibility of whole pages and gallery pieces: axe on the spreadsheet
@@ -57,26 +58,6 @@ test("should name a scrolling board without a title \"Board\"", async ({ page })
   // It takes its own name once it scrolls, which needs the whole gallery interactive.
   await expect(untitled.getByRole("group", { name: "Board", exact: true })).toHaveAttribute("tabindex", "0", { timeout: 30_000 });
 });
-
-/**
- * Every box on the page that scrolls sideways and is not a named group with a
- * tab stop (scroll-stop.ts), described by its tag and classes. Empty when the
- * keyboard can reach every one.
- */
-async function unreachableSidewaysScrollers(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
-    const offenders: string[] = [];
-    for (const element of document.querySelectorAll("body *")) {
-      if (!(element instanceof HTMLElement)) continue;
-      const overflow = getComputedStyle(element).overflowX;
-      if ((overflow !== "auto" && overflow !== "scroll") || element.scrollWidth <= element.clientWidth + 1) continue;
-      const named = element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby");
-      if (element.getAttribute("role") === "group" && element.tabIndex === 0 && named) continue;
-      offenders.push(`${element.tagName.toLowerCase()}.${[...element.classList].join(".")}`);
-    }
-    return offenders;
-  });
-}
 
 test("should pass axe on the MCP docs at phone width, with every sideways scroller a named group the keyboard reaches", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

@@ -13,6 +13,7 @@ import { registerFormatTools } from "./format-tools";
 import { registerProjectTools } from "./project-tools";
 import { registerTagTools } from "./tag-tools";
 import { registerTeamTools } from "./team-tools";
+import { registerTemplateTools } from "./template-tools";
 import { registerThemeTools } from "./theme-tools";
 import { gateTools, toolAccess, toolAllowed, toolAnnotations, writeTraits } from "./tool-access";
 import { registerVersionTools } from "./version-tools";
@@ -35,6 +36,8 @@ const readOnlyTools = [
   "tags_list",
   "teams_list",
   "themes_list",
+  "ui_template_get",
+  "ui_templates_list",
 ];
 
 const closers: (() => Promise<void>)[] = [];
@@ -47,6 +50,7 @@ async function connect(access: McpAccess) {
   registerTagTools(server, "user-1", access);
   registerFormatTools(server, access);
   registerCanvasTools(server, "user-1", access);
+  registerTemplateTools(server, access);
   registerThemeTools(server, "agent-1", access);
   registerFileTools(server, "user-1", access);
   registerTeamTools(server, "user-1", access);
