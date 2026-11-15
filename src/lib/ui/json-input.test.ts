@@ -33,6 +33,7 @@ describe("readJsonInput", () => {
     cycle.self = cycle;
     expect(readJsonInput(cycle, options)).toEqual({ issue: { severity: "error", code: "invalid_json", message: "The thing could not be read as JSON." } });
     expect(stringifyJson(cycle)).toBeNull();
+    expect(stringifyJson({ toJSON: () => { throw new Error("This value refuses to be written out."); } })).toBeNull();
     expect(stringifyJson(undefined)).toBeNull();
     expect(stringifyJson({ a: 1 })).toBe('{"a":1}');
   });

@@ -173,13 +173,24 @@ describe("validateCanvas frames", () => {
     expect(result.frames.map((item) => item.id)).toEqual(["frame-2", "frame-2-x"]);
   });
 
-  it("should refuse a spec nested far deeper than JSON allows here, without throwing", () => {
+  it("should refuse a spec nested far deeper than the limit, without throwing, whether or not the runtime can write it out", () => {
     const depth = 20_000;
     const deep = `${'{"a":'.repeat(depth)}1${"}".repeat(depth)}`;
     const text = `{"version":1,"frames":[{"id":"home","name":"Home","width":390,"spec":${deep}}]}`;
     const result = validateCanvas(text);
     expect(result.valid).toBe(false);
-    expect(result.issues.length).toBeGreaterThan(0);
+    // A runtime that cannot write the nesting out reports unreadable JSON; one that can reports the nesting limit. Both refuse it, on the frame.
+    expect(result.issues.map((issue) => issue.code)).toEqual([expect.stringMatching(/^(invalid_json|too_deep_json)$/)]);
+    expect(result.issues[0]?.frameId).toBe("home");
+  });
+
+  it("should refuse a spec nested deeper than the limit by naming that limit when every runtime can write the nesting out", () => {
+    const depth = 1_000;
+    const deep = JSON.parse(`${'{"a":'.repeat(depth)}1${"}".repeat(depth)}`) as unknown;
+    const result = validateCanvas({ version: 1, frames: [{ id: "home", name: "Home", width: 390, spec: deep }] });
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual([expect.objectContaining({ code: "too_deep_json", frameId: "home" })]);
+    expect(result.issues[0]?.message).toMatch(/^Frame "home": The spec nests JSON more than 64 levels deep\./);
   });
 
   it("should report each bad frame of the broken fixture and keep the good one clean", () => {

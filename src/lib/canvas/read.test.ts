@@ -15,7 +15,19 @@ describe("frameSpecText", () => {
     expect(frames.map((frame) => frameSpecText(frame))).toEqual([null, null, null]);
   });
 
-  it("should return null, not throw, when the spec nests too deep to write out as JSON", () => {
+  it("should return null when the spec holds a cycle, which no runtime can write out as JSON", () => {
+    const cycle: Record<string, unknown> = { version: 1 };
+    cycle.self = cycle;
+    expect(frameSpecText({ spec: cycle })).toBeNull();
+  });
+
+  it("should return null when writing the spec out throws", () => {
+    const hostile = { version: 1, toJSON: () => { throw new Error("This value refuses to be written out."); } };
+    expect(frameSpecText({ spec: hostile })).toBeNull();
+  });
+
+  it("should return text or null, and never throw, when the spec nests very deep", () => {
+    // Whether a runtime can write this nesting out depends on its stack, so only the contract is checked: no throw, and text or null.
     const deep: Record<string, unknown> = {};
     let inner = deep;
     for (let level = 0; level < 100_000; level += 1) {
@@ -23,14 +35,15 @@ describe("frameSpecText", () => {
       inner.a = next;
       inner = next;
     }
-    expect(() => JSON.stringify(deep)).toThrow(RangeError);
-    expect(frameSpecText({ spec: deep })).toBeNull();
+    let text: string | null | undefined;
+    expect(() => { text = frameSpecText({ spec: deep }); }).not.toThrow();
+    expect(text === null || typeof text === "string").toBe(true);
   });
 
-  it("should return null when the spec holds a cycle", () => {
-    const cycle: Record<string, unknown> = { version: 1 };
-    cycle.self = cycle;
-    expect(frameSpecText({ spec: cycle })).toBeNull();
+  it("should return the text when the spec nests deeper than the ui limit but every runtime can write it out", () => {
+    const depth = 1_000;
+    const text = `${'{"a":'.repeat(depth)}1${"}".repeat(depth)}`;
+    expect(frameSpecText({ spec: JSON.parse(text) as Record<string, unknown> })).toBe(text);
   });
 });
 
