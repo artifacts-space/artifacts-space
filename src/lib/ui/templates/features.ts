@@ -100,15 +100,15 @@ export const featureTemplates: readonly UiTemplate[] = [
     slots: [
       { what: "Small label above the headline", element: "eyebrow", prop: "text" },
       { what: "Headline", element: "title", prop: "text" },
-      { what: "Rows, each with a title, a sentence, a list of points, what the picture shows (image), and whether the picture sits on the left (pictureFirst)", state: "/rows" },
+      { what: "Rows, each with a title, a sentence, a list of points, and what the picture shows (image). The picture sits on the right; add pictureFirst: true to a row to put it on the left", state: "/rows" },
     ],
     fragment: {
       root: "features",
       state: {
         rows: [
-          { title: "Let people book for themselves", text: "Share one link. People pick a free time on their phone, and the visit lands in your calendar.", points: ["Works on any phone, with no app to install", "Shows only the times you are free", "Sends a confirmation right away"], image: "Booking page on a phone", pictureFirst: false },
+          { title: "Let people book for themselves", text: "Share one link. People pick a free time on their phone, and the visit lands in your calendar.", points: ["Works on any phone, with no app to install", "Shows only the times you are free", "Sends a confirmation right away"], image: "Booking page on a phone" },
           { title: "Remind people before every visit", text: "A message goes out the day before, with one tap to confirm the visit or move it.", points: ["Reminders by text or email", "One tap to pick a new time", "Freed times go back on offer"], image: "Reminder message with a confirm button", pictureFirst: true },
-          { title: "See the whole day at the front desk", text: "The day view shows who is due, who has arrived, and which room is free.", points: ["Arrivals marked as people check in", "Late visits shown in one color", "A print view for the morning meeting"], image: "Day view with arrivals", pictureFirst: false },
+          { title: "See the whole day at the front desk", text: "The day view shows who is due, who has arrived, and which room is free.", points: ["Arrivals marked as people check in", "Late visits shown in one color", "A print view for the morning meeting"], image: "Day view with arrivals" },
         ],
       },
       elements: {
@@ -118,16 +118,22 @@ export const featureTemplates: readonly UiTemplate[] = [
         title: { type: "Heading", props: { text: "Fewer missed visits, and a calmer front desk", level: 2, size: "xl" } },
         rows: { type: "Box", props: { direction: "vertical", gap: "2xl" }, repeat: { statePath: "/rows", key: "title" }, children: ["row"] },
         row: { type: "Box", props: { direction: "horizontal", stackBelow: "md", align: "center", gap: "xl" }, children: ["picture-left", "copy", "picture-right", "picture-below"] },
-        // A picture on the left shows only while the row is a row; stacked, the same picture is drawn after the words.
-        "picture-left": { type: "Box", props: { direction: "vertical", grow: true, width: "full", hideBelow: "md" }, visible: { $item: "pictureFirst", eq: true }, children: ["image-left"] },
+        /*
+         * One picture, three elements: a Box cannot change the order of its children when a row stacks, so a
+         * picture on the left (`pictureFirst`) shows only while the row is a row, and the same picture is drawn
+         * again after the words for the stacked row. A row without `pictureFirst` draws the one on the right.
+         * Exactly one of the three shows in any row at any width (e2e/templates-zigzag.spec.ts). They must stay
+         * identical: change the ratio, the radius, or the label on all three together.
+         */
+        "picture-left": { type: "Box", props: { direction: "vertical", grow: true, width: "full", hideBelow: "md" }, visible: { $item: "pictureFirst" }, children: ["image-left"] },
         "image-left": { type: "Placeholder", props: { label: { $item: "image" }, ratio: "video", radius: "lg" } },
         copy: { type: "Box", props: { direction: "vertical", grow: true, width: "full", gap: "md" }, children: ["row-title", "row-text", "row-points"] },
         "row-title": { type: "Heading", props: { text: { $item: "title" }, level: 3, size: "lg" } },
         "row-text": { type: "Text", props: { text: { $item: "text" }, tone: "muted" } },
         "row-points": { type: "List", props: { items: { $item: "points" }, marker: "check" } },
-        "picture-right": { type: "Box", props: { direction: "vertical", grow: true, width: "full" }, visible: { $item: "pictureFirst", eq: false }, children: ["image-right"] },
+        "picture-right": { type: "Box", props: { direction: "vertical", grow: true, width: "full" }, visible: { $item: "pictureFirst", not: true }, children: ["image-right"] },
         "image-right": { type: "Placeholder", props: { label: { $item: "image" }, ratio: "video", radius: "lg" } },
-        "picture-below": { type: "Box", props: { direction: "vertical", width: "full", hideAbove: "md" }, visible: { $item: "pictureFirst", eq: true }, children: ["image-below"] },
+        "picture-below": { type: "Box", props: { direction: "vertical", width: "full", hideAbove: "md" }, visible: { $item: "pictureFirst" }, children: ["image-below"] },
         "image-below": { type: "Placeholder", props: { label: { $item: "image" }, ratio: "video", radius: "lg" } },
       },
     },
