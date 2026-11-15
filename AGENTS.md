@@ -884,6 +884,15 @@ the UPDATE itself, one statement, never a read-then-write:
 - A save attaches its uploads (content media, icon, cover) in the same
   statement as its guarded write (`writeAndAttach`, a CTE), so a refused save
   attaches nothing and a landed one never names an upload it did not attach.
+- The canvas frame tools (`src/lib/mcp/canvas-tools.ts`; the edits are pure
+  functions in `src/lib/canvas/frame-edits.ts`) change one frame by reading
+  the row, applying the edit, and saving the whole canvas through
+  `updateArtifact`. That is a read-then-write, so `baseVersion` is required
+  there, never optional: the tool refuses when the row it read is not at that
+  base, and the UPDATE checks again, so the edit is always made on the
+  content the agent read and two agents changing different frames never undo
+  each other. Any new tool that changes part of an artifact's content follows
+  the same rule.
 - A person's web save with `expectedUpdatedAt` falls back, when the artifact
   moved on, to "only agents saved since" (`onlyAgentsSavedSince`): the base is
   not later than the row's last save, no person's save is later by

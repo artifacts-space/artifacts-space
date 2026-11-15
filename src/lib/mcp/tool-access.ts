@@ -27,6 +27,12 @@ export const toolAccess = {
   // Formats: guidance and dry-run validation, nothing is saved.
   artifacts_formats_guide: "read",
   artifacts_validate: "read",
+  // Canvas frames: read or change one frame of a canvas without resending the board.
+  canvas_frames_list: "read",
+  canvas_frame_get: "read",
+  canvas_frame_save: "write",
+  canvas_frame_update: "write",
+  canvas_frame_delete: "write",
   // Themes: the built-in presets an artifact's `theme` can name.
   themes_list: "read",
   // Files
@@ -82,6 +88,14 @@ export const writeTraits = {
   artifacts_delete: { destructive: true, idempotent: true, openWorld: false },
   // Replaces the current content with an older version, as a new save each time.
   artifacts_restore_version: { destructive: true, idempotent: false, openWorld: false },
+  // Frame writes always name the canvas they change (a required baseVersion), which every save moves on:
+  // a repeat with the same arguments is refused, and a change that leaves the canvas as it is saves nothing.
+  // Replaces the frame that has the same id, or adds one. Sharing never changes.
+  canvas_frame_save: { destructive: true, idempotent: true, openWorld: false },
+  // Replaces a frame's own fields.
+  canvas_frame_update: { destructive: true, idempotent: true, openWorld: false },
+  // Removes the frame from the current canvas; earlier versions keep it.
+  canvas_frame_delete: { destructive: true, idempotent: true, openWorld: false },
   // A new pending upload on every call.
   files_request_upload: { destructive: false, idempotent: false, openWorld: false },
   // Finalizing a ready file returns it unchanged. It removes only an upload that failed its checks, which was never usable.

@@ -139,7 +139,7 @@ export default function JsonRenderPage() {
       <CodeSnippet title="A canvas with one page at two sizes" language="json" code={canvasShape} className="mt-4" />
       <Prose>
         <p>
-          To show one screen at several sizes, add one frame per size and lay each out for its width. A canvas holds up to {canvasLimits.maxFrames} frames and {canvasLimits.maxElements.toLocaleString("en-US")} elements across them, and each frame keeps the ui limits. The agent reads the rules with <code>artifacts_formats_guide</code> (<code>kind: &quot;canvas&quot;</code>) and checks a canvas with <code>artifacts_validate</code>: each issue names the frame, then the element, and the fix. A frame with a problem shows a notice in its place, and the other frames still render.
+          To show one screen at several sizes, add one frame per size and lay each out for its width. A canvas holds up to {canvasLimits.maxFrames} frames and {canvasLimits.maxElements.toLocaleString("en-US")} elements across them, and each frame keeps the ui limits. The agent reads the rules with <code>artifacts_formats_guide</code> (<code>kind: &quot;canvas&quot;</code>) and checks a canvas with <code>artifacts_validate</code>: each issue names the frame, then the element, and the fix. A frame with a problem shows a notice in its place, and the other frames still render. To change one screen later, the agent uses the frame tools (<code>canvas_frames_list</code>, <code>canvas_frame_get</code>, <code>canvas_frame_save</code>, <code>canvas_frame_update</code>, <code>canvas_frame_delete</code>): it reads and sends one frame, never the whole board.
         </p>
       </Prose>
     </RegistryPage>

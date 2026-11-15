@@ -111,16 +111,24 @@ function clampAxis(offset: number, start: number, length: number, room: number):
   return min > max ? offset : Math.min(max, Math.max(min, offset));
 }
 
-/** The view moved by a drag, kept so that part of the board always stays inside the window. */
-export function panBy(view: BoardView, delta: { x: number; y: number }, bounds: Box | null, window: Size): BoardView {
-  const x = view.x + delta.x;
-  const y = view.y + delta.y;
-  if (!bounds) return { ...view, x, y };
+/**
+ * The view, moved only as far as it takes to keep part of the board inside
+ * the window. Every gesture that moves or zooms the board ends here (a drag,
+ * a pinch, the wheel, the zoom buttons), so none of them can leave the window
+ * empty with the board somewhere out of sight.
+ */
+export function keepInWindow(view: BoardView, bounds: Box | null, window: Size): BoardView {
+  if (!bounds) return view;
   return {
     zoom: view.zoom,
-    x: clampAxis(x, bounds.x * view.zoom, bounds.width * view.zoom, window.width),
-    y: clampAxis(y, bounds.y * view.zoom, bounds.height * view.zoom, window.height),
+    x: clampAxis(view.x, bounds.x * view.zoom, bounds.width * view.zoom, window.width),
+    y: clampAxis(view.y, bounds.y * view.zoom, bounds.height * view.zoom, window.height),
   };
+}
+
+/** The view moved by a drag, kept so that part of the board always stays inside the window. */
+export function panBy(view: BoardView, delta: { x: number; y: number }, bounds: Box | null, window: Size): BoardView {
+  return keepInWindow({ zoom: view.zoom, x: view.x + delta.x, y: view.y + delta.y }, bounds, window);
 }
 
 /** A point in the board's window, in CSS pixels from its top left corner. */

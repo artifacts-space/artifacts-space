@@ -79,6 +79,11 @@ describe("artifactToolCopy", () => {
     expect(description).toMatch(/read artifacts_formats_guide with kind "canvas" first/);
   });
 
+  it("should point at the frame tools where it mentions canvases, so an agent changes one screen without resending the board", () => {
+    expect(artifactToolCopy.artifacts_create.description).toMatch(/change one screen later with canvas_frame_save/);
+    expect(artifactToolCopy.artifacts_update.description).toMatch(/To change one frame of a canvas, use canvas_frame_save, canvas_frame_update, or canvas_frame_delete/);
+  });
+
   it("should not claim authority in any description when tools are listed", () => {
     for (const [name, copy] of Object.entries(artifactToolCopy)) expect(copy.description, name).not.toMatch(authorityClaims);
   });

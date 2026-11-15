@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent, type RefObject, type UIEvent } from "react";
 
-import { fitView, frameView, nextZoomStep, panBy, wheelZoom, zoomAbout, type BoardView, type Box, type Size } from "@/lib/canvas/view-rules";
+import { fitView, frameView, keepInWindow, nextZoomStep, panBy, wheelZoom, zoomAbout, type BoardView, type Box, type Size } from "@/lib/canvas/view-rules";
 
 import { usePinch } from "./use-pinch";
 
@@ -87,10 +87,15 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
     setMoved({ zoom: next.zoom, x: Math.round(next.x), y: Math.round(next.y) });
   }, []);
 
+  // A zoom keeps one point still and moves the rest, so it can push the whole board out of the window as a drag could. It goes through the drag's clamp.
+  const zoomed = useCallback((next: BoardView, smooth: boolean) => {
+    move(keepInWindow(next, latest.current.bounds, latest.current.room), smooth);
+  }, [move]);
+
   const zoomTo = useCallback((zoom: (current: number) => number) => {
     const { view: current, room: window } = latest.current;
-    move(zoomAbout(current, { x: window.width / 2, y: window.height / 2 }, zoom(current.zoom)), true);
-  }, [move]);
+    zoomed(zoomAbout(current, { x: window.width / 2, y: window.height / 2 }, zoom(current.zoom)), true);
+  }, [zoomed]);
 
   useEffect(() => {
     const element = windowRef.current;
@@ -100,15 +105,15 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
       event.preventDefault();
       const rect = element.getBoundingClientRect();
       const { view: current } = latest.current;
-      move(zoomAbout(current, { x: event.clientX - rect.left, y: event.clientY - rect.top }, wheelZoom(current.zoom, event.deltaY)), false);
+      zoomed(zoomAbout(current, { x: event.clientX - rect.left, y: event.clientY - rect.top }, wheelZoom(current.zoom, event.deltaY)), false);
     };
     element.addEventListener("wheel", onWheel, { passive: false });
     return () => {
       element.removeEventListener("wheel", onWheel);
     };
-  }, [windowRef, enabled, move]);
+  }, [windowRef, enabled, zoomed]);
 
-  const pinch = usePinch(windowRef, enabled, () => latest.current.view, (next) => { move(next, false); });
+  const pinch = usePinch(windowRef, enabled, () => latest.current.view, (next) => { zoomed(next, false); });
 
   const endDrag = useCallback(() => {
     press.current = null;

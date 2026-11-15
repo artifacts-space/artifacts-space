@@ -21,9 +21,25 @@ const rules = [
   'Call artifacts_validate with kind "canvas" before saving to see every problem at once. Each issue names the frame, then the element, and says how to fix it. A frame with a problem shows a notice in its place; the other frames still render.',
 ];
 
+const frameTools = [
+  "canvas_frames_list: every frame's id, name, size, position, and element count, without the specs. Call it first: it also gives the `baseVersion` the write tools need.",
+  "canvas_frame_get: one frame in full, with its spec.",
+  "canvas_frame_save: add a frame, or replace the frame that has the same id. Send the whole frame; `after` or `index` says where a new one goes.",
+  "canvas_frame_update: change a frame's name, width, height, padding, x, y, or its place in the order, without resending its spec.",
+  "canvas_frame_delete: remove one frame.",
+];
+
+const frameToolNotes = [
+  "Create the canvas with artifacts_create (kind \"canvas\"), with every frame or with only the first. Then add and change frames one at a time.",
+  "Every frame write takes the `baseVersion` you got from canvas_frames_list, canvas_frame_get, artifacts_get, or your last save, and its result carries the next one. If the canvas changed since, nothing is saved: call canvas_frames_list again and redo the change on what you get.",
+  "A frame write checks the frame and the board's limits like artifacts_validate, and a refusal names the frame, the element, and the fix.",
+  "To replace the whole board at once, use artifacts_update with the full canvas.",
+];
+
 /**
- * The guide agents read before writing a canvas artifact: the board's rules
- * and one compact example. It points at the ui guide for the components.
+ * The guide agents read before writing a canvas artifact: the board's rules,
+ * the tools that change one frame, and one compact example. It points at the
+ * ui guide for the components.
  */
 export function buildCanvasGuide(): string {
   return [
@@ -31,6 +47,10 @@ export function buildCanvasGuide(): string {
     "A canvas is a board of frames for mocking up websites and app screens. People pan and zoom the board, and each frame is drawn at its real width with the artifacts.space component set.",
     "## Rules",
     rules.map((rule, index) => `${String(index + 1)}. ${rule}`).join("\n"),
+    "## Changing one frame",
+    "A canvas can hold many screens. These tools read and change one frame, so you never resend the others:",
+    frameTools.map((tool) => `- ${tool}`).join("\n"),
+    frameToolNotes.map((note) => `- ${note}`).join("\n"),
     "## Example",
     JSON.stringify(exampleCanvas, null, 2),
   ].join("\n\n");
