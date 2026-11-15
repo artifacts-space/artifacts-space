@@ -1,8 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { uiComponentNames } from "@/lib/ui/catalog";
 import { componentFixtures, fixtureSpec } from "@/lib/ui/fixtures/components";
 import { signInSpec } from "@/lib/ui/fixtures/fields";
+import { textFields } from "@/lib/ui/validate-fields";
 
 import { ArtifactView } from "../artifact-view";
 
@@ -24,6 +26,46 @@ function one(type: string, props: Record<string, unknown>, state: Record<string,
 /** Every real text control in the markup: its whole opening tag. */
 function controls(html: string): string[] {
   return html.match(/<(input|textarea)\b[^>]*>/g) ?? [];
+}
+
+/** Kinds of `<input>` a reader cannot type text into. */
+const notTyped = new Set(["checkbox", "radio", "range", "hidden", "button", "submit", "reset", "file", "color", "image"]);
+
+/**
+ * True for a control kept out of a reader's reach: out of the tab order and
+ * hidden from assistive technology. That is the input a Select, a Checkbox,
+ * or a Switch keeps under its own control to carry its value; a reader
+ * never types in it. It is told by those two marks, whatever its tag, so a
+ * field that is only hidden from assistive technology still counts.
+ */
+function outOfReach(control: string): boolean {
+  return control.includes('aria-hidden="true"') && control.includes('tabindex="-1"');
+}
+
+/** True for a control a reader can type free text into: a text area, or an input of a typed kind, within the reader's reach. */
+function takesTypedText(control: string): boolean {
+  if (outOfReach(control)) return false;
+  if (control.startsWith("<textarea")) return true;
+  return !notTyped.has(/\stype="([^"]*)"/.exec(control)?.[1] ?? "text");
+}
+
+/** A region a reader can type in that is not an input or a text area. */
+const editableRegion = /\scontenteditable="(?:true|plaintext-only|)"/;
+
+/** True when the markup holds any field a reader types in: a typed control or an editable region. */
+function drawsTypedText(html: string): boolean {
+  return editableRegion.test(html) || controls(html).some(takesTypedText);
+}
+
+/**
+ * Every catalog component that draws a field a reader types in. It sees
+ * what the gallery fixtures draw and no more: a component that draws a
+ * field only for props no fixture sets is missed, so a new kind of field
+ * needs a fixture that shows it. Every component has at least one fixture;
+ * the test beside the guard checks that.
+ */
+function componentsWithTypedText(): string[] {
+  return uiComponentNames.filter((name) => componentFixtures[name].some((fixture) => drawsTypedText(page(fixtureSpec(name, fixture)))));
 }
 
 const skipAttributes = ['autoComplete="off"', 'data-1p-ignore=""', 'data-lpignore="true"', 'data-bwignore=""', 'data-form-type="other"'];
@@ -144,6 +186,60 @@ describe("text fields", () => {
     expect(html).toContain('aria-invalid="true"');
     expect(html).toContain("Choose a region.");
     expect(html).toMatch(/disabled/);
+  });
+});
+
+describe("the typed-text rule's list of text fields", () => {
+  it("should have a gallery fixture for every catalog component, so none can skip the guard by drawing nothing", () => {
+    // Nothing else fails for an empty list: the tests that run over fixtures only get fewer cases.
+    const without = uiComponentNames.filter((name) => componentFixtures[name].length === 0);
+    expect(without, "Give each of these a fixture in src/lib/ui/fixtures: the typed-text guard reads what fixtures draw").toEqual([]);
+  });
+
+  it("should list every catalog component that draws a field a reader types in, so a new one cannot be missed", () => {
+    // Read from what each component draws in its gallery fixtures, not from a second list.
+    expect(
+      componentsWithTypedText().sort(),
+      "A component draws a field a reader types in (an input, a text area, or an editable region) and is not in `textFields`, or is listed and draws none. Keep `textFields` in src/lib/ui/validate-fields.ts equal to this list",
+    ).toEqual([...textFields].sort());
+  });
+
+  // This test owns how a listed field binds what is typed: an editable region, or a field bound through another prop, fails here.
+  it.each([...textFields])("should show state in a %s through `value`, the prop the rule reads for a binding", (type) => {
+    const html = one(type, { label: "Field", value: { $bindState: "/typed" } }, { typed: "zebra-typed" });
+    // An input carries its value in the tag; a text area carries it between its tags.
+    const inputs = controls(html).filter((control) => !control.startsWith("<textarea") && control.includes('value="zebra-typed"'));
+    const textAreas = html.match(/<textarea\b[^>]*>zebra-typed/g) ?? [];
+    const shown = [...inputs, ...textAreas].filter(takesTypedText);
+    expect(
+      shown,
+      `${type} is in \`textFields\`, but no input or text area shows state bound to \`value\`. The typed-text rule reads only \`value\` for a binding: teach \`boundTextFields\` in src/lib/ui/validate-fields.ts the prop this component binds what is typed to, test it there, and then extend this test`,
+    ).toHaveLength(1);
+  });
+
+  it("should not count a checkbox, a slider, a switch, or the hidden input under a Select as typed text", () => {
+    expect(takesTypedText('<input tabindex="-1" type="checkbox" aria-hidden="true"/>')).toBe(false);
+    expect(takesTypedText('<input type="range" min="0" max="100"/>')).toBe(false);
+    expect(takesTypedText('<input tabindex="-1" aria-hidden="true"/>')).toBe(false);
+    expect(takesTypedText('<input data-slot="input"/>')).toBe(true);
+    expect(takesTypedText('<input type="search"/>')).toBe(true);
+    expect(takesTypedText('<textarea rows="3">')).toBe(true);
+  });
+
+  it("should treat an input and a text area the same when they are hidden from assistive technology", () => {
+    // Out of reach (the input a Select keeps under itself): neither counts.
+    expect(takesTypedText('<textarea tabindex="-1" aria-hidden="true">')).toBe(false);
+    expect(takesTypedText('<input tabindex="-1" aria-hidden="true"/>')).toBe(false);
+    // Hidden from assistive technology only: a reader can still click and type, so both count.
+    expect(takesTypedText('<textarea aria-hidden="true">')).toBe(true);
+    expect(takesTypedText('<input aria-hidden="true"/>')).toBe(true);
+  });
+
+  it("should count an editable region as a field a reader types in, and not a region that is switched off", () => {
+    expect(drawsTypedText('<div contenteditable="true"></div>')).toBe(true);
+    expect(drawsTypedText('<div contenteditable="plaintext-only"></div>')).toBe(true);
+    expect(drawsTypedText('<div contenteditable="false"></div>')).toBe(false);
+    expect(drawsTypedText("<p>No field here.</p>")).toBe(false);
   });
 });
 
