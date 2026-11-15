@@ -157,8 +157,8 @@ function buttonIcon(props: ButtonProps, side: "start" | "end"): ReactNode {
 
 /**
  * True only for the value true. State can hold any JSON, and React writes
- * aria-* through as given, so `aria-expanded` is written as true or false
- * whatever the type says.
+ * aria-* through as given, so `aria-expanded` and `aria-pressed` are written
+ * as true or false whatever the type says.
  */
 function isTrue(value: unknown): boolean {
   return value === true;
@@ -173,19 +173,48 @@ function isTrue(value: unknown): boolean {
  */
 const dangerClass = "bg-tone-danger text-background hover:bg-[color-mix(in_oklch,var(--tone-danger),var(--foreground)_14%)] focus-visible:ring-tone-danger/40";
 
+/**
+ * A toggle that is on, on every variant it takes: the text color as the
+ * fill, the page color as its label and as a thin line just inside its edge.
+ * The fill is a solid block where rest is quiet (outline, secondary, ghost)
+ * and the inner line marks it where rest is already solid (default), so it
+ * never differs by color alone, and the focus ring stays outside the edge.
+ * The text color reads on every surface at 4.5:1, so the edge holds 3:1
+ * there, and the label holds 4.5:1 on the fill. Hover mixes the fill a step
+ * toward the label (`pressedHoverMix`, which the theme rule checks over
+ * every preset). The dark: classes override the variants' own dark fills.
+ */
+const pressedFill = "bg-foreground hover:bg-[color-mix(in_oklch,var(--foreground),var(--background)_12%)]";
+const pressedClass = cn(
+  "border-foreground text-background outline-1 outline-solid -outline-offset-3 outline-background hover:text-background",
+  pressedFill,
+  "dark:border-foreground dark:bg-foreground dark:hover:bg-[color-mix(in_oklch,var(--foreground),var(--background)_12%)]",
+);
+
+/** True when the button draws its pressed look: pressed, on a variant that takes it (validation refuses it on danger). */
+const looksPressed = (props: ButtonProps) => isTrue(props.pressed) && props.variant !== "danger";
+
 function buttonClass(props: ButtonProps, size: (typeof buttonSize)[ButtonSize]): string {
-  const danger = props.variant === "danger" && dangerClass;
-  if (props.iconOnly) return cn("shrink-0", size.extra && "size-10", danger);
-  return cn("max-w-full min-w-0", props.fullWidth ? "w-full" : "w-fit", size.extra, danger);
+  const look = props.variant === "danger" ? dangerClass : looksPressed(props) && pressedClass;
+  if (props.iconOnly) return cn("shrink-0", size.extra && "size-10", look);
+  return cn("max-w-full min-w-0", props.fullWidth ? "w-full" : "w-fit", size.extra, look);
+}
+
+/** The aria-* state a button says it is in: open or closed (`expanded`), and on or off (`pressed`), each written only when set. */
+function ariaStates(props: ButtonProps): { "aria-expanded"?: boolean; "aria-pressed"?: boolean } {
+  return {
+    ...(props.expanded === undefined ? {} : { "aria-expanded": isTrue(props.expanded) }),
+    ...(props.pressed === undefined ? {} : { "aria-pressed": isTrue(props.pressed) }),
+  };
 }
 
 export function ButtonView({ props, emit }: ViewProps<"Button">) {
   const size = buttonSize[props.size ?? "md"];
   const named = props.iconOnly ? { "aria-label": props.label } : {};
-  // A disclosure button says whether what it opens is open; an ordinary button says nothing.
-  const expanded = props.expanded === undefined ? {} : { "aria-expanded": isTrue(props.expanded) };
+  // A disclosure button says whether what it opens is open, and a toggle whether it is on; an ordinary button says nothing.
+  const states = ariaStates(props);
   return (
-    <Button {...named} {...expanded} variant={props.variant === "danger" ? "default" : (props.variant ?? "default")} data-variant={props.variant === "danger" ? "danger" : undefined} size={props.iconOnly ? size.icon : size.text} disabled={props.disabled ?? false} className={buttonClass(props, size)} onClick={() => { emit("press"); }}>
+    <Button {...named} {...states} variant={props.variant === "danger" ? "default" : (props.variant ?? "default")} data-variant={props.variant === "danger" ? "danger" : undefined} size={props.iconOnly ? size.icon : size.text} disabled={props.disabled ?? false} className={buttonClass(props, size)} onClick={() => { emit("press"); }}>
       {buttonIcon(props, "start")}
       {props.iconOnly ? null : <span className="truncate">{props.label}</span>}
       {buttonIcon(props, "end")}

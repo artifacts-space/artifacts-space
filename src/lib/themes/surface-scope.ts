@@ -72,13 +72,15 @@ const other = (mode: PaletteMode): PaletteMode => (mode === "light" ? "dark" : "
 
 const tokenCache = new WeakMap<ThemeColors, Record<string, string>>();
 
-const toneNames = ["--tone-info", "--tone-success", "--tone-warning", "--tone-danger"] as const;
+const toneNames = ["--tone-info", "--tone-success", "--tone-warning", "--tone-danger", "--tone-accent"] as const;
 
 /**
  * On an accent of middling lightness a tone can run out of room before it
  * reads as text and on its own tint (a red tone on a red accent, a badge
  * there). It then takes the accent's own label color, which the surface's
- * fill is set to hold as text and as a badge (accentFill).
+ * fill is set to hold as text and as a badge (accentFill). The accent tone
+ * starts there already: on a palette built on the accent, the accent is the
+ * surface itself, and the palette's own accent is that label color.
  */
 function tonesOnAccent(tokens: Record<string, string>, colors: ThemeColors): Record<string, string> {
   const page = read(colors.background);

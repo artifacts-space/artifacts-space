@@ -49,14 +49,35 @@ export const inputProps = {
     iconOnly: z.boolean().optional(),
     disabled: z.boolean().optional(),
     expanded: z.boolean().optional(),
+    pressed: z.boolean().optional(),
   }),
   Input: inputFieldProps,
   Textarea: textareaProps,
 };
 
 /** A button that shows only an icon still needs one to show; its label then names it for screen readers. */
-function buttonCheck(props: Record<string, unknown>): string[] {
+function iconOnlyProblems(props: Record<string, unknown>): string[] {
   return props.iconOnly === true && props.icon === undefined ? ["`iconOnly` needs an `icon`. Set `icon` to an icon name, or remove `iconOnly`. The `label` then names the button for screen readers."] : [];
+}
+
+/**
+ * `pressed` is a toggle that stays on (Bold, a filter chip), and `expanded`
+ * a button that opens a panel: two different widgets, so a button is one or
+ * the other. A danger button is a one-time action that deletes or cannot be
+ * undone, so it never stays pressed, and the pressed fill would hide its
+ * warning color. Both read the props as written: `pressed` set in any form,
+ * expression included, counts, and so does `variant` written as "danger".
+ */
+function pressedProblems(props: Record<string, unknown>): string[] {
+  if (props.pressed === undefined) return [];
+  const problems: string[] = [];
+  if (props.expanded !== undefined) problems.push("`pressed` and `expanded` describe different buttons: `pressed` a toggle that stays on, such as Bold, and `expanded` a button that opens a panel, such as a menu. Keep `pressed` for a toggle, or `expanded` for a button that opens something.");
+  if (props.variant === "danger") problems.push("A danger Button is a one-time action that deletes or cannot be undone, so it cannot stay pressed, and the pressed look would hide its warning color. Remove `pressed`, or use the default, outline, secondary, or ghost variant for a toggle.");
+  return problems;
+}
+
+function buttonCheck(props: Record<string, unknown>): string[] {
+  return [...iconOnlyProblems(props), ...pressedProblems(props)];
 }
 
 function sliderCheck(props: Record<string, unknown>): string[] {

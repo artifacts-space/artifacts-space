@@ -244,7 +244,7 @@ describe("status tones", () => {
     for (const mode of ["light", "dark"] as const) {
       const surfaces = [...site[mode].keys()].filter((name) => /^--block-[a-z]+-bg$/.test(name));
       expect(surfaces).toHaveLength(9);
-      for (const tone of ["info", "success", "warning", "danger"]) {
+      for (const tone of ["info", "success", "warning", "danger", "accent"]) {
         const text = parseColor(siteColor(mode, `--tone-${tone}`) ?? "");
         if (!text) throw new Error(`${mode} has no --tone-${tone}`);
         for (const surfaceName of ["--background", "--card", "--muted", ...surfaces]) {
@@ -261,7 +261,7 @@ describe("status tones", () => {
     for (const [id, preset] of builtInPresets()) {
       for (const mode of ["light", "dark"] as const) {
         const tokens = paletteTokens(mode, preset.theme[mode]);
-        for (const tone of ["info", "success", "warning", "danger"]) {
+        for (const tone of ["info", "success", "warning", "danger", "accent"]) {
           const text = parseColor(tokens[`--tone-${tone}`] ?? "");
           if (!text) throw new Error(`${id} ${mode} has no --tone-${tone}`);
           for (const surfaceName of ["--card", "--background", "--secondary", "--muted", "--accent"]) {

@@ -8,14 +8,17 @@ import type { Locator } from "@playwright/test";
 
 /**
  * What a reader can see and press in a frame, as one string: its visible
- * text, then the names of its buttons that show only an icon. Two readings
+ * text, then the names of its buttons that show only an icon, then the
+ * toggles that are on (`aria-pressed="true"`), when any are. Two readings
  * are equal exactly when the frame looks the same to a reader.
  */
 export function signatureOf(frame: Locator): Promise<string> {
   return frame.evaluate((element: HTMLElement) => {
     const shown = (node: Element) => node.checkVisibility({ visibilityProperty: true }) && node.getClientRects().length > 0;
     const named = [...element.querySelectorAll("button[aria-label]")].filter(shown).map((node) => node.getAttribute("aria-label") ?? "");
-    return `${element.innerText.replace(/\s+/g, " ").trim()} | ${named.join(", ")}`;
+    // A toggle that is on (Bold) may change nothing but itself: its state is part of what the frame shows.
+    const on = [...element.querySelectorAll('button[aria-pressed="true"]')].filter(shown).map((node) => node.getAttribute("aria-label") ?? node.textContent.trim());
+    return `${element.innerText.replace(/\s+/g, " ").trim()} | ${named.join(", ")}${on.length > 0 ? ` | on: ${on.join(", ")}` : ""}`;
   });
 }
 

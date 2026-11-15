@@ -20,8 +20,8 @@ export type BoxSurface = (typeof boxSurfaces)[number];
 /** An icon by name. The message names a few; the guide lists all of them. */
 export const iconName = z.enum(uiIconNames, "Use an icon name from the Icon component's list, such as check, arrow-right, star, or mail.");
 
-/** Text color for Icon and Text: the default, muted, or a status tone. */
-export const inkTone = z.enum(["default", "muted", "info", "success", "warning", "danger"]);
+/** Text color for Icon and Text: the default, muted, a status tone, or the theme's accent. */
+export const inkTone = z.enum(["default", "muted", "info", "success", "warning", "danger", "accent"]);
 export type InkTone = z.infer<typeof inkTone>;
 
 export const boxProps = z.object({
@@ -140,6 +140,6 @@ export const boxCheck: PropCheck = (props) => [...stackProblems(props), ...stack
 export const screenDescriptions = {
   Box:
     "A free-layout container for drawing screens. Children stack vertically or sit in a row (`direction`), with `gap`, `padding` (`paddingX` / `paddingY` override one axis), `align` (across the direction), `justify` (along it), `wrap`, `grow` (take the free room in a row), `width`, `maxWidth` (xs 320, sm 384, md 576, lg 768, xl 1024, 2xl 1280 pixels; center it with `align: \"center\"` on the parent) and `minHeight`. `surface` paints it and sets a text color that reads on it: none, page, card, muted, a hue (gray, brown, orange, yellow, green, blue, purple, pink, red), or inverse and primary, which switch everything inside to a contrasting palette and do not nest. `border` (all, top, bottom, start, end, x, y), `radius`, and `shadow` finish it. `overflow`: hidden clips children to the radius; scroll makes a row scroll sideways instead of wrapping (set `label` to name it). Responsive props follow the width of the page column or canvas frame, never the browser window (sm 576, md 672, lg 896 pixels): `stackBelow` turns a row into a column below that width; on such a row, `alignBelow` (start, center, end, stretch) is the `align` to use once it has stacked, so `align: \"center\"` on the row does not shrink each stacked child to its content, and `reverseBelow` draws the stacked children in reverse order (words above a picture that sits first in the row; keyboard and reading order stay as written, so do not use it across buttons, links, or fields). `hideBelow` and `hideAbove` hide the Box. `label` names it for screen readers.",
-  Icon: `An icon by name, in the text color. \`size\`: xs to xl. \`tone\`: default, muted, or a status tone. Decorative unless \`label\` is set. Names: ${uiIconNames.join(", ")}.`,
+  Icon: `An icon by name, in the text color. \`size\`: xs to xl. \`tone\`: default, muted, a status tone (info, success, warning, danger), or accent (the theme's accent color). Decorative unless \`label\` is set. Names: ${uiIconNames.join(", ")}.`,
   Placeholder: "A neutral stand-in so a mockup needs no upload. `variant`: image (default), video, or map fill the width at `ratio` (square, photo 4:3, video 16:9, wide 21:9, portrait 3:4); logo is a small wordmark box; avatar is a small circle. `label` says what goes there. `frame`: browser or phone draws a plain window or phone around an image, video, or map stand-in, for a product shot; the frame is decoration with no working controls.",
 } as const;

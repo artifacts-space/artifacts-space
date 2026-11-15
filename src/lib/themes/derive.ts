@@ -351,17 +351,32 @@ export const toneTintMax = 0.12;
 export const dangerHoverMix = 0.14;
 
 /**
- * Status tones on the themed card, page, quiet surfaces (--secondary,
- * --muted, --accent), and every block hue's background (a Box can be
- * painted with one). A tone is text there and on its own tint over each (a
- * badge), so it keeps the site's hue and chroma and is re-lit until it
- * reads at 4.5:1 on every one. Dots and edges use the same token.
+ * How far a pressed Button's fill moves under the pointer: the text color
+ * (its fill) mixed this far toward the page color (its label), in OKLCH.
+ * The text color reads on every surface at 4.5:1 and the page color on it,
+ * so a small step keeps both pairs well clear of their minimums; the
+ * surface rule in `surface-scope.test.ts` holds them over every preset. The
+ * Button's class in `src/components/artifact-view/ui/inputs.tsx` carries
+ * the same number, and a test holds the two together.
+ */
+export const pressedHoverMix = 0.12;
+
+/**
+ * Status tones, and the accent tone, on the themed card, page, quiet
+ * surfaces (--secondary, --muted, --accent), and every block hue's
+ * background (a Box can be painted with one). A tone is text there and on
+ * its own tint over each (a badge), so it keeps its hue and chroma and is
+ * re-lit until it reads at 4.5:1 on every one. The status tones start from
+ * the site's hues; the accent tone starts from the theme's accent, so it is
+ * the theme's own color as text (on the site palette, whose accent is its
+ * ink, the ink). Dots and edges use the same token.
  */
 export function toneTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
   const card = read(colors.card);
   const surfaces = paintedSurfaces(mode, colors);
   const reads = (tone: Oklch) => surfaces.every((surface) => contrastRatio(tone, surface) >= 4.55 && contrastRatio(tone, paintOver(tone, toneTintMax, surface)) >= 4.55);
-  return Object.fromEntries(toneRoles.map((role) => [`--tone-${role}`, formatOklch(holdApart(read(siteTones[mode][role]), card, reads))]));
+  const seeds: [string, string][] = [...toneRoles.map((role): [string, string] => [role, siteTones[mode][role]]), ["accent", colors.accent]];
+  return Object.fromEntries(seeds.map(([role, seed]) => [`--tone-${role}`, formatOklch(holdApart(read(seed), card, reads))]));
 }
 
 /** Every CSS token a palette sets, keyed by custom property name, with canonical color values. */

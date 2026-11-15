@@ -77,8 +77,16 @@ export const iconDocs: Record<"Icon", ComponentDoc> = {
         }),
       },
       { title: "Named for screen readers", note: "With a `label` the icon is announced; without one it is decorative.", spec: single("Icon", { name: "star", size: "lg", tone: "warning", label: "Rated five stars" }) },
+      {
+        title: "In the accent color",
+        spec: spec("row", {
+          row: { type: "Box", props: { direction: "horizontal", align: "center", gap: "sm" }, children: ["mark", "words"] },
+          mark: icon("sparkles", { tone: "accent" }),
+          words: text("New in this release.", { tone: "accent" }),
+        }),
+      },
     ],
-    rules: ["`name` is one of the listed icon names. An unknown name fails validation.", "An icon that carries meaning on its own needs a `label`."],
+    rules: ["`name` is one of the listed icon names. An unknown name fails validation.", "An icon that carries meaning on its own needs a `label`.", "`tone`: default, muted, a status tone (info, success, warning, danger), or accent, the theme's accent color. Every tone reads on every Box surface and in every theme."],
   },
 };
 

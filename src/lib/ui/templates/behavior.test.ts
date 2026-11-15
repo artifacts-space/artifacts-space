@@ -187,14 +187,34 @@ describe("pressButtons, for a button that says whether what it opens is open", (
     expect(find(sample(), "Open menu")?.expanded).toBeNull();
   });
 
-  it("should read every toggle that says whether it is open in the templates", async () => {
+  it("should read every toggle that says whether it is open, or whether it is on, in the templates", async () => {
     const { uiTemplates } = await import("./index");
-    const toggles = uiTemplates.flatMap((template) => pressButtons(template).buttons.filter((button) => button.action === "toggleState").map((button) => ({ id: template.id, key: button.key, expanded: button.expanded })));
+    const toggles = uiTemplates.flatMap((template) => pressButtons(template).buttons.filter((button) => button.action === "toggleState").map((button) => ({ id: template.id, key: button.key, state: button.expanded ?? button.pressed, both: button.expanded !== null && button.pressed !== null })));
     expect(toggles.length).toBeGreaterThan(0);
-    // Every menu toggle in the templates says whether its menu is open, and the fragment can follow it.
-    expect(toggles.filter((toggle) => toggle.expanded === null)).toEqual([]);
-    // A press flips it, whichever way the menu starts (navbar-collapsible starts open).
-    for (const toggle of toggles) expect(toggle.expanded?.afterPress, `${toggle.id} "${toggle.key}"`).toBe(toggle.expanded?.atStart === false);
+    // Every toggle in the templates says whether its menu is open (expanded) or whether it is on (pressed), and the fragment can follow it.
+    expect(toggles.filter((toggle) => toggle.state === null)).toEqual([]);
+    expect(toggles.filter((toggle) => toggle.both)).toEqual([]);
+    // A press flips it, whichever way it starts (navbar-collapsible starts open).
+    for (const toggle of toggles) expect(toggle.state?.afterPress, `${toggle.id} "${toggle.key}"`).toBe(toggle.state?.atStart === false);
+  });
+});
+
+describe("pressButtons, for a toggle that says whether it is on", () => {
+  const find = (template: UiTemplate, label: string) => pressButtons(template).buttons.find((button) => button.label === label);
+  const bold = (pressed: unknown): TemplateElement => ({ type: "Button", props: { label: "Bold", pressed }, on: { press: { action: "toggleState", params: { statePath: "/bold" } } } });
+
+  it("should read pressed from the state a toggle flips, before and after the press", () => {
+    expect(find(sample({ bold: bold({ $state: "/bold" }) }, { bold: false }), "Bold")?.pressed).toEqual({ atStart: false, afterPress: true });
+    expect(find(sample({ bold: bold({ $state: "/bold" }) }, { bold: true }), "Bold")?.pressed).toEqual({ atStart: true, afterPress: false });
+  });
+
+  it("should leave expanded unread on a toggle that says only whether it is on", () => {
+    expect(find(sample({ bold: bold({ $state: "/bold" }) }, { bold: false }), "Bold")?.expanded).toBeNull();
+  });
+
+  it("should leave pressed unread when the button has none, or the fragment cannot resolve it", () => {
+    expect(find(sample({ bold: bold(undefined) }, { bold: false }), "Bold")?.pressed).toBeNull();
+    expect(find(sample({ bold: bold({ $or: [{ $state: "/bold" }, { $state: "/sent" }] }) }, { bold: false }), "Bold")?.pressed).toBeNull();
   });
 });
 

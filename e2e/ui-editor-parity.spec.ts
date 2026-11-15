@@ -8,7 +8,8 @@ import { expect, test } from "./support/test";
  * Heading sizes, weights, tones and alignment, Badge variants and icons, a
  * List's markers, Button sizes and the danger fill, a Textarea's rows, a
  * vertical rule, a plain Metric, a row drawn in reverse once it has
- * stacked, a Box that grows in a row, a Link's icon at either side). It is drawn for readers in the gallery and opened in the editor on
+ * stacked, a Box that grows in a row, a Link's icon at either side, the
+ * accent tone on Text and a Badge, a pressed Button). It is drawn for readers in the gallery and opened in the editor on
  * the editor fixture, and each block's computed style is compared between
  * the two.
  */
@@ -17,7 +18,7 @@ import { expect, test } from "./support/test";
 const textStyle = ["color", "font-size", "font-weight", "font-family", "text-align", "text-transform", "letter-spacing", "line-height", "text-decoration-line"] as const;
 
 /** Every block with words, by its words. */
-const words = ["Product", "Pricing", "Changelog", "Careers", "New this week", "Count every shelf", "Stock that keeps up", "Small heading at the end", "order-4821", "Ends on Friday", "Shipped", "Beta", "Draft", "Unlimited projects", "Weekly reports", "Grows to fill the row", "Words first on a phone", "Shelves counted"];
+const words = ["Product", "Pricing", "Changelog", "Careers", "New this week", "Count every shelf", "Stock that keeps up", "Small heading at the end", "order-4821", "Ends on Friday", "Shipped", "Beta", "Draft", "Unlimited projects", "Weekly reports", "Grows to fill the row", "Words first on a phone", "Shelves counted", "Picked by the team", "Featured"];
 
 const readView = (page: Page) => page.locator('section#specs [data-specimen="Styled blocks"]');
 const editorView = (page: Page) => page.locator("[data-slot=ui-block-editor]");
@@ -44,12 +45,13 @@ async function drawn(view: Locator) {
   const text: Record<string, Record<string, string>> = {};
   for (const word of words) text[word] = await styleOf(view.getByText(word, { exact: true }), textStyle);
   const boxes: Record<string, Awaited<ReturnType<typeof boxOf>>> = {};
-  for (const word of ["Shipped", "Beta", "Draft", "Unlimited projects", "Weekly reports"]) boxes[word] = await boxOf(view.getByText(word, { exact: true }));
+  for (const word of ["Shipped", "Beta", "Draft", "Featured", "Unlimited projects", "Weekly reports"]) boxes[word] = await boxOf(view.getByText(word, { exact: true }));
   const hero = view.getByRole("group", { name: "Styled hero" });
   const width = (target: Locator) => target.evaluate((element) => element.getBoundingClientRect().width);
   const row = await width(hero);
   const art = await width(hero.getByRole("img", { name: "Screenshot" }));
-  const buttons = await Promise.all(["Start free", "Open menu", "Delete draft"].map((name) => styleOf(view.getByRole("button", { name }), ["height", "font-size", "color", "background-color"])));
+  const buttons = await Promise.all(["Start free", "Open menu", "Delete draft", "Bold"].map((name) => styleOf(view.getByRole("button", { name }), ["height", "font-size", "color", "background-color", "border-top-color", "outline-style", "outline-color", "outline-offset"])));
+  const pressed = await view.getByRole("button", { name: "Bold" }).getAttribute("aria-pressed");
   // The rule between the buttons, as tall as its row.
   const rule = Math.round(await view.getByRole("separator").first().evaluate((element) => element.getBoundingClientRect().height));
   // The row that stacks in reverse: whether its words sit above its picture, and the share of the row the picture takes.
@@ -62,7 +64,7 @@ async function drawn(view: Locator) {
   const stat = await styleOf(view.getByText("Shelves counted", { exact: true }).locator("xpath=.."), ["box-shadow", "padding-top", "border-top-width"]);
   const height = (name: string) => view.getByRole("textbox", { name, exact: true }).evaluate((element) => Math.round(element.getBoundingClientRect().height));
   const notes = { short: await height("Short note"), long: await height("Long note") };
-  return { text, boxes, artShare: Math.round((art / row) * 100), buttons, notes, rule, wordsFirst, shotShare, stat };
+  return { text, boxes, artShare: Math.round((art / row) * 100), buttons, pressed, notes, rule, wordsFirst, shotShare, stat };
 }
 
 /** A link's icon: the side it is drawn on, its size, its color, and the gap to the words. */
@@ -97,6 +99,11 @@ function expectStyledFixture(forReaders: Drawn, isMobile: boolean) {
   expect(forReaders.rule).toBeGreaterThan(20);
   expect(forReaders.stat["box-shadow"]).toBe("none");
   expect(forReaders.buttons[2]?.["background-color"]).not.toBe(forReaders.buttons[0]?.["background-color"]);
+  // The pressed Button: on, filled with the text color, and its inner line drawn; the accent words are not the body color.
+  expect(forReaders.pressed).toBe("true");
+  expect(forReaders.buttons[3]?.["outline-style"]).toBe("solid");
+  expect(forReaders.buttons[3]?.["background-color"]).toBe(forReaders.text["Grows to fill the row"]?.color);
+  expect(forReaders.boxes.Featured?.edge).not.toBe(forReaders.boxes.Draft?.edge);
   // On a phone the row has stacked, words first; on a desktop it is a row with the picture first.
   expect(forReaders.wordsFirst).toBe(isMobile);
 }
@@ -125,6 +132,7 @@ test("should draw every styled block in the editor as it is drawn for readers", 
   for (const word of words) expect(inEditor.text[word], `the words "${word}"`).toEqual(forReaders.text[word]);
   expect(inEditor.boxes).toEqual(forReaders.boxes);
   expect(inEditor.buttons).toEqual(forReaders.buttons);
+  expect(inEditor.pressed, "the pressed Button says it is on").toBe(forReaders.pressed);
   expect(inEditor.notes, "the heights of the two-row and six-row text areas").toEqual(forReaders.notes);
   expect(inEditor.stat, "the plain Metric").toEqual(forReaders.stat);
   expect(inEditor.wordsFirst, "the order of the row that stacks in reverse").toBe(forReaders.wordsFirst);

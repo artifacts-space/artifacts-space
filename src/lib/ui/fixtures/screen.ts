@@ -40,6 +40,7 @@ export const iconFixtures: ComponentFixture[] = [
   { name: "Small and muted", props: { name: "chevron-right", size: "xs", tone: "muted" } },
   { name: "Extra large, success", props: { name: "circle-check", size: "xl", tone: "success" } },
   { name: "Labelled", props: { name: "star", tone: "warning", label: "Rated five stars" } },
+  { name: "Accent", props: { name: "sparkles", size: "lg", tone: "accent" } },
 ];
 
 export const placeholderFixtures: ComponentFixture[] = [
@@ -62,6 +63,7 @@ export const screenTextFixtures: ComponentFixture[] = [
   { name: "Price, 4xl semibold", props: { text: "$29", size: "4xl", weight: "semibold" } },
   { name: "Centered, clamped to two lines", props: { text: `${longLabel}. ${longLabel}. ${longLabel}.`, align: "center", clamp: 2 } },
   { name: "Danger tone, end aligned", props: { text: "Payment failed.", tone: "danger", align: "end", size: "xs" } },
+  { name: "Accent tone, semibold", props: { text: "New this month", tone: "accent", weight: "semibold" } },
 ];
 
 export const screenHeadingFixtures: ComponentFixture[] = [
@@ -83,9 +85,12 @@ export const screenLinkFixtures: ComponentFixture[] = [
 
 type Elements = Record<string, { type: string; props: Record<string, unknown>; children?: string[] }>;
 
-const tones = ["info", "success", "warning", "danger"] as const;
+const tones = ["info", "success", "warning", "danger", "accent"] as const;
 
-/** One surface with everything that must read on it: body and muted text, each status tone as text and as an icon, a rule, links, and buttons. */
+/** A pressed Button of each variant that takes it, by its label: the text color as the fill on every one. */
+const pressedButtons = { bold: "default", italic: "outline", starred: "secondary", saved: "ghost" } as const;
+
+/** One surface with everything that must read on it: body and muted text, each status tone and the accent as text and as an icon, a rule, links, and buttons, pressed ones included. */
 function surfaceElements(surface: BoxSurface): Elements {
   const id = (part: string) => `${surface}-${part}`;
   // A chart and a diagram draw their own colors, so the surfaces that switch the palette each hold one of both.
@@ -97,7 +102,7 @@ function surfaceElements(surface: BoxSurface): Elements {
     [id("tones")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: tones.flatMap((tone) => [id(`icon-${tone}`), id(`text-${tone}`)]) },
     [id("badges")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "sm", align: "center" }, children: tones.map((tone) => id(`badge-${tone}`)) },
     [id("rule")]: { type: "Separator", props: { label: "Details" } },
-    [id("actions")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: [id("primary"), id("outline"), id("danger"), id("nav"), id("quiet")] },
+    [id("actions")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: [id("primary"), id("outline"), id("danger"), ...Object.keys(pressedButtons).map(id), id("nav"), id("quiet")] },
     [id("primary")]: { type: "Button", props: { label: "Primary" } },
     [id("outline")]: { type: "Button", props: { label: "Outline", variant: "outline" } },
     [id("danger")]: { type: "Button", props: { label: "Delete", variant: "danger", icon: "trash" } },
@@ -108,6 +113,9 @@ function surfaceElements(surface: BoxSurface): Elements {
     elements[id("chart")] = { type: "Chart", props: { type: "bar", title: `Orders on the ${surface} surface`, labels: ["Q1", "Q2", "Q3"], series: [{ name: "Online", values: [4, 6, 5] }, { name: "In store", values: [3, 2, 4] }, { name: "Phone", values: [1, 2, 1] }] } };
     elements[id("diagram")] = { type: "Diagram", props: { title: `Flow on the ${surface} surface`, code: "flowchart LR\n  A[Order] --> B[Pack] --> C[Ship]" } };
   }
+  for (const [key, variant] of Object.entries(pressedButtons)) {
+    elements[id(key)] = { type: "Button", props: { label: key.charAt(0).toUpperCase() + key.slice(1), variant, pressed: true } };
+  }
   for (const tone of tones) {
     elements[id(`icon-${tone}`)] = { type: "Icon", props: { name: "circle-check", size: "sm", tone } };
     elements[id(`text-${tone}`)] = { type: "Text", props: { text: `${tone} text`, tone, size: "sm" } };
@@ -116,7 +124,7 @@ function surfaceElements(surface: BoxSurface): Elements {
   return elements;
 }
 
-/** Every Box surface with every text tone and every tone badge on it, and a chart and a diagram on the two that switch the palette, for the contrast scan in light, in dark, and under themes. */
+/** Every Box surface with every text tone, every tone badge, and a pressed Button of each variant on it, and a chart and a diagram on the two that switch the palette, for the contrast scan in light, in dark, and under themes. */
 export const surfaceMatrixSpec = {
   version: 1,
   root: "page",
@@ -181,7 +189,7 @@ export const styledBlocksSpec = {
   version: 1,
   root: "page",
   elements: {
-    page: { type: "Box", props: { gap: "md" }, children: ["nav", "eyebrow", "title", "lead", "sub", "mono", "caption", "badges", "features", "actions", "note-short", "note-long", "hero", "stacked", "stat"] },
+    page: { type: "Box", props: { gap: "md" }, children: ["nav", "eyebrow", "title", "lead", "sub", "mono", "caption", "accent-note", "badges", "features", "actions", "note-short", "note-long", "hero", "stacked", "stat"] },
     nav: { type: "Box", props: { direction: "horizontal", align: "center", justify: "between", gap: "md", padding: "md", border: "bottom", wrap: true, label: "Styled navigation" }, children: ["nav-links", "nav-docs"] },
     "nav-links": { type: "Box", props: { direction: "horizontal", gap: "lg", wrap: true }, children: ["link-active", "link-plain", "link-muted-active", "link-muted"] },
     "link-active": { type: "Link", props: { label: "Product", variant: "nav", active: true } },
@@ -195,10 +203,13 @@ export const styledBlocksSpec = {
     sub: { type: "Heading", props: { text: "Small heading at the end", level: 3, size: "sm", align: "end" } },
     mono: { type: "Text", props: { text: "order-4821", variant: "mono" } },
     caption: { type: "Text", props: { text: "Ends on Friday", variant: "caption", tone: "danger", weight: "medium", align: "end", clamp: 1 } },
-    badges: { type: "Box", props: { direction: "horizontal", gap: "sm", wrap: true }, children: ["badge-solid", "badge-outline", "badge-soft"] },
+    "accent-note": { type: "Text", props: { text: "Picked by the team", tone: "accent", size: "sm" } },
+    badges: { type: "Box", props: { direction: "horizontal", gap: "sm", wrap: true, align: "center" }, children: ["badge-solid", "badge-outline", "badge-soft", "badge-accent", "toggle-bold"] },
     "badge-solid": { type: "Badge", props: { label: "Shipped", tone: "success", variant: "solid", icon: "check" } },
     "badge-outline": { type: "Badge", props: { label: "Beta", tone: "info", variant: "outline" } },
     "badge-soft": { type: "Badge", props: { label: "Draft" } },
+    "badge-accent": { type: "Badge", props: { label: "Featured", tone: "accent", variant: "outline" } },
+    "toggle-bold": { type: "Button", props: { label: "Bold", variant: "outline", size: "sm", pressed: true } },
     features: { type: "List", props: { marker: "check", items: ["Unlimited projects", "Weekly reports"] } },
     actions: { type: "Box", props: { direction: "horizontal", gap: "sm", align: "center" }, children: ["action-start", "action-rule", "action-menu", "action-delete"] },
     "action-rule": { type: "Separator", props: { orientation: "vertical" } },
