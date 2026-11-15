@@ -8,12 +8,14 @@ import { cn } from "@/lib/utils";
  * A link from artifact content. Only http, https, and mailto URLs become
  * links; anything else renders as plain text. Links open in a new tab with
  * rel="noopener noreferrer nofollow ugc" and show an external-link mark.
+ * `current` marks the link as the page a reader is on.
  */
-export function ExternalLink({ href, children, className }: { href: unknown; children: ReactNode; className?: string }) {
+export function ExternalLink({ href, children, className, current }: { href: unknown; children: ReactNode; className?: string; current?: boolean | undefined }) {
   const safe = safeHref(href);
   if (!safe) return <span className={className}>{children}</span>;
   return (
     <a
+      aria-current={current ? "page" : undefined}
       href={safe}
       target="_blank"
       rel={externalLinkRel}

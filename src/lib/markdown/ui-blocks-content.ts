@@ -91,7 +91,6 @@ function headingBlock({ props, level }: BlockContext): string[] {
   return [heading(level + own - 1, text)];
 }
 
-/** Renderers for layout, content, and media components. */
 /** A link with an address, or just its words when it goes nowhere (a mockup's menu item). */
 function linkBlock({ props }: BlockContext): string[] {
   const label = textOf(props.label) ?? "";
@@ -113,6 +112,7 @@ function placeholder({ props }: BlockContext): string[] {
   return [`_${name} placeholder${label ? `: ${inlineText(label)}` : ""}_`];
 }
 
+/** Renderers for layout, content, and media components. */
 export const contentBlocks: Record<string, BlockRenderer> = {
   Section: titled,
   Card: titled,

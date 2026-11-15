@@ -199,7 +199,7 @@ export function LinkView({ props }: ViewProps<"Link">) {
   if (variant === "inline") {
     return (
       <span className="min-w-0 text-md break-words">
-        <ExternalLink href={href}>{props.label}</ExternalLink>
+        <ExternalLink href={href} current={props.active}>{props.label}</ExternalLink>
       </span>
     );
   }

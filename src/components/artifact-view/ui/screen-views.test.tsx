@@ -131,6 +131,22 @@ describe("screen props on Text, Heading, and Link", () => {
     expect(html).toContain(">Docs</span>");
   });
 
+  it.each(["inline", "nav", "muted"] as const)("should mark the current page on a %s Link when active is set, with and without an address", (variant) => {
+    const linked = renderToStaticMarkup(<LinkView props={{ label: "Docs", href: "https://example.com/docs", variant, active: true }} emit={emit} />);
+    expect(linked).toMatch(/<a [^>]*aria-current="page"/);
+    const plain = renderToStaticMarkup(<LinkView props={{ label: "Docs", variant, active: true }} emit={emit} />);
+    expect(plain).toMatch(/<span [^>]*aria-current="page"/);
+    expect(plain).not.toContain("<a");
+  });
+
+  it.each(["inline", "nav", "muted"] as const)("should not mark the current page on a %s Link when active is not set, with and without an address", (variant) => {
+    const linked = renderToStaticMarkup(<LinkView props={{ label: "Docs", href: "https://example.com/docs", variant }} emit={emit} />);
+    const plain = renderToStaticMarkup(<LinkView props={{ label: "Docs", variant }} emit={emit} />);
+    expect(linked).toContain("<a ");
+    expect(linked).not.toContain("aria-current");
+    expect(plain).not.toContain("aria-current");
+  });
+
   it("should open a nav link in a new tab under the same rules as every artifact link", () => {
     const html = renderToStaticMarkup(<LinkView props={{ label: "Pricing", href: "https://example.com/pricing", variant: "nav" }} emit={emit} />);
     expect(html).toContain('href="https://example.com/pricing"');
