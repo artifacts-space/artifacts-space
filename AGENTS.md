@@ -997,16 +997,22 @@ template text is ours, so the tools add no untrusted-content label.
 - Do not write a test for a template. `templates.test.ts` runs
   `templateProblems` (`rules.ts`) over every template in the index.
   `e2e/templates.spec.ts` draws each category on
-  `/dev/templates?category=<name>` at 1440, 768, and 390 pixels and checks
-  that every template stays inside its frames, passes axe, and passes color
-  contrast in light and in dark. `e2e/templates-behavior.spec.ts` reads each
-  template at 1440, 768, 640 (the tablet frame made narrower), and 390,
-  which sit on either side of every width step (576, 672, 896): it presses
-  every button whose press sets state and checks that its own frame changes,
-  no other does, and the button that undoes it brings the frame back; that
-  every link and button reachable at 1440 is reachable at the narrower
-  widths, at rest or with a panel open; and that no link, button, or picture
-  is drawn more often at 768 or 640 than at either end. What it presses and
+  `/dev/templates?category=<name>` in the frames its `viewport` names
+  (`templateFrameWidths` in `frames.ts`, the one record the page and the
+  specs read: 1440, 768, and 390 pixels for `fluid`, 1440 and 768 for
+  `wide`, 390 for `phone`) and checks that every template stays inside its
+  frames, passes axe, and passes color contrast in light and in dark.
+  `e2e/templates-behavior.spec.ts` reads each template in those frames, and
+  a fluid one also at 640 (the tablet frame made narrower), so its readings
+  sit on either side of every width step (576, 672, 896): it presses every
+  button whose press sets state and checks that its own frame changes, no
+  other does, and the button that undoes it brings the frame back; that
+  every link and button reachable in the widest frame is reachable at the
+  narrower widths, at rest or with a panel open; and that no link, button,
+  or picture is drawn more often between the ends than at either end. A
+  press nothing undoes is checked for its change only, and the test notes
+  why: a `setState` no button writes back, and every `pushState` and
+  `removeState` (`oneWayReasons`). What it presses and
   counts is read from the fragment (`behavior.ts`), never from a list. A
   link or button left out of narrow frames on purpose goes in
   `leftOutWhenNarrow` in that spec, with its reason. All of them name the

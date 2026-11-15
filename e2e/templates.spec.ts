@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 
+import { templateFrameWidths } from "../src/lib/ui/templates/frames";
 import { templateCategoriesInUse, templatesIn, uiTemplates } from "../src/lib/ui/templates/index";
 import type { TemplateCategory, UiTemplate } from "../src/lib/ui/templates/types";
 
@@ -19,9 +20,8 @@ import { expect, test } from "./support/test";
 /** The categories that have templates. Every template has one category, so the loops below reach every template. */
 const categories = templateCategoriesInUse();
 
-/** The same widths the page draws each viewport at (templateFrameWidths in templates-fixture.tsx, which a spec cannot import: it is a client component). */
-const frameWidths = { fluid: [1440, 768, 390], wide: [1440, 768], phone: [390] } as const;
-const widthsOf = (template: UiTemplate) => frameWidths[template.viewport];
+/** The widths the page draws a template at: the record the page itself reads. */
+const widthsOf = (template: UiTemplate) => templateFrameWidths[template.viewport];
 
 /*
  * The page streams its content, and a stored theme can update the page

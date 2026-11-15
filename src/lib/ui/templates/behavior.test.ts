@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { actionHides, actionLabels, pictureLabels, pressButtons } from "./behavior";
+import { actionHides, actionLabels, oneWayReasons, pictureLabels, pressButtons } from "./behavior";
 import type { TemplateElement, UiTemplate } from "./types";
 
 /** A navbar in small: links from a list, a sign-in link, a menu that opens and closes, a form that sends, and a picture. */
@@ -65,6 +65,43 @@ describe("pressButtons", () => {
     const found = pressButtons(sample(more));
     expect(found.buttons.map((button) => button.label)).toEqual(["Open menu", "Close menu", "Send"]);
     expect(found.unlabelled).toEqual(["remove"]);
+  });
+});
+
+describe("pressButtons, for a push and a remove", () => {
+  /** A list a reader adds to and takes from: "Add link" pushes, and each row's "Remove link" takes that row. */
+  const list: Record<string, TemplateElement> = {
+    add: { type: "Button", props: { label: "Add link" }, on: { press: { action: "pushState", params: { statePath: "/links", value: { label: "Docs" } } } } },
+    row: { type: "Box", props: {}, repeat: { statePath: "/links" }, children: ["remove"] },
+    remove: { type: "Button", props: { label: "Remove link" }, on: { press: { action: "removeState", params: { statePath: "/links", index: { $index: true } } } } },
+  };
+  const find = (template: UiTemplate, label: string) => pressButtons(template).buttons.find((button) => button.label === label);
+
+  it("should read a push as a press that changes the start and that no press undoes, when a remove on the same list exists", () => {
+    expect(find(sample(list), "Add link")).toMatchObject({ action: "pushState", statePath: "/links", changesStart: true, restoredBy: [], oneWay: oneWayReasons.pushState });
+  });
+
+  it("should read a remove as one-way, and as changing the start only when its list starts with an item to take", () => {
+    expect(find(sample(list), "Remove link")).toMatchObject({ action: "removeState", changesStart: true, restoredBy: [], oneWay: oneWayReasons.removeState });
+    expect(find(sample(list, { links: [] }), "Remove link")).toMatchObject({ changesStart: false, oneWay: oneWayReasons.removeState });
+    expect(find(sample(list, { links: "none" }), "Remove link")?.changesStart).toBe(false);
+  });
+
+  it("should read a remove at a fixed place as changing the start only when the list has an item there", () => {
+    const fixed = (index: number): Record<string, TemplateElement> => ({ remove: { type: "Button", props: { label: "Remove link" }, on: { press: { action: "removeState", params: { statePath: "/links", index } } } } });
+    expect(find(sample(fixed(1)), "Remove link")?.changesStart).toBe(true);
+    expect(find(sample(fixed(2)), "Remove link")?.changesStart).toBe(false);
+  });
+
+  it("should give a reason to a setState nothing undoes, and none to one that is undone or writes the starting value", () => {
+    expect(find(sample(), "Send")).toMatchObject({ action: "setState", oneWay: oneWayReasons.setState });
+    expect(find(sample(), "Open menu")?.oneWay).toBeNull();
+    expect(find(sample(), "Close menu")?.oneWay).toBeNull();
+  });
+
+  it("should never pair a setState with a push or a remove on the same path", () => {
+    const more: Record<string, TemplateElement> = { reset: { type: "Button", props: { label: "Add link" }, on: { press: { action: "pushState", params: { statePath: "/open", value: false } } } } };
+    expect(find(sample(more), "Open menu")?.restoredBy).toEqual(["Close menu"]);
   });
 });
 

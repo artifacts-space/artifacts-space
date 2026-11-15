@@ -7,20 +7,10 @@ import { UiView } from "@/components/artifact-view/ui-view";
 import { ScrollFrame } from "@/components/docs/scroll-frame";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { useHydrated } from "@/components/use-hydrated";
+import { templateFrameWidths, type TemplateFrameWidth } from "@/lib/ui/templates/frames";
 import { templateCategoriesInUse, templatesIn, uiTemplates } from "@/lib/ui/templates/index";
 import { templateAsSpec } from "@/lib/ui/templates/instantiate";
-import type { TemplateViewport, UiTemplate } from "@/lib/ui/templates/types";
-
-/** A frame width on the page: a desktop, a tablet, and a phone. */
-export type TemplateFrameWidth = 1440 | 768 | 390;
-
-/**
- * The frame widths a template is drawn at, by the viewport it is made for.
- * The tablet frame sits between the width steps the blocks change at (576,
- * 672, and 896 pixels), where a layout made for the two ends can show a
- * part twice or not at all.
- */
-export const templateFrameWidths: Record<TemplateViewport, readonly TemplateFrameWidth[]> = { fluid: [1440, 768, 390], wide: [1440, 768], phone: [390] };
+import type { UiTemplate } from "@/lib/ui/templates/types";
 
 const frameWidthClass: Record<TemplateFrameWidth, string> = { 1440: "w-[1440px]", 768: "w-[768px]", 390: "w-[390px]" };
 
