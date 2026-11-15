@@ -1,5 +1,3 @@
-import { appScreenTemplates } from "./app-2";
-import { appMomentTemplates } from "./app-3";
 import type { UiTemplate } from "./types";
 
 /**
@@ -8,10 +6,11 @@ import type { UiTemplate } from "./types";
  * sign-in screens and the shell are here; app-2.ts holds the working screens
  * (dashboard, table, detail, settings, checkout) and app-3.ts the small
  * moments (empty state, error, dialog, command menu, notifications). The
- * shared test (templates.test.ts) and the e2e loop (e2e/templates.spec.ts)
- * cover every template added to any of the three.
+ * index (index.ts) lists the three files under the app batch, in that order.
+ * The shared test (templates.test.ts) and the e2e loop
+ * (e2e/templates.spec.ts) cover every template added to any of the three.
  */
-const entryTemplates: readonly UiTemplate[] = [
+export const appTemplates: readonly UiTemplate[] = [
   {
     id: "auth-sign-in-card",
     name: "Sign in, centered card",
@@ -240,6 +239,3 @@ const entryTemplates: readonly UiTemplate[] = [
     },
   },
 ];
-
-/** Every app screen template, from the three files of this batch. */
-export const appTemplates: readonly UiTemplate[] = [...entryTemplates, ...appScreenTemplates, ...appMomentTemplates];

@@ -19,7 +19,7 @@ async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/templat
 
 /**
  * Development-only page for the templates e2e tests: section templates
- * (src/lib/ui/templates) drawn by the real renderer at 1440 and at 390
+ * (src/lib/ui/templates) drawn by the real renderer at 1440, 768, and 390
  * pixels wide, without a database. `?category=<name>` draws one category,
  * `?template=<id>` one template, and with neither the page lists the
  * categories. Returns 404 in every other environment.

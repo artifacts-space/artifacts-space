@@ -988,12 +988,35 @@ template text is ours, so the tools add no untrusted-content label.
   (`templateCategories` in `types.ts`).
 - Add a template by adding it to its batch file (`nav.ts`, `heroes.ts`,
   `features.ts`, `pricing.ts`, `social.ts`, `app.ts`; the category says
-  which). Do not write a validity test for it: `templates.test.ts` runs
-  `templateProblems` (`rules.ts`) over every template in the index, and
+  which). A batch that outgrows one file continues in `social-2.ts`,
+  `app-2.ts`, and so on, and each file is one entry of `templateSources` in
+  `index.ts`: the index is built from that list and nothing else, so a
+  template is in the index only with the file it is written in, and
+  `templates.test.ts` reads each file for its ids. The docs' "Edit this
+  page" link reads the same list (`templateCategorySource`).
+- Do not write a test for a template. `templates.test.ts` runs
+  `templateProblems` (`rules.ts`) over every template in the index.
   `e2e/templates.spec.ts` draws each category on
-  `/dev/templates?category=<name>` at 1440 and 390 pixels and checks that
-  every template stays inside its frame, passes axe, and passes color
-  contrast in light and in dark. Both name the template that fails.
+  `/dev/templates?category=<name>` in the frames its `viewport` names
+  (`templateFrameWidths` in `frames.ts`, the one record the page and the
+  specs read: 1440, 768, and 390 pixels for `fluid`, 1440 and 768 for
+  `wide`, 390 for `phone`) and checks that every template stays inside its
+  frames, passes axe, and passes color contrast in light and in dark.
+  `e2e/templates-behavior.spec.ts` reads each template in those frames, and
+  a fluid one also at 640 (the tablet frame made narrower), so its readings
+  sit on either side of every width step (576, 672, 896): it presses every
+  button whose press sets state and checks that its own frame changes, no
+  other does, and the button that undoes it brings the frame back; that
+  every link and button reachable in the widest frame is reachable at the
+  narrower widths, at rest or with a panel open; and that no link, button,
+  or picture is drawn more often between the ends than at either end. A
+  press nothing undoes is checked for its change only, and the test notes
+  why: a `setState` no button writes back, and every `pushState` and
+  `removeState` (`oneWayReasons`). What it presses and
+  counts is read from the fragment (`behavior.ts`), never from a list. A
+  link or button left out of narrow frames on purpose goes in
+  `leftOutWhenNarrow` in that spec, with its reason. All of them name the
+  template that fails.
 - Pages stay light however many templates there are. `/dev/templates` draws
   one category (or `?template=<id>`), never all of them. The docs index
   (`/docs/json-render/templates`) has one row per template and no specs;
@@ -1017,13 +1040,26 @@ template text is ours, so the tools add no untrusted-content label.
   the root is a Box; at most 60 elements and 10 levels deep; its first
   heading is level 1 or 2, so stacked sections never skip a level; list content
   lives in `state` and is drawn by one `repeat`; every state path the
-  template reads or writes starts at a key of its own `state`; a bare
+  template reads or writes starts at a key of its own `state`; a Box that
+  hides links or buttons below a width step is paired with one that hides
+  links or buttons above the same step; the value a bound Select starts
+  with, and every string a condition compares it with, is one of its
+  options word for word (a Select's value is its option's words); a
+  state-changing button has a fixed label; a bare
   `${name}` in `$template` only inside a repeat; no Image or File (use
   Placeholder); links have no `href`, or point at example.com; `validateForm`
   names its `statePath`; every slot points at a prop that is set or a state
   value that exists; and the template, drawn as a spec, validates with no
   errors and no warnings. Copy is original placeholder text: no company
   names, no real logos, nothing taken from a block library.
+- A view never marks a part of itself as a landmark: one screen is often on
+  a page several times (three canvas frames, three widths here), and axe
+  then reports `landmark-unique`. An open Accordion panel is a group named
+  by its button, not a region (`AccordionView`, `accordion-view.test.tsx`);
+  `landmark-views.test.tsx` renders every component fixture and fails on a
+  new landmark, with the views still to change listed by reason.
+  `e2e/templates-canvas.spec.ts` scans one template screen in three frames
+  (`/dev/canvas?fixture=screens`).
 - An agent never gets a template's own keys. `instantiateTemplate`
   (`instantiate.ts`) puts every element key and every state path under a
   prefix (the template's id by default), so several templates, or one twice,

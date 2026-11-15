@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 
+import { templateFrameWidths } from "../src/lib/ui/templates/frames";
 import { templateCategoriesInUse, templatesIn, uiTemplates } from "../src/lib/ui/templates/index";
 import type { TemplateCategory, UiTemplate } from "../src/lib/ui/templates/types";
 
@@ -9,8 +10,8 @@ import { expect, test } from "./support/test";
 
 /*
  * Every section template (src/lib/ui/templates), drawn by the real renderer
- * on the fixture page /dev/templates at the widths it is made for: 1440
- * pixels, 390 pixels, or both. The page draws one category at a time
+ * on the fixture page /dev/templates at the widths it is made for: 1440,
+ * 768, and 390 pixels. The page draws one category at a time
  * (`?category=`), so it stays light however many templates there are. The
  * loops read the index, so a template added to a batch file is covered here
  * with no test of its own, and each failure names the template.
@@ -19,7 +20,8 @@ import { expect, test } from "./support/test";
 /** The categories that have templates. Every template has one category, so the loops below reach every template. */
 const categories = templateCategoriesInUse();
 
-const widthsOf = (template: UiTemplate) => (template.viewport === "fluid" ? [1440, 390] : template.viewport === "wide" ? [1440] : [390]);
+/** The widths the page draws a template at: the record the page itself reads. */
+const widthsOf = (template: UiTemplate) => templateFrameWidths[template.viewport];
 
 /*
  * The page streams its content, and a stored theme can update the page
@@ -247,10 +249,13 @@ test("should pass the same docs checks when the machine is slow, so no scan depe
 test("should name the billing switch in the HTML the server sends, before the browser runs", async ({ request }) => {
   const html = await (await request.get("/docs/json-render/templates/pricing")).text();
   const control = /<[a-z]+\b[^>]*role="switch"[^>]*>/.exec(html)?.[0] ?? "";
-  const labelId = /aria-labelledby="([^"]+)"/.exec(control)?.[1] ?? "missing";
+  // First that the switch is there at all: a label id read from nothing would say nothing.
   expect(control, "the switch in the server's HTML").not.toBe("");
-  expect(html).toContain(`id="${labelId}"`);
-  expect(html.slice(html.indexOf(`id="${labelId}"`), html.indexOf(`id="${labelId}"`) + 400)).toContain("Bill yearly and save two months");
+  const labelId = /aria-labelledby="([^"]+)"/.exec(control)?.[1];
+  expect(labelId, "the id the switch names its label by").toBeDefined();
+  expect(html).toContain(`id="${labelId ?? ""}"`);
+  const labelAt = html.indexOf(`id="${labelId ?? ""}"`);
+  expect(html.slice(labelAt, labelAt + 400)).toContain("Bill yearly and save two months");
 });
 
 test("should copy a template's spec, indented, from its docs page, though the page carries it compact", async ({ page, context, browserName }) => {

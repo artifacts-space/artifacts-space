@@ -76,6 +76,39 @@ describe("templateProblems", () => {
     expect(templateProblems(withElements({ sub: { type: "Heading", props: { text: "A detail", level: 3 } } }, ["title", "sub", "points"]), "heroes")).toEqual([]);
   });
 
+  it("should name a Box that hides a link below a step when none hides links or buttons above that step, and allow a pair", () => {
+    const narrow: TemplateElement = { type: "Box", props: { hideBelow: "md" }, children: ["go"] };
+    const go: TemplateElement = { type: "Link", props: { label: "Pricing" } };
+    const menu = (step: string): TemplateElement => ({ type: "Box", props: { hideAbove: step }, children: ["open"] });
+    const open: TemplateElement = { type: "Button", props: { label: "Open menu" } };
+    const children = ["title", "points", "narrow", "menu"];
+    expect(problemsOf(withElements({ narrow, go, menu: menu("sm"), open }, children))).toMatch(/element "narrow" hides links or buttons with `hideBelow: "md"`, but no Box holds any with `hideAbove: "md"`/);
+    expect(problemsOf(withElements({ narrow, go, menu: menu("sm"), open }, children))).toMatch(/element "menu" hides links or buttons with `hideAbove: "sm"`/);
+    expect(templateProblems(withElements({ narrow, go, menu: menu("md"), open }, children), "heroes")).toEqual([]);
+    // Words alone may hide with no counterpart.
+    expect(templateProblems(withElements({ narrow: { type: "Box", props: { hideBelow: "md" }, children: ["note"] }, note: { type: "Text", props: { text: "A note" } } }, ["title", "points", "narrow"]), "heroes")).toEqual([]);
+  });
+
+  it("should name a condition and a starting value that are not one of a bound Select's options, and allow ones that are", () => {
+    const speed: TemplateElement = { type: "Select", props: { label: "Speed", options: ["Standard", "Express"], value: { $bindState: "/speed" } } };
+    const cost = (words: string): TemplateElement => ({ type: "Text", props: { text: { $cond: { $state: "/speed", eq: words }, $then: "$12", $else: "Free" } } });
+    const withChoice = (start: string, words: string): UiTemplate => {
+      const base = withElements({ speed, cost: cost(words) }, ["title", "points", "speed", "cost"]);
+      return { ...base, fragment: { ...base.fragment, state: { ...base.fragment.state, speed: start } } };
+    };
+    expect(templateProblems(withChoice("Standard", "Express"), "heroes")).toEqual([]);
+    expect(templateProblems(withChoice("Standard", "Express, next day"), "heroes").join("\n")).toMatch(/a condition compares \/speed with "Express, next day", which is not one of the options of "speed"/);
+    expect(templateProblems(withChoice("Slow", "Express"), "heroes").join("\n")).toMatch(/element "speed" starts at "Slow" \(\/speed\), which is not one of its options/);
+  });
+
+  it("should name a state-changing button whose label is not fixed, and a label only the browser can resolve", () => {
+    const remove: TemplateElement = { type: "Button", props: { label: { $template: "Remove ${text}" } }, on: { press: { action: "removeState", params: { statePath: "/points", index: { $index: true } } } } };
+    const withRemove = withElements({ points: { type: "Box", props: {}, repeat: { statePath: "/points" }, children: ["point", "remove"] }, remove });
+    expect(problemsOf(withRemove)).toMatch(/element "remove" changes state when pressed, but its label is not written in the template/);
+    const either: TemplateElement = { type: "Link", props: { label: { $cond: { $state: "/points/0/text", eq: "Fast" }, $then: "Fast", $else: "Slow" } } };
+    expect(problemsOf(withElements({ either }, ["title", "points", "either"]))).toMatch(/element "either": its label cannot be read from the template/);
+  });
+
   it("should name a component that needs an upload", () => {
     expect(problemsOf(withElements({ shot: { type: "Image", props: { file: "00000000-0000-4000-8000-000000000000", alt: "x" } } }, ["title", "points", "shot"]))).toMatch(/Image needs an upload\. Use Placeholder/);
   });
