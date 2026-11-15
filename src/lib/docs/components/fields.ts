@@ -38,6 +38,14 @@ export const fieldDocs: Record<"Input" | "Textarea", ComponentDoc> = {
           search: { type: "Input", props: { label: "Search orders", hideLabel: true, type: "search", placeholder: "Search orders", fullWidth: true } },
         }),
       },
+      {
+        title: "With an icon",
+        note: "The icon is decoration. Screen readers hear the label, not the icon.",
+        spec: single("Box", { gap: "md", maxWidth: "sm" }, {
+          search: { type: "Input", props: { label: "Search", hideLabel: true, type: "search", placeholder: "Search projects", icon: "search", fullWidth: true } },
+          email: { type: "Input", props: { label: "Email", type: "email", placeholder: "you@example.com", icon: "mail", fullWidth: true } },
+        }),
+      },
     ],
     rules: [
       typedNote,
@@ -45,6 +53,7 @@ export const fieldDocs: Record<"Input" | "Textarea", ComponentDoc> = {
       "Password managers skip every field, and no field has a form around it.",
       noLinkRule,
       "`label` is required. `hideLabel` keeps it for screen readers only.",
+      "`icon` draws an icon by name (see Icon) at the start of the field. It is decoration, hidden from screen readers; the label still names the field.",
     ],
   },
   Textarea: {

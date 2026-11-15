@@ -8,7 +8,8 @@ import { expect, test } from "./support/test";
  * Heading sizes, weights, tones and alignment, Badge variants and icons, a
  * List's markers, Button sizes and the danger fill, a Textarea's rows, a
  * vertical rule, a plain Metric, a row drawn in reverse once it has
- * stacked, a Box that grows in a row, a Link's icon at either side). It is drawn for readers in the gallery and opened in the editor on
+ * stacked, a Box that grows in a row, a Link's icon at either side, a
+ * Badge's dot, and the display pieces: an AvatarGroup, a Kbd, a Rating). It is drawn for readers in the gallery and opened in the editor on
  * the editor fixture, and each block's computed style is compared between
  * the two.
  */
@@ -17,7 +18,7 @@ import { expect, test } from "./support/test";
 const textStyle = ["color", "font-size", "font-weight", "font-family", "text-align", "text-transform", "letter-spacing", "line-height", "text-decoration-line"] as const;
 
 /** Every block with words, by its words. */
-const words = ["Product", "Pricing", "Changelog", "Careers", "New this week", "Count every shelf", "Stock that keeps up", "Small heading at the end", "order-4821", "Ends on Friday", "Shipped", "Beta", "Draft", "Unlimited projects", "Weekly reports", "Grows to fill the row", "Words first on a phone", "Shelves counted"];
+const words = ["Product", "Pricing", "Changelog", "Careers", "New this week", "Count every shelf", "Stock that keeps up", "Small heading at the end", "order-4821", "Ends on Friday", "Shipped", "Beta", "Draft", "Unlimited projects", "Weekly reports", "Grows to fill the row", "Words first on a phone", "Shelves counted", "Online"];
 
 const readView = (page: Page) => page.locator('section#specs [data-specimen="Styled blocks"]');
 const editorView = (page: Page) => page.locator("[data-slot=ui-block-editor]");
@@ -30,13 +31,30 @@ function styleOf(target: Locator, properties: readonly string[]): Promise<Record
 }
 
 /** The box around a block's words (a badge's pill, a list item): its fill, its edge, and the icons in it. */
-function boxOf(target: Locator): Promise<{ fill: string; edge: string; icons: number; iconColor: string }> {
+function boxOf(target: Locator): Promise<{ fill: string; edge: string; icons: number; iconColor: string; dot: string }> {
   return target.evaluate((element) => {
     const box = element.parentElement ?? element;
     const style = getComputedStyle(box);
     const icon = box.querySelector("svg");
-    return { fill: style.backgroundColor, edge: style.borderTopColor, icons: box.querySelectorAll("svg").length, iconColor: icon ? getComputedStyle(icon).color : "" };
+    const dot = box.querySelector("[data-badge-dot]");
+    return { fill: style.backgroundColor, edge: style.borderTopColor, icons: box.querySelectorAll("svg").length, iconColor: icon ? getComputedStyle(icon).color : "", dot: dot ? getComputedStyle(dot).backgroundColor : "" };
   });
+}
+
+/** The display pieces' sizes, and what each shows: the circles of the avatar row, the keys, the stars, and the lone dot's color. */
+async function displayOf(view: Locator) {
+  const row = view.getByRole("group", { name: "Display pieces" });
+  const size = (target: Locator) => target.evaluate((element) => { const box = element.getBoundingClientRect(); return [Math.round(box.width), Math.round(box.height)]; });
+  const faces = row.getByRole("img", { name: /^3 people/ });
+  const stars = row.getByRole("img", { name: "3.5 out of 5" });
+  return {
+    faces: await size(faces),
+    circles: await faces.locator("[data-avatar-person], [data-avatar-more]").count(),
+    keys: await size(row.locator("kbd").first()),
+    stars: await size(stars),
+    full: await stars.locator('[data-star="full"]').count(),
+    lone: await row.locator('[data-badge-dot="only"]').evaluate((element) => getComputedStyle(element).backgroundColor),
+  };
 }
 
 /** How a view draws the fixture: each block's text style, the boxes that carry icons, and the widths in the row that grows. */
@@ -44,7 +62,7 @@ async function drawn(view: Locator) {
   const text: Record<string, Record<string, string>> = {};
   for (const word of words) text[word] = await styleOf(view.getByText(word, { exact: true }), textStyle);
   const boxes: Record<string, Awaited<ReturnType<typeof boxOf>>> = {};
-  for (const word of ["Shipped", "Beta", "Draft", "Unlimited projects", "Weekly reports"]) boxes[word] = await boxOf(view.getByText(word, { exact: true }));
+  for (const word of ["Shipped", "Beta", "Draft", "Online", "Unlimited projects", "Weekly reports"]) boxes[word] = await boxOf(view.getByText(word, { exact: true }));
   const hero = view.getByRole("group", { name: "Styled hero" });
   const width = (target: Locator) => target.evaluate((element) => element.getBoundingClientRect().width);
   const row = await width(hero);
@@ -62,7 +80,7 @@ async function drawn(view: Locator) {
   const stat = await styleOf(view.getByText("Shelves counted", { exact: true }).locator("xpath=.."), ["box-shadow", "padding-top", "border-top-width"]);
   const height = (name: string) => view.getByRole("textbox", { name, exact: true }).evaluate((element) => Math.round(element.getBoundingClientRect().height));
   const notes = { short: await height("Short note"), long: await height("Long note") };
-  return { text, boxes, artShare: Math.round((art / row) * 100), buttons, notes, rule, wordsFirst, shotShare, stat };
+  return { text, boxes, artShare: Math.round((art / row) * 100), buttons, notes, rule, wordsFirst, shotShare, stat, display: await displayOf(view) };
 }
 
 /** A link's icon: the side it is drawn on, its size, its color, and the gap to the words. */
@@ -92,6 +110,9 @@ function expectStyledFixture(forReaders: Drawn, isMobile: boolean) {
   expectStyledWords(forReaders.text);
   expect(forReaders.boxes.Shipped?.icons).toBe(1);
   expect(forReaders.boxes["Unlimited projects"]?.icons).toBe(1);
+  expect(forReaders.boxes.Online?.dot).not.toBe("");
+  expect(forReaders.display.circles).toBe(3);
+  expect(forReaders.display.full).toBe(3);
   expect(forReaders.artShare).toBeGreaterThan(30);
   expect(forReaders.notes.long).toBeGreaterThan(forReaders.notes.short + 60);
   expect(forReaders.rule).toBeGreaterThan(20);
@@ -127,6 +148,7 @@ test("should draw every styled block in the editor as it is drawn for readers", 
   expect(inEditor.buttons).toEqual(forReaders.buttons);
   expect(inEditor.notes, "the heights of the two-row and six-row text areas").toEqual(forReaders.notes);
   expect(inEditor.stat, "the plain Metric").toEqual(forReaders.stat);
+  expect(inEditor.display, "the avatar row, the keys, the stars, and the lone dot").toEqual(forReaders.display);
   expect(inEditor.wordsFirst, "the order of the row that stacks in reverse").toBe(forReaders.wordsFirst);
   expect(Math.abs(inEditor.shotShare - forReaders.shotShare), "the picture's share of the row that stacks").toBeLessThanOrEqual(2);
   expect(Math.abs(inEditor.rule - forReaders.rule), "the height of the rule between the buttons").toBeLessThanOrEqual(2);

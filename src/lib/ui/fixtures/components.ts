@@ -1,6 +1,7 @@
 import type { UiComponentName } from "../catalog";
 import { chartFixtures } from "./charts";
 import { keyValueFixtures, stepsFixtures } from "./details";
+import { avatarGroupFixtures, kbdFixtures, ratingFixtures } from "./display";
 import { avatarFixtures, inputFixtures, screenBadgeFixtures, screenButtonFixtures, screenImageFixtures, screenListFixtures, screenSelectFixtures, textareaFixtures } from "./fields";
 import { longText, unbroken } from "./long-text";
 import { boardFixtures, calendarFixtures } from "./planning";
@@ -38,6 +39,7 @@ const layout: Pick<Record<UiComponentName, ComponentFixture[]>, "Section" | "Sta
     { name: "Four columns", props: { columns: 4 }, children: Array.from({ length: 6 }, (_, index) => ({ type: "Metric", props: { label: `Metric ${index + 1}`, value: index * 1234 } })) },
     { name: "Three columns", props: { columns: 3 }, children: Array.from({ length: 3 }, (_, index) => ({ type: "Callout", props: { title: `Note ${index + 1}`, text: "One of three blocks in a three-column grid." } })) },
     { name: "Empty", props: { columns: 3 } },
+    { name: "Two columns on a phone", props: { columns: 4, narrowColumns: 2 }, children: Array.from({ length: 4 }, (_, index) => ({ type: "Metric", props: { label: `Narrow metric ${index + 1}`, value: (index + 1) * 120, variant: "plain" } })) },
   ],
   Card: [
     { name: "Normal", props: { title: "Decision", description: "Use Base UI for primitives." }, children: [text("Radix is not used anywhere.")] },
@@ -59,7 +61,7 @@ const layout: Pick<Record<UiComponentName, ComponentFixture[]>, "Section" | "Sta
   Box: boxFixtures,
 };
 
-const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Text" | "Markdown" | "Code" | "Callout" | "Badge" | "List" | "Steps" | "Link" | "Quote" | "Icon" | "Avatar"> = {
+const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Text" | "Markdown" | "Code" | "Callout" | "Badge" | "List" | "Steps" | "Link" | "Quote" | "Icon" | "Avatar" | "AvatarGroup" | "Kbd" | "Rating"> = {
   Heading: [
     { name: "Levels", props: { text: "Level one heading", level: 1 } },
     { name: "Level four", props: { text: "Level four heading", level: 4 } },
@@ -116,6 +118,9 @@ const content: Pick<Record<UiComponentName, ComponentFixture[]>, "Heading" | "Te
   ],
   Icon: iconFixtures,
   Avatar: avatarFixtures,
+  AvatarGroup: avatarGroupFixtures,
+  Kbd: kbdFixtures,
+  Rating: ratingFixtures,
 };
 
 const data: Pick<Record<UiComponentName, ComponentFixture[]>, "Table" | "Metric" | "Chart" | "KeyValue" | "Progress" | "Timeline" | "Board" | "Calendar" | "Diagram"> = {

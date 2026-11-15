@@ -33,8 +33,18 @@ export const layoutDocs = {
           lead: metric("Lead time", 3.4, { unit: "h", change: -0.6, goodDirection: "down" }),
         }),
       },
+      {
+        title: "Two columns on a phone",
+        note: "Small items stay two across on a narrow screen, so a band of stats is half as tall.",
+        spec: single("Grid", { columns: 4, narrowColumns: 2 }, {
+          teams: metric("Teams", 1280, { variant: "plain" }),
+          artifacts: metric("Artifacts", 48200, { format: "compact", variant: "plain" }),
+          agents: metric("Agents", 312, { variant: "plain" }),
+          uptime: metric("Uptime", 99.98, { unit: "%", variant: "plain" }),
+        }),
+      },
     ],
-    rules: ["`columns` applies on wide screens. Phones always show one column."],
+    rules: ["`columns` applies on wide screens. Phones show one column, or two with `narrowColumns: 2`, which is never more than `columns`."],
   },
   Card: {
     examples: [
@@ -176,7 +186,19 @@ export const contentDocs = {
           rated: { type: "Badge", props: { label: "4.8", icon: "star" } },
         }),
       },
+      {
+        title: "A status dot",
+        note: "A dot alone is an unread mark: screen readers hear its label.",
+        spec: spec("row", {
+          row: { type: "Box", props: { direction: "horizontal", align: "center", gap: "sm" }, children: ["online", "live", "inbox", "unread"] },
+          online: { type: "Badge", props: { label: "Online", tone: "success", dot: "start" } },
+          live: { type: "Badge", props: { label: "Live", tone: "danger", variant: "solid", dot: "start" } },
+          inbox: text("Inbox", { size: "sm" }),
+          unread: { type: "Badge", props: { label: "Unread messages", tone: "info", dot: "only" } },
+        }),
+      },
     ],
+    rules: ["`dot: \"start\"` draws a small dot in the tone before the label. `dot: \"only\"` draws the dot alone and keeps the label for screen readers, so the label must say what the dot means (\"Unread messages\")."],
   },
   List: {
     examples: [

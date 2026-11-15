@@ -16,6 +16,8 @@ export const layoutProps = {
   }),
   Grid: z.object({
     columns: z.number().int().min(1).max(4).optional(),
+    /** Columns where the interface is narrow (a phone, below 576 pixels). Default 1. */
+    narrowColumns: z.number().int().min(1).max(2).optional(),
     gap: gap.optional(),
   }),
   Card: z.object({
@@ -42,6 +44,13 @@ export const separatorCheck = (props: Record<string, unknown>): string[] =>
   props.orientation === "vertical" && typeof props.label === "string" && props.label.trim() !== ""
     ? ['`label` applies to a horizontal Separator. Remove `label`, or remove `orientation: "vertical"`.']
     : [];
+
+/** A narrow interface never shows more columns than a wide one. Reads `columns` and `narrowColumns` only, as written. */
+export const gridCheck = (props: Record<string, unknown>): string[] => {
+  const { columns = 2, narrowColumns } = props;
+  if (typeof columns !== "number" || typeof narrowColumns !== "number" || narrowColumns <= columns) return [];
+  return [`\`narrowColumns\` (${String(narrowColumns)}) is more than \`columns\` (${String(columns)}): a narrow interface never shows more columns than a wide one. Lower it, or raise \`columns\`.`];
+};
 
 /** Components whose children map one to one onto an array prop. */
 export const pairedChildren = {
