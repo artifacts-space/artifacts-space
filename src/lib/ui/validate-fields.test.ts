@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import { isBlocking } from "./issues";
 import { validateUiSpec } from "./validate";
-import { linkCarryingProps } from "./validate-fields";
+import { componentProps } from "./catalog";
+import { announcedProps, linkCarryingProps } from "./validate-fields";
 
 const bound = { type: "Input", props: { label: "Name", value: { $bindState: "/name" } } };
 const plain = { type: "Input", props: { label: "Name", value: "Maya" } };
@@ -107,5 +108,81 @@ describe("typed text never reaches a link", () => {
     // content.tsx: Markdown and Link. steps.tsx: Steps. data.tsx: Diagram. media.tsx: a File download, whose address comes from an attached file's id.
     expect(files.sort()).toEqual(["content.tsx", "data.tsx", "media.tsx", "steps.tsx"]);
     expect(Object.keys(linkCarryingProps).sort()).toEqual(["Diagram", "Link", "Markdown", "Steps"]);
+  });
+});
+
+describe("announce on words that follow typing", () => {
+  interface Element {
+    type: string;
+    props: Record<string, unknown>;
+    on?: unknown;
+  }
+  const thanks = (text: unknown, announce: unknown = true): Element => ({ type: "Text", props: { text, announce } });
+  const greeting = { $template: "Thanks, ${/name}." };
+
+  function warnings(field: Element, spoken: Element) {
+    const spec = { version: 1, root: "page", state: { name: "", plan: "Team", on: false }, elements: { page: { type: "Stack", props: {}, children: ["field", "spoken"] }, field, spoken } };
+    const result = validateUiSpec(spec);
+    return { result, found: result.issues.filter((issue) => issue.code === "announce_follows_typing") };
+  }
+
+  it("should warn, and still draw the spec, when an announced Text reads state a bound Input writes", () => {
+    const { result, found } = warnings(bound, thanks({ $state: "/name" }));
+    expect(found).toHaveLength(1);
+    expect(found[0]?.severity).toBe("warning");
+    expect(found[0]?.elementKey).toBe("spoken");
+    expect(found[0]?.message).toBe(
+      'Element "spoken" (Text): `announce` is set and `text` reads "/name", which text field "field" writes as a reader types, so a screen reader would speak on every key. Remove `announce`, or show words there that do not come from a text field.',
+    );
+    expect(result.valid).toBe(true);
+    expect(result.renderable).toBe(true);
+  });
+
+  it("should warn when the words come from a bound Textarea through a template", () => {
+    const { found } = warnings({ type: "Textarea", props: { label: "Name", value: { $bindState: "/name" } } }, thanks(greeting));
+    expect(found.map((issue) => issue.elementKey)).toEqual(["spoken"]);
+    expect(found[0]?.message).toContain('`text` reads "/name"');
+  });
+
+  it("should warn once for a Callout, naming the first of its title and text that follows typing", () => {
+    const { found } = warnings(bound, { type: "Callout", props: { title: greeting, text: { $state: "/name" }, announce: true } });
+    expect(found).toHaveLength(1);
+    expect(found[0]?.message).toContain('(Callout): `announce` is set and `title` reads "/name"');
+    expect(warnings(bound, { type: "Callout", props: { title: "Saved", text: greeting, announce: true } }).found[0]?.message).toContain('`text` reads "/name"');
+  });
+
+  it("should warn when the typed words are one side of a choice, and say nothing when they only decide it", () => {
+    expect(warnings(bound, thanks({ $cond: { $state: "/on" }, $then: greeting, $else: "" })).found).toHaveLength(1);
+    expect(warnings(bound, thanks({ $cond: { $state: "/name" }, $then: "Looks good.", $else: "" })).found).toEqual([]);
+  });
+
+  it("should say nothing when the state is written only by a Button", () => {
+    const button = { type: "Button", props: { label: "Join" }, on: { press: { action: "setState", params: { statePath: "/name", value: "Maya" } } } };
+    expect(warnings(button, thanks({ $state: "/name" })).found).toEqual([]);
+  });
+
+  it("should say nothing when the element is not announced, or announce is not written as true", () => {
+    expect(warnings(bound, { type: "Text", props: { text: { $state: "/name" } } }).found).toEqual([]);
+    expect(warnings(bound, thanks({ $state: "/name" }, false)).found).toEqual([]);
+    expect(warnings(bound, thanks({ $state: "/name" }, { $state: "/on" })).found).toEqual([]);
+  });
+
+  it("should say nothing when the field that writes the state is a Select or a Switch", () => {
+    const select = { type: "Select", props: { label: "Plan", options: ["Free", "Team"], value: { $bindState: "/plan" } } };
+    expect(warnings(select, thanks({ $template: "You chose ${/plan}." })).found).toEqual([]);
+    const toggle = { type: "Switch", props: { label: "Updates", checked: { $bindState: "/on" } } };
+    expect(warnings(toggle, thanks({ $cond: { $state: "/on" }, $then: "Updates are on.", $else: "Updates are off." })).found).toEqual([]);
+  });
+
+  it("should say nothing when the announced words read other state, or the text field is not bound", () => {
+    expect(warnings(bound, thanks({ $template: "Plan: ${/plan}." })).found).toEqual([]);
+    expect(warnings(plain, thanks({ $state: "/name" })).found).toEqual([]);
+    // A bare name in a template is a field of a repeat's item, not a state path.
+    expect(warnings(bound, thanks({ $template: "Thanks, ${name}." })).found).toEqual([]);
+  });
+
+  it("should list every component that takes announce, so a new one cannot be missed", () => {
+    const takesAnnounce = Object.entries(componentProps).filter(([, schema]) => "announce" in schema.shape).map(([name]) => name);
+    expect(Object.keys(announcedProps).sort()).toEqual(takesAnnounce.sort());
   });
 });

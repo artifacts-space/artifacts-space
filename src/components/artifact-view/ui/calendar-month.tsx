@@ -71,7 +71,8 @@ interface GridProps {
   onSelect: (day: number | null) => void;
 }
 
-function MonthGrid({ month, weekStart, entries, selected, panelId, onSelect }: GridProps) {
+/** One month as a table of days, and under it the panel that lists a pressed day's events. `selected` is the day whose panel is open. */
+export function MonthGrid({ month, weekStart, entries, selected, panelId, onSelect }: GridProps) {
   const weeks = monthWeeks(month, weekStart);
   const from = weeks[0]?.[0] ?? firstDayOfMonth(month);
   const to = weeks.at(-1)?.[6] ?? lastDayOfMonth(month);
@@ -97,7 +98,8 @@ function MonthGrid({ month, weekStart, entries, selected, panelId, onSelect }: G
           </tbody>
         </table>
       </div>
-      <section id={panelId} aria-label={selected === null ? "Selected day" : `Events on ${formatLongDay(selected)}`} hidden={selected === null} className="min-w-0 rounded-md border bg-card px-3 pb-1 shadow-xs">
+      {/* A named group, not a section: a named section is a landmark, and one screen is often on a page more than once. */}
+      <div role="group" id={panelId} aria-label={selected === null ? "Selected day" : `Events on ${formatLongDay(selected)}`} hidden={selected === null} className="min-w-0 rounded-md border bg-card px-3 pb-1 shadow-xs">
         {selected === null ? null : (
           <div className="@container relative">
             <Button variant="ghost" size="icon-xs" aria-label="Close day" className="absolute top-1.5 right-0" onClick={() => { onSelect(null); }}>
@@ -106,7 +108,7 @@ function MonthGrid({ month, weekStart, entries, selected, panelId, onSelect }: G
             <DayEntries day={selected} entries={selectedEntries} level={4} />
           </div>
         )}
-      </section>
+      </div>
     </div>
   );
 }

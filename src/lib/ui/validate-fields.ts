@@ -1,5 +1,6 @@
-import { containsExpression } from "./expressions";
-import { specError, type UiSpecIssue } from "./issues";
+import { containsExpression, templateStatePaths } from "./expressions";
+import { specError, specWarning, type UiSpecIssue } from "./issues";
+import { isPlainObject } from "./json-walk";
 import type { UiSpec } from "./spec";
 
 /**
@@ -81,6 +82,66 @@ export function typedTextIssues(spec: UiSpec): UiSpecIssue[] {
         `Element "${key}" (${element.type}): \`${prop}\` cannot use an expression in a spec whose ${bound} bound to state, because text a reader types must never reach a link. Write \`${prop}\` out in the spec, or ${unbind}.`,
         key,
       ));
+    }
+  }
+  return issues;
+}
+
+/**
+ * The props whose words an element speaks when it has `announce`, by
+ * component. Add a component here when it takes `announce`;
+ * validate-fields.test.ts fails for one that takes it and is missing.
+ */
+export const announcedProps: Readonly<Record<string, readonly string[]>> = {
+  Text: ["text"],
+  Callout: ["title", "text"],
+};
+
+/** Each state path a text field writes what is typed to, with the key of the first field bound to it. */
+function typedPaths(spec: UiSpec): Map<string, string> {
+  const paths = new Map<string, string>();
+  for (const key of boundTextFields(spec)) {
+    const value = spec.elements[key]?.props.value;
+    const path = isPlainObject(value) && typeof value.$bindState === "string" ? value.$bindState : null;
+    if (path !== null && !paths.has(path)) paths.set(path, key);
+  }
+  return paths;
+}
+
+/**
+ * The state paths the words of a prop come from: `$state`, and each
+ * `${/path}` of a `$template`. The test of a `$cond` only picks between
+ * words, so it is not one of them; what it picks from is.
+ */
+function wordPaths(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(wordPaths);
+  if (!isPlainObject(value)) return [];
+  if ("$cond" in value) return [...wordPaths(value.$then), ...wordPaths(value.$else)];
+  if (typeof value.$state === "string") return [value.$state];
+  if (typeof value.$template === "string") return templateStatePaths(value.$template);
+  return Object.values(value).flatMap(wordPaths);
+}
+
+/**
+ * Warnings for an element that has `announce: true` and shows words read
+ * from state that a text field writes. Its words change with every key, so
+ * a screen reader would speak on every key. The spec still draws.
+ */
+export function announcedTypingIssues(spec: UiSpec): UiSpecIssue[] {
+  const typed = typedPaths(spec);
+  if (typed.size === 0) return [];
+  const issues: UiSpecIssue[] = [];
+  for (const [key, element] of Object.entries(spec.elements)) {
+    if (element.props.announce !== true) continue;
+    for (const prop of announcedProps[element.type] ?? []) {
+      const path = wordPaths(element.props[prop]).find((read) => typed.has(read));
+      if (path === undefined) continue;
+      issues.push(specWarning(
+        "announce_follows_typing",
+        `Element "${key}" (${element.type}): \`announce\` is set and \`${prop}\` reads "${path}", which text field "${typed.get(path) ?? ""}" writes as a reader types, so a screen reader would speak on every key. Remove \`announce\`, or show words there that do not come from a text field.`,
+        key,
+      ));
+      break;
     }
   }
   return issues;
