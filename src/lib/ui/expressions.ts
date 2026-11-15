@@ -46,6 +46,11 @@ function templatePaths(text: string): string[] {
   return [...text.matchAll(templateReference)].map((match) => match[1] ?? "");
 }
 
+/** The absolute state paths a `$template` string reads: each `${/path}`. A bare `${name}` is a field of a repeat's item, not a state path. */
+export function templateStatePaths(text: string): string[] {
+  return templatePaths(text).filter((path) => path.startsWith("/"));
+}
+
 function isUnsafeString(key: string | null, text: string): boolean {
   if ((key !== null && pathKeys.has(key)) || text.startsWith("/")) {
     if (hasForbiddenSegment(text)) return true;

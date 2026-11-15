@@ -182,7 +182,11 @@ lint. Nothing renders under the 13px floor.
   mounted by `UiView`): a view hands it words with `useAnnounced`, behind the
   `announce` prop. Never put `role="status"` or `aria-live` on an element
   that arrives later; a screen reader announces that unreliably. Text drawn
-  with the interface is not spoken, and the editor has no region.
+  with the interface is not spoken, and the editor has no region. Words
+  that follow typing must not be announced: validation warns
+  (`announce_follows_typing`, `announcedTypingIssues` in
+  `src/lib/ui/validate-fields.ts`) when an announced prop reads state a text
+  field writes. A component that takes `announce` goes into `announcedProps`.
 - A box that scrolls (either way) is a named tab stop while it scrolls and
   nothing while it fits: wrap it in `ScrollFrame`
   (`src/components/code/scroll-frame.tsx`), or use `useScrollable` with
@@ -1079,8 +1083,11 @@ template text is ours, so the tools add no untrusted-content label.
   a page several times (three canvas frames, three widths here), and axe
   then reports `landmark-unique`. An open Accordion panel is a group named
   by its button, not a region (`AccordionView`, `accordion-view.test.tsx`);
+  Steps and the Calendar's panel for a pressed day are named groups too.
   `landmark-views.test.tsx` renders every component fixture and fails on a
-  new landmark, with the views still to change listed by reason.
+  new landmark; its list of views still to change is empty, so keep it so.
+  A part that only shows after a press is in no fixture: draw it open in
+  that test, as the Calendar's panel is (`MonthGrid` with a day selected).
   `e2e/templates-canvas.spec.ts` scans one template screen in three frames
   (`/dev/canvas?fixture=screens`).
 - An agent never gets a template's own keys. `instantiateTemplate`
