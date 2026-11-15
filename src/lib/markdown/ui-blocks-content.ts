@@ -1,5 +1,7 @@
+import { avatarGroupName, kbdWords, ratingWords } from "@/lib/ui/display-words";
+
 import { fenced, indentContinuation, inlineText, link, linkTarget, quoted } from "./text";
-import { boldTitle, heading, objectsOf, textOf, textsOf, type BlockContext, type BlockRenderer } from "./ui-props";
+import { boldTitle, heading, numberOf, objectsOf, textOf, textsOf, type BlockContext, type BlockRenderer } from "./ui-props";
 
 /*
  * Markdown for the layout, content, and media components of a ui spec.
@@ -113,6 +115,24 @@ function placeholder({ props }: BlockContext): string[] {
 }
 
 /** Renderers for layout, content, and media components. */
+/** The row's one name, as screen readers hear it. */
+function avatarGroup({ props }: BlockContext): string[] {
+  const people = objectsOf(props.people).map((person) => ({ name: textOf(person.name) ?? "" }));
+  return people.length > 0 ? [inlineText(avatarGroupName(people, numberOf(props.max) ?? undefined, numberOf(props.total) ?? undefined))] : [];
+}
+
+/** The keys as code, then the words they are read as. */
+function kbd({ props }: BlockContext): string[] {
+  const keys = textsOf(props.keys);
+  return keys.length > 0 ? [`\`${keys.join(" ").replaceAll("`", "'")}\` (${inlineText(kbdWords(keys))})`] : [];
+}
+
+/** The score in words. */
+function rating({ props }: BlockContext): string[] {
+  const value = numberOf(props.value);
+  return value === null ? [] : [inlineText(ratingWords(value, numberOf(props.max) ?? undefined, textOf(props.label) ?? undefined))];
+}
+
 export const contentBlocks: Record<string, BlockRenderer> = {
   Section: titled,
   Card: titled,
@@ -134,6 +154,9 @@ export const contentBlocks: Record<string, BlockRenderer> = {
   Icon: icon,
   Placeholder: placeholder,
   Avatar: ({ props }) => [inlineText(textOf(props.name) ?? "")],
+  AvatarGroup: avatarGroup,
+  Kbd: kbd,
+  Rating: rating,
   Quote: quote,
   Diagram: diagram,
   Image: image,

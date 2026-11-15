@@ -90,6 +90,10 @@
   --color-tone-warning: var(--tone-warning);
   --color-tone-danger: var(--tone-danger);
   --color-tone-accent: var(--tone-accent);
+  /* Forced colors (Windows High Contrast) replace every page color, so a state that must survive them takes the system's own
+     selected pair, which the browser keeps: a pressed toggle. Light and dark are the system's, so these have no .dark value. */
+  --color-forced-selected: Highlight;
+  --color-forced-selected-text: HighlightText;
   --color-series-1: var(--series-1);
   --color-series-2: var(--series-2);
   --color-series-3: var(--series-3);

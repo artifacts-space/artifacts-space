@@ -166,6 +166,13 @@ lint. Nothing renders under the 13px floor.
 - A `Select`'s `onValueChange` can pass `null`; handle it.
 - A Menu `GroupLabel` must sit inside a Menu `Group`.
 - Icons come from `@tabler/icons-react`.
+- Interface icon names are in `src/lib/ui/icon-names.ts`, with their
+  components in `src/components/artifact-view/ui/icon-glyphs.ts`. Brand marks
+  (`brand-github`, `brand-google`, and so on) are outline only, drawn in the
+  text color, and every name starts with `brand-`. Do not add a brand of a
+  document, notes, or workspace tool (this product's own market) or a mark
+  that needs its own color. An icon-only Button with a brand mark still needs
+  its `label` as its name.
 - Forms use `noValidate` and show errors in the page's own UI, never browser
   validation bubbles.
 - Copy is plain, short, and benefit-first, in sentences with verbs. The UI
@@ -195,6 +202,11 @@ lint. Nothing renders under the 13px floor.
   it measures again. An axe scan of anything holding a diagram first calls
   `expectScrollersSettled` (`e2e/support/scrollers.ts`), which waits for the
   drawing and for every scrolling box to become reachable.
+- A display piece that is drawn from marks (AvatarGroup, Rating, Kbd, a
+  Badge's lone dot) is one thing to a screen reader, named in words, with
+  what is drawn hidden from it. The words come from
+  `src/lib/ui/display-words.ts`, which the Markdown copy of an interface
+  reads too, so readers and agents get the same sentence.
 - An interface action that the renderer does not run itself goes into
   `src/components/artifact-view/ui/state-actions.tsx` (`toggleState` is
   there), with its name in `allowedActions` and its state path under a key
@@ -614,7 +626,12 @@ catch this, so test the generated SQL with `.toSQL()`, as
   as the fill and edge, with the page color as its label, and moves toward
   the page color under the pointer
   (`pressedHoverMix`); `surface-scope.test.ts` holds its label at 4.5:1 and
-  its edge at 3:1 against the surface over every preset and surface. The
+  its edge at 3:1 against the surface over every preset and surface. Forced
+  colors (Windows High Contrast) replace every page color, so there it takes
+  the system's selected pair (`--color-forced-selected`, Highlight under
+  HighlightText, important over hover and dark fills);
+  `e2e/a11y-pressed-accent.spec.ts` emulates forced colors and checks that
+  each variant's edge and fill differ from the same button at rest. The
   accent tone (`--tone-accent`, Text, Icon, and Badge `tone: "accent"`) is
   the theme's accent under the tone rule (`toneTokens`); the site's accent
   is its ink, so the site palette starts it from a blue of its own in the
@@ -1109,7 +1126,18 @@ template text is ours, so the tools add no untrusted-content label.
   names its `statePath`; every slot points at a prop that is set or a state
   value that exists; and the template, drawn as a spec, validates with no
   errors and no warnings. Copy is original placeholder text: no company
-  names, no real logos, nothing taken from a block library.
+  names, no real logos, nothing taken from a block library. One narrow
+  exception, approved by the owner on 2026-11-15, is a brand mark (the
+  `brand-` icons in `src/lib/ui/icon-names.ts`): a social profile link in a
+  footer or a contact section, drawn as an icon-only Button or a Link whose
+  label names the network ("LinkedIn"), and a "Continue with <provider>"
+  sign-in Button that uses `brand-google`, `brand-apple`, or `brand-github`.
+  Still not allowed: a company name or logo as the product's own brand,
+  customer logos, or a mark used as if the template's company were that
+  company. `brandProblems` (`rules.ts`) checks the part it can read: a brand
+  mark sits on a Button or a Link (in an element or in an item of the state
+  a repeat draws), its label names the brand, and "Continue with" is for the
+  three sign-in marks only.
 - A view never marks a part of itself as a landmark: one screen is often on
   a page several times (three canvas frames, three widths here), and axe
   then reports `landmark-unique`. An open Accordion panel is a group named

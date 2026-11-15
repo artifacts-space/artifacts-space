@@ -13,7 +13,8 @@ import { readColors } from "./support/colors";
  * 4.5:1 and the edge against the surface at 3:1, at rest and under the
  * pointer. The accent tone is read there too: the theme's own accent as
  * text, the site's own blue on the site palette, and the surface's own
- * text color on a primary surface.
+ * text color on a primary surface. In forced colors, which replace every
+ * page color, a pressed toggle keeps a mark of its own on each variant.
  */
 
 const specimen = (page: Page, group: string, name: string) => page.locator(`section#${group} [data-specimen="${name}"]`);
@@ -79,6 +80,40 @@ test("should pass axe on the Button, Badge, Text, and Icon groups of the gallery
     const section = page.locator(`section#${group}`);
     await section.scrollIntoViewIfNeeded();
     await expectNoAxeViolations(section);
+  }
+});
+
+/** What forced colors leave of a button's look: its edge, its fill, and its outline, as computed. */
+function forcedLook(button: Locator) {
+  return button.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { border: `${style.borderTopWidth} ${style.borderTopStyle} ${style.borderTopColor}`, fill: style.backgroundColor, outline: `${style.outlineWidth} ${style.outlineStyle} ${style.outlineColor}`, words: style.color };
+  });
+}
+
+const forcedPairs = [
+  { variant: "outline", rest: "Toggle, not pressed", pressed: "Toggle, pressed, outline", name: "Bold" },
+  { variant: "secondary", rest: "Toggle, not pressed, secondary with an icon", pressed: "Toggle, pressed, secondary with an icon", name: "Starred" },
+  { variant: "ghost", rest: "Toggle, not pressed, ghost icon only", pressed: "Toggle, pressed, ghost icon only", name: "Saved" },
+] as const;
+
+test("should keep a pressed toggle apart from the same button at rest in forced colors, on every variant a toggle takes", async ({ page }) => {
+  await page.emulateMedia({ forcedColors: "active" });
+  await galleryReady(page, "Button");
+  expect(await page.evaluate(() => matchMedia("(forced-colors: active)").matches)).toBe(true);
+  for (const { variant, rest, pressed, name } of forcedPairs) {
+    const off = specimen(page, "Button", rest).getByRole("button", { name });
+    const on = specimen(page, "Button", pressed).getByRole("button", { name });
+    await expect(off).toHaveAttribute("aria-pressed", "false");
+    await expect(on).toHaveAttribute("aria-pressed", "true");
+    const [atRest, whenPressed] = [await forcedLook(off), await forcedLook(on)];
+    // The browser has replaced the page colors, so what tells them apart is the system's selected pair on the edge and the fill.
+    expect(whenPressed.border, `${variant}: the edge, pressed and at rest`).not.toBe(atRest.border);
+    expect(whenPressed.fill, `${variant}: the fill, pressed and at rest`).not.toBe(atRest.fill);
+    // Under the pointer it stays marked: no hover fill of the variant takes the mark back.
+    await on.hover();
+    expect((await forcedLook(on)).fill, `${variant}: the fill under the pointer`).toBe(whenPressed.fill);
+    await page.mouse.move(0, 0);
   }
 });
 

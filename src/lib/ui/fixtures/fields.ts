@@ -16,6 +16,10 @@ export const inputFixtures: ComponentFixture[] = [
   { name: "Password stand-in", props: { label: "Password", type: "password", description: "At least 12 characters." } },
   { name: "Password stand-in, disabled", props: { label: "Current password", type: "password", disabled: true } },
   { name: "Long", props: { label: longText(120), placeholder: longText(120), description: longText(400), error: unbroken(300), value: unbroken(500) } },
+  { name: "Search with an icon", props: { label: "Search the docs", type: "search", placeholder: "Search…", icon: "search", hideLabel: true } },
+  { name: "Email with an icon and an error", props: { label: "Email", type: "email", value: "maya@", icon: "mail", error: "Enter a full email address." } },
+  { name: "Disabled with an icon", props: { label: "Phone", value: "+1 555 0100", icon: "phone", disabled: true } },
+  { name: "Password stand-in with an icon", props: { label: "Password", type: "password", icon: "lock" } },
 ];
 
 export const textareaFixtures: ComponentFixture[] = [
@@ -49,6 +53,8 @@ export const screenButtonFixtures: ComponentFixture[] = [
   { name: "Disclosure, open", props: { label: "Show less", variant: "outline", icon: "chevron-up", iconPosition: "end", expanded: true } },
   { name: "Toggle, not pressed", props: { label: "Bold", variant: "outline", pressed: false } },
   { name: "Toggle, pressed, outline", props: { label: "Bold", variant: "outline", pressed: true } },
+  { name: "Toggle, not pressed, secondary with an icon", props: { label: "Starred", variant: "secondary", icon: "star", pressed: false } },
+  { name: "Toggle, not pressed, ghost icon only", props: { label: "Saved", variant: "ghost", icon: "bookmark", iconOnly: true, pressed: false } },
   { name: "Toggle, pressed, secondary with an icon", props: { label: "Starred", variant: "secondary", icon: "star", pressed: true } },
   { name: "Toggle, pressed, ghost icon only", props: { label: "Saved", variant: "ghost", icon: "bookmark", iconOnly: true, pressed: true } },
 ];
@@ -61,6 +67,10 @@ export const screenBadgeFixtures: ComponentFixture[] = [
   { name: "Accent", props: { label: "Featured", tone: "accent" } },
   { name: "Accent, solid", props: { label: "New", tone: "accent", variant: "solid" } },
   { name: "Accent, outline with an icon", props: { label: "Staff pick", tone: "accent", variant: "outline", icon: "star" } },
+  { name: "Dot before the label", props: { label: "Online", tone: "success", dot: "start" } },
+  { name: "Dot on a solid badge", props: { label: "Live", tone: "danger", variant: "solid", dot: "start" } },
+  { name: "Dot alone", props: { label: "Unread", tone: "info", dot: "only" } },
+  { name: "Dot alone, neutral", props: { label: "Away", dot: "only" } },
 ];
 
 export const screenListFixtures: ComponentFixture[] = [
@@ -95,8 +105,8 @@ export const signInSpec = {
     "brand-mark": { type: "Avatar", props: { name: "Northwind", size: "sm", tone: "info" } },
     "brand-name": { type: "Text", props: { text: "Northwind", weight: "semibold" } },
     title: { type: "Heading", props: { text: "Sign in to your account", level: 2, size: "lg" } },
-    email: { type: "Input", props: { label: "Email", type: "email", placeholder: "you@example.com", fullWidth: true, value: { $bindState: "/email" } } },
-    password: { type: "Input", props: { label: "Password", type: "password", fullWidth: true } },
+    email: { type: "Input", props: { label: "Email", type: "email", placeholder: "you@example.com", fullWidth: true, icon: "mail", value: { $bindState: "/email" } } },
+    password: { type: "Input", props: { label: "Password", type: "password", fullWidth: true, icon: "lock" } },
     submit: { type: "Button", props: { label: "Sign in", fullWidth: true, icon: "arrow-right", iconPosition: "end" } },
     echo: { type: "Text", props: { variant: "caption", text: { $template: "Signing in as ${/email}" } }, visible: { $state: "/email" } },
     help: { type: "Link", props: { label: "Forgot your password?", variant: "muted" } },

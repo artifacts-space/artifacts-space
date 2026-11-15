@@ -5,9 +5,10 @@ import type { z } from "zod";
 import { contentChecks, contentProps } from "./props/content";
 import { chartDescription } from "./props/chart";
 import { dataChecks, dataProps, type PropCheck } from "./props/data";
+import { displayDescriptions } from "./props/display";
 import { fieldDescriptions } from "./props/fields";
 import { inputChecks, inputEvents, inputProps } from "./props/input";
-import { layoutProps, separatorCheck } from "./props/layout";
+import { gridCheck, layoutProps, separatorCheck } from "./props/layout";
 import { mediaChecks, mediaProps } from "./props/media";
 import { planningChecks, planningDescriptions, planningProps } from "./props/planning";
 import { boxCheck, placeholderCheck, screenDescriptions } from "./props/screen";
@@ -44,7 +45,7 @@ export const containerComponents: ReadonlySet<UiComponentName> = new Set([
 ]);
 
 /** Cross-field prop rules. Most are checked after the zod schema passes; see `fieldWiseChecks`. */
-export const componentChecks: Partial<Record<UiComponentName, PropCheck>> = { ...contentChecks, ...dataChecks, ...planningChecks, ...inputChecks, ...mediaChecks, Box: boxCheck, Placeholder: placeholderCheck, Separator: separatorCheck };
+export const componentChecks: Partial<Record<UiComponentName, PropCheck>> = { ...contentChecks, ...dataChecks, ...planningChecks, ...inputChecks, ...mediaChecks, Box: boxCheck, Placeholder: placeholderCheck, Separator: separatorCheck, Grid: gridCheck };
 
 /**
  * Components whose rule reads only the props it is about, each on its own.
@@ -52,7 +53,7 @@ export const componentChecks: Partial<Record<UiComponentName, PropCheck>> = { ..
  * reports every problem at once. A new rule should be written this way and
  * listed here.
  */
-export const fieldWiseChecks: ReadonlySet<UiComponentName> = new Set(["Box", "Input", "Button", "List", "Placeholder", "Separator", "Link"]);
+export const fieldWiseChecks: ReadonlySet<UiComponentName> = new Set(["Box", "Input", "Button", "List", "Placeholder", "Separator", "Link", "AvatarGroup", "Rating", "Grid"]);
 
 /** Events a component can emit for `on` bindings. */
 export const componentEvents: Partial<Record<UiComponentName, readonly string[]>> = inputEvents;
@@ -60,7 +61,7 @@ export const componentEvents: Partial<Record<UiComponentName, readonly string[]>
 const descriptions: Record<UiComponentName, string> = {
   Section: "A titled region of the page. Use it to group related content. Children stack vertically.",
   Stack: "Lays children out vertically (default) or horizontally. Horizontal stacks wrap on narrow screens.",
-  Grid: "A responsive grid. `columns` (1-4) applies where the interface is wide enough; a narrow one shows fewer, and phones show one column.",
+  Grid: "A responsive grid. `columns` (1-4) applies where the interface is wide enough; a narrow one shows fewer, and phones show one column, or two with `narrowColumns: 2` (small items such as metrics or logos).",
   Card: "A bordered surface with an optional title and description. Children go inside.",
   Tabs: "Tabbed panels. Give one `tabs` entry per child: child N is the panel for tab N.",
   Accordion: "Collapsible panels. Give one `items` entry per child: child N is the body of item N.",
@@ -71,13 +72,16 @@ const descriptions: Record<UiComponentName, string> = {
   Markdown: "GitHub-flavored Markdown (tables, task lists). Raw HTML is not rendered.",
   Code: "A block of source code with an optional language label and title.",
   Callout: "A highlighted note. `tone`: neutral, info, success, warning, or danger. `announce` speaks it to screen readers when it appears after a reader's action.",
-  Badge: "A small status label with a tone: neutral (default), info, success, warning, danger, or accent (the accent color: the theme's accent, or blue on the default palette; for a label that is not a status). `variant`: soft (default), solid, or outline. `icon` puts an icon by name (see Icon) before the label.",
+  Badge: "A small status label with a tone: neutral (default), info, success, warning, danger, or accent (the accent color: the theme's accent, or blue on the default palette; for a label that is not a status). `variant`: soft (default), solid, or outline. `icon` puts an icon by name (see Icon) before the label. `dot: \"start\"` puts a small status dot in the tone before the label; `dot: \"only\"` shows the dot alone (an unread mark), and the label is then read by screen readers only.",
   List: "A bulleted or numbered list of plain-text items. `marker` replaces the bullets with an icon: check, cross, or arrow.",
   Steps: "A numbered how-to or runbook. Each item has a `title`, an optional `body` in Markdown, and optional `code` (with `language`) to copy and run.",
   Link: "A link that opens in a new tab. Only absolute http, https, and mailto URLs are allowed; leave `href` out for a mockup link that goes nowhere. `variant`: inline (default, underlined), nav (a plain menu link), or muted (small and quiet, for footers). `active` marks the current page. `icon` puts an icon by name (see Icon) at the start or the end (`iconPosition`); an inline link with an `href` ends with its own arrow, so its icon goes at the start.",
   Quote: "A block quote with an optional citation.",
   Icon: screenDescriptions.Icon,
   Avatar: fieldDescriptions.Avatar,
+  AvatarGroup: displayDescriptions.AvatarGroup,
+  Kbd: displayDescriptions.Kbd,
+  Rating: displayDescriptions.Rating,
   Table: "A data table. `rows` are objects keyed by each column's `key`. Missing cells show a dash. Up to 500 rows. A column's `format` shows numbers (number, compact, percent, currency) or, with `check`, draws true as a check mark and false as a dash, each read out as Yes or No; without it true and false show as the words Yes and No.",
   Metric: "A key number with a label, an optional unit, and an optional change. `change` uses `changeFormat` (default: the value's `format`), so a revenue metric usually sets changeFormat \"percent\". `goodDirection` says whether up or down is good. `sparkline` (2-200 numbers, oldest first) draws a small trend line under the value. `variant: \"plain\"` shows the number, label, and change without the card, for a band of stats.",
   Chart: chartDescription,

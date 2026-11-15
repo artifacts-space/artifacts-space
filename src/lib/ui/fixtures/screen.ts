@@ -96,11 +96,16 @@ function surfaceElements(surface: BoxSurface): Elements {
   // A chart and a diagram draw their own colors, so the surfaces that switch the palette each hold one of both.
   const drawn = surface === "inverse" || surface === "primary";
   const elements: Elements = {
-    [id("box")]: { type: "Box", props: { surface, padding: "md", gap: "sm", radius: "lg", border: surface === "none" ? "all" : "none", label: `Surface ${surface}` }, children: [id("body"), id("muted"), id("tones"), id("badges"), id("rule"), id("actions"), ...(drawn ? [id("chart"), id("diagram")] : [])] },
+    [id("box")]: { type: "Box", props: { surface, padding: "md", gap: "sm", radius: "lg", border: surface === "none" ? "all" : "none", label: `Surface ${surface}` }, children: [id("body"), id("muted"), id("tones"), id("rule"), id("actions"), ...(drawn ? [id("chart"), id("diagram")] : [])] },
     [id("body")]: { type: "Text", props: { text: `Body text on the ${surface} surface.` } },
     [id("muted")]: { type: "Text", props: { text: "Muted text, for secondary detail.", tone: "muted", size: "sm" } },
-    [id("tones")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: tones.flatMap((tone) => [id(`icon-${tone}`), id(`text-${tone}`)]) },
-    [id("badges")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "sm", align: "center" }, children: tones.map((tone) => id(`badge-${tone}`)) },
+    // One wrapping row holds every small piece, so 15 surfaces stay under the 500-element limit: each tone as an icon and text, each
+    // tone badge, and the display pieces, which draw their own text and marks (avatar letters on tints, a "+N" count, keys, stars, a dot).
+    [id("tones")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: [...tones.flatMap((tone) => [id(`icon-${tone}`), id(`text-${tone}`)]), ...tones.map((tone) => id(`badge-${tone}`)), id("faces"), id("keys"), id("stars"), id("dot")] },
+    [id("faces")]: { type: "AvatarGroup", props: { people: [{ name: "Maya Chen" }, { name: "Omar Haddad", tone: "info" }, { name: "Priya Nair", tone: "success" }, { name: "Ines Okafor", tone: "warning" }, { name: "Kenji Mori", tone: "danger" }], max: 4, total: 6, size: "sm" } },
+    [id("keys")]: { type: "Kbd", props: { keys: ["⌘", "K"] } },
+    [id("stars")]: { type: "Rating", props: { value: 3.5, showValue: true, size: "sm", label: `Rating on the ${surface} surface` } },
+    [id("dot")]: { type: "Badge", props: { label: "Online", tone: "success", dot: "start" } },
     [id("rule")]: { type: "Separator", props: { label: "Details" } },
     [id("actions")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: [id("primary"), id("outline"), id("danger"), ...Object.keys(pressedButtons).map(id), id("nav"), id("quiet")] },
     [id("primary")]: { type: "Button", props: { label: "Primary" } },
@@ -189,7 +194,7 @@ export const styledBlocksSpec = {
   version: 1,
   root: "page",
   elements: {
-    page: { type: "Box", props: { gap: "md" }, children: ["nav", "eyebrow", "title", "lead", "sub", "mono", "caption", "accent-note", "badges", "features", "actions", "note-short", "note-long", "hero", "stacked", "stat"] },
+    page: { type: "Box", props: { gap: "md" }, children: ["nav", "eyebrow", "title", "lead", "sub", "mono", "caption", "accent-note", "badges", "features", "actions", "note-short", "note-long", "hero", "stacked", "stat", "display"] },
     nav: { type: "Box", props: { direction: "horizontal", align: "center", justify: "between", gap: "md", padding: "md", border: "bottom", wrap: true, label: "Styled navigation" }, children: ["nav-links", "nav-docs"] },
     "nav-links": { type: "Box", props: { direction: "horizontal", gap: "lg", wrap: true }, children: ["link-active", "link-plain", "link-muted-active", "link-muted"] },
     "link-active": { type: "Link", props: { label: "Product", variant: "nav", active: true } },
@@ -204,7 +209,8 @@ export const styledBlocksSpec = {
     mono: { type: "Text", props: { text: "order-4821", variant: "mono" } },
     caption: { type: "Text", props: { text: "Ends on Friday", variant: "caption", tone: "danger", weight: "medium", align: "end", clamp: 1 } },
     "accent-note": { type: "Text", props: { text: "Picked by the team", tone: "accent", size: "sm" } },
-    badges: { type: "Box", props: { direction: "horizontal", gap: "sm", wrap: true, align: "center" }, children: ["badge-solid", "badge-outline", "badge-soft", "badge-accent", "toggle-bold"] },
+    badges: { type: "Box", props: { direction: "horizontal", gap: "sm", wrap: true, align: "center" }, children: ["badge-solid", "badge-outline", "badge-soft", "badge-accent", "badge-dot", "toggle-bold"] },
+    "badge-dot": { type: "Badge", props: { label: "Online", tone: "success", dot: "start" } },
     "badge-solid": { type: "Badge", props: { label: "Shipped", tone: "success", variant: "solid", icon: "check" } },
     "badge-outline": { type: "Badge", props: { label: "Beta", tone: "info", variant: "outline" } },
     "badge-soft": { type: "Badge", props: { label: "Draft" } },
@@ -217,6 +223,11 @@ export const styledBlocksSpec = {
     stacked: { type: "Box", props: { direction: "horizontal", stackBelow: "md", align: "center", alignBelow: "stretch", reverseBelow: true, gap: "lg", label: "Stacked row" }, children: ["stacked-art", "stacked-copy"] },
     "stacked-art": { type: "Placeholder", props: { label: "Stacked shot", frame: "browser" } },
     "stacked-copy": { type: "Text", props: { text: "Words first on a phone" } },
+    display: { type: "Box", props: { direction: "horizontal", gap: "md", align: "center", wrap: true, label: "Display pieces" }, children: ["display-faces", "display-keys", "display-stars", "display-unread"] },
+    "display-faces": { type: "AvatarGroup", props: { people: [{ name: "Maya Chen" }, { name: "Omar Haddad", tone: "info" }, { name: "Priya Nair", tone: "success" }], max: 2 } },
+    "display-keys": { type: "Kbd", props: { keys: ["⌘", "K"] } },
+    "display-stars": { type: "Rating", props: { value: 3.5, showValue: true } },
+    "display-unread": { type: "Badge", props: { label: "Unread", tone: "info", dot: "only" } },
     stat: { type: "Metric", props: { label: "Shelves counted", value: 1240, change: 12, changeFormat: "percent", goodDirection: "up", variant: "plain" } },
     "action-start": { type: "Button", props: { label: "Start free", size: "lg", icon: "arrow-right", iconPosition: "end" } },
     "action-menu": { type: "Button", props: { label: "Open menu", icon: "menu-2", iconOnly: true, variant: "ghost" } },

@@ -47,6 +47,12 @@ describe("Input and Textarea props", () => {
     expect(found[0]).toContain("`type` must be written in the spec");
   });
 
+  it("should accept an icon by name on any Input, the password stand-in included, and refuse a name not in the list", () => {
+    expect(messages("Input", { label: "Search", type: "search", icon: "search" })).toEqual([]);
+    expect(messages("Input", { label: "Password", type: "password", icon: "lock" })).toEqual([]);
+    expect(messages("Input", { label: "Search", icon: "not-an-icon" })).not.toEqual([]);
+  });
+
   it("should refuse a Textarea with fewer than 2 or more than 12 rows", () => {
     expect(messages("Textarea", { label: "Notes", rows: 1 })).not.toEqual([]);
     expect(messages("Textarea", { label: "Notes", rows: 13 })).not.toEqual([]);

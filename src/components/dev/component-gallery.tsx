@@ -25,6 +25,7 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { uiComponentNames } from "@/lib/ui/catalog";
 import { componentFixtures, fixtureFiles, fixtureSpec } from "@/lib/ui/fixtures/components";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
+import { brandMarksSpec } from "@/lib/ui/fixtures/brand-marks";
 import { pressedToggleSpec, signInSpec } from "@/lib/ui/fixtures/fields";
 import { formatFixtures, mediaFormatFixtures, type FormatFixture } from "@/lib/ui/fixtures/formats";
 import { announcedSpec, landingPageSpec, styledBlocksSpec, surfaceMatrixSpec } from "@/lib/ui/fixtures/screen";
@@ -36,6 +37,7 @@ const specFixtures: { name: string; spec: unknown }[] = [
   { name: "Example", spec: exampleUiSpec },
   { name: "Surfaces and tones", spec: surfaceMatrixSpec },
   { name: "Landing page", spec: landingPageSpec },
+  { name: "Brand marks", spec: brandMarksSpec },
   { name: "Sign-in screen", spec: signInSpec },
   { name: "Styled blocks", spec: styledBlocksSpec },
   { name: "Announced line and a toggle", spec: announcedSpec },

@@ -154,7 +154,7 @@ export const badgeTone: Record<BadgeTone, string> = {
   accent: "border-tone-accent/30 bg-tone-accent/10 text-tone-accent",
 };
 
-/** Small status-dot colors per tone (Board columns, Calendar events), and the accent's for a Badge's tone. */
+/** Small status-dot colors per tone (Board columns, Calendar events, and a Badge's dot, accent included). */
 export const toneDot: Record<BadgeTone, string> = {
   neutral: "bg-muted-foreground/50",
   info: "bg-tone-info",
@@ -198,9 +198,31 @@ export function BadgeIcon({ name }: { name: BadgeProps["icon"] }) {
   return Glyph ? <Glyph aria-hidden className="size-3 shrink-0" /> : null;
 }
 
+/** A dot alone stands for the badge, so even a neutral one is drawn strong enough to see (3:1). */
+const loneDot: Record<BadgeTone, string> = { ...toneDot, neutral: "bg-muted-foreground" };
+
+/** A badge's status dot, before its label; on a solid badge it is the page color, so it shows on the tone's fill. */
+export function BadgeDot({ props }: { props: Pick<BadgeProps, "dot" | "tone" | "variant"> }) {
+  if (props.dot !== "start") return null;
+  const color = props.variant === "solid" ? "bg-background" : loneDot[props.tone ?? "neutral"];
+  return <span aria-hidden data-badge-dot="start" className={cn("size-1.5 shrink-0 rounded-full", color)} />;
+}
+
+/** A badge drawn as its dot alone (an unread mark): the label is its name, for screen readers only. */
+export function LoneBadgeDot({ props }: { props: Pick<BadgeProps, "label" | "tone"> }) {
+  return (
+    <span className="inline-flex size-5 shrink-0 items-center justify-center">
+      <span aria-hidden data-badge-dot="only" className={cn("size-2.5 rounded-full", loneDot[props.tone ?? "neutral"])} />
+      <span className="sr-only">{props.label}</span>
+    </span>
+  );
+}
+
 export function BadgeView({ props }: ViewProps<"Badge">) {
+  if (props.dot === "only") return <LoneBadgeDot props={props} />;
   return (
     <span className={badgeClassName(props)}>
+      <BadgeDot props={props} />
       <BadgeIcon name={props.icon} />
       <span className="truncate">{props.label}</span>
     </span>

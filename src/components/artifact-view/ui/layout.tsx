@@ -68,7 +68,8 @@ export function StackView({ props, children }: ViewProps<"Stack">) {
 
 export function GridView({ props, children }: ViewProps<"Grid">) {
   const columns = (props.columns ?? 2) as keyof typeof gridColumns;
-  return <div data-slot="ui-grid" className={cn("grid min-w-0", gridColumns[columns], gapClass[props.gap ?? "md"])}>{children}</div>;
+  // Two columns on a narrow interface replace the one every grid starts from; the wider steps stay as they are.
+  return <div data-slot="ui-grid" className={cn("grid min-w-0", gridColumns[columns], props.narrowColumns === 2 && "grid-cols-2", gapClass[props.gap ?? "md"])}>{children}</div>;
 }
 
 export function CardView({ props, children }: ViewProps<"Card">) {

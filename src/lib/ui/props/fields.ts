@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import type { PropCheck } from "./data";
+import { avatarSize } from "./display";
+import { iconName } from "./screen";
 import { label, prose, tone } from "./shared";
 
 /**
@@ -24,6 +26,8 @@ export const inputFieldProps = z.object({
   placeholder: label(120).optional(),
   value: z.string().max(500).optional(),
   fullWidth: z.boolean().optional(),
+  /** An icon by name drawn at the start of the field, as decoration: the label still names it. */
+  icon: iconName.optional(),
   ...fieldBase,
 });
 
@@ -39,7 +43,7 @@ export const textareaProps = z.object({
 
 export const avatarProps = z.object({
   name: label(80),
-  size: z.enum(["sm", "md", "lg", "xl"]).optional(),
+  size: avatarSize.optional(),
   tone: tone.optional(),
 });
 
@@ -62,7 +66,7 @@ export const inputCheck: PropCheck = (props) => {
 /** Agent-facing descriptions; the guide is generated from them. */
 export const fieldDescriptions = {
   Input:
-    "A one-line text field. `type`: text (default), email, search, number, or password. Bind `value` with { \"$bindState\": \"/path\" }; it only changes on-page state and nothing is ever sent. A password field is a stand-in: it shows dots, cannot be typed into, and takes no `value`. `description` and `error` show under the field; `hideLabel` keeps the label for screen readers only; `fullWidth` fills the container.",
+    "A one-line text field. `type`: text (default), email, search, number, or password. Bind `value` with { \"$bindState\": \"/path\" }; it only changes on-page state and nothing is ever sent. A password field is a stand-in: it shows dots, cannot be typed into, and takes no `value`. `description` and `error` show under the field; `hideLabel` keeps the label for screen readers only; `fullWidth` fills the container. `icon` draws an icon by name (see Icon) at the start of the field, such as \"search\" or \"mail\"; it is decoration, and the label still names the field.",
   Textarea: "A multi-line text field. `rows` (2-12, default 3) is the least number of lines it shows; it grows with what is typed. Bind `value` with { \"$bindState\": \"/path\" }; it only changes on-page state and nothing is ever sent. Takes `description`, `error`, `hideLabel`, `disabled`, and `fullWidth` like Input.",
   Avatar: "A round avatar with the initials of `name`, which also names it for screen readers. `size`: sm to xl. `tone` tints it.",
 } as const;

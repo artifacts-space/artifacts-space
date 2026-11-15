@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { Children, type ComponentType, type ReactNode } from "react";
 
 import { ExternalLinkMark } from "@/components/artifact-view/external-link";
-import { BadgeIcon, badgeClassName, headingClassName, LinkIcon, linkClassName, ListMark, listMarkerOf, markedListClass, textClassName, toneStyles } from "@/components/artifact-view/ui/content";
+import { BadgeDot, BadgeIcon, badgeClassName, headingClassName, LinkIcon, linkClassName, ListMark, LoneBadgeDot, listMarkerOf, markedListClass, textClassName, toneStyles } from "@/components/artifact-view/ui/content";
 import { safeHref } from "@/lib/link-policy";
 import { textLimit } from "@/lib/ui/block-templates";
 import { componentProps, type UiComponentName, type UiProps } from "@/lib/ui/catalog";
@@ -98,10 +98,13 @@ function QuoteBlock({ id, props }: BlockProps<"Quote">) {
   );
 }
 
+/** A badge's label typed in place, with its dot and icon. A dot alone has no words on screen, so it is drawn as readers see it and its label is set in the properties. */
 function BadgeBlock({ id, props }: BlockProps<"Badge">) {
   const { setProp } = useBlockEditor();
+  if (props.dot === "only") return <LoneBadgeDot props={props} />;
   return (
     <span className={badgeClassName(props)}>
+      <BadgeDot props={props} />
       <BadgeIcon name={props.icon} />
       <EditableText blockKey={id} value={props.label} onChange={(text) => { setProp(id, "label", text); }} maxLength={textLimit("Badge", "label")} label="Badge" placeholder="Label" className="min-h-0 whitespace-nowrap" />
     </span>

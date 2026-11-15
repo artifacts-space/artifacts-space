@@ -59,6 +59,8 @@ describe("the pressed look", () => {
   it.each(["outline", "secondary", "ghost"] as const)("should fill a pressed %s Button with the text color and write its label in the page color", (variant) => {
     const classes = classesOf(button({ label: "Bold", variant, pressed: true }));
     for (const name of ["bg-foreground", "text-background", "border-foreground", "dark:bg-foreground", "dark:border-foreground"]) expect(classes, name).toContain(name);
+    // Forced colors replace the fill, so there the system's selected pair marks it, over any hover or dark fill.
+    for (const name of ["forced-colors:bg-forced-selected!", "forced-colors:border-forced-selected!", "forced-colors:text-forced-selected-text!"]) expect(classes, name).toContain(name);
     // The variant's own fills and words under the pointer give way to the pressed ones.
     for (const name of ["hover:bg-muted", "hover:text-foreground", "bg-secondary", "dark:bg-input/30", "dark:hover:bg-input/50", "dark:hover:bg-muted/50"]) expect(classes, name).not.toContain(name);
   });
@@ -81,6 +83,7 @@ describe("the pressed look", () => {
     const off = classesOf(button({ label: "Bold", variant: "outline", pressed: false }));
     expect(off).toContain("border-border");
     expect(off).not.toContain("bg-foreground");
+    expect(off).not.toContain("forced-colors:bg-forced-selected!");
     expect(classesOf(button({ label: "Bold", variant: "outline" }))).toEqual(off);
   });
 
@@ -102,5 +105,11 @@ describe("the accent tone", () => {
     expect(badge("soft")).toEqual(expect.arrayContaining(["bg-tone-accent/10", "text-tone-accent", "border-tone-accent/30"]));
     expect(badge("solid")).toEqual(expect.arrayContaining(["bg-tone-accent", "text-background"]));
     expect(badge("outline")).toEqual(expect.arrayContaining(["border-tone-accent/40", "text-tone-accent"]));
+  });
+
+  it("should draw an accent Badge's dot in the accent tone, before the label and alone", () => {
+    const dotClasses = (dot: "start" | "only") => /<span aria-hidden="true" data-badge-dot="[a-z]+" class="([^"]*)"/.exec(renderToStaticMarkup(<BadgeView props={{ label: "New", tone: "accent", dot }} emit={emit} />))?.[1]?.split(" ") ?? [];
+    expect(dotClasses("start")).toContain("bg-tone-accent");
+    expect(dotClasses("only")).toContain("bg-tone-accent");
   });
 });

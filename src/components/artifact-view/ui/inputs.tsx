@@ -182,12 +182,18 @@ const dangerClass = "bg-tone-danger text-background hover:bg-[color-mix(in_oklch
  * there, and the label holds 4.5:1 on the fill. Hover mixes the fill a step
  * toward the label (`pressedHoverMix`, which the theme rule checks over
  * every preset). The dark: classes override the variants' own dark fills.
+ * Forced colors (Windows High Contrast) replace the fill with the button
+ * face, which would leave pressed looking like rest, so there it takes the
+ * system's selected pair (Highlight under HighlightText) on its fill and
+ * edge; important, so no hover or dark fill of the variant takes it back.
  */
+const pressedForcedColors = "forced-colors:border-forced-selected! forced-colors:bg-forced-selected! forced-colors:text-forced-selected-text!";
 const pressedHover = "hover:bg-[color-mix(in_oklch,var(--foreground),var(--background)_12%)]";
 const pressedClass = cn(
   "border-foreground bg-foreground text-background hover:text-background",
   pressedHover,
   "dark:border-foreground dark:bg-foreground dark:hover:bg-[color-mix(in_oklch,var(--foreground),var(--background)_12%)]",
+  pressedForcedColors,
 );
 
 /** The variants a toggle takes: quiet at rest, so pressed is a change from quiet to solid. Validation refuses `pressed` on the others. */

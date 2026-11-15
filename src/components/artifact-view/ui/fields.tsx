@@ -4,8 +4,10 @@ import { useId, type ReactNode } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import type { UiProps } from "@/lib/ui/catalog";
 import { cn } from "@/lib/utils";
 
+import { uiIconComponents } from "./icon-glyphs";
 import { useInputValue, type ViewProps } from "./stout";
 
 /**
@@ -66,6 +68,13 @@ export function useFieldNotes(description: string | undefined, error: string | u
   return { id, notes, control };
 }
 
+/** The icon at the start of a field: decoration, hidden from screen readers, in the placeholder's color. */
+function FieldIcon({ name, className }: { name: UiProps<"Input">["icon"]; className?: string }) {
+  if (!name) return null;
+  const Glyph = uiIconComponents[name];
+  return <Glyph aria-hidden data-field-icon="" className={cn("size-4 shrink-0 text-muted-foreground", className)} />;
+}
+
 /**
  * The password stand-in: dots in a box drawn like a field. It is an image to
  * assistive technology, not an input: it takes no focus, no typing, and no
@@ -87,8 +96,9 @@ function PasswordStandIn({ props }: ViewProps<"Input">) {
         aria-describedby={describedBy}
         data-password-stand-in=""
         data-disabled={props.disabled ? "" : undefined}
-        className={cn("flex h-8 w-full min-w-0 items-center rounded-lg border border-input px-2.5 shadow-xs select-none", props.disabled && "cursor-not-allowed bg-input/50 opacity-50 dark:bg-input/80")}
+        className={cn("flex h-8 w-full min-w-0 items-center gap-2 rounded-lg border border-input px-2.5 shadow-xs select-none", props.disabled && "cursor-not-allowed bg-input/50 opacity-50 dark:bg-input/80")}
       >
+        <FieldIcon name={props.icon} />
         <span aria-hidden className="truncate text-sm tracking-[0.25em] text-muted-foreground">••••••••</span>
       </div>
       {/* Read only as the image's description, never as text of its own. */}
@@ -102,16 +112,20 @@ function TextInput({ props, bindings, emit }: ViewProps<"Input">) {
   const [value, setValue] = useInputValue(props.value, bindings?.value, "");
   return (
     <FieldShell controlId={id} label={props.label} hideLabel={props.hideLabel} description={props.description} error={props.error} notes={notes} fullWidth={props.fullWidth}>
-      <Input
-        {...fieldSkipProps}
-        {...control}
-        id={id}
-        type={props.type ?? "text"}
-        value={value}
-        placeholder={props.placeholder}
-        disabled={props.disabled}
-        onChange={(event) => { setValue(event.target.value); emit("change"); }}
-      />
+      <div className="relative min-w-0">
+        <FieldIcon name={props.icon} className={cn("pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2", props.disabled && "opacity-50")} />
+        <Input
+          {...fieldSkipProps}
+          {...control}
+          id={id}
+          type={props.type ?? "text"}
+          value={value}
+          placeholder={props.placeholder}
+          disabled={props.disabled}
+          className={props.icon ? "pl-8" : undefined}
+          onChange={(event) => { setValue(event.target.value); emit("change"); }}
+        />
+      </div>
     </FieldShell>
   );
 }

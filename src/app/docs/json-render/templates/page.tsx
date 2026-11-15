@@ -27,7 +27,7 @@ const fragmentShape = `{ "id": "pricing-three-tiers", "prefix": "plans",
 const rules = [
   ["Size", `At most ${String(templateBudget.maxElements)} elements, nested at most ${String(templateBudget.maxDepth)} deep, so six or more fit in one spec.`],
   ["Lists", "A list (plans, links, features) lives in the template's state and is drawn by one repeat. Change the list, not the elements."],
-  ["Words", "Placeholder copy, written for this set. No company names and no real logos."],
+  ["Words", "Placeholder copy, written for this set. No company names and no real logos. The one exception is a brand mark (`brand-` icons) on a social profile button, or on a Continue with Google, Apple, or GitHub button."],
   ["Media", "Placeholder stands in for images, logos, video, and maps. A template needs no upload."],
   ["Links", "Links go nowhere, as in any mockup."],
   ["Style", "Only the component set's named steps: no CSS, no colors, no class names."],

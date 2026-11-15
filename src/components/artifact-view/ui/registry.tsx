@@ -12,6 +12,7 @@ import { CalendarView } from "./calendar";
 import { ChartView } from "./chart";
 import { BadgeView, CalloutView, CodeView, HeadingView, LinkView, ListView, MarkdownBlockView, QuoteView, TextView } from "./content";
 import { DiagramView, MetricView, ProgressView, TableView, TimelineView } from "./data";
+import { AvatarGroupView, KbdView, RatingView } from "./display";
 import { InputView, TextareaView } from "./fields";
 import { ButtonView, CheckboxView, ChecklistView, SelectView, SliderView, SwitchView } from "./inputs";
 import { AccordionView, CardView, GridView, SectionView, SeparatorView, StackView, TabsView } from "./layout";
@@ -45,6 +46,9 @@ export const uiViews: Views = {
   Quote: QuoteView,
   Icon: IconView,
   Avatar: AvatarView,
+  AvatarGroup: AvatarGroupView,
+  Kbd: KbdView,
+  Rating: RatingView,
   Table: TableView,
   Metric: MetricView,
   Chart: ChartView,
