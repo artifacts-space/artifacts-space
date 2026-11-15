@@ -32,7 +32,7 @@ export function KeyValueView({ props }: ViewProps<"KeyValue">) {
       {props.items.length === 0 ? (
         <p className="text-sm text-muted-foreground">No details yet.</p>
       ) : (
-        <dl className={cn("grid min-w-0 gap-x-8 border-t", twoColumns && "md:grid-cols-2")}>
+        <dl className={cn("grid min-w-0 gap-x-8 border-t", twoColumns && "@[38rem]/ui:grid-cols-2")}>
           {props.items.map((item, index) => (
             <div key={`${String(index)}-${item.label}`} className="flex min-w-0 items-baseline gap-4 border-b py-2 text-sm leading-6">
               <dt className="w-2/5 max-w-56 shrink-0 break-words text-muted-foreground">{item.label}</dt>

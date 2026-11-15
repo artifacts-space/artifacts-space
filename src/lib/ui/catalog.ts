@@ -49,7 +49,7 @@ export const componentEvents: Partial<Record<UiComponentName, readonly string[]>
 const descriptions: Record<UiComponentName, string> = {
   Section: "A titled region of the page. Use it to group related content. Children stack vertically.",
   Stack: "Lays children out vertically (default) or horizontally. Horizontal stacks wrap on narrow screens.",
-  Grid: "A responsive grid. `columns` (1-4) applies on wide screens; phones show one column.",
+  Grid: "A responsive grid. `columns` (1-4) applies where the interface is wide enough; a narrow one shows fewer, and phones show one column.",
   Card: "A bordered surface with an optional title and description. Children go inside.",
   Tabs: "Tabbed panels. Give one `tabs` entry per child: child N is the panel for tab N.",
   Accordion: "Collapsible panels. Give one `items` entry per child: child N is the body of item N.",
@@ -67,7 +67,7 @@ const descriptions: Record<UiComponentName, string> = {
   Table: "A data table. `rows` are objects keyed by each column's `key`. Missing cells show a dash. Up to 500 rows.",
   Metric: "A key number with a label, an optional unit, and an optional change. `change` uses `changeFormat` (default: the value's `format`), so a revenue metric usually sets changeFormat \"percent\". `goodDirection` says whether up or down is good. `sparkline` (2-200 numbers, oldest first) draws a small trend line under the value.",
   Chart: chartDescription,
-  KeyValue: "Label and value pairs for specs, settings, and summaries. Each item's `format` styles a number like a Table column; `tone` shows the value as a status badge; `mono` shows it in monospace (ids, paths). `columns`: 1 or 2 on wide screens.",
+  KeyValue: "Label and value pairs for specs, settings, and summaries. Each item's `format` styles a number like a Table column; `tone` shows the value as a status badge; `mono` shows it in monospace (ids, paths). `columns`: 1, or 2 where the interface is wide enough.",
   Progress: "A progress bar. `value` out of `max` (default 100).",
   Timeline: "A vertical list of dated events with done, current, or upcoming status.",
   Board: planningDescriptions.Board,
