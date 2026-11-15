@@ -19,6 +19,15 @@ describe("placeFrames", () => {
     expect(placeFrames([{ width: 390, position: { x: -500, y: 240 } }])).toEqual([{ x: -500, y: 240 }]);
   });
 
+  it("should return a copy, so changing a place never changes the frame it came from", () => {
+    const frame = { width: 390, position: { x: 10, y: 20 } };
+    const [place] = placeFrames([frame]);
+    expect(place).toEqual({ x: 10, y: 20 });
+    expect(place).not.toBe(frame.position);
+    if (place) place.x = 999;
+    expect(frame.position).toEqual({ x: 10, y: 20 });
+  });
+
   it("should start the automatic row right of the placed frames and level with the highest one when some have positions", () => {
     const places = placeFrames([
       { width: 390, position: null },

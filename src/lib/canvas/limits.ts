@@ -27,6 +27,10 @@ export const canvasLimits = {
   autoGap: 80,
 } as const;
 
+/** What a frame id may hold. The guide and the refusal both say `frameIdRule`, so they cannot drift from the pattern's meaning. */
+export const frameIdPattern = /^[a-z0-9][a-z0-9-]*$/;
+export const frameIdRule = "lowercase letters, digits, and hyphens, starting with a letter or digit";
+
 /** The usual frame widths, named in the guide and the docs. */
 export const frameSizes = { desktop: 1440, tablet: 768, phone: 390 } as const;
 

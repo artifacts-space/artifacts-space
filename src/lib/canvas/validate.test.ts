@@ -53,6 +53,14 @@ describe("validateCanvas", () => {
     expect(result.issues).toEqual([expect.objectContaining({ severity: "warning", code: "missing_version" })]);
   });
 
+  it("should warn and still accept when the canvas has a top-level field it does not take", () => {
+    const result = validateCanvas(canvas([frame()], { title: "Checkout flow", width: 390 }));
+    expect(result.valid).toBe(true);
+    expect(result.renderable).toBe(true);
+    expect(result.issues).toEqual([{ severity: "warning", code: "unknown_field", message: '"title", "width" are not canvas fields and are ignored. A canvas takes version and frames; a name, width, or spec belongs on a frame.' }]);
+    expect(messages(canvas([frame()], { title: "Checkout flow" }))).toEqual(['"title" is not a canvas field and is ignored. A canvas takes version and frames; a name, width, or spec belongs on a frame.']);
+  });
+
   it.each([[2], [0], [1.5], ["1"]])("should refuse version %j when it is not a version this build knows", (version) => {
     const result = validateCanvas({ version, frames: [frame()] });
     expect(result.valid).toBe(false);

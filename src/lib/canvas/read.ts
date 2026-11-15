@@ -1,7 +1,8 @@
+import { readJsonInput, readVersionField, stringifyJson } from "@/lib/ui/json-input";
 import { isPlainObject } from "@/lib/ui/json-walk";
 
 import { canvasError, canvasWarning, frameError, frameLabel, frameWarning, isBlockingCanvasIssue, type CanvasIssue } from "./issues";
-import { canvasLimits, framePaddings, frameSizes, type FramePadding } from "./limits";
+import { canvasLimits, frameIdPattern, frameIdRule, framePaddings, frameSizes, type FramePadding } from "./limits";
 import { CANVAS_VERSION, migrateCanvas } from "./version";
 
 /** One frame as read from a canvas: its fields, with fallbacks where a field was unusable. */
@@ -38,47 +39,19 @@ export interface CanvasRead {
 
 const shape = `{ "version": ${String(CANVAS_VERSION)}, "frames": [{ "id": "home", "name": "Home", "width": ${String(frameSizes.desktop)}, "spec": { … } }] }`;
 const frameFields: ReadonlySet<string> = new Set(["id", "name", "width", "height", "padding", "x", "y", "spec"]);
-const idPattern = /^[a-z0-9][a-z0-9-]*$/;
-const encoder = new TextEncoder();
+/** A canvas's own top-level fields. Anything else is ignored, with a warning. */
+const canvasFields: ReadonlySet<string> = new Set(["version", "frames"]);
 
-function unreadable(issue: CanvasIssue): CanvasRead {
-  return { renderable: false, frames: [], issues: [issue] };
-}
+/** How a canvas names itself when its JSON cannot be read. */
+const canvasInput = {
+  maxBytes: canvasLimits.maxCanvasBytes,
+  noun: "canvas",
+  splitInto: "canvases",
+  shapeHint: `A canvas is one JSON object: ${shape}.`,
+} as const;
 
-function stringify(value: unknown): string | null {
-  try {
-    const text = JSON.stringify(value) as string | undefined;
-    return typeof text === "string" ? text : null;
-  } catch {
-    return null;
-  }
-}
-
-function parseInput(input: unknown): { value: unknown } | { issue: CanvasIssue } {
-  const text = typeof input === "string" ? input : stringify(input);
-  if (text === null) return { issue: canvasError("invalid_json", "The canvas could not be read as JSON.") };
-  const bytes = encoder.encode(text).length;
-  if (bytes > canvasLimits.maxCanvasBytes) {
-    return { issue: canvasError("too_large", `The canvas is ${bytes.toLocaleString("en-US")} bytes; the limit is ${canvasLimits.maxCanvasBytes.toLocaleString("en-US")}. Split it into several canvases or trim data.`) };
-  }
-  if (typeof input !== "string") return { value: input };
-  try {
-    return { value: JSON.parse(input) as unknown };
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : "it is not valid JSON";
-    return { issue: canvasError("invalid_json", `The content is not valid JSON: ${reason}. A canvas is one JSON object: ${shape}.`) };
-  }
-}
-
-function readVersion(raw: Record<string, unknown>): { version: number; issue?: CanvasIssue } {
-  const version = raw.version;
-  if (version === undefined) {
-    return { version: CANVAS_VERSION, issue: canvasWarning("missing_version", `Add "version": ${String(CANVAS_VERSION)} at the top level so the canvas keeps its meaning as the format evolves.`) };
-  }
-  if (typeof version !== "number" || !Number.isInteger(version) || version < 1 || version > CANVAS_VERSION) {
-    return { version: CANVAS_VERSION, issue: canvasError("unsupported_version", `"version" must be an integer from 1 to ${String(CANVAS_VERSION)}. Use ${String(CANVAS_VERSION)}.`) };
-  }
-  return { version };
+function unreadable(issues: CanvasIssue[]): CanvasRead {
+  return { renderable: false, frames: [], issues };
 }
 
 /** A whole number within [min, max], or null when the value is anything else. */
@@ -94,8 +67,8 @@ function standInId(index: number, taken: ReadonlySet<string>): string {
 
 function idProblem(value: unknown, taken: ReadonlySet<string>): string | null {
   if (typeof value !== "string" || value === "") return `"id" is missing. Give each frame a short id such as "home" or "checkout-phone".`;
-  if (value.length > canvasLimits.maxIdLength || !idPattern.test(value)) {
-    return `"id" must be up to ${String(canvasLimits.maxIdLength)} lowercase letters, digits, and hyphens, starting with a letter or digit, such as "checkout-phone".`;
+  if (value.length > canvasLimits.maxIdLength || !frameIdPattern.test(value)) {
+    return `"id" must be up to ${String(canvasLimits.maxIdLength)} ${frameIdRule}, such as "checkout-phone".`;
   }
   return taken.has(value) ? `another frame already has the id "${value}". Frame ids must be unique.` : null;
 }
@@ -162,7 +135,7 @@ function readFields(raw: Record<string, unknown>, label: string) {
   return { fields: { name: name.name, width: width.width, height: height.height, padding: padding.padding, position: position.position, spec: spec.spec, elementCount: spec.elementCount }, problems };
 }
 
-function unknownFieldIssues(raw: Record<string, unknown>, id: string, label: string): CanvasIssue[] {
+function unknownFrameFieldIssues(raw: Record<string, unknown>, id: string, label: string): CanvasIssue[] {
   const extra = Object.keys(raw).filter((key) => !frameFields.has(key));
   if (extra.length === 0) return [];
   const verb = extra.length === 1 ? "is not a frame field and is" : "are not frame fields and are";
@@ -185,7 +158,7 @@ function readFrame(value: unknown, index: number, taken: Set<string>): CanvasFra
   const label = frameLabel(badId === null ? id : null, index);
   const { fields, problems } = readFields(value, label);
   const errors = [...(badId === null ? [] : [badId]), ...problems].map((problem) => frameError("invalid_frame", id, label, problem));
-  return { id, label, ...fields, issues: [...errors, ...unknownFieldIssues(value, id, label)] };
+  return { id, label, ...fields, issues: [...errors, ...unknownFrameFieldIssues(value, id, label)] };
 }
 
 function readFrames(values: readonly unknown[]): CanvasFrameRead[] {
@@ -201,7 +174,25 @@ function boardIssues(frames: readonly CanvasFrameRead[]): CanvasIssue[] {
 
 /** A frame's spec as JSON text for the renderer, or null when it has none or it nests too deep to write out. */
 export function frameSpecText(frame: Pick<CanvasFrameRead, "spec">): string | null {
-  return frame.spec ? stringify(frame.spec) : null;
+  return frame.spec ? stringifyJson(frame.spec) : null;
+}
+
+/** A warning for top-level fields a canvas does not take, so a misplaced field (a title, a frame's width) is not lost in silence. */
+function unknownFieldIssues(raw: Record<string, unknown>): CanvasIssue[] {
+  const extra = Object.keys(raw).filter((key) => !canvasFields.has(key));
+  if (extra.length === 0) return [];
+  const verb = extra.length === 1 ? "is not a canvas field and is" : "are not canvas fields and are";
+  return [canvasWarning("unknown_field", `${extra.map((key) => `"${key}"`).join(", ")} ${verb} ignored. A canvas takes version and frames; a name, width, or spec belongs on a frame.`)];
+}
+
+/** The frames list as written, or the issue that says why the board cannot be drawn. */
+function framesList(raw: Record<string, unknown>): { values: readonly unknown[] } | { issue: CanvasIssue } {
+  const frames: unknown = raw.frames;
+  if (!Array.isArray(frames)) return { issue: canvasError("invalid_frames", `"frames" must be a list of frames: ${shape}.`) };
+  if (frames.length > canvasLimits.maxFrames) {
+    return { issue: canvasError("too_many_frames", `The canvas has ${String(frames.length)} frames; the limit is ${String(canvasLimits.maxFrames)}. Split it into several canvases.`) };
+  }
+  return { values: frames };
 }
 
 /**
@@ -212,19 +203,15 @@ export function frameSpecText(frame: Pick<CanvasFrameRead, "spec">): string | nu
  * stand-in values and its issues, so one bad frame never hides the others.
  */
 export function readCanvas(input: unknown): CanvasRead {
-  const parsed = parseInput(input);
-  if ("issue" in parsed) return unreadable(parsed.issue);
-  if (!isPlainObject(parsed.value)) return unreadable(canvasError("not_object", `A canvas must be one JSON object: ${shape}.`));
-  const { version, issue: versionIssue } = readVersion(parsed.value);
+  const parsed = readJsonInput(input, canvasInput);
+  if ("issue" in parsed) return unreadable([parsed.issue]);
+  if (!isPlainObject(parsed.value)) return unreadable([canvasError("not_object", `A canvas must be one JSON object: ${shape}.`)]);
+  const { version, issue: versionIssue } = readVersionField(parsed.value, CANVAS_VERSION, "so the canvas keeps its meaning as the format evolves");
   const raw = migrateCanvas(parsed.value, version);
-  const issues: CanvasIssue[] = versionIssue ? [versionIssue] : [];
-  if (!Array.isArray(raw.frames)) {
-    return { renderable: false, frames: [], issues: [...issues, canvasError("invalid_frames", `"frames" must be a list of frames: ${shape}.`)] };
-  }
-  if (raw.frames.length > canvasLimits.maxFrames) {
-    return { renderable: false, frames: [], issues: [...issues, canvasError("too_many_frames", `The canvas has ${String(raw.frames.length)} frames; the limit is ${String(canvasLimits.maxFrames)}. Split it into several canvases.`)] };
-  }
-  const frames = readFrames(raw.frames as readonly unknown[]);
+  const issues: CanvasIssue[] = [...(versionIssue ? [versionIssue] : []), ...unknownFieldIssues(raw)];
+  const list = framesList(raw);
+  if ("issue" in list) return unreadable([...issues, list.issue]);
+  const frames = readFrames(list.values);
   issues.push(...boardIssues(frames));
   return { renderable: !issues.some(isBlockingCanvasIssue), frames, issues };
 }
