@@ -138,7 +138,15 @@ jobs:
   # The gallery (Playwright, `pnpm test:e2e`) runs in parallel shards. On one
   # worker its 683 tests took 34 minutes on main in Nov 2026: about 15 each
   # for the phone and desktop projects, seconds for the production checks.
-  # Six shards finished in 5 to 8 minutes each (PR #119). Playwright splits
+  # Six shards finished in 5 to 8 minutes each (PR #119). By 15 Nov 2026 the
+  # gallery had grown (screen components, section templates, more a11y
+  # scans) and six shards took 10 to 20 minutes on main; one passed the
+  # 25-minute limit on a pull request. With twelve shards (PR #187) ten took
+  # 5 to 10 minutes and two took 17 and 19: the ones holding the gallery
+  # accessibility specs (a11y-screen-more, a11y-fields, a11y-screen-display,
+  # a11y-scrollers), whose tests each load the whole gallery page. Shards are
+  # balanced by test count, not time, so more shards help those two little;
+  # a lighter gallery page, or splitting those specs, is the next step. Playwright splits
   # whole files in order, balanced by the number of tests that are not
   # skipped, so a shard's time varies with the files it gets. When the slowest
   # shard passes 12 minutes, add numbers to `matrix.shard`; `--shard` takes
@@ -165,13 +173,13 @@ jobs:
       # Playwright's Docker guide: Chromium can run out of shared memory
       # without the host's IPC namespace.
       options: --ipc=host
-    # Shards take 5-8 minutes; the headroom covers a cold cache.
+    # Shards should take under 12 minutes; the headroom covers a cold cache.
     timeout-minutes: 25
     strategy:
       # Let every shard finish, so one run shows every failing test.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     steps:
       # `--shard` takes its total from `strategy.job-total`, which counts every
       # matrix combination. A second matrix key, or a repeated or missing shard
@@ -220,7 +228,7 @@ jobs:
           fi
           echo "::warning::The Playwright image does not match @playwright/test (missing:$missing). Update container.image in ci.yml."
           pnpm exec playwright install chromium
-      # Restore only, so six shards do not race to save it; the Build job saves
+      # Restore only, so the shards do not race to save it; the Build job saves
       # it. The exact key exists only once Build has finished for this commit;
       # before that, restore-keys brings back an earlier commit's cache.
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
