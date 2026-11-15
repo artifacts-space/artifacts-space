@@ -200,6 +200,13 @@ lint. Nothing renders under the 13px floor.
   what is drawn hidden from it. The words come from
   `src/lib/ui/display-words.ts`, which the Markdown copy of an interface
   reads too, so readers and agents get the same sentence.
+- A prop that pairs one entry with each child (Tabs `tabs`, Accordion
+  `items`, Grid `spans`) is listed in `pairedChildren`
+  (`src/lib/ui/props/layout.ts`). Validation checks the counts match, and
+  the editor's block edits (`pairedProp` in `src/lib/ui/spec-blocks.ts`)
+  keep it in step when a child is added, moved, duplicated, or deleted. A
+  Grid without `spans` stays without it. A new paired prop goes in that
+  list, never in a second copy of the edits.
 - An interface action that the renderer does not run itself goes into
   `src/components/artifact-view/ui/state-actions.tsx` (`toggleState` is
   there), with its name in `allowedActions` and its state path under a key

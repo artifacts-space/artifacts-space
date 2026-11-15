@@ -14,7 +14,7 @@ import { containsExpression, unsupportedExpressions } from "./expressions";
 import { propIssues, specError, specWarning, type UiSpecIssue } from "./issues";
 import { isPlainObject } from "./json-walk";
 import { uiLimits } from "./limits";
-import { pairedChildren } from "./props/layout";
+import { isPairedType, pairedChildren } from "./props/layout";
 import type { UiElement } from "./spec";
 
 /** Actions an `on` binding may run. All of them only change the spec's own state. */
@@ -61,11 +61,15 @@ function checkChildren(key: string, type: UiComponentName, element: UiElement): 
       ? [specWarning("leaf_children", `Element "${key}" (${type}) does not show children, so its ${element.children.length} children are hidden. Wrap them in a Stack or Card instead.`, key)]
       : [];
   }
-  if (type !== "Tabs" && type !== "Accordion") return [];
+  if (!isPairedType(type)) return [];
   const prop = pairedChildren[type];
   const entries = element.props[prop];
+  if (type === "Grid" && element.repeat !== undefined && entries !== undefined) {
+    return [specError("children_mismatch", `Element "${key}" (Grid): \`spans\` pairs with the children written in the spec, and a Grid with \`repeat\` draws its child once per item. Remove \`spans\`, or write the children out.`, key)];
+  }
   if (!Array.isArray(entries) || entries.length === element.children.length) return [];
-  return [specError("children_mismatch", `Element "${key}" (${type}): ${entries.length} ${prop} but ${element.children.length} children. Give exactly one child per entry in ${prop}; child N is the panel for entry N.`, key)];
+  const pairing = type === "Grid" ? "entry N is how many columns child N spans" : "child N is the panel for entry N";
+  return [specError("children_mismatch", `Element "${key}" (${type}): ${entries.length} ${prop} but ${element.children.length} children. Give exactly one child per entry in ${prop}; ${pairing}.`, key)];
 }
 
 function bindingIssues(key: string, event: string, binding: unknown): UiSpecIssue[] {

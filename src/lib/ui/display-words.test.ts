@@ -43,4 +43,9 @@ describe("ratingWords", () => {
     expect(ratingWords(3, 10)).toBe("3 out of 10");
     expect(ratingWords(4.5, 5, "Average rating")).toBe("Average rating: 4.5 out of 5");
   });
+
+  it("should never say more than max or less than nothing, when the value was read from state", () => {
+    expect(ratingWords(7)).toBe("5 out of 5");
+    expect(ratingWords(-1, 10)).toBe("0 out of 10");
+  });
 });

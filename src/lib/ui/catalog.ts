@@ -53,7 +53,7 @@ export const componentChecks: Partial<Record<UiComponentName, PropCheck>> = { ..
  * reports every problem at once. A new rule should be written this way and
  * listed here.
  */
-export const fieldWiseChecks: ReadonlySet<UiComponentName> = new Set(["Box", "Input", "Button", "List", "Placeholder", "Separator", "Link", "AvatarGroup", "Rating", "Grid"]);
+export const fieldWiseChecks: ReadonlySet<UiComponentName> = new Set(["Box", "Input", "Button", "List", "Placeholder", "Separator", "Link", "AvatarGroup", "Rating", "Grid", "Badge"]);
 
 /** Events a component can emit for `on` bindings. */
 export const componentEvents: Partial<Record<UiComponentName, readonly string[]>> = inputEvents;
@@ -61,7 +61,7 @@ export const componentEvents: Partial<Record<UiComponentName, readonly string[]>
 const descriptions: Record<UiComponentName, string> = {
   Section: "A titled region of the page. Use it to group related content. Children stack vertically.",
   Stack: "Lays children out vertically (default) or horizontally. Horizontal stacks wrap on narrow screens.",
-  Grid: "A responsive grid. `columns` (1-4) applies where the interface is wide enough; a narrow one shows fewer, and phones show one column, or two with `narrowColumns: 2` (small items such as metrics or logos).",
+  Grid: "A responsive grid. `columns` (1-4) applies where the interface is wide enough; a narrow one shows fewer, and phones show one column, or two with `narrowColumns: 2` (small items such as metrics or logos). `spans` gives how many columns each child takes, one entry per child in order (a wide card in a feature grid: `\"spans\": [2, 1, 1]`); a span is at most `columns`, and where the grid shows fewer columns it takes them all, so nothing overflows.",
   Card: "A bordered surface with an optional title and description. Children go inside.",
   Tabs: "Tabbed panels. Give one `tabs` entry per child: child N is the panel for tab N.",
   Accordion: "Collapsible panels. Give one `items` entry per child: child N is the body of item N.",
@@ -72,7 +72,7 @@ const descriptions: Record<UiComponentName, string> = {
   Markdown: "GitHub-flavored Markdown (tables, task lists). Raw HTML is not rendered.",
   Code: "A block of source code with an optional language label and title.",
   Callout: "A highlighted note. `tone`: neutral, info, success, warning, or danger. `announce` speaks it to screen readers when it appears after a reader's action.",
-  Badge: "A small status label with a tone. `variant`: soft (default), solid, or outline. `icon` puts an icon by name (see Icon) before the label. `dot: \"start\"` puts a small status dot in the tone before the label; `dot: \"only\"` shows the dot alone (an unread mark), and the label is then read by screen readers only.",
+  Badge: "A small status label with a tone. `variant`: soft (default), solid, or outline. `icon` puts an icon by name (see Icon) before the label. `dot: \"start\"` puts a small status dot in the tone before the label; `dot: \"only\"` shows the dot alone (an unread mark), and the label is then read by screen readers only; it takes no `icon` or `variant`.",
   List: "A bulleted or numbered list of plain-text items. `marker` replaces the bullets with an icon: check, cross, or arrow.",
   Steps: "A numbered how-to or runbook. Each item has a `title`, an optional `body` in Markdown, and optional `code` (with `language`) to copy and run.",
   Link: "A link that opens in a new tab. Only absolute http, https, and mailto URLs are allowed; leave `href` out for a mockup link that goes nowhere. `variant`: inline (default, underlined), nav (a plain menu link), or muted (small and quiet, for footers). `active` marks the current page. `icon` puts an icon by name (see Icon) at the start or the end (`iconPosition`); an inline link with an `href` ends with its own arrow, so its icon goes at the start.",
