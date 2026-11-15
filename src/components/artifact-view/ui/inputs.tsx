@@ -156,6 +156,15 @@ function buttonIcon(props: ButtonProps, side: "start" | "end"): ReactNode {
 }
 
 /**
+ * True only for the value true. State can hold any JSON, and React writes
+ * aria-* through as given, so `aria-expanded` is written as true or false
+ * whatever the type says.
+ */
+function isTrue(value: unknown): boolean {
+  return value === true;
+}
+
+/**
  * A destructive action: the danger tone as the fill and the page color as
  * its label, the same pair as the tone written on the page, which holds
  * 4.5:1 by rule on every surface and in every theme. Hover mixes the fill
@@ -174,7 +183,7 @@ export function ButtonView({ props, emit }: ViewProps<"Button">) {
   const size = buttonSize[props.size ?? "md"];
   const named = props.iconOnly ? { "aria-label": props.label } : {};
   // A disclosure button says whether what it opens is open; an ordinary button says nothing.
-  const expanded = props.expanded === undefined ? {} : { "aria-expanded": props.expanded };
+  const expanded = props.expanded === undefined ? {} : { "aria-expanded": isTrue(props.expanded) };
   return (
     <Button {...named} {...expanded} variant={props.variant === "danger" ? "default" : (props.variant ?? "default")} data-variant={props.variant === "danger" ? "danger" : undefined} size={props.iconOnly ? size.icon : size.text} disabled={props.disabled ?? false} className={buttonClass(props, size)} onClick={() => { emit("press"); }}>
       {buttonIcon(props, "start")}

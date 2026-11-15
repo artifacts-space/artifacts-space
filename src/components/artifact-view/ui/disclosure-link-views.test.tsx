@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { ArtifactView } from "../artifact-view";
 
 import { LinkView } from "./content";
+import { ButtonView } from "./inputs";
+import type { ViewProps } from "./stout";
 
 /*
  * Button `expanded`, which tells screen readers whether what a button opens
@@ -28,6 +30,18 @@ describe("a Button that says whether what it opens is open", () => {
   it("should set aria-expanded from state when expanded reads the path the button flips", () => {
     expect(buttonTag(page(menu({ $state: "/open" }), { open: false }))).toContain('aria-expanded="false"');
     expect(buttonTag(page(menu({ $state: "/open" }), { open: true }))).toContain('aria-expanded="true"');
+  });
+
+  it("should show a notice instead of the button when the state expanded reads holds a string", () => {
+    const html = page(menu({ $state: "/open" }), { open: "yes" });
+    expect(html).toContain("This Button could not be shown.");
+    expect(html).not.toContain("aria-expanded");
+  });
+
+  it("should write aria-expanded only as true or false when a string reaches the view", () => {
+    // State can hold any JSON; the renderer refuses this before the view, and the view holds the line on its own too.
+    const props = { label: "Open menu", expanded: "yes" } as unknown as ViewProps<"Button">["props"];
+    expect(buttonTag(renderToStaticMarkup(<ButtonView props={props} emit={() => undefined} />))).toContain('aria-expanded="false"');
   });
 
   it("should leave aria-expanded off a button without expanded", () => {

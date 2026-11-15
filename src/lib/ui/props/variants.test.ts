@@ -152,6 +152,12 @@ describe("Link icon", () => {
     expect(messages("Link", { label: "Docs", icon: "arrow-right", iconPosition: "end", variant: "inline", href: { $state: "/url" } })).toEqual([expect.stringContaining(endIcon)]);
   });
 
+  it("should say nothing about the icon's side when the href is one the link policy refuses, which draws no arrow", () => {
+    for (const href of ["#top", ""]) {
+      expect(messages("Link", { label: "Docs", icon: "arrow-right", iconPosition: "end", href }).join(" ")).not.toContain(endIcon);
+    }
+  });
+
   it("should say nothing about the icon while the variant or the position is an expression", () => {
     expect(messages("Link", { label: "Docs", icon: "arrow-right", iconPosition: { $state: "/side" }, href: "https://example.com" })).toEqual([]);
     expect(messages("Link", { label: "Docs", icon: "arrow-right", iconPosition: "end", variant: { $state: "/kind" }, href: "https://example.com" })).toEqual([]);

@@ -1,4 +1,4 @@
-import type { Locator, Page } from "@playwright/test";
+import type { Locator, Page, TestInfo } from "@playwright/test";
 
 import { expect, test } from "./test";
 
@@ -78,18 +78,28 @@ function describeDiagrams(drawing: Locator): Promise<string[]> {
   });
 }
 
+/** Tests whose time limit already grew for a diagram wait. */
+const extendedForDiagrams = new WeakSet<TestInfo>();
+
+/** Grows a test's time limit by one diagram wait, the first time only; a test with no limit keeps none. */
+function allowOneDiagramWait(info: TestInfo, timeout: number) {
+  if (info.timeout === 0 || extendedForDiagrams.has(info)) return;
+  extendedForDiagrams.add(info);
+  info.setTimeout(info.timeout + Math.max(timeout, diagramDrawTimeout));
+}
+
 /**
  * Waits until no diagram in `scope` is still drawing: each is drawn or
  * has failed (`data-diagram-state`, set by every diagram view). A diagram
  * in a document draws only once it nears the window, so scroll such a
  * one into view first.
  *
- * The test's own time limit grows by the wait, so a diagram that never
- * draws fails here, naming the diagram, and not later as a test timeout.
+ * The test's own time limit grows once by the longest wait, however many
+ * times a test calls this, so a diagram that never draws fails here, naming
+ * the diagram, and not later as a test timeout.
  */
 export async function expectDiagramsSettled(scope: Locator, timeout = diagramDrawTimeout): Promise<void> {
-  const info = test.info();
-  if (info.timeout > 0) info.setTimeout(info.timeout + timeout);
+  allowOneDiagramWait(test.info(), timeout);
   const drawing = scope.locator('[data-diagram-state="drawing"]');
   try {
     await expect(drawing).toHaveCount(0, { timeout });

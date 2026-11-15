@@ -129,7 +129,7 @@ export const inputDocs = {
       "Variants: default, outline, secondary, ghost, danger. Sizes: sm, md, lg.",
       "`danger` is for an action that deletes or cannot be undone: a solid fill in the danger tone. Its label reads on every Box surface and in every theme.",
       "`iconOnly` needs an `icon`; the `label` is then what screen readers announce.",
-      "`expanded` says whether what the button opens is open (a menu toggle, a \"Show more\"). Read it from the same path the button flips: `\"expanded\": { \"$state\": \"/open\" }`. Leave it off a button that opens nothing.",
+      "`expanded` says whether what the button opens is open (a menu toggle, a \"Show more\"). Read it from the same path the button flips: `\"expanded\": { \"$state\": \"/open\" }`. That path must hold `true` or `false`; any other value stops the button from being shown. Leave it off a button that opens nothing.",
     ],
   },
 } satisfies Record<string, ComponentDoc>;

@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { isSafeHref, maxHrefLength } from "@/lib/link-policy";
 
+import { isExpression } from "../expressions";
+
 import type { PropCheck } from "./data";
 import { avatarProps } from "./fields";
 import { iconName, iconProps, inkTone } from "./screen";
@@ -91,11 +93,14 @@ const linkIconFields = z.object({ variant: z.enum(["inline", "nav", "muted"]).op
  * An inline link with an address already ends with its own mark, the arrow
  * that says it opens a new tab, so it takes an icon at the start only. It
  * reads `variant` and `iconPosition` as written and says nothing while
- * either is an expression; any `href`, written or read from state, counts.
+ * either is an expression. The address counts as the view counts it: one
+ * the link policy accepts, or one read from state. A refused `href` has its
+ * own error and draws no arrow.
  */
 export const linkCheck: PropCheck = (props) => {
   const read = linkIconFields.safeParse(props);
-  if (!read.success || props.href === undefined) return [];
+  const drawsArrow = isExpression(props.href) || isSafeHref(props.href);
+  if (!read.success || !drawsArrow) return [];
   const { variant = "inline", iconPosition } = read.data;
   if (variant !== "inline" || iconPosition !== "end") return [];
   return ['An inline link with an `href` ends with its own arrow, so its icon goes at the start. Set `iconPosition: "start"`, or use `variant: "nav"` or `"muted"`, which have no arrow.'];

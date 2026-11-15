@@ -162,6 +162,10 @@ test("should leave no box that scrolls out of the keyboard's reach on the diagra
 
 test("should fail the diagram wait with words that name a diagram that never draws, before the test's own time runs out", async ({ page }) => {
   await page.setContent('<section data-specimen="Never drawn"><figure><figcaption>Release flow</figcaption><div data-diagram-state="drawing">flowchart LR</div></figure></section>');
-  const failure = await expectDiagramsSettled(page.locator("body"), 500).then(() => "it settled", (error: unknown) => (error instanceof Error ? error.message : String(error)));
-  expect(failure).toBe('Still drawing after 0.5 s: specimen "Never drawn", caption "Release flow", words "flowchart LR"');
+  const limit = test.info().timeout;
+  const wait = () => expectDiagramsSettled(page.locator("body"), 500).then(() => "it settled", (error: unknown) => (error instanceof Error ? error.message : String(error)));
+  expect(await wait()).toBe('Still drawing after 0.5 s: specimen "Never drawn", caption "Release flow", words "flowchart LR"');
+  // A second wait in the same test does not grow its time limit again.
+  await wait();
+  expect(test.info().timeout).toBe(limit + diagramDrawTimeout);
 });
