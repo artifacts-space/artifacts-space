@@ -519,7 +519,11 @@ catch this, so test the generated SQL with `.toSQL()`, as
 - `*.db.test.ts` files run SQL against a real Postgres. They run only when
   `TEST_DATABASE_URL` names a throwaway database with the migrations applied,
   so `pnpm test` skips them; the CI **Database tests** job runs them against a
-  service container and fails if any is skipped.
+  service container and fails if any is skipped. Run them with `pnpm test:db`,
+  which takes one file at a time: every file shares the one database, and
+  several fill or trim the same tables, so files side by side change each
+  other's counts (a full pool of unapproved OAuth apps once got a 201 where it
+  expected a 503, because another file's old apps were there to evict).
 - `pnpm test:e2e` renders the component gallery at `/dev/components` on a
   phone and a desktop viewport. It also builds and starts production on
   `PLAYWRIGHT_PORT + 1000` for the `*.prod.spec.ts` checks, which need real
