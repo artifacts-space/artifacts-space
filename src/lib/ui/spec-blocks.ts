@@ -140,10 +140,21 @@ function newPairedEntry(prop: PairedProp): Record<string, string> | number {
   return prop === "tabs" ? { label: "New tab" } : { title: "New item" };
 }
 
-/** A moved or copied child keeps its own entry; anything else gets a new one. */
-function keptEntry(prop: PairedProp, entry: unknown): unknown {
-  const fits = prop === "spans" ? typeof entry === "number" : isPlainObject(entry);
-  return fits ? entry : newPairedEntry(prop);
+/**
+ * A span kept by a child that moves into a Grid, cut to that Grid's
+ * `columns` (default 2), so a wide cell from a wider grid is as wide as this
+ * one allows and the spec stays valid. Columns read from state are not
+ * known here, so the span is kept as it is.
+ */
+function spanIn(spec: RawSpec, parent: string, span: number): number {
+  const columns: unknown = propsOf(spec, parent).columns ?? 2;
+  return typeof columns === "number" ? Math.min(span, columns) : span;
+}
+
+/** A moved or copied child keeps its own entry (a span cut to the grid it lands in); anything else gets a new one. */
+function keptEntry(spec: RawSpec, parent: string, prop: PairedProp, entry: unknown): unknown {
+  if (prop === "spans") return typeof entry === "number" ? spanIn(spec, parent, entry) : newPairedEntry(prop);
+  return isPlainObject(entry) ? entry : newPairedEntry(prop);
 }
 
 /** Takes `key` out of its parent (and its paired label with it). Returns the spec and the label removed. */
@@ -170,7 +181,7 @@ function attach(spec: RawSpec, key: string, parent: string, index: number, entry
   const prop = pairedProp(spec, parent);
   if (!prop) return next;
   const entries = pairedEntries(next, parent, prop);
-  entries.splice(at, 0, keptEntry(prop, entry));
+  entries.splice(at, 0, keptEntry(next, parent, prop, entry));
   next = setProp(next, parent, prop, entries);
   return next;
 }

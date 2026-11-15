@@ -55,6 +55,18 @@ function unknownPropWarnings(key: string, type: UiComponentName, props: Record<s
     .map((prop) => specWarning("unknown_prop", `Element "${key}" (${type}): prop "${prop}" is not a ${type} prop and is ignored. Known props: ${known.join(", ") || "none"}.`, key));
 }
 
+/**
+ * A paired prop matches children by their place in the spec, and `repeat`
+ * draws one written child once per item, so the two cannot go together.
+ * Tabs and Accordion always pair; a Grid pairs only when it has `spans`.
+ */
+function repeatedPairing(key: string, type: keyof typeof pairedChildren, element: UiElement): UiSpecIssue[] {
+  const prop = pairedChildren[type];
+  if (element.repeat === undefined || element.props[prop] === undefined) return [];
+  const fix = type === "Grid" ? "Remove `spans`, or write the children out." : `Remove \`repeat\`, and write one child per entry in \`${prop}\`.`;
+  return [specError("children_mismatch", `Element "${key}" (${type}): \`${prop}\` pairs with the children written in the spec, and a ${type} with \`repeat\` draws its child once per item. ${fix}`, key)];
+}
+
 function checkChildren(key: string, type: UiComponentName, element: UiElement): UiSpecIssue[] {
   if (!containerComponents.has(type)) {
     return element.children.length > 0
@@ -64,9 +76,8 @@ function checkChildren(key: string, type: UiComponentName, element: UiElement): 
   if (!isPairedType(type)) return [];
   const prop = pairedChildren[type];
   const entries = element.props[prop];
-  if (type === "Grid" && element.repeat !== undefined && entries !== undefined) {
-    return [specError("children_mismatch", `Element "${key}" (Grid): \`spans\` pairs with the children written in the spec, and a Grid with \`repeat\` draws its child once per item. Remove \`spans\`, or write the children out.`, key)];
-  }
+  const repeated = repeatedPairing(key, type, element);
+  if (repeated.length > 0) return repeated;
   if (!Array.isArray(entries) || entries.length === element.children.length) return [];
   const pairing = type === "Grid" ? "entry N is how many columns child N spans" : "child N is the panel for entry N";
   return [specError("children_mismatch", `Element "${key}" (${type}): ${entries.length} ${prop} but ${element.children.length} children. Give exactly one child per entry in ${prop}; ${pairing}.`, key)];

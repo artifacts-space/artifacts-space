@@ -19,7 +19,7 @@ const elementCodes: Omit<IssueCodeDoc, "blocking">[] = [
   { code: "unknown_component", severity: "error", meaning: "The type is not in the catalog. The element renders nothing." },
   { code: "invalid_element", severity: "error", meaning: "An entry in elements is not an object with a type." },
   { code: "missing_child", severity: "error", meaning: "children names a key that does not exist." },
-  { code: "children_mismatch", severity: "error", meaning: "Tabs, Accordion, or a Grid with `spans` has a different number of children and entries." },
+  { code: "children_mismatch", severity: "error", meaning: "Tabs, Accordion, or a Grid with `spans` has a different number of children and entries, or pairs them while it repeats its child with `repeat`." },
   { code: "invalid_event", severity: "error", meaning: "on uses an event the component does not emit." },
   { code: "invalid_action", severity: "error", meaning: "on runs an action other than the five state actions." },
   { code: "unsupported_expression", severity: "error", meaning: "A prop uses $computed." },
