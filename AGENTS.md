@@ -183,6 +183,14 @@ lint. Nothing renders under the 13px floor.
   `announce` prop. Never put `role="status"` or `aria-live` on an element
   that arrives later; a screen reader announces that unreliably. Text drawn
   with the interface is not spoken, and the editor has no region.
+- A box that scrolls (either way) is a named tab stop while it scrolls and
+  nothing while it fits: wrap it in `ScrollFrame`
+  (`src/components/code/scroll-frame.tsx`), or use `useScrollable` with
+  `scrollStopProps` on the box itself. When what is inside is replaced (a
+  diagram drawn over its placeholder), pass `useScrollable` a content key so
+  it measures again. An axe scan of anything holding a diagram first calls
+  `expectScrollersSettled` (`e2e/support/scrollers.ts`), which waits for the
+  drawing and for every scrolling box to become reachable.
 - An interface action that the renderer does not run itself goes into
   `src/components/artifact-view/ui/state-actions.tsx` (`toggleState` is
   there), with its name in `allowedActions` and its state path under a key

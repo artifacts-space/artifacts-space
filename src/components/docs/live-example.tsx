@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 import { InlineCodeText } from "./docs-content";
 import { ExamplePreview } from "./example-preview";
-import { ScrollFrame } from "./scroll-frame";
+import { ScrollFrame } from "@/components/code/scroll-frame";
 
 /**
  * The spec under a live example, behind a quiet "Show JSON" toggle. The JSON

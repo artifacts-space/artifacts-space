@@ -1,4 +1,6 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+
+import { expect } from "./test";
 
 /**
  * Every box on the page that scrolls sideways and is not a named group with a
@@ -25,4 +27,37 @@ export async function unreachableSidewaysScrollers(page: Page): Promise<string[]
     }
     return offenders;
   });
+}
+
+/**
+ * Every box inside `scope`, or `scope` itself, that scrolls either way and
+ * is not a named group with a tab stop, described by its tag and classes.
+ * Unlike `unreachableSidewaysScrollers` it also counts boxes that scroll
+ * down (a long source listing, a chart's table).
+ */
+export async function unreachableScrollersIn(scope: Locator): Promise<string[]> {
+  return scope.evaluate((root) => {
+    const scrollable = (overflow: string) => overflow === "auto" || overflow === "scroll";
+    const scrolls = (element: HTMLElement) => {
+      const style = getComputedStyle(element);
+      const sideways = scrollable(style.overflowX) && element.scrollWidth > element.clientWidth + 1;
+      return sideways || (scrollable(style.overflowY) && element.scrollHeight > element.clientHeight + 1);
+    };
+    const reachable = (element: HTMLElement) =>
+      element.getAttribute("role") === "group" && element.tabIndex === 0 && (element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby"));
+    return [root, ...root.querySelectorAll("*")]
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && scrolls(element) && !reachable(element))
+      .map((element) => `${element.tagName.toLowerCase()}.${[...element.classList].join(".")}`);
+  });
+}
+
+/**
+ * Waits until every diagram in `scope` has been drawn and every box in it
+ * that scrolls is a named tab stop. A diagram draws after the page loads,
+ * and only then is its frame as wide as it will be, so an axe scan that
+ * runs sooner can pass or fail by luck.
+ */
+export async function expectScrollersSettled(scope: Locator): Promise<void> {
+  await expect(scope.locator("[data-diagram-frame]:not([data-diagram-drawn])")).toHaveCount(0, { timeout: 30_000 });
+  await expect.poll(() => unreachableScrollersIn(scope)).toEqual([]);
 }

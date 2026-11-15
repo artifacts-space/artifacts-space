@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { docsHeading, type DocsHeading, type DocsSlug } from "@/lib/docs/pages";
 import { cn } from "@/lib/utils";
 
-import { ScrollFrame } from "./scroll-frame";
+import { ScrollFrame } from "@/components/code/scroll-frame";
 
 /**
  * Building blocks for docs pages. Headings take their id and title from the
