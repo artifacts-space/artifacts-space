@@ -8,7 +8,7 @@ import { MarkdownView } from "@/components/artifact-view/markdown-view";
 import { externalLinkRel, safeHref } from "@/lib/link-policy";
 import type { UiProps } from "@/lib/ui/catalog";
 import type { InkTone } from "@/lib/ui/props/screen";
-import type { TextAlign, Tone } from "@/lib/ui/props/shared";
+import type { BadgeTone, TextAlign, Tone } from "@/lib/ui/props/shared";
 import { hasTitleText } from "@/lib/ui/title-rules";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +66,10 @@ export const textSize = {
   "4xl": "text-4xl leading-[1.1] tracking-[-0.025em]",
 } as const;
 
-/** Text colors for Text and Icon: status tones hold 4.5:1 on every surface a Box paints (toneTokens in src/lib/themes/derive.ts). */
+/**
+ * Text colors for Text and Icon: status tones and the accent tone hold 4.5:1
+ * on every surface a Box paints (toneTokens in src/lib/themes/derive.ts).
+ */
 export const inkToneClass: Record<InkTone, string> = {
   default: "",
   muted: "text-muted-foreground",
@@ -74,6 +77,7 @@ export const inkToneClass: Record<InkTone, string> = {
   success: "text-tone-success",
   warning: "text-tone-warning",
   danger: "text-tone-danger",
+  accent: "text-tone-accent",
 };
 
 const textWeight: Record<NonNullable<TextProps["weight"]>, string> = { normal: "font-normal", medium: "font-medium", semibold: "font-semibold" };
@@ -140,44 +144,48 @@ export function CalloutView({ props }: ViewProps<"Callout">) {
   );
 }
 
-/** Badge colors per tone. */
-export const badgeTone: Record<Tone, string> = {
+/** Badge colors per tone; the status ones also color KeyValue values, Board badges, and Calendar events. */
+export const badgeTone: Record<BadgeTone, string> = {
   neutral: "border-border bg-muted text-foreground",
   info: "border-tone-info/30 bg-tone-info/10 text-tone-info",
   success: "border-tone-success/30 bg-tone-success/10 text-tone-success",
   warning: "border-tone-warning/35 bg-tone-warning/12 text-tone-warning",
   danger: "border-tone-danger/30 bg-tone-danger/10 text-tone-danger",
+  accent: "border-tone-accent/30 bg-tone-accent/10 text-tone-accent",
 };
 
-/** Small status-dot colors per tone (Board columns, Calendar events). */
-export const toneDot: Record<Tone, string> = {
+/** Small status-dot colors per tone (Board columns, Calendar events, and a Badge's dot, accent included). */
+export const toneDot: Record<BadgeTone, string> = {
   neutral: "bg-muted-foreground/50",
   info: "bg-tone-info",
   success: "bg-tone-success",
   warning: "bg-tone-warning",
   danger: "bg-tone-danger",
+  accent: "bg-tone-accent",
 };
 
 type BadgeProps = UiProps<"Badge">;
 
 /** A solid badge is the tone as the fill, with the page color as its text: the same pair as the tone as text on the page. */
-const badgeSolid: Record<Tone, string> = {
+const badgeSolid: Record<BadgeTone, string> = {
   neutral: "border-transparent bg-foreground text-background",
   info: "border-transparent bg-tone-info text-background",
   success: "border-transparent bg-tone-success text-background",
   warning: "border-transparent bg-tone-warning text-background",
   danger: "border-transparent bg-tone-danger text-background",
+  accent: "border-transparent bg-tone-accent text-background",
 };
 
-const badgeOutline: Record<Tone, string> = {
+const badgeOutline: Record<BadgeTone, string> = {
   neutral: "border-border text-foreground",
   info: "border-tone-info/40 text-tone-info",
   success: "border-tone-success/40 text-tone-success",
   warning: "border-tone-warning/45 text-tone-warning",
   danger: "border-tone-danger/40 text-tone-danger",
+  accent: "border-tone-accent/40 text-tone-accent",
 };
 
-const badgeVariant: Record<NonNullable<BadgeProps["variant"]>, Record<Tone, string>> = { soft: badgeTone, solid: badgeSolid, outline: badgeOutline };
+const badgeVariant: Record<NonNullable<BadgeProps["variant"]>, Record<BadgeTone, string>> = { soft: badgeTone, solid: badgeSolid, outline: badgeOutline };
 
 /** Every class a badge takes from its props; the interface editor draws badges typed in place with it. */
 export function badgeClassName(props: Pick<BadgeProps, "tone" | "variant">): string {
@@ -191,7 +199,7 @@ export function BadgeIcon({ name }: { name: BadgeProps["icon"] }) {
 }
 
 /** A dot alone stands for the badge, so even a neutral one is drawn strong enough to see (3:1). */
-const loneDot: Record<Tone, string> = { ...toneDot, neutral: "bg-muted-foreground" };
+const loneDot: Record<BadgeTone, string> = { ...toneDot, neutral: "bg-muted-foreground" };
 
 /** A badge's status dot, before its label; on a solid badge it is the page color, so it shows on the tone's fill. */
 export function BadgeDot({ props }: { props: Pick<BadgeProps, "dot" | "tone" | "variant"> }) {

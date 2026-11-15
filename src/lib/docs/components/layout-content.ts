@@ -141,10 +141,11 @@ export const contentDocs = {
       {
         title: "Sizes and tones",
         spec: spec("page", {
-          page: { type: "Stack", props: { gap: "sm" }, children: ["lead", "body", "fine"] },
+          page: { type: "Stack", props: { gap: "sm" }, children: ["lead", "body", "fine", "accent"] },
           lead: text("The rollout is on track.", { size: "lg" }),
           body: text("Line breaks are kept,\nso short notes read as written."),
           fine: text("Updated by @release-bot 5 minutes ago.", { size: "sm", tone: "muted" }),
+          accent: text("New this month", { tone: "accent", weight: "semibold" }),
         }),
       },
       {
@@ -158,7 +159,7 @@ export const contentDocs = {
         }),
       },
     ],
-    rules: ["A `variant` sets a size and a tone; `size` and `tone` still win when given.", "`clamp` cuts the text off after that many lines with an ellipsis. The full text stays in the page for screen readers.",
+    rules: ["A `variant` sets a size and a tone; `size` and `tone` still win when given.", "`tone`: default, muted, a status tone (info, success, warning, danger), or accent, the accent color for words that are not a status: the theme's own accent, or blue on the default palette, whose accent is its text color. Every tone reads on every Box surface and in every theme; on a primary surface, which is the accent, accent text takes that surface's text color.", "`clamp` cuts the text off after that many lines with an ellipsis. The full text stays in the page for screen readers.",
       "`announce` speaks the text to screen readers when it appears after a reader's action, such as a line a button press shows through `visible`, and again when its words change. Text that is there when the interface is first drawn is not spoken. Do not set it on text that follows typing: it would speak on every key, and validation warns about it (`announce_follows_typing`). Mark one element for each action: when two appear together, only the last is spoken.",
     ],
   },
@@ -192,7 +193,7 @@ export const contentDocs = {
   },
   Badge: {
     examples: [
-      { title: "Tones", spec: single("Stack", { direction: "horizontal", gap: "sm" }, { neutral: badge("draft"), info: badge("beta", "info"), success: badge("shipped", "success"), warning: badge("at risk", "warning"), danger: badge("blocked", "danger") }) },
+      { title: "Tones", spec: single("Stack", { direction: "horizontal", gap: "sm" }, { neutral: badge("draft"), info: badge("beta", "info"), success: badge("shipped", "success"), warning: badge("at risk", "warning"), danger: badge("blocked", "danger"), accent: badge("featured", "accent") }) },
       {
         title: "Variants and an icon",
         spec: single("Stack", { direction: "horizontal", gap: "sm" }, {
@@ -214,7 +215,10 @@ export const contentDocs = {
         }),
       },
     ],
-    rules: ["`dot: \"start\"` draws a small dot in the tone before the label. `dot: \"only\"` draws the dot alone and keeps the label for screen readers, so the label must say what the dot means (\"Unread messages\"). A dot alone takes no `icon` or `variant`: it has no pill for them to style."],
+    rules: [
+      "`tone`: neutral (default), info, success, warning, danger, or accent. The status tones mean a state; accent is the accent color (the theme's own accent, or blue on the default palette), for a label that is not a status (New, Featured). Every tone reads in every variant on every Box surface and in every theme.",
+      "`dot: \"start\"` draws a small dot in the tone before the label. `dot: \"only\"` draws the dot alone and keeps the label for screen readers, so the label must say what the dot means (\"Unread messages\"). A dot alone takes no `icon` or `variant`: it has no pill for them to style.",
+    ],
   },
   List: {
     examples: [

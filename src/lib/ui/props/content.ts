@@ -8,7 +8,7 @@ import type { PropCheck } from "./data";
 import { avatarGroupCheck, displayProps, ratingCheck } from "./display";
 import { avatarProps } from "./fields";
 import { iconName, iconProps, inkTone } from "./screen";
-import { label, prose, textAlign, tone } from "./shared";
+import { badgeTones, label, prose, textAlign, tone } from "./shared";
 
 const stepItem = z.object({
   title: label(160),
@@ -51,7 +51,7 @@ export const contentProps = {
   }),
   Badge: z.object({
     label: label(60),
-    tone: tone.optional(),
+    tone: badgeTones.optional(),
     variant: z.enum(["soft", "solid", "outline"]).optional(),
     icon: iconName.optional(),
     /** A status dot in the tone: before the label, or alone with the label read by screen readers only. */

@@ -4,7 +4,7 @@ import { longText, unbroken } from "./long-text";
 /*
  * Fixtures for text fields, avatars, and the screen props of Button, Badge,
  * List, Select, and Image, plus a sign-in screen that shows the set composes
- * and that its password field is only drawn.
+ * and that its password field is only drawn, and a toggle that stays pressed.
  */
 
 export const inputFixtures: ComponentFixture[] = [
@@ -51,6 +51,12 @@ export const screenButtonFixtures: ComponentFixture[] = [
   { name: "Danger, disabled", props: { label: "Delete account", variant: "danger", disabled: true } },
   { name: "Disclosure, closed", props: { label: "Show more", variant: "outline", icon: "chevron-down", iconPosition: "end", expanded: false } },
   { name: "Disclosure, open", props: { label: "Show less", variant: "outline", icon: "chevron-up", iconPosition: "end", expanded: true } },
+  { name: "Toggle, not pressed", props: { label: "Bold", variant: "outline", pressed: false } },
+  { name: "Toggle, pressed, outline", props: { label: "Bold", variant: "outline", pressed: true } },
+  { name: "Toggle, not pressed, secondary with an icon", props: { label: "Starred", variant: "secondary", icon: "star", pressed: false } },
+  { name: "Toggle, not pressed, ghost icon only", props: { label: "Saved", variant: "ghost", icon: "bookmark", iconOnly: true, pressed: false } },
+  { name: "Toggle, pressed, secondary with an icon", props: { label: "Starred", variant: "secondary", icon: "star", pressed: true } },
+  { name: "Toggle, pressed, ghost icon only", props: { label: "Saved", variant: "ghost", icon: "bookmark", iconOnly: true, pressed: true } },
 ];
 
 export const screenBadgeFixtures: ComponentFixture[] = [
@@ -58,6 +64,9 @@ export const screenBadgeFixtures: ComponentFixture[] = [
   { name: "Solid, neutral", props: { label: "Popular", variant: "solid" } },
   { name: "Outline with an icon", props: { label: "Verified", tone: "success", variant: "outline", icon: "check" } },
   { name: "Solid danger, long", props: { label: longText(60), tone: "danger", variant: "solid", icon: "alert-triangle" } },
+  { name: "Accent", props: { label: "Featured", tone: "accent" } },
+  { name: "Accent, solid", props: { label: "New", tone: "accent", variant: "solid" } },
+  { name: "Accent, outline with an icon", props: { label: "Staff pick", tone: "accent", variant: "outline", icon: "star" } },
   { name: "Dot before the label", props: { label: "Online", tone: "success", dot: "start" } },
   { name: "Dot on a solid badge", props: { label: "Live", tone: "danger", variant: "solid", dot: "start" } },
   { name: "Dot alone", props: { label: "Unread", tone: "info", dot: "only" } },
@@ -101,5 +110,17 @@ export const signInSpec = {
     submit: { type: "Button", props: { label: "Sign in", fullWidth: true, icon: "arrow-right", iconPosition: "end" } },
     echo: { type: "Text", props: { variant: "caption", text: { $template: "Signing in as ${/email}" } }, visible: { $state: "/email" } },
     help: { type: "Link", props: { label: "Forgot your password?", variant: "muted" } },
+  },
+};
+
+/** A toggle that stays pressed: one press flips `/bold`, the button reads it as `pressed`, and the sample text follows. */
+export const pressedToggleSpec = {
+  version: 1,
+  root: "page",
+  state: { bold: false },
+  elements: {
+    page: { type: "Box", props: { gap: "sm", padding: "md", border: "all", radius: "lg", maxWidth: "md", label: "Text style" }, children: ["bold", "sample"] },
+    bold: { type: "Button", props: { label: "Bold", variant: "outline", size: "sm", pressed: { $state: "/bold" } }, on: { press: { action: "toggleState", params: { statePath: "/bold" } } } },
+    sample: { type: "Text", props: { text: "The quick note reads heavier while Bold is on.", weight: { $cond: { $state: "/bold" }, $then: "semibold", $else: "normal" } } },
   },
 };

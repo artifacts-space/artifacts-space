@@ -33,6 +33,10 @@ export type ColumnFormat = z.infer<typeof columnFormat>;
 export const tone = z.enum(["neutral", "info", "success", "warning", "danger"]);
 export type Tone = z.infer<typeof tone>;
 
+/** A Badge also takes "accent": the accent color (the theme's, or blue on the default palette), for a label that is not a status (New, Featured). */
+export const badgeTones = z.enum([...tone.options, "accent"]);
+export type BadgeTone = z.infer<typeof badgeTones>;
+
 /** Spacing between children. */
 export const gap = z.enum(["none", "sm", "md", "lg"]);
 export type Gap = z.infer<typeof gap>;

@@ -3,6 +3,7 @@
 import { JSONUIProvider, Renderer } from "@json-render/react";
 import { useMemo } from "react";
 
+import { useHydrated } from "@/components/use-hydrated";
 import { toRendererSpec } from "@/lib/ui/spec";
 import { validateUiSpec } from "@/lib/ui/validate";
 
@@ -15,9 +16,12 @@ import { IssueList, ViewNotice } from "./view-notice";
  * Renders a ui artifact (a json-render spec) with the stout registry. A spec
  * that cannot render at all shows its validation issues instead. A spec that
  * renders with some broken elements shows a short note above it; each broken
- * element shows its own inline notice.
+ * element shows its own inline notice. With `markReady`, its root carries
+ * `data-example-ready` once React has taken it over, a mark a test waits on
+ * before it presses a button there (the docs examples set it).
  */
-export function UiView({ content }: { content: string }) {
+export function UiView({ content, markReady = false }: { content: string; markReady?: boolean }) {
+  const hydrated = useHydrated();
   const result = useMemo(() => validateUiSpec(content), [content]);
   const { handlers, accessRef } = useStateActions();
   const errors = result.issues.filter((issue) => issue.severity === "error");
@@ -29,7 +33,7 @@ export function UiView({ content }: { content: string }) {
     );
   }
   return (
-    <div className="@container/ui flex min-w-0 flex-col gap-4">
+    <div className="@container/ui flex min-w-0 flex-col gap-4" data-example-ready={markReady && hydrated ? "" : undefined}>
       {errors.length > 0 ? (
         <ViewNotice tone="warning" title={`${String(errors.length)} ${errors.length === 1 ? "part" : "parts"} of this interface could not be shown.`}>
           <details>

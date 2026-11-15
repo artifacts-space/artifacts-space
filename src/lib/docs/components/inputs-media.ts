@@ -122,6 +122,19 @@ export const inputDocs = {
           { open: false },
         ),
       },
+      {
+        title: "A toggle that stays pressed",
+        note: "`pressed` reads the same state the button flips, so one press turns Bold on, the button shows it, and screen readers hear it.",
+        spec: spec(
+          "page",
+          {
+            page: { type: "Stack", props: { gap: "sm" }, children: ["bold", "sample"] },
+            bold: { type: "Button", props: { label: "Bold", variant: "outline", size: "sm", pressed: { $state: "/bold" } }, on: { press: { action: "toggleState", params: { statePath: "/bold" } } } },
+            sample: { type: "Text", props: { text: "This line turns semibold while Bold is on.", weight: { $cond: { $state: "/bold" }, $then: "semibold", $else: "normal" } } },
+          },
+          { bold: false },
+        ),
+      },
     ],
     rules: [
       "`press` can run setState, toggleState, pushState, removeState, or validateForm. A button cannot load or send data.",
@@ -130,6 +143,7 @@ export const inputDocs = {
       "`danger` is for an action that deletes or cannot be undone: a solid fill in the danger tone. Its label reads on every Box surface and in every theme.",
       "`iconOnly` needs an `icon`; the `label` is then what screen readers announce.",
       "`expanded` says whether what the button opens is open (a menu toggle, a \"Show more\"). Read it from the same path the button flips: `\"expanded\": { \"$state\": \"/open\" }`. That path must hold `true` or `false`; any other value stops the button from being shown. Leave it off a button that opens nothing.",
+      "`pressed` says whether a toggle is on (Bold, a filter chip, a view switch). Read it from the path the button flips: `\"pressed\": { \"$state\": \"/bold\" }`. A toggle goes from quiet to solid when pressed, so it takes `variant: \"outline\"`, `\"secondary\"`, or `\"ghost\"`: pressed, it is filled with the text color, with its label in the page color, on every surface. The default variant is solid already and is refused, and so is danger: a one-time action, not a state that stays on. A button takes `pressed` or `expanded`, never both.",
     ],
   },
 } satisfies Record<string, ComponentDoc>;

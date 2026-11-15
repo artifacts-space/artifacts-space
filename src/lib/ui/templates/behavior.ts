@@ -104,7 +104,20 @@ export interface PressButton {
    * when the fragment cannot tell (a push or a remove, a condition only
    * the browser can resolve).
    */
-  expanded: { atStart: boolean; afterPress: boolean } | null;
+  expanded: AriaFlip | null;
+  /**
+   * Whether the button tells screen readers it is on (`aria-pressed`), at
+   * the start and after its press, read from its `pressed` prop the same way
+   * as `expanded`: a toggle such as Bold. Null when it has none, or when
+   * the fragment cannot tell.
+   */
+  pressed: AriaFlip | null;
+}
+
+/** An aria-* state of a button, true or false, at the start and after its press. */
+export interface AriaFlip {
+  atStart: boolean;
+  afterPress: boolean;
 }
 
 /** One state-changing binding of an element's `press`. */
@@ -190,19 +203,22 @@ const writesValue = (write: StateWrite): write is ValueWrite => write.action ===
 /** What a setState or a toggleState leaves at its path when the path holds `current`: the value written, or true unless it was true (the renderer's toggle). */
 const leaves = (write: ValueWrite, current: unknown): unknown => (write.action === "setState" ? write.value : current !== true);
 
-/** Whether a button's `expanded` holds while the state is `state`, or undefined when the fragment cannot tell. */
-function expandedAt(element: TemplateElement | undefined, state: unknown): boolean | undefined {
-  const expanded: unknown = element?.props?.expanded;
-  return typeof expanded === "boolean" ? expanded : holds(expanded, state);
+/** The props a button says its state with: `aria-expanded` and `aria-pressed`. */
+type AriaProp = "expanded" | "pressed";
+
+/** Whether a button's `expanded` or `pressed` holds while the state is `state`, or undefined when the fragment cannot tell. */
+function ariaAt(element: TemplateElement | undefined, prop: AriaProp, state: unknown): boolean | undefined {
+  const value: unknown = element?.props?.[prop];
+  return typeof value === "boolean" ? value : holds(value, state);
 }
 
-/** A button's `aria-expanded` at the start and after its press, when the fragment can read both. */
-function expandedStates(fragment: TemplateFragment, write: StateWrite): PressButton["expanded"] {
+/** A button's `aria-expanded` or `aria-pressed` at the start and after its press, when the fragment can read both. */
+function ariaStates(fragment: TemplateFragment, write: StateWrite, prop: AriaProp): AriaFlip | null {
   const element = fragment.elements[write.key];
   const start = fragment.state ?? {};
-  const atStart = expandedAt(element, start);
+  const atStart = ariaAt(element, prop, start);
   if (atStart === undefined || !writesValue(write)) return null;
-  const afterPress = expandedAt(element, withValue(start, write.statePath, leaves(write, readPointer(start, write.statePath))));
+  const afterPress = ariaAt(element, prop, withValue(start, write.statePath, leaves(write, readPointer(start, write.statePath))));
   return afterPress === undefined ? null : { atStart, afterPress };
 }
 
@@ -262,7 +278,7 @@ export function pressButtons(template: UiTemplate): { buttons: PressButton[]; un
     }
     const changes = changesStart(fragment, write);
     const restoredBy = restorersOf(fragment, writes, write);
-    buttons.push({ key: write.key, label, action: write.action, statePath: write.statePath, value: write.value, changesStart: changes, restoredBy, oneWay: oneWayReason(write, changes, restoredBy), expanded: expandedStates(fragment, write) });
+    buttons.push({ key: write.key, label, action: write.action, statePath: write.statePath, value: write.value, changesStart: changes, restoredBy, oneWay: oneWayReason(write, changes, restoredBy), expanded: ariaStates(fragment, write, "expanded"), pressed: ariaStates(fragment, write, "pressed") });
   }
   return { buttons, unlabelled };
 }

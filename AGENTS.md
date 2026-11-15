@@ -628,6 +628,23 @@ catch this, so test the generated SQL with `.toSQL()`, as
   danger tone as the fill under the page color, the tone rule's own pair, and
   moves toward the text color under the pointer (`dangerHoverMix`);
   `surface-scope.test.ts` holds it at 4.5:1 over every preset and surface.
+  A pressed Button (`pressed`, only on outline, secondary, and ghost, which
+  go from quiet to solid; default and danger refuse it) is the text color
+  as the fill and edge, with the page color as its label, and moves toward
+  the page color under the pointer
+  (`pressedHoverMix`); `surface-scope.test.ts` holds its label at 4.5:1 and
+  its edge at 3:1 against the surface over every preset and surface. Forced
+  colors (Windows High Contrast) replace every page color, so there it takes
+  the system's selected pair (`--color-forced-selected`, Highlight under
+  HighlightText, important over hover and dark fills);
+  `e2e/a11y-pressed-accent.spec.ts` emulates forced colors and checks that
+  each variant's edge and fill differ from the same button at rest. The
+  accent tone (`--tone-accent`, Text, Icon, and Badge `tone: "accent"`) is
+  the theme's accent under the tone rule (`toneTokens`); the site's accent
+  is its ink, so the site palette starts it from a blue of its own in the
+  `--brand` family (hue 262; `--brand` stays for focus and selection); on a primary
+  surface, which is the accent, it starts from that surface's label color
+  (the accent palette's own accent), with the tones' fallback behind it.
 
 ### Page column
 
@@ -1067,7 +1084,11 @@ template text is ours, so the tools add no untrusted-content label.
   from the path it flips (`"expanded": { "$state": "/open" }`), so screen
   readers hear whether its panel is open; the loop reads `aria-expanded`
   before and after each press from the fragment (`PressButton.expanded`),
-  and a unit test fails for a template toggle without it. Every
+  and a unit test fails for a template toggle without it. A toggle that
+  stays on instead of opening a panel (Bold, a filter chip) sets `pressed`
+  from its path, never both; the loop reads `aria-pressed` the same way
+  (`PressButton.pressed`), and a toggle that is on counts as a change of
+  its frame. Every
   action the validator allows is read by `behavior.ts` (`stateActions`) or
   listed there as not pressed, with a reason (`unpressedActions`), and a
   test fails for a new action that is in neither. What it presses and

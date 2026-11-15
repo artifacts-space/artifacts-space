@@ -20,8 +20,8 @@ export type BoxSurface = (typeof boxSurfaces)[number];
 /** An icon by name. The message names a few; the guide lists all of them. */
 export const iconName = z.enum(uiIconNames, "Use an icon name from the Icon component's list, such as check, arrow-right, star, or mail.");
 
-/** Text color for Icon and Text: the default, muted, or a status tone. */
-export const inkTone = z.enum(["default", "muted", "info", "success", "warning", "danger"]);
+/** Text color for Icon and Text: the default, muted, a status tone, or the accent (the theme's, or blue on the default palette). */
+export const inkTone = z.enum(["default", "muted", "info", "success", "warning", "danger", "accent"]);
 export type InkTone = z.infer<typeof inkTone>;
 
 export const boxProps = z.object({

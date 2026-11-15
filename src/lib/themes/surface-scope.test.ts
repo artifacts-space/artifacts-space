@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { blockHues } from "@/lib/block-colors/block-color-rules";
 
 import { contrastRatio, mixOklch, paintOver, parseColor, type Oklch } from "./color";
-import { blockFills, dangerHoverMix, paletteTokens, toneTintMax, type PaletteMode } from "./derive";
+import { blockFills, dangerHoverMix, nonTextMinimum, paletteTokens, pressedHoverMix, toneTintMax, type PaletteMode } from "./derive";
 import { themePresets } from "./presets";
 import { presetTheme, siteDefaultTheme } from "./resolve";
 import type { Theme } from "./schema";
@@ -11,7 +11,8 @@ import { surfaceEngine, type QuietFill } from "./surface-scope";
 
 const modes: PaletteMode[] = ["light", "dark"];
 const fills: QuietFill[] = ["muted", ...blockHues];
-const tones = ["info", "success", "warning", "danger"] as const;
+// The accent tone is held to the status tones' rule everywhere they are.
+const tones = ["info", "success", "warning", "danger", "accent"] as const;
 const inks = ["--foreground", "--muted-foreground", ...tones.map((tone) => `--tone-${tone}`)];
 
 function color(value: string | undefined): Oklch {
@@ -277,5 +278,57 @@ describe("a danger Button: the danger tone as the fill, the page color as its la
       expect(rest, mode).toBeGreaterThanOrEqual(4.5);
       expect(hover, `${mode}, under the pointer`).toBeGreaterThanOrEqual(rest - 0.001);
     }
+  });
+});
+
+describe("a pressed Button: the text color as the fill, the page color as its label", () => {
+  /** The label on the fill, and the fill's edge on the surface, at rest and under the pointer. */
+  function reads(tokens: { label: Oklch; fill: Oklch; surface: Oklch }) {
+    const hover = mixOklch(tokens.fill, tokens.label, pressedHoverMix);
+    return {
+      label: { rest: contrastRatio(tokens.label, tokens.fill), hover: contrastRatio(tokens.label, hover) },
+      edge: { rest: contrastRatio(tokens.fill, tokens.surface), hover: contrastRatio(hover, tokens.surface) },
+    };
+  }
+
+  function expectReads(tokens: { label: Oklch; fill: Oklch; surface: Oklch }, where: string) {
+    const { label, edge } = reads(tokens);
+    expect(label.rest, `${where}: label`).toBeGreaterThanOrEqual(4.5);
+    expect(label.hover, `${where}: label under the pointer`).toBeGreaterThanOrEqual(4.5);
+    expect(edge.rest, `${where}: edge on the surface`).toBeGreaterThanOrEqual(nonTextMinimum);
+    expect(edge.hover, `${where}: edge on the surface under the pointer`).toBeGreaterThanOrEqual(nonTextMinimum);
+  }
+
+  it.each(themes)("should hold its label at 4.5:1 and its edge at 3:1, at rest and under the pointer, on the page, the card, the muted fill, and every hue of the %s preset", (_id, theme) => {
+    for (const mode of modes) {
+      const tokens = paletteTokens(mode, theme[mode]);
+      const engine = surfaceEngine(theme, mode, "test");
+      const hueFills = blockFills(mode, theme[mode]);
+      const places: [string, Record<string, string>, Oklch][] = [
+        ["page", {}, color(tokens["--background"])],
+        ["card", {}, color(tokens["--card"])],
+        ...fills.map((fill, index): [string, Record<string, string>, Oklch] => [fill, engine.quietInk(fill), fill === "muted" ? color(tokens["--muted"]) : (hueFills[index - 1] ?? color(tokens["--card"]))]),
+      ];
+      for (const [place, style, surface] of places) {
+        expectReads({ label: color(tokens["--background"]), fill: resolved(style, tokens, "--foreground"), surface }, `${mode} on ${place}`);
+      }
+    }
+  });
+
+  it.each(themes)("should hold its label at 4.5:1 and its edge at 3:1, at rest and under the pointer, on the primary surface of the %s preset", (_id, theme) => {
+    for (const mode of modes) {
+      const scope = surfaceEngine(theme, mode, "test").strong("primary");
+      // On the site palette primary is the inverse surface: the other mode's own palette, which the test above reads.
+      if (Object.keys(scope.style).length === 0) continue;
+      const page = color(scope.style["--background"]);
+      expectReads({ label: page, fill: color(scope.style["--foreground"]), surface: page }, mode);
+    }
+  });
+
+  it("should fail the rule when the hover step is so large that the label runs out of contrast", () => {
+    const tokens = paletteTokens("light", siteDefaultTheme().light);
+    const label = color(tokens["--background"]);
+    const fill = color(tokens["--foreground"]);
+    expect(contrastRatio(label, mixOklch(fill, label, 0.9))).toBeLessThan(4.5);
   });
 });

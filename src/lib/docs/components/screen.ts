@@ -81,6 +81,14 @@ export const iconDocs: Record<"Icon", ComponentDoc> = {
       },
       { title: "Named for screen readers", note: "With a `label` the icon is announced; without one it is decorative.", spec: single("Icon", { name: "star", size: "lg", tone: "warning", label: "Rated five stars" }) },
       {
+        title: "In the accent color",
+        spec: spec("row", {
+          row: { type: "Box", props: { direction: "horizontal", align: "center", gap: "sm" }, children: ["mark", "words"] },
+          mark: icon("sparkles", { tone: "accent" }),
+          words: text("New in this release.", { tone: "accent" }),
+        }),
+      },
+      {
         title: "Brand marks: social links in a footer",
         note: "Each mark is an icon-only Button, so its `label` names the network for screen readers.",
         spec: spec("footer", {
@@ -106,6 +114,7 @@ export const iconDocs: Record<"Icon", ComponentDoc> = {
     rules: [
       "`name` is one of the listed icon names. An unknown name fails validation.",
       "An icon that carries meaning on its own needs a `label`.",
+      "`tone`: default, muted, a status tone (info, success, warning, danger), or accent: the theme's own accent, or blue on the default palette. Every tone reads on every Box surface and in every theme.",
       "Brand marks all start with `brand-`, such as `brand-github` or `brand-google`. They are outline only and drawn in the text color, never in a brand color, and every component that takes an icon name takes them: Icon, Button, Badge, and Link.",
       "Use a brand mark for a link to the brand's profile, or for a \"Continue with\" button for that provider, and name the brand in the `label` or the words (\"GitHub\", \"Continue with Google\"). An icon-only Button needs that `label`. Do not use a mark as if your own product were that brand.",
     ],

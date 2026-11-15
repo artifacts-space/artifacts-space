@@ -124,16 +124,20 @@ async function expectToggleKeepsFocus(frame: Locator, button: PressButton, width
 }
 
 /**
- * A button that says whether what it opens is open (`expanded`) says it to
- * screen readers too: `aria-expanded` is what `behavior.ts` read from the
- * fragment for this moment. `label` is the words it shows then. Only a
- * toggle is read after its press: another button may leave the page.
+ * A button that says whether what it opens is open (`expanded`), or whether
+ * it is on (`pressed`), says it to screen readers too: `aria-expanded` and
+ * `aria-pressed` are what `behavior.ts` read from the fragment for this
+ * moment. `label` is the words it shows then. Only a toggle is read after
+ * its press: another button may leave the page.
  */
 async function expectExpanded(frame: Locator, button: PressButton, when: "atStart" | "afterPress", width: number) {
-  if (!button.expanded || (when === "afterPress" && button.action !== "toggleState")) return;
+  if (when === "afterPress" && button.action !== "toggleState") return;
   const label = when === "atStart" ? button.label : (button.restoredBy[0] ?? button.label);
-  const value = String(button.expanded[when]);
-  await expect(shownButton(frame, label).first(), `"${label}" at ${String(width)} says aria-expanded="${value}"`).toHaveAttribute("aria-expanded", value);
+  for (const [name, flip] of [["aria-expanded", button.expanded], ["aria-pressed", button.pressed]] as const) {
+    if (!flip) continue;
+    const value = String(flip[when]);
+    await expect(shownButton(frame, label).first(), `"${label}" at ${String(width)} says ${name}="${value}"`).toHaveAttribute(name, value);
+  }
 }
 
 /** Presses the first button a reader can see among `labels`, and returns its label. */
