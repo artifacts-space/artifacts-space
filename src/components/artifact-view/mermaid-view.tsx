@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo, useRef, type ReactNode } from "react";
 
+import { ScrollFrame } from "@/components/code/scroll-frame";
+import { scrollStopProps, scrollStopRing } from "@/components/code/scroll-stop";
+import { useScrollable } from "@/components/code/use-scrollable";
 import { svgDataUri } from "@/lib/svg";
 import { minReadableWidth } from "@/lib/svg-text-size";
 import { cn } from "@/lib/utils";
@@ -15,7 +18,9 @@ function SourceFallback({ code, title, reason }: { code: string; title: string; 
   return (
     <div className="space-y-3">
       <ViewNotice tone="warning" title={title}>{reason}</ViewNotice>
-      <pre className="max-h-80 overflow-auto rounded-md border bg-muted/50 p-4 font-mono text-sm leading-6 whitespace-pre-wrap break-words">{code}</pre>
+      <ScrollFrame label="Diagram source" className="max-h-80 overflow-auto rounded-md border bg-muted/50">
+        <pre className="p-4 font-mono text-sm leading-6 whitespace-pre-wrap break-words">{code}</pre>
+      </ScrollFrame>
     </div>
   );
 }
@@ -31,7 +36,8 @@ function SourceFallback({ code, title, reason }: { code: string; title: string; 
 export function MermaidView({ code, title, className }: { code: string; title?: string; className?: string }) {
   const { scopeRef, state } = useMermaidDiagram(code);
   return (
-    <div ref={scopeRef} className={cn("min-w-0", className)}>
+    // data-diagram-state (drawing, drawn, or failed), as diagrams in documents carry it: tests wait for a drawing attempt to end.
+    <div ref={scopeRef} data-diagram-state={state.status} className={cn("min-w-0", className)}>
       {state.status === "failed" ? <SourceFallback code={code} title="This diagram could not be drawn." reason={state.reason} /> : <DiagramFigure title={title} diagram={state.diagram} />}
     </div>
   );
@@ -63,6 +69,37 @@ function DiagramImage({ diagram, src, alt }: { diagram: RenderedDiagram; src: st
   );
 }
 
+interface DiagramFrameProps {
+  /** What the drawing is, for the key the frame measures again on: a new drawing can be wider. */
+  drawing: string;
+  framed: boolean;
+  /** The frame's name while it scrolls: the caption's id when there is one, else the diagram's own name. */
+  name: { label: string } | { labelledBy: string };
+  children: ReactNode;
+}
+
+/**
+ * The box the drawing sits in. It scrolls sideways when the drawing is
+ * wider than the page, and while it does it is a named group and a tab
+ * stop, so a keyboard can scroll it too (scroll-stop.ts). It measures
+ * again once the drawing replaces the placeholder, and on resize.
+ */
+function DiagramFrame({ drawing, framed, name, children }: DiagramFrameProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const scrollable = useScrollable(ref, drawing);
+  return (
+    <div
+      ref={ref}
+      {...scrollStopProps(scrollable, name)}
+      data-diagram-frame=""
+      // justify-center-safe: when the diagram is wider than the frame, it starts at the left edge so all of it can be scrolled to.
+      className={cn("flex min-h-24 justify-center-safe overflow-x-auto bg-card px-4 py-6 sm:px-6", scrollStopRing, framed && "card-nested")}
+    >
+      {children}
+    </div>
+  );
+}
+
 /**
  * The frame a Mermaid diagram shows in: the image once drawn, a quiet
  * placeholder while it draws. Shared by the mermaid format and diagrams in
@@ -73,11 +110,11 @@ export function DiagramFigure({ title, diagram, source, zoomable = false, framed
   const alt = title ?? "Diagram";
   // Encoded once per drawing, and shared by the image and its zoomed copy.
   const src = useMemo(() => (diagram ? svgDataUri(diagram.svg) : ""), [diagram]);
+  const captionId = useId();
   return (
     <figure className="min-w-0">
-      {title ? <figcaption className="mb-3 text-md font-medium">{title}</figcaption> : null}
-      {/* justify-center-safe: when the diagram is wider than the frame, it starts at the left edge so all of it can be scrolled to. */}
-      <div className={cn("flex min-h-24 justify-center-safe overflow-x-auto bg-card px-4 py-6 sm:px-6", framed && "card-nested")}>
+      {title ? <figcaption id={captionId} className="mb-3 text-md font-medium">{title}</figcaption> : null}
+      <DiagramFrame drawing={src} framed={framed} name={title ? { labelledBy: captionId } : { label: alt }}>
         {diagram ? (
           zoomable ? <DiagramZoom src={src} width={diagram.width} height={diagram.height} label={alt}><DiagramImage diagram={diagram} src={src} alt={alt} /></DiagramZoom> : <DiagramImage diagram={diagram} src={src} alt={alt} />
         ) : (
@@ -85,7 +122,7 @@ export function DiagramFigure({ title, diagram, source, zoomable = false, framed
             <span className="sr-only">Drawing diagram…</span>
           </div>
         )}
-      </div>
+      </DiagramFrame>
       {source ? (
         <div className="sr-only">
           <p>Diagram source, in Mermaid:</p>

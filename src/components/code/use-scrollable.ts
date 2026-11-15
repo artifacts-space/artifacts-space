@@ -4,9 +4,12 @@ import { useEffect, useState, type RefObject } from "react";
 
 /**
  * True while the element's content overflows it, so only a block that
- * actually scrolls becomes a keyboard tab stop.
+ * actually scrolls becomes a keyboard tab stop. It measures again when the
+ * element or its first child changes size. Pass `contentKey` when what is
+ * inside is replaced (a drawing that takes the place of its placeholder):
+ * each new key measures again and watches the new first child.
  */
-export function useScrollable(ref: RefObject<HTMLElement | null>): boolean {
+export function useScrollable(ref: RefObject<HTMLElement | null>, contentKey?: unknown): boolean {
   const [scrollable, setScrollable] = useState(false);
 
   useEffect(() => {
@@ -18,7 +21,7 @@ export function useScrollable(ref: RefObject<HTMLElement | null>): boolean {
     observer.observe(element);
     if (element.firstElementChild) observer.observe(element.firstElementChild);
     return () => { observer.disconnect(); };
-  }, [ref]);
+  }, [ref, contentKey]);
 
   return scrollable;
 }

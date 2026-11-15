@@ -7,7 +7,7 @@ import type { SyntaxKind, SyntaxLine } from "@/lib/syntax/tokens";
 import { cn } from "@/lib/utils";
 
 import { codeBlockModel } from "./code-block-model";
-import { scrollStopProps } from "./scroll-stop";
+import { scrollStopProps, scrollStopRing } from "./scroll-stop";
 import { useHighlightedLines } from "./use-highlighted-lines";
 import { useScrollable } from "./use-scrollable";
 
@@ -24,7 +24,6 @@ const kindClass: Record<SyntaxKind, string> = {
 };
 
 const surfaceClass = "min-w-0 overflow-hidden rounded-lg border border-code-border bg-code text-code-foreground";
-const focusClass = "outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset";
 
 function HighlightedCode({ lines }: { lines: readonly SyntaxLine[] }) {
   return lines.map((line, index) => (
@@ -80,7 +79,7 @@ function CodeArea({ display, lines, name, wrap = false, prompt = false, classNam
     <pre
       ref={scrollRef}
       {...scrollStopProps(scrollable, { label: `${name} code` })}
-      className={cn("font-mono text-sm leading-6", focusClass, wrap && "whitespace-pre-wrap break-words", className)}
+      className={cn("font-mono text-sm leading-6", scrollStopRing, wrap && "whitespace-pre-wrap break-words", className)}
     >
       {prompt ? <span aria-hidden="true" className="text-syntax-comment select-none">$ </span> : null}
       <code className={codeClass(prompt, wrap)}>{lines ? <HighlightedCode lines={lines} /> : display || " "}</code>

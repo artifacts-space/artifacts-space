@@ -2,6 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
+import { expectScrollersSettled } from "./support/scrollers";
 
 /*
  * The pieces a screen is drawn with (Box, Icon, Placeholder, and the screen
@@ -84,6 +85,8 @@ test("should pass axe on every surface with every tone, and on a composed landin
   for (const name of ["Surfaces and tones", "Landing page"]) {
     const whole = specimen(page, "specs", name);
     await whole.scrollIntoViewIfNeeded();
+    // Each surface holds a diagram, which draws after the page loads; scan once every one is drawn at its final width.
+    await expectScrollersSettled(whole);
     await expectNoAxeViolations(whole);
   }
 });
