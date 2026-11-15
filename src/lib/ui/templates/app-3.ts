@@ -36,7 +36,7 @@ export const appMomentTemplates: readonly UiTemplate[] = [
         secondary: { type: "Button", props: { label: "Import from a file", icon: "upload", variant: "outline" } },
         help: { type: "Box", props: { direction: "horizontal", align: "center", justify: "center", gap: "xs", wrap: true }, children: ["help-text", "help-link"] },
         "help-text": { type: "Text", props: { text: "Not sure where to start?", size: "sm", tone: "muted" } },
-        "help-link": { type: "Link", props: { label: "Read the two-minute guide", variant: "muted", active: true } },
+        "help-link": { type: "Link", props: { label: "Read the two-minute guide", variant: "inline" } },
       },
     },
   },
