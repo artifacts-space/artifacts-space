@@ -42,6 +42,9 @@ export const screenButtonFixtures: ComponentFixture[] = [
   { name: "Icon only", props: { label: "Open menu", icon: "menu-2", iconOnly: true, variant: "ghost" } },
   { name: "Icon only, large", props: { label: "Play the tour", icon: "player-play", iconOnly: true, size: "lg" } },
   { name: "Disabled", props: { label: "Sold out", disabled: true, variant: "secondary" } },
+  { name: "Danger", props: { label: "Delete project", variant: "danger" } },
+  { name: "Danger with an icon", props: { label: "Remove member", variant: "danger", icon: "trash", size: "sm" } },
+  { name: "Danger, disabled", props: { label: "Delete account", variant: "danger", disabled: true } },
 ];
 
 export const screenBadgeFixtures: ComponentFixture[] = [
@@ -60,6 +63,7 @@ export const screenListFixtures: ComponentFixture[] = [
 export const screenSelectFixtures: ComponentFixture[] = [
   { name: "With an error", props: { label: "Region", options: ["Europe", "Americas", "Asia"], error: "Choose a region to continue.", description: "Where your team works." } },
   { name: "Disabled, label hidden", props: { label: "Sort by", options: ["Newest", "Oldest"], value: "Newest", disabled: true, hideLabel: true } },
+  { name: "Full width", props: { label: "Country", options: ["Canada", "Mexico", "United States"], placeholder: "Choose a country", fullWidth: true } },
 ];
 
 /** Image fixtures need a file id, so the caller passes the gallery's stand-in image. */

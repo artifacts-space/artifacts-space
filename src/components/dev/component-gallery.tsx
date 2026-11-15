@@ -27,7 +27,7 @@ import { componentFixtures, fixtureFiles, fixtureSpec } from "@/lib/ui/fixtures/
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
 import { signInSpec } from "@/lib/ui/fixtures/fields";
 import { formatFixtures, mediaFormatFixtures, type FormatFixture } from "@/lib/ui/fixtures/formats";
-import { landingPageSpec, styledBlocksSpec, surfaceMatrixSpec } from "@/lib/ui/fixtures/screen";
+import { announcedSpec, landingPageSpec, styledBlocksSpec, surfaceMatrixSpec } from "@/lib/ui/fixtures/screen";
 import { deepSpec, invalidPropsSpec, javascriptLinkSpec, manyElementsSpec, repeatSpec, unknownTypeSpec } from "@/lib/ui/fixtures/specs";
 import { desktopApps, mcpClients } from "@/lib/setup/client-installs";
 import { presetTheme } from "@/lib/themes/resolve";
@@ -38,6 +38,7 @@ const specFixtures: { name: string; spec: unknown }[] = [
   { name: "Landing page", spec: landingPageSpec },
   { name: "Sign-in screen", spec: signInSpec },
   { name: "Styled blocks", spec: styledBlocksSpec },
+  { name: "Announced line and a toggle", spec: announcedSpec },
   { name: "Unknown type", spec: unknownTypeSpec },
   { name: "Invalid props", spec: invalidPropsSpec },
   { name: "javascript: link", spec: javascriptLinkSpec },

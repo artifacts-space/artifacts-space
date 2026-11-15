@@ -45,7 +45,7 @@ export const inputDocs = {
         ),
       },
     ],
-    rules: [stateNote, "`description` sits under the label. `error` marks the field invalid and shows the message. `hideLabel` keeps the label for screen readers only."],
+    rules: [stateNote, "`description` sits under the label. `error` marks the field invalid and shows the message. `hideLabel` keeps the label for screen readers only.", "A Select is at most 384 pixels wide; `fullWidth` lets it fill its container, like Input and Textarea."],
   },
   Switch: {
     examples: [
@@ -111,8 +111,10 @@ export const inputDocs = {
       { title: "Full width", spec: single("Box", { maxWidth: "sm" }, { wide: { type: "Button", props: { label: "Create account", fullWidth: true } } }) },
     ],
     rules: [
-      "`press` can run setState, pushState, removeState, or validateForm. A button cannot load or send data.",
-      "Variants: default, outline, secondary, ghost. Sizes: sm, md, lg.",
+      "`press` can run setState, toggleState, pushState, removeState, or validateForm. A button cannot load or send data.",
+      "`toggleState` flips the value at `statePath` between true and false, so one button opens and closes what a `visible` condition shows: { \"action\": \"toggleState\", \"params\": { \"statePath\": \"/open\" } }.",
+      "Variants: default, outline, secondary, ghost, danger. Sizes: sm, md, lg.",
+      "`danger` is for an action that deletes or cannot be undone: a solid fill in the danger tone. Its label reads on every Box surface and in every theme.",
       "`iconOnly` needs an `icon`; the `label` is then what screen readers announce.",
     ],
   },

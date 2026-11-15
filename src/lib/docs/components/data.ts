@@ -27,8 +27,28 @@ export const dataDocs = {
           ],
         }),
       },
+      {
+        title: "Check marks for a comparison",
+        spec: single("Table", {
+          caption: "Plans",
+          columns: [
+            { key: "feature", label: "Feature" },
+            { key: "free", label: "Free", format: "check" },
+            { key: "team", label: "Team", format: "check" },
+          ],
+          rows: [
+            { feature: "Unlimited artifacts", free: true, team: true },
+            { feature: "Team themes", free: false, team: true },
+            { feature: "Audit log", free: false, team: true },
+          ],
+        }),
+      },
     ],
-    rules: ["`rows` are objects keyed by each column's `key`. A missing cell shows a dash.", "Percent values are written as percents: 4.2 shows as 4.2%."],
+    rules: [
+      "`rows` are objects keyed by each column's `key`. A missing cell shows a dash.",
+      "Percent values are written as percents: 4.2 shows as 4.2%.",
+      "A column with `format: \"check\"` draws true as a check mark and false as a dash, centered, and screen readers hear Yes or No. Text and numbers in that column show as written. Without the format, true and false show as the words Yes and No.",
+    ],
   },
   Metric: {
     examples: [
@@ -46,6 +66,7 @@ export const dataDocs = {
       "`change` uses `changeFormat`, which defaults to the value's `format`. A revenue metric usually sets changeFormat \"percent\".",
       "`goodDirection` decides the color: a change in the good direction shows as success, the other way as danger.",
       "`sparkline` takes 2 to 200 numbers, oldest first. null leaves a gap.",
+      "`variant: \"plain\"` drops the card: the label, number, and change sit on whatever is behind them, for a row of stats in a band.",
     ],
   },
   Chart: {

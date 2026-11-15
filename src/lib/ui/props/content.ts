@@ -30,6 +30,7 @@ export const contentProps = {
     weight: z.enum(["normal", "medium", "semibold"]).optional(),
     align: textAlign.optional(),
     clamp: z.number().int().min(1).max(3).optional(),
+    announce: z.boolean().optional(),
   }),
   Markdown: z.object({
     content: prose(20_000),
@@ -43,6 +44,7 @@ export const contentProps = {
     text: prose(2000),
     title: label(160).optional(),
     tone: tone.optional(),
+    announce: z.boolean().optional(),
   }),
   Badge: z.object({
     label: label(60),

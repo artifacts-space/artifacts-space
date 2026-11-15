@@ -24,6 +24,7 @@ export const inputProps = {
     options: z.array(label(120)).min(1).max(100),
     value: label(120).optional(),
     placeholder: label(80).optional(),
+    fullWidth: z.boolean().optional(),
     ...fieldBase,
   }),
   Switch: z.object({
@@ -40,7 +41,7 @@ export const inputProps = {
   }),
   Button: z.object({
     label: label(60),
-    variant: z.enum(["default", "outline", "secondary", "ghost"]).optional(),
+    variant: z.enum(["default", "outline", "secondary", "ghost", "danger"]).optional(),
     size: z.enum(["sm", "md", "lg"]).optional(),
     fullWidth: z.boolean().optional(),
     icon: iconName.optional(),

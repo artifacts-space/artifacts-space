@@ -205,7 +205,7 @@ export const docsPages = [
   {
     slug: "json-render/dynamic",
     title: "Dynamic props and actions",
-    description: "Read and write on-page state with $state, $bindState, $template, $cond, visible, repeat, and the four state actions.",
+    description: "Read and write on-page state with $state, $bindState, $template, $cond, visible, repeat, and the five state actions.",
     section: "JSON Render",
     source: app("json-render/dynamic/"),
     headings: [

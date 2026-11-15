@@ -6,8 +6,9 @@ import { expect, test } from "./support/test";
  * apart from the caret and the handles. One fixture holds every block whose
  * look comes from a screen prop (a Link's variant and current page, Text and
  * Heading sizes, weights, tones and alignment, Badge variants and icons, a
- * List's markers, Button sizes, a Textarea's rows, a Box that grows in a
- * row). It is drawn for readers in the gallery and opened in the editor on
+ * List's markers, Button sizes and the danger fill, a Textarea's rows, a
+ * vertical rule, a plain Metric, a row drawn in reverse once it has
+ * stacked, a Box that grows in a row). It is drawn for readers in the gallery and opened in the editor on
  * the editor fixture, and each block's computed style is compared between
  * the two.
  */
@@ -16,7 +17,7 @@ import { expect, test } from "./support/test";
 const textStyle = ["color", "font-size", "font-weight", "font-family", "text-align", "text-transform", "letter-spacing", "line-height", "text-decoration-line"] as const;
 
 /** Every block with words, by its words. */
-const words = ["Product", "Pricing", "Changelog", "Careers", "New this week", "Count every shelf", "Stock that keeps up", "Small heading at the end", "order-4821", "Ends on Friday", "Shipped", "Beta", "Draft", "Unlimited projects", "Weekly reports", "Grows to fill the row"];
+const words = ["Product", "Pricing", "Changelog", "Careers", "New this week", "Count every shelf", "Stock that keeps up", "Small heading at the end", "order-4821", "Ends on Friday", "Shipped", "Beta", "Draft", "Unlimited projects", "Weekly reports", "Grows to fill the row", "Words first on a phone", "Shelves counted"];
 
 const readView = (page: Page) => page.locator('section#specs [data-specimen="Styled blocks"]');
 const editorView = (page: Page) => page.locator("[data-slot=ui-block-editor]");
@@ -48,13 +49,48 @@ async function drawn(view: Locator) {
   const width = (target: Locator) => target.evaluate((element) => element.getBoundingClientRect().width);
   const row = await width(hero);
   const art = await width(hero.getByRole("img", { name: "Screenshot" }));
-  const buttons = await Promise.all(["Start free", "Open menu"].map((name) => styleOf(view.getByRole("button", { name }), ["height", "font-size", "color", "background-color"])));
+  const buttons = await Promise.all(["Start free", "Open menu", "Delete draft"].map((name) => styleOf(view.getByRole("button", { name }), ["height", "font-size", "color", "background-color"])));
+  // The rule between the buttons, as tall as its row.
+  const rule = Math.round(await view.getByRole("separator").first().evaluate((element) => element.getBoundingClientRect().height));
+  // The row that stacks in reverse: whether its words sit above its picture, and the share of the row the picture takes.
+  const stacked = view.getByRole("group", { name: "Stacked row" });
+  const top = (target: Locator) => target.evaluate((element) => element.getBoundingClientRect().top);
+  const shot = stacked.locator("[data-frame=browser]");
+  const wordsFirst = (await top(stacked.getByText("Words first on a phone", { exact: true }))) < (await top(shot));
+  const shotShare = Math.round(((await width(shot)) / (await width(stacked))) * 100);
+  // The plain Metric: no card around its label.
+  const stat = await styleOf(view.getByText("Shelves counted", { exact: true }).locator("xpath=.."), ["box-shadow", "padding-top", "border-top-width"]);
   const height = (name: string) => view.getByRole("textbox", { name, exact: true }).evaluate((element) => Math.round(element.getBoundingClientRect().height));
   const notes = { short: await height("Short note"), long: await height("Long note") };
-  return { text, boxes, artShare: Math.round((art / row) * 100), buttons, notes };
+  return { text, boxes, artShare: Math.round((art / row) * 100), buttons, notes, rule, wordsFirst, shotShare, stat };
 }
 
-test("should draw every styled block in the editor as it is drawn for readers", async ({ page }) => {
+type Drawn = Awaited<ReturnType<typeof drawn>>;
+
+/** The words of the styled fixture carry the styles it sets. */
+function expectStyledWords(text: Drawn["text"]) {
+  expect(text.Product?.["text-decoration-line"]).toBe("underline");
+  expect(text.Pricing?.["text-decoration-line"]).toBe("none");
+  expect(text.Changelog?.color).not.toBe(text.Careers?.color);
+  expect(text["Count every shelf"]?.["text-align"]).toBe("center");
+  expect(text["Ends on Friday"]?.["text-align"]).toBe("end");
+}
+
+/** What the fixture is there to show, so equal does not mean equally plain. */
+function expectStyledFixture(forReaders: Drawn, isMobile: boolean) {
+  expectStyledWords(forReaders.text);
+  expect(forReaders.boxes.Shipped?.icons).toBe(1);
+  expect(forReaders.boxes["Unlimited projects"]?.icons).toBe(1);
+  expect(forReaders.artShare).toBeGreaterThan(30);
+  expect(forReaders.notes.long).toBeGreaterThan(forReaders.notes.short + 60);
+  expect(forReaders.rule).toBeGreaterThan(20);
+  expect(forReaders.stat["box-shadow"]).toBe("none");
+  expect(forReaders.buttons[2]?.["background-color"]).not.toBe(forReaders.buttons[0]?.["background-color"]);
+  // On a phone the row has stacked, words first; on a desktop it is a row with the picture first.
+  expect(forReaders.wordsFirst).toBe(isMobile);
+}
+
+test("should draw every styled block in the editor as it is drawn for readers", async ({ page, isMobile }) => {
   await page.goto("/dev/components#specs");
   const read = readView(page);
   await read.scrollIntoViewIfNeeded();
@@ -76,18 +112,13 @@ test("should draw every styled block in the editor as it is drawn for readers", 
   expect(inEditor.boxes).toEqual(forReaders.boxes);
   expect(inEditor.buttons).toEqual(forReaders.buttons);
   expect(inEditor.notes, "the heights of the two-row and six-row text areas").toEqual(forReaders.notes);
+  expect(inEditor.stat, "the plain Metric").toEqual(forReaders.stat);
+  expect(inEditor.wordsFirst, "the order of the row that stacks in reverse").toBe(forReaders.wordsFirst);
+  expect(Math.abs(inEditor.shotShare - forReaders.shotShare), "the picture's share of the row that stacks").toBeLessThanOrEqual(2);
+  expect(Math.abs(inEditor.rule - forReaders.rule), "the height of the rule between the buttons").toBeLessThanOrEqual(2);
   expect(linkInEditor).toEqual(linkForReaders);
   expect(Math.abs(inEditor.artShare - forReaders.artShare), "the placeholder's share of the row that grows").toBeLessThanOrEqual(1);
 
-  // What the fixture is there to show, so equal does not mean equally plain.
-  expect(forReaders.text.Product?.["text-decoration-line"]).toBe("underline");
-  expect(forReaders.text.Pricing?.["text-decoration-line"]).toBe("none");
-  expect(forReaders.text.Changelog?.color).not.toBe(forReaders.text.Careers?.color);
-  expect(forReaders.text["Count every shelf"]?.["text-align"]).toBe("center");
-  expect(forReaders.text["Ends on Friday"]?.["text-align"]).toBe("end");
-  expect(forReaders.boxes.Shipped?.icons).toBe(1);
-  expect(forReaders.boxes["Unlimited projects"]?.icons).toBe(1);
   expect(linkForReaders.arrows).toBe(1);
-  expect(forReaders.artShare).toBeGreaterThan(30);
-  expect(forReaders.notes.long).toBeGreaterThan(forReaders.notes.short + 60);
+  expectStyledFixture(forReaders, isMobile);
 });

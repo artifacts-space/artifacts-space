@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { blockHues } from "@/lib/block-colors/block-color-rules";
 
-import { contrastRatio, paintOver, parseColor, type Oklch } from "./color";
-import { blockFills, paletteTokens, toneTintMax, type PaletteMode } from "./derive";
+import { contrastRatio, mixOklch, paintOver, parseColor, type Oklch } from "./color";
+import { blockFills, dangerHoverMix, paletteTokens, toneTintMax, type PaletteMode } from "./derive";
 import { themePresets } from "./presets";
 import { presetTheme, siteDefaultTheme } from "./resolve";
 import type { Theme } from "./schema";
@@ -244,6 +244,38 @@ describe("a status badge on a primary surface", () => {
     for (const mode of modes) {
       const scope = surfaceEngine(preset, mode, "t").strong("primary");
       if (Object.keys(scope.style).length > 0) expect(scope.style["--background"], mode).toBe(preset[mode].accent);
+    }
+  });
+});
+
+describe("a danger Button: the danger tone as the fill, the page color as its label", () => {
+  /** The label's contrast on the fill at rest, and on the fill under the pointer. */
+  function reads(tokens: { label: Oklch; fill: Oklch; text: Oklch }): { rest: number; hover: number } {
+    return { rest: contrastRatio(tokens.label, tokens.fill), hover: contrastRatio(tokens.label, mixOklch(tokens.fill, tokens.text, dangerHoverMix)) };
+  }
+
+  it.each(themes)("should hold its label at 4.5:1 and lose nothing under the pointer on the page, the muted fill, and every hue of the %s preset", (_id, theme) => {
+    for (const mode of modes) {
+      const tokens = paletteTokens(mode, theme[mode]);
+      const engine = surfaceEngine(theme, mode, "test");
+      // The page, a card, and an unpainted Box use the palette's own tone; a quiet fill may re-light it.
+      const places: [string, Record<string, string>][] = [["page", {}], ...fills.map((fill): [string, Record<string, string>] => [fill, engine.quietInk(fill)])];
+      for (const [place, style] of places) {
+        const { rest, hover } = reads({ label: color(tokens["--background"]), fill: resolved(style, tokens, "--tone-danger"), text: resolved(style, tokens, "--foreground") });
+        expect(rest, `${mode} on ${place}`).toBeGreaterThanOrEqual(4.5);
+        expect(hover, `${mode} on ${place}, under the pointer`).toBeGreaterThanOrEqual(rest - 0.001);
+      }
+    }
+  });
+
+  it.each(themes)("should hold its label at 4.5:1 and lose nothing under the pointer on the primary surface of the %s preset", (_id, theme) => {
+    for (const mode of modes) {
+      const scope = surfaceEngine(theme, mode, "test").strong("primary");
+      // On the site palette primary is the inverse surface: the other mode's own palette, which the test above reads.
+      if (Object.keys(scope.style).length === 0) continue;
+      const { rest, hover } = reads({ label: color(scope.style["--background"]), fill: color(scope.style["--tone-danger"]), text: color(scope.style["--foreground"]) });
+      expect(rest, mode).toBeGreaterThanOrEqual(4.5);
+      expect(hover, `${mode}, under the pointer`).toBeGreaterThanOrEqual(rest - 0.001);
     }
   });
 });

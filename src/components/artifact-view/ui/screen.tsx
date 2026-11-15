@@ -41,20 +41,50 @@ function placeholderShape(props: PlaceholderProps): string {
   return cn(ratioClass[ratio], variant.ratio ? variant.box : "w-full");
 }
 
-/** A neutral stand-in for an image, video, map, logo, or avatar, so a mockup needs no upload. */
-export function PlaceholderView({ props }: ViewProps<"Placeholder">) {
+/** The stand-in itself: a named image with a mark and, when there is room, its label. */
+function StandIn({ props, className }: { props: PlaceholderProps; className: string }) {
   const variant = placeholderVariant[props.variant ?? "image"];
   const small = variant.ratio === null && props.ratio === undefined;
   return (
-    <div
-      role="img"
-      aria-label={props.label ?? variant.name}
-      className={cn("flex min-w-0 flex-col items-center justify-center gap-2 overflow-hidden border border-dashed bg-muted text-muted-foreground", placeholderShape(props), radiusClass[props.radius ?? variant.radius])}
-    >
+    <div role="img" aria-label={props.label ?? variant.name} className={cn("flex min-w-0 flex-col items-center justify-center gap-2 overflow-hidden bg-muted text-muted-foreground", className)}>
       <variant.Glyph aria-hidden className={small ? "size-4" : "size-6"} stroke={1.5} />
       {props.label && !small ? <span className="max-w-full truncate px-3 text-xs">{props.label}</span> : null}
     </div>
   );
+}
+
+/** A browser window drawn around the stand-in: a bar with three dots and an address pill. All of it is decoration. */
+function BrowserFrame({ props }: { props: PlaceholderProps }) {
+  return (
+    <div data-frame="browser" className="w-full min-w-0 overflow-hidden rounded-lg border bg-card shadow-sm">
+      <div aria-hidden className="flex items-center gap-1.5 border-b bg-muted px-3 py-2">
+        <span className="size-2 shrink-0 rounded-full bg-muted-foreground/40" />
+        <span className="size-2 shrink-0 rounded-full bg-muted-foreground/40" />
+        <span className="size-2 shrink-0 rounded-full bg-muted-foreground/40" />
+        <span className="mx-auto h-4 w-3/5 max-w-64 rounded-full bg-background" />
+      </div>
+      <StandIn props={props} className={cn("w-full", ratioClass[props.ratio ?? "video"])} />
+    </div>
+  );
+}
+
+/** A phone drawn around the stand-in: a rounded body with a speaker slot. All of it is decoration. */
+function PhoneFrame({ props }: { props: PlaceholderProps }) {
+  return (
+    <div data-frame="phone" className="w-full max-w-64 min-w-0 rounded-4xl border bg-card p-2 shadow-sm">
+      <div aria-hidden className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted-foreground/40" />
+      <StandIn props={props} className={cn("w-full rounded-3xl", ratioClass[props.ratio ?? "portrait"])} />
+    </div>
+  );
+}
+
+/** A neutral stand-in for an image, video, map, logo, or avatar, so a mockup needs no upload. A frame draws a window or a phone around a picture-sized one. */
+export function PlaceholderView({ props }: ViewProps<"Placeholder">) {
+  const variant = placeholderVariant[props.variant ?? "image"];
+  const framed = variant.ratio !== null ? props.frame : undefined;
+  if (framed === "browser") return <BrowserFrame props={props} />;
+  if (framed === "phone") return <PhoneFrame props={props} />;
+  return <StandIn props={props} className={cn("border border-dashed", placeholderShape(props), radiusClass[props.radius ?? variant.radius])} />;
 }
 
 const avatarSize: Record<NonNullable<UiProps<"Avatar">["size"]>, string> = { sm: "size-6 text-xs", md: "size-8 text-xs", lg: "size-10 text-sm", xl: "size-14 text-lg" };

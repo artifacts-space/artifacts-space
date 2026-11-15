@@ -8,7 +8,7 @@ import { scrollStopProps } from "@/components/code/scroll-stop";
 import { useScrollable } from "@/components/code/use-scrollable";
 import { Button } from "@/components/ui/button";
 import { formatCellValue, formatNumber, missingValue, sharedFractionDigits } from "@/lib/ui/number-format";
-import type { CellFormat } from "@/lib/ui/props/shared";
+import type { CellFormat, CellValue, ColumnFormat } from "@/lib/ui/props/shared";
 import type { UiProps } from "@/lib/ui/catalog";
 import { cn } from "@/lib/utils";
 
@@ -18,20 +18,55 @@ import type { ViewProps } from "./stout";
 /** Rows shown before "Show all". */
 const initialRows = 100;
 
-function isNumeric(format: CellFormat | undefined) {
-  return format !== undefined && format !== "text";
+function isNumeric(format: ColumnFormat | undefined): format is Exclude<CellFormat, "text"> {
+  return format !== undefined && format !== "text" && format !== "check";
 }
 
 const alignClass = { left: "text-left", center: "text-center", right: "text-right" } as const;
 
 type TableProps = UiProps<"Table">;
+type TableColumn = TableProps["columns"][number];
+
+/** Numbers sit at the right, check marks in the middle, and everything else at the left, unless the column says otherwise. */
+function columnAlign(column: TableColumn): string {
+  if (column.align) return alignClass[column.align];
+  if (column.format === "check") return alignClass.center;
+  return alignClass[isNumeric(column.format) ? "right" : "left"];
+}
+
+/**
+ * A yes or no drawn as a mark: a check for true and a dash for false. The
+ * mark is decoration; a screen reader hears the same Yes or No the text
+ * form shows.
+ */
+function CheckMark({ value }: { value: boolean }) {
+  const Glyph = value ? IconCheck : IconMinus;
+  return (
+    <>
+      <Glyph aria-hidden data-check={value ? "yes" : "no"} className={cn("inline-block size-4 align-text-bottom", value ? "text-foreground" : "text-muted-foreground")} />
+      <span className="sr-only">{value ? "Yes" : "No"}</span>
+    </>
+  );
+}
+
+/** One cell: a mark for a yes or no in a check column, and the formatted value everywhere else. */
+function TableCell({ column, value, currency, digits }: { column: TableColumn; value: CellValue | undefined; currency: string; digits: number }) {
+  const check = column.format === "check";
+  const format: CellFormat = column.format === undefined || column.format === "check" ? "text" : column.format;
+  const text = formatCellValue(value, format, currency, digits);
+  return (
+    <td className={cn("max-w-[40ch] px-3 py-1.5 align-top", columnAlign(column), isNumeric(column.format) ? "whitespace-nowrap tabular-nums" : "wrap-anywhere", text === missingValue && "text-muted-foreground")}>
+      {check && typeof value === "boolean" ? <CheckMark value={value} /> : text}
+    </td>
+  );
+}
 
 /** Each numeric column's shared decimal count, from every row (shown or not), so the numbers line up and do not shift on "Show all". */
 function columnDigits(props: TableProps, currency: string): Map<string, number> {
   const digits = new Map<string, number>();
   for (const column of props.columns) {
     const format = column.format;
-    if (format === undefined || format === "text") continue;
+    if (!isNumeric(format)) continue;
     const values = props.rows.map((row) => row[column.key]).filter((value): value is number => typeof value === "number");
     digits.set(column.key, sharedFractionDigits(values, format, currency));
   }
@@ -60,7 +95,7 @@ export function TableView({ props }: ViewProps<"Table">) {
           <thead className="sticky top-0 z-10 bg-card">
             <tr>
               {props.columns.map((column) => (
-                <th key={column.key} scope="col" className={cn("border-b px-3 py-2 font-medium whitespace-nowrap text-muted-foreground", alignClass[column.align ?? (isNumeric(column.format) ? "right" : "left")])}>
+                <th key={column.key} scope="col" className={cn("border-b px-3 py-2 font-medium whitespace-nowrap text-muted-foreground", columnAlign(column))}>
                   <span className="inline-block max-w-[24ch] truncate align-bottom">{column.label}</span>
                 </th>
               ))}
@@ -71,14 +106,7 @@ export function TableView({ props }: ViewProps<"Table">) {
               <tr><td colSpan={props.columns.length} className="px-3 py-6 text-center text-muted-foreground">No rows yet.</td></tr>
             ) : rows.map((row, index) => (
               <tr key={index} className="border-b last:border-b-0 even:bg-muted/30">
-                {props.columns.map((column) => {
-                  const text = formatCellValue(row[column.key], column.format ?? "text", currency, digits.get(column.key) ?? 0);
-                  return (
-                    <td key={column.key} className={cn("max-w-[40ch] px-3 py-1.5 align-top", alignClass[column.align ?? (isNumeric(column.format) ? "right" : "left")], isNumeric(column.format) ? "whitespace-nowrap tabular-nums" : "wrap-anywhere", text === missingValue && "text-muted-foreground")}>
-                      {text}
-                    </td>
-                  );
-                })}
+                {props.columns.map((column) => <TableCell key={column.key} column={column} value={row[column.key]} currency={currency} digits={digits.get(column.key) ?? 0} />)}
               </tr>
             ))}
           </tbody>
@@ -129,7 +157,7 @@ function sparklineSummary(props: UiProps<"Metric">): string {
 export function MetricView({ props, emit }: ViewProps<"Metric">) {
   const value = typeof props.value === "number" ? formatNumber(props.value, props.format ?? "number", props.currency ?? "USD") : props.value;
   return (
-    <div className="card-surface flex min-w-0 flex-col gap-1 p-4">
+    <div className={cn("flex min-w-0 flex-col gap-1", props.variant === "plain" ? null : "card-surface p-4")}>
       <p className="truncate text-sm text-muted-foreground" title={props.label}>{props.label}</p>
       <p className="flex min-w-0 items-baseline gap-1.5">
         <span className="min-w-0 text-2xl font-medium tracking-[-0.02em] break-all tabular-nums">{value}</span>

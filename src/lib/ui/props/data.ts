@@ -1,13 +1,13 @@
 import { z } from "zod";
 
 import { chartCheck, chartProps } from "./chart";
-import { cellFormat, cellValue, currencyCode, finiteNumber, label, numberFormat, prose, tone } from "./shared";
+import { cellFormat, cellValue, columnFormat, currencyCode, finiteNumber, label, numberFormat, prose, tone } from "./shared";
 
 const tableColumn = z.object({
   key: label(60),
   label: label(80),
   align: z.enum(["left", "center", "right"]).optional(),
-  format: cellFormat.optional(),
+  format: columnFormat.optional(),
 });
 
 const keyValueItem = z.object({
@@ -44,6 +44,7 @@ export const dataProps = {
     changeLabel: label(60).optional(),
     goodDirection: z.enum(["up", "down"]).optional(),
     sparkline: z.array(z.union([finiteNumber(), z.null()])).max(200).optional(),
+    variant: z.enum(["card", "plain"]).optional(),
   }),
   Chart: chartProps,
   KeyValue: z.object({

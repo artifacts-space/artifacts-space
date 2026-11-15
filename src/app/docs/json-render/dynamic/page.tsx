@@ -28,6 +28,7 @@ const conditions = [
 
 const actionRows = [
   ["setState", '{ "statePath": "/decision", "value": "Approved" }', "Writes a value at a path."],
+  ["toggleState", '{ "statePath": "/open" }', "Flips a value between true and false, so one button opens and closes."],
   ["pushState", '{ "statePath": "/items", "value": { … }, "clearStatePath": "/draft" }', "Appends to an array. clearStatePath, if given, is set to an empty string afterwards."],
   ["removeState", '{ "statePath": "/items", "index": { "$index": true } }', "Removes one array item by position."],
   ["validateForm", '{ "statePath": "/review" }', "Writes { valid, errors } to the path (default /formValidation)."],
@@ -37,7 +38,7 @@ const eventList = Object.entries(componentEvents).map(([component, events]) => `
 
 const bindingShape = compactJson({ on: { press: [{ action: "setState", params: { statePath: "/step", value: 2 } }, { action: "pushState", params: { statePath: "/log", value: { $state: "/draft" } } }] } });
 
-/** Dynamic props, conditions, repeats, and the four state actions, each with a live example. */
+/** Dynamic props, conditions, repeats, and the state actions, each with a live example. */
 export default function DynamicPage() {
   const page = "json-render/dynamic" as const;
   return (

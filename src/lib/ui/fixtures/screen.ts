@@ -12,11 +12,21 @@ import type { ComponentFixture, FixtureChild } from "./components";
 const text = (value: string, props: Record<string, unknown> = {}): FixtureChild => ({ type: "Text", props: { text: value, ...props } });
 const longLabel = "A label at its limit, written out in real words so wrapping and truncation are tested as a reader meets them, not with fill";
 
+/** A panel with no content of its own: centered in a stacked row, it is only as wide as its padding. */
+const shotPanel: FixtureChild = { type: "Box", props: { label: "Product shot", surface: "muted", padding: "lg", minHeight: "sm", radius: "md", grow: true } };
+
+const verticalRule: FixtureChild = { type: "Separator", props: { orientation: "vertical" } };
+
 export const boxFixtures: ComponentFixture[] = [
   { name: "Row, space between", props: { direction: "horizontal", align: "center", justify: "between", gap: "md", padding: "md", border: "all", radius: "lg" }, children: [{ type: "Heading", props: { text: "Weekly digest", level: 3 } }, { type: "Button", props: { label: "Subscribe" } }] },
   { name: "Card surface", props: { surface: "card", padding: "lg", gap: "sm", border: "all", radius: "xl", shadow: "sm", maxWidth: "sm" }, children: [{ type: "Heading", props: { text: "Starter", level: 3 } }, text("For one person and their agents.", { tone: "muted" }), { type: "Button", props: { label: "Choose Starter", variant: "outline" } }] },
   { name: "Inverse surface", props: { surface: "inverse", padding: "xl", gap: "sm", radius: "lg", align: "center" }, children: [{ type: "Heading", props: { text: "Ship the plan, not the meeting", level: 2, align: "center" } }, text("Everything inside reads on the dark band.", { tone: "muted", align: "center" }), { type: "Button", props: { label: "Get started" } }] },
   { name: "Stacks below md", props: { direction: "horizontal", stackBelow: "md", gap: "lg", align: "center" }, children: [text("A row on a wide page column, a column on a narrow one."), { type: "Placeholder", props: { label: "Product shot" } }] },
+  { name: "Stacked, children keep their width", props: { direction: "horizontal", stackBelow: "md", gap: "lg", align: "center" }, children: [text("Centered across, in a row and once stacked: the panel shrinks to its content."), shotPanel] },
+  { name: "Stacked, children fill the width", props: { direction: "horizontal", stackBelow: "md", gap: "lg", align: "center", alignBelow: "stretch" }, children: [text("Centered beside the panel in a row; each fills the width once the row has stacked."), shotPanel] },
+  { name: "Stacked, drawn in reverse", props: { direction: "horizontal", stackBelow: "md", gap: "lg", align: "center", alignBelow: "stretch", reverseBelow: true }, children: [{ type: "Placeholder", props: { label: "Picture first in the row" } }, text("Words above the picture once the row has stacked.")] },
+  { name: "Row with vertical rules", props: { direction: "horizontal", gap: "md", align: "center" }, children: [text("Docs"), verticalRule, text("Pricing"), verticalRule, text("Changelog")] },
+  { name: "Vertical rules in a row that stacks", props: { direction: "horizontal", stackBelow: "md", gap: "md", align: "center" }, children: [text("Monthly"), verticalRule, text("Yearly")] },
   { name: "Hidden below md", props: { hideBelow: "md", padding: "sm", surface: "muted", radius: "md" }, children: [text("Only shown on a wide page column.")] },
   { name: "Hidden above md", props: { hideAbove: "md", padding: "sm", surface: "muted", radius: "md" }, children: [text("Only shown on a narrow page column.")] },
   { name: "Scrolling row", props: { direction: "horizontal", overflow: "scroll", gap: "md", label: "Customer logos" }, children: Array.from({ length: 12 }, (_, index) => ({ type: "Placeholder", props: { variant: "logo", label: `Logo ${index + 1}` } })) },
@@ -39,6 +49,9 @@ export const placeholderFixtures: ComponentFixture[] = [
   { name: "Logo", props: { variant: "logo", label: "Acme" } },
   { name: "Avatar", props: { variant: "avatar", label: "Maya Chen" } },
   { name: "Long label", props: { ratio: "portrait", label: longLabel.slice(0, 80) } },
+  { name: "Browser frame", props: { frame: "browser", label: "Dashboard" } },
+  { name: "Phone frame", props: { frame: "phone", label: "Home screen" } },
+  { name: "Browser frame, long label, wide", props: { frame: "browser", ratio: "wide", variant: "video", label: longLabel.slice(0, 80) } },
 ];
 
 /** Extra Text, Heading, and Link fixtures for the screen props. */
@@ -80,9 +93,10 @@ function surfaceElements(surface: BoxSurface): Elements {
     [id("tones")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: tones.flatMap((tone) => [id(`icon-${tone}`), id(`text-${tone}`)]) },
     [id("badges")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "sm", align: "center" }, children: tones.map((tone) => id(`badge-${tone}`)) },
     [id("rule")]: { type: "Separator", props: { label: "Details" } },
-    [id("actions")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: [id("primary"), id("outline"), id("nav"), id("quiet")] },
+    [id("actions")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: [id("primary"), id("outline"), id("danger"), id("nav"), id("quiet")] },
     [id("primary")]: { type: "Button", props: { label: "Primary" } },
     [id("outline")]: { type: "Button", props: { label: "Outline", variant: "outline" } },
+    [id("danger")]: { type: "Button", props: { label: "Delete", variant: "danger", icon: "trash" } },
     [id("nav")]: { type: "Link", props: { label: "Nav link", variant: "nav" } },
     [id("quiet")]: { type: "Link", props: { label: "Muted link", variant: "muted" } },
   };
@@ -163,7 +177,7 @@ export const styledBlocksSpec = {
   version: 1,
   root: "page",
   elements: {
-    page: { type: "Box", props: { gap: "md" }, children: ["nav", "eyebrow", "title", "lead", "sub", "mono", "caption", "badges", "features", "actions", "note-short", "note-long", "hero"] },
+    page: { type: "Box", props: { gap: "md" }, children: ["nav", "eyebrow", "title", "lead", "sub", "mono", "caption", "badges", "features", "actions", "note-short", "note-long", "hero", "stacked", "stat"] },
     nav: { type: "Box", props: { direction: "horizontal", align: "center", justify: "between", gap: "md", padding: "md", border: "bottom", wrap: true, label: "Styled navigation" }, children: ["nav-links", "nav-docs"] },
     "nav-links": { type: "Box", props: { direction: "horizontal", gap: "lg", wrap: true }, children: ["link-active", "link-plain", "link-muted-active", "link-muted"] },
     "link-active": { type: "Link", props: { label: "Product", variant: "nav", active: true } },
@@ -182,7 +196,13 @@ export const styledBlocksSpec = {
     "badge-outline": { type: "Badge", props: { label: "Beta", tone: "info", variant: "outline" } },
     "badge-soft": { type: "Badge", props: { label: "Draft" } },
     features: { type: "List", props: { marker: "check", items: ["Unlimited projects", "Weekly reports"] } },
-    actions: { type: "Box", props: { direction: "horizontal", gap: "sm", align: "center" }, children: ["action-start", "action-menu"] },
+    actions: { type: "Box", props: { direction: "horizontal", gap: "sm", align: "center" }, children: ["action-start", "action-rule", "action-menu", "action-delete"] },
+    "action-rule": { type: "Separator", props: { orientation: "vertical" } },
+    "action-delete": { type: "Button", props: { label: "Delete draft", variant: "danger" } },
+    stacked: { type: "Box", props: { direction: "horizontal", stackBelow: "md", align: "center", alignBelow: "stretch", reverseBelow: true, gap: "lg", label: "Stacked row" }, children: ["stacked-art", "stacked-copy"] },
+    "stacked-art": { type: "Placeholder", props: { label: "Stacked shot", frame: "browser" } },
+    "stacked-copy": { type: "Text", props: { text: "Words first on a phone" } },
+    stat: { type: "Metric", props: { label: "Shelves counted", value: 1240, change: 12, changeFormat: "percent", goodDirection: "up", variant: "plain" } },
     "action-start": { type: "Button", props: { label: "Start free", size: "lg", icon: "arrow-right", iconPosition: "end" } },
     "action-menu": { type: "Button", props: { label: "Open menu", icon: "menu-2", iconOnly: true, variant: "ghost" } },
     "note-short": { type: "Textarea", props: { label: "Short note", rows: 2 } },
@@ -192,5 +212,23 @@ export const styledBlocksSpec = {
     "hero-note": { type: "Text", props: { text: "Grows to fill the row" } },
     "hero-art": { type: "Box", props: { grow: true }, children: ["hero-image"] },
     "hero-image": { type: "Placeholder", props: { label: "Screenshot", ratio: "video" } },
+  },
+};
+
+/**
+ * A line that appears after a button press and is spoken to screen readers,
+ * and a note that one button opens and closes with `toggleState`.
+ */
+export const announcedSpec = {
+  version: 1,
+  root: "page",
+  state: { joined: false, open: false },
+  elements: {
+    page: { type: "Box", props: { gap: "md", padding: "lg", surface: "card", border: "all", radius: "xl", maxWidth: "md", label: "Waitlist" }, children: ["title", "join", "thanks", "more", "details"] },
+    title: { type: "Heading", props: { text: "Join the waitlist", level: 3 } },
+    join: { type: "Button", props: { label: "Join the list" }, on: { press: { action: "setState", params: { statePath: "/joined", value: true } } } },
+    thanks: { type: "Text", props: { text: "Thanks. You are on the list.", tone: "success", announce: true }, visible: { $state: "/joined" } },
+    more: { type: "Button", props: { label: "Details", variant: "outline" }, on: { press: { action: "toggleState", params: { statePath: "/open" } } } },
+    details: { type: "Callout", props: { title: "One email", text: "We write once, when your place is ready.", tone: "info", announce: true }, visible: { $state: "/open" } },
   },
 };
