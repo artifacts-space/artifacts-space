@@ -35,17 +35,19 @@ test("should pass axe on the AvatarGroup, Kbd, Rating, Badge, and Input groups o
 
 test("should give screen readers one name for each display piece, in words, and nothing for what is drawn", async ({ page }) => {
   await galleryReady(page, "AvatarGroup");
-  await expect(specimen(page, "AvatarGroup", "Seven people, four shown")).toMatchAriaSnapshot(`
-    - img "7 people: Maya Chen, Omar Haddad, Priya Nair, Tomás de la Cruz, and 3 more"
-  `);
-  await expect(specimen(page, "AvatarGroup", "A sample of a larger group")).toMatchAriaSnapshot(`
-    - img "2,400 people: Maya Chen, Omar Haddad, Priya Nair, and 2,397 more"
-  `);
+  // Each is one image to assistive technology: its circles and stars are not in the tree on their own.
+  const named = [
+    ["AvatarGroup", "Seven people, four shown", "7 people: Maya Chen, Omar Haddad, Priya Nair, Tomás de la Cruz, and 3 more"],
+    ["AvatarGroup", "A sample of a larger group", "2,400 people: Maya Chen, Omar Haddad, Priya Nair, and 2,397 more"],
+    ["Rating", "Four and a half", "Average rating: 4.5 out of 5"],
+  ] as const;
+  for (const [group, name, words] of named) {
+    const images = specimen(page, group, name).getByRole("img");
+    await expect(images, name).toHaveCount(1);
+    await expect(images, name).toHaveAccessibleName(words);
+  }
   await expect(specimen(page, "Kbd", "Control Shift P")).toMatchAriaSnapshot(`
     - text: Control Shift P
-  `);
-  await expect(specimen(page, "Rating", "Four and a half")).toMatchAriaSnapshot(`
-    - img "Average rating: 4.5 out of 5"
   `);
   await expect(specimen(page, "Badge", "Dot alone")).toMatchAriaSnapshot(`
     - text: Unread

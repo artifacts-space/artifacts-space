@@ -84,10 +84,10 @@ export function RatingView({ props }: ViewProps<"Rating">) {
   const size = starSize[props.size ?? "md"];
   return (
     <span role="img" aria-label={ratingWords(props.value, max, props.label)} className="inline-flex w-fit items-center gap-1.5">
-      <span className="inline-flex items-center gap-0.5">
+      <span aria-hidden className="inline-flex items-center gap-0.5">
         {Array.from({ length: max }, (_, index) => <Star key={index} fill={Math.min(1, Math.max(0, props.value - index))} size={size} />)}
       </span>
-      {props.showValue ? <span className="text-sm font-medium tabular-nums">{scoreText(props.value)}</span> : null}
+      {props.showValue ? <span aria-hidden className="text-sm font-medium tabular-nums">{scoreText(props.value)}</span> : null}
     </span>
   );
 }

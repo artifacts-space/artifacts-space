@@ -56,6 +56,8 @@ describe("RatingView", () => {
     const html = one("Rating", { value: 7, max: 10, showValue: true });
     expect(count(html, /data-star=/g)).toBe(10);
     expect(html).toMatch(/tabular-nums">7</);
+    // The stars and the number are hidden: the image's name is the whole score.
+    expect(count(html, /<span aria-hidden="true" class="inline-flex items-center gap-0.5">/g)).toBe(1);
   });
 });
 
