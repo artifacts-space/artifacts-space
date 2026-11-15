@@ -3,6 +3,7 @@ import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
 import { expectScrollersSettled } from "./support/scrollers";
+import { brandUiIconNames } from "../src/lib/ui/icon-names";
 
 /*
  * The pieces a screen is drawn with (Box, Icon, Placeholder, and the screen
@@ -99,7 +100,7 @@ test("should draw every brand mark at five growing sizes in the text color, each
   const github = marks.getByRole("img", { name: "GitHub" });
   await expect(github).toHaveCount(5);
   await expect(marks.getByRole("img", { name: "Google" })).toHaveCount(5);
-  await expect(marks.getByRole("img")).toHaveCount(21 * 5);
+  await expect(marks.getByRole("img")).toHaveCount(brandUiIconNames.length * 5);
   const drawn = await github.evaluateAll((icons) => icons.map((icon) => {
     const box = icon.getBoundingClientRect();
     return { width: Math.round(box.width), color: getComputedStyle(icon).color, ink: getComputedStyle(icon.parentElement ?? icon).color, stroke: getComputedStyle(icon).stroke };

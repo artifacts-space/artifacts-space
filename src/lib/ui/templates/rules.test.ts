@@ -154,7 +154,54 @@ describe("templateProblems", () => {
     const base = withElements({ channels: { type: "Box", props: {}, repeat: { statePath: "/channels", key: "label" }, children: ["channel"] }, channel: { type: "Button", props: { label: { $item: "label" }, icon: { $item: "icon" }, iconOnly: true } } }, ["title", "points", "channels"]);
     const withChannels = (channels: unknown): UiTemplate => ({ ...base, fragment: { ...base.fragment, state: { ...base.fragment.state, channels } } });
     expect(templateProblems(withChannels([{ icon: "brand-youtube", label: "YouTube" }]), "heroes")).toEqual([]);
-    expect(problemsOf(withChannels([{ icon: "brand-youtube", label: "Our videos" }]))).toMatch(/an item in state \(Our videos\): the label "Our videos" does not name YouTube/);
+    expect(problemsOf(withChannels([{ icon: "brand-youtube", label: "Our videos" }]))).toMatch(/an item in state \(Our videos\), drawn by element "channel": the label "Our videos" does not name YouTube/);
+  });
+
+  it("should accept a label that has the brand as a word of its own, and refuse one that only contains its letters", () => {
+    const mark = (label: string, icon: string): string => problemsOf(withElements({ social: { type: "Button", props: { label, icon, iconOnly: true } } }, ["title", "points", "social"]));
+    expect(mark("Follow us on X", "brand-x")).toBe("");
+    expect(mark("x", "brand-x")).toBe("");
+    expect(mark("Next", "brand-x")).toMatch(/the label "Next" does not name X, the brand of brand-x, as a word of its own/);
+    expect(mark("Follow us on LinkedIn.", "brand-linkedin")).toBe("");
+    expect(mark("LinkedInsights", "brand-linkedin")).toMatch(/does not name LinkedIn/);
+    expect(mark("Googled it", "brand-google")).toMatch(/does not name Google/);
+  });
+
+  describe("a brand mark in an item of the state", () => {
+    /** A repeat over /channels whose one drawing element is `drawer`, nested one Box down so the walk has to go below the repeat's child. */
+    const drawnBy = (drawer: TemplateElement, channels: unknown = [{ icon: "brand-youtube", label: "YouTube" }]): UiTemplate => {
+      const base = withElements({ channels: { type: "Box", props: {}, repeat: { statePath: "/channels", key: "label" }, children: ["row"] }, row: { type: "Box", props: {}, children: ["channel"] }, channel: drawer }, ["title", "points", "channels"]);
+      return { ...base, fragment: { ...base.fragment, state: { ...base.fragment.state, channels } } };
+    };
+    const reads = (type: string, extra: Record<string, unknown> = {}): TemplateElement => ({ type, props: { label: { $item: "label" }, icon: { $item: "icon" }, ...extra } });
+
+    it("should accept a Button or a Link that the repeat draws the item with", () => {
+      expect(templateProblems(drawnBy(reads("Button", { iconOnly: true })), "heroes")).toEqual([]);
+      expect(templateProblems(drawnBy(reads("Link")), "heroes")).toEqual([]);
+    });
+
+    it("should name an Icon or a Badge that the repeat draws the item with, as for an element", () => {
+      expect(problemsOf(drawnBy({ type: "Icon", props: { name: { $item: "icon" }, label: { $item: "label" } } }))).toMatch(/an item in state \(YouTube\), drawn by element "channel" \(Icon\): brand-youtube is a brand mark\. A template uses one only on a Button or a Link/);
+      expect(problemsOf(drawnBy(reads("Badge")))).toMatch(/drawn by element "channel" \(Badge\): brand-youtube is a brand mark/);
+    });
+
+    it("should read the mark from a name field when the drawing element reads the item's name", () => {
+      const named = drawnBy({ type: "Icon", props: { name: { $item: "name" } } }, [{ name: "brand-youtube", label: "YouTube" }]);
+      expect(problemsOf(named)).toMatch(/\(Icon\): brand-youtube is a brand mark/);
+    });
+
+    it("should name an item whose drawing element cannot be found, rather than let it pass", () => {
+      const fixedMark: TemplateElement = { type: "Button", props: { label: { $item: "label" }, icon: "star" } };
+      expect(problemsOf(drawnBy(fixedMark))).toMatch(/an item in state \(YouTube\): brand-youtube is in the state, but no element under a repeat over \/channels reads it with \{ "\$item": "icon" \}/);
+      const otherField: TemplateElement = { type: "Button", props: { label: { $item: "label" }, icon: { $item: "glyph" } } };
+      expect(problemsOf(drawnBy(otherField))).toMatch(/no element under a repeat over \/channels reads it/);
+    });
+
+    it("should name a brand mark in state that no repeat draws", () => {
+      const base = withElements({}, ["title", "points"]);
+      const loose: UiTemplate = { ...base, fragment: { ...base.fragment, state: { ...base.fragment.state, profiles: [{ icon: "brand-youtube", label: "YouTube" }] } } };
+      expect(problemsOf(loose)).toMatch(/an item in state \(YouTube\): brand-youtube is in the state, but no element under a repeat over \/profiles reads it/);
+    });
   });
 
   it("should name a validateForm action that names no statePath", () => {
