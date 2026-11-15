@@ -213,8 +213,11 @@ lint. Nothing renders under the 13px floor.
   the editor's block edits (`pairedProp` in `src/lib/ui/spec-blocks.ts`)
   keep it in step when a child is added, moved, duplicated, or deleted. A
   Grid without `spans` stays without it, and a span that moves into another
-  Grid is cut to that Grid's `columns`. A paired element takes no `repeat`,
-  since it pairs by place. A Grid's width steps, its column classes, and its
+  Grid is cut to that Grid's `columns`. A paired element should not take
+  `repeat`, since it pairs by place: a Grid with `spans` and `repeat` is an
+  error (no saved spec uses `spans` yet), and Tabs or an Accordion with
+  `repeat` is only a warning (`repeated_pairing`), because saved specs drew
+  that way before the check. A Grid's width steps, its column classes, and its
   span classes come from one table (`gridSteps` in
   `src/components/artifact-view/ui/grid-steps.ts`). A new paired prop goes
   in that list, never in a second copy of the edits.

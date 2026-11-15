@@ -77,7 +77,7 @@ export const layoutDocs = {
         }),
       },
     ],
-    rules: ["Give exactly one child per entry in `tabs`: child N is the panel for tab N.", "`defaultIndex` picks the tab that opens first (0-based).", "Tabs take no `repeat`: the panels pair with the tabs by their place in the spec, so write each panel out."],
+    rules: ["Give exactly one child per entry in `tabs`: child N is the panel for tab N.", "`defaultIndex` picks the tab that opens first (0-based).", "Do not give Tabs `repeat`: the panels pair with the tabs by their place in the spec, so write each panel out. Tabs with `repeat` still draw, with a warning."],
   },
   Accordion: {
     examples: [
@@ -89,7 +89,7 @@ export const layoutDocs = {
         }),
       },
     ],
-    rules: ["Give exactly one child per entry in `items`: child N is the body of item N.", "An Accordion takes no `repeat`: the bodies pair with the items by their place in the spec, so write each body out."],
+    rules: ["Give exactly one child per entry in `items`: child N is the body of item N.", "Do not give an Accordion `repeat`: the bodies pair with the items by their place in the spec, so write each body out. An Accordion with `repeat` still draws, with a warning."],
   },
   Separator: {
     examples: [
