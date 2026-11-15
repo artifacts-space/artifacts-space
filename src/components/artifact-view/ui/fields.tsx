@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type CSSProperties, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -131,10 +131,8 @@ export function TextareaView({ props, bindings, emit }: ViewProps<"Textarea">) {
         {...fieldSkipProps}
         {...control}
         id={id}
+        // The field grows with what is typed, so `rows` is the least it shows; the shared field sets that height.
         rows={rows}
-        // The field grows with what is typed, so `rows` is the least it shows: that many lines, plus its padding and border.
-        style={{ "--field-rows": String(rows) } as CSSProperties}
-        className="min-h-[calc(var(--field-rows)*1lh+1rem+2px)]"
         value={value}
         placeholder={props.placeholder}
         disabled={props.disabled}

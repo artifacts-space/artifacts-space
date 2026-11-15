@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ArtifactFilesProvider } from "@/components/artifact-view/files-context";
@@ -102,6 +102,20 @@ function ThemedSpecimen({ id }: { id: string }) {
       </ThemeBackdrop>
     </Specimen>
   );
+}
+
+const neverChanges = () => () => undefined;
+
+/**
+ * Says the gallery has hydrated, for tests. The server leaves the mark out
+ * and the browser adds it once React has taken over every group above it.
+ * The server's HTML is on screen before that, and a test that writes on it
+ * (an accessibility scan marks what it scans) would differ from what React
+ * expects to find.
+ */
+function ReadyMark() {
+  const hydrated = useSyncExternalStore(neverChanges, () => true, () => false);
+  return hydrated ? <span hidden data-gallery-ready="" /> : null;
 }
 
 /**
@@ -208,6 +222,7 @@ export function ComponentGallery() {
           {mediaFormatFixtures.map((fixture) => <FormatSpecimen key={fixture.name} fixture={fixture} media />)}
         </Group>
       </div>
+      <ReadyMark />
     </div>
   );
 }

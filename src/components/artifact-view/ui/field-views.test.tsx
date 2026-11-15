@@ -64,8 +64,20 @@ describe("password stand-in", () => {
 
   it("should show a notice in place of the field, with no editable field, when a password Input is given a binding", () => {
     const html = one("Input", { label: "Password", type: "password", value: { $bindState: "/secret" } }, { secret: "" });
+    // The rule's own words: without the rule the stand-in would draw and this notice would not.
+    expect(html).toContain("A password Input is a stand-in that cannot be typed into: it takes no `value` and cannot be bound with `$bindState`.");
+    expect(html).toContain("1 part of this interface could not be shown.");
+    expect(html).not.toContain("data-password-stand-in");
     expect(controls(html)).toEqual([]);
     expect(html).not.toContain('type="password"');
+  });
+
+  it("should refuse a password Input with a written value the same way", () => {
+    const html = one("Input", { label: "Password", type: "password", value: "hunter2" });
+    expect(html).toContain("A password Input is a stand-in that cannot be typed into");
+    expect(html).not.toContain("data-password-stand-in");
+    expect(html).not.toContain("hunter2");
+    expect(controls(html)).toEqual([]);
   });
 
   it("should never render a password input anywhere in the sign-in screen", () => {
@@ -105,9 +117,10 @@ describe("text fields", () => {
   });
 
   it("should give a Textarea its rows as the least height it shows", () => {
-    expect(controls(one("Textarea", { label: "Notes", rows: 6 }))[0]).toContain("--field-rows:6");
-    expect(controls(one("Textarea", { label: "Notes" }))[0]).toContain("--field-rows:3");
-    expect(controls(one("Textarea", { label: "Notes", rows: 6 }))[0]).toContain("min-h-[calc(var(--field-rows)*1lh+1rem+2px)]");
+    expect(controls(one("Textarea", { label: "Notes", rows: 6 }))[0]).toContain("--textarea-rows:6");
+    expect(controls(one("Textarea", { label: "Notes" }))[0]).toContain("--textarea-rows:3");
+    // The height rule is the shared field's own, so it is in one place.
+    expect(controls(one("Textarea", { label: "Notes", rows: 6 }))[0]).toContain("min-h-[calc(var(--textarea-rows)*1lh");
   });
 
   it("should keep the label for screen readers only when hideLabel is set", () => {

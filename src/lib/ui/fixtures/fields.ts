@@ -13,7 +13,7 @@ export const inputFixtures: ComponentFixture[] = [
   { name: "Search, label hidden", props: { label: "Search the docs", type: "search", placeholder: "Search…", hideLabel: true, fullWidth: true } },
   { name: "Number", props: { label: "Seats", type: "number", value: "5" } },
   { name: "Disabled", props: { label: "Plan", value: "Team", disabled: true } },
-  { name: "Password stand-in", props: { label: "Password", type: "password", description: "Drawn only: it cannot be typed into." } },
+  { name: "Password stand-in", props: { label: "Password", type: "password", description: "At least 12 characters." } },
   { name: "Password stand-in, disabled", props: { label: "Current password", type: "password", disabled: true } },
   { name: "Long", props: { label: longText(120), placeholder: longText(120), description: longText(400), error: unbroken(300), value: unbroken(500) } },
 ];

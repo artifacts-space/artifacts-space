@@ -13,11 +13,16 @@ import { expectNoAxeViolations } from "./support/a11y";
 
 const specimen = (page: Page, group: string, name: string) => page.locator(`section#${group} [data-specimen="${name}"]`);
 
-/** The gallery is interactive once a bound field answers typing; the sign-in screen is the last thing these tests use. */
+/**
+ * The gallery is ready once React has hydrated it, which its ready mark
+ * says. The server's HTML is on screen, and its fields editable, before
+ * that: a scan writes a marker on what it scans, and a marker written on
+ * HTML React has yet to check is a hydration mismatch.
+ */
 async function galleryReady(page: Page) {
   await page.goto("/dev/components#Input");
   await expect(page.locator("section#Input")).toBeVisible({ timeout: 30_000 });
-  await expect(specimen(page, "specs", "Sign-in screen").getByRole("textbox", { name: "Email" })).toBeEditable({ timeout: 30_000 });
+  await expect(page.locator("[data-gallery-ready]")).toBeAttached({ timeout: 60_000 });
 }
 
 test("should pass axe on the Input, Textarea, Avatar, Button, Badge, List, Select, and Image groups of the gallery", async ({ page }) => {
@@ -78,6 +83,14 @@ test("should show a Textarea at least as tall as its rows, and let it grow with 
   const line = (six - two) / 4;
   expect(line).toBeGreaterThan(14);
   expect(Math.abs(four - (two + 2 * line))).toBeLessThan(2);
+  // The height is the rows' lines plus the field's own padding and border, whatever those are set to.
+  const box = await specimen(page, "Textarea", "Six rows").getByRole("textbox").evaluate((element) => {
+    const style = getComputedStyle(element);
+    const px = (name: string) => Number.parseFloat(style.getPropertyValue(name));
+    return { line: px("line-height"), around: px("padding-top") + px("padding-bottom") + px("border-top-width") + px("border-bottom-width") };
+  });
+  expect(Math.abs(six - (6 * box.line + box.around))).toBeLessThan(1);
+  expect(Math.abs(line - box.line)).toBeLessThan(1);
   const short = specimen(page, "Textarea", "Two rows").getByRole("textbox");
   await short.fill("one\ntwo\nthree\nfour\nfive");
   expect(await height("Two rows")).toBeGreaterThan(two + 2 * line);
@@ -89,11 +102,11 @@ test("should name the password stand-in once, describe it, and show it disabled"
   await plain.scrollIntoViewIfNeeded();
   const standIn = plain.locator("[data-password-stand-in]");
   await expect(standIn).toHaveAccessibleName("Password");
-  await expect(standIn).toHaveAccessibleDescription("A password field in a mockup. It cannot be typed into. Drawn only: it cannot be typed into.");
+  await expect(standIn).toHaveAccessibleDescription("A password field in a mockup. It cannot be typed into. At least 12 characters.");
   // The label is the image's name, not a second line of text before it.
   await expect(standIn.locator("xpath=..")).toMatchAriaSnapshot(`
     - img "Password"
-    - paragraph: "Drawn only: it cannot be typed into."
+    - paragraph: At least 12 characters.
   `);
   const disabled = specimen(page, "Input", "Password stand-in, disabled").locator("[data-password-stand-in]");
   await expect(disabled).toHaveAccessibleName("Current password");
