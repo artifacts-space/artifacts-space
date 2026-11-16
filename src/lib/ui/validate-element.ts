@@ -55,6 +55,9 @@ function unknownPropWarnings(key: string, type: UiComponentName, props: Record<s
     .map((prop) => specWarning("unknown_prop", `Element "${key}" (${type}): prop "${prop}" is not a ${type} prop and is ignored. Known props: ${known.join(", ") || "none"}.`, key));
 }
 
+/** How a message names each paired element, with its article. */
+const pairedNames = { Grid: "a Grid", Tabs: "a Tabs element", Accordion: "an Accordion" } satisfies Record<keyof typeof pairedChildren, string>;
+
 /**
  * A paired prop matches children by their place in the spec, and `repeat`
  * draws one written child once per item, so the two do not go together.
@@ -65,7 +68,7 @@ function unknownPropWarnings(key: string, type: UiComponentName, props: Record<s
 function repeatedPairing(key: string, type: keyof typeof pairedChildren, element: UiElement): UiSpecIssue[] {
   const prop = pairedChildren[type];
   if (element.repeat === undefined || element.props[prop] === undefined) return [];
-  const problem = `Element "${key}" (${type}): \`${prop}\` pairs with the children written in the spec, and a ${type} with \`repeat\` draws its child once per item.`;
+  const problem = `Element "${key}" (${type}): \`${prop}\` pairs with the children written in the spec, and ${pairedNames[type]} with \`repeat\` draws its child once per item.`;
   if (type === "Grid") return [specError("children_mismatch", `${problem} Remove \`spans\`, or write the children out.`, key)];
   return [specWarning("repeated_pairing", `${problem} Its panels may not line up with \`${prop}\`. Remove \`repeat\`, and write one child per entry in \`${prop}\`.`, key)];
 }

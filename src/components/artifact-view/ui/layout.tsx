@@ -4,6 +4,7 @@ import { Children, type ReactNode } from "react";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { defaultGridColumns } from "@/lib/ui/props/layout";
 import type { Gap } from "@/lib/ui/props/shared";
 import { hasTitleText, titleOr } from "@/lib/ui/title-rules";
 import { cn } from "@/lib/utils";
@@ -65,7 +66,7 @@ function spannedCells(children: ReactNode, spans: readonly number[] | undefined,
 
 export function GridView({ props, children }: ViewProps<"Grid">) {
   // The width steps, their columns, and every span come from one table (grid-steps.ts).
-  const columns = props.columns ?? 2;
+  const columns = props.columns ?? defaultGridColumns;
   return (
     <div data-slot="ui-grid" className={cn("grid min-w-0", gridColumnClass(columns, props.narrowColumns), gapClass[props.gap ?? "md"])}>
       {spannedCells(children, props.spans, columns, props.narrowColumns)}

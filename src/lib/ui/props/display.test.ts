@@ -96,13 +96,13 @@ describe("Grid spans", () => {
   });
 
   it.each([
-    ["Tabs", { tabs: [{ label: "One" }] }, "tabs"],
-    ["Accordion", { items: [{ title: "One" }] }, "items"],
-  ])("should warn, not refuse, when %s repeats its child, so a saved spec still draws", (type, props, prop) => {
+    ["Tabs", { tabs: [{ label: "One" }] }, "tabs", "a Tabs element"],
+    ["Accordion", { items: [{ title: "One" }] }, "items", "an Accordion"],
+  ])("should warn, not refuse, when %s repeats its child, so a saved spec still draws", (type, props, prop, named) => {
     const issues = validateUiSpec({ version: 1, root: "p", state: { items: [{ id: "a" }] }, elements: { p: { type, props, repeat: { statePath: "/items", key: "id" }, children: ["c"] }, c: { type: "Text", props: { text: "Panel" } } } }).issues;
     expect(issues.filter((issue) => issue.severity === "error")).toEqual([]);
     expect(issues.filter((issue) => issue.code === "repeated_pairing")).toEqual([
-      { severity: "warning", code: "repeated_pairing", elementKey: "p", message: `Element "p" (${type}): \`${prop}\` pairs with the children written in the spec, and a ${type} with \`repeat\` draws its child once per item. Its panels may not line up with \`${prop}\`. Remove \`repeat\`, and write one child per entry in \`${prop}\`.` },
+      { severity: "warning", code: "repeated_pairing", elementKey: "p", message: `Element "p" (${type}): \`${prop}\` pairs with the children written in the spec, and ${named} with \`repeat\` draws its child once per item. Its panels may not line up with \`${prop}\`. Remove \`repeat\`, and write one child per entry in \`${prop}\`.` },
     ]);
   });
 

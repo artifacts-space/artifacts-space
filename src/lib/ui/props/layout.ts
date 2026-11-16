@@ -61,13 +61,16 @@ function spanProblem(columns: number, spans: unknown): string[] {
   return [`\`spans\` ${wide.join(", ")} ${wide.length === 1 ? "is" : "are"} more than \`columns\` (${String(columns)}): a child spans at most every column. Lower ${wide.length === 1 ? "it" : "them"}, or raise \`columns\`.`];
 }
 
+/** How many columns a Grid has when `columns` is not set. */
+export const defaultGridColumns = 2;
+
 /**
  * Grid rules on `columns`, `narrowColumns`, and `spans`, as written: each
  * is read only when it is a number (or a list), so an expression gets no
  * message here.
  */
 export const gridCheck = (props: Record<string, unknown>): string[] => {
-  const { columns = 2 } = props;
+  const { columns = defaultGridColumns } = props;
   if (typeof columns !== "number") return [];
   return [...narrowProblem(columns, props.narrowColumns), ...spanProblem(columns, props.spans)];
 };
