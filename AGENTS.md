@@ -634,6 +634,17 @@ on a second domain (`src/lib/page-host/rules.ts`).
   with the Report link (`SharedPageNotice`). Agents read the rules in
   `buildHtmlGuide`, which lists the same hosts as `pageContentPolicy`; a
   test keeps them equal.
+- Full screen (`PageWindow` in `html-view.tsx`): a bar of this site's sits
+  above the running page, and its button puts the page's box over the whole
+  window and back. The box and its frame stay the same elements, shown in
+  the browser's top layer (`popover`), so the page keeps running and keeps
+  what the reader did in it; never draw a second frame for it, which would
+  load the page again. A fixed box alone is not enough: the /app pane's
+  body is a size container, which holds a fixed box inside it. The bar
+  stays in full screen with the artifact's title, so a page anyone wrote
+  never has the whole window to itself, and the frame gets no
+  `allowfullscreen`. Escape reaches the site only while focus is in the
+  bar, so the bar's button is always there.
 - `PAGE_HOST` unset (and not `next dev`): no page runs, and `PageFrame`
   draws nothing (`usePagesCanRun`). Tests: `rules.test.ts`,
   `proxy.test.ts`, `e2e/page-frame.spec.ts` on `/dev/page-frame`, and
@@ -763,21 +774,28 @@ the artifact page and in the /app panes, and an interface's Text and List
 blocks follow the same cap. Plain text has no frame of its own, for readers
 or editors, and a comment's text fills its card.
 
-In the /app pane the rows above the box that scrolls the body (share
-notice, title, chips, meta line, save notices) leave the room the body
-leaves beside its column (`scrollbarRoom` in `detail-scroll.ts`): the
-body's scrollbar when it takes room, and for an interface the gutter its
-block handles hang in. That gutter is one variable, set by
-`detailOuterClass` from the artifact's kind alone, and rows inside the body
-(the body's surface, the source, the Files section) read it through
-`gutterRoom`, so the title never moves when View source opens. A band that
-spans the pane (a notice, the Files section) takes the `column` class for
-its content. Under View source the field's side padding is the column's.
-A new row must keep to this. `e2e/title-body-column.spec.ts` (fixtures:
-the editor in the pane and on the page, for Markdown, text, and interface
-artifacts), `e2e/title-body-column-db.spec.ts` (a reader on the real page,
-and the pane's read-only view), and `e2e/pane-header-column.spec.ts`
-measure both edges at several window widths.
+In the /app pane the toolbar stays and everything under it is one page
+that scrolls (`detailOuter` in `detail-scroll.ts`): the title block (icon,
+title, summary, chips, meta line) scrolls away with the body, as on a
+document page, and it sits on the body's surface in the artifact's theme
+(`PaneHead` and `headSurface` in `pane-head.tsx`; the theme's page color
+when themed, the card otherwise). Never pin the title block, and never
+give it a surface of its own. Two things stay in view while the page
+scrolls (`PinnedInPane`): a notice that arrives (someone else saved, an
+agent saved, a catch-up), and the meta line while a save has not gone
+through (`isSaveProblem`). Phones scroll the window, and nothing pins
+there. Every row that holds the content's column, above the body and
+inside it, leaves the block gutter on both sides (`gutterRoom`): one
+variable, set by `detailOuterClass` from the artifact's kind alone, so the
+title never moves when View source opens. A band that spans the pane (a
+notice, the Files section) takes the `column` class for its content.
+Under View source the field's side padding is the column's. A new row
+must keep to this. `e2e/title-body-column.spec.ts` (fixtures: the editor
+in the pane and on the page, for Markdown, text, and interface artifacts),
+`e2e/title-body-column-db.spec.ts` (a reader on the real page, and the
+pane's read-only view), and `e2e/pane-header-column.spec.ts` measure both
+edges at several window widths; `e2e/pane-head.spec.ts` checks that the
+title block scrolls away, what stays, and the surface.
 
 ### Themes
 

@@ -8,7 +8,7 @@ import { CopyButton } from "@/components/copy-button";
 import { LineField } from "@/components/line-field";
 import { cn } from "@/lib/utils";
 
-import { scrollbarRoom } from "./detail-scroll";
+import { gutterRoom } from "./detail-scroll";
 import type { ArtifactDraft } from "./use-artifact-draft";
 
 type UpdateDraft = <K extends keyof ArtifactDraft>(key: K, value: ArtifactDraft[K]) => void;
@@ -16,7 +16,7 @@ type UpdateDraft = <K extends keyof ArtifactDraft>(key: K, value: ArtifactDraft[
 /** Notice shown while the artifact is shared by link or publicly: a band across the pane, with its words in the content's column (`column`), above the title they line up with. */
 export function ShareBanner({ shareUrl, isPublic, column }: { shareUrl: string; isPublic: boolean; column: string }) {
   return (
-    <div className={cn("border-b bg-muted/50 py-2", scrollbarRoom)}>
+    <div className={cn("border-b bg-muted/50 py-2", gutterRoom)}>
       <div className={cn(column, "flex flex-wrap items-center gap-3")}>
         <IconLink className="size-3.5 text-muted-foreground" />
         <span className="text-sm text-muted-foreground">{isPublic ? "Anyone can find and read this artifact." : "Anyone with the link can read this artifact."}</span>
@@ -43,15 +43,17 @@ interface TitleFieldsProps {
   onEnter?: () => void;
   /** The content's column (previewColumnClass), so the title lines up with the body. */
   column: string;
+  /** Extra classes from the surrounding layout, such as the pane's surface. */
+  className?: string | undefined;
 }
 
 /**
  * Icon, title, and one-line summary fields. A long title or summary wraps
  * inside the column (LineField) instead of running off its right edge.
  */
-export function TitleFields({ title, icon, summary, update, titleRef, onEnter, column }: TitleFieldsProps) {
+export function TitleFields({ title, icon, summary, update, titleRef, onEnter, column, className }: TitleFieldsProps) {
   return (
-    <div className={cn("group/title pt-6 sm:pt-10", scrollbarRoom)}>
+    <div data-slot="title-fields" className={cn("group/title pt-6 sm:pt-10", gutterRoom, className)}>
       <div className={column}>
         <DraftIcon icon={icon} update={update} />
         <LineField

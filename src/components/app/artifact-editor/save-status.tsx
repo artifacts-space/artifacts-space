@@ -10,7 +10,7 @@ import type { ArtifactEditorDto, ArtifactHarnessDto } from "@/lib/artifact-types
 import { cn } from "@/lib/utils";
 
 import type { AutosaveStatus } from "./use-autosave";
-import { scrollbarRoom } from "./detail-scroll";
+import { gutterRoom } from "./detail-scroll";
 
 /** The quiet words for a save status: "Saving…", "Saved", or why it is not saved. Null when there is nothing to say. */
 export function saveStatusLabel(status: AutosaveStatus, dirty: boolean): string | null {
@@ -19,6 +19,11 @@ export function saveStatusLabel(status: AutosaveStatus, dirty: boolean): string 
   if (status.kind === "saving" || dirty) return "Saving…";
   if (status.kind === "saved") return status.waitingForApproval ? "Saved · Readers outside the team see it once it is approved" : "Saved";
   return null;
+}
+
+/** True when a save did not go through and the person must act: it was held back, or it failed. */
+export function isSaveProblem(status: AutosaveStatus): boolean {
+  return status.kind === "held" || status.kind === "failed";
 }
 
 interface SaveStatusBarProps {
@@ -36,7 +41,7 @@ interface SaveStatusBarProps {
   onRetry: () => void;
   /** The content's column (previewColumnClass), so the line sits under the title. */
   column?: string;
-  /** Extra classes from the surrounding layout, such as sticking in the /app shell. */
+  /** Extra classes from the surrounding layout, such as the pane's gutter and surface. */
   className?: string;
 }
 
@@ -82,7 +87,7 @@ function EditedBy({ stored, updatedAt, updatedBy, harness }: Pick<SaveStatusBarP
  */
 export function SaveStatusBar({ status, dirty, length, updatedAt, updatedBy, harness, stored = true, id, onRetry, column, className }: SaveStatusBarProps) {
   const label = saveStatusLabel(status, dirty);
-  const problem = status.kind === "held" || status.kind === "failed";
+  const problem = isSaveProblem(status);
   return (
     <div data-slot="save-status" className={cn("pt-1", className)}>
       <div className={cn("flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b pb-3 text-xs text-muted-foreground", column ?? "px-5 sm:px-7")}>
@@ -120,7 +125,7 @@ const noticeRow = "flex flex-wrap items-center gap-x-3 gap-y-2";
 function NoticeBand({ column, className, slot, children }: NoticeBandProps) {
   if (!column) return <div role="status" data-slot={slot} className={cn(noticeRow, "border-b bg-muted/50 px-5 py-2.5 sm:px-7", className)}>{children}</div>;
   return (
-    <div role="status" data-slot={slot} className={cn("border-b bg-muted/50 py-2.5", scrollbarRoom, className)}>
+    <div role="status" data-slot={slot} className={cn("border-b bg-muted/50 py-2.5", gutterRoom, className)}>
       <div className={cn(column, noticeRow)}>{children}</div>
     </div>
   );
