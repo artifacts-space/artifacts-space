@@ -29,7 +29,15 @@ export interface BoardFrame {
 /** The height the board assumes for a frame it has not measured yet. */
 export const unmeasuredHeight = 800;
 
-const paddingClass: Record<FramePadding, string> = { none: "p-0", sm: "p-4", md: "p-6", lg: "p-10" };
+/** The space between a frame's edge and its content. The capture box (capture/capture-box.tsx) reads it too, so a frame's image has the frame's own padding. */
+export const framePaddingClass: Record<FramePadding, string> = { none: "p-0", sm: "p-4", md: "p-6", lg: "p-10" };
+
+/**
+ * What a frame's body is with its place and its edge taken away: a column at
+ * the frame's width, in the theme's page colors. The board adds the edge,
+ * the shadow, and the scaling; the capture box draws only this.
+ */
+export const frameSurfaceClass = "flex w-(--frame-width) flex-col bg-background text-foreground";
 
 /** The size shown beside a frame's name: its width, and its least height when it has one. */
 export function frameSizeLabel(frame: Pick<BoardFrame, "width" | "height">): string {
@@ -82,7 +90,7 @@ const labelClass =
  * frame outside the window skips its layout and paint until it comes near.
  */
 const bodyClass =
-  "flex w-(--frame-width) flex-col rounded-lg border border-card-edge bg-background text-foreground shadow-xs [zoom:min(1,tan(atan2(100cqw,var(--frame-width))))] group-focus-visible/frame:ring-3 group-focus-visible/frame:ring-ring/50 @[640px]/canvas:[zoom:1] @[640px]/canvas:[contain-intrinsic-block-size:auto_var(--frame-rest-height)] @[640px]/canvas:[content-visibility:auto]";
+  `${frameSurfaceClass} rounded-lg border border-card-edge shadow-xs [zoom:min(1,tan(atan2(100cqw,var(--frame-width))))] group-focus-visible/frame:ring-3 group-focus-visible/frame:ring-ring/50 @[640px]/canvas:[zoom:1] @[640px]/canvas:[contain-intrinsic-block-size:auto_var(--frame-rest-height)] @[640px]/canvas:[content-visibility:auto]`;
 
 /**
  * One frame: its name and size above it, then its content at the frame's real
@@ -99,7 +107,7 @@ export const CanvasFrame = memo(function CanvasFrame({ frame }: { frame: BoardFr
         <span className="truncate font-medium text-foreground">{frame.name}</span>
         <span className="shrink-0 text-muted-foreground">{frameSizeLabel(frame)}</span>
       </div>
-      <div {...{ [frameBodyAttribute]: frame.id }} className={cn(bodyClass, paddingClass[frame.padding])} style={{ minHeight: frame.height ?? undefined }}>
+      <div {...{ [frameBodyAttribute]: frame.id }} className={cn(bodyClass, framePaddingClass[frame.padding])} style={{ minHeight: frame.height ?? undefined }}>
         <FrameContent frame={frame} />
       </div>
     </div>

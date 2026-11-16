@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import { loadEditableArtifactAction } from "@/app/artifact/[publicId]/edit-actions";
+import { serverCaptureApi } from "@/components/artifact-view/canvas/capture/capture-api";
+import { FrameCaptureHost } from "@/components/artifact-view/canvas/capture/frame-capture-host";
 import type { FileDto } from "@/lib/files/types";
 
 import { usePublishPageEditorChrome, useWaitingChrome } from "./page-editor-chrome";
@@ -57,6 +59,13 @@ export function EditSurface({ publicId, title, updatedAt, reviewed, fullWidth, f
   // The header builds the waiting controls itself; this tells it only when the editable copy could not load. Once loaded, PageEditFrame's controls publish their own.
   usePublishPageEditorChrome(!editor.artifact && error ? failed : null);
 
+  const loaded = editor.artifact;
   // One frame for both states: the heading and body never remount when editing unlocks.
-  return <PageEditFrame editor={editor} reviewed={reviewed} pageFullWidth={fullWidth}>{children}</PageEditFrame>;
+  return (
+    <>
+      <PageEditFrame editor={editor} reviewed={reviewed} pageFullWidth={fullWidth}>{children}</PageEditFrame>
+      {/* Draws the frames of a canvas for agents, out of sight, once the editable copy has loaded. This page is rendered only for someone who may edit. */}
+      <FrameCaptureHost artifactId={loaded?.id ?? null} kind={loaded?.kind ?? ""} savedAt={loaded?.updatedAt ?? null} api={serverCaptureApi} />
+    </>
+  );
 }

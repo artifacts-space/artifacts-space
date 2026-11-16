@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult } from "@/lib/artifact-types";
+import { CaptureNotWantedError } from "@/lib/canvas/capture-errors";
 import { capturesNeeded, finishCapture, startCapture, type CapturesNeeded, type StartCaptureInput, type StartedCapture } from "@/lib/canvas/captures";
 import { getSession } from "@/lib/session";
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -35,9 +36,24 @@ export async function frameCapturesNeededAction(artifactId: string): Promise<Act
   return run("The frames to draw could not be read. Try again.", (userId) => capturesNeeded(userId, artifactIdSchema.parse(artifactId)));
 }
 
+/**
+ * What a start answers: the capture and its uploads, or "not-wanted" when the
+ * drawing is no longer needed (its frame changed, or another tab's image of
+ * it is already current). The tab leaves a drawing that is not wanted and
+ * goes on; a failed result ends its pass.
+ */
+export type StartCaptureAnswer = ({ state: "started" } & StartedCapture) | { state: "not-wanted" };
+
 /** Starts a capture of one frame: checks the edit access and the limits, and returns a presigned PUT for each part. */
-export async function startFrameCaptureAction(input: StartCaptureInput): Promise<ActionResult<StartedCapture>> {
-  return run("The frame image could not be started. Try again.", (userId) => startCapture(userId, input));
+export async function startFrameCaptureAction(input: StartCaptureInput): Promise<ActionResult<StartCaptureAnswer>> {
+  return run("The frame image could not be started. Try again.", async (userId): Promise<StartCaptureAnswer> => {
+    try {
+      return { state: "started", ...(await startCapture(userId, input)) };
+    } catch (error) {
+      if (error instanceof CaptureNotWantedError) return { state: "not-wanted" };
+      throw error;
+    }
+  });
 }
 
 /** Checks a capture's uploaded parts and makes it the frame's current image. */

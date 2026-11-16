@@ -17,8 +17,8 @@ function isFixtureName(value: unknown): value is CanvasFixtureName {
 }
 
 async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/canvas">["searchParams"] }) {
-  const { fixture } = await searchParams;
-  return <CanvasFixture name={isFixtureName(fixture) ? fixture : "site"} />;
+  const { fixture, capture } = await searchParams;
+  return <CanvasFixture name={isFixtureName(fixture) ? fixture : "site"} capture={capture === "1"} />;
 }
 
 /**
@@ -26,9 +26,11 @@ async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/canvas"
  * column, without a database (canvas-fixture.tsx). `?fixture=` picks site
  * (one page at three sizes), flow (four phone screens), placed (two rows
  * placed by hand), empty, broken (one good frame and two that cannot be
- * shown), unreadable, large (a full board, for timing), or screens (one
- * screen of section templates in three frames). Returns 404 in
- * every other environment.
+ * shown), unreadable, large (a full board, for timing), screens (one
+ * screen of section templates in three frames), or pictures (one frame
+ * with uploaded pictures). `?capture=1` adds a capture host that draws the
+ * frames through a stand-in API, with no database and no file storage;
+ * without it the page has no host. Returns 404 in every other environment.
  */
 export default function CanvasFixturePage({ searchParams }: PageProps<"/dev/canvas">) {
   if (process.env.NODE_ENV !== "development") notFound();

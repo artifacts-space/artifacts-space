@@ -14,6 +14,7 @@ import { assertFileFits } from "@/lib/quota/usage";
 import type { Theme } from "@/lib/themes/schema";
 import { UserFacingError } from "@/lib/user-facing-error";
 
+import { CaptureNotWantedError } from "./capture-errors";
 import {
   captureAvailability,
   captureGeometry,
@@ -165,7 +166,7 @@ async function assertRoom(userId: string, record: ArtifactRecord, board: Capture
   // Only images of content that is on the board count: the next needed-list call removes the others.
   const current = new Set(boardDrawings(board).map(drawingKey));
   const rows = (await listLiveCaptures(record.id)).filter((row) => current.has(drawingKey(row)));
-  if (rows.some((row) => row.status === "ready" && drawingKey(row) === drawingKey(drawing))) throw new UserFacingError("This frame already has a current image.");
+  if (rows.some((row) => row.status === "ready" && drawingKey(row) === drawingKey(drawing))) throw new CaptureNotWantedError("This frame already has a current image.");
   if ((await countPendingCaptures(userId, now)) >= captureLimits.maxPendingPerUser) throw new UserFacingError("You have many unfinished frame images. Wait for them to finish, then try again.");
   const used = rows.filter((row) => countsTowardStorage(row, now)).reduce((sum, row) => sum + row.bytes, 0);
   if (!fitsCanvasCap(used, bytes)) throw new UserFacingError("This canvas holds as many frame images as it can.");
@@ -190,7 +191,7 @@ export async function startCapture(userId: string, input: StartCaptureInput, now
   await enforceRateLimit("frameCaptureStartByArtifact", record.id);
   const board = await boardOrRefuse(record);
   const frame = frameOf(board, parsed);
-  if (!frame) throw new UserFacingError(changedMessage);
+  if (!frame) throw new CaptureNotWantedError(changedMessage);
   // The frame is never drawn shorter than the least height it asks for.
   if (frame.height !== null && parsed.height < frame.height) throw new UserFacingError("The drawing is shorter than its frame.");
   const geometry = captureGeometry(frame.width, parsed.height);
