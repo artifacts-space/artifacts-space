@@ -25,7 +25,7 @@ export const legalContact = {
 export const legalDates = {
   effective: { label: "November 7, 2026", iso: "2026-11-07" },
   updated: {
-    privacy: { label: "November 15, 2026", iso: "2026-11-15" },
+    privacy: { label: "November 16, 2026", iso: "2026-11-16" },
     terms: { label: "November 13, 2026", iso: "2026-11-13" },
   } satisfies Record<LegalDocument, { label: string; iso: string }>,
 } as const;
