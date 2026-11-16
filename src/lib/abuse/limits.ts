@@ -119,6 +119,31 @@ export const rateLimits = {
   feedbackByUser: { limit: 5, windowSeconds: hour },
   /** Started file uploads per user per hour, from the web app and MCP together. */
   fileUpload: { limit: 200, windowSeconds: hour },
+  /**
+   * Frame capture needed-list calls per person per hour (src/lib/canvas/captures.ts).
+   * An open canvas asks when it opens, when its tab comes back, and after
+   * each batch it drew: a few calls per visit. This is the runaway cap.
+   */
+  frameCaptureNeeded: { limit: 1200, windowSeconds: hour },
+  /**
+   * Frame captures started per person per hour. A full board is 24 frames in
+   * two modes, 48 captures, so this is 25 full boards drawn from scratch in
+   * an hour; an edit redraws only the frames it changed.
+   */
+  frameCaptureStart: { limit: 1200, windowSeconds: hour },
+  /**
+   * Frame captures started for one canvas per 10 minutes, by everyone who may
+   * edit it together: 12 redraws of a full board. It is counted only after
+   * the edit access check, so nobody else can use up a canvas's budget.
+   */
+  frameCaptureStartByArtifact: { limit: 600, windowSeconds: 600 },
+  /**
+   * Frame capture finish calls per person per hour. A capture is finished
+   * once, so this matches the captures a person may start. Each call reads
+   * the capture's parts from storage, and repeated or parallel calls on one
+   * capture would each read them again; this bounds that.
+   */
+  frameCaptureFinish: { limit: 1200, windowSeconds: hour },
   /** Comments per agent per minute and per hour. Agents are stricter, to stop runaway loops. */
   agentCommentMinute: { limit: 6, windowSeconds: 60 },
   agentCommentHour: { limit: 60, windowSeconds: hour },
@@ -260,6 +285,10 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   reportByNetworkArtifact: "We have received a lot of reports about this artifact from your network in the last hour.",
   feedbackByUser: "You have sent several problem reports in the last hour.",
   fileUpload: "You have uploaded a lot of files in the last hour.",
+  frameCaptureNeeded: "Your open canvases have asked which frames to draw a lot in the last hour.",
+  frameCaptureStart: "Your browser has drawn a lot of frame images in the last hour.",
+  frameCaptureStartByArtifact: "A lot of frame images were drawn for this canvas in the last few minutes.",
+  frameCaptureFinish: "Your browser has finished a lot of frame images in the last hour.",
   agentCommentMinute: "You have posted a lot of comments in the last minute.",
   agentCommentHour: "You have posted a lot of comments in the last hour.",
   personCommentMinute: "You have posted a lot of comments in the last minute.",

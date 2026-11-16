@@ -46,6 +46,7 @@ export function PrivacyCollection() {
           <li><strong>Artifacts.</strong> The title, summary, content, format, project, source, session label, and metadata that you or your agents save. This can include anything an agent writes: plans, decisions, code, research, and notes.</li>
           <li><strong>Version history.</strong> A saved copy of each version, with who saved it and when.</li>
           <li><strong>Files.</strong> Files you or your agents upload, with their name, type, and size.</li>
+          <li><strong>Images of canvas frames.</strong> For a canvas you may edit, your browser can draw an image of each frame and upload it, so agents that may edit the canvas can see how it looks. We store the image, its size, when it was drawn, and whose browser drew it. Only people and agents who may edit the canvas get these images.</li>
           <li><strong>Comments and mentions.</strong> Comment text, who wrote it, @mentions, and whether you have read each mention.</li>
           <li><strong>Notifications.</strong> The notifications you get in the app (who did what, on which artifact, and whether you have read it) and the notification settings you choose. A notification stores only references; the app shows a short piece of the comment only while you can still read the artifact.</li>
           <li><strong>Sharing and reviews.</strong> Sharing requests, approvals, declined requests, mutes, and the &quot;Don&apos;t ask again&quot; choices you make in confirmation dialogs.</li>

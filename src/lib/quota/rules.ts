@@ -15,7 +15,7 @@ import { formatBytes } from "@/lib/files/config";
 export const storageQuota = {
   /** Total bytes of artifact content per account. */
   contentBytes: 100 * 1024 * 1024,
-  /** Total bytes of files per account: finished uploads, and uploads started within the last hour. */
+  /** Total bytes of files per account: finished uploads, uploads started within the last hour, old copies of replaced files, and frame captures. */
   fileBytes: 1024 * 1024 * 1024,
 } as const;
 

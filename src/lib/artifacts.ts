@@ -11,6 +11,7 @@ import { getEditableArtifact, viewableInTeamCondition } from "@/lib/access";
 import { authoredByViewerCondition, findDeletableArtifact, ownedAgentIds } from "@/lib/agents/owner-access";
 import { loadActors } from "@/lib/agents/queries";
 import { assertValidArtifactContent } from "@/lib/artifact-content";
+import { removeArtifactCaptures } from "@/lib/canvas/captures-store";
 import {
   artifactKinds,
   type ArtifactDto,
@@ -458,13 +459,17 @@ export async function restoreArtifactVersion(userId: string, id: string, version
   return saveChanges(changes, { editorId: userId, before, actor, options, restoredFromId: version.id });
 }
 
-/** Deletes an artifact and its files, for its author or the person who added the agent that wrote it. */
+/** Deletes an artifact, its files, and its frame captures, for its author or the person who added the agent that wrote it. */
 export async function deleteArtifact(userId: string, id: string) {
   const own = await findDeletableArtifact(userId, { id });
   if (!own) return false;
   await deleteArtifactFiles(own.id).catch((error: unknown) => {
     // The rows lose their artifact when it goes; the cleanup job removes them.
     console.error("[files] Files of a deleted artifact were left for cleanup", error instanceof Error ? error.name : "unknown error");
+  });
+  await removeArtifactCaptures(own.id).catch((error: unknown) => {
+    // The cleanup job finds captures whose artifact is gone and removes them.
+    console.error("[captures] Frame captures of a deleted artifact were left for cleanup", error instanceof Error ? error.name : "unknown error");
   });
   const [record] = await getDb()
     .delete(artifact)

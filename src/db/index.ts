@@ -6,6 +6,7 @@ import { Pool } from "pg";
 import * as connectionSchema from "./connection-schema";
 import * as editLeaseSchema from "./edit-lease-schema";
 import * as fileCopySchema from "./file-copy-schema";
+import * as frameCaptureSchema from "./frame-capture-schema";
 import * as notificationSchema from "./notification-schema";
 import * as oauthSchema from "./oauth-schema";
 import * as rolesSchema from "./roles-schema";
@@ -13,7 +14,7 @@ import * as appSchema from "./schema";
 import * as teamWelcomeSchema from "./team-welcome-schema";
 import * as viewsSchema from "./views-schema";
 
-const schema = { ...appSchema, ...oauthSchema, ...viewsSchema, ...notificationSchema, ...rolesSchema, ...connectionSchema, ...fileCopySchema, ...teamWelcomeSchema, ...editLeaseSchema };
+const schema = { ...appSchema, ...oauthSchema, ...viewsSchema, ...notificationSchema, ...rolesSchema, ...connectionSchema, ...fileCopySchema, ...teamWelcomeSchema, ...editLeaseSchema, ...frameCaptureSchema };
 
 let database: ReturnType<typeof createDatabase> | undefined;
 

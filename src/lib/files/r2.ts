@@ -6,7 +6,8 @@ import { fileLimits } from "./config";
  * Cloudflare R2 storage over its S3-compatible API, signed with SigV4.
  * Server only: it reads the R2 keys from the environment, and nothing here
  * may be imported by a client component. Callers pass keys made by
- * fileObjectKey; no part of a key comes straight from user input.
+ * fileObjectKey, or by captureObjectKey for frame captures; no part of a key
+ * comes straight from user input.
  */
 
 /** Where the bucket lives and the keys that sign requests. */
@@ -53,6 +54,11 @@ export function parseEndpoint(value: string): string {
   if (url.protocol !== "https:" && !local) throw new Error("R2_ENDPOINT must use https, or http on localhost.");
   if (url.pathname !== "/" || url.search || url.hash || url.username || url.password) throw new Error("R2_ENDPOINT must be a bare origin, such as http://localhost:9000.");
   return url.origin;
+}
+
+/** Whether file storage is set up: every R2 variable has a value. Never throws, so callers can ask before they need it. */
+export function isR2Configured(env: NodeJS.ProcessEnv = process.env): boolean {
+  return envNames.every((name) => Boolean(env[name]));
 }
 
 /** Reads the R2 settings from the environment. Throws, naming the missing variables, when any is unset. */
