@@ -1075,8 +1075,9 @@ The browser side is `src/components/artifact-view/canvas/capture`.
   (`data-frame-captures`, `data-frame-capture-passes`) and checks
   `data-frame-capture-left-out`, how many drawings the last pass could not
   make. A drawing that is left out is counted by its reason
-  (`LeftOutReason`) and named in one `console.debug` line when the pass
-  ends, with counts only: the host never logs an error, and never names a
+  (`LeftOutReason`), and so is a picture that is left blank
+  (`PictureProblem`); both are named in one `console.debug` line when the
+  pass ends (`passDebugLine`), with counts only: the host never logs an error, and never names a
   frame, a spec, or a file.
   `e2e/frame-captures-db.spec.ts` runs the real path from both mount points
   (the /app editor and the artifact page) and checks that the server accepts

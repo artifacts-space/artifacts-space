@@ -209,8 +209,37 @@ export function leftOutTotal(counts: LeftOutCounts): number {
 }
 
 /** The counts as words for one debug line: "too-large 2, error 1". No frame, spec, or file is named. */
-export function leftOutWords(counts: LeftOutCounts): string {
+export function leftOutWords(counts: LeftOutCounts | BlankPictureCounts): string {
   return Object.entries(counts).map(([reason, count]) => `${reason} ${String(count)}`).join(", ");
+}
+
+/**
+ * Why a picture a frame shows was left blank, which makes its capture
+ * partial: the file route did not answer ok, the picture came empty, it is
+ * larger than the host inlines, it did not arrive in time, the browser could
+ * not read it into a data URL, or the request failed.
+ */
+export type PictureProblem = "status" | "empty" | "too-large" | "timeout" | "unreadable" | "network";
+
+/** How many pictures a pass left blank, by reason. Each picture counts once in a pass, however many frames show it. */
+export type BlankPictureCounts = Partial<Record<PictureProblem, number>>;
+
+/** Counts one more picture left blank for each of `problems`. */
+export function countBlankPictures(counts: BlankPictureCounts, problems: readonly PictureProblem[]): BlankPictureCounts {
+  return problems.reduce<BlankPictureCounts>((sum, problem) => ({ ...sum, [problem]: (sum[problem] ?? 0) + 1 }), counts);
+}
+
+/**
+ * The one debug line a pass writes when it ends, or null when everything
+ * came out whole: what it left out and what it left blank, as counts and
+ * reasons only. It never names a frame, a spec, or a file.
+ */
+export function passDebugLine(leftOut: LeftOutCounts, blankPictures: BlankPictureCounts): string | null {
+  const said = [
+    Object.keys(leftOut).length > 0 ? `frame images left out: ${leftOutWords(leftOut)}` : null,
+    Object.keys(blankPictures).length > 0 ? `pictures left blank: ${leftOutWords(blankPictures)}` : null,
+  ].filter((words) => words !== null);
+  return said.length > 0 ? `[captures] In this pass, ${said.join("; ")}.` : null;
 }
 
 /** How long the host waits for one picture a frame shows. After it, the picture is left blank and the capture is partial. */

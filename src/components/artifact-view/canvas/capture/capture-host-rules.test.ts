@@ -5,12 +5,14 @@ import { captureLimits } from "@/lib/canvas/capture-rules";
 import {
   asksAgain,
   attemptKey,
+  countBlankPictures,
   countLeftOut,
   encodeQualities,
   encodeWithin,
   leftOutTotal,
   leftOutWords,
   maxBatchesPerPass,
+  passDebugLine,
   mayDraw,
   minDrawingWindowWidth,
   ownSaveWaits,
@@ -241,6 +243,18 @@ describe("left-out counts", () => {
     expect(counts).toEqual({ "too-large": 2, error: 1 });
     expect(leftOutTotal(counts)).toBe(3);
     expect(leftOutTotal({})).toBe(0);
+  });
+
+  it("should count blank pictures by reason", () => {
+    expect(countBlankPictures(countBlankPictures({}, ["timeout", "status"]), ["timeout"])).toEqual({ timeout: 2, status: 1 });
+    expect(countBlankPictures({}, [])).toEqual({});
+  });
+
+  it("should write one line for what a pass left out and left blank, and none when all came out whole", () => {
+    expect(passDebugLine({}, {})).toBeNull();
+    expect(passDebugLine({ "too-large": 1 }, {})).toBe("[captures] In this pass, frame images left out: too-large 1.");
+    expect(passDebugLine({}, { timeout: 2 })).toBe("[captures] In this pass, pictures left blank: timeout 2.");
+    expect(passDebugLine({ error: 1 }, { status: 3 })).toBe("[captures] In this pass, frame images left out: error 1; pictures left blank: status 3.");
   });
 
   it("should word the counts with reasons and numbers only", () => {

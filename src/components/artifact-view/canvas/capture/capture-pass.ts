@@ -6,7 +6,7 @@ import { themeFontAssets } from "@/lib/themes/style";
 import type { CaptureApi } from "./capture-api";
 import type { BoxElements, BoxJob } from "./capture-box";
 import { drawParts, type DrawnParts } from "./capture-draw";
-import { asksAgain, attemptKey, countLeftOut, leftOutTotal, leftOutWords, picturesInSpec, planDrawing, untriedDrawings, type DrawingPlan, type FrameDrawing, type LeftOutCounts, type LeftOutReason } from "./capture-host-rules";
+import { asksAgain, attemptKey, countBlankPictures, countLeftOut, passDebugLine, picturesInSpec, planDrawing, untriedDrawings, type BlankPictureCounts, type DrawingPlan, type FrameDrawing, type LeftOutCounts, type LeftOutReason } from "./capture-host-rules";
 import { loadPictures, type FramePictures, type PictureCache } from "./capture-pictures";
 import { nextFrame, waitUntilReady } from "./capture-ready";
 
@@ -41,6 +41,8 @@ type Outcome = "done" | "skip" | "stop" | LeftOutReason;
 export interface PassSummary {
   /** How many drawings it left out for the next pass, by reason. */
   leftOut: LeftOutCounts;
+  /** How many pictures it left blank, by reason. Their captures are partial. */
+  blankPictures: BlankPictureCounts;
 }
 
 let boxCount = 0;
@@ -87,9 +89,18 @@ async function drawAndSend(env: PassEnv, job: BoxJob, drawing: CaptureDrawing, p
   return startAndSend(env, drawing, plan, picturesFailed || ready.pictureFailed || !ready.settled, drawn);
 }
 
-async function captureOne(env: PassEnv, board: Extract<CapturesNeeded, { state: "draw" }>, item: FrameDrawing<NeededFrame>, files: ReadonlyMap<string, FileDto>, cache: PictureCache): Promise<Outcome> {
+/** What a pass remembers as it goes. */
+interface PassMemory {
+  tried: Set<string>;
+  cache: PictureCache;
+  leftOut: LeftOutCounts;
+  blankPictures: BlankPictureCounts;
+}
+
+async function captureOne(env: PassEnv, board: Extract<CapturesNeeded, { state: "draw" }>, item: FrameDrawing<NeededFrame>, files: ReadonlyMap<string, FileDto>, memory: PassMemory): Promise<Outcome> {
   try {
-    const pictures = await loadPictures(picturesInSpec(item.frame.spec, new Set(files.keys())), files, env.api, cache);
+    const pictures = await loadPictures(picturesInSpec(item.frame.spec, new Set(files.keys())), files, env.api, memory.cache);
+    memory.blankPictures = countBlankPictures(memory.blankPictures, pictures.problems);
     if (!env.mayContinue()) return "stop";
     return await drawAndSend(env, newJob(item.frame, item.drawing, board, pictures), item.drawing, pictures.failed);
   } catch {
@@ -100,13 +111,6 @@ async function captureOne(env: PassEnv, board: Extract<CapturesNeeded, { state: 
   }
 }
 
-/** What a pass remembers as it goes. */
-interface PassMemory {
-  tried: Set<string>;
-  cache: PictureCache;
-  leftOut: LeftOutCounts;
-}
-
 /** Draws every drawing of a batch this pass has not tried. False when the pass must end. */
 async function drawBatch(env: PassEnv, board: Extract<CapturesNeeded, { state: "draw" }>, fresh: readonly FrameDrawing<NeededFrame>[], memory: PassMemory): Promise<boolean> {
   const files = new Map(board.files.map((file) => [file.id, file]));
@@ -114,7 +118,7 @@ async function drawBatch(env: PassEnv, board: Extract<CapturesNeeded, { state: "
     memory.tried.add(attemptKey(item.drawing));
     await env.idle();
     if (!env.mayContinue()) return false;
-    const outcome = await captureOne(env, board, item, files, memory.cache);
+    const outcome = await captureOne(env, board, item, files, memory);
     if (outcome === "stop") return false;
     if (outcome !== "done" && outcome !== "skip") memory.leftOut = countLeftOut(memory.leftOut, outcome);
   }
@@ -133,7 +137,7 @@ async function runBatches(env: PassEnv, memory: PassMemory): Promise<void> {
 
 /** Runs one pass. Resolves when it ends, with what it left out; never rejects. */
 export async function runPass(env: PassEnv): Promise<PassSummary> {
-  const memory: PassMemory = { tried: new Set(), cache: new Map(), leftOut: {} };
+  const memory: PassMemory = { tried: new Set(), cache: new Map(), leftOut: {}, blankPictures: {} };
   try {
     await runBatches(env, memory);
   } catch {
@@ -142,6 +146,7 @@ export async function runPass(env: PassEnv): Promise<PassSummary> {
     env.hide();
   }
   // One quiet line for whoever looks: counts and reasons only, never a frame, a spec, or a file.
-  if (leftOutTotal(memory.leftOut) > 0) console.debug(`[captures] Frame images left out of this pass: ${leftOutWords(memory.leftOut)}.`);
-  return { leftOut: memory.leftOut };
+  const line = passDebugLine(memory.leftOut, memory.blankPictures);
+  if (line) console.debug(line);
+  return { leftOut: memory.leftOut, blankPictures: memory.blankPictures };
 }
