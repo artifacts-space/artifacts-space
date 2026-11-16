@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { openGallery, specimen } from "./support/gallery";
 import { expect, test } from "./support/test";
 
 /*
@@ -32,24 +33,32 @@ async function setInterfaceWidth(scope: Locator, width: number): Promise<void> {
   }, width);
 }
 
-/** Sets the interface's width and returns how many columns `block` (a Grid, or a key-value list) lays out. */
+/**
+ * Sets the interface's width and returns how many columns `block` (a Grid, or a key-value list) lays out.
+ * The block must be laid out: one with no layout (under `display: none`, as the server's HTML is while
+ * it streams in) reports its rule as written, `repeat(4, minmax(0, 1fr))`, which is no count of columns.
+ */
 async function columnsAt(scope: Locator, block: Locator, width: number): Promise<number> {
   await setInterfaceWidth(scope, width);
   return block.evaluate((element) => {
+    if (!element.checkVisibility()) throw new Error("The block has no layout, so its columns cannot be counted.");
     const tracks = getComputedStyle(element).gridTemplateColumns;
     return tracks === "none" ? 0 : tracks.split(" ").length;
   });
 }
 
-const specimen = (scope: Locator, group: string, name: string) => scope.locator(`#${group} [data-specimen="${name}"]`);
+/** Opens the gallery with one specimen, hydrated and laid out, and returns it. */
+async function openSpecimen(page: Page, group: string, name: string): Promise<Locator> {
+  await openGallery(page, [`${group}/${name}`]);
+  return specimen(page, group, name);
+}
 const gridIn = (scope: Locator) => scope.locator("[data-slot=ui-grid]").first();
 
 test.describe("on a wide window", () => {
   test.skip(({ isMobile }) => isMobile, "The window is the narrow part on a phone; these checks need a wide window.");
 
   test("should fit a four-column grid to the interface when the window is wide", async ({ page }) => {
-    await page.goto("/dev/components");
-    const scope = specimen(page.locator("body"), "Grid", "Four columns");
+    const scope = await openSpecimen(page, "Grid", "Four columns");
 
     expect(await columnsAt(scope, gridIn(scope), widths.narrow)).toBe(1);
     expect(await columnsAt(scope, gridIn(scope), widths.pastTwoColumns)).toBe(2);
@@ -57,8 +66,7 @@ test.describe("on a wide window", () => {
   });
 
   test("should fit a three-column grid to the interface when the window is wide", async ({ page }) => {
-    await page.goto("/dev/components");
-    const scope = specimen(page.locator("body"), "Grid", "Three columns");
+    const scope = await openSpecimen(page, "Grid", "Three columns");
 
     expect(await columnsAt(scope, gridIn(scope), widths.narrow)).toBe(1);
     expect(await columnsAt(scope, gridIn(scope), widths.pastTwoColumns)).toBe(2);
@@ -66,8 +74,7 @@ test.describe("on a wide window", () => {
   });
 
   test("should fit a two-column key-value list to the interface when the window is wide", async ({ page }) => {
-    await page.goto("/dev/components");
-    const scope = specimen(page.locator("body"), "KeyValue", "Two columns");
+    const scope = await openSpecimen(page, "KeyValue", "Two columns");
     const list = scope.locator("[data-slot=ui-key-value-list]");
 
     expect(await columnsAt(scope, list, widths.pastTwoColumns)).toBe(1);
@@ -75,8 +82,7 @@ test.describe("on a wide window", () => {
   });
 
   test("should give a card more padding when the interface is wide", async ({ page }) => {
-    await page.goto("/dev/components");
-    const scope = specimen(page.locator("body"), "Card", "Normal");
+    const scope = await openSpecimen(page, "Card", "Normal");
     const card = scope.locator(".card-surface");
 
     await setInterfaceWidth(scope, widths.narrow);
@@ -86,8 +92,7 @@ test.describe("on a wide window", () => {
   });
 
   test("should size a level-1 heading up when the interface is wide", async ({ page }) => {
-    await page.goto("/dev/components");
-    const scope = specimen(page.locator("body"), "Heading", "Levels");
+    const scope = await openSpecimen(page, "Heading", "Levels");
     const heading = scope.getByRole("heading", { level: 1 });
 
     await setInterfaceWidth(scope, widths.narrow);
