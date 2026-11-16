@@ -17,6 +17,7 @@ vi.mock("@/lib/abuse/rate-limit", () => ({
 }));
 
 const { config, proxy } = await import("./proxy");
+const { pageHostPattern } = await import("./lib/security-header-rules");
 
 const origin = "https://artifacts.space";
 const sessionCookie = "better-auth.session_token=token.signature";
@@ -229,12 +230,58 @@ describe("proxy", () => {
   });
 
   it("should run on the landing and sign-in pages only when a session cookie is present", () => {
-    const entries = config.matcher.filter((entry) => typeof entry !== "string");
-    expect(entries.map((entry) => entry.source).sort()).toEqual(["/", "/", "/sign-in", "/sign-in", "/sign-up", "/sign-up"]);
-    for (const entry of entries) {
-      expect(entry.has).toHaveLength(1);
-      expect(["__Secure-better-auth.session_token", "better-auth.session_token"]).toContain(entry.has[0]?.key);
+    const cookies = config.matcher.flatMap((entry) => (typeof entry === "string" ? [] : entry.has.flatMap((condition) => ("key" in condition ? [{ source: entry.source, key: condition.key, conditions: entry.has.length }] : []))));
+    expect(cookies.map((entry) => entry.source).sort()).toEqual(["/", "/", "/sign-in", "/sign-in", "/sign-up", "/sign-up"]);
+    for (const entry of cookies) {
+      expect(entry.conditions).toBe(1);
+      expect(["__Secure-better-auth.session_token", "better-auth.session_token"]).toContain(entry.key);
     }
+  });
+
+  it("should run on every path of a page host, with the same host pattern as the header rules", () => {
+    const hosts = config.matcher.flatMap((entry) => (typeof entry === "string" ? [] : entry.has.flatMap((condition) => ("value" in condition ? [{ source: entry.source, type: condition.type, value: condition.value }] : []))));
+    expect(hosts).toEqual([{ source: "/:path*", type: "host", value: pageHostPattern }]);
+  });
+});
+
+describe("proxy on a page host", () => {
+  const label = "0123456789abcdef0123456789abcdef";
+
+  function onHost(host: string, path: string, method = "GET") {
+    return new NextRequest(new URL(path, `https://${host}`), { method, headers: new Headers({ host }) });
+  }
+
+  beforeEach(() => {
+    vi.stubEnv("PAGE_HOST", "artifacts.link");
+    vi.stubEnv("BETTER_AUTH_URL", origin);
+  });
+
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  it("should answer with the frame document, framed by the site only, when the page host's root is asked for", async () => {
+    const response = await proxy(onHost(`${label}.artifacts.link`, "/"));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-security-policy")).toContain(`frame-ancestors ${origin}`);
+    expect(response.headers.get("x-frame-options")).toBeNull();
+    expect(await response.text()).toContain("artifact-page:ready");
+  });
+
+  it.each(["/app", "/sign-in", "/api/auth/get-session", "/artifact/abc", "/mcp", "/_next/static/chunk.js"])("should answer 404 for %s and never run the site's checks", async (path) => {
+    const response = await proxy(onHost(`${label}.artifacts.link`, path, "GET"));
+    expect(response.status).toBe(404);
+    expect(mocks.getSession).not.toHaveBeenCalled();
+    expect(mocks.checkArtifactPage).not.toHaveBeenCalled();
+  });
+
+  it("should answer 404 for a host that looks like a page host on another domain", async () => {
+    const response = await proxy(onHost(`${label}.example.com`, "/"));
+    expect(response.status).toBe(404);
+  });
+
+  it("should answer 404 on every page host when no page domain is set", async () => {
+    vi.stubEnv("PAGE_HOST", "");
+    const response = await proxy(onHost(`${label}.artifacts.link`, "/"));
+    expect(response.status).toBe(404);
   });
 });
 

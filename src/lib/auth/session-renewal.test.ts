@@ -57,7 +57,7 @@ describe("session renewal through the proxy", () => {
   it("should name Better Auth's real session cookie in the proxy matcher when a person signs in", async () => {
     const { cookie } = await signIn();
     const name = cookie.slice(0, cookie.indexOf("="));
-    const matcherCookies = config.matcher.flatMap((entry) => (typeof entry === "string" ? [] : entry.has.map((condition) => condition.key)));
+    const matcherCookies = config.matcher.flatMap((entry) => (typeof entry === "string" ? [] : entry.has.flatMap((condition) => ("key" in condition ? [condition.key] : []))));
     // The matcher spells out the HTTPS name and the plain one; a renamed cookie would silently skip the redirect.
     expect(matcherCookies).toContain(name);
     expect(matcherCookies).toContain(name.replace(/^__Secure-/, ""));
