@@ -150,6 +150,7 @@ export const featureTemplates: readonly UiTemplate[] = [
       { what: "Checklist points", element: "points", prop: "items" },
       { what: "Main button label", element: "primary", prop: "label" },
       { what: "Second button label", element: "secondary", prop: "label" },
+      { what: "Example web address shown in the browser bar", element: "image", prop: "address" },
       { what: "What the picture shows", element: "image", prop: "label" },
     ],
     fragment: {
@@ -165,7 +166,7 @@ export const featureTemplates: readonly UiTemplate[] = [
         primary: { type: "Button", props: { label: "Try the inbox" } },
         secondary: { type: "Button", props: { label: "Watch a two-minute tour", variant: "ghost", icon: "player-play" } },
         picture: { type: "Box", props: { direction: "vertical", grow: true }, children: ["image"] },
-        image: { type: "Placeholder", props: { label: "Screenshot of the shared inbox", ratio: "photo", frame: "browser" } },
+        image: { type: "Placeholder", props: { label: "Screenshot of the shared inbox", address: "app.example.com/inbox", ratio: "photo", frame: "browser" } },
       },
     },
   },

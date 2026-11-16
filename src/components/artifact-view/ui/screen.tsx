@@ -53,7 +53,7 @@ function StandIn({ props, className }: { props: PlaceholderProps; className: str
   );
 }
 
-/** A browser window drawn around the stand-in: a bar with three dots and an address pill. All of it is decoration. */
+/** A browser window drawn around the stand-in: a bar with three dots and an address pill, which holds the `address` words when there are some. All of it is decoration. */
 function BrowserFrame({ props }: { props: PlaceholderProps }) {
   return (
     <div data-frame="browser" className="w-full min-w-0 overflow-hidden rounded-lg border bg-card shadow-sm">
@@ -61,7 +61,7 @@ function BrowserFrame({ props }: { props: PlaceholderProps }) {
         <span className="size-2 shrink-0 rounded-full bg-muted-foreground/40" />
         <span className="size-2 shrink-0 rounded-full bg-muted-foreground/40" />
         <span className="size-2 shrink-0 rounded-full bg-muted-foreground/40" />
-        <span className="mx-auto h-4 w-3/5 max-w-64 rounded-full bg-background" />
+        <span className={cn("mx-auto w-3/5 max-w-64 truncate rounded-full bg-background px-3 text-center text-xs text-muted-foreground", props.address ? "h-5 leading-5" : "h-4")}>{props.address}</span>
       </div>
       <StandIn props={props} className={cn("w-full", ratioClass[props.ratio ?? "video"])} />
     </div>

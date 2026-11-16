@@ -63,6 +63,7 @@ export const placeholderProps = z.object({
   ratio: aspectRatio.optional(),
   radius: radius.optional(),
   frame: z.enum(["none", "browser", "phone"]).optional(),
+  address: label(60).optional(),
 });
 
 const stepOrder = { sm: 1, md: 2, lg: 3 } as const;
@@ -117,21 +118,32 @@ function scrollProblems(props: Record<string, unknown>): string[] {
 }
 
 const frameFields = placeholderProps.pick({ variant: true, frame: true });
+const addressFields = placeholderProps.pick({ frame: true, address: true });
 
-/**
- * A frame is drawn around a picture-sized stand-in; a logo or an avatar is
- * too small to sit in a window or a phone. Like the Box rules, it says
- * nothing unless both props are valid as written: an expression is only
- * known once it resolves, and an invalid value has its own error.
- */
-export const placeholderCheck: PropCheck = (props) => {
+/** An `address` is the words in a browser window's address bar, so it needs `frame: "browser"`. */
+function addressProblems(props: Record<string, unknown>): string[] {
+  const read = addressFields.safeParse(props);
+  if (!read.success || read.data.address === undefined || read.data.frame === "browser") return [];
+  return ['`address` is drawn in the address bar of a browser frame. Set `frame: "browser"`, or remove `address`.'];
+}
+
+function frameProblems(props: Record<string, unknown>): string[] {
   const read = frameFields.safeParse(props);
   if (!read.success) return [];
   const { variant, frame } = read.data;
   if (frame !== "browser" && frame !== "phone") return [];
   if (variant !== "logo" && variant !== "avatar") return [];
   return [`\`frame\` applies to an image, video, or map Placeholder. Remove \`frame\`, or change \`variant: "${variant}"\`.`];
-};
+}
+
+/**
+ * A frame is drawn around a picture-sized stand-in; a logo or an avatar is
+ * too small to sit in a window or a phone. Like the Box rules, each rule
+ * says nothing unless the props it reads are valid as written: an
+ * expression is only known once it resolves, and an invalid value has its
+ * own error.
+ */
+export const placeholderCheck: PropCheck = (props) => [...frameProblems(props), ...addressProblems(props)];
 
 /** A Box that can never show, or a rule that cannot apply to it, is a mistake worth naming. */
 export const boxCheck: PropCheck = (props) => [...stackProblems(props), ...stackedProblems(props), ...hideProblems(props), ...scrollProblems(props)];
@@ -141,5 +153,5 @@ export const screenDescriptions = {
   Box:
     "A free-layout container for drawing screens. Children stack vertically or sit in a row (`direction`), with `gap`, `padding` (`paddingX` / `paddingY` override one axis), `align` (across the direction), `justify` (along it), `wrap`, `grow` (take the free room in a row), `width`, `maxWidth` (xs 320, sm 384, md 576, lg 768, xl 1024, 2xl 1280 pixels; center it with `align: \"center\"` on the parent) and `minHeight`. `surface` paints it and sets a text color that reads on it: none, page, card, muted, a hue (gray, brown, orange, yellow, green, blue, purple, pink, red), or inverse and primary, which switch everything inside to a contrasting palette and do not nest. `border` (all, top, bottom, start, end, x, y), `radius`, and `shadow` finish it. `overflow`: hidden clips children to the radius; scroll makes a row scroll sideways instead of wrapping (set `label` to name it). Responsive props follow the width of the page column or canvas frame, never the browser window (sm 576, md 672, lg 896 pixels): `stackBelow` turns a row into a column below that width; on such a row, `alignBelow` (start, center, end, stretch) is the `align` to use once it has stacked, so `align: \"center\"` on the row does not shrink each stacked child to its content, and `reverseBelow` draws the stacked children in reverse order (words above a picture that sits first in the row; keyboard and reading order stay as written, so do not use it across buttons, links, or fields). `hideBelow` and `hideAbove` hide the Box. `label` names it for screen readers.",
   Icon: `An icon by name, in the text color. \`size\`: xs to xl. \`tone\`: default, muted, a status tone, or accent (the theme's accent, or blue on the default palette). Decorative unless \`label\` is set. Names: ${plainUiIconNames.join(", ")}. Brand marks, outline only and in the text color, for social links and sign-in buttons (an icon-only Button or Link with one needs a \`label\` naming the network, such as "GitHub"): ${brandUiIconNames.join(", ")}.`,
-  Placeholder: "A neutral stand-in so a mockup needs no upload. `variant`: image (default), video, or map fill the width at `ratio` (square, photo 4:3, video 16:9, wide 21:9, portrait 3:4); logo is a small wordmark box; avatar is a small circle. `label` says what goes there. `frame`: browser or phone draws a plain window or phone around an image, video, or map stand-in, for a product shot; the frame is decoration with no working controls.",
+  Placeholder: "A neutral stand-in so a mockup needs no upload. `variant`: image (default), video, or map fill the width at `ratio` (square, photo 4:3, video 16:9, wide 21:9, portrait 3:4); logo is a small wordmark box; avatar is a small circle. `label` says what goes there. `frame`: browser or phone draws a plain window or phone around an image, video, or map stand-in, for a product shot; the frame is decoration with no working controls. `address` (up to 60 characters) is the example web address written in a browser frame's address bar; the bar is decoration, hidden from screen readers, so put what matters in `label`, which still names the picture.",
 } as const;

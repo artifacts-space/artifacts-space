@@ -51,6 +51,7 @@ export const heroTemplates: readonly UiTemplate[] = [
       { what: "Second button label", element: "secondary", prop: "label" },
       { what: "Customers shown as small avatars, each with a name", state: "/people" },
       { what: "Proof sentence beside the avatars", element: "proof-text", prop: "text" },
+      { what: "Example web address shown in the browser bar", element: "image", prop: "address" },
       { what: "What the picture shows", element: "image", prop: "label" },
     ],
     fragment: {
@@ -72,7 +73,7 @@ export const heroTemplates: readonly UiTemplate[] = [
         face: { type: "Avatar", props: { name: { $item: "name" }, size: "sm" } },
         "proof-text": { type: "Text", props: { text: "Trusted by 2,400 clinics in 12 countries.", size: "sm", tone: "muted" } },
         media: { type: "Box", props: { grow: true }, children: ["image"] },
-        image: { type: "Placeholder", props: { label: "Calendar screenshot", ratio: "photo", frame: "browser" } },
+        image: { type: "Placeholder", props: { label: "Calendar screenshot", address: "app.example.com/calendar", ratio: "photo", frame: "browser" } },
       },
     },
   },
@@ -123,6 +124,7 @@ export const heroTemplates: readonly UiTemplate[] = [
       { what: "Supporting sentence", element: "text", prop: "text" },
       { what: "Main button label", element: "primary", prop: "label" },
       { what: "Second button label", element: "secondary", prop: "label" },
+      { what: "Example web address shown in the browser bar", element: "shot", prop: "address" },
       { what: "What the product picture shows", element: "shot", prop: "label" },
     ],
     fragment: {
@@ -137,7 +139,7 @@ export const heroTemplates: readonly UiTemplate[] = [
         primary: { type: "Button", props: { label: "Try it free", size: "lg" } },
         secondary: { type: "Button", props: { label: "Book a walkthrough", variant: "outline", size: "lg" } },
         frame: { type: "Box", props: { direction: "vertical", maxWidth: "xl" }, children: ["shot"] },
-        shot: { type: "Placeholder", props: { label: "Stock overview screenshot", ratio: "video", frame: "browser" } },
+        shot: { type: "Placeholder", props: { label: "Stock overview screenshot", address: "app.example.com/stock", ratio: "video", frame: "browser" } },
       },
     },
   },
