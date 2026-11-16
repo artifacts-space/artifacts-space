@@ -120,5 +120,5 @@ export function useNewArtifact({ setArtifacts, setSelectedId, clearFilters }: Ne
   /** Full artifacts already in hand for the artifact pane: the page's own, plus those the blank pages became. */
   const withStored = useCallback((initial: readonly ArtifactDto[] | undefined) => withStoredArtifacts(initial, stored), [stored]);
 
-  return { session, withStored, start, saved, select, leave, refresh, deleted };
+  return { session, stored, withStored, start, saved, select, leave, refresh, deleted };
 }

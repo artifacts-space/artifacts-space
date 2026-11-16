@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { loadArtifactAction } from "@/app/(workspace)/app/actions";
 import type { ActionResult, ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
 
-import { byId, seedKey, withMissing } from "./full-artifact-rules";
+import { byId, ownSavesKey, seedKey, withMissing, withOwnSaves } from "./full-artifact-rules";
 
 /** Loads one artifact in full by its public id: the server action on /app, a stand-in in the /dev/workspace fixture. */
 export type ArtifactLoader = (publicId: string) => Promise<ActionResult<ArtifactDto>>;
@@ -13,15 +13,23 @@ const loadFailed = "The artifact could not be loaded. Check your connection and 
 /**
  * The artifacts held so far, seeded from `initial` and taking new ones when
  * `initial` brings new ids. Compared by ids (seedKey), not by array
- * identity, so a new array with the same artifacts changes nothing.
+ * identity, so a new array with the same artifacts changes nothing. A held
+ * artifact takes only this tab's own later saves (`ownSaves`, see
+ * withOwnSaves), never a later copy from the seed.
  */
-function useLoaded(initial: readonly ArtifactDto[] | undefined) {
+function useLoaded(initial: readonly ArtifactDto[] | undefined, ownSaves: readonly ArtifactDto[]) {
   const [loaded, setLoaded] = useState(() => byId(initial));
   const key = seedKey(initial);
   const [seenKey, setSeenKey] = useState(key);
   if (key !== seenKey) {
     setSeenKey(key);
     if (initial) setLoaded((current) => withMissing(current, initial));
+  }
+  const savesKey = ownSavesKey(ownSaves);
+  const [seenSavesKey, setSeenSavesKey] = useState(savesKey);
+  if (savesKey !== seenSavesKey) {
+    setSeenSavesKey(savesKey);
+    setLoaded((current) => withOwnSaves(current, ownSaves));
   }
   const add = useCallback((artifact: ArtifactDto) => {
     setLoaded((current) => new Map(current).set(artifact.id, artifact));
@@ -69,8 +77,8 @@ function useLoadSelected({ selectedId, selectedPublicId, isLoaded, attempt, load
  * artifact outside the list, loaded by the server for that link). `load`
  * fetches the rest; it is the server action unless a fixture hands its own.
  */
-export function useFullArtifact(selected: ArtifactListItemDto | null, initial?: readonly ArtifactDto[], load?: ArtifactLoader) {
-  const { loaded, add } = useLoaded(initial);
+export function useFullArtifact(selected: ArtifactListItemDto | null, initial: readonly ArtifactDto[] | undefined, load: ArtifactLoader | undefined, ownSaves: readonly ArtifactDto[]) {
+  const { loaded, add } = useLoaded(initial, ownSaves);
   const [failure, setFailure] = useState<{ id: string; message: string } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const selectedId = selected?.id ?? null;

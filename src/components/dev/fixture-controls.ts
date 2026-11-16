@@ -58,12 +58,13 @@ export function createFixtureStore(held: ReadonlySet<string> = new Set(), seed: 
 /**
  * Wires the fixture's controls onto `window.fixture`: a refresh, the held
  * loads, and a count of the links handled. Returns the loader to hand the
- * workspace (only with `slowLoad`; it holds the artifacts in `held`) and the
- * callback that counts links.
+ * workspace (with `slowLoad` it holds the artifacts in `held`; Back to an
+ * artifact outside the list loads through it too) and the callback that
+ * counts links.
  */
 export function useFixtureControls(slowLoad: boolean, artifacts: readonly ArtifactDto[], held: ReadonlySet<string>) {
   const router = useRouter();
-  const [store] = useState(() => createFixtureStore(held, artifacts));
+  const [store] = useState(() => createFixtureStore(slowLoad ? held : new Set(), artifacts));
   // Later changes (an artifact moved to another project) reach the store here.
   useEffect(() => { store.setArtifacts(artifacts); }, [store, artifacts]);
   useEffect(() => {
@@ -75,5 +76,5 @@ export function useFixtureControls(slowLoad: boolean, artifacts: readonly Artifa
     };
     return () => { delete window.fixture; };
   }, [router, store]);
-  return { loadArtifact: slowLoad ? store.load : undefined, onLinkHandled: store.countLink };
+  return { loadArtifact: store.load, onLinkHandled: store.countLink };
 }

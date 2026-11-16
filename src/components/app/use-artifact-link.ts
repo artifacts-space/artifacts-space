@@ -1,11 +1,17 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type RefObject } from "react";
 
-import { parseArtifactLinkSearch, withoutArtifactLink, withoutCommentHash, type ArtifactLink } from "@/lib/app-link";
-import { linkedStart, linkNotice, openArtifactLink } from "@/lib/app-link-rules";
-import type { ArtifactListItemDto } from "@/lib/artifact-types";
+import { loadArtifactAction } from "@/app/(workspace)/app/actions";
+import { parseArtifactLinkSearch, withoutCommentHash, type ArtifactLink } from "@/lib/app-link";
+import { linkedStart, linkNotice } from "@/lib/app-link-rules";
+import { toArtifactListItem } from "@/lib/artifact-preview";
+import type { ActionResult, ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
+import { addressStep, namedArtifact, searchNaming, type PendingIntent } from "@/lib/workspace-url-rules";
+
+import type { ArtifactLoader } from "./use-full-artifact";
+import { writeUrl, type UrlSync } from "./use-selection-url";
 
 /** Phones (below md) scroll the page, and the list sits above the artifact there. */
 const phoneLayout = "(width < 48rem)";
@@ -33,19 +39,10 @@ interface ArtifactLinkOptions {
   failed?: boolean | undefined;
   /** Called each time a link in the address bar is acted on. */
   onHandled?: (() => void) | undefined;
+  /** Loads an artifact Back or Forward names that the list does not hold: the server action, or a fixture's stand-in. */
+  loadArtifact?: ArtifactLoader | undefined;
   list: RefObject<HTMLElement | null>;
   detail: RefObject<HTMLElement | null>;
-}
-
-/** The current URL without the link (and an old link's `#comment-<id>`): the address bar is the record of what is handled, so a link still there has not been acted on. */
-function cleanLocation(): string {
-  const { pathname, search, hash } = window.location;
-  return `${pathname}${withoutArtifactLink(search)}${withoutCommentHash(hash)}`;
-}
-
-/** The link in the address bar, with the comment an old thread link names in its fragment (the server never sees it). */
-function linkInLocation(): ArtifactLink | null {
-  return parseArtifactLinkSearch(new URLSearchParams(window.location.search), window.location.hash);
 }
 
 /**
@@ -58,25 +55,50 @@ function firstLink(params: URLSearchParams): ArtifactLink | null {
   return typeof window === "undefined" ? parseArtifactLinkSearch(params) : parseArtifactLinkSearch(params, window.location.hash);
 }
 
+/** Replaces the address bar's query string with `search` when it (or an old link's `#comment-<id>`) differs; returns the query string shown. */
+function settleUrl(search: string): string {
+  const { search: now, hash } = window.location;
+  if (search === now && withoutCommentHash(hash) === hash) return now;
+  return writeUrl({ mode: "replace", search });
+}
+
+/** The list with `item` first, and no other copy of it. */
+function pinned(artifacts: ArtifactListItemDto[], item: ArtifactListItemDto): ArtifactListItemDto[] {
+  return [item, ...artifacts.filter((artifact) => artifact.id !== item.id)];
+}
+
 /**
- * The workspace's list and selection, driven by links as well as clicks.
+ * The workspace's list and selection, driven by the address bar as well as
+ * clicks. The address bar names the open artifact (`?artifact=<id>`), so it
+ * can be copied, bookmarked, reloaded, and walked with Back and Forward.
  *
- * A link arrives when the address bar holds one (`?artifact=<id>`): on the
- * first load, and after each navigation to it while the workspace is open,
- * even to the same link twice, since the link leaves the address bar as soon
- * as it is acted on. The address bar, not the router's state or the page's
- * props, decides: Next can keep showing a link it has not caught up on, hand
- * a repeated navigation the same props, and restore an earlier page's props
- * on Back.
- *
- * Each link selects its artifact (pinning it to the top when it is not in
+ * A link arrives when the address bar names an artifact the workspace did
+ * not put there: on the first load, and after each navigation to a link
+ * while the workspace is open (a notification, say), even to the same link
+ * twice. It selects its artifact (pinning it to the top when it is not in
  * the list) without remounting the workspace, so search, filters, and panel
- * sizes stay. A link to an artifact that is gone sets `notice` to "gone", or
- * to "failed" when the server could not check it. `opened` is the last link
- * that opened its artifact, for its comments.
+ * sizes stay. Its `comments=1` and `comment=<id>` act once: they leave the
+ * address bar with a replace, and `artifact=` stays. A link to an artifact
+ * that is gone sets `notice` to "gone", or to "failed" when the server could
+ * not check it, and the address bar goes back to what it named before.
+ *
+ * Back and Forward open the artifact the entry names the same way, adding no
+ * entry: from the list, else the server's answer, else loaded through the
+ * access check, else the notice. Plain /app opens what it showed before.
+ * Links and Back are told apart by nothing but the URL (an entry Back
+ * reaches never holds comment params), since React can draw Next's
+ * traversal before the browser's `popstate` reaches any listener of ours.
+ * The entry listener only catches a new entry (a link, Back) that Next drew
+ * in the same pass as the workspace's own writes before it, which leaves
+ * the search unchanged.
+ * `opened` is the last artifact a link or Back opened, for its comments and
+ * to bring it into view.
+ *
+ * `pick` is for the person's own choice (it pushes a history entry, through
+ * `useSelectionInUrl`), and `afterDelete` for the selection that follows a
+ * delete, with nothing chosen (plain /app, replaced).
  */
-export function useArtifactLink({ initialArtifacts, target = null, failed = false, onHandled, list, detail }: ArtifactLinkOptions) {
-  const router = useRouter();
+export function useArtifactLink({ initialArtifacts, target = null, failed = false, onHandled, loadArtifact = loadArtifactAction, list, detail }: ArtifactLinkOptions) {
   const params = useSearchParams();
   const search = params.toString();
   const [start] = useState(() => linkedStart(initialArtifacts, firstLink(params), target));
@@ -84,37 +106,142 @@ export function useArtifactLink({ initialArtifacts, target = null, failed = fals
   const [selectedId, setSelectedId] = useState(start.selectedId);
   const [notice, setNotice] = useState(() => linkNotice(start.unavailable, failed));
   const [opened, setOpened] = useState(start.opened);
-  // The first load's link is already in the state above; it only needs forgetting.
-  const startLink = useRef(parseArtifactLinkSearch(params) !== null);
+  /** Artifacts the address bar's changes loaded in full, so the pane opens them without loading them again. */
+  const [held, setHeld] = useState<readonly ArtifactDto[]>([]);
+  const written = useRef<string | null>(null);
+  const intent = useRef<PendingIntent>(null);
+  /** Artifacts deleted in this visit, so Back to one says it is gone instead of opening an older answer of the server. */
+  const deleted = useRef<Set<string>>(new Set());
+  /** The artifact plain /app shows, chosen implicitly: the first load's when it named none. */
+  const plainShown = useRef(start.opened ? null : (start.artifacts.find((artifact) => artifact.id === start.selectedId)?.publicId ?? null));
+  const urlSync = useMemo<UrlSync>(() => ({
+    takeIntent: () => {
+      const current = intent.current;
+      intent.current = null;
+      return current;
+    },
+    wrote: (search) => { written.current = search; },
+    showsPlain: (publicId) => { plainShown.current = publicId; },
+  }), []);
 
-  const arrive = useEffectEvent((link: ArtifactLink) => {
-    const outcome = openArtifactLink(artifacts, link, target);
-    setNotice(linkNotice(outcome.kind === "unavailable", failed));
-    if (outcome.kind === "open") {
-      setArtifacts(outcome.artifacts);
-      setSelectedId(outcome.selectedId);
+  /** Opens what a load found for the address bar, unless the person has moved on; else says so and names what is open again. */
+  const landLoaded = (result: ActionResult<ArtifactDto> | null, link: ArtifactLink, entry: string, previous: string) => {
+    if (window.location.search !== entry) return;
+    if (result?.success) {
+      const full = result.data;
+      setHeld((current) => [...current.filter((artifact) => artifact.id !== full.id), full]);
+      setArtifacts((current) => pinned(current, toArtifactListItem(full)));
+      setSelectedId(full.id);
       setOpened(link);
+      setNotice(null);
+      written.current = settleUrl(searchNaming(entry, full.publicId));
+      return;
     }
-  });
-  // Drops the link from the address bar at once, and from the router's own URL with a replace, so a reload,
-  // Back, or a refresh after a save never hands it back. Next's own state keeps Next's router out of the first step.
-  const forget = useEffectEvent(() => {
-    const clean = cleanLocation();
-    window.history.replaceState(window.history.state, "", clean);
-    router.replace(clean, { scroll: false });
+    setNotice(result ? "gone" : "failed");
+    written.current = settleUrl(searchNaming(entry, namedArtifact(previous)));
+  };
+
+  /**
+   * A change of the address bar the workspace did not write (a link, Back, Forward): opens what it names, adding no
+   * entry, and drops a link's one-shot params. What cannot be opened shows the notice, and the address bar goes back
+   * to what it named before.
+   */
+  const follow = useEffectEvent((now: string) => {
+    const previous = written.current ?? "";
+    written.current = now;
+    intent.current = null;
+    const link = parseArtifactLinkSearch(new URLSearchParams(now), window.location.hash);
     onHandled?.();
+    const step = addressStep({ artifacts, link, target, failed, plainShown: plainShown.current, deleted: deleted.current });
+    if (step.kind === "open") {
+      setNotice(null);
+      setArtifacts(step.artifacts);
+      setSelectedId(step.selectedId);
+      setOpened(link ?? { publicId: step.publicId, comments: false });
+      written.current = settleUrl(searchNaming(now, link ? step.publicId : null));
+      return;
+    }
+    if (step.kind === "failed") {
+      setNotice("failed");
+      written.current = settleUrl(searchNaming(now, namedArtifact(previous)));
+    }
+    if (step.kind !== "load" || !link) return;
+    loadArtifact(step.publicId)
+      .then((result) => { landLoaded(result, link, now, previous); })
+      .catch(() => { landLoaded(null, link, now, previous); });
   });
 
-  // Runs after each navigation commits: the search or the server's answer for it changes.
+  /**
+   * The first load: its link is already in the state above; only its one-shot params need dropping. When the
+   * address bar has already moved on from what the page was drawn for (Back pressed into an entry this page did
+   * not write, before the workspace was ready), it opens what the address bar names, as Back does.
+   */
+  const settleFirst = useEffectEvent(() => {
+    // Until the write below lands, the address bar still holds the link: noted as ours, so a second run of this
+    // effect (React runs it twice in development) does not take it for a new link.
+    const now = window.location.search;
+    if (namedArtifact(now) !== namedArtifact(search)) {
+      written.current = search ? `?${search}` : "";
+      follow(now);
+      return;
+    }
+    written.current = now;
+    if (!parseArtifactLinkSearch(new URLSearchParams(now))) return;
+    const next = searchNaming(now, start.opened?.publicId ?? null);
+    onHandled?.();
+    // The first commit's effects can run before Next's router takes over the history API, and Next would then put
+    // the old URL back on its next update. A microtask runs after all of them, so Next follows this write.
+    queueMicrotask(() => { written.current = settleUrl(next); });
+  });
+
+  // Runs after each navigation commits (the search, or the server's answer for it, changes) and after each write of ours.
   useEffect(() => {
-    const link = linkInLocation();
-    if (!link) return;
-    if (startLink.current) startLink.current = false;
-    else arrive(link);
-    forget();
+    if (written.current === null) {
+      settleFirst();
+      return;
+    }
+    const now = window.location.search;
+    if (now !== written.current) follow(now);
   }, [search, target, failed]);
+
+  // Next can draw the workspace's own writes late, in one pass with the next entry: a link chosen again (the same
+  // notification twice) or Back right after a pick. The search React sees then never changes and the effect above
+  // never runs, so each new entry (a push or a traversal, never a replace) is checked here once it has had its turn.
+  const settleEntry = useEffectEvent(() => {
+    const now = window.location.search;
+    if (written.current !== null && now !== written.current) follow(now);
+  });
+  useEffect(() => {
+    let pending: ReturnType<typeof setTimeout> | undefined;
+    const settle = () => {
+      clearTimeout(pending);
+      pending = setTimeout(settleEntry, 0);
+    };
+    const onEntry = (event: NavigationCurrentEntryChangeEvent) => {
+      if (event.navigationType === "push" || event.navigationType === "traverse") settle();
+    };
+    // Browsers without the Navigation API still report Back and Forward.
+    const navigation = "navigation" in window ? window.navigation : null;
+    navigation?.addEventListener("currententrychange", onEntry);
+    window.addEventListener("popstate", settle);
+    return () => {
+      clearTimeout(pending);
+      navigation?.removeEventListener("currententrychange", onEntry);
+      window.removeEventListener("popstate", settle);
+    };
+  }, []);
 
   useRevealOpened(opened, list, detail);
 
-  return { artifacts, setArtifacts, selectedId, setSelectedId, notice, dismissNotice: () => { setNotice(null); }, opened };
+  const pick = useCallback((id: string) => {
+    intent.current = { mode: "push", id };
+    setSelectedId(id);
+  }, []);
+  const afterDelete = useCallback((removedId: string, nextId: string) => {
+    deleted.current.add(removedId);
+    intent.current = { mode: "clear" };
+    setSelectedId(nextId);
+  }, []);
+
+  return { artifacts, setArtifacts, selectedId, pick, afterDelete, notice, dismissNotice: () => { setNotice(null); }, opened, held, urlSync };
 }

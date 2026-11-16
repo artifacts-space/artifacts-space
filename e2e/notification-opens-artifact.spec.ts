@@ -46,7 +46,7 @@ test("should open the artifact and then its comments when a comment notification
 
   await chooseNotification(page, "mentioned you on Long markdown fixture");
   await expect(commentsHeading(page, "Long markdown fixture")).toBeVisible();
-  await expect(page).toHaveURL(/\/dev\/workspace$/);
+  await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspace000md$/);
   await page.keyboard.press("Escape");
   await expect(commentsHeading(page, "Long markdown fixture")).toHaveCount(0);
 
@@ -68,6 +68,28 @@ test("should open the same artifact again when the same notification is chosen t
   await page.keyboard.press("Escape");
   await expect(selectedCard(page)).toContainText("Long markdown fixture");
   await expect(editor(page, "Long markdown fixture")).toBeVisible();
+});
+
+test("should open the comments again when the same notification is chosen twice on a slow CPU", async ({ page }) => {
+  // A slow CPU makes Next draw the workspace's own address writes late, in one pass with the second link, whose
+  // address then equals the first link's: nothing React sees changes, and only the new history entry says so.
+  test.slow();
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
+  const drawn = { timeout: 15_000 };
+  await page.goto("/dev/workspace");
+  await chooseNotification(page, "mentioned you on Long markdown fixture");
+  await expect(commentsHeading(page, "Long markdown fixture")).toBeVisible(drawn);
+  await page.keyboard.press("Escape");
+  await page.locator('[data-slot="artifact-list"]').getByRole("button", { name: /Long ui fixture/ }).click();
+  await expect(editor(page, "Long ui fixture")).toBeVisible(drawn);
+
+  await chooseNotification(page, "mentioned you on Long markdown fixture");
+  await expect(commentsHeading(page, "Long markdown fixture")).toBeVisible(drawn);
+  await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspace000md$/, drawn);
+  await page.keyboard.press("Escape");
+  await expect(selectedCard(page)).toContainText("Long markdown fixture");
+  expect(await linksHandled(page), "each link is acted on once").toBe(2);
 });
 
 test("should pin an artifact outside the list to the top of its group and open it when its notification is chosen", async ({ page }) => {
@@ -132,46 +154,48 @@ test("should not jump back to the linked artifact when the page refreshes after 
   await page.locator('[data-slot="artifact-list"]').getByRole("button", { name: /Long ui fixture/ }).click();
   await expect(editor(page, "Long ui fixture")).toBeVisible();
 
-  // A save on /app revalidates the page, and the router refreshes its own URL: that URL must have lost the link too.
+  // A save on /app revalidates the page, and the router refreshes its own URL: that URL names the open artifact, and the link's comments are gone.
   // Only the refresh itself: an RSC request for this page that is not a prefetch of a bell row's link.
   const refreshed = page.waitForResponse((response) => isPageRequest(response.request()));
   await refreshPage(page);
-  expect((await refreshed).url()).not.toContain("artifact=");
+  const refreshedUrl = new URL((await refreshed).url());
+  expect(refreshedUrl.searchParams.get("artifact")).toBe("fixtureworkspace0000ui");
+  expect(refreshedUrl.searchParams.has("comments")).toBe(false);
   await expect(selectedCard(page)).toContainText("Long ui fixture");
   await expect(commentsHeading(page, "Long markdown fixture")).toHaveCount(0);
-  await expect(page).toHaveURL(/\/dev\/workspace$/);
+  await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspace0000ui$/);
 });
 
-test("should not reopen an earlier link when the person goes back or reloads", async ({ page }) => {
+test("should open the earlier artifact without its comments when the person goes back, and keep it on reload", async ({ page }) => {
   await page.goto("/dev/workspace?artifact=fixtureworkspacenote01&comments=1");
   await expect(commentsHeading(page, "Note 2")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect.poll(() => linksHandled(page)).toBe(1);
+  await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspacenote01$/);
 
-  // The link's own cleanup ends with a replace that loads the page without the link; let it finish first.
-  const replaced = page.waitForResponse((response) => isPageRequest(response.request()) && !response.url().includes("artifact="));
   await chooseNotification(page, "approved your changes to Long markdown fixture");
   await expect(selectedCard(page)).toContainText("Long markdown fixture");
   await expect.poll(() => linksHandled(page)).toBe(2);
-  await replaced;
+  await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspace000md$/);
 
   const requests: string[] = [];
   page.on("request", (request) => { if (isPageRequest(request)) requests.push(request.url()); });
   await page.goBack();
+  await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspacenote01$/);
+  await expect(editor(page, "Note 2")).toBeVisible();
+  await expect(selectedCard(page)).toContainText("Note 2");
   // A refresh is the sync point: whatever Back set off has run by the time its answer is drawn.
   const refreshed = page.waitForResponse((response) => isPageRequest(response.request()));
   await refreshPage(page);
   await refreshed;
-  await expect(selectedCard(page)).toContainText("Long markdown fixture");
-  expect(await linksHandled(page)).toBe(2);
+  await expect(editor(page, "Note 2")).toBeVisible();
+  // Back is acted on like a link, but its entry names only the artifact: the comments the first link opened stay closed.
+  expect(await linksHandled(page)).toBe(3);
   await expect(commentsHeading(page, "Note 2")).toHaveCount(0);
-  // No request after Back asked for the link again. Back itself may fetch the page when Next no longer holds that
-  // entry's content (seen in CI), so the count is not fixed: the refresh is there, and none of them carries the link.
-  expect(requests.length).toBeGreaterThan(0);
-  expect(requests.filter((url) => url.includes("artifact="))).toEqual([]);
+  expect(requests.filter((url) => new URL(url).searchParams.has("comments"))).toEqual([]);
 
   await page.reload();
-  await expect(editor(page, "Long ui fixture")).toBeVisible();
+  await expect(editor(page, "Note 2")).toBeVisible();
   await expect(commentsHeading(page, "Note 2")).toHaveCount(0);
 });
 
@@ -202,7 +226,7 @@ test("should open the comments once the artifact has loaded when the page itself
   await expect(commentsHeading(page, "Long markdown fixture")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(editor(page, "Long markdown fixture")).toBeVisible();
-  await expect(page).toHaveURL(/\/dev\/workspace\?slowload=1$/);
+  await expect(page).toHaveURL(/\/dev\/workspace\?slowload=1&artifact=fixtureworkspace000md$/);
 });
 
 test("should never open the comments later when the person picks another artifact while the linked one loads", async ({ page }) => {

@@ -66,16 +66,6 @@ export function artifactLinkHref(link: ArtifactLink): string {
   return link.comments ? `${base}&comments=1` : base;
 }
 
-/** The search string with the artifact link removed, so a reload or a later pick does not jump back. */
-export function withoutArtifactLink(search: string): string {
-  const params = new URLSearchParams(search);
-  params.delete("artifact");
-  params.delete("comments");
-  params.delete("comment");
-  const rest = params.toString();
-  return rest ? `?${rest}` : "";
-}
-
 /** The fragment without a link's `#comment-<id>`, which only the link needed; any other fragment stays. */
 export function withoutCommentHash(hash: string): string {
   return commentHashPattern.test(hash) ? "" : hash;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { artifactLinkHref, commentIdFromHash, parseArtifactLink, parseArtifactLinkSearch, withoutArtifactLink, withoutCommentHash } from "./app-link";
+import { artifactLinkHref, commentIdFromHash, parseArtifactLink, parseArtifactLinkSearch, withoutCommentHash } from "./app-link";
 
 describe("parseArtifactLink", () => {
   it("should read the artifact and the comments flag when both are set", () => {
@@ -37,14 +37,6 @@ describe("artifactLinkHref", () => {
 
   it("should name the comment when the link opens one", () => {
     expect(artifactLinkHref({ publicId: "abc", comments: true, commentId: "c-1" })).toBe("/app?artifact=abc&comment=c-1");
-  });
-});
-
-describe("withoutArtifactLink", () => {
-  it("should drop only the link params when other filters are set", () => {
-    expect(withoutArtifactLink("?team=core&artifact=abc&comments=1")).toBe("?team=core");
-    expect(withoutArtifactLink("?artifact=abc")).toBe("");
-    expect(withoutArtifactLink("?artifact=abc&comment=c-1&team=core")).toBe("?team=core");
   });
 });
 
