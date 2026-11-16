@@ -4,6 +4,7 @@ import { Prose } from "@/components/docs/docs-content";
 import { LegalH, Mail, PostalAddress } from "@/components/legal/legal-page";
 import { rateLimitRetentionDays } from "@/lib/abuse/limits";
 import { sessionLifetimeSeconds } from "@/lib/auth/session-config";
+import { captureLimits } from "@/lib/canvas/capture-rules";
 import { fileLimits } from "@/lib/files/config";
 import { legalContact, legalPaths } from "@/lib/legal/contact";
 import { oauthLimits } from "@/lib/oauth/config";
@@ -68,6 +69,7 @@ export function PrivacyRights() {
           <li><strong>Artifacts:</strong> until you delete them. Deleting an artifact also deletes its versions, comments, mentions, reports, and files.</li>
           <li><strong>Version history:</strong> each artifact keeps up to {versionRetention.keep} versions, for up to {versionDays} days. The approved version and any version waiting for approval stay until they are replaced.</li>
           <li><strong>Files:</strong> deleted from storage when you delete them or their artifact. Uploads that never finish are deleted after {fileLimits.pendingTtlMs / hourMs} hour, and files never attached to an artifact after {fileLimits.unattachedTtlMs / hourMs} hours.</li>
+          <li><strong>Images of canvas frames:</strong> an image is deleted after its frame changes or is removed, the next time someone who may edit the canvas opens it, and with the canvas when you delete it. An image that never finishes uploading is deleted after {captureLimits.pendingTtlMs / hourMs} hour.</li>
           <li><strong>Deleted comments:</strong> the text is erased at once. A placeholder stays so replies keep their place.</li>
           <li><strong>Sessions and sign-in:</strong> a session ends when you sign out or {sessionDays} days after you last use it. Sign-in links expire after 10 minutes, and team invitations after 7 days.</li>
           <li><strong>Connected apps:</strong> app access tokens last {oauthLimits.accessTokenSeconds / 3600} hour and refresh tokens {refreshDays} days. App registrations nobody approved are deleted after {oauthLimits.unapprovedClientHours} hours.</li>

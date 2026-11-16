@@ -36,8 +36,9 @@ export const envDocs: readonly EnvDoc[] = [
   { name: "VAPID_SUBJECT", need: "optional", what: "A contact for push services: mailto:you@example.com or an https:// URL." },
   { name: "STORAGE_QUOTA_CONTENT_BYTES", need: "optional", what: "Artifact content quota per account, in bytes. Default 100 MB." },
   { name: "STORAGE_QUOTA_FILE_BYTES", need: "optional", what: "File quota per account, in bytes. Default 1 GB." },
+  { name: "FRAME_CAPTURES", need: "optional", what: "Set to off to stop storing images of canvas frames, which the browsers of people who may edit a canvas draw so agents can see it. On by default where file storage is set up." },
   { name: "VERCEL_PROJECT_PRODUCTION_URL", need: "platform", what: "Set by Vercel. The site origin when BETTER_AUTH_URL is unset." },
-  { name: "VERCEL_ENV", need: "platform", what: "Set by Vercel. Production and preview share one email budget; anything else counts its own. Problem reports name it with the commit. Google sign-in is off on preview, whose URLs are not registered with Google." },
+  { name: "VERCEL_ENV", need: "platform", what: "Set by Vercel. Production and preview share one email budget; anything else counts its own. Problem reports name it with the commit. Google sign-in is off on preview, whose URLs are not registered with Google, and so are images of canvas frames." },
   { name: "VERCEL_GIT_COMMIT_SHA", need: "platform", what: "Set by Vercel. Problem reports name the deploy by its short commit." },
   { name: "NODE_ENV", need: "platform", what: "Set by Next.js. Development turns on the dev sign-in route and prints sign-in links instead of sending them." },
 ];

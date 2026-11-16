@@ -203,6 +203,7 @@ dev user.
 | `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | For files | The R2 bucket and an S3 API key scoped to it. |
 | `CRON_SECRET` | In production | At least 16 characters. Vercel Cron sends it to `/api/cron/*`. |
 | `STORAGE_QUOTA_CONTENT_BYTES`, `STORAGE_QUOTA_FILE_BYTES` | No | Per-account quotas. Defaults: 100 MB of content and 1 GB of files. |
+| `FRAME_CAPTURES` | No | Set to `off` to stop storing images of canvas frames. On by default where R2 is set up. |
 
 Local `localhost` and `127.0.0.1` database URLs use the PostgreSQL TCP driver.
 Remote URLs use Neon's serverless driver. Users, sessions, OAuth clients, and

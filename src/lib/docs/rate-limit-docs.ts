@@ -8,11 +8,11 @@ import { rateLimitMessage } from "@/lib/abuse/rate-limit";
  */
 
 /** How a client sees a refusal. */
-export type RefusalShape = "mcp-429" | "tool-error" | "http-429" | "form" | "not-counted";
+export type RefusalShape = "mcp-429" | "tool-error" | "http-429" | "form" | "not-counted" | "not-drawn";
 
 interface LimitPlacement {
-  /** Who is counted: a user, a token, a team, or a network address. */
-  per: "user" | "token" | "team" | "network" | "email address" | "connection" | "code or refresh token";
+  /** Who is counted: a user, a token, a team, a canvas, or a network address. */
+  per: "user" | "token" | "team" | "canvas" | "network" | "email address" | "connection" | "code or refresh token";
   /** Where the limit is checked, in words. */
   where: string;
   refusal: RefusalShape;
@@ -32,6 +32,9 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   harnessChoice: { per: "user", where: "Changing an artifact's \"Made with\" agent or a connection's agent in the web app", refusal: "form", group: "MCP and artifacts" },
   sharingRequest: { per: "user", where: "Sharing and comments-setting changes (making private is never limited)", refusal: "tool-error", group: "MCP and artifacts" },
   fileUpload: { per: "user", where: "files_request_upload and web uploads", refusal: "tool-error", group: "Files and pages" },
+  frameCaptureNeeded: { per: "user", where: "An open canvas asking which of its frames have no image yet, for people who may edit it", refusal: "not-drawn", group: "Files and pages" },
+  frameCaptureStart: { per: "user", where: "Images of canvas frames that your browser draws for agents", refusal: "not-drawn", group: "Files and pages" },
+  frameCaptureStartByArtifact: { per: "canvas", where: "Images of one canvas's frames, from everyone who may edit it", refusal: "not-drawn", group: "Files and pages" },
   fileDownloadByNetwork: { per: "network", where: "/api/files views and downloads", refusal: "http-429", group: "Files and pages" },
   fileRequestByNetwork: { per: "network", where: "Every /api/files request: views, downloads, and video and audio playback (seeks and later parts)", refusal: "http-429", group: "Files and pages" },
   fileRangeByNetworkFile: { per: "network", where: "/api/files playback of one file: seeks and later parts", refusal: "http-429", group: "Files and pages" },

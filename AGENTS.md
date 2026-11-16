@@ -251,8 +251,10 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
 - The schema is in `src/db/schema.ts`, `src/db/oauth-schema.ts`,
   `src/db/views-schema.ts`, `src/db/notification-schema.ts`,
   `src/db/connection-schema.ts`, `src/db/file-copy-schema.ts`,
-  `src/db/team-welcome-schema.ts`, and `src/db/edit-lease-schema.ts`. Change
-  it, then run `pnpm db:generate` and commit the migration in `drizzle/`.
+  `src/db/team-welcome-schema.ts`, `src/db/edit-lease-schema.ts`, and
+  `src/db/frame-capture-schema.ts`. Change it, then run `pnpm db:generate`
+  and commit the migration in `drizzle/`. A new schema file is also listed
+  in `drizzle.config.ts` and spread into the schema in `src/db/index.ts`.
 - Migrations apply automatically when a production deploy builds:
   `pnpm build` runs `scripts/migrate-on-deploy.mts` before `next build`, under
   an advisory lock. A failed migration fails the build, and the old deployment
@@ -948,6 +950,68 @@ open only at `/api/files/<id>/copies/<copyId>`, for people who may edit, and
 never cached. A copy is kept while any version in the history was saved while
 it was current (`copies.ts`), goes with its file or artifact, and counts
 toward its uploader's file storage quota.
+
+### Frame captures
+
+A frame capture is an image of one canvas frame, drawn by the browser of
+someone who may edit the canvas, so an agent can see what the frame looks
+like (`src/lib/canvas/captures.ts`, rows in `captures-store.ts`, the board
+and its hashes in `captures-board.ts`, pure rules in `capture-rules.ts`,
+table `frame_capture`). The tab asks which drawings are needed, starts a
+capture, PUTs its parts straight to R2, and finishes it
+(`src/app/(workspace)/app/frame-capture-actions.ts`).
+
+- A capture is keyed by content, not by frame: `frame_hash` is a SHA-256 of
+  what decides the pixels (`captureHashInput`: the frame's width, height,
+  padding, and spec, the resolved theme, the mode, each file the spec names
+  with its storage key, name, size, type, and whether it is attached, and
+  `CAPTURE_REVISION`). Only the server makes a hash, from the newest saved
+  content. A rename or a move keeps the image, and two frames with the same
+  content share one. When a release changes how frames draw, raise
+  `CAPTURE_REVISION`. A theme that follows the reader is drawn in light and
+  in dark; one that pins a mode is drawn once.
+- The theme is resolved without `resolveThemeFor`'s fallback: a team theme
+  that cannot be read stops the pass ("not now"), because a hash made with
+  the site theme in its place would call a wrongly colored image current.
+- A drawing is cut into parts a model reads at full size (`captureGeometry`):
+  at most 1,568 patches of 28 pixels each, nothing scaled, 56 shared pixels
+  between rows, two columns for a frame wider than 1,568 pixels, at most 12
+  parts. Finish checks every stored part: its type from its first bytes
+  (`src/lib/files/image-size-rules.ts`, WebP or JPEG only), its byte size,
+  and its exact pixel size for its place in the frame.
+- Every capture has its own id in its keys
+  (`captures/<artifact id>/<capture id>/<n>`), so two captures never share
+  an object. Finish is one statement (`markCaptureReady`): the row turns
+  ready only while it is pending, and only then every other capture of that
+  content and mode is marked removed. It locks those rows in id order first,
+  so two finishes of one content cannot deadlock. Readers of the table take
+  the ready row; there is at most one for a content and mode.
+- One way to delete: mark the row removed, delete its objects, then delete
+  the row (`finishRemovals`). A row younger than its upload URLs stays
+  removed until they have ended, so a part that arrives late is still
+  deleted. `/api/cron/cleanup-files` finishes removals that stopped halfway,
+  removes captures still pending after an hour, and removes captures whose
+  artifact is gone (`sweepCaptures`). `frame_capture.artifact_id` has no
+  foreign key on purpose, so a removed row outlives its artifact until its
+  objects are gone. No capture code logs a key or an upload URL; do not
+  reuse `deleteStoredObjects`, which logs keys.
+- Editors only. The three actions check the session and `getEditableArtifact`,
+  and the canvas's own rate limit is counted only after that check. Anything
+  that later serves an image (an MCP tool, a page) must serve it only to
+  callers who may edit the canvas: an editor chooses the pixels, and an edit
+  to a link or public canvas needs approval, so an image must never reach a
+  reader of the approved version.
+- Captures are not artifact files: they are not in the Files section and
+  versions do not keep them. They count toward the file storage quota of
+  the person whose browser drew them (`fileBytesUsed`), a person may have 16
+  unfinished at once, and one canvas keeps at most 100 MB of current images
+  (`captureLimits`). The needed-list call removes captures of content that is
+  no longer on the board, so the cap counts only current images.
+- Off switch: `FRAME_CAPTURES=off`, read at request time. Captures are also
+  off on Vercel previews (`VERCEL_ENV=preview`: they share the production
+  database, and the bucket refuses their origin) and where R2 is not set up
+  (`captureAvailability`). Off means the needed-list call answers "not-now"
+  before it reads or counts anything, and start and finish refuse.
 
 ### Concurrent edits
 

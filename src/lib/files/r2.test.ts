@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { amzDate, downloadSigningTime, parseEndpoint, presignDownload, presignUpload, presignUrl, r2ConfigFromEnv, r2ObjectUrl, streamObject, type R2Config } from "./r2";
+import { amzDate, downloadSigningTime, isR2Configured, parseEndpoint, presignDownload, presignUpload, presignUrl, r2ConfigFromEnv, r2ObjectUrl, streamObject, type R2Config } from "./r2";
 
 const config: R2Config = {
   accountId: "0123456789abcdef0123456789abcdef",
@@ -83,6 +83,20 @@ describe("helpers", () => {
 
   it("should name every missing variable when the config is incomplete", () => {
     expect(() => r2ConfigFromEnv({ NODE_ENV: "test", R2_BUCKET: "b" })).toThrow("R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY");
+  });
+});
+
+describe("isR2Configured", () => {
+  const env = { NODE_ENV: "test" as const, R2_ACCOUNT_ID: "acct", R2_BUCKET: "bucket", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret" };
+
+  it("should say storage is set up when every R2 variable has a value", () => {
+    expect(isR2Configured(env)).toBe(true);
+  });
+
+  it("should say storage is not set up when any R2 variable is missing or blank, without throwing", () => {
+    expect(isR2Configured({ NODE_ENV: "test" })).toBe(false);
+    expect(isR2Configured({ ...env, R2_SECRET_ACCESS_KEY: "" })).toBe(false);
+    expect(isR2Configured({ NODE_ENV: "test", R2_ACCOUNT_ID: "acct", R2_BUCKET: "bucket", R2_ACCESS_KEY_ID: "id" })).toBe(false);
   });
 });
 

@@ -29,6 +29,7 @@ const refusalText: Record<RefusalShape, string> = {
   "http-429": "HTTP 429 with Retry-After",
   form: "Error in the page",
   "not-counted": "The view is not counted; the page is unaffected",
+  "not-drawn": "The frame image is not drawn now; the page is unaffected",
 };
 
 const groups = [...new Set(rateLimitRows().map((row) => row.group))];
@@ -82,7 +83,7 @@ export default function LimitsPage() {
         head={["Quota", "Default", "Counts"]}
         rows={[
           ["Artifact content", size(storageQuota.contentBytes), "Content and metadata of every artifact and every saved version."],
-          ["Files", size(storageQuota.fileBytes), "Finished uploads, and uploads started in the last hour."],
+          ["Files", size(storageQuota.fileBytes), "Finished uploads, uploads started in the last hour, old copies of replaced files, and images of canvas frames your browser drew."],
         ]}
         mono={[1]}
       />
