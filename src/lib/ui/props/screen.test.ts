@@ -5,7 +5,8 @@ import { blockHues } from "@/lib/block-colors/block-color-rules";
 
 import { containerComponents, uiCatalog } from "../catalog";
 import { brandMarksSpec } from "../fixtures/brand-marks";
-import { landingPageSpec, styledBlocksSpec, surfaceMatrixSpec } from "../fixtures/screen";
+import { landingPageSpec, styledBlocksSpec, surfaceMatrixSpecs } from "../fixtures/screen";
+import { uiLimits } from "../limits";
 import { brandMarkLabels, brandUiIconNames, extraUiIconNames, plainUiIconNames, uiIconNames } from "../icon-names";
 import { validateUiSpec } from "../validate";
 
@@ -162,7 +163,7 @@ describe("Text, Heading, and Link screen props", () => {
 });
 
 describe("screen fixtures", () => {
-  it.each([["every surface with every tone", surfaceMatrixSpec], ["the landing page", landingPageSpec], ["every styled block", styledBlocksSpec], ["every brand mark", brandMarksSpec]])("should validate %s with no errors or warnings", (_name, fixture) => {
+  it.each([["the first surfaces with every tone", surfaceMatrixSpecs[0]], ["the other surfaces with every tone", surfaceMatrixSpecs[1]], ["the landing page", landingPageSpec], ["every styled block", styledBlocksSpec], ["every brand mark", brandMarksSpec]])("should validate %s with no errors or warnings", (_name, fixture) => {
     expect(validateUiSpec(fixture).issues).toEqual([]);
   });
 
@@ -173,7 +174,13 @@ describe("screen fixtures", () => {
     expect(new Set(icons.map((icon) => icon.props?.size))).toEqual(new Set(["xs", "sm", "md", "lg", "xl"]));
   });
 
-  it("should put every surface in the matrix when the contrast scan reads it", () => {
-    for (const surface of boxSurfaces) expect(surfaceMatrixSpec.elements).toHaveProperty(`${surface}-box`);
+  it("should put every surface in the matrix, once, when the contrast scan reads it", () => {
+    const boxes = surfaceMatrixSpecs.flatMap((spec) => Object.keys(spec.elements).filter((key) => key.endsWith("-box")));
+    expect(boxes.toSorted()).toEqual(boxSurfaces.map((surface) => `${surface}-box`).toSorted());
+  });
+
+  it("should keep each surface spec well under the element limit when the matrix is drawn", () => {
+    // A quarter of the limit stays free, so a new piece on every surface, or a new surface, never breaks the specimen.
+    for (const spec of surfaceMatrixSpecs) expect(Object.keys(spec.elements).length).toBeLessThanOrEqual(uiLimits.maxElements * 0.75);
   });
 });

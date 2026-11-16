@@ -1,5 +1,7 @@
 import { expect, test } from "./support/test";
 
+import { openGallery } from "./support/gallery";
+
 const themes = ["light", "dark"] as const;
 
 for (const theme of themes) {
@@ -47,4 +49,14 @@ test("should show the gallery's video and recording ready to play in the read vi
   await expect(specimen.locator('[data-media-kind="video"] [data-media-state="ready"] video')).toBeVisible(loaded);
   await expect(specimen.locator('[data-media-kind="audio"] [data-media-state="ready"] audio')).toHaveCount(1, loaded);
   await expect(specimen.locator("figcaption", { hasText: "Two minutes, start to finish." })).toBeVisible();
+});
+
+test("should draw only the groups and specimens asked for when the gallery is opened with show", async ({ page }) => {
+  await openGallery(page, ["Input", "specs/Sign-in screen", "specs/Surfaces and tones"]);
+  // Other groups are left out, the slow ones included.
+  await expect(page.locator("section#Textarea, section#formats, section#themes, section#media")).toHaveCount(0);
+  expect(await page.locator("section#Input [data-specimen]").count()).toBeGreaterThan(3);
+  await expect(page.locator("section#specs [data-specimen]")).toHaveCount(2);
+  // The surfaces specimen holds both of its specs, every surface between them.
+  await expect(page.locator('[data-specimen="Surfaces and tones"]').getByRole("group", { name: /^Surface / })).toHaveCount(15);
 });

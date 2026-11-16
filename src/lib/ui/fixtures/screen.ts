@@ -101,8 +101,8 @@ function surfaceElements(surface: BoxSurface): Elements {
     [id("box")]: { type: "Box", props: { surface, padding: "md", gap: "sm", radius: "lg", border: surface === "none" ? "all" : "none", label: `Surface ${surface}` }, children: [id("body"), id("muted"), id("tones"), id("rule"), id("actions"), ...(drawn ? [id("chart"), id("diagram")] : [])] },
     [id("body")]: { type: "Text", props: { text: `Body text on the ${surface} surface.` } },
     [id("muted")]: { type: "Text", props: { text: "Muted text, for secondary detail.", tone: "muted", size: "sm" } },
-    // One wrapping row holds every small piece, so 15 surfaces stay under the 500-element limit: each tone as an icon and text, each
-    // tone badge, and the display pieces, which draw their own text and marks (avatar letters on tints, a "+N" count, keys, stars, a dot).
+    // One wrapping row holds every small piece: each tone as an icon and text, each tone badge, and the display pieces, which draw
+    // their own text and marks (avatar letters on tints, a "+N" count, keys, stars, a dot).
     [id("tones")]: { type: "Box", props: { direction: "horizontal", wrap: true, gap: "md", align: "center" }, children: [...tones.flatMap((tone) => [id(`icon-${tone}`), id(`text-${tone}`)]), ...tones.map((tone) => id(`badge-${tone}`)), id("faces"), id("keys"), id("stars"), id("dot")] },
     [id("faces")]: { type: "AvatarGroup", props: { people: [{ name: "Maya Chen" }, { name: "Omar Haddad", tone: "info" }, { name: "Priya Nair", tone: "success" }, { name: "Ines Okafor", tone: "warning" }, { name: "Kenji Mori", tone: "danger" }], max: 4, total: 6, size: "sm" } },
     [id("keys")]: { type: "Kbd", props: { keys: ["⌘", "K"] } },
@@ -131,15 +131,30 @@ function surfaceElements(surface: BoxSurface): Elements {
   return elements;
 }
 
-/** Every Box surface with every text tone, every tone badge, and a pressed Button of each variant on it, and a chart and a diagram on the two that switch the palette, for the contrast scan in light, in dark, and under themes. */
-export const surfaceMatrixSpec = {
-  version: 1,
-  root: "page",
-  elements: {
-    page: { type: "Box", props: { gap: "md" }, children: boxSurfaces.map((surface) => `${surface}-box`) },
-    ...Object.assign({}, ...boxSurfaces.map(surfaceElements)) as Elements,
-  },
-};
+/** A spec of these surfaces, one under another. */
+function surfaceSpec(surfaces: readonly BoxSurface[]) {
+  return {
+    version: 1,
+    root: "page",
+    elements: {
+      page: { type: "Box", props: { gap: "md" }, children: surfaces.map((surface) => `${surface}-box`) },
+      ...Object.assign({}, ...surfaces.map(surfaceElements)) as Elements,
+    },
+  };
+}
+
+/** Where the surfaces split into two specs of about the same size: the plain ones and the first hues, then the other hues. */
+const half = Math.ceil(boxSurfaces.length / 2);
+
+/**
+ * Every Box surface with every text tone, every tone badge, and a pressed
+ * Button of each variant on it, and a chart and a diagram on the two that
+ * switch the palette, for the contrast scan in light, in dark, and under
+ * themes. Two specs, which the gallery draws in one specimen: all fifteen
+ * surfaces in one spec came to exactly the 500-element limit, so one more
+ * piece on each surface would have broken it.
+ */
+export const surfaceMatrixSpecs = [surfaceSpec(boxSurfaces.slice(0, half)), surfaceSpec(boxSurfaces.slice(half))];
 
 const feature = (key: string, icon: string, title: string, body: string): Elements => ({
   [key]: { type: "Box", props: { gap: "sm", padding: "lg", surface: "card", border: "all", radius: "xl" }, children: [`${key}-icon`, `${key}-title`, `${key}-body`] },

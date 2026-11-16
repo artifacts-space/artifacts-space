@@ -3,6 +3,7 @@ import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
 import { readColors } from "./support/colors";
+import { openGallery, specimen } from "./support/gallery";
 
 /*
  * Button `pressed` and the accent tone. A pressed toggle says it is on to
@@ -16,14 +17,6 @@ import { readColors } from "./support/colors";
  * text color on a primary surface. In forced colors, which replace every
  * page color, a pressed toggle keeps a mark of its own on each variant.
  */
-
-const specimen = (page: Page, group: string, name: string) => page.locator(`section#${group} [data-specimen="${name}"]`);
-
-/** The gallery is ready once React has hydrated it, which its ready mark says. */
-async function galleryReady(page: Page, group: string) {
-  await page.goto(`/dev/components#${group}`);
-  await expect(page.locator("[data-gallery-ready]")).toBeAttached({ timeout: 60_000 });
-}
 
 /** Holds the page in one color scheme for the whole test, in every frame it opens. */
 async function useScheme(page: Page, scheme: "light" | "dark") {
@@ -40,7 +33,7 @@ const docsPreviewSkip = {
 };
 
 test("should flip aria-pressed with one press, show the button pressed, and pass axe on and off", async ({ page }) => {
-  await galleryReady(page, "specs");
+  await openGallery(page, ["specs/Pressed toggle"]);
   const toggle = specimen(page, "specs", "Pressed toggle");
   await toggle.scrollIntoViewIfNeeded();
   const bold = toggle.getByRole("button", { name: "Bold" });
@@ -72,11 +65,12 @@ test("should flip aria-pressed with one press, show the button pressed, and pass
 });
 
 test("should pass axe on the Button, Badge, Text, and Icon groups of the gallery, with every pressed and accent fixture drawn", async ({ page }) => {
-  await galleryReady(page, "Button");
+  const groups = ["Button", "Badge", "Text", "Icon"];
+  await openGallery(page, groups);
   await expect(specimen(page, "Button", "Toggle, pressed, outline").getByRole("button", { name: "Bold" })).toHaveAttribute("aria-pressed", "true");
   await expect(specimen(page, "Button", "Toggle, not pressed").getByRole("button", { name: "Bold" })).toHaveAttribute("aria-pressed", "false");
   await expect(specimen(page, "Button", "Toggle, pressed, ghost icon only").getByRole("button", { name: "Saved" })).toHaveAttribute("aria-pressed", "true");
-  for (const group of ["Button", "Badge", "Text", "Icon"]) {
+  for (const group of groups) {
     const section = page.locator(`section#${group}`);
     await section.scrollIntoViewIfNeeded();
     await expectNoAxeViolations(section);
@@ -99,7 +93,7 @@ const forcedPairs = [
 
 test("should keep a pressed toggle apart from the same button at rest in forced colors, on every variant a toggle takes", async ({ page }) => {
   await page.emulateMedia({ forcedColors: "active" });
-  await galleryReady(page, "Button");
+  await openGallery(page, forcedPairs.flatMap(({ rest, pressed }) => [`Button/${rest}`, `Button/${pressed}`]));
   expect(await page.evaluate(() => matchMedia("(forced-colors: active)").matches)).toBe(true);
   for (const { variant, rest, pressed, name } of forcedPairs) {
     const off = specimen(page, "Button", rest).getByRole("button", { name });
@@ -205,18 +199,19 @@ async function expectPressedReads(page: Page, box: Locator, lowest: PressedReadi
   }
 }
 
+/** Every surface on the site palette and under two themes: the gallery specimen that holds it, and where it is in that specimen. */
 const matrices = [
-  { theme: "site", find: (page: Page) => specimen(page, "specs", "Surfaces and tones") },
-  { theme: "ocean", find: (page: Page) => page.locator('[data-themed-surfaces="ocean"]') },
-  { theme: "editorial", find: (page: Page) => page.locator('[data-themed-surfaces="editorial"]') },
+  { theme: "site", show: "specs/Surfaces and tones", find: (page: Page) => specimen(page, "specs", "Surfaces and tones") },
+  { theme: "ocean", show: "themes/theme · ocean", find: (page: Page) => page.locator('[data-themed-surfaces="ocean"]') },
+  { theme: "editorial", show: "themes/theme · editorial", find: (page: Page) => page.locator('[data-themed-surfaces="editorial"]') },
 ] as const;
 
 for (const scheme of ["light", "dark"] as const) {
-  for (const { theme, find } of matrices) {
+  for (const { theme, show, find } of matrices) {
     test(`should hold a pressed Button's label at 4.5:1 and its edge at 3:1 on every surface, at rest and under the pointer, under the ${theme} palette when the site is ${scheme}`, async ({ page, isMobile }) => {
       test.skip(isMobile, "the same colors as the desktop run");
       await useScheme(page, scheme);
-      await galleryReady(page, "specs");
+      await openGallery(page, [show]);
       await page.addStyleTag({ content: "*, *::before, *::after { transition: none !important; }" });
       const boxes = await find(page).getByRole("group", { name: /^Surface / }).all();
       expect(boxes).toHaveLength(15);
@@ -234,7 +229,7 @@ for (const scheme of ["light", "dark"] as const) {
   test(`should draw the accent tone in the theme's accent, and in the surface's text color on a primary surface, when the site is ${scheme}`, async ({ page, isMobile }) => {
     test.skip(isMobile, "the same colors as the desktop run");
     await useScheme(page, scheme);
-    await galleryReady(page, "specs");
+    await openGallery(page, ["themes/theme · ocean"]);
     const ocean = page.locator('[data-themed-surfaces="ocean"]');
     const surface = (name: string) => ocean.getByRole("group", { name: `Surface ${name}`, exact: true });
     const accentText = (name: string) => surface(name).getByText("accent text", { exact: true });
@@ -256,7 +251,7 @@ for (const scheme of ["light", "dark"] as const) {
   test(`should draw the site's accent tone as a blue of its own, not its body text, at 4.5:1 on every surface, when the site is ${scheme}`, async ({ page, isMobile }) => {
     test.skip(isMobile, "the same colors as the desktop run");
     await useScheme(page, scheme);
-    await galleryReady(page, "specs");
+    await openGallery(page, ["specs/Surfaces and tones"]);
     const boxes = await specimen(page, "specs", "Surfaces and tones").getByRole("group", { name: /^Surface / }).all();
     expect(boxes).toHaveLength(15);
     const pageBox = specimen(page, "specs", "Surfaces and tones").getByRole("group", { name: "Surface page", exact: true });

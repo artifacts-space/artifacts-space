@@ -2,6 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
+import { openGallery, specimen } from "./support/gallery";
 import { diagramDrawTimeout, expectDiagramsSettled, expectScrollersSettled, unreachableScrollersIn } from "./support/scrollers";
 
 /*
@@ -11,14 +12,6 @@ import { diagramDrawTimeout, expectDiagramsSettled, expectScrollersSettled, unre
  * drive each such box in a diagram, a chart's table, and a source listing
  * into overflow and back, and check the keyboard can scroll it.
  */
-
-const specimen = (page: Page, group: string, name: string) => page.locator(`section#${group} [data-specimen="${name}"]`);
-
-/** The gallery is ready once React has hydrated it, which its ready mark says. */
-async function galleryReady(page: Page, group: string) {
-  await page.goto(`/dev/components#${group}`);
-  await expect(page.locator("[data-gallery-ready]")).toBeAttached({ timeout: 60_000 });
-}
 
 const scrollOf = (target: Locator) => target.evaluate((element) => ({ left: element.scrollLeft, top: element.scrollTop }));
 
@@ -38,7 +31,7 @@ async function expectKeyboardScrolls(page: Page, frame: Locator, key: "ArrowRigh
 }
 
 test("should make a diagram that is wider than its frame a named tab stop the keyboard can scroll, and nothing once it fits", async ({ page, isMobile }) => {
-  await galleryReady(page, "Diagram");
+  await openGallery(page, ["Diagram/Flowchart"]);
   const flow = specimen(page, "Diagram", "Flowchart");
   await flow.scrollIntoViewIfNeeded();
   await expect(flow.locator("[data-diagram-state]")).toHaveAttribute("data-diagram-state", "drawn", { timeout: diagramDrawTimeout });
@@ -62,7 +55,7 @@ test("should make a diagram that is wider than its frame a named tab stop the ke
 });
 
 test("should make a failed diagram's source a named tab stop while it scrolls", async ({ page }) => {
-  await galleryReady(page, "Diagram");
+  await openGallery(page, ["Diagram/Broken source"]);
   const broken = specimen(page, "Diagram", "Broken source");
   await broken.scrollIntoViewIfNeeded();
   // The notice shows once Mermaid has loaded and tried to draw, which starts only after the page is ready.
@@ -80,7 +73,7 @@ test("should make a failed diagram's source a named tab stop while it scrolls", 
 });
 
 test("should make a chart's table a tab stop named from the chart's title, which the keyboard can scroll while it is shown and longer than its frame", async ({ page }) => {
-  await galleryReady(page, "Chart");
+  await openGallery(page, ["Chart/Huge values, 200 points"]);
   const chart = specimen(page, "Chart", "Huge values, 200 points");
   await chart.scrollIntoViewIfNeeded();
   // Hidden for screen readers behind the chart: no tab stop.
@@ -99,7 +92,7 @@ test("should make a chart's table a tab stop named from the chart's title, which
 });
 
 test("should name the table of a chart without a title \"Chart data\"", async ({ page }) => {
-  await galleryReady(page, "Chart");
+  await openGallery(page, ["Chart/Stacked bars, 8 series, 24 labels"]);
   const chart = specimen(page, "Chart", "Stacked bars, 8 series, 24 labels");
   await chart.scrollIntoViewIfNeeded();
   await chart.getByRole("button", { name: "Table" }).click();
@@ -107,7 +100,7 @@ test("should name the table of a chart without a title \"Chart data\"", async ({
 });
 
 test("should make an SVG's source a named tab stop while it scrolls, when the SVG cannot be shown", async ({ page }) => {
-  await galleryReady(page, "formats");
+  await openGallery(page, ["formats/svg · SVG, invalid"]);
   const invalid = specimen(page, "formats", "svg · SVG, invalid");
   await invalid.scrollIntoViewIfNeeded();
   await expect(invalid.getByText("This SVG could not be shown.")).toBeVisible();

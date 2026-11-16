@@ -4,6 +4,7 @@ import { expect, test } from "./support/test";
 import { expectNoAxeViolations } from "./support/a11y";
 import { board, openCanvas } from "./support/canvas";
 import { readColors } from "./support/colors";
+import { openGallery, specimen } from "./support/gallery";
 
 /*
  * Props added to the pieces a screen is drawn with: how a row looks once it
@@ -13,14 +14,6 @@ import { readColors } from "./support/colors";
  * frames. Each is scanned with axe in every state it has, and what the
  * accessibility tree says is read where that is the point.
  */
-
-const specimen = (page: Page, group: string, name: string) => page.locator(`section#${group} [data-specimen="${name}"]`);
-
-/** The gallery is ready once React has hydrated it, which its ready mark says. */
-async function galleryReady(page: Page, group = "Box") {
-  await page.goto(`/dev/components#${group}`);
-  await expect(page.locator("[data-gallery-ready]")).toBeAttached({ timeout: 60_000 });
-}
 
 const boxOf = (target: Locator) => target.evaluate((element) => {
   const { x, y, width, height } = element.getBoundingClientRect();
@@ -35,8 +28,9 @@ async function narrow(frame: Locator, isMobile: boolean) {
 }
 
 test("should pass axe on the Separator, Table, Metric, Text, and Callout groups of the gallery", async ({ page }) => {
-  await galleryReady(page, "Separator");
-  for (const group of ["Separator", "Table", "Metric", "Text", "Callout"]) {
+  const groups = ["Separator", "Table", "Metric", "Text", "Callout"];
+  await openGallery(page, groups);
+  for (const group of groups) {
     const section = page.locator(`section#${group}`);
     await section.scrollIntoViewIfNeeded();
     await expectNoAxeViolations(section);
@@ -44,7 +38,7 @@ test("should pass axe on the Separator, Table, Metric, Text, and Callout groups 
 });
 
 test("should let stacked children fill the width with alignBelow, and leave a row without it as it was", async ({ page, isMobile }) => {
-  await galleryReady(page);
+  await openGallery(page, ["Box/Stacked, children fill the width", "Box/Stacked, children keep their width"]);
   const filled = specimen(page, "Box", "Stacked, children fill the width");
   const kept = specimen(page, "Box", "Stacked, children keep their width");
   const panel = (frame: Locator) => frame.getByRole("group", { name: "Product shot" });
@@ -67,7 +61,7 @@ test("should let stacked children fill the width with alignBelow, and leave a ro
 });
 
 test("should draw a stacked row last child first with reverseBelow, and keep the order of the source for the keyboard and screen readers", async ({ page, isMobile }) => {
-  await galleryReady(page);
+  await openGallery(page, ["Box/Stacked, drawn in reverse"]);
   const frame = specimen(page, "Box", "Stacked, drawn in reverse");
   const picture = frame.getByRole("img", { name: "Picture first in the row" });
   const words = frame.getByText("Words above the picture once the row has stacked.");
@@ -88,7 +82,7 @@ test("should draw a stacked row last child first with reverseBelow, and keep the
 });
 
 test("should speak a line that appears after a button press through the interface's one live region", async ({ page }) => {
-  await galleryReady(page, "specs");
+  await openGallery(page, ["specs/Announced line and a toggle", "specs/Sign-in screen", "Text/Announced", "Callout/Announced"]);
   const waitlist = specimen(page, "specs", "Announced line and a toggle");
   await waitlist.scrollIntoViewIfNeeded();
   const status = waitlist.getByRole("status");
@@ -137,7 +131,7 @@ test("should give each frame of a canvas a live region of its own, so one frame 
 });
 
 test("should open and close a note with one button that runs toggleState, and speak the note each time it opens", async ({ page }) => {
-  await galleryReady(page, "specs");
+  await openGallery(page, ["specs/Announced line and a toggle"]);
   const waitlist = specimen(page, "specs", "Announced line and a toggle");
   await waitlist.scrollIntoViewIfNeeded();
   const status = waitlist.getByRole("status");
@@ -185,7 +179,7 @@ for (const scheme of ["light", "dark"] as const) {
     await page.addInitScript((value) => {
       try { window.localStorage.setItem("theme", value); } catch { /* no storage in this frame */ }
     }, scheme);
-    await galleryReady(page, "specs");
+    await openGallery(page, ["specs/Surfaces and tones", "themes/theme · ocean"]);
     // On the site palette, and under a theme whose accent is of the other mode on each side.
     const matrices = [
       { theme: "site", matrix: specimen(page, "specs", "Surfaces and tones") },
@@ -205,7 +199,7 @@ for (const scheme of ["light", "dark"] as const) {
 }
 
 test("should draw the danger Button variants in the gallery with a name, and leave a disabled one out of reach", async ({ page }) => {
-  await galleryReady(page, "Button");
+  await openGallery(page, ["Button/Danger", "Button/Danger with an icon", "Button/Danger, disabled"]);
   const danger = specimen(page, "Button", "Danger").getByRole("button", { name: "Delete project" });
   await danger.scrollIntoViewIfNeeded();
   await expect(danger).toBeEnabled();
@@ -215,7 +209,7 @@ test("should draw the danger Button variants in the gallery with a name, and lea
 });
 
 test("should read a check column as Yes and No, and show the marks to sighted readers", async ({ page }) => {
-  await galleryReady(page, "Table");
+  await openGallery(page, ["Table/Check marks"]);
   const table = specimen(page, "Table", "Check marks").getByRole("table");
   await table.scrollIntoViewIfNeeded();
   await expect(table).toMatchAriaSnapshot(`
@@ -257,7 +251,7 @@ test("should read a check column as Yes and No, and show the marks to sighted re
 });
 
 test("should draw a plain Metric without a card around it", async ({ page }) => {
-  await galleryReady(page, "Metric");
+  await openGallery(page, ["Metric/Plain", "Metric/Currency"]);
   const plain = specimen(page, "Metric", "Plain").getByText("Teams onboarded").locator("xpath=..");
   const card = specimen(page, "Metric", "Currency").getByText("Revenue").locator("xpath=..");
   await plain.scrollIntoViewIfNeeded();
@@ -271,7 +265,7 @@ test("should draw a plain Metric without a card around it", async ({ page }) => 
 });
 
 test("should draw a vertical Separator as a line as tall as its row, named as a separator, and lay it flat once the row has stacked", async ({ page, isMobile }) => {
-  await galleryReady(page);
+  await openGallery(page, ["Box/Row with vertical rules", "Box/Vertical rules in a row that stacks"]);
   const row = specimen(page, "Box", "Row with vertical rules");
   await row.scrollIntoViewIfNeeded();
   const rules = row.getByRole("separator");
@@ -304,7 +298,7 @@ test("should draw a vertical Separator as a line as tall as its row, named as a 
 });
 
 test("should let a Select fill its container with fullWidth, and keep the others at their cap", async ({ page, isMobile }) => {
-  await galleryReady(page, "Select");
+  await openGallery(page, ["Select/Full width", "Select/Normal"]);
   const full = specimen(page, "Select", "Full width");
   await full.scrollIntoViewIfNeeded();
   const trigger = full.getByRole("combobox", { name: "Country" });
@@ -320,7 +314,7 @@ test("should let a Select fill its container with fullWidth, and keep the others
 });
 
 test("should draw a browser and a phone around a Placeholder as decoration, with one named image in each", async ({ page }) => {
-  await galleryReady(page, "Placeholder");
+  await openGallery(page, ["Placeholder/Browser frame", "Placeholder/Phone frame"]);
   const browser = specimen(page, "Placeholder", "Browser frame");
   const phone = specimen(page, "Placeholder", "Phone frame");
   await browser.scrollIntoViewIfNeeded();
