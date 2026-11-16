@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 import { card, highlighted, pointOn } from "./support/inline-comments";
 
@@ -211,9 +212,8 @@ test("should keep the reply box compact in the card at the text, and out of the 
 });
 
 test("should show one box without tabs in the component gallery", async ({ page }) => {
-  await page.goto("/dev/components");
-  // The gallery hydrates only once its Mermaid diagrams have drawn, seconds after the page loads on a busy runner, and the box's editor cannot load before that.
-  await expect(page.getByRole("status").filter({ hasText: "Drawing diagram" })).toHaveCount(0, { timeout: 60_000 });
+  // Only the specimen with the box: the whole gallery takes many seconds to hydrate on a busy runner, and the box's editor cannot load before that.
+  await openGallery(page, ["themes/artifact page chrome"]);
   // The box's editor loads as it nears the window; until then a plain box of the same size holds its place.
   await page.locator("[data-slot=comment-box-plain]").first().scrollIntoViewIfNeeded();
   const box = page.getByRole("textbox", { name: "Write a comment" }).first();

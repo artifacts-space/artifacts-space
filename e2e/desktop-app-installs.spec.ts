@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 /**
  * The "Add to" buttons for the desktop apps, on the component gallery (no
@@ -12,14 +13,14 @@ const endpoint = "https://artifacts.space/api/mcp";
 
 const row = (page: Page) => page.locator('[data-specimen="add to a desktop app"]').getByRole("list", { name: "Add to a desktop app" });
 
-async function openGallery(page: Page) {
-  await page.goto("/dev/components");
+async function openInstalls(page: Page) {
+  await openGallery(page, ["clients/add to a desktop app"]);
   await expect(row(page)).toBeVisible();
   await row(page).scrollIntoViewIfNeeded();
 }
 
 test("should show the four apps in order, each with its mark, when the row renders", async ({ page }) => {
-  await openGallery(page);
+  await openInstalls(page);
   const items = row(page).getByRole("listitem");
   await expect(items).toHaveText(["Add to Cursor", "Add to Claude Desktop (opens in a new tab)", "Add to Codex (opens in a new tab)", "Add to Grok Bot (opens in a new tab)"]);
   for (const item of await items.all()) {
@@ -34,7 +35,7 @@ test("should show the four apps in order, each with its mark, when the row rende
 });
 
 test("should link Cursor and Claude Desktop to their install links when the app has one", async ({ page }) => {
-  await openGallery(page);
+  await openInstalls(page);
   const cursor = row(page).locator("a[data-install=cursor]");
   await expect(cursor).toHaveAttribute("href", /^cursor:\/\/anysphere\.cursor-deeplink\/mcp\/install\?name=artifacts&config=/);
 
@@ -50,7 +51,7 @@ test("should link Cursor and Claude Desktop to their install links when the app 
 
 test("should open the Codex steps in the docs in a new tab when Add to Codex is pressed", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await openGallery(page);
+  await openInstalls(page);
   const button = row(page).locator("a[data-install=codex]");
   await expect(button).toHaveAttribute("href", "/docs/clients#codex");
   await expect(button).toHaveAttribute("rel", "noopener noreferrer");
@@ -76,7 +77,7 @@ test("should open the Codex steps in the docs in a new tab when Add to Codex is 
 });
 
 test("should open the Grok Bot steps in the docs in a new tab when Add to Grok Bot is pressed", async ({ page, context }) => {
-  await openGallery(page);
+  await openInstalls(page);
   const button = row(page).locator("a[data-install=grok-bot]");
   await expect(button).toHaveAttribute("href", "/docs/clients#grok-bot");
 

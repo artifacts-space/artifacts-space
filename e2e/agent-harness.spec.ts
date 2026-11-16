@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 import {
   artifactHarnessOverride,
@@ -22,7 +23,7 @@ import {
  */
 
 test("should show each app's detected agent and change it from the select on the Connections page", async ({ page }) => {
-  await page.goto("/dev/components#harnesses");
+  await openGallery(page, ["harnesses"]);
   const fixture = page.locator('[data-harness-fixture="connections"]');
   const claude = fixture.locator('[data-connected-app="Claude Code"]');
   const select = claude.getByRole("combobox", { name: "Agent for Claude Code" });

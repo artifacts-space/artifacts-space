@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 /**
  * Columns in the spreadsheet grid: drag a header's edge to resize it and
@@ -28,7 +29,7 @@ async function dragBy(page: Page, target: Locator, dx: number) {
 }
 
 async function openGallerySheet(page: Page) {
-  await page.goto("/dev/components#formats");
+  await openGallery(page, ["formats"]);
   const grid = viewerGrid(page);
   await grid.scrollIntoViewIfNeeded();
   await expect(header(grid, "col_01")).toBeVisible();

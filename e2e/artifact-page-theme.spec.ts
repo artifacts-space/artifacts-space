@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 import { readColors, type ColorReading } from "./support/colors";
 
@@ -58,7 +59,7 @@ for (const mode of ["light", "dark"] as const) {
   test(`should swap the header, comments, and footer colors with the artifact theme and keep them readable when the site is ${mode}`, async ({ page }) => {
     // Top frame only: the gallery's file stand-ins are data: frames, which have no storage.
     await page.addInitScript((value) => { if (window === window.top) window.localStorage.setItem("theme", value); }, mode);
-    await page.goto("/dev/components#themes");
+    await openGallery(page, ["themes"]);
     await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${mode}\\b`));
     const chrome = page.locator('[data-specimen="artifact page chrome"] [data-page-theme]');
     await expect(chrome).toHaveAttribute("data-page-theme", "default");
@@ -84,7 +85,7 @@ for (const mode of ["light", "dark"] as const) {
 }
 
 test("should show who can see the artifact in the header row without wrapping or overflowing", async ({ page }, testInfo) => {
-  await page.goto("/dev/components#themes");
+  await openGallery(page, ["themes"]);
   const header = page.locator('[data-specimen="artifact page chrome"] header');
   const badge = header.getByRole("button", { name: "Private. Only you can see this." });
   await expect(badge).toBeVisible();

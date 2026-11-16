@@ -1,4 +1,5 @@
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 /**
  * The artifact theme picker (the gallery's "theme picker" specimen, the
@@ -6,7 +7,7 @@ import { expect, test } from "./support/test";
  * scope it drives rendering the chosen theme.
  */
 test("should apply a preset picked with the keyboard when an editor opens the picker", async ({ page }) => {
-  await page.goto("/dev/components#themes");
+  await openGallery(page, ["themes"]);
   const specimen = page.locator('[data-specimen="theme picker"]');
   const scope = specimen.locator("[data-picker-scope]");
   await expect(scope).toHaveAttribute("data-picker-scope", "default");

@@ -197,6 +197,24 @@ test.describe("on a desktop", () => {
     await expect(page.locator(":focus").locator("[data-canvas-page-board]")).toHaveCount(1);
   });
 
+  test("should bring a control into view when focus moves to it while the board still glides to a frame", async ({ page }) => {
+    await open(page, "flow", "board");
+    await page.getByRole("button", { name: /Show at 100%/ }).click();
+    await page.getByRole("button", { name: "Frames" }).click();
+    const pane = await boxOf(board(page));
+    const alerts = frame(page, "settings").getByRole("switch", { name: "Push alerts" });
+    // The glide takes 200 ms; the focus lands in it. The browser then scrolls by where the control is drawn at that
+    // moment, not by where the view comes to rest, so the board has to bring the control into view again at rest.
+    await page.getByRole("menuitem", { name: /1\. Sign in/ }).click();
+    await alerts.focus();
+    await expect.poll(async () => board(page).evaluate((element) => [element.scrollLeft, element.scrollTop])).toEqual([0, 0]);
+    await expect.poll(async () => {
+      const box = await boxOf(alerts);
+      return box.x >= pane.x && box.x + box.width <= pane.x + pane.width;
+    }).toBe(true);
+    await expect(alerts).toBeFocused();
+  });
+
   test("should bring a control into view, without scrolling the board's box, when focus moves to one outside it", async ({ page }) => {
     await open(page, "flow", "board");
     await page.getByRole("button", { name: /Show at 100%/ }).click();

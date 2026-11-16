@@ -1,4 +1,5 @@
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 /**
  * The Views dialog (the gallery's "views dialog" specimen, the same dialog
@@ -7,7 +8,7 @@ import { expect, test } from "./support/test";
  * on an artifact that is not public.
  */
 test("should show totals, a daily chart, and top sites when an editor opens Views on a public artifact", async ({ page }) => {
-  await page.goto("/dev/components#views");
+  await openGallery(page, ["views"]);
   const fixture = page.locator('[data-views-fixture="public"]');
   await fixture.getByRole("button", { name: "Views" }).click();
 
@@ -29,7 +30,7 @@ test("should show totals, a daily chart, and top sites when an editor opens View
 });
 
 test("should say views are counted only while public when an editor opens Views on a private artifact", async ({ page }) => {
-  await page.goto("/dev/components#views");
+  await openGallery(page, ["views"]);
   await page.locator('[data-views-fixture="private"]').getByRole("button", { name: "Views" }).click();
 
   const dialog = page.getByRole("dialog", { name: "Views of Draft notes" });

@@ -8,6 +8,27 @@ import { expect, test } from "./support/test";
  * without a database, on a phone and a desktop.
  */
 
+/*
+ * These tests fail now and then on a cold dev server (the first tests of a CI shard): the notification's click is
+ * taken, and the artifact never opens. One cause is proven: the router drops a link that is still loading when
+ * anything writes the address bar in that time. Which write does it there is not known yet, so a failed test keeps
+ * its trace (CI uploads test-results), and the page notes every write of the address bar and who made it.
+ */
+test.use({ trace: "retain-on-failure" });
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    for (const name of ["pushState", "replaceState"] as const) {
+      const original = window.history[name].bind(window.history);
+      window.history[name] = (state: unknown, unused: string, url?: string | URL | null) => {
+        const stack = new Error().stack ?? "";
+        const who = !stack.includes("writeUrl") ? "the router" : stack.includes("settleUrl") ? "the workspace, for a link" : "the workspace, for the selection";
+        console.debug(`[address] ${name} by ${who}: ${String(url)} (was ${window.location.search || "plain"})`);
+        original(state, unused, url);
+      };
+    }
+  });
+});
+
 const editor = (page: Page, title: string) => page.getByRole("region", { name: `Edit ${title}` });
 const selectedCard = (page: Page) => page.locator('[data-slot="artifact-list"] [aria-current="true"]');
 const commentsHeading = (page: Page, title: string) => page.getByRole("heading", { name: `Comments on ${title}` });

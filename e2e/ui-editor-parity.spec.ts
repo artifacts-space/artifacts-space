@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 /*
  * A block looks the same in the interface editor as it does for readers,
@@ -148,7 +149,7 @@ function expectStyledFixture(forReaders: Drawn, isMobile: boolean) {
 }
 
 test("should draw every styled block in the editor as it is drawn for readers", async ({ page, isMobile }) => {
-  await page.goto("/dev/components#specs");
+  await openGallery(page, ["specs"]);
   const read = readView(page);
   await read.scrollIntoViewIfNeeded();
   await expect(read.getByText("Count every shelf", { exact: true })).toBeVisible();
