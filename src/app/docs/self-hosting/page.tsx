@@ -45,6 +45,7 @@ export default function SelfHostingPage() {
           <li><strong>Cloudflare R2</strong> for uploaded files. Without it, everything but files works.</li>
           <li><strong>A GitHub OAuth app</strong>, if you want GitHub sign-in. Optional.</li>
           <li><strong>A Google OAuth client</strong>, if you want Google sign-in. Optional.</li>
+          <li><strong>A second domain</strong>, if you want web pages (<code>html</code> artifacts) to run. Optional: set it as <code>PAGE_HOST</code>. Without it, such an artifact shows its source and does not run.</li>
           <li><strong>Node.js 22.22.1 or later</strong> and <strong>pnpm 10</strong>. CI and production run Node 26, the version in <code>.nvmrc</code>.</li>
         </ul>
         <p>The source is at <a href={DOCS_REPOSITORY}>{DOCS_REPOSITORY.replace("https://", "")}</a>.</p>

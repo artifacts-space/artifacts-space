@@ -105,6 +105,7 @@ export default function LimitsPage() {
         head={["Limit", "Value"]}
         rows={[
           ["Content per artifact", size(artifactSizeLimits.maxContentBytes)],
+          ["HTML page, styles and scripts included", size(artifactSizeLimits.maxContentBytes)],
           ["Metadata per artifact", size(artifactSizeLimits.maxMetadataBytes)],
           ["Mermaid source", `${n(maxMermaidLength)} characters`],
           ["ui spec", size(uiLimits.maxSpecBytes)],

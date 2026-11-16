@@ -36,10 +36,10 @@ const firstCall = JSON.stringify(
   2,
 );
 
-const uiPrompt = `Call artifacts_formats_guide with kind "ui", then build a ui
+const pagePrompt = `Call artifacts_formats_guide with kind "html", then build an html
 artifact that shows this week's deploy stats: three metrics,
 a line chart of deploys per day, and a table of failed deploys.
-Run artifacts_validate before you save it.`;
+Put the data in the page.`;
 
 /** Quickstart: connect a client, then save a first artifact. */
 export default function QuickstartPage() {
@@ -96,12 +96,12 @@ export default function QuickstartPage() {
         </p>
       </Prose>
 
-      <DocsH page={page} id="first-ui" />
-      <Prose><p>For dashboards and reports, ask for a <code>ui</code> artifact. The agent reads the component guide, writes a spec, and checks it before it saves:</p></Prose>
-      <CodeSnippet title="Prompt" code={uiPrompt} className="mt-4" />
+      <DocsH page={page} id="first-page" />
+      <Prose><p>For anything visual or interactive (a dashboard, a report with charts, a mockup, a prototype), ask for an <code>html</code> artifact. The agent reads the rules, writes one web page with its styles and scripts inside, and saves it:</p></Prose>
+      <CodeSnippet title="Prompt" code={pagePrompt} className="mt-4" />
       <Prose>
         <p>
-          Read <Link href={docsHref("json-render")}>JSON Render</Link> to see what a spec looks like, or try one in the <Link href={docsHref("json-render/playground")}>playground</Link>.
+          The page runs in a sandbox on the artifact&apos;s page, apart from your account, and Full screen gives it the whole window. It cannot call your API or any other site, so the agent puts the data in the page. See <Link href={docsHref("formats", "html")}>Formats</Link> for what a page may load.
         </p>
       </Prose>
 

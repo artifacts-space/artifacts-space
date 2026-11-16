@@ -44,7 +44,7 @@ export default function ThemesPage() {
     <RegistryPage slug={page}>
       <DocsH page={page} id="overview" />
       <Prose>
-        <p>A theme gives one artifact its own look. A long report can read like a printed page, and a dashboard can match your brand. Every theme passes WCAG AA contrast in light and dark, so every reader can read it.</p>
+        <p>A theme gives one artifact its own look. A long report can read like a printed page, and a team&apos;s documents can match its brand. Every theme passes WCAG AA contrast in light and dark, so every reader can read it.</p>
         <p>A theme changes these parts:</p>
         <ul>
           <li>The colors of the content: text, cards, buttons, charts, code, diagrams, and tables.</li>
@@ -52,7 +52,7 @@ export default function ThemesPage() {
           <li>The corner radius and the fonts.</li>
         </ul>
         <p>The site header, the comments, and the controls keep the standard look, so readers always know where they are. The theme applies for every reader of the artifact.</p>
-        <p>A theme is a preset id, such as <code>&quot;paper&quot;</code>, a team preset id, or theme JSON. An artifact with no theme of its own uses its team&apos;s default, or else the Default look. See <a href="#team">Team themes</a>. Every format can have a theme.</p>
+        <p>A theme is a preset id, such as <code>&quot;paper&quot;</code>, a team preset id, or theme JSON. An artifact with no theme of its own uses its team&apos;s default, or else the Default look. See <a href="#team">Team themes</a>. Every format can have a theme. A web page (<code>html</code>) sets its own colors and fonts inside its frame, so a theme changes the artifact&apos;s page around it, not the page in the frame.</p>
         <p>Theme values never become raw CSS. The server checks each value and writes it again in one standard form. The page sets each value as a CSS custom property on the artifact&apos;s wrapper, and every card, chart, code block, diagram, and table inside reads it.</p>
       </Prose>
 

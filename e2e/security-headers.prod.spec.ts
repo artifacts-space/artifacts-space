@@ -45,7 +45,7 @@ test("should send the frame document with its own policy, and none of the site's
   expect(await response.text()).toContain("artifact-page:ready");
 });
 
-for (const path of ["/preview", "/docs", "/sign-in", "/api/auth/get-session", "/mcp", "/_next/static/chunks/none.js"]) {
+for (const path of ["/preview", "/docs", "/sign-in", "/api/auth/get-session", "/mcp", "/llms.txt", "/_next/static/chunks/none.js"]) {
   test(`should answer 404 for ${path} on a page host`, async ({ request, baseURL }) => {
     const site = new URL(baseURL ?? "");
     const response = await request.get(path, { headers: { host: `${pageHostLabel}.localhost:${site.port}` }, maxRedirects: 0 });
@@ -57,7 +57,7 @@ for (const path of ["/preview", "/docs", "/sign-in", "/api/auth/get-session", "/
 
 // A wildcard domain sends every host under the page domain to the app. Only page hosts get an answer there.
 for (const name of ["www", "app", "WWW", `${pageHostLabel}.x`]) {
-  for (const path of ["/", "/preview", "/docs", "/sign-in", "/app", "/api/auth/get-session", "/api/mcp", "/robots.txt", "/_next/static/chunks/none.js"]) {
+  for (const path of ["/", "/preview", "/docs", "/sign-in", "/app", "/api/auth/get-session", "/api/mcp", "/robots.txt", "/llms.txt", "/_next/static/chunks/none.js"]) {
     test(`should answer 404 for ${path} on ${name}.<page domain>, which is no page host`, async ({ request, baseURL }) => {
       const site = new URL(baseURL ?? "");
       const response = await request.get(path, { headers: { host: `${name}.localhost:${site.port}` }, maxRedirects: 0 });
