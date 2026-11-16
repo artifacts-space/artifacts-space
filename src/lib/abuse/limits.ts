@@ -48,6 +48,13 @@ export const rateLimits = {
    */
   editLease: { limit: 1200, windowSeconds: hour },
   /**
+   * "Did it move on?" checks from an open canvas or interface per user per
+   * hour (src/lib/edits/catch-up-rules.ts). An editor asks when its tab comes
+   * back, at most once every 5 seconds; this is the runaway cap. Over it the
+   * answer is "nothing newer", and the next reload shows the newest save.
+   */
+  catchUp: { limit: 600, windowSeconds: hour },
+  /**
    * MCP `initialize` requests whose clientInfo is stored, per user per hour.
    * Over the limit the request still runs; only the clientInfo is not stored,
    * so a client that renames itself on every connect cannot churn the row.
@@ -273,6 +280,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   organize: "You have changed projects and tags a lot in the last hour.",
   harnessChoice: "You have changed agent labels a lot in the last hour.",
   editLease: "Your editors have said you are typing a lot in the last hour.",
+  catchUp: "Your open artifacts have checked for changes a lot in the last hour.",
   clientInfoRecord: "Your agents have connected a lot in the last hour.",
   readByUser: "You have read a lot of artifacts in the last hour.",
   readByToken: "This connection has read a lot in the last hour.",

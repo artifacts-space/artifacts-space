@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 
 import type { SourceToggle } from "@/components/app/artifact-editor/editor-toolbar";
-import { AgentSaveNotice, ConflictNotice, openHistoryButton } from "@/components/app/artifact-editor/save-status";
+import { AgentSaveNotice, CatchUpNotice, ConflictNotice, openHistoryButton } from "@/components/app/artifact-editor/save-status";
 import type { AutosaveStatus } from "@/components/app/artifact-editor/use-autosave";
 import type { HarnessControl } from "@/components/harness/use-artifact-harness";
 import { VersionHistory, type VersionHistoryProps } from "@/components/history/version-history";
@@ -38,6 +38,8 @@ export interface PageEditorChrome {
   conflict: PageConflict | null;
   /** Set after the editor's save went through over an agent's newer save (theirs is in History), until dismissed. */
   agentSaved: { onDismiss: () => void } | null;
+  /** Set after the page took a newer save when its tab came back (who changed what), until dismissed. */
+  caughtUp: { words: string; onDismiss: () => void } | null;
   /** "Made with": the agent harness the artifact shows; null while the editable copy loads. */
   harness: HarnessControl | null;
 }
@@ -140,6 +142,7 @@ export function useWaitingChrome(input: WaitingChromeInput | null, error: string
       save: error ? saveProblem(error) : idleSave,
       conflict: null,
       agentSaved: null,
+      caughtUp: null,
       harness: null,
     };
   }, [input, error, refresh, ownSaves]);
@@ -154,13 +157,19 @@ export function useWaitingChrome(input: WaitingChromeInput | null, error: string
 export function PageConflictNotice() {
   const chrome = usePageEditorChrome();
   if (!chrome) return null;
-  const { conflict, agentSaved, history } = chrome;
+  const { conflict, agentSaved, caughtUp, history } = chrome;
   return (
     <>
       {conflict ? <ConflictNotice status={conflict.status} onLoadTheirs={conflict.onLoadTheirs} onKeepMine={conflict.onKeepMine} className="mt-6 rounded-lg border sm:px-4" /> : null}
       <AgentSaveNotice
         show={agentSaved !== null}
         onDismiss={agentSaved?.onDismiss ?? noop}
+        history={<VersionHistory {...history} trigger={openHistoryButton} />}
+        className="mt-6 rounded-lg border sm:px-4"
+      />
+      <CatchUpNotice
+        words={caughtUp?.words ?? null}
+        onDismiss={caughtUp?.onDismiss ?? noop}
         history={<VersionHistory {...history} trigger={openHistoryButton} />}
         className="mt-6 rounded-lg border sm:px-4"
       />

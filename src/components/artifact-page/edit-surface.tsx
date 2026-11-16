@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 
 import { loadEditableArtifactAction } from "@/app/artifact/[publicId]/edit-actions";
 import { serverCaptureApi } from "@/components/artifact-view/canvas/capture/capture-api";
+import { ServerCatchUp } from "@/components/app/artifact-editor/use-catch-up";
 import { FrameCaptureHost } from "@/components/artifact-view/canvas/capture/frame-capture-host";
 import type { FileDto } from "@/lib/files/types";
 
@@ -63,7 +64,10 @@ export function EditSurface({ publicId, title, updatedAt, reviewed, fullWidth, f
   // One frame for both states: the heading and body never remount when editing unlocks.
   return (
     <>
-      <PageEditFrame editor={editor} reviewed={reviewed} pageFullWidth={fullWidth}>{children}</PageEditFrame>
+      {/* A canvas or interface takes a newer save when the tab comes back. This page is rendered only for someone who may edit. */}
+      <ServerCatchUp>
+        <PageEditFrame editor={editor} reviewed={reviewed} pageFullWidth={fullWidth}>{children}</PageEditFrame>
+      </ServerCatchUp>
       {/* Draws the frames of a canvas for agents, out of sight, once the editable copy has loaded. This page is rendered only for someone who may edit. */}
       <FrameCaptureHost artifactId={loaded?.id ?? null} kind={loaded?.kind ?? ""} savedAt={loaded?.updatedAt ?? null} api={serverCaptureApi} />
     </>

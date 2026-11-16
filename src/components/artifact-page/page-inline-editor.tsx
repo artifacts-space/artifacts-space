@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { useArtifactDraft, type ArtifactDraft } from "@/components/app/artifact-editor/use-artifact-draft";
 import { useAutosave, type SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
+import { useCatchUp, useCaughtUp, type CaughtUp } from "@/components/app/artifact-editor/use-catch-up";
 import type { SignalEditing } from "@/components/app/artifact-editor/use-editing-signal";
 import { useArtifactHarness } from "@/components/harness/use-artifact-harness";
 import type { ArtifactDto } from "@/lib/artifact-types";
@@ -49,6 +50,14 @@ export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: A
     onUpdated(next);
   }, [reset, onUpdated]);
 
+  // A newer save the page took when its tab came back (use-catch-up.tsx): the notice, and the canvas frames to mark.
+  const { caughtUp, setCaughtUp, dismiss: dismissCaughtUp } = useCaughtUp(artifact?.id ?? "");
+  const caughtUpWith = useCallback((next: ArtifactDto, note: CaughtUp) => {
+    onUpdated(next);
+    setCaughtUp(note);
+  }, [onUpdated, setCaughtUp]);
+  const changedFrames = caughtUp?.frames;
+
   const toggleSource = useCallback(() => {
     // Back from the source, editors that keep their own state reload what was typed there.
     if (sourceOpen) remount();
@@ -64,9 +73,10 @@ export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: A
     sourceOpen,
     showSource: () => { if (!sourceOpen) toggleSource(); },
     hideSource: () => { if (sourceOpen) toggleSource(); },
-  }), [artifact, draft, update, revision, sourceOpen, toggleSource]);
+    changedFrames,
+  }), [artifact, draft, update, revision, sourceOpen, toggleSource, changedFrames]);
 
-  return { artifact, draft, replace, sourceOpen, toggleSource, onUpdated, restored, start, value };
+  return { artifact, draft, replace, sourceOpen, toggleSource, onUpdated, restored, start, value, caughtUp, caughtUpWith, dismissCaughtUp };
 }
 
 type PageEditor = ReturnType<typeof usePageEditor>;
@@ -92,7 +102,8 @@ function PageEditControls({ artifact, editor, reviewed, pageFullWidth, save, sig
   useLeaveGuard(autosave.dirty || autosave.status.kind === "saving");
   const fullWidth = usePageFullWidth(artifact, pageFullWidth);
   const { status, dirty, retryNow, loadTheirs, keepMine, agentSaved, dismissAgentSaved } = autosave;
-  const { restored, sourceOpen, toggleSource } = editor;
+  const { restored, sourceOpen, toggleSource, caughtUp, caughtUpWith, dismissCaughtUp } = editor;
+  useCatchUp({ artifact, stored: true, unsaved: dirty || status.kind === "saving", onCaughtUp: caughtUpWith });
   const ownSaves = useOwnSaves();
   const harness = useArtifactHarness(artifact, editor.onUpdated);
   const chrome = useMemo<PageEditorChrome>(() => ({
@@ -112,8 +123,9 @@ function PageEditControls({ artifact, editor, reviewed, pageFullWidth, save, sig
     save: saveIndicatorFor(status, dirty, retryNow),
     conflict: status.kind === "conflict" ? { status, onLoadTheirs: loadTheirs, onKeepMine: keepMine } : null,
     agentSaved: agentSaved ? { onDismiss: dismissAgentSaved } : null,
+    caughtUp: caughtUp ? { words: caughtUp.words, onDismiss: dismissCaughtUp } : null,
     harness,
-  }), [artifact, ownSaves, reviewed, dirty, restored, sourceOpen, toggleSource, fullWidth, status, retryNow, loadTheirs, keepMine, agentSaved, dismissAgentSaved, harness]);
+  }), [caughtUp, dismissCaughtUp, artifact, ownSaves, reviewed, dirty, restored, sourceOpen, toggleSource, fullWidth, status, retryNow, loadTheirs, keepMine, agentSaved, dismissAgentSaved, harness]);
   usePublishPageEditorChrome(chrome);
   return null;
 }

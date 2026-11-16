@@ -6,6 +6,7 @@ import { IconCode, IconCodeOff } from "@tabler/icons-react";
 
 import { CsvContentEditor } from "@/components/artifact-page/csv-content-editor";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { ChangedFramesContext } from "@/components/artifact-view/canvas/changed-frames";
 import { ThemeScope } from "@/components/artifact-view/theme-scope";
 import { ContentStatus } from "@/components/editor/content-status";
 import { DocumentEditor, isDocumentKind, type DocumentKind } from "@/components/editor/document-editor";
@@ -169,7 +170,11 @@ interface InlineContentProps {
   onShowSource: () => void;
   /** Closes View source. With it the source has a Hide source button above it. */
   onHideSource?: (() => void) | undefined;
+  /** A canvas's frames that a newer save changed, to mark on the board while the notice about it is up. */
+  changedFrames?: ReadonlySet<string> | undefined;
 }
+
+const noFrames: ReadonlySet<string> = new Set();
 
 /** A field a person types into: a document, a sheet's cell, a block's text. */
 const editableField = '[contenteditable="true"], textarea, input';
@@ -304,7 +309,9 @@ export function InlineContent(props: InlineContentProps) {
     <>
       {/* Marks where the content starts, so the handoff can find its first field. It takes no room. */}
       <span ref={markRef} hidden />
-      <Content {...props} handoff={handoff} />
+      <ChangedFramesContext value={props.changedFrames ?? noFrames}>
+        <Content {...props} handoff={handoff} />
+      </ChangedFramesContext>
     </>
   );
 }

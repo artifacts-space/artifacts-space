@@ -194,6 +194,36 @@ export function AgentSaveNotice({ show, onDismiss, history, className, column }:
   );
 }
 
+interface CatchUpNoticeProps {
+  /** Who changed what, after the editor took a newer save; null shows nothing. */
+  words: string | null;
+  onDismiss: () => void;
+  /** Opens History, where the version from before the change is. */
+  history?: React.ReactNode;
+  className?: string;
+  /** The content's column in the /app pane, so the notice lines up with the title. */
+  column?: string;
+}
+
+/**
+ * Shown after an open canvas or interface took a newer save when its tab
+ * came back (use-catch-up.tsx): who saved and what changed. Dismissing it
+ * also clears the marks on the changed frames.
+ */
+export function CatchUpNotice({ words, onDismiss, history, className, column }: CatchUpNoticeProps) {
+  if (words === null) return null;
+  return (
+    <NoticeBand column={column} className={className} slot="catch-up-notice">
+      <IconInfoCircle aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+      <p className="min-w-0 flex-1 text-sm break-words">{words}</p>
+      <div className="flex shrink-0 items-center gap-1">
+        {history}
+        <Button variant="ghost" size="sm" onClick={onDismiss}>Dismiss</Button>
+      </div>
+    </NoticeBand>
+  );
+}
+
 /** The notice's way into History, as VersionHistory's `trigger`. */
 export function openHistoryButton(openHistory: () => void) {
   return <Button variant="outline" size="sm" onClick={openHistory}>Open History</Button>;

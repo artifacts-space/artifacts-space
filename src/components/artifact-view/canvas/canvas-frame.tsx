@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 import { UiView } from "../ui-view";
 import { IssueList, ViewNotice } from "../view-notice";
+import { useFrameChanged } from "./changed-frames";
 import { frameBodyAttribute } from "./use-board-measure";
 
 /** One frame, ready to draw: its fields, its place on the board, and its spec as JSON text. */
@@ -93,6 +94,13 @@ const bodyClass =
   `${frameSurfaceClass} rounded-lg border border-card-edge shadow-xs [zoom:min(1,tan(atan2(100cqw,var(--frame-width))))] group-focus-visible/frame:ring-3 group-focus-visible/frame:ring-ring/50 @[640px]/canvas:[zoom:1] @[640px]/canvas:[contain-intrinsic-block-size:auto_var(--frame-rest-height)] @[640px]/canvas:[content-visibility:auto]`;
 
 /**
+ * The outline of a frame a newer save changed. The board scales its frames,
+ * so the line's width is divided by the board's zoom and reads the same at
+ * every zoom; in the column nothing scales the frame's place.
+ */
+const changedClass = "outline-solid outline-tone-accent outline-[length:calc(2px/var(--canvas-zoom,1))] outline-offset-[calc(4px/var(--canvas-zoom,1))]";
+
+/**
  * One frame: its name and size above it, then its content at the frame's real
  * width. Its styles follow the canvas column: in a narrow column the frame is
  * in the page's flow, scaled to the column; in a wide one it sits at its
@@ -101,11 +109,13 @@ const bodyClass =
  */
 export const CanvasFrame = memo(function CanvasFrame({ frame }: { frame: BoardFrame }) {
   const labelId = useId();
+  const changed = useFrameChanged(frame.id);
   return (
-    <div role="group" aria-labelledby={labelId} tabIndex={-1} data-canvas-frame={frame.id} className={slotClass} style={frameVariables(frame)}>
+    <div role="group" aria-labelledby={labelId} tabIndex={-1} data-canvas-frame={frame.id} data-frame-changed={changed ? "" : undefined} className={cn(slotClass, changed && changedClass)} style={frameVariables(frame)}>
       <div id={labelId} data-comment-skip="" data-canvas-frame-label="" className={labelClass}>
         <span className="truncate font-medium text-foreground">{frame.name}</span>
         <span className="shrink-0 text-muted-foreground">{frameSizeLabel(frame)}</span>
+        {changed ? <span className="shrink-0 font-medium text-tone-accent">Changed</span> : null}
       </div>
       <div {...{ [frameBodyAttribute]: frame.id }} className={cn(bodyClass, framePaddingClass[frame.padding])} style={{ minHeight: frame.height ?? undefined }}>
         <FrameContent frame={frame} />

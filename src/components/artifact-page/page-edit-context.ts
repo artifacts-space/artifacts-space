@@ -23,6 +23,8 @@ export interface PageEdit {
   sourceOpen: boolean;
   showSource: () => void;
   hideSource: () => void;
+  /** A canvas's frames that a newer save changed, marked while the notice about it is up. */
+  changedFrames: ReadonlySet<string> | undefined;
 }
 
 export const PageEditContext = createContext<PageEdit | null>(null);
