@@ -162,6 +162,10 @@ const codeAfterMarker = /^[ \t>]*(?:[-+*]|\d{1,9}[.)]) {5,}\S/m;
 const tabIndent = /^[ >]*\t/m;
 /** A task box with no space and text after it: `- [ ]`, `- [x]a`, or a tab after the box. */
 const oddBox = /^[ \t>]*[-+*][ \t]+\[[ xX]\](?:[^ \n]|[ \t]*$)/m;
+/** A heading marker as an item's first text: `- # A`. */
+const headingInItem = /^[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]+#{1,6}(?:[ \t]|$)/m;
+/** A line of dashes or equals signs set in under an item's text, which the read view takes as a heading underline. */
+const underlineInItem = /^[ \t>]+(?:-+|=+)[ \t]*$/m;
 const numberedLine = /^( *)(\d{1,9})[.)][ \t]/;
 
 const markerLine = /^( *)(?:[-+*]|\d{1,9}[.)])(?:[ \t]|$)/;
@@ -185,7 +189,7 @@ function numberUnderText(markdown: string): boolean {
 
 /** True when the block has a list shape the two readers may read differently, so the read view's reading is checked. */
 export function mayReadDifferently(markdown: string): boolean {
-  if ([emptyItem, numberedTask, codeAfterMarker, tabIndent, oddBox].some((pattern) => pattern.test(markdown))) return true;
+  if ([emptyItem, numberedTask, codeAfterMarker, tabIndent, oddBox, headingInItem, underlineInItem].some((pattern) => pattern.test(markdown))) return true;
   return numberUnderText(markdown);
 }
 

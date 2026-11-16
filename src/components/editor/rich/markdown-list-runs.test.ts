@@ -3,7 +3,7 @@ import { MarkdownManager } from "@tiptap/markdown";
 import { unified } from "unified";
 import { describe, expect, it, vi } from "vitest";
 
-import { editBothWays, find, paragraph, reloaded, setText, tick } from "./list-edit-helpers";
+import { editAndSave, editBothWays, find, paragraph, reloaded, setText, tick } from "./list-edit-helpers";
 import { readsTheSame } from "./markdown-display-shape";
 import { parseMarkdown, serializeMarkdown } from "./markdown-roundtrip";
 
@@ -196,9 +196,10 @@ describe("the read view's reading of what was edited", () => {
     expect(readsTheSame(saved, doc.content ?? [])).toBe(true);
   });
 
-  it("should write the list whole when an edited item reads as a heading in the read view", () => {
+  it("should save text the read view reads as the edit when an item emptied under another would read as a dash line under it", () => {
     // `* b` then `  -` under it: the read view reads `b` over a line of dashes as a heading.
-    const { saved, whole } = editBothWays("* a\n* b\n  - c\n", (edited) => { find(edited, "paragraph", "c").content = []; });
-    expect(saved).toBe(whole);
+    const { doc, saved } = editAndSave("* a\n* b\n  - c\n", (edited) => { find(edited, "paragraph", "c").content = []; });
+    expect(readsTheSame(saved, doc.content ?? [])).toBe(true);
+    expect(parseMarkdown(saved).rawBlocks).toBe(0);
   });
 });
