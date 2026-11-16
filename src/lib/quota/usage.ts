@@ -9,6 +9,7 @@ import { agent, artifact, artifactFile, artifactVersion, user } from "@/db/schem
 import { fileLimits } from "@/lib/files/config";
 import { byteLength } from "@/lib/artifact-limits";
 import { captureLimits } from "@/lib/canvas/capture-rules";
+import { isUndefinedTable } from "@/lib/db-errors";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { contentBytesAdded, contentQuotaProblem, fileQuotaProblem, quotaLimits, type QuotaOwner } from "./rules";
@@ -56,31 +57,47 @@ export function contentBytesUsed(userId: string): Promise<number> {
   `);
 }
 
-/**
- * Bytes of files in the account: finished uploads, plus uploads started
- * within the last hour (older pending ones are abandoned), plus the old
- * copies History keeps of files it replaced, each counted for the person
- * who uploaded that copy, plus the frame captures the account's browsers
- * drew (src/lib/canvas/captures.ts: ready ones, and pending ones started
- * within the last hour).
- */
-export function fileBytesUsed(userId: string, now = new Date()): Promise<number> {
-  const pendingSince = new Date(now.getTime() - fileLimits.pendingTtlMs).toISOString();
+/** Bytes of the frame captures the account's browsers drew: ready ones, and pending ones started within the last hour. */
+function captureBytesTerm(userId: string, now: Date) {
   const capturesSince = new Date(now.getTime() - captureLimits.pendingTtlMs).toISOString();
-  return sumBytes(sql`
+  return sql`
+      + coalesce((
+        select sum(${frameCapture.bytes}) from ${frameCapture}
+        where ${frameCapture.capturedBy} in ${accountUserIds(userId)}
+          and (${frameCapture.status} = 'ready' or (${frameCapture.status} = 'pending' and ${frameCapture.startedAt} > ${capturesSince}::timestamptz))
+      ), 0)`;
+}
+
+function fileBytesQuery(userId: string, now: Date, withCaptures: boolean) {
+  const pendingSince = new Date(now.getTime() - fileLimits.pendingTtlMs).toISOString();
+  return sql`
     select
       coalesce((
         select sum(${artifactFile.size}) from ${artifactFile}
         where ${artifactFile.uploaderId} in ${accountUserIds(userId)}
           and (${artifactFile.status} = 'ready' or ${artifactFile.createdAt} > ${pendingSince}::timestamptz)
       ), 0)
-      + coalesce((select sum(${artifactFileCopy.size}) from ${artifactFileCopy} where ${artifactFileCopy.uploaderId} in ${accountUserIds(userId)}), 0)
-      + coalesce((
-        select sum(${frameCapture.bytes}) from ${frameCapture}
-        where ${frameCapture.capturedBy} in ${accountUserIds(userId)}
-          and (${frameCapture.status} = 'ready' or (${frameCapture.status} = 'pending' and ${frameCapture.startedAt} > ${capturesSince}::timestamptz))
-      ), 0) as bytes
-  `);
+      + coalesce((select sum(${artifactFileCopy.size}) from ${artifactFileCopy} where ${artifactFileCopy.uploaderId} in ${accountUserIds(userId)}), 0)${withCaptures ? captureBytesTerm(userId, now) : sql``} as bytes
+  `;
+}
+
+/**
+ * Bytes of files in the account: finished uploads, plus uploads started
+ * within the last hour (older pending ones are abandoned), plus the old
+ * copies History keeps of files it replaced, each counted for the person
+ * who uploaded that copy, plus the frame captures the account's browsers
+ * drew (src/lib/canvas/captures.ts: ready ones, and pending ones started
+ * within the last hour). Where the frame capture table does not exist yet
+ * (code serving before its migration), there are no captures to count, so
+ * uploads keep working.
+ */
+export async function fileBytesUsed(userId: string, now = new Date()): Promise<number> {
+  try {
+    return await sumBytes(fileBytesQuery(userId, now, true));
+  } catch (error) {
+    if (!isUndefinedTable(error)) throw error;
+    return sumBytes(fileBytesQuery(userId, now, false));
+  }
 }
 
 const accountOwnerUser = alias(user, "account_owner");

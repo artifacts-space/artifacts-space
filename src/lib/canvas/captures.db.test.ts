@@ -148,10 +148,15 @@ describe.runIf(Boolean(databaseUrl))("frame captures with a database", async () 
     });
 
     it("should answer not-now when the artifact is not a canvas or its theme could not be read", async () => {
+      const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
       expect(await capturesNeeded(users.ada, noteId)).toEqual({ state: "not-now" });
+      expect(logged).not.toHaveBeenCalled();
       theme.fails = true;
       expect(await capturesNeeded(users.ada, canvasId)).toEqual({ state: "not-now" });
       expect(await captures()).toEqual([]);
+      // The failure leaves a trace: the error's name, never its message, a theme, or a team.
+      expect(logged.mock.calls).toEqual([["[captures] A canvas's theme could not be read", "Error"]]);
+      logged.mockRestore();
     });
 
     it("should leave out a drawing that has a current image, and one another tab just started", async () => {
@@ -272,11 +277,33 @@ describe.runIf(Boolean(databaseUrl))("frame captures with a database", async () 
       expect((await startCapture(users.ada, startInput(drawing.frameHash))).uploads).toHaveLength(1);
     });
 
-    it("should refuse when the canvas holds as many images as it can", async () => {
+    const full = captureLimits.maxParts * captureLimits.maxPartBytes;
+    const fullRows = (frameHash: (index: number) => string, mode: "light" | "dark") =>
+      Array.from({ length: Math.ceil(captureLimits.maxCanvasBytes / full) }, (_, index) => row(frameHash(index), { status: "ready", bytes: full, mode }));
+
+    it("should refuse when the canvas holds as many images of its current content as it can", async () => {
       const drawing = await homeLight();
-      const full = captureLimits.maxParts * captureLimits.maxPartBytes;
-      await getDb().insert(frameCapture).values(Array.from({ length: Math.ceil(captureLimits.maxCanvasBytes / full) }, (_, index) => row(`full-${String(index)}`, { status: "ready", bytes: full })));
+      // The board's own dark drawing: images of current content are what the cap counts.
+      const needed = await capturesNeeded(users.ada, canvasId);
+      const dark = needed.state === "draw" ? needed.frames.find((frame) => frame.width === 1440)?.drawings.find((candidate) => candidate.mode === "dark") : undefined;
+      if (!dark) throw new Error("Expected the home frame in dark.");
+      await getDb().insert(frameCapture).values(fullRows(() => dark.frameHash, "dark"));
       await expect(startCapture(users.ada, startInput(drawing.frameHash))).rejects.toThrow("as many frame images as it can");
+    });
+
+    it("should not count images of content that left the board toward the canvas's cap", async () => {
+      const drawing = await homeLight();
+      await getDb().insert(frameCapture).values(fullRows((index) => `left-${String(index)}`, "light"));
+      expect((await startCapture(users.ada, startInput(drawing.frameHash))).uploads).toHaveLength(1);
+    });
+
+    it("should refuse a drawing that is shorter than the least height its frame asks for", async () => {
+      const tall = JSON.stringify({ version: 1, frames: [{ id: "home", name: "Home", width: 1440, height: 900, spec: heading("Home") }] });
+      await getDb().update(artifact).set({ content: tall }).where(eq(artifact.id, canvasId));
+      const drawing = await homeLight();
+      await expect(startCapture(users.ada, startInput(drawing.frameHash, [9000], 899))).rejects.toThrow("The drawing is shorter than its frame.");
+      expect(await captures()).toEqual([]);
+      expect((await startCapture(users.ada, startInput(drawing.frameHash, [9000, 8000], 900))).uploads).toHaveLength(2);
     });
 
     it("should refuse when the capture does not fit the person's file storage quota", async () => {
@@ -321,6 +348,13 @@ describe.runIf(Boolean(databaseUrl))("frame captures with a database", async () 
       expect(bucket.objects.size).toBe(0);
       // A second try finds nothing to finish.
       await expect(finishCapture(users.ada, captureId)).rejects.toThrow("Frame image not found.");
+    });
+
+    it("should say a part is empty, not too large, when it holds no bytes", async () => {
+      const { captureId } = await startedHome([9000, 8000], 1000);
+      upload(captureId, 1440, 1000, [9000, 8000], (part) => (part === 2 ? { size: 0 } : {}));
+      await expect(finishCapture(users.ada, captureId)).rejects.toThrow("Part 2 is empty or could not be read.");
+      expect((await captureById(captureId))?.status).toBe("removed");
     });
 
     it("should refuse someone who did not start the capture, and leave it as it was", async () => {

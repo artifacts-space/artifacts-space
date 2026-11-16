@@ -161,8 +161,10 @@ function frameOf(board: CaptureBoard, drawing: CaptureDrawing): BoardFrame | nul
 const changedMessage = "This frame changed, so its image is no longer needed.";
 
 /** Refuses a capture that would put the person or the canvas over a storage limit. */
-async function assertRoom(userId: string, record: ArtifactRecord, drawing: CaptureDrawing, bytes: number, now: Date): Promise<void> {
-  const rows = await listLiveCaptures(record.id);
+async function assertRoom(userId: string, record: ArtifactRecord, board: CaptureBoard, drawing: CaptureDrawing, bytes: number, now: Date): Promise<void> {
+  // Only images of content that is on the board count: the next needed-list call removes the others.
+  const current = new Set(boardDrawings(board).map(drawingKey));
+  const rows = (await listLiveCaptures(record.id)).filter((row) => current.has(drawingKey(row)));
   if (rows.some((row) => row.status === "ready" && drawingKey(row) === drawingKey(drawing))) throw new UserFacingError("This frame already has a current image.");
   if ((await countPendingCaptures(userId, now)) >= captureLimits.maxPendingPerUser) throw new UserFacingError("You have many unfinished frame images. Wait for them to finish, then try again.");
   const used = rows.filter((row) => countsTowardStorage(row, now)).reduce((sum, row) => sum + row.bytes, 0);
@@ -173,7 +175,8 @@ async function assertRoom(userId: string, record: ArtifactRecord, drawing: Captu
 /**
  * Starts a capture of one drawing for `userId`. Refuses when captures are
  * off, when the person may not edit the canvas, when the content is no
- * longer on the board, when the parts do not fit the frame's geometry, and
+ * longer on the board, when the drawing is shorter than the frame's least
+ * height, when the parts do not fit the frame's geometry, and
  * over the rate limits, the cap on unfinished captures, the canvas's
  * storage cap, or the person's file storage quota.
  */
@@ -185,13 +188,16 @@ export async function startCapture(userId: string, input: StartCaptureInput, now
   if (!record) throw new UserFacingError("Only a canvas has frame images.");
   // After the access check, so someone who may not edit never uses up the canvas's budget.
   await enforceRateLimit("frameCaptureStartByArtifact", record.id);
-  const frame = frameOf(await boardOrRefuse(record), parsed);
+  const board = await boardOrRefuse(record);
+  const frame = frameOf(board, parsed);
   if (!frame) throw new UserFacingError(changedMessage);
+  // The frame is never drawn shorter than the least height it asks for.
+  if (frame.height !== null && parsed.height < frame.height) throw new UserFacingError("The drawing is shorter than its frame.");
   const geometry = captureGeometry(frame.width, parsed.height);
   const problem = partsProblem(geometry, parsed.parts);
   if (problem) throw new UserFacingError(problem);
   const bytes = parsed.parts.reduce((sum, part) => sum + part.bytes, 0);
-  await assertRoom(userId, record, parsed, bytes, now);
+  await assertRoom(userId, record, board, parsed, bytes, now);
   const captureId = randomUUID();
   const contentType = parsed.parts[0]?.contentType ?? captureTypes[0];
   const config = r2ConfigFromEnv();
@@ -233,7 +239,8 @@ async function checkPart(config: R2Config, row: FrameCaptureRecord, geometry: Ca
   const key = captureObjectKey(row.artifactId, row.id, part);
   const stored = await headObject(config, key);
   if (!stored) return { problem: `Part ${String(part)} did not arrive.` };
-  if (stored.size <= 0 || stored.size > captureLimits.maxPartBytes) return { problem: `Part ${String(part)} is larger than a part can be.` };
+  if (stored.size <= 0) return { problem: `Part ${String(part)} is empty or could not be read.` };
+  if (stored.size > captureLimits.maxPartBytes) return { problem: `Part ${String(part)} is larger than a part can be.` };
   const storedType = (stored.contentType.split(";")[0] ?? "").trim().toLowerCase();
   if (storedType !== row.contentType) return { problem: `Part ${String(part)} is not stored as ${row.contentType}.` };
   const problem = pictureProblem(row, geometry, part, await readObjectStart(config, key, imageHeaderBytes));

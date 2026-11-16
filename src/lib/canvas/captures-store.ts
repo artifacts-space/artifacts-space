@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getDb } from "@/db";
 import { frameCapture, type FrameCaptureRecord } from "@/db/frame-capture-schema";
 import { artifact } from "@/db/schema";
+import { isDeadlock } from "@/lib/db-errors";
 import { deleteObject, r2ConfigFromEnv } from "@/lib/files/r2";
 
 import { captureLimits, captureObjectKeys, drawingKey, removalIsFinal, type CaptureDrawing } from "./capture-rules";
@@ -142,16 +143,6 @@ export async function getOwnPendingCapture(captureId: string, userId: string): P
 }
 
 const readyRowSchema = z.object({ made: z.enum(["ready", "retired"]), id: z.string(), artifact_id: z.string(), part_count: z.coerce.number(), started_at: z.coerce.date() });
-
-/** Postgres ended this statement to break a deadlock (40P01). Drivers and drizzle may wrap the error, so the causes are followed a few levels. */
-function isDeadlock(error: unknown): boolean {
-  let current: unknown = error;
-  for (let depth = 0; depth < 4 && typeof current === "object" && current !== null; depth += 1) {
-    if ("code" in current && current.code === "40P01") return true;
-    current = "cause" in current ? current.cause : null;
-  }
-  return false;
-}
 
 /**
  * The statement markCaptureReady runs. It first locks every live capture of

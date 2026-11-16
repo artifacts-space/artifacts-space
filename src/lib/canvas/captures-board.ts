@@ -62,7 +62,9 @@ async function boardTheme(record: Pick<ArtifactRecord, "userId" | "visibility" |
   try {
     const context = await loadArtifactThemeContext({ userId: record.userId, visibility: record.visibility, teamId: record.teamId }, [record.theme]);
     return resolveArtifactTheme(record.theme, context).theme;
-  } catch {
+  } catch (error) {
+    // The name only, so a failure that lasts can be found without logging a theme or a team.
+    console.error("[captures] A canvas's theme could not be read", error instanceof Error ? error.name : "unknown error");
     throw new ThemeUnreadableError();
   }
 }
