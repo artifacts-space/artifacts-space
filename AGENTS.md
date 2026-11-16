@@ -1051,7 +1051,9 @@ The browser side is `src/components/artifact-view/canvas/capture`.
   library fetch a file: the file route redirects to another origin, which
   fails in some browsers and logs an error, and a copy the page already
   showed is cached without the header a script needs. A picture that cannot
-  be fetched, or is over 10 MB, is left blank and the capture is `partial`.
+  be fetched, does not answer within 15 seconds, or is over 10 MB, is left
+  blank and the capture is `partial`. A part upload has a deadline too: one
+  pass runs at a time, so a request that never answers must never hold it.
 - The ready rule (`capture-ready.ts`): the theme's font stylesheets loaded,
   `document.fonts.ready`, every picture decoded, no diagram still
   `data-diagram-state="drawing"`, then two frames of layout. After 10
@@ -1070,7 +1072,12 @@ The browser side is `src/components/artifact-view/canvas/capture`.
   exact size, that none is blank, that light is light and dark is dark on a
   page of either mode, that a changed frame gives a changed image, and that
   a second pass uploads nothing. It waits for the host's marks
-  (`data-frame-captures`, `data-frame-capture-passes`).
+  (`data-frame-captures`, `data-frame-capture-passes`) and checks
+  `data-frame-capture-left-out`, how many drawings the last pass could not
+  make. A drawing that is left out is counted by its reason
+  (`LeftOutReason`) and named in one `console.debug` line when the pass
+  ends, with counts only: the host never logs an error, and never names a
+  frame, a spec, or a file.
   `e2e/frame-captures-db.spec.ts` runs the real path from both mount points
   (the /app editor and the artifact page) and checks that the server accepts
   every part and that a reader gets no host. It needs `E2E_LOCAL_DB=1` and
