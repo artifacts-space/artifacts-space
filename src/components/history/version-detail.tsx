@@ -42,16 +42,17 @@ interface BodyProps {
   compareWith: VersionDetailDto | null;
   compareId: string | null;
   files: readonly FileDto[];
+  pageKey: string;
 }
 
-function VersionBody({ view, selected, compareWith, compareId, files }: BodyProps) {
+function VersionBody({ view, selected, compareWith, compareId, files, pageKey }: BodyProps) {
   if (view === "preview") {
     // The preview shows the version in the theme it was saved with (a team preset as it is now, or the team default), under its cover.
     return (
       <ThemeScope theme={selected.renderTheme ?? resolveTheme(selected.theme, null).theme} className="text-foreground">
         {selected.cover ? <div data-version-cover="" className="relative mb-6 h-20 overflow-hidden rounded-lg"><CoverArt cover={selected.cover} /></div> : null}
         <VersionFiles files={files} replacedSince={selected.latest ? [] : selected.replacedSince ?? []}>
-          <ArtifactView kind={selected.kind} content={selected.content} title={selected.title} language={selected.language} />
+          <ArtifactView kind={selected.kind} content={selected.content} title={selected.title} language={selected.language} pageKey={pageKey} />
         </VersionFiles>
       </ThemeScope>
     );
@@ -86,12 +87,14 @@ interface VersionDetailProps {
   view: VersionView;
   onView: (view: VersionView) => void;
   files: readonly FileDto[];
+  /** The artifact's public id: an HTML version runs on the artifact's own page host. */
+  pageKey: string;
   restoring: boolean;
   onRestore: () => void;
 }
 
 /** One version: who saved it, a preview or a diff, and Restore for older versions. */
-export function VersionDetail({ version, versions, details, error, view, onView, files, restoring, onRestore }: VersionDetailProps) {
+export function VersionDetail({ version, versions, details, error, view, onView, files, pageKey, restoring, onRestore }: VersionDetailProps) {
   const selected = details.get(version.id);
   const needed = versionsNeeded(versions, version.id, view);
   const compareId = view === "preview" ? null : needed[1] ?? null;
@@ -120,7 +123,7 @@ export function VersionDetail({ version, versions, details, error, view, onView,
         {error ? <p role="alert" className="mb-3 text-sm text-destructive">{error}</p> : null}
         <ReplacedFiles files={filesReplacedSince(version, selected)} />
         {selected ? (
-          <VersionBody view={view} selected={selected} compareWith={compareId ? details.get(compareId) ?? null : null} compareId={compareId} files={files} />
+          <VersionBody view={view} selected={selected} compareWith={compareId ? details.get(compareId) ?? null : null} compareId={compareId} files={files} pageKey={pageKey} />
         ) : (
           <Loading />
         )}

@@ -70,13 +70,14 @@ export function editColumnClass(fullWidth: boolean): string {
 /**
  * Whether an artifact's body uses the whole width. A spreadsheet (CSV)
  * always does, whatever its Full width setting, as a sheet does in a
- * spreadsheet app; every other kind follows the setting.
+ * spreadsheet app, and so does an HTML page, which is laid out for a
+ * window, not for a reading column; every other kind follows the setting.
  */
 export function usesFullWidth(kind: ArtifactKind, fullWidth: boolean): boolean {
-  return fullWidth || kind === "csv";
+  return fullWidth || !hasWidthSetting(kind);
 }
 
-/** Whether the Full width setting does anything for this kind: it does not for a CSV, which is always full width. */
+/** Whether the Full width setting does anything for this kind: it does not for a CSV or an HTML page, which are always full width. */
 export function hasWidthSetting(kind: ArtifactKind): boolean {
-  return kind !== "csv";
+  return kind !== "csv" && kind !== "html";
 }

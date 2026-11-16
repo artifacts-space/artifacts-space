@@ -1,6 +1,7 @@
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { canvasExcerpt } from "@/lib/canvas/outline";
 import { parseCsv } from "@/lib/csv";
+import { htmlText } from "@/lib/html/rules";
 import { uiSpecToMarkdown } from "@/lib/markdown/ui-spec";
 import { OG_WORDMARK } from "@/lib/site-copy";
 import { validateUiSpec } from "@/lib/ui/validate";
@@ -107,6 +108,7 @@ function fileExcerpt(notes: string, files: DescriptionInput["files"]): string {
 
 const excerpts: Record<ArtifactKind, (input: DescriptionInput) => string> = {
   markdown: ({ content }) => markdownExcerpt(content),
+  html: ({ content }) => htmlText(content).slice(0, proseScan),
   text: ({ content }) => content.slice(0, proseScan),
   ui: ({ content }) => uiExcerpt(content),
   canvas: ({ content }) => canvasExcerpt(content),

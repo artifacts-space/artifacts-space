@@ -1,6 +1,7 @@
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { validateCanvas } from "@/lib/canvas/validate";
 import { detectDelimiter, parseCsv } from "@/lib/csv";
+import { looksLikeHtmlPage } from "@/lib/html/rules";
 import { checkMermaidSource, mermaidDiagramType } from "@/lib/mermaid-source";
 import { checkSvg } from "@/lib/svg";
 import { validateUiSpec } from "@/lib/ui/validate";
@@ -271,7 +272,7 @@ export function detectTextKind(text: string): Detection {
 }
 
 /** Extensions of formats read as text when dropped, since they are not uploaded as files. */
-const textFormatExtensions: Readonly<Record<string, ArtifactKind>> = { svg: "svg", mmd: "mermaid", mermaid: "mermaid" };
+const textFormatExtensions: Readonly<Record<string, ArtifactKind>> = { svg: "svg", mmd: "mermaid", mermaid: "mermaid", html: "html", htm: "html" };
 
 /** Source code extensions, with the language label to store when it differs from the extension. */
 const codeExtensions: Readonly<Record<string, string>> = {
@@ -316,11 +317,14 @@ export function filePlan(name: string): FilePlan {
 /**
  * The format of a dropped or pasted file's text, read because of its
  * extension. A text format that does not pass its checks (an SVG that never
- * closes) becomes Code labelled with the extension, so nothing is lost.
+ * closes, an .html file that is not a full page) becomes Code labelled with
+ * the extension, so nothing is lost.
  */
 export function detectFileText(name: string, text: string, plan: Extract<FilePlan, { read: true }>): Detection {
   const title = fileTitle(name);
   if (plan.kind === "svg" && !checkSvg(text).ok) return { kind: "code", language: "xml", content: text, title, reason: "extension" };
   if (plan.kind === "mermaid" && checkMermaidSource(text) !== null) return { kind: "code", language: "mermaid", content: text, title, reason: "extension" };
+  // A fragment or a template is not a page: it stays readable as code.
+  if (plan.kind === "html" && !looksLikeHtmlPage(text)) return { kind: "code", language: "html", content: text, title, reason: "extension" };
   return { kind: plan.kind, language: plan.language, content: text, title, reason: "extension" };
 }

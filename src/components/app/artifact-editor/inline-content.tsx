@@ -156,6 +156,8 @@ interface InlineContentProps {
   language: string;
   title: string;
   files: readonly FileDto[];
+  /** The artifact's public id: an HTML page runs on the host it decides. */
+  pageKey?: string | undefined;
   /** Changes when the content was replaced from outside, so stateful editors reload it. */
   revision: number;
   /** View source is open: the raw content replaces the page. */
@@ -253,11 +255,11 @@ function SourceEditor({ kind, content, label, place, onChange, hide }: SourceEdi
 }
 
 /** The rendered view for formats edited through View source, with a quiet way into it. */
-function RenderedWithSource({ kind, content, language, title, files, place, handoff, onShowSource }: Pick<InlineContentProps, "kind" | "content" | "language" | "title" | "files" | "onShowSource"> & { place: Placement; handoff: FocusHandoff }) {
+function RenderedWithSource({ kind, content, language, title, files, pageKey, place, handoff, onShowSource }: Pick<InlineContentProps, "kind" | "content" | "language" | "title" | "files" | "pageKey" | "onShowSource"> & { place: Placement; handoff: FocusHandoff }) {
   return (
     <ContentFrame place={place}>
       <SourceSwitch open={false} handoff={handoff} onPress={onShowSource} className="mb-3" />
-      <ArtifactView kind={kind} content={content} language={language} title={title} files={files} />
+      <ArtifactView kind={kind} content={content} language={language} title={title} files={files} pageKey={pageKey} />
     </ContentFrame>
   );
 }
@@ -299,7 +301,7 @@ function Content({ handoff, ...props }: InlineContentProps & { handoff: FocusHan
       </ContentFrame>
     );
   }
-  return <RenderedWithSource kind={kind} content={content} language={props.language} title={title} files={files} place={place} handoff={handoff} onShowSource={onShowSource} />;
+  return <RenderedWithSource kind={kind} content={content} language={props.language} title={title} files={files} pageKey={props.pageKey} place={place} handoff={handoff} onShowSource={onShowSource} />;
 }
 
 /** See the notes at the top of this file. */

@@ -32,18 +32,18 @@ interface PagePlace {
 }
 
 /** The origin of an artifact's page host. Null before the label is worked out, and where no page host is set up. */
-function usePagePlace(artifactId: string): PagePlace {
+function usePagePlace(pageKey: string): PagePlace {
   const base = useContext(PageHostContext);
   const [found, setFound] = useState<{ key: string; origin: string | null } | null>(null);
-  const key = `${base ?? ""}\n${artifactId}`;
+  const key = `${base ?? ""}\n${pageKey}`;
   useEffect(() => {
     if (!base) return undefined;
     let alive = true;
-    pageLabelFor(artifactId)
+    pageLabelFor(pageKey)
       .then((label) => { if (alive) setFound({ key, origin: pageOrigin(label, base, window.location) }); })
       .catch(() => { if (alive) setFound({ key, origin: null }); });
     return () => { alive = false; };
-  }, [artifactId, base, key]);
+  }, [pageKey, base, key]);
   const mine = found?.key === key ? found : null;
   return { origin: mine?.origin ?? null, failed: mine !== null && mine.origin === null };
 }
@@ -186,8 +186,8 @@ function PageLeft({ onShowAgain }: { onShowAgain: () => void }) {
 }
 
 interface PageFrameProps {
-  /** The artifact the page belongs to: it decides the page's host, so its browser storage stays with it. */
-  artifactId: string;
+  /** The artifact's public id: it decides the page's host, so the page's browser storage stays with the artifact. */
+  pageKey: string;
   /** The page: a full HTML document. */
   html: string;
   /** The frame's accessible name. */
@@ -203,8 +203,8 @@ interface PageFrameProps {
  * address is closed, with a way to show it again. Draws nothing where no
  * page host is set up; the caller shows the source there (`usePagesCanRun`).
  */
-export function PageFrame({ artifactId, html, title, className }: PageFrameProps) {
-  const { origin, failed } = usePagePlace(artifactId);
+export function PageFrame({ pageKey, html, title, className }: PageFrameProps) {
+  const { origin, failed } = usePagePlace(pageKey);
   const generation = useGeneration(html);
   const [attempt, setAttempt] = useState(0);
   const load = `${String(generation)}:${String(attempt)}`;

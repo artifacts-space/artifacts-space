@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { ServerPageHost } from "@/components/artifact-view/server-page-host";
 import { EditorFixture } from "@/components/dev/editor-fixture";
 import { editorFixtureKinds, type EditorFixtureKind } from "@/components/dev/fixture-content";
 import { listItemsFixtureMarkdown } from "@/components/dev/list-items-fixture";
@@ -20,15 +21,17 @@ function isFixtureKind(value: unknown): value is EditorFixtureKind {
 }
 
 async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/editor">["searchParams"] }) {
-  const { kind, save, catchup } = await searchParams;
+  const { kind, save, catchup, pagehost } = await searchParams;
   if (kind === "media") return <MediaEditorFixture />;
   if (kind === "lists") return <MediaEditorFixture initial={listItemsFixtureMarkdown} />;
-  return <EditorFixture kind={isFixtureKind(kind) ? kind : "ui"} failingSaves={save === "fail"} agentSaves={save === "agent"} catchUp={catchup === "agent" || catchup === "own-save" ? catchup : null} />;
+  const fixture = <EditorFixture kind={isFixtureKind(kind) ? kind : "ui"} failingSaves={save === "fail"} agentSaves={save === "agent"} catchUp={catchup === "agent" || catchup === "own-save" ? catchup : null} />;
+  // An HTML artifact's page runs on the page host; `pagehost=none` leaves it out, as on a deployment that has none.
+  return pagehost === "none" ? fixture : <ServerPageHost>{fixture}</ServerPageHost>;
 }
 
 /**
  * Development-only page for the editor layout e2e test: the page editor on
- * a long artifact, without a database. `?kind=` picks ui, json, markdown, blocks (a short interface), styled (every block styled by a screen prop), data, sheet (a CSV at the size limit), or canvas (four phone screens),
+ * a long artifact, without a database. `?kind=` picks ui, json, markdown, blocks (a short interface), styled (every block styled by a screen prop), data, sheet (a CSV at the size limit), canvas (four phone screens), or html (a page with a script; `?pagehost=none` shows it where no page host is set up),
  * or media: the Markdown editor with uploads kept in the tab (media-editor-fixture.tsx),
  * or lists: the same editor on list items that hold code blocks (list-items-fixture.ts).
  * `?save=fail` fails every save; `?save=agent` lands the first save over an agent's save.

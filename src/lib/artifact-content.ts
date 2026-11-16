@@ -2,6 +2,7 @@ import { ZodError } from "zod";
 
 import { validateCanvas } from "@/lib/canvas/validate";
 import { parseCsv } from "@/lib/csv";
+import { htmlProblem } from "@/lib/html/rules";
 import { checkMermaidSource } from "@/lib/mermaid-source";
 import { checkSvg } from "@/lib/svg";
 import { formatUiSpecIssues, type UiSpecIssue } from "@/lib/ui/issues";
@@ -44,6 +45,10 @@ function checkCsv(content: string): UiSpecIssue[] {
 }
 
 const checks: Record<string, (content: string) => UiSpecIssue[]> = {
+  html: (content) => {
+    const problem = htmlProblem(content);
+    return problem ? [error("invalid_html", problem)] : [];
+  },
   json: checkJson,
   csv: checkCsv,
   svg: (content) => {

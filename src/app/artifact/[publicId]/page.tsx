@@ -10,6 +10,7 @@ import { TitleTheme } from "@/components/artifact-theme/title-theme";
 import { AddCoverButton } from "@/components/artifact-cover/add-cover-button";
 import { ArtifactCover } from "@/components/artifact-cover/artifact-cover";
 import { ApprovedArticle } from "@/components/artifact-page/approved-article";
+import { ServerPageHost } from "@/components/artifact-view/server-page-host";
 import { ArtifactHeader } from "@/components/artifact-page/artifact-header";
 import { ArtifactPageFooter } from "@/components/artifact-page/artifact-page-footer";
 import { ArtifactPageTheme } from "@/components/artifact-page/artifact-page-theme";
@@ -138,8 +139,9 @@ function PendingEditNotice({ viewable }: { viewable: ViewableArtifact }) {
 /** The artifact itself: the shared cached render for an approved version, or a fresh render of the latest. */
 function ArtifactBody({ viewable, files }: { viewable: ViewableArtifact; files: FileDto[] }) {
   const { view, version } = viewable;
-  if (version.versionId) return <ApprovedArticle versionId={version.versionId} savedAt={viewable.served.updatedAt.toISOString()} files={files} />;
-  return <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} />;
+  const pageKey = viewable.record.publicId;
+  if (version.versionId) return <ApprovedArticle versionId={version.versionId} savedAt={viewable.served.updatedAt.toISOString()} files={files} pageKey={pageKey} />;
+  return <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} pageKey={pageKey} />;
 }
 
 /** Who saved the version this reader sees, or null when they are gone. Shares the byline's lookup when it is the author (loadActor). */
@@ -394,6 +396,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   return (
     // The header, comments, and footer wear the artifact theme's colors (none for an unthemed artifact) and swap with it.
     <ArtifactPageTheme theme={theme} className="min-h-screen">
+      {/* An HTML artifact's page runs in a sandbox on this deployment's page host. */}
+      <ServerPageHost>
       {/* For editors, the in-place editor below publishes its save status and More menu to the header above it. */}
       <PageEditorChromeProvider>
         <StickyChrome>
@@ -443,6 +447,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
           </main>
         </ThemeBackdrop>
       </PageEditorChromeProvider>
+      </ServerPageHost>
       {/* Cookieless view count for the author; people who can edit are never counted (the server checks too). */}
       {countsViews(record.visibility) && !viewable.canEdit ? <ViewBeacon publicId={record.publicId} /> : null}
       <ArtifactPageFooter column={column} />

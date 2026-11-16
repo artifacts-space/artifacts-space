@@ -7,8 +7,8 @@
  *
  * Props:
  * - `kind`     (string, required): the artifact format, such as "markdown",
- *              "code", "text", "json", "csv", "svg", "mermaid", "ui", or
- *              "canvas".
+ *              "html", "code", "text", "json", "csv", "svg", "mermaid",
+ *              "ui", or "canvas".
  *              An unknown kind renders as plain text.
  * - `content`  (string, required): the artifact content, exactly as stored.
  * - `title`    (string, optional): the artifact title. Used as the alt text of
@@ -17,14 +17,21 @@
  * - `files`    (FileDto[], optional): the artifact's ready files. Required to
  *              show a `file` artifact's files; Image and File elements in a
  *              ui artifact or a canvas frame use it for names and sizes.
+ * - `pageKey`  (string, optional): the artifact's public id. An `html` page
+ *              runs on a host of its own that this decides, so what the
+ *              page stores in the browser stays with the artifact. Without
+ *              it, the page runs on the host all samples share.
  * - `className` (string, optional): extra classes on the outer wrapper.
  *
  * It has no "use client" directive, so it renders on the server when used in
  * a server component. Markdown, code, text, JSON, CSV, and SVG render fully on
- * the server. Mermaid, ui, and canvas are client components; they server-render
- * their shell, and Mermaid loads only in the browser when a diagram is on screen.
- * No content runs code: SVG and Mermaid show through <img>, Markdown skips raw
- * HTML, and links allow only http, https, and mailto.
+ * the server. Mermaid, ui, canvas, and html are client components; they
+ * server-render their shell, and Mermaid loads only in the browser when a
+ * diagram is on screen. No content runs code on this site's origin: SVG and
+ * Mermaid show through <img>, Markdown skips raw HTML, and links allow only
+ * http, https, and mailto. An `html` page does run its scripts, in a
+ * sandboxed iframe on a page host (html-view.tsx), and only on a page that
+ * set one up (ServerPageHost); elsewhere its source shows.
  */
 import type { ReactNode } from "react";
 
@@ -33,6 +40,7 @@ import type { FileDto } from "@/lib/files/types";
 import { cn } from "@/lib/utils";
 
 import { FileArtifactView } from "./file-artifact-view";
+import { HtmlView } from "./html-view";
 import { CanvasView } from "./canvas-view";
 import { ArtifactFilesProvider } from "./files-context";
 import { MarkdownView } from "./markdown-view";
@@ -48,12 +56,14 @@ export interface ArtifactViewProps {
   title?: string | undefined;
   language?: string | undefined;
   files?: readonly FileDto[] | undefined;
+  pageKey?: string | undefined;
   className?: string | undefined;
 }
 
 /** How each format's content is drawn. A kind missing here (one this build does not know) shows as plain text. */
 const formatBodies: Record<FormatKind, (props: ArtifactViewProps) => ReactNode> = {
   markdown: ({ content }) => <MarkdownView content={content} media diagrams />,
+  html: ({ content, title, pageKey }) => <HtmlView content={content} title={title ?? "Artifact page"} pageKey={pageKey} />,
   code: ({ content, language }) => <CodeView content={content} language={language} />,
   text: ({ content }) => <TextView content={content} />,
   json: ({ content }) => <JsonView content={content} />,

@@ -106,6 +106,7 @@ const checkoutNotes = "Screenshots and the metrics export from the **Checkout v2
 /** Content for each format viewer. Reuses the Formats docs examples, except csv, ui, canvas, and file. */
 export const formatSamples: Record<FormatKind, FormatSample> = {
   markdown: { format: "markdown", content: formatDocs.markdown.example },
+  html: { format: "html", content: formatDocs.html.example },
   code: { format: "code", content: formatDocs.code.example, language: "typescript" },
   text: { format: "text", content: formatDocs.text.example },
   json: { format: "json", content: formatDocs.json.example },

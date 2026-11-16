@@ -563,10 +563,12 @@ A page with scripts that an agent or a person wrote never runs on this site's
 origin. It runs on a page host: `<label>.<PAGE_HOST>`, one host per artifact
 on a second domain (`src/lib/page-host/rules.ts`).
 
-- The label is a hash of the artifact's id (`pageLabelFor`), 32 hex
-  characters. It says nothing about the artifact, and never contains the
-  public id, which is the key to a link-shared artifact. One host per
-  artifact keeps each page's browser storage apart.
+- The label is a hash of the artifact's public id (`pageLabelFor`), 32 hex
+  characters. Every reader already holds the public id, so no internal id
+  reaches a reader for this. The label says nothing about the artifact: the
+  public id is the key to a link-shared artifact, and the hash cannot be
+  turned back into it. One host per artifact keeps each page's browser
+  storage apart.
 - A page host serves one thing: the frame document at `/`
   (`frame-document.ts`). The proxy answers every request whose Host looks
   like a page host, whole, before any app code (`pageHostResponse`, and the

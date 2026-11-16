@@ -20,6 +20,7 @@ const page = "formats" as const;
 /** The code block language for each kind's example. Kinds without a grammar show as plain text. */
 const exampleLanguage: Record<FormatKind, string> = {
   markdown: "markdown",
+  html: "html",
   code: "typescript",
   text: "text",
   json: "json",

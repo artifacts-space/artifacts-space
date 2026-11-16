@@ -3,8 +3,8 @@ import { specJson, type DocElement } from "@/lib/docs/spec-builders";
 import { checkoutRolloutSpec } from "@/lib/preview/samples";
 import { styledBlocksSpec } from "@/lib/ui/fixtures/screen";
 
-/** Samples the editor fixture can open: long ones for layout, a short interface ("blocks") for the block editor, "styled" for how it draws styled blocks, and a canvas of four screens. */
-export const editorFixtureKinds = ["ui", "json", "markdown", "blocks", "styled", "data", "sheet", "canvas"] as const;
+/** Samples the editor fixture can open: long ones for layout, a short interface ("blocks") for the block editor, "styled" for how it draws styled blocks, a canvas of four screens, and an HTML page with a script. */
+export const editorFixtureKinds = ["ui", "json", "markdown", "blocks", "styled", "data", "sheet", "canvas", "html"] as const;
 export type EditorFixtureKind = (typeof editorFixtureKinds)[number];
 
 /** The rollout dashboard twelve times over: a long ui with charts, timelines, and tables. */
@@ -119,4 +119,33 @@ export function fixtureArtifact({ id, kind, title, content, publicId = "fixture0
     createdAt: updatedAt,
     updatedAt,
   };
+}
+
+/** A small HTML page whose script counts clicks: it shows that the page's scripts run. */
+export function counterPage(): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Counter</title>
+  <style>
+    body { margin: 0; padding: 2rem; font: 16px/1.5 system-ui, sans-serif; }
+    button { font: inherit; padding: 0.5rem 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Counter</h1>
+  <p>Clicks: <output id="count">0</output></p>
+  <button type="button" id="add">Add one</button>
+  <script>
+    let clicks = 0;
+    document.getElementById("add").addEventListener("click", () => {
+      clicks += 1;
+      document.getElementById("count").textContent = String(clicks);
+    });
+  </script>
+</body>
+</html>
+`;
 }

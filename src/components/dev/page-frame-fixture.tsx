@@ -70,7 +70,7 @@ export function PageFrameFixture({ page }: { page: string }) {
     <main className="mx-auto flex h-dvh max-w-4xl flex-col gap-3 p-4">
       <h1 className="text-lg font-semibold">Page frame fixture</h1>
       <button type="button" className="self-start rounded-md border px-3 py-1 text-sm" onClick={() => { setVersion((current) => current + 1); }}>Save a new version</button>
-      <PageFrame artifactId={`fixture-page-${name}`} html={html} title="Fixture page" className="flex-1 rounded-md border" />
+      <PageFrame pageKey={`fixture-page-${name}`} html={html} title="Fixture page" className="flex-1 rounded-md border" />
     </main>
   );
 }

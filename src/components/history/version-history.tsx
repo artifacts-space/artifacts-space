@@ -141,6 +141,7 @@ export function VersionHistory({ publicId, title, updatedAt, reviewed, files, ha
                   view={view}
                   onView={(next) => { show(versions, selected.id, next); }}
                   files={files}
+                  pageKey={publicId}
                   restoring={restoring}
                   onRestore={() => { confirmRestore.request(() => restore(selected.id)); }}
                 />
