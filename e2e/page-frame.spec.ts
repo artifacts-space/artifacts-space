@@ -101,6 +101,34 @@ test("should show a page without colors as black on white, whatever the site's t
   expect(background).toBe("rgb(255, 255, 255)");
 });
 
+test("should say the page could not start, and not stay busy, when the browser cannot work out the page's host", async ({ page }) => {
+  // As on a site served over plain HTTP, where the browser has no Web Crypto.
+  await page.addInitScript(() => {
+    Object.defineProperty(crypto.subtle, "digest", { value: () => Promise.reject(new Error("no digest here")) });
+  });
+  await page.goto("/dev/page-frame?page=plain");
+  const box = page.locator('[data-slot="page-frame-box"]');
+  await expect(box.locator('[data-slot="page-frame-failed"]')).toHaveText("This page could not start in this browser. Open the site over HTTPS, then load it again.");
+  await expect(box).not.toHaveAttribute("aria-busy", "true");
+  await expect(box.locator("iframe")).toHaveCount(0);
+});
+
+test("should still show the page when the frame document's first message is lost", async ({ page }) => {
+  // The site drops the first "ready" it is sent, as when the frame document answers before the site listens.
+  await page.addInitScript(() => {
+    let dropped = false;
+    window.addEventListener("message", (event) => {
+      const data: unknown = event.data;
+      if (dropped || typeof data !== "object" || data === null || !("type" in data) || data.type !== "artifact-page:ready") return;
+      dropped = true;
+      event.stopImmediatePropagation();
+    }, true);
+  });
+  await page.goto("/dev/page-frame?page=plain");
+  await expect(page.locator('[data-slot="page-frame"][data-page-shown]')).toBeVisible();
+  await expect(page.locator('[data-slot="page-frame-left"]')).toHaveCount(0);
+});
+
 test("should draw no frame where no page host is set up", async ({ page }) => {
   await page.goto("/dev/page-frame?page=plain&host=none");
   await expect(page.locator("[data-slot=page-frame-box]")).toBeVisible();

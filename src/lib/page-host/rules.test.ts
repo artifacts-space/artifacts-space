@@ -4,7 +4,7 @@ import { pageHostPattern } from "@/lib/security-header-rules";
 
 import { frameDocument } from "./frame-document";
 import { framingSite, pageHostResponse } from "./respond";
-import { hostName, hostPort, looksLikePageHost, pageContentPolicy, pageHostBase, pageLabelFor, pageLabelOf, pageOrigin, pageSandbox } from "./rules";
+import { hostName, hostPort, looksLikePageHost, pageContentPolicy, pageHostBase, pageLabelFor, pageLabelOf, pageOrigin, pageSandbox, pageScriptHosts } from "./rules";
 
 const label = "0123456789abcdef0123456789abcdef";
 const production = { NODE_ENV: "production", PAGE_HOST: "artifacts.link", BETTER_AUTH_URL: "https://artifacts.space" } as NodeJS.ProcessEnv;
@@ -92,9 +92,12 @@ describe("pageContentPolicy", () => {
     expect(directive("script-src")).not.toMatch(/\*|https:(\s|$)|'self'/);
   });
 
-  it("should allow no request to this site, to the page host, or to any other site", () => {
+  it("should allow no request to this site, to the page host, or to any host but the listed package hosts", () => {
     expect(directive("connect-src")).not.toMatch(/\*|https:(\s|$)|'self'|artifacts/);
     expect(directive("img-src")).not.toMatch(/\*|https:(\s|$)|'self'/);
+    // The listed hosts stay reachable without a click: a known limit, stated on pageContentPolicy.
+    expect(directive("connect-src").split(" ").slice(1)).toEqual([...pageScriptHosts]);
+    expect(directive("img-src").split(" ").slice(1)).toEqual(["data:", "blob:", ...pageScriptHosts]);
   });
 
   it("should forbid forms, frames, plugins, and a base address", () => {
@@ -127,6 +130,8 @@ describe("frameDocument", () => {
     const html = frameDocument("https://artifacts.space");
     expect(html).toContain('host.postMessage({ type: "artifact-page:pong", id: event.data.id }, site)');
     expect(html).toContain("function onPing(event) {\n    if (event.origin !== site || event.source !== host) return;");
+    // It answers before the page is written too, and again after document.open() dropped the first listener.
+    expect(html.split('window.addEventListener("message", onPing);').length - 1).toBe(2);
     // The listener is added after document.open(), which drops the earlier ones, and before the page is written.
     expect(html.indexOf("document.open()")).toBeLessThan(html.indexOf('window.addEventListener("message", onPing)'));
     expect(html.indexOf('window.addEventListener("message", onPing)')).toBeLessThan(html.indexOf("document.write(data.html)"));

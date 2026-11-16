@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
 import { PAGE_ANSWER_MS, pageLabelFor, pageMessages, pageOrigin, pageSandbox } from "@/lib/page-host/rules";
@@ -87,6 +87,12 @@ interface OpenQuestion {
  * such answer within PAGE_ANSWER_MS means the page sent its frame to
  * another address, and `onLeft` closes it. Whatever else the frame posts is
  * the page's word: it is read for nothing but "ready" and "shown".
+ *
+ * The page is sent on each "ready" (a page that reloads itself loads the
+ * frame document again), and on the frame's first load when nothing was
+ * sent by then: the first "ready" is the only one that can come before
+ * this listens. The listener is added in a layout effect, so even a frame
+ * document from the browser's cache cannot answer first.
  */
 function usePageHandshake({ frameRef, origin, html, onLeft }: Handshake) {
   const [shown, setShown] = useState(false);
@@ -103,14 +109,19 @@ function usePageHandshake({ frameRef, origin, html, onLeft }: Handshake) {
     if (questionRef.current) window.clearTimeout(questionRef.current.timer);
     questionRef.current = null;
   }, []);
+  const sentRef = useRef(false);
+  const send = useCallback(() => {
+    sentRef.current = true;
+    frameRef.current?.contentWindow?.postMessage({ type: pageMessages.render, html }, origin);
+  }, [frameRef, origin, html]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const onMessage = (event: MessageEvent<unknown>) => {
       const frame = frameRef.current?.contentWindow;
       if (!frame || event.source !== frame || event.origin !== origin) return;
       const message = readMessage(event.data);
       if (message.type === pageMessages.ready) {
-        frame.postMessage({ type: pageMessages.render, html }, origin);
+        send();
         ask();
       }
       if (message.type === pageMessages.pong && questionRef.current !== null && message.id === questionRef.current.id) settle();
@@ -118,10 +129,14 @@ function usePageHandshake({ frameRef, origin, html, onLeft }: Handshake) {
     };
     window.addEventListener("message", onMessage);
     return () => { window.removeEventListener("message", onMessage); };
-  }, [frameRef, origin, html, ask, settle]);
+  }, [frameRef, origin, send, ask, settle]);
   useEffect(() => settle, [settle]);
 
-  return { shown, onLoad: ask };
+  const onLoad = useCallback(() => {
+    if (!sentRef.current) send();
+    ask();
+  }, [send, ask]);
+  return { shown, onLoad };
 }
 
 interface PageWindowProps {

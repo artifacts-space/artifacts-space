@@ -38,6 +38,8 @@ export function frameDocument(siteOrigin: string): string {
     document.close();
     host.postMessage({ type: ${JSON.stringify(pageMessages.shown)} }, site);
   }
+  // Answers from the start, so the site can tell this document from another origin's before the page is written.
+  window.addEventListener("message", onPing);
   window.addEventListener("message", onMessage);
   host.postMessage({ type: ${JSON.stringify(pageMessages.ready)} }, site);
 })();`;

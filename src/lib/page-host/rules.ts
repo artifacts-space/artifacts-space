@@ -87,9 +87,16 @@ const fontHosts = ["https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", 
  * (the page is written into that document, so the policy holds for it and a
  * page cannot loosen it). Inline scripts and styles run: that is the point.
  * Everything else is closed: no requests except to the public package and
- * font hosts, so a page cannot send out what it knows or track who views
- * it; no forms posted anywhere; no frames inside it; and only this site may
- * frame it, so its address shows nothing in a tab of its own.
+ * font hosts; no forms posted anywhere; no frames inside it; and only this
+ * site may frame it, so its address shows nothing in a tab of its own.
+ *
+ * What this does and does not promise: a page can reach no host its author
+ * controls, so it cannot send what it knows to its author or track who
+ * views it. It can still put data in the address of a request to one of
+ * the listed hosts (an image, a fetch, a script), with no click. Only the
+ * operator of that host could read it there. That is the price of loading
+ * libraries and data from them; a host goes on the list only when its
+ * operator shows a page's author nothing about single requests.
  */
 export function pageContentPolicy(siteOrigin: string): string {
   const scripts = pageScriptHosts.join(" ");
