@@ -1,7 +1,7 @@
 import { z, ZodError } from "zod";
 
 import { readFrameImage, type FrameImageResult } from "@/lib/canvas/capture-read";
-import { frameImageLinkText, frameImageText, type FrameImageRefusal } from "@/lib/canvas/capture-read-rules";
+import { frameImageLinkText, frameImageText, linkIsAKey, type FrameImageRefusal } from "@/lib/canvas/capture-read-rules";
 import { captureLimits, captureModes } from "@/lib/canvas/capture-rules";
 import { fileLimits } from "@/lib/files/config";
 import { isPublicId } from "@/lib/public-id";
@@ -24,7 +24,7 @@ const inputSchema = {
   frameId: z.string().min(1).max(80).describe("The frame's id, from canvas_frames_list"),
   mode: z.enum(captureModes).optional().describe('"light" or "dark". Left out: light, or the one mode the canvas\'s theme always uses.'),
   part: z.number().int().min(1).max(captureLimits.maxParts).optional().describe("Which part of the image, from 1. Left out: 1. The result says how many parts there are."),
-  as: z.enum(["image", "link"]).optional().describe(`"image" (the default) returns the picture itself. "link" returns a link to it that works for about ${String(fileLimits.downloadUrlSeconds / 60)} minutes, for a client that cannot show pictures from tools. Anyone who has the link can open the image, so give it only to the person you are working for, never in an artifact, a comment, or a message others read. A link to an image drawn in the last few minutes is not ready yet, and the answer says when to call again.`),
+  as: z.enum(["image", "link"]).optional().describe(`"image" (the default) returns the picture itself. "link" returns a link to it that works for about ${String(fileLimits.downloadUrlSeconds / 60)} minutes, for a client that cannot show pictures from tools. ${linkIsAKey} A link to an image drawn in the last few minutes is not ready yet, and the answer says when to call again.`),
 };
 
 const description =
