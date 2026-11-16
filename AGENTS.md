@@ -606,6 +606,18 @@ on a second domain (`src/lib/page-host/rules.ts`).
   so a page can set a cookie for the whole page domain that another
   artifact's page can read. Nothing of ours reads cookies there. Listing
   the page domain on the Public Suffix List would close it.
+- The page domain serves frame documents and nothing else. A wildcard
+  (`*.<PAGE_HOST>`) sends every host under the domain to this app, so a
+  host there that is not a page host (`www.<PAGE_HOST>`) must never show
+  the site: it would be the same site, to a browser, as pages that run
+  anyone's scripts. Two rules hold it: a rewrite in `next.config.ts`,
+  checked before any file or page, sends every path of every host under
+  the page domain to `/page-host-refusal`, a 404 (`pageDomainRewrites`);
+  and the proxy refuses those hosts on the paths it runs first
+  (`isUnderPageDomain`). The rewrite is read when the app is built, so
+  `PAGE_HOST` is set for the build as well as at run time. The domain
+  itself (no label) is not covered: never point it at this app.
+  `rules.ts` has no `@/` import, because `next.config.ts` loads it.
 - `PAGE_HOST` unset (and not `next dev`): no page runs, and `PageFrame`
   draws nothing (`usePagesCanRun`). Tests: `rules.test.ts`,
   `proxy.test.ts`, `e2e/page-frame.spec.ts` on `/dev/page-frame`, and

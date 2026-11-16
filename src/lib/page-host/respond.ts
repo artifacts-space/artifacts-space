@@ -21,7 +21,8 @@ export function framingSite(host: string | null, env: NodeJS.ProcessEnv = proces
   return `http://localhost${port ? `:${port}` : ""}`;
 }
 
-function refuse(status: number): Response {
+/** The answer where nothing is served: on a page host's other paths, and on every other host under the page domain. */
+export function pageHostRefusal(status: 404 | 405 = 404): Response {
   return new Response(status === 405 ? "Method not allowed" : "Not found", { status, headers: pageHostRefusalHeaders });
 }
 
@@ -33,8 +34,8 @@ function refuse(status: number): Response {
  */
 export function pageHostResponse(request: PageHostRequest, env: NodeJS.ProcessEnv = process.env): Response {
   const label = pageLabelOf(request.host, pageHostBase(env));
-  if (!label || request.pathname !== "/") return refuse(404);
-  if (request.method !== "GET" && request.method !== "HEAD") return refuse(405);
+  if (!label || request.pathname !== "/") return pageHostRefusal(404);
+  if (request.method !== "GET" && request.method !== "HEAD") return pageHostRefusal(405);
   const site = framingSite(request.host, env);
   const headers = pageHostHeaders(site, env.NODE_ENV !== "development");
   return new Response(request.method === "HEAD" ? null : frameDocument(site), { status: 200, headers });

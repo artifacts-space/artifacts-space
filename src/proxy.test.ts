@@ -273,6 +273,23 @@ describe("proxy on a page host", () => {
     expect(mocks.checkArtifactPage).not.toHaveBeenCalled();
   });
 
+  it.each(["www.artifacts.link", "app.artifacts.link", `${label}.x.artifacts.link`])("should answer 404 on %s, a host under the page domain that is no page host, and never run the site's checks", async (host) => {
+    for (const path of ["/", "/app", "/sign-in", "/artifact/abc"]) {
+      const response = await proxy(onHost(host, path));
+      expect(response.status, path).toBe(404);
+      expect(response.headers.get("set-cookie")).toBeNull();
+    }
+    expect(mocks.getSession).not.toHaveBeenCalled();
+    expect(mocks.checkArtifactPage).not.toHaveBeenCalled();
+  });
+
+  it("should not refuse the site's own host or a look-alike of the page domain", async () => {
+    for (const host of ["artifacts.space", "notartifacts.link", "artifacts.link.example.com"]) {
+      const response = await proxy(onHost(host, "/app"));
+      expect(response.status, host).not.toBe(404);
+    }
+  });
+
   it("should answer 404 for a host that looks like a page host on another domain", async () => {
     const response = await proxy(onHost(`${label}.example.com`, "/"));
     expect(response.status).toBe(404);
