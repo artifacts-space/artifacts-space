@@ -1,3 +1,5 @@
+import { earlierFormatNote } from "@/lib/artifact-formats";
+
 import { uiCatalog } from "./catalog";
 import { exampleUiSpec } from "./fixtures/example";
 import { uiLimits } from "./limits";
@@ -47,6 +49,7 @@ export function buildUiGuide(): string {
   return [
     `# ui artifacts (component set version ${UI_SPEC_VERSION})`,
     "A ui artifact is a json-render spec rendered with the artifacts.space component set. Pages are read-only to the world: inputs only change on-page state.",
+    `${earlierFormatNote} Use this guide to read or change a ui artifact that exists, or a frame of a canvas.`,
     "## Rules",
     rules.map((rule, index) => `${index + 1}. ${rule}`).join("\n"),
     templateGuide("ui"),

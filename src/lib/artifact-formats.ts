@@ -14,6 +14,16 @@ export interface FormatInfo {
 export const formatKinds = artifactKinds;
 export type FormatKind = ArtifactKind;
 
+
+/**
+ * Where new visual work goes (the owner's decision, 16 Nov 2026): an HTML
+ * page. The interface and canvas formats stay for the artifacts that use
+ * them, and agents are no longer pointed at them for new work.
+ */
+export const newVisualWork = 'For a new mockup, dashboard, or report, prefer kind "html", a full web page.';
+
+/** The same, for the opening of the two earlier formats' guides. */
+export const earlierFormatNote = `This is an earlier format, kept for the artifacts that use it. ${newVisualWork} Call artifacts_formats_guide with kind "html" for its rules.`;
 export const formatInfo: Record<FormatKind, FormatInfo> = {
   markdown: {
     label: "Markdown",
@@ -58,12 +68,12 @@ export const formatInfo: Record<FormatKind, FormatInfo> = {
   ui: {
     label: "Interface",
     helper: "A rich page, such as a dashboard or report, built from our components.",
-    agent: "A json-render spec on the artifacts.space component set: dashboards, reports, checklists. Read artifacts_formats_guide with kind \"ui\" before writing one.",
+    agent: `An earlier format, kept for artifacts that already use it: a json-render spec on the artifacts.space component set. ${newVisualWork} Read artifacts_formats_guide with kind "ui" before changing one.`,
   },
   canvas: {
     label: "Canvas",
     helper: "A board of screens: mockups of websites and apps, built from our components.",
-    agent: "A board of frames for mocking up websites and app screens. Each frame is one screen at a width you choose (1440 desktop, 768 tablet, 390 phone) and holds a json-render spec on the artifacts.space component set. No HTML or CSS. Read artifacts_formats_guide with kind \"canvas\" before writing one.",
+    agent: `An earlier format, kept for artifacts that already use it: a board of frames, each one screen that holds a json-render spec on the artifacts.space component set. No HTML or CSS. ${newVisualWork} Read artifacts_formats_guide with kind "canvas" before changing one.`,
   },
   file: {
     label: "Files",
