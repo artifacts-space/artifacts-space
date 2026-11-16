@@ -61,6 +61,21 @@ describe("the width steps", () => {
     }
   });
 
+  it("should name, in every class of a step, the width its from gives", () => {
+    // Tailwind's container sizes: @xl is 36rem and @4xl is 56rem; @[38rem] names its own. One rem is 16 pixels.
+    const namedRem: Record<string, number> = { xl: 36, "4xl": 56 };
+    const pixelsOf = (className: string): number => {
+      const variant = /^@(?:\[(\d+)rem\]|(\w+))\/ui:/.exec(className);
+      if (!variant) return 0;
+      return (variant[1] === undefined ? (namedRem[variant[2] ?? ""] ?? -1) : Number(variant[1])) * 16;
+    };
+    for (const step of gridSteps) {
+      for (const className of [...Object.values(step.columnClasses), ...Object.values(step.spanClasses)]) {
+        expect(pixelsOf(className), className).toBe(step.from);
+      }
+    }
+  });
+
   it("should start each step wider than the one before it", () => {
     const starts = gridSteps.map((step) => step.from);
     expect(starts).toEqual([...starts].sort((a, b) => a - b));

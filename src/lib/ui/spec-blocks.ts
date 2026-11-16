@@ -1,5 +1,5 @@
 import { isPlainObject } from "./json-walk";
-import { isPairedType, pairedChildren } from "./props/layout";
+import { defaultGridColumns, isPairedType, pairedChildren } from "./props/layout";
 
 /**
  * Block operations for the interface editor: each takes a raw ui spec (the
@@ -142,12 +142,12 @@ function newPairedEntry(prop: PairedProp): Record<string, string> | number {
 
 /**
  * A span kept by a child that moves into a Grid, cut to that Grid's
- * `columns` (default 2), so a wide cell from a wider grid is as wide as this
+ * `columns` (`defaultGridColumns` when unset), so a wide cell from a wider grid is as wide as this
  * one allows and the spec stays valid. Columns read from state are not
  * known here, so the span is kept as it is.
  */
 function spanIn(spec: RawSpec, parent: string, span: number): number {
-  const columns: unknown = propsOf(spec, parent).columns ?? 2;
+  const columns: unknown = propsOf(spec, parent).columns ?? defaultGridColumns;
   return typeof columns === "number" ? Math.min(span, columns) : span;
 }
 
