@@ -10,6 +10,8 @@ import { applySessionDecision, noStore, proxySession } from "@/lib/auth/proxy-se
 import { getAuth } from "@/lib/auth/server";
 import { artifactLinkHref } from "@/lib/app-link";
 import { markdownRequestFor, markdownRoutePath } from "@/lib/markdown/negotiation";
+import { pageHostResponse } from "@/lib/page-host/respond";
+import { looksLikePageHost } from "@/lib/page-host/rules";
 import { routeCheckFor, signInPath, type RouteCheck } from "@/lib/route-status";
 import { noindexHeader, robotsHeaderName } from "@/lib/search/search-rules";
 import { getTeamForMember } from "@/lib/teams/queries";
@@ -35,6 +37,11 @@ import { getTeamForMember } from "@/lib/teams/queries";
  * and the workspace opens that comment (src/lib/app-link.ts). The redirect is
  * the same for every id, readable or not, so it reveals nothing; /app runs
  * the sign-in and access checks.
+ *
+ * A request to a page host (`<label>.<PAGE_HOST>`, where an HTML artifact's
+ * page runs) never reaches the app: the proxy answers it whole, with the
+ * frame document or a 404 (src/lib/page-host/respond.ts). The matcher's
+ * last entry sends every path of such a host here.
  *
  * Signed-in visitors skip the landing page and the sign-in pages and go to
  * the workspace (src/lib/auth/entry-rules.ts). Those pages stay static: the
@@ -162,7 +169,8 @@ function checkEntryPage(request: NextRequest, page: NonNullable<EntryPage>) {
   return NextResponse.next();
 }
 
-export async function proxy(request: NextRequest) {
+/** The site's own pages: entry pages, Markdown versions, and the checks that need a real status. */
+async function siteProxy(request: NextRequest) {
   const entry = entryPageFor(request.method, request.nextUrl.pathname);
   if (entry) return checkEntryPage(request, entry);
   const markdown = markdownRequestFor(request.method, request.nextUrl.pathname, request.headers.get("accept"));
@@ -182,11 +190,19 @@ export async function proxy(request: NextRequest) {
   }
 }
 
+export function proxy(request: NextRequest) {
+  const host = request.headers.get("host");
+  // A page host never reaches the app, whatever the path.
+  if (looksLikePageHost(host)) return pageHostResponse({ method: request.method, pathname: request.nextUrl.pathname, host });
+  return siteProxy(request);
+}
+
 /*
  * The landing and sign-in pages are static. The proxy runs on them only when
  * a Better Auth session cookie is present (`__Secure-` on HTTPS), so crawlers
  * and signed-out visitors get the CDN copy with no proxy call at all.
- * Matcher values must be literals, so the cookie names are spelled out.
+ * Matcher values must be literals, so the cookie names and the page host
+ * pattern are spelled out.
  */
 export const config = {
   matcher: [
@@ -202,5 +218,7 @@ export const config = {
     { source: "/sign-in", has: [{ type: "cookie", key: "better-auth.session_token" }] },
     { source: "/sign-up", has: [{ type: "cookie", key: "__Secure-better-auth.session_token" }] },
     { source: "/sign-up", has: [{ type: "cookie", key: "better-auth.session_token" }] },
+    // Every path of a page host: `pageHostPattern` in src/lib/page-host/rules.ts, spelled out (a test keeps them equal).
+    { source: "/:path*", has: [{ type: "host", value: "[0-9a-f]{32}\\..+" }] },
   ],
 };

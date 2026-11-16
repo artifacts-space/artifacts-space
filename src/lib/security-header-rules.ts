@@ -7,15 +7,24 @@
  * that repeats that policy instead of being overwritten by the site default.
  */
 
+/**
+ * Matches the Host of every page host (where an HTML artifact's page runs,
+ * src/lib/page-host/rules.ts), whatever its domain: for these rules and the
+ * proxy matcher, which take literals and cannot read the environment. No
+ * host of the site itself starts with a 32-character hex label.
+ */
+export const pageHostPattern = "[0-9a-f]{32}\\..+";
+
 /** One header, in the shape `next.config.ts` `headers()` takes. */
 export interface HeaderEntry {
   key: string;
   value: string;
 }
 
-/** One `headers()` rule: a path pattern and the headers it sets. */
+/** One `headers()` rule: a path pattern, an optional Host it must not have, and the headers it sets. */
 export interface HeaderRule {
   source: string;
+  missing?: { type: "host"; value: string }[];
   headers: HeaderEntry[];
 }
 
@@ -84,7 +93,8 @@ const siteWide: HeaderEntry[] = [
  */
 export function securityHeaderRules(): HeaderRule[] {
   return [
-    { source: "/:path*", headers: siteWide },
+    // Not on a page host: its one document must be framed by this site, and it sends its own, stricter policy (src/lib/page-host/rules.ts).
+    { source: "/:path*", missing: [{ type: "host", value: pageHostPattern }], headers: siteWide },
     {
       // File views redirect to a short-lived R2 link: framed by our own artifact page, and no Referer to R2.
       source: "/api/files/:path*",

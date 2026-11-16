@@ -557,6 +557,60 @@ catch this, so test the generated SQL with `.toSQL()`, as
   invitation email reaches `inviteMemberAction` through
   `invitation-send-refusal.ts`; the action then deletes the new invitation.
 
+### Page host
+
+A page with scripts that an agent or a person wrote never runs on this site's
+origin. It runs on a page host: `<label>.<PAGE_HOST>`, one host per artifact
+on a second domain (`src/lib/page-host/rules.ts`).
+
+- The label is a hash of the artifact's id (`pageLabelFor`), 32 hex
+  characters. It says nothing about the artifact, and never contains the
+  public id, which is the key to a link-shared artifact. One host per
+  artifact keeps each page's browser storage apart.
+- A page host serves one thing: the frame document at `/`
+  (`frame-document.ts`). The proxy answers every request whose Host looks
+  like a page host, whole, before any app code (`pageHostResponse`, and the
+  matcher's last entry): the frame document, or 404. No app page, API, file,
+  or sign-in exists there, so no session can, and a page has nothing of ours
+  to call. `pageHostPattern` (in `security-header-rules.ts`) is the one
+  literal the matcher and the header rules share; a test keeps the matcher's
+  copy equal. Never add a route that answers on a page host.
+- The page host reads nothing. The site's page (`PageFrame`) shows the frame
+  document in a sandboxed iframe and hands it the HTML with `postMessage`,
+  to the page host's origin only. So the access check stays where it was:
+  whoever was given the content can run it. Never put a session, a token,
+  or an artifact's id in a page host address.
+- The frame document takes the page from the window that frames it, and only
+  when that window is the site (`framingSite`: `siteOrigin()` in production,
+  never the request). Its `frame-ancestors` names the site alone, so the
+  address shows nothing in a tab of its own.
+- What a page may do is the frame document's Content-Security-Policy
+  (`pageContentPolicy`): inline scripts run; other requests go only to the
+  public package and font hosts in `pageScriptHosts`. No request to this
+  site, to the page host, or to any other site; no form posts; no frames. A
+  page cannot loosen it. Add a host to the list only for a public,
+  read-only package or font host.
+- The iframe's sandbox (`pageSandbox`) never has `allow-top-navigation`,
+  `allow-downloads`, or `allow-popups-to-escape-sandbox`: a tab the page
+  opens keeps the sandbox. A page can still send its own frame to another
+  address; the site notices and closes the frame (`usePageHandshake`,
+  `PAGE_ANSWER_MS`). After each load of the frame the site asks a question
+  with a fresh id, and takes an answer only from the frame's window, from
+  the page host's origin, with that id. A document of another origin cannot
+  answer. Nothing in the frame document is a secret from the page: the two
+  share a window, so never rely on one.
+- The site-wide header rule skips page hosts (`missing` host), because its
+  `frame-ancestors 'none'` and `X-Frame-Options: DENY` would stop the site
+  from framing the frame document. `pageHostResponse` sends its own headers.
+- Known limit: hosts under one page domain are the same site to a browser,
+  so a page can set a cookie for the whole page domain that another
+  artifact's page can read. Nothing of ours reads cookies there. Listing
+  the page domain on the Public Suffix List would close it.
+- `PAGE_HOST` unset (and not `next dev`): no page runs, and `PageFrame`
+  draws nothing (`usePagesCanRun`). Tests: `rules.test.ts`,
+  `proxy.test.ts`, `e2e/page-frame.spec.ts` on `/dev/page-frame`, and
+  `e2e/security-headers.prod.spec.ts` for the production build.
+
 ## Testing
 
 - Unit tests are Vitest files next to the code: `foo.ts` and `foo.test.ts`.

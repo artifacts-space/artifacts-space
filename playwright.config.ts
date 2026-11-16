@@ -40,6 +40,8 @@ const openAiChallengeOff = { OPENAI_APPS_CHALLENGE_TOKEN: "" };
 const productionTestEnv = {
   BETTER_AUTH_URL: `http://localhost:${String(prodPort)}`,
   BETTER_AUTH_SECRET: "e2e-only-secret-not-used-anywhere-else-0123456789",
+  // `<label>.localhost` reaches this server, as under next dev.
+  PAGE_HOST: "localhost",
   DATABASE_URL: isLocalDatabaseUrl(process.env.DATABASE_URL) ? process.env.DATABASE_URL : "postgres://e2e@127.0.0.1:9/none",
   ...googleSignInOff,
   ...openAiChallengeOff,
