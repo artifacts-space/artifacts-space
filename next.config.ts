@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+import { pageDomainRewrites } from "./src/lib/page-host/rules";
 import { securityHeaderRules } from "./src/lib/security-header-rules";
 
 const nextConfig: NextConfig = {
@@ -15,6 +16,8 @@ const nextConfig: NextConfig = {
       // The notifications service worker: always checked for updates, and it may load nothing from elsewhere.
       { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }, { key: "Content-Security-Policy", value: "default-src 'self'; frame-ancestors 'none'" }] },
     ]),
+  // Hosts under the page domain that are not page hosts get nothing of the app: checked before any file or page.
+  rewrites: () => Promise.resolve({ beforeFiles: pageDomainRewrites(), afterFiles: [], fallback: [] }),
   partialPrefetching: true,
   turbopack: {
     rules: {

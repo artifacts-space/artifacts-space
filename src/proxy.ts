@@ -11,7 +11,7 @@ import { getAuth } from "@/lib/auth/server";
 import { artifactLinkHref } from "@/lib/app-link";
 import { markdownRequestFor, markdownRoutePath } from "@/lib/markdown/negotiation";
 import { pageHostResponse } from "@/lib/page-host/respond";
-import { looksLikePageHost } from "@/lib/page-host/rules";
+import { isUnderPageDomain, looksLikePageHost, pageHostBase } from "@/lib/page-host/rules";
 import { routeCheckFor, signInPath, type RouteCheck } from "@/lib/route-status";
 import { noindexHeader, robotsHeaderName } from "@/lib/search/search-rules";
 import { getTeamForMember } from "@/lib/teams/queries";
@@ -192,8 +192,9 @@ async function siteProxy(request: NextRequest) {
 
 export function proxy(request: NextRequest) {
   const host = request.headers.get("host");
-  // A page host never reaches the app, whatever the path.
-  if (looksLikePageHost(host)) return pageHostResponse({ method: request.method, pathname: request.nextUrl.pathname, host });
+  // A page host never reaches the app, whatever the path. Nor does any other host under the page domain: the
+  // Next config sends those to a 404 (pageDomainRewrites), and the paths that run this proxy first stop here.
+  if (looksLikePageHost(host) || isUnderPageDomain(host, pageHostBase())) return pageHostResponse({ method: request.method, pathname: request.nextUrl.pathname, host });
   return siteProxy(request);
 }
 

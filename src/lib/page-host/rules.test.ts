@@ -4,7 +4,7 @@ import { pageHostPattern } from "@/lib/security-header-rules";
 
 import { frameDocument } from "./frame-document";
 import { framingSite, pageHostResponse } from "./respond";
-import { hostName, hostPort, looksLikePageHost, pageContentPolicy, pageHostBase, pageLabelFor, pageLabelOf, pageOrigin, pageSandbox, pageScriptHosts } from "./rules";
+import { hostName, hostPort, isUnderPageDomain, looksLikePageHost, pageDomainRewrites, pageContentPolicy, pageHostBase, pageLabelFor, pageLabelOf, pageOrigin, pageSandbox, pageScriptHosts } from "./rules";
 
 const label = "0123456789abcdef0123456789abcdef";
 const production = { NODE_ENV: "production", PAGE_HOST: "artifacts.link", BETTER_AUTH_URL: "https://artifacts.space" } as NodeJS.ProcessEnv;
@@ -187,5 +187,45 @@ describe("pageHostResponse", () => {
     const response = ask("/", "GET", `${label}.example.com`);
     expect(response.status).toBe(404);
     expect(response.headers.get("content-security-policy")).toBe("default-src 'none'; sandbox; frame-ancestors 'none'");
+  });
+});
+
+describe("hosts under the page domain that are not page hosts", () => {
+  const label = "0123456789abcdef0123456789abcdef";
+  /** Next matches a `has` host value against the whole host name, without its port. */
+  const ruleMatches = (host: string, env: Record<string, string>) => {
+    const [rule] = pageDomainRewrites({ NODE_ENV: "production", ...env });
+    const value = rule?.has[0]?.value;
+    return value !== undefined && new RegExp(`^${value}$`).test(host);
+  };
+
+  it("should send every path of every host under the page domain to the refusal", () => {
+    const rules = pageDomainRewrites({ NODE_ENV: "production", PAGE_HOST: "artifacts.link" });
+    expect(rules).toEqual([{ source: "/:path*", has: [{ type: "host", value: ".+\\.artifacts\\.link" }], destination: "/page-host-refusal" }]);
+    for (const host of ["www.artifacts.link", "app.artifacts.link", "a.b.artifacts.link", `${label}.x.artifacts.link`, `${label}.artifacts.link`]) {
+      expect(ruleMatches(host, { PAGE_HOST: "artifacts.link" }), host).toBe(true);
+    }
+  });
+
+  it("should never catch the site, a look-alike domain, or the page domain itself", () => {
+    for (const host of ["artifacts.space", "www.artifacts.space", "artifacts.link", "notartifacts.link", "www.artifactsxlink", "artifacts.link.example.com", "localhost"]) {
+      expect(ruleMatches(host, { PAGE_HOST: "artifacts.link" }), host).toBe(false);
+    }
+  });
+
+  it("should add no rule where no page domain is set", () => {
+    expect(pageDomainRewrites({ NODE_ENV: "production" })).toEqual([]);
+    expect(pageDomainRewrites({ NODE_ENV: "production", PAGE_HOST: "not a host" })).toEqual([]);
+  });
+
+  it("should tell a host under the page domain from the domain itself and from other domains", () => {
+    expect(isUnderPageDomain("www.artifacts.link", "artifacts.link")).toBe(true);
+    expect(isUnderPageDomain("WWW.Artifacts.Link:443", "artifacts.link")).toBe(true);
+    expect(isUnderPageDomain(`${label}.artifacts.link`, "artifacts.link")).toBe(true);
+    expect(isUnderPageDomain("artifacts.link", "artifacts.link")).toBe(false);
+    expect(isUnderPageDomain("notartifacts.link", "artifacts.link")).toBe(false);
+    expect(isUnderPageDomain("artifacts.space", "artifacts.link")).toBe(false);
+    expect(isUnderPageDomain("www.artifacts.link", null)).toBe(false);
+    expect(isUnderPageDomain(null, "artifacts.link")).toBe(false);
   });
 });

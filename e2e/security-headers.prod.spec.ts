@@ -55,6 +55,31 @@ for (const path of ["/preview", "/docs", "/sign-in", "/api/auth/get-session", "/
   });
 }
 
+// A wildcard domain sends every host under the page domain to the app. Only page hosts get an answer there.
+for (const name of ["www", "app", `${pageHostLabel}.x`]) {
+  for (const path of ["/", "/preview", "/docs", "/sign-in", "/app", "/api/auth/get-session", "/api/mcp", "/robots.txt", "/_next/static/chunks/none.js"]) {
+    test(`should answer 404 for ${path} on ${name}.<page domain>, which is no page host`, async ({ request, baseURL }) => {
+      const site = new URL(baseURL ?? "");
+      const response = await request.get(path, { headers: { host: `${name}.localhost:${site.port}` }, maxRedirects: 0 });
+      expect(response.status()).toBe(404);
+      expect(await response.text()).toBe("Not found");
+      expect(response.headers()["set-cookie"]).toBeUndefined();
+    });
+  }
+}
+
+test("should answer 404 for a POST to a host under the page domain that is no page host", async ({ request, baseURL }) => {
+  const site = new URL(baseURL ?? "");
+  const response = await request.post("/api/auth/sign-in/email", { headers: { host: `www.localhost:${site.port}` }, data: { email: "someone@example.com", password: "x" }, maxRedirects: 0 });
+  expect(response.status()).toBe(404);
+  expect(response.headers()["set-cookie"]).toBeUndefined();
+});
+
+test("should still serve the site on its own host", async ({ request }) => {
+  const response = await request.get("/preview");
+  expect(response.status()).toBe(200);
+});
+
 test("should answer 404 for a host that looks like a page host on another domain", async ({ request }) => {
   const response = await request.get("/", { headers: { host: `${pageHostLabel}.example.com` }, maxRedirects: 0 });
   expect(response.status()).toBe(404);

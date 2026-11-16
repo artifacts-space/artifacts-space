@@ -1,4 +1,5 @@
-import { permissionsPolicy } from "@/lib/security-header-rules";
+// A relative path, and no `@/` import in this file: next.config.ts loads it, and its loader does not know the alias.
+import { permissionsPolicy } from "../security-header-rules";
 
 /*
  * The page host: where a page that an agent wrote runs. Such a page has
@@ -25,6 +26,42 @@ export function pageHostBase(env: NodeJS.ProcessEnv = process.env): string | nul
   const set = env.PAGE_HOST?.trim().toLowerCase();
   if (set) return /^[a-z0-9.-]+$/.test(set) ? set : null;
   return env.NODE_ENV === "development" ? "localhost" : null;
+}
+
+/** True for a host under the page domain (`www.<base>`, `<label>.<base>`, `a.b.<base>`); never for the domain itself. */
+export function isUnderPageDomain(host: string | null, base: string | null): boolean {
+  if (!base) return false;
+  const name = hostName(host);
+  return name.length > base.length + 1 && name.endsWith(`.${base}`);
+}
+
+/** The path every request to another host under the page domain is sent to; it answers 404 (src/app/page-host-refusal). */
+export const pageHostRefusalPath = "/page-host-refusal";
+
+/** One rewrite of the Next config: a path pattern, the hosts it holds for, and where it goes. */
+export interface HostRewrite {
+  source: string;
+  has: { type: "host"; value: string }[];
+  destination: string;
+}
+
+/**
+ * The page domain serves frame documents and nothing else. A wildcard
+ * domain sends every host under it to this app, so without this rule
+ * `www.<base>` would show the whole site on the page domain, the same site
+ * (to a browser) as pages that run anyone's scripts. This rewrite, checked
+ * before any file or page, sends every path of every host under the page
+ * domain to the refusal. A page host itself never gets here: the proxy
+ * answers it first. Read when the app is built, so `PAGE_HOST` must be set
+ * for the build as well as at run time. The domain itself is not covered:
+ * never point it at this app.
+ */
+export function pageDomainRewrites(env: NodeJS.ProcessEnv = process.env): HostRewrite[] {
+  const base = pageHostBase(env);
+  if (!base) return [];
+  // A host name holds letters, digits, hyphens, and dots (pageHostBase checks it); only the dot means something in a pattern.
+  const escaped = base.replaceAll(".", "\\.");
+  return [{ source: "/:path*", has: [{ type: "host", value: `.+\\.${escaped}` }], destination: pageHostRefusalPath }];
 }
 
 /** A Host header without its port, in lower case. */
