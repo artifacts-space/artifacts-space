@@ -3,7 +3,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { frameImageText, notDrawnYet, frameHasProblems, type FrameImageFacts } from "@/lib/canvas/capture-read-rules";
+import { frameImageText, notDrawnYet, frameHasProblems, type FrameImageFacts, linkIsAKey } from "@/lib/canvas/capture-read-rules";
 import type { McpAccess } from "@/lib/oauth/scopes";
 import { UserFacingError } from "@/lib/user-facing-error";
 
@@ -79,7 +79,7 @@ describe("canvas_frame_image", () => {
     data.readFrameImage.mockResolvedValue({ state: "link", facts, url: "https://files.example.com/part?signed=1", expiresAt: new Date("2026-11-16T09:45:00.000Z") });
     const result = await call({ id: publicId, frameId: "home", as: "link" });
     expect(result.content).toHaveLength(1);
-    expect(textOf(result)).toBe(`${frameImageText(facts)} Link to the image, which works until 2026-11-16T09:45:00.000Z: https://files.example.com/part?signed=1`);
+    expect(textOf(result)).toBe(`${frameImageText(facts)} ${linkIsAKey} Link to the image, which works until 2026-11-16T09:45:00.000Z: https://files.example.com/part?signed=1`);
     expect(result).not.toHaveProperty("structuredContent");
   });
 

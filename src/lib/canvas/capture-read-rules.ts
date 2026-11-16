@@ -143,9 +143,16 @@ export function frameImageText(facts: FrameImageFacts): string {
   return sentences.join(" ");
 }
 
-/** The text of a link result: the image's facts, then the link and how long it works. */
+/** What a link result says about the link itself: it opens the image for anyone who has it, past the editors-only rule. */
+export const linkIsAKey = "Anyone who has the link can open the image until it ends, so give it only to the person you are working for, and never put it in an artifact, a comment, or a message that others read.";
+
+/**
+ * The text of a link result: the image's facts, that the link is a key
+ * (it is the one way these pixels leave the edit-access check), then the
+ * link and how long it works. The link comes last.
+ */
 export function frameImageLinkText(facts: FrameImageFacts, url: string, expiresAt: string): string {
-  return `${frameImageText(facts)} Link to the image, which works until ${expiresAt}: ${url}`;
+  return `${frameImageText(facts)} ${linkIsAKey} Link to the image, which works until ${expiresAt}: ${url}`;
 }
 
 /** What the frame lists say of one frame's image in a mode: "current" when its current content has a checked image. */

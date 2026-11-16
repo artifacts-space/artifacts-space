@@ -1020,6 +1020,9 @@ capture, PUTs its parts straight to R2, and finishes it
   picture read through the server, would serve whatever was put after the
   check) and after the same check of the object's head and first bytes. It
   works as long as a file link, and answers with the capture's own type.
+  A link is the one way these pixels leave the edit-access check, so its
+  text says that anyone who has it can open the image and that it must not
+  go into an artifact, a comment, or a message (`linkIsAKey`).
   No image is a typed tool error with a code (`frame_image_not_drawn`,
   `frame_has_problems`, `frame_images_off`, `frame_images_full`,
   `theme_unreadable`, `mode_not_drawn`, `part_out_of_range`,

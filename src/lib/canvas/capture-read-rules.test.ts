@@ -84,6 +84,14 @@ describe("frameImageLinkText", () => {
     expect(text.startsWith(frameImageText(facts()))).toBe(true);
     expect(text.endsWith(" Link to the image, which works until 2026-11-16T09:45:00.000Z: https://files.example.com/part")).toBe(true);
   });
+
+  it("should say that anyone who has the link can open the image, and where it must not go", () => {
+    const text = frameImageLinkText(facts(), "https://files.example.com/part", "2026-11-16T09:45:00.000Z");
+    expect(text).toContain("Anyone who has the link can open the image until it ends");
+    expect(text).toContain("never put it in an artifact, a comment, or a message that others read");
+    // The warning comes before the link, so the link stays the last thing in the text.
+    expect(text.indexOf("Anyone who has the link")).toBeLessThan(text.indexOf("https://files.example.com/part"));
+  });
 });
 
 describe("refusals", () => {
