@@ -23,7 +23,7 @@ const boxInPage = "h-[min(80dvh,60rem)] min-h-96 rounded-lg border";
  * The same box over the whole window. It is shown in the browser's top layer (`popover`, see useTopLayer), whose
  * own styles these replace: no margin, edge, or padding, and the window's size instead of the content's.
  */
-const boxOnScreen = "fixed inset-0 z-50 m-0 size-auto max-h-none max-w-none border-0 p-0";
+const boxOnScreen = "fixed inset-0 z-50 m-0 size-auto max-h-none max-w-none overscroll-contain border-0 p-0";
 
 /**
  * Puts the box in the browser's top layer while `on`, and brings the focus to the bar's button after each change
@@ -134,5 +134,7 @@ export function HtmlView({ content, title, pageKey }: { content: string; title: 
       </div>
     );
   }
-  return <PageWindow content={content} title={title} pageKey={pageKey ?? samplePage} />;
+  const key = pageKey ?? samplePage;
+  // Keyed by the artifact: full screen is about the page the reader put there, never the next one shown in its place.
+  return <PageWindow key={key} content={content} title={title} pageKey={key} />;
 }

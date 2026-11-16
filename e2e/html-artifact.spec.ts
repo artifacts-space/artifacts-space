@@ -60,7 +60,7 @@ test("should put the page over the whole window with Full screen, keep what the 
 
   await page.getByRole("button", { name: "Full screen", exact: true }).click();
   const viewport = page.viewportSize();
-  expect(await box.boundingBox()).toEqual({ x: 0, y: 0, width: viewport?.width, height: viewport?.height });
+  await expect.poll(() => box.boundingBox()).toEqual({ x: 0, y: 0, width: viewport?.width, height: viewport?.height });
   // Nothing of the site is drawn over it: each corner belongs to the box.
   const corners = await box.evaluate((element) => {
     const { innerWidth: width, innerHeight: height } = window;
@@ -76,7 +76,7 @@ test("should put the page over the whole window with Full screen, keep what the 
   await expectNoAxeViolations(box);
 
   await bar.getByRole("button", { name: "Exit full screen" }).click();
-  expect(await box.boundingBox()).toEqual(inPage);
+  await expect.poll(() => box.boundingBox()).toEqual(inPage);
   await expect(page.frameLocator(frameSelector).locator("#count")).toHaveText("2");
   await expect(page.getByRole("button", { name: "Full screen", exact: true })).toBeFocused();
 });
