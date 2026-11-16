@@ -1,6 +1,6 @@
 import type { CaptureType, PartBox } from "@/lib/canvas/capture-rules";
 
-import { encodeTypes, encodeWithin, type DrawingPlan, type PartEncoder } from "./capture-host-rules";
+import { encodeTypes, encodeWithin, type DrawingPlan, type LeftOutReason, type PartEncoder } from "./capture-host-rules";
 
 /**
  * Draws a capture box and cuts the drawing into parts. The drawing library
@@ -14,6 +14,11 @@ export interface DrawnParts {
   type: CaptureType;
   parts: Blob[];
 }
+
+/** What a drawing came to: its parts, or why it is left out of this pass. */
+export type DrawOutcome = ({ state: "drawn" } & DrawnParts) | { state: "left-out"; reason: LeftOutReason };
+
+const leftOut = (reason: LeftOutReason): DrawOutcome => ({ state: "left-out", reason });
 
 function encoderOf(canvas: HTMLCanvasElement): PartEncoder<Blob> {
   return (type, quality) =>
@@ -36,12 +41,12 @@ function cutPart(drawing: HTMLCanvasElement, box: PartBox, background: string): 
   return canvas;
 }
 
-/** Every part as `type`, or why not: the browser cannot write the type, or a part cannot be made small enough. */
-async function encodeParts(drawing: HTMLCanvasElement, plan: DrawingPlan, background: string, type: CaptureType): Promise<Blob[] | "wrong-type" | "too-large"> {
+/** Every part as `type`, or why not: the browser cannot write the type, a part cannot be made small enough, or the browser gave no canvas or no picture. */
+async function encodeParts(drawing: HTMLCanvasElement, plan: DrawingPlan, background: string, type: CaptureType): Promise<Blob[] | "wrong-type" | "too-large" | "failed"> {
   const parts: Blob[] = [];
   for (const box of plan.parts) {
     const canvas = cutPart(drawing, box, background);
-    if (!canvas) return "too-large";
+    if (!canvas) return "failed";
     const outcome = await encodeWithin(encoderOf(canvas), type);
     if (outcome.state !== "fits") return outcome.state;
     parts.push(outcome.part.data);
@@ -52,20 +57,22 @@ async function encodeParts(drawing: HTMLCanvasElement, plan: DrawingPlan, backgr
 /**
  * Draws `element` (the capture box, `width` CSS pixels wide and
  * `plan.drawnHeight` tall) and returns its parts, as WebP, or as JPEG where
- * the browser cannot write WebP. Null when the drawing did not come out at
- * the box's size or a part cannot be made small enough: the host then
- * leaves this drawing out. Throws when the library fails; the caller
- * catches it.
+ * the browser cannot write WebP. Otherwise it says why the host leaves this
+ * drawing out: the drawing did not come out at the box's size, a part
+ * cannot be made small enough, the browser gave no picture (which is not a
+ * matter of type, so JPEG is not tried), or the browser writes neither
+ * type. Throws when the library fails; the caller catches it.
  */
-export async function drawParts(element: HTMLElement, width: number, plan: DrawingPlan): Promise<DrawnParts | null> {
+export async function drawParts(element: HTMLElement, width: number, plan: DrawingPlan): Promise<DrawOutcome> {
   const { snapdom } = await import("@zumer/snapdom");
   const drawing = await snapdom.toCanvas(element, { scale: 1, dpr: 1, embedFonts: true, placeholders: false });
-  if (Math.abs(drawing.width - width) > 1 || Math.abs(drawing.height - plan.drawnHeight) > 1) return null;
+  if (Math.abs(drawing.width - width) > 1 || Math.abs(drawing.height - plan.drawnHeight) > 1) return leftOut("wrong-size");
   const background = getComputedStyle(element).backgroundColor;
   for (const type of encodeTypes) {
     const parts = await encodeParts(drawing, plan, background, type);
-    if (parts === "too-large") return null;
-    if (parts !== "wrong-type") return { type, parts };
+    if (parts === "too-large") return leftOut("too-large");
+    if (parts === "failed") return leftOut("encode-failed");
+    if (parts !== "wrong-type") return { state: "drawn", type, parts };
   }
-  return null;
+  return leftOut("no-type");
 }

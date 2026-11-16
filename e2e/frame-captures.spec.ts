@@ -44,6 +44,8 @@ const host = (page: Page) => page.locator("[data-frame-captures]");
 async function passesEnded(page: Page, passes: number) {
   await expect(host(page)).toHaveAttribute("data-frame-capture-passes", String(passes), { timeout: 60_000 });
   await expect(host(page)).toHaveAttribute("data-frame-captures", "idle");
+  // Every drawing the pass tried came out: none was left for the next pass.
+  await expect(host(page)).toHaveAttribute("data-frame-capture-left-out", "0");
 }
 
 /** Opens a canvas fixture with a capture host and waits for its first pass to end. */

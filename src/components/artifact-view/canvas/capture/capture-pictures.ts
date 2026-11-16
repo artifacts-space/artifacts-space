@@ -1,7 +1,7 @@
 import type { FileDto } from "@/lib/files/types";
 
 import type { CaptureApi } from "./capture-api";
-import { maxPictureBytes } from "./capture-host-rules";
+import { maxPictureBytes, pictureFetchTimeoutMs } from "./capture-host-rules";
 
 /**
  * The pictures a frame shows, fetched by the capture host itself and handed
@@ -25,10 +25,15 @@ function asDataUrl(blob: Blob): Promise<string | null> {
   });
 }
 
-/** One picture as a data URL, or null when it could not be fetched or is larger than the host inlines. Never throws. */
-async function fetchPicture(url: string): Promise<string | null> {
+/**
+ * One picture as a data URL, or null when it could not be fetched, took
+ * longer than `timeoutMs` (a request that never answers must not hold the
+ * pass, and with it every later one), or is larger than the host inlines.
+ * Never throws.
+ */
+export async function fetchPicture(url: string, timeoutMs: number = pictureFetchTimeoutMs): Promise<string | null> {
   try {
-    const response = await fetch(url, { credentials: "same-origin", cache: "no-store" });
+    const response = await fetch(url, { credentials: "same-origin", cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
     if (!response.ok) return null;
     const blob = await response.blob();
     if (blob.size === 0 || blob.size > maxPictureBytes) return null;

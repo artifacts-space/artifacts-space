@@ -5,8 +5,11 @@ import { captureLimits } from "@/lib/canvas/capture-rules";
 import {
   asksAgain,
   attemptKey,
+  countLeftOut,
   encodeQualities,
   encodeWithin,
+  leftOutTotal,
+  leftOutWords,
   maxBatchesPerPass,
   mayDraw,
   minDrawingWindowWidth,
@@ -197,10 +200,51 @@ describe("encodeWithin", () => {
     expect(await encodeWithin(encode, "image/webp")).toEqual({ state: "too-large" });
   });
 
-  it("should say wrong-type when the browser writes another type than asked, or nothing", async () => {
+  it("should say wrong-type when the browser writes another type than asked", async () => {
     const { encode, asked } = encoder("image/png", [1_000]);
     expect(await encodeWithin(encode, "image/webp")).toEqual({ state: "wrong-type" });
     expect(asked).toEqual([0.9]);
-    expect(await encodeWithin(() => Promise.resolve(null), "image/jpeg")).toEqual({ state: "wrong-type" });
+  });
+
+  it("should say failed, not wrong-type, when the browser gives no picture at any quality", async () => {
+    const asked: number[] = [];
+    const none: PartEncoder<string> = (_type, quality) => {
+      asked.push(quality);
+      return Promise.resolve(null);
+    };
+    expect(await encodeWithin(none, "image/jpeg")).toEqual({ state: "failed" });
+    expect(asked).toEqual([...encodeQualities]);
+  });
+
+  it("should ask at the next quality when the browser gives no picture at one", async () => {
+    let calls = 0;
+    const flaky: PartEncoder<string> = (type, quality) => {
+      calls += 1;
+      return Promise.resolve(calls === 1 ? null : { type, bytes: 1_000, data: `q${String(quality)}` });
+    };
+    expect(await encodeWithin(flaky, "image/webp")).toEqual({ state: "fits", part: { type: "image/webp", bytes: 1_000, data: "q0.8" } });
+  });
+
+  it("should say too-large when a picture came out at some quality but none fits", async () => {
+    let calls = 0;
+    const big: PartEncoder<string> = (type) => {
+      calls += 1;
+      return Promise.resolve(calls === 2 ? null : { type, bytes: captureLimits.maxPartBytes + 1, data: "big" });
+    };
+    expect(await encodeWithin(big, "image/webp")).toEqual({ state: "too-large" });
+  });
+});
+
+describe("left-out counts", () => {
+  it("should count drawings by reason and add them up", () => {
+    const counts = countLeftOut(countLeftOut(countLeftOut({}, "too-large"), "error"), "too-large");
+    expect(counts).toEqual({ "too-large": 2, error: 1 });
+    expect(leftOutTotal(counts)).toBe(3);
+    expect(leftOutTotal({})).toBe(0);
+  });
+
+  it("should word the counts with reasons and numbers only", () => {
+    expect(leftOutWords({ "too-large": 2, error: 1 })).toBe("too-large 2, error 1");
+    expect(leftOutWords({})).toBe("");
   });
 });

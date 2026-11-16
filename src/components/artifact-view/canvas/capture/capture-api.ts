@@ -3,6 +3,8 @@ import type { ActionResult } from "@/lib/artifact-types";
 import type { CapturesNeeded, PartUpload, StartCaptureInput } from "@/lib/canvas/captures";
 import { fileUrl, type FileDto } from "@/lib/files/types";
 
+import { partUploadTimeoutMs } from "./capture-host-rules";
+
 /**
  * What the capture host (frame-capture-host.tsx) calls: the server actions,
  * which check the session and the edit access on every call, and a PUT
@@ -26,11 +28,13 @@ export interface CaptureApi {
  * PUTs one part to its signed URL with the headers the server signed. The
  * browser sets Content-Length itself, from the part's size, which is the
  * size that was signed (as put-file.ts does). No cookies go to file storage.
+ * An upload that takes longer than `partUploadTimeoutMs` counts as failed,
+ * so a connection that stalls never holds the pass.
  */
 async function putPart(upload: PartUpload, part: Blob): Promise<boolean> {
   try {
     const headers = Object.fromEntries(Object.entries(upload.headers).filter(([name]) => name.toLowerCase() !== "content-length"));
-    const response = await fetch(upload.url, { method: "PUT", headers, body: part, credentials: "omit" });
+    const response = await fetch(upload.url, { method: "PUT", headers, body: part, credentials: "omit", signal: AbortSignal.timeout(partUploadTimeoutMs) });
     return response.ok;
   } catch {
     return false;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { CaptureApi } from "./capture-api";
 import { CaptureBox, type BoxElements, type BoxJob } from "./capture-box";
-import { mayDraw, ownSaveWaits, startsPass, type DrawingConditions, type PassHistory, type PassReason } from "./capture-host-rules";
+import { leftOutTotal, mayDraw, ownSaveWaits, startsPass, type DrawingConditions, type PassHistory, type PassReason } from "./capture-host-rules";
 import type { PassEnv } from "./capture-pass";
 
 /*
@@ -74,10 +74,11 @@ function useCaptureBox() {
   return { job, show, hide, shown, release };
 }
 
-/** How many passes ended, and whether one runs now: the marks a test waits for. */
+/** How many passes ended, whether one runs now, and how many drawings the last pass left out: the marks a test waits for. */
 interface HostMarks {
   drawing: boolean;
   passes: number;
+  leftOut: number;
 }
 
 /**
@@ -85,7 +86,7 @@ interface HostMarks {
  * pass's code loads on the first pass.
  */
 function useCapturePasses({ active, artifactId, savedAt, api, box }: { active: boolean; artifactId: string | null; savedAt: string | null; api: CaptureApi | null; box: ReturnType<typeof useCaptureBox> }) {
-  const [marks, setMarks] = useState<HostMarks>({ drawing: false, passes: 0 });
+  const [marks, setMarks] = useState<HostMarks>({ drawing: false, passes: 0, leftOut: 0 });
   const history = useRef<PassHistory>({ running: false, lastStartedAt: null });
   const alive = useRef(false);
   const saved = useRef(savedAt);
@@ -102,10 +103,10 @@ function useCapturePasses({ active, artifactId, savedAt, api, box }: { active: b
     const env: PassEnv = { api, artifactId, show, hide, idle: whenIdle, mayContinue: () => alive.current && mayDraw(conditionsNow()) };
     void import("./capture-pass")
       .then(({ runPass }) => runPass(env))
-      .catch(() => undefined)
-      .finally(() => {
+      .then((summary) => leftOutTotal(summary.leftOut), () => 0)
+      .then((leftOut) => {
         history.current = { ...history.current, running: false };
-        if (alive.current) setMarks((current) => ({ drawing: false, passes: current.passes + 1 }));
+        if (alive.current) setMarks((current) => ({ drawing: false, passes: current.passes + 1, leftOut }));
       });
   }, [api, artifactId, show, hide]);
 
@@ -150,8 +151,10 @@ function useCapturePasses({ active, artifactId, savedAt, api, box }: { active: b
  * per page, beside the editor, never inside the artifact's content; it
  * renders nothing but a hidden, inert container, and nothing at all where
  * `api` is null, the artifact is not a saved canvas, or the viewer's device
- * asks to save data. Its marks, `data-frame-captures` ("idle" or "drawing")
- * and `data-frame-capture-passes`, are what a test waits for.
+ * asks to save data. Its marks are what a test waits for:
+ * `data-frame-captures` ("idle" or "drawing"), `data-frame-capture-passes`,
+ * and `data-frame-capture-left-out`, how many drawings the last pass could
+ * not make.
  */
 export function FrameCaptureHost({ artifactId, kind, savedAt, api }: FrameCaptureHostProps) {
   const active = api !== null && artifactId !== null && kind === "canvas";
@@ -167,6 +170,7 @@ export function FrameCaptureHost({ artifactId, kind, savedAt, api }: FrameCaptur
       data-comment-skip=""
       data-frame-captures={marks.drawing ? "drawing" : "idle"}
       data-frame-capture-passes={marks.passes}
+      data-frame-capture-left-out={marks.leftOut}
       className="pointer-events-none fixed top-0 left-0 size-0 overflow-hidden"
     >
       {job ? <CaptureBox key={job.key} job={job} onShown={onShown} /> : null}

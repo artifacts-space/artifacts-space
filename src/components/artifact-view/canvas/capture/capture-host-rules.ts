@@ -162,22 +162,62 @@ export interface EncodedPart<Data> {
 /** Encodes one part as `type` at `quality`, or null when the browser could not. */
 export type PartEncoder<Data> = (type: CaptureType, quality: number) => Promise<EncodedPart<Data> | null>;
 
-/** A part that fits, why it does not, or that the browser cannot write the type. */
-export type PartOutcome<Data> = { state: "fits"; part: EncodedPart<Data> } | { state: "too-large" } | { state: "wrong-type" };
+/**
+ * A part that fits, or why there is none: it is too large at every quality,
+ * the browser cannot write the type, or the browser gave no picture at all.
+ */
+export type PartOutcome<Data> = { state: "fits"; part: EncodedPart<Data> } | { state: "too-large" } | { state: "wrong-type" } | { state: "failed" };
 
 /**
  * Encodes a part as `type`, stepping the quality down until it is within
  * the part limit. A browser that cannot write WebP gives another type back
- * without saying so; that is "wrong-type", and the caller tries JPEG.
+ * without saying so; that is "wrong-type", and the caller tries JPEG. A
+ * browser that gives no picture at a quality is asked at the next one; when
+ * it gave none at any, that is "failed", which is not a matter of type.
  */
 export async function encodeWithin<Data>(encode: PartEncoder<Data>, type: CaptureType, maxBytes: number = captureLimits.maxPartBytes): Promise<PartOutcome<Data>> {
+  let encoded = false;
   for (const quality of encodeQualities) {
     const part = await encode(type, quality);
-    if (part?.type !== type) return { state: "wrong-type" };
+    if (!part) continue;
+    if (part.type !== type) return { state: "wrong-type" };
+    encoded = true;
     if (part.bytes > 0 && part.bytes <= maxBytes) return { state: "fits", part };
   }
-  return { state: "too-large" };
+  return { state: encoded ? "too-large" : "failed" };
 }
+
+/**
+ * Why a drawing was left out of a pass, so the next pass tries it again:
+ * the drawing did not come out at the box's size, a part cannot be made
+ * small enough, the browser gave no picture, the browser writes neither
+ * type, or the browser or the drawing library threw.
+ */
+export type LeftOutReason = "wrong-size" | "too-large" | "encode-failed" | "no-type" | "error";
+
+/** How many drawings a pass left out, by reason. */
+export type LeftOutCounts = Partial<Record<LeftOutReason, number>>;
+
+/** Counts one more drawing left out for `reason`. */
+export function countLeftOut(counts: LeftOutCounts, reason: LeftOutReason): LeftOutCounts {
+  return { ...counts, [reason]: (counts[reason] ?? 0) + 1 };
+}
+
+/** How many drawings a pass left out in all. */
+export function leftOutTotal(counts: LeftOutCounts): number {
+  return Object.values(counts).reduce((sum, count) => sum + count, 0);
+}
+
+/** The counts as words for one debug line: "too-large 2, error 1". No frame, spec, or file is named. */
+export function leftOutWords(counts: LeftOutCounts): string {
+  return Object.entries(counts).map(([reason, count]) => `${reason} ${String(count)}`).join(", ");
+}
+
+/** How long the host waits for one picture a frame shows. After it, the picture is left blank and the capture is partial. */
+export const pictureFetchTimeoutMs = 15_000;
+
+/** How long the host waits for one part to upload. After it, the pass ends, as for any upload that fails. */
+export const partUploadTimeoutMs = 60_000;
 
 /** The types a drawing is tried in, in order: WebP, then JPEG where the browser cannot write WebP. */
 export const encodeTypes: readonly CaptureType[] = ["image/webp", "image/jpeg"];

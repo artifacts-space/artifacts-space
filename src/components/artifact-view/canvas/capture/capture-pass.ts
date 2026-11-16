@@ -6,7 +6,7 @@ import { themeFontAssets } from "@/lib/themes/style";
 import type { CaptureApi } from "./capture-api";
 import type { BoxElements, BoxJob } from "./capture-box";
 import { drawParts, type DrawnParts } from "./capture-draw";
-import { asksAgain, attemptKey, picturesInSpec, planDrawing, untriedDrawings, type DrawingPlan, type FrameDrawing } from "./capture-host-rules";
+import { asksAgain, attemptKey, countLeftOut, leftOutTotal, leftOutWords, picturesInSpec, planDrawing, untriedDrawings, type DrawingPlan, type FrameDrawing, type LeftOutCounts, type LeftOutReason } from "./capture-host-rules";
 import { loadPictures, type FramePictures, type PictureCache } from "./capture-pictures";
 import { nextFrame, waitUntilReady } from "./capture-ready";
 
@@ -15,7 +15,9 @@ import { nextFrame, waitUntilReady } from "./capture-ready";
  * needs, draw each one in the capture box, upload its parts, and ask again,
  * until the answer holds nothing this pass has not tried. Loaded on the
  * first pass, so pages that never draw do not pay for it. A pass never
- * throws and never logs: a drawing that fails is left for the next pass.
+ * throws and never logs an error: a drawing that fails is left for the next
+ * pass, counted by its reason, and named in one debug line when the pass
+ * ends, so a frame that can never be drawn is not invisible.
  */
 
 /** What a pass needs from the host component. */
@@ -32,8 +34,14 @@ export interface PassEnv {
   idle: () => Promise<void>;
 }
 
-/** done: uploaded. skip: left out, the pass goes on. stop: the pass ends. */
-type Outcome = "done" | "skip" | "stop";
+/** done: uploaded. skip: no longer wanted, the pass goes on. stop: the pass ends. A reason: left out for it, the pass goes on. */
+type Outcome = "done" | "skip" | "stop" | LeftOutReason;
+
+/** What a pass came to. */
+export interface PassSummary {
+  /** How many drawings it left out for the next pass, by reason. */
+  leftOut: LeftOutCounts;
+}
 
 let boxCount = 0;
 
@@ -75,7 +83,7 @@ async function drawAndSend(env: PassEnv, job: BoxJob, drawing: CaptureDrawing, p
   if (!cut) return "stop";
   await nextFrame();
   const drawn = await drawParts(cut.clip, job.width, plan);
-  if (!drawn) return "skip";
+  if (drawn.state === "left-out") return drawn.reason;
   return startAndSend(env, drawing, plan, picturesFailed || ready.pictureFailed || !ready.settled, drawn);
 }
 
@@ -86,39 +94,54 @@ async function captureOne(env: PassEnv, board: Extract<CapturesNeeded, { state: 
     return await drawAndSend(env, newJob(item.frame, item.drawing, board, pictures), item.drawing, pictures.failed);
   } catch {
     // The drawing library or the browser failed on this frame. The next pass tries it again.
-    return "skip";
+    return "error";
   } finally {
     env.hide();
   }
 }
 
+/** What a pass remembers as it goes. */
+interface PassMemory {
+  tried: Set<string>;
+  cache: PictureCache;
+  leftOut: LeftOutCounts;
+}
+
 /** Draws every drawing of a batch this pass has not tried. False when the pass must end. */
-async function drawBatch(env: PassEnv, board: Extract<CapturesNeeded, { state: "draw" }>, fresh: readonly FrameDrawing<NeededFrame>[], tried: Set<string>, cache: PictureCache): Promise<boolean> {
+async function drawBatch(env: PassEnv, board: Extract<CapturesNeeded, { state: "draw" }>, fresh: readonly FrameDrawing<NeededFrame>[], memory: PassMemory): Promise<boolean> {
   const files = new Map(board.files.map((file) => [file.id, file]));
   for (const item of fresh) {
-    tried.add(attemptKey(item.drawing));
+    memory.tried.add(attemptKey(item.drawing));
     await env.idle();
     if (!env.mayContinue()) return false;
-    if ((await captureOne(env, board, item, files, cache)) === "stop") return false;
+    const outcome = await captureOne(env, board, item, files, memory.cache);
+    if (outcome === "stop") return false;
+    if (outcome !== "done" && outcome !== "skip") memory.leftOut = countLeftOut(memory.leftOut, outcome);
   }
   return true;
 }
 
-/** Runs one pass. Resolves when it ends; never rejects. */
-export async function runPass(env: PassEnv): Promise<void> {
-  const tried = new Set<string>();
-  const cache: PictureCache = new Map();
+async function runBatches(env: PassEnv, memory: PassMemory): Promise<void> {
+  for (let batch = 1; env.mayContinue(); batch += 1) {
+    const answer = await env.api.needed(env.artifactId);
+    if (!answer.success || answer.data.state !== "draw") return;
+    const fresh = untriedDrawings(answer.data.frames, memory.tried);
+    if (!(await drawBatch(env, answer.data, fresh, memory))) return;
+    if (!asksAgain(batch, fresh.length > 0)) return;
+  }
+}
+
+/** Runs one pass. Resolves when it ends, with what it left out; never rejects. */
+export async function runPass(env: PassEnv): Promise<PassSummary> {
+  const memory: PassMemory = { tried: new Set(), cache: new Map(), leftOut: {} };
   try {
-    for (let batch = 1; env.mayContinue(); batch += 1) {
-      const answer = await env.api.needed(env.artifactId);
-      if (!answer.success || answer.data.state !== "draw") return;
-      const fresh = untriedDrawings(answer.data.frames, tried);
-      if (!(await drawBatch(env, answer.data, fresh, tried, cache))) return;
-      if (!asksAgain(batch, fresh.length > 0)) return;
-    }
+    await runBatches(env, memory);
   } catch {
     // A lost connection or a failed action: the next pass starts over.
   } finally {
     env.hide();
   }
+  // One quiet line for whoever looks: counts and reasons only, never a frame, a spec, or a file.
+  if (leftOutTotal(memory.leftOut) > 0) console.debug(`[captures] Frame images left out of this pass: ${leftOutWords(memory.leftOut)}.`);
+  return { leftOut: memory.leftOut };
 }
