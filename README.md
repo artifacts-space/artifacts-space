@@ -190,21 +190,20 @@ dev user.
 
 ### Environment variables
 
-| Variable | Required | What it is |
-| --- | --- | --- |
-| `DATABASE_URL` | Yes | Postgres connection string. Vercel's Neon integration sets it. |
-| `DATABASE_URL_UNPOOLED` | For migrations | Direct (unpooled) connection string. Vercel production builds and `pnpm db:migrate` use it, before `DATABASE_URL`, so fill it in or leave it out (`.env.example` has it commented out). A value set for the command wins over `.env.local`. |
-| `ALLOW_SHARED_MIGRATE` | No | Set to `1` for one run to let `pnpm db:migrate` change a database that is not on localhost. |
-| `BETTER_AUTH_SECRET` | Yes | At least 32 characters, for example from `openssl rand -base64 32`. |
-| `BETTER_AUTH_URL` | Yes | This site's origin, such as `http://localhost:3000` or `https://your-domain`. |
-| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | For GitHub sign-in | From a GitHub OAuth app. GitHub sign-in stays off while the id is empty. |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | For Google sign-in | From a Google OAuth client (Web application) with the redirect URI `<BETTER_AUTH_URL>/api/auth/callback/google`. Google sign-in stays off while either value is empty or a `replace-with-…` placeholder. It is always off on Vercel preview deploys, whose URLs are not registered redirect URIs. The sign-in pages read them at build time, so a change needs a new build. |
-| `SENDIR_API_KEY`, `SENDIR_IDENTITY_ID` | In production | Send magic sign-in links and other email. Use a key scoped to the identity. `SENDIR_URL` overrides the API base. |
-| `ABUSE_REPORT_EMAIL` | In production | The site operator's address. Every reader report on an artifact is emailed here, and only here. Without it, reports are still stored and each one logs a warning. |
-| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | For files | The R2 bucket and an S3 API key scoped to it. |
-| `CRON_SECRET` | In production | At least 16 characters. Vercel Cron sends it to `/api/cron/*`. |
-| `STORAGE_QUOTA_CONTENT_BYTES`, `STORAGE_QUOTA_FILE_BYTES` | No | Per-account quotas. Defaults: 100 MB of content and 1 GB of files. |
-| `FRAME_CAPTURES` | No | Set to `off` to stop storing images of canvas frames. On by default where R2 is set up. |
+`.env.example` has a line, with a comment, for every variable you set in a
+file. Three are needed to start:
+
+| Variable | What it is |
+| --- | --- |
+| `DATABASE_URL` | Postgres connection string. Vercel's Neon integration sets it. |
+| `BETTER_AUTH_SECRET` | At least 32 characters, for example from `openssl rand -base64 32`. |
+| `BETTER_AUTH_URL` | This site's origin, such as `http://localhost:3000` or `https://your-domain`. |
+
+Most of the others turn one thing on, such as GitHub and Google sign-in,
+email, file uploads, browser notifications, pages that run scripts, and the
+scheduled cleanup jobs. The full list, with what each one does and what
+happens without it, is in the docs:
+https://artifacts.space/docs/self-hosting#env
 
 Local `localhost` and `127.0.0.1` database URLs use the PostgreSQL TCP driver.
 Remote URLs use Neon's serverless driver. Users, sessions, OAuth clients, and
@@ -230,7 +229,11 @@ the `content-type` and `content-length` headers, and exposes `ETag`.
 1. Import the repository as a Next.js project.
 2. Add Postgres through the Neon integration, or set `DATABASE_URL` and
    `DATABASE_URL_UNPOOLED` yourself.
-3. Set the other variables above for Production (and Preview, if you use it).
+3. Set the other variables for Production (and Preview, if you use it). A
+   deployment needs at least `SENDIR_API_KEY` and `SENDIR_IDENTITY_ID`
+   (sign-in emails), the four `R2_*` values (file uploads), and `CRON_SECRET`
+   (the cleanup crons refuse to run without it). The
+   [full list](https://artifacts.space/docs/self-hosting#env) has the rest.
 4. Set `DATABASE_URL_UNPOOLED` for Production. Each production build applies
    pending migrations before the new code goes live; if one fails, the build
    fails and the old deployment keeps serving. Preview builds never migrate.
