@@ -634,6 +634,17 @@ on a second domain (`src/lib/page-host/rules.ts`).
   with the Report link (`SharedPageNotice`). Agents read the rules in
   `buildHtmlGuide`, which lists the same hosts as `pageContentPolicy`; a
   test keeps them equal.
+- Full screen (`PageWindow` in `html-view.tsx`): a bar of this site's sits
+  above the running page, and its button puts the page's box over the whole
+  window and back. The box and its frame stay the same elements, shown in
+  the browser's top layer (`popover`), so the page keeps running and keeps
+  what the reader did in it; never draw a second frame for it, which would
+  load the page again. A fixed box alone is not enough: the /app pane's
+  body is a size container, which holds a fixed box inside it. The bar
+  stays in full screen with the artifact's title, so a page anyone wrote
+  never has the whole window to itself, and the frame gets no
+  `allowfullscreen`. Escape reaches the site only while focus is in the
+  bar, so the bar's button is always there.
 - `PAGE_HOST` unset (and not `next dev`): no page runs, and `PageFrame`
   draws nothing (`usePagesCanRun`). Tests: `rules.test.ts`,
   `proxy.test.ts`, `e2e/page-frame.spec.ts` on `/dev/page-frame`, and
