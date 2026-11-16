@@ -1,4 +1,5 @@
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 /**
  * The cover picker (the gallery's "cover picker" specimen, the same
@@ -7,7 +8,7 @@ import { expect, test } from "./support/test";
  * height on phones and desktops, and removal.
  */
 test("should show a gradient cover picked with the keyboard, in each theme", async ({ page }, testInfo) => {
-  await page.goto("/dev/components#themes");
+  await openGallery(page, ["themes"]);
   const specimen = page.locator('[data-specimen="cover picker"]');
   await specimen.getByRole("button", { name: "Cover: No cover" }).click();
 

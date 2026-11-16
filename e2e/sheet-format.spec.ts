@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 /**
  * Sheet formatting: banded rows and each column's alignment. Readers see
@@ -21,7 +22,7 @@ async function openEditorSheet(page: Page, query = "") {
 }
 
 test("should show a saved banding and column alignment to a reader without the controls to change them", async ({ page }) => {
-  await page.goto("/dev/components#formats");
+  await openGallery(page, ["formats"]);
   const specimen = page.locator('[data-specimen="csv · Banded sheet, names centered"]');
   const grid = specimen.getByRole("grid", { name: "CSV table" });
   await grid.scrollIntoViewIfNeeded();

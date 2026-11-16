@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 /**
  * Selecting in the spreadsheet grid, keyboard first: arrows, Tab, Enter,
@@ -31,7 +32,7 @@ async function paste(grid: Locator, text: string) {
 }
 
 async function openViewer(page: Page) {
-  await page.goto("/dev/components#formats");
+  await openGallery(page, ["formats"]);
   const grid = viewerGrid(page);
   await grid.scrollIntoViewIfNeeded();
   await expect(grid.getByRole("gridcell", { name: "r1c1", exact: true })).toBeVisible();

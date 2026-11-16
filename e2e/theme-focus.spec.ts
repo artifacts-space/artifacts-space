@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 /**
  * Focus inside a themed artifact: the gallery's "theme · focus ring"
@@ -12,7 +13,7 @@ import { expect, test } from "./support/test";
 async function openSpecimen(page: Page, theme: "light" | "dark") {
   // Top frame only: the gallery's file stand-ins are data: frames, which have no storage.
   await page.addInitScript((value) => { if (window === window.top) window.localStorage.setItem("theme", value); }, theme);
-  await page.goto("/dev/components#themes");
+  await openGallery(page, ["themes"]);
   await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${theme}\\b`));
   await expect(page.getByRole("status").filter({ hasText: "Drawing diagram" })).toHaveCount(0, { timeout: 60_000 });
 }

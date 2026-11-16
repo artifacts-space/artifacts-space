@@ -53,6 +53,36 @@ export interface PanZoom {
   };
 }
 
+/**
+ * True while the board's world still moves toward the view (a button's glide, a CSS transition on the world itself).
+ * Only the world's own animations count, never those of what the frames show: a spinner in a frame is no glide.
+ */
+function isGliding(pane: HTMLElement): boolean {
+  return (pane.querySelector("[data-canvas-world]")?.getAnimations({ subtree: false }).length ?? 0) > 0;
+}
+
+/** How many frames the board waits for a glide to end before it gives up bringing the focused control into view. */
+const REVEAL_FRAMES = 30;
+
+/**
+ * Brings the focused control inside `pane` into view once the board is drawn at rest. It waits, a frame at a time,
+ * for the glide to end, then asks the browser to scroll to the control; the board turns that scroll into a pan.
+ * One wait runs at a time (`pending` holds its frame), and it ends when the focus leaves the board.
+ */
+function revealFocusedAtRest(pane: HTMLElement, pending: { frame: number | null }, left = REVEAL_FRAMES) {
+  if (pending.frame !== null) cancelAnimationFrame(pending.frame);
+  pending.frame = requestAnimationFrame(() => {
+    pending.frame = null;
+    const focused = document.activeElement;
+    if (!(focused instanceof HTMLElement) || focused === pane || !pane.contains(focused)) return;
+    if (isGliding(pane) && left > 0) {
+      revealFocusedAtRest(pane, pending, left - 1);
+      return;
+    }
+    focused.scrollIntoView({ block: "nearest", inline: "nearest" });
+  });
+}
+
 function startsOnControl(event: PointerEvent<HTMLElement>): boolean {
   return event.target instanceof Element && event.target.closest(interactive) !== null;
 }
@@ -75,6 +105,11 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
   const [dragging, setDragging] = useState(false);
   const [glide, setGlide] = useState(false);
   const press = useRef<Press | null>(null);
+  const reveal = useRef<{ frame: number | null }>({ frame: null });
+  useEffect(() => {
+    const pending = reveal.current;
+    return () => { if (pending.frame !== null) cancelAnimationFrame(pending.frame); };
+  }, []);
   const room = size ?? { width: 0, height: 0 };
   const view = moved ?? fitView(bounds, room);
   const latest = useRef({ view, bounds, room });
@@ -83,8 +118,12 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
   });
 
   const move = useCallback((next: BoardView, smooth: boolean) => {
+    const moved = { zoom: next.zoom, x: Math.round(next.x), y: Math.round(next.y) };
+    // Noted at once, not only by the effect above: the handlers start from `latest`, and two of them can run before
+    // that effect does (a scroll in one frame and another in the next), so the second must start from the first's view.
+    latest.current = { ...latest.current, view: moved };
     setGlide(smooth);
-    setMoved({ zoom: next.zoom, x: Math.round(next.x), y: Math.round(next.y) });
+    setMoved(moved);
   }, []);
 
   // A zoom keeps one point still and moves the rest, so it can push the whole board out of the window as a drag could. It goes through the drag's clamp.
@@ -181,14 +220,19 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
   };
 
   // Focus moving to a control outside the window (Tab) makes the browser scroll the window, even though it shows no scrollbars. Turn that scroll into a pan, so the control comes into view and the view stays the one source of the board's place.
+  // While a glide runs, the browser measures that scroll against the board as it is drawn at that moment, not where
+  // the view comes to rest, so the pan would leave the control off by what the glide had left. The pan ends the
+  // glide; once the board is drawn at rest, the focused control is brought into view again, and that scroll is exact.
   const onScroll = (event: UIEvent<HTMLElement>) => {
     const element = event.currentTarget;
     const { scrollLeft, scrollTop } = element;
     if (scrollLeft === 0 && scrollTop === 0) return;
+    const gliding = isGliding(element);
     element.scrollLeft = 0;
     element.scrollTop = 0;
     const current = latest.current.view;
     move({ zoom: current.zoom, x: current.x - scrollLeft, y: current.y - scrollTop }, false);
+    if (gliding) revealFocusedAtRest(element, reveal.current);
   };
 
   // The browser took the pointer for its own gesture: a one-finger swipe that turned out to scroll the page. Any pan it caused before that is undone, so scrolling past the board never nudges it.
@@ -206,6 +250,8 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
   const zoomIn = () => { zoomTo((zoom) => nextZoomStep(zoom, 1)); };
   const zoomOut = () => { zoomTo((zoom) => nextZoomStep(zoom, -1)); };
   const fit = () => {
+    // Noted at once, as in `move`: a handler that runs before the effect must start from the fitted view.
+    latest.current = { ...latest.current, view: fitView(latest.current.bounds, latest.current.room) };
     setGlide(true);
     setMoved(null);
   };

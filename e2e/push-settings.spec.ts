@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 /**
  * Notification settings with browser notifications set up, on the component
@@ -13,7 +14,7 @@ import { expect, test } from "./support/test";
  * holds back hydration and the browser check for several seconds.
  */
 async function openSpecimen(page: Page) {
-  await page.goto("/dev/components#notifications");
+  await openGallery(page, ["notifications"]);
   await expect(page.getByRole("status").filter({ hasText: "Drawing diagram" })).toHaveCount(0, { timeout: 60_000 });
 }
 

@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
+import { openGallery } from "./support/gallery";
 
 /**
  * The spreadsheet grid: a sheet at the viewer's size limit keeps only the
@@ -33,7 +34,7 @@ async function pageScrollsSideways(page: Page) {
 }
 
 test("should keep only the cells in view in the page when a sheet at the size limit scrolls", async ({ page }) => {
-  await page.goto("/dev/components#formats");
+  await openGallery(page, ["formats"]);
   const grid = largeSheet(page);
   await grid.scrollIntoViewIfNeeded();
   await expect(grid).toHaveAttribute("aria-rowcount", "1001");
@@ -57,7 +58,7 @@ test("should keep only the cells in view in the page when a sheet at the size li
 });
 
 test("should label every rendered cell with its place in the whole sheet when the grid is virtualized", async ({ page }) => {
-  await page.goto("/dev/components#formats");
+  await openGallery(page, ["formats"]);
   const grid = largeSheet(page);
   const row = grid.locator('[role=row][aria-rowindex="302"]');
   await scrollGridTo(grid, { top: 32 * 300, left: 2000 }, row);
@@ -100,7 +101,7 @@ test("should scroll only the grid sideways and keep the page header in view when
 });
 
 test("should keep the active cell in view when the keyboard moves it past the edge of the grid", async ({ page }) => {
-  await page.goto("/dev/components#formats");
+  await openGallery(page, ["formats"]);
   const grid = largeSheet(page);
   await grid.focus();
   await page.keyboard.press("Control+End");
