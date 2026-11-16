@@ -2,6 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
+import { openGallery, specimen } from "./support/gallery";
 import { expectScrollersSettled } from "./support/scrollers";
 import { brandUiIconNames } from "../src/lib/ui/icon-names";
 
@@ -14,13 +15,14 @@ import { brandUiIconNames } from "../src/lib/ui/icon-names";
  * every tone is read by e2e/a11y-contrast.spec.ts, which scans the gallery.
  */
 
-const specimen = (page: Page, group: string, name: string) => page.locator(`section#${group} [data-specimen="${name}"]`);
-
-/** The gallery is interactive once the scrolling row has measured itself and become a tab stop. */
-async function galleryReady(page: Page) {
-  await page.goto("/dev/components#Box");
+/** Opens the gallery with these groups and specimens, the scrolling row among them, and waits until that row has measured itself and become a tab stop. */
+async function openWithScrollingRow(page: Page, shown: readonly string[]) {
+  await openGallery(page, shown);
   await expect(specimen(page, "Box", "Scrolling row").getByRole("group", { name: "Customer logos" })).toHaveAttribute("tabindex", "0", { timeout: 30_000 });
 }
+
+/** The surfaces on the site palette and under the ocean theme. */
+const surfaceMatrices = ["specs/Surfaces and tones", "themes/theme · ocean"];
 
 const computed = (target: Locator, property: string) => target.evaluate((element, name) => getComputedStyle(element).getPropertyValue(name), property);
 
@@ -73,8 +75,9 @@ function contrast(a: Rgb, b: Rgb): number {
 }
 
 test("should pass axe on the Box, Icon, and Placeholder groups of the gallery", async ({ page }) => {
-  await galleryReady(page);
-  for (const group of ["Box", "Icon", "Placeholder"]) {
+  const groups = ["Box", "Icon", "Placeholder"];
+  await openWithScrollingRow(page, groups);
+  for (const group of groups) {
     const section = page.locator(`section#${group}`);
     await section.scrollIntoViewIfNeeded();
     await expectNoAxeViolations(section);
@@ -82,7 +85,7 @@ test("should pass axe on the Box, Icon, and Placeholder groups of the gallery", 
 });
 
 test("should pass axe on every surface with every tone, and on a composed landing page", async ({ page }) => {
-  await galleryReady(page);
+  await openGallery(page, ["specs/Surfaces and tones", "specs/Landing page"]);
   for (const name of ["Surfaces and tones", "Landing page"]) {
     const whole = specimen(page, "specs", name);
     await whole.scrollIntoViewIfNeeded();
@@ -93,7 +96,7 @@ test("should pass axe on every surface with every tone, and on a composed landin
 });
 
 test("should draw every brand mark at five growing sizes in the text color, each named by its brand, and pass axe", async ({ page }) => {
-  await galleryReady(page);
+  await openGallery(page, ["specs/Brand marks"]);
   const marks = specimen(page, "specs", "Brand marks");
   await marks.scrollIntoViewIfNeeded();
   await expectNoAxeViolations(marks);
@@ -115,7 +118,7 @@ test("should draw every brand mark at five growing sizes in the text color, each
 });
 
 test("should name a Box with a label as a group, and a scrolling row as a group the keyboard can reach", async ({ page }) => {
-  await galleryReady(page);
+  await openWithScrollingRow(page, ["Box/Scrolling row", "specs/Landing page"]);
   const row = specimen(page, "Box", "Scrolling row").getByRole("group", { name: "Customer logos" });
   // The row holds twelve logos: wider than its box at every viewport, so it scrolls inside itself and the page does not.
   expect(await row.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
@@ -127,7 +130,7 @@ test("should name a Box with a label as a group, and a scrolling row as a group 
 
 test("should follow the width of its container, not the window, when a row has stackBelow", async ({ page, isMobile }) => {
   test.skip(isMobile, "the window is the narrow one there; this proves a narrow container in a wide window");
-  await galleryReady(page);
+  await openGallery(page, ["Box/Stacks below md"]);
   const frame = specimen(page, "Box", "Stacks below md");
   const row = frame.locator("[class*='@2xl/ui:flex-row']");
   await expect(row).toHaveCount(1);
@@ -140,7 +143,7 @@ test("should follow the width of its container, not the window, when a row has s
 
 test("should hide and show a Box by the width of its container", async ({ page, isMobile }) => {
   test.skip(isMobile, "the window is the narrow one there; this proves a narrow container in a wide window");
-  await galleryReady(page);
+  await openGallery(page, ["Box/Hidden below md", "Box/Hidden above md"]);
   const wideOnly = specimen(page, "Box", "Hidden below md");
   const narrowOnly = specimen(page, "Box", "Hidden above md");
   await expect(wideOnly.getByText("Only shown on a wide page column.")).toBeVisible();
@@ -151,7 +154,7 @@ test("should hide and show a Box by the width of its container", async ({ page, 
 });
 
 test("should show the phone layout of the landing page on a phone, with the menu links hidden", async ({ page, isMobile }) => {
-  await galleryReady(page);
+  await openGallery(page, ["specs/Landing page"]);
   const landing = specimen(page, "specs", "Landing page");
   await landing.scrollIntoViewIfNeeded();
   const pricing = landing.getByText("Pricing", { exact: true });
@@ -167,7 +170,7 @@ for (const scheme of ["light", "dark"] as const) {
     await page.addInitScript((value) => {
       try { window.localStorage.setItem("theme", value); } catch { /* no storage in this frame */ }
     }, scheme);
-    await galleryReady(page);
+    await openGallery(page, surfaceMatrices);
     const matrix = specimen(page, "specs", "Surfaces and tones");
     const plain = matrix.getByRole("group", { name: "Surface page" });
     const inverse = matrix.getByRole("group", { name: "Surface inverse" });
@@ -192,7 +195,7 @@ for (const scheme of ["light", "dark"] as const) {
     await page.addInitScript((value) => {
       try { window.localStorage.setItem("theme", value); } catch { /* no storage in this frame */ }
     }, scheme);
-    await galleryReady(page);
+    await openGallery(page, surfaceMatrices);
     // On the site palette, and under a theme whose accent is of the other mode on each side.
     for (const matrix of [specimen(page, "specs", "Surfaces and tones"), page.locator('[data-themed-surfaces="ocean"]')]) {
       const outside = await paintedRgb(matrix.getByRole("group", { name: "Surface page" }), "--series-1");

@@ -1,7 +1,8 @@
-import type { Locator, Page } from "@playwright/test";
+import type { Locator } from "@playwright/test";
 import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
+import { openGallery, specimen } from "./support/gallery";
 
 /*
  * The display pieces of a screen (AvatarGroup, Kbd, Rating), the Badge's
@@ -11,22 +12,15 @@ import { expectNoAxeViolations } from "./support/a11y";
  * of the "Surfaces and tones" specimen.
  */
 
-const specimen = (page: Page, group: string, name: string) => page.locator(`section#${group} [data-specimen="${name}"]`);
-
-/** The gallery is ready once React has hydrated it, which its ready mark says. */
-async function galleryReady(page: Page, group: string) {
-  await page.goto(`/dev/components#${group}`);
-  await expect(page.locator("[data-gallery-ready]")).toBeAttached({ timeout: 60_000 });
-}
-
 const boxOf = (target: Locator) => target.evaluate((element) => {
   const { left, right, top, bottom, width } = element.getBoundingClientRect();
   return { left, right, top, bottom, width };
 });
 
 test("should pass axe on the AvatarGroup, Kbd, Rating, Badge, and Input groups of the gallery", async ({ page }) => {
-  await galleryReady(page, "AvatarGroup");
-  for (const group of ["AvatarGroup", "Kbd", "Rating", "Badge", "Input"]) {
+  const groups = ["AvatarGroup", "Kbd", "Rating", "Badge", "Input"];
+  await openGallery(page, groups);
+  for (const group of groups) {
     const section = page.locator(`section#${group}`);
     await section.scrollIntoViewIfNeeded();
     await expectNoAxeViolations(section);
@@ -34,7 +28,7 @@ test("should pass axe on the AvatarGroup, Kbd, Rating, Badge, and Input groups o
 });
 
 test("should give screen readers one name for each display piece, in words, and nothing for what is drawn", async ({ page }) => {
-  await galleryReady(page, "AvatarGroup");
+  await openGallery(page, ["AvatarGroup/Seven people, four shown", "AvatarGroup/A sample of a larger group", "Rating/Four and a half", "Kbd/Control Shift P", "Badge/Dot alone"]);
   // Each is one image to assistive technology: its circles and stars are not in the tree on their own.
   const named = [
     ["AvatarGroup", "Seven people, four shown", "7 people: Maya Chen, Omar Haddad, Priya Nair, Tomás de la Cruz, and 3 more"],
@@ -55,7 +49,7 @@ test("should give screen readers one name for each display piece, in words, and 
 });
 
 test("should tuck each avatar under the one before it, and keep the row inside a phone-wide frame", async ({ page }) => {
-  await galleryReady(page, "AvatarGroup");
+  await openGallery(page, ["AvatarGroup/Seven people, four shown", "AvatarGroup/A sample of a larger group"]);
   const seven = specimen(page, "AvatarGroup", "Seven people, four shown");
   await seven.scrollIntoViewIfNeeded();
   const circles = await seven.locator("[data-avatar-person], [data-avatar-more]").all();
@@ -73,7 +67,7 @@ test("should tuck each avatar under the one before it, and keep the row inside a
 });
 
 test("should draw an Input's icon inside the field, before where the text starts, and leave the label as its name", async ({ page }) => {
-  await galleryReady(page, "Input");
+  await openGallery(page, ["Input/Search with an icon", "Input/Password stand-in with an icon"]);
   const fixture = specimen(page, "Input", "Search with an icon");
   await fixture.scrollIntoViewIfNeeded();
   const field = fixture.getByRole("searchbox", { name: "Search the docs" });
@@ -95,7 +89,7 @@ test("should draw an Input's icon inside the field, before where the text starts
 });
 
 test("should keep two metrics to a row in a phone-wide grid with narrowColumns 2, and four to a row where it is wide", async ({ page, isMobile }) => {
-  await galleryReady(page, "Grid");
+  await openGallery(page, ["Grid/Two columns on a phone"]);
   const fixture = specimen(page, "Grid", "Two columns on a phone");
   await fixture.scrollIntoViewIfNeeded();
   const tops = async () => Promise.all([1, 2, 3, 4].map(async (index) => Math.round((await boxOf(fixture.getByText(`Narrow metric ${String(index)}`, { exact: true }))).top)));
@@ -113,7 +107,7 @@ test("should keep two metrics to a row in a phone-wide grid with narrowColumns 2
 });
 
 test("should give the wide card two of three columns where the grid is wide, and every card the full row in a phone-wide frame", async ({ page, isMobile }) => {
-  await galleryReady(page, "Grid");
+  await openGallery(page, ["Grid/Feature grid, one wide card"]);
   const fixture = specimen(page, "Grid", "Feature grid, one wide card");
   await fixture.scrollIntoViewIfNeeded();
   const widths = async () => Promise.all((await fixture.locator("[data-grid-span]").all()).map(async (cell) => Math.round((await boxOf(cell)).width)));
