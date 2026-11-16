@@ -8,8 +8,19 @@ import type { TemplateElement, TemplateFragment, UiTemplate } from "./types";
  * the rest.
  */
 
-/** Components a reader presses, types into, or opens. Drawing them in another order than they are written breaks keyboard order. */
-const interactiveTypes: ReadonlySet<string> = new Set(["Button", "Link", "Input", "Textarea", "Select", "Checkbox", "Switch", "Slider", "Tabs", "Accordion"]);
+/**
+ * Components that are always something a keyboard reaches: controls, and
+ * boxes that become a tab stop (a table, chart, board, or diagram that
+ * scrolls) or hold one (a code block's copy button, a calendar's days, a
+ * download).
+ */
+const focusableTypes: ReadonlySet<string> = new Set([
+  "Button", "Input", "Textarea", "Select", "Checkbox", "Switch", "Slider", "Checklist", "Tabs", "Accordion",
+  "Calendar", "Board", "Table", "Chart", "Diagram", "Code", "Steps", "File",
+]);
+
+/** A Markdown link, an autolink, or a bare address: Markdown is focusable only when it holds one. */
+const markdownLink = /\]\(|<(?:https?:|mailto:)|https?:\/\//;
 
 const elementOf = (fragment: TemplateFragment, key: string): TemplateElement | undefined => (Object.hasOwn(fragment.elements, key) ? fragment.elements[key] : undefined);
 
@@ -37,42 +48,87 @@ function descendants(fragment: TemplateFragment, key: string): string[] {
   return [...seen];
 }
 
-const isInteractive = (element: TemplateElement) => interactiveTypes.has(element.type) || element.on !== undefined;
+const scrolls = (overflow: unknown) => overflow !== undefined && overflow !== "hidden" && overflow !== "visible";
+
+/**
+ * True when a keyboard can reach the element: a control or other always-focusable
+ * kind, any element with an `on` binding, a Link with an `href` (one without is
+ * plain words), a Box that scrolls, or Markdown that holds a link. An
+ * expression for `href` or `overflow` is only known once it resolves, so it
+ * counts.
+ */
+function isFocusable(element: TemplateElement): boolean {
+  if (focusableTypes.has(element.type) || element.on !== undefined) return true;
+  const props = element.props ?? {};
+  if (element.type === "Link") return props.href !== undefined && props.href !== "";
+  if (element.type === "Box") return scrolls(props.overflow);
+  return element.type === "Markdown" && (typeof props.content !== "string" || markdownLink.test(props.content));
+}
+
+/** True when the element, or anything under it, can be focused. */
+function holdsFocusable(fragment: TemplateFragment, key: string): boolean {
+  const element = elementOf(fragment, key);
+  if (element === undefined) return false;
+  return isFocusable(element) || descendants(fragment, key).some((child) => {
+    const inner = elementOf(fragment, child);
+    return inner !== undefined && isFocusable(inner);
+  });
+}
 
 /**
  * `reverseBelow` is visual only: keyboard and reading order stay as written.
- * That is safe when the reversed children hold words and pictures (a row of
- * a feature section), and wrong when one holds a control, which the keyboard
- * would reach in the opposite order to the one drawn.
+ * It reorders the row's own children, so it changes the order of focusable
+ * things only when two or more of those children each hold one (the keyboard
+ * would meet them in the written order while the reader sees the opposite).
+ * One child that holds controls keeps its place among the rest, and words and
+ * pictures have no focus order at all (a feature row). Which children show is
+ * decided at run time, so a child hidden by `visible` still counts.
  */
 function reversedRowProblems(fragment: TemplateFragment): string[] {
   return Object.entries(fragment.elements).flatMap(([key, element]) => {
     const reversed = element.props?.reverseBelow;
     if (reversed === undefined || reversed === false) return [];
-    const controls = descendants(fragment, key).filter((child) => {
-      const inner = elementOf(fragment, child);
-      return inner !== undefined && isInteractive(inner);
-    });
-    return controls.length === 0 ? [] : [`element "${key}" draws its children in reverse below its stack width, but "${controls.join('", "')}" can be pressed or typed into. \`reverseBelow\` is visual only, so keyboard order would run against what is drawn. Keep controls out of a reversed row.`];
+    const holding = (element.children ?? []).filter((child) => holdsFocusable(fragment, child));
+    if (holding.length < 2) return [];
+    return [`element "${key}" draws its children in reverse below its stack width, and "${holding.join('", "')}" each hold something a reader can focus. \`reverseBelow\` is visual only, so the keyboard would reach them in the opposite order to the one drawn. Keep focusable things in one child of a reversed row.`];
   });
+}
+
+/** The one Button a Box holds as its only child, or undefined. */
+function loneButton(fragment: TemplateFragment, box: TemplateElement | undefined): { key: string; button: TemplateElement } | undefined {
+  const [only, ...rest] = box?.type === "Box" ? box.children ?? [] : [];
+  const button = only === undefined || rest.length > 0 ? undefined : elementOf(fragment, only);
+  return only !== undefined && button?.type === "Button" ? { key: only, button } : undefined;
+}
+
+/** The problems with one child of a stretching row: a button drawn directly in it, or alone in a Box that is not `fullWidth`. */
+function stretchedChildProblems(fragment: TemplateFragment, row: string, child: string): string[] {
+  const element = elementOf(fragment, child);
+  if (element?.type === "Button") {
+    return element.props?.fullWidth === true
+      ? [`element "${child}" is a \`fullWidth\` button drawn directly in the row "${row}": as a row it takes the whole width and squeezes the words beside it. Put it alone in a Box, which sets the width the button fills.`]
+      : [`element "${child}" is a button in the row "${row}", which stacks with \`alignBelow: "stretch"\`: a button keeps the width of its words, so it stays small at the start of the column. Put it alone in a Box (the Box stretches) and give the button \`fullWidth\`.`];
+  }
+  const lone = loneButton(fragment, element);
+  if (lone === undefined || lone.button.props?.fullWidth === true) return [];
+  return [`element "${lone.key}" sits alone in the Box "${child}" of the row "${row}", which stacks with \`alignBelow: "stretch"\`: the Box stretches but the button keeps the width of its words. Give the button "${lone.key}" \`fullWidth\`.`];
 }
 
 /**
  * A button is as wide as its words (`fullWidth` makes it fill its box), so a
  * row's `alignBelow: "stretch"` never widens a button that is its direct
  * child: the button stays small at the start of the stacked column, beside
- * full-width buttons elsewhere. Wrap the button in a Box, which stretches,
- * and make the button `fullWidth` (in a row the Box is as wide as the button).
+ * full-width buttons elsewhere. The fix has two halves, and both are checked:
+ * the button sits alone in a Box, which stretches, and the button is
+ * `fullWidth`, which fills it (as a row the Box is as wide as the button). A
+ * Box that holds several buttons is a row of actions, not a lone call to
+ * action, and is left alone.
  */
 function stackedButtonProblems(fragment: TemplateFragment): string[] {
   return Object.entries(fragment.elements).flatMap(([key, element]) => {
     const { direction, stackBelow, alignBelow } = element.props ?? {};
     if (element.type !== "Box" || direction !== "horizontal" || stackBelow === undefined || alignBelow !== "stretch") return [];
-    const small = (element.children ?? []).filter((child) => {
-      const inner = elementOf(fragment, child);
-      return inner?.type === "Button" && inner.props?.fullWidth !== true;
-    });
-    return small.map((child) => `element "${child}" is a button in the row "${key}", which stacks with \`alignBelow: "stretch"\`: a button keeps the width of its words, so it stays small at the start of the column. Put it in a Box and give it \`fullWidth\`.`);
+    return (element.children ?? []).flatMap((child) => stretchedChildProblems(fragment, key, child));
   });
 }
 
