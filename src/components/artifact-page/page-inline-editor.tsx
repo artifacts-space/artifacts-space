@@ -103,8 +103,9 @@ function PageEditControls({ artifact, editor, reviewed, pageFullWidth, save, sig
   const fullWidth = usePageFullWidth(artifact, pageFullWidth);
   const { status, dirty, retryNow, loadTheirs, keepMine, agentSaved, dismissAgentSaved } = autosave;
   const { restored, sourceOpen, toggleSource, caughtUp, caughtUpWith, dismissCaughtUp } = editor;
-  useCatchUp({ artifact, stored: true, unsaved: dirty || status.kind === "saving", onCaughtUp: caughtUpWith });
   const ownSaves = useOwnSaves();
+  // The person's own cover, icon, or theme save is not news: ask from the newest save this tab made.
+  useCatchUp({ artifact, knownUpdatedAt: ownSaveBase(artifact.updatedAt, ownSaves), stored: true, unsaved: dirty || status.kind === "saving", onCaughtUp: caughtUpWith });
   const harness = useArtifactHarness(artifact, editor.onUpdated);
   const chrome = useMemo<PageEditorChrome>(() => ({
     history: {

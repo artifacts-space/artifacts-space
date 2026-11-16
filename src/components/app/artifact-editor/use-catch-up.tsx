@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { frameChanges } from "@/lib/canvas/frame-changes";
 import { catchUpAction, type NewerArtifact } from "@/lib/edits/catch-up-actions";
-import { catchUpWords, shouldCatchUp } from "@/lib/edits/catch-up-rules";
+import { catchUpWords, shouldCatchUp, takesAnswer, type EditorMoment } from "@/lib/edits/catch-up-rules";
 
 /** Asks whether an artifact moved on from the save the editor shows; null when it did not, or when the answer could not be had. */
 export type CatchUpLoader = (artifactId: string, knownUpdatedAt: string) => Promise<NewerArtifact | null>;
@@ -67,9 +67,19 @@ export function useEditorCatchUp({ artifact, stored, unsaved, onUpdated }: Omit<
   return { words: caughtUp?.words ?? null, frames: caughtUp?.frames, dismiss };
 }
 
+function momentOf(held: { artifact: ArtifactDto; known: string; unsaved: boolean }): EditorMoment {
+  return { artifactId: held.artifact.id, knownUpdatedAt: held.known, unsaved: held.unsaved };
+}
+
 interface CatchUpOptions {
   /** The saved artifact the editor shows. */
   artifact: ArtifactDto;
+  /**
+   * The newest save of the artifact this tab made, when the editor's copy
+   * is older: cover, icon, and theme save through their own actions. Left
+   * out, the editor's copy is the newest this tab knows.
+   */
+  knownUpdatedAt?: string;
   /** False for a blank page that was never saved. */
   stored: boolean;
   /** The editor holds unsaved changes, or a save is on its way. */
@@ -83,13 +93,15 @@ interface CatchUpOptions {
  * comes back: on focus, and when the tab becomes visible. Events only, never
  * a timer. Nothing is asked while the editor holds unsaved changes, and an
  * answer that arrives after the person typed, saved, or opened another
- * artifact is dropped; the next return asks again. The rules are in
- * src/lib/edits/catch-up-rules.ts.
+ * artifact is dropped; the next return asks again. A check that never
+ * answers stops blocking the next one after CATCH_UP_STALE_MS. The rules are
+ * in src/lib/edits/catch-up-rules.ts.
  */
-export function useCatchUp({ artifact, stored, unsaved, onCaughtUp }: CatchUpOptions): void {
+export function useCatchUp({ artifact, knownUpdatedAt, stored, unsaved, onCaughtUp }: CatchUpOptions): void {
   const loader = useContext(CatchUpContext);
-  const latestRef = useRef({ artifact, stored, unsaved, onCaughtUp });
-  useEffect(() => { latestRef.current = { artifact, stored, unsaved, onCaughtUp }; }, [artifact, stored, unsaved, onCaughtUp]);
+  const known = knownUpdatedAt ?? artifact.updatedAt;
+  const latestRef = useRef({ artifact, known, stored, unsaved, onCaughtUp });
+  useEffect(() => { latestRef.current = { artifact, known, stored, unsaved, onCaughtUp }; }, [artifact, known, stored, unsaved, onCaughtUp]);
 
   useEffect(() => {
     if (!loader) return undefined;
@@ -102,12 +114,12 @@ export function useCatchUp({ artifact, stored, unsaved, onCaughtUp }: CatchUpOpt
       if (!shouldCatchUp({ kind: shown.kind, stored: asked.stored, visible: document.visibilityState === "visible", unsaved: asked.unsaved, running: history.running, lastStartedAt: history.lastStartedAt, now })) return;
       history.running = true;
       history.lastStartedAt = now;
-      loader(shown.id, shown.updatedAt)
+      loader(shown.id, asked.known)
         .then((newer) => {
           const current = latestRef.current;
-          if (!alive || newer?.artifact.id !== shown.id) return;
+          if (!alive || !newer) return;
           // The editor moved on while the check ran: the next return asks again.
-          if (current.unsaved || current.artifact.id !== shown.id || current.artifact.updatedAt !== shown.updatedAt) return;
+          if (!takesAnswer(momentOf(asked), momentOf(current), newer.artifact.id)) return;
           current.onCaughtUp(newer.artifact, describeCatchUp(shown, newer));
         })
         .catch(() => undefined)

@@ -13,6 +13,9 @@ import type { ChangedBy } from "./edit-conflict-rules";
 /** Focus and visibility often arrive together: a second signal this soon after a check is dropped. */
 export const CATCH_UP_GAP_MS = 5000;
 
+/** A check that has not answered after this long no longer blocks the next one (a hung connection, a tab that slept). */
+export const CATCH_UP_STALE_MS = 30_000;
+
 /**
  * The formats that catch up: rendered views, which redraw cleanly. A
  * document holds a caret in text that would move under it, so documents
@@ -45,8 +48,28 @@ export interface CatchUpCheck {
  */
 export function shouldCatchUp(check: CatchUpCheck): boolean {
   if (!catchesUp(check.kind) || !check.stored || !check.visible) return false;
-  if (check.unsaved || check.running) return false;
-  return check.lastStartedAt === null || check.now - check.lastStartedAt >= CATCH_UP_GAP_MS;
+  if (check.unsaved) return false;
+  if (check.lastStartedAt === null) return !check.running;
+  const waited = check.now - check.lastStartedAt;
+  return check.running ? waited >= CATCH_UP_STALE_MS : waited >= CATCH_UP_GAP_MS;
+}
+
+/** What the editor held at one moment: which artifact, the newest save of it this tab knows, and whether it has unsaved changes. */
+export interface EditorMoment {
+  artifactId: string;
+  knownUpdatedAt: string;
+  unsaved: boolean;
+}
+
+/**
+ * Whether an answer may still be taken: the editor is where it was when it
+ * asked. An answer that arrives after the person typed, after their own save
+ * moved the editor on, or after another artifact opened is dropped; the next
+ * return to the tab asks again.
+ */
+export function takesAnswer(asked: EditorMoment, now: EditorMoment, answeredId: string | null): boolean {
+  if (answeredId !== asked.artifactId || now.artifactId !== asked.artifactId) return false;
+  return !now.unsaved && now.knownUpdatedAt === asked.knownUpdatedAt;
 }
 
 /** Who saved, as the notice names them: the agent's harness, the person's handle, or "Someone". */

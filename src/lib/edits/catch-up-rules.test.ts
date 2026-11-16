@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CATCH_UP_GAP_MS, catchesUp, catchUpWords, shouldCatchUp, type CatchUpCheck } from "./catch-up-rules";
+import { CATCH_UP_GAP_MS, CATCH_UP_STALE_MS, catchesUp, catchUpWords, shouldCatchUp, takesAnswer, type CatchUpCheck, type EditorMoment } from "./catch-up-rules";
 
 const ready: CatchUpCheck = { kind: "canvas", stored: true, visible: true, unsaved: false, running: false, lastStartedAt: null, now: 1_000_000 };
 const agent = { handle: "ann", harness: { id: "claude-code" as const, name: "Claude Code" } };
@@ -33,6 +33,33 @@ describe("shouldCatchUp", () => {
   it("should drop a second signal that follows a check within the gap, and ask again after it", () => {
     expect(shouldCatchUp({ ...ready, lastStartedAt: ready.now - CATCH_UP_GAP_MS + 1 })).toBe(false);
     expect(shouldCatchUp({ ...ready, lastStartedAt: ready.now - CATCH_UP_GAP_MS })).toBe(true);
+  });
+
+  it("should stop waiting for a check that never answered", () => {
+    expect(shouldCatchUp({ ...ready, running: true, lastStartedAt: ready.now - CATCH_UP_STALE_MS + 1 })).toBe(false);
+    expect(shouldCatchUp({ ...ready, running: true, lastStartedAt: ready.now - CATCH_UP_STALE_MS })).toBe(true);
+  });
+});
+
+describe("takesAnswer", () => {
+  const asked: EditorMoment = { artifactId: "a1", knownUpdatedAt: "2026-11-07T12:00:00.000Z", unsaved: false };
+
+  it("should take an answer when the editor is where it was when it asked", () => {
+    expect(takesAnswer(asked, { ...asked }, "a1")).toBe(true);
+  });
+
+  it("should drop an answer that arrives after the person typed", () => {
+    expect(takesAnswer(asked, { ...asked, unsaved: true }, "a1")).toBe(false);
+  });
+
+  it("should drop an answer that arrives after the editor's own save moved it on", () => {
+    expect(takesAnswer(asked, { ...asked, knownUpdatedAt: "2026-11-07T12:01:00.000Z" }, "a1")).toBe(false);
+  });
+
+  it("should drop an answer that arrives after another artifact opened, or that is about another artifact", () => {
+    expect(takesAnswer(asked, { ...asked, artifactId: "a2" }, "a1")).toBe(false);
+    expect(takesAnswer(asked, { ...asked }, "a2")).toBe(false);
+    expect(takesAnswer(asked, { ...asked }, null)).toBe(false);
   });
 });
 

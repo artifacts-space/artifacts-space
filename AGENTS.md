@@ -1231,7 +1231,10 @@ the UPDATE itself, one statement, never a read-then-write:
   `CanvasFrame`, so the full-screen board marks them too) until the notice is
   dismissed. Nothing is asked while the editor holds unsaved changes or a
   save is on its way, and an answer that arrives after the person typed is
-  dropped: their own save settles it, as above. Editors only: the action
+  dropped (`takesAnswer`): their own save settles it, as above. The editor
+  asks from the newest save its tab made (`knownUpdatedAt`), so the person's
+  own cover, icon, or theme save is never reported as news. A check that
+  never answers stops blocking the next one after 30 seconds. Editors only: the action
   reads through the editable-artifact checks, so a reader of the approved
   version never gets the latest one. It is on only where a page wrapped its
   editors in `ServerCatchUp` (`/app`, and the artifact page's `EditSurface`);
