@@ -29,6 +29,9 @@ interface BoardToolbarProps {
   onFullScreenChange: (fullScreen: boolean) => void;
 }
 
+/** The name of the button that opens full screen. The page finds the button by it, to hand the focus back when full screen closes. */
+export const fullScreenLabel = "Full screen";
+
 /**
  * The board's controls, floating in its lower right corner: a menu that goes
  * to any frame without a pointer, zoom out, the current zoom (press for
@@ -76,7 +79,7 @@ export function BoardToolbar({ frames, zoom, onZoomIn, onZoomOut, onActualSize, 
         Fit
       </Button>
       <span aria-hidden className="mx-0.5 h-4 w-px bg-border" />
-      <IconButton label={fullScreen ? "Exit full screen" : "Full screen"} onClick={() => { onFullScreenChange(!fullScreen); }}>
+      <IconButton label={fullScreen ? "Exit full screen" : fullScreenLabel} onClick={() => { onFullScreenChange(!fullScreen); }}>
         {fullScreen ? <IconArrowsMinimize /> : <IconArrowsMaximize />}
       </IconButton>
     </div>

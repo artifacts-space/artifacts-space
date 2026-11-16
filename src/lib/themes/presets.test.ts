@@ -108,13 +108,14 @@ describe("theme presets", () => {
     }
   });
 
-  it("should keep secondary text, such as a tab that is not selected, at 4.5:1 on the page, the card, and the muted fill on every preset in both modes", () => {
+  it("should keep secondary text, such as a tab that is not selected, at 4.5:1 on the page, the card, and every quiet fill on every preset in both modes", () => {
     for (const [id, preset] of builtInPresets()) {
       for (const mode of ["light", "dark"] as const) {
         const tokens = paletteTokens(mode, preset.theme[mode]);
         const quiet = parseColor(tokens["--muted-foreground"] ?? "");
         if (!quiet) throw new Error(`${id} ${mode}: missing --muted-foreground`);
-        for (const surface of ["--background", "--card", "--muted"]) {
+        // The quiet fills the tone and chart rules read: a highlighted menu row is --accent, the darkest of them.
+        for (const surface of ["--background", "--card", "--secondary", "--muted", "--accent"]) {
           const fill = parseColor(tokens[surface] ?? "");
           if (!fill) throw new Error(`${id} ${mode}: missing ${surface}`);
           expect(contrastRatio(quiet, fill), `${id} ${mode} secondary text on ${surface}`).toBeGreaterThanOrEqual(4.5);

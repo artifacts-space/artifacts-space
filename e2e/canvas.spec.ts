@@ -193,6 +193,8 @@ test.describe("on a desktop", () => {
     await page.setViewportSize({ width: 600, height: 900 });
     await expect(screen).toBeHidden();
     await expect(board(page)).toHaveAttribute("data-canvas-board", "stacked");
+    // The button that opened full screen is gone with the board's controls, so the canvas itself takes the focus: it never falls to the page.
+    await expect(page.locator(":focus").locator("[data-canvas-page-board]")).toHaveCount(1);
   });
 
   test("should bring a control into view, without scrolling the board's box, when focus moves to one outside it", async ({ page }) => {

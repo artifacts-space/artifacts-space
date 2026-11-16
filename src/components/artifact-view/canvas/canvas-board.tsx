@@ -6,7 +6,7 @@ import { boundsOf, zoomPercent, type BoardView, type Box } from "@/lib/canvas/vi
 import { cn } from "@/lib/utils";
 
 import { BoardFullScreen } from "./board-full-screen";
-import { BoardToolbar } from "./board-toolbar";
+import { BoardToolbar, fullScreenLabel } from "./board-toolbar";
 import { CanvasFrame, unmeasuredHeight, type BoardFrame } from "./canvas-frame";
 import { useBoardWindow, useFrameHeights, type BoardMode } from "./use-board-measure";
 import { usePanZoom, type PanZoom } from "./use-pan-zoom";
@@ -184,14 +184,14 @@ function Board({ frames, fullScreen, onFullScreenChange }: BoardProps) {
 export function CanvasBoard({ frames }: { frames: readonly BoardFrame[] }) {
   const [fullScreen, setFullScreen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  // Back in the page, focus goes to the button that opened full screen, or to the page's board when its controls are gone (a narrow window).
+  // Back in the page, focus goes to the button that opened full screen, or to the canvas itself when its controls are gone (a narrow window stacks the frames).
   const focusPageBoard = () => {
-    const pageBoard = rootRef.current?.querySelector<HTMLElement>(`[${pageBoardAttribute}]`);
-    const target = pageBoard?.querySelector<HTMLElement>("[data-canvas-toolbar] button:last-of-type") ?? pageBoard?.querySelector<HTMLElement>("[data-canvas-board]");
-    target?.focus({ preventScroll: true });
+    const root = rootRef.current;
+    const button = root?.querySelector<HTMLElement>(`[${pageBoardAttribute}] button[aria-label="${fullScreenLabel}"]`);
+    (button ?? root)?.focus({ preventScroll: true });
   };
   return (
-    <div ref={rootRef} className="min-w-0">
+    <div ref={rootRef} tabIndex={-1} className="min-w-0 outline-none">
       <Board frames={frames} fullScreen={false} onFullScreenChange={setFullScreen} />
       <BoardFullScreen open={fullScreen} onOpenChange={setFullScreen} onClosed={focusPageBoard}>
         <Board frames={frames} fullScreen onFullScreenChange={setFullScreen} />

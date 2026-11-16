@@ -23,7 +23,12 @@ export interface ThemeScopeValue {
 
 export const ThemeScopeContext = createContext<ThemeScopeValue | null>(null);
 
-/** The theme a ThemeScope applies, and the mode it forces, if any. */
+/**
+ * The theme a ThemeScope applies, and the mode it forces, if any. It is the
+ * whole scope's theme, never the palette of a strong surface (an inverse or
+ * primary Box) inside it: something opened from inside such a Box that must
+ * look like the Box needs that surface's own values, which this does not carry.
+ */
 export interface ThemeSource {
   theme: Theme;
   mode: PaletteMode | undefined;
