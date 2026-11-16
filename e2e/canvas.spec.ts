@@ -197,29 +197,35 @@ test.describe("on a desktop", () => {
     await expect(page.locator(":focus").locator("[data-canvas-page-board]")).toHaveCount(1);
   });
 
-  test("should bring a control into view when focus moves to it while the board still glides to a frame", async ({ page }) => {
+  test("should bring a control into view when focus moves to it while the board still glides", async ({ page }) => {
     await open(page, "flow", "board");
     await page.getByRole("button", { name: /Show at 100%/ }).click();
-    await page.getByRole("button", { name: "Frames" }).click();
+    await expect(board(page)).toHaveAttribute("data-canvas-zoom", "100%");
+    const world = board(page).locator("[data-canvas-world]");
+    const atRest = () => world.evaluate(async (element) => {
+      await Promise.allSettled(element.getAnimations({ subtree: false }).map((animation) => animation.finished));
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+    await atRest();
     const pane = await boxOf(board(page));
     const alerts = frame(page, "settings").getByRole("switch", { name: "Push alerts" });
-    await expect(page.getByRole("menuitem", { name: /1\. Sign in/ })).toBeVisible();
     expect((await boxOf(alerts)).x).toBeGreaterThan(pane.x + pane.width);
-    // Chosen and focused in the page, in one go, so the focus lands in the 200 ms glide on a runner of any speed. The
-    // menu hands the focus to the picked frame as it closes; once it has, and while the world's transition still runs,
-    // the control is focused, as Tab would do. The browser then scrolls by where the control is drawn at that moment.
-    const gliding = await alerts.evaluate(async (control: HTMLElement) => {
-      const item = [...document.querySelectorAll('[role="menuitem"]')].find((node) => node.textContent.includes("1. Sign in"));
-      const world = document.querySelector("[data-canvas-board] [data-canvas-world]");
-      if (!(item instanceof HTMLElement) || !world) return "missing";
-      item.click();
-      const onFrame = () => document.activeElement?.getAttribute("data-canvas-frame") === "sign-in";
-      for (let frames = 0; frames < 120 && !onFrame(); frames += 1) await new Promise(requestAnimationFrame);
-      const running = world.getAnimations({ subtree: false }).length > 0;
+    // In the page and in one task (no frame in between), so it holds on a runner of any speed: an arrow key starts a
+    // glide that takes the control further out, and the control is focused before the glide has moved at all. The
+    // browser then scrolls by where the control is drawn at that moment, not by where the view comes to rest, and
+    // the scroll reaches the board a frame later, while the glide runs.
+    const glide = await alerts.evaluate(async (control: HTMLElement) => {
+      const pane = control.closest("[data-canvas-board]");
+      const moving = pane?.querySelector("[data-canvas-world]");
+      if (!pane || !moving) return "missing";
+      pane.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", shiftKey: true, bubbles: true, cancelable: true }));
+      // React draws the key press in a microtask of this same task.
+      await new Promise<void>((resolve) => { queueMicrotask(resolve); });
+      const running = moving.getAnimations({ subtree: false }).length > 0;
       control.focus();
-      return `${onFrame() ? "focus still on the frame" : "focus moved"}, ${running ? "gliding" : "at rest"}`;
+      return running ? "gliding" : "at rest";
     });
-    expect(gliding).toBe("focus moved, gliding");
+    expect(glide).toBe("gliding");
     await expect(alerts).toBeFocused();
     // The end state, read together: the focus scroll was turned into a pan (the box is back at 0), and the control is
     // inside the board. Right after the focus the box is still scrolled, which alone would put the control in view.
@@ -229,10 +235,7 @@ test.describe("on a desktop", () => {
     };
     await expect.poll(atRestInView).toBe(true);
     // And it stays so once nothing moves any more: no later pan takes the control out again.
-    await board(page).locator("[data-canvas-world]").evaluate(async (world) => {
-      await Promise.allSettled(world.getAnimations({ subtree: false }).map((animation) => animation.finished));
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    });
+    await atRest();
     expect(await atRestInView()).toBe(true);
   });
 

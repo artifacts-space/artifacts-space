@@ -13,7 +13,8 @@ import { expect, test } from "./support/test";
  * taken, and the artifact never opens. One cause is proven: the router drops a link that is still loading when
  * anything writes the address bar in that time. Which write does it there is not known yet, so a failed test keeps
  * its trace (CI uploads test-results), and the page notes every write of the address bar and who made it.
- * Remove the trace and the notes with the fix they point at: a trace is kept for every test of this file until then.
+ * Issue #207 tracks it. Remove the trace and the notes with the fix they point at: a trace is kept for every test
+ * of this file until then.
  */
 test.use({ trace: "retain-on-failure" });
 test.beforeEach(async ({ page }) => {

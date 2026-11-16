@@ -250,6 +250,8 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
   const zoomIn = () => { zoomTo((zoom) => nextZoomStep(zoom, 1)); };
   const zoomOut = () => { zoomTo((zoom) => nextZoomStep(zoom, -1)); };
   const fit = () => {
+    // Noted at once, as in `move`: a handler that runs before the effect must start from the fitted view.
+    latest.current = { ...latest.current, view: fitView(latest.current.bounds, latest.current.room) };
     setGlide(true);
     setMoved(null);
   };
