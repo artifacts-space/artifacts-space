@@ -1038,8 +1038,9 @@ The browser side is `src/components/artifact-view/canvas/capture`.
   real width, in a `ThemeScope` with the theme the server sent and the mode
   forced. It has the frame body's surface, padding, and least height
   (`frameSurfaceClass` and `framePaddingClass`, exported from
-  `canvas-frame.tsx` so the board and the box cannot drift) and no edge or
-  shadow. It sits in the host's zero-size, `inert`, fixed container, so it
+  `canvas-frame.tsx` so the board and the box cannot drift), the room of
+  the frame's one-pixel edge without its color, so lines wrap where they
+  wrap on the board, and no shadow. It sits in the host's zero-size, `inert`, fixed container, so it
   is never seen, focused, read aloud, or counted in the page's scroll size.
   Do not hide it with `display: none` or `visibility: hidden`: it must lay
   out and draw.

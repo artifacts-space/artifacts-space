@@ -144,11 +144,11 @@ test.describe("frame captures", () => {
       const phone = (mode: "light" | "dark") => captures.find((capture) => capture.frames.includes("home-phone") && capture.mode === mode)?.parts[0]?.brightness ?? -1;
       expect(phone("light")).toBeGreaterThan(200);
       expect(phone("dark")).toBeLessThan(60);
-      // Each drawing is laid out at its frame's own width: it is as tall as the frame on the board.
+      // Each drawing is laid out exactly as its frame on the board: the same height, give or take the edge's two pixels and a rounded fraction.
       for (const frame of ["home-desktop", "home-tablet", "home-phone"]) {
         const onBoard = await frameBody(page, frame).evaluate((element) => element.scrollHeight);
         const drawn = captures.find((capture) => capture.frames.includes(frame) && capture.mode === "light");
-        expect(Math.abs((drawn?.height ?? 0) - onBoard), `${frame} is drawn at the height it has on the board`).toBeLessThanOrEqual(onBoard * 0.05);
+        expect(Math.abs((drawn?.height ?? 0) - onBoard), `${frame} is drawn at the height it has on the board`).toBeLessThanOrEqual(3);
       }
     });
   }
