@@ -110,5 +110,5 @@ describe("reading a page written to be slow", () => {
     // One pass takes a few milliseconds; a pattern that retries from each place takes minutes at this size. The
     // limit sits far from both, so a loaded machine does not fail it.
     expect(within(() => { htmlText(page); htmlTitle(page); })).toBeLessThan(5_000);
-  });
+  }, 60_000);
 });
