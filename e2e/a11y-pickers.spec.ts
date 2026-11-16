@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
+import { openGallery } from "./support/gallery";
 
 /*
  * Accessibility of the theme picker and the cover picker (the gallery's
@@ -18,13 +19,14 @@ const themeSpecimen = (page: Page) => page.locator('[data-specimen="theme picker
 const groupedSpecimen = (page: Page) => page.locator('[data-specimen="theme picker · groups"]');
 const coverSpecimen = (page: Page) => page.locator('[data-specimen="cover picker"]');
 
-async function openGallery(page: Page) {
-  await page.goto("/dev/components#themes");
+/** The gallery with the three pickers alone. */
+async function openPickers(page: Page) {
+  await openGallery(page, ["themes/theme picker", "themes/theme picker · groups", "themes/cover picker"]);
   await expect(themeSpecimen(page)).toBeVisible();
 }
 
 test("should pass axe with the theme picker open", async ({ page }) => {
-  await openGallery(page);
+  await openPickers(page);
   await themeSpecimen(page).getByRole("button", { name: /Theme: Default/ }).click();
   const picker = page.getByRole("listbox", { name: "Artifact theme" });
   await expect(picker.getByRole("option", { name: "Default Geist Sans" })).toBeFocused();
@@ -32,14 +34,14 @@ test("should pass axe with the theme picker open", async ({ page }) => {
 });
 
 test("should pass axe with the grouped theme picker open", async ({ page }) => {
-  await openGallery(page);
+  await openPickers(page);
   await groupedSpecimen(page).getByRole("button", { name: /Grouped theme: Custom/ }).click();
   await expect(page.getByRole("listbox", { name: "Artifact theme" }).getByRole("option", { name: "Custom DM Sans" })).toBeFocused();
   await expectNoAxeViolations(page.getByRole("dialog", { name: "Theme" }));
 });
 
 test("should give the theme picker a listbox tree with the current theme selected", async ({ page }) => {
-  await openGallery(page);
+  await openPickers(page);
   await themeSpecimen(page).getByRole("button", { name: /Theme: Default/ }).click();
   await expect(page.getByRole("dialog", { name: "Theme" })).toMatchAriaSnapshot(`
     - dialog "Theme":
@@ -60,7 +62,7 @@ test("should give the theme picker a listbox tree with the current theme selecte
 });
 
 test("should put the grouped theme picker's options in groups named by their headings", async ({ page }) => {
-  await openGallery(page);
+  await openPickers(page);
   await groupedSpecimen(page).getByRole("button", { name: /Grouped theme: Custom/ }).click();
   await expect(page.getByRole("listbox", { name: "Artifact theme" })).toMatchAriaSnapshot(`
     - listbox "Artifact theme":
@@ -88,7 +90,7 @@ test("should put the grouped theme picker's options in groups named by their hea
 });
 
 test("should move focus across groups with arrow keys and pick from another group", async ({ page }) => {
-  await openGallery(page);
+  await openPickers(page);
   const trigger = groupedSpecimen(page).getByRole("button", { name: /Grouped theme: Custom/ });
   await trigger.click();
   const picker = page.getByRole("listbox", { name: "Artifact theme" });
@@ -108,14 +110,14 @@ test("should move focus across groups with arrow keys and pick from another grou
 });
 
 test("should pass axe with the cover picker open", async ({ page }) => {
-  await openGallery(page);
+  await openPickers(page);
   await coverSpecimen(page).getByRole("button", { name: "Cover: No cover" }).click();
   await expect(page.getByRole("listbox", { name: "Cover gradient" }).getByRole("option", { name: "Stone" })).toBeFocused();
   await expectNoAxeViolations(page.getByRole("dialog", { name: "Cover" }));
 });
 
 test("should give the cover picker a listbox tree with the current cover selected", async ({ page }) => {
-  await openGallery(page);
+  await openPickers(page);
   await coverSpecimen(page).getByRole("button", { name: "Cover: No cover" }).click();
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("Enter");
@@ -134,7 +136,7 @@ test("should give the cover picker a listbox tree with the current cover selecte
 });
 
 test("should move focus with arrow keys and leave the theme as it was until one is picked", async ({ page }) => {
-  await openGallery(page);
+  await openPickers(page);
   await themeSpecimen(page).getByRole("button", { name: /Theme: Default/ }).click();
   const picker = page.getByRole("listbox", { name: "Artifact theme" });
   await expect(picker.getByRole("option", { name: "Default Geist Sans" })).toBeFocused();

@@ -586,6 +586,15 @@ catch this, so test the generated SQL with `.toSQL()`, as
   production HTML (for example, that theme fonts are never preloaded on pages
   that do not use them). CI splits it with `--shard=<i>/<n>`; run one shard
   locally the same way.
+- A spec that checks some gallery specimens opens the gallery with
+  `openGallery(page, [...])` (`e2e/support/gallery.ts`), naming the groups
+  (`"Input"`, `"specs"`) or single specimens (`"specs/Sign-in screen"`) it
+  reads: the page then draws only those (`?show=`, rules in
+  `src/components/dev/gallery-filter.ts`) and the helper waits for its ready
+  mark. The whole gallery took about 20 seconds per test to draw on a CI
+  runner, and specs that loaded it in every test pushed a shard past the
+  25-minute limit. Only `e2e/gallery.spec.ts` and the contrast scan draw the
+  whole page.
 - Specs import `test` and `expect` from `e2e/support/test.ts`, never from
   `@playwright/test` (ESLint fails on it; type imports may stay). Its auto
   fixture fails any test whose pages throw or log `console.error` (hydration
@@ -631,7 +640,9 @@ catch this, so test the generated SQL with `.toSQL()`, as
   tone badge read on every hue. A primary surface tells the views inside it
   the mode its accent palette is, and steps its fill until the accent's
   label holds a badge. A new surface goes there and into the "Surfaces and tones"
-  gallery specimen, which the contrast spec reads. A danger Button is the
+  gallery specimen, which the contrast spec reads. That specimen draws two
+  specs (`surfaceMatrixSpecs`), each held under three quarters of the element
+  limit by `screen.test.ts`; when one nears it, split the surfaces again. A danger Button is the
   danger tone as the fill under the page color, the tone rule's own pair, and
   moves toward the text color under the pointer (`dangerHoverMix`);
   `surface-scope.test.ts` holds it at 4.5:1 over every preset and surface.
