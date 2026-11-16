@@ -8,26 +8,13 @@ import type { Gap } from "@/lib/ui/props/shared";
 import { hasTitleText, titleOr } from "@/lib/ui/title-rules";
 import { cn } from "@/lib/utils";
 
-import { gridSpanClass } from "./grid-spans";
+import { gridColumnClass, gridSpanClass } from "./grid-steps";
 import type { ViewProps } from "./stout";
 import { TabStrip } from "./tab-strip";
 
 const gapClass: Record<Gap, string> = { none: "gap-0", sm: "gap-2", md: "gap-4", lg: "gap-6" };
 
 const alignClass = { start: "items-start", center: "items-center", end: "items-end", stretch: "items-stretch" } as const;
-
-/**
- * Columns follow the width of the interface (the `ui` container on the
- * renderer's root), never the window: two from 576px, three from 608px, four
- * from 896px. An artifact page's column is 976px at most, and a docs example
- * is about 630px, so a three-column grid shows three columns in both.
- */
-const gridColumns = {
-  1: "grid-cols-1",
-  2: "grid-cols-1 @xl/ui:grid-cols-2",
-  3: "grid-cols-1 @xl/ui:grid-cols-2 @[38rem]/ui:grid-cols-3",
-  4: "grid-cols-1 @xl/ui:grid-cols-2 @4xl/ui:grid-cols-4",
-} as const;
 
 function Empty({ what }: { what: string }) {
   return <p className="text-sm text-muted-foreground">No {what} yet.</p>;
@@ -77,10 +64,10 @@ function spannedCells(children: ReactNode, spans: readonly number[] | undefined,
 }
 
 export function GridView({ props, children }: ViewProps<"Grid">) {
-  const columns = (props.columns ?? 2) as keyof typeof gridColumns;
-  // Two columns on a narrow interface replace the one every grid starts from; the wider steps stay as they are.
+  // The width steps, their columns, and every span come from one table (grid-steps.ts).
+  const columns = props.columns ?? 2;
   return (
-    <div data-slot="ui-grid" className={cn("grid min-w-0", gridColumns[columns], props.narrowColumns === 2 && "grid-cols-2", gapClass[props.gap ?? "md"])}>
+    <div data-slot="ui-grid" className={cn("grid min-w-0", gridColumnClass(columns, props.narrowColumns), gapClass[props.gap ?? "md"])}>
       {spannedCells(children, props.spans, columns, props.narrowColumns)}
     </div>
   );

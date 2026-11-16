@@ -55,6 +55,29 @@ function unknownPropWarnings(key: string, type: UiComponentName, props: Record<s
     .map((prop) => specWarning("unknown_prop", `Element "${key}" (${type}): prop "${prop}" is not a ${type} prop and is ignored. Known props: ${known.join(", ") || "none"}.`, key));
 }
 
+/**
+ * A paired prop matches children by their place in the spec, and `repeat`
+ * draws one written child once per item, so the two do not go together.
+ * A Grid with `spans` and `repeat` is an error: `spans` is new, so no saved
+ * spec uses it. Tabs and Accordion with `repeat` drew before this check
+ * existed, so they get a warning and still draw as they did.
+ */
+function repeatedPairing(key: string, type: keyof typeof pairedChildren, element: UiElement): UiSpecIssue[] {
+  const prop = pairedChildren[type];
+  if (element.repeat === undefined || element.props[prop] === undefined) return [];
+  const problem = `Element "${key}" (${type}): \`${prop}\` pairs with the children written in the spec, and a ${type} with \`repeat\` draws its child once per item.`;
+  if (type === "Grid") return [specError("children_mismatch", `${problem} Remove \`spans\`, or write the children out.`, key)];
+  return [specWarning("repeated_pairing", `${problem} Its panels may not line up with \`${prop}\`. Remove \`repeat\`, and write one child per entry in \`${prop}\`.`, key)];
+}
+
+function countMismatch(key: string, type: keyof typeof pairedChildren, element: UiElement): UiSpecIssue[] {
+  const prop = pairedChildren[type];
+  const entries = element.props[prop];
+  if (!Array.isArray(entries) || entries.length === element.children.length) return [];
+  const pairing = type === "Grid" ? "entry N is how many columns child N spans" : "child N is the panel for entry N";
+  return [specError("children_mismatch", `Element "${key}" (${type}): ${entries.length} ${prop} but ${element.children.length} children. Give exactly one child per entry in ${prop}; ${pairing}.`, key)];
+}
+
 function checkChildren(key: string, type: UiComponentName, element: UiElement): UiSpecIssue[] {
   if (!containerComponents.has(type)) {
     return element.children.length > 0
@@ -62,14 +85,9 @@ function checkChildren(key: string, type: UiComponentName, element: UiElement): 
       : [];
   }
   if (!isPairedType(type)) return [];
-  const prop = pairedChildren[type];
-  const entries = element.props[prop];
-  if (type === "Grid" && element.repeat !== undefined && entries !== undefined) {
-    return [specError("children_mismatch", `Element "${key}" (Grid): \`spans\` pairs with the children written in the spec, and a Grid with \`repeat\` draws its child once per item. Remove \`spans\`, or write the children out.`, key)];
-  }
-  if (!Array.isArray(entries) || entries.length === element.children.length) return [];
-  const pairing = type === "Grid" ? "entry N is how many columns child N spans" : "child N is the panel for entry N";
-  return [specError("children_mismatch", `Element "${key}" (${type}): ${entries.length} ${prop} but ${element.children.length} children. Give exactly one child per entry in ${prop}; ${pairing}.`, key)];
+  const repeated = repeatedPairing(key, type, element);
+  if (repeated.some((issue) => issue.severity === "error")) return repeated;
+  return [...repeated, ...countMismatch(key, type, element)];
 }
 
 function bindingIssues(key: string, event: string, binding: unknown): UiSpecIssue[] {

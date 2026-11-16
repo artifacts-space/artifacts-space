@@ -19,7 +19,7 @@ const elementCodes: Omit<IssueCodeDoc, "blocking">[] = [
   { code: "unknown_component", severity: "error", meaning: "The type is not in the catalog. The element renders nothing." },
   { code: "invalid_element", severity: "error", meaning: "An entry in elements is not an object with a type." },
   { code: "missing_child", severity: "error", meaning: "children names a key that does not exist." },
-  { code: "children_mismatch", severity: "error", meaning: "Tabs, Accordion, or a Grid with `spans` has a different number of children and entries." },
+  { code: "children_mismatch", severity: "error", meaning: "Tabs, Accordion, or a Grid with `spans` has a different number of children and entries, or a Grid has both `spans` and `repeat`." },
   { code: "invalid_event", severity: "error", meaning: "on uses an event the component does not emit." },
   { code: "invalid_action", severity: "error", meaning: "on runs an action other than the five state actions." },
   { code: "unsupported_expression", severity: "error", meaning: "A prop uses $computed." },
@@ -30,6 +30,7 @@ const elementCodes: Omit<IssueCodeDoc, "blocking">[] = [
   { code: "missing_version", severity: "warning", meaning: "The spec has no version field." },
   { code: "unknown_prop", severity: "warning", meaning: "A prop the component does not have. It is ignored." },
   { code: "leaf_children", severity: "warning", meaning: "A component that does not show children has some." },
+  { code: "repeated_pairing", severity: "warning", meaning: "Tabs or an Accordion repeats its child with `repeat`, so its panels may not line up with its entries. It still draws." },
   { code: "orphaned_element", severity: "warning", meaning: "An element the root never reaches. It is ignored." },
   { code: "announce_follows_typing", severity: "warning", meaning: "A Text or Callout with announce (true, or an expression that can be true) shows words read from state that a text field writes, so it would be spoken on every key." },
 ];

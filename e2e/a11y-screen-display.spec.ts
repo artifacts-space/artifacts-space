@@ -130,7 +130,7 @@ test("should give the wide card two of three columns where the grid is wide, and
   await expectNoAxeViolations(fixture);
 });
 
-for (const [slug, name] of [["avatar-group", "AvatarGroup"], ["kbd", "Kbd"], ["rating", "Rating"], ["badge", "Badge"], ["input", "Input"], ["grid", "Grid"]] as const) {
+for (const [slug, name] of [["avatar-group", "AvatarGroup"], ["kbd", "Kbd"], ["rating", "Rating"], ["badge", "Badge"], ["input", "Input"], ["grid", "Grid"], ["tabs", "Tabs"], ["accordion", "Accordion"]] as const) {
   test(`should pass axe on the ${slug} docs page, with its live examples drawn`, async ({ page }) => {
     await page.goto(`/docs/json-render/components/${slug}`);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
