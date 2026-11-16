@@ -158,6 +158,18 @@ describe("variants on Button, Metric, Separator, Select, and Placeholder", () =>
     }
   });
 
+  it("should write the address in the browser bar, hidden from screen readers with the rest of the frame", () => {
+    const html = renderToStaticMarkup(<PlaceholderView props={{ frame: "browser", label: "Dashboard", address: "app.example.com/stock" }} emit={emit} />);
+    expect(html).toContain("app.example.com/stock");
+    expect(html.match(/role="img"/g)).toHaveLength(1);
+    expect(html.indexOf("app.example.com/stock")).toBeLessThan(html.indexOf('role="img"'));
+    expect(html).toMatch(/<div aria-hidden="true"[^>]*>(?:(?!<\/div>).)*app\.example\.com\/stock/);
+  });
+
+  it("should draw no address in a phone frame, whatever the props say", () => {
+    expect(renderToStaticMarkup(<PlaceholderView props={{ frame: "phone", address: "app.example.com/stock" }} emit={emit} />)).not.toContain("app.example.com");
+  });
+
   it("should give a phone frame the portrait ratio and a browser frame the video ratio unless one is set", () => {
     expect(renderToStaticMarkup(<PlaceholderView props={{ frame: "phone" }} emit={emit} />)).toContain("aspect-3/4");
     expect(renderToStaticMarkup(<PlaceholderView props={{ frame: "browser" }} emit={emit} />)).toContain("aspect-video");

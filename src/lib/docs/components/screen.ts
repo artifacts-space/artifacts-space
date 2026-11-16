@@ -130,7 +130,7 @@ export const placeholderDocs: Record<"Placeholder", ComponentDoc> = {
         spec: spec("row", {
           row: { type: "Box", props: { direction: "horizontal", stackBelow: "sm", align: "end", alignBelow: "center", gap: "lg" }, children: ["desktop", "phone"] },
           desktop: { type: "Box", props: { grow: true }, children: ["window"] },
-          window: { type: "Placeholder", props: { frame: "browser", label: "Dashboard" } },
+          window: { type: "Placeholder", props: { frame: "browser", label: "Dashboard", address: "app.example.com/dashboard" } },
           phone: { type: "Placeholder", props: { frame: "phone", label: "Home screen" } },
         }),
       },
@@ -147,7 +147,7 @@ export const placeholderDocs: Record<"Placeholder", ComponentDoc> = {
     rules: [
       "A placeholder never loads a file. Use Image for an uploaded picture.",
       "`label` is what screen readers announce; the small logo and avatar shapes do not show it.",
-      "`frame` (browser or phone) draws a window or a phone around an image, video, or map stand-in. The frame is decoration: its dots and bars are not controls and are hidden from screen readers. A framed stand-in ignores `radius`; a phone frame is at most 256 pixels wide and defaults to the portrait ratio.",
+      "`frame` (browser or phone) draws a window or a phone around an image, video, or map stand-in. The frame is decoration: its dots and bars are not controls and are hidden from screen readers. `address` writes example words in a browser frame's address bar (they are hidden from screen readers with the rest of the frame, so put what matters in `label`). A framed stand-in ignores `radius`; a phone frame is at most 256 pixels wide and defaults to the portrait ratio.",
     ],
   },
 };

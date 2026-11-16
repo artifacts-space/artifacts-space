@@ -89,6 +89,19 @@ describe("variants and formats", () => {
     expect(messages("Placeholder", { frame: "tablet" })).not.toEqual([]);
   });
 
+  it("should accept an address on a browser frame and name the frame an address needs otherwise", () => {
+    expect(messages("Placeholder", { frame: "browser", address: "app.example.com/stock" })).toEqual([]);
+    const needsBrowser = [expect.stringContaining('`address` is drawn in the address bar of a browser frame. Set `frame: "browser"`, or remove `address`.')];
+    expect(messages("Placeholder", { address: "app.example.com/stock" })).toEqual(needsBrowser);
+    expect(messages("Placeholder", { frame: "phone", address: "app.example.com/stock" })).toEqual(needsBrowser);
+    expect(messages("Placeholder", { frame: "browser", address: "x".repeat(61) })).not.toEqual([]);
+  });
+
+  it("should say nothing about an address when the frame or the address is an expression", () => {
+    expect(messages("Placeholder", { frame: { $state: "/frame" }, address: "app.example.com" })).toEqual([]);
+    expect(messages("Placeholder", { frame: "browser", address: { $state: "/address" } })).toEqual([]);
+  });
+
   it("should say nothing about frame when variant is an expression", () => {
     const shape = { $cond: { $state: "/open" }, $then: "logo", $else: "image" };
     expect(messages("Placeholder", { variant: shape, frame: "browser" })).toEqual([]);

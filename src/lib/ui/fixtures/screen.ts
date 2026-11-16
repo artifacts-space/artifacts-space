@@ -51,6 +51,8 @@ export const placeholderFixtures: ComponentFixture[] = [
   { name: "Avatar", props: { variant: "avatar", label: "Maya Chen" } },
   { name: "Long label", props: { ratio: "portrait", label: longLabel.slice(0, 80) } },
   { name: "Browser frame", props: { frame: "browser", label: "Dashboard" } },
+  { name: "Browser frame, address", props: { frame: "browser", label: "Dashboard", address: "app.example.com/stock" } },
+  { name: "Browser frame, long address, wide", props: { frame: "browser", ratio: "wide", label: "Dashboard", address: longLabel.slice(0, 60) } },
   { name: "Phone frame", props: { frame: "phone", label: "Home screen" } },
   { name: "Browser frame, long label, wide", props: { frame: "browser", ratio: "wide", variant: "video", label: longLabel.slice(0, 80) } },
 ];

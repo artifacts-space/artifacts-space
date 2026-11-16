@@ -6,6 +6,7 @@ import { validateUiSpec } from "../validate";
 import { actionHides, actionLabels, pressButtons } from "./behavior";
 import { elementStatePaths, templateFacts } from "./facts";
 import { prefixProblem, templateAsSpec } from "./instantiate";
+import { layoutProblems } from "./layout-rules";
 import { templateBudget, templateCategories, templateNamePattern, type TemplateElement, type TemplateFile, type TemplateFragment, type UiTemplate } from "./types";
 
 /**
@@ -371,6 +372,7 @@ export function templateProblems(template: UiTemplate, file: TemplateFile): stri
     ...choiceProblems(fragment),
     ...elementProblems(fragment),
     ...brandProblems(fragment),
+    ...layoutProblems(template),
     ...stateProblems(fragment),
     ...slotProblems(template),
     ...specProblems(template),
