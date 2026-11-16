@@ -11,6 +11,7 @@ import { AddCoverButton } from "@/components/artifact-cover/add-cover-button";
 import { ArtifactCover } from "@/components/artifact-cover/artifact-cover";
 import { ApprovedArticle } from "@/components/artifact-page/approved-article";
 import { ServerPageHost } from "@/components/artifact-view/server-page-host";
+import { ViewNotice } from "@/components/artifact-view/view-notice";
 import { ArtifactHeader } from "@/components/artifact-page/artifact-header";
 import { ArtifactPageFooter } from "@/components/artifact-page/artifact-page-footer";
 import { ArtifactPageTheme } from "@/components/artifact-page/artifact-page-theme";
@@ -308,6 +309,21 @@ function LinkableBody({ viewable, files, canComment }: { viewable: ViewableArtif
   );
 }
 
+/**
+ * Above an HTML page that is shared by link or with everyone, for readers
+ * who cannot edit it: the page is its author's, not this site's, so a form
+ * in it that asks for a password is not ours. With the Report link, here
+ * where the page is, as well as in the footer.
+ */
+function SharedPageNotice({ viewable }: { viewable: ViewableArtifact }) {
+  if (viewable.view.kind !== "html" || viewable.canEdit || !isReportable(viewable.record.visibility)) return null;
+  return (
+    <ViewNotice title="This page was made by its author, not by artifacts.space." className="mb-4">
+      <p>It runs in a sandbox, apart from your account. Do not type a password or payment details into it. <ReportDialog publicId={viewable.record.publicId} /></p>
+    </ViewNotice>
+  );
+}
+
 /** Whether this reader may take a CSV's data out: editors always; everyone else while "Allow CSV download" is on. */
 function exportsCsv(viewable: ViewableArtifact): boolean {
   return mayExportCsv({ canEdit: viewable.canEdit }, { kind: viewable.view.kind, allowCsvDownload: viewable.record.allowCsvDownload });
@@ -427,6 +443,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
                   <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
                   <PageConflictNotice />
                   <article className="mt-10" data-block-links="">
+                    <SharedPageNotice viewable={viewable} />
                     {/* A CSV's grid fills the window under the header, as a sheet does. */}
                     <SheetFill artifactKey={record.publicId}>
                       {/* Banding and column alignment, the same for every reader; editors change them from the grid. */}
