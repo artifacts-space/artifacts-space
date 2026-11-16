@@ -28,6 +28,7 @@ const readOnlyTools = [
   "artifacts_versions",
   "artifacts_views",
   "canvas_frame_get",
+  "canvas_frame_image",
   "canvas_frames_list",
   "comments_list",
   "files_get_download_url",

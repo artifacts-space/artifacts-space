@@ -1,4 +1,4 @@
-import type { PresignedUpload } from "@/lib/files/r2";
+import type { ObjectRead, PresignedUpload } from "@/lib/files/r2";
 
 /**
  * An in-memory stand-in for R2, for frame capture tests: the R2 calls the
@@ -6,7 +6,7 @@ import type { PresignedUpload } from "@/lib/files/r2";
  * putting it in `objects`.
  */
 
-/** One stored object: its size, its type, and its first bytes. */
+/** One stored object: its size, its type, and its first bytes. A whole read answers with `start`, as a small picture would. */
 export interface FakeObject {
   size: number;
   contentType: string;
@@ -40,6 +40,10 @@ export function fakeCaptureBucket() {
   /** The key of every object the code asked about, in order. */
   const heads: string[] = [];
   const presigned: { key: string; contentType: string; size: number; expiresIn: number }[] = [];
+  /** The key of every object the code read whole, in order. */
+  const reads: string[] = [];
+  /** Every download link the code signed. */
+  const links: { key: string; contentType: string; disposition: string; expiresIn: number }[] = [];
   const r2 = {
     isR2Configured: () => state.configured,
     r2ConfigFromEnv: () => ({ accountId: "test", bucket: "test", accessKeyId: "test", secretAccessKey: "test" }),
@@ -53,6 +57,17 @@ export function fakeCaptureBucket() {
       return Promise.resolve(object ? { size: object.size, contentType: object.contentType } : null);
     },
     readObjectStart: (_config: unknown, key: string, length: number) => Promise.resolve((objects.get(key)?.start ?? new Uint8Array()).slice(0, length)),
+    readObject: (_config: unknown, key: string, maxBytes: number): Promise<ObjectRead> => {
+      reads.push(key);
+      const object = objects.get(key);
+      if (!object) return Promise.resolve({ state: "missing" });
+      if (object.size > maxBytes) return Promise.resolve({ state: "too-large" });
+      return Promise.resolve({ state: "found", bytes: Uint8Array.from(object.start), contentType: object.contentType });
+    },
+    presignDownload: (_config: unknown, input: { key: string; contentType: string; disposition: string; expiresIn: number }) => {
+      links.push(input);
+      return Promise.resolve({ url: `https://r2.test/${input.key}?signed=1`, expiresAt: new Date(Date.UTC(2026, 10, 16, 12, 0, 0) + input.expiresIn * 1000) });
+    },
     deleteObject: (_config: unknown, key: string) => {
       if (state.deletesFail) return Promise.reject(new Error("R2 DELETE failed."));
       objects.delete(key);
@@ -60,5 +75,5 @@ export function fakeCaptureBucket() {
       return Promise.resolve();
     },
   };
-  return { objects, state, deleted, heads, presigned, r2 };
+  return { objects, state, deleted, heads, presigned, reads, links, r2 };
 }

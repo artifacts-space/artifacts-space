@@ -30,6 +30,8 @@ export const toolAccess = {
   // Canvas frames: read or change one frame of a canvas without resending the board.
   canvas_frames_list: "read",
   canvas_frame_get: "read",
+  // The image of one frame, drawn by an editor's browser: only for callers who may edit the canvas, on any connection.
+  canvas_frame_image: "read",
   canvas_frame_save: "write",
   canvas_frame_update: "write",
   canvas_frame_delete: "write",

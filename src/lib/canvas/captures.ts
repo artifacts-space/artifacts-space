@@ -47,8 +47,8 @@ import { countPendingCaptures, getOwnPendingCapture, insertPendingCapture, listL
 /** The most spec text one needed-list answer carries, in bytes. It always carries at least one frame. */
 const maxBatchSpecBytes = 400_000;
 
-/** One frame for the tab to draw, in each mode listed. */
-export type NeededFrame = BoardFrame;
+/** One frame for the tab to draw, in each mode listed. The tab draws by content, so it gets no frame id. */
+export type NeededFrame = Omit<BoardFrame, "id">;
 
 /**
  * What a tab should draw now. "not-now" means nothing can be drawn here
@@ -59,7 +59,8 @@ export type CapturesNeeded = { state: "not-now" } | { state: "draw"; theme: Them
 
 const notNow: CapturesNeeded = { state: "not-now" };
 
-function capturesAreOn(): boolean {
+/** Whether frame captures run here: not switched off, not a preview deployment, and file storage is set up. Read at request time. */
+export function capturesAreOn(): boolean {
   return captureAvailability({ FRAME_CAPTURES: process.env.FRAME_CAPTURES, VERCEL_ENV: process.env.VERCEL_ENV }, isR2Configured()) === "on";
 }
 
@@ -85,7 +86,7 @@ function batchFrames(board: CaptureBoard, wanted: readonly CaptureDrawing[]): Ne
     for (const drawing of drawings) keys.delete(drawingKey(drawing));
     bytes += byteLength(frame.spec);
     if (frames.length > 0 && bytes > maxBatchSpecBytes) break;
-    frames.push({ ...frame, drawings });
+    frames.push({ width: frame.width, height: frame.height, padding: frame.padding, spec: frame.spec, drawings });
   }
   return frames;
 }

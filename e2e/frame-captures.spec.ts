@@ -127,7 +127,7 @@ test.describe("frame captures", () => {
   });
 
   for (const scheme of ["light", "dark"] as const) {
-    test(`should draw every frame in light and in dark, in parts of exactly their size, on a ${scheme} page`, async ({ page }) => {
+    test(`should draw every frame in light and in dark, in parts of exactly their size, on a ${scheme} page`, async ({ page, browserName }) => {
       await page.emulateMedia({ colorScheme: scheme });
       await openWithCaptures(page, "site");
       const { captures, neededCalls } = await uploaded(page);
@@ -139,7 +139,8 @@ test.describe("frame captures", () => {
       for (const capture of captures) {
         expectDrawn(capture);
         expect(capture.partial).toBe(false);
-        expect(capture.contentType).toBe("image/webp");
+        // WebP where the browser can write it. WebKit cannot, so there the host falls back to JPEG.
+        expect(capture.contentType).toBe(browserName === "webkit" ? "image/jpeg" : "image/webp");
       }
       for (const frame of ["home-desktop", "home-tablet", "home-phone", "home-full-bleed"]) expectModes(captures, frame);
       // A frame with padding shows the page color around its content: nearly white in light, nearly black in dark.

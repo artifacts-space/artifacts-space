@@ -144,6 +144,13 @@ export const rateLimits = {
    * capture would each read them again; this bounds that.
    */
   frameCaptureFinish: { limit: 1200, windowSeconds: hour },
+  /**
+   * Frame images read per person per hour (canvas_frame_image), on top of
+   * the MCP read limits. A full board is 24 frames; a tall frame is a few
+   * parts. Each read fetches up to 300 KB from storage and hands it to a
+   * model, so this is lower than the plain read limits.
+   */
+  frameImageRead: { limit: 600, windowSeconds: hour },
   /** Comments per agent per minute and per hour. Agents are stricter, to stop runaway loops. */
   agentCommentMinute: { limit: 6, windowSeconds: 60 },
   agentCommentHour: { limit: 60, windowSeconds: hour },
@@ -289,6 +296,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   frameCaptureStart: "Your browser has drawn a lot of frame images in the last hour.",
   frameCaptureStartByArtifact: "A lot of frame images were drawn for this canvas in the last few minutes.",
   frameCaptureFinish: "Your browser has finished a lot of frame images in the last hour.",
+  frameImageRead: "You have read a lot of frame images in the last hour.",
   agentCommentMinute: "You have posted a lot of comments in the last minute.",
   agentCommentHour: "You have posted a lot of comments in the last hour.",
   personCommentMinute: "You have posted a lot of comments in the last minute.",

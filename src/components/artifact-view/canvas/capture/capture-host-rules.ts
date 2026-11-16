@@ -181,8 +181,10 @@ export async function encodeWithin<Data>(encode: PartEncoder<Data>, type: Captur
     const part = await encode(type, quality);
     if (!part) continue;
     if (part.type !== type) return { state: "wrong-type" };
+    // A picture without bytes is no picture: the browser failed, the part is not too large.
+    if (part.bytes === 0) continue;
     encoded = true;
-    if (part.bytes > 0 && part.bytes <= maxBytes) return { state: "fits", part };
+    if (part.bytes <= maxBytes) return { state: "fits", part };
   }
   return { state: encoded ? "too-large" : "failed" };
 }

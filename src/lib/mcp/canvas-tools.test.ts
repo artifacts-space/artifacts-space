@@ -18,7 +18,10 @@ const data = vi.hoisted(() => ({
   getEditableArtifact: vi.fn(),
   loadArtifactForViewer: vi.fn(),
   lastSavedBy: vi.fn(),
+  frameImageStatesFor: vi.fn(),
+  readFrameImage: vi.fn(),
 }));
+vi.mock("@/lib/canvas/capture-read", () => ({ frameImageStatesFor: data.frameImageStatesFor, readFrameImage: data.readFrameImage }));
 vi.mock("@/lib/artifacts", () => ({ updateArtifact: data.updateArtifact }));
 vi.mock("@/lib/access", () => ({ getEditableArtifact: data.getEditableArtifact }));
 vi.mock("@/lib/artifact-read", () => ({ loadArtifactForViewer: data.loadArtifactForViewer }));
@@ -112,6 +115,44 @@ describe("canvas_frames_list", () => {
     expect(approved).toMatchObject({ version: "approved", editPending: true });
     expect(approved).not.toHaveProperty("baseVersion");
     expect(approved).not.toHaveProperty("versionId");
+  });
+
+  it("should say which modes of each drawn frame have a current image when the caller can edit the canvas", async () => {
+    data.loadArtifactForViewer.mockResolvedValue(read(true));
+    data.frameImageStatesFor.mockResolvedValue(new Map([["home", { light: "current", dark: "none" }]]));
+    const listed = (await call("canvas_frames_list", { id: publicId })).json() as { frames: Record<string, unknown>[] };
+    expect(data.frameImageStatesFor).toHaveBeenCalledWith("agent-1", publicId);
+    expect(listed.frames[0]).toMatchObject({ id: "home", image: { light: "current", dark: "none" } });
+    // A frame the board does not draw, or where images are off, has no `image` at all.
+    expect(listed.frames[1]).not.toHaveProperty("image");
+    const one = (await call("canvas_frame_get", { id: publicId, frameId: "home" })).json();
+    expect(one).toMatchObject({ image: { light: "current", dark: "none" }, baseVersion: token });
+    expect((await call("canvas_frame_get", { id: publicId, frameId: "pricing" })).json()).not.toHaveProperty("image");
+  });
+
+  it("should never ask for image states, and report none, when the caller cannot edit the canvas or reads the approved version", async () => {
+    // Were the states read for a reader, this is what would leak.
+    data.frameImageStatesFor.mockResolvedValue(new Map([["home", { light: "current", dark: "current" }]]));
+    for (const reader of [read(false), read(true, "approved", stored, true), read(false, "approved")]) {
+      data.loadArtifactForViewer.mockResolvedValue(reader);
+      const listed = await call("canvas_frames_list", { id: publicId });
+      expect(listed.text).not.toContain("image");
+      expect((await call("canvas_frame_get", { id: publicId, frameId: "home" })).text).not.toContain('"image"');
+    }
+    expect(data.frameImageStatesFor).not.toHaveBeenCalled();
+  });
+
+  it("should still list the frames, without `image`, when the image states cannot be read", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    data.loadArtifactForViewer.mockResolvedValue(read(true));
+    data.frameImageStatesFor.mockRejectedValue(new TypeError("connection lost to db.internal"));
+    const listed = await call("canvas_frames_list", { id: publicId });
+    expect(listed.isError).toBe(false);
+    expect(listed.json()).toMatchObject({ frameCount: 2, baseVersion: token });
+    expect(listed.text).not.toContain('"image"');
+    // The error's name only: never its message.
+    expect(logged).toHaveBeenCalledWith("[mcp] Frame image states could not be read", "TypeError");
+    logged.mockRestore();
   });
 
   it("should answer not found when the caller may not read the artifact", async () => {
@@ -302,11 +343,11 @@ describe("canvas_frame_delete", () => {
 });
 
 describe("read-only connections", () => {
-  it("should list only the two read tools, and refuse a frame write as an unknown tool", async () => {
+  it("should list only the three read tools, and refuse a frame write as an unknown tool", async () => {
     await client.close();
     await connect("read");
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name).sort()).toEqual(["canvas_frame_get", "canvas_frames_list"]);
+    expect(tools.map((tool) => tool.name).sort()).toEqual(["canvas_frame_get", "canvas_frame_image", "canvas_frames_list"]);
     const result = await call("canvas_frame_save", { id: publicId, frame: frame("checkout"), baseVersion: token });
     expect(result.isError).toBe(true);
     expect(result.text).toMatch(/not found/);

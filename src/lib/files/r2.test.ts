@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { amzDate, downloadSigningTime, isR2Configured, parseEndpoint, presignDownload, presignUpload, presignUrl, r2ConfigFromEnv, r2ObjectUrl, streamObject, type R2Config } from "./r2";
+import { amzDate, downloadSigningTime, isR2Configured, parseEndpoint, presignDownload, presignUpload, presignUrl, r2ConfigFromEnv, r2ObjectUrl, readObject, streamObject, type R2Config } from "./r2";
 
 const config: R2Config = {
   accountId: "0123456789abcdef0123456789abcdef",
@@ -163,5 +163,38 @@ describe("streamObject", () => {
   it("should throw without details when R2 refuses", async () => {
     answer(null, 403);
     await expect(streamObject(config, key, 3)).rejects.toThrow("R2 GET failed with status 403.");
+  });
+});
+
+describe("readObject", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function answer(body: Uint8Array<ArrayBuffer> | null, status: number, headers: Record<string, string> = {}) {
+    const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() => Promise.resolve(new Response(body, { status, headers })));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("should return the object's bytes and stored type when it fits, asking R2 for no more than the cap plus one byte", async () => {
+    const fetchMock = answer(new Uint8Array([1, 2, 3]), 206, { "Content-Type": "image/webp" });
+    expect(await readObject(config, key, 3)).toEqual({ state: "found", bytes: new Uint8Array([1, 2, 3]), contentType: "image/webp" });
+    expect(new Headers(fetchMock.mock.calls[0]?.[1].headers).get("range")).toBe("bytes=0-3");
+  });
+
+  it("should say the object is missing when it does not exist", async () => {
+    answer(null, 404);
+    expect(await readObject(config, key, 3)).toEqual({ state: "missing" });
+  });
+
+  it("should never return an object larger than the caller expects", async () => {
+    answer(new Uint8Array([1, 2, 3, 4]), 206, { "Content-Type": "image/webp" });
+    expect(await readObject(config, key, 3)).toEqual({ state: "too-large" });
+  });
+
+  it("should throw without details when R2 refuses", async () => {
+    answer(null, 403);
+    await expect(readObject(config, key, 3)).rejects.toThrow("R2 GET failed with status 403.");
   });
 });

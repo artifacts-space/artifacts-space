@@ -237,6 +237,13 @@ describe("encodeWithin", () => {
   });
 });
 
+describe("encodeWithin with an empty picture", () => {
+  it("should say failed, not too-large, when every picture the browser gives has no bytes", async () => {
+    const empty: PartEncoder<string> = (type) => Promise.resolve({ type, bytes: 0, data: "" });
+    expect(await encodeWithin(empty, "image/webp")).toEqual({ state: "failed" });
+  });
+});
+
 describe("left-out counts", () => {
   it("should count drawings by reason and add them up", () => {
     const counts = countLeftOut(countLeftOut(countLeftOut({}, "too-large"), "error"), "too-large");
