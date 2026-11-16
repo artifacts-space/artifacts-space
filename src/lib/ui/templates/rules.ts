@@ -216,12 +216,14 @@ interface BrandUse {
 
 /**
  * An object of the state that carries a brand mark: its own path, the path of
- * the list it is an item of (null when it sits outside any list), and the
+ * the list it is an item of (null when it is not an item itself), the path of
+ * the nearest list above it (null when it sits outside any list), and the
  * field that holds the mark.
  */
 interface StateMark {
   path: string;
   list: string | null;
+  within: string | null;
   field: "icon" | "name";
   mark: string;
   label: unknown;
@@ -235,18 +237,31 @@ function brandFieldOf(value: Record<string, unknown>): "icon" | "name" | undefin
 
 const pointerSegment = (key: string | number) => String(key).replaceAll("~", "~0").replaceAll("/", "~1");
 
-/** Every object of the state that carries a brand mark, with the path of the list it is an item of, if any. */
+/** A value of the state met on the walk: its path, the list it is an item of, and the nearest list above it. */
+interface StateFrame {
+  value: unknown;
+  path: string;
+  list: string | null;
+  within: string | null;
+}
+
+/** The values one level below a frame: an array's items know their list, an object's entries only the list above. */
+function belowFrame({ value, path, within }: StateFrame): StateFrame[] {
+  if (Array.isArray(value)) return value.map((item: unknown, index) => ({ value: item, path: `${path}/${String(index)}`, list: path, within: path }));
+  if (!isPlainObject(value)) return [];
+  return Object.entries(value).map(([key, item]) => ({ value: item, path: `${path}/${pointerSegment(key)}`, list: null, within }));
+}
+
+/** Every object of the state that carries a brand mark, with the list it is an item of and the nearest list above it. */
 function stateMarks(state: unknown): StateMark[] {
   const found: StateMark[] = [];
-  const stack: { value: unknown; path: string; inList: boolean }[] = [{ value: state, path: "", inList: false }];
-  for (let entry = stack.pop(); entry; entry = stack.pop()) {
-    const { value, path, inList } = entry;
-    if (Array.isArray(value)) stack.push(...value.map((item: unknown, index) => ({ value: item, path: `${path}/${String(index)}`, inList: true })));
-    if (!isPlainObject(value)) continue;
-    stack.push(...Object.entries(value).map(([key, item]) => ({ value: item, path: `${path}/${pointerSegment(key)}`, inList: false })));
-    const field = brandFieldOf(value);
-    const mark = field === undefined ? undefined : value[field];
-    if (field !== undefined && typeof mark === "string") found.push({ path, list: inList ? path.slice(0, path.lastIndexOf("/")) : null, field, mark, label: value.label });
+  const stack: StateFrame[] = [{ value: state, path: "", list: null, within: null }];
+  for (let frame = stack.pop(); frame; frame = stack.pop()) {
+    stack.push(...belowFrame(frame));
+    if (!isPlainObject(frame.value)) continue;
+    const field = brandFieldOf(frame.value);
+    const mark = field === undefined ? undefined : frame.value[field];
+    if (field !== undefined && typeof mark === "string") found.push({ path: frame.path, list: frame.list, within: frame.within, field, mark, label: frame.value.label });
   }
   return found;
 }
@@ -281,11 +296,23 @@ function markDrawers(fragment: TemplateFragment, { list, field, path }: StateMar
 const drawsBrandSuffix = "A template draws a brand mark only on a Button or a Link that can be found from the fragment.";
 
 /** Why no drawing element was found for a mark in state, with the fix when the element that carries the repeat reads the item itself. */
-function undrawnReason(fragment: TemplateFragment, { list, field, mark, path }: StateMark): string {
+function undrawnReason(fragment: TemplateFragment, { list, within, field, mark, path }: StateMark): string {
+  if (list === null && within !== null) return `${mark} is in the state inside an item of ${within}, below the item's own fields, so no { "$item": … } read reaches it, and no element reads it with { "$state": "${path}/${field}" }. Move the mark to a field of the item. ${drawsBrandSuffix}`;
   if (list === null) return `${mark} is in the state outside any list, but no element reads it with { "$state": "${path}/${field}" }. ${drawsBrandSuffix}`;
   const carrier = Object.entries(fragment.elements).find(([, element]) => isPlainObject(element.repeat) && element.repeat.statePath === list && (readsItemField(element.props?.icon, field) || readsItemField(element.props?.name, field)));
   if (carrier) return `${mark} is in the state, but element "${carrier[0]}" reads it with { "$item": "${field}" } and carries the repeat over ${list} itself. A repeat draws its children once per item, so the element that carries it is drawn once and cannot read an item. Put the repeat on a Box above it. ${drawsBrandSuffix}`;
   return `${mark} is in the state, but no element under a repeat over ${list} reads it with { "$item": "${field}" }. ${drawsBrandSuffix}`;
+}
+
+/** The words an element shows beside a mark from state: its own `label` text, or the object's `label` when the element reads it; undefined when they cannot be told. */
+function shownLabel(element: TemplateElement, { path, label }: StateMark): string | undefined {
+  const own = element.props?.label;
+  if (typeof own === "string") return own;
+  if (typeof label !== "string" || !isPlainObject(own)) return undefined;
+  if (own.$item === "label" || own.$state === `${path}/label`) return label;
+  if (typeof own.$template !== "string") return undefined;
+  const text = own.$template.replaceAll("${label}", label).replaceAll(`\${${path}/label}`, label);
+  return text.includes("${") ? undefined : text;
 }
 
 /** The brand uses of one state object: one per element that reads its mark, or one with no component when none does. */
@@ -294,7 +321,7 @@ function stateItemUses(fragment: TemplateFragment, item: StateMark): BrandUse[] 
   const where = list === null ? `the state at ${path}/${field}${typeof label === "string" ? ` (${label})` : ""}` : `an item in state (${String(label)})`;
   const drawers = markDrawers(fragment, item);
   if (drawers.length === 0) return [{ where, mark, label, component: null, unread: undrawnReason(fragment, item) }];
-  return drawers.map(({ key, element }) => ({ where: `${where}, drawn by element "${key}"`, mark, label: typeof label === "string" ? label : element.props?.label, component: element.type }));
+  return drawers.map(({ key, element }) => ({ where: `${where}, drawn by element "${key}"`, mark, label: shownLabel(element, item), component: element.type }));
 }
 
 /** Every brand mark the fragment draws: in an element's props, or in an item of its state that a repeat draws. */
