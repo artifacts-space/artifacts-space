@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { WorkspaceAgentSave } from "@/components/dev/catch-up-fixture";
 import { WorkspaceFixture, type FixtureWelcome } from "@/components/dev/workspace-fixture";
 import { parseArtifactLink } from "@/lib/app-link";
 import { parseProjectFilter, parseTagFilter } from "@/lib/projects/filter-params";
@@ -35,5 +36,7 @@ function fixtureWelcome(param: string | string[] | undefined): FixtureWelcome {
 export default async function WorkspaceFixturePage({ searchParams }: PageProps<"/dev/workspace">) {
   if (process.env.NODE_ENV !== "development") notFound();
   const params = await searchParams;
-  return <WorkspaceFixture projectFilter={parseProjectFilter(params)} link={parseArtifactLink(params)} linkFailed={params.linkcheck === "failed"} slowLoad={params.slowload === "1"} scopes={params.scopes === "1"} team={typeof params.team === "string" ? params.team : null} many={params.many === "1"} tags={parseTagFilter(params)} welcome={fixtureWelcome(params.welcome)} />;
+  const workspace = <WorkspaceFixture projectFilter={parseProjectFilter(params)} link={parseArtifactLink(params)} linkFailed={params.linkcheck === "failed"} slowLoad={params.slowload === "1"} scopes={params.scopes === "1"} team={typeof params.team === "string" ? params.team : null} many={params.many === "1"} tags={parseTagFilter(params)} welcome={fixtureWelcome(params.welcome)} />;
+  // With `catchup=agent`, an agent's save of the Long ui fixture waits for its editor's first check (e2e/catch-up.spec.ts).
+  return params.catchup === "agent" ? <WorkspaceAgentSave>{workspace}</WorkspaceAgentSave> : workspace;
 }

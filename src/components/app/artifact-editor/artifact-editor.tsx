@@ -34,10 +34,11 @@ import { ShareBanner, TitleFields } from "./editor-sections";
 import { BlankToolbar, EditorToolbar, type SourceToggle } from "./editor-toolbar";
 import { FormatDialog } from "./format-dialog";
 import { hasInlineField, InlineContent } from "./inline-content";
-import { AgentSaveNotice, ConflictNotice, openHistoryButton, SaveStatusBar } from "./save-status";
+import { AgentSaveNotice, CatchUpNotice, ConflictNotice, openHistoryButton, SaveStatusBar } from "./save-status";
 import { useArtifactActions } from "./use-artifact-actions";
 import { useArtifactDraft } from "./use-artifact-draft";
 import { useAutosave } from "./use-autosave";
+import { useEditorCatchUp } from "./use-catch-up";
 import { useFullWidth, type FullWidthControl } from "./use-full-width";
 
 interface ArtifactEditorProps {
@@ -163,7 +164,11 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   const fullWidthShown = usesFullWidth(draft.kind, artifact.fullWidth);
   // The title, chips, and meta line sit in the content's column, so they line up with the body.
   const column = previewColumnClass(fullWidthShown);
-  useLeaveGuard(autosave.dirty || saving);
+  const unsaved = autosave.dirty || saving;
+  useLeaveGuard(unsaved);
+  // A canvas or interface takes a newer save (an agent's, say) when the tab comes back, and says who changed what.
+  const catchUp = useEditorCatchUp({ artifact, stored: !page.blank, unsaved, onUpdated });
+  const noticeHistory = <VersionHistory publicId={artifact.publicId} title={artifact.title} updatedAt={artifact.updatedAt} reviewed={shared} files={artifact.files} hasUnsavedChanges={autosave.dirty} onRestored={(restored) => { reset(restored); onUpdated(restored); }} trigger={openHistoryButton} />;
 
   const toggleSource = () => {
     remember();
@@ -217,8 +222,9 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           show={autosave.agentSaved}
           onDismiss={autosave.dismissAgentSaved}
           column={column}
-          history={<VersionHistory publicId={artifact.publicId} title={artifact.title} updatedAt={artifact.updatedAt} reviewed={shared} files={artifact.files} hasUnsavedChanges={autosave.dirty} onRestored={(restored) => { reset(restored); onUpdated(restored); }} trigger={openHistoryButton} />}
+          history={noticeHistory}
         />
+        <CatchUpNotice words={catchUp.words} onDismiss={catchUp.dismiss} column={column} history={noticeHistory} />
         {/* A rendered view has no field to focus first, so the pane itself takes focus for Page Up/Down, Space, and the arrows. */}
         <div
           ref={bodyRef}
@@ -244,6 +250,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
               onChange={(content) => { update("content", content); }}
               onShowSource={() => { if (!sourceOpen) toggleSource(); }}
               onHideSource={() => { if (sourceOpen) toggleSource(); }}
+              changedFrames={catchUp.frames}
             />
             </BlockMenuFor>
             </ArtifactSheetFormat>

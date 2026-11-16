@@ -1220,6 +1220,29 @@ the UPDATE itself, one statement, never a read-then-write:
   new agent write path for content, title, or format on `writeArtifactSave`.
 - Every result an agent gets after its own save carries the `baseVersion` of
   that save and shows what it wrote (`asSaved`), never a later read.
+- An open canvas or interface catches up with a newer save when its tab comes
+  back (`src/lib/edits/catch-up-rules.ts`, `catchUpAction`, and
+  `src/components/app/artifact-editor/use-catch-up.tsx`). On focus and when
+  the tab becomes visible, never on a timer, the editor asks whether the
+  artifact moved on; a second signal within 5 seconds is dropped. The newer
+  save reaches the editor as a restore does (`onUpdated`, then useAutosave
+  rebases the draft), and a notice says who changed what (`CatchUpNotice`).
+  A canvas marks its changed frames (`ChangedFramesContext`, read by
+  `CanvasFrame`, so the full-screen board marks them too) until the notice is
+  dismissed. Nothing is asked while the editor holds unsaved changes or a
+  save is on its way, and an answer that arrives after the person typed is
+  dropped (`takesAnswer`): their own save settles it, as above. The editor
+  asks from the newest save its tab made (`knownUpdatedAt`), so the person's
+  own cover, icon, or theme save is never reported as news. A check that
+  never answers stops blocking the next one after 30 seconds. Editors only: the action
+  reads through the editable-artifact checks, so a reader of the approved
+  version never gets the latest one. It is on only where a page wrapped its
+  editors in `ServerCatchUp` (`/app`, and the artifact page's `EditSurface`);
+  a fixture uses `CatchUpProvider` (`catch-up-fixture.tsx`,
+  `e2e/catch-up.spec.ts`). Documents and the other formats keep to a reload
+  (`catchesUp`): a caret in text that moves under it needs more care. There
+  is no push channel yet, so a tab that stays in view does not update until
+  it is focused again.
 
 ### Agent harnesses
 

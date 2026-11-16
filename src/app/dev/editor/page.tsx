@@ -20,10 +20,10 @@ function isFixtureKind(value: unknown): value is EditorFixtureKind {
 }
 
 async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/editor">["searchParams"] }) {
-  const { kind, save } = await searchParams;
+  const { kind, save, catchup } = await searchParams;
   if (kind === "media") return <MediaEditorFixture />;
   if (kind === "lists") return <MediaEditorFixture initial={listItemsFixtureMarkdown} />;
-  return <EditorFixture kind={isFixtureKind(kind) ? kind : "ui"} failingSaves={save === "fail"} agentSaves={save === "agent"} />;
+  return <EditorFixture kind={isFixtureKind(kind) ? kind : "ui"} failingSaves={save === "fail"} agentSaves={save === "agent"} catchUp={catchup === "agent" || catchup === "own-save" ? catchup : null} />;
 }
 
 /**

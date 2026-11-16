@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Dashboard } from "@/components/app/dashboard";
 import type { ShareTeam } from "@/components/app/share-teams-context";
 import { toShareTeams } from "@/components/app/share-teams";
+import { ServerCatchUp } from "@/components/app/artifact-editor/use-catch-up";
 import { ServerFrameCaptures } from "@/components/artifact-view/canvas/capture/capture-api-context";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { parseArtifactLink, type ArtifactLink } from "@/lib/app-link";
@@ -88,6 +89,8 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
   return (
     // Editors in the workspace draw the frames of a canvas for agents (frame-capture-host.tsx). Fixture pages do not wrap themselves in this, so they draw none.
     <ServerFrameCaptures>
+    {/* An open canvas or interface takes a newer save when the tab comes back (use-catch-up.tsx). Fixture pages have no server to ask. */}
+    <ServerCatchUp>
     <Dashboard
       key={`${scopeTeam?.id ?? "mine"}:${projectFilterId(projectFilter)}:${tagFilter.join(",")}`}
       facets={facets}
@@ -105,6 +108,7 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
       scopeTeam={scopeTeam}
       welcome={welcome}
     />
+    </ServerCatchUp>
     </ServerFrameCaptures>
   );
 }
