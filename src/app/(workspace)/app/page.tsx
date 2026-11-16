@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Dashboard } from "@/components/app/dashboard";
 import type { ShareTeam } from "@/components/app/share-teams-context";
 import { toShareTeams } from "@/components/app/share-teams";
+import { ServerFrameCaptures } from "@/components/artifact-view/canvas/capture/capture-api-context";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { parseArtifactLink, type ArtifactLink } from "@/lib/app-link";
 import { toArtifactListItem } from "@/lib/artifact-preview";
@@ -85,6 +86,8 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
   const linkTarget = link ? (artifacts.find((item) => item.publicId === link.publicId) ?? (linked ? toArtifactListItem(linked) : null)) : null;
 
   return (
+    // Editors in the workspace draw the frames of a canvas for agents (frame-capture-host.tsx). Fixture pages do not wrap themselves in this, so they draw none.
+    <ServerFrameCaptures>
     <Dashboard
       key={`${scopeTeam?.id ?? "mine"}:${projectFilterId(projectFilter)}:${tagFilter.join(",")}`}
       facets={facets}
@@ -102,5 +105,6 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
       scopeTeam={scopeTeam}
       welcome={welcome}
     />
+    </ServerFrameCaptures>
   );
 }

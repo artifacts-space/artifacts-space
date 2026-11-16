@@ -33,6 +33,7 @@ describe.runIf(Boolean(databaseUrl))("frame captures with a database", async () 
   const { artifact, artifactFile, rateLimitBucket, user } = await import("@/db/schema");
   const { rateLimits } = await import("@/lib/abuse/limits");
   const { jpegStart, pngStart, webpStart } = await import("@/test/fake-capture-bucket");
+  const { CaptureNotWantedError } = await import("./capture-errors");
   const { captureGeometry, captureLimits, captureObjectKey, partBox } = await import("./capture-rules");
   const { capturesNeeded, finishCapture, startCapture } = await import("./captures");
 
@@ -235,6 +236,17 @@ describe.runIf(Boolean(databaseUrl))("frame captures with a database", async () 
       await getDb().update(artifact).set({ content: board("Start") }).where(eq(artifact.id, canvasId));
       await expect(startCapture(users.ada, startInput(drawing.frameHash))).rejects.toThrow("This frame changed");
       expect(await captures()).toEqual([]);
+    });
+
+    it("should say the drawing is not wanted, not that the pass must stop, when the frame changed or already has an image", async () => {
+      // The capture host skips one drawing on this error and ends its pass on any other.
+      await expect(startCapture(users.ada, startInput("0".repeat(64)))).rejects.toBeInstanceOf(CaptureNotWantedError);
+      const { captureId, drawing } = await startedHome();
+      upload(captureId, 1440, 600, [9000]);
+      await finishCapture(users.ada, captureId);
+      await expect(startCapture(users.ada, startInput(drawing.frameHash))).rejects.toBeInstanceOf(CaptureNotWantedError);
+      // A limit is not "not wanted": the host must stop asking.
+      await expect(startCapture(users.ada, startInput(drawing.frameHash, [captureLimits.maxPartBytes + 1]))).rejects.not.toBeInstanceOf(CaptureNotWantedError);
     });
 
     it("should refuse parts that do not fit the frame, a type that is not allowed, and an oversized part", async () => {

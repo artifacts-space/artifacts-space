@@ -8,6 +8,7 @@ import { ShareControl } from "@/components/app/share-control";
 import type { ShareTeam } from "@/components/app/share-teams-context";
 import { useRenderTheme } from "@/components/app/use-render-theme";
 import { useLeaveGuard } from "@/components/artifact-page/use-leave-guard";
+import { EditorFrameCaptures } from "@/components/artifact-view/canvas/capture/capture-api-context";
 import { ArtifactSheetFormat } from "@/components/artifact-view/sheet-format";
 import { SheetKeyContext } from "@/components/artifact-view/use-sheet-prefs";
 import { AttachedFiles } from "@/components/files/attached-files";
@@ -264,6 +265,8 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           replace({ ...draft, kind, language, content }, kind !== draft.kind || content !== draft.content);
         }}
       />
+      {/* Draws the frames of a canvas for agents, out of sight. Beside the content, never inside it, so View source does not stop it. */}
+      <EditorFrameCaptures artifact={artifact} stored={!page.blank} />
       <ConfirmDialog
         state={confirmDelete.dialog}
         title="Delete this artifact?"

@@ -59,6 +59,7 @@
     "@tiptap/react": "3.32.0",
     "@tiptap/starter-kit": "3.32.0",
     "@tiptap/suggestion": "3.32.0",
+    "@zumer/snapdom": "3.7.0",
     "aws4fetch": "1.0.20",
     "better-auth": "1.7.18",
     "class-variance-authority": "^0.7.1",

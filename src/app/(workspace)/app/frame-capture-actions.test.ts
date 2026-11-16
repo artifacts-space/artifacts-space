@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { CaptureNotWantedError } from "@/lib/canvas/capture-errors";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 /*
@@ -42,7 +43,7 @@ describe("frame capture actions", () => {
 
   it("should act as the signed-in person when they are signed in", async () => {
     expect(await frameCapturesNeededAction(" artifact-1 ")).toEqual({ success: true, data: { state: "not-now" } });
-    expect(await startFrameCaptureAction(startInput)).toEqual({ success: true, data: { captureId, uploads: [] } });
+    expect(await startFrameCaptureAction(startInput)).toEqual({ success: true, data: { state: "started", captureId, uploads: [] } });
     expect(await finishFrameCaptureAction(captureId)).toEqual({ success: true, data: { current: true } });
     expect(mocks.needed).toHaveBeenCalledWith("user-1", "artifact-1");
     expect(mocks.start).toHaveBeenCalledWith("user-1", startInput);
@@ -54,6 +55,11 @@ describe("frame capture actions", () => {
     expect((await frameCapturesNeededAction("x".repeat(201))).success).toBe(false);
     expect((await frameCapturesNeededAction(42 as never)).success).toBe(false);
     expect(mocks.needed).not.toHaveBeenCalled();
+  });
+
+  it("should answer not-wanted, not a failure, when the drawing is no longer needed", async () => {
+    mocks.start.mockRejectedValue(new CaptureNotWantedError("This frame already has a current image."));
+    expect(await startFrameCaptureAction(startInput)).toEqual({ success: true, data: { state: "not-wanted" } });
   });
 
   it("should show the service's own words when it refuses, and log nothing", async () => {

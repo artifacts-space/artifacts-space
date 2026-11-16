@@ -1013,6 +1013,69 @@ capture, PUTs its parts straight to R2, and finishes it
   (`captureAvailability`). Off means the needed-list call answers "not-now"
   before it reads or counts anything, and start and finish refuse.
 
+The browser side is `src/components/artifact-view/canvas/capture`.
+
+- One capture host per page (`FrameCaptureHost`), mounted beside the editor
+  by a component that holds the artifact and the edit access: the /app
+  editor (`EditorFrameCaptures` in `ArtifactEditor`, on only where the page
+  wrapped itself in `ServerFrameCaptures`, as `/app` does) and the artifact
+  page's `EditSurface`, which is rendered only for someone who may edit.
+  Never mount it in `SharedArtifactPanel` (readers), and never inside
+  `InlineContent` (it would stop under View source, and fixtures would get
+  one). A fixture gets a host only when it asks: `/dev/canvas?capture=1`.
+- The host asks the server what to draw when the canvas opens, when the tab
+  comes back (focus or visibility; a second signal within 5 seconds is
+  dropped), and when its window loses focus after the tab's own save. A save
+  alone starts nothing, and nothing polls. One pass runs at a time; it asks
+  again after each batch and ends when a batch holds nothing it has not
+  tried, when a start is refused (a limit, the canvas's cap), or when an
+  upload fails. A start answered "not-wanted" (the frame changed, or another
+  tab's image is current) skips that one drawing. It draws nothing on a
+  device that asks to save data, in a window under 640 pixels, or in a
+  hidden tab. The decisions are pure, in `capture-host-rules.ts`.
+- Each drawing is made in the capture box (`capture-box.tsx`): `UiView`
+  with the frame's spec, from the spec's own starting state, at the frame's
+  real width, in a `ThemeScope` with the theme the server sent and the mode
+  forced. It has the frame body's surface, padding, and least height
+  (`frameSurfaceClass` and `framePaddingClass`, exported from
+  `canvas-frame.tsx` so the board and the box cannot drift) and no edge or
+  shadow. It sits in the host's zero-size, `inert`, fixed container, so it
+  is never seen, focused, read aloud, or counted in the page's scroll size.
+  Do not hide it with `display: none` or `visibility: hidden`: it must lay
+  out and draw.
+- Pictures: the host fetches each file an Image shows itself, from the URL
+  the page uses, with `credentials: "same-origin"` and `cache: "no-store"`,
+  and hands the box data URLs through `ArtifactFilesProvider` (`urlFor`, and
+  `eager`, which `ImageView` reads to load at once). Never let the drawing
+  library fetch a file: the file route redirects to another origin, which
+  fails in some browsers and logs an error, and a copy the page already
+  showed is cached without the header a script needs. A picture that cannot
+  be fetched, or is over 10 MB, is left blank and the capture is `partial`.
+- The ready rule (`capture-ready.ts`): the theme's font stylesheets loaded,
+  `document.fonts.ready`, every picture decoded, no diagram still
+  `data-diagram-state="drawing"`, then two frames of layout. After 10
+  seconds the host draws what is there and marks the capture `partial`.
+- The drawing (`capture-draw.ts`) loads the drawing library on the first
+  drawing only (a dynamic `import()`), draws at one image pixel per CSS
+  pixel, and cuts parts with the server's own geometry (`planDrawing`), so
+  each part has exactly the pixel size finish checks. The box is first cut
+  to the height the parts cover, so a very tall frame stays within what a
+  browser can draw. Parts are WebP at quality 0.9 down to 0.7 to stay under
+  300 KB, or JPEG where the browser cannot write WebP.
+- Tests: `e2e/frame-captures.spec.ts` runs the host on
+  `/dev/canvas?capture=1` with a stand-in API
+  (`src/components/dev/capture-fixture-api.ts`) that keeps every upload in
+  `window.fixtureCaptures`, and reads the uploaded pixels: each part's
+  exact size, that none is blank, that light is light and dark is dark on a
+  page of either mode, that a changed frame gives a changed image, and that
+  a second pass uploads nothing. It waits for the host's marks
+  (`data-frame-captures`, `data-frame-capture-passes`).
+  `e2e/frame-captures-db.spec.ts` runs the real path from both mount points
+  (the /app editor and the artifact page) and checks that the server accepts
+  every part and that a reader gets no host. It needs `E2E_LOCAL_DB=1` and
+  `E2E_LOCAL_R2=1` with a local S3-compatible store that takes a PUT from
+  the test page's origin, and skips without them.
+
 ### Concurrent edits
 
 A person's work wins over an agent's (`src/lib/edits`, rules in
