@@ -62,10 +62,13 @@ function unknownPropWarnings(key: string, type: UiComponentName, props: Record<s
  * spec uses it. Tabs and Accordion with `repeat` drew before this check
  * existed, so they get a warning and still draw as they did.
  */
+/** How a message names each paired element, with its article. */
+const pairedNames = { Grid: "a Grid", Tabs: "a Tabs element", Accordion: "an Accordion" } satisfies Record<keyof typeof pairedChildren, string>;
+
 function repeatedPairing(key: string, type: keyof typeof pairedChildren, element: UiElement): UiSpecIssue[] {
   const prop = pairedChildren[type];
   if (element.repeat === undefined || element.props[prop] === undefined) return [];
-  const problem = `Element "${key}" (${type}): \`${prop}\` pairs with the children written in the spec, and a ${type} with \`repeat\` draws its child once per item.`;
+  const problem = `Element "${key}" (${type}): \`${prop}\` pairs with the children written in the spec, and ${pairedNames[type]} with \`repeat\` draws its child once per item.`;
   if (type === "Grid") return [specError("children_mismatch", `${problem} Remove \`spans\`, or write the children out.`, key)];
   return [specWarning("repeated_pairing", `${problem} Its panels may not line up with \`${prop}\`. Remove \`repeat\`, and write one child per entry in \`${prop}\`.`, key)];
 }

@@ -243,6 +243,25 @@ describe("a Grid's spans, kept in step with its children", () => {
     expect(moved ? errorsOf(moved) : "no spec").toEqual([]);
   });
 
+  it("should keep a moved child's span as it is when the grid it lands in reads columns from state", () => {
+    const fromState = readRawSpec(JSON.stringify({
+      version: 1,
+      root: "page",
+      state: { columns: 4 },
+      elements: {
+        page: { type: "Stack", props: {}, children: ["wide-grid", "live-grid"] },
+        "wide-grid": { type: "Grid", props: { columns: 4, spans: [4, 1] }, children: ["banner", "tile"] },
+        banner: { type: "Card", props: { title: "Banner" } },
+        tile: { type: "Card", props: { title: "Tile" } },
+        "live-grid": { type: "Grid", props: { columns: { $state: "/columns" }, spans: [1] }, children: ["note"] },
+        note: { type: "Card", props: { title: "Note" } },
+      },
+    }));
+    if (!fromState) throw new Error("fixture");
+    const moved = moveBlock(fromState, "banner", "live-grid", 1);
+    expect(moved ? propsOf(moved, "live-grid").spans : "no spec").toEqual([1, 4]);
+  });
+
   it("should give a duplicated child the span of the child it copies, right after it", () => {
     expect(spansOf(duplicateBlock(grid([2, 1, 1]), "wide")?.spec ?? null)).toEqual([2, 2, 1, 1]);
   });
