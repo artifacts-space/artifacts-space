@@ -101,14 +101,14 @@ test("should open the comments again when the same notification is chosen twice 
   expect(await linksHandled(page), "each link is acted on once").toBe(2);
 });
 
-test("should pin an artifact outside the list to the top of its group and open it when its notification is chosen", async ({ page }) => {
+test("should pin an artifact outside the list to the top of its place in the sidebar and open it when its notification is chosen", async ({ page }) => {
   await page.goto("/dev/workspace");
   await expect(editor(page, "Long ui fixture")).toBeVisible();
 
   await chooseNotification(page, "approved sharing Shared by link fixture");
   await expect(editor(page, "Shared by link fixture")).toBeVisible();
-  // It has no project for this viewer, so it leads the Unfiled group.
-  await expect(page.locator('[data-slot="artifact-list"] [role=group][aria-label=Unfiled] li').first()).toContainText("Shared by link fixture");
+  // It has no project for this viewer, so it leads the artifacts listed after the projects.
+  await expect(page.getByRole("region", { name: "Artifacts without a project" }).locator("li").first()).toContainText("Shared by link fixture");
   await expect(selectedCard(page)).toContainText("Shared by link fixture");
   await expect(commentsHeading(page, "Shared by link fixture")).toHaveCount(0);
   await expectBroughtIntoView(page, "Shared by link fixture");

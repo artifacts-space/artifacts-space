@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { countsArePartial, groupCount, listLimit, moreRow, narrowsTree, sidebarViewCounts, unfiledCount, type SidebarNarrowing } from "./sidebar-count-rules";
+import { countsArePartial, groupCount, listLimit, moreRow, narrowsTree, sidebarViewCounts, looseCount, showsLoose, type SidebarNarrowing } from "./sidebar-count-rules";
 
 const none: SidebarNarrowing = { query: "", kind: "all", view: "all", tags: [], project: false };
 const viewer = "viewer-1";
@@ -75,14 +75,32 @@ describe("groupCount", () => {
   });
 });
 
-describe("unfiledCount", () => {
+describe("looseCount", () => {
   it("should count every artifact no project entry holds, including ones whose project has no entry", () => {
     // 340 artifacts, 300 in the tree's projects: 30 with no project, 10 in a project the viewer cannot use here.
-    expect(unfiledCount(340, [200, 100])).toBe(40);
+    expect(looseCount(340, [200, 100])).toBe(40);
   });
 
   it("should never go below zero when moves shift the counts before fresh totals arrive", () => {
-    expect(unfiledCount(3, [2, 2])).toBe(0);
+    expect(looseCount(3, [2, 2])).toBe(0);
+  });
+});
+
+describe("showsLoose", () => {
+  const nothing = { shown: 0, more: false, dragging: false, filterOn: false };
+
+  it("should show nothing at all when no artifact is without a project", () => {
+    expect(showsLoose(nothing)).toBe(false);
+  });
+
+  it("should show the artifacts without a project when there are some, listed or older than the list holds", () => {
+    expect(showsLoose({ ...nothing, shown: 2 })).toBe(true);
+    expect(showsLoose({ ...nothing, more: true })).toBe(true);
+  });
+
+  it("should give a dragged card somewhere to leave its project, and the filter a way out, when nothing is listed", () => {
+    expect(showsLoose({ ...nothing, dragging: true })).toBe(true);
+    expect(showsLoose({ ...nothing, filterOn: true })).toBe(true);
   });
 });
 

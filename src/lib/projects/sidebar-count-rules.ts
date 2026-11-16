@@ -24,7 +24,7 @@ export interface SidebarNarrowing {
   kind: string;
   view: WorkspaceView;
   tags: readonly string[];
-  /** True while the URL's project filter is on (a project, or Unfiled). */
+  /** True while the URL's project filter is on (a project, or "No project"). */
   project: boolean;
 }
 
@@ -65,23 +65,36 @@ export interface GroupCount {
 }
 
 /**
- * One project's (or Unfiled's) count. While the tree is narrowed it is the
- * matches listed; otherwise the server's count, and never less than the rows
- * listed (an artifact made or moved since the page loaded).
+ * The count of one project, or of the artifacts without a project. While
+ * the tree is narrowed it is the matches listed; otherwise the server's
+ * count, and never less than the rows listed (an artifact made or moved
+ * since the page loaded).
  */
 export function groupCount(narrowed: boolean, scopeCount: number, shown: number): GroupCount {
   return { count: narrowed ? shown : Math.max(scopeCount, shown), shown };
 }
 
 /**
- * Unfiled's count over the whole scope: every artifact no project entry
- * holds, so it counts the artifacts the tree lists under Unfiled, including
- * those whose project has no entry here.
+ * How many artifacts in the whole scope are in no project of the tree:
+ * every artifact no project entry holds, so it counts the artifacts the
+ * sidebar lists loose after the projects, including those whose project
+ * has no entry here.
  */
-export function unfiledCount(total: number, entryCounts: readonly number[]): number {
+export function looseCount(total: number, entryCounts: readonly number[]): number {
   let filed = 0;
   for (const count of entryCounts) filed += count;
   return Math.max(0, total - filed);
+}
+
+/**
+ * Whether the sidebar shows the artifacts in no project, after the
+ * projects. Only when there is something to show or do there: artifacts, a
+ * row saying there are more, a card being dragged (it takes the card out of
+ * its project), or its own filter to clear. With none of these it is not
+ * there at all: having no project is not a place of its own.
+ */
+export function showsLoose(options: { shown: number; more: boolean; dragging: boolean; filterOn: boolean }): boolean {
+  return options.shown > 0 || options.more || options.dragging || options.filterOn;
 }
 
 /** What the row under a group says when it lists fewer artifacts than its count. */

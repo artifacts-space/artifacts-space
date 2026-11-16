@@ -58,7 +58,7 @@ export function viewCounts(items: readonly ViewItem[], viewerId: string): ViewCo
   return { all: items.length, shared, public: shown };
 }
 
-/** One group in the project tree: a project's key, or null for Unfiled, with the artifacts shown under it. */
+/** One group in the sidebar: a project's key with the artifacts shown under it, or null for the artifacts in no project. */
 export interface TreeGroup<T> {
   key: string | null;
   items: T[];
@@ -66,21 +66,22 @@ export interface TreeGroup<T> {
 
 /**
  * Groups the shown artifacts under the project entries, in the entries'
- * order, then Unfiled last. `keyOf` gives an artifact's project key, or null
- * for none. An artifact whose project has no entry (a project the viewer
- * cannot manage here) is listed under Unfiled, so it is never lost.
+ * order, then those in no project last (key null). `keyOf` gives an
+ * artifact's project key, or null for none. An artifact whose project has no
+ * entry (a project the viewer cannot use here) is listed with those in no
+ * project, so it is never lost.
  */
 export function groupByProject<T>(items: readonly T[], entryKeys: readonly string[], keyOf: (item: T) => string | null): TreeGroup<T>[] {
   const known = new Set(entryKeys);
   const byKey = new Map<string, T[]>(entryKeys.map((key) => [key, []]));
-  const unfiled: T[] = [];
+  const loose: T[] = [];
   for (const item of items) {
     const key = keyOf(item);
     const bucket = key !== null && known.has(key) ? byKey.get(key) : undefined;
     if (bucket) bucket.push(item);
-    else unfiled.push(item);
+    else loose.push(item);
   }
-  return [...entryKeys.map((key) => ({ key, items: byKey.get(key) ?? [] })), { key: null, items: unfiled }];
+  return [...entryKeys.map((key) => ({ key, items: byKey.get(key) ?? [] })), { key: null, items: loose }];
 }
 
 /** How many dot colours there are: the `--series-*` tokens. */

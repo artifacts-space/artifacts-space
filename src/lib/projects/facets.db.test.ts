@@ -4,8 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /*
  * The sidebar's counts against a real Postgres: the facets count every
- * artifact in a scope, Unfiled holds exactly what no usable project holds
- * (so its count and the Unfiled filter's rows agree), and Shared with me
+ * artifact in a scope, "no project" holds exactly what no usable project
+ * holds (so its count and the No project filter's rows agree), and Shared with me
  * and Public are counted in the database, not over the newest 100. Runs only
  * when TEST_DATABASE_URL names a throwaway local database with the
  * migrations applied; never point it at a shared one.
@@ -62,7 +62,7 @@ describe.runIf(Boolean(databaseUrl))("project facets with a database", async () 
       row("filed", { userId: viewer, projectId: id("own"), visibility: "public" }),
       row("loose-1", { userId: viewer }),
       row("loose-2", { userId: viewer }),
-      // A project the viewer cannot use in their own list: it counts as Unfiled there.
+      // A project the viewer cannot use in their own list: it counts as no project there.
       row("elsewhere", { userId: viewer, projectId: id("theirs") }),
       row("crew-note", { userId: other, teamId: crew, visibility: "team" }),
     ]);
@@ -76,13 +76,13 @@ describe.runIf(Boolean(databaseUrl))("project facets with a database", async () 
     await db.delete(user).where(inArray(user.id, [viewer, other]));
   });
 
-  it("should count Unfiled as every artifact no usable project holds, matching the Unfiled filter's rows", async () => {
+  it("should count as no project every artifact no usable project holds, matching the No project filter's rows", async () => {
     const facets = await listProjectFacets(viewer, { kind: "mine" });
     expect(facets.total).toBe(4);
     expect(facets.projects).toEqual([expect.objectContaining({ key: "own", count: 1 })]);
     expect(facets.none).toBe(3);
-    const unfiled = await listArtifacts(viewer, { project: { none: true } });
-    expect(unfiled.map((item) => item.id).sort()).toEqual([id("elsewhere"), id("loose-1"), id("loose-2")].sort());
+    const loose = await listArtifacts(viewer, { project: { none: true } });
+    expect(loose.map((item) => item.id).sort()).toEqual([id("elsewhere"), id("loose-1"), id("loose-2")].sort());
   });
 
   it("should count Public in the database, and nothing as shared on the viewer's own list", async () => {
