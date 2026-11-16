@@ -38,7 +38,7 @@ export function useDashboardProjects({ artifacts, setArtifacts, rows, facets, ap
   const canDrag = useMediaQuery("(pointer: fine)");
   const shared = useMemo(() => teams.filter((team) => !team.personal).map(({ slug, name }) => ({ slug, name })), [teams]);
   const homeOf = (artifact: Movable) => homeSpaceOf(artifact, teams, viewerId);
-  const projects = useSidebarProjects({ rows, facets, api, teams: shared, setArtifacts, homeOf });
+  const projects = useSidebarProjects({ rows, facets, api, list: scopeTeam ? "team" : "mine", teams: shared, setArtifacts, homeOf });
   const dragged = draggingId ? artifacts.find((item) => item.id === draggingId) : undefined;
   // While a card is dragged, projects in another space are shown as closed to it.
   const blockedKeys = new Set(dragged ? projects.entries.filter((entry) => "refusal" in projects.targetFor(dragged, entry)).map((entry) => entry.key) : []);
@@ -61,5 +61,5 @@ export function useDashboardProjects({ artifacts, setArtifacts, rows, facets, ap
     onDragChange: setDraggingId,
   };
 
-  return { projects, moves, dragging: draggingId !== null, blockedKeys, shared, filterBy, dropped };
+  return { projects, moves, dragging: draggingId !== null, blockedKeys, filterBy, dropped };
 }

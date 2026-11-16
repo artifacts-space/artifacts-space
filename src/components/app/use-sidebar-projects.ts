@@ -14,6 +14,7 @@ import {
   sidebarProjects,
   type HomeSpace,
   type MoveTarget,
+  type SidebarList,
   type SidebarProject,
   type SidebarProjectRow,
   type SidebarProjectsState,
@@ -29,6 +30,8 @@ interface SidebarProjectsOptions {
   rows: SidebarProjectRow[];
   facets: ProjectFacets;
   api: ProjectsApi;
+  /** Which list the sidebar is for: on Mine, a team's empty projects are left out. */
+  list: SidebarList;
   /** The viewer's shared teams, to name a project created for one. */
   teams: readonly SidebarTeam[];
   setArtifacts: SetArtifacts;
@@ -72,14 +75,14 @@ function moveMessage(title: string, to: ArtifactProjectDto | null, from: Artifac
  * Undo when they land. Fresh server data (after any project change) replaces
  * the local state.
  */
-export function useSidebarProjects({ rows, facets, api, teams, setArtifacts, homeOf }: SidebarProjectsOptions) {
+export function useSidebarProjects({ rows, facets, api, list, teams, setArtifacts, homeOf }: SidebarProjectsOptions) {
   const [source, setSource] = useState({ rows, facets });
   const [state, setState] = useState(() => initialState(rows, facets));
   if (source.rows !== rows || source.facets !== facets) {
     setSource({ rows, facets });
     setState(initialState(rows, facets));
   }
-  const entries = useMemo(() => sidebarProjects(state.rows, state.counts), [state]);
+  const entries = useMemo(() => sidebarProjects(state.rows, state.counts, list), [state, list]);
 
   async function apply(artifact: Pick<ArtifactListItemDto, "id" | "title">, from: ArtifactProjectDto | null, move: Move) {
     const shift = (a: ArtifactProjectDto | null, b: ArtifactProjectDto | null) => {

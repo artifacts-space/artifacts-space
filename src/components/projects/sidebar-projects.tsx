@@ -7,10 +7,9 @@ import type { ArtifactListState } from "@/components/app/artifact-list-state";
 import { TreeArtifact, type CardMoves } from "@/components/app/tree-artifact";
 import type { SidebarProjectsControls } from "@/components/app/use-sidebar-projects";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ArtifactListItemDto } from "@/lib/artifact-types";
 import { projectNameKey, type ProjectFilter } from "@/lib/projects/rules";
-import { deleteProjectCopy, projectKeyOf, type SidebarProject, type SidebarProjectRow, type SidebarTeam } from "@/lib/projects/sidebar-rules";
+import { deleteProjectCopy, projectKeyOf, type SidebarList, type SidebarProject, type SidebarProjectRow, type SidebarTeam } from "@/lib/projects/sidebar-rules";
 import { groupCount, moreRow, unfiledCount, type GroupCount } from "@/lib/projects/sidebar-count-rules";
 import type { TreeGroup } from "@/lib/projects/sidebar-view-rules";
 
@@ -21,10 +20,8 @@ interface SidebarProjectsProps {
   controls: SidebarProjectsControls;
   filter: ProjectFilter | null;
   onFilter: (filter: ProjectFilter | null) => void;
-  /** The team tab's team, or null on Mine. New projects go to it. */
+  /** The team tab's team, or null on Mine. A new project is the team's there, and the viewer's own on Mine. */
   scopeTeam: SidebarTeam | null;
-  /** On Mine, the shared teams a new project can be for. */
-  teams: readonly SidebarTeam[];
   /** True while an artifact card is being dragged. */
   dragging: boolean;
   /** Entries the dragged card may not go into: they live in another space. */
@@ -44,37 +41,21 @@ interface SidebarProjectsProps {
   onClearFilters: () => void;
 }
 
-/** The "Only me" choice. Team slugs never hold an underscore, so it cannot name a team. */
-const ONLY_ME = "__me";
-
-/** Who a new project is for, on Mine: the viewer (ONLY_ME) or a shared team's slug. */
-function ScopeSelect({ teams, value, onChange }: { teams: readonly SidebarTeam[]; value: string; onChange: (value: string) => void }) {
-  if (teams.length === 0) return null;
-  const label = (slug: string) => teams.find((team) => team.slug === slug)?.name ?? "Only me";
-  return (
-    <Select value={value} onValueChange={(next: string | null) => { onChange(next ?? ONLY_ME); }}>
-      <SelectTrigger size="sm" aria-label="Who the project is for" className="mt-1 h-7 w-full border-0 bg-transparent px-1.5 text-sm text-muted-foreground shadow-none">
-        <SelectValue>{(slug: string) => `For ${label(slug)}`}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={ONLY_ME}>Only me</SelectItem>
-        {teams.map((team) => <SelectItem key={team.slug} value={team.slug}>{team.name}</SelectItem>)}
-      </SelectContent>
-    </Select>
-  );
-}
-
-function CreateForm({ controls, scopeTeam, teams, onDone }: Pick<SidebarProjectsProps, "controls" | "scopeTeam" | "teams"> & { onDone: () => void }) {
-  const [forSlug, setForSlug] = useState(ONLY_ME);
+/**
+ * The form for a new project. It belongs to the list it is made in: the
+ * team's on a team tab, the viewer's own on Mine. A team's project is made
+ * on the team's tab, since Mine does not list a team's empty projects.
+ */
+function CreateForm({ controls, scopeTeam, onDone }: Pick<SidebarProjectsProps, "controls" | "scopeTeam"> & { onDone: () => void }) {
   async function submit(name: string) {
-    const result = await controls.create(name, scopeTeam?.slug ?? (forSlug === ONLY_ME ? null : forSlug));
+    const result = await controls.create(name, scopeTeam?.slug ?? null);
     if (!result.success) return result.error;
     onDone();
     return null;
   }
   return (
     <InlineNameForm label="New project name" submitLabel="Create project" onSubmit={submit} onCancel={onDone}>
-      {scopeTeam ? <p className="mt-1 px-1.5 text-xs text-muted-foreground">Everyone in {scopeTeam.name} can use it.</p> : <ScopeSelect teams={teams} value={forSlug} onChange={setForSlug} />}
+      {scopeTeam ? <p className="mt-1 px-1.5 text-xs text-muted-foreground">Everyone in {scopeTeam.name} can use it.</p> : null}
     </InlineNameForm>
   );
 }
@@ -115,7 +96,8 @@ function selectedIn(artifact: ArtifactListItemDto | undefined, known: ReadonlySe
 }
 
 type TreeProps = Pick<SidebarProjectsProps, "controls" | "filter" | "onFilter" | "onDropArtifact" | "blockedKeys" | "groups" | "narrowed" | "total" | "selectedId" | "onSelect" | "moves"> & {
-  namesTeams: boolean;
+  /** Which list this is: Mine never renames or deletes a team's project. */
+  list: SidebarList;
   closed: ReadonlySet<string>;
   onToggle: (key: string) => void;
 };
@@ -160,7 +142,7 @@ function GroupItems({ id, label, items, open, more, onShowAll, selectedId, onSel
 }
 
 /** Every project with its artifacts, then Unfiled, with rename in place and delete behind a confirm. */
-function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, namesTeams, groups, narrowed, total, selectedId, onSelect, moves, closed, onToggle }: TreeProps) {
+function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, list, groups, narrowed, total, selectedId, onSelect, moves, closed, onToggle }: TreeProps) {
   const baseId = useId();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<{ row: SidebarProjectRow; count: number | null } | null>(null);
@@ -212,7 +194,7 @@ function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, 
             project={{ ...project, count: count.count }}
             active={active}
             blocked={blockedKeys.has(project.key)}
-            namesTeams={namesTeams}
+            list={list}
             disclosure={open}
             onFilter={() => { onFilter(active ? null : { key: project.key }); }}
             onDropArtifact={(id) => { onDropArtifact(id, project); }}
@@ -278,14 +260,15 @@ function TreeNotice({ state, onClearFilters }: { state: ArtifactListState; onCle
 }
 
 /**
- * The sidebar's project tree: every project the viewer may use here, with
+ * The sidebar's project tree: every project of this list (on Mine, the
+ * viewer's own, and a team's only while it holds one of their artifacts), with
  * its count and the artifacts it holds, then Unfiled. Click a project's
  * chevron to show or hide its artifacts, and its name to show only it (the
  * filter follows). Drop an artifact on a project to move it, or use the
  * artifact's menu; create, rename, or delete projects in place. Deleting
  * keeps the artifacts; they just become unfiled.
  */
-export function SidebarProjects({ dragging, scopeTeam, teams, listState, onClearFilters, ...tree }: SidebarProjectsProps) {
+export function SidebarProjects({ dragging, scopeTeam, listState, onClearFilters, ...tree }: SidebarProjectsProps) {
   const [creating, setCreating] = useState(false);
   const known = new Set(tree.controls.entries.map((entry) => entry.key));
   const selected = tree.selectedId === null ? undefined : tree.groups.flatMap((group) => group.items).find((item) => item.id === tree.selectedId);
@@ -303,8 +286,8 @@ export function SidebarProjects({ dragging, scopeTeam, teams, listState, onClear
         onFoldAll={() => { setClosed(allClosed ? new Set() : new Set(allKeys)); }}
         onCreate={() => { setCreating(true); }}
       />
-      {creating ? <CreateForm controls={tree.controls} scopeTeam={scopeTeam} teams={teams} onDone={() => { setCreating(false); }} /> : null}
-      <ProjectTree {...tree} namesTeams={scopeTeam === null} closed={closed} onToggle={toggle} />
+      {creating ? <CreateForm controls={tree.controls} scopeTeam={scopeTeam} onDone={() => { setCreating(false); }} /> : null}
+      <ProjectTree {...tree} list={scopeTeam === null ? "mine" : "team"} closed={closed} onToggle={toggle} />
       {tree.controls.entries.length === 0 && !creating ? <p className="px-2 pt-1 text-xs text-muted-foreground">Create a project, then move artifacts into it.</p> : null}
       <TreeNotice state={listState} onClearFilters={onClearFilters} />
     </section>

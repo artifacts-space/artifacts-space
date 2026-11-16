@@ -3,17 +3,21 @@ import { expect, test } from "./support/test";
 
 /**
  * The project tree in the workspace sidebar, on /dev/workspace: the real
- * workspace with projects kept in memory. "Design" holds two artifacts,
- * "Research" one, the team project "Launch" none, and "Locked note" refuses
- * every move, as an artifact the viewer cannot edit would. Everything else
- * is Unfiled.
+ * workspace with projects kept in memory. "Design" holds two artifacts and
+ * "Research" one. Acme's project "Launch" holds "Note 30", which the viewer
+ * shared with Acme; Acme's project "Handbook" holds nothing of the viewer's,
+ * so their own list never shows it. "Locked note" refuses every move, as an
+ * artifact the viewer cannot edit would. Everything else is Unfiled.
  */
 
 const projects = (page: Page) => page.getByRole("region", { name: "Projects" });
 const entryName = (name: string) => new RegExp(`^${name}, \\d+ artifacts?$`);
 const entry = (page: Page, name: string) => projects(page).getByRole("button", { name: entryName(name) });
+/** A team's project in the viewer's own list: its row names the team it is shared with. */
+const teamEntryName = (name: string, team: string) => new RegExp(`^${name}, shared with ${team}, \\d+ artifacts?$`);
+const teamEntry = (page: Page, name: string, team: string) => projects(page).getByRole("button", { name: teamEntryName(name, team) });
 /** A group's row: the drop target, holding the disclosure, the name, and the menu. */
-const entryRow = (page: Page, name: string) => projects(page).locator("[data-slot=project-row]").filter({ has: page.getByRole("button", { name: entryName(name) }) });
+const entryRow = (page: Page, name: string, label = entryName(name)) => projects(page).locator("[data-slot=project-row]").filter({ has: page.getByRole("button", { name: label }) });
 const group = (page: Page, name: string) => projects(page).getByRole("group", { name, exact: true });
 const card = (page: Page, title: string) =>
   page.locator("[data-slot=artifact-list] li").filter({ has: page.getByText(title, { exact: true }) });
@@ -46,7 +50,7 @@ test.describe("desktop", () => {
     await openWorkspace(page);
     await expect(entry(page, "Design")).toHaveText(/Design\s*2/);
     await expect(entry(page, "Research")).toHaveText(/Research\s*1/);
-    await expect(entry(page, "Launch")).toHaveText(/Launch\s*0/);
+    await expect(teamEntry(page, "Launch", "Acme")).toHaveText(/Launch\s*Acme\s*1/);
     await expect(entry(page, "Unfiled")).toBeVisible();
     await expect(group(page, "Design").locator("li")).toHaveCount(2);
     await expectIn(page, "Long csv fixture", "Research");
@@ -79,9 +83,6 @@ test.describe("desktop", () => {
     await show.focus();
     await page.keyboard.press("Enter");
     await expect(group(page, "Design").locator("li")).toHaveCount(2);
-
-    // Launch is empty: it has nothing to show or hide.
-    await expect(projects(page).getByRole("button", { name: /artifacts in Launch$/ })).toHaveCount(0);
 
     await projects(page).getByRole("button", { name: "Close every project" }).click();
     await expect(group(page, "Research").locator("li")).toHaveCount(0);
@@ -127,6 +128,8 @@ test.describe("desktop", () => {
     await dragCard(page, csv, entry(page, "Unfiled"));
     await expectIn(page, "Long csv fixture", "Unfiled");
     await expect(entry(page, "Research")).toHaveText(/Research\s*0/);
+    // Research is the viewer's own, so it stays when it is empty; it has nothing to show or hide.
+    await expect(projects(page).getByRole("button", { name: /artifacts in Research$/ })).toHaveCount(0);
     await expect(page.getByText("Took “Long csv fixture” out of Research.")).toBeVisible();
   });
 
@@ -143,13 +146,14 @@ test.describe("desktop", () => {
     await openWorkspace(page);
     // A note near the top of Unfiled, so Launch stays in view while it is dragged.
     const note = card(page, "Note 3");
-    await dragCard(page, note, entry(page, "Launch"), async () => {
-      await expect(entryRow(page, "Launch")).toHaveAttribute("data-drop-target", "blocked");
+    const launch = teamEntryName("Launch", "Acme");
+    await dragCard(page, note, teamEntry(page, "Launch", "Acme"), async () => {
+      await expect(entryRow(page, "Launch", launch)).toHaveAttribute("data-drop-target", "blocked");
     });
     await expect(page.getByText("Share it with Acme first to put it in Launch.")).toBeVisible();
     await expectIn(page, "Note 3", "Unfiled");
-    await expect(entry(page, "Launch")).toHaveText(/Launch\s*0/);
-    await expect(entry(page, "Unfiled")).toHaveText(/Unfiled\s*37/);
+    await expect(teamEntry(page, "Launch", "Acme")).toHaveText(/Launch\s*Acme\s*1/);
+    await expect(entry(page, "Unfiled")).toHaveText(/Unfiled\s*36/);
   });
 
   test("should show a team project as closed in the row menu, with the same hint, when the artifact is private", async ({ page }) => {
@@ -207,11 +211,43 @@ test.describe("desktop", () => {
     await expectIn(page, "Note 4", "Unfiled");
   });
 
-  test("should label a team project with its team in the project's menu", async ({ page }) => {
+  test("should offer only a name for a new project in the viewer's own list, never a team to make it for", async ({ page }) => {
     await openWorkspace(page);
-    await projects(page).getByRole("button", { name: "Options for Launch" }).click();
-    await expect(page.getByRole("menu")).toContainText("Acme");
+    await projects(page).getByRole("button", { name: "New project" }).click();
+    await expect(page.getByRole("textbox", { name: "New project name" })).toBeVisible();
+    await expect(projects(page).getByRole("combobox")).toHaveCount(0);
   });
+});
+
+/*
+ * The viewer's own list is theirs. A team's project shows there only while
+ * it holds one of their artifacts, it says which team it is shared with, and
+ * it is never renamed or deleted from there.
+ */
+test("should leave a team's project out of the viewer's own list when it holds none of their artifacts", async ({ page }) => {
+  await openWorkspace(page);
+  await expect(teamEntry(page, "Launch", "Acme")).toBeVisible();
+  await expect(projects(page).getByRole("button", { name: /^Handbook/ })).toHaveCount(0);
+  await expect(projects(page).getByRole("group", { name: "Handbook" })).toHaveCount(0);
+});
+
+test("should name the team beside a team's project and offer no rename or delete for it", async ({ page }) => {
+  await openWorkspace(page);
+  await expect(teamEntry(page, "Launch", "Acme")).toBeVisible();
+  await expect(entryRow(page, "Launch", teamEntryName("Launch", "Acme")).locator("[data-slot=project-team]")).toHaveText("Acme");
+  await expectIn(page, "Note 30", "Launch");
+  // The viewer's own projects keep their menu; the team's has none here.
+  await expect(projects(page).getByRole("button", { name: "Options for Design" })).toHaveCount(1);
+  await expect(projects(page).getByRole("button", { name: "Options for Launch" })).toHaveCount(0);
+});
+
+test("should take a team's project off the viewer's own list when their last artifact leaves it", async ({ page }) => {
+  await openWorkspace(page);
+  const shared = card(page, "Note 30");
+  await shared.getByRole("button", { name: "Move to project" }).click();
+  await page.getByRole("menuitem", { name: "Unfiled" }).click();
+  await expectIn(page, "Note 30", "Unfiled");
+  await expect(projects(page).getByRole("button", { name: /^Launch/ })).toHaveCount(0);
 });
 
 test.describe("phone", () => {

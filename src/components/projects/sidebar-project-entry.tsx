@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { scopeLabel, type SidebarProject, type SidebarProjectRow } from "@/lib/projects/sidebar-rules";
+import { manageableRows, scopeLabel, sharedWithTeams, type SidebarList, type SidebarProject, type SidebarProjectRow } from "@/lib/projects/sidebar-rules";
 import { cn } from "@/lib/utils";
 
 import { carriesArtifact, droppedArtifactId } from "./artifact-drag";
@@ -84,6 +84,8 @@ interface DropRowProps {
   /** True while the dragged card belongs to another space: the drop is refused with a hint. */
   blocked?: boolean;
   label: string;
+  /** The teams a team's project is shared with, said after its name on Mine; null for the viewer's own and on a team tab. */
+  sharedWith?: string | null;
   icon: React.ReactNode;
   count: number;
   active: boolean;
@@ -92,6 +94,12 @@ interface DropRowProps {
   onDropArtifact: (artifactId: string) => void;
   /** The row's menu. */
   children?: React.ReactNode;
+}
+
+/** The row's accessible name: the project, the teams it is shared with when it is a team's, and its count. */
+function rowLabel(label: string, sharedWith: string | null, count: number): string {
+  const artifacts = `${String(count)} ${count === 1 ? "artifact" : "artifacts"}`;
+  return sharedWith ? `${label}, shared with ${sharedWith}, ${artifacts}` : `${label}, ${artifacts}`;
 }
 
 /** The row's look: dimmed when the dragged card may not go in, ringed while it is over the row. */
@@ -109,7 +117,7 @@ function dropRowClass(over: boolean, blocked: boolean): string {
  * filters the list to the group when clicked, and its count. It takes
  * dropped artifacts.
  */
-export function DropRow({ blocked = false, label, icon, count, active, disclosure, onFilter, onDropArtifact, children }: DropRowProps) {
+export function DropRow({ blocked = false, label, sharedWith = null, icon, count, active, disclosure, onFilter, onDropArtifact, children }: DropRowProps) {
   const { over, handlers } = useDropTarget(onDropArtifact);
   return (
     <div
@@ -122,7 +130,7 @@ export function DropRow({ blocked = false, label, icon, count, active, disclosur
       <button
         type="button"
         aria-pressed={active}
-        aria-label={`${label}, ${String(count)} ${count === 1 ? "artifact" : "artifacts"}`}
+        aria-label={rowLabel(label, sharedWith, count)}
         title={active ? "Show every project" : `Show only ${label}`}
         onClick={onFilter}
         className={cn(
@@ -132,6 +140,7 @@ export function DropRow({ blocked = false, label, icon, count, active, disclosur
       >
         {icon}
         <span className="min-w-0 flex-1 truncate">{label}</span>
+        {sharedWith ? <span data-slot="project-team" title={`Shared with ${sharedWith}. Rename or delete it in that team's workspace.`} className="max-w-[45%] shrink-0 truncate text-xs text-muted-foreground">{sharedWith}</span> : null}
         {/* A space between the name and the count, so the visible text reads "Design 2", as the label begins. */}
         {" "}
         <span className={cn("shrink-0 text-xs text-muted-foreground tabular-nums", children ? "pr-6 pointer-coarse:pr-11" : "pr-1.5")}>{count}</span>
@@ -148,15 +157,15 @@ export function NoProjectRow(props: Omit<DropRowProps, "label" | "icon" | "child
 
 interface EntryMenuProps {
   project: SidebarProject;
-  /** True on Mine: team projects then say which team they belong to. */
-  namesTeams: boolean;
+  /** The rows this list may rename or delete (manageableRows): never a team's on Mine. */
+  rows: readonly SidebarProjectRow[];
   onRename: (row: SidebarProjectRow) => void;
   onDelete: (row: SidebarProjectRow) => void;
 }
 
-/** Rename and Delete for each row behind an entry. A name shared by several scopes lists each one. */
-function EntryMenu({ project, namesTeams, onRename, onDelete }: EntryMenuProps) {
-  const labelled = project.rows.length > 1 || (namesTeams && project.rows.some((row) => row.team !== null));
+/** Rename and Delete for each row of an entry this list may change. When the name is also a team's, the row says whose it is. */
+function EntryMenu({ project, rows, onRename, onDelete }: EntryMenuProps) {
+  const labelled = project.rows.length > 1;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -167,7 +176,7 @@ function EntryMenu({ project, namesTeams, onRename, onDelete }: EntryMenuProps) 
         <IconDots aria-hidden className="size-3.5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-auto min-w-44">
-        {project.rows.map((row, index) => (
+        {rows.map((row, index) => (
           <DropdownMenuGroup key={row.id}>
             {index > 0 ? <DropdownMenuSeparator /> : null}
             {labelled ? <DropdownMenuLabel>{scopeLabel(row.team)}</DropdownMenuLabel> : null}
@@ -180,8 +189,10 @@ function EntryMenu({ project, namesTeams, onRename, onDelete }: EntryMenuProps) 
   );
 }
 
-interface ProjectEntryProps extends Omit<EntryMenuProps, "project"> {
+interface ProjectEntryProps extends Omit<EntryMenuProps, "project" | "rows"> {
   project: SidebarProject;
+  /** Which list this is: on Mine a team's project names its team and has no menu. */
+  list: SidebarList;
   active: boolean;
   blocked: boolean;
   disclosure: Disclosure;
@@ -189,11 +200,16 @@ interface ProjectEntryProps extends Omit<EntryMenuProps, "project"> {
   onDropArtifact: (artifactId: string) => void;
 }
 
-/** One project in the project tree: disclosure, filter, drop target, and its menu. */
-export function ProjectEntry({ project, active, blocked, disclosure, onFilter, onDropArtifact, ...menu }: ProjectEntryProps) {
+/**
+ * One project in the project tree: disclosure, filter, drop target, and its
+ * menu. On Mine a team's project says which team it is shared with and has
+ * no menu: it is renamed or deleted in that team's workspace.
+ */
+export function ProjectEntry({ project, list, active, blocked, disclosure, onFilter, onDropArtifact, ...menu }: ProjectEntryProps) {
+  const rows = manageableRows(project, list);
   return (
-    <DropRow blocked={blocked} label={project.name} icon={<ProjectMark name={project.name} icon={project.icon} />} count={project.count} active={active} disclosure={disclosure} onFilter={onFilter} onDropArtifact={onDropArtifact}>
-      <EntryMenu project={project} {...menu} />
+    <DropRow blocked={blocked} label={project.name} sharedWith={sharedWithTeams(project, list)} icon={<ProjectMark name={project.name} icon={project.icon} />} count={project.count} active={active} disclosure={disclosure} onFilter={onFilter} onDropArtifact={onDropArtifact}>
+      {rows.length > 0 ? <EntryMenu project={project} rows={rows} {...menu} /> : null}
     </DropRow>
   );
 }

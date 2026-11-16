@@ -76,7 +76,6 @@ export function WorkspaceSidebar({ sidebarRef, listRef, ...props }: WorkspaceSid
           filter={props.projectFilter}
           onFilter={sidebar.filterBy}
           scopeTeam={props.scopeTeam}
-          teams={sidebar.shared}
           dragging={sidebar.dragging}
           blockedKeys={sidebar.blockedKeys}
           onDropArtifact={sidebar.dropped}

@@ -7,9 +7,13 @@ import type { SidebarProjectRow } from "@/lib/projects/sidebar-rules";
 
 /**
  * Development only: projects for the /dev/workspace fixture, kept in
- * memory, with a stand-in for the project server actions. Every fixture
- * artifact is private, so like the server it refuses team projects.
- * "Locked note" refuses every move, so tests can see a move roll back.
+ * memory, with a stand-in for the project server actions. The viewer's
+ * artifacts are private but one (SHARED_WITH_ACME_ID, in the team project
+ * "Launch"), so like the server it refuses to move them into a team's
+ * project. The rows hold more than the server would send for the viewer's
+ * own list: "Handbook" is a team's empty project, which that list never
+ * shows (sidebarProjects). "Locked note" refuses every move, so tests can
+ * see a move roll back.
  */
 
 /** The fixture's projects and which project each artifact is in. */
@@ -22,15 +26,25 @@ export const LOCKED_TITLE = "Locked note";
 
 const acme = { slug: "acme", name: "Acme" };
 
-/** Two of the viewer's projects, one team project, and three artifacts filed in them. */
+/** The team the fixture's team projects belong to, as an artifact names it. */
+export const ACME_TEAM_ID = "fixture-acme";
+/** "Note 30": the viewer's artifact shared with Acme, in Acme's project "Launch". */
+export const SHARED_WITH_ACME_ID = "fixture-note-29";
+
+/**
+ * Two of the viewer's projects with three artifacts in them, and two of
+ * Acme's: "Launch" holds the artifact the viewer shared with Acme, and
+ * "Handbook" holds nothing of theirs.
+ */
 export function initialFixtureProjects(): FixtureProjectsState {
   return {
     rows: [
       { id: "project-design", name: "Design", icon: null, team: null },
       { id: "project-research", name: "Research", icon: "🔬", team: null },
       { id: "project-launch", name: "Launch", icon: null, team: acme },
+      { id: "project-handbook", name: "Handbook", icon: null, team: acme },
     ],
-    links: { "fixture-ui": "project-design", "fixture-markdown": "project-design", "fixture-csv": "project-research" },
+    links: { "fixture-ui": "project-design", "fixture-markdown": "project-design", "fixture-csv": "project-research", [SHARED_WITH_ACME_ID]: "project-launch" },
   };
 }
 

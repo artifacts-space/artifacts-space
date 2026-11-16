@@ -17,7 +17,7 @@ import { matchesProjectFilter } from "@/lib/projects/sidebar-rules";
 
 import { fixtureArtifact, longCsv, longJson, longMarkdown, longUi } from "./fixture-content";
 import { fixtureNewArtifactApi, storedFixtureArtifacts } from "./fixture-new-artifacts";
-import { createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, withProjects } from "./fixture-projects";
+import { ACME_TEAM_ID, createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, SHARED_WITH_ACME_ID, withProjects } from "./fixture-projects";
 import { useFixtureControls } from "./fixture-controls";
 import { fixtureFeedbackSend } from "./feedback-fixture";
 import { fixtureNotifications, LINK_ONLY_PUBLIC_ID } from "./notification-fixture";
@@ -66,7 +66,9 @@ function fixtureArtifacts(many: boolean): ArtifactDto[] {
   // Note 2 keeps comments on for its author, so links can open a thread (e2e/artifact-link.spec.ts).
   // Note 9 uses the Ocean theme, so the preview shows it in its theme (e2e/app-preview-theme.spec.ts).
   // Note 3 was made with Claude Code, so its card and byline show the harness (e2e/agent-harness.spec.ts).
+  // Note 30 is shared with Acme, in Acme's project "Launch": the one team project the viewer's own list shows (e2e/sidebar-projects.spec.ts).
   const all = [...long, ...short.map((note, index): ArtifactDto => {
+    if (note.id === SHARED_WITH_ACME_ID) return { ...note, visibility: "team", teamId: ACME_TEAM_ID };
     if (index === 1) return { ...note, comments: "team" };
     if (index === 2) return { ...note, harness: { id: "claude-code", stamped: "claude-code", overridden: false } };
     if (index === 8) return { ...note, theme: "ocean", kind: "markdown", content: "# Ocean notes\n\nThe preview wears this artifact's theme." };
