@@ -63,7 +63,7 @@ function detectSvg(text: string): Detection | null {
 /** A full HTML page (it starts with `<!doctype html>`), named by its own `<title>`. A fragment stays what it was: Markdown, with its markup as text. */
 function detectHtml(text: string): Detection | null {
   if (!looksLikeHtmlPage(text)) return null;
-  return { kind: "html", language: "", content: text, title: htmlTitle(text) || null, reason: "html" };
+  return { kind: "html", language: "", content: text, title: htmlTitle(text).slice(0, 160).trim() || null, reason: "html" };
 }
 
 /** A valid canvas with at least one frame; an object that only happens to have an empty `frames` list stays JSON. */

@@ -56,12 +56,16 @@ const headEnd = /<\/head\b[^>]*(?:>|$)/i;
 const titleTag = /<title\b[^>]*(?:>|$)/i;
 const titleEnd = /<\/title\b/i;
 
-/** Where the body's content starts: after `<body …>`, or after the head when the page has no body tag, else 0. */
+/**
+ * Where the body's content starts: after the `<body …>` that follows the head, or after the head when no body tag
+ * follows it; in a page without a head end, after its first body tag, else 0. A `<body` written inside the head
+ * (in a script's text, a comment) is not the body.
+ */
 function bodyStart(content: string): number {
-  const body = bodyTag.exec(content);
-  if (body) return body.index + body[0].length;
   const end = headEnd.exec(content);
-  return end ? end.index + end[0].length : 0;
+  const afterHead = end ? end.index + end[0].length : 0;
+  const body = bodyTag.exec(afterHead > 0 ? content.slice(afterHead) : content);
+  return body ? afterHead + body.index + body[0].length : afterHead;
 }
 
 /** How much text after `<title>` is read as the title. */
@@ -74,9 +78,9 @@ const titleChars = 1_000;
  */
 export function htmlText(content: string): string {
   // The head goes first, then the budget: a page with a large inline stylesheet still gives its words.
-  const start = bodyStart(content);
+  const from = bodyStart(content);
   const text = content
-    .slice(start, start + scanChars)
+    .slice(from, from + scanChars)
     .replace(/<!--[\s\S]*?(--!?>|$)/g, " ")
     .replace(/<(script|style|template|noscript|svg|head)\b[\s\S]*?(<\/\1\b[^>]*(?:>|$)|$)/gi, " ")
     .replace(/<[^>]*(>|$)/g, " ");

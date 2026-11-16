@@ -59,6 +59,11 @@ describe("a full page pasted into an empty artifact", () => {
     expect(detectTextKind(`\n  ${page}`)).toMatchObject({ kind: "html" });
   });
 
+  it("should shorten a title longer than an artifact's title may be", () => {
+    const long = `<!doctype html><html><head><title>${"Launch ".repeat(60)}</title></head><body></body></html>`;
+    expect(detectTextKind(long).title?.length).toBeLessThanOrEqual(160);
+  });
+
   it("should leave a fragment and prose that mentions a doctype as Markdown", () => {
     expect(detectTextKind("<h1>Launch plan</h1>\n<p>Ship on Friday.</p>").kind).toBe("markdown");
     expect(detectTextKind("Start every page with <!doctype html> so it draws in standards mode.").kind).toBe("markdown");

@@ -79,6 +79,12 @@ describe("reading a page with a large head", () => {
     expect(htmlText(`<!doctype html><head>${style}</head><p>No body tag</p>`)).toBe("No body tag");
   });
 
+  it("should not take a body tag written inside the head for the body", () => {
+    const tricky = '<!doctype html><html><head><script>const tpl = "<body class=card>secret()";</script><!-- <body> --></head><body><p>Real words</p></body></html>';
+    expect(htmlText(tricky)).toBe("Real words");
+    expect(htmlText('<!doctype html><head><script>const a = "<body>x";</script></head><p>No body tag</p>')).toBe("No body tag");
+  });
+
   it("should never take a title from the body", () => {
     expect(htmlTitle("<!doctype html><head></head><body><svg><title>Chart</title></svg></body>")).toBe("");
   });
