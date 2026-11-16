@@ -1,7 +1,7 @@
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { validateCanvas } from "@/lib/canvas/validate";
 import { detectDelimiter, parseCsv } from "@/lib/csv";
-import { looksLikeHtmlPage } from "@/lib/html/rules";
+import { htmlTitle, looksLikeHtmlPage } from "@/lib/html/rules";
 import { checkMermaidSource, mermaidDiagramType } from "@/lib/mermaid-source";
 import { checkSvg } from "@/lib/svg";
 import { validateUiSpec } from "@/lib/ui/validate";
@@ -15,7 +15,7 @@ import { validateUiSpec } from "@/lib/ui/validate";
  */
 
 /** Why a format was chosen, for tests and for the chip that names it. */
-export type DetectReason = "empty" | "prose" | "heading" | "svg" | "json" | "ui" | "canvas" | "fence" | "shebang" | "mermaid" | "csv" | "extension";
+export type DetectReason = "empty" | "prose" | "heading" | "svg" | "html" | "json" | "ui" | "canvas" | "fence" | "shebang" | "mermaid" | "csv" | "extension";
 
 export interface Detection {
   kind: ArtifactKind;
@@ -58,6 +58,12 @@ function detectSvg(text: string): Detection | null {
   const start = afterPrologue(text);
   if (!svgRoot.test(text.slice(start, start + 5))) return null;
   return checkSvg(text).ok ? { kind: "svg", language: "", content: text, title: null, reason: "svg" } : null;
+}
+
+/** A full HTML page (it starts with `<!doctype html>`), named by its own `<title>`. A fragment stays what it was: Markdown, with its markup as text. */
+function detectHtml(text: string): Detection | null {
+  if (!looksLikeHtmlPage(text)) return null;
+  return { kind: "html", language: "", content: text, title: htmlTitle(text) || null, reason: "html" };
 }
 
 /** A valid canvas with at least one frame; an object that only happens to have an empty `frames` list stays JSON. */
@@ -255,7 +261,7 @@ function afterBom(text: string): number {
 }
 
 /** Detectors in order: the most specific signals first. CSV is last, since shape is the weakest signal. */
-const detectors: readonly ((text: string) => Detection | null)[] = [detectSvg, detectFence, detectJson, detectShebang, detectMermaid, detectCsv];
+const detectors: readonly ((text: string) => Detection | null)[] = [detectSvg, detectHtml, detectFence, detectJson, detectShebang, detectMermaid, detectCsv];
 
 /**
  * The format of text pasted or dropped into an empty new artifact. Plain

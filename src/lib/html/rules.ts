@@ -23,7 +23,7 @@ function start(content: string): string {
  */
 export function htmlProblem(content: string): string | null {
   if (doctype.test(start(content))) return null;
-  return "An HTML artifact is a full page: it must start with <!doctype html>, followed by <html>, <head>, and <body>.";
+  return "An HTML artifact is a full page: it must start with <!doctype html>.";
 }
 
 /** Whether text reads as a full HTML page, for a pasted or uploaded file. */
@@ -43,8 +43,29 @@ function decodeEntities(text: string): string {
   });
 }
 
-/** How much of the source the text readers scan: a link preview needs a few hundred characters, never a megabyte. */
+/** How much of the page's body the text reader scans: a link preview needs a few hundred characters, never a megabyte. */
 const scanChars = 60_000;
+
+/*
+ * Anyone can save a page, and these readers run for link previews, so every pattern here does one pass however the
+ * source is written: a tag pattern ends at `>` or at the end of the text, so a tag that never closes is found once,
+ * not tried again from each place it could start.
+ */
+const bodyTag = /<body\b[^>]*(?:>|$)/i;
+const headEnd = /<\/head\b[^>]*(?:>|$)/i;
+const titleTag = /<title\b[^>]*(?:>|$)/i;
+const titleEnd = /<\/title\b/i;
+
+/** Where the body's content starts: after `<body …>`, or after the head when the page has no body tag, else 0. */
+function bodyStart(content: string): number {
+  const body = bodyTag.exec(content);
+  if (body) return body.index + body[0].length;
+  const end = headEnd.exec(content);
+  return end ? end.index + end[0].length : 0;
+}
+
+/** How much text after `<title>` is read as the title. */
+const titleChars = 1_000;
 
 /**
  * The words a reader would see on the page, roughly: the source without
@@ -52,11 +73,12 @@ const scanChars = 60_000;
  * excerpt and for search, never for display as HTML.
  */
 export function htmlText(content: string): string {
-  const source = content.slice(0, scanChars);
-  const body = source.replace(/^[\s\S]*?<body\b[^>]*>/i, "");
-  const text = body
+  // The head goes first, then the budget: a page with a large inline stylesheet still gives its words.
+  const start = bodyStart(content);
+  const text = content
+    .slice(start, start + scanChars)
     .replace(/<!--[\s\S]*?(--!?>|$)/g, " ")
-    .replace(/<(script|style|template|noscript|svg|head)\b[\s\S]*?(<\/\1\b[^>]*>|$)/gi, " ")
+    .replace(/<(script|style|template|noscript|svg|head)\b[\s\S]*?(<\/\1\b[^>]*(?:>|$)|$)/gi, " ")
     .replace(/<[^>]*(>|$)/g, " ");
   return decodeEntities(text).replace(/\s+/g, " ").trim();
 }
@@ -70,10 +92,15 @@ export function showsAuthorNote(view: { kind: ArtifactKind; canEdit: boolean; vi
   return view.kind === "html" && !view.canEdit && isReportable(view.visibility);
 }
 
-/** The page's own <title>, or "" when it has none. */
+/** The page's own <title>, or "" when it has none. Read from the whole head: a title can sit after a large inline stylesheet. */
 export function htmlTitle(content: string): string {
-  const match = /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i.exec(content.slice(0, scanChars));
-  return match ? decodeEntities(match[1] ?? "").replace(/\s+/g, " ").trim() : "";
+  const head = content.slice(0, bodyStart(content) || content.length);
+  const open = titleTag.exec(head);
+  if (!open) return "";
+  const from = open.index + open[0].length;
+  const rest = head.slice(from, from + titleChars);
+  const end = rest.search(titleEnd);
+  return decodeEntities(end === -1 ? rest : rest.slice(0, end)).replace(/\s+/g, " ").trim();
 }
 
 /** What a new HTML artifact starts with in the editor: a small, complete page. */

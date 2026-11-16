@@ -61,3 +61,46 @@ describe("showsAuthorNote", () => {
     expect(showsAuthorNote({ kind: "markdown", canEdit: false, visibility: "public" })).toBe(false);
   });
 });
+
+describe("reading a page with a large head", () => {
+  const style = `<style>${".a{color:red}".repeat(8_000)}</style>`;
+  const page = `<!doctype html><html><head>${style}<title>Quarterly review</title></head><body><h1>Revenue grew</h1></body></html>`;
+
+  it("should still give the page's words when an inline stylesheet is longer than the scan budget", () => {
+    expect(style.length).toBeGreaterThan(60_000);
+    expect(htmlText(page)).toBe("Revenue grew");
+  });
+
+  it("should still find a title that sits after the stylesheet", () => {
+    expect(htmlTitle(page)).toBe("Quarterly review");
+  });
+
+  it("should read the words of a page without a body tag, after its head", () => {
+    expect(htmlText(`<!doctype html><head>${style}</head><p>No body tag</p>`)).toBe("No body tag");
+  });
+
+  it("should never take a title from the body", () => {
+    expect(htmlTitle("<!doctype html><head></head><body><svg><title>Chart</title></svg></body>")).toBe("");
+  });
+});
+
+describe("reading a page written to be slow", () => {
+  const within = (run: () => unknown) => {
+    const started = performance.now();
+    run();
+    return performance.now() - started;
+  };
+
+  it.each([
+    ["a body tag that never closes, a million characters of it", "<body".repeat(200_000)],
+    ["a title tag that never closes", "<title".repeat(160_000)],
+    ["a head end that never closes", "</head".repeat(160_000)],
+    ["a comment that never closes", `<body>${"<!--".repeat(250_000)}`],
+    ["a script that never closes", `<body>${"<script>".repeat(120_000)}`],
+    ["a script whose end tag never closes", `<body><script>${"</script".repeat(120_000)}`],
+    ["tags that never close", `<body>${"<p".repeat(400_000)}`],
+  ])("should read %s in one pass", (_name, body) => {
+    const page = `<!doctype html>${body}`;
+    expect(within(() => { htmlText(page); htmlTitle(page); })).toBeLessThan(500);
+  });
+});

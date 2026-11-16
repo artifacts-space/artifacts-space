@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { contentForSwitch, formatSwitchProblem } from "@/components/app/artifact-editor/format-choice-rules";
 import { validateArtifactContent } from "@/lib/artifact-content";
-import { detectFileText, filePlan } from "@/lib/create/detect-kind-rules";
+import { detectFileText, detectTextKind, filePlan } from "@/lib/create/detect-kind-rules";
 import { contentToMarkdown } from "@/lib/markdown/artifact-markdown";
 import { artifactDescription } from "@/lib/og/description";
 import { buildSynopsis } from "@/lib/og/synopsis";
@@ -50,6 +50,23 @@ describe("a dropped .html file", () => {
     const plan = filePlan("partial.html");
     if (!plan.read) throw new Error("an .html file is read as text");
     expect(detectFileText("partial.html", "<div>{{ name }}</div>", plan)).toMatchObject({ kind: "code", language: "html" });
+  });
+});
+
+describe("a full page pasted into an empty artifact", () => {
+  it("should become an HTML artifact named by its own title", () => {
+    expect(detectTextKind(page)).toMatchObject({ kind: "html", content: page, title: "Launch", reason: "html" });
+    expect(detectTextKind(`\n  ${page}`)).toMatchObject({ kind: "html" });
+  });
+
+  it("should leave a fragment and prose that mentions a doctype as Markdown", () => {
+    expect(detectTextKind("<h1>Launch plan</h1>\n<p>Ship on Friday.</p>").kind).toBe("markdown");
+    expect(detectTextKind("Start every page with <!doctype html> so it draws in standards mode.").kind).toBe("markdown");
+  });
+
+  it("should still read an SVG with a doctype as an SVG", () => {
+    const svg = '<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>';
+    expect(detectTextKind(svg).kind).toBe("svg");
   });
 });
 
