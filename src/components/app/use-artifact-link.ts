@@ -88,8 +88,9 @@ function pinned(artifacts: ArtifactListItemDto[], item: ArtifactListItemDto): Ar
  * Links and Back are told apart by nothing but the URL (an entry Back
  * reaches never holds comment params), since React can draw Next's
  * traversal before the browser's `popstate` reaches any listener of ours.
- * The `popstate` listener only catches a traversal Next drew in the same
- * pass as the pick before it, which leaves the search unchanged.
+ * The entry listener only catches a new entry (a link, Back) that Next drew
+ * in the same pass as the workspace's own writes before it, which leaves
+ * the search unchanged.
  * `opened` is the last artifact a link or Back opened, for its comments and
  * to bring it into view.
  *
@@ -203,22 +204,30 @@ export function useArtifactLink({ initialArtifacts, target = null, failed = fals
     if (now !== written.current) follow(now);
   }, [search, target, failed]);
 
-  // Back pressed before Next drew a pick's entry: Next draws both in one pass, so the search it hands React never
-  // changes and the effect above never runs. After the traversal has had its turn, the address bar is checked here.
-  const settleTraversal = useEffectEvent(() => {
+  // Next can draw the workspace's own writes late, in one pass with the next entry: a link chosen again (the same
+  // notification twice) or Back right after a pick. The search React sees then never changes and the effect above
+  // never runs, so each new entry (a push or a traversal, never a replace) is checked here once it has had its turn.
+  const settleEntry = useEffectEvent(() => {
     const now = window.location.search;
     if (written.current !== null && now !== written.current) follow(now);
   });
   useEffect(() => {
     let pending: ReturnType<typeof setTimeout> | undefined;
-    const onTraversal = () => {
+    const settle = () => {
       clearTimeout(pending);
-      pending = setTimeout(settleTraversal, 0);
+      pending = setTimeout(settleEntry, 0);
     };
-    window.addEventListener("popstate", onTraversal);
+    const onEntry = (event: NavigationCurrentEntryChangeEvent) => {
+      if (event.navigationType === "push" || event.navigationType === "traverse") settle();
+    };
+    // Browsers without the Navigation API still report Back and Forward.
+    const navigation = "navigation" in window ? window.navigation : null;
+    navigation?.addEventListener("currententrychange", onEntry);
+    window.addEventListener("popstate", settle);
     return () => {
       clearTimeout(pending);
-      window.removeEventListener("popstate", onTraversal);
+      navigation?.removeEventListener("currententrychange", onEntry);
+      window.removeEventListener("popstate", settle);
     };
   }, []);
 

@@ -70,6 +70,28 @@ test("should open the same artifact again when the same notification is chosen t
   await expect(editor(page, "Long markdown fixture")).toBeVisible();
 });
 
+test("should open the comments again when the same notification is chosen twice on a slow CPU", async ({ page }) => {
+  // A slow CPU makes Next draw the workspace's own address writes late, in one pass with the second link, whose
+  // address then equals the first link's: nothing React sees changes, and only the new history entry says so.
+  test.slow();
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
+  const drawn = { timeout: 15_000 };
+  await page.goto("/dev/workspace");
+  await chooseNotification(page, "mentioned you on Long markdown fixture");
+  await expect(commentsHeading(page, "Long markdown fixture")).toBeVisible(drawn);
+  await page.keyboard.press("Escape");
+  await page.locator('[data-slot="artifact-list"]').getByRole("button", { name: /Long ui fixture/ }).click();
+  await expect(editor(page, "Long ui fixture")).toBeVisible(drawn);
+
+  await chooseNotification(page, "mentioned you on Long markdown fixture");
+  await expect(commentsHeading(page, "Long markdown fixture")).toBeVisible(drawn);
+  await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspace000md$/, drawn);
+  await page.keyboard.press("Escape");
+  await expect(selectedCard(page)).toContainText("Long markdown fixture");
+  expect(await linksHandled(page), "each link is acted on once").toBe(2);
+});
+
 test("should pin an artifact outside the list to the top of its group and open it when its notification is chosen", async ({ page }) => {
   await page.goto("/dev/workspace");
   await expect(editor(page, "Long ui fixture")).toBeVisible();
