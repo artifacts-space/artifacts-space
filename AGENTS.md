@@ -1380,6 +1380,29 @@ verified attribution: any client can name itself "Claude Code", and the
 byline's tooltip says so. Readers see the harness name and icon, never
 OAuth client ids or raw client names.
 
+### Where new visual work goes
+
+Decided by the owner on 16 Nov 2026: a new mockup, prototype, dashboard, or
+report is an HTML artifact (kind `html`, a full web page that runs in the
+page sandbox). The interface (`ui`) and canvas formats are kept for the
+artifacts that use them and get no new work:
+
+- Agents are pointed at `html` for visual work (`artifacts_create` in
+  `src/lib/mcp/routing-copy.ts`), and the `ui` and canvas format
+  descriptions and guides open by saying so (`newVisualWork`,
+  `earlierFormatNote` in `src/lib/artifact-formats.ts`). Keep one wording,
+  from those two constants.
+- Nothing saved is deleted or converted. Existing interface and canvas
+  artifacts keep drawing, their tools keep working, and their bugs,
+  contrast failures, and security faults are still fixed.
+- Do not add a component to the interface component set, a section
+  template, or a feature to the canvas board built on that set. Section
+  templates and their two MCP tools are retired once HTML starting points
+  exist; canvas frames become HTML frames on the same board.
+- Live updates of an open canvas beyond catching up when the tab comes back
+  (a stream, Follow, pictures after an agent's save) are paused until HTML
+  pages have a runtime.
+
 ### Section templates
 
 Section templates are ready-made pieces of a website or app screen (a

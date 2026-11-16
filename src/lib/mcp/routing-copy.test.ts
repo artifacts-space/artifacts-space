@@ -73,14 +73,19 @@ describe("artifactToolCopy", () => {
     expect(description).toMatch(/version history/);
   });
 
-  it("should say when to choose a canvas and to read its guide first when an agent is asked for a mockup", () => {
+  it("should send visual and interactive work to an HTML page, and to its guide first, when an agent is asked for a mockup or a dashboard", () => {
     const { description } = artifactToolCopy.artifacts_create;
-    expect(description).toMatch(/mockup of a website or of app screens, set kind "canvas"/);
-    expect(description).toMatch(/read artifacts_formats_guide with kind "canvas" first/);
+    expect(description).toMatch(/a mockup of a website or of app screens, a prototype, a dashboard, a report with charts\), set kind "html"/);
+    expect(description).toMatch(/read artifacts_formats_guide with kind "html" first/);
   });
 
-  it("should point at the frame tools where it mentions canvases, so an agent changes one screen without resending the board", () => {
-    expect(artifactToolCopy.artifacts_create.description).toMatch(/change one screen later with canvas_frame_save/);
+  it("should no longer point new work at the canvas or interface formats when an agent creates an artifact", () => {
+    const { description } = artifactToolCopy.artifacts_create;
+    expect(description).not.toMatch(/kind "canvas"/);
+    expect(description).not.toMatch(/kind "ui"/);
+  });
+
+  it("should still point at the frame tools for a canvas that exists, so an agent changes one screen without resending the board", () => {
     expect(artifactToolCopy.artifacts_update.description).toMatch(/To change one frame of a canvas, use canvas_frame_save, canvas_frame_update, or canvas_frame_delete/);
   });
 

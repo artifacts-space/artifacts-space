@@ -46,6 +46,9 @@ export default function JsonRenderPage() {
   const page = "json-render" as const;
   return (
     <RegistryPage slug={page}>
+      <Note title="An earlier format">
+        For a new mockup, prototype, dashboard, or report, write an <Link href={docsHref("formats", "html")} className="underline underline-offset-2">HTML page</Link>: a full web page that looks and behaves as you wrote it. The <code>ui</code> and <code>canvas</code> formats on these pages are kept for the artifacts that use them, and still work as described here.
+      </Note>
       <DocsH page={page} id="how" />
       <Prose>
         <p>
@@ -120,7 +123,7 @@ export default function JsonRenderPage() {
       <DocsH page={page} id="canvas" />
       <Prose>
         <p>
-          A <code>canvas</code> artifact is a board of frames for mocking up websites and app screens. Each frame is one screen at a width you choose, and its <code>spec</code> is a ui spec, so every component and rule on these pages works inside a frame. Readers drag to move the board, zoom in to read a frame, and open the board full screen to give it the whole window; on a phone the frames stack in the page, each scaled to fit. No HTML or CSS is involved, and each frame keeps its own state.
+          A <code>canvas</code> artifact is a board of frames that show screens of websites and apps. Each frame is one screen at a width you choose, and its <code>spec</code> is a ui spec, so every component and rule on these pages works inside a frame. Readers drag to move the board, zoom in to read a frame, and open the board full screen to give it the whole window; on a phone the frames stack in the page, each scaled to fit. No HTML or CSS is involved, and each frame keeps its own state.
         </p>
       </Prose>
       <FactTable

@@ -71,7 +71,7 @@ export default function FormatsPage() {
     <RegistryPage slug={page}>
       <DocsH page={page} id="overview" />
       <Prose>
-        <p>Every artifact has one <code>kind</code>. It decides how the content is checked when it is saved and how the page shows it. Pick the simplest kind that fits: Markdown for prose, <code>ui</code> when the reader needs a dashboard or a report, <code>canvas</code> for mockups of screens, <code>file</code> for anything uploaded.</p>
+        <p>Every artifact has one <code>kind</code>. It decides how the content is checked when it is saved and how the page shows it. Pick the simplest kind that fits: Markdown for prose, <code>html</code> for anything visual or interactive (a mockup, a prototype, a dashboard, a report with charts), <code>file</code> for anything uploaded. The <code>ui</code> and <code>canvas</code> kinds are earlier formats, kept for the artifacts that use them.</p>
       </Prose>
       <FactTable
         head={["kind", "Name", "For"]}

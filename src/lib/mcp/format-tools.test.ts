@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { earlierFormatNote, formatInfo, newVisualWork } from "@/lib/artifact-formats";
 import { artifactKinds } from "@/lib/artifact-types";
 import { exampleCanvas } from "@/lib/canvas/fixtures";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
@@ -57,8 +58,40 @@ describe("formatGuide for canvas", () => {
     expect(guide).toContain('artifacts_formats_guide with kind "ui"');
   });
 
-  it("should point agents at the canvas guide from the overview", () => {
-    expect(formatGuide()).toContain('call it with kind "canvas"');
+  it("should point agents at the canvas guide from the overview, for a canvas that exists", () => {
+    expect(formatGuide()).toContain('to read or change one, call it with kind "ui" or kind "canvas"');
+  });
+});
+
+describe("where the format guide sends new visual work", () => {
+  it("should send it to an HTML page in the overview, before it names the earlier formats", () => {
+    const guide = formatGuide();
+    const html = guide.indexOf('call artifacts_formats_guide with kind "html"');
+    expect(html).toBeGreaterThan(-1);
+    expect(guide.indexOf("The ui and canvas formats are earlier formats")).toBeGreaterThan(html);
+    expect(guide).not.toContain("For rich pages built from our components");
+  });
+
+  it("should say so in the ui and canvas kinds, in one wording", () => {
+    for (const kind of ["ui", "canvas"] as const) {
+      expect(formatInfo[kind].agent, kind).toContain(newVisualWork);
+      expect(formatInfo[kind].agent, kind).toMatch(/^An earlier format, kept for artifacts that already use it/);
+      expect(formatInfo[kind].helper, kind).toMatch(/^An earlier format: .*choose HTML\.$/);
+    }
+    expect(newVisualWork).toContain('prefer kind "html"');
+  });
+
+  it("should open the ui and canvas guides with the same note", () => {
+    for (const kind of ["ui", "canvas"] as const) {
+      const guide = formatGuide(kind);
+      expect(guide.indexOf(earlierFormatNote), kind).toBeGreaterThan(-1);
+      expect(guide.indexOf(earlierFormatNote), kind).toBeLessThan(guide.indexOf("## Rules"));
+    }
+  });
+
+  it("should not call html an earlier format", () => {
+    expect(formatInfo.html.agent).not.toMatch(/earlier format/);
+    expect(formatGuide("html")).not.toContain(earlierFormatNote);
   });
 });
 
