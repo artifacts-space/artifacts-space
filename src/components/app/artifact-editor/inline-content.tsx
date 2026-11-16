@@ -88,7 +88,7 @@ function SourceFrame({ place, above, children }: { place: Placement; above?: Rea
   );
 }
 
-/** Set by a press of Edit source or Hide source, so the button that takes its place takes the focus too. */
+/** Set by a press of Edit source or Hide source, so what takes the pressed button's place takes the focus too. */
 type FocusHandoff = RefObject<boolean>;
 
 interface SourceSwitchProps {
@@ -134,7 +134,12 @@ function sourcePadding(surface: InlineSurface, underSwitch: boolean): string {
   return underSwitch ? "px-6 pt-3 pb-6 sm:pb-8" : "px-6 py-6 sm:py-8";
 }
 
-/** Where Hide source sits: over the card on the page, and at the top of the column in /app, with the room a rendered view has above it. */
+/**
+ * Where Hide source sits: over the card on the page (the `mb-3` Edit source
+ * has), and at the top of the column in /app, with the room a rendered view
+ * has above it (ContentFrame's `py-5 sm:py-8`), so the two buttons share one
+ * place. e2e/source-view.spec.ts measures both.
+ */
 function switchPlace(surface: InlineSurface): string {
   return surface === "pane" ? "px-6 pt-5 sm:pt-8" : "mb-3";
 }
@@ -166,11 +171,46 @@ interface InlineContentProps {
   onHideSource?: (() => void) | undefined;
 }
 
-/** The handoff for one content area. A press that no button answered (the source opened from a document's own control) is forgotten, so it never moves the focus later. */
-function useFocusHandoff(sourceOpen: boolean): FocusHandoff {
+/** A field a person types into: a document, a sheet's cell, a block's text. */
+const editableField = '[contenteditable="true"], textarea, input';
+
+/**
+ * Puts the focus in the content's first field: now, or when the field
+ * arrives (an editor draws after its code has loaded), and only while the
+ * focus is still nowhere, so it never takes the focus from where a person
+ * has since put it. Returns how to stop waiting.
+ */
+function focusFirstField(content: Element | null | undefined): (() => void) | undefined {
+  if (!content) return undefined;
+  const settle = (): boolean => {
+    const field = content.querySelector<HTMLElement>(editableField);
+    if (!field) return false;
+    if (document.activeElement === document.body) field.focus({ preventScroll: true });
+    return true;
+  };
+  if (settle()) return undefined;
+  const observer = new MutationObserver(() => { if (settle()) observer.disconnect(); });
+  observer.observe(content, { childList: true, subtree: true, attributes: true, attributeFilter: ["contenteditable"] });
+  return () => { observer.disconnect(); };
+}
+
+/**
+ * The handoff for one content area, and the mark the content is drawn after.
+ * A switch that arrives takes the focus in its own effect, which runs before
+ * this one. When none arrives (Hide source over a document, a sheet, or an
+ * interface's blocks, which have no Edit source), the content's first field
+ * takes it, so the focus does not fall to the page. A view with neither a
+ * switch nor a field leaves the focus where the browser puts it.
+ */
+function useFocusHandoff(sourceOpen: boolean): { handoff: FocusHandoff; markRef: RefObject<HTMLSpanElement | null> } {
   const handoffRef = useRef(false);
-  useEffect(() => { handoffRef.current = false; }, [sourceOpen]);
-  return handoffRef;
+  const markRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!handoffRef.current) return undefined;
+    handoffRef.current = false;
+    return focusFirstField(markRef.current?.nextElementSibling);
+  }, [sourceOpen]);
+  return { handoff: handoffRef, markRef };
 }
 
 /** The way back from the source, where there is one: code is its own source, with no other view to go back to. */
@@ -232,11 +272,10 @@ function DocumentContent({ kind, content, revision, place, onChange, onShowSourc
   return <ContentFrame place={place}>{kind === "markdown" ? <InlineCommentSurface>{document}</InlineCommentSurface> : document}</ContentFrame>;
 }
 
-/** See the notes at the top of this file. */
-export function InlineContent(props: InlineContentProps) {
+/** The content in its frame: the source, or the format's own view. */
+function Content({ handoff, ...props }: InlineContentProps & { handoff: FocusHandoff }) {
   const { kind, content, title, files, revision, sourceOpen, surface = "pane", fullWidth = false, theme = null, onChange, onShowSource, onHideSource } = props;
   const place: Placement = { surface, fullWidth, theme };
-  const handoff = useFocusHandoff(sourceOpen);
   const hide = hideFor(kind, handoff, onHideSource);
   if (sourceOpen) return <SourceEditor kind={kind} content={content} label="Artifact source" place={place} onChange={onChange} hide={hide} />;
   if (kind === "code") return <SourceEditor kind={kind} content={content} label="Artifact content" place={place} onChange={onChange} />;
@@ -256,4 +295,16 @@ export function InlineContent(props: InlineContentProps) {
     );
   }
   return <RenderedWithSource kind={kind} content={content} language={props.language} title={title} files={files} place={place} handoff={handoff} onShowSource={onShowSource} />;
+}
+
+/** See the notes at the top of this file. */
+export function InlineContent(props: InlineContentProps) {
+  const { handoff, markRef } = useFocusHandoff(props.sourceOpen);
+  return (
+    <>
+      {/* Marks where the content starts, so the handoff can find its first field. It takes no room. */}
+      <span ref={markRef} hidden />
+      <Content {...props} handoff={handoff} />
+    </>
+  );
 }

@@ -48,29 +48,38 @@ test("should put Hide source where Edit source was, and bring the canvas back wi
   await expect(editSource(page), "focus comes back to Edit source").toBeFocused();
 });
 
-test("should offer Hide source above a document's source too, and leave the focus alone when a menu opened it", async ({ page }) => {
+test("should offer Hide source above a document's source too, and put the focus in the document when it closes", async ({ page }) => {
   await page.goto("/dev/editor?kind=markdown");
   await expect(page.getByRole("banner").getByRole("button", { name: "More actions" })).toBeEnabled();
   await viewSourceFromMenu(page);
   await expect(hideSource(page)).toBeVisible();
   await expect(hideSource(page), "a menu press is not a press of the switch").not.toBeFocused();
-  await hideSource(page).click();
+  await hideSource(page).focus();
+  await page.keyboard.press("Enter");
   await expect(source(page)).toHaveCount(0);
-  await expect(page.getByRole("textbox", { name: "Artifact content" })).toBeVisible();
+  // A document has no Edit source button to take the focus, so the document itself does.
+  await expect(page.getByRole("textbox", { name: "Artifact content" })).toBeFocused();
 });
 
-test("should offer Hide source above the source in the /app pane", async ({ page, isMobile }) => {
+test("should put Hide source where Edit source was in the /app pane, above the source", async ({ page, isMobile }) => {
   test.skip(isMobile, "the pane's layout is checked on a desktop window");
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/dev/workspace");
-  await expect(page.getByRole("region", { name: "Content" })).toBeVisible();
-  await expect(page.getByText("Checkout v2 rollout").first()).toBeVisible();
-  await viewSourceFromMenu(page);
+  await page.goto("/dev/workspace?artifact=fixtureworkspace0json");
+  const editor = page.getByRole("region", { name: "Edit Long json fixture" });
+  const before = await corner(editor.getByRole("button", { name: "Edit source" }));
+  await editor.getByRole("button", { name: "Edit source" }).click();
+  await expect(source(page)).toBeVisible();
+
+  const after = await corner(hideSource(page));
+  expect(Math.abs(after.right - before.right), "Hide source ends where Edit source ended").toBeLessThanOrEqual(1);
+  expect(Math.abs(after.top - before.top), "Hide source sits at the height Edit source had").toBeLessThanOrEqual(1);
+  await expect(hideSource(page)).toBeFocused();
   const field = await source(page).boundingBox();
   const button = await hideSource(page).boundingBox();
   if (!field || !button) throw new Error("the source or its button is not on the page");
   expect(button.y + button.height, "the button sits above the source").toBeLessThanOrEqual(field.y + 1);
-  expect(button.x + button.width, "the button ends inside the source's column").toBeLessThanOrEqual(field.x + field.width + 0.5);
-  await hideSource(page).click();
+
+  await page.keyboard.press("Enter");
   await expect(source(page)).toHaveCount(0);
+  await expect(editor.getByRole("button", { name: "Edit source" })).toBeFocused();
 });
