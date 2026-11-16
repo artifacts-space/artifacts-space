@@ -148,7 +148,8 @@ jobs:
   # whole gallery page, about 20 seconds a test on a runner. Those specs now
   # open the gallery with only the groups or specimens they read
   # (`openGallery` in e2e/support/gallery.ts, `?show=`), and the two shards
-  # took AFTER_SLOW_SHARDS, the rest AFTER_OTHER_SHARDS (PR AFTER_PR). Only
+  # took 6 and 9 minutes, the rest 5 to 12 (PR #193); the slowest, at 11.5,
+  # holds the new-artifact specs, not the gallery. Only
   # gallery.spec.ts and a11y-contrast.spec.ts draw the whole page; a new spec
   # that reads the gallery uses `openGallery`. Playwright splits whole files
   # in order, balanced by the number of tests that are not skipped (128 to
