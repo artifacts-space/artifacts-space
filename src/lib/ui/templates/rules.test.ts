@@ -204,6 +204,44 @@ describe("templateProblems", () => {
     });
   });
 
+  describe("a brand mark in the state outside any list", () => {
+    const withProfile = (profile: unknown, drawer?: TemplateElement): UiTemplate => {
+      const base = withElements(drawer ? { profile: drawer } : {}, drawer ? ["title", "points", "profile"] : ["title", "points"]);
+      return { ...base, fragment: { ...base.fragment, state: { ...base.fragment.state, profile } } };
+    };
+    const readsState = (type: string, extra: Record<string, unknown> = {}): TemplateElement => ({ type, props: { label: { $state: "/profile/label" }, icon: { $state: "/profile/icon" }, ...extra } });
+
+    it("should accept a Button or a Link that reads the mark from its path in state", () => {
+      expect(templateProblems(withProfile({ icon: "brand-github", label: "GitHub" }, readsState("Button", { iconOnly: true })), "heroes")).toEqual([]);
+      expect(templateProblems(withProfile({ icon: "brand-github", label: "GitHub" }, readsState("Link")), "heroes")).toEqual([]);
+    });
+
+    it("should check the label of the item when a Button reads the mark from its path in state", () => {
+      expect(problemsOf(withProfile({ icon: "brand-github", label: "Our code" }, readsState("Button", { iconOnly: true })))).toMatch(/the state at \/profile\/icon \(Our code\), drawn by element "profile": the label "Our code" does not name GitHub/);
+    });
+
+    it("should name an Icon that reads the mark from its path in state", () => {
+      expect(problemsOf(withProfile({ icon: "brand-github", label: "GitHub" }, { type: "Icon", props: { name: { $state: "/profile/icon" } } }))).toMatch(/the state at \/profile\/icon \(GitHub\), drawn by element "profile" \(Icon\): brand-github is a brand mark/);
+    });
+
+    it("should name the path of a mark that no element reads", () => {
+      expect(problemsOf(withProfile({ icon: "brand-github", label: "GitHub" }))).toMatch(/the state at \/profile\/icon \(GitHub\): brand-github is in the state outside any list, but no element reads it with \{ "\$state": "\/profile\/icon" \}/);
+    });
+
+    it("should name the path of a mark at the root of the state when no element reads it", () => {
+      const base = withElements({});
+      const rooted: UiTemplate = { ...base, fragment: { ...base.fragment, state: { ...base.fragment.state, icon: "brand-github" } } };
+      expect(problemsOf(rooted)).toMatch(/the state at \/icon: brand-github is in the state outside any list/);
+    });
+  });
+
+  it("should name the element that carries the repeat when it reads the item's mark itself", () => {
+    const carrier: TemplateElement = { type: "Button", props: { label: { $item: "label" }, icon: { $item: "icon" }, iconOnly: true }, repeat: { statePath: "/channels" } };
+    const base = withElements({ channels: carrier }, ["title", "points", "channels"]);
+    const template: UiTemplate = { ...base, fragment: { ...base.fragment, state: { ...base.fragment.state, channels: [{ icon: "brand-youtube", label: "YouTube" }] } } };
+    expect(problemsOf(template)).toMatch(/brand-youtube is in the state, but element "channels" reads it with \{ "\$item": "icon" \} and carries the repeat over \/channels itself\. A repeat draws its children once per item/);
+  });
+
   it("should name a validateForm action that names no statePath", () => {
     expect(problemsOf(withElements({ go: { type: "Button", props: { label: "Go" }, on: { press: { action: "validateForm" } } } }, ["title", "points", "go"]))).toMatch(/validateForm must name its `statePath`/);
   });
