@@ -31,6 +31,7 @@ describe.runIf(Boolean(databaseUrl))("frame captures with a database", async () 
   const { getDb } = await import("@/db");
   const { frameCapture } = await import("@/db/frame-capture-schema");
   const { artifact, artifactFile, rateLimitBucket, user } = await import("@/db/schema");
+  const { rateLimits } = await import("@/lib/abuse/limits");
   const { jpegStart, pngStart, webpStart } = await import("@/test/fake-capture-bucket");
   const { captureGeometry, captureLimits, captureObjectKey, partBox } = await import("./capture-rules");
   const { capturesNeeded, finishCapture, startCapture } = await import("./captures");
@@ -348,6 +349,27 @@ describe.runIf(Boolean(databaseUrl))("frame captures with a database", async () 
       expect(bucket.objects.size).toBe(0);
       // A second try finds nothing to finish.
       await expect(finishCapture(users.ada, captureId)).rejects.toThrow("Frame image not found.");
+    });
+
+    it("should count every finish call toward the person's limit, and refuse past it before reading storage", async () => {
+      const { captureId } = await startedHome();
+      upload(captureId, 1440, 600, [9000]);
+      const before = { ada: await counted("frameCaptureFinish", users.ada), bo: await counted("frameCaptureFinish", users.bo) };
+      // Someone else's call counts for them, and finds nothing to finish.
+      await expect(finishCapture(users.bo, captureId)).rejects.toThrow("Frame image not found.");
+      expect(await counted("frameCaptureFinish", users.bo)).toBe(before.bo + 1);
+      expect(await counted("frameCaptureFinish", users.ada)).toBe(before.ada);
+      // At the limit, the call is refused before the capture or its parts are read.
+      await getDb().update(rateLimitBucket).set({ count: rateLimits.frameCaptureFinish.limit }).where(eq(rateLimitBucket.key, `frameCaptureFinish:${users.ada}`));
+      await finishCapture(users.ada, randomUUID()).catch(() => undefined);
+      await getDb().update(rateLimitBucket).set({ count: rateLimits.frameCaptureFinish.limit }).where(eq(rateLimitBucket.key, `frameCaptureFinish:${users.ada}`));
+      const asked = bucket.heads.length;
+      await expect(finishCapture(users.ada, captureId)).rejects.toThrow("finished a lot of frame images");
+      expect(bucket.heads.length).toBe(asked);
+      expect((await captureById(captureId))?.status).toBe("pending");
+      await getDb().delete(rateLimitBucket).where(eq(rateLimitBucket.key, `frameCaptureFinish:${users.ada}`));
+      expect(await finishCapture(users.ada, captureId)).toEqual({ current: true });
+      expect(await counted("frameCaptureFinish", users.ada)).toBe(1);
     });
 
     it("should say a part is empty, not too large, when it holds no bytes", async () => {

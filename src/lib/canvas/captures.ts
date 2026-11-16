@@ -271,13 +271,16 @@ async function refuseAndRemove(row: FrameCaptureRecord, reason: string, now: Dat
  * content. Only the person who started it can finish it, and only while
  * they may still edit the canvas and the content is still on the board. A
  * capture that fails a check (a missing part, a wrong type, a wrong pixel
- * size, a wrong byte size) is removed. Returns `current: false` when the
+ * size, a wrong byte size) is removed. Finish calls are rate limited per
+ * person, since each one reads the capture's parts from storage. Returns `current: false` when the
  * parts were fine but the capture was no longer pending by the time it was
  * marked: another capture of the same content finished first.
  */
 export async function finishCapture(userId: string, captureId: string, now: Date = new Date()): Promise<{ current: boolean }> {
   const id = z.uuid("That is not a capture id.").parse(captureId);
   assertCapturesOn();
+  // Before anything is read: each finish checks the capture's parts in storage.
+  await enforceRateLimit("frameCaptureFinish", userId);
   const row = await getOwnPendingCapture(id, userId);
   if (!row) throw new UserFacingError("Frame image not found.");
   const record = await getEditableArtifact(userId, { id: row.artifactId });

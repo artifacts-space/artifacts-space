@@ -37,6 +37,8 @@ export function fakeCaptureBucket() {
   /** Turn on to make every delete fail, as R2 does in an outage. */
   const state = { deletesFail: false, configured: true };
   const deleted: string[] = [];
+  /** The key of every object the code asked about, in order. */
+  const heads: string[] = [];
   const presigned: { key: string; contentType: string; size: number; expiresIn: number }[] = [];
   const r2 = {
     isR2Configured: () => state.configured,
@@ -46,6 +48,7 @@ export function fakeCaptureBucket() {
       return Promise.resolve({ url: `https://r2.test/${input.key}`, method: "PUT", headers: { "Content-Type": input.contentType, "Content-Length": String(input.size) }, expiresAt: new Date(0) });
     },
     headObject: (_config: unknown, key: string) => {
+      heads.push(key);
       const object = objects.get(key);
       return Promise.resolve(object ? { size: object.size, contentType: object.contentType } : null);
     },
@@ -57,5 +60,5 @@ export function fakeCaptureBucket() {
       return Promise.resolve();
     },
   };
-  return { objects, state, deleted, presigned, r2 };
+  return { objects, state, deleted, heads, presigned, r2 };
 }

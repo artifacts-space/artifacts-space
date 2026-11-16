@@ -35,6 +35,7 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   frameCaptureNeeded: { per: "user", where: "An open canvas asking which of its frames have no image yet, for people who may edit it", refusal: "not-drawn", group: "Files and pages" },
   frameCaptureStart: { per: "user", where: "Images of canvas frames that your browser draws for agents", refusal: "not-drawn", group: "Files and pages" },
   frameCaptureStartByArtifact: { per: "canvas", where: "Images of one canvas's frames, from everyone who may edit it", refusal: "not-drawn", group: "Files and pages" },
+  frameCaptureFinish: { per: "user", where: "The check of each frame image after your browser uploaded it", refusal: "not-drawn", group: "Files and pages" },
   fileDownloadByNetwork: { per: "network", where: "/api/files views and downloads", refusal: "http-429", group: "Files and pages" },
   fileRequestByNetwork: { per: "network", where: "Every /api/files request: views, downloads, and video and audio playback (seeks and later parts)", refusal: "http-429", group: "Files and pages" },
   fileRangeByNetworkFile: { per: "network", where: "/api/files playback of one file: seeks and later parts", refusal: "http-429", group: "Files and pages" },

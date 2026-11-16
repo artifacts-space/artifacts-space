@@ -137,6 +137,13 @@ export const rateLimits = {
    * the edit access check, so nobody else can use up a canvas's budget.
    */
   frameCaptureStartByArtifact: { limit: 600, windowSeconds: 600 },
+  /**
+   * Frame capture finish calls per person per hour. A capture is finished
+   * once, so this matches the captures a person may start. Each call reads
+   * the capture's parts from storage, and repeated or parallel calls on one
+   * capture would each read them again; this bounds that.
+   */
+  frameCaptureFinish: { limit: 1200, windowSeconds: hour },
   /** Comments per agent per minute and per hour. Agents are stricter, to stop runaway loops. */
   agentCommentMinute: { limit: 6, windowSeconds: 60 },
   agentCommentHour: { limit: 60, windowSeconds: hour },
@@ -281,6 +288,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   frameCaptureNeeded: "Your open canvases have asked which frames to draw a lot in the last hour.",
   frameCaptureStart: "Your browser has drawn a lot of frame images in the last hour.",
   frameCaptureStartByArtifact: "A lot of frame images were drawn for this canvas in the last few minutes.",
+  frameCaptureFinish: "Your browser has finished a lot of frame images in the last hour.",
   agentCommentMinute: "You have posted a lot of comments in the last minute.",
   agentCommentHour: "You have posted a lot of comments in the last hour.",
   personCommentMinute: "You have posted a lot of comments in the last minute.",

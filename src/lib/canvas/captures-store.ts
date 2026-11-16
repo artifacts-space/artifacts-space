@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getDb } from "@/db";
 import { frameCapture, type FrameCaptureRecord } from "@/db/frame-capture-schema";
 import { artifact } from "@/db/schema";
-import { isDeadlock } from "@/lib/db-errors";
+import { isDeadlock, isUndefinedTable } from "@/lib/db-errors";
 import { deleteObject, r2ConfigFromEnv } from "@/lib/files/r2";
 
 import { captureLimits, captureObjectKeys, drawingKey, removalIsFinal, type CaptureDrawing } from "./capture-rules";
@@ -209,9 +209,20 @@ async function markOrphans(): Promise<void> {
  * The cleanup job's part: marks captures still pending after an hour and
  * captures whose artifact is gone as removed, then finishes removals whose
  * upload URLs have ended (those just marked, and any that stopped halfway
- * before). Returns how many rows went, and whether more wait.
+ * before). Returns how many rows went, and whether more wait. Where the
+ * table does not exist yet, there is nothing to clean up.
  */
 export async function sweepCaptures(now: Date = new Date()): Promise<{ removed: number; remaining: boolean }> {
+  try {
+    return await sweep(now);
+  } catch (error) {
+    // Code serving before the table's migration has no captures to clean up; any other failure is real.
+    if (isUndefinedTable(error)) return { removed: 0, remaining: false };
+    throw error;
+  }
+}
+
+async function sweep(now: Date): Promise<{ removed: number; remaining: boolean }> {
   await markRemoved(and(eq(frameCapture.status, "pending"), lt(frameCapture.startedAt, new Date(now.getTime() - captureLimits.pendingTtlMs))));
   await markOrphans();
   const rows = await getDb()
